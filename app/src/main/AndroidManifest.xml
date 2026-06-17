@@ -24,9 +24,9 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="false"
-        android:icon="@mipmap/z2"
+        android:icon="@mipmap/jd_app_icon"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/z2_round"
+        android:roundIcon="@mipmap/jd_app_icon_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         tools:targetApi="35">
