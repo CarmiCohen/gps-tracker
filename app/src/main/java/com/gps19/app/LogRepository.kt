@@ -1,0 +1,179 @@
+package com.gps19.app
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import timber.log.Timber
+import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.math.abs
+
+/**
+ * LogRepository: Dedicated repository for application logs.
+ * v8.8.21:
+ * - Root-Cause Fix (Issue 95-C): Merge logic now utilizes role and deviceId for grouping 
+ *   to prevent identity collisions in multi-role environments.
+ * - Root-Cause Fix (Issue 93-B): Prevents preserving blank IDs during merge operations.
+ * v8.8.32: Removed vid propagation.
+ */
+@Singleton
+class LogRepository @Inject constructor(
+    private val logDao: LogDao,
+    private val telemetry: TelemetryRepository
+) {
+    private val logMutex = Mutex()
+    private var logWriteCount = 0
+    private val scope = CoroutineScope(Dispatchers.IO)
+
+    companion object {
+        private const val DB_PRUNE_THRESHOLD = 50
+    }
+
+    val eventLogsFlow: Flow<List<LogEntry>> = logDao.getAllLogs().map { entities ->
+        entities.map { 
+            LogEntry(
+                localId = it.localId, 
+                timestamp = it.timestamp, 
+                message = it.message, 
+                type = it.type, 
+                isImportant = it.isImportant, 
+                id = it.deviceId, 
+                viewerId = it.viewerId, 
+                count = it.count, 
+                extremeValue = it.extremeValue, 
+                durationMs = it.durationMs, 
+                isSpecial = it.isSpecial, 
+                specialColor = it.specialColor, 
+                firstSeenTs = it.firstSeenTs,
+                role = it.role
+            ) 
+        }
+    }
+
+    fun addLog(entry: LogEntry) {
+        val integrity = telemetry.integrityState.value
+        if (integrity.isStorageCritical && !entry.isSpecial) {
+            return
+        }
+
+        scope.launch {
+            logMutex.withLock {
+                try {
+                    val existing = if (entry.localId.isNotBlank()) logDao.getLogByLocalId(entry.localId) else null
+                    if (existing != null) {
+                        logDao.update(existing.copy(
+                            timestamp = entry.timestamp,
+                            message = entry.message,
+                            type = entry.type,
+                            isImportant = entry.isImportant,
+                            extremeValue = entry.extremeValue,
+                            count = entry.count,
+                            durationMs = entry.durationMs,
+                            isSpecial = entry.isSpecial,
+                            specialColor = entry.specialColor,
+                            role = entry.role
+                        ))
+                        return@withLock
+                    }
+
+                    // Root-Cause Fix (Issue 95-C): Group by Metadata (Type + Role + DeviceId)
+                    val last = logDao.getLastLogByMetadata(entry.type, entry.role, entry.id)
+                    if (last != null) {
+                        val lastBase = stripLogVariableParts(last.message)
+                        val currentBase = stripLogVariableParts(entry.message)
+                        
+                        if (lastBase == currentBase && lastBase.isNotEmpty() && last.isSpecial == entry.isSpecial) {
+                            val newCount = last.count + entry.count
+                            val newDuration = last.durationMs + entry.durationMs
+                            val newExtreme = if (entry.extremeValue != null) {
+                                val lastExtreme = last.extremeValue ?: 0.0
+                                if (abs(entry.extremeValue) > abs(lastExtreme)) entry.extremeValue else lastExtreme
+                            } else last.extremeValue
+                            
+                            logDao.update(last.copy(
+                                localId = if (last.localId.isBlank()) entry.localId else last.localId,
+                                count = newCount,
+                                durationMs = newDuration,
+                                extremeValue = newExtreme,
+                                timestamp = entry.timestamp,
+                                message = entry.message
+                            ))
+                            return@withLock
+                        }
+                    }
+                    
+                    logDao.insert(LogEntity(
+                        localId = if (entry.localId.isBlank()) UUID.randomUUID().toString() else entry.localId, 
+                        timestamp = entry.timestamp, 
+                        message = entry.message, 
+                        type = entry.type, 
+                        isImportant = entry.isImportant, 
+                        deviceId = entry.id, 
+                        viewerId = entry.viewerId, 
+                        count = entry.count, 
+                        extremeValue = entry.extremeValue, 
+                        durationMs = entry.durationMs, 
+                        isSpecial = entry.isSpecial, 
+                        specialColor = entry.specialColor,
+                        firstSeenTs = if (entry.firstSeenTs == 0L) (entry.timestamp - entry.durationMs) else entry.firstSeenTs,
+                        role = entry.role
+                    ))
+                    
+                    logWriteCount++
+                    if (logWriteCount >= DB_PRUNE_THRESHOLD) {
+                        logWriteCount = 0
+                        if (logDao.getCount() > 1000) {
+                            logDao.pruneLogs()
+                        }
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Error adding log to database")
+                }
+            }
+        }
+    }
+
+    private fun stripLogVariableParts(message: String): String {
+        var m = message
+        m = m.replace(Regex("""\[.*?\]"""), "")
+        m = m.replace(Regex("""\(.*?\)"""), "")
+        m = m.replace(Regex("""\s*after an interruption of[^.]+""", RegexOption.IGNORE_CASE), "")
+        m = m.replace(Regex(""":\s*-?\d+(\.\d+)?\s*[A-Za-z%°]*"""), "")
+        m = m.replace(Regex("""\s+-?\d+(\.\d+)?\s*[A-Za-z%°]*"""), "")
+        return m.trim().trimEnd('.')
+    }
+
+    fun clearLogs() { 
+        scope.launch { 
+            try {
+                logDao.clearAll() 
+            } catch (e: Exception) {
+                Timber.e(e, "Error clearing logs")
+            }
+        } 
+    }
+
+    suspend fun loadAllLogsStatic(): List<LogEntry> = logDao.getAllLogsStatic().map { 
+        LogEntry(
+            localId = it.localId, 
+            timestamp = it.timestamp, 
+            message = it.message, 
+            type = it.type, 
+            isImportant = it.isImportant, 
+            id = it.deviceId, 
+            viewerId = it.viewerId, 
+            count = it.count, 
+            extremeValue = it.extremeValue, 
+            durationMs = it.durationMs, 
+            isSpecial = it.isSpecial, 
+            specialColor = it.specialColor, 
+            firstSeenTs = it.firstSeenTs,
+            role = it.role
+        ) 
+    }
+}

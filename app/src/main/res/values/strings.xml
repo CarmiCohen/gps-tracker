@@ -1,0 +1,184 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GPS-Tracker</string>
+    <string name="title_activity_main">GPS-Tracker</string>
+
+    <!-- Landing Screen -->
+    <string name="landing_tracker_title">TRACKER MODE</string>
+    <string name="landing_tracker_subtitle">Inside Tractor</string>
+    <string name="landing_viewer_title">VIEWER MODE</string>
+    <string name="landing_viewer_subtitle">In Pocket</string>
+
+    <!-- Navigation & Common -->
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_close">Close</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_refresh">REFRESH</string>
+    <string name="btn_authorize">Authorize</string>
+    <string name="btn_open_settings">Open Settings</string>
+    <string name="btn_app_info">App Info</string>
+    <string name="status_muted">Muted</string>
+
+    <!-- Permission Dialogs -->
+    <string name="perm_background_title">Background Location Access</string>
+    <string name="perm_background_desc">GPS-Tracker collects location data to enable tracking your device even when the app is closed.</string>
+    <string name="perm_background_btn_accept">Accept \u0026 Continue</string>
+    <string name="perm_background_btn_reject">No Thanks</string>
+    <string name="perm_background_denied_toast">Background location is required for tracker.</string>
+
+    <!-- Tracking Control -->
+    <string name="stop_tracking_title">Stop Tracking?</string>
+    <string name="stop_tracking_desc">Are you sure? Tracking session will be terminated. Auto-dismiss in %1$ds</string>
+    <string name="btn_stop_tracking">Stop Tracking</string>
+    <string name="btn_terminate_tracker">TERMINATE TRACKING SESSION</string>
+    <string name="btn_terminate_viewer">TERMINATE MONITORING SESSION</string>
+
+    <!-- Tracker Dashboard -->
+    <string name="status_no_viewers">NO VIEWERS CONNECTED</string>
+    <string name="dashboard_expand_hint">Tap status card above to expand dashboard</string>
+
+    <!-- Alarm Overlay -->
+    <string name="alarm_title_muted">ALARMS MUTED</string>
+    <string name="alarm_title_active">ALERT SYSTEM</string>
+    <string name="alarm_title_secure">SYSTEM SECURE</string>
+    <string name="alarm_no_violations">No active violations detected</string>
+    <string name="btn_mute_siren">MUTE SIREN</string>
+    <string name="btn_go_to_map">MAP</string>
+    <string name="alert_title_system_storage_low">System Storage Low</string>
+    <string name="alarm_location_pending">[LOCATION ACQUISITION PENDING]</string>
+    <string name="alarm_xiaomi_permission_required">[SYSTEM PERMISSION REQUIRED]</string>
+    <string name="alarm_xiaomi_permission_desc">Xiaomi devices require \'Show on Lock screen\' and \'Display pop-up windows\' permissions to show critical alerts over the lockscreen.</string>
+
+    <!-- Settings Overlay -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_label_tracker_id">Tracker ID</string>
+    <string name="settings_label_viewer_id">Viewer ID</string>
+    <string name="settings_label_geofence">Geofence Radius (meters)</string>
+    <string name="settings_placeholder_radius">60</string>
+    <string name="settings_unit_meters">meters</string>
+    <string name="btn_clean">Clean</string>
+    <string name="btn_phone_setup">Phone Setup</string>
+    <string name="btn_alerts">Alerts</string>
+    <string name="btn_sound">Sound</string>
+    <string name="btn_load_config">Load Config</string>
+    <string name="btn_save_logs">Save Logs</string>
+    <string name="settings_label_relay_url">Relay URL</string>
+
+    <!-- Maintenance & Initialization -->
+    <string name="clean_init_title">Clean \u0026 Initialize</string>
+    <string name="clean_group_maintenance">Maintenance Actions</string>
+    <string name="btn_clear_home">Clear Home Point</string>
+    <string name="btn_reset_stats">Reset Statistics</string>
+    <string name="btn_full_init">Full Initialization</string>
+
+    <!-- Alert Management -->
+    <string name="alert_mgmt_title">Alert Management</string>
+    <string name="alert_group_toggles">Active Toggles</string>
+    <string name="btn_all_on">ALL ON</string>
+    <string name="btn_reset">Reset</string>
+    <string name="alert_group_master">Siren Master Control (R854)</string>
+    <string name="alert_label_global_mute">GLOBAL MUTE (No Audio)</string>
+    <string name="alert_desc_global_mute">When Muted, violations are still recorded and displayed red, but audio is inhibited.</string>
+    <string name="alert_group_comm">Communication</string>
+    <string name="alert_group_location">Location</string>
+    <string name="alert_group_device">Device Status</string>
+    <string name="alert_group_integrity">System Integrity</string>
+    <string name="alert_group_sentinel">Physical Sentinel</string>
+    <string name="alert_desc_mic_hysteresis">Note: System \'Mic Active\' icon may linger for 45s after closing the app due to a safety hysteresis.</string>
+    <string name="btn_calibrate_chair">Calibrate Empty Chair</string>
+
+    <!-- Sound Setup -->
+    <string name="sound_title">Sound Setup</string>
+    <string name="sound_label_test_audio">Test Audio</string>
+    <string name="btn_test_audio_stop">STOP</string>
+    <string name="btn_test_audio_test">TEST</string>
+    <string name="sound_group_type">Siren Type</string>
+    <string name="sound_group_behaviors">Behaviors</string>
+    <string name="sound_label_vibration">Vibration</string>
+    <string name="sound_label_override_silent">Override Silent Mode</string>
+    <string name="sound_label_force_max">Force Max Volume</string>
+    <string name="sound_group_volume_mode">Volume Control Mode</string>
+    <string name="sound_val_system_control">System Control</string>
+    <string name="sound_val_app_control">App Control</string>
+    <string name="sound_group_app_volume">App Volume Level</string>
+    <string name="sound_desc_app_volume">App Volume: %1$d%% %2$s</string>
+    <string name="sound_desc_system_volume">Using device\'s media volume buttons</string>
+
+    <!-- Phone Setup Guide -->
+    <string name="setup_detected_device">Detected: %1$s %2$s</string>
+    <string name="setup_step1_title">1. Lock in Recents</string>
+    <string name="setup_step2_title">2. Battery Mode</string>
+    <string name="setup_step3_title">3. Display Over Apps</string>
+    <string name="setup_step3_desc">Enable \'Appear on top\' to allow the emergency alert screen to bypass lockscreens.</string>
+    <string name="setup_step4_title">4. Microphone Access</string>
+    <string name="setup_step4_desc">Critical for Acoustic Tamper alerts. Please ensure microphone permission is granted. NOTE: System \'Mic Active\' icon may linger for 45s after closing the app to ensure stable transitions.</string>
+    <string name="setup_step5_title">5. Auto-start \u0026 Activity</string>
+    <string name="setup_step6_title">6. Wi-Fi Power Saving</string>
+    <string name="setup_step6_desc">Disable \'Wi-Fi power saving mode\' in system settings to prevent network idling during sleep.</string>
+    <string name="setup_info_only">Info Only</string>
+    <string name="setup_step7_title">7. Exact Alarms</string>
+    <string name="setup_step7_desc">Critical for system watchdog reliability. Allow the app to schedule exact alarms to ensure it wakes up even in deep sleep.</string>
+    <string name="setup_step8_title">8. MIUI Special Permissions</string>
+    <string name="setup_step8_desc">MIUI blocks background pop-ups by default. Enable \'Show on Lock screen\' and \'Display pop-up windows while running in the background\' in Other Permissions.</string>
+    <string name="btn_miui_permissions">Other Permissions</string>
+    <string name="setup_step9_title">9. Geofence Origin</string>
+    <string name="setup_step9_desc">No home points defined. Tracking will work, but distance alerts and geofence violations cannot be calculated.</string>
+    <string name="btn_open_map">Open Map</string>
+    <string name="btn_test_alarm">TEST ALARM</string>
+
+    <!-- Log Overlay -->
+    <string name="log_hist_prefix">[HIST] </string>
+    <string name="log_duration_less_10s">less than 10s</string>
+    <string name="log_persistence_summary"> - persistence was %1$s, %2$.1f%% of window</string>
+    <string name="log_filter_details">Details</string>
+    <string name="log_filter_hist">Hist</string>
+    <string name="log_diagnostics_title">FORENSIC DIAGNOSTICS</string>
+    <string name="log_diag_latency">Latency</string>
+    <string name="log_diag_battery">Battery Drain</string>
+    <string name="log_diag_gps_age">GPS Age</string>
+    <string name="log_diag_sentinel">Sentinel</string>
+
+    <!-- Telemetry Labels -->
+    <string name="label_viewer">V: %1$s</string>
+    <string name="label_tracker">T: %1$s</string>
+    <string name="label_last_seen">Last Seen</string>
+    <string name="label_app_bruto">Bruto</string>
+    <string name="label_total_monitor">Total Monitor</string>
+    <string name="label_total_connected">Total Connected</string>
+    <string name="label_session">Session</string>
+    <string name="label_since_conn">Since Conn</string>
+    <string name="label_since_disco">Since Disco</string>
+    <string name="label_max_drop">Max Drop</string>
+    <string name="label_total_drop">Total Drop</string>
+    <string name="label_gps_age">GPS Age</string>
+    <string name="label_satellites">Satellites</string>
+    <string name="label_accuracy">Accuracy</string>
+    <string name="label_ping">Ping</string>
+    <string name="label_watchdog">Watchdog</string>
+
+    <!-- Badges -->
+    <string name="label_int_badge">INT</string>
+    <string name="label_srv_badge">SRV</string>
+    <string name="label_trk_badge">TRK</string>
+    <string name="label_viewer_badge">VIEWER</string>
+    <string name="label_dat_badge">DAT</string>
+    <string name="label_view_badge">VIEW</string>
+
+    <!-- Log/Alert Logic -->
+    <string name="log_msg_tracker_id_changed">USER ACTION: Tracker ID changed to: %1$s (Identification label updated)</string>
+    <string name="log_msg_viewer_id_changed">USER ACTION: Viewer ID changed to: %1$s (Monitoring destination updated)</string>
+    <string name="log_msg_relay_url_changed">USER ACTION: Relay URL changed to: %1$s (Server connection point modified)</string>
+    <string name="log_msg_stats_reset">USER ACTION: Connectivity stats reset (Connectivity history has been cleared)</string>
+    <string name="log_msg_logs_cleared">USER ACTION: Event logs cleared from database (All previous event history has been erased)</string>
+    <string name="log_msg_geofence_updated">USER ACTION: Geofence distance updated to: %1$dm (Geofence radius updated)</string>
+    <string name="log_msg_home_points_cleared">USER ACTION: All home points cleared (Safe zones have been removed)</string>
+    <string name="log_msg_home_point_added">USER ACTION: Home point added at %1$.4f, %2$.4f (New safe zone location defined)</string>
+    <string name="log_msg_home_point_removed">USER ACTION: Home point removed from map (Safe zone location deleted)</string>
+    <string name="log_msg_full_init">USER ACTION: Full initialization performed. All data erased. (System has been reset to factory defaults)</string>
+    <string name="log_msg_alert_settings_modified">USER ACTION: Alert settings modified (Security profile updated)</string>
+    <string name="log_msg_relay_reset">USER ACTION: Reset to official relay: %1$s (Connection switched to production server)</string>
+    <string name="log_msg_siren_stopped">USER ACTION: Siren%1$s stopped by user (Audio alarm has been manually silenced)</string>
+    <string name="log_msg_trails_cleared">USER ACTION: Map trails cleared (Historical path data has been removed from display)</string>
+    <string name="log_msg_tracker_restored">CONNECTIVITY: Tracker connection restored (Communication with tracker is now active)</string>
+    <string name="log_msg_tracker_lost_watchdog">CONNECTIVITY: Tracker connection lost (Visual Watchdog) (Data stream from tracker has stopped)</string>
+</resources>

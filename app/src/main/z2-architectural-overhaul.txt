@@ -1,0 +1,8 @@
+Refactor Summary v4.640:
+1. TrackerStateManager decoupled from ViewModel.
+2. HomePointUseCase, DashboardUseCase, and GpsStatusManager extracted.
+3. SystemStatusProvider created for pure reactive OS monitoring.
+4. MainRepository refactored into Facade over SettingsRepository and TelemetryRepository.
+5. Standardized Dashboard state computation in business layer.
+6. Reactive Battery/Network monitoring (no polling).
+7. Full State Hoisting for SettingsOverlay and LogOverlay.

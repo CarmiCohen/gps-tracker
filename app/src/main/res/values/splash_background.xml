@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- R865: Unified Identity Green -->
+    <color name="splash_background">#84CC16</color>
+</resources>

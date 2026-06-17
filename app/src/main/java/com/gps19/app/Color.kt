@@ -1,0 +1,46 @@
+package com.gps19.app
+
+import androidx.compose.ui.graphics.Color
+
+/**
+ * R799: New Color System.
+ * Decouples Role Identity from Semantic Status.
+ * v8.8.3:
+ * - Added BrandJd (#367C2B) to synchronize with colors.xml (R866).
+ * v8.8.0:
+ * - Centralized FORENSIC_PINK_COLOR from :core:engine to resolve UI leak.
+ */
+
+const val FORENSIC_PINK_COLOR = 0xFFF472B6.toInt()
+
+// Brand Colors
+val BrandJd = Color(0xFF367C2B) // JD Branding Green (R866)
+
+// Role Colors (Identity)
+val ViewerOrange = Color(0xFFF97316)     // Orange 500 (Viewer Role primary)
+val ViewerOrangeDark = Color(0xFFEA580C) // Orange 600
+
+val Lime500 = Color(0xFF84CC16)   // Lime 500 (Tracker Role primary - R851a)
+val Lime600 = Color(0xFF65A30D)
+
+val Teal500 = Color(0xFF06B6D4)   // Teal 500
+val Teal600 = Color(0xFF0891B2)
+
+// Semantic Status Colors
+val Emerald500 = Color(0xFF10B981) // Success / OK
+val Rose500 = Color(0xFFE11D48)    // Error / Alert
+val Amber500 = Color(0xFFF59E0B)   // Warning / Pending
+val Slate500 = Color(0xFF64748B)   // Inactive / Offline
+
+// UI Accents
+val Violet500 = Color(0xFFA78BFA)
+val Indigo500 = Color(0xFF6366F1) 
+val Purple500 = Color(0xFF800080) // Added for R805 markers
+
+// Neutral Palette (Backgrounds & Surfaces)
+val Slate950 = Color(0xFF020617)
+val Slate900 = Color(0xFF0F172A)
+val Slate800 = Color(0xFF1E293B)
+val Slate400 = Color(0xFF94A3B8)
+val Slate100 = Color(0xFFF1F5F9)
+val White = Color(0xFFFFFFFF)

@@ -1,0 +1,446 @@
+package com.gps19.app
+
+import android.content.Context
+import android.util.Log
+import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.socket.client.IO
+import io.socket.client.Socket
+import kotlinx.coroutines.*
+import org.json.JSONArray
+import org.json.JSONObject
+import timber.log.Timber
+import java.util.*
+import javax.inject.Inject
+
+/**
+ * Socket.io implementation of the SignalingProvider.
+ * v8.8.21:
+ * - Role-Based Standardization: Delegated message filtering to SignalingValidator (engine).
+ * - Logic Decoupling: Delegated payload generation to SignalPayloadGenerator.
+ * - Conflation Logic: Delegated message merging to SignalingMessageConflator (engine).
+ * v8.8.28: Standardized signaling keys to snake_case (viewer_id, from_viewer).
+ * v8.8.32: Removed vid propagation.
+ * v8.8.35:
+ * - Issue 135: Enhanced 'join' payload with role and version for relay-side forensic indexing.
+ */
+class CommunicationManager @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val settingsRepository: SettingsRepository,
+    private val telemetryRepository: TelemetryRepository,
+    private val logRepository: LogRepository,
+    private val logManager: LogManager,
+    private val timeProvider: TimeProvider,
+    private val onRemoteUpdateWrapper: RemoteUpdateWrapper
+) : SignalingProvider {
+
+    private var socket: Socket? = null
+    private var isStopped = false
+    
+    private var deviceId = ""
+    private var viewerId = ""
+    private var relayUrl = ""
+    private var isTrackerMode = false
+    
+    private val rtts = mutableListOf<Int>()
+    private var lastRttInternal = 0
+    private var lastRelayTrafficTs = timeProvider.elapsedRealtime()
+
+    private val commExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        if (throwable is CancellationException || isStopped) return@CoroutineExceptionHandler
+        Timber.e(throwable, "CRITICAL: Communication failure")
+        logManager.logServiceEvent("CRITICAL: Communication failure: ${throwable.message}", true)
+    }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
+    private var pendingLocationUpdate: JSONObject? = null
+    private var conflationJob: Job? = null
+
+    private fun logToApp(message: String, important: Boolean = false) {
+        if (isStopped) return
+        Log.d("GPS19_COMM", message)
+        logManager.submitToLogSink(message, "system", important)
+    }
+
+    override fun getLastRelayTrafficTs(): Long = lastRelayTrafficTs
+
+    private fun markTraffic() {
+        lastRelayTrafficTs = timeProvider.elapsedRealtime()
+    }
+
+    private fun createJoinPayload(): JSONObject {
+        return JSONObject().apply {
+            put("id", deviceId)
+            put("role", if (isTrackerMode) "tracker" else "viewer")
+            put("ver", BuildConfig.VERSION_NAME)
+        }
+    }
+
+    override fun updateIdentity(deviceId: String, viewerId: String, isTracker: Boolean, force: Boolean) {
+        val oldId = this.deviceId
+        val cleanedDeviceId = deviceId.trim()
+        val cleanedViewerId = viewerId.trim()
+
+        if (isTracker && !SignalingConstants.isValidTrackerId(cleanedDeviceId)) {
+            logToApp("Invalid Tracker ID: $cleanedDeviceId (Missing '${SignalingConstants.TRACKER_PREFIX}' prefix)", true)
+            return
+        }
+        if (!isTracker && !SignalingConstants.isValidViewerId(cleanedViewerId)) {
+            logToApp("Invalid Viewer ID: $cleanedViewerId (Missing '${SignalingConstants.VIEWER_PREFIX}' prefix)", true)
+            return
+        }
+
+        val idChanged = oldId.isNotEmpty() && oldId != cleanedDeviceId
+        
+        this.deviceId = cleanedDeviceId
+        this.viewerId = cleanedViewerId
+        this.isTrackerMode = isTracker
+        
+        if ((idChanged || force) && isConnected()) {
+            if (idChanged && oldId.isNotEmpty()) {
+                logToApp("Identity changed. Leaving $oldId", true)
+                socket?.emit("leave", oldId)
+            }
+            if (this.deviceId.isNotEmpty()) {
+                logToApp("Joining room: ${this.deviceId} (Force: $force)", force)
+                socket?.emit("join", createJoinPayload())
+            }
+        }
+    }
+
+    override fun connect(url: String, deviceId: String, viewerId: String, isTracker: Boolean) {
+        this.isStopped = false
+        this.relayUrl = url.trim()
+        this.deviceId = deviceId.trim()
+        this.viewerId = viewerId.trim()
+        this.isTrackerMode = isTracker
+        
+        if (isTracker && !SignalingConstants.isValidTrackerId(this.deviceId)) {
+            logToApp("Connect aborted: Invalid Tracker ID", true)
+            return
+        }
+        if (!isTracker && !SignalingConstants.isValidViewerId(this.viewerId)) {
+            logToApp("Connect aborted: Invalid Viewer ID", true)
+            return
+        }
+
+        socket?.disconnect()
+        socket?.off()
+
+        if (relayUrl.isEmpty()) {
+            logToApp("Connect aborted: URL is empty", false)
+            return
+        }
+
+        logToApp("Starting connection to $relayUrl", true)
+        markTraffic() 
+
+        val opts = IO.Options().apply {
+            transports = arrayOf("polling", "websocket")
+            timeout = 45000 
+            reconnection = true
+            reconnectionAttempts = Int.MAX_VALUE
+            reconnectionDelay = 5000 
+            reconnectionDelayMax = 30000
+            randomizationFactor = 0.5
+        }
+
+        try {
+            socket = IO.socket(relayUrl, opts)
+            registerSocketListeners()
+            socket?.connect()
+        } catch (e: Exception) {
+            logToApp("Socket creation failed: ${e.message}", true)
+        }
+    }
+
+    private fun registerSocketListeners() {
+        val s = socket ?: return
+
+        val onConnectAction = {
+            logToApp("Connected to relay", true)
+            markTraffic()
+            if (deviceId.isNotEmpty()) {
+                s.emit("join", createJoinPayload())
+            }
+            pushSettings()
+            telemetryRepository.updateRelayStatus(true)
+        }
+
+        s.on(Socket.EVENT_CONNECT) { onConnectAction() }
+        s.on("reconnecting") { logToApp("Relay Reconnecting...", true) }
+        s.on("reconnect") {
+            logToApp("Relay Reconnected", true)
+            onConnectAction() 
+        }
+        
+        s.on(Socket.EVENT_DISCONNECT) { args ->
+            val reason = args?.getOrNull(0)?.toString() ?: "unknown"
+            logToApp("Relay Disconnected ($reason)", true)
+            telemetryRepository.updateRelayStatus(false)
+        }
+
+        s.on(Socket.EVENT_CONNECT_ERROR) { args ->
+            val error = args?.getOrNull(0)?.toString() ?: "Transport Error"
+            logToApp("Relay Connect Error: $error", true)
+            telemetryRepository.updateRelayStatus(false)
+        }
+
+        s.on("location_relay") { markTraffic(); handleLocationRelay(it) }
+        s.on("location_relay_bin") { markTraffic(); handleLocationRelayBinary(it) }
+        s.on("log_relay") { markTraffic(); handleLogRelay(it) }
+        s.on("settings_relay") { markTraffic(); handleSettingsRelay(it) }
+        s.on("viewer_status_relay") { markTraffic(); handleViewerStatusRelay(it) }
+        s.on("ping_relay") { markTraffic(); handlePingRelay(it) }
+        s.on("pong_relay") { markTraffic(); handlePongRelay(it) }
+    }
+
+    private fun handleLocationRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            val incomingId = data.optString("id")
+            val incomingViewerId = data.optString("viewer_id")
+            val fromViewer = data.optBoolean("from_viewer", false)
+
+            if (!SignalingValidator.shouldProcessLocationUpdate(
+                    incomingId = incomingId,
+                    ownDeviceId = deviceId,
+                    isFromViewer = fromViewer,
+                    viewerId = incomingViewerId,
+                    ownViewerId = viewerId,
+                    isTrackerMode = isTrackerMode
+            )) return
+            
+            onRemoteUpdateWrapper.onUpdate(data)
+        } catch (e: Exception) {
+            Log.e("GPS19", "location_relay parse error")
+        }
+    }
+
+    private fun handleLocationRelayBinary(args: Array<Any>) {
+        try {
+            val data = args[0] as ByteArray
+            val status = RealtimeStatus.parseFrom(data)
+            
+            if (!SignalingValidator.shouldProcessLocationUpdate(
+                    incomingId = status.id,
+                    ownDeviceId = deviceId,
+                    isFromViewer = status.fromViewer,
+                    viewerId = status.viewerId,
+                    ownViewerId = viewerId,
+                    isTrackerMode = isTrackerMode
+            )) return
+            
+            val json = JSONObject().apply {
+                put("id", status.id); put("viewer_id", status.viewerId); put("from_viewer", status.fromViewer)
+                put("lat", status.lat); put("lng", status.lng); put("speed", status.speed)
+                put("accuracy", status.accuracy); put("max_accuracy", status.maxAccuracy)
+                put("bearing", status.bearing); put("battery", status.battery); put("temp", status.temp)
+                put("is_charging", status.isCharging); put("ts", status.ts); put("gps_ts", status.gpsTs)
+                put("sats_view", status.satsView); put("sats_used", status.satsUsed)
+                put("uptime_ms", status.uptimeMs)
+                put("total_connected_ms", status.totalConnectedMs); put("session_connected_ms", status.sessionConnectedMs)
+                put("total_drop_ms", status.totalDropMs); put("max_drop_ms", status.maxDropMs)
+                put("last_conn_ts", status.lastConnTs); put("last_disc_ts", status.lastDiscTs); put("is_historical", status.isHistorical)
+                put("alt", status.alt)
+            }
+            onRemoteUpdateWrapper.onUpdate(json)
+        } catch (e: Exception) {
+            Log.e("GPS19", "location_relay_bin parse error")
+        }
+    }
+
+    private fun handleLogRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            val incomingId = data.optString("id")
+            val incomingViewerId = data.optString("viewer_id")
+
+            if (!SignalingValidator.shouldProcessLogRelay(
+                    incomingId = incomingId,
+                    ownDeviceId = deviceId,
+                    incomingViewerId = incomingViewerId,
+                    ownViewerId = viewerId,
+                    isTrackerMode = isTrackerMode
+            )) return
+            
+            logRepository.addLog(LogEntry.fromJSONObject(data))
+        } catch (e: Exception) {
+            Timber.e(e, "log_relay parse error")
+        }
+    }
+
+    private fun handleSettingsRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            val incomingId = data.optString("id", "").trim()
+            val fromViewer = data.optBoolean("from_viewer", false)
+
+            if (!SignalingValidator.shouldProcessSettingsUpdate(
+                    incomingId = incomingId,
+                    ownDeviceId = deviceId,
+                    fromViewer = fromViewer,
+                    isTrackerMode = isTrackerMode
+            )) return
+            
+            if (data.optString("viewer_id", "").trim().isEmpty()) return
+
+            onRemoteUpdateWrapper.onUpdate(data)
+        } catch (e: Exception) {
+            Timber.e(e, "settings_relay parse error")
+        }
+    }
+
+    private fun handleViewerStatusRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            val incomingViewerId = data.optString("viewer_id")
+            if (!isTrackerMode && incomingViewerId == viewerId) return
+
+            onRemoteUpdateWrapper.onUpdate(JSONObject().apply {
+                put("type", "viewer_pulse"); put("viewer_id", incomingViewerId); put("from_viewer", true)
+            })
+        } catch (e: Exception) {
+            Timber.e(e, "viewer_status_relay parse error")
+        }
+    }
+
+    private fun handlePingRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            val from = data.optString("from")
+            val pingDeviceId = data.optString("id", "")
+            
+            if (pingDeviceId == deviceId && deviceId.isNotEmpty()) {
+                val isViewerPing = from == SignalingConstants.getPeerTypeLabel(true)
+                val isTrackerPing = from == SignalingConstants.getOwnTypeLabel(true)
+                
+                if ((isTrackerMode && isViewerPing) || (!isTrackerMode && isTrackerPing)) {
+                    val incomingMap = mutableMapOf<String, Any>()
+                    data.keys().forEach { incomingMap[it] = data.get(it) }
+                    
+                    SignalPayloadGenerator.createPongPayload(incomingMap, deviceId, isTrackerMode)?.let { pongMap ->
+                        socket?.emit("pong_cmd", JSONObject(pongMap))
+                    }
+                    
+                    onRemoteUpdateWrapper.onUpdate(JSONObject().apply {
+                        put("type", SignalingConstants.getPulseType(isTrackerMode))
+                        put("viewer_id", data.optString("viewer_id"))
+                        put("from_viewer", isViewerPing)
+                    })
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "ping_relay parse error")
+        }
+    }
+
+    private fun handlePongRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            val fromStr = data.optString("from")
+            val pingDeviceId = data.optString("id", "")
+            
+            if (pingDeviceId == deviceId && deviceId.isNotEmpty()) {
+                val pongViewerId = data.optString("viewer_id", "")
+                val isFromViewer = fromStr == SignalingConstants.VIEWER_PREFIX.lowercase() || fromStr == "viewer"
+                
+                val isMyPong = if (isTrackerMode) fromStr == "tracker" else isFromViewer
+                val isPeerPong = if (isTrackerMode) isFromViewer else fromStr == "tracker"
+
+                if (isMyPong) {
+                    onRemoteUpdateWrapper.onUpdate(JSONObject().apply { 
+                        put("type", "pong_activity"); put("viewer_id", pongViewerId); put("from_viewer", isFromViewer) 
+                    })
+                    val rtt = (timeProvider.currentTimeMillis() - data.optLong("ts")).toInt()
+                    if (rtt > 0) {
+                        rtts.add(rtt); if (rtts.size > 5) rtts.removeAt(0)
+                        lastRttInternal = rtts.minOrNull() ?: rtt
+                        telemetryRepository.updateLastRtt(lastRttInternal)
+                    }
+                } else if (isPeerPong) {
+                    onRemoteUpdateWrapper.onUpdate(JSONObject().apply {
+                        put("type", SignalingConstants.getPulseType(isTrackerMode))
+                        put("viewer_id", pongViewerId)
+                        put("from_viewer", isFromViewer)
+                    })
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "pong_relay parse error")
+        }
+    }
+
+    override fun clearRtt() { 
+        rtts.clear(); lastRttInternal = 0; telemetryRepository.updateLastRtt(0)
+    }
+
+    override fun getRtt(): Int = lastRttInternal
+
+    override fun emit(event: String, data: JSONObject) {
+        if (isStopped) return
+        if (event == "location_update") { emitLocationConflated(data) } else { socket?.emit(event, data) }
+    }
+
+    override fun emitBinary(event: String, data: ByteArray) {
+        if (isStopped) return
+        socket?.emit(event, data) 
+    }
+
+    private fun emitLocationConflated(data: JSONObject) {
+        val pending = pendingLocationUpdate?.toMap()
+        val incoming = data.toMap()
+        
+        // v8.8.21: Delegated conflation logic to SignalingMessageConflator (engine)
+        val result = SignalingMessageConflator.conflate(pending, incoming)
+        pendingLocationUpdate = JSONObject(result)
+
+        if (conflationJob == null || !conflationJob!!.isActive) {
+            conflationJob = scope.launch {
+                delay(100)
+                val toSend = pendingLocationUpdate
+                if (toSend != null && isConnected() && !isStopped) { 
+                    socket?.emit("location_update", toSend)
+                    pendingLocationUpdate = null
+                }
+            }
+        }
+    }
+
+    private fun JSONObject.toMap(): Map<String, Any> {
+        val map = mutableMapOf<String, Any>()
+        val keys = keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            map[key] = get(key)
+        }
+        return map
+    }
+
+    override fun isConnected() = socket?.connected() ?: false
+
+    override fun pushSettings() {
+        if (isTrackerMode || deviceId.isEmpty() || isStopped) return
+        scope.launch {
+            try {
+                val homePoints = settingsRepository.loadHomePoints()
+                val array = JSONArray()
+                homePoints.forEach { array.put(JSONObject().apply { put("lat", it.latitude); put("lng", it.longitude) }) }
+                socket?.emit("settings_update", JSONObject().apply {
+                    put("home_points", array); put("settings_ts", settingsRepository.getLong(SettingsRepository.HOME_POINTS_TS_KEY, 0L))
+                    put("max_dist", settingsRepository.getFloat(SettingsRepository.MAX_DISTANCE_STORAGE_KEY, 60f).toDouble())
+                    put("id", deviceId); put("viewer_id", viewerId); put("from_viewer", true)
+                })
+            } catch (e: Exception) { 
+                if (e is CancellationException) throw e
+                Timber.e(e, "Error pushing settings to socket") 
+            }
+        }
+    }
+
+    override fun disconnect() { 
+        isStopped = true
+        scope.cancel()
+        socket?.disconnect() 
+    }
+}

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- R799: Decoupled Color System -->
+    <!-- These hex values must match com.gps19.app.Color.kt exactly -->
+
+    <!-- Role Identity -->
+    <!-- R851a: Restored Tracker to Green (Lime) -->
+    <color name="role_tracker">#84CC16</color>      <!-- Lime 500 -->
+    <color name="role_tracker_dark">#65A30D</color> <!-- Lime 600 -->
+    <color name="role_viewer">#F97316</color>       <!-- ViewerOrange (R815/R851a alignment) -->
+
+    <!-- Brand Identity -->
+    <!-- R866: JD Branding Color -->
+    <color name="brand_jd">#367C2B</color>
+
+    <!-- Semantic Status -->
+    <color name="status_ok">#10B981</color>      <!-- Emerald 500 -->
+    <color name="status_error">#E11D48</color>   <!-- Rose 500 -->
+    <color name="status_warning">#F59E0B</color> <!-- Amber 500 -->
+    <color name="status_inactive">#64748B</color> <!-- Slate 500 -->
+
+    <!-- Generic / Legacy -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="slate_900">#0F172A</color>
+
+    <!-- Legacy Theme Colors (Used by Splash/System Bars) -->
+    <!-- Mapped to R799 system roles -->
+    <color name="colorPrimary">@color/role_tracker</color>
+    <color name="colorPrimaryDark">@color/role_tracker_dark</color>
+    <color name="colorAccent">@color/role_viewer</color>
+</resources>

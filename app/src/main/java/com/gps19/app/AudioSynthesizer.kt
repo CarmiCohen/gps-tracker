@@ -1,0 +1,301 @@
+package com.gps19.app
+
+import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioManager
+import android.media.AudioTrack
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.util.Log
+import com.gps19.core.engine.SIREN_AUTO_STOP_MS
+import com.gps19.core.engine.SIREN_RESUME_COOLDOWN_MS
+import com.gps19.core.engine.TimeProvider
+import kotlinx.coroutines.*
+import timber.log.Timber
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlin.math.exp
+import kotlin.math.min
+
+/**
+ * AudioSynthesizer: Procedural audio generator for sirens and alerts.
+ * v8.8.21: Migrated to TimeProvider for all timing logic.
+ */
+object AudioSynthesizer {
+    private const val SAMPLE_RATE = 44100
+    private const val FADE_IN_DURATION_MS = 1000L
+    private val isLooping = AtomicBoolean(false)
+    private val isForced = AtomicBoolean(false)
+    private val silencedUntil = AtomicLong(0)
+    
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var sirenJob: Job? = null
+
+    fun isPlaying(): Boolean = isLooping.get()
+    fun isForced(): Boolean = isForced.get()
+    
+    fun getSilencedUntil(): Long = silencedUntil.get()
+
+    fun playShortAlert() {
+        scope.launch {
+            try {
+                for (i in 0 until 8) {
+                    playNote(880.0, 0.1, decay = false, ignoreLooping = true, volume = 0.5f, overrideSilence = true)
+                    delay(50)
+                    playNote(1100.0, 0.15, decay = false, ignoreLooping = true, volume = 0.6f, overrideSilence = true)
+                    delay(400)
+                }
+            } catch (e: Exception) {
+                if (e !is CancellationException) {
+                    Timber.e(e, "Error playing short alert")
+                }
+            }
+        }
+    }
+
+    /**
+     * Enhanced Siren Player
+     */
+    fun playSiren(
+        type: String = "Siren", 
+        force: Boolean = false, 
+        volume: Float = 1.0f, 
+        overrideSilence: Boolean = true, 
+        context: Context? = null, 
+        loop: Boolean = true,
+        vibrate: Boolean = false,
+        timeProvider: TimeProvider
+    ) {
+        if (!force && timeProvider.currentTimeMillis() < silencedUntil.get()) return
+        
+        if (context != null && !overrideSilence) {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (am.ringerMode != AudioManager.RINGER_MODE_NORMAL) {
+                Log.d("AudioSynthesizer", "Siren suppressed by silence setting")
+                return
+            }
+        }
+
+        isLooping.set(true)
+        if (force) isForced.set(true)
+        
+        sirenJob?.cancel()
+        val currentJob = scope.launch {
+            val thisJob = coroutineContext[Job]
+            var isAutoStopped = false
+            try {
+                Log.d("AudioSynthesizer", "Siren loop started: $type (force=$force, loop=$loop)")
+                val startTime = timeProvider.currentTimeMillis()
+                val vibrator = if (vibrate && context != null) context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator else null
+
+                while (isActive) {
+                    val now = timeProvider.currentTimeMillis()
+                    val elapsed = now - startTime
+                    if (elapsed >= SIREN_AUTO_STOP_MS) {
+                        isAutoStopped = true
+                        break
+                    }
+
+                    // Calculate fade-in factor (0.0 to 1.0 over 1s)
+                    val fadeInFactor = if (elapsed < FADE_IN_DURATION_MS) {
+                        elapsed.toFloat() / FADE_IN_DURATION_MS
+                    } else 1.0f
+                    
+                    val effectiveVolume = volume * fadeInFactor
+
+                    if (vibrator != null && vibrator.hasVibrator()) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            vibrator.vibrate(VibrationEffect.createOneShot(1000, VibrationEffect.DEFAULT_AMPLITUDE))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            vibrator.vibrate(1000)
+                        }
+                    }
+
+                    when (type) {
+                        "Siren" -> playSirenCycle(effectiveVolume, overrideSilence, timeProvider)
+                        "Chimes" -> playChimesCycle(effectiveVolume, overrideSilence, timeProvider)
+                        "Pulse" -> playPulseCycle(effectiveVolume, overrideSilence, timeProvider)
+                        else -> playSirenCycle(effectiveVolume, overrideSilence, timeProvider)
+                    }
+                    if (!loop) break
+                    yield()
+                }
+            } catch (e: CancellationException) {
+                Log.d("AudioSynthesizer", "Siren job cancelled")
+            } catch (e: Exception) {
+                Timber.e(e, "Siren loop error")
+            } finally {
+                if (sirenJob == thisJob) {
+                    isLooping.set(false)
+                    isForced.set(false)
+                    if (isAutoStopped) {
+                        Log.d("AudioSynthesizer", "Siren auto-stopped (45s limit reached). Triggering cooldown.")
+                        setSilence(SIREN_RESUME_COOLDOWN_MS, timeProvider)
+                    }
+                    Log.d("AudioSynthesizer", "Siren loop finished (flags reset)")
+                }
+            }
+        }
+        sirenJob = currentJob
+    }
+
+    private suspend fun playSirenCycle(volume: Float, overrideSilence: Boolean, timeProvider: TimeProvider): Long {
+        val cycleDuration = 2.0 
+        val numSamples = (SAMPLE_RATE * cycleDuration).toInt()
+        val samples = ShortArray(numSamples)
+        for (i in 0 until numSamples) {
+            if (!currentCoroutineContext().isActive) return 0L
+            val t = i.toDouble() / SAMPLE_RATE
+            val progress = (i.toDouble() / numSamples)
+            val modulation = sin(2.0 * PI * progress - PI/2) * 0.5 + 0.5 
+            val freq = 600.0 + (modulation * 800.0)
+            samples[i] = (sin(2.0 * PI * freq * t) * 0.8 * volume * Short.MAX_VALUE).toInt().toShort()
+        }
+        playBuffer(samples, overrideSilence, timeProvider)
+        return (cycleDuration * 1000).toLong()
+    }
+
+    private suspend fun playChimesCycle(volume: Float, overrideSilence: Boolean, timeProvider: TimeProvider): Long {
+        val notes = listOf(523.25, 659.25, 783.99, 1046.50)
+        var totalDuration = 0L
+        for (freq in notes) {
+            if (!currentCoroutineContext().isActive) return totalDuration
+            playNote(freq, 0.5, decay = true, ignoreLooping = false, volume = volume, overrideSilence = overrideSilence, timeProvider = timeProvider)
+            delay(100)
+            totalDuration += 600L
+        }
+        if (currentCoroutineContext().isActive) {
+            delay(1000)
+            totalDuration += 1000L
+        }
+        return totalDuration
+    }
+
+    private suspend fun playPulseCycle(volume: Float, overrideSilence: Boolean, timeProvider: TimeProvider): Long {
+        var totalDuration = 0L
+        for (i in 0 until 3) {
+            if (!currentCoroutineContext().isActive) return totalDuration
+            playNote(1000.0, 0.2, decay = false, ignoreLooping = false, volume = volume, overrideSilence = overrideSilence, timeProvider = timeProvider)
+            delay(200)
+            totalDuration += 400L
+        }
+        if (currentCoroutineContext().isActive) {
+            delay(1000)
+            totalDuration += 1000L
+        }
+        return totalDuration
+    }
+
+    fun stopSiren(silenceDurationMs: Long = 300000, timeProvider: TimeProvider) {
+        isLooping.set(false)
+        isForced.set(false)
+        sirenJob?.cancel()
+        setSilence(silenceDurationMs, timeProvider)
+        Log.d("AudioSynthesizer", "Siren stop requested")
+    }
+
+    private fun setSilence(durationMs: Long, timeProvider: TimeProvider) {
+        if (durationMs > 0) {
+            val newSilence = timeProvider.currentTimeMillis() + durationMs
+            while (true) {
+                val current = silencedUntil.get()
+                if (newSilence <= current) break
+                if (silencedUntil.compareAndSet(current, newSilence)) break
+            }
+        }
+    }
+
+    private suspend fun playBuffer(samples: ShortArray, overrideSilence: Boolean, timeProvider: TimeProvider) = withContext(Dispatchers.Default) {
+        if (!isActive) return@withContext
+        var audioTrack: AudioTrack? = null
+        try {
+            audioTrack = AudioTrack.Builder()
+                .setAudioAttributes(AudioAttributes.Builder()
+                    .setUsage(if (overrideSilence) AudioAttributes.USAGE_ALARM else AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build())
+                .setAudioFormat(AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(SAMPLE_RATE)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build())
+                .setBufferSizeInBytes(samples.size * 2)
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+
+            audioTrack.write(samples, 0, samples.size)
+            audioTrack.play()
+            
+            val durationMs = (samples.size.toDouble() / SAMPLE_RATE * 1000).toLong()
+            val start = timeProvider.currentTimeMillis()
+            while (isActive && timeProvider.currentTimeMillis() - start < durationMs) {
+                delay(50)
+            }
+        } catch (e: Exception) {
+            if (e !is CancellationException) {
+                Timber.e(e, "Error in playBuffer")
+            }
+        } finally {
+            try {
+                audioTrack?.stop()
+                audioTrack?.release()
+            } catch (e: Exception) {}
+        }
+    }
+
+    private suspend fun playNote(frequency: Double, duration: Double, decay: Boolean, ignoreLooping: Boolean, volume: Float, overrideSilence: Boolean, timeProvider: TimeProvider? = null) = withContext(Dispatchers.Default) {
+        if (!ignoreLooping && !isActive) return@withContext
+        val count = (SAMPLE_RATE * duration).toInt()
+        val samples = ShortArray(count)
+        for (i in 0 until count) {
+            val t = i.toDouble() / SAMPLE_RATE
+            var amplitude = 0.8 * volume
+            if (decay) amplitude *= exp(-5.0 * t / duration)
+            samples[i] = (sin(2.0 * PI * frequency * t) * amplitude * Short.MAX_VALUE).toInt().toShort()
+        }
+
+        var audioTrack: AudioTrack? = null
+        try {
+            audioTrack = AudioTrack.Builder()
+                .setAudioAttributes(AudioAttributes.Builder()
+                    .setUsage(if (overrideSilence) AudioAttributes.USAGE_ALARM else AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build())
+                .setAudioFormat(AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(SAMPLE_RATE)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build())
+                .setBufferSizeInBytes(count * 2)
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+
+            audioTrack.write(samples, 0, count)
+            audioTrack.play()
+            
+            val durationMs = (duration * 1000).toLong()
+            if (timeProvider != null) {
+                val start = timeProvider.currentTimeMillis()
+                while (isActive && timeProvider.currentTimeMillis() - start < durationMs) {
+                    delay(10)
+                }
+            } else {
+                delay(durationMs)
+            }
+        } catch (e: Exception) {
+            if (e !is CancellationException) {
+                Timber.e(e, "Error in playNote")
+            }
+        } finally {
+            try {
+                audioTrack?.stop()
+                audioTrack?.release()
+            } catch (e: Exception) {}
+        }
+    }
+}

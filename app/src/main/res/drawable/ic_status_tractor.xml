@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- R865: Unified Identity Green (Lime 500) -->
+    <path
+        android:fillColor="#84CC16"
+        android:pathData="M10,20 h80 a10,10 0 0 1 10,10 v40 a10,10 0 0 1 -10,10 h-80 a10,10 0 0 1 -10,-10 v-40 a10,10 0 0 1 10,-10 z" />
+    <!-- "J" shape -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M45,35 v25 a8,8 0 0 1 -16,0 v-3 h6 v3 a2,2 0 0 0 4,0 v-25 z" />
+    <!-- "D" shape -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M55,35 v30 h10 a15,15 0 0 0 0,-30 z M61,41 h4 a9,9 0 0 1 0,18 h-4 z" />
+</vector>

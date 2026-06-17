@@ -1,0 +1,208 @@
+package com.gps19.core.engine
+
+import kotlinx.serialization.Serializable
+
+/**
+ * EngineModels: Data structures for the core tracking engine.
+ * v8.8.35:
+ * - Issue 156: Synchronized version strings to v8.8.35 baseline.
+ * - Forensic Simplification: Reflects removal of 'ver' and 'vid' tags from data stream.
+ */
+
+@Serializable
+data class EngineGeoPoint(val lat: Double, val lng: Double)
+
+enum class DiscoveryPhase {
+    BOOTSTRAP, DISCOVERING, MONITORING
+}
+
+enum class SentinelStatus {
+    VALID,
+    JUMP,
+    OUTLIER,
+    JITTER,
+    JAMMER_SUSPICION,
+    TAMPER_ALERT,
+    ACOUSTIC_WARNING,
+    SENSOR_SUSPICIOUS,
+    TRAJECTORY_PROMOTED
+}
+
+enum class EngineXiaomiStatus {
+    GRANTED, DENIED, UNKNOWN
+}
+
+/**
+ * EngineConnectionPoint: Pure Kotlin representation of a forensic telemetry slice.
+ * v8.8.21: Extracted from :app:ConnectionPoint for engine-level aggregation.
+ * v8.8.34: Forensic Simplification - Removed 'ver' field.
+ * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
+ */
+@Serializable
+data class EngineConnectionPoint(
+    val ts: Long,
+    val rtt: Int,
+    val remoteSig: Int,
+    val isConnected: Boolean,
+    val isGap: Boolean = false,
+    val hasGps: Boolean = false,
+    val gpsIndex: Float = 0f,
+    val noiseIdx: Float = 0f,
+    val luxIdx: Float = 0f,
+    val vibeIdx: Float = 0f,
+    val proxIdx: Float = 1f,
+    val liftIdx: Float = 0f,
+    val snrIdx: Float = 0f,
+    val sitVz: Float = 0f,
+    val sitDz: Float = 0f,
+    val sitBaro: Float = 0f,
+    val sitTilt: Float = 0f,
+    val sitShock: Float = 0f,
+    val isBatterySteepDischarge: Boolean = false,
+    val isCoolingModeActive: Boolean = false,
+    val speed: Float = 0f,
+    val bearing: Float = 0f,
+    val isSitDetected: Boolean = false,
+    val isSitActive: Boolean = false,
+    val isTick: Boolean = false
+)
+
+enum class RibbonScale(val key: String, val intervalSeconds: Int) {
+    FOUR_MIN("4M", 1),
+    SIXTEEN_MIN("16M", 4),
+    ONE_HOUR("1H", 15),
+    FOUR_HOUR("4H", 60),
+    TWENTY_FOUR_HOUR("24H", 360),
+    SEVEN_DAY("7D", 2700)
+}
+
+/**
+ * Sensor and SNR snapshots for gap filling.
+ */
+data class EngineSnrSample(val ts: Long, val snr: Float)
+data class EngineSensorSnapshot(
+    val ts: Long,
+    val acoustic: Double,
+    val lux: Float,
+    val vibe: Float,
+    val proxIdx: Float,
+    val lift: Float,
+    val isSitDetected: Boolean
+)
+
+@Serializable
+data class SentinelResult(
+    val status: SentinelStatus,
+    val reason: String = "",
+    val optimizedPoint: EngineGeoPoint? = null,
+    val jumpConfidence: JumpConfidence? = null
+)
+
+@Serializable
+data class JumpConfidence(
+    val score: Int = 0, 
+    val isJump: Boolean = false,
+    val isOutlier: Boolean = false,
+    val tier: Int = 0, 
+    val reason: String = ""
+)
+
+@Serializable
+data class SatelliteInfo(
+    val svid: Int,
+    val cn0: Float,
+    val usedInFix: Boolean,
+    val constellation: Int
+)
+
+@Serializable
+data class GnssDetail(
+    val satellites: List<SatelliteInfo> = emptyList()
+)
+
+/**
+ * SpatialAnchor: Minimal interface for position recovery.
+ */
+interface SpatialAnchor {
+    val lat: Double
+    val lng: Double
+    val alt: Double
+    val gpsTs: Long
+    val ts: Long
+}
+
+@Serializable
+data class ViolationReport(
+    val type: String, 
+    val title: String, 
+    val subtitle: String, 
+    val conditionMet: Boolean,
+    val technicalDetails: String? = null, 
+    val extremeValue: Double? = null
+)
+
+@Serializable
+data class SystemHealthReport(val reports: List<ViolationReport>)
+
+data class AlarmEvaluationState(
+    val now: Long, 
+    val serviceStartTime: Long, 
+    val lastAlarmAckTs: Long, 
+    val appStartTime: Long,
+    val isRelayConnected: Boolean, 
+    val isTrackerConnected: Boolean, 
+    val discoveryPhase: DiscoveryPhase,
+    val isHardwareOnline: Boolean, 
+    val isLocalInternetLoss: Boolean, 
+    val isJammerSuspicion: Boolean,
+    val isSignalLoss: Boolean, 
+    val isGpsStalling: Boolean, 
+    var powerAlarmPending: Boolean,
+    val trackerLat: Double, 
+    val trackerLng: Double, 
+    val homePoints: List<EngineGeoPoint>, 
+    val maxDistance: Double,
+    val trackerGpsAccuracy: Float, 
+    val maxTrackerAccuracy: Float, 
+    val lastGpsPacketTs: Long,
+    val trackerSpeed: Float = 0f,
+    val isTrackerVisualJump: Boolean = false,
+    val isTrajectoryPromoted: Boolean = false,
+    val jumpTier: Int = 0,
+    val trackerBattery: Int, 
+    val trackerTemp: Float,
+    var wasDistanceViolated: Boolean, 
+    var distanceViolationCounter: Int, 
+    var firstViolationTs: Long, 
+    var firstViolationWasJump: Boolean,
+    val distToHomeAuthority: Double? = null,
+    val isGpsGap: Boolean = false,
+    val isSuspicious: Boolean = false,
+    val isTamperDetected: Boolean = false,
+    val trackerTiltDegrees: Float = 0f,
+    val trackerAcousticDb: Double = 0.0,
+    val trackerBaroAlt: Float = 0f,
+    val trackerLux: Float = 0f,
+    val isNear: Boolean = true,
+    val luxBaseline: Float = 0f,
+    val acousticFloorDb: Double = 0.0,
+    val adaptiveVibrationFloor: Float = 0.12f,
+    val peakVibrationShock: Float = 0f,
+    val trackerCurrentMa: Int = 0,
+    val isPowerTamper: Boolean = false,
+    val isSitActive: Boolean = false,
+    val lastSitTs: Long = 0L,
+    val verticalVelocity: Float = 0f,
+    val isLocationPending: Boolean = false,
+    val isPowerSaveMode: Boolean = false, 
+    val standbyBucket: Int = -1,
+    val netInterface: String = "UNKNOWN",
+    val isStorageLow: Boolean = false,
+    val isStorageCritical: Boolean = false,
+    val isTrackerMode: Boolean = true,
+    val isBatterySteepDischarge: Boolean = false,
+    val isCoolingModeActive: Boolean = false,
+    val xiaomiStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
+    val isXiaomiManualOverride: Boolean = false,
+    val isXiaomiAutostartGranted: Boolean = true
+)
