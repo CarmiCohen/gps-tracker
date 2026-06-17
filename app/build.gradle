@@ -7,6 +7,32 @@ plugins {
     id 'com.google.protobuf'
 }
 
+def getGitVersionCode = { ->
+    try {
+        def stdout = new ByteArrayOutputStream()
+        exec {
+            commandLine 'git', 'rev-list', '--count', 'HEAD'
+            standardOutput = stdout
+        }
+        return Integer.parseInt(stdout.toString().trim())
+    } catch (Exception ignored) {
+        return 1
+    }
+}
+
+def getGitVersionName = { ->
+    try {
+        def stdout = new ByteArrayOutputStream()
+        exec {
+            commandLine 'git', 'describe', '--tags', '--always', '--dirty'
+            standardOutput = stdout
+        }
+        return stdout.toString().trim()
+    } catch (Exception ignored) {
+        return "1.0.0"
+    }
+}
+
 android {
     namespace 'com.gps19.app'
     compileSdk 35
@@ -16,10 +42,8 @@ android {
         minSdk 24
         targetSdk 35
         
-        def date = new Date()
-        def yearOffset = date.format('yyyy').toInteger() - 2020
-        versionCode Integer.parseInt(yearOffset.toString() + date.format('MMddHHmm'))
-        versionName "8.8.35"
+        versionCode getGitVersionCode()
+        versionName getGitVersionName()
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
