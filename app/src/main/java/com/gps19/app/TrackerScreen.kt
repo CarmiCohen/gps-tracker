@@ -31,6 +31,8 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * v8.8.36:
+ * - Issue 165: Migrated to PhysicsUtils for location validation.
  * v8.8.21:
  * - Timing Integrity: Passed TimeProvider to AudioSynthesizer for synchronized siren control.
  */
@@ -170,8 +172,8 @@ fun TrackerScreen(
                             Box(Modifier.fillMaxWidth().padding(end = 8.dp), contentAlignment = Alignment.CenterEnd) {
                                 MapToolsOverlay(
                                     isTrackerMode = true,
-                                    trackerValid = isValidLocation(uiState.localLocation.lat, uiState.localLocation.lng),
-                                    viewerValid = isValidLocation(uiState.trackerLocation.lat, uiState.trackerLocation.lng),
+                                    trackerValid = PhysicsUtils.isValidLocation(uiState.localLocation.lat, uiState.localLocation.lng),
+                                    viewerValid = PhysicsUtils.isValidLocation(uiState.trackerLocation.lat, uiState.trackerLocation.lng),
                                     showFence = uiState.isFenceVisible,
                                     onToggleFence = { viewModel.onEvent(UiEvent.SetFenceVisible(!uiState.isFenceVisible)) },
                                     geofenceMode = uiState.geofenceMode,

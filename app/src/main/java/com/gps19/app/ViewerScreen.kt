@@ -26,9 +26,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.osmdroid.util.GeoPoint
+import com.gps19.core.engine.*
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * v8.8.36:
+ * - Issue 165: Migrated to PhysicsUtils for location validation.
  * v8.8.21:
  * - Timing Integrity: Passed TimeProvider to AudioSynthesizer for synchronized siren control.
  */
@@ -168,8 +171,8 @@ fun ViewerScreen(
                             Box(Modifier.fillMaxWidth().padding(end = 8.dp), contentAlignment = Alignment.CenterEnd) {
                                 MapToolsOverlay(
                                     isTrackerMode = false,
-                                    trackerValid = isValidLocation(uiState.trackerLocation.lat, uiState.trackerLocation.lng),
-                                    viewerValid = isValidLocation(uiState.localLocation.lat, uiState.localLocation.lng),
+                                    trackerValid = PhysicsUtils.isValidLocation(uiState.trackerLocation.lat, uiState.trackerLocation.lng),
+                                    viewerValid = PhysicsUtils.isValidLocation(uiState.localLocation.lat, uiState.localLocation.lng),
                                     showFence = uiState.isFenceVisible,
                                     onToggleFence = { viewModel.onEvent(UiEvent.SetFenceVisible(!uiState.isFenceVisible)) },
                                     geofenceMode = uiState.geofenceMode,

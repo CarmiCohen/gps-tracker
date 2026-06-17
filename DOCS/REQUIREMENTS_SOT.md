@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.8.35
+# System Source of Truth (SoT) - v8.8.36
 
 This document serves as the definitive operational specification for the GPS-Tracker system.
 
@@ -137,7 +137,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `PARKING_ANCHOR_FACTOR` | 0.8 | Decay factor for parking anchor stability. |
 | `RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT` | 20.0m | Accuracy required to resolve distance violations. |
 
-## 2. Forensic Ribbon Scaling (v8.8.35)
+## 2. Forensic Ribbon Scaling (v8.8.36)
 | Constant | Value | Description |
 | :--- | :--- | :--- |
 | `RIBBON_NOISE_SCALE_DB` | 40.0dB | Maximum range for acoustic ribbon mapping. |
@@ -163,7 +163,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ## 4. Remote Forensic Verification
 ### 4.1. Version & Role Visibility
-*   **Engine Identity**: The system operates on the v8.8.35 baseline logic.
+*   **Engine Identity**: The system operates on the v8.8.36 baseline logic.
 *   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using a timestamp (`yearOffset` + `MMddHHmm`) to ensure uniqueness across years.
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Standardized ALERT_IDs**: Aligned with `EngineConstants.kt`. Includes `ALERT_ID_VISUAL_JUMP` for trajectory-based jumps.
@@ -219,7 +219,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ---
 
-## 8. Forensic Alert Manifest (v8.8.35)
+## 8. Forensic Alert Manifest (v8.8.36)
 | Alert ID | Alert Title (Standardized) | Trigger Description |
 | :--- | :--- | :--- |
 | `LOCAL_INTERNET` | This device: Internet Lost | Local connectivity failure. |
@@ -261,3 +261,5 @@ This document serves as the definitive operational specification for the GPS-Tra
 | **Issue 124** | **GPS Revival**: System must retry hardware revival every 5m during stall and escalate to critical after 3 failures. | **Verified (TrackerService)** |
 | **Issue 125** | **Monotonic UI**: UI lockout and pulse logic must use monotonic time to survive system clock jumps. | **Verified (MainViewModel)** |
 | **Issue 149** | **Forensic Parity**: Symbol parity for jump markers (Magenta Squares). Viewers explicitly latch peer visual jumps. | **Verified (ViewerService/Map)** |
+| **Issue 163** | **Power Tamper Hardening**: Reconnected power tamper detection via `IntegrityMonitor`. Hardened detection using `EXTRA_PLUGGED` and polling auto-recovery. | **Verified (IntegrityMonitor)** |
+| **Issue 148** | **A15 Stability**: Enforced 1000ms GPS polling (`A15_STABLE_GPS_POLLING_MS`) and 5s proximity debounce for Samsung A15 devices. | **Verified (ServiceBehaviorUseCase)** |

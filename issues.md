@@ -1,4 +1,4 @@
-# Architectural Audit Issues (v8.8.35)
+# Architectural Audit Issues (v8.8.36)
 
 This document tracks deviations from the high-assurance modular architecture defined in the project's core documentation.
 
@@ -141,10 +141,10 @@ This document tracks deviations from the high-assurance modular architecture def
 ## 161. FIXED Viewer Alarm Title Confusion - Resolution: Updated local system alert titles to \"This device:\" in `EngineConstants.kt` and refined `getTrackerTitle` in `MainAlarmLogic.kt` to strip prefixes only in Tracker mode, ensuring clear attribution on the Viewer. (v8.8.35).
 ## 162. FIXED Constant Redundancy - Resolution: Removed duplicated scheduling (DAILY_CLEANUP_HOUR, DAILY_ARCHIVE_HOUR) and RTT constants (MAX_ALLOWED_RTT_MS, COMM_RTT_FLOOR_MS, COMM_RTT_SCALING_FACTOR) from Constants.kt and ensured EngineConstants.kt is the exclusive source. (v8.8.35).
 ## 164. FIXED Telemetry Validation Parity - Resolution: Standardized TelemetryUseCase.kt to use PhysicsUtils.isValidLocation. (v8.8.35).
+## 165. FIXED Code Redundancy in Utils.kt - Resolution: Migrated pure logic (`calculateDistance`, `isValidLocation`, `formatDuration`, etc.) to `:core:engine` (PhysicsUtils, FormatterUtils) and removed redundant delegations in `Utils.kt`. (v8.8.36).
+## 166. FIXED Build Integrity & Lint - Resolution: Verified build stability and architectural alignment following modularization. SnapshotStateList and "skipped frames" optimizations confirmed stable in v8.8.36.
+## 167. FIXED Documentation Debt (SoT) - Resolution: Updated `REQUIREMENTS_SOT.md` and `DEVICE_SPECIFIC_ADAPTATIONS.md` to include Samsung A15 polling and power-tamper specifications. (v8.8.36).
 
 ## 133. FIXED TBD (Rank: 8) Xiaomi Background Stability Test - Task: Verify 10Hz polling (HIGH_FREQUENCY_GPS_POLLING_MS) and isXiaomiAutostartGranted effectiveness on a physical Xiaomi device to ensure background persistence.
 ## 134. CANCELLED (Rank: 4) Advanced Trajectory Visualization - Task: Enhance the Map UI to display the engine identity in the coordinate info popup for every trail and jump point, enabling on-device forensic verification.
-## 165. OPEN (Rank: 5) Code Redundancy in Utils.kt - Task: Remove redundant delegations (calculateDistance, isValidLocation, etc.) and migrate pure logic to :core:engine to ensure architectural purity.
-## 166. OPEN (Rank: 4) Verify Build Integrity & Lint - Task: Conduct a full audit of the project for lint warnings, "skipped frames" in logs, and potential SnapshotStateList leaks following recent modularization.
-## 167. OPEN (Rank: 3) Documentation Debt (SoT) - Task: Update REQUIREMENTS_SOT.md and other docs to include specific Samsung/A15 power-tamper and polling adaptations from Issue 163 and 148.
 ## 168. OPEN (Rank: 2) Xiaomi 10Hz Stability Preparation - Task: Prepare debug logging suite for physical device testing of HIGH_FREQUENCY_GPS_POLLING_MS to verify long-term background persistence.

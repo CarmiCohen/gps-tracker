@@ -1,4 +1,4 @@
-# Device-Specific Adaptations (v8.8.35)
+# Device-Specific Adaptations (v8.8.36)
 
 This document describes the specialized logic and polling configurations implemented to bypass OEM-specific background restrictions on supported hardware.
 
@@ -14,12 +14,18 @@ The Samsung A15 utilizes a virtual proximity sensor that is prone to "flickering
 ### 1.3. GPS Polling Stabilization (Samsung A15)
 To ensure long-term stability on the A15 hardware, the system enforces a 1000ms polling interval (`A15_STABLE_GPS_POLLING_MS`). This prevents the GPS hardware from entering aggressive power-save modes that were observed when using standard moving/stationary intervals.
 
+### 1.4. Power Tamper Hardening (General Samsung)
+Issue 163: Restored power tamper detection by reconnecting callbacks to `IntegrityMonitor`. Hardened power detection in `IntegrityMonitor.pollSystemStatus` using `EXTRA_PLUGGED` to supplement broadcast receivers. Integrated `onViolationSustained` for Thermal, Battery Health, and Storage alerts to ensure reliable background reporting on Samsung devices.
+
 ## 2. Xiaomi (MIUI/HyperOS) Hardening
 ### 2.1. Autostart Verification
 The system monitors `isXiaomiAutostartGranted`. If false, a critical `XIAOMI_SYSTEM_MISSING` alert is triggered, as the app cannot reliably recover from system reboots or background kills without this permission.
 
 ### 2.2. Manual Override (R928)
 Due to the non-standard nature of Xiaomi's background management, users can toggle a "Manual Override" in the Sound Setup. This bypasses the logic-gate for "UNKNOWN" permission states, allowing the engine to remain active.
+
+### 2.3. Background Persistence
+Integrated `isXiaomiAutostartGranted` check in `TrackerService.kt` alarm loop and enabled `HIGH_FREQUENCY_GPS_POLLING_MS` (10Hz) for Xiaomi devices to ensure background stability parity with Samsung S21 FE.
 
 ## 3. General OEM Throttling
 ### 3.1. Standby Bucket Monitoring

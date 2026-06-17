@@ -28,6 +28,7 @@ import kotlin.math.*
  * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
  * v8.8.35: Issue 163 - Restored power tamper detection by reconnecting callbacks to IntegrityMonitor.
  * v8.8.35: Issue 148 - Implemented A15 stable polling (1000ms).
+ * v8.9.2: Issue 168 - Added forensic logging for GPS interval transitions.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -374,6 +375,20 @@ class TrackerService : BaseMonitorService() {
         )
         
         if (gpsInterval != currentGpsInterval) {
+            val reason = when (gpsInterval) {
+                COOLING_GPS_POLLING_MS -> "Thermal Throttling"
+                SUSPICIOUS_GPS_POLLING_MS -> "Suspicious Mode"
+                STATIONARY_GPS_POLLING_MS -> "Stationary"
+                A15_STABLE_GPS_POLLING_MS -> "A15 Stabilization"
+                HIGH_FREQUENCY_GPS_POLLING_MS -> if (isXiaomi) "Xiaomi 10Hz Persistence" else "S21FE 10Hz Persistence"
+                else -> "Moving"
+            }
+            // Issue 168: Detailed forensic logging for GPS interval transitions
+            val logMsg = "GPS TRANSITION: ${if (currentGpsInterval == -1L) "START" else "${currentGpsInterval}ms"} -> ${gpsInterval}ms ($reason). " +
+                         "Context: Suspicious=$isSuspiciousMode, Stationary=${sensorManager.isStationary()}, " +
+                         "Cooling=${integrityMonitor.isCoolingModeActive}, Device(A15=$isA15, S21FE=$isS21FE, Xiaomi=$isXiaomi)"
+            logManager.logServiceEvent(logMsg, important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+
             currentGpsInterval = gpsInterval
             gpsManager.setPollingInterval(gpsInterval)
         }

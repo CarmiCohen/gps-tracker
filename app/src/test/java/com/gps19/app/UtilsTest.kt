@@ -1,11 +1,17 @@
 package com.gps19.app
 
+import com.gps19.core.engine.FormatterUtils
+import com.gps19.core.engine.PhysicsUtils
 import com.gps19.core.engine.TelemetryUtils
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * UtilsTest: Tests for migrated utility functions.
+ * v8.8.36: Issue 165 - Migrated to PhysicsUtils and FormatterUtils.
+ */
 class UtilsTest {
 
     @Test
@@ -14,7 +20,7 @@ class UtilsTest {
         val lon1 = -0.1278
         val lat2 = 48.8566
         val lon2 = 2.3522
-        val result = calculateDistance(lat1, lon1, lat2, lon2)
+        val result = PhysicsUtils.calculateDistance(lat1, lon1, lat2, lon2)
         assertEquals(344000.0, result, 1000.0)
     }
 
@@ -22,21 +28,21 @@ class UtilsTest {
     fun `calculateDistance returns zero for same point`() {
         val lat = 32.0853
         val lon = 34.7818
-        assertEquals(0.0, calculateDistance(lat, lon, lat, lon), 0.001)
+        assertEquals(0.0, PhysicsUtils.calculateDistance(lat, lon, lat, lon), 0.001)
     }
 
     @Test
     fun `isValidLocation identifies valid and invalid coordinates`() {
-        assertTrue(isValidLocation(32.0, 34.0))
-        assertFalse(isValidLocation(0.0, 0.0))
-        assertFalse(isValidLocation(91.0, 0.0))
-        assertFalse(isValidLocation(Double.NaN, 34.0))
+        assertTrue(PhysicsUtils.isValidLocation(32.0, 34.0))
+        assertFalse(PhysicsUtils.isValidLocation(0.0, 0.0))
+        assertFalse(PhysicsUtils.isValidLocation(91.0, 0.0))
+        assertFalse(PhysicsUtils.isValidLocation(Double.NaN, 34.0))
     }
 
     @Test
     fun `formatDurationUnified formats correctly`() {
-        assertEquals("01:05:00", formatDurationUnified(3900000L))
-        assertEquals("00:00:00", formatDurationUnified(0L))
+        assertEquals("01:05:00", FormatterUtils.formatDurationUnified(3900000L))
+        assertEquals("00:00:00", FormatterUtils.formatDurationUnified(0L))
     }
 
     @Test

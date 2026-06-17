@@ -31,6 +31,7 @@ import java.util.*
 /**
  * LogComponents: UI for system logs and diagnostic history.
  * Extracted from OverlayComponents for Issue 115 modularization.
+ * v8.8.36: Issue 165 - Migrated to FormatterUtils.
  */
 
 @Composable
@@ -71,7 +72,7 @@ fun LogOverlay(
                         val msgPrefix = if (isRecovered) stringResource(R.string.log_hist_prefix) else ""
                         val renderingConfig = remember(log.message, log.isImportant, log.isSpecial, log.specialColor) { getLogRenderingConfig(log) }
                         val isHebrewMsg = remember(log.message) { log.message.any { it in '\u0590'..'\u05FF' } }
-                        val cleanMsg = remember(log.message) { cleanLogDisplayMessage(log.message) }
+                        val cleanMsg = remember(log.message) { FormatterUtils.cleanLogDisplayMessage(log.message) }
                         
                         val baseMsg = remember(log.count, log.durationMs, log.firstSeenTs, log.timestamp, cleanMsg, now, appStartTime) {
                             val countText = if (log.count > 1) " (x${log.count})" else ""
@@ -79,10 +80,10 @@ fun LogOverlay(
                             val durationText = if (log.count > 1 && log.durationMs > 0) {
                                 val windowMs = maxOf(1000L, log.timestamp - log.firstSeenTs)
                                 val pct = (log.durationMs * 100.0 / windowMs).coerceIn(0.0, 100.0)
-                                val generalized = if (log.durationMs < 10000L) "less than 10s" else formatDurationSimple(log.durationMs)
+                                val generalized = if (log.durationMs < 10000L) "less than 10s" else FormatterUtils.formatDurationSimple(log.durationMs)
                                 " - persistence was $generalized, ${String.format(Locale.getDefault(), "%.1f", pct)}% of window"
                             } else if (log.durationMs > 0) {
-                                " [${formatDurationSimple(log.durationMs)}]"
+                                " [${FormatterUtils.formatDurationSimple(log.durationMs)}]"
                             } else ""
 
                             "$cleanMsg$countText$durationText"

@@ -6,13 +6,12 @@ import android.location.GnssStatus
 import android.os.Build
 import com.gps19.core.engine.*
 import org.osmdroid.util.GeoPoint
-import java.util.Locale
-import kotlin.math.*
 
 /**
- * Utils: Project-wide helper functions.
- * v8.7.0:
- * - Modularization: Delegated core math to :core:engine.
+ * Utils: Android-specific helper functions.
+ * v8.8.36:
+ * - Issue 165: Migrated pure logic to :core:engine (PhysicsUtils, FormatterUtils).
+ *   Removed redundant delegations.
  */
 
 enum class XiaomiPermissionStatus {
@@ -22,126 +21,10 @@ enum class XiaomiPermissionStatus {
 }
 
 /**
- * Calculates the distance between two points in meters using the Haversine formula.
- * Delegated to PhysicsUtils in :core:engine for consistency.
- */
-fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-    return PhysicsUtils.calculateDistance(lat1, lon1, lat2, lon2)
-}
-
-/**
- * Checks if a location is valid (not (0,0), not NaN, and within global bounds).
- * Delegated to PhysicsUtils in :core:engine.
- */
-fun isValidLocation(lat: Double, lng: Double): Boolean {
-    return PhysicsUtils.isValidLocation(lat, lng)
-}
-
-/**
- * Checks if a location is the default coordinate.
- */
-fun isDefaultLocation(lat: Double, lng: Double): Boolean {
-    return abs(lat - DEFAULT_LAT) < 0.0001 && abs(lng - DEFAULT_LNG) < 0.0001
-}
-
-/**
  * Checks if a GeoPoint is valid.
  */
 fun isValidLocation(p: GeoPoint?): Boolean {
-    return p != null && isValidLocation(p.latitude, p.longitude)
-}
-
-/**
- * Unified duration formatting with day support.
- */
-fun formatDurationUnified(ms: Long): String {
-    if (ms <= 0) return "00:00:00"
-    val totalSeconds = ms / 1000
-    val s = totalSeconds % 60
-    val totalMinutes = totalSeconds / 60
-    val m = totalMinutes % 60
-    val totalHours = totalMinutes / 60
-    
-    if (totalHours >= 24) {
-        val days = totalHours / 24
-        val hours = totalHours % 24
-        return "${days}d ${hours}h ${m}m"
-    }
-    
-    return String.format(Locale.getDefault(), "%02d:%02d:%02d", totalHours, m, s)
-}
-
-/**
- * Concise duration formatting for logs (R845).
- */
-fun formatDurationSimple(ms: Long): String {
-    val totalSec = ms / 1000
-    if (totalSec <= 0L) return "0s"
-    if (totalSec < 60) return "${totalSec}s"
-    val m = totalSec / 60
-    val s = totalSec % 60
-    if (m < 60) {
-        return if (s == 0L) "${m}m" else "${m}m ${s}s"
-    }
-    val h = m / 60
-    val mm = m % 60
-    return if (mm == 0L) "${h}h" else "${h}h ${mm}m"
-}
-
-/**
- * Formats duration in "Xh YYm" or "Xd Yh ZZm" format for heartbeat logs.
- */
-fun formatDurationHoursMinutes(ms: Long): String {
-    val totalMinutes = ms / 60000
-    val m = totalMinutes % 60
-    val totalHours = totalMinutes / 60
-    val h = totalHours % 24
-    val d = totalHours / 24
-
-    return if (d > 0) {
-        String.format(Locale.getDefault(), "%dd %02dh %02dm", d, h, m)
-    } else {
-        String.format(Locale.getDefault(), "%dh %02dm", h, m)
-    }
-}
-
-/**
- * Cleans a log message for display.
- */
-fun cleanLogDisplayMessage(message: String): String {
-    var m = message
-    // R860: Strip leading tags in brackets for cleaner UI
-    m = m.replace(Regex("^\\[[^\\]]+\\]\\s*"), "")
-    m = m.replace(Regex("\\s*\\((Sustained|Interruption|Duration):[^)]+\\)", RegexOption.IGNORE_CASE), "")
-    m = m.replace(Regex("\\s*after an interruption of[^.]+", RegexOption.IGNORE_CASE), "")
-    m = m.replace(Regex("(?i)\\b(INFRA|SYSTEM|ALARM|EVENT):?\\s*"), "")
-    return m.trim()
-}
-
-/**
- * Calculates a communication quality index (0-10) based on RTT and signal levels.
- */
-fun calculateCommIndex(rtt: Int, remoteSig: Int, localSig: Int): Int {
-    return TelemetryUtils.calculateCommIndex(rtt, remoteSig, localSig)
-}
-
-/**
- * Calculates the GPS-Index.
- */
-fun calculateGpsIndex(gpsAgeMs: Long, maxAccuracy: Float, satsUsed: Int): Float {
-    return TelemetryUtils.calculateGpsIndex(gpsAgeMs, maxAccuracy, satsUsed).totalIndex
-}
-
-fun smoothCoordinate(last: Double, current: Double, alpha: Double = 0.3): Double {
-    if (last == 0.0) return current
-    return last + alpha * (current - last)
-}
-
-fun smoothBearing(last: Float, current: Float, alpha: Float = 0.2f): Float {
-    var delta = current - last
-    while (delta < -180) delta += 360
-    while (delta > 180) delta -= 360
-    return (last + delta * alpha + 360) % 360
+    return p != null && PhysicsUtils.isValidLocation(p.latitude, p.longitude)
 }
 
 fun getConstellationName(type: Int): String {

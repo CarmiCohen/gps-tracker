@@ -50,6 +50,7 @@ import com.gps19.core.engine.*
  * MapComponents: Shared map logic for Tracker and Viewer.
  * v8.8.36:
  * - Issue 147: Migrated marker and polyline pools to SnapshotStateList to resolve "failed lock verification" warnings.
+ * - Issue 165: Migrated to PhysicsUtils for location validation.
  * v8.8.32: Forensic Marker Unification - Switched to ALERT_ID_VISUAL_JUMP constant.
  */
 
@@ -94,8 +95,8 @@ fun AppMapContainer(
 
     val initialCenter = remember(uiState.trackerLocation.lat, uiState.localLocation.lat) {
         when {
-            isValidLocation(trackerLat, trackerLng) -> GeoPoint(trackerLat, trackerLng)
-            isValidLocation(viewerLat, viewerLng) -> GeoPoint(viewerLat, viewerLng)
+            PhysicsUtils.isValidLocation(trackerLat, trackerLng) -> GeoPoint(trackerLat, trackerLng)
+            PhysicsUtils.isValidLocation(viewerLat, viewerLng) -> GeoPoint(viewerLat, viewerLng)
             else -> GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
         }
     }
@@ -140,7 +141,7 @@ fun AppMapContainer(
         )
 
         Text(
-            text = "v${BuildConfig.VERSION_NAME} 8",
+            text = BuildConfig.VERSION_NAME,
             color = Color.White,
             fontSize = 9.sp,
             fontWeight = FontWeight.Black,
@@ -165,8 +166,8 @@ fun AppMapContainer(
                 Box(Modifier.align(Alignment.CenterStart).padding(start = 8.dp).fillMaxHeight(0.85f).width(140.dp)) { 
                     MapToolsOverlay(
                         isTrackerMode = isTrackerMode,
-                        trackerValid = isValidLocation(trackerLat, trackerLng),
-                        viewerValid = isValidLocation(viewerLat, viewerLng),
+                        trackerValid = PhysicsUtils.isValidLocation(trackerLat, trackerLng),
+                        viewerValid = PhysicsUtils.isValidLocation(viewerLat, viewerLng),
                         showFence = uiState.isFenceVisible,
                         onToggleFence = { onEvent(UiEvent.SetFenceVisible(!uiState.isFenceVisible)) },
                         geofenceMode = uiState.geofenceMode,
@@ -296,8 +297,8 @@ fun OsmMap(
     LaunchedEffect(isLocked, lat, lng, myLat, myLng, isFresh, isMeFresh) {
         if (isLocked) {
             if (systemPulse - lastTriggerTs < 500) return@LaunchedEffect
-            val trackerValid = isValidLocation(lat, lng)
-            val meValid = myLat != null && myLng != null && isValidLocation(myLat, myLng)
+            val trackerValid = PhysicsUtils.isValidLocation(lat, lng)
+            val meValid = myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)
             val view = mapViewRef.value ?: return@LaunchedEffect
             if (trackerValid && meValid && isFresh && isMeFresh) {
                 val dist = PhysicsUtils.calculateDistance(lat, lng, myLat!!, myLng!!)
@@ -316,7 +317,7 @@ fun OsmMap(
     }
 
     LaunchedEffect(centeringTrackerTrigger) {
-        if (centeringTrackerTrigger > 0 && isValidLocation(lat, lng)) {
+        if (centeringTrackerTrigger > 0 && PhysicsUtils.isValidLocation(lat, lng)) {
             lastTriggerTs = systemPulse
             mapViewRef.value?.controller?.animateTo(GeoPoint(lat, lng))
             mapViewRef.value?.controller?.setZoom(18.0)
@@ -324,7 +325,7 @@ fun OsmMap(
     }
 
     LaunchedEffect(centeringViewerTrigger) {
-        if (centeringViewerTrigger > 0 && myLat != null && myLng != null && isValidLocation(myLat, myLng)) {
+        if (centeringViewerTrigger > 0 && myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)) {
             lastTriggerTs = systemPulse
             mapViewRef.value?.controller?.animateTo(GeoPoint(myLat, myLng))
             mapViewRef.value?.controller?.setZoom(18.0)
@@ -344,7 +345,7 @@ fun OsmMap(
             isClickable = true
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             org.osmdroid.config.Configuration.getInstance().cacheMapTileCount = 50
-            val sp = if (initialCenter != null && isValidLocation(initialCenter.latitude, initialCenter.longitude)) initialCenter else GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
+            val sp = if (initialCenter != null && PhysicsUtils.isValidLocation(initialCenter.latitude, initialCenter.longitude)) initialCenter else GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
             controller.setZoom(18.0)
             controller.setCenter(sp)
             val scaleBar = ScaleBarOverlay(this).apply { setUnitsOfMeasure(ScaleBarOverlay.UnitsOfMeasure.metric) }
@@ -388,8 +389,8 @@ fun OsmMap(
     }, update = { view ->
         val trackerMarker = trackerMarkerRef.value ?: return@AndroidView
         val viewerMarker = viewerMarkerRef.value ?: return@AndroidView
-        val trackerValid = isValidLocation(lat, lng)
-        val meValid = myLat != null && myLng != null && isValidLocation(myLat, myLng)
+        val trackerValid = PhysicsUtils.isValidLocation(lat, lng)
+        val meValid = myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)
 
         if (lastHomeRendered.value != home || lastFenceState.value != isFenceVisible) {
             fenceFolderRef.value?.items?.clear()

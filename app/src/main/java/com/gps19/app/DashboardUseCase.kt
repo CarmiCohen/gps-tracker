@@ -15,6 +15,8 @@ import kotlin.math.abs
  *   by utilizing both position timestamp and telemetry arrival timestamp.
  * v8.8.34: Forensic Simplification - Removed 'ver' from display logic.
  * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
+ * v8.8.36: Issue 165 - Migrated to FormatterUtils.
+ * v8.9.2: Cleaned up redundant 'v' prefix in version display.
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {
@@ -36,13 +38,13 @@ class DashboardUseCase @Inject constructor() {
 
         val activeStats = if (isViewer) ts else s
         
-        val totalUptime = formatDurationUnified(activeStats.uptimeMs)
-        val session = if (activeStats.lastConnTs > 0) formatDurationUnified(activeStats.sessionConnectedMs) else "00:00:00"
-        val sinceConn = if (activeStats.lastConnTs > 0) formatDurationUnified(now - activeStats.lastConnTs) else "--"
-        val sinceDisco = if (activeStats.lastDiscTs > 0) formatDurationUnified(now - activeStats.lastDiscTs) else "--"
+        val totalUptime = FormatterUtils.formatDurationUnified(activeStats.uptimeMs)
+        val session = if (activeStats.lastConnTs > 0) FormatterUtils.formatDurationUnified(activeStats.sessionConnectedMs) else "00:00:00"
+        val sinceConn = if (activeStats.lastConnTs > 0) FormatterUtils.formatDurationUnified(now - activeStats.lastConnTs) else "--"
+        val sinceDisco = if (activeStats.lastDiscTs > 0) FormatterUtils.formatDurationUnified(now - activeStats.lastDiscTs) else "--"
         
-        val totalDrop = formatDurationUnified(activeStats.totalDropMs)
-        val maxDrop = formatDurationUnified(activeStats.maxDropMs)
+        val totalDrop = FormatterUtils.formatDurationUnified(activeStats.totalDropMs)
+        val maxDrop = FormatterUtils.formatDurationUnified(activeStats.maxDropMs)
         
         val lastSeen = if (uiState.connectivity.lastRemoteActivityTs > 0) {
             val delta = (now - uiState.connectivity.lastRemoteActivityTs) / 1000
@@ -77,9 +79,9 @@ class DashboardUseCase @Inject constructor() {
 
         val isTrackerOffline = isViewer && (trackerState == TrackerState.UNKNOWN)
         val engineVer = if (isViewer) {
-            if (isTrackerOffline) "v${BuildConfig.VERSION_NAME} (Last)" else "v${BuildConfig.VERSION_NAME}"
+            if (isTrackerOffline) "${BuildConfig.VERSION_NAME} (Last)" else BuildConfig.VERSION_NAME
         } else {
-            "v${BuildConfig.VERSION_NAME}"
+            BuildConfig.VERSION_NAME
         }
 
         val bucket = if (isViewer) uiState.trackerLocation.standbyBucket else uiState.integrity.standbyBucket
@@ -119,7 +121,7 @@ class DashboardUseCase @Inject constructor() {
             engineVersion = engineVer,
             sinceConn = sinceConn,
             sinceDisco = sinceDisco,
-            violationUptime = formatDurationUnified(loc.violationUptimeMs),
+            violationUptime = FormatterUtils.formatDurationUnified(loc.violationUptimeMs),
             violationPercentage = "%.1f%%".format(Locale.getDefault(), loc.violationPercentage * 100f),
             lat = gpsVal("%.6f".format(Locale.getDefault(), loc.lat)),
             lng = gpsVal("%.6f".format(Locale.getDefault(), loc.lng)),

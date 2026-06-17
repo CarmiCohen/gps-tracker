@@ -37,6 +37,25 @@ object PhysicsUtils {
     }
 
     /**
+     * Checks if a location is the default coordinate.
+     */
+    fun isDefaultLocation(lat: Double, lng: Double): Boolean {
+        return abs(lat - DEFAULT_LAT) < 0.0001 && abs(lng - DEFAULT_LNG) < 0.0001
+    }
+
+    fun smoothCoordinate(last: Double, current: Double, alpha: Double = 0.3): Double {
+        if (last == 0.0) return current
+        return last + alpha * (current - last)
+    }
+
+    fun smoothBearing(last: Float, current: Float, alpha: Float = 0.2f): Float {
+        var delta = current - last
+        while (delta < -180) delta += 360
+        while (delta > 180) delta -= 360
+        return (last + delta * alpha + 360) % 360
+    }
+
+    /**
      * Adaptive Multi-Factor Jump Engine logic.
      */
     fun isVisualJump(
