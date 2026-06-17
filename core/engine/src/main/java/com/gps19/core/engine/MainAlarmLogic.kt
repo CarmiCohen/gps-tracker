@@ -10,6 +10,8 @@ import kotlin.math.*
  * v8.8.21: Issue 18 - Refined Xiaomi subtitle to guide users toward the manual override.
  * v8.8.22: Corrected Xiaomi guidance string to "Phone Setup" and integrated Autostart gating.
  * v8.8.23: Standardized all thresholds with Requirements SoT.
+ * v8.8.35: Issue 160 - Fixed Xiaomi gating logic where autostart was incorrectly ignored if special permissions were granted.
+ * v8.8.35: Issue 161 - Refined getTrackerTitle to handle "This device:" prefix and ensured local alerts on Viewer are correctly labeled.
  */
 object MainAlarmLogic {
 
@@ -30,7 +32,7 @@ object MainAlarmLogic {
         reports.add(
             ViolationReport(
                 type = ALERT_ID_LOCAL_INTERNET,
-                title = ALERT_TITLE_LOCAL_INTERNET,
+                title = getTrackerTitle(isTracker, ALERT_TITLE_LOCAL_INTERNET),
                 subtitle = if (isTracker) "Tracker lost internet connection" else "Viewer lost internet connection",
                 conditionMet = state.isLocalInternetLoss
             )
@@ -44,7 +46,7 @@ object MainAlarmLogic {
         reports.add(
             ViolationReport(
                 type = ALERT_ID_RELAY_OFFLINE,
-                title = ALERT_TITLE_RELAY_OFFLINE,
+                title = getTrackerTitle(isTracker, ALERT_TITLE_RELAY_OFFLINE),
                 subtitle = "Relay server is unreachable",
                 conditionMet = isRelayConditionMet
             )
@@ -57,7 +59,7 @@ object MainAlarmLogic {
         reports.add(
             ViolationReport(
                 type = ALERT_ID_TRACKER_OFFLINE,
-                title = if (isTracker) ALERT_TITLE_VIEWER_OFFLINE else ALERT_TITLE_TRACKER_OFFLINE,
+                title = getTrackerTitle(isTracker, if (isTracker) ALERT_TITLE_VIEWER_OFFLINE else ALERT_TITLE_TRACKER_OFFLINE),
                 subtitle = "$peerLabel is not connected to relay server",
                 conditionMet = canCheckPeerErrors && !state.isTrackerConnected && !shouldSuppressPeerErrors
             )
@@ -75,7 +77,7 @@ object MainAlarmLogic {
         reports.add(
             ViolationReport(
                 type = ALERT_ID_SIGNAL_LOSS,
-                title = if (isTracker) ALERT_TITLE_VIEWER_SIGNAL_LOSS else ALERT_TITLE_SIGNAL_LOSS,
+                title = getTrackerTitle(isTracker, if (isTracker) ALERT_TITLE_VIEWER_SIGNAL_LOSS else ALERT_TITLE_SIGNAL_LOSS),
                 subtitle = "No data received from $peerLabel for >${if (isTracker) VIEWER_SIGNAL_LOSS_THRESHOLD_MS/1000 else TRACKER_SIGNAL_LOSS_THRESHOLD_MS/1000}s",
                 conditionMet = canCheckPeerErrors && state.isSignalLoss && !shouldSuppressPeerErrors
             )
@@ -93,7 +95,7 @@ object MainAlarmLogic {
         reports.add(
             ViolationReport(
                 type = ALERT_ID_TRACKER_GAP,
-                title = if (isTracker) ALERT_TITLE_VIEWER_GAP else ALERT_TITLE_TRACKER_GAP,
+                title = getTrackerTitle(isTracker, if (isTracker) ALERT_TITLE_VIEWER_GAP else ALERT_TITLE_TRACKER_GAP),
                 subtitle = "GPS fix is older than ${GPS_GAP_THRESHOLD_MS / 1000}s",
                 conditionMet = canCheckPeerErrors && state.isGpsGap && !shouldSuppressPeerErrors
             )
@@ -362,7 +364,8 @@ object MainAlarmLogic {
 
         // 7. DEVICE SPECIFIC GATING
         // R742 Hardening: Refined Xiaomi subtitle to guide users (Issue 18).
-        val isAutostartBlocked = state.xiaomiStatus != EngineXiaomiStatus.GRANTED && !state.isXiaomiAutostartGranted
+        // Issue 160: isAutostartBlocked must be decoupled from xiaomiStatus to ensure independent verification.
+        val isAutostartBlocked = !state.isXiaomiAutostartGranted
         
         val xiaomiViolation = when (state.xiaomiStatus) {
             EngineXiaomiStatus.DENIED -> true
@@ -389,9 +392,13 @@ object MainAlarmLogic {
         return SystemHealthReport(reports)
     }
 
+    /**
+     * getTrackerTitle: Strips role prefixes when in Tracker mode to ensure clean local alerts.
+     * When in Viewer mode, keeps prefixes to distinguish between local and remote alerts.
+     */
     private fun getTrackerTitle(isTracker: Boolean, title: String): String {
-        if (!isTracker) return title
-        return title.removePrefix("Tracker:").trim()
+        val cleaned = title.removePrefix("Tracker:").removePrefix("This device:").trim()
+        return if (isTracker) cleaned else title
     }
 
     private fun isDefaultLocation(lat: Double, lng: Double) = abs(lat - DEFAULT_LAT) < 0.0001 && abs(lng - DEFAULT_LNG) < 0.0001

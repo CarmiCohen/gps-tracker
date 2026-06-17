@@ -11,6 +11,9 @@ The Samsung A15 utilizes a virtual proximity sensor that is prone to "flickering
 - **Window**: 5,000ms (`PROXIMITY_DEBOUNCE_STATIONARY_A15_MS`).
 - **Logic**: Transitions to "Far" are ignored unless sustained for the full window, preventing false tamper triggers.
 
+### 1.3. GPS Polling Stabilization (Samsung A15)
+To ensure long-term stability on the A15 hardware, the system enforces a 1000ms polling interval (`A15_STABLE_GPS_POLLING_MS`). This prevents the GPS hardware from entering aggressive power-save modes that were observed when using standard moving/stationary intervals.
+
 ## 2. Xiaomi (MIUI/HyperOS) Hardening
 ### 2.1. Autostart Verification
 The system monitors `isXiaomiAutostartGranted`. If false, a critical `XIAOMI_SYSTEM_MISSING` alert is triggered, as the app cannot reliably recover from system reboots or background kills without this permission.

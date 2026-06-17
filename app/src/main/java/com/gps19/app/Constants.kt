@@ -7,6 +7,7 @@ import com.gps19.core.engine.*
  * v8.8.35:
  * - Issue 156: Synchronized version strings to v8.8.35 baseline.
  * - Forensic Simplification: Reflects removal of 'ver' and 'vid' tags from data stream.
+ * - Issue 162: Removed duplicated scheduling and RTT constants; migrated to EngineConstants.kt.
  */
 
 // Global App Defaults
@@ -40,26 +41,13 @@ const val LOG_SYSTEM_SHUTDOWN = "System Shutdown"
 const val LOG_SENSORS_STOPPED = "Sensors stopped"
 const val LOG_SYNC_FLUSH = "Sync: Flushing %d offline status updates..."
 const val LOG_SYNC_FAILED = "Sync: Flush failed: %s"
-const val LOG_MUZZLE_STARTUP_MS = 10000L
 
 // Network
-const val NETWORK_TIMEOUT_MS = 10000
-const val NET_REJOIN_THRESHOLD_MS = 15000L
-const val NET_HEAL_THRESHOLD_MS = 45000L
-const val PING_INTERVAL_MS = 10000L
-const val MAX_ALLOWED_RTT_MS = 5000
 const val DEFAULT_SIGNAL_STRENGTH = 10
-const val SOCKET_TIMEOUT_MS = 60000
 const val SOCKET_RECONNECT_DELAY_MS = 2000L
 const val SOCKET_RECONNECT_DELAY_MAX_MS = 60000L
 const val SOCKET_RANDOMIZATION_FACTOR = 0.5
 const val CONFLATION_DELAY_MS = 100L
-const val RTT_WINDOW_SIZE = 5
-const val COMM_RTT_FLOOR_MS = 150
-const val COMM_RTT_SCALING_FACTOR = 2000.0
-
-// Trajectory & Persistence
-const val HOME_POINT_REFRESH_INTERVAL_MS = 30000L
 
 // Logging Intervals
 const val LOG_INTERVAL_FAST_MS = 15000L
@@ -67,10 +55,7 @@ const val LOG_INTERVAL_SLOW_MS = 60000L
 const val LOG_INTERVAL_COUNT_THRESHOLD = 30
 
 // History Manager Tasks
-const val MAX_HISTORY_POINTS_PER_RIBBONS = 240
-const val DAILY_CLEANUP_HOUR = 2
 val DAILY_CLEANUP_DATE_KEY = "last_daily_cleanup_date"
-const val DAILY_ARCHIVE_HOUR = 3
 
 // Map & Performance
 const val ALARM_ACK_RESET_MS = 2000L

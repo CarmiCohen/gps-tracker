@@ -5,6 +5,9 @@ package com.gps19.core.engine
  * v8.8.35:
  * - Issue 156: Synchronized version strings to v8.8.35 baseline.
  * - Forensic Simplification: Reflects removal of 'ver' and 'vid' tags from data stream.
+ * - Issue 148: Added A15_STABLE_GPS_POLLING_MS for polling stabilization.
+ * - Issue 161: Standardized local system alert titles to use "This device:" prefix.
+ * - Issue 162: Migrated Network & Scheduling constants from app module for centralization.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -135,6 +138,7 @@ const val STATIONARY_GPS_POLLING_MS = 20000L
 const val MOVING_GPS_POLLING_MS = 2000L 
 const val SUSPICIOUS_GPS_POLLING_MS = 1000L
 const val HIGH_FREQUENCY_GPS_POLLING_MS = 100L
+const val A15_STABLE_GPS_POLLING_MS = 1000L
 const val COOLING_GPS_POLLING_MS = 30000L
 const val VIEWER_GPS_POLLING_MS = 10000L 
 const val GPS_GAP_THRESHOLD_MS = 180000L
@@ -205,6 +209,15 @@ const val RIBBON_SNR_SCALE_DB = 45.0f
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0
+const val NETWORK_TIMEOUT_MS = 10000
+const val NET_REJOIN_THRESHOLD_MS = 15000L
+const val NET_HEAL_THRESHOLD_MS = 45000L
+const val PING_INTERVAL_MS = 10000L
+const val SOCKET_TIMEOUT_MS = 60000
+const val RTT_WINDOW_SIZE = 5
+
+// Trajectory & Persistence (v8.8.35)
+const val HOME_POINT_REFRESH_INTERVAL_MS = 30000L
 
 // Alert Internal IDs (Aligned with SoT)
 const val ALERT_ID_LOCAL_INTERNET = "LOCAL_INTERNET"
@@ -249,10 +262,10 @@ const val ALERT_TITLE_TRACKER_TILT = "Tracker: Tilt Alert"
 const val ALERT_TITLE_TRACKER_ACOUSTIC = "Tracker: Acoustic Alert"
 const val ALERT_TITLE_TRACKER_LIFT = "Tracker: Lift"
 const val ALERT_TITLE_TRACKER_CHAIR = "Tracker: Chair Occupied"
-const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "Tracker: System Storage Low"
-const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "Tracker: System Storage Critical"
+const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "This device: System Storage Low"
+const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "This device: System Storage Critical"
 const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "Tracker: Critical Battery Health"
-const val ALERT_TITLE_XIAOMI_SYSTEM_MISSING = "Tracker: Xiaomi System Not Ready"
+const val ALERT_TITLE_XIAOMI_SYSTEM_MISSING = "This device: Xiaomi System Not Ready"
 
 // System Watchdog & Grace Periods
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L

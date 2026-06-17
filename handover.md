@@ -1,37 +1,24 @@
-# Forensic Handover Report (v8.8.35 - PERFORMANCE-AUDIT-STABILIZED)
+# Handover Document
 
-## 1. Session Summary
-This session successfully remediated **Issue #135 (Relay Audit Verification)** and **Issue #146 (Startup Performance)**. The forensic integrity of the telemetry pipeline has been extended to the Relay server logs, and the application's startup sequence has been optimized to eliminate main-thread stalls and frame skips.
-
-## 2. Implementation Status
-
-### 2.1. Relay Audit Verification (Issue #135)
-- **Enriched Handshake**: Updated `CommunicationManager.kt` to emit a structured JSON payload during the `join` event, including `id`, `role` (tracker/viewer), and `ver` (engine version).
-- **Server-Side Traceability**: Upgraded `relay-server/index.js` to **v6.042**. The server now parses and logs enriched device metadata to the console, ensuring end-to-end forensic auditability of every session.
-
-### 2.2. Startup Performance Optimization (Issue #146)
-- **OSM Backgrounding**: Moved `OsmConfig` initialization in `GpsApplication.kt` to a background thread to prevent synchronous disk I/O from stalling the Main thread.
-- **Staggered Initialization**: Modified `MainViewModel.kt` to introduce controlled delays (150ms-1000ms) between startup tasks. Reactive observations and historical ribbon collection are now postponed until the UI landing page is stabilized, resolving the ~30+ skipped frames issue.
-
-### 2.3. Git Repository Hardening
-- **Repository Initialized**: Initialized the root project folder as a Git repository and established a standard `.gitignore` to protect against build-artifact leakage.
-
-## 3. Fixed Issues (Recorded in issues.md)
-- **135**: Relay Audit Verification - Resolved via enriched handshake and v6.042 relay logging.
-- **146**: Startup Performance (Skipped Frames) - Resolved via staggered initialization and backgrounded OSM config.
-- **156/157**: Global Version Baseline - (Confirmed from previous session) All strings aligned to v8.8.35.
-
-## 4. Modified Files
-- `app/src/main/java/com/gps19/app/CommunicationManager.kt` (Enriched handshake)
-- `relay-server/index.js` (v6.042: Handshake logging)
-- `app/src/main/java/com/gps19/app/GpsApplication.kt` (Backgrounded OSM config)
-- `app/src/main/java/com/gps19/app/MainViewModel.kt` (Staggered initialization)
-- `issues.md` (Marked 135/146 as FIXED)
-- `.gitignore` (Added for project hygiene)
-
-## 5. Resumption Instructions
-1. **Issue 147 (SnapshotStateList)**: Investigate the Compose lock verification warnings. Initial search suggests no direct `mutableStateListOf` usage, so deep inspection of `MainUiState` collection updates is required.
-2. **Issue 133 (Xiaomi Test)**: Proceed with physical verification of 10Hz polling effectiveness on a Xiaomi device.
-3. **Issue 148 (A15 Stabilization)**: Monitor the A15's 1000ms polling adaptation for long-term drift or rejection.
-
-**Status: Baseline v8.8.35 is stable, startup is fluid, and relay-side auditability is live. Ready for Issue 147.**
+## Recent Changes (v8.8.35)
+- **Issue 164 (Telemetry Validation Parity)**:
+    - Standardized `TelemetryUseCase.kt` to use `PhysicsUtils.isValidLocation` for all coordinate validation.
+    - Removed redundant local `isValidLocation` implementation.
+- **Issue 161 (Viewer Alarm Title Confusion)**:
+    - Updated `EngineConstants.kt` to use "This device:" prefix for local system alerts (`LOCAL_INTERNET`, `RELAY_OFFLINE`, `STORAGE_LOW`, `STORAGE_CRITICAL`, `XIAOMI_MISSING`).
+    - Refined `getTrackerTitle` in `MainAlarmLogic.kt` to strip role prefixes ("Tracker:", "This device:") only when in Tracker mode, ensuring clear attribution on the Viewer.
+    - Standardized `detectViolations` to pass all alert titles through `getTrackerTitle`.
+- **Issue 162 (Constant Redundancy)**:
+    - Migrated network and scheduling constants (`NETWORK_TIMEOUT_MS`, `DAILY_CLEANUP_HOUR`, etc.) to `EngineConstants.kt`.
+    - Removed duplicated values from `Constants.kt` to enforce a single source of truth.
+- **Issue 148 (GPS Polling Stabilization - A15)**:
+    - Added `A15_STABLE_GPS_POLLING_MS` (1000ms) to `EngineConstants.kt`.
+    - Updated `ServiceBehaviorUseCase.kt` to enforce 1Hz polling for Samsung A15 devices.
+- **Issue 163 (Power Tamper Recovery)**: 
+    - Reconnected `IntegrityMonitor` sustained violation callbacks to `TrackerService`.
+    - Hardened power detection in `IntegrityMonitor.pollSystemStatus` using `EXTRA_PLUGGED`.
+    - Restored "sticky" power alarm logic in `TrackerService`.
+- **Issue 160**: Fixed Xiaomi gating logic error by decoupling autostart from MIUI status.
+- **Issue 147**: Migrated marker pools to `SnapshotStateList` in `MapComponents.kt`.
+- **Issue 159**: Cleaned up database schema (Migration v33) to remove legacy forensic tags.
+- **Issue 146**: Optimized startup performance with background OsmConfig initialization.

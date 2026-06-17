@@ -26,6 +26,8 @@ import kotlin.math.*
  * v8.8.31 (Identity Propagation): Now passing identity to LocationProcessor for forensic marking.
  * v8.8.32: Fixed forensic marking for VISUAL_JUMP to ensure persistent map markers.
  * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
+ * v8.8.35: Issue 163 - Restored power tamper detection by reconnecting callbacks to IntegrityMonitor.
+ * v8.8.35: Issue 148 - Implemented A15 stable polling (1000ms).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -66,6 +68,7 @@ class TrackerService : BaseMonitorService() {
     private var isXiaomiManualOverride = false
     private var isS21FE = false
     private var isXiaomi = false
+    private var isA15 = false
     private var currentGpsInterval = -1L
 
     private val localProcessorListener = object : LocationProcessorListener {
@@ -99,12 +102,18 @@ class TrackerService : BaseMonitorService() {
             
             isS21FE = isS21FEDevice()
             isXiaomi = isXiaomiDevice()
+            isA15 = isA15Device()
 
             alarmManager = AppAlarmManager(this@TrackerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color -> 
                 logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color)
             }
             
-            integrityMonitor = IntegrityMonitor(this@TrackerService, repository, timeProvider, onViolationSustained = { }, onLogEvent = { msg, important -> 
+            integrityMonitor = IntegrityMonitor(this@TrackerService, repository, timeProvider, onViolationSustained = { type ->
+                // Issue 163: Reconnect power tamper latch
+                if (type == ALERT_ID_TRACKER_POWER) {
+                    alarmManager.setPowerAlarmPending(true)
+                }
+            }, onLogEvent = { msg, important ->
                 val isSpecial = msg.contains("tamper", ignoreCase = true) || 
                                msg.contains("confirmed", ignoreCase = true) ||
                                msg.contains("EMERGENCY", ignoreCase = true)
@@ -361,7 +370,7 @@ class TrackerService : BaseMonitorService() {
             isSuspiciousMode = isSuspiciousMode,
             isStationary = sensorManager.isStationary(),
             nowRealtime = nowRealtime,
-            deviceSpecialFlags = ServiceBehaviorUseCase.DeviceSpecialFlags(isS21FE = isS21FE, isXiaomi = isXiaomi)
+            deviceSpecialFlags = ServiceBehaviorUseCase.DeviceSpecialFlags(isS21FE = isS21FE, isXiaomi = isXiaomi, isA15 = isA15)
         )
         
         if (gpsInterval != currentGpsInterval) {

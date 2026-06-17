@@ -12,6 +12,7 @@ import javax.inject.Singleton
  * v8.8.32: Removed vid propagation.
  * v8.8.34: Forensic Simplification - Removed 'ver' propagation.
  * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
+ * v8.8.35: Issue 164 - Standardized to use PhysicsUtils.isValidLocation for coordinate validation.
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(
@@ -23,7 +24,7 @@ class TelemetryUseCase @Inject constructor(
         nowMs: Long, 
         appStartTime: Long
     ): LocationState {
-        val isLocationValid = isValidLocation(update.lat, update.lng)
+        val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng)
         val newTimestamp = update.gpsTs
         
         return currentLoc.copy(
@@ -103,7 +104,7 @@ class TelemetryUseCase @Inject constructor(
         nowMs: Long, 
         appStartTime: Long
     ): LocationState {
-        val isLocationValid = isValidLocation(update.lat, update.lng)
+        val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng)
         val newTimestamp = update.gpsTs
         
         return currentLoc.copy(
@@ -185,9 +186,5 @@ class TelemetryUseCase @Inject constructor(
     fun calculateViolationPercentage(violationMs: Long?, totalMs: Long): Float {
         if (violationMs == null || totalMs <= 0) return 0f
         return (violationMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
-    }
-
-    private fun isValidLocation(lat: Double, lng: Double): Boolean {
-        return !lat.isNaN() && !lng.isNaN() && lat != 0.0 && lng != 0.0
     }
 }

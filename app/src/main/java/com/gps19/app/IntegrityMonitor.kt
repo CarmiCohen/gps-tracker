@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 /**
  * IntegrityMonitor: Tracks hardware and network health.
  * v8.8.21: Migrated to TimeProvider for all timing logic to ensure system-wide consistency.
+ * v8.8.35: Issue 163 - Hardened power tamper detection and connected violation callbacks.
  */
 class IntegrityMonitor(
     private val context: Context,
@@ -70,33 +71,41 @@ class IntegrityMonitor(
      */
     fun pollSystemStatus(nowWall: Long, nowRealtime: Long) {
         val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
-        batteryTemp = (intent?.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0) / 10f
-        if (batteryTemp > maxTemperature) {
-            maxTemperature = batteryTemp
-            repository.saveFloatSync(MainRepository.MAX_TEMP_KEY, maxTemperature)
-        }
-
-        // Issue #3: Thermal Throttling Logic
-        if (!isCoolingModeActive && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
-            isCoolingModeActive = true
-            onLogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true)
-        } else if (isCoolingModeActive && batteryTemp < MAX_SAFE_TEMPERATURE_RECOVERY) {
-            isCoolingModeActive = false
-            onLogEvent("System Info: Thermal limit recovered (${batteryTemp}°C). Normal tracking resumed.", false)
-        }
-
-        val batteryLevel = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val isCharging = intent?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) == android.os.BatteryManager.BATTERY_STATUS_CHARGING
-
-        if (batteryLevel != -1 && !isCharging) {
-            if (nowRealtime - lastBatteryCheckTs > 60000L) { // Check once per minute using monotonic time
-                batterySamples.add(nowRealtime to batteryLevel)
-                lastBatteryCheckTs = nowRealtime
-                checkBatteryDischarge(nowRealtime)
+        
+        if (intent != null) {
+            batteryTemp = (intent.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, 0)) / 10f
+            if (batteryTemp > maxTemperature) {
+                maxTemperature = batteryTemp
+                repository.saveFloatSync(MainRepository.MAX_TEMP_KEY, maxTemperature)
             }
-        } else if (isCharging) {
-            batterySamples.clear()
-            isBatterySteepDischarge = false
+
+            // Issue #3: Thermal Throttling Logic
+            if (!isCoolingModeActive && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
+                isCoolingModeActive = true
+                onLogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true)
+                onViolationSustained(ALERT_ID_TRACKER_TEMP)
+            } else if (isCoolingModeActive && batteryTemp < MAX_SAFE_TEMPERATURE_RECOVERY) {
+                isCoolingModeActive = false
+                onLogEvent("System Info: Thermal limit recovered (${batteryTemp}°C). Normal tracking resumed.", false)
+            }
+
+            val batteryLevel = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+            val plugged = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
+            val isCharging = plugged > 0
+
+            // v8.8.35: Auto-recovery of power state in polling loop
+            if (isCharging) onPowerConnected() else onPowerDisconnected()
+
+            if (batteryLevel != -1 && !isCharging) {
+                if (nowRealtime - lastBatteryCheckTs > 60000L) { // Check once per minute using monotonic time
+                    batterySamples.add(nowRealtime to batteryLevel)
+                    lastBatteryCheckTs = nowRealtime
+                    checkBatteryDischarge(nowRealtime)
+                }
+            } else if (isCharging) {
+                batterySamples.clear()
+                isBatterySteepDischarge = false
+            }
         }
 
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -140,7 +149,7 @@ class IntegrityMonitor(
         checkStorageIntegrity()
 
         if (lastPowerDisconnectTs > 0 && !isPowerTamperDetected) {
-            if (nowRealtime - lastPowerDisconnectTs > POWER_DISCONNECT_DEBOUNCE_MS) {
+            if (checkViolationSustained(ALERT_ID_TRACKER_POWER, lastPowerDisconnectTs, POWER_DISCONNECT_DEBOUNCE_MS)) {
                 isPowerTamperDetected = true
                 onLogEvent("Tracker power tamper confirmed (debounce met)", true)
             }
@@ -164,6 +173,7 @@ class IntegrityMonitor(
         
         if (isBatterySteepDischarge && !wasSteep) {
             onLogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected ($drop% in ${(nowRealtime - earliest.first) / 60000}m). System shutdown likely imminent.", true)
+            onViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE)
         }
     }
 
@@ -180,6 +190,7 @@ class IntegrityMonitor(
                 isStorageCritical = currentCritical
                 if (isStorageCritical) {
                     onLogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB). ALL non-essential logging HALTED to prevent corruption.", true)
+                    onViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL)
                 }
             }
 
@@ -187,6 +198,7 @@ class IntegrityMonitor(
                 isStorageLow = currentLow
                 if (isStorageLow && !isStorageCritical) {
                     onLogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB). Throttling logs.", true)
+                    onViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW)
                 } else if (!isStorageLow) {
                     isStorageCritical = false
                     onLogEvent("System Info: Storage space restored (${megabytesAvailable}MB).", false)
@@ -228,7 +240,10 @@ class IntegrityMonitor(
         val online = isInternetHardwarePresent()
         if (!online) {
             val firstDetected = sustainedViolations.getOrPut(ALERT_ID_LOCAL_INTERNET) { now }
-            if (now - firstDetected > INTERNET_LOSS_THRESHOLD_MS) return false
+            if (now - firstDetected > INTERNET_LOSS_THRESHOLD_MS) {
+                onViolationSustained(ALERT_ID_LOCAL_INTERNET)
+                return false
+            }
         } else {
             sustainedViolations.remove(ALERT_ID_LOCAL_INTERNET)
         }

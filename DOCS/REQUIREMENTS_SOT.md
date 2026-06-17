@@ -47,6 +47,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `MOVING_GPS_POLLING_MS` | 2,000ms | High-frequency polling interval when motion is detected. |
 | `SUSPICIOUS_GPS_POLLING_MS` | 1,000ms | Max-frequency polling during security violations. |
 | `HIGH_FREQUENCY_GPS_POLLING_MS`| 100ms | 10Hz specialized polling for Xiaomi/Samsung devices. |
+| `A15_STABLE_GPS_POLLING_MS` | 1,000ms | Stabilization polling interval for Samsung A15. |
 | `COOLING_GPS_POLLING_MS` | 30,000ms | Throttled interval for thermal mitigation. |
 | `VIEWER_GPS_POLLING_MS` | 10,000ms | Forced polling interval in Viewer mode. |
 | `TICK_INTERVAL_MS` | 1,000ms | Standard system pulse (1Hz). |
