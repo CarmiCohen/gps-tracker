@@ -1,6 +1,6 @@
 package com.gps19.app
 
-import com.gps19.core.engine.TimeProvider
+import com.gps19.core.engine.*
 import dagger.Lazy
 import javax.inject.Inject
 import javax.inject.Singleton

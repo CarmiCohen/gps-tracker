@@ -2,12 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * v8.8.35:
- * - Issue 156: Synchronized version strings to v8.8.35 baseline.
- * - Forensic Simplification: Reflects removal of 'ver' and 'vid' tags from data stream.
- * - Issue 148: Added A15_STABLE_GPS_POLLING_MS for polling stabilization.
- * - Issue 161: Standardized local system alert titles to use "This device:" prefix.
- * - Issue 162: Migrated Network & Scheduling constants from app module for centralization.
+ * v8.8.36:
+ * - Release 8.8.36: Updated version baseline.
+ * - Issue 145: Centralized MAX_HISTORY_POINTS_PER_RIBBONS for UI consistency.
+ * - Issue 104: Unified LOG_MUZZLE_STARTUP_MS for service boot suppression.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -218,6 +216,10 @@ const val RTT_WINDOW_SIZE = 5
 
 // Trajectory & Persistence (v8.8.35)
 const val HOME_POINT_REFRESH_INTERVAL_MS = 30000L
+
+// Logging & UI (v8.8.36)
+const val LOG_MUZZLE_STARTUP_MS = 10000L
+const val MAX_HISTORY_POINTS_PER_RIBBONS = 240
 
 // Alert Internal IDs (Aligned with SoT)
 const val ALERT_ID_LOCAL_INTERNET = "LOCAL_INTERNET"
