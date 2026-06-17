@@ -1,5 +1,11 @@
 # Project History & Versioning
 
+## v8.9.2
+- **Branding Finalization (R935)**: Replaced adaptive app icon with high-resolution JD bitmap. Standardized icon resources to `jd_app_icon.xml` and `jd_bitmap.png` on brand-aligned green background. Removed redundant legacy icon XMLs.
+
+## v8.9.1
+- **Tag Baseline**: Baseline for major version increment.
+
 ## v8.8.35
 - **Database Schema Cleanup (Issue 159)**: Formally removed legacy `ver` and `vid` columns from SQLite tables via Room Migration v33. Schema is now clean and aligned with the simplified forensic model.
 - **Global Version Synchronization (Issue 156)**: Synchronized all documentation (SOT, Alarms, Sentinel) and build scripts to the v8.8.35 baseline.
