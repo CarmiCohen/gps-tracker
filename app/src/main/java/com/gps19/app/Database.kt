@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * v8.9.3:
+ * - Issue 188: Added gpsTs to PendingStatusEntity to preserve historical fix accuracy.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v33 Migration Forensic Audit:
@@ -96,6 +98,7 @@ data class PendingStatusEntity(
     val temp: Float,
     val isCharging: Boolean,
     val timestamp: Long,
+    val gpsTs: Long = 0L,
     val satsView: Int,
     val satsUsed: Int,
     val maxAccuracy: Float,
@@ -206,7 +209,7 @@ interface PendingStatusDao {
     suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 33, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 34, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -359,6 +362,11 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("DROP TABLE pending_status_updates")
                 db.execSQL("ALTER TABLE pending_status_updates_new RENAME TO pending_status_updates")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_status_updates_timestamp ON pending_status_updates (timestamp)")
+            }
+        }
+        val MIGRATION_33_34 = object : Migration(33, 34) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN gpsTs INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

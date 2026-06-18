@@ -225,7 +225,7 @@ class LocationProcessor(
         val fallbackPoint = EngineGeoPoint(if (lastLat != 0.0) lastLat else lat, if (lastLng != 0.0) lastLng else lng)
 
         if (!isSpatiallyValid) {
-            if (shouldSavePoint(isSuspicious, true, 1000.0, 0L)) listener.onTrailPointSaved(lat, lng, isViewerTrail, true)
+            if (shouldSavePoint(isSuspicious, true, 1000.0, 0L)) listener.onTrailPointSaved(lat, lng, isViewerTrail, true, effectiveTs)
             return ProcessedLocation(rawPoint = EngineGeoPoint(lat, lng), optimizedPoint = fallbackPoint, status = sentinelResult.status, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedKph(), timestamp = effectiveTs, isStalled = finalIsStalled, receiptRealtime = nowRealtime, jumpTier = finalJumpTier, distToHome = lastNearestHomeDistance, isSpatiallyValid = false, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer)
         }
 
@@ -262,7 +262,7 @@ class LocationProcessor(
 
         val timeSinceLastGpsSave = if (gpsTs > 0 && lastSavedGpsTs > 0) gpsTs - lastSavedGpsTs else 0L
         if (shouldSavePoint(isSuspicious, isThrottled, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSave) && !skipPersistence) {
-            listener.onTrailPointSaved(persistencePoint.lat, persistencePoint.lng, isViewerTrail, false)
+            listener.onTrailPointSaved(persistencePoint.lat, persistencePoint.lng, isViewerTrail, false, effectiveTs)
             lastSavedLat = persistencePoint.lat; lastSavedLng = persistencePoint.lng; lastSavedTs = nowWall; lastSavedGpsTs = gpsTs
         }
         
@@ -312,7 +312,7 @@ class LocationProcessor(
 }
 
 interface LocationProcessorListener {
-    fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean)
+    fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long)
     fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean)
     fun onMaxAccuracyChanged(accuracy: Float)
     fun onChairBaselineChanged(baseline: Float)

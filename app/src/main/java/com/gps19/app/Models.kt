@@ -9,17 +9,10 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v8.9.3:
+ * - Issue 188: Preserved historical GPS timestamps in TrailPoint model.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * v8.8.21:
- * - Issue 93-B: Hardened LogEntry.fromJSONObject to ensure localId is never blank.
- * - Issue 95-C: Added role field to LogEntry for multi-role forensic traceability.
- * - Telemetry Unification: LocationUpdate fully migrated to :core:engine.
- * v8.8.28: Standardized signaling keys to snake_case (viewer_id, from_viewer).
- * v8.8.32: Added forensic fields for SIT and Storage depth (Issue 139, 142).
- * v8.8.34: Forensic Simplification - Removed 'ver' fields from all models to simplify architecture.
- * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
- * v8.8.37: Added verticalVelocity to ConnectionPoint for forensic parity (Issue 135).
  */
 
 @Serializable
@@ -33,6 +26,7 @@ fun GeoPoint.toSerializable() = SerializableGeoPoint(latitude, longitude)
 data class TrailPoint(
     val lat: Double,
     val lng: Double,
+    val timestamp: Long = 0L,
     val isJump: Boolean = false
 ) {
     fun toGeoPoint() = GeoPoint(lat, lng)

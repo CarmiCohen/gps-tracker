@@ -1,37 +1,30 @@
-# Forensic Handover - GPS Tracker (v8.9.2)
+# Forensic Handover - GPS Tracker (v8.9.4)
 
-## **Current State: v8.9.2 (Branding & Forensic Finalization)**
-The project has successfully transitioned to the **v8.9.2** baseline. All core background services, repositories, and UI controllers have been synchronized. Forensic integrity for high-fidelity event reconstruction is fully implemented and verified across the module boundary.
+## **Current State: v8.9.4 (Full Temporal Fidelity)**
+The project has been updated to **v8.9.4**. This release finalizes the historical accuracy hardening for Issue 188.
 
 ### **Forensic State Audit (This Session)**
-1.  **Issue 182: Global Version Synchronization**
-    *   **Services**: `TrackerService.kt`, `ViewerService.kt`, and `BaseMonitorService.kt` source headers bumped to v8.9.2.
-    *   **Core Logic**: `LogManager.kt`, `GpsApplication.kt`, and `MainViewModel.kt` synchronized.
-    *   **Data Layer**: `SettingsRepository.kt` and `Database.kt` (Room Migration v33) updated to the latest baseline.
-    *   **Emission**: `SyncManager` and `LogManager` now utilize `BuildConfig.VERSION_NAME` for version injection, eliminating legacy hardcoded strings.
-
-2.  **Settings Persistence Recovery & Hardening**
-    *   **Fix**: Resolved critical compilation errors in `SettingsRepository.kt` caused by field name desync between the Kotlin layer and `app_settings.proto`.
-    *   **Field Mapping**: Corrected `lux` (Kotlin) to `value_lux` (Proto) and ensured `is_cooling_mode_active` and `is_storage_critical` are properly persisted in `DataStore`.
-    *   **Integrity**: Verified `loadTrackerState` and `saveTrackerState` map 100% of forensic SIT and OS-restriction fields.
-
-3.  **Role Forensic Parity (Issue 185)**
-    *   **Implementation**: `ViewerService.kt` fully implements the `localProcessorListener`. Viewers now locally persist peer trails and engine logs, ensuring discrete events (Jumps, SIT triggers) are reconstructed on the Viewer's map and database.
+1.  **Issue 188: Historical GPS Timestamp Preservation (COMPLETED)**
+    *   **Data Model**: Expanded `TrailPoint` model to include `timestamp`.
+    *   **Engine Alignment**: Updated `LocationProcessor` and its listener interface to propagate `effectiveTs` (hardware time) for every saved trail point.
+    *   **Service Layer**: Updated `TrackerService` and `ViewerService` to pass the original fix time from the GPS hardware through the engine to the repository.
+    *   **Data Integrity**: Modified `MainRepository.saveTrailPoint` and `MainFileHelper.kt` to preserve these timestamps during local storage, manual exports, and imports. This prevents "clumping" of dots on the map when syncing historical data.
+2.  **Asset Audit (Issue 183)**
+    *   Verified that `AndroidManifest.xml` no longer references legacy assets (`z`, `z2`, `splash`).
 
 ### **Forensic Marker Verification**
-*   **verticalVelocity**: Preserved across the telemetry pipeline.
-*   **SIT Metrics**: `sitBaro`, `sitTilt`, and `sitShock` are recorded in `HistoryEntity` and `PendingStatusEntity`.
-*   **Visual Jumps**: Tracker-calculated jumps are explicitly latched and recorded via `ServiceForensicUseCase` on both devices.
+*   **Trail Accuracy**: Map trail points now reflect the actual time of the GPS fix, not the time of synchronization.
+*   **Backfill Parity**: Synchronization of offline data now maintains 1:1 temporal resolution with real-time updates.
 
 ## **Resumption Context (Prioritized Open Items)**
 | ID | Rank | Task | Forensic Context |
 |:---|:---|:---|:---|
-| **133** | 9 | **Xiaomi Background Stability** | Mandatory physical testing of 10Hz persistence and Autostart gating effectiveness. |
-| **183** | 7 | **Physical Asset Purge** | REDUNDANCY DETECTED: Files `z.xml`, `z2.xml`, and `splash.xml` still exist in `res/mipmap-anydpi-v26` despite being marked FIXED in docs. Delete them. |
-| **184** | 5 | **Muzzle Window Validation** | Verify if 500ms `MUZZLE_WINDOW_DURATION_MS` prevents false-positives on devices with high I/O latency. |
-| **180** | 5 | **Dashboard SIT Audit** | Sanity check the display of SIT metrics on the analytical ribbons in Viewer mode. |
+| **183** | 9 | **Physical Asset Deletion** | Legacy mipmaps (`z.xml`, `z2.xml`, `splash.xml`, etc.) still exist in `res/mipmap-anydpi-v26`. Delete them. |
+| **133** | 8 | **Xiaomi Background Stability** | Mandatory physical testing of 10Hz persistence on Xiaomi hardware. |
+| **187** | 7 | **Viewer State Persistence** | ViewerService startup state restoration for `maxAccuracy` and engine consistency. |
+| **191** | 6 | **Muzzle Window Validation** | Verify if 500ms `MUZZLE_WINDOW_DURATION_MS` prevents false vibration triggers during slow disk I/O. |
 
 ## **Resumption Command**
-"Resuming on v8.9.2 baseline. Prioritize physical asset removal (Issue 183) followed by Xiaomi hardware verification (Issue 133)."
+"Resuming on v8.9.4 baseline. Issue 188 is fully resolved. Proceed with redundant asset removal (Issue 183) or Xiaomi stability verification (Issue 133)."
 
-**Status:** ARCHITECTURALLY ALIGNED. FORENSICALLY COMPLETE. SETTINGS HARDENED.
+**Status:** ARCHITECTURALLY ALIGNED. TEMPORAL FIDELITY HARDENED.

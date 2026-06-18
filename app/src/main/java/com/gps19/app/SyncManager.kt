@@ -12,6 +12,8 @@ import org.json.JSONObject
 
 /**
  * SyncManager: Handles broadcasting state updates and relay synchronization.
+ * v8.9.3:
+ * - Issue 188: Preserved historical gps_ts during offline flushing.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * - Issue 134: Removed dead code broadcastIntegrityUpdate and pushStatusUpdateOnly.
@@ -93,7 +95,7 @@ class SyncManager(
                         put("temp", entity.temp)
                         put("is_charging", entity.isCharging)
                         put("ts", entity.timestamp)
-                        put("gps_ts", entity.timestamp)
+                        put("gps_ts", if (entity.gpsTs > 0) entity.gpsTs else entity.timestamp)
                         put("sats_view", entity.satsView)
                         put("sats_used", entity.satsUsed)
                         put("max_accuracy", entity.maxAccuracy)
@@ -286,6 +288,7 @@ class SyncManager(
                     bearing = data.optDouble("bearing", 0.0).toFloat(),
                     battery = integrity.batteryLevel, temp = integrity.batteryTemp,
                     isCharging = integrity.isCharging, timestamp = now,
+                    gpsTs = effectiveGpsTs,
                     satsView = gpsManager?.satellitesInView ?: 0, satsUsed = gpsManager?.satellitesUsed ?: 0,
                     maxAccuracy = maxAccuracy, distToTracker = distToTracker, distToHome = distToHome,
                     snrIdx = safeFloat(snrIdx), isBatterySteepDischarge = integrity.isBatterySteepDischarge,

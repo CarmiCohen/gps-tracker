@@ -20,6 +20,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
+ * v8.9.3:
+ * - Issue 188: Preserved historical GPS timestamps in trail points during import/export.
  * v8.8.21: Migrated to TimeProvider for all timing logic.
  * v8.8.22:
  * - Forensic Audit: Standardized unified exports to include mandatory 'role' field 
@@ -144,7 +146,8 @@ object MainFileHelper {
                                 val arr = json.getJSONArray("tracker_trail")
                                 for (i in 0 until arr.length()) {
                                     val obj = arr.getJSONObject(i)
-                                    repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = false, force = true)
+                                    val ts = obj.optLong("timestamp", 0L)
+                                    repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = false, timestamp = if (ts > 0) ts else null, force = true)
                                 }
                                 filePoints += arr.length()
                             }
@@ -152,7 +155,8 @@ object MainFileHelper {
                                 val arr = json.getJSONArray("viewer_trail")
                                 for (i in 0 until arr.length()) {
                                     val obj = arr.getJSONObject(i)
-                                    repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = true, force = true)
+                                    val ts = obj.optLong("timestamp", 0L)
+                                    repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = true, timestamp = if (ts > 0) ts else null, force = true)
                                 }
                                 filePoints += arr.length()
                             }
@@ -162,7 +166,8 @@ object MainFileHelper {
                             val isViewer = json.optString("role") == "viewer" || json.optString("source") == "viewer"
                             for (i in 0 until arr.length()) {
                                 val obj = arr.getJSONObject(i)
-                                repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = isViewer, force = true)
+                                val ts = obj.optLong("timestamp", 0L)
+                                repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = isViewer, timestamp = if (ts > 0) ts else null, force = true)
                             }
                             filePoints += arr.length()
                         }
@@ -317,12 +322,22 @@ object MainFileHelper {
                     put("role", appMode)
                     put("tracker_trail", JSONArray().apply {
                         trackerTrail.forEach { pt ->
-                            put(JSONObject().apply { put("lat", pt.lat); put("lng", pt.lng); put("role", "tracker") })
+                            put(JSONObject().apply { 
+                                put("lat", pt.lat)
+                                put("lng", pt.lng)
+                                put("timestamp", pt.timestamp)
+                                put("role", "tracker") 
+                            })
                         }
                     })
                     put("viewer_trail", JSONArray().apply {
                         viewerTrail.forEach { pt ->
-                            put(JSONObject().apply { put("lat", pt.lat); put("lng", pt.lng); put("role", "viewer") })
+                            put(JSONObject().apply { 
+                                put("lat", pt.lat)
+                                put("lng", pt.lng)
+                                put("timestamp", pt.timestamp)
+                                put("role", "viewer") 
+                            })
                         }
                     })
                 }
@@ -383,6 +398,7 @@ object MainFileHelper {
                     arr.put(JSONObject().apply {
                         put("lat", it.lat)
                         put("lng", it.lng)
+                        put("timestamp", it.timestamp)
                         put("role", source) // Standardized to include role in every entry
                     })
                 }

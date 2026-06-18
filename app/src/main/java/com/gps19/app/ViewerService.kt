@@ -17,6 +17,8 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.3:
+ * - Issue 188: Preserved historical GPS timestamps in trail points.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * - Issue 185: Implemented log and trail handling in localProcessorListener for forensic parity.
@@ -43,8 +45,8 @@ class ViewerService : BaseMonitorService() {
     private var isXiaomiManualOverride = false
 
     private val localProcessorListener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean) {
-            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump)
+        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long) {
+            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp)
         }
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean) {
             val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null

@@ -21,6 +21,8 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.3:
+ * - Issue 188: Preserved historical GPS timestamps in trail points.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * - Issue 135: Passing all SIT forensic fields to historyManager.updateRibbons for full forensic parity.
@@ -77,8 +79,8 @@ class TrackerService : BaseMonitorService() {
     private var gpsMaxGapMs = 0L
 
     private val localProcessorListener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean) {
-            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump)
+        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long) {
+            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp)
         }
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean) {
             val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
