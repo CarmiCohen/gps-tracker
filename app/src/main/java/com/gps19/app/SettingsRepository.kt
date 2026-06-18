@@ -30,6 +30,8 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * v8.9.5:
+ * - Issue 192: Added currentMa to TrackerStatusProto persistence.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
@@ -437,6 +439,7 @@ class SettingsRepository @Inject constructor(
                     .setIsJammer(status.isJammer)
                     .setIsCoolingModeActive(status.isCoolingModeActive)
                     .setIsStorageCritical(status.isStorageCritical)
+                    .setCurrentMa(status.currentMa)
                 builder.setTrackerState(trackerBuilder.build())
                 builder.build()
             }
@@ -482,7 +485,8 @@ class SettingsRepository @Inject constructor(
             isStorageCritical = s.isStorageCritical,
             isBatterySteepDischarge = s.isBatterySteepDischarge,
             isJammer = s.isJammer,
-            isCoolingModeActive = s.isCoolingModeActive
+            isCoolingModeActive = s.isCoolingModeActive,
+            currentMa = s.currentMa
         )
     }
 

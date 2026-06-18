@@ -1,30 +1,24 @@
-# Forensic Handover - GPS Tracker (v8.9.4)
+# Handover - v8.9.5
 
-## **Current State: v8.9.4 (Full Temporal Fidelity)**
-The project has been updated to **v8.9.4**. This release finalizes the historical accuracy hardening for Issue 188.
+## Technical Summary: Issue #189 Fix
+**Issue**: Viewer Background Location Gap.
+**Affected Component**: `ViewerService.kt`
 
-### **Forensic State Audit (This Session)**
-1.  **Issue 188: Historical GPS Timestamp Preservation (COMPLETED)**
-    *   **Data Model**: Expanded `TrailPoint` model to include `timestamp`.
-    *   **Engine Alignment**: Updated `LocationProcessor` and its listener interface to propagate `effectiveTs` (hardware time) for every saved trail point.
-    *   **Service Layer**: Updated `TrackerService` and `ViewerService` to pass the original fix time from the GPS hardware through the engine to the repository.
-    *   **Data Integrity**: Modified `MainRepository.saveTrailPoint` and `MainFileHelper.kt` to preserve these timestamps during local storage, manual exports, and imports. This prevents "clumping" of dots on the map when syncing historical data.
-2.  **Asset Audit (Issue 183)**
-    *   Verified that `AndroidManifest.xml` no longer references legacy assets (`z`, `z2`, `splash`).
+### Changes:
+- **GPS Injection**: `GpsManager` is now injected and started within `ViewerService`.
+- **Background Polling**: Set to `VIEWER_GPS_POLLING_MS` (10,000ms) to balance background persistence with battery life.
+- **Relative Geofencing**:
+    - The `LocationProcessor` now receives the Viewer's local coordinates.
+    - `updateCalculatedDistances` is called with a `SpatialAnchor` constructed from the `remoteHandler`'s current tracker state.
+    - `evaluateAlarms` now passes `maxOf(distToTracker, remoteHandler.trackerDistToHome ?: 0.0)` as `distToHomeAuthority`. This ensures the geofence alarm triggers if the tracker leaves its home zone OR if it drifts too far from the Viewer.
+- **Lifecycle Management**: Added `gpsCollectionJob` and `gnssDetailJob` to the service's lifecycle management, ensuring they are cancelled in `onDestroy`.
 
-### **Forensic Marker Verification**
-*   **Trail Accuracy**: Map trail points now reflect the actual time of the GPS fix, not the time of synchronization.
-*   **Backfill Parity**: Synchronization of offline data now maintains 1:1 temporal resolution with real-time updates.
+### Dependencies:
+- Requires `GpsManager` to be correctly provided via Hilt (already configured in `AppModule`).
+- Relies on `LocationProcessor.updateCalculatedDistances` for spherical distance calculations.
 
-## **Resumption Context (Prioritized Open Items)**
-| ID | Rank | Task | Forensic Context |
-|:---|:---|:---|:---|
-| **183** | 9 | **Physical Asset Deletion** | Legacy mipmaps (`z.xml`, `z2.xml`, `splash.xml`, etc.) still exist in `res/mipmap-anydpi-v26`. Delete them. |
-| **133** | 8 | **Xiaomi Background Stability** | Mandatory physical testing of 10Hz persistence on Xiaomi hardware. |
-| **187** | 7 | **Viewer State Persistence** | ViewerService startup state restoration for `maxAccuracy` and engine consistency. |
-| **191** | 6 | **Muzzle Window Validation** | Verify if 500ms `MUZZLE_WINDOW_DURATION_MS` prevents false vibration triggers during slow disk I/O. |
-
-## **Resumption Command**
-"Resuming on v8.9.4 baseline. Issue 188 is fully resolved. Proceed with redundant asset removal (Issue 183) or Xiaomi stability verification (Issue 133)."
-
-**Status:** ARCHITECTURALLY ALIGNED. TEMPORAL FIDELITY HARDENED.
+### Verification Steps:
+1. Start the app in Viewer mode.
+2. Move the Viewer device away from the Tracker while the app is in the background.
+3. Verify that "Distance to Tracker" updates on the dashboard upon return.
+4. Verify that Geofence alerts trigger if the relative distance exceeds the threshold.

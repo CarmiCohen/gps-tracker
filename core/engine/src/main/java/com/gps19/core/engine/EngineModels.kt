@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v8.9.5:
+ * - Issue 192: Added currentMa to EngineConnectionPoint for forensic parity.
  * v8.9.2:
  * - Issue 182: Synchronized version strings to v8.9.2 baseline.
  * v8.8.35:
@@ -44,6 +46,7 @@ enum class EngineXiaomiStatus {
  * v8.8.34: Forensic Simplification - Removed 'ver' field.
  * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
  * v8.8.37: Added verticalVelocity for forensic parity.
+ * v8.9.5: Added currentMa for power forensic parity.
  */
 @Serializable
 data class EngineConnectionPoint(
@@ -72,7 +75,8 @@ data class EngineConnectionPoint(
     val bearing: Float = 0f,
     val isSitDetected: Boolean = false,
     val isSitActive: Boolean = false,
-    val isTick: Boolean = false
+    val isTick: Boolean = false,
+    val currentMa: Int = 0
 )
 
 enum class RibbonScale(val key: String, val intervalSeconds: Int) {

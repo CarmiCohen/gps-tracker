@@ -4,6 +4,8 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * v8.9.5:
+ * - Issue 192: Added currentMa and SIT forensic fields to mergeWorstCase for absolute parity.
  * v8.8.21: Extracted from HistoryManager to ensure cross-platform forensic integrity.
  */
 class TelemetryAggregator {
@@ -12,7 +14,7 @@ class TelemetryAggregator {
 
     /**
      * Merges high-resolution points into a "Worst Case" summary for lower resolutions.
-     * Logic: Take the MAX of negative metrics (RTT, Noise, Vibe) and MIN of positive (Signal, Accuracy).
+     * Logic: Take the MAX of negative metrics (RTT, Noise, Vibe, Current) and MIN of positive (Signal, Accuracy).
      */
     fun mergeWorstCase(acc: EngineConnectionPoint, cur: EngineConnectionPoint): EngineConnectionPoint {
         return acc.copy(
@@ -29,12 +31,16 @@ class TelemetryAggregator {
             snrIdx = min(acc.snrIdx, cur.snrIdx),
             sitVz = if (abs(cur.sitVz) > abs(acc.sitVz)) cur.sitVz else acc.sitVz,
             sitDz = if (abs(cur.sitDz) > abs(acc.sitDz)) cur.sitDz else acc.sitDz,
+            sitBaro = if (abs(cur.sitBaro) > abs(acc.sitBaro)) cur.sitBaro else acc.sitBaro,
+            sitTilt = if (abs(cur.sitTilt) > abs(acc.sitTilt)) cur.sitTilt else acc.sitTilt,
+            sitShock = max(acc.sitShock, cur.sitShock),
             isBatterySteepDischarge = acc.isBatterySteepDischarge || cur.isBatterySteepDischarge,
             isCoolingModeActive = acc.isCoolingModeActive || cur.isCoolingModeActive,
             speed = max(acc.speed, cur.speed),
             bearing = if (cur.hasGps) cur.bearing else acc.bearing,
             isSitDetected = acc.isSitDetected || cur.isSitDetected,
-            isSitActive = acc.isSitActive || cur.isSitActive
+            isSitActive = acc.isSitActive || cur.isSitActive,
+            currentMa = min(acc.currentMa, cur.currentMa) // Hardened for power forensics (highest discharge)
         )
     }
 
@@ -101,7 +107,8 @@ class TelemetryAggregator {
                 proxIdx = resolvedProx,
                 liftIdx = resolvedLift,
                 snrIdx = resolvedSnr,
-                isSitDetected = resolvedSit
+                isSitDetected = resolvedSit,
+                currentMa = baseTemplate.currentMa
             )
 
             results.addAll(processPoint(fillPoint))
@@ -168,7 +175,8 @@ class TelemetryAggregator {
                 liftIdx = resolvedLift,
                 snrIdx = resolvedSnr,
                 isSitDetected = resolvedSit,
-                isSitActive = false
+                isSitActive = false,
+                currentMa = 0
             ))
             currentTs += intervalMs
         }

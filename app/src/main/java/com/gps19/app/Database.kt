@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * v8.9.5:
+ * - Issue 192: Added currentMa to PendingStatusEntity and HistoryEntity for full forensic power parity.
  * v8.9.3:
  * - Issue 188: Added gpsTs to PendingStatusEntity to preserve historical fix accuracy.
  * v8.9.2:
@@ -74,7 +76,8 @@ data class HistoryEntity(
     val isSitActive: Boolean = false,
     val sitBaro: Float = 0f,
     val sitTilt: Float = 0f,
-    val sitShock: Float = 0f
+    val sitShock: Float = 0f,
+    val currentMa: Int = 0
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -97,6 +100,7 @@ data class PendingStatusEntity(
     val battery: Int,
     val temp: Float,
     val isCharging: Boolean,
+    val currentMa: Int = 0,
     val timestamp: Long,
     val gpsTs: Long = 0L,
     val satsView: Int,
@@ -209,7 +213,7 @@ interface PendingStatusDao {
     suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 34, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 35, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -367,6 +371,12 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_33_34 = object : Migration(33, 34) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN gpsTs INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+        val MIGRATION_34_35 = object : Migration(34, 35) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN currentMa INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE connection_history ADD COLUMN currentMa INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

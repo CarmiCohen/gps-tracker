@@ -206,4 +206,7 @@ message TrackerStatusProto {
     // Issue 136: AppSettings Persistence Gap
     bool is_cooling_mode_active = 60;
     bool is_storage_critical = 61;
+
+    // Issue 192: Power Forensic Consistency
+    int32 current_ma = 62;
 }

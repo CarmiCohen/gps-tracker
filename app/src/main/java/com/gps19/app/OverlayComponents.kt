@@ -24,6 +24,8 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * v8.9.5:
+ * - Issue 192: Added currentMa to LegacyDashboardGrid for power forensic visibility.
  * v8.8.27: Modularization complete. Screen-specific overlays moved to:
  * - LandingComponents.kt
  * - LogComponents.kt
@@ -194,6 +196,7 @@ fun LegacyDashboardGrid(
 
             InfoRow(leftVal = d.peakShock, leftLabel = "Peak Shock", leftColor = if (!d.isLinkFresh) Slate500 else Rose500, rightVal = d.vibrationFloor, rightLabel = "Vibration Floor", rightColor = Slate500)
             InfoRow(leftVal = d.luxBaseline, leftLabel = "Lux Baseline", leftColor = if(!d.isLinkFresh) Slate500 else Amber500, rightVal = d.acousticFloor, rightLabel = "Acoustic Floor", rightColor = if(!d.isLinkFresh) Slate500 else Color(0xFF38BDF8))
+            InfoRow(leftVal = d.currentMa, leftLabel = stringResource(R.string.log_diag_battery), leftColor = if(!d.isLinkFresh) Slate500 else Color.White, rightVal = "", rightLabel = "")
         }
     }
 }

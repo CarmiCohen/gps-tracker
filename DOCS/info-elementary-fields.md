@@ -1,4 +1,4 @@
-# Info Elementary Page: Field Definitions and Functions (v8.8.35)
+# Info Elementary Page: Field Definitions and Functions (v8.9.5)
 
 This document describes the technical fields displayed on the Info (Dashboard) page of the GPS Tracker application.
 
@@ -14,6 +14,7 @@ This document describes the technical fields displayed on the Info (Dashboard) p
 *   **[SUSPICIOUS]**: Indicates high-risk telemetry patterns (e.g., high vibration/noise without movement).
 *   **[TAMPER]**: Indicates a physical sentinel violation (Tilt, Acoustic, Light, etc.).
 *   **[PROMOTED]**: A trajectory confirmed through 30s (`TRAJECTORY_PROMOTION_WINDOW_MS`) of consistent movement, bypassing jitter filters.
+*   **[BATT HEALTH]**: Triggered by a **Steep Discharge** event (> 5% drop in 10 minutes).
 
 ## 2. Timing & Connectivity (Diagnostic)
 *   **Max Drop**: The longest period of disconnection recorded in the session.
@@ -45,12 +46,19 @@ This document describes the technical fields displayed on the Info (Dashboard) p
 *   **Proximity**: Detection of device covering/handling.
 
 ## 5. SIT (Sitting) Detection
-These fields are primarily visualized in the **Analytical Ribbons** overlay and track mechanical "sitting" events (e.g., when the tracker is placed on a chair or a person sits down with the device).
-*   **SIT (isSitActive)**: A binary forensic latch indicating an active sitting event. Triggered when `tiltDelta > 7.0°`, `baroDelta > 0.08m`, and `peakShock > 0.35g` occur simultaneously, or if a specialized "plunge" kinematic pattern is matched.
+These fields are primarily visualized in the **Analytical Ribbons** overlay and track mechanical "sitting" events.
+*   **SIT (isSitActive)**: A binary forensic latch indicating an active sitting event. Triggered when `tiltDelta > 7.0°`, `baroDelta > 0.08m`, and `peakShock > 0.35g` occur simultaneously.
 *   **SVZ (sitVz)**: SIT Vertical Velocity. Records the peak vertical speed (m/s) during the detection window.
 *   **SDZ (sitDz)**: SIT Vertical Displacement. Records the total vertical drop (meters) measured by the barometer during the SIT event.
 
-## 6. Baselines & Hardening
+## 6. Power & Forensic Current (Issue 192)
+*   **Battery Drain (currentMa)**: Real-time battery current in mA. 
+    *   Negative values indicate discharge (e.g., -450mA), positive values indicate charging.
+*   **CUR Ribbon**: Forensic visualization of power consumption in the Analytical Ribbons overlay.
+    *   *Mapping*: Normalized to a 1000mA scale (`abs(currentMa) / 1000f`). Captures high-drain events like GPS cold starts or active telemetry bursts.
+*   **BAT Ribbon**: Indicates binary **Steep Discharge** status (1.0 if `isBatterySteepDischarge` is active).
+
+## 7. Baselines & Hardening
 *   **Peak Shock**: Highest instantaneous g-force detected (> 0.8g `VIBRATION_SHOCK_THRESHOLD_G`).
 *   **Vibration Floor**: Adaptive noise-floor EMA (Initial: 0.05g `INITIAL_VIBRATION_FLOOR`).
 *   **Lux Baseline**: Environmental light EMA.

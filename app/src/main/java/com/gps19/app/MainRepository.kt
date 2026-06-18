@@ -18,6 +18,8 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * v8.9.5:
+ * - Issue 192: Added currentMa to connection_history mapping for full forensic parity.
  * v8.9.3:
  * - Issue 188: Preserved historical GPS timestamps in trail points.
  * v8.9.2:
@@ -295,7 +297,8 @@ class MainRepository @Inject constructor(
                 isSitActive = entity.isSitActive,
                 sitBaro = entity.sitBaro,
                 sitTilt = entity.sitTilt,
-                sitShock = entity.sitShock
+                sitShock = entity.sitShock,
+                currentMa = entity.currentMa
             ) 
         }
     }
@@ -332,7 +335,8 @@ class MainRepository @Inject constructor(
                 isSitActive = point.isSitActive,
                 sitBaro = point.sitBaro,
                 sitTilt = point.sitTilt,
-                sitShock = point.sitShock
+                sitShock = point.sitShock,
+                currentMa = point.currentMa
             ))
         }
 

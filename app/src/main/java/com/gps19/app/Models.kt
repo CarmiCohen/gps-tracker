@@ -9,6 +9,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v8.9.5:
+ * - Issue 192: Added currentMa to ConnectionPoint, LocationState, and IntegrityStateUi for full forensic parity.
+ * - Build Fix: Corrected CommitSettings inheritance to UiEvent.
  * v8.9.3:
  * - Issue 188: Preserved historical GPS timestamps in TrailPoint model.
  * v8.9.2:
@@ -76,7 +79,8 @@ data class ConnectionPoint(
     val isSitActive: Boolean = false,
     val sitBaro: Float = 0f,
     val sitTilt: Float = 0f,
-    val sitShock: Float = 0f
+    val sitShock: Float = 0f,
+    val currentMa: Int = 0
 )
 
 data class ViolationPoint(
@@ -266,7 +270,8 @@ data class LocationState(
     val gnssDetail: GnssDetail? = null,
     val snrIdx: Float = 0f,
     val isBatterySteepDischarge: Boolean = false,
-    val isCoolingModeActive: Boolean = false
+    val isCoolingModeActive: Boolean = false,
+    val currentMa: Int = 0
 )
 
 data class DashboardState(
@@ -336,7 +341,8 @@ data class DashboardState(
     val isGpsVisible: Boolean = true,  
     val isLinkVisible: Boolean = true,   
     val isBatterySteepDischarge: Boolean = false, 
-    val isCoolingModeActive: Boolean = false 
+    val isCoolingModeActive: Boolean = false,
+    val currentMa: String = "--"
 )
 
 sealed class UiEvent {
@@ -491,5 +497,6 @@ data class IntegrityStateUi(
     val isStorageLow: Boolean = false,
     val isStorageCritical: Boolean = false,
     val isBatterySteepDischarge: Boolean = false, 
-    val isCoolingModeActive: Boolean = false
+    val isCoolingModeActive: Boolean = false,
+    val currentMa: Int = 0
 )

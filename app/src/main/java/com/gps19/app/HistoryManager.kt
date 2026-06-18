@@ -12,6 +12,8 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * v8.9.5:
+ * - Issue 192: Added currentMa to updateRibbons and backfillGaps for forensic power parity.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * - Issue 135: Added verticalVelocity to updateRibbons and backfillGaps for forensic parity.
@@ -65,7 +67,8 @@ class HistoryManager(
         speed: Float = 0f,
         bearing: Float = 0f,
         isSitDetected: Boolean = false,
-        isSitActive: Boolean = false
+        isSitActive: Boolean = false,
+        currentMa: Int = 0
     ) {
         detectClockTampering(now)
 
@@ -108,7 +111,8 @@ class HistoryManager(
                 speed = speed,
                 bearing = bearing,
                 isSitDetected = isSitDetected,
-                isSitActive = isSitActive
+                isSitActive = isSitActive,
+                currentMa = currentMa
             )
         }
 
@@ -138,7 +142,8 @@ class HistoryManager(
             bearing = bearing,
             isSitDetected = isSitDetected,
             isSitActive = isSitActive,
-            isTick = false 
+            isTick = false,
+            currentMa = currentMa
         )
 
         processResults(aggregator.processPoint(currentPoint))
@@ -188,7 +193,8 @@ class HistoryManager(
         speed: Float,
         bearing: Float,
         isSitDetected: Boolean,
-        isSitActive: Boolean
+        isSitActive: Boolean,
+        currentMa: Int
     ) {
         val snrSamples = if (isTrackerMode && gpsManager != null) {
             gpsManager.getSnrSamples(lastTickTs + 1, now).map { EngineSnrSample(it.first, it.second) }
@@ -226,7 +232,8 @@ class HistoryManager(
             speed = speed,
             bearing = bearing,
             isSitDetected = isSitDetected,
-            isSitActive = isSitActive
+            isSitActive = isSitActive,
+            currentMa = currentMa
         )
 
         val results = aggregator.backfillGaps(lastTickTs, now, snrSamples, sensorSamples, acousticFloor, baseTemplate)
@@ -310,7 +317,8 @@ class HistoryManager(
             speed = p.speed,
             bearing = p.bearing,
             isSitDetected = p.isSitDetected,
-            isSitActive = p.isSitActive
+            isSitActive = p.isSitActive,
+            currentMa = p.currentMa
         )
     }
 

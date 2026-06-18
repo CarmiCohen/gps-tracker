@@ -158,7 +158,8 @@ class DashboardUseCase @Inject constructor() {
             isGpsVisible = isTelemetryVisible,
             isLinkVisible = isTelemetryVisible,
             isBatterySteepDischarge = loc.isBatterySteepDischarge,
-            isCoolingModeActive = loc.isCoolingModeActive
+            isCoolingModeActive = loc.isCoolingModeActive,
+            currentMa = sensorVal("${loc.currentMa}mA")
         )
     }
 }

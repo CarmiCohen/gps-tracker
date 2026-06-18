@@ -7,6 +7,8 @@ import javax.inject.Singleton
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
  * Extracted from MainViewModel to resolve Issue 115 (Architectural Bloat).
+ * v8.9.5:
+ * - Issue 192: Added currentMa mapping for full forensic parity.
  * v8.8.27: Hardened vid propagation during forensic audit.
  * v8.8.28: Resolved BirdEMA build error by migrating to SentinelValidator.
  * v8.8.32: Removed vid propagation.
@@ -73,7 +75,8 @@ class TelemetryUseCase @Inject constructor(
             isStorageCritical = update.isStorageCritical,
             gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail,
             snrIdx = update.snrIdx,
-            isCoolingModeActive = update.isCoolingModeActive
+            isCoolingModeActive = update.isCoolingModeActive,
+            currentMa = update.currentMa
         )
     }
 
@@ -94,7 +97,8 @@ class TelemetryUseCase @Inject constructor(
             standbyBucket = status.standbyBucket, netInterface = status.netInterface,
             isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical,
             gnssDetail = status.gnssDetail, snrIdx = status.snrIdx,
-            isCoolingModeActive = status.isCoolingModeActive
+            isCoolingModeActive = status.isCoolingModeActive,
+            currentMa = status.currentMa
         )
     }
 
@@ -153,7 +157,8 @@ class TelemetryUseCase @Inject constructor(
             isStorageCritical = update.isStorageCritical,
             gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail,
             snrIdx = update.snrIdx,
-            isCoolingModeActive = update.isCoolingModeActive
+            isCoolingModeActive = update.isCoolingModeActive,
+            currentMa = update.currentMa
         )
     }
 

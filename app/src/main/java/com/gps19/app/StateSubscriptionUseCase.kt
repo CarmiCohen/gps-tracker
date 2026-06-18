@@ -13,6 +13,8 @@ import javax.inject.Singleton
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * v8.9.5:
+ * - Issue 192: Propagated currentMa in observeIntegrityUpdates for power forensic parity.
  * v8.8.27: Added history flow management to further decouple MainViewModel.
  */
 @Singleton
@@ -154,7 +156,8 @@ class StateSubscriptionUseCase @Inject constructor(
                 netInterface = info.netInterface,
                 isStorageLow = info.isStorageLow,
                 isStorageCritical = info.isStorageCritical,
-                isCoolingModeActive = info.isCoolingModeActive
+                isCoolingModeActive = info.isCoolingModeActive,
+                currentMa = info.currentMa
             ),
             isLocalOnline = info.isHardwareOnline,
             batteryLevel = info.batteryLevel,

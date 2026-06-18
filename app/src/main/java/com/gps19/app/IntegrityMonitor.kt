@@ -14,6 +14,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * v8.9.5:
+ * - Issue 192: Exposed isCharging and maxTemperature for telemetry parity.
  * v8.8.21: Migrated to TimeProvider for all timing logic to ensure system-wide consistency.
  * v8.8.35: Issue 163 - Hardened power tamper detection and connected violation callbacks.
  */
@@ -24,7 +26,9 @@ class IntegrityMonitor(
     private val onViolationSustained: (String) -> Unit,
     private val onLogEvent: (String, Boolean) -> Unit
 ) {
-    private var maxTemperature = 0f
+    var maxTemperature = 0f
+        private set
+
     private val sustainedViolations = mutableMapOf<String, Long>()
     
     var batteryTemp = 0f
@@ -44,6 +48,9 @@ class IntegrityMonitor(
         private set
 
     var currentNetInterface: String = "UNKNOWN"
+        private set
+
+    var isCharging = false
         private set
 
     // Issue #2: Battery Discharge Profiling - Now uses monotonic time (Issue 24)
@@ -91,7 +98,7 @@ class IntegrityMonitor(
 
             val batteryLevel = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
             val plugged = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
-            val isCharging = plugged > 0
+            isCharging = plugged > 0
 
             // v8.8.35: Auto-recovery of power state in polling loop
             if (isCharging) onPowerConnected() else onPowerDisconnected()

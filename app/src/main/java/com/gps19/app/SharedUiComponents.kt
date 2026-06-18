@@ -50,6 +50,8 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v8.9.5:
+ * - Issue 192: Added CUR (Current/Power) forensic ribbon for parity.
  * v8.8.32:
  * - Issue 145: Replaced hardcoded 240f with MAX_HISTORY_POINTS_PER_RIBBONS constant.
  * - Handshaking Polish: Added technical/matrix style for "WAITING" status.
@@ -124,6 +126,7 @@ fun AnalyticalRibbons(viewModel: MainViewModel) {
         StatefulSensorRibbon(sensorFlow, "LIF", selectedScale, lineColor = Color(0xFFFACC15), valueSelector = { it.liftIdx })
         StatefulSensorRibbon(sensorFlow, "BAT", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isBatterySteepDischarge) 1f else 0f })
         StatefulSensorRibbon(sensorFlow, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isCoolingModeActive) 1f else 0f })
+        StatefulSensorRibbon(sensorFlow, "CUR", selectedScale, lineColor = Color(0xFFFB923C), valueSelector = { (kotlin.math.abs(it.currentMa).toFloat() / 1000f).coerceIn(0f, 1f) })
         StatefulSensorRibbon(sensorFlow, "SIT", selectedScale, lineColor = Emerald500, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isSitActive) 1f else 0f })
         StatefulSensorRibbon(sensorFlow, "SVZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitVz) / 2.0f).coerceIn(0f, 1f) })
         StatefulSensorRibbon(sensorFlow, "SDZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitDz) / 0.5f).coerceIn(0f, 1f) })
@@ -702,10 +705,10 @@ fun HeaderBar(
 
             Spacer(Modifier.height(16.dp))
 
-            IconButton(onClick = { commitAnd(onDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }) { 
+            IconButton(onClick = { commitAnd(onDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(44.dp)) { 
                 Icon(Icons.Default.Info, "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
             }
-            IconButton(onClick = { commitAnd(onR) }) { 
+            IconButton(onClick = { commitAnd(onR) }, modifier = Modifier.size(44.dp)) {
                 Icon(Icons.Default.BarChart, null, tint = if (nav.isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp))
             }
 

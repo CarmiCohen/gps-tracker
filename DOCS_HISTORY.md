@@ -1,7 +1,21 @@
 # Project History & Versioning
 
+## v8.9.5
+- **Viewer Background Location (Issue 189)**: Injected `GpsManager` into `ViewerService` to enable Viewer-side location tracking. Implemented relative geofencing by calculating distance between Viewer and Tracker in the background.
+- **Power Forensic Parity (Issue 192)**: Achieved absolute parity for battery current (`currentMa`) across models, database (v35), and ribbons. Updated `ViewerService` to pass `trackerCurrentMa` to `evaluateAlarms`.
+- **evaluateAlarms Parameter Sync**: Resolved a parameter mismatch in `ViewerService` to ensure all forensic fields are correctly passed to the engine.
+
+## v8.9.4
+- **Viewer Engine State Restoration (Issue 187)**: Updated `ViewerService` to load `maxAccuracy`, SIT metrics, and tracker state (spatial anchor) from the repository into `LocationProcessor` on startup, ensuring engine consistency across restarts.
+
+## v8.9.3
+- **Historical GPS Timestamp Preservation (Issue 188)**: Added `gpsTs` field to `PendingStatusEntity` (Database v34) and updated `SyncManager` to preserve original hardware fix timestamps during backfill.
+
 ## v8.9.2
 - **Branding Finalization (R935)**: Replaced adaptive app icon with high-resolution JD bitmap. Standardized icon resources to `jd_app_icon.xml` and `jd_bitmap.png` on brand-aligned green background. Removed redundant legacy icon XMLs.
+- **ViewerService Listener Completion (Issue 185)**: Fully implemented `localProcessorListener` in `ViewerService.kt` for remote-to-local trail and log persistence.
+- **GPS Stability Audit (Issue 181)**: De-noised forensic logs by consolidating reliability metrics into 10s intervals during 10Hz polling windows.
+- **Muzzle Window Hardening (Issue 184)**: Optimized `SyncManager` with batch deletions and hardened `TrackerService` muzzle state to prevent race conditions during disk I/O.
 
 ## v8.9.1
 - **Tag Baseline**: Baseline for major version increment.
@@ -16,7 +30,7 @@
 
 ## v8.8.32
 - **Forensic Parity Fix (Issue 149)**: Achieved symbol parity for forensic markers (Magenta Squares for Jumps, Red Circles for Out-of-Range).
-- **Viewer Jump Latching**: Updated `ViewerService.kt` to explicitly detect `remoteHandler.isTrackerVisualJump` and record it via `ServiceForensicUseCase`. This ensures Tracker-calculated jump points persist to the Viewer's local map.
+- **Viewer Jump Latching**: Updated `ViewerService.kt` to explicitly detect `remoteHandler.isTrackerVisualJump` and record it via `ServiceForensicUseCase`. This ensures Tracker-calculated jump points persist to the Viewer-side map.
 - **Architectural Alignment (Issue 150)**: Replaced string literals with centralized `ALERT_ID_VISUAL_JUMP` constant in `EngineConstants.kt`. Updated all consumption points in `TrackerService.kt`, `ViewerService.kt`, and `MapComponents.kt` to ensure module boundary synchronization.
 
 ## v8.8.31

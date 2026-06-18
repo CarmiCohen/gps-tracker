@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * TelemetryMerger: Pure logic for aggregating and merging telemetry updates.
+ * v8.9.5:
+ * - Issue 192: Added currentMa to the merge copy list to ensure power forensic parity.
  * v8.8.21: Standardized merging rules to ensure data consistency across role transitions.
  */
 object TelemetryMerger {
@@ -39,7 +41,8 @@ object TelemetryMerger {
                 distToHome = current.distToHome,
                 distToTracker = current.distToTracker,
                 snrIdx = current.snrIdx,
-                gnssDetail = incoming.gnssDetail ?: current.gnssDetail
+                gnssDetail = incoming.gnssDetail ?: current.gnssDetail,
+                currentMa = current.currentMa
             )
         } else {
             incoming

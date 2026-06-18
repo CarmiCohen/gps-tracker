@@ -12,6 +12,8 @@ import org.json.JSONObject
 
 /**
  * SyncManager: Handles broadcasting state updates and relay synchronization.
+ * v8.9.5:
+ * - Issue 192: Included current_ma in pushCurrentStatus parameters and LocationUpdate mapping for absolute parity.
  * v8.9.3:
  * - Issue 188: Preserved historical gps_ts during offline flushing.
  * v8.9.2:
@@ -93,6 +95,7 @@ class SyncManager(
                         put("bearing", entity.bearing)
                         put("battery", entity.battery)
                         put("temp", entity.temp)
+                        put("current_ma", entity.currentMa)
                         put("is_charging", entity.isCharging)
                         put("ts", entity.timestamp)
                         put("gps_ts", if (entity.gpsTs > 0) entity.gpsTs else entity.timestamp)
@@ -175,6 +178,10 @@ class SyncManager(
         gpsTsOverride: Long? = null,
         gnssDetail: GnssDetail? = null,
         snrIdx: Float = 0f,
+        battery: Int? = null,
+        temp: Float? = null,
+        currentMa: Int? = null,
+        isCharging: Boolean? = null,
         isBatterySteepDischarge: Boolean = false,
         isCoolingModeActive: Boolean = false
     ) {
@@ -184,6 +191,11 @@ class SyncManager(
         val integrity = telemetryRepository.integrityState.value
         val effectiveGpsTs = gpsTsOverride ?: loc?.time ?: 0L
         
+        val resolvedBattery = battery ?: integrity.batteryLevel
+        val resolvedTemp = temp ?: integrity.batteryTemp
+        val resolvedCurrentMa = currentMa ?: integrity.currentMa
+        val resolvedIsCharging = isCharging ?: integrity.isCharging
+
         val data = JSONObject().apply {
             put("id", deviceId); put("viewer_id", viewerId); put("from_viewer", !isTrackerMode)
             put("role", if (isTrackerMode) "tracker" else "viewer")
@@ -212,7 +224,7 @@ class SyncManager(
             put("acoustic_floor_db", safeDouble(acousticFloorDb))
             put("adaptive_vibration_floor", safeFloat(adaptiveVibrationFloor))
             put("dist_to_home", safeDouble(distToHome ?: 0.0))
-            put("battery", integrity.batteryLevel); put("temp", integrity.batteryTemp); put("max_temp", integrity.maxTemp); put("is_charging", integrity.isCharging); put("current_ma", integrity.currentMa)
+            put("battery", resolvedBattery); put("temp", resolvedTemp); put("max_temp", integrity.maxTemp); put("is_charging", resolvedIsCharging); put("current_ma", resolvedCurrentMa)
             put("is_tamper_detected", isTamperDetected)
             put("is_power_tamper", isPowerTamper)
             put("is_sit_detected", isSitDetected)
@@ -286,12 +298,12 @@ class SyncManager(
                     speed = data.optDouble("speed", 0.0).toFloat(),
                     accuracy = data.optDouble("accuracy", 0.0).toFloat(),
                     bearing = data.optDouble("bearing", 0.0).toFloat(),
-                    battery = integrity.batteryLevel, temp = integrity.batteryTemp,
-                    isCharging = integrity.isCharging, timestamp = now,
+                    battery = resolvedBattery, temp = resolvedTemp,
+                    isCharging = resolvedIsCharging, currentMa = resolvedCurrentMa, timestamp = now,
                     gpsTs = effectiveGpsTs,
                     satsView = gpsManager?.satellitesInView ?: 0, satsUsed = gpsManager?.satellitesUsed ?: 0,
                     maxAccuracy = maxAccuracy, distToTracker = distToTracker, distToHome = distToHome,
-                    snrIdx = safeFloat(snrIdx), isBatterySteepDischarge = integrity.isBatterySteepDischarge,
+                    snrIdx = safeFloat(snrIdx), isBatterySteepDischarge = isBatterySteepDischarge,
                     isCoolingModeActive = isCoolingModeActive,
                     isSitDetected = isSitDetected, isSitActive = isSitActive,
                     sitVz = sitVz, sitDz = sitDz,
@@ -310,7 +322,7 @@ class SyncManager(
             speed = data.optDouble("speed", 0.0).toFloat(),
             accuracy = data.optDouble("accuracy", 0.0).toFloat(), 
             bearing = data.optDouble("bearing", 0.0).toFloat(),
-            battery = integrity.batteryLevel, temp = integrity.batteryTemp, maxTemp = integrity.maxTemp, isCharging = integrity.isCharging, currentMa = integrity.currentMa,
+            battery = resolvedBattery, temp = resolvedTemp, maxTemp = integrity.maxTemp, isCharging = resolvedIsCharging, currentMa = resolvedCurrentMa,
             gpsTs = effectiveGpsTs, isMe = true, distToTracker = distToTracker, distToHome = distToHome,
             satsView = gpsManager?.satellitesInView ?: 0, satsUsed = gpsManager?.satellitesUsed ?: 0, 
             isJump = isJump, isJammer = isJammer, isStalled = isStalledActive,
@@ -320,7 +332,7 @@ class SyncManager(
             peakVibrationShock = peakShock, peakVibrationShockTs = peakShockTs,
             luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb,
             adaptiveVibrationFloor = adaptiveVibrationFloor, isSuspicious = isSuspicious,
-            isTamperDetected = isTamperDetected, isPowerTamper = integrity.isPowerTamper,
+            isTamperDetected = isTamperDetected, isPowerTamper = isPowerTamper,
             isSitDetected = isSitDetected, isSitActive = isSitActive, lastSitTs = lastSitTs,
             proxIdx = proxIdx, proximityCm = proximityCm, micPending = micPending,
             uptimeMs = sessionManager.uptimeMs, totalDropMs = sessionManager.getTotalDropWithActive(now), 
@@ -343,8 +355,8 @@ class SyncManager(
             isStorageCritical = integrity.isStorageCritical,
             gnssDetail = gnssDetail,
             snrIdx = snrIdx,
-            isBatterySteepDischarge = integrity.isBatterySteepDischarge,
-            isCoolingModeActive = integrity.isCoolingModeActive
+            isBatterySteepDischarge = isBatterySteepDischarge,
+            isCoolingModeActive = isCoolingModeActive
         ))
     }
 }

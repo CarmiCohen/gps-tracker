@@ -15,6 +15,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v8.9.5:
+ * - Issue 192: Fixed persistence gap for currentMa in TrackerStatus.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * - Issue 180: Verified forensic SIT parity across telemetry mapping.
@@ -550,7 +552,7 @@ class RemoteHandler(
                 repository.saveTrackerState(TrackerStatus(
                     lat = trackerLat, lng = trackerLng, speed = trackerSpeed, bearing = trackerBearing, accuracy = trackerAccuracy,
                     gpsTs = trackerLastGpsTs, ts = now, battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp,
-                    isCharging = isTrackerCharging, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
+                    isCharging = isTrackerCharging, currentMa = trackerCurrentMa, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
                     lastConnTs = trackerLastConnTs, lastDiscTs = trackerLastDiscTs, uptimeMs = trackerUptimeMs,
                     totalConnectedMs = trackerTotalConnectedMs,
                     sessionConnectedMs = trackerSessionConnectedMs, totalDropMs = trackerTotalDropMs,

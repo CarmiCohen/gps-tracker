@@ -21,6 +21,8 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.5:
+ * - Issue 192: Passing currentMa to historyManager.updateRibbons for full forensic parity.
  * v8.9.3:
  * - Issue 188: Preserved historical GPS timestamps in trail points.
  * v8.9.2:
@@ -473,7 +475,8 @@ class TrackerService : BaseMonitorService() {
             speed = ((proc?.filteredSpeed ?: 0.0) / 3.6).toFloat(),
             bearing = (lastKnownLocation?.bearing ?: 0f),
             isSitDetected = rawSitDetected,
-            isSitActive = lastSitDetected
+            isSitActive = lastSitDetected,
+            currentMa = integrityMonitor.getBatteryCurrent()
         )
 
         evaluateAlarmsInternal(nowRealtime, isSignalLoss, isJammerSuspicionActive, isGpsStalledActive, isTamperSiren)
