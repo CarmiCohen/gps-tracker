@@ -19,10 +19,12 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * v8.8.30: Timing Hardening - Migrated UI lockout and pulse logic to monotonic time (elapsedRealtime).
- * v8.8.32: Removed local isValidLocation in favor of PhysicsUtils.isValidLocation (Issue 144).
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.35:
  * - Issue 146: Staggered initialization to resolve startup frame skips.
+ * v8.8.30: Timing Hardening - Migrated UI lockout and pulse logic to monotonic time (elapsedRealtime).
+ * v8.8.32: Removed local isValidLocation in favor of PhysicsUtils.isValidLocation (Issue 144).
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(

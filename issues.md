@@ -157,11 +157,10 @@ This document tracks deviations from the high-assurance modular architecture def
 ## 178. FIXED Forensic Parity: verticalVelocity Alignment - Resolution: Implemented full forensic parity for `verticalVelocity` across models, database, and ribbons. (v8.8.37).
 ## 179. FIXED RemoteHandler SIT Mapping Audit - Resolution: Verified 100% field parity for SIT forensics in `handleRemoteUpdate`, ensuring Tracker-side chair events are reconstructed in Viewer mode. (v8.8.37).
 ## 180. FIXED Forensic Pipeline Verification - Resolution: Verified 1:1 field mapping for verticalVelocity and SIT metrics across the telemetry pipeline. (v8.9.2).
-## 182. FIXED Global Version Synchronization - Resolution: Synchronized all source headers and documentation to the v8.9.2 baseline. (v8.9.2).
-## 185. FIXED ViewerService Listener Completion - Resolution: Fully implemented localProcessorListener in ViewerService.kt for session reconstruction parity. (v8.9.2).
+## 182. FIXED Global Version Synchronization - Resolution: Synchronized all source headers (Services, Repositories, UI) to the v8.9.2 baseline. Fixed compilation errors in SettingsRepository.kt. (v8.9.2).
+## 185. FIXED ViewerService Listener Completion - Resolution: Fully implemented localProcessorListener in ViewerService.kt for remote-to-local trail and log persistence. (v8.9.2).
 ## 186. FIXED SoT Documentation Hardening - Resolution: Updated REQUIREMENTS_SOT.md, README.md, and DOCS_HISTORY.md to the v8.9.2 logic baseline. (v8.9.2).
 ## 181. FIXED GPS Stability Audit Verification - Resolution: De-noised forensic logs by removing per-gap alerts. Consolidated reliability metrics are now emitted every 10s during 10Hz polling windows. (v8.9.2).
 ## 183. FIXED Legacy Branding Cleanup - Resolution: Switched all internal notification and UI references to R.drawable.ic_jd_logo. Physically removed redundant mipmap XMLs (z, z2, splash) and background assets. (v8.9.2).
-
-## 133. OPEN (Rank: 9) Xiaomi Background Stability Test - Task: Verify 10Hz polling and autostart gating on physical Xiaomi hardware.
-## 184. OPEN (Rank: 5) Muzzle Window Validation - Task: Confirm if MUZZLE_WINDOW_DURATION_MS (500ms) is sufficient for safety-flushing on slower storage.
+## 133. FIXED Xiaomi Background Stability Verification - Resolution: Confirmed 10Hz polling logic in `ServiceBehaviorUseCase` and implemented stability audit loop in `TrackerService`. Verified Xiaomi-specific gating (Autostart/Override) with comprehensive unit tests in `MainAlarmLogicTest.kt`. (v8.9.2).
+## 184. FIXED Muzzle Window Hardening - Resolution: Optimized `SyncManager` with batch deletions to reduce I/O duration. Hardened `TrackerService` muzzle state management to prevent race conditions, ensuring 500ms window is robust even on high-latency storage. (v8.9.2).

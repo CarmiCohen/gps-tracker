@@ -18,6 +18,8 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.21: Migrated to TimeProvider for all timing logic to ensure system-wide consistency.
  */
 @AndroidEntryPoint

@@ -30,11 +30,12 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
- * v8.8.21: Migrated to TimeProvider for all timing logic.
- * v8.8.32: Removed vid propagation.
- * v8.8.32 (Issue 137): Persist isCoolingModeActive and isStorageCritical.
- * v8.8.34: Removed 'ver' references (Issue 145).
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
+ * v8.8.34: Removed 'ver' references (Issue 145).
+ * v8.8.32 (Issue 137): Persist isCoolingModeActive and isStorageCritical.
+ * v8.8.21: Migrated to TimeProvider for all timing logic.
  */
 @Singleton
 class SettingsRepository @Inject constructor(

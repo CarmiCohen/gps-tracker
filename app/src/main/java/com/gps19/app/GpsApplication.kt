@@ -20,6 +20,8 @@ import kotlinx.coroutines.launch
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.35:
  * - Issue 146: Optimized startup by moving OSM configuration to background thread.
  */

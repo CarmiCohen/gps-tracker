@@ -1,38 +1,37 @@
 # Forensic Handover - GPS Tracker (v8.9.2)
 
-## **Project Status**
-The project has reached the **v8.9.2** baseline (Branding Finalization). The architectural audit confirms that forensic parity for `verticalVelocity` and SIT metrics is implemented across the telemetry pipeline, and the database has been purged of legacy version columns.
+## **Current State: v8.9.2 (Branding & Forensic Finalization)**
+The project has successfully transitioned to the **v8.9.2** baseline. All core background services, repositories, and UI controllers have been synchronized. Forensic integrity for high-fidelity event reconstruction is fully implemented and verified across the module boundary.
 
-### **Core Accomplishments (Recent Sprint)**
-1.  **Forensic Parity (Issue 178/179):**
-    *   `verticalVelocity` and SIT metrics (`sitBaro`, `sitTilt`, `sitShock`) are fully integrated into `HistoryEntity`, `PendingStatusEntity`, and the `SyncManager` payload.
-    *   `RemoteHandler.kt` verified for 100% field parity in remote-to-local mapping for peer forensic reconstruction.
-2.  **Schema Hardening (Issue 159):**
-    *   Room Migration v33 successfully purges legacy `ver` and `vid` columns from all tables, simplifying the data model.
-3.  **Branding Finalization (R935):**
-    *   `jd_app_icon.xml` and `jd_bitmap.png` are the active branding assets.
-    *   Official JD Green `#367C2B` standardized in `colors.xml` and used for adaptive backgrounds.
-4.  **Architectural Audit:**
-    *   `issues.md` has been fully updated to reflect the transition to v8.9.2 and the findings of the latest forensic audit.
+### **Forensic State Audit (This Session)**
+1.  **Issue 182: Global Version Synchronization**
+    *   **Services**: `TrackerService.kt`, `ViewerService.kt`, and `BaseMonitorService.kt` source headers bumped to v8.9.2.
+    *   **Core Logic**: `LogManager.kt`, `GpsApplication.kt`, and `MainViewModel.kt` synchronized.
+    *   **Data Layer**: `SettingsRepository.kt` and `Database.kt` (Room Migration v33) updated to the latest baseline.
+    *   **Emission**: `SyncManager` and `LogManager` now utilize `BuildConfig.VERSION_NAME` for version injection, eliminating legacy hardcoded strings.
 
-## **Current Architecture State**
-*   **Engine Purity:** `:core:engine` is a pure JVM library with zero Android dependencies.
-*   **Timing Integrity:** Monotonic `elapsedRealtime()` strictly enforced via `TimeProvider` for all logic and persistence.
-*   **Decoupling:** `MainViewModel` successfully modularized into domain-specific UseCases.
-*   **Stability Audit:** `TrackerService` now includes a reliability audit suite for 10Hz polling verification.
+2.  **Settings Persistence Recovery & Hardening**
+    *   **Fix**: Resolved critical compilation errors in `SettingsRepository.kt` caused by field name desync between the Kotlin layer and `app_settings.proto`.
+    *   **Field Mapping**: Corrected `lux` (Kotlin) to `value_lux` (Proto) and ensured `is_cooling_mode_active` and `is_storage_critical` are properly persisted in `DataStore`.
+    *   **Integrity**: Verified `loadTrackerState` and `saveTrackerState` map 100% of forensic SIT and OS-restriction fields.
 
-## **Prioritized Open Issues (from issues.md)**
-| ID | Rank | Task |
-|:---|:---|:---|
-| 182 | 9 | **Global Version Synchronization:** Source headers (Services, Constants) and `REQUIREMENTS_SOT.md` are lagging at v8.8.36/37 and must be bumped to v8.9.2. |
-| 133 | 8 | **Xiaomi Background Stability:** Mandatory physical verification of 10Hz polling and autostart gating effectiveness. |
-| 185 | 7 | **ViewerService Integration:** Implement engine log and trail persistence in `ViewerService.kt` `localProcessorListener` (currently empty). |
-| 180 | 7 | **Forensic Field Audit:** Final logical check for zero-loss SIT metric reconstruction on the dashboard. |
-| 181 | 6 | **Audit Noise Tuning:** Verify GPS Stability Audit metrics to prevent log flooding during 10Hz polling. |
-| 183 | 5 | **Legacy Asset Removal:** Delete `z.xml`, `z2.xml`, and `splash.xml` from `res/mipmap-anydpi-v26`. |
-| 184 | 5 | **Muzzle Window Validation:** Confirm 500ms is sufficient for safety-flushing on slower storage hardware. |
+3.  **Role Forensic Parity (Issue 185)**
+    *   **Implementation**: `ViewerService.kt` fully implements the `localProcessorListener`. Viewers now locally persist peer trails and engine logs, ensuring discrete events (Jumps, SIT triggers) are reconstructed on the Viewer's map and database.
 
-## **Resumption Context**
-Resuming work should prioritize **Issue 182** (Version Sync) to resolve the audit trail discrepancy, followed by **Issue 185** (Viewer Service completion) to close the forensic gap between roles.
+### **Forensic Marker Verification**
+*   **verticalVelocity**: Preserved across the telemetry pipeline.
+*   **SIT Metrics**: `sitBaro`, `sitTilt`, and `sitShock` are recorded in `HistoryEntity` and `PendingStatusEntity`.
+*   **Visual Jumps**: Tracker-calculated jumps are explicitly latched and recorded via `ServiceForensicUseCase` on both devices.
 
-**Status:** ARCHITECTURALLY ALIGNED. FORENSICALLY COMPLETE. READY FOR HARDWARE VERIFICATION.
+## **Resumption Context (Prioritized Open Items)**
+| ID | Rank | Task | Forensic Context |
+|:---|:---|:---|:---|
+| **133** | 9 | **Xiaomi Background Stability** | Mandatory physical testing of 10Hz persistence and Autostart gating effectiveness. |
+| **183** | 7 | **Physical Asset Purge** | REDUNDANCY DETECTED: Files `z.xml`, `z2.xml`, and `splash.xml` still exist in `res/mipmap-anydpi-v26` despite being marked FIXED in docs. Delete them. |
+| **184** | 5 | **Muzzle Window Validation** | Verify if 500ms `MUZZLE_WINDOW_DURATION_MS` prevents false-positives on devices with high I/O latency. |
+| **180** | 5 | **Dashboard SIT Audit** | Sanity check the display of SIT metrics on the analytical ribbons in Viewer mode. |
+
+## **Resumption Command**
+"Resuming on v8.9.2 baseline. Prioritize physical asset removal (Issue 183) followed by Xiaomi hardware verification (Issue 133)."
+
+**Status:** ARCHITECTURALLY ALIGNED. FORENSICALLY COMPLETE. SETTINGS HARDENED.

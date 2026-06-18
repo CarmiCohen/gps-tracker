@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v33 Migration Forensic Audit:
  * - Issue 135: Ensured 'verticalVelocity' is present in both connection_history and pending_status_updates.
  * - Standardized all forensic SIT fields across tables.

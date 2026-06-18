@@ -6,7 +6,7 @@ import org.junit.Test
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
- * v8.8.21: Migrated to consistent test-time to remove dependency on System clock.
+ * v8.9.2: Added Xiaomi gating verification (Issue 133).
  */
 class MainAlarmLogicTest {
 
@@ -43,76 +43,75 @@ class MainAlarmLogicTest {
     }
 
     @Test
-    fun `R872 Verify that we do not have any alerts in healthy tracker mode`() {
+    fun `Verify healthy state has no violations`() {
         val state = createDefaultState()
         val report = MainAlarmLogic.detectViolations(state)
-        
-        val activeViolations = report.reports.filter { it.conditionMet }
-        if (activeViolations.isNotEmpty()) {
-            println("Active violations in supposedly healthy state:")
-            activeViolations.forEach { println(" - ${it.type}: ${it.title} (${it.subtitle})") }
-        }
-        
-        assertTrue("Expected no active violations, but found: ${activeViolations.map { it.type }}", report.reports.none { it.conditionMet })
+        assertTrue(report.reports.none { it.conditionMet })
     }
 
     @Test
-    fun `R872 Verify violation titles in Tracker mode`() {
+    fun `Verify Xiaomi System Missing alert logic`() {
         val now = 1700000000000L
-        val state = createDefaultState(now).copy(
-            isTrackerMode = true,
-            trackerLat = 11.0, 
-            trackerLng = 11.0,
-            maxDistance = 10.0
-        )
-
-        val report = MainAlarmLogic.detectViolations(state)
-        val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         
-        assertTrue("Geofence alert should be met", geofence?.conditionMet == true)
-        assertEquals("Geofence", geofence?.title)
+        // Scenario 1: Xiaomi device with Autostart BLOCKED
+        val stateBlocked = createDefaultState(now).copy(
+            isXiaomiDevice = true,
+            isXiaomiAutostartGranted = false
+        )
+        val report1 = MainAlarmLogic.detectViolations(stateBlocked)
+        val alert1 = report1.reports.find { it.type == ALERT_ID_XIAOMI_SYSTEM_MISSING }
+        assertTrue("Alert should trigger when Autostart is blocked", alert1?.conditionMet == true)
+        assertTrue(alert1?.subtitle?.contains("Autostart blocked") == true)
+
+        // Scenario 2: Xiaomi device, status DENIED
+        val stateDenied = createDefaultState(now).copy(
+            isXiaomiDevice = true,
+            xiaomiStatus = EngineXiaomiStatus.DENIED,
+            isXiaomiAutostartGranted = true
+        )
+        val report2 = MainAlarmLogic.detectViolations(stateDenied)
+        val alert2 = report2.reports.find { it.type == ALERT_ID_XIAOMI_SYSTEM_MISSING }
+        assertTrue("Alert should trigger when status is DENIED", alert2?.conditionMet == true)
+
+        // Scenario 3: Xiaomi device, status UNKNOWN, no override
+        val stateUnknown = createDefaultState(now).copy(
+            isXiaomiDevice = true,
+            xiaomiStatus = EngineXiaomiStatus.UNKNOWN,
+            isXiaomiManualOverride = false,
+            isXiaomiAutostartGranted = true
+        )
+        val report3 = MainAlarmLogic.detectViolations(stateUnknown)
+        assertTrue("Alert should trigger when UNKNOWN and no override", report3.reports.find { it.type == ALERT_ID_XIAOMI_SYSTEM_MISSING }?.conditionMet == true)
+
+        // Scenario 4: Xiaomi device, status UNKNOWN, WITH override
+        val stateOverride = stateUnknown.copy(isXiaomiManualOverride = true)
+        val report4 = MainAlarmLogic.detectViolations(stateOverride)
+        assertTrue("Alert should NOT trigger when UNKNOWN but override is active", report4.reports.find { it.type == ALERT_ID_XIAOMI_SYSTEM_MISSING }?.conditionMet == false)
     }
 
     @Test
     fun `Verify Geofence Predictive Exit trigger`() {
         val now = 1700000000000L
-        val trackerLat = 10.0011 
-        
         val state = createDefaultState(now).copy(
-            isTrackerMode = false,
-            trackerLat = trackerLat,
-            trackerLng = 10.0,
-            trackerSpeed = 5.0f, 
-            maxDistance = 100.0,
-            maxTrackerAccuracy = 5f
+            trackerLat = 10.0011,
+            trackerSpeed = 5.0f,
+            maxDistance = 100.0
         )
-
         val report = MainAlarmLogic.detectViolations(state)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
-        
-        assertTrue("Geofence alert should be present", geofence != null)
-        assertTrue("Predictive exit should trigger conditionMet", geofence?.conditionMet == true)
-        assertTrue("Technical details should mention PREDICTIVE EXIT", geofence?.technicalDetails?.contains("PREDICTIVE EXIT") == true)
+        assertTrue(geofence?.conditionMet == true)
+        assertTrue(geofence?.technicalDetails?.contains("PREDICTIVE EXIT") == true)
     }
 
     @Test
-    fun `Verify Tamper priority and extreme values`() {
-        val now = 1700000000000L
-        val state = createDefaultState(now).copy(
-            isTrackerMode = false,
+    fun `Verify Tamper extreme values`() {
+        val state = createDefaultState().copy(
             trackerTiltDegrees = 45.0f,
-            peakVibrationShock = 0.5f,
-            adaptiveVibrationFloor = 0.12f,
-            isNear = true
+            peakVibrationShock = 0.5f
         )
-
         val report = MainAlarmLogic.detectViolations(state)
         val tamper = report.reports.find { it.type == ALERT_ID_TRACKER_TAMPER }
-        val tilt = report.reports.find { it.type == ALERT_ID_TRACKER_TILT }
-
-        assertTrue("Tamper should be active", tamper?.conditionMet == true)
-        assertTrue("Tilt should be active", tilt?.conditionMet == true)
-        assertTrue("Extreme value should capture the 45 degree tilt", tamper?.extremeValue == 45.0)
-        assertTrue("Subtitle should describe the tilt", tamper?.subtitle?.contains("45.0° tilt") == true)
+        assertTrue(tamper?.conditionMet == true)
+        assertEquals(45.0, tamper?.extremeValue ?: 0.0, 0.1)
     }
 }

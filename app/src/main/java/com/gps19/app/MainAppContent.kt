@@ -39,6 +39,8 @@ import kotlinx.coroutines.delay
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.23:
  * - R925: Implemented mandatory 2,000ms landing page pause for auto-mode entry.
  * - R926: Guaranteed service start during auto-transition to prevent stale/gray data.

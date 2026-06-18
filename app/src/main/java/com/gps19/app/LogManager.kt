@@ -9,8 +9,9 @@ import java.util.UUID
 /**
  * LogManager: Centralizes logging logic, handling both local repository 
  * storage and remote relay emission.
- * v8.8.22:
- * - Aligned with SoT: now uses global LOG_MUZZLE_STARTUP_MS constant.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * v8.8.22: Aligned with SoT: now uses global LOG_MUZZLE_STARTUP_MS constant.
  * v8.8.23: Standardized all thresholds with Requirements SoT.
  * v8.8.25: Timing Standardization - Migrated to TimeProvider.
  * v8.8.26: Issue 114 - Forensic vid propagation in submitToLogSink.
