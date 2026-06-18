@@ -1,20 +1,17 @@
 # GPS-Tracker (Pure Native APK)
 
-**Version: 8.8.35**
+**Version: 8.9.2**
 
 This project is a **Pure Native Android Application** built with Kotlin and Jetpack Compose, designed for high-precision background tracking and remote monitoring in demanding environments.
 
+## Recent Changes (v8.9.2)
+- **Branding Finalization (Issue 182/R935)**: Standardized to John Deere Green `#367C2B` and established `jd_app_icon.xml` as the primary asset. Redundant legacy branding assets marked for removal.
+- **Forensic Parity (Issue 178/179)**: Achieved full field parity for `verticalVelocity` and SIT metrics (`sitBaro`, `sitTilt`, `sitShock`) across the telemetry pipeline.
+- **Viewer Service Completion (Issue 185)**: Implemented local log and trail persistence in `ViewerService` to ensure forensic mirroring between roles.
+- **GPS Stability Audit (Issue 168)**: Integrated 10Hz polling verification suite to monitor fix reliability on high-frequency devices (Xiaomi/Samsung).
+
 ## Recent Changes (v8.8.35)
-- **Database Schema Cleanup (Issue 159)**: Formally removed legacy `ver` and `vid` columns from SQLite tables via Room Migration v33. Schema is now clean and aligned with the simplified forensic model.
-- **Global Version Synchronization (Issue 156)**: Synchronized all documentation (SOT, Alarms, Sentinel) and build scripts to the v8.8.35 baseline.
-
-## Recent Changes (v8.8.34)
-- **Forensic Simplification**: Removed redundant version fields from all active data models and telemetry pipelines.
-- **Build Stability (Issue 155)**: Resolved model synchronization conflicts following forensic field removal.
-
-## Recent Changes (v8.8.32)
-- **Forensic Parity Fix (Issue 149)**: Achieved symbol parity for forensic markers (Magenta Squares for Jumps, Red Circles for Out-of-Range).
-- **Viewer Jump Latching**: Viewers now explicitly record Tracker-calculated visual jumps to local forensics.
+- **Database Schema Cleanup (Issue 159)**: Formally removed legacy `ver` and `vid` columns from SQLite tables via Room Migration v33.
 
 ## Project Core Features
 - **Pure Logic Engine (:core:engine)**: Physically isolated tracking math, free from Android framework dependencies.

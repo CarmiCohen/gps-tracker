@@ -15,13 +15,10 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
- * v8.8.21:
- * - FIXED SOT Desync: Corrected JSON key mismatch for home points (home_points vs homePoints).
- * - FIXED Issue 93-B: Standardized field mapping from TrackerStatus to local variables.
- * - Issue 76: Added trackerLastValidFixRealtime (monotonic) for stable gap detection.
- * v8.8.28: Standardized signaling keys to snake_case (viewer_id, from_viewer) and pulse types.
- * v8.8.34: Forensic Simplification - Removed all peer version tracking (trackerVer).
- * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * - Issue 180: Verified forensic SIT parity across telemetry mapping.
+ * - Issue 135: Standardized field mapping for verticalVelocity and SIT metrics.
  */
 class RemoteHandler(
     private val context: Context,

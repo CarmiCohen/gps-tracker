@@ -48,6 +48,8 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.36:
  * - Issue 147: Migrated marker and polyline pools to SnapshotStateList to resolve "failed lock verification" warnings.
  * - Issue 165: Migrated to PhysicsUtils for location validation.

@@ -6,8 +6,10 @@ import javax.inject.Singleton
 
 /**
  * ServiceForensicUseCase: Manages state-latched violation recording for background services.
- * Ensures critical events (Signal Loss, Jammer, Stall, etc.) are recorded once per occurrence.
- * Extracted from TrackerService/ViewerService to resolve Issue 115 (God Objects).
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * v8.8.36:
+ * - Issue 173: Added ALERT_ID_TRACKER_CHAIR to recorded violation markers.
  */
 @Singleton
 class ServiceForensicUseCase @Inject constructor(
@@ -31,6 +33,7 @@ class ServiceForensicUseCase @Inject constructor(
         handleLatch(ALERT_ID_VISUAL_JUMP, ALERT_ID_VISUAL_JUMP in activeViolations, lat, lng, accuracy, now)
         handleLatch(ALERT_ID_GPS_STALL, ALERT_ID_GPS_STALL in activeViolations, lat, lng, accuracy, now)
         handleLatch(ALERT_ID_TRACKER_GAP, ALERT_ID_TRACKER_GAP in activeViolations, lat, lng, accuracy, now)
+        handleLatch(ALERT_ID_TRACKER_CHAIR, ALERT_ID_TRACKER_CHAIR in activeViolations, lat, lng, accuracy, now) // Issue 173
 
         // 2. Alarm-based violations (passed in via unresolvedAlarms)
         handleLatch(ALERT_ID_TRACKER_TAMPER, ALERT_ID_TRACKER_TAMPER in unresolvedAlarms, lat, lng, accuracy, now)

@@ -10,13 +10,10 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
- * v8.8.2: 
- * - R923 Fix: Dashboard now recovers immediately upon telemetry receipt, even without GPS fix,
- *   by utilizing both position timestamp and telemetry arrival timestamp.
- * v8.8.34: Forensic Simplification - Removed 'ver' from display logic.
- * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * - Cleaned up redundant 'v' prefix in version display.
  * v8.8.36: Issue 165 - Migrated to FormatterUtils.
- * v8.9.2: Cleaned up redundant 'v' prefix in version display.
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {

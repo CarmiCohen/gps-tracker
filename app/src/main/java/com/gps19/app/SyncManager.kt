@@ -12,8 +12,9 @@ import org.json.JSONObject
 
 /**
  * SyncManager: Handles broadcasting state updates and relay synchronization.
- * v8.8.35:
- * - Issue 156: Synchronized version to v8.8.35 baseline.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * - Issue 134: Removed dead code broadcastIntegrityUpdate and pushStatusUpdateOnly.
  * - Forensic Simplification: Removed legacy 'ver' and 'vid' from internal models; 
  *   version is now injected at the emission layer via BuildConfig.VERSION_NAME.
  */
@@ -133,161 +134,10 @@ class SyncManager(
 
     fun stopSyncLoop() { syncJob?.cancel() }
 
-    fun broadcastIntegrityUpdate(
-        sig: Boolean, gps: Boolean, jam: Boolean, net: Boolean, 
-        suspicious: Boolean, tamper: Boolean, powerTamper: Boolean, 
-        alarms: String, micPending: Boolean, sit: Boolean = false, sitActive: Boolean = false, sitTs: Long = 0L,
-        vz: Float = 0f, dz: Float = 0f, baro: Float = 0f, tilt: Float = 0f, shock: Float = 0f,
-        clockRegression: Boolean = false,
-        isLocationPending: Boolean = false,
-        isPowerSaveMode: Boolean = false,
-        standbyBucket: Int = -1,
-        netInterface: String = "UNKNOWN",
-        isStorageLow: Boolean = false,
-        isStorageCritical: Boolean = false,
-        isBatterySteepDischarge: Boolean = false,
-        isCoolingModeActive: Boolean = false
-    ) {
-        val currentIntegrity = telemetryRepository.integrityState.value
-        telemetryRepository.updateIntegrity(currentIntegrity.copy(
-            signalLoss = sig, 
-            gpsStalled = gps, 
-            jammerSuspicion = jam, 
-            localInternetLoss = net,
-            isSuspicious = suspicious,
-            isTamperDetected = tamper,
-            isPowerTamper = powerTamper,
-            activeAlarmsJson = alarms, 
-            micPending = micPending,
-            isSitDetected = sit,
-            isSitActive = sitActive,
-            lastSitTs = sitTs,
-            sitVz = vz,
-            sitDz = dz,
-            sitBaro = baro,
-            sitTilt = tilt,
-            sitShock = shock,
-            isClockRegression = clockRegression,
-            isLocationPending = isLocationPending,
-            isPowerSaveMode = isPowerSaveMode,
-            standbyBucket = standbyBucket,
-            netInterface = netInterface,
-            isStorageLow = isStorageLow,
-            isStorageCritical = isStorageCritical,
-            isBatterySteepDischarge = isBatterySteepDischarge,
-            isCoolingModeActive = isCoolingModeActive
-        ))
-    }
-
     fun broadcastRttUpdate(isPeerAvailable: Boolean, lastPeerTs: Long, isHardwareOnline: Boolean) {
         telemetryRepository.updateLastRtt(networkManager.getRtt())
         telemetryRepository.updateRemoteActivity(lastPeerTs)
         telemetryRepository.updateIntegrity(telemetryRepository.integrityState.value.copy(isHardwareOnline = isHardwareOnline))
-    }
-
-    fun pushStatusUpdateOnly(deviceId: String, viewerId: String, isTrackerMode: Boolean, isStalledActive: Boolean, micPending: Boolean, isSitActive: Boolean = false) {
-        if (deviceId.isEmpty()) return
-        val now = timeProvider.currentTimeMillis()
-        val signalIndex = TelemetryUtils.calculateCommIndex(networkManager.getRtt(), DEFAULT_SIGNAL_STRENGTH, DEFAULT_SIGNAL_STRENGTH)
-        val integrity = telemetryRepository.integrityState.value
-        
-        val snrIdx = if (isTrackerMode && gpsManager != null) (gpsManager.consumeMinSnr() / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f) else 0f
-        
-        val data = JSONObject().apply {
-            put("id", deviceId); put("viewer_id", viewerId); put("from_viewer", !isTrackerMode)
-            put("role", if (isTrackerMode) "tracker" else "viewer")
-            put("battery", integrity.batteryLevel); put("temp", integrity.batteryTemp); put("max_temp", integrity.maxTemp); put("is_charging", integrity.isCharging)
-            put("current_ma", integrity.currentMa)
-            put("ts", now)
-            put("ver", BuildConfig.VERSION_NAME)
-            put("sats_view", gpsManager?.satellitesInView ?: 0); put("sats_used", gpsManager?.satellitesUsed ?: 0)
-            put("signal", signalIndex); put("is_jammer", integrity.jammerSuspicion); put("is_stalled", isStalledActive)
-            put("mic_pending", micPending)
-            put("is_suspicious", integrity.isSuspicious)
-            put("is_tamper_detected", integrity.isTamperDetected)
-            put("is_power_tamper", integrity.isPowerTamper)
-            put("is_sit_detected", integrity.isSitDetected)
-            put("is_sit_active", isSitActive)
-            put("last_sit_ts", integrity.lastSitTs)
-            put("is_clock_regression", integrity.isClockRegression)
-            put("is_location_pending", integrity.isLocationPending)
-            put("snr_idx", snrIdx)
-            put("is_battery_steep_discharge", integrity.isBatterySteepDischarge)
-            put("is_cooling_mode_active", integrity.isCoolingModeActive)
-            
-            put("is_power_save_mode", integrity.isPowerSaveMode)
-            put("standby_bucket", integrity.standbyBucket)
-            put("net_interface", integrity.netInterface)
-            put("is_storage_low", integrity.isStorageLow)
-            put("is_storage_critical", integrity.isStorageCritical)
-            
-            put("sit_vz", safeFloat(integrity.sitVz))
-            put("sit_dz", safeFloat(integrity.sitDz))
-            put("sit_baro", safeFloat(integrity.sitBaro))
-            put("sit_tilt", safeFloat(integrity.sitTilt))
-            put("sit_shock", safeFloat(integrity.sitShock))
-            
-            put("uptime_ms", sessionManager.uptimeMs)
-            put("total_connected_ms", sessionManager.totalConnectedMs); put("session_connected_ms", sessionManager.sessionConnectedMs)
-            put("total_drop_ms", sessionManager.getTotalDropWithActive(now)); put("max_drop_ms", sessionManager.getMaxDropWithActive(now))
-            put("max_drop_ts", sessionManager.getMaxDropTsWithActive(now))
-            put("last_conn_ts", sessionManager.lastConnectionTs)
-            put("last_disc_ts", sessionManager.lastDisconnectionTs)
-            
-            put("violation_uptime_ms", sessionManager.violationUptimeMs)
-            put("violation_percentage", sessionManager.getViolationPercentage())
-        }
-        
-        if (networkManager.isConnected()) {
-            networkManager.emit("location_update", data)
-        } else if (isTrackerMode) {
-            scope.launch {
-                offlineRepository.addPendingStatusUpdate(PendingStatusEntity(
-                    lat = 0.0, lng = 0.0, speed = 0f, accuracy = 0f, bearing = 0f,
-                    battery = integrity.batteryLevel, temp = integrity.batteryTemp,
-                    isCharging = integrity.isCharging, timestamp = now,
-                    satsView = gpsManager?.satellitesInView ?: 0, satsUsed = gpsManager?.satellitesUsed ?: 0,
-                    maxAccuracy = 0f, snrIdx = snrIdx, isBatterySteepDischarge = integrity.isBatterySteepDischarge,
-                    isCoolingModeActive = integrity.isCoolingModeActive,
-                    isSitDetected = integrity.isSitDetected, isSitActive = isSitActive,
-                    sitVz = integrity.sitVz, sitDz = integrity.sitDz,
-                    sitBaro = integrity.sitBaro, sitTilt = integrity.sitTilt, sitShock = integrity.sitShock,
-                    isStorageLow = integrity.isStorageLow, isStorageCritical = integrity.isStorageCritical,
-                    isPowerSaveMode = integrity.isPowerSaveMode, standbyBucket = integrity.standbyBucket,
-                    netInterface = integrity.netInterface
-                ))
-            }
-        }
-
-        telemetryRepository.updateLocation(LocationUpdate(
-            lat = 0.0, lng = 0.0, speed = 0f, accuracy = 0f, bearing = 0f,
-            battery = integrity.batteryLevel, temp = integrity.batteryTemp, maxTemp = integrity.maxTemp, isCharging = integrity.isCharging, currentMa = integrity.currentMa,
-            gpsTs = 0L, isMe = true, satsView = gpsManager?.satellitesInView ?: 0, satsUsed = gpsManager?.satellitesUsed ?: 0,
-            maxAccuracy = 0f, signal = signalIndex, isJump = integrity.jammerSuspicion, isStalled = isStalledActive,
-            micPending = micPending, isSuspicious = integrity.isSuspicious, 
-            isTamperDetected = integrity.isTamperDetected, isPowerTamper = integrity.isPowerTamper,
-            isSitDetected = integrity.isSitDetected, isSitActive = isSitActive, lastSitTs = integrity.lastSitTs,
-            sitVz = integrity.sitVz, sitDz = integrity.sitDz, sitBaro = integrity.sitBaro, sitTilt = integrity.sitTilt, sitShock = integrity.sitShock,
-            uptimeMs = sessionManager.uptimeMs, totalDropMs = sessionManager.getTotalDropWithActive(now), 
-            maxDropMs = sessionManager.getMaxDropWithActive(now), 
-            maxDropTs = sessionManager.getMaxDropTsWithActive(now),
-            totalConnectedMs = sessionManager.totalConnectedMs,
-            sessionConnectedMs = sessionManager.sessionConnectedMs,
-            lastConnTs = sessionManager.lastConnectionTs, 
-            lastDiscTs = sessionManager.lastDisconnectionTs,
-            violationUptimeMs = sessionManager.violationUptimeMs,
-            violationPercentage = sessionManager.getViolationPercentage(),
-            isClockRegression = integrity.isClockRegression,
-            isLocationPending = integrity.isLocationPending,
-            isPowerSaveMode = integrity.isPowerSaveMode,
-            standbyBucket = integrity.standbyBucket,
-            netInterface = integrity.netInterface,
-            isStorageLow = integrity.isStorageLow,
-            isStorageCritical = integrity.isStorageCritical,
-            snrIdx = snrIdx,
-            isBatterySteepDischarge = integrity.isBatterySteepDischarge,
-            isCoolingModeActive = integrity.isCoolingModeActive
-        ))
     }
 
     fun pushCurrentStatus(

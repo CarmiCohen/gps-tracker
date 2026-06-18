@@ -21,14 +21,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v8.8.27: Modularization Phase 2 - Delegated Forensic Marking and Behavioral Logic to UseCases.
- * v8.8.31: Escalated GPS Revival - Implemented retry loop and critical hardware failure logging.
- * v8.8.31 (Identity Propagation): Now passing identity to LocationProcessor for forensic marking.
- * v8.8.32: Fixed forensic marking for VISUAL_JUMP to ensure persistent map markers.
- * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
- * v8.8.35: Issue 163 - Restored power tamper detection by reconnecting callbacks to IntegrityMonitor.
- * v8.8.35: Issue 148 - Implemented A15 stable polling (1000ms).
- * v8.9.2: Issue 168 - Added forensic logging for GPS interval transitions.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * - Issue 135: Passing all SIT forensic fields to historyManager.updateRibbons for full forensic parity.
+ * - FIXED: Typo in evaluateAlarmsInternal parameters.
+ * - Issue 181: De-noised GPS Stability Audit by removing per-gap logs; now relying on 10s consolidated audit.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -71,6 +68,13 @@ class TrackerService : BaseMonitorService() {
     private var isXiaomi = false
     private var isA15 = false
     private var currentGpsInterval = -1L
+    private var lastGpsTransitionLogTs = 0L
+
+    // Issue 168: Stability Audit Metrics
+    private var lastGpsArrivalRealtime = 0L
+    private var lastGpsAuditRealtime = 0L
+    private var gpsArrivalCount = 0
+    private var gpsMaxGapMs = 0L
 
     private val localProcessorListener = object : LocationProcessorListener {
         override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean) {
@@ -307,6 +311,23 @@ class TrackerService : BaseMonitorService() {
             }
         }
 
+        // Issue 168: Periodic Stability Audit
+        if (nowRealtime - lastGpsAuditRealtime > GPS_STABILITY_AUDIT_INTERVAL_MS) {
+            if (currentGpsInterval == HIGH_FREQUENCY_GPS_POLLING_MS) {
+                val expectedCount = (GPS_STABILITY_AUDIT_INTERVAL_MS / HIGH_FREQUENCY_GPS_POLLING_MS).toInt()
+                val reliability = if (expectedCount > 0) (gpsArrivalCount.toFloat() / expectedCount.toFloat()) * 100f else 0f
+                val auditMsg = "STABILITY AUDIT: 10Hz persistence is %.1f%% (%d/%d fixes). Max Gap: %dms".format(
+                    reliability, gpsArrivalCount, expectedCount, gpsMaxGapMs
+                )
+                val isPoor = reliability < 80f || gpsMaxGapMs > GPS_STABILITY_GAP_THRESHOLD_MS
+                logManager.logServiceEvent(auditMsg, important = isPoor, isSpecial = isPoor, specialColor = if (isPoor) FORENSIC_PINK_COLOR else null)
+            }
+            // Reset audit window
+            gpsArrivalCount = 0
+            gpsMaxGapMs = 0L
+            lastGpsAuditRealtime = nowRealtime
+        }
+
         // Forensic Marking - Delegated to UseCase
         lastProcessedLocation?.let { proc ->
             val unresolvedAlarms = alarmManager.getUnresolvedAlarmTypes()
@@ -316,6 +337,7 @@ class TrackerService : BaseMonitorService() {
             if (isGpsStalledActive) activeViolations.add(ALERT_ID_GPS_STALL)
             if (isGpsGapActive) activeViolations.add(ALERT_ID_TRACKER_GAP)
             if (proc.status == SentinelStatus.JUMP) activeViolations.add(ALERT_ID_VISUAL_JUMP)
+            if (lastSitDetected) activeViolations.add(ALERT_ID_TRACKER_CHAIR) 
 
             forensicUseCase.recordViolationMarkers(
                 now = now,
@@ -383,11 +405,15 @@ class TrackerService : BaseMonitorService() {
                 HIGH_FREQUENCY_GPS_POLLING_MS -> if (isXiaomi) "Xiaomi 10Hz Persistence" else "S21FE 10Hz Persistence"
                 else -> "Moving"
             }
-            // Issue 168: Detailed forensic logging for GPS interval transitions
+            
             val logMsg = "GPS TRANSITION: ${if (currentGpsInterval == -1L) "START" else "${currentGpsInterval}ms"} -> ${gpsInterval}ms ($reason). " +
                          "Context: Suspicious=$isSuspiciousMode, Stationary=${sensorManager.isStationary()}, " +
                          "Cooling=${integrityMonitor.isCoolingModeActive}, Device(A15=$isA15, S21FE=$isS21FE, Xiaomi=$isXiaomi)"
-            logManager.logServiceEvent(logMsg, important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+            
+            if (nowRealtime - lastGpsTransitionLogTs > GPS_TRANSITION_LOG_MUZZLE_MS) {
+                lastGpsTransitionLogTs = nowRealtime
+                logManager.logServiceEvent(logMsg, important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+            }
 
             currentGpsInterval = gpsInterval
             gpsManager.setPollingInterval(gpsInterval)
@@ -434,8 +460,12 @@ class TrackerService : BaseMonitorService() {
             proxIdx = sensorManager.proximityIdx,
             liftIdx = (abs(sensorManager.relativeAltitude) / RIBBON_LIFT_SCALE_METERS).coerceIn(0f, 1f),
             snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f),
+            verticalVelocity = sensorManager.currentVerticalVelocity,
             sitVz = locationProcessor.sentinel.lastSitVz,
             sitDz = locationProcessor.sentinel.lastSitDz,
+            sitBaro = locationProcessor.sentinel.lastSitBaro,
+            sitTilt = locationProcessor.sentinel.lastSitTilt,
+            sitShock = locationProcessor.sentinel.lastSitShock,
             isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge,
             isCoolingModeActive = integrityMonitor.isCoolingModeActive,
             speed = ((proc?.filteredSpeed ?: 0.0) / 3.6).toFloat(),
@@ -491,6 +521,7 @@ class TrackerService : BaseMonitorService() {
                 standbyBucket = integrityMonitor.currentStandbyBucket, netInterface = integrityMonitor.getActiveNetworkInterface(), isStorageLow = integrityMonitor.isStorageLow,
                 isStorageCritical = integrityMonitor.isStorageCritical, isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive,
                 discoveryPhase = null,
+                isXiaomiDevice = isXiaomi,
                 xiaomiStatus = xiaomiStatus,
                 isXiaomiManualOverride = isXiaomiManualOverride,
                 isXiaomiAutostartGranted = isXiaomiAutostartGranted(this@TrackerService)
@@ -503,6 +534,19 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun onLocationChanged(location: Location) {
+        val nowRealtime = timeProvider.elapsedRealtime()
+        
+        // Issue 168: Stability Tracking
+        if (lastGpsArrivalRealtime > 0) {
+            val gap = nowRealtime - lastGpsArrivalRealtime
+            if (gap > gpsMaxGapMs) gpsMaxGapMs = gap
+            
+            // Issue 181: Removed per-gap log to prevent flooding.
+            // Audit logic in processTick handles consolidated reporting.
+        }
+        lastGpsArrivalRealtime = nowRealtime
+        gpsArrivalCount++
+
         val processed = locationProcessor.processGpsPoint(
             lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedKph = location.speed.toDouble() * 3.6, 
             gpsTs = location.time, accuracy = location.accuracy, bearing = location.bearing, snr = gpsManager.averageSnr, 
@@ -519,7 +563,7 @@ class TrackerService : BaseMonitorService() {
         }
         
         if (processed.status == SentinelStatus.JUMP || processed.status == SentinelStatus.OUTLIER) {
-            if (systemMonitor.jumpStateStartTs == 0L) systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime()
+            if (systemMonitor.jumpStateStartTs == 0L) systemMonitor.jumpStateStartTs = nowRealtime
         } else if (processed.status == SentinelStatus.VALID) {
             systemMonitor.jumpStateStartTs = 0L
             pendingAcousticViolation = false
@@ -528,7 +572,6 @@ class TrackerService : BaseMonitorService() {
         lastKnownLocation = location; lastProcessedLocation = processed
 
         if (processed.status != SentinelStatus.VALID) {
-            val nowRealtime = timeProvider.elapsedRealtime()
             val nowWall = timeProvider.currentTimeMillis()
             val silenceDelta = if (remoteHandler.lastPeerActivityTs > 0) nowRealtime - remoteHandler.lastPeerActivityTs else 0L
             val isSignalLoss = integrityMonitor.checkSignalIntegrity(nowRealtime, silenceDelta, true)

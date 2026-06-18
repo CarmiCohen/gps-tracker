@@ -7,16 +7,9 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
- * v8.8.32:
- * - Removed 'vid' column from LogEntity, HistoryEntity, and PendingStatusEntity for version simplification.
- * - Increment to v31.
- * - Issue 139/142: Expanded forensic depth in HistoryEntity and PendingStatusEntity.
- * - Issue 140/143: Added 'ver' column for historical version tagging.
- * v8.8.34:
- * - Forensic Simplification: Removed 'ver' from all entities in code.
- * - Note: 'ver' and 'vid' columns remain in schema as dead weight to preserve migration paths.
- * v8.8.35 (Issue 159):
- * - Database Schema Cleanup: Formally removed 'ver' and 'vid' columns from all tables via MIGRATION_32_33.
+ * v33 Migration Forensic Audit:
+ * - Issue 135: Ensured 'verticalVelocity' is present in both connection_history and pending_status_updates.
+ * - Standardized all forensic SIT fields across tables.
  */
 @Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
 data class LogEntity(
@@ -40,8 +33,8 @@ data class LogEntity(
 @Entity(tableName = "trail_points", indices = [Index(value = ["timestamp"])])
 data class TrailEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val lat: Double,
-    val lng: Double,
+    @ColumnInfo(name = "lat") val lat: Double,
+    @ColumnInfo(name = "lng") val lng: Double,
     val timestamp: Long,
     val isViewerTrail: Boolean,
     val isJump: Boolean = false
@@ -64,6 +57,7 @@ data class HistoryEntity(
     val proxIdx: Float = 1f, 
     val liftIdx: Float = 0f,
     val snrIdx: Float = 0f,
+    val verticalVelocity: Float = 0f,
     val sitVz: Float = 0f, 
     val sitDz: Float = 0f,
     @ColumnInfo(name = "isBatterySteepDischarge")
@@ -343,9 +337,9 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE trail_points_new RENAME TO trail_points")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_trail_points_timestamp ON trail_points (timestamp)")
 
-                // connection_history: remove 'vid', 'ver'
-                db.execSQL("CREATE TABLE connection_history_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, ts INTEGER NOT NULL, rtt INTEGER NOT NULL, isConnected INTEGER NOT NULL, isGap INTEGER NOT NULL, hasGps INTEGER NOT NULL, isTick INTEGER NOT NULL, ribbonKey TEXT NOT NULL, gpsIndex REAL NOT NULL, noiseIdx REAL NOT NULL, luxIdx REAL NOT NULL, vibeIdx REAL NOT NULL, proxIdx REAL NOT NULL, liftIdx REAL NOT NULL, snrIdx REAL NOT NULL, sitVz REAL NOT NULL, sitDz REAL NOT NULL, isBatterySteepDischarge INTEGER NOT NULL, remoteSig INTEGER NOT NULL, isCoolingModeActive INTEGER NOT NULL, speed REAL NOT NULL, bearing REAL NOT NULL, isSitDetected INTEGER NOT NULL, isSitActive INTEGER NOT NULL, sitBaro REAL NOT NULL, sitTilt REAL NOT NULL, sitShock REAL NOT NULL)")
-                db.execSQL("INSERT INTO connection_history_new (id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock) SELECT id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock FROM connection_history")
+                // connection_history: remove 'vid', 'ver', add 'verticalVelocity'
+                db.execSQL("CREATE TABLE connection_history_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, ts INTEGER NOT NULL, rtt INTEGER NOT NULL, isConnected INTEGER NOT NULL, isGap INTEGER NOT NULL, hasGps INTEGER NOT NULL, isTick INTEGER NOT NULL, ribbonKey TEXT NOT NULL, gpsIndex REAL NOT NULL, noiseIdx REAL NOT NULL, luxIdx REAL NOT NULL, vibeIdx REAL NOT NULL, proxIdx REAL NOT NULL, liftIdx REAL NOT NULL, snrIdx REAL NOT NULL, verticalVelocity REAL NOT NULL, sitVz REAL NOT NULL, sitDz REAL NOT NULL, isBatterySteepDischarge INTEGER NOT NULL, remoteSig INTEGER NOT NULL, isCoolingModeActive INTEGER NOT NULL, speed REAL NOT NULL, bearing REAL NOT NULL, isSitDetected INTEGER NOT NULL, isSitActive INTEGER NOT NULL, sitBaro REAL NOT NULL, sitTilt REAL NOT NULL, sitShock REAL NOT NULL)")
+                db.execSQL("INSERT INTO connection_history_new (id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, verticalVelocity, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock) SELECT id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, 0 as verticalVelocity, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock FROM connection_history")
                 db.execSQL("DROP TABLE connection_history")
                 db.execSQL("ALTER TABLE connection_history_new RENAME TO connection_history")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_connection_history_ts ON connection_history (ts)")

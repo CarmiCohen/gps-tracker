@@ -31,6 +31,8 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.36:
  * - Issue 165: Migrated to PhysicsUtils for location validation.
  * v8.8.21:

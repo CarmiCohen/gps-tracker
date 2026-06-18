@@ -1,4 +1,4 @@
-# Architectural Audit Issues (v8.9.2)
+# Architectural Audit Issues (v8.8.37)
 
 This document tracks deviations from the high-assurance modular architecture defined in the project's core documentation.
 
@@ -153,15 +153,8 @@ This document tracks deviations from the high-assurance modular architecture def
 ## 172. FIXED Xiaomi False Positives on Non-Xiaomi - Resolution: Added `isXiaomiDevice` flag to `AlarmEvaluationState` and updated `MainAlarmLogic.kt` to gate `ALERT_ID_XIAOMI_SYSTEM_MISSING` violations, ensuring they only occur on Xiaomi hardware. (v8.8.36).
 ## 173. FIXED Tracker-Side SIT Marker Persistence - Resolution: Ensured `ALERT_ID_TRACKER_CHAIR` is passed to `forensicUseCase.recordViolationMarkers` in `TrackerService.kt` to ensure discrete SIT events are recorded to the local forensic database. (v8.8.36).
 ## 168. FIXED Xiaomi 10Hz Stability Preparation - Resolution: Implemented a GPS Stability Audit suite in `TrackerService.kt`. The system now tracks fix counts and inter-fix gaps, emitting periodic reliability metrics and forensic gap alerts during 10Hz polling to enable data-driven background persistence verification. (v8.8.36).
-## 177. FIXED Dead Code Cleanup - Resolution: Formally removed redundant telemetry methods in `SyncManager` (`broadcastIntegrityUpdate`, `pushStatusUpdateOnly`). (v8.8.37).
-## 178. FIXED Forensic Parity: verticalVelocity Alignment - Resolution: Implemented full forensic parity for `verticalVelocity` across models, database, and ribbons. (v8.8.37).
-## 179. FIXED RemoteHandler SIT Mapping Audit - Resolution: Verified 100% field parity for SIT forensics in `handleRemoteUpdate`, ensuring Tracker-side chair events are reconstructed in Viewer mode. (v8.8.37).
-## 180. FIXED Forensic Pipeline Verification - Resolution: Verified 1:1 field mapping for verticalVelocity and SIT metrics across the telemetry pipeline. (v8.9.2).
-## 182. FIXED Global Version Synchronization - Resolution: Synchronized all source headers and documentation to the v8.9.2 baseline. (v8.9.2).
-## 185. FIXED ViewerService Listener Completion - Resolution: Fully implemented localProcessorListener in ViewerService.kt for session reconstruction parity. (v8.9.2).
-## 186. FIXED SoT Documentation Hardening - Resolution: Updated REQUIREMENTS_SOT.md, README.md, and DOCS_HISTORY.md to the v8.9.2 logic baseline. (v8.9.2).
-## 181. FIXED GPS Stability Audit Verification - Resolution: De-noised forensic logs by removing per-gap alerts. Consolidated reliability metrics are now emitted every 10s during 10Hz polling windows. (v8.9.2).
-## 183. FIXED Legacy Branding Cleanup - Resolution: Switched all internal notification and UI references to R.drawable.ic_jd_logo. Physically removed redundant mipmap XMLs (z, z2, splash) and background assets. (v8.9.2).
+## 177. FIXED SyncManager Dead Code - Resolution: Removed `SyncManager.broadcastIntegrityUpdate` and `SyncManager.pushStatusUpdateOnly` as they were orphaned following modularization. (v8.8.37).
+## 178. FIXED Forensic Parity: verticalVelocity Alignment - Resolution: Implemented full forensic parity for `verticalVelocity` across `EngineConnectionPoint`, `HistoryEntity`, `ConnectionPoint`, and analytical ribbons. Verified and hardened Migration v33 to initialize historical `verticalVelocity` to 0. (v8.8.37).
+## 179. FIXED RemoteHandler SIT Mapping Audit - Resolution: Verified and confirmed 100% field parity for SIT forensics in `RemoteHandler.init` and `handleRemoteUpdate`, ensuring Tracker-side chair events are correctly reconstructed in Viewer mode. (v8.8.37).
 
-## 133. OPEN (Rank: 9) Xiaomi Background Stability Test - Task: Verify 10Hz polling and autostart gating on physical Xiaomi hardware.
-## 184. OPEN (Rank: 5) Muzzle Window Validation - Task: Confirm if MUZZLE_WINDOW_DURATION_MS (500ms) is sufficient for safety-flushing on slower storage.
+## 133. OPEN (Rank: 8) Xiaomi Background Stability Test - Task: Verify 10Hz polling (HIGH_FREQUENCY_GPS_POLLING_MS) and isXiaomiAutostartGranted effectiveness on a physical Xiaomi device to ensure background persistence.

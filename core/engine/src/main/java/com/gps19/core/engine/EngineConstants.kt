@@ -2,10 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * v8.8.36:
- * - Release 8.8.36: Updated version baseline.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * - Issue 171: Added GPS_TRANSITION_LOG_MUZZLE_MS for forensic log stability.
  * - Issue 145: Centralized MAX_HISTORY_POINTS_PER_RIBBONS for UI consistency.
  * - Issue 104: Unified LOG_MUZZLE_STARTUP_MS for service boot suppression.
+ * - Issue 168: Added GPS_STABILITY_AUDIT constants for Xiaomi 10Hz verification.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -217,9 +219,12 @@ const val RTT_WINDOW_SIZE = 5
 // Trajectory & Persistence (v8.8.35)
 const val HOME_POINT_REFRESH_INTERVAL_MS = 30000L
 
-// Logging & UI (v8.8.36)
+// Logging & UI (v8.9.2)
 const val LOG_MUZZLE_STARTUP_MS = 10000L
+const val GPS_TRANSITION_LOG_MUZZLE_MS = 30000L
 const val MAX_HISTORY_POINTS_PER_RIBBONS = 240
+const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
+const val GPS_STABILITY_GAP_THRESHOLD_MS = 1000L
 
 // Alert Internal IDs (Aligned with SoT)
 const val ALERT_ID_LOCAL_INTERNET = "LOCAL_INTERNET"

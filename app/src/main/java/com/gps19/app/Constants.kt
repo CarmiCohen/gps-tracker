@@ -4,10 +4,11 @@ import com.gps19.core.engine.*
 
 /**
  * Constants: Centralized configuration values and system thresholds.
- * v8.8.35:
- * - Issue 156: Synchronized version strings to v8.8.35 baseline.
+ * v8.9.2:
+ * - Issue 182: Synchronized version strings to v8.9.2 baseline.
  * - Forensic Simplification: Reflects removal of 'ver' and 'vid' tags from data stream.
  * - Issue 162: Removed duplicated scheduling and RTT constants; migrated to EngineConstants.kt.
+ * - FIXED: Restored FLOW_SHARING_TIMEOUT_MS for ViewModel state stability.
  */
 
 // Global App Defaults
@@ -31,6 +32,7 @@ const val LOG_SENSORS_STARTED_TRACKER = "Sensors started (Tracker Mode)"
 const val LOG_SENSORS_STOPPED_VIEWER = "Sensors stopped (Viewer Mode)"
 const val LOG_SUSPICIOUS_ACTIVATED = "Suspicious mode activated: %s"
 const val LOG_SUSPICIOUS_DEACTIVATED = "Suspicious mode deactivated"
+const val LOG_SUSPICIOUS_STATE_CHANGE = "Suspicious state changed: %s"
 const val LOG_TRAJECTORY_CONFIRMED = "Trajectory confirmed"
 const val LOG_SAFETY_FLUSH = "Safety-flush: Pending settings committed"
 const val LOG_UI_PULSE_STABILITY = "UI Pulse Stability: Timeout detected while in foreground (Jitter > %dms). Throttling down."

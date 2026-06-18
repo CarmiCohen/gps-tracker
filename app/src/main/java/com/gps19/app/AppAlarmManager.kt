@@ -10,12 +10,15 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.21:
  * - FIXED Issue 93-B: Stopped passing empty string as localId to ensure LogManager generates a UUID.
  * - FIXED Issue 59-C: Version tag now uses current BuildConfig.VERSION_NAME dynamically.
  * v8.8.22:
  * - Chunk 3: Added isXiaomiAutostartGranted to evaluateAlarms for engine-level gating.
  * v8.8.23: Standardized all thresholds with Requirements SoT.
+ * v8.8.36: Issue 172 - Added isXiaomiDevice to evaluateAlarms for engine-level gating.
  */
 class AppAlarmManager(
     private val context: Context,
@@ -125,6 +128,7 @@ class AppAlarmManager(
         isBatterySteepDischarge: Boolean = false,
         isCoolingModeActive: Boolean = false,
         discoveryPhase: DiscoveryPhase? = null,
+        isXiaomiDevice: Boolean = false,
         xiaomiStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
         isXiaomiManualOverride: Boolean = false,
         isXiaomiAutostartGranted: Boolean = true,
@@ -194,6 +198,7 @@ class AppAlarmManager(
             isTrackerMode = isTrackerMode,
             isBatterySteepDischarge = isBatterySteepDischarge,
             isCoolingModeActive = isCoolingModeActive,
+            isXiaomiDevice = isXiaomiDevice,
             xiaomiStatus = xiaomiStatus,
             isXiaomiManualOverride = isXiaomiManualOverride,
             isXiaomiAutostartGranted = isXiaomiAutostartGranted

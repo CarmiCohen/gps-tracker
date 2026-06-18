@@ -1,4 +1,4 @@
-# Device-Specific Adaptations (v8.8.36)
+# Device-Specific Adaptations (v8.9.2)
 
 This document describes the specialized logic and polling configurations implemented to bypass OEM-specific background restrictions on supported hardware.
 
@@ -26,6 +26,12 @@ Due to the non-standard nature of Xiaomi's background management, users can togg
 
 ### 2.3. Background Persistence
 Integrated `isXiaomiAutostartGranted` check in `TrackerService.kt` alarm loop and enabled `HIGH_FREQUENCY_GPS_POLLING_MS` (10Hz) for Xiaomi devices to ensure background stability parity with Samsung S21 FE.
+
+### 2.4. Stability Audit Suite (Issue 168)
+Implemented a GPS Stability Audit suite in `TrackerService` to verify 10Hz persistence on physical Xiaomi hardware.
+- **Metrics**: Tracks fix arrival counts, inter-fix gaps (ms), and max gap observed.
+- **Audit Loop**: Every 10s (`GPS_STABILITY_AUDIT_INTERVAL_MS`), the system emits a "STABILITY AUDIT" log reporting the reliability percentage.
+- **Forensic Escalation**: If a gap > 1000ms (`GPS_STABILITY_GAP_THRESHOLD_MS`) is detected during 10Hz polling, a "STABILITY GAP" forensic log is emitted to signal potential system-level background throttling.
 
 ## 3. General OEM Throttling
 ### 3.1. Standby Bucket Monitoring

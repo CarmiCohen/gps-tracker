@@ -12,14 +12,9 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * v8.8.22:
- * - Chunk 2 Purity: Removed class-level Calendar and SimpleDateFormat to comply with zero-framework-leakage in logic loops.
- * - Optimized time-based triggers to avoid high-frequency object allocation (1Hz -> 1/60Hz for time checks).
- * v8.8.26: Issue 114 - Forensic propagation in mapToAppPoint.
- * v8.8.27: Issue 117 - Standardized scheduling constants for daily cleanup and archiving.
- * v8.8.32: Issue 140 - Accept identity/version parameter for historical tagging.
- * v8.8.34: Forensic Simplification - Removed identity/version tagging to simplify architecture.
- * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * - Issue 135: Added verticalVelocity to updateRibbons and backfillGaps for forensic parity.
  */
 class HistoryManager(
     private val context: Context,
@@ -59,6 +54,7 @@ class HistoryManager(
         proxIdx: Float = 1f,
         liftIdx: Float = 0f,
         snrIdx: Float = 0f,
+        verticalVelocity: Float = 0f,
         sitVz: Float = 0f,
         sitDz: Float = 0f,
         sitBaro: Float = 0f,
@@ -101,6 +97,7 @@ class HistoryManager(
                 proxIdx = proxIdx,
                 liftIdx = liftIdx,
                 snrIdx = snrIdx,
+                verticalVelocity = verticalVelocity,
                 sitVz = sitVz,
                 sitDz = sitDz,
                 sitBaro = sitBaro,
@@ -129,15 +126,19 @@ class HistoryManager(
             proxIdx = proxIdx,
             liftIdx = liftIdx,
             snrIdx = snrIdx,
+            verticalVelocity = verticalVelocity,
             sitVz = sitVz,
             sitDz = sitDz,
+            sitBaro = sitBaro,
+            sitTilt = sitTilt,
+            sitShock = sitShock,
             isBatterySteepDischarge = isBatterySteepDischarge,
             isCoolingModeActive = isCoolingModeActive,
             speed = speed,
             bearing = bearing,
             isSitDetected = isSitDetected,
             isSitActive = isSitActive,
-            isTick = false // current point is usually from processTick or telemetry
+            isTick = false 
         )
 
         processResults(aggregator.processPoint(currentPoint))
@@ -176,6 +177,7 @@ class HistoryManager(
         proxIdx: Float,
         liftIdx: Float,
         snrIdx: Float,
+        verticalVelocity: Float,
         sitVz: Float,
         sitDz: Float,
         sitBaro: Float,
@@ -213,8 +215,12 @@ class HistoryManager(
             proxIdx = proxIdx,
             liftIdx = liftIdx,
             snrIdx = snrIdx,
+            verticalVelocity = verticalVelocity,
             sitVz = sitVz,
             sitDz = sitDz,
+            sitBaro = sitBaro,
+            sitTilt = sitTilt,
+            sitShock = sitShock,
             isBatterySteepDischarge = isBatterySteepDischarge,
             isCoolingModeActive = isCoolingModeActive,
             speed = speed,
@@ -293,6 +299,7 @@ class HistoryManager(
             proxIdx = p.proxIdx,
             liftIdx = p.liftIdx,
             snrIdx = p.snrIdx,
+            verticalVelocity = p.verticalVelocity,
             sitVz = p.sitVz,
             sitDz = p.sitDz,
             sitBaro = p.sitBaro,

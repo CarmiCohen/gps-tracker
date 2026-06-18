@@ -9,6 +9,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.36:
  * - Issue 165: Migrated pure logic to :core:engine (PhysicsUtils, FormatterUtils).
  *   Removed redundant delegations.

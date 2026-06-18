@@ -15,10 +15,8 @@ import java.util.Locale
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
- * v6.6.2:
- * - Maintenance: Updated to v6.6.2.
- * v6.6.1:
- * - Hardening: Strict Xiaomi readiness gate. UNKNOWN status now treated as blocked to ensure fully verified state.
+ * v8.9.2:
+ * - Issue 183: Switched notification icons from legacy R.mipmap.z2 to R.drawable.ic_jd_logo.
  */
 class AppNotificationManager(private val context: Context) {
 
@@ -56,7 +54,7 @@ class AppNotificationManager(private val context: Context) {
         )
 
         return NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.mipmap.z2)
+            .setSmallIcon(R.drawable.ic_jd_logo)
             .setContentTitle("GPS Tracker Active")
             .setContentText(contentText)
             .setOngoing(true)
@@ -87,7 +85,7 @@ class AppNotificationManager(private val context: Context) {
         )
 
         val builder = NotificationCompat.Builder(context, alarmChannelId)
-            .setSmallIcon(R.mipmap.z2)
+            .setSmallIcon(R.drawable.ic_jd_logo)
             .setContentTitle("CRITICAL ALARM")
             .setContentText(causes)
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -119,7 +117,6 @@ class AppNotificationManager(private val context: Context) {
         val canDraw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
         val xiaomiStatus = isXiaomiSpecialPermissionGranted(context)
         
-        // R742 Hardening: Treat UNKNOWN on Xiaomi as potentially blocked to ensure fully verified state.
         val effectivelyBlocked = !canDraw || (isXiaomiDevice() && xiaomiStatus != XiaomiPermissionStatus.GRANTED)
 
         updateAlarmNotification(causes, showPermissionAction = effectivelyBlocked)

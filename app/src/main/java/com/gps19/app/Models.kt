@@ -9,6 +9,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.21:
  * - Issue 93-B: Hardened LogEntry.fromJSONObject to ensure localId is never blank.
  * - Issue 95-C: Added role field to LogEntry for multi-role forensic traceability.
@@ -17,6 +19,7 @@ import java.util.*
  * v8.8.32: Added forensic fields for SIT and Storage depth (Issue 139, 142).
  * v8.8.34: Forensic Simplification - Removed 'ver' fields from all models to simplify architecture.
  * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
+ * v8.8.37: Added verticalVelocity to ConnectionPoint for forensic parity (Issue 135).
  */
 
 @Serializable
@@ -70,6 +73,7 @@ data class ConnectionPoint(
     val isTick: Boolean = false, val hasGps: Boolean = false, val gpsIndex: Float = 0f,
     val noiseIdx: Float = 0f, val luxIdx: Float = 0f, val vibeIdx: Float = 0f, val proxIdx: Float = 1f,
     val liftIdx: Float = 0f, val snrIdx: Float = 0f,
+    val verticalVelocity: Float = 0f,
     val sitVz: Float = 0f, val sitDz: Float = 0f,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,

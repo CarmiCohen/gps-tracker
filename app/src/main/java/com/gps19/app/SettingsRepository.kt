@@ -55,8 +55,8 @@ class SettingsRepository @Inject constructor(
         const val VIEWER_ID_KEY = "viewer_id"
         const val RELAY_URL_KEY = "relay_url"
         const val DEFAULT_RELAY_URL = "https://gps-survival-relay.onrender.com"
-        const val DEFAULT_TRACKER_ID = "T"
-        const val DEFAULT_VIEWER_ID = "C"
+        const val DEFAULT_TRACKER_ID = "Ttk"
+        const val DEFAULT_VIEWER_ID = "Cohen"
         const val MAX_DISTANCE_STORAGE_KEY = "max_distance"
         const val DEFAULT_MAX_DISTANCE = 60.0
         const val MAX_ACCURACY_KEY = "max_accuracy"

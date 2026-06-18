@@ -11,16 +11,16 @@ import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
+import java.util.*
 import javax.inject.Inject
 import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * v8.8.27: Modularization Phase 2 - Delegated Forensic Marking to ServiceForensicUseCase.
- * v8.8.31 (Identity Propagation): Now passing identity to LocationProcessor for forensic marking.
- * v8.8.32: Fixed forensic marking for VISUAL_JUMP to ensure persistent map markers for tracker jumps.
- * v8.8.34: Forensic Simplification - Removed peer version tracking from history manager.
- * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * - Issue 185: Implemented log and trail handling in localProcessorListener for forensic parity.
+ * - Issue 135: Passing all SIT forensic fields from remoteHandler to historyManager for forensic parity.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -43,11 +43,22 @@ class ViewerService : BaseMonitorService() {
     private var isXiaomiManualOverride = false
 
     private val localProcessorListener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean) {}
-        override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean) {}
-        override fun onMaxAccuracyChanged(accuracy: Float) {}
-        override fun onChairBaselineChanged(baseline: Float) {}
-        override fun onGpsStallDetected(ts: Long) {}
+        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean) {
+            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump)
+        }
+        override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean) {
+            val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
+            logManager.logServiceEvent(message, isImportant, isSpecial = isSpecial || message.contains("Merge-on-Stale"), specialColor = specialColor)
+        }
+        override fun onMaxAccuracyChanged(accuracy: Float) {
+            repository.saveFloatSync(MainRepository.MAX_ACCURACY_KEY, accuracy)
+        }
+        override fun onChairBaselineChanged(baseline: Float) {
+            logManager.logServiceEvent("Tracker: Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°")
+        }
+        override fun onGpsStallDetected(ts: Long) {
+            // Tracker-side stall tracking handled via RemoteHandler updates
+        }
     }
 
     override fun onCreate() {
@@ -244,8 +255,12 @@ class ViewerService : BaseMonitorService() {
             proxIdx = remoteHandler.trackerProxIdx,
             liftIdx = (abs(remoteHandler.trackerBaroAlt) / RIBBON_LIFT_SCALE_METERS).coerceIn(0f, 1f),
             snrIdx = remoteHandler.trackerSnrIdx,
+            verticalVelocity = remoteHandler.trackerVerticalVelocity,
             sitVz = remoteHandler.trackerSitVz,
             sitDz = remoteHandler.trackerSitDz,
+            sitBaro = remoteHandler.trackerSitBaro,
+            sitTilt = remoteHandler.trackerSitTilt,
+            sitShock = remoteHandler.trackerSitShock,
             isBatterySteepDischarge = remoteHandler.isTrackerBatterySteepDischarge,
             isCoolingModeActive = remoteHandler.isTrackerCoolingModeActive,
             speed = remoteHandler.trackerSpeed,
@@ -283,6 +298,7 @@ class ViewerService : BaseMonitorService() {
                 isStorageLow = integrityMonitor.isStorageLow, isStorageCritical = integrityMonitor.isStorageCritical,
                 isBatterySteepDischarge = remoteHandler.isTrackerBatterySteepDischarge, isCoolingModeActive = remoteHandler.isTrackerCoolingModeActive,
                 discoveryPhase = null,
+                isXiaomiDevice = isXiaomiDevice(),
                 xiaomiStatus = xiaomiStatus,
                 isXiaomiManualOverride = isXiaomiManualOverride,
                 isXiaomiAutostartGranted = isXiaomiAutostartGranted(this@ViewerService)

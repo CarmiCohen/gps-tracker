@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.8.36
+# System Source of Truth (SoT) - v8.9.2
 
 This document serves as the definitive operational specification for the GPS-Tracker system.
 
@@ -137,7 +137,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `PARKING_ANCHOR_FACTOR` | 0.8 | Decay factor for parking anchor stability. |
 | `RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT` | 20.0m | Accuracy required to resolve distance violations. |
 
-## 2. Forensic Ribbon Scaling (v8.8.36)
+## 2. Forensic Ribbon Scaling (v8.9.2)
 | Constant | Value | Description |
 | :--- | :--- | :--- |
 | `RIBBON_NOISE_SCALE_DB` | 40.0dB | Maximum range for acoustic ribbon mapping. |
@@ -163,7 +163,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ## 4. Remote Forensic Verification
 ### 4.1. Version & Role Visibility
-*   **Engine Identity**: The system operates on the v8.8.36 baseline logic.
+*   **Engine Identity**: The system operates on the v8.9.2 baseline logic.
 *   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using a timestamp (`yearOffset` + `MMddHHmm`) to ensure uniqueness across years.
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Standardized ALERT_IDs**: Aligned with `EngineConstants.kt`. Includes `ALERT_ID_VISUAL_JUMP` for trajectory-based jumps.
@@ -219,7 +219,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ---
 
-## 8. Forensic Alert Manifest (v8.8.36)
+## 8. Forensic Alert Manifest (v8.9.2)
 | Alert ID | Alert Title (Standardized) | Trigger Description |
 | :--- | :--- | :--- |
 | `LOCAL_INTERNET` | This device: Internet Lost | Local connectivity failure. |
@@ -250,16 +250,39 @@ This document serves as the definitive operational specification for the GPS-Tra
 | Requirement ID | Requirement Description | Implementation Status |
 | :--- | :--- | :--- |
 | **R872** | **Alert Suppression**: No local alerts/sirens shall trigger on the Tracker device. New alerts must strictly respect the 2s grace period. | **Verified (BehaviorUseCase)** |
-| **R917** | **Smooth Update**: The app must operate normally after an APK update without requiring a manual "Force Stop" or removal from recents. | **Verified (DataStore + Sticky FGS)** |
-| **R933** | **Alert Grace Period**: A mandatory 2-second grace period is enforced between consecutive alert triggers. | **Verified (AppAlarmManager)** |
-| **R916** | **Settings Persistence**: Users must be able to modify and persist IDs, distance, alert config, and sound selections at all times. | **Verified (SettingsRepository)** |
 | **R915** | **UI Responsiveness**: The Map settings toggle must reliably respond to touch events over the AndroidView. | **Verified (MapComponents)** |
-| **R866** | **Branding Accuracy**: JD Branding Green must match exactly #367C2B. | **Verified (Color.kt)** |
-| **R867** | **Role Identity**: Default Tracker ID shall be "T" and Default Viewer ID shall be "C". | **Verified (SettingsRepository)** |
-| **R868** | **Telemetry Layout**: The Status Card must display `maxAccuracy` for both Tracker and Viewer roles in a unified format. | **Verified (SharedUiComponents)** |
+| **R916** | **Settings Persistence**: Users must be able to modify and persist IDs, distance, alert config, and sound selections at all times. | **Verified (SettingsRepository)** |
+| **R917** | **Smooth Update**: The app must operate normally after an APK update without requiring a manual \"Force Stop\" or removal from recents. | **Verified (DataStore + Sticky FGS)** |
+| **R921/R926** | **Session Lifecycle**: Exhaustive state reset and mandatory landing page pause to ensure lifecycle stability across sessions. | **Verified (MainViewModel)** |
+| **R922** | **LED Logic**: INT LED reflects local relay state; SRV/TRK/DAT/GPS are gated by peer health (isRemote) for end-to-end verification. | **Verified (SharedUiComponents)** |
+| **R923** | **Forensic Refresh**: Dashboard recovers immediately upon telemetry receipt using the maximum of GPS and arrival timestamps. | **Verified (DashboardUseCase)** |
+| **R933** | **Alert Grace Period**: A mandatory 2-second grace period is enforced between consecutive alert triggers to prevent event flooding. | **Verified (AppAlarmManager)** |
 | **R935** | **Icon Branding**: The app icon shall use the John Deere deer logo without any accompanying text. | **Verified (ic_jd_logo.xml)** |
-| **Issue 124** | **GPS Revival**: System must retry hardware revival every 5m during stall and escalate to critical after 3 failures. | **Verified (TrackerService)** |
+| **R866** | **Branding Accuracy**: JD Branding Green must match exactly #367C2B. | **Verified (Color.kt)** |
+| **R867** | **Role Identity**: Default Tracker ID shall be \"Ttk\" and Default Viewer ID shall be \"Cohen\". | **Verified (SettingsRepository)** |
+| **R868** | **Telemetry Layout**: The Status Card must display `maxAccuracy` for both Tracker and Viewer roles in a unified format. | **Verified (SharedUiComponents)** |
+| **Issue 6** | **Xiaomi Gating**: Implemented `ALERT_ID_XIAOMI_SYSTEM_MISSING` to detect and alert on MIUI background restrictions. | **Verified (MainAlarmLogic)** |
+| **Issue 13** | **Timing Integrity**: Migrated to `SystemClock.elapsedRealtime()` for all debouncing and persistence timing to prevent wall-clock leaks. | **Verified (MainRepository)** |
+| **Issue 15** | **Forensic I/O**: Implemented safety-flush in service `onDestroy` and monotonic interval checks for history persistence. | **Verified (MainRepository)** |
+| **Issue 45** | **FGS Compliance**: Correctly passing `FOREGROUND_SERVICE_TYPE_LOCATION` for Android 10+ and asserting types in callbacks. | **Verified (ViewerService)** |
+| **Issue 58** | **Module Hardening**: Converted `:core:engine` to a pure `java-library` to enforce zero Android framework dependencies. | **Verified (build.gradle)** |
+| **Issue 70** | **Thermal Throttling**: Implemented \"Cooling Mode\" (46°C/44°C) that throttles GPS polling to protect hardware. | **Verified (IntegrityMonitor)** |
+| **Issue 71/72** | **System Integrity**: Monitoring of low/critical storage and OS-level restrictions (Standby Buckets, Power Save) for forensic visibility. | **Verified (IntegrityMonitor)** |
+| **Issue 102** | **TimeProvider**: Standardized all duration and timeout logic across the system to use the `TimeProvider` abstraction. | **Verified (Standardized Architecture)** |
+| **Issue 115** | **Modularization**: Decoupled `MainViewModel` into feature UseCases (Navigation, Settings, Telemetry, Behavior, Session, Alert, Map). | **Verified (MainViewModel)** |
+| **Issue 124** | **GPS Revival**: System retries hardware revival every 5m during stall and escalates to critical after 3 failures. | **Verified (TrackerService)** |
 | **Issue 125** | **Monotonic UI**: UI lockout and pulse logic must use monotonic time to survive system clock jumps. | **Verified (MainViewModel)** |
-| **Issue 149** | **Forensic Parity**: Symbol parity for jump markers (Magenta Squares). Viewers explicitly latch peer visual jumps. | **Verified (ViewerService/Map)** |
-| **Issue 163** | **Power Tamper Hardening**: Reconnected power tamper detection via `IntegrityMonitor`. Hardened detection using `EXTRA_PLUGGED` and polling auto-recovery. | **Verified (IntegrityMonitor)** |
+| **Issue 146** | **Startup Performance**: Optimized launch by moving `OsmConfig` to background thread and staggering ViewModel initialization. | **Verified (GpsApplication)** |
 | **Issue 148** | **A15 Stability**: Enforced 1000ms GPS polling (`A15_STABLE_GPS_POLLING_MS`) and 5s proximity debounce for Samsung A15 devices. | **Verified (ServiceBehaviorUseCase)** |
+| **Issue 149** | **Forensic Parity**: Symbol parity for jump markers (Magenta Squares). Viewers explicitly latch peer visual jumps to local forensics. | **Verified (ViewerService/Map)** |
+| **Issue 163** | **Power Tamper Hardening**: Reconnected power tamper detection via `IntegrityMonitor` using `EXTRA_PLUGGED` and auto-recovery. | **Verified (IntegrityMonitor)** |
+| **Issue 168** | **Stability Audit Suite**: Implemented GPS Stability Audit suite in TrackerService.kt to track fix reliability and inter-fix gaps. | **Verified (TrackerService)** |
+| **Issue 169** | **Version Synchronization**: Synchronized source headers in Tracker/Viewer services with the v8.9.2 baseline for audit integrity. | **Verified (TrackerService/ViewerService)** |
+| **Issue 170/172** | **Xiaomi Alert Guard**: Added explicit `isXiaomiDevice` check to gate `ALERT_ID_XIAOMI_SYSTEM_MISSING` violations. | **Verified (MainAlarmLogic)** |
+| **Issue 171** | **GPS Transition Muzzle**: Implemented `GPS_TRANSITION_LOG_MUZZLE_MS` (30s) to prevent forensic log flooding. | **Verified (TrackerService)** |
+| **Issue 173** | **SIT Marker Persistence**: Reconnected `ALERT_ID_TRACKER_CHAIR` to `forensicUseCase` for persistent map visualization on the Tracker. | **Verified (TrackerService)** |
+| **Issue 174** | **Default Identity**: Updated `DEFAULT_TRACKER_ID` to \"Ttk\" and `DEFAULT_VIEWER_ID` to \"Cohen\" for verified role identity. | **Verified (SettingsRepository)** |
+| **Issue 175** | **Version Update Smoothness**: Verified `MY_PACKAGE_REPLACED` handling in `BootReceiver` for background service continuity. | **Verified (BootReceiver)** |
+| **Issue 176** | **Statistics Persistence**: Verified forensic ribbon and statistics accumulation across app restarts using Room and DataStore. | **Verified (HistoryManager/SettingsRepository)** |
+| **Issue 177** | **Dead Code Cleanup**: Formally removed redundant telemetry methods in `SyncManager` following consolidation around `pushCurrentStatus`. | **Verified (SyncManager)** |
+| **Issue 178/179**| **Forensic Parity Audit**: Verified 100% field parity for `verticalVelocity` and SIT metrics across the pipeline and `RemoteHandler`. | **Verified (RemoteHandler/HistoryManager)** |

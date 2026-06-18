@@ -2,7 +2,8 @@ package com.gps19.core.engine
 
 /**
  * SignalingConstants: Core rules for relay communication and role enforcement.
- * v8.8.21:
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * - Role-Based Standardization: Explicitly enforcing Tracker ID ("T") vs Viewer ID ("C").
  */
 object SignalingConstants {

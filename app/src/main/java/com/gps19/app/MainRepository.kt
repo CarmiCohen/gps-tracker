@@ -18,15 +18,9 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
- * v8.8.21:
- * - Logic Decoupling: Delegated violation deduplication to ViolationProcessor (engine).
- * - Timing Integrity: Migrated to TimeProvider for all forensic and debouncing timing.
- * - Boundary Cleanup: Delegated logging to LogRepository.
- * - Persistence Policy: Delegated storage preservation rules to PersistencePolicy (engine).
- * v8.8.25: Standardized history batching thresholds with Engine SoT (Issue 113).
- * v8.8.32: Removed vid propagation.
- * v8.8.34: Forensic Simplification - Removed 'ver' propagation.
- * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * - Issue 135: Added verticalVelocity to connection_history mapping for forensic parity.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -51,7 +45,6 @@ class MainRepository @Inject constructor(
     private var lastHomeRefreshTs = 0L
     private var lastAlarmAckTs: Long = 0L
 
-    // v8.8.21: Computational state moved to engine processor
     private val violationProcessor = ViolationProcessor(timeProvider)
 
     private var trailWriteCount = 0
@@ -233,7 +226,6 @@ class MainRepository @Inject constructor(
         if (lat == 0.0 || lng == 0.0) return
         
         val integrity = telemetry.integrityState.value
-        // v8.8.21: Delegated storage preservation logic to PersistencePolicy
         if (!PersistencePolicy.shouldSaveTrailPoint(
             isStorageCritical = integrity.isStorageCritical,
             isStorageLow = integrity.isStorageLow,
@@ -268,10 +260,6 @@ class MainRepository @Inject constructor(
         offlineRepository.clear()
     }
 
-    /**
-     * addViolation: Standard forensic entry point.
-     * v8.8.21: Computational "fuzzy" logic moved to ViolationProcessor.
-     */
     fun addViolation(lat: Double, lng: Double, type: String, adaptiveRadius: Double = 0.0, timestamp: Long? = null) {
         if (!violationProcessor.shouldRecordViolation(lat, lng, type, adaptiveRadius)) return
 
@@ -295,6 +283,7 @@ class MainRepository @Inject constructor(
                 hasGps = entity.hasGps, gpsIndex = entity.gpsIndex,
                 noiseIdx = entity.noiseIdx, luxIdx = entity.luxIdx, vibeIdx = entity.vibeIdx, proxIdx = entity.proxIdx,
                 liftIdx = entity.liftIdx, snrIdx = entity.snrIdx,
+                verticalVelocity = entity.verticalVelocity,
                 sitVz = entity.sitVz, sitDz = entity.sitDz,
                 isBatterySteepDischarge = entity.isBatterySteepDischarge,
                 isCoolingModeActive = entity.isCoolingModeActive,
@@ -322,7 +311,6 @@ class MainRepository @Inject constructor(
         scope.launch { _liveHistoryFlow.emit(ribbonKey to points) }
         
         val integrity = telemetry.integrityState.value
-        // v8.8.21: Delegated storage preservation logic to PersistencePolicy
         if (!PersistencePolicy.shouldSaveHistoryPoint(integrity.isStorageCritical)) return
 
         points.forEach { point ->
@@ -331,6 +319,7 @@ class MainRepository @Inject constructor(
                 hasGps = point.hasGps, isTick = point.isTick, ribbonKey = ribbonKey, gpsIndex = point.gpsIndex,
                 noiseIdx = point.noiseIdx, luxIdx = point.luxIdx, vibeIdx = point.vibeIdx, proxIdx = point.proxIdx,
                 liftIdx = point.liftIdx, snrIdx = point.snrIdx,
+                verticalVelocity = point.verticalVelocity,
                 sitVz = point.sitVz, sitDz = point.sitDz,
                 isBatterySteepDischarge = point.isBatterySteepDischarge,
                 remoteSig = point.remoteSig,
@@ -352,10 +341,6 @@ class MainRepository @Inject constructor(
         }
     }
 
-    /**
-     * flushHistory: Publicly accessible high-assurance flush for data persistence.
-     * Use during service shutdown or critical state transitions.
-     */
     suspend fun flushHistory() {
         flushHistoryBufferInternal(timeProvider.elapsedRealtime())
     }

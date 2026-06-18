@@ -10,6 +10,8 @@ import org.junit.Test
 
 /**
  * UtilsTest: Tests for migrated utility functions.
+ * v8.9.2:
+ * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.36: Issue 165 - Migrated to PhysicsUtils and FormatterUtils.
  */
 class UtilsTest {
