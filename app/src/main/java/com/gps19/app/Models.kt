@@ -9,6 +9,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v8.9.6:
+ * - Issue 193: Added isTelemetryFresh to DashboardState to resolve Zombie Telemetry UX.
  * v8.9.5:
  * - Issue 192: Added currentMa to ConnectionPoint, LocationState, and IntegrityStateUi for full forensic parity.
  * - Build Fix: Corrected CommitSettings inheritance to UiEvent.
@@ -337,7 +339,8 @@ data class DashboardState(
     val distToHome: String = "--",    
     val distToViewer: String = "--",  
     val isGpsFresh: Boolean = true,    
-    val isLinkFresh: Boolean = true,   
+    val isLinkFresh: Boolean = true,
+    val isTelemetryFresh: Boolean = true,
     val isGpsVisible: Boolean = true,  
     val isLinkVisible: Boolean = true,   
     val isBatterySteepDischarge: Boolean = false, 

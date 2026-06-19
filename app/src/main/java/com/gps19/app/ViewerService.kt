@@ -18,17 +18,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.6:
+ * - Issue 194: Added ALERT_ID_TRACKER_CHAIR to recordViolationMarkers to ensure SIT parity via status flags.
+ * - Issue 190: Passing explicit xiaomiAutostartStatus to evaluateAlarms for robust indeterminate handling.
  * v8.9.5:
  * - Issue 192: Fixed evaluateAlarms parameter mismatch; passing remoteHandler.trackerCurrentMa to historyManager.
  * - Issue 189: Fixed Viewer Background Location Gap. Injected GpsManager and implemented relative geofencing.
- * v8.9.4:
- * - Issue 187: Implemented startup state restoration for LocationProcessor (maxAccuracy, SIT, tracker state).
- * v8.9.3:
- * - Issue 188: Preserved historical GPS timestamps in trail points.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * - Issue 185: Implemented log and trail handling in localProcessorListener for forensic parity.
- * - Issue 135: Passing all SIT forensic fields from remoteHandler to historyManager for forensic parity.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -98,7 +93,7 @@ class ViewerService : BaseMonitorService() {
             
             locationProcessor = LocationProcessor(localProcessorListener, timeProvider)
             
-            // Issue 187: Load Engine State for Viewer Engine Consistency
+            // Load Engine State
             val savedMaxAcc = repository.getFloat(MainRepository.MAX_ACCURACY_KEY, 0f)
             val savedLastSit = repository.getLong(MainRepository.LAST_SIT_TS_KEY, 0L)
             val savedBaseline = repository.getFloat(MainRepository.CHAIR_BASELINE_TILT_KEY, -1000f)
@@ -167,8 +162,6 @@ class ViewerService : BaseMonitorService() {
             val recoveredTs = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
             lastServiceTickTs = recoveredTs
             lastServiceTickRealtime = timeProvider.elapsedRealtime()
-            
-            // Issue 187: Prevent immediate GPS Gap alerts by resetting the valid fix baseline to now
             locationProcessor.setLastValidFixTs(timeProvider.elapsedRealtime())
             
             startTickLoop()
@@ -204,7 +197,6 @@ class ViewerService : BaseMonitorService() {
         lastKnownLocation = location
         lastProcessedLocation = processed
 
-        // Update relative distance using live remote handler data
         val trackerAnchor = object : SpatialAnchor {
             override val lat = remoteHandler.trackerLat
             override val lng = remoteHandler.trackerLng
@@ -286,7 +278,6 @@ class ViewerService : BaseMonitorService() {
         val isTrackerStalled = remoteHandler.trackerGpsStallStartTs > 0L && (nowRealtime - remoteHandler.trackerGpsStallStartTs > GPS_STALL_THRESHOLD_MS)
         val isTrackerGap = remoteHandler.trackerLastValidFixRealtime > 0L && (nowRealtime - remoteHandler.trackerLastValidFixRealtime > GPS_GAP_THRESHOLD_MS)
 
-        // Forensic Marking for Viewer - Delegated to UseCase
         if (remoteHandler.trackerLat != 0.0 && remoteHandler.trackerLng != 0.0) {
             val unresolvedAlarms = alarmManager.getUnresolvedAlarmTypes()
             val activeViolations = mutableSetOf<String>()
@@ -295,6 +286,7 @@ class ViewerService : BaseMonitorService() {
             if (isTrackerStalled) activeViolations.add(ALERT_ID_GPS_STALL)
             if (isTrackerGap) activeViolations.add(ALERT_ID_TRACKER_GAP)
             if (remoteHandler.isTrackerVisualJump) activeViolations.add(ALERT_ID_VISUAL_JUMP)
+            if (remoteHandler.isTrackerSitDetected) activeViolations.add(ALERT_ID_TRACKER_CHAIR)
 
             forensicUseCase.recordViolationMarkers(
                 now = now,
@@ -366,6 +358,13 @@ class ViewerService : BaseMonitorService() {
             XiaomiPermissionStatus.DENIED -> EngineXiaomiStatus.DENIED
             XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN
         }
+        
+        // Issue 190: Pass explicit Autostart status in Viewer mode as well (for local health)
+        val xiaomiAutostartStatus = when(getXiaomiAutostartStatus(this@ViewerService)) {
+            XiaomiPermissionStatus.GRANTED -> EngineXiaomiStatus.GRANTED
+            XiaomiPermissionStatus.DENIED -> EngineXiaomiStatus.DENIED
+            XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN
+        }
 
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
@@ -379,7 +378,7 @@ class ViewerService : BaseMonitorService() {
                 isHardwareOnline = true, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
                 isJammerSuspicion = isTrackerJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled,
                 isUiVisible = isUiVisible(), 
-                distToHomeAuthority = maxOf(distToTracker, remoteHandler.trackerDistToHome ?: 0.0), // Relative Geofence Support
+                distToHomeAuthority = maxOf(distToTracker, remoteHandler.trackerDistToHome ?: 0.0),
                 maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(),
                 isGpsGap = isTrackerGap,
                 isSuspicious = remoteHandler.isTrackerSuspicious, isTamperDetected = remoteHandler.isTrackerTamperDetected,
@@ -394,6 +393,7 @@ class ViewerService : BaseMonitorService() {
                 discoveryPhase = null,
                 isXiaomiDevice = isXiaomiDevice(),
                 xiaomiStatus = xiaomiStatus,
+                xiaomiAutostartStatus = xiaomiAutostartStatus, // Issue 190
                 isXiaomiManualOverride = isXiaomiManualOverride,
                 isXiaomiAutostartGranted = isXiaomiAutostartGranted(this@ViewerService)
             )

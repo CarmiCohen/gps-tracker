@@ -4,17 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v8.9.6:
+ * - Issue 190: Added xiaomiAutostartStatus and removed redundant isXiaomiAutostartGranted from AlarmEvaluationState.
  * v8.9.5:
  * - Issue 192: Added currentMa to EngineConnectionPoint for forensic parity.
  * v8.9.2:
  * - Issue 182: Synchronized version strings to v8.9.2 baseline.
- * v8.8.35:
- * - Issue 156: Synchronized version strings to v8.8.35 baseline.
- * - Forensic Simplification: Reflects removal of 'ver' and 'vid' tags from data stream.
- * v8.8.36:
- * - Issue 172: Added isXiaomiDevice flag to AlarmEvaluationState.
- * v8.8.37:
- * - Issue 135: Added verticalVelocity to EngineConnectionPoint for forensic parity.
  */
 
 @Serializable
@@ -42,11 +37,6 @@ enum class EngineXiaomiStatus {
 
 /**
  * EngineConnectionPoint: Pure Kotlin representation of a forensic telemetry slice.
- * v8.8.21: Extracted from :app:ConnectionPoint for engine-level aggregation.
- * v8.8.34: Forensic Simplification - Removed 'ver' field.
- * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
- * v8.8.37: Added verticalVelocity for forensic parity.
- * v8.9.5: Added currentMa for power forensic parity.
  */
 @Serializable
 data class EngineConnectionPoint(
@@ -172,10 +162,8 @@ data class AlarmEvaluationState(
     var powerAlarmPending: Boolean,
     val trackerLat: Double, 
     val trackerLng: Double, 
-    val homePoints: List<EngineGeoPoint>, 
-    val maxDistance: Double,
-    val trackerGpsAccuracy: Float, 
-    val maxTrackerAccuracy: Float, 
+    val trackerGpsAccuracy: Float,
+    val maxTrackerAccuracy: Float,
     val lastGpsPacketTs: Long,
     val trackerSpeed: Float = 0f,
     val isTrackerVisualJump: Boolean = false,
@@ -187,6 +175,8 @@ data class AlarmEvaluationState(
     var distanceViolationCounter: Int, 
     var firstViolationTs: Long, 
     var firstViolationWasJump: Boolean,
+    val homePoints: List<EngineGeoPoint> = emptyList(),
+    val maxDistance: Double = 60.0,
     val distToHomeAuthority: Double? = null,
     val isGpsGap: Boolean = false,
     val isSuspicious: Boolean = false,
@@ -216,6 +206,6 @@ data class AlarmEvaluationState(
     val isCoolingModeActive: Boolean = false,
     val isXiaomiDevice: Boolean = false,
     val xiaomiStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
-    val isXiaomiManualOverride: Boolean = false,
-    val isXiaomiAutostartGranted: Boolean = true
+    val xiaomiAutostartStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
+    val isXiaomiManualOverride: Boolean = false
 )

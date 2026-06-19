@@ -2,12 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.6:
+ * - Issue 194: Added SIT_TRANSMISSION_LATCH_MS to ensure robust SIT event propagation.
+ * - Issue 191: Increased MUZZLE_WINDOW_DURATION_MS safety ceiling to 2000ms.
+ * - Issue 193: Added TELEMETRY_UI_STALE_THRESHOLD_MS (10s) for "Zombie UX" mitigation.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * - Issue 171: Added GPS_TRANSITION_LOG_MUZZLE_MS for forensic log stability.
- * - Issue 145: Centralized MAX_HISTORY_POINTS_PER_RIBBONS for UI consistency.
- * - Issue 104: Unified LOG_MUZZLE_STARTUP_MS for service boot suppression.
- * - Issue 168: Added GPS_STABILITY_AUDIT constants for Xiaomi 10Hz verification.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -99,6 +99,7 @@ const val CHAIR_PLUNGE_VELOCITY_THRESHOLD = 0.18f
 const val CHAIR_PLUNGE_DISTANCE_THRESHOLD = 0.05f 
 const val CHAIR_PLUNGE_WINDOW_MS = 800L
 const val CHAIR_SIT_COOLDOWN_MS = 5000L
+const val SIT_TRANSMISSION_LATCH_MS = 10000L
 
 // Filtering Thresholds (R810 Zero-Lag)
 const val SUSPICIOUS_Q_SCALE = 1000.0
@@ -152,7 +153,7 @@ const val WATCH_TIMEOUT_MS = 30000L
 const val CLOCK_REGRESSION_GATE_MS = 100L
 const val SENSOR_WARMING_MS = 5000L
 const val SUSPICIOUS_STATE_COOLDOWN_MS = 60000L
-const val MUZZLE_WINDOW_DURATION_MS = 500L
+const val MUZZLE_WINDOW_DURATION_MS = 2000L
 const val GPS_REVIVAL_RETRY_INTERVAL_MS = 300000L
 const val MAX_REVIVAL_ATTEMPTS = 3
 
@@ -225,6 +226,7 @@ const val GPS_TRANSITION_LOG_MUZZLE_MS = 30000L
 const val MAX_HISTORY_POINTS_PER_RIBBONS = 240
 const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 1000L
+const val TELEMETRY_UI_STALE_THRESHOLD_MS = 10000L
 
 // Alert Internal IDs (Aligned with SoT)
 const val ALERT_ID_LOCAL_INTERNET = "LOCAL_INTERNET"

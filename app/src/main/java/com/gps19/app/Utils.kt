@@ -9,11 +9,10 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
+ * v8.9.6:
+ * - Issue 190: Added getXiaomiAutostartStatus to support indeterminate state handling.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * v8.8.36:
- * - Issue 165: Migrated pure logic to :core:engine (PhysicsUtils, FormatterUtils).
- *   Removed redundant delegations.
  */
 
 enum class XiaomiPermissionStatus {
@@ -66,16 +65,20 @@ fun isXiaomiSpecialPermissionGranted(context: Context): XiaomiPermissionStatus {
     }
 }
 
-fun isXiaomiAutostartGranted(context: Context): Boolean {
-    if (!isXiaomiDevice()) return true
+fun getXiaomiAutostartStatus(context: Context): XiaomiPermissionStatus {
+    if (!isXiaomiDevice()) return XiaomiPermissionStatus.UNKNOWN
     val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     return try {
         val checkOpMethod = ops.javaClass.getMethod("checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
         val autostart = checkOpMethod.invoke(ops, 10008, android.os.Process.myUid(), context.packageName) as Int
-        autostart == AppOpsManager.MODE_ALLOWED
+        if (autostart == AppOpsManager.MODE_ALLOWED) XiaomiPermissionStatus.GRANTED else XiaomiPermissionStatus.DENIED
     } catch (e: Exception) {
-        true
+        XiaomiPermissionStatus.UNKNOWN
     }
+}
+
+fun isXiaomiAutostartGranted(context: Context): Boolean {
+    return getXiaomiAutostartStatus(context) == XiaomiPermissionStatus.GRANTED
 }
 
 fun isSamsungDevice(): Boolean {

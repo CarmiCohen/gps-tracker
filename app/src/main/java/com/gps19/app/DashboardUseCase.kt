@@ -10,10 +10,10 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
+ * v8.9.6:
+ * - Issue 193: Implemented isTelemetryFresh calculation for Zombie Telemetry UX mitigation.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * - Cleaned up redundant 'v' prefix in version display.
- * v8.8.36: Issue 165 - Migrated to FormatterUtils.
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {
@@ -55,12 +55,13 @@ class DashboardUseCase @Inject constructor() {
 
         val loc = if (isViewer) uiState.trackerLocation else uiState.localLocation
         
-        // R923 Fix: Use maximum of GPS timestamp and Telemetry arrival timestamp for visibility check.
         val effectiveLastActivityTs = maxOf(loc.timestamp, loc.telemetryTs)
         val telemetryAge = if (effectiveLastActivityTs > 0) now - effectiveLastActivityTs else Long.MAX_VALUE
         val isTelemetryVisible = telemetryAge < SENSOR_GRACE_PERIOD_MS
         
-        // SoT: GPS_UI_FAIL_THRESHOLD_MS (7s) for position fresh check. R923: Recover immediately on telemetry.
+        // Issue 193: Telemetry freshness threshold (10s)
+        val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
+        
         val effectiveGpsAge = if (effectiveLastActivityTs > 0) now - effectiveLastActivityTs else Long.MAX_VALUE
         val isGpsActive = effectiveGpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
 
@@ -83,16 +84,11 @@ class DashboardUseCase @Inject constructor() {
 
         val bucket = if (isViewer) uiState.trackerLocation.standbyBucket else uiState.integrity.standbyBucket
         
-        // SoT: SNR Index is 0.0-1.0 mapped to core engine scale (standard GNSS CN0 range)
         val snrValue = if (loc.snrIdx > 0f && isTelemetryVisible) "${(loc.snrIdx * RIBBON_SNR_SCALE_DB).toInt()}dB" else "--"
 
-        // Helper to hide stale coordinates (7s threshold)
         fun gpsVal(value: String): String = if (isGpsActive) value else "--"
-        
-        // Helper to hide expired sensors (10m threshold)
         fun sensorVal(value: String): String = if (isTelemetryVisible) value else "--"
 
-        // R880: Format distances for display. Persist values, UI will handle gray-out via isGpsFresh.
         fun formatDist(d: Double?): String {
             if (d == null || d.isNaN() || d == 0.0) return "--"
             return when {
@@ -155,6 +151,7 @@ class DashboardUseCase @Inject constructor() {
             distToViewer = formatDist(uiState.distanceTrackerToViewer),
             isGpsFresh = isGpsActive,
             isLinkFresh = (telemetryAge < WATCH_DOG_UI_GRACE_MS),
+            isTelemetryFresh = isTelemetryFresh,
             isGpsVisible = isTelemetryVisible,
             isLinkVisible = isTelemetryVisible,
             isBatterySteepDischarge = loc.isBatterySteepDischarge,

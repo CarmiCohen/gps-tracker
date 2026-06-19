@@ -5,9 +5,10 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v8.9.6:
+ * - Issue 190: Implemented robust handling for "Unknown" Xiaomi Autostart status.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * - Issue 170: Added explicit isXiaomiDevice check for ALERT_ID_XIAOMI_SYSTEM_MISSING.
  */
 object MainAlarmLogic {
 
@@ -359,25 +360,30 @@ object MainAlarmLogic {
         )
 
         // 7. DEVICE SPECIFIC GATING
-        // R742 Hardening: Refined Xiaomi subtitle to guide users (Issue 18).
-        // Issue 160: isAutostartBlocked must be decoupled from xiaomiStatus to ensure independent verification.
-        // Issue 170/172: ALERT_ID_XIAOMI_SYSTEM_MISSING is now gated by isXiaomiDevice flag.
-        val isAutostartBlocked = !state.isXiaomiAutostartGranted
+        // Issue 190: Robust handling for Xiaomi UNKNOWN status.
+        // Logic: ALERT is only triggered if status is explicitly DENIED OR if (status is UNKNOWN AND Manual Override is OFF).
+        // If status is UNKNOWN and Manual Override is ON, we Muzzle the alert to avoid noisy unresolvable alarms.
         
+        val isAutostartExplicitlyDenied = state.xiaomiAutostartStatus == EngineXiaomiStatus.DENIED
+        val isSpecialExplicitlyDenied = state.xiaomiStatus == EngineXiaomiStatus.DENIED
+        
+        val isAutostartIndeterminate = state.xiaomiAutostartStatus == EngineXiaomiStatus.UNKNOWN
+        val isSpecialIndeterminate = state.xiaomiStatus == EngineXiaomiStatus.UNKNOWN
+
         val xiaomiViolation = if (state.isXiaomiDevice) {
-            when (state.xiaomiStatus) {
-                EngineXiaomiStatus.DENIED -> true
-                EngineXiaomiStatus.UNKNOWN -> !state.isXiaomiManualOverride || isAutostartBlocked
-                else -> isAutostartBlocked
+            when {
+                isAutostartExplicitlyDenied || isSpecialExplicitlyDenied -> true
+                isAutostartIndeterminate || isSpecialIndeterminate -> !state.isXiaomiManualOverride
+                else -> false // Both GRANTED
             }
         } else false
         
         val xiaomiSubtitle = if (state.isXiaomiDevice) {
             when {
-                state.xiaomiStatus == EngineXiaomiStatus.DENIED -> "MIUI background permissions DENIED"
-                isAutostartBlocked -> "MIUI Autostart blocked - Enable in Phone Setup"
-                state.xiaomiStatus == EngineXiaomiStatus.UNKNOWN -> "MIUI status UNKNOWN - Toggle manual override in Phone Setup"
-                else -> ""
+                isAutostartExplicitlyDenied -> "MIUI Autostart explicitly DENIED - Enable in Phone Setup"
+                isSpecialExplicitlyDenied -> "MIUI background permissions explicitly DENIED"
+                isAutostartIndeterminate || isSpecialIndeterminate -> "MIUI status UNKNOWN - Toggle manual override in Phone Setup"
+                else -> "MIUI status OK"
             }
         } else "Not a Xiaomi device"
 

@@ -50,6 +50,8 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v8.9.6:
+ * - Issue 193: Implemented isTelemetryFresh usage in StatusBar and StatusRowData to resolve Zombie Telemetry UX.
  * v8.9.5:
  * - Issue 192: Added CUR (Current/Power) forensic ribbon for parity.
  * v8.8.32:
@@ -401,7 +403,6 @@ fun GlobalStatusBar(
 
     val loc = if (mode == "viewer") uiState.trackerLocation else uiState.localLocation
     val lastGpsTs = loc.timestamp
-    // R923: Utilize maximum of GPS and telemetry timestamps for status card freshness.
     val effectiveGpsAge = if (maxOf(lastGpsTs, loc.telemetryTs) > 0) now - maxOf(lastGpsTs, loc.telemetryTs) else Long.MAX_VALUE
     val isGpsFix = effectiveGpsAge < GPS_UI_FAIL_THRESHOLD_MS && lastGpsTs > 0
 
@@ -424,7 +425,8 @@ fun GlobalStatusBar(
         isSirenPlaying = uiState.isSirenPlaying,
         isTrackerLocPending = uiState.trackerLocation.isLocationPending, isViewerLocPending = uiState.localLocation.isLocationPending,
         trackerTelemetryTs = uiState.trackerLocation.telemetryTs,
-        viewerTelemetryTs = uiState.localLocation.telemetryTs
+        viewerTelemetryTs = uiState.localLocation.telemetryTs,
+        isTelemetryFresh = dashboardState.isTelemetryFresh // Issue 193
     )
 }
 
@@ -438,7 +440,8 @@ fun StatusBar(
     viewerSatsUsed: Int = 0, viewerSatsView: Int = 0, viewerGpsTs: Long = 0L, trackerId: String = "TRK", viewerId: String = "VIEW", watchdogOk: Boolean = true,
     trackerState: TrackerState = TrackerState.UNKNOWN, hasActiveAlarms: Boolean = false, isRedScreenSuppressed: Boolean = false,
     isSirenPlaying: Boolean = false, isTrackerLocPending: Boolean = false, isViewerLocPending: Boolean = false,
-    trackerTelemetryTs: Long = 0L, viewerTelemetryTs: Long = 0L
+    trackerTelemetryTs: Long = 0L, viewerTelemetryTs: Long = 0L,
+    isTelemetryFresh: Boolean = true // Issue 193
 ) {
     val age = if (lastP > 0) now - lastP else Long.MAX_VALUE 
     val progressValue = if (lastP > 0) maxOf(0f, minOf(1f, (WATCH_TIMEOUT_MS - age).toFloat() / WATCH_TIMEOUT_MS)) else 0f
@@ -463,10 +466,7 @@ fun StatusBar(
         Column(modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 3.dp)) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(1.dp)) {
-                    // R922: INT=Relay connection (Ungated). 
                     StatusBadge("INT", isServer, isBold = true)
-                    
-                    // R922: All other LEDs gated by peer operational status (isRemote).
                     StatusBadge("SRV", isInternet && isRemote, isBold = true)
                     StatusBadge("TRK", isRemote, activeColor = Lime500)
                     StatusBadge("DAT", isData && isRemote)
@@ -519,7 +519,7 @@ fun StatusBar(
                     Box(modifier = Modifier.weight(1f)) { StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerOrange, overrideDistanceColor = Lime500, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = if(viewerGpsTs > 0) vAge else -1L, now = now, isRemote = false, isLocPending = isViewerLocPending, isRelayConnected = isServer) }
                     
                     val tAge = now - maxOf(lastGpsTs, trackerTelemetryTs)
-                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = trkIdLabel, battery = remoteBattery, commIndex = if(isRemote) remoteCommIndex else 0, color = if(isRemote) Lime500 else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, now = now, trackerState = trackerState, isRemote = true, isPeerActive = isRemote, isLocPending = isTrackerLocPending, isRelayConnected = isServer) }
+                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = trkIdLabel, battery = remoteBattery, commIndex = if(isRemote) remoteCommIndex else 0, color = if(isRemote) Lime500 else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, now = now, trackerState = trackerState, isRemote = true, isPeerActive = isRemote, isLocPending = isTrackerLocPending, isRelayConnected = isServer, isTelemetryFresh = isTelemetryFresh) }
                 }
             } else {
                 if (mode == "viewer") {
@@ -529,7 +529,7 @@ fun StatusBar(
                 }
                 val trkColor = if (mode == "viewer" && !isRemote) Slate500 else Lime500 
                 val tAge = now - maxOf(lastGpsTs, trackerTelemetryTs)
-                StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isRemote) remoteCommIndex else 0) else commIndex, color = trkColor, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, now = now, trackerState = trackerState, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isRemote else true, isLocPending = isTrackerLocPending, isRelayConnected = isServer)
+                StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isRemote) remoteCommIndex else 0) else commIndex, color = trkColor, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, now = now, trackerState = trackerState, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isRemote else true, isLocPending = isTrackerLocPending, isRelayConnected = isServer, isTelemetryFresh = if(mode == "viewer") isTelemetryFresh else true)
             }
         }
     }
@@ -540,7 +540,8 @@ fun StatusRowData(
     label: String, battery: Int, commIndex: Int, color: Color, isCharging: Boolean = false, accuracy: Float = 0f, maxAccuracy: Float = 0f, 
     satsView: Int = 0, satsUsed: Int = 0, gpsAgeMs: Long = -1L, temp: Float = 0f, distance: Double? = null, horizontalPadding: androidx.compose.ui.unit.Dp = 1.dp, now: Long = 0L,
     trackerState: TrackerState? = null, isRemote: Boolean = false, isPeerActive: Boolean = true, overrideDistanceColor: Color? = null, isLocPending: Boolean = false,
-    isRelayConnected: Boolean = false
+    isRelayConnected: Boolean = false,
+    isTelemetryFresh: Boolean = true // Issue 193
 ) {
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     
@@ -548,7 +549,9 @@ fun StatusRowData(
     val isConnStale = isRemote && !isPeerActive
     val isGpsStale = !isGpsFresh || isConnStale
     
-    // Handshaking: Connected to relay but waiting for peer data
+    // Issue 193: Telemetry freshness for battery and temp
+    val telemetryColor = if (isTelemetryFresh && !isConnStale) color else Slate500
+
     val isHandshaking = isConnStale && isRelayConnected
 
     val contentColor = if (isConnStale) Slate500 else color
@@ -575,7 +578,6 @@ fun StatusRowData(
             }
             if (isHandshaking) {
                 Spacer(Modifier.width(4.dp))
-                // Technical Handshaking look: Matrix-style pulsing wait state
                 Text(
                     text = ">>> WAITING FOR TELEMETRY <<<", 
                     color = Slate500.copy(alpha = handshakeAlpha), 
@@ -588,13 +590,13 @@ fun StatusRowData(
             } else {
                 val animatedBattery by animateIntAsState(targetValue = battery, animationSpec = tween(1500), label = "BatteryAnim")
                 Row(modifier = Modifier.width(54.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.width(10.dp), contentAlignment = Alignment.Center) { if (isCharging) Icon(Icons.Default.Bolt, null, tint = if(!isConnStale) Amber500 else Slate500, modifier = Modifier.size(10.dp)) }
-                    Icon(if (isCharging) Icons.Default.BatteryChargingFull else Icons.Default.BatteryFull, null, tint = if (isConnStale) Slate500 else if (battery >= 0 && battery < 20) Rose500 else contentColor, modifier = Modifier.size(10.dp))
-                    Spacer(Modifier.width(2.dp)); Text(text = if(battery >= 0) "$animatedBattery%" else "--%", color = contentColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
+                    Box(Modifier.width(10.dp), contentAlignment = Alignment.Center) { if (isCharging) Icon(Icons.Default.Bolt, null, tint = if(!isConnStale && isTelemetryFresh) Amber500 else Slate500, modifier = Modifier.size(10.dp)) }
+                    Icon(if (isCharging) Icons.Default.BatteryChargingFull else Icons.Default.BatteryFull, null, tint = if (isConnStale || !isTelemetryFresh) Slate500 else if (battery >= 0 && battery < 20) Rose500 else telemetryColor, modifier = Modifier.size(10.dp))
+                    Spacer(Modifier.width(2.dp)); Text(text = if(battery >= 0) "$animatedBattery%" else "--%", color = telemetryColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                 }
                 Row(modifier = Modifier.width(22.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "°", color = contentColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = (-2).dp), style = compactStyle)
-                    Text(text = String.format(Locale.getDefault(), "%.0f", temp), color = contentColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
+                    Text(text = "°", color = telemetryColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = (-2).dp), style = compactStyle)
+                    Text(text = String.format(Locale.getDefault(), "%.0f", temp), color = telemetryColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                 }
                 Box(modifier = Modifier.width(20.dp), contentAlignment = Alignment.Center) { CommBar(commIndex, contentColor) }
                 Spacer(Modifier.width(4.dp))
@@ -656,22 +658,18 @@ fun StatusBadge(label: String, active: Boolean, activeColor: Color = Emerald500,
 @Composable
 fun HeaderBar(
     uiState: MainUiState, 
-    onDashboard: () -> Unit, 
-    onS: () -> Unit, 
-    onL: () -> Unit, 
-    onM: () -> Unit, 
+    onDashboard = {}, 
+    onS = {}, 
+    onL = {}, 
+    onM = {}, 
     onR: () -> Unit = {}, 
     onEvent: (UiEvent) -> Unit
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    
-    // R882: Robust subversion extraction from VERSION_NAME (e.g. "6.4.2" -> "2", "6.4.2-beta.1" -> "1")
     val subVersion = BuildConfig.VERSION_NAME.substringAfterLast('.', BuildConfig.VERSION_NAME).substringBefore('-')
-    
     val nav = uiState.navigation
     val isAnyOverlayOpen = nav.isLogVisible || nav.isSettingsOpen || nav.isRibbonsVisible
     val isDashboardActive = !nav.isMapVisible && !isAnyOverlayOpen
-
     val topPadding = if (isXiaomiDevice()) 8.dp else 2.dp
     
     val commitAnd = { action: () -> Unit ->
@@ -695,25 +693,20 @@ fun HeaderBar(
             horizontalAlignment = Alignment.CenterHorizontally) {
             
             Spacer(Modifier.height(8.dp))
-
             IconButton(onClick = { 
                 commitAnd(onS)
                 onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) 
             }) { 
                 Icon(Icons.Default.Settings, null, tint = if (nav.isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) 
             }
-
             Spacer(Modifier.height(16.dp))
-
             IconButton(onClick = { commitAnd(onDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(44.dp)) { 
                 Icon(Icons.Default.Info, "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
             }
             IconButton(onClick = { commitAnd(onR) }, modifier = Modifier.size(44.dp)) {
                 Icon(Icons.Default.BarChart, null, tint = if (nav.isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp))
             }
-
             Spacer(Modifier.weight(1f))
-
             if (!uiState.isSystemReady) {
                 IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }) {
                     Box(contentAlignment = Alignment.Center) {
@@ -722,54 +715,33 @@ fun HeaderBar(
                     }
                 }
             }
-
-            Text(
-                text = subVersion,
-                color = Color.White,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-
+            Text(text = subVersion, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(vertical = 4.dp))
             IconButton(onClick = { 
                 commitAnd(onL)
                 onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) 
             }) { 
                 Icon(Icons.AutoMirrored.Filled.List, null, tint = if (nav.isLogVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp))
             }
-
             IconButton(onClick = { commitAnd(onM) }) { Icon(Icons.Default.Map, null, tint = if (nav.isMapVisible && !isAnyOverlayOpen) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
-            
-            // R920: Exit button removed from header row/column.
-            
             Spacer(Modifier.height(8.dp))
         }
     } else {
         Column(modifier = Modifier.fillMaxWidth().padding(top = topPadding)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), 
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Start 
-            ) { 
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) { 
                 IconButton(onClick = { 
                     commitAnd(onS)
                     onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) 
                 }, modifier = Modifier.size(44.dp)) { 
                     Icon(Icons.Default.Settings, null, tint = if (nav.isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
                 }
-
                 Spacer(Modifier.width(12.dp))
-
                 IconButton(onClick = { commitAnd(onDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(44.dp)) { 
                     Icon(Icons.Default.Info, "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
                 }
                 IconButton(onClick = { commitAnd(onR) }, modifier = Modifier.size(44.dp)) { 
                     Icon(Icons.Default.BarChart, null, tint = if (nav.isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp))
                 }
-
                 Spacer(Modifier.weight(1f))
-
                 if (!uiState.isSystemReady) {
                     IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }, modifier = Modifier.size(44.dp)) {
                         Box(contentAlignment = Alignment.Center) {
@@ -778,28 +750,16 @@ fun HeaderBar(
                         }
                     }
                 }
-
-                Text(
-                    text = subVersion,
-                    color = Color.White,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                )
-
+                Text(text = subVersion, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(horizontal = 4.dp))
                 IconButton(onClick = { 
                     commitAnd(onL)
                     onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false))
                 }, modifier = Modifier.size(44.dp)) { 
                     Icon(Icons.AutoMirrored.Filled.List, null, tint = if (nav.isLogVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
                 }
-
                 IconButton(onClick = { commitAnd(onM) }, modifier = Modifier.size(44.dp)) {
                     Icon(Icons.Default.Map, null, tint = if (nav.isMapVisible && !isAnyOverlayOpen) Color.Gray else Color.White, modifier = Modifier.size(22.dp))
                 }
-                
-                // R920: Exit button removed from header row/column.
             }
         }
     }

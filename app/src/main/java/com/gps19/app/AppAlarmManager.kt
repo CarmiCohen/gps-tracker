@@ -10,15 +10,10 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * v8.9.6:
+ * - Issue 190: Removed redundant isXiaomiAutostartGranted; now using explicit xiaomiAutostartStatus.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * v8.8.21:
- * - FIXED Issue 93-B: Stopped passing empty string as localId to ensure LogManager generates a UUID.
- * - FIXED Issue 59-C: Version tag now uses current BuildConfig.VERSION_NAME dynamically.
- * v8.8.22:
- * - Chunk 3: Added isXiaomiAutostartGranted to evaluateAlarms for engine-level gating.
- * v8.8.23: Standardized all thresholds with Requirements SoT.
- * v8.8.36: Issue 172 - Added isXiaomiDevice to evaluateAlarms for engine-level gating.
  */
 class AppAlarmManager(
     private val context: Context,
@@ -130,8 +125,8 @@ class AppAlarmManager(
         discoveryPhase: DiscoveryPhase? = null,
         isXiaomiDevice: Boolean = false,
         xiaomiStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
+        xiaomiAutostartStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
         isXiaomiManualOverride: Boolean = false,
-        isXiaomiAutostartGranted: Boolean = true,
         isSitActive: Boolean = false,
         isLocationPending: Boolean = false
     ) {
@@ -200,8 +195,8 @@ class AppAlarmManager(
             isCoolingModeActive = isCoolingModeActive,
             isXiaomiDevice = isXiaomiDevice,
             xiaomiStatus = xiaomiStatus,
-            isXiaomiManualOverride = isXiaomiManualOverride,
-            isXiaomiAutostartGranted = isXiaomiAutostartGranted
+            xiaomiAutostartStatus = xiaomiAutostartStatus,
+            isXiaomiManualOverride = isXiaomiManualOverride
         )
 
         val report = MainAlarmLogic.detectViolations(evaluationState)
@@ -230,7 +225,6 @@ class AppAlarmManager(
                         eval.firstTriggerTs = now
                         eval.isResolved = false
                         triggerOccurredInThisCycle = true
-                        // Issue 93-B: Pass null instead of "" for localId to trigger UUID generation
                         onLogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor)
                         
                         if (now - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) {

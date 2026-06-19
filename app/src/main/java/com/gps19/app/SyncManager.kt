@@ -12,15 +12,14 @@ import org.json.JSONObject
 
 /**
  * SyncManager: Handles broadcasting state updates and relay synchronization.
+ * v8.9.6:
+ * - Issue 191: Implemented onSyncFinished handshake to resolve Muzzle Window race conditions.
  * v8.9.5:
  * - Issue 192: Included current_ma in pushCurrentStatus parameters and LocationUpdate mapping for absolute parity.
  * v8.9.3:
  * - Issue 188: Preserved historical gps_ts during offline flushing.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * - Issue 134: Removed dead code broadcastIntegrityUpdate and pushStatusUpdateOnly.
- * - Forensic Simplification: Removed legacy 'ver' and 'vid' from internal models; 
- *   version is now injected at the emission layer via BuildConfig.VERSION_NAME.
  */
 class SyncManager(
     private val context: Context,
@@ -37,12 +36,17 @@ class SyncManager(
 ) {
     private var syncJob: Job? = null
     private var onSyncStarted: (() -> Unit)? = null
+    private var onSyncFinished: (() -> Unit)? = null
 
     private fun safeDouble(value: Double): Double = if (java.lang.Double.isNaN(value) || java.lang.Double.isInfinite(value)) 0.0 else value
     private fun safeFloat(value: Float): Float = if (java.lang.Float.isNaN(value) || java.lang.Float.isInfinite(value)) 0f else value
 
     fun setOnSyncStartedListener(listener: () -> Unit) {
         this.onSyncStarted = listener
+    }
+
+    fun setOnSyncFinishedListener(listener: () -> Unit) {
+        this.onSyncFinished = listener
     }
 
     fun startSyncLoop(deviceId: String, viewerId: String, isTracker: Boolean) {
@@ -74,10 +78,10 @@ class SyncManager(
         
         scope.launch {
             try {
-                onSyncStarted?.invoke() // Notify for muzzling (Issue 99)
-                
                 val pending = offlineRepository.getPendingStatusUpdates(50)
                 if (pending.isEmpty()) return@launch
+                
+                onSyncStarted?.invoke() // Start Muzzle (Issue 91/191)
                 
                 logManager.logServiceEvent("Sync: Flushing ${pending.size} offline status updates...")
                 
@@ -133,6 +137,8 @@ class SyncManager(
                 }
             } catch (e: Exception) {
                 logManager.logServiceEvent("Sync: Flush failed: ${e.message}")
+            } finally {
+                onSyncFinished?.invoke() // End Muzzle (Issue 191)
             }
         }
     }

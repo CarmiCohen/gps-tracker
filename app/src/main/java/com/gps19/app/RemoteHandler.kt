@@ -15,6 +15,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v8.9.6:
+ * - Issue 194: Implemented rising-edge detection for isTrackerSitDetected to support transmission latching without log duplication.
  * v8.9.5:
  * - Issue 192: Fixed persistence gap for currentMa in TrackerStatus.
  * v8.9.2:
@@ -323,7 +325,21 @@ class RemoteHandler(
             isTrackerSuspicious = data.optBoolean("is_suspicious", isTrackerSuspicious)
             isTrackerTamperDetected = data.optBoolean("is_tamper_detected", isTrackerTamperDetected)
             isTrackerPowerTamper = data.optBoolean("is_power_tamper", isTrackerPowerTamper)
-            isTrackerSitDetected = data.optBoolean("is_sit_detected", isTrackerSitDetected)
+            
+            // Issue 194: Rising-edge detection for latched SIT events
+            val incomingSitDetected = data.optBoolean("is_sit_detected", false)
+            if (incomingSitDetected && !isTrackerSitDetected) {
+                 repository.addLog(LogEntry(
+                    timestamp = now,
+                    message = "Tracker: Sit Detected (Remote)",
+                    type = "event",
+                    isImportant = true,
+                    isSpecial = true,
+                    specialColor = -0x10000 // Pink (placeholder until constant is shared)
+                ))
+            }
+            isTrackerSitDetected = incomingSitDetected
+
             isTrackerSitActive = data.optBoolean("is_sit_active", isTrackerSitActive)
             trackerLastSitTs = data.optLong("last_sit_ts", trackerLastSitTs)
             trackerVerticalVelocity = data.optDouble("vertical_velocity", trackerVerticalVelocity.toDouble()).toFloat()

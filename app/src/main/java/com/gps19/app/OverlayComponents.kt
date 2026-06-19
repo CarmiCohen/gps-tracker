@@ -24,14 +24,10 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * v8.9.6:
+ * - Issue 193: Implemented isTelemetryFresh usage in LegacyDashboardGrid to resolve Zombie Telemetry UX.
  * v8.9.5:
  * - Issue 192: Added currentMa to LegacyDashboardGrid for power forensic visibility.
- * v8.8.27: Modularization complete. Screen-specific overlays moved to:
- * - LandingComponents.kt
- * - LogComponents.kt
- * - AlarmComponents.kt
- * - SettingsComponents.kt
- * - GnssComponents.kt
  */
 
 @Composable
@@ -51,6 +47,7 @@ fun LegacyDashboardGrid(
 
     val gpsColor = if (d.isGpsFresh) Color.White else Slate500
     val linkColor = if (d.isLinkFresh) Color.White else Slate500
+    val telemetryColor = if (d.isTelemetryFresh) Color.White else Slate500
     val masterColor = if (d.isLinkFresh) Color.White else Slate500
 
     val conn = uiState.connectivity
@@ -169,11 +166,11 @@ fun LegacyDashboardGrid(
 
             Spacer(Modifier.height(6.dp)); HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp); Spacer(Modifier.height(6.dp))
 
-            InfoRow(leftVal = d.vibration, leftLabel = "Vibration", leftColor = if (!d.isLinkFresh) Slate500 else Color(FORENSIC_PINK_COLOR), rightVal = d.heading, rightLabel = "Compass", rightColor = if(!d.isLinkFresh) Slate500 else Color(0xFFFB923C))
-            InfoRow(leftVal = d.tilt, leftLabel = "Tilt", leftColor = if(!d.isLinkFresh) Slate500 else Violet500, rightVal = d.acoustic, rightLabel = "Noise Level", rightColor = if(!d.isLinkFresh) Slate500 else Color(0xFF38BDF8))
-            InfoRow(leftVal = d.lift, leftLabel = "Lift", leftColor = if(!d.isLinkFresh) Slate500 else Color(0xFFFACC15), rightVal = d.lux, rightLabel = "Lux", rightColor = if(!d.isLinkFresh) Slate500 else Amber500)
+            InfoRow(leftVal = d.vibration, leftLabel = "Vibration", leftColor = if (!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR), rightVal = d.heading, rightLabel = "Compass", rightColor = if(!d.isTelemetryFresh) Slate500 else Color(0xFFFB923C))
+            InfoRow(leftVal = d.tilt, leftLabel = "Tilt", leftColor = if(!d.isTelemetryFresh) Slate500 else Violet500, rightVal = d.acoustic, rightLabel = "Noise Level", rightColor = if(!d.isTelemetryFresh) Slate500 else Color(0xFF38BDF8))
+            InfoRow(leftVal = d.lift, leftLabel = "Lift", leftColor = if(!d.isTelemetryFresh) Slate500 else Color(0xFFFACC15), rightVal = d.lux, rightLabel = "Lux", rightColor = if(!d.isTelemetryFresh) Slate500 else Amber500)
             
-            InfoRow(leftVal = d.proximity, leftLabel = "Proximity", leftColor = if (!d.isLinkFresh) Slate500 else Emerald500, rightVal = d.proximityCm, rightLabel = "Raw Prox", rightColor = if (!d.isLinkFresh) Slate500 else Color(FORENSIC_PINK_COLOR))
+            InfoRow(leftVal = d.proximity, leftLabel = "Proximity", leftColor = if (!d.isTelemetryFresh) Slate500 else Emerald500, rightVal = d.proximityCm, rightLabel = "Raw Prox", rightColor = if (!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR))
 
             if (d.chairForensics != "--") {
                 Spacer(Modifier.height(2.dp))
@@ -181,7 +178,7 @@ fun LegacyDashboardGrid(
                     Text("Forensics:", color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(55.dp))
                     Text(
                         text = d.chairForensics, 
-                        color = if (d.isLinkFresh) Color(FORENSIC_PINK_COLOR) else Slate500, 
+                        color = if (d.isTelemetryFresh) Color(FORENSIC_PINK_COLOR) else Slate500, 
                         fontSize = 10.sp, 
                         fontFamily = FontFamily.Monospace, 
                         fontWeight = FontWeight.Bold,
@@ -190,13 +187,13 @@ fun LegacyDashboardGrid(
                 }
             }
             
-            InfoRow(leftVal = d.trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!d.isLinkFresh) Slate500 else Lime500, rightVal = if (isViewer) d.viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerOrange)
+            InfoRow(leftVal = d.trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!d.isTelemetryFresh) Slate500 else Lime500, rightVal = if (isViewer) d.viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerOrange)
 
             Spacer(Modifier.height(6.dp)); HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp); Spacer(Modifier.height(6.dp))
 
-            InfoRow(leftVal = d.peakShock, leftLabel = "Peak Shock", leftColor = if (!d.isLinkFresh) Slate500 else Rose500, rightVal = d.vibrationFloor, rightLabel = "Vibration Floor", rightColor = Slate500)
-            InfoRow(leftVal = d.luxBaseline, leftLabel = "Lux Baseline", leftColor = if(!d.isLinkFresh) Slate500 else Amber500, rightVal = d.acousticFloor, rightLabel = "Acoustic Floor", rightColor = if(!d.isLinkFresh) Slate500 else Color(0xFF38BDF8))
-            InfoRow(leftVal = d.currentMa, leftLabel = stringResource(R.string.log_diag_battery), leftColor = if(!d.isLinkFresh) Slate500 else Color.White, rightVal = "", rightLabel = "")
+            InfoRow(leftVal = d.peakShock, leftLabel = "Peak Shock", leftColor = if (!d.isTelemetryFresh) Slate500 else Rose500, rightVal = d.vibrationFloor, rightLabel = "Vibration Floor", rightColor = Slate500)
+            InfoRow(leftVal = d.luxBaseline, leftLabel = "Lux Baseline", leftColor = if(!d.isTelemetryFresh) Slate500 else Amber500, rightVal = d.acousticFloor, rightLabel = "Acoustic Floor", rightColor = if(!d.isTelemetryFresh) Slate500 else Color(0xFF38BDF8))
+            InfoRow(leftVal = d.currentMa, leftLabel = stringResource(R.string.log_diag_battery), leftColor = if(!d.isTelemetryFresh) Slate500 else Color.White, rightVal = "", rightLabel = "")
         }
     }
 }
