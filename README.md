@@ -1,8 +1,13 @@
 # GPS-Tracker (Pure Native APK)
 
-**Version: 8.9.2**
+**Version: 8.9.5**
 
 This project is a **Pure Native Android Application** built with Kotlin and Jetpack Compose, designed for high-precision background tracking and remote monitoring in demanding environments.
+
+## Recent Changes (v8.9.5)
+- **Power Forensic Parity (Issue 192)**: Achieved absolute forensic parity for battery current (`currentMa`). currentMa is now persisted in Database v35 and TrackerStatusProto (AppSettings) to ensure remote power-deficit alerts and ribbons persist across restarts and backfill.
+- **Viewer Background Location (Issue 189)**: Implemented 10s background polling for Viewer-side location. Updated LocationProcessor to calculate relative distance between nodes, ensuring geofence alerts and "Distance to Tracker" updates persist when the app is in the background.
+- **evaluateAlarms Parameter Sync**: Hardened the telemetry pipeline by ensuring all forensic fields (including trackerCurrentMa) are correctly passed to the engine for remote alarm evaluation.
 
 ## Recent Changes (v8.9.2)
 - **Branding Finalization (Issue 182/R935)**: Standardized to John Deere Green `#367C2B` and established `jd_app_icon.xml` as the primary asset. Redundant legacy branding assets marked for removal.

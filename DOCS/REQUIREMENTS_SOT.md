@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.2
+# System Source of Truth (SoT) - v8.9.5
 
 This document serves as the definitive operational specification for the GPS-Tracker system.
 
@@ -137,7 +137,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `PARKING_ANCHOR_FACTOR` | 0.8 | Decay factor for parking anchor stability. |
 | `RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT` | 20.0m | Accuracy required to resolve distance violations. |
 
-## 2. Forensic Ribbon Scaling (v8.9.2)
+## 2. Forensic Ribbon Scaling (v8.9.5)
 | Constant | Value | Description |
 | :--- | :--- | :--- |
 | `RIBBON_NOISE_SCALE_DB` | 40.0dB | Maximum range for acoustic ribbon mapping. |
@@ -145,6 +145,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `RIBBON_VIBRATION_SCALE_G` | 2.0g | Maximum range for vibration ribbon mapping. |
 | `RIBBON_LIFT_SCALE_METERS` | 5.0m | Maximum range for barometric lift ribbon mapping. |
 | `RIBBON_SNR_SCALE_DB` | 45.0dB | Maximum range for SNR ribbon mapping. |
+| `RIBBON_CURRENT_SCALE_MA` | 1000mA | Maximum range for battery current ribbon mapping (v8.9.5). |
 
 ## 3. Network & Connectivity
 | Constant | Value | Description |
@@ -163,8 +164,8 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ## 4. Remote Forensic Verification
 ### 4.1. Version & Role Visibility
-*   **Engine Identity**: The system operates on the v8.9.2 baseline logic.
-*   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using a timestamp (`yearOffset` + `MMddHHmm`) to ensure uniqueness across years.
+*   **Engine Identity**: The system operates on the v8.9.5 baseline logic.
+*   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using a timestamp (`yearOffset` + `MMddHHmm`) or git commits to ensure uniqueness.
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Standardized ALERT_IDs**: Aligned with `EngineConstants.kt`. Includes `ALERT_ID_VISUAL_JUMP` for trajectory-based jumps.
 *   **Xiaomi System Ready**: Hardened gating for Xiaomi devices using `is_xiaomi_manual_override` and autostart verification.
@@ -173,6 +174,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Module Hardening**: `:core:engine` is a pure `java-library` with zero Android dependencies.
 *   **Role Forensic**: Mandatory `role` field present in all sync payloads and JSON exports for multi-role trace stability. Viewers explicitly latch and record peer visual jumps to local forensics.
 *   **Schema Cleanup**: Legacy `ver` and `vid` columns formally removed from database schema in v33 (v8.8.35).
+*   **Power Parity**: `currentMa` field added to Database v35 (PendingStatusEntity and HistoryEntity) and `TrackerStatusProto` for end-to-end power forensics (v8.9.5).
 
 ---
 
@@ -219,7 +221,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ---
 
-## 8. Forensic Alert Manifest (v8.9.2)
+## 8. Forensic Alert Manifest (v8.9.5)
 | Alert ID | Alert Title (Standardized) | Trigger Description |
 | :--- | :--- | :--- |
 | `LOCAL_INTERNET` | This device: Internet Lost | Local connectivity failure. |
@@ -286,3 +288,5 @@ This document serves as the definitive operational specification for the GPS-Tra
 | **Issue 176** | **Statistics Persistence**: Verified forensic ribbon and statistics accumulation across app restarts using Room and DataStore. | **Verified (HistoryManager/SettingsRepository)** |
 | **Issue 177** | **Dead Code Cleanup**: Formally removed redundant telemetry methods in `SyncManager` following consolidation around `pushCurrentStatus`. | **Verified (SyncManager)** |
 | **Issue 178/179**| **Forensic Parity Audit**: Verified 100% field parity for `verticalVelocity` and SIT metrics across the pipeline and `RemoteHandler`. | **Verified (RemoteHandler/HistoryManager)** |
+| **Issue 189** | **Viewer Background Location**: Implemented 10s polling and relative distance calculation in `ViewerService`. | **Verified (ViewerService)** |
+| **Issue 192** | **Power Forensic Parity**: Achieved absolute parity for `currentMa` across models, database (v35), and ribbons. | **Verified (SyncManager/HistoryManager)** |
