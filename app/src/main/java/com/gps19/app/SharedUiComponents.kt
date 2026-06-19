@@ -658,10 +658,10 @@ fun StatusBadge(label: String, active: Boolean, activeColor: Color = Emerald500,
 @Composable
 fun HeaderBar(
     uiState: MainUiState, 
-    onDashboard = {}, 
-    onS = {}, 
-    onL = {}, 
-    onM = {}, 
+    onDashboard: () -> Unit = {}, 
+    onS: () -> Unit = {}, 
+    onL: () -> Unit = {}, 
+    onM: () -> Unit = {},
     onR: () -> Unit = {}, 
     onEvent: (UiEvent) -> Unit
 ) {

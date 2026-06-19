@@ -545,8 +545,7 @@ class TrackerService : BaseMonitorService() {
                 isXiaomiDevice = isXiaomi,
                 xiaomiStatus = xiaomiStatus,
                 xiaomiAutostartStatus = xiaomiAutostartStatus, // Issue 190
-                isXiaomiManualOverride = isXiaomiManualOverride,
-                isXiaomiAutostartGranted = isXiaomiAutostartGranted(this@TrackerService)
+                isXiaomiManualOverride = isXiaomiManualOverride
             )
         }
     }

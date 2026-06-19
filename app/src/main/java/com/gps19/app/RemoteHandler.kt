@@ -15,14 +15,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v8.9.7:
+ * - Issue 194: Added handleRemoteLog to reconstruct forensic markers from synced SIT events.
  * v8.9.6:
  * - Issue 194: Implemented rising-edge detection for isTrackerSitDetected to support transmission latching without log duplication.
  * v8.9.5:
  * - Issue 192: Fixed persistence gap for currentMa in TrackerStatus.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * - Issue 180: Verified forensic SIT parity across telemetry mapping.
- * - Issue 135: Standardized field mapping for verticalVelocity and SIT metrics.
  */
 class RemoteHandler(
     private val context: Context,
@@ -35,7 +33,7 @@ class RemoteHandler(
     private val onPulse: (String) -> Unit
 ) {
     var isTrackerConnected = false
-    var lastPeerActivityTs = 0L // v8.8.2: Now monotonic (elapsedRealtime)
+    var lastPeerActivityTs = 0L 
     var peerSignal = 0
     var lastPeerGpsTs = 0L
     private var lastRemotePacketTs = 0L
@@ -239,6 +237,22 @@ class RemoteHandler(
         repository.saveDoubleSync(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
     }
 
+    /**
+     * Issue 194: Reconstructs forensic state from incoming remote logs.
+     * Ensures that recovered "Sit Detected" events trigger the same map markers as real-time flags.
+     */
+    fun handleRemoteLog(entry: LogEntry) {
+        if (entry.message.contains("Sit Detected", ignoreCase = true)) {
+            // Rising-edge detection for log-based SIT events to ensure marker placement
+            if (!isTrackerSitDetected) {
+                isTrackerSitDetected = true
+                // Note: The marker will be placed by ViewerService.processTick in the next cycle
+                // at the tracker's current lat/lng. For recovered logs, this is a best-effort 
+                // spatial anchor if the location packet was lost.
+            }
+        }
+    }
+
     fun handleRemoteUpdate(data: JSONObject, isTrackerMode: Boolean) {
         val fromId = data.optString("id")
         val fromViewer = data.optBoolean("from_viewer", false) 
@@ -264,7 +278,6 @@ class RemoteHandler(
             return
         }
 
-        // Standardized to home_points (Issue 93-SOT)
         if (isTrackerMode && fromViewer && data.has("home_points")) {
             scope.launch {
                 try {
@@ -287,7 +300,6 @@ class RemoteHandler(
             return
         }
 
-        // Standardized pulse types (v8.8.28)
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
             if (isTrackerMode && fromViewer) {
                 onPulse(fromId)
@@ -326,7 +338,7 @@ class RemoteHandler(
             isTrackerTamperDetected = data.optBoolean("is_tamper_detected", isTrackerTamperDetected)
             isTrackerPowerTamper = data.optBoolean("is_power_tamper", isTrackerPowerTamper)
             
-            // Issue 194: Rising-edge detection for latched SIT events
+            // Issue 194: Rising-edge detection for latched SIT events in real-time telemetry
             val incomingSitDetected = data.optBoolean("is_sit_detected", false)
             if (incomingSitDetected && !isTrackerSitDetected) {
                  repository.addLog(LogEntry(
@@ -335,7 +347,7 @@ class RemoteHandler(
                     type = "event",
                     isImportant = true,
                     isSpecial = true,
-                    specialColor = -0x10000 // Pink (placeholder until constant is shared)
+                    specialColor = -0x10000
                 ))
             }
             isTrackerSitDetected = incomingSitDetected

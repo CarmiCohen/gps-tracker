@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * v8.9.7:
+ * - Issue 194: Added 'synced' column to LogEntity and implemented reliable log sync queries.
  */
 @Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
 data class LogEntity(
@@ -24,7 +26,8 @@ data class LogEntity(
     val isSpecial: Boolean = false,
     val specialColor: Int? = null,
     @ColumnInfo(defaultValue = "0") val firstSeenTs: Long = 0L,
-    @ColumnInfo(defaultValue = "tracker") val role: String = "tracker"
+    @ColumnInfo(defaultValue = "tracker") val role: String = "tracker",
+    @ColumnInfo(defaultValue = "0") val synced: Boolean = false
 )
 
 @Entity(tableName = "trail_points", indices = [Index(value = ["timestamp"])])
@@ -125,6 +128,8 @@ interface LogDao {
     @Query("SELECT * FROM logs WHERE type = :type AND role = :role AND deviceId = :deviceId ORDER BY timestamp DESC LIMIT 1") suspend fun getLastLogByMetadata(type: String, role: String, deviceId: String): LogEntity?
     @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1000") fun getAllLogs(): Flow<List<LogEntity>>
     @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1000") suspend fun getAllLogsStatic(): List<LogEntity>
+    @Query("SELECT * FROM logs WHERE synced = 0 ORDER BY timestamp ASC LIMIT :limit") suspend fun getUnsyncedLogs(limit: Int): List<LogEntity>
+    @Query("UPDATE logs SET synced = 1 WHERE localId IN (:localIds)") suspend fun markLogsAsSynced(localIds: List<String>)
     @Query("DELETE FROM logs") suspend fun clearAll()
     @Query("SELECT COUNT(*) FROM logs") suspend fun getCount(): Int
     @Query("DELETE FROM logs WHERE timestamp < (SELECT timestamp FROM logs ORDER BY timestamp DESC LIMIT 1 OFFSET 999)") suspend fun pruneLogs()
@@ -169,7 +174,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 36, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 37, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -285,6 +290,11 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("INSERT INTO pending_status_updates_v36 SELECT $selectP FROM pending_status_updates")
                 db.execSQL("DROP TABLE pending_status_updates"); db.execSQL("ALTER TABLE pending_status_updates_v36 RENAME TO pending_status_updates")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_status_updates_timestamp ON pending_status_updates (timestamp)")
+            }
+        }
+        val MIGRATION_36_37 = object : Migration(36, 37) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE logs ADD COLUMN synced INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

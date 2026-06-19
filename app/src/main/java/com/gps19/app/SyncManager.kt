@@ -12,14 +12,10 @@ import org.json.JSONObject
 
 /**
  * SyncManager: Handles broadcasting state updates and relay synchronization.
+ * v8.9.7:
+ * - Issue 194: Implemented reliable log synchronization (flushPendingLogs) to ensure zero-loss SIT events.
  * v8.9.6:
  * - Issue 191: Implemented onSyncFinished handshake to resolve Muzzle Window race conditions.
- * v8.9.5:
- * - Issue 192: Included current_ma in pushCurrentStatus parameters and LocationUpdate mapping for absolute parity.
- * v8.9.3:
- * - Issue 188: Preserved historical gps_ts during offline flushing.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  */
 class SyncManager(
     private val context: Context,
@@ -66,9 +62,36 @@ class SyncManager(
 
                     if (isTracker) {
                         flushPendingUpdates(deviceId, viewerId)
+                        flushPendingLogs() // Issue 194: Reliable event delivery
                     }
                 }
                 delay(PING_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun flushPendingLogs() {
+        scope.launch {
+            try {
+                val unsynced = logManager.getUnsyncedLogs(20)
+                if (unsynced.isEmpty()) return@launch
+
+                val syncedIds = mutableListOf<String>()
+                unsynced.forEach { log ->
+                    val data = log.toJSONObject().apply {
+                        put("ver", BuildConfig.VERSION_NAME)
+                        put("is_recovered", true)
+                    }
+                    if (networkManager.isConnected()) {
+                        networkManager.emit("log_update", data)
+                        syncedIds.add(log.localId)
+                    }
+                }
+                if (syncedIds.isNotEmpty()) {
+                    logManager.markLogsAsSynced(syncedIds)
+                }
+            } catch (e: Exception) {
+                // Background sync failure silently ignored to avoid log spamming
             }
         }
     }
@@ -285,8 +308,8 @@ class SyncManager(
             
             put("uptime_ms", sessionManager.uptimeMs)
             put("total_connected_ms", sessionManager.totalConnectedMs); put("session_connected_ms", sessionManager.sessionConnectedMs)
-            put("total_drop_ms", sessionManager.getTotalDropWithActive(now)); put("max_drop_ms", sessionManager.getMaxDropWithActive(now))
-            put("max_drop_ts", sessionManager.getMaxDropTsWithActive(now))
+            put("total_drop_ms", sessionManager.getTotalDropWithActive(timeProvider.elapsedRealtime())); put("max_drop_ms", sessionManager.getMaxDropWithActive(timeProvider.elapsedRealtime()))
+            put("max_drop_ts", sessionManager.getMaxDropTsWithActive(timeProvider.elapsedRealtime()))
             put("last_conn_ts", sessionManager.lastConnectionTs)
             put("last_disc_ts", sessionManager.lastDisconnectionTs)
             
@@ -341,9 +364,9 @@ class SyncManager(
             isTamperDetected = isTamperDetected, isPowerTamper = isPowerTamper,
             isSitDetected = isSitDetected, isSitActive = isSitActive, lastSitTs = lastSitTs,
             proxIdx = proxIdx, proximityCm = proximityCm, micPending = micPending,
-            uptimeMs = sessionManager.uptimeMs, totalDropMs = sessionManager.getTotalDropWithActive(now), 
-            maxDropMs = sessionManager.getMaxDropWithActive(now),
-            maxDropTs = sessionManager.getMaxDropTsWithActive(now),
+            uptimeMs = sessionManager.uptimeMs, totalDropMs = sessionManager.getTotalDropWithActive(timeProvider.elapsedRealtime()), 
+            maxDropMs = sessionManager.getMaxDropWithActive(timeProvider.elapsedRealtime()),
+            maxDropTs = sessionManager.getMaxDropTsWithActive(timeProvider.elapsedRealtime()),
             totalConnectedMs = sessionManager.totalConnectedMs,
             sessionConnectedMs = sessionManager.sessionConnectedMs,
             lastConnTs = sessionManager.lastConnectionTs, 

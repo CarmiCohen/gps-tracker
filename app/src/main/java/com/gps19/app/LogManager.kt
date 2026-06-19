@@ -7,14 +7,9 @@ import javax.inject.Singleton
 import java.util.UUID
 
 /**
- * LogManager: Centralizes logging logic, handling both local repository 
- * storage and remote relay emission.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * v8.8.22: Aligned with SoT: now uses global LOG_MUZZLE_STARTUP_MS constant.
- * v8.8.23: Standardized all thresholds with Requirements SoT.
- * v8.8.25: Timing Standardization - Migrated to TimeProvider.
- * v8.8.26: Issue 114 - Forensic vid propagation in submitToLogSink.
+ * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * v8.9.7:
+ * - Issue 194: Added support for reliable log synchronization (getUnsyncedLogs, markLogsAsSynced).
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -45,7 +40,6 @@ class LogManager @Inject constructor(
         
         if (type == "hidden") return
 
-        // R892/STORAGE: Critical Gate Audit - Ensure isSpecial logs bypass storage suppression
         val isSuppressedByStorage = integrity.isStorageCritical && !isSpecial
         if (isSuppressedByStorage) return
 
@@ -66,19 +60,21 @@ class LogManager @Inject constructor(
             extremeValue = extremeValue,
             durationMs = durationMs,
             isSpecial = isSpecial,
-            specialColor = specialColor
+            specialColor = specialColor,
+            role = if (configManager.isTrackerMode) "tracker" else "viewer"
         )
         
         val data = log.toJSONObject().apply {
             put("ver", BuildConfig.VERSION_NAME)
         }
         networkManager.get().emit("log_update", data)
-        
-        // Final local persistence gate (already validated by isSuppressedByStorage)
         logRepository.addLog(log)
     }
 
     fun logServiceEvent(m: String, important: Boolean = true, isSpecial: Boolean = false, specialColor: Int? = null) {
         submitToLogSink(m, "system", important, isSpecial = isSpecial, specialColor = specialColor)
     }
+
+    suspend fun getUnsyncedLogs(limit: Int) = logRepository.getUnsyncedLogs(limit)
+    suspend fun markLogsAsSynced(ids: List<String>) = logRepository.markLogsAsSynced(ids)
 }

@@ -15,11 +15,8 @@ import kotlin.math.abs
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * v8.8.21:
- * - Root-Cause Fix (Issue 95-C): Merge logic now utilizes role and deviceId for grouping 
- *   to prevent identity collisions in multi-role environments.
- * - Root-Cause Fix (Issue 93-B): Prevents preserving blank IDs during merge operations.
- * v8.8.32: Removed vid propagation.
+ * v8.9.7:
+ * - Issue 194: Updated addLog to accept an initial 'synced' state to prevent duplicate emissions.
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -55,7 +52,7 @@ class LogRepository @Inject constructor(
         }
     }
 
-    fun addLog(entry: LogEntry) {
+    fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
         val integrity = telemetry.integrityState.value
         if (integrity.isStorageCritical && !entry.isSpecial) {
             return
@@ -76,12 +73,12 @@ class LogRepository @Inject constructor(
                             durationMs = entry.durationMs,
                             isSpecial = entry.isSpecial,
                             specialColor = entry.specialColor,
-                            role = entry.role
+                            role = entry.role,
+                            synced = initiallySynced // Update sync status if requested
                         ))
                         return@withLock
                     }
 
-                    // Root-Cause Fix (Issue 95-C): Group by Metadata (Type + Role + DeviceId)
                     val last = logDao.getLastLogByMetadata(entry.type, entry.role, entry.id)
                     if (last != null) {
                         val lastBase = stripLogVariableParts(last.message)
@@ -101,7 +98,8 @@ class LogRepository @Inject constructor(
                                 durationMs = newDuration,
                                 extremeValue = newExtreme,
                                 timestamp = entry.timestamp,
-                                message = entry.message
+                                message = entry.message,
+                                synced = initiallySynced // Reset/update sync status on merge
                             ))
                             return@withLock
                         }
@@ -121,7 +119,8 @@ class LogRepository @Inject constructor(
                         isSpecial = entry.isSpecial, 
                         specialColor = entry.specialColor,
                         firstSeenTs = if (entry.firstSeenTs == 0L) (entry.timestamp - entry.durationMs) else entry.firstSeenTs,
-                        role = entry.role
+                        role = entry.role,
+                        synced = initiallySynced
                     ))
                     
                     logWriteCount++
@@ -137,6 +136,17 @@ class LogRepository @Inject constructor(
             }
         }
     }
+
+    suspend fun getUnsyncedLogs(limit: Int): List<LogEntry> = logDao.getUnsyncedLogs(limit).map {
+        LogEntry(
+            localId = it.localId, timestamp = it.timestamp, message = it.message, type = it.type,
+            isImportant = it.isImportant, id = it.deviceId, viewerId = it.viewerId, count = it.count,
+            extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial,
+            specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role
+        )
+    }
+
+    suspend fun markLogsAsSynced(localIds: List<String>) = logDao.markLogsAsSynced(localIds)
 
     private fun stripLogVariableParts(message: String): String {
         var m = message

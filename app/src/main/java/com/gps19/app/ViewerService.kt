@@ -18,12 +18,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.7:
+ * - Issue 194: Updated network callback to handle "remote_log" for forensic SIT reconstruction.
  * v8.9.6:
  * - Issue 194: Added ALERT_ID_TRACKER_CHAIR to recordViolationMarkers to ensure SIT parity via status flags.
  * - Issue 190: Passing explicit xiaomiAutostartStatus to evaluateAlarms for robust indeterminate handling.
- * v8.9.5:
- * - Issue 192: Fixed evaluateAlarms parameter mismatch; passing remoteHandler.trackerCurrentMa to historyManager.
- * - Issue 189: Fixed Viewer Background Location Gap. Injected GpsManager and implemented relative geofencing.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -129,7 +128,12 @@ class ViewerService : BaseMonitorService() {
 
             EntryPointAccessors.fromApplication(applicationContext, GpsApplication.GpsApplicationEntryPoint::class.java)
                 .networkManagerWrapper().setCallback { data -> 
-                    remoteHandler.handleRemoteUpdate(data, false)
+                    // Issue 194: Forensic log interception
+                    if (data.optString("type") == "remote_log") {
+                        remoteHandler.handleRemoteLog(LogEntry.fromJSONObject(data))
+                    } else {
+                        remoteHandler.handleRemoteUpdate(data, false)
+                    }
                 }
             
             gpsManager.setPollingInterval(VIEWER_GPS_POLLING_MS)
@@ -359,7 +363,6 @@ class ViewerService : BaseMonitorService() {
             XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN
         }
         
-        // Issue 190: Pass explicit Autostart status in Viewer mode as well (for local health)
         val xiaomiAutostartStatus = when(getXiaomiAutostartStatus(this@ViewerService)) {
             XiaomiPermissionStatus.GRANTED -> EngineXiaomiStatus.GRANTED
             XiaomiPermissionStatus.DENIED -> EngineXiaomiStatus.DENIED
@@ -393,9 +396,8 @@ class ViewerService : BaseMonitorService() {
                 discoveryPhase = null,
                 isXiaomiDevice = isXiaomiDevice(),
                 xiaomiStatus = xiaomiStatus,
-                xiaomiAutostartStatus = xiaomiAutostartStatus, // Issue 190
-                isXiaomiManualOverride = isXiaomiManualOverride,
-                isXiaomiAutostartGranted = isXiaomiAutostartGranted(this@ViewerService)
+                xiaomiAutostartStatus = xiaomiAutostartStatus,
+                isXiaomiManualOverride = isXiaomiManualOverride
             )
         }
 

@@ -15,14 +15,13 @@ import javax.inject.Inject
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * v8.9.7:
+ * - Issue 194: Updated handleLogRelay to forward incoming logs to RemoteHandler for forensic reconstruction.
  * v8.8.21:
  * - Role-Based Standardization: Delegated message filtering to SignalingValidator (engine).
  * - Logic Decoupling: Delegated payload generation to SignalPayloadGenerator.
  * - Conflation Logic: Delegated message merging to SignalingMessageConflator (engine).
  * v8.8.28: Standardized signaling keys to snake_case (viewer_id, from_viewer).
- * v8.8.32: Removed vid propagation.
- * v8.8.35:
- * - Issue 135: Enhanced 'join' payload with role and version for relay-side forensic indexing.
  */
 class CommunicationManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -264,7 +263,14 @@ class CommunicationManager @Inject constructor(
                     isTrackerMode = isTrackerMode
             )) return
             
-            logRepository.addLog(LogEntry.fromJSONObject(data))
+            val entry = LogEntry.fromJSONObject(data)
+            logRepository.addLog(entry)
+
+            // Issue 194: Forward to RemoteHandler for forensic reconstruction
+            val wrapped = JSONObject(data.toString())
+            wrapped.put("type", "remote_log")
+            onRemoteUpdateWrapper.onUpdate(wrapped)
+
         } catch (e: Exception) {
             Timber.e(e, "log_relay parse error")
         }
@@ -391,7 +397,6 @@ class CommunicationManager @Inject constructor(
         val pending = pendingLocationUpdate?.toMap()
         val incoming = data.toMap()
         
-        // v8.8.21: Delegated conflation logic to SignalingMessageConflator (engine)
         val result = SignalingMessageConflator.conflate(pending, incoming)
         pendingLocationUpdate = JSONObject(result)
 
