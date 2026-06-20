@@ -1,9 +1,28 @@
 # Project History & Versioning
 
+## v8.9.8
+- **Room Migration Registry Fix (Issue 200)**: Registered `MIGRATION_37_38` in `AppModule.kt` to prevent startup crashes on upgraded devices.
+- **Multi-version Schema Robustness (Issue 201)**: Hardened `MIGRATION_35_36` with dynamic column detection for the `logs` table, ensuring resilient upgrades across diverse legacy version paths.
+- **Zombie Telemetry UX Sweep (Issue 193)**: Finalized forensic UI sweep. Applied `Slate500` ("Ghost Mode") dimming to Map markers, accuracy circles, all sensor-derived fields in the Dashboard, and LogOverlay entries when telemetry is stale (>10s).
+- **Xiaomi Boot Resilience (Issue 190)**: Implemented `XIAOMI_BOOT_GRACE_MS` (30s) and monotonic timing to suppress transient "System Not Ready" alarms during the MIUI boot transition.
+- **Aggressive Stall Recovery (Issue 198)**: Shortened GPS stall detection to 60s and revival retry to 120s to ensure high-availability tracking on restricted OEM hardware.
+- **Build Modernization (Issue 199)**: Upgraded project toolchain to Java 17 and aligned with Android SDK 35. Cleaned up deprecated Gradle DSL syntax.
+
+## v8.9.7
+- **Plunge Matching: Advanced SIT Detection (Issue 196)**: Refined the "Plunge" state machine. `AppSensorManager.kt` and `LocationProcessor.kt` now fully propagate `sitVzTs` for forensic parity.
+- **SIT Persistence Packet Loss Risk (Issue 194)**: Implemented a reliable, acknowledged event synchronization pipeline for SIT (chair) detection via `SyncManager.flushPendingLogs`.
+- **Muzzle Window Hardening (Issue 191)**: Implemented device-specific hysteresis (500ms for A15, 200ms default) in the `SyncManager` handshake to suppress I/O-induced vibration alarms.
+- **Database v38 (Issue 197)**: Added `sitVzTs` to `connection_history` and `pending_status_updates`. Implemented `MIGRATION_37_38`.
+
+## v8.9.6
+- **Room Migration Forensic Audit (Issue 195)**: Implemented Room migration (v36) to perform full table reconstruction (logs, connection_history, pending_status_updates). Aligned models with DB schema for Android 15 compatibility.
+- **Xiaomi Indeterminate Handling (Issue 190)**: Implemented Muzzle/Override logic for Xiaomi "UNKNOWN" autostart status. Added `isXiaomiManualOverride` to bypass alarms when OS reflection fails.
+- **Zombie UX Mitigation (Issue 193)**: Introduced `TELEMETRY_UI_STALE_THRESHOLD_MS` (10s) and began system-wide dimming of stale forensic fields.
+
 ## v8.9.5
 - **Viewer Background Location (Issue 189)**: Injected `GpsManager` into `ViewerService` to enable Viewer-side location tracking. Implemented relative geofencing by calculating distance between Viewer and Tracker in the background.
 - **Power Forensic Parity (Issue 192)**: Achieved absolute parity for battery current (`currentMa`) across models, database (v35), and ribbons. Updated `ViewerService` to pass `trackerCurrentMa` to `evaluateAlarms`.
-- **evaluateAlarms Parameter Sync**: Resolved a parameter mismatch in `ViewerService` to ensure all forensic fields are correctly passed to the engine.
+- **evaluateAlarms Parameter Sync (Issue 192)**: Resolved a parameter mismatch in `ViewerService` to ensure all forensic fields are correctly passed to the engine.
 
 ## v8.9.4
 - **Viewer Engine State Restoration (Issue 187)**: Updated `ViewerService` to load `maxAccuracy`, SIT metrics, and tracker state (spatial anchor) from the repository into `LocationProcessor` on startup, ensuring engine consistency across restarts.
@@ -12,7 +31,7 @@
 - **Historical GPS Timestamp Preservation (Issue 188)**: Added `gpsTs` field to `PendingStatusEntity` (Database v34) and updated `SyncManager` to preserve original hardware fix timestamps during backfill.
 
 ## v8.9.2
-- **Branding Finalization (R935)**: Replaced adaptive app icon with high-resolution JD bitmap. Standardized icon resources to `jd_app_icon.xml` and `jd_bitmap.png` on brand-aligned green background. Removed redundant legacy icon XMLs.
+- **Branding Finalization (Issue 183 / R935)**: Replaced adaptive app icon with high-resolution JD bitmap. Standardized icon resources to `jd_app_icon.xml` and `jd_bitmap.png` on brand-aligned green background. Removed redundant legacy icon XMLs.
 - **ViewerService Listener Completion (Issue 185)**: Fully implemented `localProcessorListener` in `ViewerService.kt` for remote-to-local trail and log persistence.
 - **GPS Stability Audit (Issue 181)**: De-noised forensic logs by consolidating reliability metrics into 10s intervals during 10Hz polling windows.
 - **Muzzle Window Hardening (Issue 184)**: Optimized `SyncManager` with batch deletions and hardened `TrackerService` muzzle state to prevent race conditions during disk I/O.

@@ -1,7 +1,9 @@
 package com.gps19.app
 
 import android.app.AppOpsManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.location.GnssStatus
 import android.os.Build
 import com.gps19.core.engine.*
@@ -9,6 +11,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
+ * v8.9.8:
+ * - Issue 190: Added openXiaomiAutostartSettings to assist with MIUI verification.
  * v8.9.6:
  * - Issue 190: Added getXiaomiAutostartStatus to support indeterminate state handling.
  * v8.9.2:
@@ -74,6 +78,33 @@ fun getXiaomiAutostartStatus(context: Context): XiaomiPermissionStatus {
         if (autostart == AppOpsManager.MODE_ALLOWED) XiaomiPermissionStatus.GRANTED else XiaomiPermissionStatus.DENIED
     } catch (e: Exception) {
         XiaomiPermissionStatus.UNKNOWN
+    }
+}
+
+/**
+ * openXiaomiAutostartSettings: Attempts to launch the specific MIUI Autostart settings page.
+ * Falls back to app info page if the specific activity is not found.
+ */
+fun openXiaomiAutostartSettings(context: Context) {
+    if (!isXiaomiDevice()) return
+    try {
+        val intent = Intent()
+        intent.component = ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        try {
+            val intent = Intent("miui.intent.action.OP_AUTO_START")
+            intent.addCategory(Intent.CATEGORY_DEFAULT)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        } catch (e2: Exception) {
+            // Fallback to app details
+            val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            intent.data = android.net.Uri.fromParts("package", context.packageName, null)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        }
     }
 }
 

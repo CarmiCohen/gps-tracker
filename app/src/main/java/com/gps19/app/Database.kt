@@ -244,7 +244,12 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Harmonize 'logs' table
                 db.execSQL("CREATE TABLE logs_v36 (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, localId TEXT NOT NULL, timestamp INTEGER NOT NULL, message TEXT NOT NULL, type TEXT NOT NULL, isImportant INTEGER NOT NULL, deviceId TEXT NOT NULL, viewerId TEXT NOT NULL, count INTEGER NOT NULL, extremeValue REAL, durationMs INTEGER NOT NULL, isSpecial INTEGER NOT NULL, specialColor INTEGER, firstSeenTs INTEGER NOT NULL DEFAULT 0, role TEXT NOT NULL DEFAULT 'tracker')")
-                db.execSQL("INSERT INTO logs_v36 (id, localId, timestamp, message, type, isImportant, deviceId, viewerId, count, extremeValue, durationMs, isSpecial, specialColor, firstSeenTs, role) SELECT id, localId, timestamp, message, type, isImportant, deviceId, viewerId, count, extremeValue, durationMs, isSpecial, specialColor, firstSeenTs, role FROM logs")
+                val cursorL = db.query("PRAGMA table_info(logs)")
+                val colsL = mutableSetOf<String>(); while(cursorL.moveToNext()) colsL.add(cursorL.getString(1)); cursorL.close()
+                val selectL = "id, localId, timestamp, message, type, isImportant, deviceId, viewerId, count, extremeValue, durationMs, isSpecial, specialColor, " +
+                             (if(colsL.contains("firstSeenTs")) "firstSeenTs" else "0") + ", " +
+                             (if(colsL.contains("role")) "role" else "'tracker'")
+                db.execSQL("INSERT INTO logs_v36 SELECT $selectL FROM logs")
                 db.execSQL("DROP TABLE logs"); db.execSQL("ALTER TABLE logs_v36 RENAME TO logs")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_timestamp ON logs (timestamp)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_localId ON logs (localId)")

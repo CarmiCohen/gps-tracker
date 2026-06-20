@@ -21,12 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.8:
+ * - Issue 190: Hardened forensic logging for Standby Bucket transitions (Special Pink).
+ * - Stability: Fixed typo in Light sensor fast path trigger.
  * v8.9.7:
  * - Plunge Matching: Integrated sensor-level peakVerticalVelocityTs into Engine processing.
  * - Issue 191: Implemented device-specific hysteresis delay (500ms for A15) in Muzzle Handshake.
- * v8.9.6:
- * - Issue 194: Implemented SIT_TRANSMISSION_LATCH_MS to ensure robust SIT event propagation.
- * - Issue 191: Implemented deterministic Muzzle Handshake with SyncManager to resolve I/O race conditions.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -123,7 +123,9 @@ class TrackerService : BaseMonitorService() {
             }, onLogEvent = { msg, important ->
                 val isSpecial = msg.contains("tamper", ignoreCase = true) || 
                                msg.contains("confirmed", ignoreCase = true) ||
-                               msg.contains("EMERGENCY", ignoreCase = true)
+                               msg.contains("EMERGENCY", ignoreCase = true) ||
+                               msg.contains("PRIORITY", ignoreCase = true) ||
+                               msg.contains("BUCKET", ignoreCase = true)
                 logManager.logServiceEvent(msg, important, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
             })
             

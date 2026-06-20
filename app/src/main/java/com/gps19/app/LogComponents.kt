@@ -31,6 +31,7 @@ import java.util.*
 /**
  * LogComponents: UI for system logs and diagnostic history.
  * Extracted from OverlayComponents for Issue 115 modularization.
+ * v8.9.8: Issue 193 - Integrated Ghost Mode (Slate500) for stale telemetry.
  * v8.8.36: Issue 165 - Migrated to FormatterUtils.
  */
 
@@ -38,7 +39,8 @@ import java.util.*
 fun LogOverlay(
     logs: List<LogEntry>, onExport: () -> Unit, onToggle: () -> Unit, onClear: () -> Unit,
     showDetails: Boolean, showRecovered: Boolean, onSetShowDetails: (Boolean) -> Unit,
-    onSetShowRecovered: (Boolean) -> Unit, appStartTime: Long, systemPulse: Long
+    onSetShowRecovered: (Boolean) -> Unit, appStartTime: Long, systemPulse: Long,
+    isTelemetryFresh: Boolean = true
 ) {
     val timeFormatter = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
     val now = systemPulse
@@ -56,7 +58,9 @@ fun LogOverlay(
     Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate950) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) { Text("${filteredLogs.size} / ${logs.size}", color = Slate500, fontSize = 9.sp, fontWeight = FontWeight.Normal) }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) { 
+                    Text("${filteredLogs.size} / ${logs.size}", color = if (isTelemetryFresh) Slate500 else Slate500.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Normal) 
+                }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     LogFilterButton(stringResource(R.string.log_filter_details), showDetails, Lime500, onSetShowDetails)
                     LogFilterButton(stringResource(R.string.log_filter_hist), showRecovered, Amber500, onSetShowRecovered)
@@ -70,7 +74,9 @@ fun LogOverlay(
                         val time = remember(log.timestamp) { try { timeFormatter.format(Date(log.timestamp)) } catch(e: Exception) { "--:--:--" } }
                         val isRecovered = remember(log.timestamp, appStartTime) { (log.timestamp < appStartTime) || (log.timestamp < now - 43200000L) }
                         val msgPrefix = if (isRecovered) stringResource(R.string.log_hist_prefix) else ""
-                        val renderingConfig = remember(log.message, log.isImportant, log.isSpecial, log.specialColor) { getLogRenderingConfig(log) }
+                        val renderingConfig = remember(log.message, log.isImportant, log.isSpecial, log.specialColor, isTelemetryFresh) { 
+                            getLogRenderingConfig(log, isTelemetryFresh) 
+                        }
                         val isHebrewMsg = remember(log.message) { log.message.any { it in '\u0590'..'\u05FF' } }
                         val cleanMsg = remember(log.message) { FormatterUtils.cleanLogDisplayMessage(log.message) }
                         
@@ -93,7 +99,7 @@ fun LogOverlay(
                         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 0.5.dp, horizontal = 8.dp).background(Color.White.copy(alpha = 0.02f)), verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = time, 
-                                color = Color.White.copy(alpha = 0.6f), 
+                                color = if (isTelemetryFresh) Color.White.copy(alpha = 0.6f) else Slate500, 
                                 fontSize = 10.sp, 
                                 fontFamily = FontFamily.Monospace, 
                                 modifier = Modifier.requiredWidth(95.dp), 
@@ -102,7 +108,16 @@ fun LogOverlay(
                                 overflow = TextOverflow.Clip
                             )
                             Spacer(Modifier.width(4.dp))
-                            CompositionLocalProvider(LocalLayoutDirection provides if (isHebrewMsg) LayoutDirection.Rtl else LayoutDirection.Ltr) { Text(text = displayMessage, color = renderingConfig.color, fontSize = 11.sp, fontWeight = renderingConfig.fontWeight, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f)) }
+                            CompositionLocalProvider(LocalLayoutDirection provides if (isHebrewMsg) LayoutDirection.Rtl else LayoutDirection.Ltr) { 
+                                Text(
+                                    text = displayMessage, 
+                                    color = renderingConfig.color, 
+                                    fontSize = 11.sp, 
+                                    fontWeight = renderingConfig.fontWeight, 
+                                    fontFamily = FontFamily.Monospace, 
+                                    modifier = Modifier.weight(1f)
+                                ) 
+                            }
                         }
                     }
                 }
@@ -119,7 +134,11 @@ fun LogFilterButton(label: String, active: Boolean, activeColor: Color, onClick:
 @Stable
 data class LogRenderingConfig(val color: Color, val fontWeight: FontWeight)
 
-fun getLogRenderingConfig(log: LogEntry): LogRenderingConfig {
+fun getLogRenderingConfig(log: LogEntry, isTelemetryFresh: Boolean = true): LogRenderingConfig {
+    if (!isTelemetryFresh) {
+        return LogRenderingConfig(Slate500, FontWeight.Normal)
+    }
+
     if (log.isSpecial) {
         val color = log.specialColor?.let { Color(it) } ?: Color(FORENSIC_PINK_COLOR) 
         return LogRenderingConfig(color, FontWeight.Bold)

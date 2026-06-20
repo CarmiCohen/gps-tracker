@@ -50,14 +50,12 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v8.9.8:
+ * - Issue 193: Forensic Sweep - Dimmed CommBar and Sats to Slate500 when telemetry is stale.
  * v8.9.6:
  * - Issue 193: Implemented isTelemetryFresh usage in StatusBar and StatusRowData to resolve Zombie Telemetry UX.
  * v8.9.5:
  * - Issue 192: Added CUR (Current/Power) forensic ribbon for parity.
- * v8.8.32:
- * - Issue 145: Replaced hardcoded 240f with MAX_HISTORY_POINTS_PER_RIBBONS constant.
- * - Handshaking Polish: Added technical/matrix style for "WAITING" status.
- * - Forensic Handshaking: Pulsing role labels and stylized telemetry wait state.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -549,7 +547,7 @@ fun StatusRowData(
     val isConnStale = isRemote && !isPeerActive
     val isGpsStale = !isGpsFresh || isConnStale
     
-    // Issue 193: Telemetry freshness for battery and temp
+    // Issue 193: Telemetry freshness for battery, temp, and signal
     val telemetryColor = if (isTelemetryFresh && !isConnStale) color else Slate500
 
     val isHandshaking = isConnStale && isRelayConnected
@@ -598,14 +596,14 @@ fun StatusRowData(
                     Text(text = "°", color = telemetryColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = (-2).dp), style = compactStyle)
                     Text(text = String.format(Locale.getDefault(), "%.0f", temp), color = telemetryColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                 }
-                Box(modifier = Modifier.width(20.dp), contentAlignment = Alignment.Center) { CommBar(commIndex, contentColor) }
+                Box(modifier = Modifier.width(20.dp), contentAlignment = Alignment.Center) { CommBar(commIndex, if (isTelemetryFresh) contentColor else Slate500) }
                 Spacer(Modifier.width(4.dp))
-                Box(modifier = Modifier.width(34.dp)) { if (satsView > 0) Text(text = "$satsUsed/$satsView", color = if(isGpsStale) Slate500 else gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) }
+                Box(modifier = Modifier.width(34.dp)) { if (satsView > 0) Text(text = "$satsUsed/$satsView", color = if(isGpsStale || !isTelemetryFresh) Slate500 else gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) }
                 Box(modifier = Modifier.width(26.dp)) {
                     if (gpsAgeMs != -1L) {
                         val ageSec = (maxOf(0L, gpsAgeMs) / 1000).toInt()
                         val ageStr = when { ageSec < 100 -> "${ageSec}s"; ageSec < 3600 -> "${ageSec/60}m"; else -> ">1h" }
-                        Text(text = ageStr, color = gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
+                        Text(text = ageStr, color = if (isGpsStale || !isTelemetryFresh) Slate500 else gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                     }
                 }
             }
@@ -613,10 +611,11 @@ fun StatusRowData(
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
             if (!isHandshaking) {
                 fun formatAcc(v: Float): String = when { v >= 10000f -> "${(v / 1000).toInt()}k"; v >= 1000f -> String.format(Locale.getDefault(), "%.1fk", v / 1000f); else -> v.toInt().toString() }
+                val accColor = if (isGpsStale || !isTelemetryFresh) Slate500 else gpsColor
                 val accText = if (maxAccuracy > 0) "±${formatAcc(accuracy)}/${formatAcc(maxAccuracy)}" else if (accuracy > 0) "±${formatAcc(accuracy)}" else ""
                 if (accText.isNotEmpty()) Text(
                     text = accText, 
-                    color = gpsColor, 
+                    color = accColor, 
                     fontSize = 8.sp, 
                     fontWeight = FontWeight.Bold, 
                     fontFamily = FontFamily.Monospace, 
@@ -634,7 +633,7 @@ fun StatusRowData(
                         animatedDistance >= 1000 -> String.format(Locale.getDefault(), "%.1fkm", animatedDistance / 1000.0)
                         else -> "${animatedDistance.toInt()}m" 
                     }
-                    Text(text = distStr, color = distColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1, style = compactStyle, textAlign = TextAlign.End)
+                    Text(text = distStr, color = if (isTelemetryFresh) distColor else Slate500, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1, style = compactStyle, textAlign = TextAlign.End)
                 }
             }
         }

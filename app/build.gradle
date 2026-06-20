@@ -10,7 +10,7 @@ plugins {
 def getGitVersionCode = { ->
     try {
         def stdout = new ByteArrayOutputStream()
-        exec {
+        project.exec {
             commandLine 'git', 'rev-list', '--count', 'HEAD'
             standardOutput = stdout
         }
@@ -23,7 +23,7 @@ def getGitVersionCode = { ->
 def getGitVersionName = { ->
     try {
         def stdout = new ByteArrayOutputStream()
-        exec {
+        project.exec {
             commandLine 'git', 'describe', '--tags', '--always', '--dirty'
             standardOutput = stdout
         }
@@ -34,42 +34,42 @@ def getGitVersionName = { ->
 }
 
 android {
-    namespace 'com.gps19.app'
-    compileSdk 35
+    namespace = 'com.gps19.app'
+    compileSdk = 35
 
     defaultConfig {
-        applicationId "com.gps19.app"
-        minSdk 24
-        targetSdk 35
+        applicationId = "com.gps19.app"
+        minSdk = 24
+        targetSdk = 35
         
-        versionCode getGitVersionCode()
-        versionName getGitVersionName()
+        versionCode = getGitVersionCode()
+        versionName = getGitVersionName()
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
-            useSupportLibrary true
+            useSupportLibrary = true
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled true
+            minifyEnabled = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '17'
     }
     buildFeatures {
-        compose true
-        buildConfig true
+        compose = true
+        buildConfig = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion '1.5.10'
+        kotlinCompilerExtensionVersion = '1.5.10'
     }
     packaging {
         resources {
