@@ -5,6 +5,8 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v8.9.8:
+ * - Issue 190: Added XIAOMI_BOOT_GRACE_MS check to suppress transient alarms during startup.
  * v8.9.6:
  * - Issue 190: Implemented robust handling for "Unknown" Xiaomi Autostart status.
  * v8.9.2:
@@ -364,13 +366,15 @@ object MainAlarmLogic {
         // Logic: ALERT is only triggered if status is explicitly DENIED OR if (status is UNKNOWN AND Manual Override is OFF).
         // If status is UNKNOWN and Manual Override is ON, we Muzzle the alert to avoid noisy unresolvable alarms.
         
+        val isXiaomiBootGraceActive = (now - state.serviceStartTime) < XIAOMI_BOOT_GRACE_MS
+        
         val isAutostartExplicitlyDenied = state.xiaomiAutostartStatus == EngineXiaomiStatus.DENIED
         val isSpecialExplicitlyDenied = state.xiaomiStatus == EngineXiaomiStatus.DENIED
         
         val isAutostartIndeterminate = state.xiaomiAutostartStatus == EngineXiaomiStatus.UNKNOWN
         val isSpecialIndeterminate = state.xiaomiStatus == EngineXiaomiStatus.UNKNOWN
 
-        val xiaomiViolation = if (state.isXiaomiDevice) {
+        val xiaomiViolation = if (state.isXiaomiDevice && !isXiaomiBootGraceActive) {
             when {
                 isAutostartExplicitlyDenied || isSpecialExplicitlyDenied -> true
                 isAutostartIndeterminate || isSpecialIndeterminate -> !state.isXiaomiManualOverride
@@ -378,14 +382,14 @@ object MainAlarmLogic {
             }
         } else false
         
-        val xiaomiSubtitle = if (state.isXiaomiDevice) {
-            when {
-                isAutostartExplicitlyDenied -> "MIUI Autostart explicitly DENIED - Enable in Phone Setup"
-                isSpecialExplicitlyDenied -> "MIUI background permissions explicitly DENIED"
-                isAutostartIndeterminate || isSpecialIndeterminate -> "MIUI status UNKNOWN - Toggle manual override in Phone Setup"
-                else -> "MIUI status OK"
-            }
-        } else "Not a Xiaomi device"
+        val xiaomiSubtitle = when {
+            !state.isXiaomiDevice -> "Not a Xiaomi device"
+            isXiaomiBootGraceActive -> "MIUI status stabilizing..."
+            isAutostartExplicitlyDenied -> "MIUI Autostart explicitly DENIED - Enable in Phone Setup"
+            isSpecialExplicitlyDenied -> "MIUI background permissions explicitly DENIED"
+            isAutostartIndeterminate || isSpecialIndeterminate -> "MIUI status UNKNOWN - Toggle manual override in Phone Setup"
+            else -> "MIUI status OK"
+        }
 
         reports.add(
             ViolationReport(

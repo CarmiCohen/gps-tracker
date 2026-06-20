@@ -19,6 +19,7 @@ import kotlin.math.*
 /**
  * ViewerService: Background monitoring for the Viewer role.
  * v8.9.7:
+ * - Issue 194: Finalized marker reconstruction by passing forensicUseCase to RemoteHandler.
  * - Issue 194: Updated network callback to handle "remote_log" for forensic SIT reconstruction.
  * v8.9.6:
  * - Issue 194: Added ALERT_ID_TRACKER_CHAIR to recordViolationMarkers to ensure SIT parity via status flags.
@@ -106,7 +107,7 @@ class ViewerService : BaseMonitorService() {
             syncManager = SyncManager(this@ViewerService, networkManager, sessionManager, gpsManager, null, locationProcessor, telemetryRepository, offlineRepository, logManager, timeProvider, lifecycleScope)
             syncManager.startSyncLoop(configManager.deviceId, configManager.viewerId, false)
 
-            remoteHandler = RemoteHandler(this@ViewerService, repository, locationProcessor, alarmManager, sessionManager, timeProvider, lifecycleScope) { id -> handleTrackerPulse(id) }
+            remoteHandler = RemoteHandler(this@ViewerService, repository, locationProcessor, alarmManager, sessionManager, forensicUseCase, timeProvider, lifecycleScope) { id -> handleTrackerPulse(id) }
 
             historyManager = HistoryManager(this@ViewerService, repository, gpsManager, null, locationProcessor, timeProvider, lifecycleScope) { msg, important -> logManager.logServiceEvent(msg, important) }
 
@@ -377,7 +378,7 @@ class ViewerService : BaseMonitorService() {
                 isTrajectoryPromoted = remoteHandler.isTrackerTrajectoryPromoted, jumpTier = remoteHandler.trackerJumpTier,
                 trackerLat = remoteHandler.trackerLat, trackerLng = remoteHandler.trackerLng, trackerAccuracy = remoteHandler.trackerAccuracy,
                 maxTrackerAccuracy = remoteHandler.trackerMaxAccuracy, trackerLastGpsTs = remoteHandler.trackerLastGpsTs,
-                trackerSpeed = remoteHandler.trackerSpeed, trackerBattery = remoteHandler.trackerBattery, trackerTemp = remoteHandler.trackerTemp,
+                trackerSpeed = remoteHandler.trackerSpeed, trackerBearing = 0f, trackerBattery = remoteHandler.trackerBattery, trackerTemp = remoteHandler.trackerTemp,
                 isHardwareOnline = true, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
                 isJammerSuspicion = isTrackerJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled,
                 isUiVisible = isUiVisible(), 

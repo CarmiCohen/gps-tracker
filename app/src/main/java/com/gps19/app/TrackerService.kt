@@ -21,16 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.7:
+ * - Plunge Matching: Integrated sensor-level peakVerticalVelocityTs into Engine processing.
+ * - Issue 191: Implemented device-specific hysteresis delay (500ms for A15) in Muzzle Handshake.
  * v8.9.6:
  * - Issue 194: Implemented SIT_TRANSMISSION_LATCH_MS to ensure robust SIT event propagation.
  * - Issue 191: Implemented deterministic Muzzle Handshake with SyncManager to resolve I/O race conditions.
- * - Issue 190: Passing explicit xiaomiAutostartStatus to evaluateAlarms for robust indeterminate handling.
- * v8.9.5:
- * - Issue 192: Passing currentMa to historyManager.updateRibbons for full forensic parity.
- * v8.9.3:
- * - Issue 188: Preserved historical GPS timestamps in trail points.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -160,14 +156,15 @@ class TrackerService : BaseMonitorService() {
             syncManager.setOnSyncFinishedListener {
                 muzzleReleaseJob?.cancel()
                 muzzleReleaseJob = lifecycleScope.launch {
-                    delay(200)
+                    val hysteresis = if (isA15) MUZZLE_HYSTERESIS_A15_MS else MUZZLE_HYSTERESIS_MS
+                    delay(hysteresis)
                     isMuzzled = false
                 }
             }
             
             syncManager.startSyncLoop(configManager.deviceId, configManager.viewerId, true)
 
-            remoteHandler = RemoteHandler(this@TrackerService, repository, locationProcessor, alarmManager, sessionManager, timeProvider, lifecycleScope) { id -> handleViewerPulse(id) }
+            remoteHandler = RemoteHandler(this@TrackerService, repository, locationProcessor, alarmManager, sessionManager, forensicUseCase, timeProvider, lifecycleScope) { id -> handleViewerPulse(id) }
 
             commandRouter = CommandRouter(
                 this@TrackerService, configManager, logManager, networkManager, alarmManager, notificationManager, 
@@ -193,7 +190,6 @@ class TrackerService : BaseMonitorService() {
             gpsCollectionJob = lifecycleScope.launch { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
             gnssDetailJob = lifecycleScope.launch { gpsManager.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
 
-            // R916: Dynamic settings and geofence observation
             settingsJob = lifecycleScope.launch {
                 launch {
                     repository.alertSettingsFlow.collect { settings ->
@@ -365,13 +361,14 @@ class TrackerService : BaseMonitorService() {
         val peakDb = sensorManager.consumeAcousticPeak()
         val minDb = sensorManager.consumeAcousticMin()
         val peakShock = sensorManager.consumePeakVibration()
+        val peakVzTs = sensorManager.consumePeakVerticalVelocityTs()
         
         locationProcessor.updateSensorData(
             vibration = sensorManager.currentVibrationIndex, heading = sensorManager.currentCompassHeading, baroAlt = sensorManager.relativeAltitude,
             lux = sensorManager.currentLux, isNear = sensorManager.isProximityNear, powerTamper = integrityMonitor.isPowerTamperDetected,
             tiltDegrees = sensorManager.currentTiltDegrees, acousticDb = peakDb, peakShock = peakShock, acousticMinDb = minDb,
-            peakVerticalVelocity = sensorManager.currentVerticalVelocity, plungeMatched = sensorManager.consumePlungeMatched(), 
-            peakVerticalVelocityTs = 0L, 
+            peakVerticalVelocity = sensorManager.currentVerticalVelocity, peakVerticalVelocityTs = peakVzTs, 
+            plungeMatched = sensorManager.consumePlungeMatched(), 
             isSirenActive = false, isWarming = sensorManager.isWarming, manualAdaptiveFloor = sensorManager.adaptiveVibrationFloor,
             isMuzzled = isMuzzled,
             nowRealtime = nowRealtime, nowWall = now
@@ -515,7 +512,6 @@ class TrackerService : BaseMonitorService() {
             XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN
         }
         
-        // Issue 190: Pass explicit Autostart status
         val xiaomiAutostartStatus = when(getXiaomiAutostartStatus(this)) {
             XiaomiPermissionStatus.GRANTED -> EngineXiaomiStatus.GRANTED
             XiaomiPermissionStatus.DENIED -> EngineXiaomiStatus.DENIED
@@ -544,7 +540,7 @@ class TrackerService : BaseMonitorService() {
                 discoveryPhase = null,
                 isXiaomiDevice = isXiaomi,
                 xiaomiStatus = xiaomiStatus,
-                xiaomiAutostartStatus = xiaomiAutostartStatus, // Issue 190
+                xiaomiAutostartStatus = xiaomiAutostartStatus,
                 isXiaomiManualOverride = isXiaomiManualOverride
             )
         }

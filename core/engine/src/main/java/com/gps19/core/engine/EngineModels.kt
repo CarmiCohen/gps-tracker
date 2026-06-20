@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v8.9.7:
+ * - Plunge Matching: Added sitVzTs to EngineConnectionPoint for forensic parity.
  * v8.9.6:
  * - Issue 190: Added xiaomiAutostartStatus and removed redundant isXiaomiAutostartGranted from AlarmEvaluationState.
  * v8.9.5:
@@ -55,6 +57,7 @@ data class EngineConnectionPoint(
     val snrIdx: Float = 0f,
     val verticalVelocity: Float = 0f,
     val sitVz: Float = 0f,
+    val sitVzTs: Long = 0L,
     val sitDz: Float = 0f,
     val sitBaro: Float = 0f,
     val sitTilt: Float = 0f,
@@ -195,6 +198,7 @@ data class AlarmEvaluationState(
     val isSitActive: Boolean = false,
     val lastSitTs: Long = 0L,
     val verticalVelocity: Float = 0f,
+    val sitVzTs: Long = 0L,
     val isLocationPending: Boolean = false,
     val isPowerSaveMode: Boolean = false, 
     val standbyBucket: Int = -1,

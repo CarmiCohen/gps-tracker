@@ -9,6 +9,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v8.9.7:
+ * - Plunge Matching: Added sitVzTs to ConnectionPoint, TrackerStatus, and LocationState for forensic parity.
  * v8.9.6:
  * - Issue 193: Added isTelemetryFresh to DashboardState to resolve Zombie Telemetry UX.
  * v8.9.5:
@@ -73,7 +75,7 @@ data class ConnectionPoint(
     val noiseIdx: Float = 0f, val luxIdx: Float = 0f, val vibeIdx: Float = 0f, val proxIdx: Float = 1f,
     val liftIdx: Float = 0f, val snrIdx: Float = 0f,
     val verticalVelocity: Float = 0f,
-    val sitVz: Float = 0f, val sitDz: Float = 0f,
+    val sitVz: Float = 0f, val sitVzTs: Long = 0L, val sitDz: Float = 0f,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
     val speed: Float = 0f, val bearing: Float = 0f,
@@ -181,6 +183,7 @@ data class TrackerStatus(
     val lastSitTs: Long = 0L,
     val verticalVelocity: Float = 0f,
     val sitVz: Float = 0f,
+    val sitVzTs: Long = 0L,
     val sitDz: Float = 0f,
     val sitBaro: Float = 0f,
     val sitTilt: Float = 0f,
@@ -258,6 +261,7 @@ data class LocationState(
     val lastSitTs: Long = 0L,
     val verticalVelocity: Float = 0f,
     val sitVz: Float = 0f,
+    val sitVzTs: Long = 0L,
     val sitDz: Float = 0f,
     val sitBaro: Float = 0f,
     val sitTilt: Float = 0f,
@@ -451,6 +455,7 @@ data class IntegrityState(
     val isSitActive: Boolean = false,
     val lastSitTs: Long = 0L,
     val sitVz: Float = 0f,
+    val sitVzTs: Long = 0L,
     val sitDz: Float = 0f,
     val sitBaro: Float = 0f,
     val sitTilt: Float = 0f,

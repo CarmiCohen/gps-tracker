@@ -2,12 +2,16 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.8:
+ * - Issue 193: Unified GPS_UI_FAIL_THRESHOLD_MS with TELEMETRY_UI_STALE_THRESHOLD_MS (10s).
+ * - Issue 190: Hardened Xiaomi Stability - Shortened Stall detection (60s) and Revival intervals (120s).
+ * - Issue 190: Added XIAOMI_BOOT_GRACE_MS (30s) to suppress transient DENIED states during startup.
+ * v8.9.7:
+ * - Issue 191: Added MUZZLE_HYSTERESIS_MS and MUZZLE_HYSTERESIS_A15_MS for robust I/O stabilization.
  * v8.9.6:
  * - Issue 194: Added SIT_TRANSMISSION_LATCH_MS to ensure robust SIT event propagation.
  * - Issue 191: Increased MUZZLE_WINDOW_DURATION_MS safety ceiling to 2000ms.
  * - Issue 193: Added TELEMETRY_UI_STALE_THRESHOLD_MS (10s) for "Zombie UX" mitigation.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -142,8 +146,8 @@ const val HIGH_FREQUENCY_GPS_POLLING_MS = 100L
 const val A15_STABLE_GPS_POLLING_MS = 1000L
 const val COOLING_GPS_POLLING_MS = 30000L
 const val VIEWER_GPS_POLLING_MS = 10000L 
-const val GPS_GAP_THRESHOLD_MS = 180000L
-const val GPS_STALL_THRESHOLD_MS = 180000L
+const val GPS_GAP_THRESHOLD_MS = 60000L
+const val GPS_STALL_THRESHOLD_MS = 60000L
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
 const val TICK_INTERVAL_MS = 1000L
 const val TICK_INTERVAL_SLOW_MS = 5000L
@@ -154,8 +158,11 @@ const val CLOCK_REGRESSION_GATE_MS = 100L
 const val SENSOR_WARMING_MS = 5000L
 const val SUSPICIOUS_STATE_COOLDOWN_MS = 60000L
 const val MUZZLE_WINDOW_DURATION_MS = 2000L
-const val GPS_REVIVAL_RETRY_INTERVAL_MS = 300000L
+const val MUZZLE_HYSTERESIS_MS = 200L
+const val MUZZLE_HYSTERESIS_A15_MS = 500L
+const val GPS_REVIVAL_RETRY_INTERVAL_MS = 120000L
 const val MAX_REVIVAL_ATTEMPTS = 3
+const val XIAOMI_BOOT_GRACE_MS = 30000L
 
 const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 60000L
@@ -226,7 +233,10 @@ const val GPS_TRANSITION_LOG_MUZZLE_MS = 30000L
 const val MAX_HISTORY_POINTS_PER_RIBBONS = 240
 const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 1000L
+
+// Issue 193: Unified UI Staleness Threshold (10s)
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 10000L
+const val GPS_UI_FAIL_THRESHOLD_MS = 10000L
 
 // Alert Internal IDs (Aligned with SoT)
 const val ALERT_ID_LOCAL_INTERNET = "LOCAL_INTERNET"
@@ -289,7 +299,6 @@ const val ALARM_OVERLAY_THROTTLE_MS = 30000L
 const val HEARTBEAT_INTERVAL_MS = 3600000L
 
 // UI Health & Visibility
-const val GPS_UI_FAIL_THRESHOLD_MS = 7000L
 const val WATCH_DOG_UI_GRACE_MS = 30000L
 const val SENSOR_GRACE_PERIOD_MS = 600000L
 const val TEST_ALARM_DURATION_MS = 3000L

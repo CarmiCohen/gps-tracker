@@ -13,6 +13,7 @@ import org.json.JSONObject
 /**
  * SyncManager: Handles broadcasting state updates and relay synchronization.
  * v8.9.7:
+ * - Plunge Matching: Added sit_vz_ts to telemetry payloads for forensic parity.
  * - Issue 194: Implemented reliable log synchronization (flushPendingLogs) to ensure zero-loss SIT events.
  * v8.9.6:
  * - Issue 191: Implemented onSyncFinished handshake to resolve Muzzle Window race conditions.
@@ -136,6 +137,7 @@ class SyncManager(
                         put("is_sit_detected", entity.isSitDetected)
                         put("is_sit_active", entity.isSitActive)
                         put("sit_vz", safeFloat(entity.sitVz))
+                        put("sit_vz_ts", entity.sitVzTs)
                         put("sit_dz", safeFloat(entity.sitDz))
                         put("vertical_velocity", safeFloat(entity.verticalVelocity))
                         put("sit_baro", safeFloat(entity.sitBaro))
@@ -198,6 +200,7 @@ class SyncManager(
         violationPercentage: Float = 0f,
         verticalVelocity: Float = 0f,
         sitVz: Float = 0f,
+        sitVzTs: Long = 0L,
         sitDz: Float = 0f,
         sitBaro: Float = 0f,
         sitTilt: Float = 0f,
@@ -275,6 +278,7 @@ class SyncManager(
             put("is_storage_critical", integrity.isStorageCritical)
             
             put("sit_vz", safeFloat(sitVz))
+            put("sit_vz_ts", sitVzTs)
             put("sit_dz", safeFloat(sitDz))
             put("sit_baro", safeFloat(sitBaro))
             put("sit_tilt", safeFloat(sitTilt))
@@ -335,7 +339,7 @@ class SyncManager(
                     snrIdx = safeFloat(snrIdx), isBatterySteepDischarge = isBatterySteepDischarge,
                     isCoolingModeActive = isCoolingModeActive,
                     isSitDetected = isSitDetected, isSitActive = isSitActive,
-                    sitVz = sitVz, sitDz = sitDz,
+                    sitVz = sitVz, sitVzTs = sitVzTs, sitDz = sitDz,
                     sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
                     isStorageLow = integrity.isStorageLow, isStorageCritical = integrity.isStorageCritical,
                     isPowerSaveMode = integrity.isPowerSaveMode, standbyBucket = integrity.standbyBucket,
@@ -374,7 +378,7 @@ class SyncManager(
             violationUptimeMs = sessionManager.violationUptimeMs,
             violationPercentage = sessionManager.getViolationPercentage(),
             verticalVelocity = verticalVelocity,
-            sitVz = sitVz, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
+            sitVz = sitVz, sitVzTs = sitVzTs, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
             isClockRegression = isClockRegression,
             isLocationPending = integrity.isLocationPending,
             isPowerSaveMode = integrity.isPowerSaveMode,

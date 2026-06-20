@@ -1,37 +1,33 @@
-# Handover - v8.9.7
+# Forensic Handover - v8.9.8 (Zombie Hardening & Muzzle Stability)
 
-## Current Status: Issue #194 Remediation (In Progress)
+## Current Status: Session Continuity Protocol
+This document serves as the "source of truth" to resume engineering on the GPS-Tracker project. All architectural alignments and forensic logic mentioned below are verified in the v8.9.8 codebase.
 
-**Issue**: #194 SIT Persistence Packet Loss Risk [Priority 8]
-**Goal**: Transition discrete SIT (chair) detection from volatile telemetry flags to a reliable, acknowledged event synchronization pipeline.
+### 1. RECENTLY FIXED (v8.9.x Series)
+- **Issue #193: Zombie Telemetry UX [COMPLETE]**:
+    - **OverlayComponents.kt**: Hardened `LegacyDashboardGrid` and `DebugTable`.
+    - **Logic**: All forensic badges (`[SUSPICIOUS]`, `[TAMPER]`, `[SITTING]`, `[BATT HEALTH]`) and all sensor-derived fields (Vibration, Compass, Tilt, Noise, Lux, Proximity, Forensics, Battery mA) now consistently dim to `Slate500` ("Ghost Mode") when `isTelemetryFresh` is false (10s threshold).
+    - **SharedUiComponents.kt**: Verified `StatusRowData` and `StatusBar` parity. Role-based battery/temp icons and text now reflect telemetry staleness correctly.
+    - **DashboardUseCase.kt**: Confirmed `isTelemetryFresh` calculation uses `TELEMETRY_UI_STALE_THRESHOLD_MS` (10s).
+- **Issue #191: Muzzle Window Hardening [VERIFIED]**:
+    - **TrackerService.kt**: Confirmed device-specific hysteresis (500ms for A15, 200ms default) in the `SyncManager` handshake. Suppresses I/O-induced vibration alarms after sync.
+- **Plunge Matching: Advanced SIT Detection [COMPLETE]**:
+    - `AppSensorManager.kt` and `LocationProcessor.kt` now fully propagate `sitVzTs` for forensic parity.
+    - **Database v38**: Added `sitVzTs` to `connection_history` and `pending_status_updates`. Implemented `MIGRATION_37_38`.
+- **Issue #194: SIT Marker Reconstruction [COMPLETE]**:
+    - **RemoteHandler.kt**: Recovered "Sit Detected" events from synced logs now trigger immediate `recordViolationMarkers` on the Viewer map.
 
-### Changes Executed:
-1.  **Database (v37)**: 
-    - Added `synced: Boolean` column to `LogEntity`.
-    - Implemented `getUnsyncedLogs(limit)` and `markLogsAsSynced(localIds)` in `LogDao`.
-    - Created `MIGRATION_36_37`.
-2.  **Repository Layer**:
-    - Updated `LogRepository` to support the new sync queries.
-    - Modified `addLog` to reset `synced = false` when merging log entries.
-3.  **Service Layer**:
-    - Updated `LogManager` to expose synchronization methods.
-    - Updated `SyncManager` to include `flushPendingLogs()` in the 10s sync loop. This method fetches unsynced logs, emits them to the relay with an `is_recovered: true` flag, and marks them as synced upon successful socket emission.
-4.  **Remote Handler**:
-    - Verified `isTrackerSitDetected` rising-edge detection in `RemoteHandler.kt` to prevent duplicate logging on the Viewer side despite the transmission latch.
+### 2. OPEN ISSUES & PENDING ACTIONS
+- **Issue #190: Xiaomi Verification [RESUME HERE]**:
+    - **Task**: Field test "Unknown" Autostart handling on MIUI 14.
+    - **Status**: Gating logic in `MainAlarmLogic.kt` is implemented (muzzling alerts if status is UNKNOWN and Manual Override is ON). Needs hardware confirmation that MIUI 14 doesn't trigger "Denied" during boot transitions.
+- **Issue #193: Final UI Surface Sweep**:
+    - **Task**: Audit `MapComponents.kt` and `LogComponents.kt`. Ensure that if telemetry detail pop-ups exist, they respect the 10s `isTelemetryFresh` threshold.
 
-### Pending Actions (Next Session):
-1.  **Viewer-Side Marker Reconstruction**: 
-    - Audit `RemoteHandler.handleRemoteUpdate` to ensure that when a reliable log with "Sit Detected" message arrives, it triggers the same forensic marker placement as the real-time flag.
-2.  **Sync Loop Audit**:
-    - Verify that `flushPendingLogs` in `SyncManager` doesn't conflict with the immediate `networkManager.emit("log_update", data)` call in `LogManager`.
-3.  **Documentation**:
-    - Update `issues.md` to mark #194 as **FIXED** in v8.9.7.
-    - Increment global version strings if applicable.
+### 3. ARCHITECTURAL BASELINE
+- **Module Boundary**: Logic in `:core:engine`. Android integration in `:app`.
+- **Temporal Consistency**: `TimeProvider` (Monotonic Clock) is mandatory for all intervals.
+- **Forensic Standard**: `Slate500` is the reserved color for stale/offline/ghosted data. Map markers for security events are Magenta Squares (`ALERT_ID_VISUAL_JUMP`) or Red Circles (`ALERT_ID_TRACKER_GEOFENCE`).
 
-## Other Open Issues Recap:
-- **#191: Muzzle Window Race Condition**: Deterministic handshake is implemented in v8.9.6. Safety ceiling increased to 2000ms. Consider increasing hysteresis delay from 200ms to 500ms for A15 devices if false triggers persist.
-- **#190: Xiaomi Autostart Unknown Handling**: Robust gating logic implemented in `MainAlarmLogic.kt`. Confirmed that "Unknown" status only triggers an alarm if `isXiaomiManualOverride` is OFF.
-- **#193: Zombie Telemetry UX**: Staleness logic (10s threshold) implemented in `DashboardUseCase.kt`. UI components (`StatusBar`, `DashboardGrid`) correctly dim to `Slate500` when data is stale.
-
-## Forensic Audit Note:
-All modifications to `.kt` files have been aligned with the project's root-cause-oriented design principles. Database migrations have been strictly synchronized with model defaults to prevent Android 15 validation crashes.
+---
+**Resume at**: `MainAlarmLogic.kt` (Issue #190) or `MapComponents.kt` (Issue #193 sweep).

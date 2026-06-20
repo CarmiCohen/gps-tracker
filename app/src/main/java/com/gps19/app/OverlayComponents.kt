@@ -24,6 +24,8 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * v8.9.7:
+ * - Issue 193: Consistently dimmed all forensic badges and labels to Slate500 when telemetry is stale (>10s).
  * v8.9.6:
  * - Issue 193: Implemented isTelemetryFresh usage in LegacyDashboardGrid to resolve Zombie Telemetry UX.
  * v8.9.5:
@@ -88,16 +90,16 @@ fun LegacyDashboardGrid(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (d.isSuspicious) {
-                        Text(text = "[SUSPICIOUS]", color = Amber500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Text(text = "[SUSPICIOUS]", color = if (d.isTelemetryFresh) Amber500 else Slate500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     }
                     if (d.isTamperDetected) {
-                        Text(text = "[TAMPER]", color = Rose500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Text(text = "[TAMPER]", color = if (d.isTelemetryFresh) Rose500 else Slate500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     }
                     if (d.isSitDetected) {
-                        Text(text = "[SITTING]", color = Color(FORENSIC_PINK_COLOR), fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Text(text = "[SITTING]", color = if (d.isTelemetryFresh) Color(FORENSIC_PINK_COLOR) else Slate500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     }
                     if (d.isBatterySteepDischarge) {
-                        Text(text = "[BATT HEALTH]", color = Rose500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Text(text = "[BATT HEALTH]", color = if (d.isTelemetryFresh) Rose500 else Slate500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     }
                 }
             }
@@ -140,11 +142,11 @@ fun LegacyDashboardGrid(
             InfoRow(leftVal = d.engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else Lime500, rightVal = d.sinceConn, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else Emerald500)
             
             InfoRow(
-                leftVal = d.lastChairSit, leftLabel = "Last Sit", leftColor = if(isConnStale) Slate500 else Color(FORENSIC_PINK_COLOR), 
+                leftVal = d.lastChairSit, leftLabel = "Last Sit", leftColor = if(!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR), 
                 rightVal = d.sinceDisco, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else Emerald500
             )
             
-            InfoRow(leftVal = d.violationUptime, leftLabel = "Violation", leftColor = if (isConnStale) Slate500 else Rose500, rightVal = d.violationPercentage, rightLabel = "Stress Idx", rightColor = if (isConnStale) Slate500 else Rose500)
+            InfoRow(leftVal = d.violationUptime, leftLabel = "Violation", leftColor = if (!d.isTelemetryFresh) Slate500 else Rose500, rightVal = d.violationPercentage, rightLabel = "Stress Idx", rightColor = if (!d.isTelemetryFresh) Slate500 else Rose500)
             
             InfoRow(
                 leftVal = d.distToHome, leftLabel = "Dist Home", leftColor = gpsColor,
@@ -191,7 +193,7 @@ fun LegacyDashboardGrid(
 
             Spacer(Modifier.height(6.dp)); HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp); Spacer(Modifier.height(6.dp))
 
-            InfoRow(leftVal = d.peakShock, leftLabel = "Peak Shock", leftColor = if (!d.isTelemetryFresh) Slate500 else Rose500, rightVal = d.vibrationFloor, rightLabel = "Vibration Floor", rightColor = Slate500)
+            InfoRow(leftVal = d.peakShock, leftLabel = "Peak Shock", leftColor = if (!d.isTelemetryFresh) Slate500 else Rose500, rightVal = d.vibrationFloor, rightLabel = "Vibration Floor", rightColor = if (d.isTelemetryFresh) Slate400 else Slate500)
             InfoRow(leftVal = d.luxBaseline, leftLabel = "Lux Baseline", leftColor = if(!d.isTelemetryFresh) Slate500 else Amber500, rightVal = d.acousticFloor, rightLabel = "Acoustic Floor", rightColor = if(!d.isTelemetryFresh) Slate500 else Color(0xFF38BDF8))
             InfoRow(leftVal = d.currentMa, leftLabel = stringResource(R.string.log_diag_battery), leftColor = if(!d.isTelemetryFresh) Slate500 else Color.White, rightVal = "", rightLabel = "")
         }
@@ -271,21 +273,21 @@ fun DebugTable(
             Text(stringResource(R.string.log_diagnostics_title), color = Lime500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                DebugItem(stringResource(R.string.log_diag_latency), "${rtt}ms")
-                DebugItem(stringResource(R.string.log_diag_battery), "${currentMa}mA")
+                DebugItem(stringResource(R.string.log_diag_latency), "${rtt}ms", valueColor = if (d.isLinkFresh) Color.White else Slate500)
+                DebugItem(stringResource(R.string.log_diag_battery), "${currentMa}mA", valueColor = if (d.isTelemetryFresh) Color.White else Slate500)
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                DebugItem(stringResource(R.string.log_diag_gps_age), if (gpsAgeSec >= 0) "${gpsAgeSec}s" else "--")
-                DebugItem(stringResource(R.string.log_diag_sentinel), d.trackerState.name)
+                DebugItem(stringResource(R.string.log_diag_gps_age), if (gpsAgeSec >= 0) "${gpsAgeSec}s" else "--", valueColor = if (d.isGpsFresh) Color.White else Slate500)
+                DebugItem(stringResource(R.string.log_diag_sentinel), d.trackerState.name, valueColor = if (d.isGpsFresh) Lime500 else Slate500)
             }
         }
     }
 }
 
 @Composable
-private fun DebugItem(label: String, value: String) {
+private fun DebugItem(label: String, value: String, valueColor: Color = Color.White) {
     Column(modifier = Modifier.width(140.dp)) {
         Text(label, color = Slate500, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-        Text(value, color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+        Text(value, color = valueColor, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
     }
 }

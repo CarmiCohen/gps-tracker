@@ -25,6 +25,8 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU and Environmental sensors.
+ * v8.9.7:
+ * - Plunge Matching: Implemented peakVerticalVelocityTs tracking and enhanced displacement processing.
  * v8.8.21: Migrated to TimeProvider for all timing logic.
  */
 @Singleton
@@ -55,6 +57,7 @@ class AppSensorManager @Inject constructor(
     private var internalMinDb: Double = 100.0
     private var internalPeakVibration: Float = 0f
     private var internalPeakVerticalVelocity: Float = 0f
+    private var internalPeakVerticalVelocityTs: Long = 0L
     private var internalPeakVerticalDisplacement: Float = 0f
     
     @Volatile
@@ -494,6 +497,14 @@ class AppSensorManager @Inject constructor(
         }
     }
 
+    fun consumePeakVerticalVelocityTs(): Long {
+        synchronized(this) {
+            val p = internalPeakVerticalVelocityTs
+            internalPeakVerticalVelocityTs = 0L
+            return p
+        }
+    }
+
     fun consumePeakVerticalDisplacement(): Float {
         synchronized(this) {
             val p = internalPeakVerticalDisplacement
@@ -575,6 +586,7 @@ class AppSensorManager @Inject constructor(
             }
 
             val now = timeProvider.elapsedRealtime()
+            val wallNow = timeProvider.currentTimeMillis()
             if (plungePhase > 0 && now - lastPlungePhaseTs > 1500) plungePhase = 0
 
             when (plungePhase) {
@@ -603,6 +615,7 @@ class AppSensorManager @Inject constructor(
             synchronized(this) {
                 if (abs(currentVerticalVelocity) > abs(internalPeakVerticalVelocity)) {
                     internalPeakVerticalVelocity = currentVerticalVelocity
+                    internalPeakVerticalVelocityTs = wallNow
                 }
                 if (abs(currentVerticalDisplacement) > abs(internalPeakVerticalDisplacement)) {
                     internalPeakVerticalDisplacement = currentVerticalDisplacement

@@ -5,6 +5,8 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * v8.9.7:
+ * - Plunge Matching: Integrated lastSitVzTs for forensic reconstruction of sit events.
  * v8.8.13:
  * - Issue 79: Re-implemented consumeSitDetected to resolve sticky SIT state.
  * v8.8.21:
@@ -59,6 +61,7 @@ class LocationSentinel {
     var baselineSitTilt: Float = -1f
     
     var lastSitVz: Float = 0f
+    var lastSitVzTs: Long = 0L
     var lastSitDz: Float = 0f
     var lastSitBaro: Float = 0f
     var lastSitTilt: Float = 0f
@@ -108,6 +111,7 @@ class LocationSentinel {
         peakShock: Float = 0f,
         acousticMinDb: Double = -1.0,
         peakVerticalVelocity: Float = 0f,
+        peakVerticalVelocityTs: Long = 0L,
         plungeMatched: Boolean = false,
         peakVerticalDisplacement: Float = 0f,
         isSirenActive: Boolean = false,
@@ -150,6 +154,7 @@ class LocationSentinel {
                     sitDetectionCooldownTs = nowRealtime + CHAIR_SIT_COOLDOWN_MS
                     
                     lastSitVz = safeF(peakVerticalVelocity)
+                    lastSitVzTs = peakVerticalVelocityTs
                     lastSitDz = safeF(peakVerticalDisplacement)
                     lastSitBaro = safeF(baroDelta)
                     lastSitTilt = safeF(tiltDelta)
@@ -477,7 +482,7 @@ class LocationSentinel {
         adaptiveVibrationFloor = INITIAL_VIBRATION_FLOOR; peakVibrationShock = 0f; peakVibrationShockTs = 0L
         lastAcousticContractionRealtime = 0L
         isSitDetected = false; lastSitTs = 0L; lastSitRealtime = 0L; baselineSitTilt = -1f; sitDetectionCooldownTs = 0L; stationaryStartTs = 0L
-        lastSitVz = 0f; lastSitDz = 0f; lastSitBaro = 0f; lastSitTilt = 0f; lastSitShock = 0f
+        lastSitVz = 0f; lastSitVzTs = 0L; lastSitDz = 0f; lastSitBaro = 0f; lastSitTilt = 0f; lastSitShock = 0f
         gpsMotionStartTs = 0L
         lastFastPathAcousticSpikeTs = 0L
         immFilter.reset()

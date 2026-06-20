@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Database: persistence configuration for GPS Tracker.
  * v8.9.7:
+ * - Plunge Matching: Added sitVzTs to HistoryEntity and PendingStatusEntity for forensic parity.
  * - Issue 194: Added 'synced' column to LogEntity and implemented reliable log sync queries.
  */
 @Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
@@ -59,6 +60,7 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "0") val snrIdx: Float = 0f,
     @ColumnInfo(defaultValue = "0") val verticalVelocity: Float = 0f,
     @ColumnInfo(defaultValue = "0") val sitVz: Float = 0f, 
+    @ColumnInfo(defaultValue = "0") val sitVzTs: Long = 0L,
     @ColumnInfo(defaultValue = "0") val sitDz: Float = 0f,
     @ColumnInfo(name = "isBatterySteepDischarge", defaultValue = "0") val isBatterySteepDischarge: Boolean = false,
     @ColumnInfo(defaultValue = "10") val remoteSig: Int = 10,
@@ -107,6 +109,7 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val isSitDetected: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isSitActive: Boolean = false,
     @ColumnInfo(defaultValue = "0") val sitVz: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val sitVzTs: Long = 0L,
     @ColumnInfo(defaultValue = "0") val sitDz: Float = 0f,
     @ColumnInfo(defaultValue = "0") val verticalVelocity: Float = 0f,
     @ColumnInfo(defaultValue = "0") val sitBaro: Float = 0f,
@@ -174,7 +177,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 37, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 38, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -183,6 +186,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_37_38 = object : Migration(37, 38) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE connection_history ADD COLUMN sitVzTs INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN sitVzTs INTEGER NOT NULL DEFAULT 0")
+            }
+        }
         val MIGRATION_16_17 = object : Migration(16, 17) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE logs ADD COLUMN firstSeenTs INTEGER NOT NULL DEFAULT 0") } }
         val MIGRATION_17_18 = object : Migration(17, 18) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE connection_history ADD COLUMN snrIdx REAL NOT NULL DEFAULT 0") } }
         val MIGRATION_18_19 = object : Migration(18, 19) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN snrIdx REAL NOT NULL DEFAULT 0") } }

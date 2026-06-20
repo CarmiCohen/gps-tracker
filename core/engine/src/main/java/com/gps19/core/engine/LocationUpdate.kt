@@ -41,6 +41,7 @@ data class LocationUpdate(
     val lastSitTs: Long = 0L,
     val verticalVelocity: Float? = null,
     val sitVz: Float? = null,
+    val sitVzTs: Long = 0L,
     val sitDz: Float? = null,
     val sitBaro: Float? = null,
     val sitTilt: Float? = null,

@@ -48,6 +48,8 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * v8.9.8:
+ * - Issue 193: Forensic Sweep - Switched stale marker colors to Slate500 (Ghost Mode).
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.36:
@@ -583,14 +585,14 @@ private fun addTrailSegmentToFolder(view: MapView, folder: FolderOverlay, segmen
 private fun createTrackerBitmap(density: Float, isFresh: Boolean): Bitmap { 
     val sz = (32 * density).toInt(); val bitmap = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888); val canvas = Canvas(bitmap); val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     paint.style = Paint.Style.STROKE; paint.color = android.graphics.Color.WHITE; paint.strokeWidth = 1.0f * density; canvas.drawCircle(sz/2f, sz/2f, sz/2f - density, paint)
-    paint.color = if (isFresh) Lime500.toArgb() else android.graphics.Color.GRAY; paint.strokeWidth = 3.0f * density; canvas.drawCircle(sz/2f, sz/2f, sz/2f - 3.5f * density, paint)
+    paint.color = if (isFresh) Lime500.toArgb() else Slate500.toArgb(); paint.strokeWidth = 3.0f * density; canvas.drawCircle(sz/2f, sz/2f, sz/2f - 3.5f * density, paint)
     return bitmap
 }
 
 private fun createViewerBitmap(density: Float, isFresh: Boolean): Bitmap {
     val sz = (20 * density).toInt(); val bitmap = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888); val canvas = Canvas(bitmap); val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     paint.style = Paint.Style.STROKE; paint.color = android.graphics.Color.WHITE; paint.strokeWidth = 1.0f * density; canvas.drawCircle(sz/2f, sz/2f, sz/2f - density, paint)
-    paint.color = if (isFresh) ViewerOrange.toArgb() else 0x80808080.toInt(); paint.style = Paint.Style.FILL; canvas.drawCircle(sz/2f, sz/2f, sz/2f - 3.5f * density, paint)
+    paint.color = if (isFresh) ViewerOrange.toArgb() else Slate500.toArgb(); paint.style = Paint.Style.FILL; canvas.drawCircle(sz/2f, sz/2f, sz/2f - 3.5f * density, paint)
     return bitmap
 }
 

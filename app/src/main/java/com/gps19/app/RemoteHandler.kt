@@ -17,6 +17,7 @@ import org.osmdroid.util.GeoPoint
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
  * v8.9.7:
  * - Issue 194: Added handleRemoteLog to reconstruct forensic markers from synced SIT events.
+ * - Issue 194: Injected ServiceForensicUseCase for immediate marker reconstruction on recovered logs.
  * v8.9.6:
  * - Issue 194: Implemented rising-edge detection for isTrackerSitDetected to support transmission latching without log duplication.
  * v8.9.5:
@@ -28,6 +29,7 @@ class RemoteHandler(
     private val locationProcessor: LocationProcessor,
     private val alarmManager: AppAlarmManager,
     private val sessionManager: SessionManager,
+    private val forensicUseCase: ServiceForensicUseCase,
     private val timeProvider: TimeProvider,
     private val scope: CoroutineScope,
     private val onPulse: (String) -> Unit
@@ -240,15 +242,25 @@ class RemoteHandler(
     /**
      * Issue 194: Reconstructs forensic state from incoming remote logs.
      * Ensures that recovered "Sit Detected" events trigger the same map markers as real-time flags.
+     * Modified in v8.9.7 to trigger immediate violation recording via forensicUseCase.
      */
     fun handleRemoteLog(entry: LogEntry) {
         if (entry.message.contains("Sit Detected", ignoreCase = true)) {
             // Rising-edge detection for log-based SIT events to ensure marker placement
             if (!isTrackerSitDetected) {
                 isTrackerSitDetected = true
-                // Note: The marker will be placed by ViewerService.processTick in the next cycle
-                // at the tracker's current lat/lng. For recovered logs, this is a best-effort 
-                // spatial anchor if the location packet was lost.
+                
+                // Immediate forensic marker placement for recovered events
+                if (trackerLat != 0.0 && trackerLng != 0.0) {
+                    forensicUseCase.recordViolationMarkers(
+                        now = timeProvider.currentTimeMillis(),
+                        lat = trackerLat,
+                        lng = trackerLng,
+                        accuracy = trackerMaxAccuracy.toDouble(),
+                        activeViolations = setOf(ALERT_ID_TRACKER_CHAIR),
+                        unresolvedAlarms = emptySet()
+                    )
+                }
             }
         }
     }
