@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.5
+# System Source of Truth (SoT) - v8.9.8
 
 This document serves as the definitive operational specification for the GPS-Tracker system.
 
@@ -9,22 +9,23 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `LAT_DEG_TO_METERS` | 111194.9266m | Conversion factor at the equator. |
 | `DEFAULT_LAT` | 32.7940 | Default system latitude (Haifa). |
 | `DEFAULT_LNG` | 34.9896 | Default system longitude (Haifa). |
-| `ABSOLUTE_DISTANCE_CAP_METERS` | 50000m | Safety ceiling for distance calculations. |
+| `ABSOLUTE_DISTANCE_CAP_METERS` | 50000.0m | Safety ceiling for distance calculations. |
 | `BATTERY_ALARM_THRESHOLD` | 99% | Trigger for Charge Deficit when plugged. |
 | `CRITICAL_BATTERY_THRESHOLD` | 20% | Trigger for Low Battery when unplugged. |
 | `BATTERY_STEEP_DISCHARGE_THRESHOLD` | 5% | Trigger for Battery Health warning. |
 | `BATTERY_STEEP_DISCHARGE_WINDOW_MS` | 600,000ms | 10-minute window for profiling steep discharge. |
 | `MAX_SAFE_TEMPERATURE_CELSIUS`| 46.0°C | Thermal limit. Triggers "Cooling Mode". |
 | `MAX_SAFE_TEMPERATURE_RECOVERY`| 44.0°C | Temperature for recovery from "Cooling Mode". |
-| `GPS_GAP_THRESHOLD_MS` | 180,000ms | Threshold for "Total Silence" alarms. |
+| `GPS_GAP_THRESHOLD_MS` | 60,000ms | Threshold for Tracker GPS Gap alarm (v8.9.8). |
 | `TRACKER_SIGNAL_LOSS_THRESHOLD_MS`| 180,000ms | Threshold for Tracker Signal Lost (Communication). |
 | `VIEWER_SIGNAL_LOSS_THRESHOLD_MS`| 30,000ms | Threshold for Viewer Signal Lost (Communication). |
 | `JAMMER_DETECTION_THRESHOLD_MS`| 180,000ms | Threshold for Jump Alert (sustained signal instability). |
 | `INTERNET_LOSS_THRESHOLD_MS` | 60,000ms | Threshold for Viewer Local Internet loss. |
 | `WATCH_TIMEOUT_MS` | 30,000ms | Deadline for peer activity. |
-| `SYSTEM_WATCH_DOG_INTERVAL_MS`| 90,000ms | Main system watchdog cycle for service health. |
-| `SYSTEM_WATCH_DOG_THROTTLE_MS`| 60,000ms | Throttling window for system watchdog re-triggers. |
-| `GPS_UI_FAIL_THRESHOLD_MS` | 7,000ms | UI Staleness threshold for Position health. |
+| `SYSTEM_WATCHDOG_INTERVAL_MS`| 90,000ms | Main system watchdog cycle for service health. |
+| `SYSTEM_WATCHDOG_THROTTLE_MS`| 60,000ms | Throttling window for system watchdog re-triggers. |
+| `GPS_UI_FAIL_THRESHOLD_MS` | 10,000ms | UI Staleness threshold for Position health (v8.9.8). |
+| `TELEMETRY_UI_STALE_THRESHOLD_MS`| 10,000ms | Threshold for "Ghost Mode" visual dimming (v8.9.8). |
 | `WATCH_DOG_UI_GRACE_MS` | 30,000ms | UI Staleness threshold for Link health. |
 | `SENSOR_GRACE_PERIOD_MS` | 600,000ms | UI Visibility cutoff (10m). Values revert to -- after this period. |
 | `DISTANCE_GRACE_MS` | 60,000ms | Initial grace period for geofence (BOOTSTRAP phase). |
@@ -50,7 +51,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `A15_STABLE_GPS_POLLING_MS` | 1,000ms | Stabilization polling interval for Samsung A15. |
 | `COOLING_GPS_POLLING_MS` | 30,000ms | Throttled interval for thermal mitigation. |
 | `VIEWER_GPS_POLLING_MS` | 10,000ms | Forced polling interval in Viewer mode. |
-| `TICK_INTERVAL_MS` | 1,000ms | Standard system pulse (1Hz). |
+| `TICK_INTERVAL_MS" | 1,000ms | Standard system pulse (1Hz). |
 | `TICK_INTERVAL_SLOW_MS` | 5,000ms | Power-save pulse (0.2Hz) for background idle. |
 | `REAL_TIME_GAP_LIMIT_MS` | 10,000ms | Forensic gap threshold for slow-tick variance. |
 | `JUMP_HOLD_DURATION_MS` | 180,000ms | Grace period for Tier 1/2 Jumps before geofence alarm. |
@@ -62,8 +63,8 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `PROXIMITY_DEBOUNCE_STATIONARY_A15_MS`| 5,000ms | Virtual proximity debounce window for Samsung A15. |
 | `PROXIMITY_DEBOUNCE_STATIONARY_MS` | 3,000ms | Standard proximity debounce window. |
 | `PROXIMITY_DEBOUNCE_MOVING_MS` | 1,000ms | Reduced proximity debounce window when moving. |
-| `GPS_STALL_THRESHOLD_MS` | 180,000ms | Watchdog threshold for hardware GPS chip freeze. |
-| `GPS_REVIVAL_RETRY_INTERVAL_MS` | 300,000ms | Interval between hardware revival attempts during stall. |
+| `GPS_STALL_THRESHOLD_MS` | 60,000ms | Watchdog threshold for hardware GPS chip freeze (v8.9.8). |
+| `GPS_REVIVAL_RETRY_INTERVAL_MS` | 120,000ms | Interval between hardware revival attempts during stall (v8.9.8). |
 | `MAX_REVIVAL_ATTEMPTS` | 3 | Limit for soft-revival before critical hardware lock alarm. |
 | `SYSTEM_STORAGE_LOW_THRESHOLD_MB` | 50MB | Threshold for non-critical storage warning. |
 | `SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB` | 10MB | Threshold for critical storage emergency. |
@@ -73,10 +74,10 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `DRIFT_TOLERANCE_MS` | 5,000ms | Forensic threshold for Clock-Jump detection. |
 | `TRAJECTORY_PROMOTION_WINDOW_MS`| 30,000ms | Window for consistent movement to override Jump rejection. |
 | `DISTANCE_ALARM_SAMPLES_REQUIRED`| 6 | Required consecutive samples for distance violation. |
-| `OUTLIER_DISTANCE_THRESHOLD` | 2,000m | Tier 1 Outlier distance floor. |
+| `OUTLIER_DISTANCE_THRESHOLD` | 2000.0m | Tier 1 Outlier distance floor. |
 | `OUTLIER_SPEED_CAP_MPS` | 83.33 m/s| Tier 1 Outlier speed cap (300 km/h). |
-| `JUMP_POINT_DISTANCE_THRESHOLD`| 100m | Tier 2 Security Jump distance floor. |
-| `JUMP_GATE_VISUAL_JITTER_METERS`| 10m | Tier 3 Visual Jitter distance floor. |
+| `JUMP_POINT_DISTANCE_THRESHOLD`| 100.0m | Tier 2 Security Jump distance floor. |
+| `JUMP_GATE_VISUAL_JITTER_METERS`| 10.0m | Tier 3 Visual Jitter distance floor. |
 | `MAX_PHYSICAL_SPEED_MPS` | 33.33 m/s| Tier 2 Security speed limit (120 km/h). |
 | `PATH_EFFICIENCY_THRESHOLD` | 0.1 | Radial noise filter for trajectory promotion. |
 | `VIBRATION_SHOCK_THRESHOLD_G` | 0.8g | Absolute floor for shock violation gate. |
@@ -113,8 +114,11 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `HISTORY_BATCH_WRITE_INTERVAL_MS`| 5,000ms | Interval for flushing history buffer to database. |
 | `HISTORY_BUFFER_MAX_SIZE` | 100 points| Max buffer size for history points. |
 | `SUSPICIOUS_STATE_COOLDOWN_MS` | 60,000ms | Duration of the elevated suspicious state after a trigger. |
-| `MUZZLE_WINDOW_DURATION_MS` | 500ms | Suppression window for physical triggers during sync I/O. |
+| `MUZZLE_WINDOW_DURATION_MS` | 2,000ms | Suppression window for physical triggers during sync I/O (v8.9.7). |
+| `MUZZLE_HYSTERESIS_MS` | 200ms | Standard muzzle hysteresis (v8.9.7). |
+| `MUZZLE_HYSTERESIS_A15_MS` | 500ms | Samsung A15 specific muzzle hysteresis (v8.9.7). |
 | `LOG_MUZZLE_STARTUP_MS` | 10,000ms | Suppression of non-important system logs during service boot. |
+| `XIAOMI_BOOT_GRACE_MS` | 30,000ms | Suppression of "System Not Ready" alarms during MIUI boot (v8.9.8). |
 | `LIGHT_THRESHOLD_LUX_JUMP` | 150.0 lux | Threshold for light-based tamper alerts. |
 | `SUSPICIOUS_Q_SCALE` | 1000.0 | Measurement noise multiplier during suspicious states. |
 | `HIGH_ACCURACY_THRESHOLD_METERS`| 35.0m | Threshold for "High Accuracy" status classification. |
@@ -129,7 +133,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `DEFAULT_ACCURACY_FALLBACK` | 15.0m | Default accuracy value when hardware returns 0. |
 | `GPS_SEQUENCE_TOLERANCE_MS` | 60000ms | Maximum age for GPS sequence continuity. |
 | `GPS_MIN_UPDATE_DISTANCE_METERS`| 2.0m | Minimum displacement for repository updates. |
-| `PARKING_ACCEL_LIMIT` | 1.0 m/s² | Accel limit for parking confirmation. |
+| `PARKING_ACCEL_LIMIT" | 1.0 m/s² | Accel limit for parking confirmation. |
 | `ALTITUDE_VELOCITY_CAP` | 10.0 m/s | Maximum vertical velocity allowed. |
 | `PROMOTION_ANGLE_TOLERANCE` | 30.0° | Angle tolerance for trajectory promotion. |
 | `COMPASS_STABILITY_THRESHOLD` | 20.0° | Stability required for compass-based movement. |
@@ -159,12 +163,13 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `NET_HEAL_THRESHOLD_MS` | 45000ms | Window for network "Healing" phase. |
 | `SOCKET_TIMEOUT_MS` | 60,000ms | Socket.io connection timeout. |
 | `HOME_POINT_REFRESH_INTERVAL_MS`| 30,000ms | Interval for refreshing geofence centers. |
+| `ACK_SYNC_LOOP_INTERVAL_MS` | 10,000ms | Interval for acknowledged log synchronization (v8.9.7). |
 
 ---
 
 ## 4. Remote Forensic Verification
 ### 4.1. Version & Role Visibility
-*   **Engine Identity**: The system operates on the v8.9.5 baseline logic.
+*   **Engine Identity**: The system operates on the v8.9.8 baseline logic.
 *   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using a timestamp (`yearOffset` + `MMddHHmm`) or git commits to ensure uniqueness.
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Standardized ALERT_IDs**: Aligned with `EngineConstants.kt`. Includes `ALERT_ID_VISUAL_JUMP` for trajectory-based jumps.
@@ -175,6 +180,8 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Role Forensic**: Mandatory `role` field present in all sync payloads and JSON exports for multi-role trace stability. Viewers explicitly latch and record peer visual jumps to local forensics.
 *   **Schema Cleanup**: Legacy `ver` and `vid` columns formally removed from database schema in v33 (v8.8.35).
 *   **Power Parity**: `currentMa` field added to Database v35 (PendingStatusEntity and HistoryEntity) and `TrackerStatusProto` for end-to-end power forensics (v8.9.5).
+*   **SIT Acknowledgement**: Discrete SIT events are synchronized via a 10s acknowledged loop to prevent forensic loss during blackouts (v8.9.7).
+*   **Ghost Mode UI**: Visual staleness indicators applied to all sensor fields and markers when telemetry > 10s old (v8.9.8).
 
 ---
 
@@ -217,11 +224,11 @@ This document serves as the definitive operational specification for the GPS-Tra
 | **PARKING** | Device stationary (Vibration < 0.12g) and within parking anchor. |
 | **JUMPING** | Encountering Jump Points (Tier 1 or 2). |
 | **COOLING** | Device temperature exceeds 46.0°C. |
-| **STALLED** | GPS hardware active but frozen (> 180s). |
+| **STALLED** | GPS hardware active but frozen (> 60s). |
 
 ---
 
-## 8. Forensic Alert Manifest (v8.9.5)
+## 8. Forensic Alert Manifest (v8.9.8)
 | Alert ID | Alert Title (Standardized) | Trigger Description |
 | :--- | :--- | :--- |
 | `LOCAL_INTERNET` | This device: Internet Lost | Local connectivity failure. |
@@ -231,16 +238,16 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `JUMP_ALERT` | Tracker: Jammer Alert | GPS sustained instability / Jump rejection. |
 | `VISUAL_JUMP` | Tracker: Visual Jump | Trajectory-based jump detected by engine. |
 | `GEOFENCE_VIOLATION`| Tracker: Geofence | Breach of max distance or predictive exit. |
-| `GPS_STALL` | Tracker: GPS Stalled | Hardware chip freeze (no updates >180s). |
-| `GPS_GAP` | Tracker: GPS Gap | Fix age exceeded 180s. |
+| `GPS_STALL" | Tracker: GPS Stalled | Hardware chip freeze (no updates >60s). |
+| `GPS_GAP` | Tracker: GPS Gap | Fix age exceeded 60s. |
 | `POWER_TAMPER` | Tracker: Charger unplugged | Power disconnection. |
 | `LOW_BATTERY` | Tracker: Low Battery | Level < 20% (unplugged) or charge deficit. |
 | `HIGH_TEMP` | Tracker: High Temp | Thermal > 46.0°C. |
 | `TRACKER_TAMPER` | Tracker: Tamper Detected | Unified sensor violation (Shock, Tilt, Light, Prox). |
 | `TILT_ALERT` | Tracker: Tilt Alert | Orientation change > 15°. |
-| `ACOUSTIC_ALERT` | Tracker: Acoustic Alert | Audio spike > 40dB above baseline. |
+| `ACOUSTIC_ALERT" | Tracker: Acoustic Alert | Audio spike > 40dB above baseline. |
 | `LIFT_ALERT` | Tracker: Lift | Barometric lift > 0.8m. |
-| `CHAIR_OCCUPIED` | Tracker: Chair Occupied | Multi-sensor pattern matching "sitting" event. |
+| `CHAIR_OCCUPIED" | Tracker: Chair Occupied | Multi-sensor pattern matching "sitting" event. |
 | `SYSTEM_STORAGE_LOW`| Tracker: System Storage Low | < 50MB free. |
 | `SYSTEM_STORAGE_CRITICAL`| Tracker: System Storage Critical | < 10MB free. |
 | `BATTERY_HEALTH` | Tracker: Critical Battery Health| Steep discharge (>5% in 10m). |
@@ -272,7 +279,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | **Issue 71/72** | **System Integrity**: Monitoring of low/critical storage and OS-level restrictions (Standby Buckets, Power Save) for forensic visibility. | **Verified (IntegrityMonitor)** |
 | **Issue 102** | **TimeProvider**: Standardized all duration and timeout logic across the system to use the `TimeProvider` abstraction. | **Verified (Standardized Architecture)** |
 | **Issue 115** | **Modularization**: Decoupled `MainViewModel` into feature UseCases (Navigation, Settings, Telemetry, Behavior, Session, Alert, Map). | **Verified (MainViewModel)** |
-| **Issue 124** | **GPS Revival**: System retries hardware revival every 5m during stall and escalates to critical after 3 failures. | **Verified (TrackerService)** |
+| **Issue 124** | **GPS Revival**: System retries hardware revival every 2m during stall and escalates to critical after 3 failures (v8.9.8). | **Verified (TrackerService)** |
 | **Issue 125** | **Monotonic UI**: UI lockout and pulse logic must use monotonic time to survive system clock jumps. | **Verified (MainViewModel)** |
 | **Issue 146** | **Startup Performance**: Optimized launch by moving `OsmConfig` to background thread and staggering ViewModel initialization. | **Verified (GpsApplication)** |
 | **Issue 148** | **A15 Stability**: Enforced 1000ms GPS polling (`A15_STABLE_GPS_POLLING_MS`) and 5s proximity debounce for Samsung A15 devices. | **Verified (ServiceBehaviorUseCase)** |
@@ -288,5 +295,14 @@ This document serves as the definitive operational specification for the GPS-Tra
 | **Issue 176** | **Statistics Persistence**: Verified forensic ribbon and statistics accumulation across app restarts using Room and DataStore. | **Verified (HistoryManager/SettingsRepository)** |
 | **Issue 177** | **Dead Code Cleanup**: Formally removed redundant telemetry methods in `SyncManager` following consolidation around `pushCurrentStatus`. | **Verified (SyncManager)** |
 | **Issue 178/179**| **Forensic Parity Audit**: Verified 100% field parity for `verticalVelocity` and SIT metrics across the pipeline and `RemoteHandler`. | **Verified (RemoteHandler/HistoryManager)** |
-| **Issue 189** | **Viewer Background Location**: Implemented 10s polling and relative distance calculation in `ViewerService`. | **Verified (ViewerService)** |
+| **Issue 189** | **Viewer Background Location**: Implemented 10s background polling and relative distance calculation in `ViewerService`. | **Verified (ViewerService)** |
+| **Issue 190** | **Xiaomi Autostart & Boot Resilience**: Implemented robust handling for indeterminate \"Unknown\" status and `XIAOMI_BOOT_GRACE_MS` (30s) to suppress transient boot alarms. | **Verified (MainAlarmLogic)** |
+| **Issue 191** | **Muzzle Window Hardening**: Increased `MUZZLE_WINDOW_DURATION_MS` to 2000ms and added device-specific hysteresis (500ms for A15). | **Verified (SyncManager/TrackerService)** |
 | **Issue 192** | **Power Forensic Parity**: Achieved absolute parity for `currentMa` across models, database (v35), and ribbons. | **Verified (SyncManager/HistoryManager)** |
+| **Issue 193** | **Zombie Telemetry UX Sweep**: Implemented visual staleness indicators (\"Ghost Mode\") for all sensor-derived dashboard fields and markers when telemetry > 10s old. | **Verified (DashboardUseCase/MapComponents)** |
+| **Issue 194** | **SIT Persistence Packet Loss Risk**: Implemented a 10s acknowledged sync loop for discrete SIT events to prevent forensic loss during blackouts. | **Verified (SyncManager/ViewerService)** |
+| **Issue 195** | **Room Migration Forensic Audit**: Implemented Room migration (v36) for full table reconstruction and Android 15 compatibility. | **Verified (Database)** |
+| **Issue 196** | **Advanced SIT Detection**: Refined \"Plunge\" state machine and propagated `sitVzTs` for forensic parity. | **Verified (AppSensorManager)** |
+| **Issue 197** | **Database Schema Expansion (v38)**: Added `sitVzTs` to history tables for improved chair event reconstruction. | **Verified (Database)** |
+| **Issue 198** | **GPS Availability Hardening**: Shortened GPS stall detection to 60s and revival retry to 120s for high-availability tracking. | **Verified (TrackerService)** |
+| **Issue 199** | **Toolchain Modernization**: Upgraded to Java 17 and Android SDK 35. Aligned Gradle DSL syntax. | **Verified (build.gradle)** |

@@ -1,8 +1,11 @@
 # GPS-Tracker (Pure Native APK)
 
-**Version: 8.9.5**
+**Version: 8.9.9**
 
 This project is a **Pure Native Android Application** built with Kotlin and Jetpack Compose, designed for high-precision background tracking and remote monitoring in demanding environments.
+
+## Recent Changes (v8.9.9)
+- **Documentation Alignment & SoT Hardening**: Synchronized `REQUIREMENTS_SOT.md` with `EngineConstants.kt`. Hardened GPS stall (60s), revival (120s), and muzzle window (2000ms) thresholds. Unified UI staleness and "Ghost Mode" gates to 10s.
 
 ## Recent Changes (v8.9.5)
 - **Power Forensic Parity (Issue 192)**: Achieved absolute forensic parity for battery current (`currentMa`). currentMa is now persisted in Database v35 and TrackerStatusProto (AppSettings) to ensure remote power-deficit alerts and ribbons persist across restarts and backfill.

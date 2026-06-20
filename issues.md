@@ -1,7 +1,11 @@
 # Open Issues
 - **Issue #190: Xiaomi MIUI 14 Hardware Confirmation**: Gating logic for "Unknown" status and boot grace is implemented, but requires field verification on physical MIUI 14 hardware to ensure no "Denied" spikes occur during boot transitions.
+- **Issue #203: Documentation Version Desync**: `REQUIREMENTS_SoT.md` and `issues.md` are at v8.9.8, but `APP_DESCRIPTION.md`, `SETTINGS_PAGE_DETAIL.md`, `info-elementary-fields.md`, and `README.md` are lagging behind (v8.8.35 - v8.9.5).
 
 # Fixed Issues
+## 204. FIXED GPS Stall/Revival Constant Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `GPS_STALL_THRESHOLD_MS` = 60s and `GPS_REVIVAL_RETRY_INTERVAL_MS` = 120s. Note: Other documentation files still require updates (Issue #203). (v8.9.8).
+## 205. FIXED Muzzle Window Constant Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `MUZZLE_WINDOW_DURATION_MS` = 2000ms. Note: Other documentation files still require updates (Issue #203). (v8.9.8).
+## 206. FIXED Staleness Threshold Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `TELEMETRY_UI_STALE_THRESHOLD_MS` = 10s and `GPS_UI_FAIL_THRESHOLD_MS` = 10s, unifying "Ghost Mode" and "Position Health" thresholds. (v8.9.8).
 ## 19. FIXED Dashboard Recovery Parity - Resolution: Implemented instantaneous UI recovery upon telemetry receipt. The dashboard and status card now utilize the maximum of GPS and telemetry timestamps for freshness logic. (v8.8.23).
 ## 110. FIXED Modular Engine Hardening - Resolution: Finalized the physical isolation of the `:core:engine` as a pure JVM library. Enforced 100% dependency purity. (v8.8.22).
 ## 111. FIXED SNR Scaling Standardization - Resolution: Replaced hardcoded SNR scaling with `RIBBON_SNR_SCALE_DB` in `TrackerService.kt`. (v8.8.24).
@@ -14,7 +18,7 @@
 ## 118. FIXED Timing & Forensic Stability - Resolution: Standardized all alarm evaluation, SIT cooldowns, and gap detection on monotonic time (`TimeProvider.elapsedRealtime()`). (v8.8.22).
 ## 119. FIXED OEM Restriction Verification - Resolution: Integrated Xiaomi Autostart detection and enabled 10Hz specialized GPS polling for Xiaomi and Samsung S21 FE devices. (v8.8.22).
 ## 120. FIXED Muzzle Window & Forensic Audit - Resolution: Implemented a 500ms \"Muzzle Window\" during sync I/O to eliminate physical tamper false positives. (v8.8.22).
-## 121. FIXED LED Logic Decoupling - Resolution: Fixed status LEDs on the Tracker side to reflect local hardware health independently of Viewer connection status. (v8.8.31).
+## 121. FIXED LED Logic DecouPLING - Resolution: Fixed status LEDs on the Tracker side to reflect local hardware health independently of Viewer connection status. (v8.8.31).
 ## 122. FIXED App Icon Foreground Branding - Resolution: Updated `ic_jd_logo.xml` to use the deer-only branding (no text) for the app icon foreground. (v8.8.30).
 ## 123. FIXED Identity Hardening (v8.8.30) - Resolution: Updated identity branding and versioning baseline. (v8.8.30).
 ## 124. FIXED GPS Revival Escalation (v8.8.31) - Resolution: Implemented a 5-minute retry loop (`GPS_REVIVAL_RETRY_INTERVAL_MS`) and forensic escalation in `TrackerService.kt`. After 3 failed revival attempts, a CRITICAL forensic log is emitted to signal a hard hardware lock or relocation requirement. (v8.8.31).
