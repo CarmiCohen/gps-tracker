@@ -1,11 +1,11 @@
-# Settings Page Detailed Reference (v8.8.35)
+# Settings Page Detailed Reference (v8.9.10)
 
 This document provides a comprehensive breakdown of every field, toggle, and action available in the "Settings" overlay of the GPS Tracker application.
 
 ## 1. Primary Identity & Routing
 These settings define how the device identifies itself and where it sends its data. Available in all modes (Tracker/Viewer).
-- **Tracker ID**: A unique string used to identify the tracker's device. This ID defines the "Room" on the relay server.
-- **Viewer ID**: Identifies the monitoring phone.
+- **Tracker ID**: A unique string used to identify the tracker's device. This ID defines the "Room" on the relay server. Default: "Ttk".
+- **Viewer ID**: Identifies the monitoring phone. Default: "Cohen".
 - **Relay URL**: The address of the Socket.io server used to relay data between the Tracker and Viewer. Default: `https://gps-survival-relay.onrender.com`.
 
 ## 2. Geofencing (Fence Distance)
@@ -26,8 +26,8 @@ Allows selective enabling/disabling of the alert portfolio, organized by categor
     - **Jammer Detection**: `JAMMER_DETECTION_THRESHOLD_MS` (180s) for sustained GPS instability.
 - **Location**: 
     - **Geofence**: Based on `GEOFENCE_BUFFER_MULT` (6.0) and `GEOFENCE_ACCURACY_EXPANSION_MULT`.
-    - **GPS Stalled**: `GPS_STALL_THRESHOLD_MS` (180s) hardware chip freeze detection. Featuring **Escalated Revival** (Issue 124) with a 5m retry loop.
-    - **GPS Gap**: `GPS_GAP_THRESHOLD_MS` (180s) fix age threshold.
+    - **GPS Stalled**: `GPS_STALL_THRESHOLD_MS` (60s) hardware chip freeze detection. Featuring **Escalated Revival** (Issue 124/198) with a 120s retry loop.
+    - **GPS Gap**: `GPS_GAP_THRESHOLD_MS` (60s) fix age threshold.
 - **Device Status**: 
     - **Power Tamper**: `POWER_DISCONNECT_DEBOUNCE_MS` (3s).
     - **Low Battery**: `CRITICAL_BATTERY_THRESHOLD` (20%) or charge deficit.
@@ -35,7 +35,7 @@ Allows selective enabling/disabling of the alert portfolio, organized by categor
     - **Battery Health**: Monitors steep discharge (5% in 10m `BATTERY_STEEP_DISCHARGE_WINDOW_MS`).
 - **System Integrity**:
     - **System Storage Low**: Warns if internal storage drops below 50MB (`SYSTEM_STORAGE_LOW_THRESHOLD_MB`).
-    - **Xiaomi System**: Monitors background permission status on MIUI/HyperOS devices.
+    - **Xiaomi System**: Monitors background permission status on MIUI/HyperOS devices. Includes `XIAOMI_BOOT_GRACE_MS` (30s).
     - **Xiaomi Manual Override**: Allows bypassing Xiaomi-specific permission checks. When enabled, the `UNKNOWN` background permission state is treated as valid, preventing false-positive alarms. Located in "Phone Setup" guidance.
 - **Physical Sentinel**: 
     - **Tamper Alert**: Combined sensor fusion for hardware handling (`TRACKER_TAMPER`).
@@ -65,4 +65,4 @@ Allows selective enabling/disabling of the alert portfolio, organized by categor
 ## 5. Summary of Actions
 - **Phone Setup**: Accesses the Setup Guide for OS-level permissions.
 - **Load Config**: Import a JSON configuration file to bulk-update settings.
-- **Save Logs**: Exports the current forensic event history and telemetry indices for audit. Standardized to include the mandatory `role` field.
+- **Save Logs**: Exports the current forensic event history and telemetry indices for audit. Standardized to include coordinate-aware anchors (v8.9.10) and mandatory `role` field.

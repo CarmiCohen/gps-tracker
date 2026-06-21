@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * v8.9.10:
+ * - Issue 209: Added lat/lng to LogEntity for historical marker recovery.
  * v8.9.7:
  * - Plunge Matching: Added sitVzTs to HistoryEntity and PendingStatusEntity for forensic parity.
  * - Issue 194: Added 'synced' column to LogEntity and implemented reliable log sync queries.
@@ -28,7 +30,9 @@ data class LogEntity(
     val specialColor: Int? = null,
     @ColumnInfo(defaultValue = "0") val firstSeenTs: Long = 0L,
     @ColumnInfo(defaultValue = "tracker") val role: String = "tracker",
-    @ColumnInfo(defaultValue = "0") val synced: Boolean = false
+    @ColumnInfo(defaultValue = "0") val synced: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val lat: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val lng: Double = 0.0
 )
 
 @Entity(tableName = "trail_points", indices = [Index(value = ["timestamp"])])
@@ -171,13 +175,13 @@ interface ViolationDao {
 interface PendingStatusDao {
     @Insert suspend fun insert(status: PendingStatusEntity)
     @Query("SELECT * FROM pending_status_updates ORDER BY timestamp ASC LIMIT :limit") suspend fun getOldestPending(limit: Int): List<PendingStatusEntity>
-    @Query("DELETE FROM pending_status_updates WHERE id IN (:ids)") suspend fun deletePending(ids: List<Long>)
+    @Query("DELETE FROM pending_status_updates WHERE id IN (:ids)") suspend fun deletePending(ids: LongArray)
     @Query("SELECT COUNT(*) FROM pending_status_updates") suspend fun getCount(): Int
     @Query("DELETE FROM pending_status_updates WHERE timestamp < (SELECT timestamp FROM pending_status_updates ORDER BY timestamp DESC LIMIT 1 OFFSET 999)") suspend fun prune()
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 38, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 39, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -186,6 +190,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_38_39 = object : Migration(38, 39) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE logs ADD COLUMN lat REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE logs ADD COLUMN lng REAL NOT NULL DEFAULT 0")
+            }
+        }
         val MIGRATION_37_38 = object : Migration(37, 38) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE connection_history ADD COLUMN sitVzTs INTEGER NOT NULL DEFAULT 0")

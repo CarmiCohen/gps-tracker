@@ -1,4 +1,4 @@
-# Info Elementary Page: Field Definitions and Functions (v8.9.5)
+# Info Elementary Page: Field Definitions and Functions (v8.9.10)
 
 This document describes the technical fields displayed on the Info (Dashboard) page of the GPS Tracker application.
 
@@ -8,8 +8,8 @@ This document describes the technical fields displayed on the Info (Dashboard) p
     *   `PARKING`: The device is stationary (Vibration < 0.12g `VIBRATION_STATIONARY_THRESHOLD`) and has settled.
     *   `JUMPING`: Erratic GPS movement detected (Security Hold `JUMP_HOLD_DURATION_MS` 180s active).
     *   `COOLING`: The device has exceeded `MAX_SAFE_TEMPERATURE_CELSIUS` (46.0°C) and is in power-save mode.
-    *   `STALLED`: GPS hardware is active but providing frozen coordinates (> 180s `GPS_STALL_THRESHOLD_MS`).
-        *   **Escalated Revival (Issue 124)**: System attempts soft-revival every 5m. After 3 failures, it escalates to a CRITICAL hardware lock alert.
+    *   `STALLED`: GPS hardware is active but providing frozen coordinates (> 60s `GPS_STALL_THRESHOLD_MS`).
+        *   **Escalated Revival (Issue 124/198)**: System attempts soft-revival every 120s (`GPS_REVIVAL_RETRY_INTERVAL_MS`). After 3 failures, it escalates to a CRITICAL hardware lock alert.
     *   `OFFLINE`: Peer device is disconnected from the relay.
 *   **[SUSPICIOUS]**: Indicates high-risk telemetry patterns (e.g., high vibration/noise without movement).
 *   **[TAMPER]**: Indicates a physical sentinel violation (Tilt, Acoustic, Light, etc.).
@@ -31,7 +31,7 @@ This document describes the technical fields displayed on the Info (Dashboard) p
 *   **Tr Accuracy**: Current accuracy in meters.
 *   **Satellites Index**: Satellites used vs. in view.
 *   **Tr Max**: Worst accuracy recorded in the session.
-*   **Age Index**: Staleness of the current position fix (7s `GPS_UI_FAIL_THRESHOLD_MS` gray-out).
+*   **Age Index**: Staleness of the current position fix (10s `GPS_UI_FAIL_THRESHOLD_MS` gray-out/Ghost Mode).
 *   **Acc Index**: Sub-score for coordinate precision.
 *   **Avg SNR**: Average Signal-to-Noise Ratio (dB) across all used satellites (`snrIdx`). Provides a primary indicator of signal quality and potential jamming/obstruction.
 
@@ -64,5 +64,6 @@ These fields are primarily visualized in the **Analytical Ribbons** overlay and 
 *   **Lux Baseline**: Environmental light EMA.
 *   **Acoustic Floor**: Ambient noise baseline EMA (Min: 50.0dB `ACOUSTIC_MIN_THRESHOLD_DB`).
 *   **Jump Tier**: Classification of current GPS noise (1: Outlier, 2: Security, 3: Jitter).
-*   **Muzzle Window**: 500ms suppression window (`MUZZLE_WINDOW_DURATION_MS`) to eliminate false tamper triggers during sync.
+*   **Muzzle Window**: 2000ms suppression window (`MUZZLE_WINDOW_DURATION_MS`) to eliminate false tamper triggers during sync.
+*   **Log Spatial Anchor (v8.9.10)**: All forensic logs and alerts are now automatically anchored with `lat`/`lng` coordinates. This enables historical marker reconstruction on the Map even for events that occurred during relay blackouts.
 *   **Identity Unification**: Legacy `ver` and `vid` fields have been removed as part of the v8.8.35 forensic simplification.

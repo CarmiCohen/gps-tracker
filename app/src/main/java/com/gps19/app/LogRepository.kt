@@ -15,6 +15,8 @@ import kotlin.math.abs
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * v8.9.10:
+ * - Issue 209: Added lat/lng mapping for historical forensic marker reconstruction.
  * v8.9.7:
  * - Issue 194: Updated addLog to accept an initial 'synced' state to prevent duplicate emissions.
  */
@@ -47,7 +49,9 @@ class LogRepository @Inject constructor(
                 isSpecial = it.isSpecial, 
                 specialColor = it.specialColor, 
                 firstSeenTs = it.firstSeenTs,
-                role = it.role
+                role = it.role,
+                lat = it.lat,
+                lng = it.lng
             ) 
         }
     }
@@ -74,7 +78,9 @@ class LogRepository @Inject constructor(
                             isSpecial = entry.isSpecial,
                             specialColor = entry.specialColor,
                             role = entry.role,
-                            synced = initiallySynced // Update sync status if requested
+                            synced = initiallySynced, // Update sync status if requested
+                            lat = entry.lat,
+                            lng = entry.lng
                         ))
                         return@withLock
                     }
@@ -99,7 +105,9 @@ class LogRepository @Inject constructor(
                                 extremeValue = newExtreme,
                                 timestamp = entry.timestamp,
                                 message = entry.message,
-                                synced = initiallySynced // Reset/update sync status on merge
+                                synced = initiallySynced, // Reset/update sync status on merge
+                                lat = entry.lat,
+                                lng = entry.lng
                             ))
                             return@withLock
                         }
@@ -120,7 +128,9 @@ class LogRepository @Inject constructor(
                         specialColor = entry.specialColor,
                         firstSeenTs = if (entry.firstSeenTs == 0L) (entry.timestamp - entry.durationMs) else entry.firstSeenTs,
                         role = entry.role,
-                        synced = initiallySynced
+                        synced = initiallySynced,
+                        lat = entry.lat,
+                        lng = entry.lng
                     ))
                     
                     logWriteCount++
@@ -142,7 +152,8 @@ class LogRepository @Inject constructor(
             localId = it.localId, timestamp = it.timestamp, message = it.message, type = it.type,
             isImportant = it.isImportant, id = it.deviceId, viewerId = it.viewerId, count = it.count,
             extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial,
-            specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role
+            specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
+            lat = it.lat, lng = it.lng
         )
     }
 
@@ -183,7 +194,9 @@ class LogRepository @Inject constructor(
             isSpecial = it.isSpecial, 
             specialColor = it.specialColor, 
             firstSeenTs = it.firstSeenTs,
-            role = it.role
+            role = it.role,
+            lat = it.lat,
+            lng = it.lng
         ) 
     }
 }

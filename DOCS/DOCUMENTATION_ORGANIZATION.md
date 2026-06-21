@@ -1,4 +1,4 @@
-# Documentation Organization & Forensic Audit Standard (v8.8.35)
+# Documentation Organization & Forensic Audit Standard (v8.9.10)
 
 This document defines the project's multi-layered documentation strategy to ensure forensic traceability and architectural integrity.
 
@@ -20,7 +20,7 @@ These files track "What changed, When, and Why."
 ### Tier 3: Technical Implementation Details
 Specialized documents for specific hardware, subsystems, or UI components.
 - **Sensors.md**: Deep dives into sensor fusion and logic.
-- **DEVICE_SPECIFIC_ADAPTATIONS.md**: Record of OEM-specific bypasses and optimizations (e.g., Xiaomi, Samsung S21 FE).
+- **DEVICE_SPECIFIC_ADAPTATIONS.md**: Record of OEM-specific bypasses and optimizations.
 - **MAP_TRAILS_AND_GEOFENCING.md**: Specifications for spatial visualization and boundary enforcement.
 - **SETTINGS_PAGE_DETAIL.md**: Technical breakdown of user-configurable parameters and their impact on the engine.
 
@@ -31,7 +31,7 @@ Whenever a significant architectural change or development "Chunk" is completed,
 2.  **Issues**: Move completed tasks to the "FIXED" section in `issues.md`.
 3.  **SoT**: Update the core constants and the **Verification Matrix** in `REQUIREMENTS_SOT.md`.
 4.  **README**: Update the high-level summary to reflect current version capabilities.
-5.  **Code**: Ensure source-level context (KDoc/Comments) exists at the implementation site (e.g., explaining version hardening).
+5.  **Code**: Ensure source-level context (KDoc/Comments) exists at the implementation site.
 
 ## 3. Verification Process
 To verify a build or audit a specific feature:
@@ -39,5 +39,5 @@ To verify a build or audit a specific feature:
 2.  Cross-reference the resolved items in **issues.md**.
 3.  Execute the **Compliance Matrix** in **REQUIREMENTS_SOT.md (Section 10)** against the current source code to ensure architectural standards are maintained.
 
-## 4. Forensic Unification (v8.8.35)
-As of v8.8.35, the forensic model has been simplified. Documentation should no longer mandate the presence of 'ver' or 'vid' tags in data models or database schemas. Forensic traceability is now maintained by injecting the build version string at the network emission layer (SyncManager) and log sink points.
+## 4. Forensic Unification (v8.9.10)
+As of v8.9.10, the forensic model is simplified and hardened. Forensic traceability is maintained by injecting the build version at emission points and is enhanced by **Ghost Mode UX** staleness indicators, acknowledged SIT synchronization, and **Log Spatial Anchoring** (Issue 208).

@@ -21,6 +21,8 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.10:
+ * - Issue 208: Updated all forensic log emissions to propagate spatial coordinates for historical recovery.
  * v8.9.8:
  * - Issue 190: Hardened forensic logging for Standby Bucket transitions (Special Pink).
  * - Stability: Fixed typo in Light sensor fast path trigger.
@@ -85,13 +87,17 @@ class TrackerService : BaseMonitorService() {
         }
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean) {
             val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
-            logManager.logServiceEvent(message, isImportant, isSpecial = isSpecial || message.contains("Merge-on-Stale"), specialColor = specialColor)
+            val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+            val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+            logManager.logServiceEvent(message, isImportant, isSpecial = isSpecial || message.contains("Merge-on-Stale"), specialColor = specialColor, lat = lat, lng = lng)
         }
         override fun onMaxAccuracyChanged(accuracy: Float) {
             repository.saveFloatSync(MainRepository.MAX_ACCURACY_KEY, accuracy)
         }
         override fun onChairBaselineChanged(baseline: Float) {
-            logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°")
+            val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+            val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+            logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°", lat = lat, lng = lng)
             lifecycleScope.launch { repository.saveFloat(MainRepository.CHAIR_BASELINE_TILT_KEY, baseline) }
         }
         override fun onGpsStallDetected(ts: Long) {
@@ -112,8 +118,8 @@ class TrackerService : BaseMonitorService() {
             isXiaomi = isXiaomiDevice()
             isA15 = isA15Device()
 
-            alarmManager = AppAlarmManager(this@TrackerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color -> 
-                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color)
+            alarmManager = AppAlarmManager(this@TrackerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng -> 
+                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng)
             }
             
             integrityMonitor = IntegrityMonitor(this@TrackerService, repository, timeProvider, onViolationSustained = { type ->
@@ -126,7 +132,9 @@ class TrackerService : BaseMonitorService() {
                                msg.contains("EMERGENCY", ignoreCase = true) ||
                                msg.contains("PRIORITY", ignoreCase = true) ||
                                msg.contains("BUCKET", ignoreCase = true)
-                logManager.logServiceEvent(msg, important, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
+                val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+                val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+                logManager.logServiceEvent(msg, important, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null, lat = lat, lng = lng)
             })
             
             locationProcessor = LocationProcessor(localProcessorListener, timeProvider)
@@ -141,10 +149,16 @@ class TrackerService : BaseMonitorService() {
             locationProcessor.loadState(savedMaxAcc, savedLastSit, savedBaseline, trackerState, homePoints, maxDist)
 
             sensorManager.setHardwareFailureCallback { reason ->
-                logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - $reason", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+                val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+                val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+                logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - $reason", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = lat, lng = lng)
             }
 
-            historyManager = HistoryManager(this@TrackerService, repository, gpsManager, sensorManager, locationProcessor, timeProvider, lifecycleScope) { msg, important -> logManager.logServiceEvent(msg, important) }
+            historyManager = HistoryManager(this@TrackerService, repository, gpsManager, sensorManager, locationProcessor, timeProvider, lifecycleScope) { msg, important -> 
+                val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+                val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+                logManager.logServiceEvent(msg, important, lat = lat, lng = lng) 
+            }
 
             sensorManager.start()
             networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
@@ -234,7 +248,9 @@ class TrackerService : BaseMonitorService() {
             lifecycleScope.launch { repository.saveString(MainRepository.VIEWER_ID_KEY, id) } 
         }
         if (sessionManager.onViewerPulse(id, timeProvider.currentTimeMillis(), true)) { 
-            logManager.logServiceEvent("Viewer connected: $id")
+            val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+            val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+            logManager.logServiceEvent("Viewer connected: $id", lat = lat, lng = lng)
             startTickLoop() 
         }
     }
@@ -315,10 +331,14 @@ class TrackerService : BaseMonitorService() {
                 revivalAttemptCount++
                 lastRevivalAttemptTs = nowRealtime
                 gpsManager.reviveGps()
-                logManager.logServiceEvent("GPS Stall: Revival attempt $revivalAttemptCount/$MAX_REVIVAL_ATTEMPTS triggered", important = true)
+                val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+                val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+                logManager.logServiceEvent("GPS Stall: Revival attempt $revivalAttemptCount/$MAX_REVIVAL_ATTEMPTS triggered", important = true, lat = lat, lng = lng)
             } else if (revivalAttemptCount >= MAX_REVIVAL_ATTEMPTS && timeSinceLastRevival > GPS_REVIVAL_RETRY_INTERVAL_MS) {
                 lastRevivalAttemptTs = nowRealtime
-                logManager.logServiceEvent("CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed. Manual intervention required.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+                val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+                val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+                logManager.logServiceEvent("CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed. Manual intervention required.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = lat, lng = lng)
             }
         }
 
@@ -331,7 +351,9 @@ class TrackerService : BaseMonitorService() {
                     reliability, gpsArrivalCount, expectedCount, gpsMaxGapMs
                 )
                 val isPoor = reliability < 80f || gpsMaxGapMs > GPS_STABILITY_GAP_THRESHOLD_MS
-                logManager.logServiceEvent(auditMsg, important = isPoor, isSpecial = isPoor, specialColor = if (isPoor) FORENSIC_PINK_COLOR else null)
+                val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+                val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+                logManager.logServiceEvent(auditMsg, important = isPoor, isSpecial = isPoor, specialColor = if (isPoor) FORENSIC_PINK_COLOR else null, lat = lat, lng = lng)
             }
             gpsArrivalCount = 0
             gpsMaxGapMs = 0L
@@ -381,7 +403,10 @@ class TrackerService : BaseMonitorService() {
         
         if (rawSitDetected) {
             lastSitSyncLatchTs = nowRealtime
-            logManager.logServiceEvent("Sit Detected (Engine Pulse)", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+            // Issue 208: Include current coordinates for historical forensic recovery
+            val sitLat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+            val sitLng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+            logManager.logServiceEvent("Sit Detected (Engine Pulse)", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = sitLat, lng = sitLng)
             lifecycleScope.launch { repository.saveLong(MainRepository.LAST_SIT_TS_KEY, locationProcessor.getLastSitTs()) }
         }
 
@@ -396,7 +421,9 @@ class TrackerService : BaseMonitorService() {
             nowRealtime = nowRealtime
         )
         if (nextSuspicious && !isSuspiciousMode) {
-             logManager.logServiceEvent("Suspicious mode: Physical Tamper", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+             val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+             val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+             logManager.logServiceEvent("Suspicious mode: Physical Tamper", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = lat, lng = lng)
         }
         isSuspiciousMode = nextSuspicious
 
@@ -424,7 +451,9 @@ class TrackerService : BaseMonitorService() {
             
             if (nowRealtime - lastGpsTransitionLogTs > GPS_TRANSITION_LOG_MUZZLE_MS) {
                 lastGpsTransitionLogTs = nowRealtime
-                logManager.logServiceEvent(logMsg, important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+                val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+                val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+                logManager.logServiceEvent(logMsg, important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = lat, lng = lng)
             }
 
             currentGpsInterval = gpsInterval
@@ -620,7 +649,9 @@ class TrackerService : BaseMonitorService() {
 
     private fun triggerSuspiciousMode(source: String) {
         if (!isSuspiciousMode) { 
-             logManager.logServiceEvent("Suspicious mode: Physical Tamper ($source)", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+             val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+             val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+             logManager.logServiceEvent("Suspicious mode: Physical Tamper ($source)", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = lat, lng = lng)
         }
         isSuspiciousMode = behaviorUseCase.updateSuspiciousMode(isSuspiciousMode, true, false, timeProvider.elapsedRealtime())
     }

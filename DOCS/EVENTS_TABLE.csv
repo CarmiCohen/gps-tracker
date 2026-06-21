@@ -3,12 +3,12 @@ Priority,Pattern,Importance,Color,Filter,Siren,Condition
 1,[SIREN] Offline,Important,Red,Always,Yes,Remote device is not connected to relay server
 1,[SIREN] Jump Alert,Important,Red,Always,Yes,Remote device data is erratic or jumping (Jammer)
 1,[SIREN] Signal Lost,Important,Red,Always,Yes,No data received from remote device for >180s
-1,[SIREN] GPS Stalled,Important,Red,Always,Yes,Remote device GPS location has not updated
+1,[SIREN] GPS Stalled,Important,Red,Always,Yes,Remote device GPS location has not updated (>60s)
 1,[SIREN] Charger Unplugged,Important,Red,Always,Yes,External power source removed from remote device
 1,[SIREN] Geofence,Important,Red,Always,Yes,Remote device is beyond the allowed distance from home
 1,[SIREN] Low Battery,Important,Red,Always,Yes,Remote device battery level below 20%
 1,[SIREN] High Temp,Important,Red,Always,Yes,Remote device temperature > 46C
-1,[SIREN] GPS Gap,Important,Red,Always,Yes,Remote device GPS fix is older than 180s
+1,[SIREN] GPS Gap,Important,Red,Always,Yes,Remote device GPS fix is older than 60s
 1,CRITICAL: No internet access,Important,Red,Always,No,This device lost internet connection
 2,[RESOLVED] [Alarm Name] has ended,Important,Green,Always,Stop,Alarm condition returned to normal
 2,Device returned to safe range,Important,Green,Always,Stop,Remote device moved back within geofence

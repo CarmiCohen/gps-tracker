@@ -18,12 +18,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.10:
+ * - Issue 208: Updated forensic log emissions to propagate spatial coordinates.
  * v8.9.7:
  * - Issue 194: Finalized marker reconstruction by passing forensicUseCase to RemoteHandler.
  * - Issue 194: Updated network callback to handle "remote_log" for forensic SIT reconstruction.
- * v8.9.6:
- * - Issue 194: Added ALERT_ID_TRACKER_CHAIR to recordViolationMarkers to ensure SIT parity via status flags.
- * - Issue 190: Passing explicit xiaomiAutostartStatus to evaluateAlarms for robust indeterminate handling.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -58,13 +57,17 @@ class ViewerService : BaseMonitorService() {
         }
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean) {
             val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
-            logManager.logServiceEvent(message, isImportant, isSpecial = isSpecial || message.contains("Merge-on-Stale"), specialColor = specialColor)
+            val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+            val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+            logManager.logServiceEvent(message, isImportant, isSpecial = isSpecial || message.contains("Merge-on-Stale"), specialColor = specialColor, lat = lat, lng = lng)
         }
         override fun onMaxAccuracyChanged(accuracy: Float) {
             repository.saveFloatSync(MainRepository.MAX_ACCURACY_KEY, accuracy)
         }
         override fun onChairBaselineChanged(baseline: Float) {
-            logManager.logServiceEvent("Tracker: Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°")
+            val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+            val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+            logManager.logServiceEvent("Tracker: Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°", lat = lat, lng = lng)
         }
         override fun onGpsStallDetected(ts: Long) {
             // Tracker-side stall tracking handled via RemoteHandler updates
@@ -83,12 +86,14 @@ class ViewerService : BaseMonitorService() {
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, DEFAULT_RELAY_URL)
             configManager.isTrackerMode = false
 
-            alarmManager = AppAlarmManager(this@ViewerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color -> 
-                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color)
+            alarmManager = AppAlarmManager(this@ViewerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng -> 
+                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng)
             }
 
             integrityMonitor = IntegrityMonitor(this@ViewerService, repository, timeProvider, onViolationSustained = { }, onLogEvent = { msg, important ->
-                logManager.logServiceEvent(msg, important)
+                val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+                val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+                logManager.logServiceEvent(msg, important, lat = lat, lng = lng)
             })
             
             locationProcessor = LocationProcessor(localProcessorListener, timeProvider)
@@ -109,7 +114,11 @@ class ViewerService : BaseMonitorService() {
 
             remoteHandler = RemoteHandler(this@ViewerService, repository, locationProcessor, alarmManager, sessionManager, forensicUseCase, timeProvider, lifecycleScope) { id -> handleTrackerPulse(id) }
 
-            historyManager = HistoryManager(this@ViewerService, repository, gpsManager, null, locationProcessor, timeProvider, lifecycleScope) { msg, important -> logManager.logServiceEvent(msg, important) }
+            historyManager = HistoryManager(this@ViewerService, repository, gpsManager, null, locationProcessor, timeProvider, lifecycleScope) { msg, important -> 
+                val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+                val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+                logManager.logServiceEvent(msg, important, lat = lat, lng = lng) 
+            }
 
             commandRouter = CommandRouter(
                 this@ViewerService, configManager, logManager, networkManager, alarmManager, notificationManager, 
@@ -220,7 +229,9 @@ class ViewerService : BaseMonitorService() {
             lifecycleScope.launch { repository.saveString(MainRepository.TRACKER_ID_KEY, id) } 
         }
         if (sessionManager.onTrackerPulse(id, timeProvider.currentTimeMillis(), false)) {
-            logManager.logServiceEvent("Tracker connected: $id")
+            val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
+            val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
+            logManager.logServiceEvent("Tracker connected: $id", lat = lat, lng = lng)
             startTickLoop()
         }
     }

@@ -23,7 +23,7 @@ class OfflineRepository @Inject constructor(
         pendingStatusDao.getOldestPending(limit)
 
     suspend fun deletePendingStatusUpdate(id: Long) = 
-        pendingStatusDao.deletePending(listOf(id))
+        pendingStatusDao.deletePending(longArrayOf(id))
 
     /**
      * Issue 51: Purges all buffered telemetry.

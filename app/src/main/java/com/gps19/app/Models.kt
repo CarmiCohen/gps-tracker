@@ -9,6 +9,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v8.9.10:
+ * - Issue 209: Added lat/lng to LogEntry for historical forensic marker reconstruction.
  * v8.9.7:
  * - Plunge Matching: Added sitVzTs to ConnectionPoint, TrackerStatus, and LocationState for forensic parity.
  * v8.9.6:
@@ -102,7 +104,9 @@ data class LogEntry(
     val isSpecial: Boolean = false, 
     val specialColor: Int? = null,    
     val firstSeenTs: Long = 0L,
-    val role: String = "tracker"
+    val role: String = "tracker",
+    val lat: Double = 0.0,
+    val lng: Double = 0.0
 ) {
     fun toJSONObject(): JSONObject {
         return JSONObject().apply {
@@ -114,6 +118,8 @@ data class LogEntry(
             put("is_special", isSpecial)
             put("first_seen_ts", if (firstSeenTs == 0L) timestamp else firstSeenTs)
             put("role", role)
+            if (lat != 0.0) put("lat", lat)
+            if (lng != 0.0) put("lng", lng)
             specialColor?.let { put("special_color", it) }
             extremeValue?.let { if (!it.isNaN() && !it.isInfinite()) put("extreme_value", it) }
         }
@@ -141,7 +147,9 @@ data class LogEntry(
                 extremeValue = if (obj.has("extreme_value")) {
                     val ev = obj.optDouble("extreme_value")
                     if (ev.isNaN() || ev.isInfinite()) null else ev
-                } else null
+                } else null,
+                lat = obj.optDouble("lat", 0.0),
+                lng = obj.optDouble("lng", 0.0)
             )
         }
     }

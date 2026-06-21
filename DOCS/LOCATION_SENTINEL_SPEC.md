@@ -1,6 +1,6 @@
-# Location Sentinel Specification (v8.8.35)
+# Location Sentinel Specification (v8.9.10)
 
-The **Location Sentinel** is a multi-modal sensor fusion engine designed to detect unauthorized physical interaction with the tracker. In v8.8.35, this logic is strictly isolated within the `:core:engine` module and hardened with monotonic timing (Issue 125).
+The **Location Sentinel** is a multi-modal sensor fusion engine designed to detect unauthorized physical interaction with the tracker. In v8.9.10, this logic is strictly isolated within the `:core:engine` module and geographically anchored via **Log Spatial Anchors** (Issue 208).
 
 ## 1. Monitored Sensors
 The Sentinel monitors the following hardware sensors:
@@ -28,36 +28,29 @@ Any of the following conditions will trigger a **Suspicious State** (forcing 1s 
 ## 3. Implementation Details
 
 ### A. Muzzle Window
-The sentinel implements a 500ms `MUZZLE_WINDOW_DURATION_MS` during sync operations. While `isMuzzled` is true:
--   Shock and Vibration triggers are suppressed.
--   Tilt, Light, and Proximity violations are gated.
--   Acoustic spikes are ignored.
-This prevents false tamper triggers caused by hardware interference during heavy SQLite/Network I/O.
+The sentinel implements a 2000ms `MUZZLE_WINDOW_DURATION_MS` during sync operations. While `isMuzzled` is true, sensor triggers are suppressed to prevent interference-based false positives. Includes device-specific hysteresis.
 
 ### B. Lift Detection (Barometer)
-The sentinel tracks a slow-moving baseline of atmospheric pressure. If the current pressure indicates a vertical rise of more than 0.8 meters, it assumes the vehicle is being lifted or winched.
+If the current pressure indicates a vertical rise of more than 0.8 meters, the system assumes the vehicle is being lifted.
 
 ### C. Tilt Detection (Rotation Vector)
-Using the `Sensor.TYPE_ROTATION_VECTOR`, the engine calculates the angular delta from the point of "System Activation." If the device is rotated more than 15 degrees in any axis, a tilt violation is recorded.
+Calculates the angular delta from the point of activation. If the device is rotated more than 15 degrees, a tilt violation is recorded.
 
 ### D. Light Jump (EMA Baseline)
-Ambient light is tracked using a 1% Exponential Moving Average (EMA). Sudden spikes (> 150 lux over baseline) trigger a tamper alert.
+Sudden light spikes (> 150 lux over baseline) trigger a tamper alert.
 
 ### E. Acoustic Sentinel
-The system samples ambient noise floor. All acoustic triggers are gated by an absolute minimum of **50dB** (`ACOUSTIC_MIN_THRESHOLD_DB`) to prevent false positives in silent environments.
-- **Suspicion**: Jump > 20dB above floor.
-- **Violation**: Jump > 40dB above floor.
-- **Lockout**: 1s lockout after fast-path events.
+Triggers are gated by a **50dB** absolute floor to prevent false positives in silent environments.
 
 ### F. Adaptive Vibration Normalization
-Vibration thresholds are dynamic and normalized against the hardware noise floor (Adaptive Floor) using EMA.
-- **Stationary Floor**: Level < 0.12g (`VIBRATION_STATIONARY_THRESHOLD`).
+Vibration thresholds are dynamic and normalized against the hardware noise floor using EMA.
 
-## 4. Forensic Continuity (v8.8.35)
+## 4. Forensic Continuity (v8.9.10)
 Physical violations are logged with forensic metadata:
-1.  **Monotonic Timing (Issue 125)**: All timing deltas and violation durations are calculated using `TimeProvider.elapsedRealtime()`.
-2.  **Fuzzy Batching**: Repeated strikes or noise spikes are collapsed into single entries.
-3.  **Identity Integrity**: Every forensic entry is tagged with the mandatory `role` field. Identity is preserved at the emission point (LogManager/SyncManager) via `BuildConfig.VERSION_NAME`.
+1.  **Log Spatial Anchor (Issue 208)**: All tamper, lift, and tilt events are now automatically anchored with `lat`/`lng` coordinates to show exactly where the physical violation occurred.
+2.  **Monotonic Timing**: All timing deltas and violation durations are calculated using `TimeProvider.elapsedRealtime()`.
+3.  **Ghost Mode UX**: Visual staleness indicators are applied to all sensor-derived fields when telemetry is older than 10s.
+4.  **SIT Acknowledgment**: Discrete SIT events are synchronized via a 10s acknowledged loop to ensure persistence.
 
 ## 5. State Integration
 When a physical violation occurs:

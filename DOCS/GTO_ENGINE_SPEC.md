@@ -1,4 +1,4 @@
-# Specification: GtoEngine (Graph Trajectory Optimization) (v8.8.35)
+# Specification: GtoEngine (Graph Trajectory Optimization) (v8.9.10)
 
 This document specifies the architecture and logic for the **GtoEngine**, an advanced optimization-based reconstruction system for tracking heavy tractor assets. 
 
@@ -20,7 +20,7 @@ The engine maintains a "Sliding Window" of nodes (GPS fixes) and "Factors" (cons
 
 ### 2.2. Factors (Constraints)
 *   **GPS Factors**: The raw coordinate and its reported accuracy.
-*   **Kinematic Factors**: Constraints based on tractor physics (Acceleration < 2.0 m/s² `MAX_TRACTOR_ACCEL`).
+*   **Kinematic Factors**: Constraints based on tractor physics (Acceleration < 2.0 m/s²).
 *   **IMU Factors**: Correlation between physical vibration (Accelerometer) and movement distance.
 *   **Magnetometer Factors**: Heading consistency check.
 
@@ -29,9 +29,9 @@ The engine maintains a "Sliding Window" of nodes (GPS fixes) and "Factors" (cons
 ## 3. Advanced Classification Logic
 
 ### 3.1. Hindsight Correction
-If a point arrives that implies a 100m "Jump" (`JUMP_POINT_DISTANCE_THRESHOLD`), the GtoEngine evaluates the sequence:
+If a point arrives that implies a "Jump", the GtoEngine evaluates the sequence:
 *   **Scenario A**: Next points return to the origin. **Decision**: The jump was noise. It is smoothed out.
-*   **Scenario B**: Next points continue from the jump location. **Decision**: The jump was real high-speed movement. **Promotion**: The "Jump Hold" (180s) is canceled via **Trajectory Promotion** (30s consistent movement), and the alarm is triggered immediately.
+*   **Scenario B**: Next points continue from the jump location. **Decision**: The jump was real high-speed movement. **Promotion**: The "Jump Hold" is canceled via **Trajectory Promotion**, and the alarm is triggered immediately.
 
 ### 3.2. Mechanical Vibration Signature
 *   **Work vs. Theft**: The engine analyzes the accelerometer frequency. 
@@ -39,7 +39,7 @@ If a point arrives that implies a 100m "Jump" (`JUMP_POINT_DISTANCE_THRESHOLD`),
     *   **Zero Vibration + Fast Movement**: The tractor is being towed. Thresholds are tightened.
 
 ### 3.3. Radial Jitter (Zig-Zag) Filtering
-By evaluating the graph's **Path Efficiency**, the engine calculates the ratio of `Displacement / PathLength`. If the efficiency is < 0.1 (`PATH_EFFICIENCY_THRESHOLD`), the engine "collapses" the jitter into a single stationary node, preventing the "spider-web" effect.
+By evaluating the graph's **Path Efficiency**, the engine calculates the ratio of `Displacement / PathLength`. If the efficiency is low, the engine "collapses" the jitter into a single stationary node.
 
 ---
 
@@ -47,7 +47,7 @@ By evaluating the graph's **Path Efficiency**, the engine calculates the ratio o
 
 The GtoEngine operates as a "State-Aware Optimizer":
 
-1.  **Stage 1: The Sentry Gate**: Deterministic thresholds (e.g., 2km `OUTLIER_DISTANCE_THRESHOLD`) discard garbage data.
+1.  **Stage 1: The Sentry Gate**: Deterministic thresholds discard garbage data.
 2.  **Stage 2: Graph Update**: New GPS and IMU data are added as nodes and factors.
 3.  **Stage 3: Optimization**: The engine solves the graph to find the "Least-Energy" path.
 4.  **Stage 4: Alarm Validation**: If the *optimized* path violates the geofence, the system evaluates the **Trajectory Confidence**.
@@ -67,4 +67,4 @@ The GtoEngine operates as a "State-Aware Optimizer":
 | **CPU Cost** | Low | Moderate (Matrix solving) |
 
 ## 6. Summary Conclusion
-The **GtoEngine** provides a "Truth-at-Source" model that understands the difference between a tractor bouncing in a field and a tractor being moved by an unauthorized party. In v8.8.35, this logic is strictly isolated in the `:core:engine` module, ensuring forensic integrity. Legacy version tags have been removed in favor of a simplified forensic model.
+The **GtoEngine** provides a "Truth-at-Source" model that understands the difference between a tractor bouncing in a field and a tractor being moved by an unauthorized party. In v8.9.10, this logic is strictly isolated and geographically anchored via **Log Spatial Anchors**, ensuring forensic integrity.

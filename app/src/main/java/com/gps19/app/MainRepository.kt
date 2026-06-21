@@ -18,13 +18,16 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * v8.9.10:
+ * - Issue 208: Synchronized versioning and forensic logging baseline for release verification.
+ * v8.9.9:
+ * - Issue 208: Updated addLog to support 'initiallySynced' flag for duplicate suppression.
  * v8.9.5:
  * - Issue 192: Added currentMa to connection_history mapping for full forensic parity.
  * v8.9.3:
  * - Issue 188: Preserved historical GPS timestamps in trail points.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * - Issue 135: Added verticalVelocity to connection_history mapping for forensic parity.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -219,8 +222,8 @@ class MainRepository @Inject constructor(
         maxDrop: Long, maxDropTs: Long, lastGpsTs: Long, violationUptimeMs: Long
     ) = settings.saveSessionMetricsBulk(totalConnected, uptime, totalDrop, maxDrop, maxDropTs, lastGpsTs, violationUptimeMs)
 
-    fun addLog(entry: LogEntry) {
-        logRepository.addLog(entry)
+    fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
+        logRepository.addLog(entry, initiallySynced)
     }
 
     fun clearLogs() { logRepository.clearLogs() }
@@ -383,7 +386,7 @@ class MainRepository @Inject constructor(
                     viewerId = "SYSTEM",
                     isSpecial = true,
                     specialColor = 0xFFFFD700.toInt()
-                ))
+                ), initiallySynced = true) // I/O Audit logs are local and don't need real-time sync unless recovered
             }
         }
     }

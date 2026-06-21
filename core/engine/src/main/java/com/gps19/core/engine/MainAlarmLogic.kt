@@ -5,12 +5,12 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v8.9.10:
+ * - Issue #190: Added forensic technical details to Xiaomi alert to facilitate field verification.
  * v8.9.8:
  * - Issue 190: Added XIAOMI_BOOT_GRACE_MS check to suppress transient alarms during startup.
  * v8.9.6:
  * - Issue 190: Implemented robust handling for "Unknown" Xiaomi Autostart status.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  */
 object MainAlarmLogic {
 
@@ -391,12 +391,16 @@ object MainAlarmLogic {
             else -> "MIUI status OK"
         }
 
+        // v8.9.10: forensic detail trace for Issue #190 confirmation
+        val xiaomiTechnical = "MIUI State: autostart=${state.xiaomiAutostartStatus}, special=${state.xiaomiStatus}, override=${state.isXiaomiManualOverride}, grace=$isXiaomiBootGraceActive"
+
         reports.add(
             ViolationReport(
                 type = ALERT_ID_XIAOMI_SYSTEM_MISSING,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_XIAOMI_SYSTEM_MISSING),
                 subtitle = xiaomiSubtitle,
-                conditionMet = xiaomiViolation
+                conditionMet = xiaomiViolation,
+                technicalDetails = xiaomiTechnical
             )
         )
 

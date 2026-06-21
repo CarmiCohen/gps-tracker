@@ -15,6 +15,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v8.9.10:
+ * - Issue 209: Fixed inaccurate SIT marker placement by using historical coordinates from recovered logs.
  * v8.9.7:
  * - Issue 194: Added handleRemoteLog to reconstruct forensic markers from synced SIT events.
  * - Issue 194: Injected ServiceForensicUseCase for immediate marker reconstruction on recovered logs.
@@ -242,7 +244,7 @@ class RemoteHandler(
     /**
      * Issue 194: Reconstructs forensic state from incoming remote logs.
      * Ensures that recovered "Sit Detected" events trigger the same map markers as real-time flags.
-     * Modified in v8.9.7 to trigger immediate violation recording via forensicUseCase.
+     * Modified in v8.9.10: Issue 209: Using historical coordinates from LogEntry for accurate recovery.
      */
     fun handleRemoteLog(entry: LogEntry) {
         if (entry.message.contains("Sit Detected", ignoreCase = true)) {
@@ -250,12 +252,15 @@ class RemoteHandler(
             if (!isTrackerSitDetected) {
                 isTrackerSitDetected = true
                 
-                // Immediate forensic marker placement for recovered events
-                if (trackerLat != 0.0 && trackerLng != 0.0) {
+                // Issue 209: Immediate forensic marker placement using historical coordinates
+                val effectiveLat = if (entry.lat != 0.0) entry.lat else trackerLat
+                val effectiveLng = if (entry.lng != 0.0) entry.lng else trackerLng
+
+                if (effectiveLat != 0.0 && effectiveLng != 0.0) {
                     forensicUseCase.recordViolationMarkers(
-                        now = timeProvider.currentTimeMillis(),
-                        lat = trackerLat,
-                        lng = trackerLng,
+                        now = entry.timestamp,
+                        lat = effectiveLat,
+                        lng = effectiveLng,
                         accuracy = trackerMaxAccuracy.toDouble(),
                         activeViolations = setOf(ALERT_ID_TRACKER_CHAIR),
                         unresolvedAlarms = emptySet()

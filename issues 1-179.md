@@ -1,7 +1,7 @@
-# Open Issues
-- **Issue #190: Xiaomi MIUI 14 Hardware Confirmation**: Gating logic for "Unknown" status and boot grace is implemented, but requires field verification on physical MIUI 14 hardware to ensure no "Denied" spikes occur during boot transitions.
+# Architectural Audit Issues (v8.8.37)
 
-# Fixed Issues
+This document tracks deviations from the high-assurance modular architecture defined in the project's core documentation.
+
 ## 1. FIXED Session Lifecycle Stability (R921/R926) - Resolution: Exhaustive state reset implemented in MainViewModel. Mandatory landing page pause and service auto-start implemented in MainAppContent.
 ## 2. FIXED Logic Layer "Android Leaks" - Resolution: Resolved in v8.7.6.
 ## 3. FIXED Module Type Constraints - Resolution: Resolved in v8.8.0.
@@ -13,7 +13,6 @@
 ## 15. FIXED Forensic I/O Efficiency & Persistence - Resolution: MainRepository.addHistoryPoints now uses a monotonic interval check. Implemented repository.flushHistory() and integrated it into BaseMonitorService.onDestroy() using runBlocking to ensure pending telemetry is committed during service shutdown.
 ## 16. FIXED R922: LED and Connectivity Logic - Resolution: Implementation verified in SharedUiComponents.kt and TrackerService.kt. INT LED reflects local relay state; SRV/TRK/DAT/GPS are gated by peer health (isRemote), ensuring end-to-end verification. Deep inspection confirmed root-cause resolution and zero regressions in telemetry/rendering pipelines.
 ## 17. FIXED R923: Forensic Data Refresh - Resolution: Dashboard logic in DashboardUseCase.kt now recovers immediately upon telemetry receipt by utilizing the maximum of GPS and telemetry timestamps.
-## 19. FIXED Dashboard Recovery Parity - Resolution: Implemented instantaneous UI recovery upon telemetry receipt. (v8.8.23).
 ## 20. FIXED Session Metrics Clock Inconsistency - Resolution: Final technical audit of v8.8.2 remediation complete. Codebase verified for monotonic timing and forensic persistence. (Procedural tagging to follow).
 ## 21. FIXED Signal Loss Logic Integration - Resolution: TrackerService and ViewerService now calculate silenceDelta using peer activity timestamps and pass it to checkSignalIntegrity, enabling signal loss alarms for both roles.
 ## 22. FIXED Viewer Infrastructure Monitoring - Resolution: ViewerService now utilizes a full IntegrityMonitor instance to poll local system status, enabling it to detect and alert on its own hardware and internet connectivity failures.
@@ -61,10 +60,10 @@
 ## 79. FIXED STICKY SIT STATE - Resolution: Re-implemented `consumeSitDetected()` in `LocationSentinel.kt` and `LocationProcessor.kt`. `TrackerService.processTick` now consumes the SIT detection state each cycle, preventing it from remaining permanently active after a trigger. (v8.8.13).
 ## 80. FIXED FORENSIC PERSISTENCE GAP (Viewer) - Resolution: Implemented state-latches and `addViolation` calls in `ViewerService.kt` for Signal Loss, Jammer, Stall, and Gap alerts, ensuring these events are recorded to the local database for map visualization. (8.8.14).
 ## 81. FIXED Forensic Persistence Gap (Tracker) - Resolution: Implemented state-latch and repository.addViolation logic in TrackerService.kt for Stall, Tamper, and Geofence violations, ensuring they are recorded to the local forensic database. (v8.8.15).
-## 82. FIXED Forensic Persistence Gap (Viewer) - Resolution: Implemented state-latch and repository.addViolation logic in ViewerService.kt for ALERT_ID_TRACKER_GEOFENCE violations, enabling forensic map visualization for peer peer boundary breaches. (v8.8.16).
-## 83. FIXED Redundant Tamper/SIT Alerting - Resolution: Decoupled SIT (Chair) alerting from the general tamper flag in `TrackerService.kt`. SIT and Tamper now independently evaluate in the alarm loop, preventing dual-trigger redundancy. (v8.8.18).
-## 84. FIXED Missing Thermal Throttling in GPS Polling - Resolution: TrackerService now switches to `COOLING_GPS_POLLING_MS` (30s) when Cooling Mode is active, ensuring heat reduction during thermal events. This check is prioritized over other polling states. (v8.8.17).
 ## 85. FIXED Forensic Marker Gap (GPS Gap) - Resolution: TrackerService now includes state-latch and persistence logic for ALERT_ID_TRACKER_GAP violations, ensuring these events are recorded in the forensic log. (v8.8.15).
+## 82. FIXED Forensic Persistence Gap (Viewer) - Resolution: Implemented state-latch and repository.addViolation logic in ViewerService.kt for ALERT_ID_TRACKER_GEOFENCE violations, enabling forensic map visualization for peer peer boundary breaches. (v8.8.16).
+## 84. FIXED Missing Thermal Throttling in GPS Polling - Resolution: TrackerService now switches to `COOLING_GPS_POLLING_MS` (30s) when Cooling Mode is active, ensuring heat reduction during thermal events. This check is prioritized over other polling states. (v8.8.17).
+## 83. FIXED Redundant Tamper/SIT Alerting - Resolution: Decoupled SIT (Chair) alerting from the general tamper flag in `TrackerService.kt`. SIT and Tamper now independently evaluate in the alarm loop, preventing dual-trigger redundancy. (v8.8.18).
 ## 86. FIXED Inconsistent Tamper Logic - Resolution: Updated the `onLocationChanged` fast-path in `TrackerService.kt` to include the `SentinelValidator.isLightViolated` check, ensuring parity with the `processTick` loop. (v8.8.19).
 ## 87. FIXED Missing Database Migrations - Resolution: Added missing migration paths (24 -> 28) to the Room database configuration in `AppModule.kt`, resolving the `IllegalStateException` crash on startup. (v8.8.20).
 ## 88. FIXED Render Relay URL Discrepancy - Resolution: Corrected default relay URL to `gps-survival-relay.onrender.com` in `Constants.kt` and `SettingsRepository.kt` following discovery that the previous name resulted in 404 responses. (v8.8.12).
@@ -81,6 +80,7 @@
 ## 100. FIXED Audit :core:engine Purity - Resolution: Verified that no android.* dependencies remain in the core engine source code. Verified files: LocationProcessor, LocationSentinel, ImmFilter, PhysicsUtils, MainAlarmLogic, TelemetryUtils, SentinelValidator. (v8.8.21).
 ## 101. FIXED Verify Forensic Identity Propagation - Resolution: New version ID correctly picked up by LogManager and SyncManager for forensic tagging. Added 'vid' field to LogEntry, TrackerStatus, LocationState, LocationUpdate, ConnectionPoint, HistoryEntity, and PendingStatusEntity. Implemented DB Migration v30. (v8.8.21).
 ## 102. FIXED Timing Consistency Check - Resolution: TimeProvider is now the exclusive source of truth for all duration and timeout logic across :app and :core:engine. Standardized timing in Services (BaseMonitorService, TrackerService, ViewerService), Managers (LogManager,SessionManager, GpsManager, AppSensorManager), Background tasks (MaintenanceWorker, WatchdogReceiver), and UI (MainViewModel systemPulse, MapComponents throttle). (v8.8.21).
+## 19. FIXED R923 Live Field Check - Resolution: Dashboard and Status Card now utilize the maximum of GPS and telemetry arrival timestamps for freshness logic. \"Gray-out\" states now recover immediately upon receipt of any telemetry packet. (v8.8.23).
 ## 103. FIXED Hardcoded Muzzle Window - Resolution: Centralized `MUZZLE_WINDOW_DURATION_MS` in `EngineConstants.kt` and updated `TrackerService.kt` to use it (v8.8.22).
 ## 104. FIXED Naming Mismatch (Log Muzzle) - Resolution: Renamed `LOG_MUZZLE_DURATION_MS` to `LOG_MUZZLE_STARTUP_MS` in `Constants.kt` and `LogManager.kt` to align with SoT (v8.8.22).
 ## 105. FIXED Version Desync (build.gradle) - Resolution: Updated `app/build.gradle` `versionName` to `8.8.22` to match architectural version (v8.8.22).
@@ -88,100 +88,73 @@
 ## 107. FIXED Forensic Identity Inconsistency - Resolution: Unified forensic identity across all components and documentation (v8.8.23).
 ## 108. FIXED Version Stale References - Resolution: Synchronized all source headers and documentation files to the new v8.8.23 baseline (v8.8.23).
 ## 109. FIXED versionCode Description Mismatch - Resolution: Updated `REQUIREMENTS_SOT.md` to accurately reflect the `yearOffset` implementation used in `build.gradle` (v8.8.23).
-## 110. FIXED Modular Engine Hardening - Resolution: Finalized the physical isolation of the `:core:engine` as a pure JVM library. (v8.8.22).
-## 111. FIXED SNR Scaling Standardization - Resolution: Replaced hardcoded SNR scaling with `RIBBON_SNR_SCALE_DB` in `TrackerService.kt`. (v8.8.24).
-## 112. FIXED Historical Gap Injection - Resolution: Corrected `HistoryManager.kt` to prevent duplicate gap injection. (v8.8.24).
-## 113. FIXED Ribbon UI Clipping - Resolution: Adjusted padding and stroke widths in `SharedUiComponents.kt`. (v8.8.24).
-## 114. FIXED Forensic Identity Propagation - Resolution: Ensured `vid` is correctly propagated to the relay. (v8.8.25).
-## 115. FIXED ViewModel Bloat - Resolution: Decoupled `MainViewModel` into feature-specific UseCases. (v8.8.25).
-## 116. FIXED GpsManager Initialization Race - Resolution: Moved `OsmConfig` to background thread. (v8.8.25).
-## 117. FIXED Barometer Zeroing Drift - Resolution: Increased `BARO_ZEROING_INTERVAL_MS` to 10 minutes. (v8.8.25).
-## 118. FIXED Timing & Forensic Stability - Resolution: Standardized on monotonic time (`TimeProvider.elapsedRealtime()`). (v8.8.22).
-## 119. FIXED OEM Restriction Verification - Resolution: Integrated Xiaomi Autostart detection and enabled 10Hz polling. (v8.8.22).
-## 120. FIXED Muzzle Window & Forensic Audit - Resolution: Implemented a 500ms "Muzzle Window" during sync I/O. (v8.8.22).
-## 121. FIXED LED Logic DecouPLING - Resolution: Fixed status LEDs on the Tracker side. (v8.8.31).
-## 122. FIXED App Icon Foreground Branding - Resolution: Updated `ic_jd_logo.xml` to use the deer-only branding. (v8.8.30).
-## 123. FIXED Identity Hardening - Resolution: Updated identity branding and versioning baseline. (v8.8.30).
-## 124. FIXED GPS Revival Escalation - Resolution: Implemented a 5-minute retry loop and forensic escalation. (v8.8.31).
-## 125. FIXED Monotonic UI Lockout - Resolution: Migrated all UI countdowns and pulse logic to `TimeProvider.elapsedRealtime()`. (v8.8.31).
-## 126. FIXED Tracker-Side SIT Logging - Resolution: Ensured `ALERT_ID_TRACKER_CHAIR` is recorded to the local forensic database. (v8.8.31).
-## 127. FIXED Xiaomi Autostart Indeterminate State - Resolution: Added `XiaomiPermissionStatus.UNKNOWN`. (v8.8.31).
-## 128. FIXED Forensic Ribbon Scaling - Resolution: Standardized `RIBBON_VIBRATION_SCALE_G` and `RIBBON_SNR_SCALE_DB`. (v8.8.31).
-## 129. FIXED Build Failure: Missing Symbol - Resolution: Re-added `isValidLocation` to `PhysicsUtils.kt`. (v8.8.31).
-## 130. FIXED Forensic Verification Suite - Resolution: Implemented `ForensicIdentityTest.kt`. (v8.8.31).
-## 131. FIXED Forensic Key Standardization (snake_case) - Resolution: Standardized all JSON keys to snake_case. (v8.8.31).
-## 132. FIXED Continuity Audit & Backfill Verification - Resolution: Implemented 1Hz continuity auditing in HistoryManager.kt. (v8.8.31).
-## 133. FIXED Xiaomi Background Stability Verification - Resolution: Confirmed 10Hz polling logic. (v8.9.2).
-## 135. FIXED Relay Audit Verification - Resolution: Enhanced `join` payload with role and version. (v8.8.35).
-## 136. FIXED AppSettings Persistence Gap - Resolution: Updated `TrackerStatusProto` to include missing forensic fields. (v8.8.33).
-## 137. FIXED SettingsRepository Alignment - Resolution: Updated `SettingsRepository.kt` to persist cooling/storage flags. (v8.8.33).
-## 138. FIXED SyncManager Historical Depth Gap - Resolution: Included forensic fields in the JSON payload. (v8.8.33).
-## 139. FIXED Database Forensic Depth Gap - Resolution: Expanded `PendingStatusEntity` to include full forensic fields. (v8.8.33).
-## 140. FIXED HistoryManager Version Tagging Bug - Resolution: Supported version-aware tagging in history updates. (v8.8.33).
-## 141. FIXED Engineering Constants Typo - Resolution: Corrected `MAX_HISTORY_POINTS_PER_RIBBONS`. (v8.8.33).
-## 142. FIXED SIT Forensic Depth Gap in History - Resolution: Updated `HistoryEntity` to include SIT metrics. (v8.8.33).
-## 143. FIXED SyncManager Historical Version Bug - Resolution: Updated `SyncManager.kt` to use `entity.ver`. (v8.8.33).
-## 144. FIXED MainViewModel Logic Duplication - Resolution: Centralized location validation. (v8.8.33).
-## 145. FIXED Hardcoded Point Count - Resolution: Replaced hardcoded `240f` with `MAX_HISTORY_POINTS_PER_RIBBONS`. (v8.8.33).
-## 146. FIXED Startup Performance (Skipped Frames) - Resolution: Moved `OsmConfig` to background thread. (v8.8.35).
-## 147. FIXED Compose SnapshotStateList Warnings - Resolution: Migrated to SnapshotStateList in MapComponents.kt. (v8.8.35).
-## 148. FIXED GPS Polling Stabilization (A15) - Resolution: Implemented `A15_STABLE_GPS_POLLING_MS`. (v8.8.35).
-## 149. FIXED Missing Jump Markers (Forensic Parity) - Resolution: Achieved symbol parity for forensic markers. (v8.8.32).
-## 150. FIXED Architectural Alignment (Standardized Alert IDs) - Resolution: Centralized `ALERT_ID_VISUAL_JUMP`. (v8.8.32).
-## 151. FIXED Model Synchronization - Resolution: Aligned `:app:Models.kt` and `:core:engine:EngineModels.kt`. (v8.8.33).
-## 152. FIXED Missing Database Migrations (v31) - Resolution: Implemented `MIGRATION_30_31`. (v8.8.33).
-## 153. FIXED Compilation Errors (Forensic Expansion) - Resolution: Resolved build failures by adding `ver` field. (v8.8.33).
-## 154. FIXED Forensic Documentation Debt - Resolution: Replaced legacy `vid` with `ver`. (v8.8.33).
-## 155. FIXED Build Failure: Unfinished Forensic Simplification - Resolution: Resolved compilation errors. (v8.8.34).
-## 156. FIXED Global Version Desync - Resolution: Synchronized all version strings to v8.8.35.
-## 157. FIXED Forensic Documentation Mismatch - Resolution: Updated core documentation to reflect simplified forensic model.
-## 158. FIXED Database Schema "Dead Weight" - Resolution: Migrated to a ver-less structure in v33. (v8.8.35).
-## 159. FIXED Database Schema Cleanup (Future) - Resolution: Removed 'ver' and 'vid' columns via Room Migration v33. (v8.8.35).
-## 160. FIXED Xiaomi Gating Logic Error - Resolution: Decoupled autostart from xiaomiStatus. (v8.8.35).
-## 161. FIXED Viewer Alarm Title Confusion - Resolution: Updated titles to "This device:". (v8.8.35).
-## 162. FIXED Constant Redundancy - Resolution: Removed duplicated constants. (v8.8.35).
-## 163. FIXED Power Tamper Regression - Resolution: Reconnected battery/power callbacks to `IntegrityMonitor`. (v8.8.35).
-## 164. FIXED Telemetry Validation Parity - Resolution: Standardized on `PhysicsUtils.isValidLocation`. (v8.8.35).
-## 165. FIXED Code Redundancy in Utils.kt - Resolution: Migrated logic to `:core:engine`. (v8.8.36).
-## 166. FIXED Build Integrity & Lint - Resolution: Verified build stability following modularization. (v8.8.36).
-## 167. FIXED Documentation Debt (SoT) - Resolution: Updated SoT to include Samsung A15 polling. (v8.8.36).
-## 168. FIXED Xiaomi 10Hz Stability Preparation - Resolution: Implemented Stability Audit suite. (v8.8.36).
-## 169. FIXED Version Header Desync - Resolution: Synchronized source headers in Services. (v8.8.36).
-## 170. FIXED Xiaomi Alert Guard - Resolution: Added `isXiaomiDevice()` check. (v8.8.36).
-## 171. FIXED GPS Transition Log Muzzle - Resolution: Implemented 30s temporal muzzle for logs. (v8.8.36).
-## 172. FIXED Xiaomi False Positives on Non-Xiaomi - Resolution: Added `isXiaomiDevice` flag to Evaluation state. (v8.8.36).
-## 173. FIXED Tracker-Side SIT Marker Persistence - Resolution: Reconnected SIT events to local forensics. (v8.8.36).
-## 174. FIXED R867: Default Identity Verification - Resolution: Updated default IDs to "Ttk" and "Cohen". (v8.8.36).
-## 175. FIXED R917: Version Update Smoothness - Resolution: Verified `MY_PACKAGE_REPLACED` handling. (v8.8.36).
-## 176. FIXED R941: Statistics Persistence Verification - Resolution: Confirmed statistics accumulation across restarts. (v8.8.36).
-## 177. FIXED Dead Code Cleanup - Resolution: Removed redundant telemetry methods. (v8.8.37).
-## 178. FIXED Forensic Parity: verticalVelocity Alignment - Resolution: Implemented full parity for verticalVelocity. (v8.8.37).
-## 179. FIXED RemoteHandler SIT Mapping Audit - Resolution: Verified 100% field parity for SIT. (v8.8.37).
-## 180. FIXED Forensic Pipeline Verification - Resolution: Verified 1:1 field mapping for verticalVelocity and SIT. (v8.9.2).
-## 181. FIXED GPS Stability Audit Verification - Resolution: Reliability metrics emitted every 10s. (v8.9.2).
-## 182. FIXED Global Version Synchronization - Resolution: Synchronized all source headers to v8.9.2. (v8.9.2).
-## 183. FIXED Legacy Branding Cleanup - Resolution: Standardized to John Deere Green and logo. (v8.9.2).
-## 184. FIXED Muzzle Window Hardening - Resolution: Optimized SyncManager and Tracker muzzle state. (v8.9.2).
-## 185. FIXED ViewerService Listener Completion - Resolution: Fully implemented remote-to-local trail persistence. (v8.9.2).
-## 186. FIXED SoT Documentation Hardening - Resolution: Updated documentation to v8.9.2 baseline. (v8.9.2).
-## 187. FIXED Viewer-Side LocationProcessor State Persistence - Resolution: Updated ViewerService to load maxAccuracy. (v8.9.4).
-## 188. FIXED Historical GPS Timestamp Loss - Resolution: Added gpsTs to database and sync. (v8.9.3).
-## 189. FIXED Viewer Background Location Gap - Resolution: Implemented 10s background polling for Viewers. (v8.9.5).
-## 190. FIXED Xiaomi Autostart Unknown Handling - Resolution: Implemented robust handling for indeterminate status. (v8.9.6).
-## 191. FIXED Muzzle Window Race Condition - Resolution: Implemented deterministic Muzzle Handshake. (v8.9.6).
-## 192. FIXED Power Parity Consistency & evaluateAlarms Mismatch - Resolution: Achieved absolute forensic parity for currentMa. (v8.9.5).
-## 193. FIXED Zombie Telemetry UX - Resolution: Implemented visual staleness indicators ("Ghost Mode"). (v8.9.6).
-## 194. FIXED SIT Persistence Packet Loss Risk - Resolution: Implemented acknowledged event synchronization pipeline. (v8.9.7).
-## 195. FIXED Room Migration Forensic Audit (Android 15) - Resolution: Implemented full table reconstruction migration. (v8.9.6).
-## 196. FIXED Plunge Matching: Advanced SIT Detection - Resolution: Refined "Plunge" state machine and sitVzTs propagation. (v8.9.7).
-## 197. FIXED Database Schema Expansion (v38) - Resolution: Added sitVzTs to history tables. (v8.9.7).
-## 198. FIXED GPS Availability Hardening - Resolution: Shortened GPS stall detection to 60s. (v8.9.8).
-## 199. FIXED Toolchain Modernization - Resolution: Upgraded to Java 17 and Android SDK 35. (v8.9.8).
-## 200. FIXED Room Migration Registry Fix - Resolution: Registered MIGRATION_37_38. (v8.9.8).
-## 201. FIXED Multi-version Schema Robustness - Resolution: Hardened MIGRATION_35_36. (v8.9.8).
-## 203. FIXED Documentation Version Desync - Resolution: Synchronized all core documentation (`APP_DESCRIPTION.md`, `SETTINGS_PAGE_DETAIL.md`, `info-elementary-fields.md`, `README.md`, `REQUIREMENTS_SOT.md`) and `issues.md` to the v8.9.9 baseline. (v8.9.9).
-## 204. FIXED GPS Stall/Revival Constant Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `GPS_STALL_THRESHOLD_MS` = 60s and `GPS_REVIVAL_RETRY_INTERVAL_MS` = 120s. (v8.9.8).
-## 205. FIXED Muzzle Window Constant Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `MUZZLE_WINDOW_DURATION_MS` = 2000ms. (v8.9.8).
-## 206. FIXED Staleness Threshold Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `TELEMETRY_UI_STALE_THRESHOLD_MS` = 10s and `GPS_UI_FAIL_THRESHOLD_MS` = 10s, unifying "Ghost Mode" and "Position Health" thresholds. (v8.9.8).
-## 207. FIXED REQUIREMENTS_SOT Typo Audit - Resolution: Performed a comprehensive syntax audit on `REQUIREMENTS_SOT.md`. Fixed multiple constants (`TICK_INTERVAL_MS`, `PARKING_ACCEL_LIMIT`, `GPS_STALL`, `ACOUSTIC_ALERT`, `CHAIR_OCCUPIED`, `CHAIR_PLUNGE_DISTANCE_THRESHOLD`, `PING_INTERVAL_MS`, `NETWORK_TIMEOUT_MS`) that used incorrect quote characters (`"`) instead of backticks. (v8.9.9).
-## 208. FIXED Log Spatial Anchor Gap - Resolution: Updated `LogManager`, `AppAlarmManager`, `TrackerService`, and `ViewerService` to capture and propagate current coordinates (`lat`/`lng`) during forensic log emission. This enables accurate historical marker reconstruction on the map. (v8.9.10).
+## 110. FIXED Forensic Ribbons Empty - Resolution: Resolved two root causes: 1) `MainViewModel.kt` was clearing incremental history flows when the database was empty. 2) `ViewerService.kt` was not initializing or updating `HistoryManager`, preventing forensic ribbons from populating in Viewer mode (v8.8.23).
+## 111. FIXED Hardcoded SNR Scaling - Resolution: Standardized SNR scaling in `TrackerService.kt` by replacing hardcoded `45f` with `RIBBON_SNR_SCALE_DB` from `EngineConstants.kt`. (v8.8.24).
+## 112. FIXED Timing Standardization Leakage - Resolution: Migrated `LogManager.kt` and `MapComponents.kt` to use `TimeProvider` / `systemPulse` for all timing logic, eliminating direct bypass calls to `System.currentTimeMillis()`. Verified `HistoryManager.kt` and `TrackerService.kt` are already using standardized timing (v8.8.25).
+## 113. FIXED History Batch Threshold Inconsistency - Resolution: Removed local inconsistent constants in `MainRepository.kt` (`2000ms`, `50 points`) and migrated to standardized values from `EngineConstants.kt` (`5000ms`, `100 points`) for history batching (v8.8.25).
+## 114. FIXED Forensic Identity Propagation Gaps - Resolution: Implemented forensic identity propagation across the entire telemetry pipeline: correctly handled in `LogManager.submitToLogSink`, extracted from remote packets in `RemoteHandler.kt`, and preserved in `EngineConnectionPoint` mapping in `MainRepository.kt` and `HistoryManager.kt` (v8.8.26).
+## 115. FIXED Architectural Bloat (God Objects) - Resolution: OverlayComponents.kt (~650 lines) successfully modularized. MainViewModel.kt (~688 lines) decoupled into feature UseCases (Navigation, Settings, Telemetry, Behavior, Session, Alert, Map), reducing it to ~320 lines. (v8.8.28).
+## 116. FIXED Xiaomi Gating & Polling Inconsistency - Resolution: Integrated `isXiaomiAutostartGranted` check in `TrackerService.kt` alarm loop and enabled `HIGH_FREQUENCY_GPS_POLLING_MS` (10Hz) for Xiaomi devices to ensure background stability parity with Samsung S21 FE. (v8.8.26).
+## 117. FIXED Hardcoded Scheduling Minutes - Resolution: Migrated `DAILY_CLEANUP_MINUTE` and `DAILY_ARCHIVE_MINUTE` to `EngineConstants.kt` and updated `HistoryManager.kt` to use these standardized constants for background tasks. (v8.8.27).
+## 118. FIXED Scheduling Centralization - Resolution: Standardized `DAILY_CLEANUP_HOUR` and `DAILY_ARCHIVE_HOUR` in `EngineConstants.kt` and updated `HistoryManager.kt`, `Constants.kt`, and `REQUIREMENTS_SOT.md`. Eliminated hardcoded duplicates across the system. (v8.8.29).
+## 119. FIXED R915: Map Settings Responsiveness - Resolution: Hardened `MapSettingsToggle` in `MapComponents.kt` with a semi-opaque background and explicit touch-target sizing to ensure reliable response over AndroidViews. (v8.8.29).
+## 120. FIXED R868: Unified maxAccuracy Layout - Resolution: Updated `StatusBar` and `StatusRowData` in `SharedUiComponents.kt` to pass and display `maxAccuracy` for both roles, ensuring forensic parity in the status card. (v8.8.29).
+## 121. FIXED R872: Tracker Mode Alert Suppression - Resolution: Updated `BehaviorUseCase.kt` to explicitly return `false` for `redScreenVisible` when the app is in Tracker mode, preventing local visual alerts while maintaining remote reporting. (v8.8.30).
+## 122. FIXED R935: App Icon Branding - Resolution: Updated `ic_jd_logo.xml` to use the deer-only branding (no text) for the app icon foreground. (v8.8.30).
+## 123. FIXED Identity Hardening (v8.8.30) - Resolution: Updated identity branding and versioning baseline. (v8.8.30).
+## 124. FIXED GPS Revival Escalation (v8.8.31) - Resolution: Implemented a 5-minute retry loop (`GPS_REVIVAL_RETRY_INTERVAL_MS`) and forensic escalation in `TrackerService.kt`. After 3 failed revival attempts, a CRITICAL forensic log is emitted to signal a hard hardware lock or relocation requirement. (v8.8.31).
+## 125. FIXED Monotonic UI Throttling (v8.8.31) - Resolution: Migrated `MainViewModel` and `BehaviorUseCase` to use `elapsedRealtime` for the `ALARM_OVERLAY_THROTTLE_MS` logic. This ensures UI alert lockout stability even during system wall-clock jumps. (v8.8.31).
+## 126. FIXED Forensic Model Alignment - Resolution: Corrected field name desync in `RemoteHandler.kt` for `isCoolingModeActive` and `isBatterySteepDischarge` to align with `:app` models and `:core:engine` definitions. (v8.8.31).
+## 127. FIXED Handshaking Visual Fidelity - Resolution: Implemented a stylized, matrix-style pulsing wait state (`>>> WAITING FOR TELEMETRY <<<`) in `SharedUiComponents.kt` to provide clear feedback during the initial relay connection phase. (v8.8.31).
+## 128. FIXED Forensic Identity Propagation - Resolution: Verified and hardened identity propagation across the entire telemetry pipeline. Every `ProcessedLocation` and `SyncManager` payload is now explicitly tagged with the engine identity version. (v8.8.31).
+## 129. FIXED Stress Test Purge - Resolution: Conducted a forensic sweep of the codebase and successfully removed all legacy stress-test modules and high-frequency simulation flags, ensuring a production-clean baseline. (v8.8.31).
+## 130. FIXED Forensic Verification Suite - Resolution: Implemented `ForensicIdentityTest.kt` to verify propagation and coordinate tagging in both valid and jump scenarios, ensuring no forensic data leaks during engine processing. (v8.8.31).
+## 131. FIXED Forensic Key Standardization (snake_case) - Resolution: Standardized all signaling and telemetry JSON keys to snake_case (viewer_id, from_viewer, is_charging) across SyncManager and RemoteHandler to ensure Relay-side audit compatibility. (v8.8.31).
+## 132. FIXED Continuity Audit & Backfill Verification - Resolution: Implemented 1Hz continuity auditing in HistoryManager.kt. The system now emits periodic forensic logs to verify backfill performance and telemetry resolution during idle/active transitions. (v8.8.31).
+## 149. FIXED Missing Jump Markers (Forensic Parity) - Resolution: Achieved symbol parity for forensic markers (Magenta Squares for Jumps, Red Circles for Out-of-Range). Updated `ViewerService.kt` to explicitly detect `remoteHandler.isTrackerVisualJump` and record it via `ServiceForensicUseCase`, ensuring Tracker-calculated jump points persist to the Viewer's local map. Confirmed UI filtering in `MapComponents.kt` via the JUMP/OUT overlay buttons. (v8.8.32).
+## 150. FIXED Architectural Alignment (Standardized Alert IDs) - Resolution: Replaced literal strings (e.g., \"VISUAL_JUMP\") with centralized `ALERT_ID_VISUAL_JUMP` constant in `EngineConstants.kt` and updated all consumption points in `TrackerService.kt`, `ViewerService.kt`, and `MapComponents.kt`. (v8.8.32).
+## 136. FIXED AppSettings Persistence Gap - Resolution: Updated `app_settings.proto`'s `TrackerStatusProto` to include missing forensic fields: `is_cooling_mode_active` and `is_storage_critical`. (v8.8.33).
+## 137. FIXED SettingsRepository Alignment - Resolution: Updated `saveTrackerState` and `loadTrackerState` in `SettingsRepository.kt` to persist `isCoolingModeActive` and `isStorageCritical` flags. (v8.8.33).
+## 138. FIXED SyncManager Historical Depth Gap - Resolution: Updated `flushPendingUpdates` in `SyncManager.kt` to include missing forensic fields in the JSON payload (cooling, storage, power, SIT metrics). (v8.8.33).
+## 139. FIXED Database Forensic Depth Gap - Resolution: Expanded `Database.kt` (PendingStatusEntity) to include full forensic fields (sit_baro, sit_tilt, sit_shock, is_storage_critical, etc.). (v8.8.33).
+## 140. FIXED HistoryManager Version Tagging Bug - Resolution: Modified `updateRibbons` and `backfillGaps` in `HistoryManager.kt` to support version-aware tagging, and updated `ViewerService.kt` to pass the peer's version string, ensuring Viewers correctly tag peer forensic ribbons with the Tracker's engine version. (v8.8.33).
+## 141. FIXED Engineering Constants Typo - Resolution: Corrected `MAX_HISTORY_POINTS_PER_RIBBES` to `MAX_HISTORY_POINTS_PER_RIBBONS` in `Constants.kt`. (v8.8.33).
+## 142. FIXED SIT Forensic Depth Gap in History - Resolution: Updated `HistoryEntity` and `EngineConnectionPoint` to include `sit_baro`, `sit_tilt`, and `sit_shock` for high-fidelity chair event reconstruction. (v8.8.33).
+## 143. FIXED SyncManager Historical Version Bug - Resolution: Updated `SyncManager.kt` to use `entity.ver` for recovered telemetry, ensuring it is tagged with the version that actually processed it. (v8.8.33).
+## 144. FIXED MainViewModel Logic Duplication - Resolution: Centralized location validation by removing local `isValidLocation` in `MainViewModel.kt` and using `PhysicsUtils.isValidLocation`. (v8.8.33).
+## 145. FIXED Hardcoded Point Count - Resolution: Replaced hardcoded `240f` in `SharedUiComponents.kt` with the standardized `MAX_HISTORY_POINTS_PER_RIBBONS` constant. (v8.8.33).
+## 151. FIXED Model Synchronization - Resolution: Aligned `:app:Models.kt` and `:core:engine:EngineModels.kt` to ensure zero-loss forensic propagation across the module boundary. (v8.8.33).
+## 152. FIXED Missing Database Migrations (v31) - Resolution: Implemented `MIGRATION_29_30` and `MIGRATION_30_31` in `Database.kt` and registered them in `AppModule.kt`. Corrected schema expansion for forensic depth (SIT metrics, storage flags, and version tagging). (v8.8.33).
+## 153. FIXED Compilation Errors (Forensic Expansion) - Resolution: Resolved build failures by adding `ver` field to `ConnectionPoint` and `IntegrityState` models, and removing the deprecated `providedVid` parameter in `RemoteHandler.kt`. (v8.8.33).
+## 154. FIXED Forensic Documentation Debt - Resolution: Replaced all legacy `vid` references with `ver` in `ALARM_AND_SIREN_MECHANISM.md` and `LOCATION_SENTINEL_SPEC.md` to align documentation with the new forensic standard. (v8.8.33).
+## 155. FIXED Build Failure: Unfinished Forensic Simplification - Resolution: Resolved multiple compilation errors in `SyncManager`, `TelemetryUseCase`, and `TelemetryMerger` by removing stale `ver` field references and parameters following the v8.8.34 Forensic Simplification. Verified with a full clean build. (v8.8.34).
+## 158. FIXED Database Schema \"Dead Weight\" - Resolution: Cleaned up the SQLite schema in v33 by migrating to a ver-less structure, removing 'vid' and 'ver' columns from all tables. (v8.8.35).
+## 159. FIXED Database Schema Cleanup (Future) - Resolution: Implemented Room migration (v33) to remove 'ver' and 'vid' columns from all SQLite tables, ensuring a production-clean schema baseline. (v8.8.35).
+## 156. FIXED Global Version Desync (v8.8.32 vs v8.8.35) - Resolution: Synchronized all version strings to v8.8.35 baseline across all documentation, build scripts, and source headers.
+## 157. FIXED Forensic Documentation Mismatch - Resolution: Updated core documentation (SOT, Alarms, Sentinel) to reflect the simplified forensic model, removing requirements for legacy 'ver' and 'vid' tags in data models while preserving emission-layer traceability.
+## 135. FIXED Relay Audit Verification - Resolution: Enhanced `CommunicationManager.kt` to send an enriched `join` payload (id, role, ver) and updated `relay-server/index.js` (v6.042) to extract and log these fields for forensic auditability.
+## 146. FIXED Startup Performance (Skipped Frames) - Resolution: Optimized application startup by moving `OsmConfig` initialization to a background thread in `GpsApplication.kt` and implementing staggered initialization in `MainViewModel.kt` to prevent CPU/IO contention on the Main thread.
+## 147. FIXED Compose SnapshotStateList Warnings - Resolution: Migrated marker and polyline pools to SnapshotStateList in MapComponents.kt to resolve lock verification warnings (v8.8.35).
+## 160. FIXED Xiaomi Gating Logic Error - Resolution: Decoupled `isAutostartBlocked` from `xiaomiStatus` in `MainAlarmLogic.kt`, ensuring Autostart restrictions are correctly detected even when special MIUI permissions are granted. (v8.8.35).
+## 163. FIXED Power Tamper Regression - Resolution: Reconnected battery/power callbacks to `IntegrityMonitor` in `TrackerService`. Hardened power detection in `IntegrityMonitor.pollSystemStatus` using `EXTRA_PLUGGED` to supplement broadcast receivers. Integrated `onViolationSustained` for Thermal, Battery Health, and Storage alerts. (v8.8.35).
+## 148. FIXED GPS Polling Stabilization (A15) - Resolution: Implemented `A15_STABLE_GPS_POLLING_MS` (1000ms) and updated `ServiceBehaviorUseCase.kt` to enforce this interval for A15 devices. This ensures long-term background stability by preventing the hardware from entering aggressive power-save modes. (v8.8.35).
+## 161. FIXED Viewer Alarm Title Confusion - Resolution: Updated local system alert titles to \"This device:\" in `EngineConstants.kt` and refined `getTrackerTitle` in `MainAlarmLogic.kt` to strip prefixes only in Tracker mode, ensuring clear attribution on the Viewer. (v8.8.35).
+## 162. FIXED Constant Redundancy - Resolution: Removed duplicated scheduling (DAILY_CLEANUP_HOUR, DAILY_ARCHIVE_HOUR) and RTT constants (MAX_ALLOWED_RTT_MS, COMM_RTT_FLOOR_MS, COMM_RTT_SCALING_FACTOR) from Constants.kt and ensured EngineConstants.kt is the exclusive source. (v8.8.35).
+## 164. FIXED Telemetry Validation Parity - Resolution: Standardized TelemetryUseCase.kt to use PhysicsUtils.isValidLocation. (v8.8.35).
+## 165. FIXED Code Redundancy in Utils.kt - Resolution: Migrated pure logic (`calculateDistance`, `isValidLocation`, `formatDuration`, etc.) to `:core:engine` (PhysicsUtils, FormatterUtils) and removed redundant delegations in `Utils.kt`. (v8.8.36).
+## 166. FIXED Build Integrity & Lint - Resolution: Verified build stability and architectural alignment following modularization. SnapshotStateList and \"skipped frames\" optimizations confirmed stable in v8.8.36.
+## 167. FIXED Documentation Debt (SoT) - Resolution: Updated `REQUIREMENTS_SOT.md` and `DEVICE_SPECIFIC_ADAPTATIONS.md` to include Samsung A15 polling and power-tamper specifications. (v8.8.36).
+## 174. FIXED R867: Default Identity Verification - Resolution: Updated `SettingsRepository.kt` to set `DEFAULT_TRACKER_ID` to \"Ttk\" and `DEFAULT_VIEWER_ID` to \"Cohen\".
+## 175. FIXED R917: Version Update Smoothness - Resolution: Verified that the `MY_PACKAGE_REPLACED` intent filter in `AndroidManifest.xml` and its handling in `BootReceiver.kt` correctly restarts background services after an app update.
+## 176. FIXED R941: Statistics Persistence Verification - Resolution: Confirmed that ribbons and all other statistics are accumulated and persisted across app restarts and updates using Room and DataStore, with service continuity guaranteed by `BootReceiver`.
+## 169. FIXED Version Header Desync - Resolution: Synchronized source headers in TrackerService.kt and ViewerService.kt with the v8.8.36 baseline to maintain audit integrity.
+## 170. FIXED Xiaomi Alert Guard - Resolution: Added an explicit `isXiaomiDevice()` check in `MainAlarmLogic.kt` before evaluating `ALERT_ID_XIAOMI_SYSTEM_MISSING` to prevent false positives on non-Xiaomi hardware. (v8.8.36).
+## 171. FIXED GPS Transition Log Muzzle - Resolution: Implemented a 30s temporal muzzle (`GPS_TRANSITION_LOG_MUZZLE_MS`) for \"GPS TRANSITION\" forensic logs to prevent event flooding during high-frequency state changes. (v8.8.36).
+## 172. FIXED Xiaomi False Positives on Non-Xiaomi - Resolution: Added `isXiaomiDevice` flag to `AlarmEvaluationState` and updated `MainAlarmLogic.kt` to gate `ALERT_ID_XIAOMI_SYSTEM_MISSING` violations, ensuring they only occur on Xiaomi hardware. (v8.8.36).
+## 173. FIXED Tracker-Side SIT Marker Persistence - Resolution: Ensured `ALERT_ID_TRACKER_CHAIR` is passed to `forensicUseCase.recordViolationMarkers` in `TrackerService.kt` to ensure discrete SIT events are recorded to the local forensic database. (v8.8.36).
+## 168. FIXED Xiaomi 10Hz Stability Preparation - Resolution: Implemented a GPS Stability Audit suite in `TrackerService.kt`. The system now tracks fix counts and inter-fix gaps, emitting periodic reliability metrics and forensic gap alerts during 10Hz polling to enable data-driven background persistence verification. (v8.8.36).
+## 177. FIXED SyncManager Dead Code - Resolution: Removed `SyncManager.broadcastIntegrityUpdate` and `SyncManager.pushStatusUpdateOnly` as they were orphaned following modularization. (v8.8.37).
+## 178. FIXED Forensic Parity: verticalVelocity Alignment - Resolution: Implemented full forensic parity for `verticalVelocity` across `EngineConnectionPoint`, `HistoryEntity`, `ConnectionPoint`, and analytical ribbons. Verified and hardened Migration v33 to initialize historical `verticalVelocity` to 0. (v8.8.37).
+## 179. FIXED RemoteHandler SIT Mapping Audit - Resolution: Verified and confirmed 100% field parity for SIT forensics in `RemoteHandler.init` and `handleRemoteUpdate`, ensuring Tracker-side chair events are correctly reconstructed in Viewer mode. (v8.8.37).
+
+## 133. OPEN (Rank: 8) Xiaomi Background Stability Test - Task: Verify 10Hz polling (HIGH_FREQUENCY_GPS_POLLING_MS) and isXiaomiAutostartGranted effectiveness on a physical Xiaomi device to ensure background persistence.

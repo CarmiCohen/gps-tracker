@@ -1,28 +1,25 @@
-# Map, Trails, & Geofencing Mechanism (v8.8.35)
+# Map, Trails, & Geofencing Mechanism (v8.9.10)
 
-This document describes the mapping engine, historical trail persistence, and the geofencing logic used for theft detection.
+This document describes the mapping engine, historical trail persistence, and geofence enforcement logic.
 
-## 1. Map Engine & Visuals
-- **Provider**: OpenStreetMap (osmdroid).
-- **Trail Persistence**: Historical paths are stored in the database. Every point is tagged with role.
-- **Visual Pen Lift**: Encountering a Tier 1 or Tier 2 Jump Point immediately breaks the trail line on the map.
-- **Marker Pruning**: Visual markers are pruned when the pool exceeds 50 (`MARKER_POOL_PRUNE_THRESHOLD`) to maintain performance.
+## 1. Map Engine (osmdroid)
+The application uses **osmdroid** for offline-capable map rendering. 
+- **Marker Pooling**: Uses a `SnapshotStateList` to manage markers efficiently within Compose.
+- **Pruning**: Polylines and markers are pruned after 1000 points or 50 violation markers (`MARKER_POOL_PRUNE_THRESHOLD`) to maintain UI performance.
 
-## 2. Geofence Logic
-- **Origin**: The system uses "Home Points" as geofence centers.
-- **Dynamic Gate**: `radius + (accuracy * GEOFENCE_BUFFER_MULT * GEOFENCE_ACCURACY_EXPANSION_MULT)`.
-- **Hysteresis**: A 5.0m buffer (`GEOFENCE_HYSTERESIS_METERS`) prevents siren flickering at the boundary.
-- **Accuracy Recovery**: Uses a 4-bucket sliding window. Spikes expire gradually, enabling faster recovery after interference.
+## 2. Trail Persistence
+Historical movement is visualized as a "Blue Trail."
+- **Data Source**: `TrailEntity` in SQLite.
+- **Fidelity**: Supports both real-time and recovered points from offline backfill.
+- **Jump Visualization**: Rejected points are shown as **Magenta Squares** (Jumps) or **Red Circles** (Out-of-Range).
 
-## 3. Jump Validation & Rejection
-- **Security Hold**: Tier 1 and 2 jumps trigger a 180s delay before geofence violations are permitted.
-- **Trajectory Promotion**: Consistent movement (> 2.0 m/s for > 30s) bypasses the Jump Hold for immediate alerting.
-- **Moving Hold**: A 60s anti-flapping hold is applied when transitioning from stationary to moving states.
+## 3. Geofencing (GtoEngine)
+The system enforces a safety radius around user-defined "Home Points."
+- **Dynamic Buffer**: Uses a 6-sigma buffer based on `maxAccuracy` to prevent false alarms from signal jitter.
+- **Predictive Breach**: Calculates the time-to-exit based on current velocity. Triggers alarms 2.0s before the physical breach occurs.
+- **Log Spatial Anchor (v8.9.10)**: Geofence violations are geographically anchored. The red marker on the map now accurately reflects where the violation was *calculated*, even if the machine is already moving further away.
 
-## 4. Predictive Geofence
-- **Look-ahead**: Projects the position 2.0s into the future (`GEOFENCE_PREDICTIVE_LOOKAHEAD_S`).
-- **Trigger**: Alarms if the projected point is outside the fence, provided the current trajectory is stable.
-- **Min Speed**: Predictive markers are only generated if speed > 1.0 m/s.
-
-## 5. Implementation Status
-In v8.8.35, all geofence and jump rejection logic is strictly isolated within the `:core:engine` module. All forensic markers and timing calculations (Issue 125) utilize monotonic time (`elapsedRealtime`) to ensure security audit trail integrity regardless of system clock changes. Legacy `ver` and `vid` tags have been removed in favor of a simplified forensic model.
+## 4. Forensic Integration
+- **SIT Markers**: Mechanical sitting events are reconstructed on the map from synchronized logs.
+- **Ghost Mode**: Markers and trails dim (Slate500) if the telemetry is older than 10s.
+- **Role Identity**: Every trail point and violation is tagged with the source role.
