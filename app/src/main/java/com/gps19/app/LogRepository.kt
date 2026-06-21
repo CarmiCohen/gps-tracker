@@ -15,6 +15,8 @@ import kotlin.math.abs
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * v8.9.11:
+ * - Issue #212: Added accuracy mapping for forensic parity in historical recovery.
  * v8.9.10:
  * - Issue 209: Added lat/lng mapping for historical forensic marker reconstruction.
  * v8.9.7:
@@ -51,7 +53,8 @@ class LogRepository @Inject constructor(
                 firstSeenTs = it.firstSeenTs,
                 role = it.role,
                 lat = it.lat,
-                lng = it.lng
+                lng = it.lng,
+                accuracy = it.accuracy
             ) 
         }
     }
@@ -80,7 +83,8 @@ class LogRepository @Inject constructor(
                             role = entry.role,
                             synced = initiallySynced, // Update sync status if requested
                             lat = entry.lat,
-                            lng = entry.lng
+                            lng = entry.lng,
+                            accuracy = entry.accuracy
                         ))
                         return@withLock
                     }
@@ -107,7 +111,8 @@ class LogRepository @Inject constructor(
                                 message = entry.message,
                                 synced = initiallySynced, // Reset/update sync status on merge
                                 lat = entry.lat,
-                                lng = entry.lng
+                                lng = entry.lng,
+                                accuracy = entry.accuracy
                             ))
                             return@withLock
                         }
@@ -130,7 +135,8 @@ class LogRepository @Inject constructor(
                         role = entry.role,
                         synced = initiallySynced,
                         lat = entry.lat,
-                        lng = entry.lng
+                        lng = entry.lng,
+                        accuracy = entry.accuracy
                     ))
                     
                     logWriteCount++
@@ -153,7 +159,7 @@ class LogRepository @Inject constructor(
             isImportant = it.isImportant, id = it.deviceId, viewerId = it.viewerId, count = it.count,
             extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial,
             specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
-            lat = it.lat, lng = it.lng
+            lat = it.lat, lng = it.lng, accuracy = it.accuracy
         )
     }
 
@@ -196,7 +202,8 @@ class LogRepository @Inject constructor(
             firstSeenTs = it.firstSeenTs,
             role = it.role,
             lat = it.lat,
-            lng = it.lng
+            lng = it.lng,
+            accuracy = it.accuracy
         ) 
     }
 }

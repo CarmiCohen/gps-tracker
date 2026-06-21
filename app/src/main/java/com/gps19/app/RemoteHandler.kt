@@ -15,15 +15,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v8.9.13:
+ * - Issue #212: Finalized accuracy-aware forensic recovery logic.
+ * v8.9.11:
+ * - Issue #212: Prioritized accuracy from LogEntry in forensic marker reconstruction.
  * v8.9.10:
  * - Issue 209: Fixed inaccurate SIT marker placement by using historical coordinates from recovered logs.
- * v8.9.7:
- * - Issue 194: Added handleRemoteLog to reconstruct forensic markers from synced SIT events.
- * - Issue 194: Injected ServiceForensicUseCase for immediate marker reconstruction on recovered logs.
- * v8.9.6:
- * - Issue 194: Implemented rising-edge detection for isTrackerSitDetected to support transmission latching without log duplication.
- * v8.9.5:
- * - Issue 192: Fixed persistence gap for currentMa in TrackerStatus.
  */
 class RemoteHandler(
     private val context: Context,
@@ -245,6 +242,7 @@ class RemoteHandler(
      * Issue 194: Reconstructs forensic state from incoming remote logs.
      * Ensures that recovered "Sit Detected" events trigger the same map markers as real-time flags.
      * Modified in v8.9.10: Issue 209: Using historical coordinates from LogEntry for accurate recovery.
+     * Modified in v8.9.13: Issue #212: Finalized accuracy prioritization from LogEntry.
      */
     fun handleRemoteLog(entry: LogEntry) {
         if (entry.message.contains("Sit Detected", ignoreCase = true)) {
@@ -255,13 +253,16 @@ class RemoteHandler(
                 // Issue 209: Immediate forensic marker placement using historical coordinates
                 val effectiveLat = if (entry.lat != 0.0) entry.lat else trackerLat
                 val effectiveLng = if (entry.lng != 0.0) entry.lng else trackerLng
+                
+                // Issue #212: Use log-specific accuracy if available
+                val effectiveAccuracy = if (entry.accuracy > 0f) entry.accuracy.toDouble() else trackerMaxAccuracy.toDouble()
 
                 if (effectiveLat != 0.0 && effectiveLng != 0.0) {
                     forensicUseCase.recordViolationMarkers(
                         now = entry.timestamp,
                         lat = effectiveLat,
                         lng = effectiveLng,
-                        accuracy = trackerMaxAccuracy.toDouble(),
+                        accuracy = effectiveAccuracy,
                         activeViolations = setOf(ALERT_ID_TRACKER_CHAIR),
                         unresolvedAlarms = emptySet()
                     )

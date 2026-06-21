@@ -185,7 +185,7 @@ class LocationProcessor(
         if (lastTs > 0 && effectiveTs < lastTs) {
             val delta = lastTs - effectiveTs
             if (delta > CLOCK_REGRESSION_GATE_MS) { 
-                listener.onLogAdded("Merge-on-Stale: Coordinate update bypassed due to hardware clock regression (${delta}ms). Merging status-only data.", "system", false, true)
+                listener.onLogAdded("Merge-on-Stale: Coordinate update bypassed due to hardware clock regression (${delta}ms). Merging status-only data.", "system", false, true, if (lastLat != 0.0) lastLat else lat, if (lastLng != 0.0) lastLng else lng, accuracy)
                 if (delta > 86400000L) { lastTs = 0L; sentinel.reset() }
             }
             val status = when {
@@ -313,7 +313,7 @@ class LocationProcessor(
 
 interface LocationProcessorListener {
     fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long)
-    fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean)
+    fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Float)
     fun onMaxAccuracyChanged(accuracy: Float)
     fun onChairBaselineChanged(baseline: Float)
     fun onGpsStallDetected(ts: Long)

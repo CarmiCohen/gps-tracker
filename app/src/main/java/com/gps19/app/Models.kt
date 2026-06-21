@@ -9,6 +9,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v8.9.11:
+ * - Issue #212: Added accuracy to LogEntry for forensic parity in historical recovery.
  * v8.9.10:
  * - Issue 209: Added lat/lng to LogEntry for historical forensic marker reconstruction.
  * v8.9.7:
@@ -106,7 +108,8 @@ data class LogEntry(
     val firstSeenTs: Long = 0L,
     val role: String = "tracker",
     val lat: Double = 0.0,
-    val lng: Double = 0.0
+    val lng: Double = 0.0,
+    val accuracy: Float = 0f
 ) {
     fun toJSONObject(): JSONObject {
         return JSONObject().apply {
@@ -120,6 +123,7 @@ data class LogEntry(
             put("role", role)
             if (lat != 0.0) put("lat", lat)
             if (lng != 0.0) put("lng", lng)
+            if (accuracy != 0f) put("accuracy", accuracy)
             specialColor?.let { put("special_color", it) }
             extremeValue?.let { if (!it.isNaN() && !it.isInfinite()) put("extreme_value", it) }
         }
@@ -149,7 +153,8 @@ data class LogEntry(
                     if (ev.isNaN() || ev.isInfinite()) null else ev
                 } else null,
                 lat = obj.optDouble("lat", 0.0),
-                lng = obj.optDouble("lng", 0.0)
+                lng = obj.optDouble("lng", 0.0),
+                accuracy = obj.optDouble("accuracy", 0.0).toFloat()
             )
         }
     }

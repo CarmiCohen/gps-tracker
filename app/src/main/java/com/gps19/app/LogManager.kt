@@ -8,11 +8,10 @@ import java.util.UUID
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
- * v8.9.10:
- * - Issue 208: Implemented coordinate auto-population. Logs now fallback to the last known 
- *   telemetry position if not explicitly provided, ensuring all events are spatially anchored.
- * v8.9.9:
- * - Issue 208: Fixed Duplicate Log Sync. Logs emitted in real-time are now marked as 'synced'.
+ * v8.9.14:
+ * - Issue #212: Hardened accuracy fallback logic in submitToLogSink to ensure consistency.
+ * v8.9.12:
+ * - Issue #210: Standardized logServiceEvent by removing redundant coordinate parameters.
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -38,7 +37,8 @@ class LogManager @Inject constructor(
         isSpecial: Boolean = false,
         specialColor: Int? = null,
         lat: Double = 0.0,
-        lng: Double = 0.0
+        lng: Double = 0.0,
+        accuracy: Float = 0f
     ) {
         val now = timeProvider.currentTimeMillis()
         val integrity = telemetry.integrityState.value
@@ -54,19 +54,35 @@ class LogManager @Inject constructor(
             return
         }
 
-        // Issue 208: Auto-anchor logs to the last known location if not provided
+        // Issue 208/210/212: Auto-anchor logs to the last known location if not provided
         var finalLat = lat
         var finalLng = lng
+        var finalAccuracy = accuracy
+        
         if (finalLat == 0.0 && finalLng == 0.0) {
-            val lastLoc = if (configManager.isTrackerMode) {
-                telemetry.localLocation.value
+            val local = telemetry.localLocation.value
+            val tracker = telemetry.trackerLocation.value
+            
+            val fallback = if (configManager.isTrackerMode) {
+                if (local.lat != 0.0) local else tracker
             } else {
-                telemetry.trackerLocation.value
+                if (tracker.lat != 0.0) tracker else local
             }
-            if (lastLoc.lat != 0.0 && lastLoc.lng != 0.0) {
-                finalLat = lastLoc.lat
-                finalLng = lastLoc.lng
+            
+            if (fallback.lat != 0.0 && fallback.lng != 0.0) {
+                finalLat = fallback.lat
+                finalLng = fallback.lng
+                if (finalAccuracy == 0f) {
+                    finalAccuracy = if (fallback.accuracy > 0f) fallback.accuracy else fallback.maxAccuracy
+                }
             }
+        } else if (finalAccuracy == 0f) {
+            // Coordinate provided but accuracy missing - attempt telemetry lookup
+            val local = telemetry.localLocation.value
+            val tracker = telemetry.trackerLocation.value
+            val fallback = if (configManager.isTrackerMode) local else tracker
+            if (fallback.accuracy > 0f) finalAccuracy = fallback.accuracy
+            else if (fallback.maxAccuracy > 0f) finalAccuracy = fallback.maxAccuracy
         }
 
         val log = LogEntry(
@@ -83,7 +99,8 @@ class LogManager @Inject constructor(
             specialColor = specialColor,
             role = if (configManager.isTrackerMode) "tracker" else "viewer",
             lat = finalLat,
-            lng = finalLng
+            lng = finalLng,
+            accuracy = finalAccuracy
         )
         
         val net = networkManager.get()
@@ -100,8 +117,16 @@ class LogManager @Inject constructor(
         logRepository.addLog(log, initiallySynced = isConnected)
     }
 
-    fun logServiceEvent(m: String, important: Boolean = true, isSpecial: Boolean = false, specialColor: Int? = null, lat: Double = 0.0, lng: Double = 0.0) {
-        submitToLogSink(m, "system", important, isSpecial = isSpecial, specialColor = specialColor, lat = lat, lng = lng)
+    fun logServiceEvent(
+        m: String, 
+        important: Boolean = true, 
+        isSpecial: Boolean = false, 
+        specialColor: Int? = null,
+        lat: Double = 0.0,
+        lng: Double = 0.0,
+        accuracy: Float = 0f
+    ) {
+        submitToLogSink(m, "system", important, isSpecial = isSpecial, specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy)
     }
 
     suspend fun getUnsyncedLogs(limit: Int) = logRepository.getUnsyncedLogs(limit)

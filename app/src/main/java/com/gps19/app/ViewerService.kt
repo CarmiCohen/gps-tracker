@@ -18,11 +18,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * v8.9.10:
- * - Issue 208: Updated forensic log emissions to propagate spatial coordinates.
- * v8.9.7:
- * - Issue 194: Finalized marker reconstruction by passing forensicUseCase to RemoteHandler.
- * - Issue 194: Updated network callback to handle "remote_log" for forensic SIT reconstruction.
+ * v8.9.12:
+ * - Issue #210: Simplified log emissions by removing redundant coordinate parameters 
+ *   in AppAlarmManager callback. LogManager now handles spatial anchoring via auto-anchor fallback.
+ * - Issue #209: Standardized LocationProcessorListener to use engine-provided coordinates.
+ * v8.9.11:
+ * - Issue #212: Expanded LogEntity and LogEntry for accuracy propagation.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -55,19 +56,16 @@ class ViewerService : BaseMonitorService() {
         override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long) {
             repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp)
         }
-        override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean) {
+        override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Float) {
             val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
-            val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
-            val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
-            logManager.logServiceEvent(message, isImportant, isSpecial = isSpecial || message.contains("Merge-on-Stale"), specialColor = specialColor, lat = lat, lng = lng)
+            // Issue #209: Explicitly use coordinates from engine
+            logManager.logServiceEvent(message, isImportant, isSpecial = isSpecial || message.contains("Merge-on-Stale"), specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy)
         }
         override fun onMaxAccuracyChanged(accuracy: Float) {
             repository.saveFloatSync(MainRepository.MAX_ACCURACY_KEY, accuracy)
         }
         override fun onChairBaselineChanged(baseline: Float) {
-            val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
-            val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
-            logManager.logServiceEvent("Tracker: Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°", lat = lat, lng = lng)
+            logManager.logServiceEvent("Tracker: Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°")
         }
         override fun onGpsStallDetected(ts: Long) {
             // Tracker-side stall tracking handled via RemoteHandler updates
@@ -86,14 +84,13 @@ class ViewerService : BaseMonitorService() {
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, DEFAULT_RELAY_URL)
             configManager.isTrackerMode = false
 
-            alarmManager = AppAlarmManager(this@ViewerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng -> 
-                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng)
+            // Issue #210: Standardized log callback relying on auto-anchor fallback
+            alarmManager = AppAlarmManager(this@ViewerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color -> 
+                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color)
             }
 
             integrityMonitor = IntegrityMonitor(this@ViewerService, repository, timeProvider, onViolationSustained = { }, onLogEvent = { msg, important ->
-                val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
-                val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
-                logManager.logServiceEvent(msg, important, lat = lat, lng = lng)
+                logManager.logServiceEvent(msg, important)
             })
             
             locationProcessor = LocationProcessor(localProcessorListener, timeProvider)
@@ -115,9 +112,7 @@ class ViewerService : BaseMonitorService() {
             remoteHandler = RemoteHandler(this@ViewerService, repository, locationProcessor, alarmManager, sessionManager, forensicUseCase, timeProvider, lifecycleScope) { id -> handleTrackerPulse(id) }
 
             historyManager = HistoryManager(this@ViewerService, repository, gpsManager, null, locationProcessor, timeProvider, lifecycleScope) { msg, important -> 
-                val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
-                val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
-                logManager.logServiceEvent(msg, important, lat = lat, lng = lng) 
+                logManager.logServiceEvent(msg, important) 
             }
 
             commandRouter = CommandRouter(
@@ -229,9 +224,7 @@ class ViewerService : BaseMonitorService() {
             lifecycleScope.launch { repository.saveString(MainRepository.TRACKER_ID_KEY, id) } 
         }
         if (sessionManager.onTrackerPulse(id, timeProvider.currentTimeMillis(), false)) {
-            val lat = lastProcessedLocation?.optimizedPoint?.lat ?: 0.0
-            val lng = lastProcessedLocation?.optimizedPoint?.lng ?: 0.0
-            logManager.logServiceEvent("Tracker connected: $id", lat = lat, lng = lng)
+            logManager.logServiceEvent("Tracker connected: $id")
             startTickLoop()
         }
     }

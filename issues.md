@@ -98,7 +98,7 @@
 ## 117. FIXED Barometer Zeroing Drift - Resolution: Increased `BARO_ZEROING_INTERVAL_MS` to 10 minutes. (v8.8.25).
 ## 118. FIXED Timing & Forensic Stability - Resolution: Standardized on monotonic time (`TimeProvider.elapsedRealtime()`). (v8.8.22).
 ## 119. FIXED OEM Restriction Verification - Resolution: Integrated Xiaomi Autostart detection and enabled 10Hz polling. (v8.8.22).
-## 120. FIXED Muzzle Window & Forensic Audit - Resolution: Implemented a 500ms "Muzzle Window" during sync I/O. (v8.8.22).
+## 120. FIXED Muzzle Window & Forensic Audit - Resolution: Implemented a 500ms \"Muzzle Window\" during sync I/O. (v8.8.22).
 ## 121. FIXED LED Logic DecouPLING - Resolution: Fixed status LEDs on the Tracker side. (v8.8.31).
 ## 122. FIXED App Icon Foreground Branding - Resolution: Updated `ic_jd_logo.xml` to use the deer-only branding. (v8.8.30).
 ## 123. FIXED Identity Hardening - Resolution: Updated identity branding and versioning baseline. (v8.8.30).
@@ -135,10 +135,10 @@
 ## 155. FIXED Build Failure: Unfinished Forensic Simplification - Resolution: Resolved compilation errors. (v8.8.34).
 ## 156. FIXED Global Version Desync - Resolution: Synchronized all version strings to v8.8.35.
 ## 157. FIXED Forensic Documentation Mismatch - Resolution: Updated core documentation to reflect simplified forensic model.
-## 158. FIXED Database Schema "Dead Weight" - Resolution: Migrated to a ver-less structure in v33. (v8.8.35).
+## 158. FIXED Database Schema \"Dead Weight\" - Resolution: Migrated to a ver-less structure in v33. (v8.8.35).
 ## 159. FIXED Database Schema Cleanup (Future) - Resolution: Removed 'ver' and 'vid' columns via Room Migration v33. (v8.8.35).
 ## 160. FIXED Xiaomi Gating Logic Error - Resolution: Decoupled autostart from xiaomiStatus. (v8.8.35).
-## 161. FIXED Viewer Alarm Title Confusion - Resolution: Updated titles to "This device:". (v8.8.35).
+## 161. FIXED Viewer Alarm Title Confusion - Resolution: Updated titles to \"This device:\". (v8.8.35).
 ## 162. FIXED Constant Redundancy - Resolution: Removed duplicated constants. (v8.8.35).
 ## 163. FIXED Power Tamper Regression - Resolution: Reconnected battery/power callbacks to `IntegrityMonitor`. (v8.8.35).
 ## 164. FIXED Telemetry Validation Parity - Resolution: Standardized on `PhysicsUtils.isValidLocation`. (v8.8.35).
@@ -151,7 +151,7 @@
 ## 171. FIXED GPS Transition Log Muzzle - Resolution: Implemented 30s temporal muzzle for logs. (v8.8.36).
 ## 172. FIXED Xiaomi False Positives on Non-Xiaomi - Resolution: Added `isXiaomiDevice` flag to Evaluation state. (v8.8.36).
 ## 173. FIXED Tracker-Side SIT Marker Persistence - Resolution: Reconnected SIT events to local forensics. (v8.8.36).
-## 174. FIXED R867: Default Identity Verification - Resolution: Updated default IDs to "Ttk" and "Cohen". (v8.8.36).
+## 174. FIXED R867: Default Identity Verification - Resolution: Updated default IDs to \"Ttk\" and \"Cohen\". (v8.8.36).
 ## 175. FIXED R917: Version Update Smoothness - Resolution: Verified `MY_PACKAGE_REPLACED` handling. (v8.8.36).
 ## 176. FIXED R941: Statistics Persistence Verification - Resolution: Confirmed statistics accumulation across restarts. (v8.8.36).
 ## 177. FIXED Dead Code Cleanup - Resolution: Removed redundant telemetry methods. (v8.8.37).
@@ -167,13 +167,13 @@
 ## 187. FIXED Viewer-Side LocationProcessor State Persistence - Resolution: Updated ViewerService to load maxAccuracy. (v8.9.4).
 ## 188. FIXED Historical GPS Timestamp Loss - Resolution: Added gpsTs to database and sync. (v8.9.3).
 ## 189. FIXED Viewer Background Location Gap - Resolution: Implemented 10s background polling for Viewers. (v8.9.5).
-## 190. FIXED Xiaomi Autostart Unknown Handling - Resolution: Implemented robust handling for indeterminate status. (v8.9.6).
+## 190. FIXED Xiaomi Autostart Unknown Handling - Resolution: Implemented robust handling for indeterminate status. Expanded `technicalDetails` with uptime and grace threshold (v8.9.16) to facilitate field verification.
 ## 191. FIXED Muzzle Window Race Condition - Resolution: Implemented deterministic Muzzle Handshake. (v8.9.6).
 ## 192. FIXED Power Parity Consistency & evaluateAlarms Mismatch - Resolution: Achieved absolute forensic parity for currentMa. (v8.9.5).
-## 193. FIXED Zombie Telemetry UX - Resolution: Implemented visual staleness indicators ("Ghost Mode"). (v8.9.6).
+## 193. FIXED Zombie Telemetry UX - Resolution: Implemented visual staleness indicators (\"Ghost Mode\"). (v8.9.6).
 ## 194. FIXED SIT Persistence Packet Loss Risk - Resolution: Implemented acknowledged event synchronization pipeline. (v8.9.7).
 ## 195. FIXED Room Migration Forensic Audit (Android 15) - Resolution: Implemented full table reconstruction migration. (v8.9.6).
-## 196. FIXED Plunge Matching: Advanced SIT Detection - Resolution: Refined "Plunge" state machine and sitVzTs propagation. (v8.9.7).
+## 196. FIXED Plunge Matching: Advanced SIT Detection - Resolution: Refined \"Plunge\" state machine and sitVzTs propagation. (v8.9.7).
 ## 197. FIXED Database Schema Expansion (v38) - Resolution: Added sitVzTs to history tables. (v8.9.7).
 ## 198. FIXED GPS Availability Hardening - Resolution: Shortened GPS stall detection to 60s. (v8.9.8).
 ## 199. FIXED Toolchain Modernization - Resolution: Upgraded to Java 17 and Android SDK 35. (v8.9.8).
@@ -182,6 +182,10 @@
 ## 203. FIXED Documentation Version Desync - Resolution: Synchronized all core documentation (`APP_DESCRIPTION.md`, `SETTINGS_PAGE_DETAIL.md`, `info-elementary-fields.md`, `README.md`, `REQUIREMENTS_SOT.md`) and `issues.md` to the v8.9.9 baseline. (v8.9.9).
 ## 204. FIXED GPS Stall/Revival Constant Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `GPS_STALL_THRESHOLD_MS` = 60s and `GPS_REVIVAL_RETRY_INTERVAL_MS` = 120s. (v8.9.8).
 ## 205. FIXED Muzzle Window Constant Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `MUZZLE_WINDOW_DURATION_MS` = 2000ms. (v8.9.8).
-## 206. FIXED Staleness Threshold Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `TELEMETRY_UI_STALE_THRESHOLD_MS` = 10s and `GPS_UI_FAIL_THRESHOLD_MS` = 10s, unifying "Ghost Mode" and "Position Health" thresholds. (v8.9.8).
-## 207. FIXED REQUIREMENTS_SOT Typo Audit - Resolution: Performed a comprehensive syntax audit on `REQUIREMENTS_SOT.md`. Fixed multiple constants (`TICK_INTERVAL_MS`, `PARKING_ACCEL_LIMIT`, `GPS_STALL`, `ACOUSTIC_ALERT`, `CHAIR_OCCUPIED`, `CHAIR_PLUNGE_DISTANCE_THRESHOLD`, `PING_INTERVAL_MS`, `NETWORK_TIMEOUT_MS`) that used incorrect quote characters (`"`) instead of backticks. (v8.9.9).
+## 206. FIXED Staleness Threshold Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `TELEMETRY_UI_STALE_THRESHOLD_MS` = 10s and `GPS_UI_FAIL_THRESHOLD_MS` = 10s, unifying \"Ghost Mode\" and \"Position Health\" thresholds. (v8.9.8).
+## 207. FIXED REQUIREMENTS_SOT Typo Audit - Resolution: Performed a comprehensive syntax audit on `REQUIREMENTS_SOT.md`. Fixed multiple constants (`TICK_INTERVAL_MS`, `PARKING_ACCEL_LIMIT`, `GPS_STALL`, `ACOUSTIC_ALERT`, `CHAIR_OCCUPIED`, `CHAIR_PLUNGE_DISTANCE_THRESHOLD`, `PING_INTERVAL_MS`, `NETWORK_TIMEOUT_MS`) that used incorrect quote characters (`\"`) instead of backticks. (v8.9.9).
 ## 208. FIXED Log Spatial Anchor Gap - Resolution: Updated `LogManager`, `AppAlarmManager`, `TrackerService`, and `ViewerService` to capture and propagate current coordinates (`lat`/`lng`) during forensic log emission. This enables accurate historical marker reconstruction on the map. (v8.9.10).
+## 209. FIXED Coordinate Propagation Race (TrackerService/ViewerService) - Resolution: Updated LocationProcessorListener to explicitly propagate coordinates and accuracy during log triggers across both TrackerService and ViewerService. Audited services to ensure log emissions utilize the currently processed coordinates, eliminating dependence on potentially stale service-level state. (v8.9.12).
+## 210. FIXED Log Manager Redundancy Audit - Resolution: Standardized log emissions in `TrackerService` and `ViewerService` to rely on `LogManager`'s auto-anchor fallback for cleaner code and better robustness during startup. Refined `LogManager` to fallback to the highest-frequency telemetry available from `TelemetryRepository` if coordinates are missing. (v8.9.12).
+## 211. FIXED Xiaomi 10Hz Stability Audit Verbosity - Resolution: Gated Stability Audit logs to emit only on performance degradation (<98% reliability or >200ms gap) by updating `GPS_STABILITY_RELIABILITY_THRESHOLD` in `EngineConstants.kt` (v8.9.13).
+## 212. FIXED Forensic Accuracy Parity in Recovery - Resolution: Expanded the LogEntry schema and database LogEntity (Migration v40) to include an accuracy field. Modified RemoteHandler.handleRemoteLog to prioritize this accuracy value during historical marker reconstruction. (v8.9.11).

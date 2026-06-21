@@ -5,6 +5,8 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v8.9.16:
+ * - Issue #190: Expanded Xiaomi technicalDetails with explicit uptime and grace threshold.
  * v8.9.10:
  * - Issue #190: Added forensic technical details to Xiaomi alert to facilitate field verification.
  * v8.9.8:
@@ -366,7 +368,8 @@ object MainAlarmLogic {
         // Logic: ALERT is only triggered if status is explicitly DENIED OR if (status is UNKNOWN AND Manual Override is OFF).
         // If status is UNKNOWN and Manual Override is ON, we Muzzle the alert to avoid noisy unresolvable alarms.
         
-        val isXiaomiBootGraceActive = (now - state.serviceStartTime) < XIAOMI_BOOT_GRACE_MS
+        val uptimeMs = now - state.serviceStartTime
+        val isXiaomiBootGraceActive = uptimeMs < XIAOMI_BOOT_GRACE_MS
         
         val isAutostartExplicitlyDenied = state.xiaomiAutostartStatus == EngineXiaomiStatus.DENIED
         val isSpecialExplicitlyDenied = state.xiaomiStatus == EngineXiaomiStatus.DENIED
@@ -391,8 +394,8 @@ object MainAlarmLogic {
             else -> "MIUI status OK"
         }
 
-        // v8.9.10: forensic detail trace for Issue #190 confirmation
-        val xiaomiTechnical = "MIUI State: autostart=${state.xiaomiAutostartStatus}, special=${state.xiaomiStatus}, override=${state.isXiaomiManualOverride}, grace=$isXiaomiBootGraceActive"
+        // v8.9.16: Expanded forensic detail trace for Issue #190 confirmation
+        val xiaomiTechnical = "MIUI State: autostart=${state.xiaomiAutostartStatus}, special=${state.xiaomiStatus}, override=${state.isXiaomiManualOverride}, grace=$isXiaomiBootGraceActive (Uptime: ${uptimeMs}ms, Threshold: ${XIAOMI_BOOT_GRACE_MS}ms)"
 
         reports.add(
             ViolationReport(

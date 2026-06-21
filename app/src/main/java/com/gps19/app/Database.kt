@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * v8.9.11:
+ * - Issue #212: Added accuracy to LogEntity for forensic parity in historical recovery.
  * v8.9.10:
  * - Issue 209: Added lat/lng to LogEntity for historical marker recovery.
  * v8.9.7:
@@ -32,7 +34,8 @@ data class LogEntity(
     @ColumnInfo(defaultValue = "tracker") val role: String = "tracker",
     @ColumnInfo(defaultValue = "0") val synced: Boolean = false,
     @ColumnInfo(defaultValue = "0") val lat: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val lng: Double = 0.0
+    @ColumnInfo(defaultValue = "0") val lng: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val accuracy: Float = 0f
 )
 
 @Entity(tableName = "trail_points", indices = [Index(value = ["timestamp"])])
@@ -181,7 +184,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 39, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 40, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -190,6 +193,11 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_39_40 = object : Migration(39, 40) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE logs ADD COLUMN accuracy REAL NOT NULL DEFAULT 0")
+            }
+        }
         val MIGRATION_38_39 = object : Migration(38, 39) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE logs ADD COLUMN lat REAL NOT NULL DEFAULT 0")

@@ -2,16 +2,14 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.13:
+ * - Issue #211: Tightened Stability Audit threshold to 98% reliability.
+ * v8.9.11:
+ * - Issue #211: Standardized GPS Stability Audit thresholds (95% reliability, 200ms gap).
  * v8.9.8:
  * - Issue 193: Unified GPS_UI_FAIL_THRESHOLD_MS with TELEMETRY_UI_STALE_THRESHOLD_MS (10s).
  * - Issue 190: Hardened Xiaomi Stability - Shortened Stall detection (60s) and Revival intervals (120s).
  * - Issue 190: Added XIAOMI_BOOT_GRACE_MS (30s) to suppress transient DENIED states during startup.
- * v8.9.7:
- * - Issue 191: Added MUZZLE_HYSTERESIS_MS and MUZZLE_HYSTERESIS_A15_MS for robust I/O stabilization.
- * v8.9.6:
- * - Issue 194: Added SIT_TRANSMISSION_LATCH_MS to ensure robust SIT event propagation.
- * - Issue 191: Increased MUZZLE_WINDOW_DURATION_MS safety ceiling to 2000ms.
- * - Issue 193: Added TELEMETRY_UI_STALE_THRESHOLD_MS (10s) for "Zombie UX" mitigation.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -232,7 +230,8 @@ const val LOG_MUZZLE_STARTUP_MS = 10000L
 const val GPS_TRANSITION_LOG_MUZZLE_MS = 30000L
 const val MAX_HISTORY_POINTS_PER_RIBBONS = 240
 const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
-const val GPS_STABILITY_GAP_THRESHOLD_MS = 1000L
+const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
+const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0f
 
 // Issue 193: Unified UI Staleness Threshold (10s)
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 10000L
