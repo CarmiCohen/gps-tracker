@@ -48,6 +48,7 @@ data class LocationUpdate(
     val sitShock: Float? = null,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
+    val lastValidFixRealtime: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",

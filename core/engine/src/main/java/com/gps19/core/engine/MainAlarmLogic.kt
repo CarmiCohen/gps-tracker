@@ -5,14 +5,9 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
- * v8.9.16:
- * - Issue #190: Expanded Xiaomi technicalDetails with explicit uptime and grace threshold.
- * v8.9.10:
- * - Issue #190: Added forensic technical details to Xiaomi alert to facilitate field verification.
- * v8.9.8:
- * - Issue 190: Added XIAOMI_BOOT_GRACE_MS check to suppress transient alarms during startup.
- * v8.9.6:
- * - Issue 190: Implemented robust handling for "Unknown" Xiaomi Autostart status.
+ * v8.9.18:
+ * - Issue #219: Implemented Adaptive Jump Confidence. Increased JUMP_HOLD_DURATION_MS 
+ *   when isAdaptiveJump is flagged (spoofing/reflection suspicion).
  */
 object MainAlarmLogic {
 
@@ -234,8 +229,12 @@ object MainAlarmLogic {
                 }
 
                 val timeSinceFirst = now - state.firstViolationTs
+                
+                // Issue #219: Adaptive Jump Confidence - Double hold duration for high-SNR spoofing suspicion
+                val effectiveHoldMs = if (state.isAdaptiveJump) (JUMP_HOLD_DURATION_MS * ADAPTIVE_JUMP_HOLD_MULTIPLIER).toLong() else JUMP_HOLD_DURATION_MS
+                
                 val isSustained = if (state.firstViolationWasJump) {
-                    timeSinceFirst >= JUMP_HOLD_DURATION_MS
+                    timeSinceFirst >= effectiveHoldMs
                 } else {
                     state.distanceViolationCounter >= DISTANCE_ALARM_SAMPLES_REQUIRED
                 }
@@ -250,7 +249,7 @@ object MainAlarmLogic {
                     isPredictedExit -> "PREDICTIVE EXIT (${String.format(Locale.getDefault(), "%.1f", state.trackerSpeed * 3.6)} km/h)"
                     isPromoted -> "TRAJECTORY PROMOTED"
                     isSustained -> "ALARM ACTIVE"
-                    state.firstViolationWasJump -> "Jump Hold: ${durationSec}s/${JUMP_HOLD_DURATION_MS/1000}s"
+                    state.firstViolationWasJump -> "Jump Hold: ${durationSec}s/${effectiveHoldMs/1000}s${if (state.isAdaptiveJump) " (Adaptive)" else ""}"
                     else -> "Wait: ${state.distanceViolationCounter}/$DISTANCE_ALARM_SAMPLES_REQUIRED"
                 }
 
@@ -364,9 +363,6 @@ object MainAlarmLogic {
         )
 
         // 7. DEVICE SPECIFIC GATING
-        // Issue 190: Robust handling for Xiaomi UNKNOWN status.
-        // Logic: ALERT is only triggered if status is explicitly DENIED OR if (status is UNKNOWN AND Manual Override is OFF).
-        // If status is UNKNOWN and Manual Override is ON, we Muzzle the alert to avoid noisy unresolvable alarms.
         
         val uptimeMs = now - state.serviceStartTime
         val isXiaomiBootGraceActive = uptimeMs < XIAOMI_BOOT_GRACE_MS
@@ -394,7 +390,6 @@ object MainAlarmLogic {
             else -> "MIUI status OK"
         }
 
-        // v8.9.16: Expanded forensic detail trace for Issue #190 confirmation
         val xiaomiTechnical = "MIUI State: autostart=${state.xiaomiAutostartStatus}, special=${state.xiaomiStatus}, override=${state.isXiaomiManualOverride}, grace=$isXiaomiBootGraceActive (Uptime: ${uptimeMs}ms, Threshold: ${XIAOMI_BOOT_GRACE_MS}ms)"
 
         reports.add(

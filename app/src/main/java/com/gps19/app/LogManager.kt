@@ -8,10 +8,11 @@ import java.util.UUID
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
- * v8.9.14:
- * - Issue #212: Hardened accuracy fallback logic in submitToLogSink to ensure consistency.
- * v8.9.12:
- * - Issue #210: Standardized logServiceEvent by removing redundant coordinate parameters.
+ * v8.9.19:
+ * - Issue #223: Expanded logServiceEvent and submitToLogSink to support SNR and Vibration snapshots.
+ * v8.9.17:
+ * - Issue #214: Unified accuracy fallback logic to prioritize engine-calculated maxAccuracy 
+ *   consistently when discrete fix accuracy is missing.
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -38,7 +39,9 @@ class LogManager @Inject constructor(
         specialColor: Int? = null,
         lat: Double = 0.0,
         lng: Double = 0.0,
-        accuracy: Float = 0f
+        accuracy: Float = 0f,
+        snr: Float? = null,
+        vibe: Float? = null
     ) {
         val now = timeProvider.currentTimeMillis()
         val integrity = telemetry.integrityState.value
@@ -54,35 +57,34 @@ class LogManager @Inject constructor(
             return
         }
 
-        // Issue 208/210/212: Auto-anchor logs to the last known location if not provided
+        // Issue 208/210/212/214: Authoritative Spatial Anchoring
         var finalLat = lat
         var finalLng = lng
         var finalAccuracy = accuracy
         
+        val local = telemetry.localLocation.value
+        val tracker = telemetry.trackerLocation.value
+        
+        // Determine the most authoritative telemetry source for this role
+        val fallbackTelem = if (configManager.isTrackerMode) {
+            if (local.lat != 0.0) local else tracker
+        } else {
+            if (tracker.lat != 0.0) tracker else local
+        }
+
         if (finalLat == 0.0 && finalLng == 0.0) {
-            val local = telemetry.localLocation.value
-            val tracker = telemetry.trackerLocation.value
-            
-            val fallback = if (configManager.isTrackerMode) {
-                if (local.lat != 0.0) local else tracker
-            } else {
-                if (tracker.lat != 0.0) tracker else local
-            }
-            
-            if (fallback.lat != 0.0 && fallback.lng != 0.0) {
-                finalLat = fallback.lat
-                finalLng = fallback.lng
+            // Auto-anchor to last known position
+            if (fallbackTelem.lat != 0.0 && fallbackTelem.lng != 0.0) {
+                finalLat = fallbackTelem.lat
+                finalLng = fallbackTelem.lng
                 if (finalAccuracy == 0f) {
-                    finalAccuracy = if (fallback.accuracy > 0f) fallback.accuracy else fallback.maxAccuracy
+                    // Issue #214: Consistently prioritize discrete accuracy, then maxAccuracy
+                    finalAccuracy = if (fallbackTelem.accuracy > 0f) fallbackTelem.accuracy else fallbackTelem.maxAccuracy
                 }
             }
         } else if (finalAccuracy == 0f) {
-            // Coordinate provided but accuracy missing - attempt telemetry lookup
-            val local = telemetry.localLocation.value
-            val tracker = telemetry.trackerLocation.value
-            val fallback = if (configManager.isTrackerMode) local else tracker
-            if (fallback.accuracy > 0f) finalAccuracy = fallback.accuracy
-            else if (fallback.maxAccuracy > 0f) finalAccuracy = fallback.maxAccuracy
+            // Coordinates provided but accuracy missing - use authoritative fallback
+            finalAccuracy = if (fallbackTelem.accuracy > 0f) fallbackTelem.accuracy else fallbackTelem.maxAccuracy
         }
 
         val log = LogEntry(
@@ -100,7 +102,9 @@ class LogManager @Inject constructor(
             role = if (configManager.isTrackerMode) "tracker" else "viewer",
             lat = finalLat,
             lng = finalLng,
-            accuracy = finalAccuracy
+            accuracy = finalAccuracy,
+            snrSnapshot = snr,
+            vibeSnapshot = vibe
         )
         
         val net = networkManager.get()
@@ -124,9 +128,11 @@ class LogManager @Inject constructor(
         specialColor: Int? = null,
         lat: Double = 0.0,
         lng: Double = 0.0,
-        accuracy: Float = 0f
+        accuracy: Float = 0f,
+        snr: Float? = null,
+        vibe: Float? = null
     ) {
-        submitToLogSink(m, "system", important, isSpecial = isSpecial, specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy)
+        submitToLogSink(m, "system", important, isSpecial = isSpecial, specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy, snr = snr, vibe = vibe)
     }
 
     suspend fun getUnsyncedLogs(limit: Int) = logRepository.getUnsyncedLogs(limit)

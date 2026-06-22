@@ -21,12 +21,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v8.9.15:
- * - Issue #211: Hardened Stability Audit log gating (reliability < 98% or gap > 200ms).
- * v8.9.12:
- * - Issue #210: Simplified log emissions by removing redundant coordinate parameters 
- *   in AppAlarmManager callback. LogManager now handles spatial anchoring via auto-anchor fallback.
- * - Issue #209: Standardized LocationProcessorListener to use engine-provided coordinates.
+ * v8.9.19:
+ * - Issue #223: Forensic Log Enrichment - Bridging SNR and Vibration snapshots to LogManager.
+ * - Issue #222: Propagating isHindsightCorrected to repository for ghost-path visualization.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -65,6 +62,7 @@ class TrackerService : BaseMonitorService() {
     private var isRevivalTriggered = false
     private var revivalAttemptCount = 0
     private var lastRevivalAttemptTs = 0L
+    private var lastXiaomiRecoveryTs = 0L
     
     private var isXiaomiManualOverride = false
     private var isS21FE = false
@@ -78,21 +76,23 @@ class TrackerService : BaseMonitorService() {
     private var lastGpsAuditRealtime = 0L
     private var gpsArrivalCount = 0
     private var gpsMaxGapMs = 0L
+    private var wasStabilityPoor = false
 
     private val localProcessorListener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long) {
-            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp)
+        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean) {
+            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp, isHindsightCorrected = isHindsightCorrected)
         }
-        override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Float) {
+        override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Float, snr: Float?, vibe: Float?) {
             val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
-            // Issue #209: Explicitly use coordinates from engine
-            logManager.logServiceEvent(message, isImportant, isSpecial = isSpecial || message.contains("Merge-on-Stale"), specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy)
+            logManager.logServiceEvent(message, isImportant, isSpecial = isSpecial || message.contains("Merge-on-Stale"), specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy, snr = snr, vibe = vibe)
         }
         override fun onMaxAccuracyChanged(accuracy: Float) {
             repository.saveFloatSync(MainRepository.MAX_ACCURACY_KEY, accuracy)
         }
         override fun onChairBaselineChanged(baseline: Float) {
-            logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°")
+            val proc = lastProcessedLocation
+            logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°",
+                lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
             lifecycleScope.launch { repository.saveFloat(MainRepository.CHAIR_BASELINE_TILT_KEY, baseline) }
         }
         override fun onGpsStallDetected(ts: Long) {
@@ -113,9 +113,8 @@ class TrackerService : BaseMonitorService() {
             isXiaomi = isXiaomiDevice()
             isA15 = isA15Device()
 
-            // Issue #210: Standardized log callback relying on auto-anchor fallback
-            alarmManager = AppAlarmManager(this@TrackerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color -> 
-                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color)
+            alarmManager = AppAlarmManager(this@TrackerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng, acc -> 
+                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng, acc)
             }
             
             integrityMonitor = IntegrityMonitor(this@TrackerService, repository, timeProvider, onViolationSustained = { type ->
@@ -143,7 +142,9 @@ class TrackerService : BaseMonitorService() {
             locationProcessor.loadState(savedMaxAcc, savedLastSit, savedBaseline, trackerState, homePoints, maxDist)
 
             sensorManager.setHardwareFailureCallback { reason ->
-                logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - $reason", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+                val proc = lastProcessedLocation
+                logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - $reason", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
             }
 
             historyManager = HistoryManager(this@TrackerService, repository, gpsManager, sensorManager, locationProcessor, timeProvider, lifecycleScope) { msg, important -> 
@@ -254,6 +255,7 @@ class TrackerService : BaseMonitorService() {
         isRevivalTriggered = false
         revivalAttemptCount = 0
         lastRevivalAttemptTs = 0L
+        lastXiaomiRecoveryTs = 0L
         lastSitSyncLatchTs = 0L
         logManager.logServiceEvent("Session Terminated", false)
     }
@@ -302,6 +304,21 @@ class TrackerService : BaseMonitorService() {
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
         
+        // Issue #218: Xiaomi MIUI 14 Heuristic Recovery Pulse
+        if (isXiaomi && lastServiceTickRealtime > 0) {
+            val tickGap = nowRealtime - lastServiceTickRealtime
+            if (tickGap > XIAOMI_SUPPRESSION_THRESHOLD_MS && nowRealtime - lastXiaomiRecoveryTs > XIAOMI_RECOVERY_COOLDOWN_MS) {
+                lastXiaomiRecoveryTs = nowRealtime
+                val proc = lastProcessedLocation
+                logManager.logServiceEvent("HEURISTIC RECOVERY: Xiaomi suppression detected (Gap: ${tickGap}ms). Triggering pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
+                
+                gpsManager.reviveGps()
+                systemMonitor.renewWakeLock()
+                updateForegroundServiceType()
+            }
+        }
+
         val isSocketConnected = networkManager.isConnected() && !transientDropDetected.getAndSet(false)
         networkManager.updateRelayStatus(isSocketConnected)
         
@@ -314,21 +331,25 @@ class TrackerService : BaseMonitorService() {
         val isGpsGapActive = (nowRealtime - locationProcessor.getLastValidFixTs() > GPS_GAP_THRESHOLD_MS)
         
         if (isGpsStalledActive) {
+            val proc = lastProcessedLocation
             val timeSinceLastRevival = nowRealtime - lastRevivalAttemptTs
             if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS && timeSinceLastRevival > GPS_REVIVAL_RETRY_INTERVAL_MS) {
                 revivalAttemptCount++
                 lastRevivalAttemptTs = nowRealtime
                 gpsManager.reviveGps()
-                logManager.logServiceEvent("GPS Stall: Revival attempt $revivalAttemptCount/$MAX_REVIVAL_ATTEMPTS triggered", important = true)
+                logManager.logServiceEvent("GPS Stall: Revival attempt $revivalAttemptCount/$MAX_REVIVAL_ATTEMPTS triggered", important = true,
+                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
             } else if (revivalAttemptCount >= MAX_REVIVAL_ATTEMPTS && timeSinceLastRevival > GPS_REVIVAL_RETRY_INTERVAL_MS) {
                 lastRevivalAttemptTs = nowRealtime
-                logManager.logServiceEvent("CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed. Manual intervention required.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+                logManager.logServiceEvent("CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed. Manual intervention required.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
             }
         }
 
-        // Periodic Stability Audit (Issue #211: Log gating)
+        // Periodic Stability Audit
         if (nowRealtime - lastGpsAuditRealtime > GPS_STABILITY_AUDIT_INTERVAL_MS) {
             if (currentGpsInterval == HIGH_FREQUENCY_GPS_POLLING_MS) {
+                val proc = lastProcessedLocation
                 val expectedCount = (GPS_STABILITY_AUDIT_INTERVAL_MS / HIGH_FREQUENCY_GPS_POLLING_MS).toInt()
                 val reliability = if (expectedCount > 0) (gpsArrivalCount.toFloat() / expectedCount.toFloat()) * 100f else 0f
                 val isPoor = reliability < GPS_STABILITY_RELIABILITY_THRESHOLD || gpsMaxGapMs > GPS_STABILITY_GAP_THRESHOLD_MS
@@ -337,7 +358,14 @@ class TrackerService : BaseMonitorService() {
                     val auditMsg = "STABILITY AUDIT: 10Hz persistence is %.1f%% (%d/%d fixes). Max Gap: %dms".format(
                         reliability, gpsArrivalCount, expectedCount, gpsMaxGapMs
                     )
-                    logManager.logServiceEvent(auditMsg, important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+                    logManager.logServiceEvent(auditMsg, important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                        lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
+                    wasStabilityPoor = true
+                } else if (wasStabilityPoor) {
+                    val auditMsg = "STABILITY RESTORED: 10Hz persistence at %.1f%%. Max Gap: %dms".format(reliability, gpsMaxGapMs)
+                    logManager.logServiceEvent(auditMsg, important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                        lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
+                    wasStabilityPoor = false
                 }
             }
             gpsArrivalCount = 0
@@ -387,9 +415,10 @@ class TrackerService : BaseMonitorService() {
         lastSitDetected = rawSitDetected || (locationProcessor.getLastSitRealtime() > 0 && (nowRealtime - locationProcessor.getLastSitRealtime() < SUSPICIOUS_STATE_COOLDOWN_MS))
         
         if (rawSitDetected) {
+            val proc = lastProcessedLocation
             lastSitSyncLatchTs = nowRealtime
-            // Issue #210: Standardized log relying on auto-anchor fallback
-            logManager.logServiceEvent("Sit Detected (Engine Pulse)", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+            logManager.logServiceEvent("Sit Detected (Engine Pulse)", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
             lifecycleScope.launch { repository.saveLong(MainRepository.LAST_SIT_TS_KEY, locationProcessor.getLastSitTs()) }
         }
 
@@ -404,7 +433,9 @@ class TrackerService : BaseMonitorService() {
             nowRealtime = nowRealtime
         )
         if (nextSuspicious && !isSuspiciousMode) {
-             logManager.logServiceEvent("Suspicious mode: Physical Tamper", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+             val proc = lastProcessedLocation
+             logManager.logServiceEvent("Suspicious mode: Physical Tamper", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                 lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
         }
         isSuspiciousMode = nextSuspicious
 
@@ -431,8 +462,10 @@ class TrackerService : BaseMonitorService() {
                          "Cooling=${integrityMonitor.isCoolingModeActive}, Device(A15=$isA15, S21FE=$isS21FE, Xiaomi=$isXiaomi)"
             
             if (nowRealtime - lastGpsTransitionLogTs > GPS_TRANSITION_LOG_MUZZLE_MS) {
+                val proc = lastProcessedLocation
                 lastGpsTransitionLogTs = nowRealtime
-                logManager.logServiceEvent(logMsg, important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+                logManager.logServiceEvent(logMsg, important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
             }
 
             currentGpsInterval = gpsInterval
@@ -457,7 +490,9 @@ class TrackerService : BaseMonitorService() {
             violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(),
             verticalVelocity = sensorManager.currentVerticalVelocity, sitVz = locationProcessor.sentinel.lastSitVz, sitDz = locationProcessor.sentinel.lastSitDz, 
             sitBaro = locationProcessor.sentinel.lastSitBaro, sitTilt = locationProcessor.sentinel.lastSitTilt, sitShock = locationProcessor.sentinel.lastSitShock, 
-            isClockRegression = proc?.isClockRegression ?: false, isLocationPending = pendingAcousticViolation, gnssDetail = latestGnssDetail, 
+            isClockRegression = proc?.isClockRegression ?: false, isLocationPending = pendingAcousticViolation, 
+            lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
+            gnssDetail = latestGnssDetail,
             snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f), isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive
         )
 
@@ -536,6 +571,7 @@ class TrackerService : BaseMonitorService() {
                 isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false, jumpTier = proc?.jumpTier ?: 0, trackerLat = proc?.optimizedPoint?.lat ?: 0.0, 
                 trackerLng = proc?.optimizedPoint?.lng ?: 0.0, trackerAccuracy = proc?.currentAccuracy ?: 0f, 
                 maxTrackerAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), trackerLastGpsTs = proc?.timestamp ?: 0L, 
+                trackerLastValidFixTs = locationProcessor.getLastValidFixTs(),
                 trackerSpeed = ((proc?.filteredSpeed ?: 0.0) / 3.6).toFloat(), trackerBattery = integrityMonitor.getBatteryLevel(), trackerTemp = integrityMonitor.batteryTemp,
                 isHardwareOnline = true, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
                 isJammerSuspicion = isJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isGpsStalling, isUiVisible = isUiVisible(),
@@ -628,7 +664,9 @@ class TrackerService : BaseMonitorService() {
 
     private fun triggerSuspiciousMode(source: String) {
         if (!isSuspiciousMode) { 
-             logManager.logServiceEvent("Suspicious mode: Physical Tamper ($source)", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+             val proc = lastProcessedLocation
+             logManager.logServiceEvent("Suspicious mode: Physical Tamper ($source)", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                 lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
         }
         isSuspiciousMode = behaviorUseCase.updateSuspiciousMode(isSuspiciousMode, true, false, timeProvider.elapsedRealtime())
     }

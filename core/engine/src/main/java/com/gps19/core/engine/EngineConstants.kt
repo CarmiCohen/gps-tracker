@@ -2,6 +2,11 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.18:
+ * - Issue #221: Added PENDING_UNCERTAINTY_GROWTH_RATE_MPS.
+ * - Issue #220: Added HINDSIGHT_BUFFER_SIZE and HINDSIGHT_MAX_AGE_MS.
+ * - Issue #219: Added ADAPTIVE_JUMP_SNR_THRESHOLD and ADAPTIVE_JUMP_HOLD_MULTIPLIER.
+ * - Issue #218: Added XIAOMI_SUPPRESSION_THRESHOLD_MS and XIAOMI_RECOVERY_COOLDOWN_MS.
  * v8.9.13:
  * - Issue #211: Tightened Stability Audit threshold to 98% reliability.
  * v8.9.11:
@@ -48,6 +53,17 @@ const val JUMP_GATE_SPEED_ACCURACY_HIGH_MPS = 8.3
 const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0f
 const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0f
 const val JUMP_GATE_VISUAL_JITTER_METERS = 10.0
+
+// Adaptive Jump Confidence (v8.9.18)
+const val ADAPTIVE_JUMP_SNR_THRESHOLD = 35.0f
+const val ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0f
+
+// Hindsight Correction (v8.9.18)
+const val HINDSIGHT_BUFFER_SIZE = 5
+const val HINDSIGHT_MAX_AGE_MS = 30000L
+
+// Bayesian Uncertainty (Issue #221)
+const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0f // 54 km/h conservative drift
 
 // ImmFilter Parameters
 const val IMM_STATIONARY_PROBABILITY = 0.8
@@ -161,6 +177,10 @@ const val MUZZLE_HYSTERESIS_A15_MS = 500L
 const val GPS_REVIVAL_RETRY_INTERVAL_MS = 120000L
 const val MAX_REVIVAL_ATTEMPTS = 3
 const val XIAOMI_BOOT_GRACE_MS = 30000L
+
+// Xiaomi Heuristic Recovery (v8.9.18)
+const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 15000L
+const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
 
 const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 60000L

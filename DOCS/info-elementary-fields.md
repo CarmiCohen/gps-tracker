@@ -1,4 +1,4 @@
-# Info Elementary Page: Field Definitions and Functions (v8.9.10)
+# Info Elementary Page: Field Definitions and Functions (v8.9.18)
 
 This document describes the technical fields displayed on the Info (Dashboard) page of the GPS Tracker application.
 
@@ -34,6 +34,8 @@ This document describes the technical fields displayed on the Info (Dashboard) p
 *   **Age Index**: Staleness of the current position fix (10s `GPS_UI_FAIL_THRESHOLD_MS` gray-out/Ghost Mode).
 *   **Acc Index**: Sub-score for coordinate precision.
 *   **Avg SNR**: Average Signal-to-Noise Ratio (dB) across all used satellites (`snrIdx`). Provides a primary indicator of signal quality and potential jamming/obstruction.
+*   **Bayesian Expansion (lastValidFixRealtime)**: The timestamp of the last high-confidence GPS fix.
+    *   *Logic*: If `isLocationPending` is active, the UI radius expands at 15m/s (`PENDING_UNCERTAINTY_GROWTH_RATE_MPS`) relative to this timestamp to visualize growing spatial uncertainty during a signal blackout.
 
 ## 4. Environment & Sensors
 *   **Vibration**: Normalized magnitude (g-units).

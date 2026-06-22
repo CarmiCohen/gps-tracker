@@ -12,6 +12,8 @@ import org.json.JSONObject
 
 /**
  * SyncManager: Handles broadcasting state updates and relay synchronization.
+ * v8.9.18:
+ * - Issue #221: Propagated lastValidFixRealtime for Bayesian uncertainty scaling.
  * v8.9.7:
  * - Plunge Matching: Added sit_vz_ts to telemetry payloads for forensic parity.
  * - Issue 194: Implemented reliable log synchronization (flushPendingLogs) to ensure zero-loss SIT events.
@@ -148,6 +150,7 @@ class SyncManager(
                         put("is_power_save_mode", entity.isPowerSaveMode)
                         put("standby_bucket", entity.standbyBucket)
                         put("net_interface", entity.netInterface)
+                        put("last_valid_fix_realtime", entity.lastValidFixRealtime)
                         put("ver", BuildConfig.VERSION_NAME)
                     }
                     
@@ -207,6 +210,7 @@ class SyncManager(
         sitShock: Float = 0f,
         isClockRegression: Boolean = false,
         isLocationPending: Boolean = false,
+        lastValidFixRealtime: Long = 0L,
         gpsTsOverride: Long? = null,
         gnssDetail: GnssDetail? = null,
         snrIdx: Float = 0f,
@@ -267,6 +271,7 @@ class SyncManager(
             put("is_trajectory_promoted", isTrajectoryPromoted)
             put("jump_tier", jumpTier)
             put("is_location_pending", isLocationPending)
+            put("last_valid_fix_realtime", lastValidFixRealtime)
             put("snr_idx", safeFloat(snrIdx))
             put("is_battery_steep_discharge", isBatterySteepDischarge)
             put("is_cooling_mode_active", isCoolingModeActive)
@@ -344,7 +349,8 @@ class SyncManager(
                     isStorageLow = integrity.isStorageLow, isStorageCritical = integrity.isStorageCritical,
                     isPowerSaveMode = integrity.isPowerSaveMode, standbyBucket = integrity.standbyBucket,
                     netInterface = integrity.netInterface,
-                    verticalVelocity = verticalVelocity
+                    verticalVelocity = verticalVelocity,
+                    lastValidFixRealtime = lastValidFixRealtime
                 ))
             }
         }
@@ -381,6 +387,7 @@ class SyncManager(
             sitVz = sitVz, sitVzTs = sitVzTs, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
             isClockRegression = isClockRegression,
             isLocationPending = integrity.isLocationPending,
+            lastValidFixRealtime = lastValidFixRealtime,
             isPowerSaveMode = integrity.isPowerSaveMode,
             standbyBucket = integrity.standbyBucket,
             netInterface = integrity.netInterface,

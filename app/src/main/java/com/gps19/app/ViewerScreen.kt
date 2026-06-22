@@ -30,6 +30,8 @@ import com.gps19.core.engine.*
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * v8.9.18:
+ * - Issue #221: Propagating systemPulseRealtime for Bayesian uncertainty scaling.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.36:
@@ -46,6 +48,8 @@ fun ViewerScreen(
     trackerTrail: List<TrailPoint>,
     viewerTrail: List<TrailPoint>,
     violations: List<ViolationPoint>,
+    systemPulse: Long,
+    systemPulseRealtime: Long,
     onToggleMap: () -> Unit,
     onToggleLog: () -> Unit,
     onToggleSettings: () -> Unit,
@@ -68,7 +72,6 @@ fun ViewerScreen(
     val context = LocalContext.current
 
     val dashboardState by viewModel.dashboardState.collectAsStateWithLifecycle()
-    val systemPulse by viewModel.systemPulse.collectAsStateWithLifecycle()
 
     val onDashboard = {
         if (isMapVisible) onToggleMap()
@@ -118,6 +121,7 @@ fun ViewerScreen(
                             AppMapContainer(
                                 uiState = uiState,
                                 systemPulse = systemPulse,
+                                systemPulseRealtime = systemPulseRealtime,
                                 onEvent = { viewModel.onEvent(it) },
                                 onClearTrails = { viewModel.clearTrails(context) },
                                 trail = trackerTrail, viewerTrail = viewerTrail, 
@@ -137,6 +141,7 @@ fun ViewerScreen(
                 AppMapContainer(
                     uiState = uiState,
                     systemPulse = systemPulse,
+                    systemPulseRealtime = systemPulseRealtime,
                     onEvent = { viewModel.onEvent(it) },
                     onClearTrails = { viewModel.clearTrails(context) },
                     trail = trackerTrail, viewerTrail = viewerTrail, 

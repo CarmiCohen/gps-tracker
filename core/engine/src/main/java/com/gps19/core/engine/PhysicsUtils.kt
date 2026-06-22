@@ -4,6 +4,9 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: Unified physics and geodesic calculations for the Pure Logic Engine.
+ * v8.9.18:
+ * - Issue #219: Enhanced isVisualJump with SNR-based adaptive confidence. Detects spoofing/reflection 
+ *   signatures (High SNR + Zero Vibration).
  */
 object PhysicsUtils {
 
@@ -62,6 +65,7 @@ object PhysicsUtils {
         lastLat: Double, lastLng: Double, 
         newLat: Double, newLng: Double, 
         timeDeltaMs: Long, accuracy: Float,
+        snr: Float = 0f,
         lastSpeedMps: Double = 0.0,
         isParking: Boolean = false,
         altitudeDelta: Double = 0.0,
@@ -79,34 +83,40 @@ object PhysicsUtils {
         }
         
         var score = 0
+        var isAdaptiveJump = false
         
         // Sensor Fusion: GPS-IMU Discrepancy
-        if (!hasPhysicalMotion && speedMps > 10.0) { // Using 10.0 as gate for sensor mismatch
-            score += 60 // JUMP_WEIGHT_SENSOR_MISMATCH
+        if (!hasPhysicalMotion && speedMps > 10.0) { 
+            score += JUMP_WEIGHT_SENSOR_MISMATCH
+            // Issue #219: High SNR + No Vibration = Signal Reflection/Spoofing suspicion
+            if (snr >= ADAPTIVE_JUMP_SNR_THRESHOLD) {
+                isAdaptiveJump = true
+            }
         }
         
         // Velocity Inertia (Acceleration Check)
         val accel = abs(speedMps - lastSpeedMps) / timeDeltaSec
-        val accelLimit = if (isParking) 1.0 else 2.0 // MAX_TRACTOR_ACCEL
-        if (accel > accelLimit && dist > 10.0) { // ACCEL_CHECK_MIN_DIST
-            score += 40 // JUMP_WEIGHT_ACCEL_CHECK
+        val accelLimit = if (isParking) PARKING_ACCEL_LIMIT else MAX_TRACTOR_ACCEL
+        if (accel > accelLimit && dist > ACCEL_CHECK_MIN_DIST) { 
+            score += JUMP_WEIGHT_ACCEL_CHECK
         }
         
         // 3D Jump Validation (Altitude Delta)
-        if (abs(altitudeDelta) / timeDeltaSec > 10.0) { // ALTITUDE_VELOCITY_CAP
-            score += 30 // JUMP_WEIGHT_ALTITUDE_DELTA
+        if (abs(altitudeDelta) / timeDeltaSec > ALTITUDE_VELOCITY_CAP) { 
+            score += JUMP_WEIGHT_ALTITUDE_DELTA
         }
 
-        if (speedMps > MAX_PHYSICAL_SPEED_MPS) score += 50 // JUMP_WEIGHT_TRADITIONAL_SPEED
-        if (speedMps > 22.2 && accuracy > 40.0f) score += 30 // JUMP_GATE_SPEED_ACCURACY_LOW
-        if (speedMps > 8.3 && accuracy > 150.0f) score += 20 // JUMP_GATE_SPEED_ACCURACY_HIGH
+        if (speedMps > MAX_PHYSICAL_SPEED_MPS) score += JUMP_WEIGHT_TRADITIONAL_SPEED
+        if (speedMps > JUMP_GATE_SPEED_ACCURACY_LOW_MPS && accuracy > JUMP_GATE_ACCURACY_LOW_THRESHOLD) score += JUMP_WEIGHT_ACCURACY_LOW
+        if (speedMps > JUMP_GATE_SPEED_ACCURACY_HIGH_MPS && accuracy > JUMP_GATE_ACCURACY_HIGH_THRESHOLD) score += JUMP_WEIGHT_ACCURACY_HIGH
         
         val isTier2 = dist >= JUMP_POINT_DISTANCE_THRESHOLD && (speedMps > MAX_PHYSICAL_SPEED_MPS || score >= 40)
-        val isTier3 = dist >= 10.0 && dist < JUMP_POINT_DISTANCE_THRESHOLD && score >= 30
+        val isTier3 = dist >= JUMP_CHECK_MIN_DIST && dist < JUMP_POINT_DISTANCE_THRESHOLD && score >= 30
         
         val isJump = isTier2 || isTier3 || score >= 50
         
-        val reason = when {
+        var reason = when {
+            isAdaptiveJump -> "Signal Reflection Suspicion"
             !hasPhysicalMotion && speedMps > 10.0 -> "Sensor Mismatch Jump"
             isTier2 -> "Security Jump"
             isTier3 -> "Visual Jitter"
@@ -117,6 +127,7 @@ object PhysicsUtils {
         return JumpConfidence(
             score = score.coerceIn(0, 100),
             isJump = isJump,
+            isAdaptiveJump = isAdaptiveJump,
             tier = if (isTier2) 2 else if (isTier3) 3 else 0,
             reason = reason
         )

@@ -7,6 +7,8 @@ import javax.inject.Singleton
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
  * Extracted from MainViewModel to resolve Issue 115 (Architectural Bloat).
+ * v8.9.18:
+ * - Issue #221: Mapping lastValidFixRealtime for Bayesian uncertainty scaling.
  * v8.9.5:
  * - Issue 192: Added currentMa mapping for full forensic parity.
  * v8.8.27: Hardened vid propagation during forensic audit.
@@ -68,6 +70,7 @@ class TelemetryUseCase @Inject constructor(
             violationUptimeMs = update.violationUptimeMs ?: currentLoc.violationUptimeMs,
             violationPercentage = update.violationPercentage ?: calculateViolationPercentage(update.violationUptimeMs, nowMs - appStartTime),
             isLocationPending = update.isLocationPending,
+            lastValidFixRealtime = if (update.lastValidFixRealtime > 0) update.lastValidFixRealtime else currentLoc.lastValidFixRealtime,
             isPowerSaveMode = update.isPowerSaveMode,
             standbyBucket = update.standbyBucket,
             netInterface = update.netInterface,
@@ -93,7 +96,9 @@ class TelemetryUseCase @Inject constructor(
             peakVibrationShock = status.peakVibrationShock, peakVibrationShockTs = status.peakVibrationShockTs,
             luxBaseline = status.luxBaseline, acousticFloorDb = status.acousticFloorDb, adaptiveVibrationFloor = status.adaptiveVibrationFloor,
             proxIdx = status.proxIdx, violationUptimeMs = status.violationUptimeMs, violationPercentage = status.violationPercentage,
-            isLocationPending = status.isLocationPending, isPowerSaveMode = status.isPowerSaveMode,
+            isLocationPending = status.isLocationPending, 
+            lastValidFixRealtime = status.lastValidFixRealtime,
+            isPowerSaveMode = status.isPowerSaveMode,
             standbyBucket = status.standbyBucket, netInterface = status.netInterface,
             isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical,
             gnssDetail = status.gnssDetail, snrIdx = status.snrIdx,
@@ -150,6 +155,7 @@ class TelemetryUseCase @Inject constructor(
             violationUptimeMs = update.violationUptimeMs ?: currentLoc.violationUptimeMs,
             violationPercentage = update.violationPercentage ?: calculateViolationPercentage(update.violationUptimeMs, nowMs - appStartTime),
             isLocationPending = update.isLocationPending,
+            lastValidFixRealtime = if (update.lastValidFixRealtime > 0) update.lastValidFixRealtime else currentLoc.lastValidFixRealtime,
             isPowerSaveMode = update.isPowerSaveMode,
             standbyBucket = update.standbyBucket,
             netInterface = update.netInterface,

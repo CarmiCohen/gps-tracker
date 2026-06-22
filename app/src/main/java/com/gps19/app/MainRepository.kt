@@ -18,16 +18,10 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * v8.9.19:
+ * - Issue #222: Added isHindsightCorrected propagation to trail flows and save logic.
  * v8.9.10:
  * - Issue 208: Synchronized versioning and forensic logging baseline for release verification.
- * v8.9.9:
- * - Issue 208: Updated addLog to support 'initiallySynced' flag for duplicate suppression.
- * v8.9.5:
- * - Issue 192: Added currentMa to connection_history mapping for full forensic parity.
- * v8.9.3:
- * - Issue 188: Preserved historical GPS timestamps in trail points.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -118,8 +112,12 @@ class MainRepository @Inject constructor(
 
     val eventLogsFlow: Flow<List<LogEntry>> = logRepository.eventLogsFlow
 
-    val trackerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(false).map { entities -> entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump) } }
-    val viewerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(true).map { entities -> entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump) } }
+    val trackerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(false).map { entities -> 
+        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected) } 
+    }
+    val viewerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(true).map { entities -> 
+        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected) } 
+    }
     val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> entities.map { ViolationPoint(point = GeoPoint(it.lat, it.lng), type = it.type, ts = it.ts) } }
 
     private val _uiCommands = MutableSharedFlow<UiCommand>(extraBufferCapacity = 10)
@@ -229,7 +227,7 @@ class MainRepository @Inject constructor(
     fun clearLogs() { logRepository.clearLogs() }
     suspend fun loadAllLogsStatic(): List<LogEntry> = logRepository.loadAllLogsStatic()
 
-    fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, isJump: Boolean = false, timestamp: Long? = null, force: Boolean = false) {
+    fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, isJump: Boolean = false, timestamp: Long? = null, force: Boolean = false, isHindsightCorrected: Boolean = false) {
         if (lat == 0.0 || lng == 0.0) return
         
         val integrity = telemetry.integrityState.value
@@ -242,7 +240,11 @@ class MainRepository @Inject constructor(
 
         scope.launch {
             val wallTs = timestamp ?: timeProvider.currentTimeMillis()
-            trailDao.insert(TrailEntity(lat = lat, lng = lng, timestamp = wallTs, isViewerTrail = isViewer, isJump = isJump))
+            trailDao.insert(TrailEntity(
+                lat = lat, lng = lng, timestamp = wallTs, 
+                isViewerTrail = isViewer, isJump = isJump, 
+                isHindsightCorrected = isHindsightCorrected
+            ))
             
             trailWriteCount++
             if (force || trailWriteCount >= DB_PRUNE_THRESHOLD) {
@@ -258,7 +260,9 @@ class MainRepository @Inject constructor(
         violationDao.clearAll()
     }
 
-    suspend fun loadTrailStatic(isViewer: Boolean): List<TrailPoint> = trailDao.getTrailStatic(isViewer).map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump) }
+    suspend fun loadTrailStatic(isViewer: Boolean): List<TrailPoint> = trailDao.getTrailStatic(isViewer).map { 
+        TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected) 
+    }
 
     suspend fun resetStats() = withContext(Dispatchers.IO) {
         settings.resetStatsBulk()

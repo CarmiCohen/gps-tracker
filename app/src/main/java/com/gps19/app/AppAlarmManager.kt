@@ -10,13 +10,10 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * v8.9.12:
- * - Issue #210: Standardized log emissions by removing redundant coordinate parameters from 
- *   onLogEvent. LogManager now handles spatial anchoring via auto-anchor fallback.
- * v8.9.11:
- * - Issue #212: Added accuracy propagation to onLogEvent for forensic parity.
- * v8.9.10:
- * - Issue 208: Added lat/lng propagation to onLogEvent to ensure spatial anchoring of forensic alerts.
+ * v8.9.19:
+ * - Issue #221: Added trackerLastValidFixTs to evaluateAlarms for Bayesian Gap logic.
+ * v8.9.17:
+ * - Issue #213: Propagating coordinates and accuracy in onLogEvent.
  */
 class AppAlarmManager(
     private val context: Context,
@@ -24,7 +21,7 @@ class AppAlarmManager(
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
     private val timeProvider: TimeProvider,
-    private val onLogEvent: (String, String, Boolean, Double?, String?, Long, Boolean, Int?) -> Unit
+    private val onLogEvent: (String, String, Boolean, Double?, String?, Long, Boolean, Int?, Double, Double, Float) -> Unit
 ) {
     private val activeAlarms = mutableMapOf<String, AlarmEvaluation>()
     private var lastAlarmsJson = "[]"
@@ -92,6 +89,7 @@ class AppAlarmManager(
         trackerAccuracy: Float,
         maxTrackerAccuracy: Float,
         trackerLastGpsTs: Long,
+        trackerLastValidFixTs: Long = 0L,
         trackerSpeed: Float,
         trackerBattery: Int,
         trackerTemp: Float,
@@ -228,8 +226,7 @@ class AppAlarmManager(
                         eval.firstTriggerTs = now
                         eval.isResolved = false
                         triggerOccurredInThisCycle = true
-                        // Issue #210: Coordinates now handled by LogManager fallback
-                        onLogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor)
+                        onLogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy)
                         
                         if (now - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) {
                             lastSirenStopTs = 0L 
@@ -243,8 +240,7 @@ class AppAlarmManager(
             } else if (eval.isTriggered) {
                 if (!eval.isResolved) {
                     eval.isResolved = true
-                    // Issue #210: Coordinates now handled by LogManager fallback
-                    onLogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, now - eval.firstTriggerTs, isSpecial, specialColor)
+                    onLogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, now - eval.firstTriggerTs, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy)
                 }
                 newAlarms[type] = eval
             }

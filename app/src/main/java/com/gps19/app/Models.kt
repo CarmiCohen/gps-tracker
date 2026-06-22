@@ -9,21 +9,11 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * v8.9.11:
- * - Issue #212: Added accuracy to LogEntry for forensic parity in historical recovery.
- * v8.9.10:
- * - Issue 209: Added lat/lng to LogEntry for historical forensic marker reconstruction.
- * v8.9.7:
- * - Plunge Matching: Added sitVzTs to ConnectionPoint, TrackerStatus, and LocationState for forensic parity.
- * v8.9.6:
- * - Issue 193: Added isTelemetryFresh to DashboardState to resolve Zombie Telemetry UX.
- * v8.9.5:
- * - Issue 192: Added currentMa to ConnectionPoint, LocationState, and IntegrityStateUi for full forensic parity.
- * - Build Fix: Corrected CommitSettings inheritance to UiEvent.
- * v8.9.3:
- * - Issue 188: Preserved historical GPS timestamps in TrailPoint model.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * v8.9.19:
+ * - Issue #223: Added snrSnapshot and vibeSnapshot to LogEntry for forensic enrichment.
+ * - Issue #222: Added isHindsightCorrected to TrailPoint for ghost-path visualization.
+ * v8.9.18:
+ * - Issue #221: Added lastValidFixRealtime to TrackerStatus, IntegrityState, and LocationState.
  */
 
 @Serializable
@@ -38,7 +28,8 @@ data class TrailPoint(
     val lat: Double,
     val lng: Double,
     val timestamp: Long = 0L,
-    val isJump: Boolean = false
+    val isJump: Boolean = false,
+    val isHindsightCorrected: Boolean = false
 ) {
     fun toGeoPoint() = GeoPoint(lat, lng)
 }
@@ -109,7 +100,9 @@ data class LogEntry(
     val role: String = "tracker",
     val lat: Double = 0.0,
     val lng: Double = 0.0,
-    val accuracy: Float = 0f
+    val accuracy: Float = 0f,
+    val snrSnapshot: Float? = null,
+    val vibeSnapshot: Float? = null
 ) {
     fun toJSONObject(): JSONObject {
         return JSONObject().apply {
@@ -126,6 +119,8 @@ data class LogEntry(
             if (accuracy != 0f) put("accuracy", accuracy)
             specialColor?.let { put("special_color", it) }
             extremeValue?.let { if (!it.isNaN() && !it.isInfinite()) put("extreme_value", it) }
+            snrSnapshot?.let { put("snr_snapshot", it.toDouble()) }
+            vibeSnapshot?.let { put("vibe_snapshot", it.toDouble()) }
         }
     }
 
@@ -141,7 +136,7 @@ data class LogEntry(
                 type = obj.optString("type"),
                 isImportant = obj.optBoolean("isImportant"),
                 id = obj.optString("id"),
-                viewerId = obj.optString("viewer_id"), // Standardized to viewer_id only
+                viewerId = obj.optString("viewer_id"),
                 count = obj.optInt("count", 1),
                 durationMs = obj.optLong("duration_ms", 0L),
                 isSpecial = obj.optBoolean("is_special", false),
@@ -154,7 +149,9 @@ data class LogEntry(
                 } else null,
                 lat = obj.optDouble("lat", 0.0),
                 lng = obj.optDouble("lng", 0.0),
-                accuracy = obj.optDouble("accuracy", 0.0).toFloat()
+                accuracy = obj.optDouble("accuracy", 0.0).toFloat(),
+                snrSnapshot = if (obj.has("snr_snapshot")) obj.optDouble("snr_snapshot").toFloat() else null,
+                vibeSnapshot = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot").toFloat() else null
             )
         }
     }
@@ -221,6 +218,7 @@ data class TrackerStatus(
     val isTrajectoryPromoted: Boolean = false,
     val jumpTier: Int = 0,
     val isLocationPending: Boolean = false,
+    val lastValidFixRealtime: Long = 0L,
     val isPowerSaveMode: Boolean = false, 
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",
@@ -281,6 +279,7 @@ data class LocationState(
     val sitShock: Float = 0f,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
+    val lastValidFixRealtime: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",
@@ -475,6 +474,7 @@ data class IntegrityState(
     val sitShock: Float = 0f,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
+    val lastValidFixRealtime: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",
@@ -512,6 +512,7 @@ data class IntegrityStateUi(
     val lastSitTs: Long = 0L,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
+    val lastValidFixRealtime: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",

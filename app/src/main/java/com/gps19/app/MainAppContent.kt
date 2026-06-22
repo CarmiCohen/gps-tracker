@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -39,6 +40,8 @@ import kotlinx.coroutines.delay
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * v8.9.18:
+ * - Issue #221: Propagating systemPulseRealtime for Bayesian uncertainty scaling.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.23:
@@ -62,6 +65,7 @@ fun MainAppContent(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val systemPulse by viewModel.systemPulse.collectAsStateWithLifecycle()
+    val systemPulseRealtime by viewModel.systemPulseRealtime.collectAsStateWithLifecycle()
     val redScreenVisible by viewModel.redScreenVisible.collectAsStateWithLifecycle()
     
     val navController = rememberNavController()
@@ -231,6 +235,7 @@ fun MainAppContent(
                         }
                         TrackerScreen(
                             uiState = uiState, viewModel = viewModel, logs = eventLogs, trail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
+                            systemPulse = systemPulse, systemPulseRealtime = systemPulseRealtime,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
                             onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
@@ -255,6 +260,7 @@ fun MainAppContent(
                         }
                         ViewerScreen(
                             uiState = uiState, viewModel = viewModel, logs = eventLogs, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
+                            systemPulse = systemPulse, systemPulseRealtime = systemPulseRealtime,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
                             onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },

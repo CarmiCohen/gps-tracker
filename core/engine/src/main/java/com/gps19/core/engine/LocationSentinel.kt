@@ -5,14 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * v8.9.7:
- * - Plunge Matching: Integrated lastSitVzTs for forensic reconstruction of sit events.
- * v8.8.13:
- * - Issue 79: Re-implemented consumeSitDetected to resolve sticky SIT state.
- * v8.8.21:
- * - Issue 99: Added isMuzzled parameter to updateSensorState and processLocation
- *   to suppress false vibration/shock triggers during I/O jitter. Fixed store rejected bug.
- * - Forensic Audit: Hardened runSensorSentinel to muzzle Proximity, Power, and Tilt during jitter.
+ * v8.9.19:
+ * - Issue #223: Exposed currentVibrationIndex for forensic log enrichment.
+ * - Issue #222: Exposed getHindsightBuffer for ghost-path visualization.
+ * v8.9.18:
+ * - Issue #220: Implemented Hindsight Correction (Rubber-Band Logic).
+ * - Issue #219: Propagated SNR to PhysicsUtils.isVisualJump for adaptive confidence.
  */
 class LocationSentinel {
 
@@ -28,13 +26,9 @@ class LocationSentinel {
     private var lastValidSpeedMps: Double = 0.0
     private var lastValidBearing: Float = 0.0f
 
-    private var lastRejectedLat: Double = 0.0
-    private var lastRejectedLng: Double = 0.0
-    private var lastRejectedTs: Long = 0L
-    private var lastRejectedBearing: Float = 0.0f
-    private var lastRejectedSpeedMps: Double = 0.0
+    private val hindsightBuffer = mutableListOf<RejectedPoint>()
 
-    private var currentVibrationIndex: Float = 0f
+    internal var currentVibrationIndex: Float = 0f
     var peakVibrationShock: Float = 0f
         private set
     var peakVibrationShockTs: Long = 0L
@@ -57,7 +51,7 @@ class LocationSentinel {
         private set
         
     var lastSitTs: Long = 0L // Wall clock for forensic reporting
-    var lastSitRealtime: Long = 0L // Monotonic for internal cooldown logic (v8.8.12)
+    var lastSitRealtime: Long = 0L // Monotonic for internal cooldown logic
     var baselineSitTilt: Float = -1f
     
     var lastSitVz: Float = 0f
@@ -118,7 +112,7 @@ class LocationSentinel {
         isWarming: Boolean = false,
         manualAdaptiveFloor: Float = -1f,
         acousticLockoutTs: Long = 0L,
-        isMuzzled: Boolean = false, // Issue 99
+        isMuzzled: Boolean = false,
         nowRealtime: Long,
         nowWall: Long
     ): Boolean {
@@ -140,8 +134,6 @@ class LocationSentinel {
             val tiltDelta = abs(safeF(tiltDegrees) - baselineSitTilt)
             val baroDelta = if (baroBaseline > -999) abs(safeF(baroAlt) - baroBaseline) else 0f
             
-            // Issue 77: Use monotonic time for SIT cooldown
-            // Issue 99: Suppress SIT detection during muzzle window
             if (nowRealtime > sitDetectionCooldownTs && !isMuzzled) {
                 val isSpatialTriggered = (tiltDelta > CHAIR_SIT_TILT_THRESHOLD) || 
                                          (baroDelta > CHAIR_SIT_BARO_THRESHOLD) || 
@@ -232,7 +224,7 @@ class LocationSentinel {
         
         if (manualAdaptiveFloor >= 0f) {
             this.adaptiveVibrationFloor = manualAdaptiveFloor
-        } else if (!isMuzzled) { // Issue 99: Don't adapt to I/O jitter noise
+        } else if (!isMuzzled) { 
             this.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(this.adaptiveVibrationFloor, vibration, isWarming)
         }
         
@@ -253,12 +245,14 @@ class LocationSentinel {
     fun getEstimatedBearing(): Float = immFilter.getEstimatedBearing()
     fun getStationaryProbability(): Double = immFilter.getStationaryProbability()
 
+    fun getHindsightBuffer(): List<RejectedPoint> = hindsightBuffer.toList()
+
     fun processLocation(
         lat: Double, lng: Double, alt: Double, accuracy: Float, bearing: Float,
         snr: Float, satsUsed: Int, timestamp: Long, 
         bypassBehavioral: Boolean = false,
         isSuspicious: Boolean = false,
-        isMuzzled: Boolean = false, // Issue 99
+        isMuzzled: Boolean = false, 
         nowWall: Long,
         nowRealtime: Long,
         acousticFloorDb: Double = -1.0
@@ -293,13 +287,13 @@ class LocationSentinel {
         }
         
         val isTractorSlowOverride = gpsMotionStartTs > 0 && (nowRealtime - gpsMotionStartTs > 10000L)
-        // Issue 99: Suppress physical motion flag during muzzle window to prevent false jumps
         val hasPhysicalMotion = if (isMuzzled) false else (currentVibrationIndex > (adaptiveVibrationFloor * 1.5f) || isTractorSlowOverride)
 
         val jumpConfidence = PhysicsUtils.isVisualJump(
             lastLat = lastValidLat, lastLng = lastValidLng,
             newLat = lat, newLng = lng,
             timeDeltaMs = timeDeltaMs, accuracy = accuracy,
+            snr = snr,
             lastSpeedMps = lastValidSpeedMps,
             isParking = isParking,
             altitudeDelta = altitudeDelta,
@@ -325,13 +319,12 @@ class LocationSentinel {
             }
         }
 
-        // Re-evaluate tier and jump status after score augmentation
         val augmentedScore = score.coerceIn(0, 100)
         val timeDeltaSec = timeDeltaMs / 1000.0
         val currentSpeedMps = dist / max(0.1, timeDeltaSec)
         
         val isTier2 = dist >= JUMP_POINT_DISTANCE_THRESHOLD && (currentSpeedMps > MAX_PHYSICAL_SPEED_MPS || augmentedScore >= 40)
-        val isTier3 = dist >= 10.0 && dist < JUMP_POINT_DISTANCE_THRESHOLD && augmentedScore >= 30
+        val isTier3 = dist >= JUMP_CHECK_MIN_DIST && dist < JUMP_POINT_DISTANCE_THRESHOLD && augmentedScore >= 30
         
         val finalTier = when {
             jumpConfidence.tier == 1 -> 1
@@ -362,17 +355,24 @@ class LocationSentinel {
         }
 
         if (!bypassBehavioral) {
-            if (finalJumpConfidence.isJump && lastRejectedTs > 0 && (timestamp - lastRejectedTs) < TRAJECTORY_PROMOTION_WINDOW_MS) {
-                if (isConsistentTrajectory(lat, lng, bearing, currentSpeedMps, nowWall)) {
-                    clearRejected()
-                    updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
+            // Issue #220: Hindsight Correction (Rubber-Band Logic)
+            if (hindsightBuffer.isNotEmpty()) {
+                val lastRejected = hindsightBuffer.last()
+                if (isConsistentWithHindsight(lat, lng, bearing, currentSpeedMps, timestamp, lastRejected)) {
+                    // "Reel in" the rubber band: process buffered points sequentially
+                    hindsightBuffer.forEach { p ->
+                        immFilter.update(p.lat, p.lng, p.accuracy, p.ts, SUSPICIOUS_Q_SCALE)
+                        updateLastValid(p.lat, p.lng, p.alt, p.ts, p.speedMps, p.bearing)
+                    }
+                    // hindsightBuffer.clear() - should be cleared when status is promoted
                     val optimized = immFilter.update(lat, lng, accuracy, timestamp, SUSPICIOUS_Q_SCALE)
-                    return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted", optimized, finalJumpConfidence)
+                    updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
+                    return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted (Hindsight)", optimized, finalJumpConfidence)
                 }
             }
 
             if (behavioralStatus == SentinelStatus.JUMP || behavioralStatus == SentinelStatus.JITTER) {
-                storeRejected(lat, lng, timestamp, currentSpeedMps, bearing)
+                storeRejected(lat, lng, alt, accuracy, bearing, currentSpeedMps, timestamp)
                 return SentinelResult(behavioralStatus, finalJumpConfidence.reason, jumpConfidence = finalJumpConfidence)
             }
 
@@ -390,24 +390,27 @@ class LocationSentinel {
 
         val optimizedPoint = immFilter.update(lat, lng, accuracy, timestamp, effectiveQScale)
         updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
-        clearRejected()
+        clearRejected() // Confirm current trajectory as valid, clear potential jumps
         return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = optimizedPoint, jumpConfidence = finalJumpConfidence)
     }
 
-    private fun isConsistentTrajectory(newLat: Double, newLng: Double, newBearing: Float, newSpeedMps: Double, nowWall: Long): Boolean {
-        val angleDiff = abs(newBearing - lastRejectedBearing).let { if (it > 180) 360 - it else it }
-        val distFromRejected = PhysicsUtils.calculateDistance(lastRejectedLat, lastRejectedLng, newLat, newLng)
-        val timeFromRejected = (nowWall - lastRejectedTs) / 1000.0
+    private fun isConsistentWithHindsight(newLat: Double, newLng: Double, newBearing: Float, newSpeedMps: Double, timestamp: Long, lastRejected: RejectedPoint): Boolean {
+        val angleDiff = abs(newBearing - lastRejected.bearing).let { if (it > 180) 360 - it else it }
+        val distFromRejected = PhysicsUtils.calculateDistance(lastRejected.lat, lastRejected.lng, newLat, newLng)
+        val timeFromRejected = (timestamp - lastRejected.ts) / 1000.0
         val impliedSpeed = distFromRejected / max(0.1, timeFromRejected)
-        return angleDiff < PROMOTION_ANGLE_TOLERANCE && abs(impliedSpeed - lastRejectedSpeedMps) < 10.0
+        
+        // Check temporal validity
+        if (timestamp <= lastRejected.ts || (timestamp - lastRejected.ts) > HINDSIGHT_MAX_AGE_MS) return false
+        
+        return angleDiff < PROMOTION_ANGLE_TOLERANCE && abs(impliedSpeed - lastRejected.speedMps) < 10.0
     }
 
     private fun runSensorSentinel(
         lat: Double, lng: Double, alt: Double, accuracy: Float, bearing: Float,
         nowRealtime: Long,
-        isMuzzled: Boolean = false // Issue 99
+        isMuzzled: Boolean = false 
     ): SentinelResult {
-        // Issue 99: Muzzle all physical tamper triggers during jitter window.
         if (!isMuzzled) {
             if (!isNear) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Proximity Far")
             if (isPowerTamper) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Power disconnected")
@@ -426,21 +429,17 @@ class LocationSentinel {
             }
         }
         
-        // Issue 99: Muzzle light-based tamper during jitter window
         if (!isMuzzled && SentinelValidator.isLightViolated(currentLux, luxBaseline)) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Light jump")
 
         val isAcousticLockedOut = (lastFastPathAcousticSpikeTs > 0 && (nowRealtime - lastFastPathAcousticSpikeTs < ACOUSTIC_LOCKOUT_MS))
-        // Issue 99: Also muzzle acoustic alerts during jitter window
         if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb)) {
             return SentinelResult(SentinelStatus.TAMPER_ALERT, "Acoustic alarm")
         }
 
-        // Issue 99: Suppress vibration suspicion during muzzle window
         if (!isMuzzled && SentinelValidator.isVibrationSuspicious(currentVibrationIndex, adaptiveVibrationFloor)) {
             return SentinelResult(SentinelStatus.SENSOR_SUSPICIOUS, "Vibration suspicion")
         }
         
-        // Issue 99: Suppress acoustic suspicion during muzzle window
         if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb)) {
             return SentinelResult(SentinelStatus.ACOUSTIC_WARNING, "Acoustic suspicion")
         }
@@ -465,15 +464,20 @@ class LocationSentinel {
         lastValidSpeedMps = speedMps; lastValidBearing = bearing
     }
 
-    private fun storeRejected(lat: Double, lng: Double, ts: Long, speedMps: Double, bearing: Float) {
-        lastRejectedLat = lat
-        lastRejectedLng = lng
-        lastRejectedTs = ts
-        lastRejectedSpeedMps = speedMps
-        lastRejectedBearing = bearing
+    private fun storeRejected(lat: Double, lng: Double, alt: Double, accuracy: Float, bearing: Float, speedMps: Double, ts: Long) {
+        // Prune old points
+        val now = ts
+        hindsightBuffer.removeAll { (now - it.ts) > HINDSIGHT_MAX_AGE_MS }
+        
+        if (hindsightBuffer.size >= HINDSIGHT_BUFFER_SIZE) {
+            hindsightBuffer.removeAt(0)
+        }
+        hindsightBuffer.add(RejectedPoint(lat, lng, alt, accuracy, bearing, speedMps, ts))
     }
 
-    private fun clearRejected() { lastRejectedTs = 0L }
+    private fun clearRejected() { 
+        hindsightBuffer.clear() 
+    }
 
     fun reset() {
         lastValidTs = 0L; currentVibrationIndex = 0f; currentBaroAlt = 0f; prevValidLat = 0.0; prevValidLng = 0.0
@@ -485,6 +489,7 @@ class LocationSentinel {
         lastSitVz = 0f; lastSitVzTs = 0L; lastSitDz = 0f; lastSitBaro = 0f; lastSitTilt = 0f; lastSitShock = 0f
         gpsMotionStartTs = 0L
         lastFastPathAcousticSpikeTs = 0L
+        hindsightBuffer.clear()
         immFilter.reset()
     }
 }

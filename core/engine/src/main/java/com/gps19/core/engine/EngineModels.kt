@@ -4,14 +4,11 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v8.9.18:
+ * - Issue #220: Added RejectedPoint for hindsight correction.
+ * - Issue #219: Added isAdaptiveJump to JumpConfidence.
  * v8.9.7:
  * - Plunge Matching: Added sitVzTs to EngineConnectionPoint for forensic parity.
- * v8.9.6:
- * - Issue 190: Added xiaomiAutostartStatus and removed redundant isXiaomiAutostartGranted from AlarmEvaluationState.
- * v8.9.5:
- * - Issue 192: Added currentMa to EngineConnectionPoint for forensic parity.
- * v8.9.2:
- * - Issue 182: Synchronized version strings to v8.9.2 baseline.
  */
 
 @Serializable
@@ -108,6 +105,7 @@ data class JumpConfidence(
     val score: Int = 0, 
     val isJump: Boolean = false,
     val isOutlier: Boolean = false,
+    val isAdaptiveJump: Boolean = false,
     val tier: Int = 0, 
     val reason: String = ""
 )
@@ -123,6 +121,19 @@ data class SatelliteInfo(
 @Serializable
 data class GnssDetail(
     val satellites: List<SatelliteInfo> = emptyList()
+)
+
+/**
+ * RejectedPoint: Used for hindsight trajectory correction.
+ */
+data class RejectedPoint(
+    val lat: Double,
+    val lng: Double,
+    val alt: Double,
+    val accuracy: Float,
+    val bearing: Float,
+    val speedMps: Double,
+    val ts: Long
 )
 
 /**
@@ -172,6 +183,7 @@ data class AlarmEvaluationState(
     val isTrackerVisualJump: Boolean = false,
     val isTrajectoryPromoted: Boolean = false,
     val jumpTier: Int = 0,
+    val isAdaptiveJump: Boolean = false,
     val trackerBattery: Int, 
     val trackerTemp: Float,
     var wasDistanceViolated: Boolean, 

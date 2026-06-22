@@ -1,4 +1,4 @@
-# Device-Specific Adaptations (v8.9.10)
+# Device-Specific Adaptations (v8.9.18)
 
 This document describes the specialized logic and polling configurations implemented to bypass OEM-specific background restrictions on supported hardware.
 
@@ -24,13 +24,18 @@ The system monitors `isXiaomiAutostartGranted`. If false, a critical `XIAOMI_SYS
 ### 2.2. Boot Resilience (Issue 190)
 Implemented `XIAOMI_BOOT_GRACE_MS` (30s) to suppress transient "System Not Ready" or "Denied" alarms during the MIUI/HyperOS boot transition phase.
 
-### 2.3. Manual Override (R928)
+### 2.3. Heuristic Recovery Pulse (Issue #218)
+To counter aggressive background suppression in MIUI 14+, the system implements a heuristic watchdog.
+- **Detection**: Monitors the gap between service ticks using monotonic time. If the gap exceeds 15s (`XIAOMI_SUPPRESSION_THRESHOLD_MS`), suppression is assumed.
+- **Action**: Triggers an aggressive "Revival Pulse" consisting of GPS hardware refresh, WakeLock renewal, and a Foreground Service Type update to force OS re-prioritization.
+
+### 2.4. Manual Override (R928)
 Users can toggle a "Manual Override" in the Sound Setup to bypass the logic-gate for "UNKNOWN" permission states, allowing the engine to remain active.
 
-### 2.4. Background Persistence
+### 2.5. Background Persistence
 Integrated `isXiaomiAutostartGranted` check in `TrackerService.kt` alarm loop and enabled `HIGH_FREQUENCY_GPS_POLLING_MS` (10Hz) for Xiaomi devices to ensure background stability parity with Samsung S21 FE.
 
-### 2.5. Stability Audit Suite (Issue 168)
+### 2.6. Stability Audit Suite (Issue 168)
 Implemented a GPS Stability Audit suite in `TrackerService` to verify 10Hz persistence on physical Xiaomi hardware.
 - **Metrics**: Tracks fix arrival counts, inter-fix gaps (ms), and max gap observed.
 - **Audit Loop**: Every 10s (`GPS_STABILITY_AUDIT_INTERVAL_MS`), the system emits a "STABILITY AUDIT" log reporting the reliability percentage.

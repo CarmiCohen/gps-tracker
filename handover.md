@@ -1,23 +1,31 @@
-# Project Handover - v8.9.14 Telemetry Hardening
+# Project Handover - v8.9.19 Forensic Phase (STABLE)
 
 ## 1. Context Summary
 - **Project**: `gps-tracker` (Native Android, Kotlin/Compose).
-- **Current Baseline**: **v8.9.14** (Phase 3: Telemetry & Audit Optimization Complete).
-- **Architecture**: Clean Architecture with modular separation. 
-- **Toolchain**: Java 17 and Android SDK 35 (Android 15) confirmed.
+- **Architecture**: Clean Architecture (App/Engine).
+- **Baseline**: **v8.9.19** (Forensic Enrichment).
+- **Database**: **v43** (Migration 42->43 added `snrSnapshot` and `vibeSnapshot` to `LogEntity`).
 
-## 2. Completed in v8.9.14 (Phase 3)
-### Telemetry & Audit Optimization (Issues #211, #212)
-- **Throttle Stability Audit (#211)**: Hardened gating logic in `TrackerService.processTick`. "STABILITY AUDIT" logs now only emit if `reliability < 98%` or `gpsMaxGapMs > 200ms`. This significantly reduces log clutter on high-frequency devices while maintaining forensic visibility into actual performance regressions.
-- **Enhanced Recovery Logic (#212)**: Hardened the historical reconstruction pipeline in `RemoteHandler.handleRemoteLog` to prioritize the persisted `accuracy` field from `LogEntry`. Reconstructed forensic markers now reflect their original spatial precision.
-- **Log Manager Accuracy Hardening**: Updated `LogManager.submitToLogSink` to ensure `accuracy` is intelligently populated from telemetry even when coordinates are explicitly provided without a companion accuracy value.
+## 2. Completed Items (v8.9.18 - v8.9.19)
+- **Issue #221: Bayesian Uncertainty Scaling (FIXED)**: UI radius now expands at 15m/s during GPS stalls based on `lastValidFixRealtime`.
+- **Issue #222: Hindsight Path Visualization (FIXED)**: Map now renders "Ghost Paths" in `Slate500` for points retroactively promoted by hindsight logic.
+- **Issue #223: Forensic Log Enrichment (FIXED)**: 
+    - Attached `snr` and `vibe` snapshots to forensic logs.
+    - Updated `LogEntry` model and `LogManager` pipeline.
+    - Synchronized `LocationProcessorListener` across `TrackerService` and `ViewerService`.
+    - Fixed syntax typos in `TrackerService.kt`, `ViewerService.kt`, and `AppAlarmManager.kt`.
 
-## 3. Pending Tasks
-1.  **Issue #190: MIUI 14 Field Verification**:
-    - Awaiting physical hardware verification of the boot grace period.
+## 3. Current Task: Stable Baseline Achieved
+- **Status**: **RESOLVED**. Build `assembleDebug` successful.
+- **Verification**: Database v43 schema verified and telemetry pipeline bridged.
 
-## 4. Key Files for Reference
-- `issues.md`: Master tracking of all fixed and open issues.
-- `core/engine/src/main/java/com/gps19/core/engine/EngineConstants.kt`: Centralized stability thresholds.
-- `app/src/main/java/com/gps19/app/LogManager.kt`: Hardened accuracy propagation.
-- `app/src/main/java/com/gps19/app/RemoteHandler.kt`: Accuracy-aware historical recovery.
+## 4. Next Steps
+1. **Regression Testing**: Monitor log sink for new `snr_snapshot` and `vibe_snapshot` fields in real-world conditions.
+2. **UI Integration**: Consider visualizing SNR/Vibe snapshots in the Log Viewer detail pane.
+
+## 5. Build Status
+- **Status**: SUCCESS.
+- **Target**: v8.9.20 (UI/UX Refinement).
+
+---
+*Handover v8.9.19 (Forensic Enrichment Finalized). Session Terminated.*

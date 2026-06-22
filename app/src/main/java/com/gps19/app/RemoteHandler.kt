@@ -15,6 +15,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v8.9.18:
+ * - Issue #221: Parsing lastValidFixRealtime for Bayesian uncertainty scaling.
  * v8.9.13:
  * - Issue #212: Finalized accuracy-aware forensic recovery logic.
  * v8.9.11:
@@ -153,7 +155,7 @@ class RemoteHandler(
                 isTrackerStorageLow = s.isStorageLow
                 isTrackerStorageCritical = s.isStorageCritical
                 
-                trackerLastValidFixRealtime = timeProvider.elapsedRealtime()
+                trackerLastValidFixRealtime = s.lastValidFixRealtime
 
                 repository.updateLocation(LocationUpdate(
                     lat = trackerLat, lng = trackerLng, speed = trackerSpeed, accuracy = trackerAccuracy, bearing = trackerBearing,
@@ -177,6 +179,7 @@ class RemoteHandler(
                     lastDiscTs = trackerLastDiscTs,
                     violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage,
                     isLocationPending = isTrackerLocationPending,
+                    lastValidFixRealtime = trackerLastValidFixRealtime,
                     isPowerSaveMode = isTrackerPowerSaveMode,
                     standbyBucket = trackerStandbyBucket,
                     netInterface = trackerNetInterface,
@@ -374,6 +377,7 @@ class RemoteHandler(
             trackerLastSitTs = data.optLong("last_sit_ts", trackerLastSitTs)
             trackerVerticalVelocity = data.optDouble("vertical_velocity", trackerVerticalVelocity.toDouble()).toFloat()
             isTrackerLocationPending = data.optBoolean("is_location_pending", false)
+            trackerLastValidFixRealtime = data.optLong("last_valid_fix_realtime", trackerLastValidFixRealtime)
             trackerSnrIdx = data.optDouble("snr_idx", trackerSnrIdx.toDouble()).toFloat()
             isTrackerBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false)
             isTrackerCoolingModeActive = data.optBoolean("is_cooling_mode_active", false)
@@ -584,6 +588,7 @@ class RemoteHandler(
                     violationPercentage = violationPercentage,
                     isClockRegression = isTrackerClockRegression,
                     isLocationPending = isTrackerLocationPending,
+                    lastValidFixRealtime = trackerLastValidFixRealtime,
                     isPowerSaveMode = isTrackerPowerSaveMode,
                     standbyBucket = trackerStandbyBucket,
                     netInterface = trackerNetInterface,
@@ -614,6 +619,7 @@ class RemoteHandler(
                     proxIdx = trackerProxIdx, isSuspicious = isTrackerSuspicious, isTamperDetected = isTrackerTamperDetected,
                     isTrajectoryPromoted = isTrackerTrajectoryPromoted, jumpTier = trackerJumpTier,
                     isLocationPending = isTrackerLocationPending,
+                    lastValidFixRealtime = trackerLastValidFixRealtime,
                     isPowerSaveMode = isTrackerPowerSaveMode,
                     standbyBucket = trackerStandbyBucket,
                     netInterface = trackerNetInterface,

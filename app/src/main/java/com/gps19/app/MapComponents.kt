@@ -48,20 +48,17 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * v8.9.8:
- * - Issue 193: Forensic Sweep - Switched stale marker colors to Slate500 (Ghost Mode).
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * v8.8.36:
- * - Issue 147: Migrated marker and polyline pools to SnapshotStateList to resolve "failed lock verification" warnings.
- * - Issue 165: Migrated to PhysicsUtils for location validation.
- * v8.8.32: Forensic Marker Unification - Switched to ALERT_ID_VISUAL_JUMP constant.
+ * v8.9.19:
+ * - Issue #222: Implemented Ghost Path visualization for hindsight-corrected segments.
+ * v8.9.18:
+ * - Issue #221: Implemented Bayesian uncertainty scaling for "Location Pending" state.
  */
 
 @Composable
 fun AppMapContainer(
     uiState: MainUiState,
     systemPulse: Long,
+    systemPulseRealtime: Long,
     onEvent: (UiEvent) -> Unit,
     onClearTrails: () -> Unit,
     trail: List<TrailPoint>,
@@ -82,11 +79,15 @@ fun AppMapContainer(
     val trackerLng = if (isTrackerMode) uiState.localLocation.lng else uiState.trackerLocation.lng
     val trackerBearing = if (isTrackerMode) uiState.localLocation.bearing else uiState.trackerLocation.bearing
     val trackerAccuracy = if (isTrackerMode) uiState.localLocation.accuracy else uiState.trackerLocation.accuracy
+    val trackerLastValidFixRealtime = if (isTrackerMode) uiState.localLocation.lastValidFixRealtime else uiState.trackerLocation.lastValidFixRealtime
+    val trackerLocationPending = if (isTrackerMode) uiState.localLocation.isLocationPending else uiState.trackerLocation.isLocationPending
     
     val viewerLat = if (isTrackerMode) uiState.trackerLocation.lat else uiState.localLocation.lat
     val viewerLng = if (isTrackerMode) uiState.trackerLocation.lng else uiState.localLocation.lng
     val viewerBearing = if (isTrackerMode) uiState.localLocation.bearing else uiState.trackerLocation.bearing
     val viewerAccuracy = if (isTrackerMode) uiState.localLocation.accuracy else uiState.trackerLocation.accuracy
+    val viewerLastValidFixRealtime = if (isTrackerMode) uiState.trackerLocation.lastValidFixRealtime else uiState.localLocation.lastValidFixRealtime
+    val viewerLocationPending = if (isTrackerMode) uiState.trackerLocation.isLocationPending else uiState.localLocation.isLocationPending
     
     val trackerGpsAge = if (isTrackerMode) (if (uiState.localLocation.timestamp > 0) now - uiState.localLocation.timestamp else Long.MAX_VALUE)
                  else (if (uiState.trackerLocation.timestamp > 0) now - uiState.trackerLocation.timestamp else Long.MAX_VALUE)
@@ -141,7 +142,12 @@ fun AppMapContainer(
             onLockChange = { onEvent(UiEvent.SetMapLocked(it)) },
             mapViewRef = mapViewRef,
             geofenceMode = uiState.geofenceMode,
-            systemPulse = now
+            systemPulse = now,
+            systemPulseRealtime = systemPulseRealtime,
+            isLocationPending = trackerLocationPending,
+            lastValidFixRealtime = trackerLastValidFixRealtime,
+            isMeLocationPending = viewerLocationPending,
+            meLastValidFixRealtime = viewerLastValidFixRealtime
         )
 
         Text(
@@ -237,7 +243,12 @@ fun OsmMap(
     isLocked: Boolean = true, onLockChange: (Boolean) -> Unit = {},
     mapViewRef: MutableState<MapView?> = remember { mutableStateOf(null) },
     geofenceMode: GeofenceMode = GeofenceMode.IDLE,
-    systemPulse: Long = 0L
+    systemPulse: Long = 0L,
+    systemPulseRealtime: Long = 0L,
+    isLocationPending: Boolean = false,
+    lastValidFixRealtime: Long = 0L,
+    isMeLocationPending: Boolean = false,
+    meLastValidFixRealtime: Long = 0L
 ) {
     val context = LocalContext.current
     val resources = remember(context) { context.resources }
@@ -283,7 +294,7 @@ fun OsmMap(
     val accuracyCirclesFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
     val violationMarkersFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
 
-    // R818: Persistent marker pools - Migrated to SnapshotStateList for Issue 147
+    // R818: Persistent marker pools
     val violationMarkerPool = remember { mutableStateListOf<Marker>() }
     val homeMarkerPool = remember { mutableStateListOf<Marker>() }
     val trackerPolylinePool = remember { mutableStateListOf<Polyline>() }
@@ -401,7 +412,6 @@ fun OsmMap(
             val homeFolder = homeMarkersFolderRef.value!!
             homeFolder.items.clear()
             
-            // Issue #4 Hardening: Marker Pool Pruning safety gate
             val activeHomeSize = if (isFenceVisible) home.size else 0
             if (homeMarkerPool.size > activeHomeSize + MARKER_POOL_PRUNE_THRESHOLD) {
                 val keepSize = maxOf(activeHomeSize + 5, MARKER_POOL_PRUNE_THRESHOLD)
@@ -451,21 +461,20 @@ fun OsmMap(
 
         if (lastTrailRendered.value != trail || lastViewerTrailRendered.value != viewerTrail) {
             trailFolderRef.value?.items?.clear()
-            drawTrailToFolder(view, trailFolderRef.value!!, trail, Lime500.toArgb(), trackerPolylinePool)
+            drawTrailToFolder(view, trailFolderRef.value!!, trail, Lime500.toArgb(), Slate500.toArgb(), trackerPolylinePool)
             
             viewerTrailFolderRef.value?.items?.clear()
-            drawTrailToFolder(view, viewerTrailFolderRef.value!!, viewerTrail, ViewerOrange.toArgb(), viewerPolylinePool)
+            drawTrailToFolder(view, viewerTrailFolderRef.value!!, viewerTrail, ViewerOrange.toArgb(), Slate500.toArgb(), viewerPolylinePool)
             
             lastTrailRendered.value = trail.toList()
             lastViewerTrailRendered.value = viewerTrail.toList()
 
-            // Issue #4: Soft Pruning for Polyline pools
-            val trSegs = trail.count { it.isJump } + 1
+            val trSegs = trail.count { it.isJump } + trail.count { it.isHindsightCorrected } + 1
             if (trackerPolylinePool.size > trSegs + MARKER_POOL_PRUNE_THRESHOLD) {
                 val keep = maxOf(trSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)
                 while(trackerPolylinePool.size > keep) trackerPolylinePool.removeAt(trackerPolylinePool.size - 1)
             }
-            val viSegs = viewerTrail.count { it.isJump } + 1
+            val viSegs = viewerTrail.count { it.isJump } + viewerTrail.count { it.isHindsightCorrected } + 1
             if (viewerPolylinePool.size > viSegs + MARKER_POOL_PRUNE_THRESHOLD) {
                 val keep = maxOf(viSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)
                 while(viewerPolylinePool.size > keep) viewerPolylinePool.removeAt(viewerPolylinePool.size - 1)
@@ -483,7 +492,6 @@ fun OsmMap(
                 (isJumpViolation && isViolationsVisible) || (isGeofence && isGeofenceViolationsVisible)
             }
 
-            // Issue #4 Hardening: Soft Pruning for Violation Marker Pool
             if (violationMarkerPool.size > filteredViolations.size + MARKER_POOL_PRUNE_THRESHOLD) {
                 val keepSize = maxOf(filteredViolations.size + 5, MARKER_POOL_PRUNE_THRESHOLD)
                 while (violationMarkerPool.size > keepSize) {
@@ -514,7 +522,14 @@ fun OsmMap(
         accuracyCirclesFolderRef.value?.items?.clear()
         if (trackerValid && accuracy > 0) {
             trackerCircleRef.value?.let { p ->
-                val circlePoints = Polygon.pointsAsCircle(GeoPoint(lat, lng), accuracy.toDouble())
+                val effectiveAccuracy = if (isLocationPending && lastValidFixRealtime > 0) {
+                    val elapsedSec = (systemPulseRealtime - lastValidFixRealtime) / 1000f
+                    accuracy + (PENDING_UNCERTAINTY_GROWTH_RATE_MPS * elapsedSec)
+                } else {
+                    accuracy
+                }
+                
+                val circlePoints = Polygon.pointsAsCircle(GeoPoint(lat, lng), effectiveAccuracy.toDouble())
                 p.points = circlePoints.map { GeoPoint(it.latitude, it.longitude) }
                 p.outlinePaint.color = if (isFresh) Lime500.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                 accuracyCirclesFolderRef.value?.add(p)
@@ -522,7 +537,14 @@ fun OsmMap(
         }
         if (meValid && myAccuracy != null && myAccuracy > 0) {
             viewerCircleRef.value?.let { p ->
-                val circlePoints = Polygon.pointsAsCircle(GeoPoint(myLat!!, myLng!!), myAccuracy.toDouble())
+                val effectiveMyAccuracy = if (isMeLocationPending && meLastValidFixRealtime > 0) {
+                    val elapsedSec = (systemPulseRealtime - meLastValidFixRealtime) / 1000f
+                    myAccuracy + (PENDING_UNCERTAINTY_GROWTH_RATE_MPS * elapsedSec)
+                } else {
+                    myAccuracy
+                }
+                
+                val circlePoints = Polygon.pointsAsCircle(GeoPoint(myLat!!, myLng!!), effectiveMyAccuracy.toDouble())
                 p.points = circlePoints.map { GeoPoint(it.latitude, it.longitude) }
                 p.outlinePaint.color = if (isMeFresh) ViewerOrange.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                 accuracyCirclesFolderRef.value?.add(p)
@@ -549,25 +571,37 @@ fun OsmMap(
     }, modifier = Modifier.fillMaxSize())
 }
 
-private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, colorNormal: Int, pool: SnapshotStateList<Polyline>) {
+private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, colorNormal: Int, colorHindsight: Int, pool: SnapshotStateList<Polyline>) {
     if (trailPoints.isNotEmpty()) {
         var currentSegment = mutableListOf<GeoPoint>()
+        var isCurrentSegmentHindsight = false
         var poolIdx = 0
-        trailPoints.forEach { pt -> 
+        
+        trailPoints.forEachIndexed { idx, pt -> 
             if (pt.isJump) { 
                 if (currentSegment.isNotEmpty()) { 
-                    addTrailSegmentToFolder(view, folder, currentSegment, colorNormal, pool, poolIdx++); 
+                    addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++); 
                     currentSegment = mutableListOf() 
                 } 
             } else {
+                // If hindsight status changes, break segment
+                if (idx > 0 && pt.isHindsightCorrected != isCurrentSegmentHindsight && currentSegment.isNotEmpty()) {
+                    addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++)
+                    currentSegment = mutableListOf()
+                    // Bridge the gap by adding the last point of previous segment
+                    currentSegment.add(trailPoints[idx-1].toGeoPoint())
+                }
+                isCurrentSegmentHindsight = pt.isHindsightCorrected
                 currentSegment.add(pt.toGeoPoint())
             }
         }
-        if (currentSegment.isNotEmpty()) addTrailSegmentToFolder(view, folder, currentSegment, colorNormal, pool, poolIdx++)
+        if (currentSegment.isNotEmpty()) {
+            addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++)
+        }
     }
 }
 
-private fun addTrailSegmentToFolder(view: MapView, folder: FolderOverlay, segment: List<GeoPoint>, colorNormal: Int, pool: SnapshotStateList<Polyline>, poolIdx: Int) {
+private fun addTrailSegmentToFolder(view: MapView, folder: FolderOverlay, segment: List<GeoPoint>, color: Int, pool: SnapshotStateList<Polyline>, poolIdx: Int) {
     val line = if (poolIdx < pool.size) {
         pool[poolIdx]
     } else {
@@ -578,7 +612,7 @@ private fun addTrailSegmentToFolder(view: MapView, folder: FolderOverlay, segmen
         l
     }
     line.setPoints(segment)
-    line.outlinePaint.color = colorNormal
+    line.outlinePaint.color = color
     folder.add(line)
 }
 

@@ -7,13 +7,9 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
- * v8.9.11:
- * - Issue #212: Added accuracy to LogEntity for forensic parity in historical recovery.
- * v8.9.10:
- * - Issue 209: Added lat/lng to LogEntity for historical marker recovery.
- * v8.9.7:
- * - Plunge Matching: Added sitVzTs to HistoryEntity and PendingStatusEntity for forensic parity.
- * - Issue 194: Added 'synced' column to LogEntity and implemented reliable log sync queries.
+ * v8.9.19:
+ * - Issue #223: Added snrSnapshot and vibeSnapshot to LogEntity for forensic enrichment.
+ * - Issue #222: Added isHindsightCorrected to TrailEntity for ghost-path visualization.
  */
 @Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
 data class LogEntity(
@@ -35,7 +31,9 @@ data class LogEntity(
     @ColumnInfo(defaultValue = "0") val synced: Boolean = false,
     @ColumnInfo(defaultValue = "0") val lat: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val lng: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val accuracy: Float = 0f
+    @ColumnInfo(defaultValue = "0") val accuracy: Float = 0f,
+    val snrSnapshot: Float? = null,
+    val vibeSnapshot: Float? = null
 )
 
 @Entity(tableName = "trail_points", indices = [Index(value = ["timestamp"])])
@@ -45,7 +43,8 @@ data class TrailEntity(
     @ColumnInfo(name = "lng") val lng: Double,
     val timestamp: Long,
     val isViewerTrail: Boolean,
-    val isJump: Boolean = false
+    val isJump: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val isHindsightCorrected: Boolean = false
 )
 
 @Entity(tableName = "connection_history", indices = [Index(value = ["ts"])])
@@ -107,6 +106,7 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val gpsTs: Long = 0L,
     val satsView: Int,
     val satsUsed: Int,
+    val name: String? = null,
     val maxAccuracy: Float,
     val distToTracker: Double? = null,
     val distToHome: Double? = null,
@@ -126,7 +126,8 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val isStorageCritical: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isPowerSaveMode: Boolean = false,
     @ColumnInfo(defaultValue = "-1") val standbyBucket: Int = -1,
-    @ColumnInfo(defaultValue = "UNKNOWN") val netInterface: String = "UNKNOWN"
+    @ColumnInfo(defaultValue = "UNKNOWN") val netInterface: String = "UNKNOWN",
+    @ColumnInfo(defaultValue = "0") val lastValidFixRealtime: Long = 0L
 )
 
 @Dao
@@ -184,7 +185,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 40, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 43, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -193,6 +194,22 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_42_43 = object : Migration(42, 43) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE logs ADD COLUMN snrSnapshot REAL")
+                db.execSQL("ALTER TABLE logs ADD COLUMN vibeSnapshot REAL")
+            }
+        }
+        val MIGRATION_41_42 = object : Migration(41, 42) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE trail_points ADD COLUMN isHindsightCorrected INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+        val MIGRATION_40_41 = object : Migration(40, 41) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN lastValidFixRealtime INTEGER NOT NULL DEFAULT 0")
+            }
+        }
         val MIGRATION_39_40 = object : Migration(39, 40) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE logs ADD COLUMN accuracy REAL NOT NULL DEFAULT 0")
@@ -240,7 +257,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_trail_points_timestamp ON trail_points (timestamp)")
 
                 db.execSQL("CREATE TABLE connection_history_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, ts INTEGER NOT NULL, rtt INTEGER NOT NULL, isConnected INTEGER NOT NULL, isGap INTEGER NOT NULL, hasGps INTEGER NOT NULL, isTick INTEGER NOT NULL, ribbonKey TEXT NOT NULL, gpsIndex REAL NOT NULL, noiseIdx REAL NOT NULL, luxIdx REAL NOT NULL, vibeIdx REAL NOT NULL, proxIdx REAL NOT NULL, liftIdx REAL NOT NULL, snrIdx REAL NOT NULL, verticalVelocity REAL NOT NULL, sitVz REAL NOT NULL, sitDz REAL NOT NULL, isBatterySteepDischarge INTEGER NOT NULL, remoteSig INTEGER NOT NULL, isCoolingModeActive INTEGER NOT NULL, speed REAL NOT NULL, bearing REAL NOT NULL, isSitDetected INTEGER NOT NULL, isSitActive INTEGER NOT NULL, sitBaro REAL NOT NULL, sitTilt REAL NOT NULL, sitShock REAL NOT NULL)")
-                db.execSQL("INSERT INTO connection_history_new (id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, verticalVelocity, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock) SELECT id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, 0, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock FROM connection_history")
+                db.execSQL("INSERT INTO connection_history_new (id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, 0, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock) SELECT id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, 0, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock FROM connection_history")
                 db.execSQL("DROP TABLE connection_history"); db.execSQL("ALTER TABLE connection_history_new RENAME TO connection_history")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_connection_history_ts ON connection_history (ts)")
 
