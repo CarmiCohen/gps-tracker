@@ -1,4 +1,4 @@
-# GPS Tracker: Event and Alert Tables (v8.9.10)
+# GPS Tracker: Event and Alert Tables (v8.9.20)
 
 This document summarizes all system alerts, their trigger logic, timing, and how they are presented to the user in both the Event Log and the Red Screen (Alarm Overlay).
 
@@ -16,7 +16,7 @@ This document summarizes all system alerts, their trigger logic, timing, and how
 | **Viewer: Signal Lost** | No data packets | **30 Seconds** | **30 Seconds** | Aligned with `VIEWER_SIGNAL_LOSS_THRESHOLD_MS`. |
 | **Tracker: GPS Stalled** | No movement | **60 Seconds** | **60 Seconds** | Aligned with `GPS_STALL_THRESHOLD_MS`. |
 | **Tracker: GPS Gap** | Stale data (>60s) | **60 Seconds** | **60 Seconds** | Aligned with `GPS_GAP_THRESHOLD_MS`. |
-| **Tracker: Geofence** | Out of fence | **60 Seconds** | **60 Seconds** | Aligned with `DISTANCE_GRACE_MS`. Requires 6 samples. |
+| **Tracker: Geofence** | Out of fence | **60 Seconds** | **60 Seconds** | Aligned with `BOOTSTRAP_PHASE_MS`. Requires 6 samples. |
 | **Tracker: Charger unplugged** | USB Power Off | **3 Seconds** | **3 Seconds** | Aligned with `POWER_DISCONNECT_DEBOUNCE_MS`. |
 | **Tracker: Low Battery** | Battery < 20% | Immediate | **Immediate** | Siren triggers on first packet (`CRITICAL_BATTERY_THRESHOLD`). |
 | **Tracker: High Temp** | Temp > 46.0°C | Immediate | **Immediate** | Siren triggers on first packet (`MAX_SAFE_TEMPERATURE_CELSIUS`). |

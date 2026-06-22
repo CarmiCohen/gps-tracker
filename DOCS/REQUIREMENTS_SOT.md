@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.19
+# System Source of Truth (SoT) - v8.9.20
 
 This document serves as the definitive operational specification for the GPS-Tracker system.
 
@@ -28,7 +28,6 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `TELEMETRY_UI_STALE_THRESHOLD_MS`| 10,000ms | Threshold for "Ghost Mode" visual dimming (v8.9.10). |
 | `WATCH_DOG_UI_GRACE_MS` | 30,000ms | UI Staleness threshold for Link health. |
 | `SENSOR_GRACE_PERIOD_MS` | 600,000ms | UI Visibility cutoff (10m). Values revert to -- after this period. |
-| `DISTANCE_GRACE_MS` | 60,000ms | Initial grace period for geofence (BOOTSTRAP phase). [REDUNDANT: See Issue #229] |
 | `COMMUNICATION_ALARM_GRACE_PERIOD_MS`| 60,000ms | Grace period for network-related peer alarms. |
 | `LOCATION_ALARM_GRACE_PERIOD_MS`| 30,000ms | Grace period for location-related peer alarms. |
 | `SIREN_AUTO_STOP_MS` | 45,000ms | Automatic siren cutoff to prevent battery drain. |
@@ -75,7 +74,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `TRAJECTORY_PROMOTION_WINDOW_MS`| 30,000ms | Window for consistent movement to override Jump rejection. |
 | `DISTANCE_ALARM_SAMPLES_REQUIRED`| 6 | Required consecutive samples for distance violation. |
 | `OUTLIER_DISTANCE_THRESHOLD` | 2000.0m | Tier 1 Outlier distance floor. |
-| `OUTLIER_SPEED_CAP_MPS` | 83.33 m/s| Tier 1 Outlier speed cap (300 km/h). |
+| `OUTLIER_SPEED_CAP_MPS` | 83.33 m/s| Tier 1 Outlier speed_cap (300 km/h). |
 | `JUMP_POINT_DISTANCE_THRESHOLD`| 100.0m | Tier 2 Security Jump distance floor. |
 | `JUMP_GATE_VISUAL_JITTER_METERS`| 10.0m | Tier 3 Visual Jitter distance floor. |
 | `MAX_PHYSICAL_SPEED_MPS` | 33.33 m/s| Tier 2 Security speed limit (120 km/h). |
@@ -142,7 +141,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT` | 20.0m | Accuracy required to resolve distance violations. |
 | `GPS_STABILITY_AUDIT_INTERVAL_MS` | 10,000ms | Interval for periodic GPS performance evaluation. |
 | `GPS_STABILITY_GAP_THRESHOLD_MS` | 200ms | Maximum fix-to-fix gap allowed before audit log. |
-| `GPS_STABILITY_RELIABILITY_THRESHOLD` | 98.0% | Minimum fix reliability required before audit log. [CONTRADICTION: Code says 98%, SoT previously 95%] |
+| `GPS_STABILITY_RELIABILITY_THRESHOLD` | 98.0% | Minimum fix reliability required before audit log. |
 | `PENDING_UNCERTAINTY_GROWTH_RATE_MPS`| 15.0 m/s | Growth rate of UI uncertainty radius during GPS stalls. |
 | `HINDSIGHT_BUFFER_SIZE` | 5 | Size of the rolling buffer for hindsight trajectory correction. |
 | `HINDSIGHT_MAX_AGE_MS` | 30,000ms | Maximum age of points in the hindsight buffer. |
@@ -179,7 +178,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `RIBBON_VIBRATION_SCALE_G` | 2.0g | Maximum range for vibration ribbon mapping. |
 | `RIBBON_LIFT_SCALE_METERS` | 5.0m | Maximum range for barometric lift ribbon mapping. |
 | `RIBBON_SNR_SCALE_DB` | 45.0dB | Maximum range for SNR ribbon mapping. |
-| `RIBBON_CURRENT_SCALE_MA` | 1000mA | Maximum range for battery current ribbon mapping. [INCONSISTENCY: Hardcoded in UI] |
+| `RIBBON_CURRENT_SCALE_MA` | 1000mA | Maximum range for battery current ribbon mapping. |
 
 ## 3. Network & Connectivity
 | Constant | Value | Description |
@@ -199,7 +198,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ## 4. Remote Forensic Verification
 ### 4.1. Version & Role Visibility
-*   **Engine Identity**: The system operates on the v8.9.19 baseline logic.
+*   **Engine Identity**: The system operates on the v8.9.20 baseline logic.
 *   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using a timestamp (`yearOffset` + `MMddHHmm`) or git commits to ensure uniqueness.
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Standardized Alert IDs**: Aligned with `EngineConstants.kt`. Includes `VISUAL_JUMP` for trajectory-based jumps.
@@ -261,7 +260,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ---
 
-## 8. Forensic Alert Manifest (v8.9.19)
+## 8. Forensic Alert Manifest (v8.9.20)
 | Alert ID | Alert Title (Standardized) | Trigger Description |
 | :--- | :--- | :--- |
 | `LOCAL_INTERNET` | This device: Internet Lost | Local connectivity failure. |
@@ -269,7 +268,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `TRACKER_OFFLINE` | Tracker: Offline | Tracker disconnected from relay. |
 | `SIGNAL_LOSS` | Tracker: Signal Lost | No telemetry for >180s (Tracker) / >30s (Viewer). |
 | `JUMP_ALERT` | Tracker: Jammer Alert | GPS sustained instability / Jump rejection. |
-| `VISUAL_JUMP` | Tracker: Visual Jump | Trajectory-based jump detected by engine. [CONTRADICTION: Missing in MainAlarmLogic] |
+| `VISUAL_JUMP` | Tracker: Visual Jump | Trajectory-based jump detected by engine. |
 | `GEOFENCE_VIOLATION`| Tracker: Geofence | Breach of max distance or predictive exit. |
 | `GPS_STALL` | Tracker: GPS Stalled | Hardware chip freeze (no updates >60s). |
 | `GPS_GAP` | Tracker: GPS Gap | Fix age exceeded 60s. |
@@ -346,7 +345,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | **Issue 208** | **Log Spatial Anchor Gap**: Implemented coordinate-aware forensic logging. All critical alerts and system events now include `lat`/`lng` for map reconstruction. | **Verified (LogManager/Services)** |
 | **Issue 209** | **Coordinate Propagation Race**: Ensured 1:1 mapping between processing and logging coordinates by expanding the processing listener. | **Verified (LocationProcessor/Services)** |
 | **Issue 210** | **Log Manager Redundancy Audit**: Eliminated redundant service-level coordinate logic; standardized on `LogManager` auto-anchoring. | **Verified (TrackerService/ViewerService)** |
-| **Issue 211** | **Stability Audit Verbosity**: Gated STABILITY AUDIT logs to only emit when performance falls below 95% reliability or 200ms gap. | **Verified (TrackerService)** |
+| **Issue 211** | **Stability Audit Verbosity**: Gated STABILITY AUDIT logs to only emit when performance falls below 98% reliability or 200ms gap. | **Verified (TrackerService)** |
 | **Issue 212** | **Forensic Accuracy Parity**: Logs now preserve and reconstruct historical marker precision using log-specific accuracy values. | **Verified (LogEntry/RemoteHandler)** |
 | **Issue 213** | **Forensic Anchor Desync in AppAlarmManager**: Explicitly propagated coordinates and accuracy in alarm logging callbacks. | **Verified (AppAlarmManager/Services)** |
 | **Issue 214** | **Redundant Accuracy Fallback Logic**: Unified accuracy fallback in LogManager to prioritize fix accuracy then maxAccuracy. | **Verified (LogManager)** |
@@ -359,3 +358,4 @@ This document serves as the definitive operational specification for the GPS-Tra
 | **Issue 221** | **Bayesian Uncertainty Scaling**: UI radius expands at 15m/s during GPS stalls based on `lastValidFixRealtime`. | **Verified (MapComponents)** |
 | **Issue 222** | **Hindsight Path Visualization**: Renders "Ghost Paths" (Slate500) for points retroactively promoted. | **Verified (MapComponents)** |
 | **Issue 223** | **Forensic Log Enrichment**: SNR and Vibration snapshots attached to jump/stall logs for black-box analysis. | **Verified (LogManager/Services)** |
+| **Issue 228/229**| **SoT Constant Synchronization**: Standardized GPS_STABILITY_RELIABILITY_THRESHOLD to 98.0% and removed redundant DISTANCE_GRACE_MS. | **Verified (SoT/EngineConstants)** |

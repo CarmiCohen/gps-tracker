@@ -1,31 +1,29 @@
-# Project Handover - v8.9.19 Forensic Phase (STABLE)
+# Project Handover - v8.9.20 Logic Alignment (STABLE)
 
 ## 1. Context Summary
 - **Project**: `gps-tracker` (Native Android, Kotlin/Compose).
 - **Architecture**: Clean Architecture (App/Engine).
-- **Baseline**: **v8.9.19** (Forensic Enrichment).
-- **Database**: **v43** (Migration 42->43 added `snrSnapshot` and `vibeSnapshot` to `LogEntity`).
+- **Baseline**: **v8.9.20** (Logic Alignment).
+- **Database**: **v43**.
 
-## 2. Completed Items (v8.9.18 - v8.9.19)
-- **Issue #221: Bayesian Uncertainty Scaling (FIXED)**: UI radius now expands at 15m/s during GPS stalls based on `lastValidFixRealtime`.
-- **Issue #222: Hindsight Path Visualization (FIXED)**: Map now renders "Ghost Paths" in `Slate500` for points retroactively promoted by hindsight logic.
-- **Issue #223: Forensic Log Enrichment (FIXED)**: 
-    - Attached `snr` and `vibe` snapshots to forensic logs.
-    - Updated `LogEntry` model and `LogManager` pipeline.
-    - Synchronized `LocationProcessorListener` across `TrackerService` and `ViewerService`.
-    - Fixed syntax typos in `TrackerService.kt`, `ViewerService.kt`, and `AppAlarmManager.kt`.
+## 2. Completed Items (v8.9.20)
+- **Issue #228: SoT Constant Synchronization (FIXED)**:
+    - Updated `REQUIREMENTS_SOT.md` to align `GPS_STABILITY_RELIABILITY_THRESHOLD` with the authoritative code value of 98.0%.
+- **Issue #229: Redundant Constant Cleanup (FIXED)**:
+    - Removed redundant `DISTANCE_GRACE_MS` from `EngineConstants.kt`.
+    - Updated `event-tables.md` to correctly reference `BOOTSTRAP_PHASE_MS` for geofence grace periods.
+    - Synchronized `REQUIREMENTS_SOT.md` by removing the redundant entry.
 
-## 3. Current Task: Stable Baseline Achieved
-- **Status**: **RESOLVED**. Build `assembleDebug` successful.
-- **Verification**: Database v43 schema verified and telemetry pipeline bridged.
+## 3. Current Task: Documentation & Logic Parity Achieved
+- **Status**: **RESOLVED**.
+- **Verification**: `TrackerService.kt` verified to use `GPS_STABILITY_RELIABILITY_THRESHOLD` (98.0%).
 
 ## 4. Next Steps
-1. **Regression Testing**: Monitor log sink for new `snr_snapshot` and `vibe_snapshot` fields in real-world conditions.
-2. **UI Integration**: Consider visualizing SNR/Vibe snapshots in the Log Viewer detail pane.
+1. **Field Verification**: Monitor stability audit logs on hardware to ensure 98% threshold is appropriate for production noise.
 
 ## 5. Build Status
-- **Status**: SUCCESS.
-- **Target**: v8.9.20 (UI/UX Refinement).
+- **Status**: PENDING REBUILD.
+- **Target**: v8.9.21.
 
 ---
-*Handover v8.9.19 (Forensic Enrichment Finalized). Session Terminated.*
+*Handover v8.9.20 (Issue #228 & #229 RESOLVED). Session Terminated.*

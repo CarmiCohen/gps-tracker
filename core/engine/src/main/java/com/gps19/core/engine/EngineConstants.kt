@@ -2,6 +2,11 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.20:
+ * - Issue #229: Removed redundant DISTANCE_GRACE_MS.
+ * v8.9.19:
+ * - Issue #232: Added RIBBON_CURRENT_SCALE_MA.
+ * - Issue #231: Added ALERT_TITLE_VISUAL_JUMP.
  * v8.9.18:
  * - Issue #221: Added PENDING_UNCERTAINTY_GROWTH_RATE_MPS.
  * - Issue #220: Added HINDSIGHT_BUFFER_SIZE and HINDSIGHT_MAX_AGE_MS.
@@ -131,7 +136,6 @@ const val GEOFENCE_BUFFER_MULT = 6.0
 const val GEOFENCE_HYSTERESIS_METERS = 5.0
 const val GEOFENCE_PREDICTIVE_LOOKAHEAD_S = 2.0
 const val GEOFENCE_PREDICTIVE_MIN_SPEED_MPS = 1.0
-const val DISTANCE_GRACE_MS = 60000L
 
 // EMA Factors
 const val LUX_EMA_SLOW = 0.99f
@@ -230,6 +234,7 @@ const val RIBBON_LUX_LOG_SCALE = 5.0
 const val RIBBON_VIBRATION_SCALE_G = 2.0
 const val RIBBON_LIFT_SCALE_METERS = 5.0f
 const val RIBBON_SNR_SCALE_DB = 45.0f
+const val RIBBON_CURRENT_SCALE_MA = 1000.0
 
 // Network Communication (v8.8.21)
 const val MAX_ALLOWED_RTT_MS = 5000
@@ -288,6 +293,7 @@ const val ALERT_TITLE_VIEWER_OFFLINE = "Viewer: Offline"
 const val ALERT_TITLE_SIGNAL_LOSS = "Tracker: Signal Lost"
 const val ALERT_TITLE_VIEWER_SIGNAL_LOSS = "Viewer: Signal Lost"
 const val ALERT_TITLE_JUMP_ALERT = "Tracker: Jammer Alert"
+const val ALERT_TITLE_VISUAL_JUMP = "Tracker: Visual Jump"
 const val ALERT_TITLE_TRACKER_GEOFENCE = "Tracker: Geofence"
 const val ALERT_TITLE_GPS_STALL = "Tracker: GPS Stalled"
 const val ALERT_TITLE_TRACKER_GAP = "Tracker: GPS Gap"
