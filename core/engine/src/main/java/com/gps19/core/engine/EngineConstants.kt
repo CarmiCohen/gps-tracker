@@ -2,6 +2,11 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.26:
+ * - Issue #2: Synchronized version to v8.9.26 baseline.
+ * - Issue #3: Use code precision for LAT_DEG_TO_METERS (111194.92664455874).
+ * - Issue #5: Change the code according to SoT - Standardized Alert Titles to "Tracker:".
+ * - Issue #1: Change SoT according to the code - Removed redundant ACK_SYNC_LOOP_INTERVAL_MS.
  * v8.9.21:
  * - Issue #224: Added RIBBON_SIT_TILT_SCALE_DEG and RIBBON_SIT_BARO_SCALE_METERS for forensic expansion.
  * v8.9.20:
@@ -14,14 +19,6 @@ package com.gps19.core.engine
  * - Issue #220: Added HINDSIGHT_BUFFER_SIZE and HINDSIGHT_MAX_AGE_MS.
  * - Issue #219: Added ADAPTIVE_JUMP_SNR_THRESHOLD and ADAPTIVE_JUMP_HOLD_MULTIPLIER.
  * - Issue #218: Added XIAOMI_SUPPRESSION_THRESHOLD_MS and XIAOMI_RECOVERY_COOLDOWN_MS.
- * v8.9.13:
- * - Issue #211: Tightened Stability Audit threshold to 98% reliability.
- * v8.9.11:
- * - Issue #211: Standardized GPS Stability Audit thresholds (95% reliability, 200ms gap).
- * v8.9.8:
- * - Issue 193: Unified GPS_UI_FAIL_THRESHOLD_MS with TELEMETRY_UI_STALE_THRESHOLD_MS (10s).
- * - Issue 190: Hardened Xiaomi Stability - Shortened Stall detection (60s) and Revival intervals (120s).
- * - Issue 190: Added XIAOMI_BOOT_GRACE_MS (30s) to suppress transient DENIED states during startup.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -144,6 +141,8 @@ const val LUX_EMA_SLOW = 0.99f
 const val LUX_EMA_FAST = 0.01f
 const val LUX_EMA_UP_SLOW = 0.999f
 const val LUX_EMA_UP_FAST = 0.001f
+const val LUX_EMA_DOWN_SLOW = 0.999f
+const val LUX_EMA_DOWN_FAST = 0.01f
 const val ACOUSTIC_EMA_DOWN_SLOW = 0.999f
 const val ACOUSTIC_EMA_DOWN_FAST = 0.01f
 const val ACOUSTIC_EMA_UP_SLOW = 0.9999f
@@ -289,7 +288,7 @@ const val ALERT_ID_SYSTEM_STORAGE_CRITICAL = "SYSTEM_STORAGE_CRITICAL"
 const val ALERT_ID_BATTERY_STEEP_DISCHARGE = "BATTERY_HEALTH"
 const val ALERT_ID_XIAOMI_SYSTEM_MISSING = "XIAOMI_SYSTEM_MISSING"
 
-// Alert Titles (Aligned with R747 Unification)
+// Alert Titles (Aligned with SoT)
 const val ALERT_TITLE_LOCAL_INTERNET = "This device: Internet Lost"
 const val ALERT_TITLE_RELAY_OFFLINE = "This device: Relay Lost"
 const val ALERT_TITLE_TRACKER_OFFLINE = "Tracker: Offline"
@@ -310,10 +309,10 @@ const val ALERT_TITLE_TRACKER_TILT = "Tracker: Tilt Alert"
 const val ALERT_TITLE_TRACKER_ACOUSTIC = "Tracker: Acoustic Alert"
 const val ALERT_TITLE_TRACKER_LIFT = "Tracker: Lift"
 const val ALERT_TITLE_TRACKER_CHAIR = "Tracker: Chair Occupied"
-const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "This device: System Storage Low"
-const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "This device: System Storage Critical"
+const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "Tracker: System Storage Low"
+const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "Tracker: System Storage Critical"
 const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "Tracker: Critical Battery Health"
-const val ALERT_TITLE_XIAOMI_SYSTEM_MISSING = "This device: Xiaomi System Not Ready"
+const val ALERT_TITLE_XIAOMI_SYSTEM_MISSING = "Tracker: Xiaomi System Not Ready"
 
 // System Watchdog & Grace Periods
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L

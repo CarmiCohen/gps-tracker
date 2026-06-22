@@ -18,6 +18,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.27:
+ * - Issue #218: Hardened foreground transitions with safeStartForeground wrapper for Android 14+ resilience.
+ * v8.9.26:
+ * - Issue #242: Removed redundant index calculation; using transmitted indices from RemoteHandler.
+ * v8.9.25:
+ * - Issue #241: Forensic Log Enrichment - Bridging SNR and Vibration snapshots to AppAlarmManager.
  * v8.9.21:
  * - Issue #224: Propagating tiltIdx and baroIdx for forensic ribbon expansion.
  * v8.9.19:
@@ -84,8 +90,8 @@ class ViewerService : BaseMonitorService() {
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, DEFAULT_RELAY_URL)
             configManager.isTrackerMode = false
 
-            alarmManager = AppAlarmManager(this@ViewerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng, acc -> 
-                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng, acc)
+            alarmManager = AppAlarmManager(this@ViewerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng, acc, snr, vibe -> 
+                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng, acc, snr, vibe)
             }
 
             integrityMonitor = IntegrityMonitor(this@ViewerService, repository, timeProvider, onViolationSustained = { }, onLogEvent = { msg, important ->
@@ -250,11 +256,7 @@ class ViewerService : BaseMonitorService() {
     override fun startServiceForeground() {
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
         val msg = "Monitoring system active."
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
-        } else {
-            startForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg))
-        }
+        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
     }
 
     @SuppressLint("InlinedApi")
@@ -265,7 +267,7 @@ class ViewerService : BaseMonitorService() {
                 delay(200)
                 val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
                 val msg = "Monitoring system active."
-                startForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
+                safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
             }
         }
     }
@@ -335,9 +337,6 @@ class ViewerService : BaseMonitorService() {
         val trackerGpsTs = remoteHandler.trackerLastGpsTs
         val gpsAge = if (trackerGpsTs > 0) (now - trackerGpsTs) else 3600000L
         
-        val trackerTiltIdx = (remoteHandler.trackerTiltDegrees / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0f, 1f)
-        val trackerBaroIdx = (abs(remoteHandler.trackerBaroAlt) / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0f, 1f)
-
         historyManager.updateRibbons(
             now = now,
             lastTickTs = lastServiceTickTs,
@@ -354,8 +353,8 @@ class ViewerService : BaseMonitorService() {
             proxIdx = remoteHandler.trackerProxIdx,
             liftIdx = (abs(remoteHandler.trackerBaroAlt) / RIBBON_LIFT_SCALE_METERS).coerceIn(0f, 1f),
             snrIdx = remoteHandler.trackerSnrIdx,
-            tiltIdx = trackerTiltIdx,
-            baroIdx = trackerBaroIdx,
+            tiltIdx = remoteHandler.trackerTiltIdx,
+            baroIdx = remoteHandler.trackerBaroIdx,
             verticalVelocity = remoteHandler.trackerVerticalVelocity,
             sitVz = remoteHandler.trackerSitVz,
             sitDz = remoteHandler.trackerSitDz,
@@ -412,7 +411,9 @@ class ViewerService : BaseMonitorService() {
                 isXiaomiDevice = isXiaomiDevice(),
                 xiaomiStatus = xiaomiStatus,
                 xiaomiAutostartStatus = xiaomiAutostartStatus,
-                isXiaomiManualOverride = isXiaomiManualOverride
+                isXiaomiManualOverride = isXiaomiManualOverride,
+                snrSnapshot = remoteHandler.trackerSnrIdx * RIBBON_SNR_SCALE_DB,
+                vibeSnapshot = remoteHandler.trackerVibration
             )
         }
 

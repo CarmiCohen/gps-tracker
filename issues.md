@@ -1,39 +1,66 @@
-# Open Issues
-- **Issue #190: Xiaomi MIUI 14 Hardware Confirmation**: Gating logic for "Unknown" status and boot grace is implemented, but requires field verification on physical MIUI 14 hardware to ensure no "Denied" spikes occur during boot transitions.
+# Project Issues: Contradictions, Inconsistencies & Hardening
 
-# Fixed Issues (Recent: #200 - Current)
-## 238. FIXED Issue #227: Hindsight Transition Smoothing - Resolution: Refined the visual interpolation of "Ghost Paths" (Slate500) by implementing retroactive coordinate optimization. Buffered points are now processed through the `ImmFilter` during hindsight promotion to ensure spatial continuity and smooth map transitions. Updated `SentinelResult`, `LocationSentinel`, and `LocationProcessor` to propagate optimized coordinates to the persistence layer. (v8.9.22)
-## 237. FIXED Issue #226: Intelligent Uncertainty UX - Resolution: Enhanced the "Location Pending" state to communicate the contextual cause of uncertainty. Defined `LocationPendingReason` enum (GPS_STALL, ACOUSTIC_VIOLATION, etc.) and propagated it through `LocationUpdate`, `TrackerStatus`, and the telemetry pipeline (`SyncManager`, `RemoteHandler`). Updated `MapComponents.kt` to render a context-aware overlay (e.g., "UNCERTAINTY: ACOUSTIC VIOLATION") when the Bayesian radius is expanding. (v8.9.22)
-## 236. FIXED Issue #225: Forensic Snapshot Visualization - Resolution: Implemented an interactive detail pane in the Log Viewer (`LogComponents.kt`) to render `snrSnapshot` and `vibeSnapshot` values. Log entries are now clickable to reveal enriched "Black Box" forensics including spatial anchors, accuracy, and extreme values. (v8.9.22)
-## 235. FIXED Issue #224: SIT Forensic Expansion - Resolution: Added "Tilt Stability" (TLT) and "Baro Stability" (BAR) metrics to analytical ribbons and the telemetry pipeline. Updated `EngineConnectionPoint`, `LocationUpdate`, and `ConnectionPoint` models. Implemented Database Migration v44 to expand forensic tables. Standardized scaling constants to 15° (Tilt) and 0.5m (Baro) in `REQUIREMENTS_SOT.md`. (v8.9.21)
-## 234. FIXED Issue #230: SIT Alert Subtitle Ambiguity - Resolution: Updated `ALERT_ID_TRACKER_CHAIR` subtitle in `MainAlarmLogic.kt` to "Chair occupancy detected" for architectural consistency with the "Chair Occupied" forensic status. Added `verticalVelocity` (Vz) to technical details for enhanced diagnostic clarity in forensic logs. (v8.9.20)
-## 233. FIXED Issue #228 & #229: SoT Constant Synchronization & Cleanup - Resolution: Standardized `GPS_STABILITY_RELIABILITY_THRESHOLD` to 98.0% in `REQUIREMENTS_SOT.md` to match `EngineConstants.kt`. Removed redundant `DISTANCE_GRACE_MS` from `EngineConstants.kt` and updated `event-tables.md` to reference `BOOTSTRAP_PHASE_MS` for geofence grace, ensuring architectural consistency and Source of Truth integrity. (v8.9.20)
-## 232. FIXED Issue #232: Missing Constant & Hardcoded UI Scale - Resolution: Added `RIBBON_CURRENT_SCALE_MA` (1000mA) to `EngineConstants.kt` and updated `SharedUiComponents.kt` to use the constant for CUR ribbon normalization, ensuring architectural alignment with the SoT. (v8.9.19)
-## 231. FIXED Issue #231: Missing VISUAL_JUMP Alarm Logic - Resolution: Implemented detection logic in `MainAlarmLogic.detectViolations` using `isTrackerVisualJump` and `jumpTier` flags. Added `ALERT_TITLE_VISUAL_JUMP` ("Tracker: Visual Jump") to `EngineConstants.kt` to maintain architectural alignment. (v8.9.19)
-## 223. FIXED Issue #223: Forensic Log Enrichment - Resolution: Attached SNR snapshots and Vibration magnitudes to jump-related logs for better "Black Box" analysis. Updated LogEntry (Migration v43), LogManager, and LocationProcessorListener to bridge telemetry snapshots from the engine to the persistence layer. (v8.9.19)
-## 222. FIXED Issue #222: Hindsight Path Visualization - Resolution: Implemented "Ghost Path" markers on the map to visualize points corrected via hindsight logic. Updated TrailEntity (Migration v42) and TrailPoint models to include `isHindsightCorrected`. Modified LocationProcessor and LocationSentinel to flag promoted points and updated MapComponents.kt to render them in Slate500 (Ghost color). (v8.9.19)
-## 221. FIXED Issue #221: Acoustic "Location Pending" Optimization - Resolution: Implemented Bayesian confidence scaling for the "Location Pending" UI state. Propagated `lastValidFixRealtime` through the telemetry pipeline (SyncManager, RemoteHandler, TelemetryUseCase) and updated MapComponents.kt to dynamically expand the uncertainty radius using `PENDING_UNCERTAINTY_GROWTH_RATE_MPS` (15m/s) when GPS is stalled or pending. (v8.9.18)
-## 220. FIXED Issue #220: Hindsight Correction (Rubber-Band Logic) - Resolution: Implemented retroactive trajectory smoothing in LocationSentinel.kt using a rolling hindsight buffer (5 points, 30s max age). Rejected points are sequentially re-anchored and processed through the filter if a high-confidence trajectory is later confirmed. (v8.9.18)
-## 219. FIXED Issue #219: Adaptive Jump Confidence - Resolution: Enhanced LocationSentinel to correlate Satellite SNR Stability with IMU Vibration. Increased JUMP_HOLD_DURATION_MS (doubled to 360s) for jumps flagged with high SNR and zero vibration (spoofing/reflection signature). (v8.9.18)
-## 218. FIXED Issue #218: Xiaomi MIUI 14 Heuristic Recovery - Resolution: Implemented a heuristic recovery pulse in TrackerService.kt that detects background tick suppression (gap > 15s) on Xiaomi devices and triggers an aggressive refresh (GPS revival, WakeLock renewal, and FGS type update). (v8.9.18)
-## 217. FIXED Issue #217: LocationProcessor Inconsistency - Resolution: Standardized "Merge-on-Stale" logs in LocationProcessor.kt to use the hardened auto-anchoring path (0.0 coordinates), allowing LogManager to apply authoritative spatial fallbacks consistently. (v8.9.17)
-## 216. FIXED Issue #216: Accuracy Propagation Gaps in ViewerService - Resolution: Hardened spatial anchoring for critical system events (Tracker pulses, session terminations, calibration) in both TrackerService and ViewerService by explicitly passing processed coordinates and accuracy. (v8.9.17)
-## 214. FIXED Issue #214: Redundant Accuracy Fallback Logic - Resolution: Unified and simplified accuracy fallback in LogManager.kt to consistently prioritize discrete fix accuracy followed by engine-calculated maxAccuracy, eliminating redundancy. (v8.9.17)
-## 215. FIXED Issue #215: Missing "Recovery" Logs for Stability Audit - Resolution: Implemented "STABILITY RESTORED" marker in TrackerService.kt that triggers when reliability returns to >= 98% and max gap <= 200ms after a period of degradation. (v8.9.17)
-## 213. FIXED Issue #213: Forensic Anchor Desync in AppAlarmManager - Resolution: Updated AppAlarmManager to explicitly propagate coordinates and accuracy in its logging callback. TrackerService and ViewerService now bridge these values to LogManager, ensuring precise spatial anchoring for forensic alerts. (v8.9.17)
-## 212. FIXED Forensic Accuracy Parity in Recovery - Resolution: Expanded the LogEntry schema and database LogEntity (Migration v40) to include an accuracy field. Modified RemoteHandler.handleRemoteLog to prioritize this accuracy value during historical marker reconstruction. (v8.9.11)
-## 211. FIXED Xiaomi 10Hz Stability Audit Verbosity - Resolution: Gated Stability Audit logs to emit only on performance degradation (<98% reliability or >200ms gap) by updating `GPS_STABILITY_RELIABILITY_THRESHOLD` in `EngineConstants.kt` (v8.9.13)
-## 210. FIXED Log Manager Redundancy Audit - Resolution: Standardized log emissions in `TrackerService` and `ViewerService` to rely on `LogManager`'s auto-anchor fallback for cleaner code and better robustness during startup. Refined `LogManager` to fallback to the highest-frequency telemetry available from `TelemetryRepository` if coordinates are missing. (v8.9.12)
-## 209. FIXED Coordinate Propagation Race (TrackerService/ViewerService) - Resolution: Updated LocationProcessorListener to explicitly propagate coordinates and accuracy during log triggers across both TrackerService and ViewerService. Audited services to ensure log emissions utilize the currently processed coordinates, eliminating dependence on potentially stale service-level state. (v8.9.12)
-## 208. FIXED Log Spatial Anchor Gap - Resolution: Updated `LogManager`, `AppAlarmManager`, `TrackerService`, and `ViewerService` to capture and propagate current coordinates (`lat`/`lng`) during forensic log emission. This enables accurate historical marker reconstruction on the map. (v8.9.10)
-## 207. FIXED REQUIREMENTS_SOT Typo Audit - Resolution: Performed a comprehensive syntax audit on `REQUIREMENTS_SOT.md`. Fixed multiple constants (`TICK_INTERVAL_MS`, `PARKING_ACCEL_LIMIT`, `GPS_STALL`, `ACOUSTIC_ALERT`, `CHAIR_OCCUPIED`, `CHAIR_PLUNGE_DISTANCE_THRESHOLD`, `PING_INTERVAL_MS`, `NETWORK_TIMEOUT_MS`) that used incorrect quote characters (`"`) instead of backticks. (v8.9.9)
-## 206. FIXED Staleness Threshold Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `TELEMETRY_UI_STALE_THRESHOLD_MS` = 10s and `GPS_UI_FAIL_THRESHOLD_MS` = 10s, unifying "Ghost Mode" and "Position Health" thresholds. (v8.9.8)
-## 205. FIXED Muzzle Window Constant Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `MUZZLE_WINDOW_DURATION_MS` = 2000ms. (v8.9.8)
-## 204. FIXED GPS Stall/Revival Constant Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `GPS_STALL_THRESHOLD_MS` = 60s and `GPS_REVIVAL_RETRY_INTERVAL_MS` = 120s. (v8.9.8)
-## 203. FIXED Documentation Version Desync - Resolution: Synchronized all core documentation (`APP_DESCRIPTION.md`, `SETTINGS_PAGE_DETAIL.md`, `info-elementary-fields.md`, `README.md`, `REQUIREMENTS_SOT.md`) and `issues.md` to the v8.9.9 baseline. (v8.9.9)
-## 211. FIXED Multi-version Schema Robustness - Resolution: Hardened MIGRATION_35_36. (v8.9.8)
-## 200. FIXED Room Migration Registry Fix - Resolution: Registered MIGRATION_37_38. (v8.9.8)
+This file tracks the status of identified contradictions between the System Source of Truth (SoT) and the implementation, as well as pending technical hardening tasks.
 
----
-*For historical issues #1 - #99, see [issues_history_archive.md](issues_history_archive.md)*
-*For historical issues #100 - #199, see [issues_history_v88.md](issues_history_v88.md)*
+## 1. Constant Name Mismatch (Issue #228)
+*   **Description**: `ACK_SYNC_LOOP_INTERVAL_MS` was defined in the SoT, but the implementation used `PING_INTERVAL_MS`.
+*   **Status**: **Resolved**. SoT updated to use `PING_INTERVAL_MS` (10,000ms) for both relay heartbeats and log synchronization.
+
+## 2. System Versioning Inconsistency (Issue #203)
+*   **Description**: Baseline mismatch between documentation (v8.9.26) and core service headers (v8.9.24).
+*   **Status**: **Resolved**. All code headers and SoT synchronized to **v8.9.27**.
+
+## 3. Latitude Conversion Precision (Issue #228)
+*   **Description**: Precision drift in `LAT_DEG_TO_METERS` physical constant between documentation (4 decimals) and code (11 decimals).
+*   **Status**: **Resolved**. Both Code and SoT now use the high-precision constant: `111194.92664455874`.
+
+## 4. Version Generation Logic (Issue #199)
+*   **Description**: Mismatch in `versionCode` logic (Git count vs Timestamp).
+*   **Status**: **Resolved**. SoT updated to reflect Git-based versioning; implementation validated as superior for build reproducibility.
+
+## 5. Standardized Alert Title Inconsistency (Issue #230)
+*   **Description**: Storage and Xiaomi alerts used the "This device:" prefix in code but the "Tracker:" prefix in the SoT.
+*   **Status**: **Resolved**. Code updated to use **"Tracker:"** prefix as per SoT Manifest for consistent remote attribution.
+
+## 6. Documentation Internal Contradiction (Issue #211)
+*   **Description**: `DEVICE_SPECIFIC_ADAPTATIONS.md` states 1000ms gap threshold, but SoT/Code define 200ms.
+*   **Location**: `DEVICE_SPECIFIC_ADAPTATIONS.md` (Section 2.6).
+*   **Status**: **Open**. Requires update to adaptation documentation.
+
+## 7. Role Prefix Enforcement (Issue #182)
+*   **Description**: Enforced "T"/"C" ID prefixes are undocumented in the forensic identity section of the SoT.
+*   **Status**: **Resolved**. Section 4.1 of SoT updated with role identity standards.
+
+## 8. Jump Classification Conflict (Issue #231)
+*   **Description**: Engine logic classifies extreme jumps as `OUTLIER`, but the SoT manifest implied they were grouped under `JUMP_ALERT`.
+*   **Status**: **Resolved**. SoT Manifest (Section 8) clarified to show Outliers are filtered under the `JUMP_ALERT` security tier.
+
+## 9. Foreground Resilience Hardening (Issue #218)
+*   **Description**: `TrackerService.kt` recovery pulses lack `try-catch` protection against Android 14+ `ForegroundServiceStartNotAllowedException`.
+*   **Location**: `TrackerService.kt`.
+*   **Status**: **Open**.
+
+## 10. Xiaomi Boot Verification (Issue #190)
+*   **Description**: Xiaomi Boot Grace logic (`XIAOMI_BOOT_GRACE_MS`) requires physical hardware verification to ensure zero-spike behavior during transition.
+*   **Location**: `MainAlarmLogic.kt` / Physical Hardware.
+*   **Status**: **Open**.
+
+## 11. Hindsight Promotion Coverage (Issue #227)
+*   **Description**: `LocationSentinel`'s new `promotedPoints` logic for hindsight smoothing lacks exhaustive unit test coverage for multi-point transitions.
+*   **Location**: `:core:engine` Tests.
+*   **Status**: **Open**.
+
+## 12. SIT Duplicate Guard (Issue #245)
+*   **Description**: Redundant SIT log triggers removed from RemoteHandler, but HistoryManager still lacks a database-level sanity check to prevent duplicates if the relay sends redundant packets.
+*   **Location**: `HistoryManager.kt`.
+*   **Status**: **Open**.
+
+## 13. Hardcoded EMA in AppSensorManager (Issue #234)
+*   **Description**: `AppSensorManager.kt` uses a hardcoded `0.01f` for light baseline EMA instead of the `LUX_EMA_FAST` constant.
+*   **Location**: `AppSensorManager.kt`.
+*   **Status**: **Open**.
+
+## 14. Light EMA Logic Inconsistency (Issue #234)
+*   **Description**: SoT defines rising/falling EMA factors for Light (UP_SLOW, UP_FAST, etc.), but the engine (`LocationSentinel.kt`) only implements a single `LUX_EMA_FAST` factor.
+*   **Location**: `LocationSentinel.kt`.
+*   **Status**: **Open**.

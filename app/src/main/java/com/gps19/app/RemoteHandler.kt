@@ -15,6 +15,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v8.9.26:
+ * - Issue #245: Centralized SIT rising-edge detection. Removed redundant log/forensic triggers.
  * v8.9.22:
  * - Issue #226: Parsing location_pending_reason for intelligent uncertainty UX.
  * v8.9.21:
@@ -253,33 +255,14 @@ class RemoteHandler(
 
     /**
      * Issue 194: Reconstructs forensic state from incoming remote logs.
-     * Ensures that recovered "Sit Detected" events trigger the same map markers as real-time flags.
-     * Modified in v8.9.10: Issue 209: Using historical coordinates from LogEntry for accurate recovery.
-     * Modified in v8.9.13: Issue #212: Finalized accuracy prioritization from LogEntry.
+     * Modified in v8.9.26: Issue #245: Removed redundant forensic trigger; handled by ViewerService tick loop.
      */
     fun handleRemoteLog(entry: LogEntry) {
         if (entry.message.contains("Sit Detected", ignoreCase = true)) {
-            // Rising-edge detection for log-based SIT events to ensure marker placement
+            // Rising-edge detection for state reconstruction.
+            // Forensic marker and logging are handled by ViewerService tick and CommunicationManager respectively.
             if (!isTrackerSitDetected) {
                 isTrackerSitDetected = true
-                
-                // Issue 209: Immediate forensic marker placement using historical coordinates
-                val effectiveLat = if (entry.lat != 0.0) entry.lat else trackerLat
-                val effectiveLng = if (entry.lng != 0.0) entry.lng else trackerLng
-                
-                // Issue #212: Use log-specific accuracy if available
-                val effectiveAccuracy = if (entry.accuracy > 0f) entry.accuracy.toDouble() else trackerMaxAccuracy.toDouble()
-
-                if (effectiveLat != 0.0 && effectiveLng != 0.0) {
-                    forensicUseCase.recordViolationMarkers(
-                        now = entry.timestamp,
-                        lat = effectiveLat,
-                        lng = effectiveLng,
-                        accuracy = effectiveAccuracy,
-                        activeViolations = setOf(ALERT_ID_TRACKER_CHAIR),
-                        unresolvedAlarms = emptySet()
-                    )
-                }
             }
         }
     }
@@ -369,18 +352,9 @@ class RemoteHandler(
             isTrackerTamperDetected = data.optBoolean("is_tamper_detected", isTrackerTamperDetected)
             isTrackerPowerTamper = data.optBoolean("is_power_tamper", isTrackerPowerTamper)
             
-            // Issue 194: Rising-edge detection for latched SIT events in real-time telemetry
+            // Issue #245: Updated SIT detection to avoid redundant manual logging. 
+            // The tracker-emitted log is already handled via CommunicationManager/RemoteLog.
             val incomingSitDetected = data.optBoolean("is_sit_detected", false)
-            if (incomingSitDetected && !isTrackerSitDetected) {
-                 repository.addLog(LogEntry(
-                    timestamp = now,
-                    message = "Tracker: Sit Detected (Remote)",
-                    type = "event",
-                    isImportant = true,
-                    isSpecial = true,
-                    specialColor = -0x10000
-                ))
-            }
             isTrackerSitDetected = incomingSitDetected
 
             isTrackerSitActive = data.optBoolean("is_sit_active", isTrackerSitActive)

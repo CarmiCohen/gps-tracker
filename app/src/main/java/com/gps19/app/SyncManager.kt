@@ -12,6 +12,10 @@ import org.json.JSONObject
 
 /**
  * SyncManager: Handles broadcasting state updates and relay synchronization.
+ * v8.9.26:
+ * - Issue #1: Unified sync loop to use PING_INTERVAL_MS (10s) as per code-first standardization.
+ * - Issue #2: Synchronized version string to v8.9.26 baseline.
+ * - Issue #244: Propagating locationPendingReason in flushPendingUpdates and offline storage.
  * v8.9.22:
  * - Issue #226: Propagating location_pending_reason in telemetry payloads.
  * v8.9.21:
@@ -70,6 +74,7 @@ class SyncManager(
                         flushPendingLogs() // Issue 194: Reliable event delivery
                     }
                 }
+                // Issue #1: Using PING_INTERVAL_MS for both relay heartbeat and sync loop
                 delay(PING_INTERVAL_MS)
             }
         }
@@ -155,6 +160,7 @@ class SyncManager(
                         put("standby_bucket", entity.standbyBucket)
                         put("net_interface", entity.netInterface)
                         put("last_valid_fix_realtime", entity.lastValidFixRealtime)
+                        put("location_pending_reason", entity.locationPendingReason)
                         put("ver", BuildConfig.VERSION_NAME)
                     }
                     
@@ -363,7 +369,8 @@ class SyncManager(
                     isPowerSaveMode = integrity.isPowerSaveMode, standbyBucket = integrity.standbyBucket,
                     netInterface = integrity.netInterface,
                     verticalVelocity = verticalVelocity,
-                    lastValidFixRealtime = lastValidFixRealtime
+                    lastValidFixRealtime = lastValidFixRealtime,
+                    locationPendingReason = locationPendingReason.name
                 ))
             }
         }

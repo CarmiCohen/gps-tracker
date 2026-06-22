@@ -21,6 +21,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.27:
+ * - Issue #218: Hardened foreground transitions with safeStartForeground wrapper for Android 14+ resilience.
+ * v8.9.25:
+ * - Issue #241: Forensic Log Enrichment - Bridging SNR and Vibration snapshots to AppAlarmManager.
+ * v8.9.24:
+ * - Issue #240: locationPendingReason Propagation - Dynamically calculating pending reason.
+ * v8.9.23:
+ * - Issue #243: Expanded isTrackerVisualJump gating to include SentinelStatus.JITTER (Tier 3).
  * v8.9.21:
  * - Issue #224: Propagating tiltIdx and baroIdx for forensic ribbon expansion.
  * v8.9.19:
@@ -115,8 +123,8 @@ class TrackerService : BaseMonitorService() {
             isXiaomi = isXiaomiDevice()
             isA15 = isA15Device()
 
-            alarmManager = AppAlarmManager(this@TrackerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng, acc -> 
-                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng, acc)
+            alarmManager = AppAlarmManager(this@TrackerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng, acc, snr, vibe -> 
+                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng, acc, snr, vibe)
             }
             
             integrityMonitor = IntegrityMonitor(this@TrackerService, repository, timeProvider, onViolationSustained = { type ->
@@ -271,11 +279,7 @@ class TrackerService : BaseMonitorService() {
     override fun startServiceForeground() {
         val type = getAvailableForegroundServiceType()
         val msg = "Tracking system active."
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { 
-            startForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type) 
-        } else { 
-            startForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg)) 
-        }
+        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
     }
 
     override fun updateForegroundServiceType() {
@@ -285,7 +289,7 @@ class TrackerService : BaseMonitorService() {
                 delay(200)
                 val type = getAvailableForegroundServiceType()
                 val msg = if ((type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE) != 0) "Acoustic monitoring active." else "Tracking system active."
-                startForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
+                safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
             }
         }
     }
@@ -383,7 +387,8 @@ class TrackerService : BaseMonitorService() {
             if (isJammerSuspicionActive) activeViolations.add(ALERT_ID_JUMP_ALERT)
             if (isGpsStalledActive) activeViolations.add(ALERT_ID_GPS_STALL)
             if (isGpsGapActive) activeViolations.add(ALERT_ID_TRACKER_GAP)
-            if (proc.status == SentinelStatus.JUMP) activeViolations.add(ALERT_ID_VISUAL_JUMP)
+            // Issue #243: Visual Jump forensic anchor expanded for Tier 3 Jitter
+            if (proc.status == SentinelStatus.JUMP || proc.status == SentinelStatus.JITTER) activeViolations.add(ALERT_ID_VISUAL_JUMP)
             if (lastSitDetected) activeViolations.add(ALERT_ID_TRACKER_CHAIR) 
 
             forensicUseCase.recordViolationMarkers(
@@ -477,6 +482,15 @@ class TrackerService : BaseMonitorService() {
         val tiltIdx = (sensorManager.currentTiltDegrees / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0f, 1f)
         val baroIdx = (abs(sensorManager.relativeAltitude) / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0f, 1f)
 
+        // Issue #240: Contextual Cause of Uncertainty (Bayesian Radius Expansion)
+        val pendingReason = when {
+            pendingAcousticViolation -> LocationPendingReason.ACOUSTIC_VIOLATION
+            isGpsStalledActive -> LocationPendingReason.GPS_STALL
+            isJammerSuspicionActive -> LocationPendingReason.JAMMER_SUSPICION
+            isSignalLoss -> LocationPendingReason.SIGNAL_LOSS
+            else -> LocationPendingReason.NONE
+        }
+
         // Push Status
         val proc = lastProcessedLocation
         syncManager.pushCurrentStatus(
@@ -485,7 +499,7 @@ class TrackerService : BaseMonitorService() {
             maxAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), filteredSpeed = proc?.filteredSpeed ?: 0.0,
             vibration = sensorManager.currentVibrationIndex, heading = sensorManager.currentCompassHeading, baroAlt = sensorManager.relativeAltitude,
             lux = sensorManager.currentLux, isNear = sensorManager.isProximityNear, isSuspicious = isSuspiciousMode, tiltDegrees = sensorManager.currentTiltDegrees,
-            acousticDb = sensorManager.currentAcousticDb, isJump = (proc?.status == SentinelStatus.JUMP), 
+            acousticDb = sensorManager.currentAcousticDb, isJump = (proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER), 
             isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false, jumpTier = proc?.jumpTier ?: 0, isJammer = isJammerSuspicionActive,
             isStalledRaw = proc?.isStalled ?: false, isStalledActive = isGpsStalledActive, peakShock = locationProcessor.getPeakVibrationShock(),
             peakShockTs = locationProcessor.sentinel.peakVibrationShockTs, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
@@ -495,7 +509,8 @@ class TrackerService : BaseMonitorService() {
             violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(),
             verticalVelocity = sensorManager.currentVerticalVelocity, sitVz = locationProcessor.sentinel.lastSitVz, sitDz = locationProcessor.sentinel.lastSitDz, 
             sitBaro = locationProcessor.sentinel.lastSitBaro, sitTilt = locationProcessor.sentinel.lastSitTilt, sitShock = locationProcessor.sentinel.lastSitShock, 
-            isClockRegression = proc?.isClockRegression ?: false, isLocationPending = pendingAcousticViolation,
+            isClockRegression = proc?.isClockRegression ?: false, isLocationPending = (pendingReason != LocationPendingReason.NONE),
+            locationPendingReason = pendingReason,
             lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
             gnssDetail = latestGnssDetail,
             snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f), 
@@ -577,7 +592,8 @@ class TrackerService : BaseMonitorService() {
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
             alarmManager.evaluateAlarms(
                 now = nowRealtime, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = true,
-                isRelayConnected = isSocketConnected, isTrackerConnected = true, isTrackerVisualJump = (proc?.status == SentinelStatus.JUMP),
+                isRelayConnected = isSocketConnected, isTrackerConnected = true, 
+                isTrackerVisualJump = (proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER), // Issue #243: Tier 3 Jitter Gating
                 isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false, jumpTier = proc?.jumpTier ?: 0, trackerLat = proc?.optimizedPoint?.lat ?: 0.0, 
                 trackerLng = proc?.optimizedPoint?.lng ?: 0.0, trackerAccuracy = proc?.currentAccuracy ?: 0f, 
                 maxTrackerAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), trackerLastGpsTs = proc?.timestamp ?: 0L, 
@@ -597,7 +613,9 @@ class TrackerService : BaseMonitorService() {
                 isXiaomiDevice = isXiaomi,
                 xiaomiStatus = xiaomiStatus,
                 xiaomiAutostartStatus = xiaomiAutostartStatus,
-                isXiaomiManualOverride = isXiaomiManualOverride
+                isXiaomiManualOverride = isXiaomiManualOverride,
+                snrSnapshot = gpsManager.averageSnr,
+                vibeSnapshot = sensorManager.currentVibrationIndex
             )
         }
     }
@@ -631,7 +649,7 @@ class TrackerService : BaseMonitorService() {
             revivalAttemptCount = 0; lastRevivalAttemptTs = 0L
         }
         
-        if (processed.status == SentinelStatus.JUMP || processed.status == SentinelStatus.OUTLIER) {
+        if (processed.status == SentinelStatus.JUMP || processed.status == SentinelStatus.OUTLIER || processed.status == SentinelStatus.JITTER) {
             if (systemMonitor.jumpStateStartTs == 0L) systemMonitor.jumpStateStartTs = nowRealtime
         } else if (processed.status == SentinelStatus.VALID) {
             systemMonitor.jumpStateStartTs = 0L

@@ -1,4 +1,4 @@
-# Device-Specific Adaptations (v8.9.18)
+# Device-Specific Adaptations (v8.9.27)
 
 This document describes the specialized logic and polling configurations implemented to bypass OEM-specific background restrictions on supported hardware.
 
@@ -39,7 +39,7 @@ Integrated `isXiaomiAutostartGranted` check in `TrackerService.kt` alarm loop an
 Implemented a GPS Stability Audit suite in `TrackerService` to verify 10Hz persistence on physical Xiaomi hardware.
 - **Metrics**: Tracks fix arrival counts, inter-fix gaps (ms), and max gap observed.
 - **Audit Loop**: Every 10s (`GPS_STABILITY_AUDIT_INTERVAL_MS`), the system emits a "STABILITY AUDIT" log reporting the reliability percentage.
-- **Forensic Escalation**: If a gap > 1000ms (`GPS_STABILITY_GAP_THRESHOLD_MS`) is detected during 10Hz polling, a "STABILITY GAP" forensic log is emitted.
+- **Forensic Escalation**: If a gap > 200ms (`GPS_STABILITY_GAP_THRESHOLD_MS`) is detected during 10Hz polling, a "STABILITY GAP" forensic log is emitted. (Issue #211: Standardized to 200ms).
 
 ## 3. General OEM Throttling
 ### 3.1. Standby Bucket Monitoring

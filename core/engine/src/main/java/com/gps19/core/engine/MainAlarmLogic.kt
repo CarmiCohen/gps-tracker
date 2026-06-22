@@ -5,6 +5,8 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v8.9.26:
+ * - Issue #2: Synchronized version to v8.9.26 baseline.
  * v8.9.20:
  * - Issue #230: Updated ALERT_ID_TRACKER_CHAIR subtitle to "Chair occupancy detected" 
  *   for consistency with "Chair Occupied" forensic status.

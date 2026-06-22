@@ -1,6 +1,8 @@
 package com.gps19.app
 
+import android.app.Notification
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.lifecycle.LifecycleService
@@ -18,9 +20,10 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * v8.9.27:
+ * - Issue #218: Added safeStartForeground wrapper to handle ForegroundServiceStartNotAllowedException on Android 12+.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * v8.8.21: Migrated to TimeProvider for all timing logic to ensure system-wide consistency.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -90,6 +93,35 @@ abstract class BaseMonitorService : LifecycleService() {
 
     protected fun isUiVisible(): Boolean {
         return isUiForeground.get() && (timeProvider.currentTimeMillis() - lastUiPulseTs < UI_PULSE_TIMEOUT_MS)
+    }
+
+    /**
+     * safeStartForeground: Safety wrapper for startForeground to handle Android 12+ (API 31) 
+     * background start restrictions and potential crashes.
+     */
+    protected fun safeStartForeground(id: Int, notification: Notification, type: Int = 0) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && type != 0) {
+                startForeground(id, notification, type)
+            } else {
+                startForeground(id, notification)
+            }
+        } catch (e: Exception) {
+            val isStartDenied = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && 
+                    e.javaClass.name.contains("ForegroundServiceStartNotAllowedException")
+            
+            val logMsg = if (isStartDenied) {
+                "Foreground start denied (Background restriction): ${e.message}"
+            } else {
+                "Foreground start failed: ${e.message}"
+            }
+            Timber.e(e, logMsg)
+            
+            // Log to forensic logs if initialized
+            if (this::logManager.isInitialized) {
+                logManager.logServiceEvent("RECOVERY_WARN: $logMsg", important = true)
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

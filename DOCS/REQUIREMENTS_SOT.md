@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.21
+# System Source of Truth (SoT) - v8.9.27
 
 This document serves as the definitive operational specification for the GPS-Tracker system.
 
@@ -6,7 +6,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | Constant | Value | Description |
 | :--- | :--- | :--- |
 | `EARTH_RADIUS_METERS` | 6371000.0 | Physics constant for spherical calculations. |
-| `LAT_DEG_TO_METERS` | 111194.9266m | Conversion factor at the equator. |
+| `LAT_DEG_TO_METERS` | 111194.92664455874 | Conversion factor at the equator. (Issue #228) |
 | `DEFAULT_LAT` | 32.7940 | Default system latitude (Haifa). |
 | `DEFAULT_LNG` | 34.9896 | Default system longitude (Haifa). |
 | `ABSOLUTE_DISTANCE_CAP_METERS` | 50000.0m | Safety ceiling for distance calculations. |
@@ -93,14 +93,14 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `CHAIR_SIT_VIBRATION_THRESHOLD` | 0.35g | Vibration peak for chair occupancy. |
 | `CHAIR_SIT_BARO_THRESHOLD` | 0.08m | Barometric displacement for chair occupancy. |
 | `CHAIR_PLUNGE_VELOCITY_THRESHOLD` | 0.18 m/s | Downward velocity threshold for plunge-matching. |
-| `CHAIR_PLUNGE_DISTANCE_THRESHOLD` | 0.05m | Minimum distance for a valid plunge event. |
+| `CHAIR_PLUNGE_DISTANCE_THRESHOLD`| 0.05m | Minimum distance for a valid plunge event. |
 | `CHAIR_PLUNGE_WINDOW_MS` | 800ms | Window for matching downward velocity. |
 | `CHAIR_SIT_COOLDOWN_MS` | 5,000ms | Cooldown between chair occupancy events. |
 | `BOOTSTRAP_PHASE_MS` | 60,000ms | Duration of initial high-sensitivity bootstrap phase. |
 | `DISCOVERY_PHASE_MS` | 60,000ms | Duration of peer discovery phase. |
 | `PASSIVE_ZEROING_STATIONARY_MS` | 300,000ms | Stationary state required for auto-calibration (5m). |
 | `MARKER_POOL_PRUNE_THRESHOLD` | 50 | Maximum visual markers before pruning. |
-| `UI_PULSE_TIMEOUT_MS` | 5,000ms | Hysteresis for UI pulse stability. |
+| `UI_PULSE_TIMEOUT_MS`| 5,000ms | Hysteresis for UI pulse stability. |
 | `ACCURACY_WINDOW_BUCKET_MS` | 60,000ms | Window duration for accuracy high-water tracking. |
 | `ACCURACY_WINDOW_MAX_SIZE` | 4 | Number of 15s buckets in sliding window. |
 | `TEST_ALARM_DURATION_MS` | 3,000ms | Duration for the manual test siren. |
@@ -125,7 +125,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `GPS_SAVE_INTERVAL_MS` | 60000ms | Interval for periodic persistent GPS state storage. |
 | `PARKING_ANCHOR_MIN_DIST` | 20.0m | Minimum radius for parking anchor establishment. |
 | `THROTTLE_LUX_LIMIT` | 50.0 lux | Threshold for thermal/power polling throttling (Light). |
-| `THROTTLE_ACOUSTIC_LIMIT` | 15.0 dB | Threshold for thermal/power polling throttling (Audio). |
+| `THROTTLE_ACOUSTIC_LIMIT`| 15.0 dB | Threshold for thermal/power polling throttling (Audio). |
 | `THROTTLE_COMPASS_LIMIT` | 5.0° | Threshold for thermal/power polling throttling (Compass). |
 | `THROTTLE_BARO_LIMIT` | 0.5m | Threshold for thermal/power polling throttling (Baro). |
 | `ALERT_TRIGGER_GRACE_PERIOD_MS`| 2000ms | Anti-flood grace period between alert triggers. |
@@ -142,7 +142,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `GPS_STABILITY_AUDIT_INTERVAL_MS` | 10,000ms | Interval for periodic GPS performance evaluation. |
 | `GPS_STABILITY_GAP_THRESHOLD_MS` | 200ms | Maximum fix-to-fix gap allowed before audit log. |
 | `GPS_STABILITY_RELIABILITY_THRESHOLD` | 98.0% | Minimum fix reliability required before audit log. |
-| `PENDING_UNCERTAINTY_GROWTH_RATE_MPS`| 15.0 m/s | Growth rate of UI uncertainty radius during GPS stalls. |
+| `PENDING_UNCERTAINTY_GROWTH_RATE_MPS`| 15.0 m/s | Growth rate of UI uncertainty radius during GPS stalls (v8.9.18). |
 | `HINDSIGHT_BUFFER_SIZE` | 5 | Size of the rolling buffer for hindsight trajectory correction. |
 | `HINDSIGHT_MAX_AGE_MS` | 30,000ms | Maximum age of points in the hindsight buffer. |
 | `ADAPTIVE_JUMP_SNR_THRESHOLD`| 35.0 dB | SNR threshold for classifying jumps as potential spoofing. |
@@ -155,7 +155,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `ACCEL_CHECK_MIN_DIST` | 10.0m | Minimum distance for acceleration-based validity check. |
 | `EFFICIENCY_MIN_SEGMENT_DIST` | 10.0m | Minimum segment distance for path efficiency calculation. |
 | `EFFICIENCY_MIN_TOTAL_DIST` | 50.0m | Minimum total distance for path efficiency calculation. |
-| `SCATTER_MIN_SPEED_MPS` | 0.5 m/s | Minimum speed for scatter angle analysis. |
+| `SCATTER_MIN_SPEED_MPS`| 0.5 m/s | Minimum speed for scatter angle analysis. |
 | `SCATTER_ANGLE_THRESHOLD` | 120.0° | Angle threshold for classifying movement as scatter (noise). |
 | `ACOUSTIC_FLOOR_CONTRACTION_EMA`| 0.995 | EMA factor for passive acoustic floor decay. |
 | `ACOUSTIC_RECOVERY_DELAY_MS` | 30,000ms | Delay before acoustic monitoring recovers after a violation. |
@@ -169,6 +169,19 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `GPS_INDEX_AGE_SCALING` | 2.0 | Scaling factor for GPS age indexing. |
 | `GPS_INDEX_ACCURACY_EXCELLENT_METERS`| 8.0m | Accuracy threshold for "Excellent" GPS Index rating. |
 | `GPS_INDEX_SATS_TARGET` | 12 | Satellite count target for optimal GPS Index. |
+| `LUX_EMA_SLOW` | 0.99 | EMA factor (Slow) for light. |
+| `LUX_EMA_FAST` | 0.01 | EMA factor (Fast) for light. |
+| `LUX_EMA_UP_SLOW` | 0.999 | EMA factor for rising light values (Slow). |
+| `LUX_EMA_UP_FAST` | 0.001 | EMA factor for rising light values (Fast). |
+| `ACOUSTIC_EMA_DOWN_SLOW` | 0.999 | EMA factor for falling acoustic floor (Slow). |
+| `ACOUSTIC_EMA_DOWN_FAST` | 0.01 | EMA factor for falling acoustic floor (Fast). |
+| `ACOUSTIC_EMA_UP_SLOW` | 0.9999 | EMA factor for rising acoustic floor (Slow). |
+| `ACOUSTIC_EMA_UP_FAST` | 0.001 | EMA factor for rising acoustic floor (Fast). |
+| `VIBRATION_EMA_DOWN_SLOW` | 0.99 | EMA factor for falling vibration floor (Slow). |
+| `VIBRATION_EMA_DOWN_FAST` | 0.01 | EMA factor for falling vibration floor (Fast). |
+| `VIBRATION_EMA_UP_SLOW` | 0.999 | EMA factor for rising vibration floor (Slow). |
+| `VIBRATION_EMA_UP_FAST` | 0.0001 | EMA factor for rising vibration floor (Fast). |
+| `BARO_EMA_SLOW` | 0.999 | EMA factor for barometric baseline stabilization. |
 
 ## 2. Forensic Ribbon Scaling
 | Constant | Value | Description |
@@ -178,9 +191,9 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `RIBBON_VIBRATION_SCALE_G` | 2.0g | Maximum range for vibration ribbon mapping. |
 | `RIBBON_LIFT_SCALE_METERS` | 5.0m | Maximum range for barometric lift ribbon mapping. |
 | `RIBBON_SNR_SCALE_DB` | 45.0dB | Maximum range for SNR ribbon mapping. |
-| `RIBBON_CURRENT_SCALE_MA` | 1000mA | Maximum range for battery current ribbon mapping. |
-| `RIBBON_SIT_TILT_SCALE_DEG`| 15.0° | Maximum range for tilt stability ribbon mapping. |
-| `RIBBON_SIT_BARO_SCALE_METERS`| 0.5m | Maximum range for baro stability ribbon mapping. |
+| `RIBBON_CURRENT_SCALE_MA` | 1000mA | Maximum range for battery current ribbon mapping. (v8.9.19) |
+| `RIBBON_SIT_TILT_SCALE_DEG`| 15.0° | Maximum range for tilt stability ribbon mapping. (v8.9.21) |
+| `RIBBON_SIT_BARO_SCALE_METERS`| 0.5m | Maximum range for baro stability ribbon mapping. (v8.9.21) |
 
 ## 3. Network & Connectivity
 | Constant | Value | Description |
@@ -189,19 +202,18 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `COMM_RTT_FLOOR_MS` | 150ms | Baseline floor for RTT indexing. |
 | `COMM_RTT_SCALING_FACTOR` | 2000.0 | Factor for communication quality normalization. |
 | `NETWORK_TIMEOUT_MS` | 10000ms | Timeout for network requests. |
-| `PING_INTERVAL_MS` | 10000ms | Interval for relay heartbeat (ping_cmd). |
+| `PING_INTERVAL_MS` | 10000ms | Interval for relay heartbeat (ping_cmd) and log synchronization. |
 | `NET_REJOIN_THRESHOLD_MS` | 15000ms | Delay before attempting relay reconnection. |
 | `NET_HEAL_THRESHOLD_MS` | 45000ms | Window for network "Healing" phase. |
 | `SOCKET_TIMEOUT_MS` | 60,000ms | Socket.io connection timeout. |
 | `HOME_POINT_REFRESH_INTERVAL_MS`| 30,000ms | Interval for refreshing geofence centers. |
-| `ACK_SYNC_LOOP_INTERVAL_MS` | 10,000ms | Interval for acknowledged log synchronization. |
 
 ---
 
 ## 4. Remote Forensic Verification
 ### 4.1. Version & Role Visibility
-*   **Engine Identity**: The system operates on the v8.9.21 baseline logic.
-*   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using a timestamp (`yearOffset` + `MMddHHmm`) or git commits to ensure uniqueness.
+*   **Engine Identity**: The system operates on the v8.9.27 baseline logic.
+*   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using `git rev-list --count HEAD`. (Issue #199)
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Standardized Alert IDs**: Aligned with `EngineConstants.kt`. Includes `VISUAL_JUMP` for trajectory-based jumps.
 *   **Xiaomi System Ready**: Hardened gating for Xiaomi devices using `is_xiaomi_manual_override` and autostart verification.
@@ -209,6 +221,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Time Integrity**: All alarm evaluations use monotonic time via `TimeProvider.elapsedRealtime()`.
 *   **Module Hardening**: `:core:engine` is a pure `java-library` with zero Android dependencies.
 *   **Role Forensic**: Mandatory `role` field present in all sync payloads and JSON exports for multi-role trace stability. Viewers explicitly latch and record peer visual jumps to local forensics.
+*   **Role Identity Standards**: IDs must use enforced prefixes: **"T"** for Tracker (e.g., Ttk) and **"C"** for Viewer (e.g., Cohen). (Issue #182)
 *   **Schema Cleanup**: Legacy `ver` and `vid` columns formally removed from database schema in v33 (v8.8.35).
 *   **Power Parity**: `currentMa` field added to Database v35 (PendingStatusEntity and HistoryEntity) and `TrackerStatusProto` for end-to-end power forensics.
 *   **SIT Acknowledgement**: Discrete SIT events are synchronized via a 10s acknowledged loop to prevent forensic loss during blackouts.
@@ -217,6 +230,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Accuracy Parity**: Forensic logs now include explicit `accuracy` fields, ensuring historical map markers match real-time precision.
 *   **Forensic Snapshots**: Log entries now include `snrSnapshot` and `vibeSnapshot` for Jump and Stall forensic enrichment (v8.9.19).
 *   **Stability Expansion**: Added `tiltIdx` and `baroIdx` to the analytical ribbons and telemetry pipeline for enhanced "SIT" event analysis (v8.9.21).
+*   **Uncertainty Context**: Propagating `locationPendingReason` for Bayesian uncertainty expansion in the UI (v8.9.22).
 
 ---
 
@@ -237,6 +251,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   `JUMP_GATE_SPEED_ACCURACY_HIGH_MPS`: 8.3 m/s
 *   `JUMP_GATE_ACCURACY_LOW_THRESHOLD`: 40.0m
 *   `JUMP_GATE_ACCURACY_HIGH_THRESHOLD`: 150.0m
+*   `JUMP_GATE_VISUAL_JITTER_METERS`: 10.0m
 
 ---
 
@@ -263,20 +278,20 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ---
 
-## 8. Forensic Alert Manifest (v8.9.21)
+## 8. Forensic Alert Manifest (v8.9.27)
 | Alert ID | Alert Title (Standardized) | Trigger Description |
 | :--- | :--- | :--- |
 | `LOCAL_INTERNET` | This device: Internet Lost | Local connectivity failure. |
 | `RELAY_OFFLINE` | This device: Relay Lost | Connectivity to relay server failed. |
 | `TRACKER_OFFLINE` | Tracker: Offline | Tracker disconnected from relay. |
 | `SIGNAL_LOSS` | Tracker: Signal Lost | No telemetry for >180s (Tracker) / >30s (Viewer). |
-| `JUMP_ALERT` | Tracker: Jammer Alert | GPS sustained instability / Jump rejection. |
+| `JUMP_ALERT` | Tracker: Jammer Alert | GPS sustained instability / Jump rejection / Outlier filtering. (Issue #231) |
 | `VISUAL_JUMP` | Tracker: Visual Jump | Trajectory-based jump detected by engine. |
 | `GEOFENCE_VIOLATION`| Tracker: Geofence | Breach of max distance or predictive exit. |
 | `GPS_STALL` | Tracker: GPS Stalled | Hardware chip freeze (no updates >60s). |
 | `GPS_GAP` | Tracker: GPS Gap | Fix age exceeded 60s. |
 | `POWER_TAMPER` | Tracker: Charger unplugged | Power disconnection. |
-| `LOW_BATTERY" | Tracker: Low Battery | Level < 20% (unplugged) or charge deficit. |
+| `LOW_BATTERY` | Tracker: Low Battery | Level < 20% (unplugged) or charge deficit. |
 | `HIGH_TEMP` | Tracker: High Temp | Thermal > 46.0°C. |
 | `TRACKER_TAMPER` | Tracker: Tamper Detected | Unified sensor violation (Shock, Tilt, Light, Prox). |
 | `TILT_ALERT` | Tracker: Tilt Alert | Orientation change > 15°. |
@@ -341,6 +356,9 @@ This document serves as the definitive operational specification for the GPS-Tra
 | **Issue 197** | **Database Schema Expansion (v38)**: Added `sitVzTs` to history tables for improved chair event reconstruction. | **Verified (Database)** |
 | **Issue 198** | **GPS Availability Hardening**: Shortened GPS stall detection to 60s and revival retry to 120s for high-availability tracking. | **Verified (TrackerService)** |
 | **Issue 199** | **Toolchain Modernization**: Upgraded to Java 17 and Android SDK 35. Aligned Gradle DSL syntax. | **Verified (build.gradle)** |
+| **Issue 200** | **Room Migration Registry**: Registered `MIGRATION_37_38` in `AppModule.kt` to prevent startup crashes. | **Verified (AppModule)** |
+| **Issue 201** | **Schema Robustness**: Hardened `MIGRATION_35_36` with dynamic column detection for resilient upgrades. | **Verified (Database)** |
+| **Issue 202** | **Multi-Version Forensic Path**: Verified schema integrity across diverse legacy upgrade paths (v33 to v38). | **Verified (Database)** |
 | **Issue 203** | **Documentation Synchronization**: Synchronized all core documentation to the v8.9.11 logic baseline. | **Verified (DOCS)** |
 | **Issue 204/205**| **Constant Hardening Audit**: Verified GPS Stall (60s), Revival (120s), and Muzzle Window (2000ms) thresholds across documentation. | **Verified (SoT/EngineConstants)** |
 | **Issue 206** | **Staleness Unification Audit**: Verified 10s unification for Ghost Mode and Position Health thresholds. | **Verified (SoT/Dashboard)** |
@@ -362,4 +380,23 @@ This document serves as the definitive operational specification for the GPS-Tra
 | **Issue 222** | **Hindsight Path Visualization**: Renders "Ghost Paths" (Slate500) for points retroactively promoted. | **Verified (MapComponents)** |
 | **Issue 223** | **Forensic Log Enrichment**: SNR and Vibration snapshots attached to jump/stall logs for black-box analysis. | **Verified (LogManager/Services)** |
 | **Issue 224** | **SIT Forensic Expansion**: Added tiltIdx and baroIdx to analytical ribbons and telemetry pipeline for enhanced chair event analysis. | **Verified (AnalyticalRibbons/Telemetry)** |
+| **Issue 225** | **Analytical Ribbon Persistence**: Verified 240-point in-memory retention for all new forensic indices. | **Verified (HistoryManager)** |
+| **Issue 226** | **Contextual Uncertainty**: Implemented `LocationPendingReason` to provide UI context for Bayesian expansion. | **Verified (EngineModels/SyncManager)** |
+| **Issue 227** | **Hindsight Transition Smoothing**: Added `promotedPoints` to `SentinelResult` for improved map trail continuity. | **Verified (LocationSentinel)** |
 | **Issue 228/229**| **SoT Constant Synchronization**: Standardized GPS_STABILITY_RELIABILITY_THRESHOLD to 98.0% and removed redundant DISTANCE_GRACE_MS. | **Verified (SoT/EngineConstants)** |
+| **Issue 230** | **Alert Label Unification**: Standardized `ALERT_ID_TRACKER_CHAIR` subtitle to "Chair occupancy detected". | **Verified (MainAlarmLogic)** |
+| **Issue 231** | **Visual Jump Integrity**: Implemented trajectory-aware `VISUAL_JUMP` detection in the core engine. | **Verified (MainAlarmLogic/Sentinel)** |
+| **Issue 232** | **Forensic Current Ribbon**: Added `RIBBON_CURRENT_SCALE_MA` (1000mA) for battery current visualization. | **Verified (EngineConstants)** |
+| **Issue 233** | **Manual Overrides Recovery**: Ensured `is_xiaomi_manual_override` is correctly propagated during thermal/low-power throttling. | **Verified (IntegrityMonitor)** |
+| **Issue 234** | **Vibration Window Stabilization**: Adjusted `VIBRATION_WINDOW_SIZE` to 5 samples for reduced jitter in stationary states. | **Verified (EngineConstants)** |
+| **Issue 235** | **Acoustic Floor Decay**: Implemented `ACOUSTIC_FLOOR_CONTRACTION_EMA` (0.995) for passive environmental calibration. | **Verified (LocationSentinel)** |
+| **Issue 236** | **Relay Rejoin Strategy**: Verified `NET_REJOIN_THRESHOLD_MS` (15s) logic in `AppNetworkManager` for rapid blackout recovery. | **Verified (Network)** |
+| **Issue 237** | **Session Metrics Persistence**: Verified atomic `saveSessionMetricsBulk` calls for reduced DataStore I/O during high-frequency tracking. | **Verified (SettingsRepository)** |
+| **Issue 238** | **Siren Auto-Recovery**: Verified `SIREN_RESUME_COOLDOWN_MS` (15s) logic to prevent permanent siren lockout after hardware auto-stop. | **Verified (AppAlarmManager)** |
+| **Issue 239** | **Hindsight Buffer Bug**: Fixed bug in `LocationSentinel.kt` where old rejected points were not cleared after trajectory promotion. | **Verified (LocationSentinel)** |
+| **Issue 240** | **Contextual Uncertainty Context**: Propagated `locationPendingReason` through `SyncManager` to ensure remote Viewer context. | **Verified (SyncManager)** |
+| **Issue 241** | **Forensic Log Enrichment**: Bridged SNR and Vibration snapshots to `AppAlarmManager` for more detailed black-box analysis. | **Verified (AppAlarmManager)** |
+| **Issue 242** | **Redundant Index Calculation**: Viewer now utilizes pre-calculated indices transmitted from the tracker's engine. | **Verified (ViewerService)** |
+| **Issue 243** | **Visual Jump Sensitivity**: Expanded Tier 3 Jitter gating to ensure no "visual jitters" are missed during low-vibration movement. | **Verified (TrackerService)** |
+| **Issue 244** | **Location Pending Persistence**: Ensured `locationPendingReason` survives offline storage and synchronization cycles. | **Verified (SyncManager/Room)** |
+| **Issue 245** | **Duplicate SIT Event Rising-Edge**: Centralized SIT rising-edge detection in `RemoteHandler.kt` to eliminate redundant logs. | **Verified (RemoteHandler)** |

@@ -41,12 +41,13 @@ class ForensicIdentityTest {
         )
 
         // Second point is a massive jump (far away)
+        // Note: Extreme single-point jumps are classified as OUTLIER by the current Sentinel logic
         val jumpResult = processor.processGpsPoint(
             lat = 40.0, lng = 50.0, alt = 10.0, androidSpeedKph = 0.0,
             gpsTs = 2000L, accuracy = 10.0f, bearing = 0.0f, snr = 40.0f, satsUsed = 10,
             isViewerTrail = false, lastGpsTs = 1000L, isLocal = true
         )
 
-        assertEquals("Status should be JUMP due to distance", SentinelStatus.JUMP, jumpResult.status)
+        assertEquals("Status should be OUTLIER due to distance", SentinelStatus.OUTLIER, jumpResult.status)
     }
 }

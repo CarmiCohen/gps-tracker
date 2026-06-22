@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * v8.9.24:
+ * - Issue #244: Added locationPendingReason to PendingStatusEntity for offline uncertainty context.
  * v8.9.21:
  * - Issue #224: Added tiltIdx and baroIdx to HistoryEntity and PendingStatusEntity for forensic expansion.
  * v8.9.19:
@@ -133,7 +135,8 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val isPowerSaveMode: Boolean = false,
     @ColumnInfo(defaultValue = "-1") val standbyBucket: Int = -1,
     @ColumnInfo(defaultValue = "UNKNOWN") val netInterface: String = "UNKNOWN",
-    @ColumnInfo(defaultValue = "0") val lastValidFixRealtime: Long = 0L
+    @ColumnInfo(defaultValue = "0") val lastValidFixRealtime: Long = 0L,
+    @ColumnInfo(defaultValue = "NONE") val locationPendingReason: String = "NONE"
 )
 
 @Dao
@@ -191,7 +194,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 44, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 45, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -200,6 +203,11 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_44_45 = object : Migration(44, 45) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN locationPendingReason TEXT NOT NULL DEFAULT 'NONE'")
+            }
+        }
         val MIGRATION_43_44 = object : Migration(43, 44) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE connection_history ADD COLUMN tiltIdx REAL NOT NULL DEFAULT 0")
@@ -280,8 +288,8 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("DROP TABLE violations"); db.execSQL("ALTER TABLE violations_new RENAME TO violations")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_violations_ts ON violations (ts)")
 
-                db.execSQL("CREATE TABLE pending_status_updates_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, speed REAL NOT NULL, accuracy REAL NOT NULL, bearing REAL NOT NULL, battery INTEGER NOT NULL, temp REAL NOT NULL, isCharging INTEGER NOT NULL, timestamp INTEGER NOT NULL, satsView INTEGER NOT NULL, satsUsed INTEGER NOT NULL, maxAccuracy REAL NOT NULL, distToTracker REAL, distToHome REAL, snrIdx REAL NOT NULL, isBatterySteepDischarge INTEGER NOT NULL, isCoolingModeActive INTEGER NOT NULL, isSitDetected INTEGER NOT NULL, isSitActive INTEGER NOT NULL, sitVz REAL NOT NULL, sitDz REAL NOT NULL, verticalVelocity REAL NOT NULL, sitBaro REAL NOT NULL, sitTilt REAL NOT NULL, sitShock REAL NOT NULL, isStorageLow INTEGER NOT NULL, isStorageCritical INTEGER NOT NULL, isPowerSaveMode INTEGER NOT NULL, standbyBucket INTEGER NOT NULL, netInterface TEXT NOT NULL)")
-                db.execSQL("INSERT INTO pending_status_updates_new (id, lat, lng, speed, accuracy, bearing, battery, temp, isCharging, timestamp, satsView, satsUsed, maxAccuracy, distToTracker, distToHome, snrIdx, isBatterySteepDischarge, isCoolingModeActive, isSitDetected, isSitActive, sitVz, sitDz, verticalVelocity, sitBaro, sitTilt, sitShock, isStorageLow, isStorageCritical, isPowerSaveMode, standbyBucket, netInterface) SELECT id, lat, lng, speed, accuracy, bearing, battery, temp, isCharging, timestamp, satsView, satsUsed, maxAccuracy, distToTracker, distToHome, snrIdx, isBatterySteepDischarge, isCoolingModeActive, isSitDetected, isSitActive, sitVz, sitDz, 0, sitBaro, sitTilt, sitShock, isStorageLow, isStorageCritical, isPowerSaveMode, standbyBucket, netInterface FROM pending_status_updates")
+                db.execSQL("CREATE TABLE pending_status_updates_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, speed REAL NOT NULL, accuracy REAL NOT NULL, bearing REAL NOT NULL, battery INTEGER NOT NULL, temp REAL NOT NULL, isCharging INTEGER NOT NULL, timestamp INTEGER NOT NULL, satsView INTEGER NOT NULL, satsUsed INTEGER NOT NULL, maxAccuracy REAL NOT NULL, distToTracker REAL, distToHome REAL, snrIdx REAL NOT NULL, isBatterySteepDischarge INTEGER NOT NULL, isCoolingModeActive INTEGER NOT NULL, isSitDetected INTEGER NOT NULL, isSitActive INTEGER NOT NULL, sitVz REAL NOT NULL, sitVzTs INTEGER NOT NULL DEFAULT 0, sitDz REAL NOT NULL, verticalVelocity REAL NOT NULL, sitBaro REAL NOT NULL, sitTilt REAL NOT NULL, sitShock REAL NOT NULL, isStorageLow INTEGER NOT NULL, isStorageCritical INTEGER NOT NULL, isPowerSaveMode INTEGER NOT NULL, standbyBucket INTEGER NOT NULL, netInterface TEXT NOT NULL)")
+                db.execSQL("INSERT INTO pending_status_updates_new (id, lat, lng, speed, accuracy, bearing, battery, temp, isCharging, timestamp, satsView, satsUsed, maxAccuracy, distToTracker, distToHome, snrIdx, isBatterySteepDischarge, isCoolingModeActive, isSitDetected, isSitActive, sitVz, sitVzTs, sitDz, verticalVelocity, sitBaro, sitTilt, sitShock, isStorageLow, isStorageCritical, isPowerSaveMode, standbyBucket, netInterface) SELECT id, lat, lng, speed, accuracy, bearing, battery, temp, isCharging, timestamp, satsView, satsUsed, maxAccuracy, distToTracker, distToHome, snrIdx, isBatterySteepDischarge, isCoolingModeActive, isSitDetected, isSitActive, sitVz, sitVzTs, sitDz, 0, sitBaro, sitTilt, sitShock, isStorageLow, isStorageCritical, isPowerSaveMode, standbyBucket, netInterface FROM pending_status_updates")
                 db.execSQL("DROP TABLE pending_status_updates"); db.execSQL("ALTER TABLE pending_status_updates_new RENAME TO pending_status_updates")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_status_updates_timestamp ON pending_status_updates (timestamp)")
             }

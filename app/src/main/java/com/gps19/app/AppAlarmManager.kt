@@ -10,6 +10,8 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * v8.9.25:
+ * - Issue #241: Forensic Log Enrichment - Added snrSnapshot and vibeSnapshot to evaluateAlarms and onLogEvent.
  * v8.9.22:
  * - Issue #226: Propagating locationPendingReason for intelligent uncertainty UX.
  * v8.9.19:
@@ -23,7 +25,7 @@ class AppAlarmManager(
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
     private val timeProvider: TimeProvider,
-    private val onLogEvent: (String, String, Boolean, Double?, String?, Long, Boolean, Int?, Double, Double, Float) -> Unit
+    private val onLogEvent: (String, String, Boolean, Double?, String?, Long, Boolean, Int?, Double, Double, Float, Float?, Float?) -> Unit
 ) {
     private val activeAlarms = mutableMapOf<String, AlarmEvaluation>()
     private var lastAlarmsJson = "[]"
@@ -132,7 +134,9 @@ class AppAlarmManager(
         isXiaomiManualOverride: Boolean = false,
         isSitActive: Boolean = false,
         isLocationPending: Boolean = false,
-        locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+        locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+        snrSnapshot: Float? = null,
+        vibeSnapshot: Float? = null
     ) {
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
         
@@ -230,7 +234,7 @@ class AppAlarmManager(
                         eval.firstTriggerTs = now
                         eval.isResolved = false
                         triggerOccurredInThisCycle = true
-                        onLogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy)
+                        onLogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, snrSnapshot, vibeSnapshot)
                         
                         if (now - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) {
                             lastSirenStopTs = 0L 
@@ -244,7 +248,7 @@ class AppAlarmManager(
             } else if (eval.isTriggered) {
                 if (!eval.isResolved) {
                     eval.isResolved = true
-                    onLogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, now - eval.firstTriggerTs, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy)
+                    onLogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, now - eval.firstTriggerTs, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, snrSnapshot, vibeSnapshot)
                 }
                 newAlarms[type] = eval
             }

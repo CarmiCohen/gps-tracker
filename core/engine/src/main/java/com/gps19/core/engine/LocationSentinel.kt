@@ -5,6 +5,8 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * v8.9.23:
+ * - Issue #239: Cleared hindsightBuffer upon trajectory promotion to prevent redundant point processing.
  * v8.9.22:
  * - Issue #227: Implemented optimized coordinate promotion for hindsight smoothing.
  * v8.9.19:
@@ -368,7 +370,7 @@ class LocationSentinel {
                         promoted.add(opt)
                         updateLastValid(p.lat, p.lng, p.alt, p.ts, p.speedMps, p.bearing)
                     }
-                    // hindsightBuffer.clear() - should be cleared when status is promoted
+                    hindsightBuffer.clear() // Issue #239: Clear buffer after promotion
                     val optimized = immFilter.update(lat, lng, accuracy, timestamp, SUSPICIOUS_Q_SCALE)
                     updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
                     return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted (Hindsight)", optimized, finalJumpConfidence, promotedPoints = promoted)
