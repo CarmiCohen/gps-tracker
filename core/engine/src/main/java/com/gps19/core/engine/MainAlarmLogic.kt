@@ -5,6 +5,11 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v8.9.20:
+ * - Issue #230: Updated ALERT_ID_TRACKER_CHAIR subtitle to "Chair occupancy detected" 
+ *   for consistency with "Chair Occupied" forensic status.
+ * v8.9.19:
+ * - Issue #231: Implemented VISUAL_JUMP detection logic.
  * v8.9.18:
  * - Issue #219: Implemented Adaptive Jump Confidence. Increased JUMP_HOLD_DURATION_MS 
  *   when isAdaptiveJump is flagged (spoofing/reflection suspicion).
@@ -67,6 +72,16 @@ object MainAlarmLogic {
                 title = getTrackerTitle(isTracker, ALERT_TITLE_JUMP_ALERT),
                 subtitle = "GPS data is erratic or jumping",
                 conditionMet = canCheckPeerErrors && state.isJammerSuspicion && !shouldSuppressPeerErrors
+            )
+        )
+
+        reports.add(
+            ViolationReport(
+                type = ALERT_ID_VISUAL_JUMP,
+                title = getTrackerTitle(isTracker, ALERT_TITLE_VISUAL_JUMP),
+                subtitle = "Trajectory-based jump detected",
+                conditionMet = canCheckPeerErrors && state.isTrackerVisualJump && !shouldSuppressPeerErrors,
+                technicalDetails = "Tier: ${state.jumpTier}${if (state.isAdaptiveJump) " (Adaptive)" else ""}"
             )
         )
         
@@ -339,8 +354,9 @@ object MainAlarmLogic {
             ViolationReport(
                 type = ALERT_ID_TRACKER_CHAIR,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_CHAIR),
-                subtitle = "Sudden movement detected",
-                conditionMet = state.isSitActive
+                subtitle = "Chair occupancy detected",
+                conditionMet = state.isSitActive,
+                technicalDetails = "Vz: ${String.format(Locale.getDefault(), "%.2f", state.verticalVelocity)} m/s"
             )
         )
 

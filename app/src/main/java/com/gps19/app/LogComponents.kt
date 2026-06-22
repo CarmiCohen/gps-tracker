@@ -1,5 +1,6 @@
 package com.gps19.app
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
@@ -31,6 +33,8 @@ import java.util.*
 /**
  * LogComponents: UI for system logs and diagnostic history.
  * Extracted from OverlayComponents for Issue 115 modularization.
+ * v8.9.22:
+ * - Issue #225: Implemented LogDetailPane to render snrSnapshot and vibeSnapshot for enriched forensics.
  * v8.9.8: Issue 193 - Integrated Ghost Mode (Slate500) for stale telemetry.
  * v8.8.36: Issue 165 - Migrated to FormatterUtils.
  */
@@ -55,6 +59,9 @@ fun LogOverlay(
             } 
         }
     }
+
+    var selectedLog by remember { mutableStateOf<LogEntry?>(null) }
+
     Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate950) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -96,7 +103,13 @@ fun LogOverlay(
                         }
                         val displayMessage = "$msgPrefix$baseMsg"
 
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 0.5.dp, horizontal = 8.dp).background(Color.White.copy(alpha = 0.02f)), verticalAlignment = Alignment.CenterVertically) {
+                        val isSelected = selectedLog?.localId == log.localId
+                        Row(modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 0.5.dp, horizontal = 8.dp)
+                            .background(if (isSelected) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.02f))
+                            .clickable { selectedLog = if (isSelected) null else log }, 
+                            verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = time, 
                                 color = if (isTelemetryFresh) Color.White.copy(alpha = 0.6f) else Slate500, 
@@ -122,6 +135,68 @@ fun LogOverlay(
                     }
                 }
             }
+
+            if (selectedLog != null) {
+                LogDetailPane(log = selectedLog!!, onClose = { selectedLog = null })
+            }
+        }
+    }
+}
+
+@Composable
+fun LogDetailPane(log: LogEntry, onClose: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Slate900.copy(alpha = 0.95f)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("FORENSIC DETAIL", color = Teal500, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(log.message, color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
+            Spacer(Modifier.height(8.dp))
+            
+            DetailRow(
+                label1 = "SNR-SNAPSHOT", val1 = log.snrSnapshot?.let { "%.1f dB".format(it) } ?: "--", color1 = Color(0xFF38BDF8),
+                label2 = "VIBE-SNAPSHOT", val2 = log.vibeSnapshot?.let { "%.2f g".format(it) } ?: "--", color2 = Color.Magenta
+            )
+            
+            DetailRow(
+                label1 = "LATITUDE", val1 = if (log.lat != 0.0) "%.6f".format(log.lat) else "--", color1 = Color.White,
+                label2 = "LONGITUDE", val2 = if (log.lng != 0.0) "%.6f".format(log.lng) else "--", color2 = Color.White
+            )
+            
+            DetailRow(
+                label1 = "ACCURACY", val1 = if (log.accuracy > 0) "%.1fm".format(log.accuracy) else "--", color1 = Amber500,
+                label2 = "EXTREME", val2 = log.extremeValue?.let { "%.2f".format(it) } ?: "--", color2 = Rose500
+            )
+
+            DetailRow(
+                label1 = "ROLE", val1 = log.role.uppercase(), color1 = if(log.role == "tracker") Lime500 else ViewerOrange,
+                label2 = "TYPE", val2 = log.type.uppercase(), color2 = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailRow(label1: String, val1: String, color1: Color, label2: String, val2: String, color2: Color) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label1, color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            Text(val1, color = color1, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label2, color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            Text(val2, color = color2, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
         }
     }
 }

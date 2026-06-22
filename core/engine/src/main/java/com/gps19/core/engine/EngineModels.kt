@@ -4,6 +4,11 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v8.9.22:
+ * - Issue #226: Added LocationPendingReason and locationPendingReason to AlarmEvaluationState.
+ * - Issue #227: Added promotedPoints to SentinelResult for hindsight transition smoothing.
+ * v8.9.21:
+ * - Issue #224: Added tiltIdx and baroIdx for forensic ribbon expansion.
  * v8.9.18:
  * - Issue #220: Added RejectedPoint for hindsight correction.
  * - Issue #219: Added isAdaptiveJump to JumpConfidence.
@@ -35,6 +40,18 @@ enum class EngineXiaomiStatus {
 }
 
 /**
+ * LocationPendingReason: Contextual cause for Bayesian uncertainty expansion.
+ * v8.9.22 (Issue #226)
+ */
+enum class LocationPendingReason {
+    NONE,
+    GPS_STALL,
+    ACOUSTIC_VIOLATION,
+    SIGNAL_LOSS,
+    JAMMER_SUSPICION
+}
+
+/**
  * EngineConnectionPoint: Pure Kotlin representation of a forensic telemetry slice.
  */
 @Serializable
@@ -52,6 +69,8 @@ data class EngineConnectionPoint(
     val proxIdx: Float = 1f,
     val liftIdx: Float = 0f,
     val snrIdx: Float = 0f,
+    val tiltIdx: Float = 0f,
+    val baroIdx: Float = 0f,
     val verticalVelocity: Float = 0f,
     val sitVz: Float = 0f,
     val sitVzTs: Long = 0L,
@@ -89,6 +108,7 @@ data class EngineSensorSnapshot(
     val vibe: Float,
     val proxIdx: Float,
     val lift: Float,
+    val tilt: Float,
     val isSitDetected: Boolean
 )
 
@@ -97,7 +117,8 @@ data class SentinelResult(
     val status: SentinelStatus,
     val reason: String = "",
     val optimizedPoint: EngineGeoPoint? = null,
-    val jumpConfidence: JumpConfidence? = null
+    val jumpConfidence: JumpConfidence? = null,
+    val promotedPoints: List<EngineGeoPoint>? = null
 )
 
 @Serializable
@@ -212,6 +233,7 @@ data class AlarmEvaluationState(
     val verticalVelocity: Float = 0f,
     val sitVzTs: Long = 0L,
     val isLocationPending: Boolean = false,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isPowerSaveMode: Boolean = false, 
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",

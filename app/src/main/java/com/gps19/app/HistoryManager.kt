@@ -12,11 +12,10 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * v8.9.21:
+ * - Issue #224: Added tiltIdx and baroIdx to updateRibbons and backfillGaps for forensic expansion.
  * v8.9.5:
  * - Issue 192: Added currentMa to updateRibbons and backfillGaps for forensic power parity.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * - Issue 135: Added verticalVelocity to updateRibbons and backfillGaps for forensic parity.
  */
 class HistoryManager(
     private val context: Context,
@@ -56,6 +55,8 @@ class HistoryManager(
         proxIdx: Float = 1f,
         liftIdx: Float = 0f,
         snrIdx: Float = 0f,
+        tiltIdx: Float = 0f,
+        baroIdx: Float = 0f,
         verticalVelocity: Float = 0f,
         sitVz: Float = 0f,
         sitDz: Float = 0f,
@@ -100,6 +101,8 @@ class HistoryManager(
                 proxIdx = proxIdx,
                 liftIdx = liftIdx,
                 snrIdx = snrIdx,
+                tiltIdx = tiltIdx,
+                baroIdx = baroIdx,
                 verticalVelocity = verticalVelocity,
                 sitVz = sitVz,
                 sitDz = sitDz,
@@ -130,6 +133,8 @@ class HistoryManager(
             proxIdx = proxIdx,
             liftIdx = liftIdx,
             snrIdx = snrIdx,
+            tiltIdx = tiltIdx,
+            baroIdx = baroIdx,
             verticalVelocity = verticalVelocity,
             sitVz = sitVz,
             sitDz = sitDz,
@@ -182,6 +187,8 @@ class HistoryManager(
         proxIdx: Float,
         liftIdx: Float,
         snrIdx: Float,
+        tiltIdx: Float,
+        baroIdx: Float,
         verticalVelocity: Float,
         sitVz: Float,
         sitDz: Float,
@@ -202,7 +209,7 @@ class HistoryManager(
 
         val sensorSamples = if (isTrackerMode && sensorManager != null) {
             sensorManager.getSensorSamples(lastTickTs + 1, now).map { 
-                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.isSitDetected) 
+                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
             }
         } else emptyList()
 
@@ -221,6 +228,8 @@ class HistoryManager(
             proxIdx = proxIdx,
             liftIdx = liftIdx,
             snrIdx = snrIdx,
+            tiltIdx = tiltIdx,
+            baroIdx = baroIdx,
             verticalVelocity = verticalVelocity,
             sitVz = sitVz,
             sitDz = sitDz,
@@ -257,7 +266,7 @@ class HistoryManager(
 
         val sensorSamples = if (isTrackerMode && sensorManager != null) {
             sensorManager.getSensorSamples(lastTickTs, now).map { 
-                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.isSitDetected) 
+                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
             }
         } else emptyList()
 
@@ -306,6 +315,8 @@ class HistoryManager(
             proxIdx = p.proxIdx,
             liftIdx = p.liftIdx,
             snrIdx = p.snrIdx,
+            tiltIdx = p.tiltIdx,
+            baroIdx = p.baroIdx,
             verticalVelocity = p.verticalVelocity,
             sitVz = p.sitVz,
             sitDz = p.sitDz,

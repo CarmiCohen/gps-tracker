@@ -1,12 +1,12 @@
 # Open Issues
 - **Issue #190: Xiaomi MIUI 14 Hardware Confirmation**: Gating logic for "Unknown" status and boot grace is implemented, but requires field verification on physical MIUI 14 hardware to ensure no "Denied" spikes occur during boot transitions.
-- **Issue #224: SIT Forensic Expansion**: Add "Tilt Stability" and "Baro Stability" metrics to the analytical ribbons.
-- **Issue #225: Forensic Snapshot Visualization**: Update the Log Viewer detail pane to render `snrSnapshot` and `vibeSnapshot` values for enriched "Black Box" analysis.
-- **Issue #226: Intelligent Uncertainty UX**: Enhance the "Location Pending" Bayesian radius to contextually communicate the cause of uncertainty (e.g., GPS Stall vs. Acoustic Violation).
-- **Issue #227: Hindsight Transition Smoothing**: Refine the visual interpolation of "Ghost Paths" (Slate500) as they are retroactively promoted by hindsight logic to ensure smooth map transitions.
-- **Issue #230: SIT Alert Subtitle Ambiguity**: `ALERT_ID_TRACKER_CHAIR` subtitle in `MainAlarmLogic.kt` ("Sudden movement detected") is inconsistent with the intended "Chair Occupied" forensic status.
 
 # Fixed Issues (Recent: #200 - Current)
+## 238. FIXED Issue #227: Hindsight Transition Smoothing - Resolution: Refined the visual interpolation of "Ghost Paths" (Slate500) by implementing retroactive coordinate optimization. Buffered points are now processed through the `ImmFilter` during hindsight promotion to ensure spatial continuity and smooth map transitions. Updated `SentinelResult`, `LocationSentinel`, and `LocationProcessor` to propagate optimized coordinates to the persistence layer. (v8.9.22)
+## 237. FIXED Issue #226: Intelligent Uncertainty UX - Resolution: Enhanced the "Location Pending" state to communicate the contextual cause of uncertainty. Defined `LocationPendingReason` enum (GPS_STALL, ACOUSTIC_VIOLATION, etc.) and propagated it through `LocationUpdate`, `TrackerStatus`, and the telemetry pipeline (`SyncManager`, `RemoteHandler`). Updated `MapComponents.kt` to render a context-aware overlay (e.g., "UNCERTAINTY: ACOUSTIC VIOLATION") when the Bayesian radius is expanding. (v8.9.22)
+## 236. FIXED Issue #225: Forensic Snapshot Visualization - Resolution: Implemented an interactive detail pane in the Log Viewer (`LogComponents.kt`) to render `snrSnapshot` and `vibeSnapshot` values. Log entries are now clickable to reveal enriched "Black Box" forensics including spatial anchors, accuracy, and extreme values. (v8.9.22)
+## 235. FIXED Issue #224: SIT Forensic Expansion - Resolution: Added "Tilt Stability" (TLT) and "Baro Stability" (BAR) metrics to analytical ribbons and the telemetry pipeline. Updated `EngineConnectionPoint`, `LocationUpdate`, and `ConnectionPoint` models. Implemented Database Migration v44 to expand forensic tables. Standardized scaling constants to 15° (Tilt) and 0.5m (Baro) in `REQUIREMENTS_SOT.md`. (v8.9.21)
+## 234. FIXED Issue #230: SIT Alert Subtitle Ambiguity - Resolution: Updated `ALERT_ID_TRACKER_CHAIR` subtitle in `MainAlarmLogic.kt` to "Chair occupancy detected" for architectural consistency with the "Chair Occupied" forensic status. Added `verticalVelocity` (Vz) to technical details for enhanced diagnostic clarity in forensic logs. (v8.9.20)
 ## 233. FIXED Issue #228 & #229: SoT Constant Synchronization & Cleanup - Resolution: Standardized `GPS_STABILITY_RELIABILITY_THRESHOLD` to 98.0% in `REQUIREMENTS_SOT.md` to match `EngineConstants.kt`. Removed redundant `DISTANCE_GRACE_MS` from `EngineConstants.kt` and updated `event-tables.md` to reference `BOOTSTRAP_PHASE_MS` for geofence grace, ensuring architectural consistency and Source of Truth integrity. (v8.9.20)
 ## 232. FIXED Issue #232: Missing Constant & Hardcoded UI Scale - Resolution: Added `RIBBON_CURRENT_SCALE_MA` (1000mA) to `EngineConstants.kt` and updated `SharedUiComponents.kt` to use the constant for CUR ribbon normalization, ensuring architectural alignment with the SoT. (v8.9.19)
 ## 231. FIXED Issue #231: Missing VISUAL_JUMP Alarm Logic - Resolution: Implemented detection logic in `MainAlarmLogic.detectViolations` using `isTrackerVisualJump` and `jumpTier` flags. Added `ALERT_TITLE_VISUAL_JUMP` ("Tracker: Visual Jump") to `EngineConstants.kt` to maintain architectural alignment. (v8.9.19)
@@ -31,7 +31,7 @@
 ## 205. FIXED Muzzle Window Constant Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `MUZZLE_WINDOW_DURATION_MS` = 2000ms. (v8.9.8)
 ## 204. FIXED GPS Stall/Revival Constant Alignment (SoT) - Resolution: Updated `REQUIREMENTS_SoT.md` to match `EngineConstants.kt`: `GPS_STALL_THRESHOLD_MS` = 60s and `GPS_REVIVAL_RETRY_INTERVAL_MS` = 120s. (v8.9.8)
 ## 203. FIXED Documentation Version Desync - Resolution: Synchronized all core documentation (`APP_DESCRIPTION.md`, `SETTINGS_PAGE_DETAIL.md`, `info-elementary-fields.md`, `README.md`, `REQUIREMENTS_SOT.md`) and `issues.md` to the v8.9.9 baseline. (v8.9.9)
-## 201. FIXED Multi-version Schema Robustness - Resolution: Hardened MIGRATION_35_36. (v8.9.8)
+## 211. FIXED Multi-version Schema Robustness - Resolution: Hardened MIGRATION_35_36. (v8.9.8)
 ## 200. FIXED Room Migration Registry Fix - Resolution: Registered MIGRATION_37_38. (v8.9.8)
 
 ---

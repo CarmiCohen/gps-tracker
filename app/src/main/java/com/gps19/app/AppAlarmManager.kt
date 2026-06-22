@@ -10,6 +10,8 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * v8.9.22:
+ * - Issue #226: Propagating locationPendingReason for intelligent uncertainty UX.
  * v8.9.19:
  * - Issue #221: Added trackerLastValidFixTs to evaluateAlarms for Bayesian Gap logic.
  * v8.9.17:
@@ -129,7 +131,8 @@ class AppAlarmManager(
         xiaomiAutostartStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
         isXiaomiManualOverride: Boolean = false,
         isSitActive: Boolean = false,
-        isLocationPending: Boolean = false
+        isLocationPending: Boolean = false,
+        locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
     ) {
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
         
@@ -186,6 +189,7 @@ class AppAlarmManager(
             isPowerTamper = isPowerTamper,
             isSitActive = isSitActive,
             isLocationPending = isLocationPending,
+            locationPendingReason = locationPendingReason,
             isPowerSaveMode = isPowerSaveMode,
             standbyBucket = standbyBucket,
             netInterface = netInterface,

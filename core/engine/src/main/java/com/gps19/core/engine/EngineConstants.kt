@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.21:
+ * - Issue #224: Added RIBBON_SIT_TILT_SCALE_DEG and RIBBON_SIT_BARO_SCALE_METERS for forensic expansion.
  * v8.9.20:
  * - Issue #229: Removed redundant DISTANCE_GRACE_MS.
  * v8.9.19:
@@ -235,6 +237,8 @@ const val RIBBON_VIBRATION_SCALE_G = 2.0
 const val RIBBON_LIFT_SCALE_METERS = 5.0f
 const val RIBBON_SNR_SCALE_DB = 45.0f
 const val RIBBON_CURRENT_SCALE_MA = 1000.0
+const val RIBBON_SIT_TILT_SCALE_DEG = 15.0f
+const val RIBBON_SIT_BARO_SCALE_METERS = 0.5f
 
 // Network Communication (v8.8.21)
 const val MAX_ALLOWED_RTT_MS = 5000

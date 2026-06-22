@@ -2,6 +2,13 @@ package com.gps19.core.engine
 
 import kotlinx.serialization.Serializable
 
+/**
+ * LocationUpdate: Core engine model for position and sensor telemetry.
+ * v8.9.22:
+ * - Issue #226: Added locationPendingReason for intelligent uncertainty UX.
+ * v8.9.21:
+ * - Issue #224: Added tiltIdx and baroIdx for forensic ribbon expansion.
+ */
 @Serializable
 data class LocationUpdate(
     val lat: Double = 0.0, val lng: Double = 0.0, val alt: Double = 0.0,
@@ -48,6 +55,7 @@ data class LocationUpdate(
     val sitShock: Float? = null,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val lastValidFixRealtime: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
@@ -56,6 +64,8 @@ data class LocationUpdate(
     val isStorageCritical: Boolean = false,
     val gnssDetail: GnssDetail? = null,
     val snrIdx: Float = 0f,
+    val tiltIdx: Float = 0f,
+    val baroIdx: Float = 0f,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false
 )

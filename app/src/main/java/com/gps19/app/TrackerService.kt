@@ -21,6 +21,8 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.21:
+ * - Issue #224: Propagating tiltIdx and baroIdx for forensic ribbon expansion.
  * v8.9.19:
  * - Issue #223: Forensic Log Enrichment - Bridging SNR and Vibration snapshots to LogManager.
  * - Issue #222: Propagating isHindsightCorrected to repository for ghost-path visualization.
@@ -472,6 +474,9 @@ class TrackerService : BaseMonitorService() {
             gpsManager.setPollingInterval(gpsInterval)
         }
 
+        val tiltIdx = (sensorManager.currentTiltDegrees / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0f, 1f)
+        val baroIdx = (abs(sensorManager.relativeAltitude) / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0f, 1f)
+
         // Push Status
         val proc = lastProcessedLocation
         syncManager.pushCurrentStatus(
@@ -490,10 +495,13 @@ class TrackerService : BaseMonitorService() {
             violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(),
             verticalVelocity = sensorManager.currentVerticalVelocity, sitVz = locationProcessor.sentinel.lastSitVz, sitDz = locationProcessor.sentinel.lastSitDz, 
             sitBaro = locationProcessor.sentinel.lastSitBaro, sitTilt = locationProcessor.sentinel.lastSitTilt, sitShock = locationProcessor.sentinel.lastSitShock, 
-            isClockRegression = proc?.isClockRegression ?: false, isLocationPending = pendingAcousticViolation, 
+            isClockRegression = proc?.isClockRegression ?: false, isLocationPending = pendingAcousticViolation,
             lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
             gnssDetail = latestGnssDetail,
-            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f), isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive
+            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f), 
+            tiltIdx = tiltIdx,
+            baroIdx = baroIdx,
+            isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive
         )
 
         // Forensic Ribbon Update (1Hz loop)
@@ -515,6 +523,8 @@ class TrackerService : BaseMonitorService() {
             proxIdx = sensorManager.proximityIdx,
             liftIdx = (abs(sensorManager.relativeAltitude) / RIBBON_LIFT_SCALE_METERS).coerceIn(0f, 1f),
             snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f),
+            tiltIdx = tiltIdx,
+            baroIdx = baroIdx,
             verticalVelocity = sensorManager.currentVerticalVelocity,
             sitVz = locationProcessor.sentinel.lastSitVz,
             sitDz = locationProcessor.sentinel.lastSitDz,

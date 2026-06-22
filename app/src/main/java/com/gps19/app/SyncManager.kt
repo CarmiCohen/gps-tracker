@@ -12,13 +12,15 @@ import org.json.JSONObject
 
 /**
  * SyncManager: Handles broadcasting state updates and relay synchronization.
+ * v8.9.22:
+ * - Issue #226: Propagating location_pending_reason in telemetry payloads.
+ * v8.9.21:
+ * - Issue #224: Added tilt_idx and baro_idx to telemetry payloads for forensic expansion.
  * v8.9.18:
  * - Issue #221: Propagated lastValidFixRealtime for Bayesian uncertainty scaling.
  * v8.9.7:
  * - Plunge Matching: Added sit_vz_ts to telemetry payloads for forensic parity.
  * - Issue 194: Implemented reliable log synchronization (flushPendingLogs) to ensure zero-loss SIT events.
- * v8.9.6:
- * - Issue 191: Implemented onSyncFinished handshake to resolve Muzzle Window race conditions.
  */
 class SyncManager(
     private val context: Context,
@@ -133,6 +135,8 @@ class SyncManager(
                         put("sats_used", entity.satsUsed)
                         put("max_accuracy", entity.maxAccuracy)
                         put("snr_idx", safeFloat(entity.snrIdx))
+                        put("tilt_idx", safeFloat(entity.tiltIdx))
+                        put("baro_idx", safeFloat(entity.baroIdx))
                         put("is_battery_steep_discharge", entity.isBatterySteepDischarge)
                         put("is_cooling_mode_active", entity.isCoolingModeActive)
                         put("is_historical", true)
@@ -210,10 +214,13 @@ class SyncManager(
         sitShock: Float = 0f,
         isClockRegression: Boolean = false,
         isLocationPending: Boolean = false,
+        locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
         lastValidFixRealtime: Long = 0L,
         gpsTsOverride: Long? = null,
         gnssDetail: GnssDetail? = null,
         snrIdx: Float = 0f,
+        tiltIdx: Float = 0f,
+        baroIdx: Float = 0f,
         battery: Int? = null,
         temp: Float? = null,
         currentMa: Int? = null,
@@ -271,8 +278,11 @@ class SyncManager(
             put("is_trajectory_promoted", isTrajectoryPromoted)
             put("jump_tier", jumpTier)
             put("is_location_pending", isLocationPending)
+            put("location_pending_reason", locationPendingReason.name)
             put("last_valid_fix_realtime", lastValidFixRealtime)
             put("snr_idx", safeFloat(snrIdx))
+            put("tilt_idx", safeFloat(tiltIdx))
+            put("baro_idx", safeFloat(baroIdx))
             put("is_battery_steep_discharge", isBatterySteepDischarge)
             put("is_cooling_mode_active", isCoolingModeActive)
             
@@ -341,7 +351,10 @@ class SyncManager(
                     gpsTs = effectiveGpsTs,
                     satsView = gpsManager?.satellitesInView ?: 0, satsUsed = gpsManager?.satellitesUsed ?: 0,
                     maxAccuracy = maxAccuracy, distToTracker = distToTracker, distToHome = distToHome,
-                    snrIdx = safeFloat(snrIdx), isBatterySteepDischarge = isBatterySteepDischarge,
+                    snrIdx = safeFloat(snrIdx), 
+                    tiltIdx = safeFloat(tiltIdx),
+                    baroIdx = safeFloat(baroIdx),
+                    isBatterySteepDischarge = isBatterySteepDischarge,
                     isCoolingModeActive = isCoolingModeActive,
                     isSitDetected = isSitDetected, isSitActive = isSitActive,
                     sitVz = sitVz, sitVzTs = sitVzTs, sitDz = sitDz,
@@ -386,7 +399,8 @@ class SyncManager(
             verticalVelocity = verticalVelocity,
             sitVz = sitVz, sitVzTs = sitVzTs, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
             isClockRegression = isClockRegression,
-            isLocationPending = integrity.isLocationPending,
+            isLocationPending = isLocationPending,
+            locationPendingReason = locationPendingReason,
             lastValidFixRealtime = lastValidFixRealtime,
             isPowerSaveMode = integrity.isPowerSaveMode,
             standbyBucket = integrity.standbyBucket,
@@ -395,6 +409,8 @@ class SyncManager(
             isStorageCritical = integrity.isStorageCritical,
             gnssDetail = gnssDetail,
             snrIdx = snrIdx,
+            tiltIdx = tiltIdx,
+            baroIdx = baroIdx,
             isBatterySteepDischarge = isBatterySteepDischarge,
             isCoolingModeActive = isCoolingModeActive
         ))

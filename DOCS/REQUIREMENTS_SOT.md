@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.20
+# System Source of Truth (SoT) - v8.9.21
 
 This document serves as the definitive operational specification for the GPS-Tracker system.
 
@@ -179,6 +179,8 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `RIBBON_LIFT_SCALE_METERS` | 5.0m | Maximum range for barometric lift ribbon mapping. |
 | `RIBBON_SNR_SCALE_DB` | 45.0dB | Maximum range for SNR ribbon mapping. |
 | `RIBBON_CURRENT_SCALE_MA` | 1000mA | Maximum range for battery current ribbon mapping. |
+| `RIBBON_SIT_TILT_SCALE_DEG`| 15.0° | Maximum range for tilt stability ribbon mapping. |
+| `RIBBON_SIT_BARO_SCALE_METERS`| 0.5m | Maximum range for baro stability ribbon mapping. |
 
 ## 3. Network & Connectivity
 | Constant | Value | Description |
@@ -198,7 +200,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ## 4. Remote Forensic Verification
 ### 4.1. Version & Role Visibility
-*   **Engine Identity**: The system operates on the v8.9.20 baseline logic.
+*   **Engine Identity**: The system operates on the v8.9.21 baseline logic.
 *   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using a timestamp (`yearOffset` + `MMddHHmm`) or git commits to ensure uniqueness.
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Standardized Alert IDs**: Aligned with `EngineConstants.kt`. Includes `VISUAL_JUMP` for trajectory-based jumps.
@@ -214,6 +216,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Log Spatial Anchor**: All forensic logs and critical alerts are tagged with `lat`/`lng` coordinates to enable historical marker reconstruction on the map.
 *   **Accuracy Parity**: Forensic logs now include explicit `accuracy` fields, ensuring historical map markers match real-time precision.
 *   **Forensic Snapshots**: Log entries now include `snrSnapshot` and `vibeSnapshot` for Jump and Stall forensic enrichment (v8.9.19).
+*   **Stability Expansion**: Added `tiltIdx` and `baroIdx` to the analytical ribbons and telemetry pipeline for enhanced "SIT" event analysis (v8.9.21).
 
 ---
 
@@ -260,7 +263,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ---
 
-## 8. Forensic Alert Manifest (v8.9.20)
+## 8. Forensic Alert Manifest (v8.9.21)
 | Alert ID | Alert Title (Standardized) | Trigger Description |
 | :--- | :--- | :--- |
 | `LOCAL_INTERNET` | This device: Internet Lost | Local connectivity failure. |
@@ -358,4 +361,5 @@ This document serves as the definitive operational specification for the GPS-Tra
 | **Issue 221** | **Bayesian Uncertainty Scaling**: UI radius expands at 15m/s during GPS stalls based on `lastValidFixRealtime`. | **Verified (MapComponents)** |
 | **Issue 222** | **Hindsight Path Visualization**: Renders "Ghost Paths" (Slate500) for points retroactively promoted. | **Verified (MapComponents)** |
 | **Issue 223** | **Forensic Log Enrichment**: SNR and Vibration snapshots attached to jump/stall logs for black-box analysis. | **Verified (LogManager/Services)** |
+| **Issue 224** | **SIT Forensic Expansion**: Added tiltIdx and baroIdx to analytical ribbons and telemetry pipeline for enhanced chair event analysis. | **Verified (AnalyticalRibbons/Telemetry)** |
 | **Issue 228/229**| **SoT Constant Synchronization**: Standardized GPS_STABILITY_RELIABILITY_THRESHOLD to 98.0% and removed redundant DISTANCE_GRACE_MS. | **Verified (SoT/EngineConstants)** |

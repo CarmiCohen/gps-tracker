@@ -18,6 +18,8 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.21:
+ * - Issue #224: Propagating tiltIdx and baroIdx for forensic ribbon expansion.
  * v8.9.19:
  * - Issue #223: Forensic Log Enrichment - Bridging SNR and Vibration snapshots to LogManager.
  * - Issue #222: Propagating isHindsightCorrected to repository for ghost-path visualization.
@@ -326,11 +328,16 @@ class ViewerService : BaseMonitorService() {
             verticalVelocity = 0f, sitVz = 0f, sitDz = 0f, sitBaro = 0f, sitTilt = 0f, sitShock = 0f, isClockRegression = false, 
             isLocationPending = false, gnssDetail = latestGnssDetail, 
             snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f), 
+            tiltIdx = 0f, baroIdx = 0f,
             isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive
         )
 
         val trackerGpsTs = remoteHandler.trackerLastGpsTs
         val gpsAge = if (trackerGpsTs > 0) (now - trackerGpsTs) else 3600000L
+        
+        val trackerTiltIdx = (remoteHandler.trackerTiltDegrees / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0f, 1f)
+        val trackerBaroIdx = (abs(remoteHandler.trackerBaroAlt) / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0f, 1f)
+
         historyManager.updateRibbons(
             now = now,
             lastTickTs = lastServiceTickTs,
@@ -347,6 +354,8 @@ class ViewerService : BaseMonitorService() {
             proxIdx = remoteHandler.trackerProxIdx,
             liftIdx = (abs(remoteHandler.trackerBaroAlt) / RIBBON_LIFT_SCALE_METERS).coerceIn(0f, 1f),
             snrIdx = remoteHandler.trackerSnrIdx,
+            tiltIdx = trackerTiltIdx,
+            baroIdx = trackerBaroIdx,
             verticalVelocity = remoteHandler.trackerVerticalVelocity,
             sitVz = remoteHandler.trackerSitVz,
             sitDz = remoteHandler.trackerSitDz,

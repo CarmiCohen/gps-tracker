@@ -48,6 +48,8 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * v8.9.22:
+ * - Issue #226: Intelligent Uncertainty UX - Rendering locationPendingReason on Map.
  * v8.9.19:
  * - Issue #222: Implemented Ghost Path visualization for hindsight-corrected segments.
  * v8.9.18:
@@ -81,13 +83,15 @@ fun AppMapContainer(
     val trackerAccuracy = if (isTrackerMode) uiState.localLocation.accuracy else uiState.trackerLocation.accuracy
     val trackerLastValidFixRealtime = if (isTrackerMode) uiState.localLocation.lastValidFixRealtime else uiState.trackerLocation.lastValidFixRealtime
     val trackerLocationPending = if (isTrackerMode) uiState.localLocation.isLocationPending else uiState.trackerLocation.isLocationPending
+    val trackerLocationPendingReason = if (isTrackerMode) uiState.localLocation.locationPendingReason else uiState.trackerLocation.locationPendingReason
     
     val viewerLat = if (isTrackerMode) uiState.trackerLocation.lat else uiState.localLocation.lat
     val viewerLng = if (isTrackerMode) uiState.trackerLocation.lng else uiState.localLocation.lng
-    val viewerBearing = if (isTrackerMode) uiState.localLocation.bearing else uiState.trackerLocation.bearing
-    val viewerAccuracy = if (isTrackerMode) uiState.localLocation.accuracy else uiState.trackerLocation.accuracy
+    val viewerBearing = if (isTrackerMode) uiState.trackerLocation.bearing else uiState.localLocation.bearing
+    val viewerAccuracy = if (isTrackerMode) uiState.localLocation.accuracy else uiState.localLocation.accuracy
     val viewerLastValidFixRealtime = if (isTrackerMode) uiState.trackerLocation.lastValidFixRealtime else uiState.localLocation.lastValidFixRealtime
     val viewerLocationPending = if (isTrackerMode) uiState.trackerLocation.isLocationPending else uiState.localLocation.isLocationPending
+    val viewerLocationPendingReason = if (isTrackerMode) uiState.trackerLocation.locationPendingReason else uiState.localLocation.locationPendingReason
     
     val trackerGpsAge = if (isTrackerMode) (if (uiState.localLocation.timestamp > 0) now - uiState.localLocation.timestamp else Long.MAX_VALUE)
                  else (if (uiState.trackerLocation.timestamp > 0) now - uiState.trackerLocation.timestamp else Long.MAX_VALUE)
@@ -145,8 +149,10 @@ fun AppMapContainer(
             systemPulse = now,
             systemPulseRealtime = systemPulseRealtime,
             isLocationPending = trackerLocationPending,
+            locationPendingReason = trackerLocationPendingReason,
             lastValidFixRealtime = trackerLastValidFixRealtime,
             isMeLocationPending = viewerLocationPending,
+            meLocationPendingReason = viewerLocationPendingReason,
             meLastValidFixRealtime = viewerLastValidFixRealtime
         )
 
@@ -195,6 +201,18 @@ fun AppMapContainer(
                         onZoomOut = { onEvent(UiEvent.MapZoomOut) }
                     ) 
                 }
+            }
+        }
+
+        // Issue #226: Intelligent Uncertainty UX - Display reason overlay if pending
+        if (trackerLocationPending && trackerLocationPendingReason != LocationPendingReason.NONE) {
+            Box(modifier = Modifier.align(Alignment.Center).padding(bottom = 120.dp).background(Amber500.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                Text(
+                    text = "UNCERTAINTY: ${trackerLocationPendingReason.name.replace("_", " ")}",
+                    color = Color.Black,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black
+                )
             }
         }
     }
@@ -246,8 +264,10 @@ fun OsmMap(
     systemPulse: Long = 0L,
     systemPulseRealtime: Long = 0L,
     isLocationPending: Boolean = false,
+    locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     lastValidFixRealtime: Long = 0L,
     isMeLocationPending: Boolean = false,
+    meLocationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     meLastValidFixRealtime: Long = 0L
 ) {
     val context = LocalContext.current

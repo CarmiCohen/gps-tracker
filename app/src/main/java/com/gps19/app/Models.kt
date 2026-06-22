@@ -9,11 +9,13 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v8.9.22:
+ * - Issue #226: Added locationPendingReason to TrackerStatus, LocationState, DashboardState, IntegrityState, and IntegrityStateUi.
+ * v8.9.21:
+ * - Issue #224: Added tiltIdx and baroIdx to ConnectionPoint, TrackerStatus, LocationState, and IntegrityState for forensic expansion.
  * v8.9.19:
  * - Issue #223: Added snrSnapshot and vibeSnapshot to LogEntry for forensic enrichment.
  * - Issue #222: Added isHindsightCorrected to TrailPoint for ghost-path visualization.
- * v8.9.18:
- * - Issue #221: Added lastValidFixRealtime to TrackerStatus, IntegrityState, and LocationState.
  */
 
 @Serializable
@@ -69,6 +71,7 @@ data class ConnectionPoint(
     val isTick: Boolean = false, val hasGps: Boolean = false, val gpsIndex: Float = 0f,
     val noiseIdx: Float = 0f, val luxIdx: Float = 0f, val vibeIdx: Float = 0f, val proxIdx: Float = 1f,
     val liftIdx: Float = 0f, val snrIdx: Float = 0f,
+    val tiltIdx: Float = 0f, val baroIdx: Float = 0f,
     val verticalVelocity: Float = 0f,
     val sitVz: Float = 0f, val sitVzTs: Long = 0L, val sitDz: Float = 0f,
     val isBatterySteepDischarge: Boolean = false,
@@ -218,6 +221,7 @@ data class TrackerStatus(
     val isTrajectoryPromoted: Boolean = false,
     val jumpTier: Int = 0,
     val isLocationPending: Boolean = false,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val lastValidFixRealtime: Long = 0L,
     val isPowerSaveMode: Boolean = false, 
     val standbyBucket: Int = -1,
@@ -226,6 +230,8 @@ data class TrackerStatus(
     val isStorageCritical: Boolean = false,
     val gnssDetail: GnssDetail? = null,
     val snrIdx: Float = 0f,
+    val tiltIdx: Float = 0f,
+    val baroIdx: Float = 0f,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false
 ) : SpatialAnchor
@@ -279,6 +285,7 @@ data class LocationState(
     val sitShock: Float = 0f,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val lastValidFixRealtime: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
@@ -287,6 +294,8 @@ data class LocationState(
     val isStorageCritical: Boolean = false,
     val gnssDetail: GnssDetail? = null,
     val snrIdx: Float = 0f,
+    val tiltIdx: Float = 0f,
+    val baroIdx: Float = 0f,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
     val currentMa: Int = 0
@@ -346,6 +355,7 @@ data class DashboardState(
     val plungeSpeed: String = "--",
     val chairForensics: String = "--",
     val isLocationPending: Boolean = false,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",
@@ -474,6 +484,7 @@ data class IntegrityState(
     val sitShock: Float = 0f,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val lastValidFixRealtime: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
@@ -481,7 +492,9 @@ data class IntegrityState(
     val isStorageLow: Boolean = false,
     val isStorageCritical: Boolean = false,
     val isBatterySteepDischarge: Boolean = false, 
-    val isCoolingModeActive: Boolean = false
+    val isCoolingModeActive: Boolean = false,
+    val tiltIdx: Float = 0f,
+    val baroIdx: Float = 0f
 )
 
 data class StatsState(
@@ -512,6 +525,7 @@ data class IntegrityStateUi(
     val lastSitTs: Long = 0L,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val lastValidFixRealtime: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
@@ -520,5 +534,7 @@ data class IntegrityStateUi(
     val isStorageCritical: Boolean = false,
     val isBatterySteepDischarge: Boolean = false, 
     val isCoolingModeActive: Boolean = false,
-    val currentMa: Int = 0
+    val currentMa: Int = 0,
+    val tiltIdx: Float = 0f,
+    val baroIdx: Float = 0f
 )

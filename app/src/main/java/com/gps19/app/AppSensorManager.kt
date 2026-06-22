@@ -25,6 +25,8 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU and Environmental sensors.
+ * v8.9.21:
+ * - Issue #224: Added tilt to SensorSnapshot for forensic ribbon expansion.
  * v8.9.7:
  * - Plunge Matching: Implemented peakVerticalVelocityTs tracking and enhanced displacement processing.
  * v8.8.21: Migrated to TimeProvider for all timing logic.
@@ -643,6 +645,7 @@ class AppSensorManager @Inject constructor(
         val currentAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure)
         val baselineAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure)
         relativeAltitude = if (isWarming) 0f else currentAlt - baselineAlt
+        if (abs(relativeAltitude) > secPeakLift) secPeakLift = abs(relativeAltitude)
     }
 
     private fun processRotation(rotationVector: FloatArray) {
@@ -663,6 +666,7 @@ class AppSensorManager @Inject constructor(
                          (initialRotationMatrix[8] * currentMatrix[8])
         val cosTheta = dotProduct.coerceIn(-1.0f, 1.0f)
         currentTiltDegrees = if (isWarming) 0f else Math.toDegrees(acos(cosTheta.toDouble())).toFloat()
+        if (currentTiltDegrees > secPeakTilt) secPeakTilt = currentTiltDegrees
     }
 
     private fun updateOrientation() {

@@ -7,16 +7,12 @@ import javax.inject.Singleton
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
  * Extracted from MainViewModel to resolve Issue 115 (Architectural Bloat).
+ * v8.9.22:
+ * - Issue #226: Mapping locationPendingReason for intelligent uncertainty UX.
  * v8.9.18:
  * - Issue #221: Mapping lastValidFixRealtime for Bayesian uncertainty scaling.
  * v8.9.5:
  * - Issue 192: Added currentMa mapping for full forensic parity.
- * v8.8.27: Hardened vid propagation during forensic audit.
- * v8.8.28: Resolved BirdEMA build error by migrating to SentinelValidator.
- * v8.8.32: Removed vid propagation.
- * v8.8.34: Forensic Simplification - Removed 'ver' propagation.
- * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
- * v8.8.35: Issue 164 - Standardized to use PhysicsUtils.isValidLocation for coordinate validation.
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(
@@ -70,6 +66,7 @@ class TelemetryUseCase @Inject constructor(
             violationUptimeMs = update.violationUptimeMs ?: currentLoc.violationUptimeMs,
             violationPercentage = update.violationPercentage ?: calculateViolationPercentage(update.violationUptimeMs, nowMs - appStartTime),
             isLocationPending = update.isLocationPending,
+            locationPendingReason = update.locationPendingReason,
             lastValidFixRealtime = if (update.lastValidFixRealtime > 0) update.lastValidFixRealtime else currentLoc.lastValidFixRealtime,
             isPowerSaveMode = update.isPowerSaveMode,
             standbyBucket = update.standbyBucket,
@@ -97,6 +94,7 @@ class TelemetryUseCase @Inject constructor(
             luxBaseline = status.luxBaseline, acousticFloorDb = status.acousticFloorDb, adaptiveVibrationFloor = status.adaptiveVibrationFloor,
             proxIdx = status.proxIdx, violationUptimeMs = status.violationUptimeMs, violationPercentage = status.violationPercentage,
             isLocationPending = status.isLocationPending, 
+            locationPendingReason = status.locationPendingReason,
             lastValidFixRealtime = status.lastValidFixRealtime,
             isPowerSaveMode = status.isPowerSaveMode,
             standbyBucket = status.standbyBucket, netInterface = status.netInterface,
@@ -155,6 +153,7 @@ class TelemetryUseCase @Inject constructor(
             violationUptimeMs = update.violationUptimeMs ?: currentLoc.violationUptimeMs,
             violationPercentage = update.violationPercentage ?: calculateViolationPercentage(update.violationUptimeMs, nowMs - appStartTime),
             isLocationPending = update.isLocationPending,
+            locationPendingReason = update.locationPendingReason,
             lastValidFixRealtime = if (update.lastValidFixRealtime > 0) update.lastValidFixRealtime else currentLoc.lastValidFixRealtime,
             isPowerSaveMode = update.isPowerSaveMode,
             standbyBucket = update.standbyBucket,

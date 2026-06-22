@@ -5,6 +5,8 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * v8.9.22:
+ * - Issue #227: Implemented optimized coordinate promotion for hindsight smoothing.
  * v8.9.19:
  * - Issue #223: Exposed currentVibrationIndex for forensic log enrichment.
  * - Issue #222: Exposed getHindsightBuffer for ghost-path visualization.
@@ -359,15 +361,17 @@ class LocationSentinel {
             if (hindsightBuffer.isNotEmpty()) {
                 val lastRejected = hindsightBuffer.last()
                 if (isConsistentWithHindsight(lat, lng, bearing, currentSpeedMps, timestamp, lastRejected)) {
+                    val promoted = mutableListOf<EngineGeoPoint>()
                     // "Reel in" the rubber band: process buffered points sequentially
                     hindsightBuffer.forEach { p ->
-                        immFilter.update(p.lat, p.lng, p.accuracy, p.ts, SUSPICIOUS_Q_SCALE)
+                        val opt = immFilter.update(p.lat, p.lng, p.accuracy, p.ts, SUSPICIOUS_Q_SCALE)
+                        promoted.add(opt)
                         updateLastValid(p.lat, p.lng, p.alt, p.ts, p.speedMps, p.bearing)
                     }
                     // hindsightBuffer.clear() - should be cleared when status is promoted
                     val optimized = immFilter.update(lat, lng, accuracy, timestamp, SUSPICIOUS_Q_SCALE)
                     updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
-                    return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted (Hindsight)", optimized, finalJumpConfidence)
+                    return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted (Hindsight)", optimized, finalJumpConfidence, promotedPoints = promoted)
                 }
             }
 

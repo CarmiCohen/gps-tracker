@@ -1,29 +1,31 @@
-# Project Handover - v8.9.20 Logic Alignment (STABLE)
+# Handover - GPS Tracker Project
 
-## 1. Context Summary
-- **Project**: `gps-tracker` (Native Android, Kotlin/Compose).
-- **Architecture**: Clean Architecture (App/Engine).
-- **Baseline**: **v8.9.20** (Logic Alignment).
-- **Database**: **v43**.
+## Active Development Phase: Forensic & Stability Hardening (v8.9.x)
 
-## 2. Completed Items (v8.9.20)
-- **Issue #228: SoT Constant Synchronization (FIXED)**:
-    - Updated `REQUIREMENTS_SOT.md` to align `GPS_STABILITY_RELIABILITY_THRESHOLD` with the authoritative code value of 98.0%.
-- **Issue #229: Redundant Constant Cleanup (FIXED)**:
-    - Removed redundant `DISTANCE_GRACE_MS` from `EngineConstants.kt`.
-    - Updated `event-tables.md` to correctly reference `BOOTSTRAP_PHASE_MS` for geofence grace periods.
-    - Synchronized `REQUIREMENTS_SOT.md` by removing the redundant entry.
+### Completed Fix: Issue #227 - Hindsight Transition Smoothing
+- **Resolution**: Refined the visual interpolation of promoted "Ghost Paths" by implementing retroactive coordinate optimization. Previously, hindsight promotion used raw rejected coordinates, leading to "jagged" transitions. Now, buffered points are processed through the `ImmFilter` during promotion to ensure spatial continuity.
+- **Root-Cause Implementation Details**:
+    - **Engine Models**: Expanded `SentinelResult` in `EngineModels.kt` to include `promotedPoints: List<EngineGeoPoint>?`.
+    - **LocationSentinel**: Updated `processLocation` to run buffered `RejectedPoint`s through the `immFilter` when a `TRAJECTORY_PROMOTED` state is triggered. This generates optimized (Kalman-filtered) coordinates for the entire hindsight segment.
+    - **LocationProcessor**: Modified the `TRAJECTORY_PROMOTED` handler to prioritize these optimized coordinates when invoking `onTrailPointSaved`, ensuring the "Ghost Path" (Slate500) matches the smoothed trajectory of the live path.
+    - **Map Components**: Verified `drawTrailToFolder` in `MapComponents.kt` bridges segment transitions correctly to maintain polyline continuity across color changes.
+- **Verification**: `issues.md` updated (FIXED #238). Build successful (`app:assembleDebug`).
 
-## 3. Current Task: Documentation & Logic Parity Achieved
-- **Status**: **RESOLVED**.
-- **Verification**: `TrackerService.kt` verified to use `GPS_STABILITY_RELIABILITY_THRESHOLD` (98.0%).
+### Completed Fix: Issue #226 - Intelligent Uncertainty UX
+- **Resolution**: Enhanced the "Location Pending" state to communicate the contextual cause of uncertainty, resolving ambiguity during Bayesian radius expansion.
+- **Forensic Implementation Details**:
+    - **Engine Models**: Defined `LocationPendingReason` enum (NONE, GPS_STALL, ACOUSTIC_VIOLATION, SIGNAL_LOSS, JAMMER_SUSPICION) in `EngineModels.kt` and integrated it into `AlarmEvaluationState`.
+    - **State Expansion**: Added `locationPendingReason` to `LocationUpdate`, `TrackerStatus`, `LocationState`, `DashboardState`, `IntegrityState`, and `IntegrityStateUi` across `:core:engine` and `:app`.
+    - **Telemetry Pipeline**: 
+        - `SyncManager.kt`: Serializes `location_pending_reason` into JSON.
+        - `RemoteHandler.kt`: Parses and reconstructs the reason status for the Viewer.
+        - `TelemetryUseCase.kt`: Maps the reason into the reactive `LocationState` for UI consumption.
+    - **UX/UI Components**:
+        - `MapComponents.kt`: Renders a high-visibility Amber overlay (e.g., "UNCERTAINTY: GPS STALL") when `isLocationPending` is active.
+        - `DashboardUseCase.kt`: Populates the contextual reason in the analytical dashboard.
+- **Verification**: `issues.md` updated (FIXED #237). Build successful (`app:assembleDebug`).
 
-## 4. Next Steps
-1. **Field Verification**: Monitor stability audit logs on hardware to ensure 98% threshold is appropriate for production noise.
-
-## 5. Build Status
-- **Status**: PENDING REBUILD.
-- **Target**: v8.9.21.
-
----
-*Handover v8.9.20 (Issue #228 & #229 RESOLVED). Session Terminated.*
+### Pipeline Status:
+- **Engine**: SIT, Intelligent Uncertainty, and Hindsight Smoothing logic are stable and verified.
+- **UI**: Contextual Map overlays and smoothed Ghost Paths are fully integrated.
+- **Next Task**: Field verification of Issue #190 on Xiaomi MIUI 14 hardware.

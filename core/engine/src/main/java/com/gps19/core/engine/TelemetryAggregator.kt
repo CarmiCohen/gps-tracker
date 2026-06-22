@@ -4,9 +4,10 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * v8.9.21:
+ * - Issue #224: Added tiltIdx and baroIdx to mergeWorstCase, backfillGaps, and fillRealGap.
  * v8.9.5:
  * - Issue 192: Added currentMa and SIT forensic fields to mergeWorstCase for absolute parity.
- * v8.8.21: Extracted from HistoryManager to ensure cross-platform forensic integrity.
  */
 class TelemetryAggregator {
 
@@ -14,7 +15,7 @@ class TelemetryAggregator {
 
     /**
      * Merges high-resolution points into a "Worst Case" summary for lower resolutions.
-     * Logic: Take the MAX of negative metrics (RTT, Noise, Vibe, Current) and MIN of positive (Signal, Accuracy).
+     * Logic: Take the MAX of negative metrics (RTT, Noise, Vibe, Current, Deltas) and MIN of positive (Signal, Accuracy).
      */
     fun mergeWorstCase(acc: EngineConnectionPoint, cur: EngineConnectionPoint): EngineConnectionPoint {
         return acc.copy(
@@ -29,6 +30,8 @@ class TelemetryAggregator {
             proxIdx = min(acc.proxIdx, cur.proxIdx),
             liftIdx = max(acc.liftIdx, cur.liftIdx),
             snrIdx = min(acc.snrIdx, cur.snrIdx),
+            tiltIdx = max(acc.tiltIdx, cur.tiltIdx),
+            baroIdx = max(acc.baroIdx, cur.baroIdx),
             sitVz = if (abs(cur.sitVz) > abs(acc.sitVz)) cur.sitVz else acc.sitVz,
             sitDz = if (abs(cur.sitDz) > abs(acc.sitDz)) cur.sitDz else acc.sitDz,
             sitBaro = if (abs(cur.sitBaro) > abs(acc.sitBaro)) cur.sitBaro else acc.sitBaro,
@@ -40,7 +43,7 @@ class TelemetryAggregator {
             bearing = if (cur.hasGps) cur.bearing else acc.bearing,
             isSitDetected = acc.isSitDetected || cur.isSitDetected,
             isSitActive = acc.isSitActive || cur.isSitActive,
-            currentMa = min(acc.currentMa, cur.currentMa) // Hardened for power forensics (highest discharge)
+            currentMa = min(acc.currentMa, cur.currentMa)
         )
     }
 
@@ -96,6 +99,8 @@ class TelemetryAggregator {
             val resolvedVibe = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0).toFloat() } ?: baseTemplate.vibeIdx
             val resolvedProx = snapshot?.proxIdx ?: baseTemplate.proxIdx
             val resolvedLift = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0f, 1f) } ?: baseTemplate.liftIdx
+            val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0f, 1f) } ?: baseTemplate.tiltIdx
+            val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0f, 1f) } ?: baseTemplate.baroIdx
             val resolvedSit = snapshot?.isSitDetected ?: baseTemplate.isSitDetected
 
             val fillPoint = baseTemplate.copy(
@@ -107,6 +112,8 @@ class TelemetryAggregator {
                 proxIdx = resolvedProx,
                 liftIdx = resolvedLift,
                 snrIdx = resolvedSnr,
+                tiltIdx = resolvedTilt,
+                baroIdx = resolvedBaro,
                 isSitDetected = resolvedSit,
                 currentMa = baseTemplate.currentMa
             )
@@ -159,6 +166,12 @@ class TelemetryAggregator {
             val resolvedLift = if (snapshotsInInterval.isNotEmpty()) {
                 snapshotsInInterval.maxOf { it.lift }.let { (it / RIBBON_LIFT_SCALE_METERS).coerceIn(0f, 1f) }
             } else 0f
+            val resolvedTilt = if (snapshotsInInterval.isNotEmpty()) {
+                snapshotsInInterval.maxOf { it.tilt }.let { (it / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0f, 1f) }
+            } else 0f
+            val resolvedBaro = if (snapshotsInInterval.isNotEmpty()) {
+                snapshotsInInterval.maxOf { it.lift }.let { (it / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0f, 1f) }
+            } else 0f
             val resolvedSit = snapshotsInInterval.any { it.isSitDetected }
 
             gapPoints.add(EngineConnectionPoint(
@@ -174,6 +187,8 @@ class TelemetryAggregator {
                 proxIdx = resolvedProx,
                 liftIdx = resolvedLift,
                 snrIdx = resolvedSnr,
+                tiltIdx = resolvedTilt,
+                baroIdx = resolvedBaro,
                 isSitDetected = resolvedSit,
                 isSitActive = false,
                 currentMa = 0

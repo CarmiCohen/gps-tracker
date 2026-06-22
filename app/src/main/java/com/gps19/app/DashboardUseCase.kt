@@ -10,10 +10,10 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
+ * v8.9.22:
+ * - Issue #226: Added locationPendingReason to DashboardState for intelligent uncertainty UX.
  * v8.9.6:
  * - Issue 193: Implemented isTelemetryFresh calculation for Zombie Telemetry UX mitigation.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {
@@ -156,7 +156,9 @@ class DashboardUseCase @Inject constructor() {
             isLinkVisible = isTelemetryVisible,
             isBatterySteepDischarge = loc.isBatterySteepDischarge,
             isCoolingModeActive = loc.isCoolingModeActive,
-            currentMa = sensorVal("${loc.currentMa}mA")
+            currentMa = sensorVal("${loc.currentMa}mA"),
+            isLocationPending = loc.isLocationPending,
+            locationPendingReason = loc.locationPendingReason
         )
     }
 }

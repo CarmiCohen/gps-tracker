@@ -4,6 +4,8 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * v8.9.22:
+ * - Issue #227: Implemented hindsight transition smoothing by propagating optimized promoted points.
  * v8.9.19:
  * - Issue #223: Added snr and vibration snapshots to onLogAdded for forensic enrichment.
  * - Issue #222: Propagated isHindsightCorrected to listener for ghost-path visualization.
@@ -218,8 +220,12 @@ class LocationProcessor(
         var sentinelResult = sentinel.processLocation(lat = lat, lng = lng, alt = alt, accuracy = accuracy, bearing = bearing, snr = snr, satsUsed = satsUsed, timestamp = effectiveTs, bypassBehavioral = !isLocal, isSuspicious = isSuspicious, isMuzzled = isMuzzled, nowWall = nowWall, nowRealtime = nowRealtime, acousticFloorDb = providedAcousticFloorDb)
         
         if (sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED && bufferCopy.isNotEmpty()) {
-            bufferCopy.forEach { p ->
-                listener.onTrailPointSaved(p.lat, p.lng, isViewerTrail, false, p.ts, isHindsightCorrected = true)
+            val promotedPoints = sentinelResult.promotedPoints ?: emptyList()
+            bufferCopy.forEachIndexed { idx, p ->
+                // Issue #227: Use optimized promoted coordinates if available
+                val latToSave = if (idx < promotedPoints.size) promotedPoints[idx].lat else p.lat
+                val lngToSave = if (idx < promotedPoints.size) promotedPoints[idx].lng else p.lng
+                listener.onTrailPointSaved(latToSave, lngToSave, isViewerTrail, false, p.ts, isHindsightCorrected = true)
             }
         }
 

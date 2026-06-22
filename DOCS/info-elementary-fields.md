@@ -1,4 +1,4 @@
-# Info Elementary Page: Field Definitions and Functions (v8.9.18)
+# Info Elementary Page: Field Definitions and Functions (v8.9.21)
 
 This document describes the technical fields displayed on the Info (Dashboard) page of the GPS Tracker application.
 
@@ -50,6 +50,10 @@ This document describes the technical fields displayed on the Info (Dashboard) p
 ## 5. SIT (Sitting) Detection
 These fields are primarily visualized in the **Analytical Ribbons** overlay and track mechanical "sitting" events.
 *   **SIT (isSitActive)**: A binary forensic latch indicating an active sitting event. Triggered when `tiltDelta > 7.0°`, `baroDelta > 0.08m`, and `peakShock > 0.35g` occur simultaneously.
+*   **TLT Ribbon (tiltIdx)**: Forensic visualization of device orientation stability.
+    *   *Mapping*: Normalized to a 15° scale (`tiltDegrees / 15.0`). Captures subtle orientation shifts during chair occupancy or device handling.
+*   **BAR Ribbon (baroIdx)**: Forensic visualization of barometric stability.
+    *   *Mapping*: Normalized to a 0.5m scale (`abs(relativeAltitude) / 0.5`). High-resolution tracking of vertical micro-movements.
 *   **SVZ (sitVz)**: SIT Vertical Velocity. Records the peak vertical speed (m/s) during the detection window.
 *   **SDZ (sitDz)**: SIT Vertical Displacement. Records the total vertical drop (meters) measured by the barometer during the SIT event.
 

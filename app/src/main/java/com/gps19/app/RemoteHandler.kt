@@ -15,14 +15,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v8.9.22:
+ * - Issue #226: Parsing location_pending_reason for intelligent uncertainty UX.
+ * v8.9.21:
+ * - Issue #224: Added tiltIdx and baroIdx parsing for forensic parity.
  * v8.9.18:
  * - Issue #221: Parsing lastValidFixRealtime for Bayesian uncertainty scaling.
- * v8.9.13:
- * - Issue #212: Finalized accuracy-aware forensic recovery logic.
- * v8.9.11:
- * - Issue #212: Prioritized accuracy from LogEntry in forensic marker reconstruction.
- * v8.9.10:
- * - Issue 209: Fixed inaccurate SIT marker placement by using historical coordinates from recovered logs.
  */
 class RemoteHandler(
     private val context: Context,
@@ -70,8 +68,11 @@ class RemoteHandler(
     var trackerVerticalVelocity = 0f
     var isTrackerClockRegression = false
     var isTrackerLocationPending = false
+    var trackerLocationPendingReason = LocationPendingReason.NONE
     var trackerGnssDetail: GnssDetail? = null
     var trackerSnrIdx = 0f
+    var trackerTiltIdx = 0f
+    var trackerBaroIdx = 0f
     var isTrackerBatterySteepDischarge = false 
     var isTrackerCoolingModeActive = false 
     
@@ -144,8 +145,11 @@ class RemoteHandler(
                 trackerSessionConnectedMs = s.sessionConnectedMs; trackerLastConnTs = s.lastConnTs
                 trackerLastDiscTs = s.lastDiscTs
                 isTrackerLocationPending = s.isLocationPending
+                trackerLocationPendingReason = s.locationPendingReason
                 trackerGnssDetail = s.gnssDetail
                 trackerSnrIdx = s.snrIdx
+                trackerTiltIdx = s.tiltIdx
+                trackerBaroIdx = s.baroIdx
                 isTrackerBatterySteepDischarge = s.isBatterySteepDischarge
                 isTrackerCoolingModeActive = s.isCoolingModeActive
                 
@@ -169,7 +173,7 @@ class RemoteHandler(
                     luxBaseline = trackerLuxBaseline, acousticFloorDb = trackerAcousticFloorDb,
                     adaptiveVibrationFloor = trackerAdaptiveVibrationFloor, isSuspicious = isTrackerSuspicious,
                     isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
-                    isSitDetected = isTrackerSitDetected, isSitActive = isTrackerSitActive, lastSitTs = trackerLastSitTs,
+                    isSitDetected = trackerLastSitTs > 0, isSitActive = isTrackerSitActive, lastSitTs = trackerLastSitTs,
                     verticalVelocity = trackerVerticalVelocity, sitVz = trackerSitVz, sitDz = trackerSitDz,
                     sitBaro = trackerSitBaro, sitTilt = trackerSitTilt, sitShock = trackerSitShock,
                     proxIdx = trackerProxIdx, uptimeMs = trackerUptimeMs, totalDropMs = trackerTotalDropMs,
@@ -179,6 +183,7 @@ class RemoteHandler(
                     lastDiscTs = trackerLastDiscTs,
                     violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage,
                     isLocationPending = isTrackerLocationPending,
+                    locationPendingReason = trackerLocationPendingReason,
                     lastValidFixRealtime = trackerLastValidFixRealtime,
                     isPowerSaveMode = isTrackerPowerSaveMode,
                     standbyBucket = trackerStandbyBucket,
@@ -187,6 +192,8 @@ class RemoteHandler(
                     isStorageCritical = isTrackerStorageCritical,
                     gnssDetail = trackerGnssDetail,
                     snrIdx = trackerSnrIdx,
+                    tiltIdx = trackerTiltIdx,
+                    baroIdx = trackerBaroIdx,
                     isBatterySteepDischarge = isTrackerBatterySteepDischarge,
                     isCoolingModeActive = isTrackerCoolingModeActive
                 ))
@@ -226,8 +233,11 @@ class RemoteHandler(
         trackerLastValidFixRealtime = 0L
         isTrackerClockRegression = false
         isTrackerLocationPending = false
+        trackerLocationPendingReason = LocationPendingReason.NONE
         trackerGnssDetail = null
         trackerSnrIdx = 0f
+        trackerTiltIdx = 0f
+        trackerBaroIdx = 0f
         isTrackerBatterySteepDischarge = false
         isTrackerCoolingModeActive = false
         
@@ -377,8 +387,14 @@ class RemoteHandler(
             trackerLastSitTs = data.optLong("last_sit_ts", trackerLastSitTs)
             trackerVerticalVelocity = data.optDouble("vertical_velocity", trackerVerticalVelocity.toDouble()).toFloat()
             isTrackerLocationPending = data.optBoolean("is_location_pending", false)
+            
+            val reasonStr = data.optString("location_pending_reason", "NONE")
+            trackerLocationPendingReason = try { LocationPendingReason.valueOf(reasonStr) } catch(e: Exception) { LocationPendingReason.NONE }
+
             trackerLastValidFixRealtime = data.optLong("last_valid_fix_realtime", trackerLastValidFixRealtime)
             trackerSnrIdx = data.optDouble("snr_idx", trackerSnrIdx.toDouble()).toFloat()
+            trackerTiltIdx = data.optDouble("tilt_idx", trackerTiltIdx.toDouble()).toFloat()
+            trackerBaroIdx = data.optDouble("baro_idx", trackerBaroIdx.toDouble()).toFloat()
             isTrackerBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false)
             isTrackerCoolingModeActive = data.optBoolean("is_cooling_mode_active", false)
             
@@ -570,7 +586,7 @@ class RemoteHandler(
                     adaptiveVibrationFloor = trackerAdaptiveVibrationFloor, isSuspicious = isTrackerSuspicious,
                     isTamperDetected = isTrackerTamperDetected,
                     isPowerTamper = isTrackerPowerTamper,
-                    isSitDetected = isTrackerSitDetected,
+                    isSitDetected = incomingSitDetected,
                     isSitActive = isTrackerSitActive,
                     lastSitTs = trackerLastSitTs,
                     verticalVelocity = trackerVerticalVelocity,
@@ -588,6 +604,7 @@ class RemoteHandler(
                     violationPercentage = violationPercentage,
                     isClockRegression = isTrackerClockRegression,
                     isLocationPending = isTrackerLocationPending,
+                    locationPendingReason = trackerLocationPendingReason,
                     lastValidFixRealtime = trackerLastValidFixRealtime,
                     isPowerSaveMode = isTrackerPowerSaveMode,
                     standbyBucket = trackerStandbyBucket,
@@ -596,6 +613,8 @@ class RemoteHandler(
                     isStorageCritical = isTrackerStorageCritical,
                     gnssDetail = trackerGnssDetail,
                     snrIdx = trackerSnrIdx,
+                    tiltIdx = trackerTiltIdx,
+                    baroIdx = trackerBaroIdx,
                     isBatterySteepDischarge = isTrackerBatterySteepDischarge,
                     isCoolingModeActive = isTrackerCoolingModeActive
                 ))
@@ -609,7 +628,7 @@ class RemoteHandler(
                     sessionConnectedMs = trackerSessionConnectedMs, totalDropMs = trackerTotalDropMs,
                     maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
                     violationUptimeMs = violationUptimeMs, violationPercentage = violationPercentage,
-                    isSitDetected = isTrackerSitDetected, isSitActive = isTrackerSitActive, lastSitTs = trackerLastSitTs, verticalVelocity = trackerVerticalVelocity,
+                    isSitDetected = incomingSitDetected, isSitActive = isTrackerSitActive, lastSitTs = trackerLastSitTs, verticalVelocity = trackerVerticalVelocity,
                     sitVz = trackerSitVz, sitDz = trackerSitDz, sitBaro = trackerSitBaro, sitTilt = trackerSitTilt, sitShock = trackerSitShock,
                     isPowerTamper = isTrackerPowerTamper, vibration = trackerVibration, heading = trackerHeading,
                     baroAlt = trackerBaroAlt, lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees,
@@ -619,6 +638,7 @@ class RemoteHandler(
                     proxIdx = trackerProxIdx, isSuspicious = isTrackerSuspicious, isTamperDetected = isTrackerTamperDetected,
                     isTrajectoryPromoted = isTrackerTrajectoryPromoted, jumpTier = trackerJumpTier,
                     isLocationPending = isTrackerLocationPending,
+                    locationPendingReason = trackerLocationPendingReason,
                     lastValidFixRealtime = trackerLastValidFixRealtime,
                     isPowerSaveMode = isTrackerPowerSaveMode,
                     standbyBucket = trackerStandbyBucket,
@@ -627,6 +647,8 @@ class RemoteHandler(
                     isStorageCritical = isTrackerStorageCritical,
                     gnssDetail = trackerGnssDetail,
                     snrIdx = trackerSnrIdx,
+                    tiltIdx = trackerTiltIdx,
+                    baroIdx = trackerBaroIdx,
                     isBatterySteepDischarge = isTrackerBatterySteepDischarge,
                     isCoolingModeActive = isTrackerCoolingModeActive
                 ))
