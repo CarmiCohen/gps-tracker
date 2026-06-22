@@ -18,6 +18,8 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.28:
+ * - Issue #9: Hardened foreground updates with try-catch for Android 14+ resilience.
  * v8.9.27:
  * - Issue #218: Hardened foreground transitions with safeStartForeground wrapper for Android 14+ resilience.
  * v8.9.26:
@@ -264,10 +266,14 @@ class ViewerService : BaseMonitorService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             fgsUpdateJob?.cancel()
             fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main) {
-                delay(200)
-                val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-                val msg = "Monitoring system active."
-                safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
+                try {
+                    delay(200)
+                    val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                    val msg = "Monitoring system active."
+                    safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to update foreground service type")
+                }
             }
         }
     }

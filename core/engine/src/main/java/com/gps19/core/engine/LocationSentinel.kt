@@ -5,6 +5,8 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * v8.9.27:
+ * - Issue #14: Implemented rising/falling light EMA factors (LUX_EMA_UP_FAST, LUX_EMA_DOWN_FAST).
  * v8.9.23:
  * - Issue #239: Cleared hindsightBuffer upon trajectory promotion to prevent redundant point processing.
  * v8.9.22:
@@ -184,7 +186,11 @@ class LocationSentinel {
             if (!lux.isNaN()) luxBaseline = lux
         } else {
             if (!lux.isNaN()) {
-                val alpha = SentinelValidator.accelerateAlpha(LUX_EMA_FAST, isWarming)
+                val alpha = if (lux < luxBaseline) {
+                    SentinelValidator.accelerateAlpha(LUX_EMA_DOWN_FAST, isWarming)
+                } else {
+                    SentinelValidator.accelerateAlpha(LUX_EMA_UP_FAST, isWarming)
+                }
                 luxBaseline = (luxBaseline * (1f - alpha)) + (lux * alpha)
             }
         }

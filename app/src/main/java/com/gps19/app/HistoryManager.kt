@@ -12,6 +12,8 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * v8.9.28:
+ * - Issue #12: SIT Duplicate Guard. Implemented database-level sanity check to prevent redundant SIT forensic markers.
  * v8.9.21:
  * - Issue #224: Added tiltIdx and baroIdx to updateRibbons and backfillGaps for forensic expansion.
  * v8.9.5:
@@ -38,6 +40,14 @@ class HistoryManager(
     private var hourlyBackfillTotal = 0
     private var lastAuditTs = 0L
     private var lastTimeTriggerTs = 0L
+
+    private var lastSitDetectedTs = 0L
+
+    init {
+        scope.launch {
+            lastSitDetectedTs = repository.getLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, 0L)
+        }
+    }
 
     suspend fun updateRibbons(
         now: Long,
@@ -145,7 +155,7 @@ class HistoryManager(
             isCoolingModeActive = isCoolingModeActive,
             speed = speed,
             bearing = bearing,
-            isSitDetected = isSitDetected,
+            isSitDetected = applySitDuplicateGuard(isSitDetected, now),
             isSitActive = isSitActive,
             isTick = false,
             currentMa = currentMa
@@ -240,7 +250,7 @@ class HistoryManager(
             isCoolingModeActive = isCoolingModeActive,
             speed = speed,
             bearing = bearing,
-            isSitDetected = isSitDetected,
+            isSitDetected = applySitDuplicateGuard(isSitDetected, now),
             isSitActive = isSitActive,
             currentMa = currentMa
         )
@@ -296,6 +306,21 @@ class HistoryManager(
             onLogEvent("FORENSIC ALERT: System clock jump detected ($direction ${jumpSec}s). Monotonic uptime preserved.", true)
             clockDriftRef = currentDrift
         }
+    }
+
+    private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long): Boolean {
+        if (!isDetected) return false
+        
+        // Issue #12: Prevent duplicates if a SIT event occurs within the guard window of the last recorded one.
+        if (abs(ts - lastSitDetectedTs) < SIT_DUPLICATE_GUARD_MS) {
+            return false
+        }
+        
+        lastSitDetectedTs = ts
+        scope.launch {
+            repository.saveLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, ts)
+        }
+        return true
     }
 
     private fun mapToAppPoint(p: EngineConnectionPoint): ConnectionPoint {

@@ -1,30 +1,22 @@
-# Handover - GPS Tracker Project
+# Handover - GPS Tracker Project (v8.9.28)
 
-## Active Development Phase: Forensic & Stability Hardening (v8.9.x)
+## ⚖️ Documentation Governance (Engineering Rule)
+To maintain audit integrity during the hardening phase, the following workflow is mandatory:
+1. **Active Tasks**: Tracked exclusively in `issues.md`.
+2. **Promotion**: Once a task is verified on hardware or via code-audit, it is removed from `issues.md`.
+3. **Archiving**: The resolution summary is appended to `COMPLIANCE.md`, and the "Verification Manifest" (Chapter 1) is updated.
+4. **Specification**: `SoT.md` remains the static logic reference; it must never contain "Fixed" history—only links to `COMPLIANCE.md`.
 
-### Logic Verification & Hardening (v8.9.26)
-- **Verified: Issue #190 - Xiaomi Boot Grace Logic**:
-    - **Implementation Details**: Updated `MainAlarmLogicTest.kt` to simulate the 30s boot window (`XIAOMI_BOOT_GRACE_MS`).
-    - **Forensic Verification**: Confirmed that `ALERT_ID_XIAOMI_SYSTEM_MISSING` is successfully suppressed during the grace period even if permissions are `DENIED` or `UNKNOWN`.
-    - **Status Gating**: Confirmed `UNKNOWN` states correctly trigger violations *after* grace if `isXiaomiManualOverride` is false.
-- **Fixed: ForensicIdentityTest Regression**:
-    - **Resolution**: Updated `ForensicIdentityTest.kt` to align with the engine's classification of extreme coordinate jumps as `OUTLIER` instead of `JUMP`. Restored 100% pass rate (13/13) for `:core:engine`.
+## 🛠️ Active Development Phase: Forensic & Stability Hardening
+### Next Tasks (Priority Order):
+1. **Field Verification (Issue #10 / #190)**: Physical verification of Xiaomi MIUI 14 boot-grace stability.
 
-### Completed Fix: Issue #245 - Duplicate SIT Event Rising-Edge
-- **Resolution**: Centralized SIT event rising-edge logic in `RemoteHandler.kt`.
-- **Root-Cause Implementation Details**:
-    - **RemoteHandler**: Removed manual `repository.addLog` calls in `handleRemoteUpdate`. The system now relies on the dedicated `log_relay` path for the "Sit Detected" event log.
-    - **Verification**: Eliminates duplicate "pink" markers on the map and redundant log entries.
-
-### Completed Fix: Issue #242 - Redundant Index Calculation in Viewer
-- **Resolution**: Removed manual re-calculation of `tiltIdx` and `baroIdx` in `ViewerService.kt`.
-- **Implementation**: Viewer now utilizes pre-calculated indices transmitted from the tracker's engine.
-
-### Pipeline Status & Technical Readiness:
-- **Engine**: All 13 core engine tests passing. Xiaomi boot grace and indeterminate status logic are verified via unit tests.
-- **Foreground Resilience**: `TrackerService.kt` recovery pulses (Issue #218) require `try-catch` hardening for Android 14+ `ForegroundServiceStartNotAllowedException` during background promotion.
-- **Manifest**: `TrackerService` correctly declared with `location|microphone` foreground types.
-
-### Next Task:
-1. **Field Verification**: Physical verification of Issue #190 on Xiaomi MIUI 14 hardware to ensure no "Denied" spikes occur during boot transitions.
-2. **Hardening**: Implement Android 14+ `startForeground` safety wrappers in `TrackerService.kt` for background revival pulses.
+## 📜 Phase History (v8.9.28 Reorganization)
+- **Issue #11 Resolved**: Hindsight Promotion Coverage. Implemented exhaustive unit test suite `LocationSentinelHindsightTest.kt` in `:core:engine`. Covered multi-point "rubber-band" transitions, angle/speed consistency gates, and buffer pruning logic to ensure zero-lag trajectory smoothing reliability.
+- **Issue #12 Resolved**: SIT Duplicate Guard. Implemented a persistent 15s sanity check in `HistoryManager.kt` using a new `last_history_sit_ts` setting and `SIT_DUPLICATE_GUARD_MS` constant. This prevents redundant forensic SIT markers caused by relay re-transmissions or tracker-side latching.
+- **Issue #9 Resolved**: Hardened `TrackerService.kt` and `ViewerService.kt` against Android 14+ `ForegroundServiceStartNotAllowedException`. Implemented `safeStartForeground` wrapper in `BaseMonitorService` and wrapped recovery pulses/foreground updates in `try-catch` blocks.
+- **Issue #13 Resolved**: Centralized hardcoded EMA constants in `AppSensorManager.kt` by replacing hardcoded `0.01f` with `LUX_EMA_FAST`.
+- **Issue #14 Resolved**: Implemented rising/falling light EMA factors in `LocationSentinel.kt` (LUX_EMA_UP_FAST, LUX_EMA_DOWN_FAST) to match SoT asymmetrical noise-floor tracking.
+- **Unified Compliance**: Consolidated `issues_history_archive.md`, `issues_history_v88.md`, and SoT Chapter 9 into `COMPLIANCE.md`.
+- **Primary Tracker**: Slimmed `issues.md` to focus on the remaining hardening tasks.
+- **SoT Cleanup**: Removed historical noise from `REQUIREMENTS_SOT.md`.

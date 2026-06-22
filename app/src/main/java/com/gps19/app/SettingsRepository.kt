@@ -103,6 +103,8 @@ class SettingsRepository @Inject constructor(
 
         // Issue 47
         const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = "is_xiaomi_manual_override"
+        
+        const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
     }
 
     val appModeFlow: Flow<String?> = dataStore.data.map { it.appMode.ifEmpty { null } }
@@ -158,6 +160,7 @@ class SettingsRepository @Inject constructor(
                 LAST_SIT_TS_KEY -> builder.setLastSitTs(value)
                 VIOLATION_UPTIME_MS_KEY -> builder.setViolationUptimeMs(value)
                 LAST_SERVICE_TICK_REALTIME_KEY -> builder.setLastServiceTickRealtime(value)
+                LAST_HISTORY_SIT_TS_KEY -> builder.setLastHistorySitTs(value)
             }
             builder.build()
         }
@@ -245,6 +248,7 @@ class SettingsRepository @Inject constructor(
             LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else default
             VIOLATION_UPTIME_MS_KEY -> settings.violationUptimeMs
             LAST_SERVICE_TICK_REALTIME_KEY -> settings.lastServiceTickRealtime
+            LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else default
             else -> default
         }
     }

@@ -272,7 +272,7 @@ class AppSensorManager @Inject constructor(
                     if (fastPathLightBaseline < 0) {
                         fastPathLightBaseline = lux
                     } else {
-                        val alpha = SentinelValidator.accelerateAlpha(0.01f, isWarming)
+                        val alpha = SentinelValidator.accelerateAlpha(LUX_EMA_FAST, isWarming)
                         fastPathLightBaseline = (fastPathLightBaseline * (1f - alpha)) + (lux * alpha)
                         
                         if (!isWarming && onLightSpike != null && (lux - fastPathLightBaseline) > fastPathLightSpikeThreshold) {

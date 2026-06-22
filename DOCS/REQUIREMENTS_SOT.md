@@ -157,7 +157,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `EFFICIENCY_MIN_TOTAL_DIST` | 50.0m | Minimum total distance for path efficiency calculation. |
 | `SCATTER_MIN_SPEED_MPS`| 0.5 m/s | Minimum speed for scatter angle analysis. |
 | `SCATTER_ANGLE_THRESHOLD` | 120.0° | Angle threshold for classifying movement as scatter (noise). |
-| `ACOUSTIC_FLOOR_CONTRACTION_EMA`| 0.995 | EMA factor for passive acoustic floor decay. |
+| `ACOUSTIC_FLOOR_CONTRACTION_EMA`| 0.995 | EMA factor for passive environmental calibration. |
 | `ACOUSTIC_RECOVERY_DELAY_MS` | 30,000ms | Delay before acoustic monitoring recovers after a violation. |
 | `ACOUSTIC_SAMPLE_RATE` | 8000 | Sampling rate for acoustic magnitude detection. |
 | `VIBRATION_WINDOW_SIZE` | 5 samples | Sliding window size for vibration EMA filtering. |
@@ -306,97 +306,4 @@ This document serves as the definitive operational specification for the GPS-Tra
 ---
 
 ## 9. Compliance & Operational Requirements
-| Requirement ID | Requirement Description | Implementation Status |
-| :--- | :--- | :--- |
-| **R872** | **Alert Suppression**: No local alerts/sirens shall trigger on the Tracker device. New alerts must strictly respect the 2s grace period. | **Verified (BehaviorUseCase)** |
-| **R915** | **UI Responsiveness**: The Map settings toggle must reliably respond to touch events over the AndroidView. | **Verified (MapComponents)** |
-| **R916** | **Settings Persistence**: Users must be able to modify and persist IDs, distance, alert config, and sound selections at all times. | **Verified (SettingsRepository)** |
-| **R917** | **Smooth Update**: The app must operate normally after an APK update without requiring a manual "Force Stop" or removal from recents. | **Verified (DataStore + Sticky FGS)** |
-| **R921/R926** | **Session Lifecycle**: Exhaustive state reset and mandatory landing page pause to ensure lifecycle stability across sessions. | **Verified (MainViewModel)** |
-| **R922** | **LED Logic**: INT LED reflects local relay state; SRV/TRK/DAT/GPS are gated by peer health (isRemote) for end-to-end verification. | **Verified (SharedUiComponents)** |
-| **R923** | **Forensic Refresh**: Dashboard recovers immediately upon telemetry receipt using the maximum of GPS and arrival timestamps. | **Verified (DashboardUseCase)** |
-| **R933** | **Alert Grace Period**: A mandatory 2-second grace period is enforced between consecutive alert triggers to prevent event flooding. | **Verified (AppAlarmManager)** |
-| **R935** | **Icon Branding**: The app icon shall use the John Deere deer logo without any accompanying text. | **Verified (ic_jd_logo.xml)** |
-| **R866** | **Branding Accuracy**: JD Branding Green must match exactly #367C2B. | **Verified (Color.kt)** |
-| **R867** | **Role Identity**: Default Tracker ID shall be "Ttk" and Default Viewer ID shall be "Cohen". | **Verified (SettingsRepository)** |
-| **R868** | **Telemetry Layout**: The Status Card must display `maxAccuracy` for both Tracker and Viewer roles in a unified format. | **Verified (SharedUiComponents)** |
-| **Issue 6** | **Xiaomi Gating**: Implemented `ALERT_ID_XIAOMI_SYSTEM_MISSING` to detect and alert on MIUI background restrictions. | **Verified (MainAlarmLogic)** |
-| **Issue 13** | **Timing Integrity**: Migrated to `SystemClock.elapsedRealtime()` for all debouncing and persistence timing to prevent wall-clock leaks. | **Verified (MainRepository)** |
-| **Issue 15** | **Forensic I/O**: Implemented safety-flush in service `onDestroy` and monotonic interval checks for history persistence. | **Verified (MainRepository)** |
-| **Issue 45** | **FGS Compliance**: Correctly passing `FOREGROUND_SERVICE_TYPE_LOCATION` for Android 10+ and asserting types in callbacks. | **Verified (ViewerService)** |
-| **Issue 58** | **Module Hardening**: Converted `:core:engine` to a pure `java-library` to enforce zero Android framework dependencies. | **Verified (build.gradle)** |
-| **Issue 70** | **Thermal Throttling**: Implemented "Cooling Mode" (46°C/44°C) that throttles GPS polling to protect hardware. | **Verified (IntegrityMonitor)** |
-| **Issue 71/72** | **System Integrity**: Monitoring of low/critical storage and OS-level restrictions (Standby Buckets, Power Save) for forensic visibility. | **Verified (IntegrityMonitor)** |
-| **Issue 102** | **TimeProvider**: Standardized all duration and timeout logic across the system to use the `TimeProvider` abstraction. | **Verified (Standardized Architecture)** |
-| **Issue 115** | **Modularization**: Decoupled `MainViewModel` into feature UseCases (Navigation, Settings, Telemetry, Behavior, Session, Alert, Map). | **Verified (MainViewModel)** |
-| **Issue 124** | **GPS Revival**: System retries hardware revival every 2m during stall and escalates to critical after 3 failures. | **Verified (TrackerService)** |
-| **Issue 125** | **Monotonic UI**: UI lockout and pulse logic must use monotonic time to survive system clock jumps. | **Verified (MainViewModel)** |
-| **Issue 146** | **Startup Performance**: Optimized launch by moving `OsmConfig` to background thread and staggering ViewModel initialization. | **Verified (GpsApplication)** |
-| **Issue 148** | **A15 Stability**: Enforced 1000ms GPS polling (`A15_STABLE_GPS_POLLING_MS`) and 5s proximity debounce for Samsung A15 devices. | **Verified (ServiceBehaviorUseCase)** |
-| **Issue 149** | **Forensic Parity**: Symbol parity for jump markers (Magenta Squares). Viewers explicitly latch peer visual jumps to local forensics. | **Verified (ViewerService/Map)** |
-| **Issue 163** | **Power Tamper Hardening**: Reconnected power tamper detection via `IntegrityMonitor` using `EXTRA_PLUGGED` and auto-recovery. | **Verified (IntegrityMonitor)** |
-| **Issue 168** | **Stability Audit Suite**: Implemented GPS Stability Audit suite in TrackerService.kt to track fix reliability and inter-fix gaps. | **Verified (TrackerService)** |
-| **Issue 169** | **Version Synchronization**: Synchronized source headers in Tracker/Viewer services with the v8.9.11 baseline for audit integrity. | **Verified (TrackerService/ViewerService)** |
-| **Issue 170/172** | **Xiaomi Alert Guard**: Added explicit `isXiaomiDevice` check to gate `ALERT_ID_XIAOMI_SYSTEM_MISSING` violations. | **Verified (MainAlarmLogic)** |
-| **Issue 171** | **GPS Transition Muzzle**: Implemented `GPS_TRANSITION_LOG_MUZZLE_MS` (30s) to prevent forensic log flooding. | **Verified (TrackerService)** |
-| **Issue 173** | **SIT Marker Persistence**: Reconnected `ALERT_ID_TRACKER_CHAIR` to `forensicUseCase` for persistent map visualization on the Tracker. | **Verified (TrackerService)** |
-| **Issue 174** | **Default Identity**: Updated `DEFAULT_TRACKER_ID` to "Ttk" and `DEFAULT_VIEWER_ID` to "Cohen" for verified role identity. | **Verified (SettingsRepository)** |
-| **Issue 175** | **Version Update Smoothness**: Verified `MY_PACKAGE_REPLACED` handling in `BootReceiver` for background service continuity. | **Verified (BootReceiver)** |
-| **Issue 176** | **Statistics Persistence**: Verified forensic ribbon and statistics accumulation across app restarts using Room and DataStore. | **Verified (HistoryManager/SettingsRepository)** |
-| **Issue 177** | **Dead Code Cleanup**: Formally removed redundant telemetry methods in `SyncManager` following consolidation around `pushCurrentStatus`. | **Verified (SyncManager)** |
-| **Issue 178/179**| **Forensic Parity Audit**: Verified 100% field parity for `verticalVelocity` and SIT metrics across the pipeline and `RemoteHandler`. | **Verified (RemoteHandler/HistoryManager)** |
-| **Issue 189** | **Viewer Background Location**: Implemented 10s background polling and relative distance calculation in `ViewerService`. | **Verified (ViewerService)** |
-| **Issue 190** | **Xiaomi Autostart & Boot Resilience**: Implemented robust handling for indeterminate "Unknown" status and `XIAOMI_BOOT_GRACE_MS` (30s) to suppress transient boot alarms. | **Verified (MainAlarmLogic)** |
-| **Issue 191** | **Muzzle Window Hardening**: Increased `MUZZLE_WINDOW_DURATION_MS` to 2000ms and added device-specific hysteresis (500ms for A15). | **Verified (SyncManager/TrackerService)** |
-| **Issue 192** | **Power Forensic Parity**: Achieved absolute parity for `currentMa` across models, database (v35), and ribbons. | **Verified (SyncManager/HistoryManager)** |
-| **Issue 193** | **Zombie Telemetry UX Sweep**: Implemented visual staleness indicators ("Ghost Mode") for all sensor derived dashboard fields and markers when telemetry > 10s old. | **Verified (DashboardUseCase/MapComponents)** |
-| **Issue 194** | **SIT Persistence Packet Loss Risk**: Implemented a 10s acknowledged sync loop for discrete SIT events to prevent forensic loss during blackouts. | **Verified (SyncManager/ViewerService)** |
-| **Issue 195** | **Room Migration Forensic Audit**: Implemented Room migration (v36) for full table reconstruction and Android 15 compatibility. | **Verified (Database)** |
-| **Issue 196** | **Advanced SIT Detection**: Refined "Plunge" state machine and propagated `sitVzTs` for forensic parity. | **Verified (AppSensorManager)** |
-| **Issue 197** | **Database Schema Expansion (v38)**: Added `sitVzTs` to history tables for improved chair event reconstruction. | **Verified (Database)** |
-| **Issue 198** | **GPS Availability Hardening**: Shortened GPS stall detection to 60s and revival retry to 120s for high-availability tracking. | **Verified (TrackerService)** |
-| **Issue 199** | **Toolchain Modernization**: Upgraded to Java 17 and Android SDK 35. Aligned Gradle DSL syntax. | **Verified (build.gradle)** |
-| **Issue 200** | **Room Migration Registry**: Registered `MIGRATION_37_38` in `AppModule.kt` to prevent startup crashes. | **Verified (AppModule)** |
-| **Issue 201** | **Schema Robustness**: Hardened `MIGRATION_35_36` with dynamic column detection for resilient upgrades. | **Verified (Database)** |
-| **Issue 202** | **Multi-Version Forensic Path**: Verified schema integrity across diverse legacy upgrade paths (v33 to v38). | **Verified (Database)** |
-| **Issue 203** | **Documentation Synchronization**: Synchronized all core documentation to the v8.9.11 logic baseline. | **Verified (DOCS)** |
-| **Issue 204/205**| **Constant Hardening Audit**: Verified GPS Stall (60s), Revival (120s), and Muzzle Window (2000ms) thresholds across documentation. | **Verified (SoT/EngineConstants)** |
-| **Issue 206** | **Staleness Unification Audit**: Verified 10s unification for Ghost Mode and Position Health thresholds. | **Verified (SoT/Dashboard)** |
-| **Issue 207** | **SoT Typo Audit**: Fixed incorrect quote characters in constant definitions in REQUIREMENTS_SOT.md. | **Verified (SoT)** |
-| **Issue 208** | **Log Spatial Anchor Gap**: Implemented coordinate-aware forensic logging. All critical alerts and system events now include `lat`/`lng` for map reconstruction. | **Verified (LogManager/Services)** |
-| **Issue 209** | **Coordinate Propagation Race**: Ensured 1:1 mapping between processing and logging coordinates by expanding the processing listener. | **Verified (LocationProcessor/Services)** |
-| **Issue 210** | **Log Manager Redundancy Audit**: Eliminated redundant service-level coordinate logic; standardized on `LogManager` auto-anchoring. | **Verified (TrackerService/ViewerService)** |
-| **Issue 211** | **Stability Audit Verbosity**: Gated STABILITY AUDIT logs to only emit when performance falls below 98% reliability or 200ms gap. | **Verified (TrackerService)** |
-| **Issue 212** | **Forensic Accuracy Parity**: Logs now preserve and reconstruct historical marker precision using log-specific accuracy values. | **Verified (LogEntry/RemoteHandler)** |
-| **Issue 213** | **Forensic Anchor Desync in AppAlarmManager**: Explicitly propagated coordinates and accuracy in alarm logging callbacks. | **Verified (AppAlarmManager/Services)** |
-| **Issue 214** | **Redundant Accuracy Fallback Logic**: Unified accuracy fallback in LogManager to prioritize fix accuracy then maxAccuracy. | **Verified (LogManager)** |
-| **Issue 215** | **Missing "Recovery" Logs for Stability Audit**: Implemented "STABILITY RESTORED" marker for performance recovery events. | **Verified (TrackerService)** |
-| **Issue 216** | **Accuracy Propagation Gaps in ViewerService**: Hardened spatial anchoring for Viewer pulses and session terminations. | **Verified (ViewerService)** |
-| **Issue 217** | **LocationProcessor Inconsistency**: Standardized "Merge-on-Stale" logs to use hardened auto-anchoring path. | **Verified (LocationProcessor)** |
-| **Issue 218** | **Xiaomi MIUI 14 Heuristic Recovery**: Detects background tick suppression (gap > 15s) and triggers GPS revival and WakeLock renewal. | **Verified (TrackerService)** |
-| **Issue 219** | **Adaptive Jump Confidence**: Correlates SNR and Vibration to distinguish between signal reflection and legitimate movement. | **Verified (LocationSentinel)** |
-| **Issue 220** | **Hindsight Correction**: Implements retroactive trajectory smoothing using a hindsight rolling buffer. | **Verified (LocationSentinel)** |
-| **Issue 221** | **Bayesian Uncertainty Scaling**: UI radius expands at 15m/s during GPS stalls based on `lastValidFixRealtime`. | **Verified (MapComponents)** |
-| **Issue 222** | **Hindsight Path Visualization**: Renders "Ghost Paths" (Slate500) for points retroactively promoted. | **Verified (MapComponents)** |
-| **Issue 223** | **Forensic Log Enrichment**: SNR and Vibration snapshots attached to jump/stall logs for black-box analysis. | **Verified (LogManager/Services)** |
-| **Issue 224** | **SIT Forensic Expansion**: Added tiltIdx and baroIdx to analytical ribbons and telemetry pipeline for enhanced chair event analysis. | **Verified (AnalyticalRibbons/Telemetry)** |
-| **Issue 225** | **Analytical Ribbon Persistence**: Verified 240-point in-memory retention for all new forensic indices. | **Verified (HistoryManager)** |
-| **Issue 226** | **Contextual Uncertainty**: Implemented `LocationPendingReason` to provide UI context for Bayesian expansion. | **Verified (EngineModels/SyncManager)** |
-| **Issue 227** | **Hindsight Transition Smoothing**: Added `promotedPoints` to `SentinelResult` for improved map trail continuity. | **Verified (LocationSentinel)** |
-| **Issue 228/229**| **SoT Constant Synchronization**: Standardized GPS_STABILITY_RELIABILITY_THRESHOLD to 98.0% and removed redundant DISTANCE_GRACE_MS. | **Verified (SoT/EngineConstants)** |
-| **Issue 230** | **Alert Label Unification**: Standardized `ALERT_ID_TRACKER_CHAIR` subtitle to "Chair occupancy detected". | **Verified (MainAlarmLogic)** |
-| **Issue 231** | **Visual Jump Integrity**: Implemented trajectory-aware `VISUAL_JUMP` detection in the core engine. | **Verified (MainAlarmLogic/Sentinel)** |
-| **Issue 232** | **Forensic Current Ribbon**: Added `RIBBON_CURRENT_SCALE_MA` (1000mA) for battery current visualization. | **Verified (EngineConstants)** |
-| **Issue 233** | **Manual Overrides Recovery**: Ensured `is_xiaomi_manual_override` is correctly propagated during thermal/low-power throttling. | **Verified (IntegrityMonitor)** |
-| **Issue 234** | **Vibration Window Stabilization**: Adjusted `VIBRATION_WINDOW_SIZE` to 5 samples for reduced jitter in stationary states. | **Verified (EngineConstants)** |
-| **Issue 235** | **Acoustic Floor Decay**: Implemented `ACOUSTIC_FLOOR_CONTRACTION_EMA` (0.995) for passive environmental calibration. | **Verified (LocationSentinel)** |
-| **Issue 236** | **Relay Rejoin Strategy**: Verified `NET_REJOIN_THRESHOLD_MS` (15s) logic in `AppNetworkManager` for rapid blackout recovery. | **Verified (Network)** |
-| **Issue 237** | **Session Metrics Persistence**: Verified atomic `saveSessionMetricsBulk` calls for reduced DataStore I/O during high-frequency tracking. | **Verified (SettingsRepository)** |
-| **Issue 238** | **Siren Auto-Recovery**: Verified `SIREN_RESUME_COOLDOWN_MS` (15s) logic to prevent permanent siren lockout after hardware auto-stop. | **Verified (AppAlarmManager)** |
-| **Issue 239** | **Hindsight Buffer Bug**: Fixed bug in `LocationSentinel.kt` where old rejected points were not cleared after trajectory promotion. | **Verified (LocationSentinel)** |
-| **Issue 240** | **Contextual Uncertainty Context**: Propagated `locationPendingReason` through `SyncManager` to ensure remote Viewer context. | **Verified (SyncManager)** |
-| **Issue 241** | **Forensic Log Enrichment**: Bridged SNR and Vibration snapshots to `AppAlarmManager` for more detailed black-box analysis. | **Verified (AppAlarmManager)** |
-| **Issue 242** | **Redundant Index Calculation**: Viewer now utilizes pre-calculated indices transmitted from the tracker's engine. | **Verified (ViewerService)** |
-| **Issue 243** | **Visual Jump Sensitivity**: Expanded Tier 3 Jitter gating to ensure no "visual jitters" are missed during low-vibration movement. | **Verified (TrackerService)** |
-| **Issue 244** | **Location Pending Persistence**: Ensured `locationPendingReason` survives offline storage and synchronization cycles. | **Verified (SyncManager/Room)** |
-| **Issue 245** | **Duplicate SIT Event Rising-Edge**: Centralized SIT rising-edge detection in `RemoteHandler.kt` to eliminate redundant logs. | **Verified (RemoteHandler)** |
+*   For the full Verification Manifest and Resolution History, see **[COMPLIANCE.md](../COMPLIANCE.md)**.

@@ -21,6 +21,8 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.28:
+ * - Issue #9: Hardened recovery pulse and foreground updates with try-catch for Android 14+ resilience.
  * v8.9.27:
  * - Issue #218: Hardened foreground transitions with safeStartForeground wrapper for Android 14+ resilience.
  * v8.9.25:
@@ -286,10 +288,15 @@ class TrackerService : BaseMonitorService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             fgsUpdateJob?.cancel()
             fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main) {
-                delay(200)
-                val type = getAvailableForegroundServiceType()
-                val msg = if ((type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE) != 0) "Acoustic monitoring active." else "Tracking system active."
-                safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
+                try {
+                    delay(200)
+                    val type = getAvailableForegroundServiceType()
+                    val msg = if ((type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE) != 0) "Acoustic monitoring active." else "Tracking system active."
+                    safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to update foreground service type")
+                    // safeStartForeground already handles its own exceptions, but notification building might fail.
+                }
             }
         }
     }
@@ -314,14 +321,18 @@ class TrackerService : BaseMonitorService() {
         if (isXiaomi && lastServiceTickRealtime > 0) {
             val tickGap = nowRealtime - lastServiceTickRealtime
             if (tickGap > XIAOMI_SUPPRESSION_THRESHOLD_MS && nowRealtime - lastXiaomiRecoveryTs > XIAOMI_RECOVERY_COOLDOWN_MS) {
-                lastXiaomiRecoveryTs = nowRealtime
-                val proc = lastProcessedLocation
-                logManager.logServiceEvent("HEURISTIC RECOVERY: Xiaomi suppression detected (Gap: ${tickGap}ms). Triggering pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
-                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
-                
-                gpsManager.reviveGps()
-                systemMonitor.renewWakeLock()
-                updateForegroundServiceType()
+                try {
+                    lastXiaomiRecoveryTs = nowRealtime
+                    val proc = lastProcessedLocation
+                    logManager.logServiceEvent("HEURISTIC RECOVERY: Xiaomi suppression detected (Gap: ${tickGap}ms). Triggering pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                        lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
+                    
+                    gpsManager.reviveGps()
+                    systemMonitor.renewWakeLock()
+                    updateForegroundServiceType()
+                } catch (e: Exception) {
+                    Timber.e(e, "Xiaomi heuristic recovery pulse failed")
+                }
             }
         }
 

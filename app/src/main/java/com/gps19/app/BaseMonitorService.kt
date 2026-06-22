@@ -20,6 +20,8 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * v8.9.28:
+ * - Issue #9: Hardened safeStartForeground with explicit ForegroundServiceStartNotAllowedException logging.
  * v8.9.27:
  * - Issue #218: Added safeStartForeground wrapper to handle ForegroundServiceStartNotAllowedException on Android 12+.
  * v8.9.2:

@@ -68,6 +68,8 @@ message AppSettings {
 
     // Issue 47: Xiaomi Permission Override
     optional bool is_xiaomi_manual_override = 47;
+
+    optional int64 last_history_sit_ts = 48;
 }
 
 message RealtimeStatus {

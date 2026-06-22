@@ -99,6 +99,7 @@ class MainRepository @Inject constructor(
         const val DRAFT_MAX_DISTANCE = SettingsRepository.DRAFT_MAX_DISTANCE
 
         const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = SettingsRepository.IS_XIAOMI_MANUAL_OVERRIDE_KEY
+        const val LAST_HISTORY_SIT_TS_KEY = SettingsRepository.LAST_HISTORY_SIT_TS_KEY
     }
 
     val isRelayConnected = telemetry.isRelayConnected
