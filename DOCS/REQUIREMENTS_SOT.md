@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.27
+# System Source of Truth (SoT) - v8.9.28
 
 This document serves as the definitive operational specification for the GPS-Tracker system.
 
@@ -96,6 +96,8 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `CHAIR_PLUNGE_DISTANCE_THRESHOLD`| 0.05m | Minimum distance for a valid plunge event. |
 | `CHAIR_PLUNGE_WINDOW_MS` | 800ms | Window for matching downward velocity. |
 | `CHAIR_SIT_COOLDOWN_MS` | 5,000ms | Cooldown between chair occupancy events. |
+| `SIT_TRANSMISSION_LATCH_MS` | 10,000ms | Duration for which SIT detected status is latched for transmission. |
+| `SIT_DUPLICATE_GUARD_MS` | 15,000ms | Anti-flapping guard for redundant SIT forensic markers. (Issue #12) |
 | `BOOTSTRAP_PHASE_MS` | 60,000ms | Duration of initial high-sensitivity bootstrap phase. |
 | `DISCOVERY_PHASE_MS` | 60,000ms | Duration of peer discovery phase. |
 | `PASSIVE_ZEROING_STATIONARY_MS` | 300,000ms | Stationary state required for auto-calibration (5m). |
@@ -148,9 +150,8 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `ADAPTIVE_JUMP_SNR_THRESHOLD`| 35.0 dB | SNR threshold for classifying jumps as potential spoofing. |
 | `ADAPTIVE_JUMP_HOLD_MULTIPLIER`| 2.0x | Multiplier for jump hold duration in low-vibration scenarios. |
 | `XIAOMI_SUPPRESSION_THRESHOLD_MS`| 15,000ms | Gap threshold for detecting MIUI background suppression. |
-| `XIAOMI_RECOVERY_COOLDOWN_MS` | 60,000ms | Cooldown between Xiaomi heuristic recovery pulses. |
+| `XIAOMI_RECOVERY_COOLDOWN_MS` | 60,000ms | COOLDOWN between Xiaomi heuristic recovery pulses. |
 | `GPS_TRANSITION_LOG_MUZZLE_MS`| 30,000ms | Suppression window for GPS polling interval transition logs. |
-| `SIT_TRANSMISSION_LATCH_MS` | 10,000ms | Duration for which SIT detected status is latched for transmission. |
 | `JUMP_CHECK_MIN_DIST` | 5.0m | Minimum distance for a valid jump engine check. |
 | `ACCEL_CHECK_MIN_DIST` | 10.0m | Minimum distance for acceleration-based validity check. |
 | `EFFICIENCY_MIN_SEGMENT_DIST` | 10.0m | Minimum segment distance for path efficiency calculation. |
@@ -173,6 +174,8 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `LUX_EMA_FAST` | 0.01 | EMA factor (Fast) for light. |
 | `LUX_EMA_UP_SLOW` | 0.999 | EMA factor for rising light values (Slow). |
 | `LUX_EMA_UP_FAST` | 0.001 | EMA factor for rising light values (Fast). |
+| `LUX_EMA_DOWN_SLOW` | 0.999 | EMA factor for falling light values (Slow). (Issue #14) |
+| `LUX_EMA_DOWN_FAST` | 0.01 | EMA factor for falling light values (Fast). (Issue #14) |
 | `ACOUSTIC_EMA_DOWN_SLOW` | 0.999 | EMA factor for falling acoustic floor (Slow). |
 | `ACOUSTIC_EMA_DOWN_FAST` | 0.01 | EMA factor for falling acoustic floor (Fast). |
 | `ACOUSTIC_EMA_UP_SLOW` | 0.9999 | EMA factor for rising acoustic floor (Slow). |
@@ -212,7 +215,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ## 4. Remote Forensic Verification
 ### 4.1. Version & Role Visibility
-*   **Engine Identity**: The system operates on the v8.9.27 baseline logic.
+*   **Engine Identity**: The system operates on the v8.9.28 baseline logic.
 *   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using `git rev-list --count HEAD`. (Issue #199)
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Standardized Alert IDs**: Aligned with `EngineConstants.kt`. Includes `VISUAL_JUMP` for trajectory-based jumps.
@@ -256,7 +259,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 ---
 
 ## 6. IMM Filter Specification
-*   `IMM_STATION_PROBABILITY`: 0.8
+*   `IMM_STATIONARY_PROBABILITY`: 0.8
 *   `IMM_KINEMATIC_PROBABILITY`: 0.2
 *   `IMM_MIN_MEASUREMENT_NOISE_METERS`: 5.0m
 *   `IMM_STATIONARY_Q_POS`: 0.01
@@ -278,18 +281,18 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ---
 
-## 8. Forensic Alert Manifest (v8.9.27)
+## 8. Forensic Alert Manifest (v8.9.28)
 | Alert ID | Alert Title (Standardized) | Trigger Description |
-| :--- | :--- | :--- |
+| :--- | :--- | : :--- |
 | `LOCAL_INTERNET` | This device: Internet Lost | Local connectivity failure. |
 | `RELAY_OFFLINE` | This device: Relay Lost | Connectivity to relay server failed. |
-| `TRACKER_OFFLINE` | Tracker: Offline | Tracker disconnected from relay. |
-| `SIGNAL_LOSS` | Tracker: Signal Lost | No telemetry for >180s (Tracker) / >30s (Viewer). |
+| `TRACKER_OFFLINE` | Tracker: Offline / Viewer: Offline | Peer disconnected from relay. (Role-aware) |
+| `SIGNAL_LOSS` | Tracker: Signal Lost / Viewer: Signal Lost | No telemetry for >180s (Tracker) / >30s (Viewer). (Role-aware) |
 | `JUMP_ALERT` | Tracker: Jammer Alert | GPS sustained instability / Jump rejection / Outlier filtering. (Issue #231) |
 | `VISUAL_JUMP` | Tracker: Visual Jump | Trajectory-based jump detected by engine. |
 | `GEOFENCE_VIOLATION`| Tracker: Geofence | Breach of max distance or predictive exit. |
 | `GPS_STALL` | Tracker: GPS Stalled | Hardware chip freeze (no updates >60s). |
-| `GPS_GAP` | Tracker: GPS Gap | Fix age exceeded 60s. |
+| `GPS_GAP` | Tracker: GPS Gap / Viewer: GPS Gap | Fix age exceeded 60s. (Role-aware) |
 | `POWER_TAMPER` | Tracker: Charger unplugged | Power disconnection. |
 | `LOW_BATTERY` | Tracker: Low Battery | Level < 20% (unplugged) or charge deficit. |
 | `HIGH_TEMP` | Tracker: High Temp | Thermal > 46.0°C. |

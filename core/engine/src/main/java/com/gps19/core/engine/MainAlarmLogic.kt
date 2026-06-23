@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v8.9.29:
+ * - Issue #17: Refactored getTrackerTitle to be fully role-aware for forensic parity.
+ *   Now strips "This device:" always, and "Tracker:"/"Viewer:" based on current role.
  * v8.9.26:
  * - Issue #2: Synchronized version to v8.9.26 baseline.
  * v8.9.20:
@@ -424,12 +427,18 @@ object MainAlarmLogic {
     }
 
     /**
-     * getTrackerTitle: Strips role prefixes when in Tracker mode to ensure clean local alerts.
-     * When in Viewer mode, keeps prefixes to distinguish between local and remote alerts.
+     * getTrackerTitle: Role-aware title normalization for forensic parity.
+     * 1. Always strips "This device:" for local clarity on both roles.
+     * 2. Strips the current role's prefix ("Tracker:" or "Viewer:") to keep local alerts clean.
+     * 3. Preserves the peer's prefix to distinguish remote alerts.
      */
     private fun getTrackerTitle(isTracker: Boolean, title: String): String {
-        val cleaned = title.removePrefix("Tracker:").removePrefix("This device:").trim()
-        return if (isTracker) cleaned else title
+        val noLocal = title.removePrefix("This device:").trim()
+        return if (isTracker) {
+            noLocal.removePrefix("Tracker:").trim()
+        } else {
+            noLocal.removePrefix("Viewer:").trim()
+        }
     }
 
     private fun isDefaultLocation(lat: Double, lng: Double) = abs(lat - DEFAULT_LAT) < 0.0001 && abs(lng - DEFAULT_LNG) < 0.0001
