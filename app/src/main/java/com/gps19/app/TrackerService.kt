@@ -21,17 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v8.9.33:
- * - Issue #19: Fixed dead code isRevivalTriggered flag. Now correctly set during revival sequences.
- * v8.9.32:
- * - Issue #25: Passing sensorManager.absoluteAltitude to LocationProcessor to prevent 
- *   redundant baselining in the engine.
- * v8.9.31:
- * - Issue #24: Viewer Offline Detection - Passing viewer connectivity status to alarm evaluation.
- * v8.9.30:
- * - Issue #26: Explicitly initialized serviceStartRealtime in onCreate after engine initialization.
- * v8.9.29:
- * - Issue #18: Corrected peakVerticalVelocity and peakVerticalDisplacement propagation to LocationSentinel.
+ * v8.9.35:
+ * - Issue #301: Fixed SyncManager instantiation and pushCurrentStatus parameter mismatch.
+ * v8.9.34:
+ * - Issue #267: Removed dead code isRevivalTriggered flag.
+ * - Issue #268: Removed redundant acousticFloorDb passing to LocationProcessor.
+ * - Issue #265: Optimized alarm evaluation to prevent redundancy between tick and GPS arrival.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -67,7 +62,6 @@ class TrackerService : BaseMonitorService() {
     private var isMuzzled = false
     private var muzzleReleaseJob: Job? = null
     
-    private var isRevivalTriggered = false
     private var revivalAttemptCount = 0
     private var lastRevivalAttemptTs = 0L
     private var lastXiaomiRecoveryTs = 0L
@@ -162,7 +156,7 @@ class TrackerService : BaseMonitorService() {
             sensorManager.start()
             networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
             
-            syncManager = SyncManager(applicationContext, networkManager, sessionManager, gpsManager, sensorManager, locationProcessor, telemetryRepository, offlineRepository, logManager, timeProvider, lifecycleScope)
+            syncManager = SyncManager(applicationContext, networkManager, sessionManager, gpsManager, sensorManager, locationProcessor, telemetryRepository, offlineRepository, logManager, timeProvider, repository, lifecycleScope)
             
             syncManager.setOnSyncStartedListener {
                 muzzleReleaseJob?.cancel()
@@ -233,7 +227,6 @@ class TrackerService : BaseMonitorService() {
             lastServiceTickRealtime = timeProvider.elapsedRealtime()
             locationProcessor.setLastValidFixTs(timeProvider.elapsedRealtime()) 
             
-            // Issue #26: Ensure bootstrap starts from actual engine online point
             serviceStartRealtime = timeProvider.elapsedRealtime()
 
             setupPhysicalFastPaths()
@@ -263,7 +256,6 @@ class TrackerService : BaseMonitorService() {
         integrityMonitor.resetStats()
         forensicUseCase.resetLatches()
         pendingAcousticViolation = false
-        isRevivalTriggered = false
         revivalAttemptCount = 0
         lastRevivalAttemptTs = 0L
         lastXiaomiRecoveryTs = 0L
@@ -294,7 +286,6 @@ class TrackerService : BaseMonitorService() {
                     safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to update foreground service type")
-                    // safeStartForeground already handles its own exceptions, but notification building might fail.
                 }
             }
         }
@@ -316,7 +307,6 @@ class TrackerService : BaseMonitorService() {
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
         
-        // Issue #218: Xiaomi MIUI 14 Heuristic Recovery Pulse
         if (isXiaomi && lastServiceTickRealtime > 0) {
             val tickGap = nowRealtime - lastServiceTickRealtime
             if (tickGap > XIAOMI_SUPPRESSION_THRESHOLD_MS && nowRealtime - lastXiaomiRecoveryTs > XIAOMI_RECOVERY_COOLDOWN_MS) {
@@ -326,7 +316,6 @@ class TrackerService : BaseMonitorService() {
                     logManager.logServiceEvent("HEURISTIC RECOVERY: Xiaomi suppression detected (Gap: ${tickGap}ms). Triggering pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
                         lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
                     
-                    isRevivalTriggered = true
                     gpsManager.reviveGps()
                     systemMonitor.renewWakeLock()
                     updateForegroundServiceType()
@@ -339,7 +328,6 @@ class TrackerService : BaseMonitorService() {
         val isSocketConnected = networkManager.isConnected() && !transientDropDetected.getAndSet(false)
         networkManager.updateRelayStatus(isSocketConnected)
         
-        // Issue #24: Viewer Offline Detection - Tracking viewer activity
         val isViewerActive = remoteHandler.lastPeerActivityTs > 0 && (nowRealtime - remoteHandler.lastPeerActivityTs < WATCH_TIMEOUT_MS)
         sessionManager.updateTick(nowRealtime, lastServiceTickRealtime, isPeerAvailable = isSocketConnected && isViewerActive, isInViolation = isSuspiciousMode)
         
@@ -355,7 +343,6 @@ class TrackerService : BaseMonitorService() {
             if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS && timeSinceLastRevival > GPS_REVIVAL_RETRY_INTERVAL_MS) {
                 revivalAttemptCount++
                 lastRevivalAttemptTs = nowRealtime
-                isRevivalTriggered = true
                 gpsManager.reviveGps()
                 logManager.logServiceEvent("GPS Stall: Revival attempt $revivalAttemptCount/$MAX_REVIVAL_ATTEMPTS triggered", important = true,
                     lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
@@ -366,7 +353,6 @@ class TrackerService : BaseMonitorService() {
             }
         }
 
-        // Periodic Stability Audit
         if (nowRealtime - lastGpsAuditRealtime > GPS_STABILITY_AUDIT_INTERVAL_MS) {
             if (currentGpsInterval == HIGH_FREQUENCY_GPS_POLLING_MS) {
                 val proc = lastProcessedLocation
@@ -393,7 +379,6 @@ class TrackerService : BaseMonitorService() {
             lastGpsAuditRealtime = nowRealtime
         }
 
-        // Forensic Marking
         lastProcessedLocation?.let { proc ->
             val unresolvedAlarms = alarmManager.getUnresolvedAlarmTypes()
             val activeViolations = mutableSetOf<String>()
@@ -401,7 +386,6 @@ class TrackerService : BaseMonitorService() {
             if (isJammerSuspicionActive) activeViolations.add(ALERT_ID_JUMP_ALERT)
             if (isGpsStalledActive) activeViolations.add(ALERT_ID_GPS_STALL)
             if (isGpsGapActive) activeViolations.add(ALERT_ID_TRACKER_GAP)
-            // Issue #243: Visual Jump forensic anchor expanded for Tier 3 Jitter
             if (proc.status == SentinelStatus.JUMP || proc.status == SentinelStatus.JITTER) activeViolations.add(ALERT_ID_VISUAL_JUMP)
             if (lastSitDetected) activeViolations.add(ALERT_ID_TRACKER_CHAIR) 
 
@@ -415,7 +399,6 @@ class TrackerService : BaseMonitorService() {
             )
         }
 
-        // Sensor Processing
         val peakDb = sensorManager.consumeAcousticPeak()
         val minDb = sensorManager.consumeAcousticMin()
         val peakShock = sensorManager.consumePeakVibration()
@@ -423,7 +406,6 @@ class TrackerService : BaseMonitorService() {
         val peakVzTs = sensorManager.consumePeakVerticalVelocityTs()
         val peakDz = sensorManager.consumePeakVerticalDisplacement()
         
-        // Issue #25: Use sensorManager.absoluteAltitude for engine processing to avoid double-baselining.
         locationProcessor.updateSensorData(
             vibration = sensorManager.currentVibrationIndex, heading = sensorManager.currentCompassHeading, baroAlt = sensorManager.absoluteAltitude,
             lux = sensorManager.currentLux, isNear = sensorManager.isProximityNear, powerTamper = integrityMonitor.isPowerTamperDetected,
@@ -500,7 +482,6 @@ class TrackerService : BaseMonitorService() {
         val tiltIdx = (sensorManager.currentTiltDegrees / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0f, 1f)
         val baroIdx = (abs(sensorManager.relativeAltitude) / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0f, 1f)
 
-        // Issue #240: Contextual Cause of Uncertainty (Bayesian Radius Expansion)
         val pendingReason = when {
             pendingAcousticViolation -> LocationPendingReason.ACOUSTIC_VIOLATION
             isGpsStalledActive -> LocationPendingReason.GPS_STALL
@@ -509,13 +490,12 @@ class TrackerService : BaseMonitorService() {
             else -> LocationPendingReason.NONE
         }
 
-        // Push Status
         val proc = lastProcessedLocation
         syncManager.pushCurrentStatus(
             deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true, loc = lastKnownLocation, filtered = proc?.optimizedPoint,
             distToTracker = locationProcessor.getDistanceToTracker(), distToHome = locationProcessor.getNearestHomeDistance(),
             maxAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), filteredSpeed = proc?.filteredSpeed ?: 0.0,
-            vibration = sensorManager.currentVibrationIndex, heading = sensorManager.currentCompassHeading, baroAlt = sensorManager.relativeAltitude,
+            vibration = sensorManager.currentVibrationIndex, heading = sensorManager.currentCompassHeading, baroAlt = sensorManager.absoluteAltitude,
             lux = sensorManager.currentLux, isNear = sensorManager.isProximityNear, isSuspicious = isSuspiciousMode, tiltDegrees = sensorManager.currentTiltDegrees,
             acousticDb = sensorManager.currentAcousticDb, isJump = (proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER), 
             isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false, jumpTier = proc?.jumpTier ?: 0, isJammer = isJammerSuspicionActive,
@@ -534,10 +514,10 @@ class TrackerService : BaseMonitorService() {
             snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f), 
             tiltIdx = tiltIdx,
             baroIdx = baroIdx,
-            isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive
+            isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive,
+            batteryLevel = integrityMonitor.getBatteryLevel(), batteryTemp = integrityMonitor.batteryTemp, isCharging = integrityMonitor.isCharging
         )
 
-        // Forensic Ribbon Update (1Hz loop)
         val gpsTs = proc?.timestamp ?: 0L
         val gpsAge = if (gpsTs > 0) (now - gpsTs) else 3600000L
         historyManager.updateRibbons(
@@ -546,7 +526,7 @@ class TrackerService : BaseMonitorService() {
             serviceTickCounter = serviceTickCounter,
             rtt = networkManager.getRtt(),
             peerSignal = remoteHandler.peerSignal,
-            peerAvail = isSocketConnected && isViewerActive, // Issue #24: Viewer Offline Detection
+            peerAvail = isSocketConnected && isViewerActive, 
             hasGps = gpsTs > 0,
             isTrackerMode = true,
             gpsIndex = TelemetryUtils.calculateGpsIndex(gpsAge, proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), lastKnownLocation?.extras?.getInt("satellites") ?: gpsManager.satellitesUsed).totalIndex,
@@ -573,6 +553,7 @@ class TrackerService : BaseMonitorService() {
             currentMa = integrityMonitor.getBatteryCurrent()
         )
 
+        // Issue #265: Unified Alarm Evaluation - tick loop is the authority
         evaluateAlarmsInternal(nowRealtime, isSignalLoss, isJammerSuspicionActive, isGpsStalledActive, isTamperSiren, isViewerActive)
 
         if (serviceTickCounter % 60 == 0) { notificationManager.updatePulse(sats = gpsManager.satellitesUsed, battery = integrityMonitor.getBatteryLevel(), isSecure = !alarmManager.hasUnresolvedAlarms(), isPowerSave = integrityMonitor.isPowerSaveModeActive) }
@@ -590,7 +571,7 @@ class TrackerService : BaseMonitorService() {
         isJammerSuspicion: Boolean, 
         isGpsStalling: Boolean, 
         isTamperDetected: Boolean,
-        isViewerConnected: Boolean // Issue #24: Viewer Offline Detection
+        isViewerConnected: Boolean 
     ) {
         val proc = lastProcessedLocation
         val isSocketConnected = networkManager.isConnected()
@@ -611,8 +592,8 @@ class TrackerService : BaseMonitorService() {
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
             alarmManager.evaluateAlarms(
                 now = nowRealtime, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = true,
-                isRelayConnected = isSocketConnected, isTrackerConnected = isViewerConnected, // In Tracker role, isTrackerConnected maps to Viewer connectivity
-                isTrackerVisualJump = (proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER), // Issue #243: Tier 3 Jitter Gating
+                isRelayConnected = isSocketConnected, isTrackerConnected = isViewerConnected, 
+                isTrackerVisualJump = (proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER), 
                 isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false, jumpTier = proc?.jumpTier ?: 0, trackerLat = proc?.optimizedPoint?.lat ?: 0.0, 
                 trackerLng = proc?.optimizedPoint?.lng ?: 0.0, trackerAccuracy = proc?.currentAccuracy ?: 0f, 
                 maxTrackerAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), trackerLastGpsTs = proc?.timestamp ?: 0L, 
@@ -657,14 +638,14 @@ class TrackerService : BaseMonitorService() {
             lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedKph = location.speed.toDouble() * 3.6, 
             gpsTs = location.time, accuracy = location.accuracy, bearing = location.bearing, snr = gpsManager.averageSnr, 
             satsUsed = location.extras?.getInt("satellites") ?: gpsManager.satellitesUsed, isViewerTrail = false, lastGpsTs = sessionManager.lastGpsTs, 
-            isLocal = true, providedAdaptiveVibrationFloor = sensorManager.adaptiveVibrationFloor, providedAcousticFloorDb = locationProcessor.getAcousticFloorDb(), 
+            isLocal = true, providedAdaptiveVibrationFloor = sensorManager.adaptiveVibrationFloor, 
             isSuspicious = isSuspiciousMode,
             isMuzzled = isMuzzled
         )
         
         if (!processed.isClockRegression) sessionManager.lastGpsTs = location.time
         if (!processed.isClockRegression && !processed.isStalled) { 
-            systemMonitor.gpsStallStartTs = 0L; isRevivalTriggered = false 
+            systemMonitor.gpsStallStartTs = 0L 
             revivalAttemptCount = 0; lastRevivalAttemptTs = 0L
         }
         
@@ -677,16 +658,8 @@ class TrackerService : BaseMonitorService() {
         
         lastKnownLocation = location; lastProcessedLocation = processed
 
-        if (processed.status != SentinelStatus.VALID) {
-            val nowRealtimeInternal = timeProvider.elapsedRealtime()
-            val isViewerActive = remoteHandler.lastPeerActivityTs > 0 && (nowRealtimeInternal - remoteHandler.lastPeerActivityTs < WATCH_TIMEOUT_MS)
-            val silenceDelta = if (remoteHandler.lastPeerActivityTs > 0) nowRealtimeInternal - remoteHandler.lastPeerActivityTs else 0L
-            val isSignalLoss = integrityMonitor.checkSignalIntegrity(nowRealtimeInternal, silenceDelta, true)
-            val isJammerSuspicion = (systemMonitor.jumpStateStartTs != 0L && (nowRealtimeInternal - systemMonitor.jumpStateStartTs) > JAMMER_DETECTION_THRESHOLD_MS)
-            val isGpsStalling = (systemMonitor.gpsStallStartTs > 0L && (nowRealtimeInternal - systemMonitor.gpsStallStartTs) > GPS_STALL_THRESHOLD_MS)
-            val isTamperSiren = integrityMonitor.isPowerTamperDetected || !sensorManager.isProximityNear || SentinelValidator.isLightViolated(sensorManager.currentLux, locationProcessor.getLuxBaseline())
-            evaluateAlarmsInternal(nowRealtimeInternal, isSignalLoss, isJammerSuspicion, isGpsStalling, isTamperSiren, isViewerActive)
-        }
+        // Issue #265: Removed evaluateAlarmsInternal from here. 
+        // tick loop (processTick) is sufficient and prevents over-triggering at 10Hz.
     }
 
     override fun onDestroy() {

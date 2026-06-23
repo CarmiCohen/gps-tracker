@@ -238,4 +238,10 @@ class AppNetworkManager @Inject constructor(
     }
 
     fun updateRelayStatus(connected: Boolean) { telemetryRepository.updateRelayStatus(connected) }
+
+    fun sendTelemetry(status: TrackerStatus): Boolean {
+        if (!isConnected()) return false
+        emit("location_update", status.toJSONObject(fromViewer = !isTrackerMode))
+        return true
+    }
 }

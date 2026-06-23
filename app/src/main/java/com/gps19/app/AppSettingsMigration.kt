@@ -7,7 +7,7 @@ import androidx.datastore.migrations.SharedPreferencesView
 /**
  * AppSettingsMigration: Migrates data from legacy SharedPreferences to DataStore.
  * v6.8.1:
- * - Code Redundancy: Consolidated redundant session timing fields (uptimeMs) into uptimeMs (Issue #1).
+ * - Code Redundancy: Consolidated redundant session timing fields (uptimeMs) into uptimeMs (Issue #271). (Formerly #1)
  */
 fun AppSettingsMigration(context: Context) = SharedPreferencesMigration<AppSettings>(
     context = context,

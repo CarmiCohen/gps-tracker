@@ -2,25 +2,16 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.34:
+ * - Issue #263: Corrected inverted EMA constant weights (Slow factors now < Fast factors).
+ * - Issue #264: Consolidated GtoEngine magic numbers (Speed thresholds).
  * v8.9.31:
- * - Issue #22: Added ACOUSTIC_FLOOR_MIN_DB (25.0) to prevent false triggers in silent environments.
+ * - Issue #292: Added ACOUSTIC_FLOOR_MIN_DB (25.0) to prevent false triggers in silent environments.
  * v8.9.26:
- * - Issue #2: Synchronized version to v8.9.26 baseline.
- * - Issue #3: Use code precision for LAT_DEG_TO_METERS (111194.92664455874).
- * - Issue #5: Change the code according to SoT - Standardized Alert Titles to "Tracker:".
- * - Issue #1: Change SoT according to the code - Removed redundant ACK_SYNC_LOOP_INTERVAL_MS.
- * v8.9.21:
- * - Issue #224: Added RIBBON_SIT_TILT_SCALE_DEG and RIBBON_SIT_BARO_SCALE_METERS for forensic expansion.
- * v8.9.20:
- * - Issue #229: Removed redundant DISTANCE_GRACE_MS.
- * v8.9.19:
- * - Issue #232: Added RIBBON_CURRENT_SCALE_MA.
- * - Issue #231: Added ALERT_TITLE_VISUAL_JUMP.
- * v8.9.18:
- * - Issue #221: Added PENDING_UNCERTAINTY_GROWTH_RATE_MPS.
- * - Issue #220: Added HINDSIGHT_BUFFER_SIZE and HINDSIGHT_MAX_AGE_MS.
- * - Issue #219: Added ADAPTIVE_JUMP_SNR_THRESHOLD and ADAPTIVE_JUMP_HOLD_MULTIPLIER.
- * - Issue #218: Added XIAOMI_SUPPRESSION_THRESHOLD_MS and XIAOMI_RECOVERY_COOLDOWN_MS.
+ * - Issue #272: Synchronized version to v8.9.26 baseline.
+ * - Issue #273: Use code precision for LAT_DEG_TO_METERS (111194.92664455874).
+ * - Issue #275: Change the code according to SoT - Standardized Alert Titles to "Tracker:".
+ * - Issue #271: Change SoT according to the code - Removed redundant ACK_SYNC_LOOP_INTERVAL_MS.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -140,22 +131,27 @@ const val GEOFENCE_HYSTERESIS_METERS = 5.0
 const val GEOFENCE_PREDICTIVE_LOOKAHEAD_S = 2.0
 const val GEOFENCE_PREDICTIVE_MIN_SPEED_MPS = 1.0
 
-// EMA Factors
-const val LUX_EMA_SLOW = 0.99f
-const val LUX_EMA_FAST = 0.01f
-const val LUX_EMA_UP_SLOW = 0.999f
-const val LUX_EMA_UP_FAST = 0.001f
-const val LUX_EMA_DOWN_SLOW = 0.999f
-const val LUX_EMA_DOWN_FAST = 0.01f
-const val ACOUSTIC_EMA_DOWN_SLOW = 0.999f
-const val ACOUSTIC_EMA_DOWN_FAST = 0.01f
-const val ACOUSTIC_EMA_UP_SLOW = 0.9999f
-const val ACOUSTIC_EMA_UP_FAST = 0.001f
-const val VIBRATION_EMA_DOWN_SLOW = 0.99f
-const val VIBRATION_EMA_DOWN_FAST = 0.01f
-const val VIBRATION_EMA_UP_SLOW = 0.999f
-const val VIBRATION_EMA_UP_FAST = 0.0001f
-const val BARO_EMA_SLOW = 0.999f 
+// EMA Factors (Issue #263: Corrected Inversion)
+const val LUX_EMA_SLOW = 0.01f
+const val LUX_EMA_FAST = 0.1f
+const val LUX_EMA_UP_SLOW = 0.001f
+const val LUX_EMA_UP_FAST = 0.01f
+const val LUX_EMA_DOWN_SLOW = 0.001f
+const val LUX_EMA_DOWN_FAST = 0.02f
+const val ACOUSTIC_EMA_DOWN_SLOW = 0.001f
+const val ACOUSTIC_EMA_DOWN_FAST = 0.02f
+const val ACOUSTIC_EMA_UP_SLOW = 0.0001f
+const val ACOUSTIC_EMA_UP_FAST = 0.01f
+const val VIBRATION_EMA_DOWN_SLOW = 0.01f
+const val VIBRATION_EMA_DOWN_FAST = 0.1f
+const val VIBRATION_EMA_UP_SLOW = 0.001f
+const val VIBRATION_EMA_UP_FAST = 0.01f
+const val BARO_EMA_SLOW = 0.001f 
+
+// GtoEngine Optimization Constants (Issue #264)
+const val GTO_TOW_SPEED_THRESHOLD = 10.0
+const val GTO_KINEMATIC_SPEED_DELTA = 10.0
+const val GTO_WORK_SPEED_THRESHOLD = 5.0
 
 // Engine Execution Parameters
 const val BOOTSTRAP_PHASE_MS = 60000L

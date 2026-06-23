@@ -6,10 +6,10 @@ import kotlin.math.*
 /**
  * MainAlarmLogic: Detection logic for system violations.
  * v8.9.29:
- * - Issue #17: Refactored getTrackerTitle to be fully role-aware for forensic parity.
+ * - Issue #287: Refactored getTrackerTitle to be fully role-aware for forensic parity. (Formerly #17)
  *   Now strips "This device:" always, and "Tracker:"/"Viewer:" based on current role.
  * v8.9.26:
- * - Issue #2: Synchronized version to v8.9.26 baseline.
+ * - Issue #272: Synchronized version to v8.9.26 baseline. (Formerly #2)
  * v8.9.20:
  * - Issue #230: Updated ALERT_ID_TRACKER_CHAIR subtitle to "Chair occupancy detected" 
  *   for consistency with "Chair Occupied" forensic status.

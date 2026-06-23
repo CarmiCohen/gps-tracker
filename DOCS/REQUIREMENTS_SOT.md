@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.28
+# System Source of Truth (SoT) - v8.9.34
 
 This document serves as the definitive operational specification for the GPS-Tracker system.
 
@@ -97,7 +97,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `CHAIR_PLUNGE_WINDOW_MS` | 800ms | Window for matching downward velocity. |
 | `CHAIR_SIT_COOLDOWN_MS` | 5,000ms | Cooldown between chair occupancy events. |
 | `SIT_TRANSMISSION_LATCH_MS` | 10,000ms | Duration for which SIT detected status is latched for transmission. |
-| `SIT_DUPLICATE_GUARD_MS` | 15,000ms | Anti-flapping guard for redundant SIT forensic markers. (Issue #12) |
+| `SIT_DUPLICATE_GUARD_MS` | 15,000ms | Anti-flapping guard for redundant SIT forensic markers. (Issue #282) |
 | `BOOTSTRAP_PHASE_MS` | 60,000ms | Duration of initial high-sensitivity bootstrap phase. |
 | `DISCOVERY_PHASE_MS` | 60,000ms | Duration of peer discovery phase. |
 | `PASSIVE_ZEROING_STATIONARY_MS` | 300,000ms | Stationary state required for auto-calibration (5m). |
@@ -170,21 +170,24 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `GPS_INDEX_AGE_SCALING` | 2.0 | Scaling factor for GPS age indexing. |
 | `GPS_INDEX_ACCURACY_EXCELLENT_METERS`| 8.0m | Accuracy threshold for "Excellent" GPS Index rating. |
 | `GPS_INDEX_SATS_TARGET` | 12 | Satellite count target for optimal GPS Index. |
-| `LUX_EMA_SLOW` | 0.99 | EMA factor (Slow) for light. |
-| `LUX_EMA_FAST` | 0.01 | EMA factor (Fast) for light. |
-| `LUX_EMA_UP_SLOW` | 0.999 | EMA factor for rising light values (Slow). |
-| `LUX_EMA_UP_FAST` | 0.001 | EMA factor for rising light values (Fast). |
-| `LUX_EMA_DOWN_SLOW` | 0.999 | EMA factor for falling light values (Slow). (Issue #14) |
-| `LUX_EMA_DOWN_FAST` | 0.01 | EMA factor for falling light values (Fast). (Issue #14) |
-| `ACOUSTIC_EMA_DOWN_SLOW` | 0.999 | EMA factor for falling acoustic floor (Slow). |
-| `ACOUSTIC_EMA_DOWN_FAST` | 0.01 | EMA factor for falling acoustic floor (Fast). |
-| `ACOUSTIC_EMA_UP_SLOW` | 0.9999 | EMA factor for rising acoustic floor (Slow). |
-| `ACOUSTIC_EMA_UP_FAST` | 0.001 | EMA factor for rising acoustic floor (Fast). |
-| `VIBRATION_EMA_DOWN_SLOW` | 0.99 | EMA factor for falling vibration floor (Slow). |
-| `VIBRATION_EMA_DOWN_FAST` | 0.01 | EMA factor for falling vibration floor (Fast). |
-| `VIBRATION_EMA_UP_SLOW` | 0.999 | EMA factor for rising vibration floor (Slow). |
-| `VIBRATION_EMA_UP_FAST` | 0.0001 | EMA factor for rising vibration floor (Fast). |
-| `BARO_EMA_SLOW` | 0.999 | EMA factor for barometric baseline stabilization. |
+| `LUX_EMA_SLOW` | 0.01 | EMA factor (Slow) for light. |
+| `LUX_EMA_FAST` | 0.1 | EMA factor (Fast) for light. |
+| `LUX_EMA_UP_SLOW` | 0.001 | EMA factor for rising light values (Slow). |
+| `LUX_EMA_UP_FAST` | 0.01 | EMA factor for rising light values (Fast). |
+| `LUX_EMA_DOWN_SLOW` | 0.001 | EMA factor for falling light values (Slow). (Issue #284) |
+| `LUX_EMA_DOWN_FAST` | 0.02 | EMA factor for falling light values (Fast). (Issue #284) |
+| `ACOUSTIC_EMA_DOWN_SLOW` | 0.001 | EMA factor for falling acoustic floor (Slow). |
+| `ACOUSTIC_EMA_DOWN_FAST` | 0.02 | EMA factor for falling acoustic floor (Fast). |
+| `ACOUSTIC_EMA_UP_SLOW` | 0.0001 | EMA factor for rising acoustic floor (Slow). |
+| `ACOUSTIC_EMA_UP_FAST` | 0.01 | EMA factor for rising acoustic floor (Fast). |
+| `VIBRATION_EMA_DOWN_SLOW` | 0.01 | EMA factor for falling vibration floor (Slow). |
+| `VIBRATION_EMA_DOWN_FAST` | 0.1 | EMA factor for falling vibration floor (Fast). |
+| `VIBRATION_EMA_UP_SLOW` | 0.001 | EMA factor for rising vibration floor (Slow). |
+| `VIBRATION_EMA_UP_FAST` | 0.01 | EMA factor for rising vibration floor (Fast). |
+| `BARO_EMA_SLOW` | 0.001 | EMA factor for barometric baseline stabilization. |
+| `GTO_TOW_SPEED_THRESHOLD` | 10.0 m/s | Speed threshold for identifying towing signatures. (Issue #264) |
+| `GTO_KINEMATIC_SPEED_DELTA` | 10.0 m/s | Speed delta threshold for kinematic consistency. (Issue #264) |
+| `GTO_WORK_SPEED_THRESHOLD` | 5.0 m/s | Speed floor for mechanical jitter suppression. (Issue #264) |
 
 ## 2. Forensic Ribbon Scaling
 | Constant | Value | Description |
@@ -215,7 +218,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ## 4. Remote Forensic Verification
 ### 4.1. Version & Role Visibility
-*   **Engine Identity**: The system operates on the v8.9.28 baseline logic.
+*   **Engine Identity**: The system operates on the v8.9.34 baseline logic.
 *   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using `git rev-list --count HEAD`. (Issue #199)
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Standardized Alert IDs**: Aligned with `EngineConstants.kt`. Includes `VISUAL_JUMP` for trajectory-based jumps.

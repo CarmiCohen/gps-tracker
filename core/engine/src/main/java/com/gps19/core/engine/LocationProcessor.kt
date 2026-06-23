@@ -4,11 +4,10 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * v8.9.34:
+ * - Issue #268: Removed redundant providedAcousticFloorDb from processGpsPoint.
  * v8.9.22:
- * - Issue #227: Implemented hindsight transition smoothing by propagating optimized promoted points.
- * v8.9.19:
- * - Issue #223: Added snr and vibration snapshots to onLogAdded for forensic enrichment.
- * - Issue #222: Propagated isHindsightCorrected to listener for ghost-path visualization.
+ * - Issue #227: Implemented hindsight transition smoothing.
  */
 class LocationProcessor(
     private val listener: LocationProcessorListener,
@@ -21,7 +20,7 @@ class LocationProcessor(
     private val accuracyWindow = mutableListOf<Float>()
     private var lastWindowUpdateRealtime = 0L
     
-    private var lastValidFixTs = 0L // Monotonic since v8.8.12
+    private var lastValidFixTs = 0L 
     private var lastLat = 0.0
     private var lastLng = 0.0
     private var lastTs = 0L
@@ -180,7 +179,7 @@ class LocationProcessor(
         providedIsAdaptiveJump: Boolean = false,
         providedIsJammer: Boolean = false, providedIsStalled: Boolean = false,
         providedIsTamper: Boolean = false, providedAdaptiveVibrationFloor: Float = -1f,
-        providedAcousticLockoutTs: Long = 0L, providedAcousticFloorDb: Double = -1.0,
+        providedAcousticLockoutTs: Long = 0L,
         isSuspicious: Boolean = false, 
         isMuzzled: Boolean = false,
         nowWall: Long = timeProvider.currentTimeMillis(),
@@ -218,12 +217,11 @@ class LocationProcessor(
 
         val bufferCopy = if (isLocal) sentinel.getHindsightBuffer() else emptyList()
 
-        var sentinelResult = sentinel.processLocation(lat = lat, lng = lng, alt = alt, accuracy = accuracy, bearing = bearing, snr = snr, satsUsed = satsUsed, timestamp = effectiveTs, bypassBehavioral = !isLocal, isSuspicious = isSuspicious, isMuzzled = isMuzzled, nowWall = nowWall, nowRealtime = nowRealtime, acousticFloorDb = providedAcousticFloorDb)
+        var sentinelResult = sentinel.processLocation(lat = lat, lng = lng, alt = alt, accuracy = accuracy, bearing = bearing, snr = snr, satsUsed = satsUsed, timestamp = effectiveTs, bypassBehavioral = !isLocal, isSuspicious = isSuspicious, isMuzzled = isMuzzled, nowWall = nowWall, nowRealtime = nowRealtime)
         
         if (sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED && bufferCopy.isNotEmpty()) {
             val promotedPoints = sentinelResult.promotedPoints ?: emptyList()
             bufferCopy.forEachIndexed { idx, p ->
-                // Issue #227: Use optimized promoted coordinates if available
                 val latToSave = if (idx < promotedPoints.size) promotedPoints[idx].lat else p.lat
                 val lngToSave = if (idx < promotedPoints.size) promotedPoints[idx].lng else p.lng
                 listener.onTrailPointSaved(latToSave, lngToSave, isViewerTrail, false, p.ts, isHindsightCorrected = true)

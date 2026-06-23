@@ -5,7 +5,7 @@ import kotlin.math.*
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
  * v8.9.31:
- * - Issue #21: SIT Forensic Duplicate Risk. Fixed by ensuring isSitDetected defaults to false during backfill if samples are missing.
+ * - Issue #291: SIT Forensic Duplicate Risk. Fixed by ensuring isSitDetected defaults to false during backfill if samples are missing. (Formerly #21)
  * v8.9.21:
  * - Issue #224: Added tiltIdx and baroIdx to mergeWorstCase, backfillGaps, and fillRealGap.
  * v8.9.5:
@@ -104,8 +104,8 @@ class TelemetryAggregator {
             val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0f, 1f) } ?: baseTemplate.tiltIdx
             val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0f, 1f) } ?: baseTemplate.baroIdx
             
-            // Issue #21: SIT detection is a point-in-time event. Replicating the latched baseTemplate.isSitDetected 
-            // across a gap creates false forensic streaks. It must default to false if no snapshot confirms it.
+            // Issue #291: SIT detection is a point-in-time event. Replicating the latched baseTemplate.isSitDetected
+            // across a gap creates false forensic streaks. It must default to false if no snapshot confirms it. (Formerly #21)
             val resolvedSit = snapshot?.isSitDetected ?: false
 
             val fillPoint = baseTemplate.copy(

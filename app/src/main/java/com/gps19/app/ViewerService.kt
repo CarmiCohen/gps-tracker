@@ -18,23 +18,10 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.31:
+ * - Issue #301: Fixed SyncManager instantiation and pushCurrentStatus parameter mismatch.
  * v8.9.30:
- * - Issue #26: Explicitly initialized serviceStartRealtime in onCreate after engine initialization.
- * v8.9.29:
- * - Issue #23: Fixed Geofence evaluation bug; now using trackerDistToHome exclusively for Tracker geofence alarms.
- * v8.9.28:
- * - Issue #9: Hardened foreground updates with try-catch for Android 14+ resilience.
- * v8.9.27:
- * - Issue #218: Hardened foreground transitions with safeStartForeground wrapper for Android 14+ resilience.
- * v8.9.26:
- * - Issue #242: Removed redundant index calculation; using transmitted indices from RemoteHandler.
- * v8.9.25:
- * - Issue #241: Forensic Log Enrichment - Bridging SNR and Vibration snapshots to AppAlarmManager.
- * v8.9.21:
- * - Issue #224: Propagating tiltIdx and baroIdx for forensic ribbon expansion.
- * v8.9.19:
- * - Issue #223: Forensic Log Enrichment - Bridging SNR and Vibration snapshots to LogManager.
- * - Issue #222: Propagating isHindsightCorrected to repository for ghost-path visualization.
+ * - Issue #296: Explicitly initialized serviceStartRealtime in onCreate after engine initialization.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -117,7 +104,7 @@ class ViewerService : BaseMonitorService() {
 
             networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, false)
             
-            syncManager = SyncManager(this@ViewerService, networkManager, sessionManager, gpsManager, null, locationProcessor, telemetryRepository, offlineRepository, logManager, timeProvider, lifecycleScope)
+            syncManager = SyncManager(this@ViewerService, networkManager, sessionManager, gpsManager, null, locationProcessor, telemetryRepository, offlineRepository, logManager, timeProvider, repository, lifecycleScope)
             syncManager.startSyncLoop(configManager.deviceId, configManager.viewerId, false)
 
             remoteHandler = RemoteHandler(this@ViewerService, repository, locationProcessor, alarmManager, sessionManager, forensicUseCase, timeProvider, lifecycleScope) { id -> handleTrackerPulse(id) }
@@ -168,7 +155,7 @@ class ViewerService : BaseMonitorService() {
                 }
                 launch {
                     repository.maxDistanceFlow.collect { dist ->
-                        locationProcessor.setMaxDistanceAuthority(dist)
+                        locationProcessor.setMaxDistanceAuthority(dist.toDouble())
                     }
                 }
                 launch {
@@ -183,7 +170,7 @@ class ViewerService : BaseMonitorService() {
             lastServiceTickRealtime = timeProvider.elapsedRealtime()
             locationProcessor.setLastValidFixTs(timeProvider.elapsedRealtime())
             
-            // Issue #26: Ensure bootstrap starts from actual engine online point
+            // Issue #296: Ensure bootstrap starts from actual engine online point
             serviceStartRealtime = timeProvider.elapsedRealtime()
 
             startTickLoop()
@@ -341,10 +328,13 @@ class ViewerService : BaseMonitorService() {
             isPowerTamper = integrityMonitor.isPowerTamperDetected, isSitDetected = false, isSitActive = false, lastSitTs = 0L, receiptRealtime = 0L,
             violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(),
             verticalVelocity = 0f, sitVz = 0f, sitDz = 0f, sitBaro = 0f, sitTilt = 0f, sitShock = 0f, isClockRegression = false, 
-            isLocationPending = false, gnssDetail = latestGnssDetail, 
+            isLocationPending = false, locationPendingReason = LocationPendingReason.NONE,
+            lastValidFixRealtime = remoteHandler.trackerLastValidFixRealtime,
+            gnssDetail = latestGnssDetail, 
             snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f), 
             tiltIdx = 0f, baroIdx = 0f,
-            isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive
+            isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive,
+            batteryLevel = integrityMonitor.getBatteryLevel(), batteryTemp = integrityMonitor.batteryTemp, isCharging = integrityMonitor.isCharging
         )
 
         val trackerGpsTs = remoteHandler.trackerLastGpsTs

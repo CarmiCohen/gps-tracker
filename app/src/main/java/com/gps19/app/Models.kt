@@ -162,6 +162,8 @@ data class LogEntry(
 
 @Serializable
 data class TrackerStatus(
+    val deviceId: String = "",
+    val viewerId: String = "",
     override val lat: Double = 0.0,
     override val lng: Double = 0.0,
     override val alt: Double = 0.0,
@@ -214,6 +216,7 @@ data class TrackerStatus(
     val acousticFloorDb: Double = 0.0,
     val adaptiveVibrationFloor: Float = 0.12f,
     val proxIdx: Float = 1.0f,
+    val proximityCm: Float = -1f,
     val isClockRegression: Boolean = false,
     val isStalled: Boolean = false,
     val isJammer: Boolean = false,
@@ -234,7 +237,87 @@ data class TrackerStatus(
     val baroIdx: Float = 0f,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false
-) : SpatialAnchor
+) : SpatialAnchor {
+    fun toJSONObject(fromViewer: Boolean): JSONObject {
+        return JSONObject().apply {
+            put("id", deviceId)
+            put("viewer_id", viewerId)
+            put("from_viewer", fromViewer)
+            put("lat", lat)
+            put("lng", lng)
+            put("alt", alt)
+            put("speed", speed.toDouble())
+            put("bearing", bearing.toDouble())
+            put("accuracy", accuracy.toDouble())
+            put("max_accuracy", maxAccuracy.toDouble())
+            put("gps_ts", gpsTs)
+            put("ts", ts)
+            put("uptime_ms", uptimeMs)
+            put("last_conn_ts", lastConnTs)
+            put("last_disc_ts", lastDiscTs)
+            put("total_drop_ms", totalDropMs)
+            put("max_drop_ms", maxDropMs)
+            put("max_drop_ts", maxDropTs)
+            put("total_connected_ms", totalConnectedMs)
+            put("session_connected_ms", sessionConnectedMs)
+            put("battery", battery)
+            put("temp", temp.toDouble())
+            put("max_temp", maxTemp.toDouble())
+            put("is_charging", isCharging)
+            put("current_ma", currentMa)
+            put("sats_view", satsView)
+            put("sats_used", satsUsed)
+            put("peak_vibration_shock", peakVibrationShock.toDouble())
+            put("peak_shock_ts", peakVibrationShockTs)
+            put("is_power_tamper", isPowerTamper)
+            put("violation_uptime_ms", violationUptimeMs)
+            put("violation_percentage", violationPercentage.toDouble())
+            put("is_sit_detected", isSitDetected)
+            put("is_sit_active", isSitActive)
+            put("last_sit_ts", lastSitTs)
+            put("vertical_velocity", verticalVelocity.toDouble())
+            put("sit_vz", sitVz.toDouble())
+            put("sit_vz_ts", sitVzTs)
+            put("sit_dz", sitDz.toDouble())
+            put("sit_baro", sitBaro.toDouble())
+            put("sit_tilt", sitTilt.toDouble())
+            put("sit_shock", sitShock.toDouble())
+            put("is_suspicious", isSuspicious)
+            put("is_tamper_detected", isTamperDetected)
+            put("vibration", vibration.toDouble())
+            put("heading", heading.toDouble())
+            put("tilt_degrees", tiltDegrees.toDouble())
+            put("acoustic_db", acousticDb)
+            put("baro_alt", baroAlt.toDouble())
+            put("lux", lux.toDouble())
+            put("is_near", isNear)
+            put("lux_baseline", luxBaseline.toDouble())
+            put("acoustic_floor_db", acousticFloorDb)
+            put("adaptive_vibration_floor", adaptiveVibrationFloor.toDouble())
+            put("prox_idx", proxIdx.toDouble())
+            put("proximity_cm", proximityCm.toDouble())
+            put("is_clock_regression", isClockRegression)
+            put("is_stalled", isStalled)
+            put("is_jammer", isJammer)
+            put("is_jump", isJump)
+            put("is_trajectory_promoted", isTrajectoryPromoted)
+            put("jump_tier", jumpTier)
+            put("is_location_pending", isLocationPending)
+            put("location_pending_reason", locationPendingReason.name)
+            put("last_valid_fix_realtime", lastValidFixRealtime)
+            put("is_power_save_mode", isPowerSaveMode)
+            put("standby_bucket", standbyBucket)
+            put("net_interface", netInterface)
+            put("is_storage_low", isStorageLow)
+            put("is_storage_critical", isStorageCritical)
+            put("snr_idx", snrIdx.toDouble())
+            put("tilt_idx", tiltIdx.toDouble())
+            put("baro_idx", baroIdx.toDouble())
+            put("is_battery_steep_discharge", isBatterySteepDischarge)
+            put("is_cooling_mode_active", isCoolingModeActive)
+        }
+    }
+}
 
 data class AlarmInfo(val title: String, val subtitle: String, val type: String = "", val isResolved: Boolean = false, val isSirenDisabled: Boolean = false)
 

@@ -439,7 +439,6 @@ class RemoteHandler(
                     providedIsJammer = isJammerPacket,
                     providedIsStalled = isStalledPacket,
                     providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending,
-                    providedAcousticFloorDb = trackerAcousticFloorDb,
                     isSuspicious = isTrackerSuspicious,
                     nowWall = now,
                     nowRealtime = nowRealtime

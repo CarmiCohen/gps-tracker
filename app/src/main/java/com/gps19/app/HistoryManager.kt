@@ -13,7 +13,7 @@ import kotlin.math.abs
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
  * v8.9.28:
- * - Issue #12: SIT Duplicate Guard. Implemented database-level sanity check to prevent redundant SIT forensic markers.
+ * - Issue #282: SIT Duplicate Guard. Implemented database-level sanity check to prevent redundant SIT forensic markers. (Formerly #12)
  * v8.9.21:
  * - Issue #224: Added tiltIdx and baroIdx to updateRibbons and backfillGaps for forensic expansion.
  * v8.9.5:
@@ -311,7 +311,7 @@ class HistoryManager(
     private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long): Boolean {
         if (!isDetected) return false
         
-        // Issue #12: Prevent duplicates if a SIT event occurs within the guard window of the last recorded one.
+        // Issue #282: Prevent duplicates if a SIT event occurs within the guard window of the last recorded one. (Formerly #12)
         if (abs(ts - lastSitDetectedTs) < SIT_DUPLICATE_GUARD_MS) {
             return false
         }

@@ -100,7 +100,7 @@
 ## v8.8.23
 - **Architectural Synchronization (A40)**: Standardized all physics, filtering, and network thresholds in `EngineConstants.kt` to align 100% with the System Source of Truth (`REQUIREMENTS_SOT.md`).
 - **Internal Identity Unification (A46)**: Synchronized engine versioning across `Constants.kt` and `SyncManager.kt`. Updated `versionName` in `build.gradle` to "8.8.23".
-- **Dashboard Recovery Parity (Issue 19 / R923)**: Implemented instantaneous UI recovery upon telemetry receipt. The dashboard and status card now utilize the maximum of GPS and telemetry timestamps for freshness logic.
+- **Dashboard Recovery Parity (Issue 289 / R923)**: Implemented instantaneous UI recovery upon telemetry receipt. The dashboard and status card now utilize the maximum of GPS and telemetry timestamps for freshness logic.
 
 ## v8.8.22
 - **Modular Engine Hardening (Chunk 1)**: Finalized the physical isolation of the `:core:engine` as a pure JVM library. Enforced 100% dependency purity.

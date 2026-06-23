@@ -5,23 +5,10 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * v8.9.34:
+ * - Issue #266: Lux EMA Implementation. Integrated Slow/Fast variants for rising/falling light.
  * v8.9.31:
- * - Issue #22: Acoustic Floor Decay Logic. Enforced ACOUSTIC_FLOOR_MIN_DB to prevent excessive sensitivity in quiet environments.
- * v8.9.28:
- * - Issue #15: Integrated GtoEngine for Graph Trajectory Optimization. Replaced hindsightBuffer
- *   with sliding-window factor graph evaluation.
- * v8.9.27:
- * - Issue #14: Implemented rising/falling light EMA factors (LUX_EMA_UP_FAST, LUX_EMA_DOWN_FAST).
- * v8.9.23:
- * - Issue #239: Cleared hindsightBuffer upon trajectory promotion to prevent redundant point processing.
- * v8.9.22:
- * - Issue #227: Implemented optimized coordinate promotion for hindsight smoothing.
- * v8.9.19:
- * - Issue #223: Exposed currentVibrationIndex for forensic log enrichment.
- * - Issue #222: Exposed getHindsightBuffer for ghost-path visualization.
- * v8.9.18:
- * - Issue #220: Implemented Hindsight Correction (Rubber-Band Logic).
- * - Issue #219: Propagated SNR to PhysicsUtils.isVisualJump for adaptive confidence.
+ * - Issue #292: Acoustic Floor Decay Logic. Enforced ACOUSTIC_FLOOR_MIN_DB.
  */
 class LocationSentinel {
 
@@ -60,8 +47,8 @@ class LocationSentinel {
     var isSitDetected: Boolean = false
         private set
         
-    var lastSitTs: Long = 0L // Wall clock for forensic reporting
-    var lastSitRealtime: Long = 0L // Monotonic for internal cooldown logic
+    var lastSitTs: Long = 0L 
+    var lastSitRealtime: Long = 0L 
     var baselineSitTilt: Float = -1f
     
     var lastSitVz: Float = 0f
@@ -71,11 +58,11 @@ class LocationSentinel {
     var lastSitTilt: Float = 0f
     var lastSitShock: Float = 0f
 
-    private var sitDetectionCooldownTs: Long = 0L // Monotonic
-    private var stationaryStartTs: Long = 0L // Monotonic
+    private var sitDetectionCooldownTs: Long = 0L 
+    private var stationaryStartTs: Long = 0L 
 
     // Tractor-Slow state
-    private var gpsMotionStartTs: Long = 0L // Monotonic
+    private var gpsMotionStartTs: Long = 0L 
 
     // Dynamic Baselines
     var luxBaseline: Float = -1f
@@ -95,9 +82,6 @@ class LocationSentinel {
     private fun safeF(v: Float): Float = if (v.isNaN() || v.isInfinite()) 0f else v
     private fun safeD(v: Double): Double = if (v.isNaN() || v.isInfinite()) 0.0 else v
 
-    /**
-     * setSpatialAnchor: Recovers the engine's position state from persistence.
-     */
     fun setSpatialAnchor(lat: Double, lng: Double, alt: Double, timestamp: Long) {
         lastValidLat = lat; lastValidLng = lng; lastValidAlt = alt; lastValidTs = timestamp
         immFilter.update(lat, lng, 10f, timestamp) 
@@ -190,11 +174,13 @@ class LocationSentinel {
             if (!lux.isNaN()) luxBaseline = lux
         } else {
             if (!lux.isNaN()) {
-                val alpha = if (lux < luxBaseline) {
-                    SentinelValidator.accelerateAlpha(LUX_EMA_DOWN_FAST, isWarming)
+                // Issue #266: Use rising/falling EMA factors from EngineConstants
+                val baseAlpha = if (lux < luxBaseline) {
+                    if (isStationary()) LUX_EMA_DOWN_SLOW else LUX_EMA_DOWN_FAST
                 } else {
-                    SentinelValidator.accelerateAlpha(LUX_EMA_UP_FAST, isWarming)
+                    if (isStationary()) LUX_EMA_UP_SLOW else LUX_EMA_UP_FAST
                 }
+                val alpha = SentinelValidator.accelerateAlpha(baseAlpha, isWarming)
                 luxBaseline = (luxBaseline * (1f - alpha)) + (lux * alpha)
             }
         }
@@ -203,7 +189,7 @@ class LocationSentinel {
             if (!baroAlt.isNaN()) baroBaseline = baroAlt
         } else {
             if (!baroAlt.isNaN()) {
-                val alpha = SentinelValidator.accelerateAlpha(1f - BARO_EMA_SLOW, isWarming)
+                val alpha = SentinelValidator.accelerateAlpha(BARO_EMA_SLOW, isWarming)
                 baroBaseline = (baroBaseline * (1f - alpha)) + (baroAlt * alpha)
             }
         }
@@ -221,7 +207,6 @@ class LocationSentinel {
                     val alpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_UP_FAST, isWarming)
                     acousticFloorDb = (acousticFloorDb * (1f - alpha)) + (updateDb * alpha)
                 }
-                // Issue #22: Enforce hard floor minimum to prevent false triggers in silence.
                 if (acousticFloorDb < ACOUSTIC_FLOOR_MIN_DB) acousticFloorDb = ACOUSTIC_FLOOR_MIN_DB
             }
             
@@ -373,7 +358,6 @@ class LocationSentinel {
         }
 
         if (!bypassBehavioral) {
-            // Issue #15: GtoEngine Trajectory Optimization
             if (gtoEngine.evaluateTrajectory(lat, lng, bearing, currentSpeedMps, timestamp)) {
                 val promoted = mutableListOf<EngineGeoPoint>()
                 gtoEngine.getWindow().forEach { p ->
@@ -406,7 +390,7 @@ class LocationSentinel {
 
         val optimizedPoint = immFilter.update(lat, lng, accuracy, timestamp, effectiveQScale)
         updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
-        gtoEngine.clear() // Confirm current trajectory as valid, clear optimization window
+        gtoEngine.clear()
         return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = optimizedPoint, jumpConfidence = finalJumpConfidence)
     }
 

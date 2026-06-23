@@ -53,13 +53,13 @@ class IntegrityMonitor(
     var isCharging = false
         private set
 
-    // Issue #2: Battery Discharge Profiling - Now uses monotonic time (Issue 24)
+    // Issue #272: Battery Discharge Profiling - Now uses monotonic time (Issue #294). (Formerly #2 / #24)
     private val batterySamples = ConcurrentLinkedQueue<Pair<Long, Int>>()
     private var lastBatteryCheckTs = 0L
     var isBatterySteepDischarge = false
         private set
 
-    // Issue #3: Thermal Throttling
+    // Issue #273: Thermal Throttling (Formerly #3)
     var isCoolingModeActive = false
         private set
 
@@ -74,7 +74,7 @@ class IntegrityMonitor(
     }
 
     /**
-     * pollSystemStatus: Updated to take both wall and monotonic time (Issue 24).
+     * pollSystemStatus: Updated to take both wall and monotonic time (Issue #294). (Formerly #24)
      */
     fun pollSystemStatus(nowWall: Long, nowRealtime: Long) {
         val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
@@ -86,7 +86,7 @@ class IntegrityMonitor(
                 repository.saveFloatSync(MainRepository.MAX_TEMP_KEY, maxTemperature)
             }
 
-            // Issue #3: Thermal Throttling Logic
+            // Issue #273: Thermal Throttling Logic (Formerly #3)
             if (!isCoolingModeActive && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
                 isCoolingModeActive = true
                 onLogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true)
@@ -268,7 +268,7 @@ class IntegrityMonitor(
 
     /**
      * checkViolationSustained: Returns true if the violation has persisted beyond the threshold.
-     * Forensic event handling is centralized in BaseMonitorService (Issue #12).
+     * Forensic event handling is centralized in BaseMonitorService (Issue #282). (Formerly #12)
      * v8.8.21: Now uses TimeProvider for high-assurance duration checks.
      */
     fun checkViolationSustained(type: String, startTs: Long, threshold: Long): Boolean {

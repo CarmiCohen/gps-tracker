@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.onEach
  * v8.8.4:
  * - Issue 38: Implemented UiCommand.StopSiren observer to auto-dismiss activity when silenced.
  * v8.8.28:
- * - Issue 18: Wired Xiaomi manual override status and callback to AlarmOverlay.
+ * - Issue 288: Wired Xiaomi manual override status and callback to AlarmOverlay. (Formerly #18)
  * v6.199:
  * - Lifecycle: Updated to use collectAsStateWithLifecycle() for UI state collection.
  * v5.607:
