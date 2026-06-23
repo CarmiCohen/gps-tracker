@@ -5,6 +5,11 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * v8.9.31:
+ * - Issue #22: Acoustic Floor Decay Logic. Enforced ACOUSTIC_FLOOR_MIN_DB to prevent excessive sensitivity in quiet environments.
+ * v8.9.28:
+ * - Issue #15: Integrated GtoEngine for Graph Trajectory Optimization. Replaced hindsightBuffer
+ *   with sliding-window factor graph evaluation.
  * v8.9.27:
  * - Issue #14: Implemented rising/falling light EMA factors (LUX_EMA_UP_FAST, LUX_EMA_DOWN_FAST).
  * v8.9.23:
@@ -21,6 +26,7 @@ import kotlin.math.*
 class LocationSentinel {
 
     private val immFilter = ImmFilter()
+    private val gtoEngine = GtoEngine()
 
     private var prevValidLat: Double = 0.0
     private var prevValidLng: Double = 0.0
@@ -31,8 +37,6 @@ class LocationSentinel {
     private var lastValidTs: Long = 0L
     private var lastValidSpeedMps: Double = 0.0
     private var lastValidBearing: Float = 0.0f
-
-    private val hindsightBuffer = mutableListOf<RejectedPoint>()
 
     internal var currentVibrationIndex: Float = 0f
     var peakVibrationShock: Float = 0f
@@ -209,7 +213,7 @@ class LocationSentinel {
             
             if (updateDb >= 0.0 && !updateDb.isNaN()) {
                 if (acousticFloorDb < 0) {
-                    acousticFloorDb = updateDb
+                    acousticFloorDb = max(updateDb, ACOUSTIC_FLOOR_MIN_DB)
                 } else if (updateDb < acousticFloorDb) {
                     val alpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_DOWN_FAST, isWarming)
                     acousticFloorDb = (acousticFloorDb * (1f - alpha)) + (updateDb * alpha) 
@@ -217,15 +221,17 @@ class LocationSentinel {
                     val alpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_UP_FAST, isWarming)
                     acousticFloorDb = (acousticFloorDb * (1f - alpha)) + (updateDb * alpha)
                 }
+                // Issue #22: Enforce hard floor minimum to prevent false triggers in silence.
+                if (acousticFloorDb < ACOUSTIC_FLOOR_MIN_DB) acousticFloorDb = ACOUSTIC_FLOOR_MIN_DB
             }
             
             val contractionElapsed = nowRealtime - lastAcousticContractionRealtime
             if (contractionElapsed >= 500 || lastAcousticContractionRealtime == 0L) {
-                if (acousticFloorDb > 10.0 && lastAcousticContractionRealtime > 0) {
+                if (acousticFloorDb > ACOUSTIC_FLOOR_MIN_DB && lastAcousticContractionRealtime > 0) {
                     val secondsPassed = contractionElapsed / 1000.0
                     if (secondsPassed > 0) {
                         val decayFactor = Math.pow(ACOUSTIC_FLOOR_CONTRACTION_EMA.toDouble(), secondsPassed)
-                        acousticFloorDb *= decayFactor
+                        acousticFloorDb = max(acousticFloorDb * decayFactor, ACOUSTIC_FLOOR_MIN_DB)
                     }
                 }
                 lastAcousticContractionRealtime = nowRealtime
@@ -255,7 +261,9 @@ class LocationSentinel {
     fun getEstimatedBearing(): Float = immFilter.getEstimatedBearing()
     fun getStationaryProbability(): Double = immFilter.getStationaryProbability()
 
-    fun getHindsightBuffer(): List<RejectedPoint> = hindsightBuffer.toList()
+    fun getHindsightBuffer(): List<RejectedPoint> = gtoEngine.getWindow().map {
+        RejectedPoint(it.lat, it.lng, it.alt, it.accuracy, it.bearing, it.speedMps, it.ts)
+    }
 
     fun processLocation(
         lat: Double, lng: Double, alt: Double, accuracy: Float, bearing: Float,
@@ -271,7 +279,7 @@ class LocationSentinel {
         this.lastSatsUsed = satsUsed
 
         if (acousticFloorDb >= 0.0) {
-            this.acousticFloorDb = acousticFloorDb
+            this.acousticFloorDb = max(acousticFloorDb, ACOUSTIC_FLOOR_MIN_DB)
         }
         
         if (lastValidTs == 0L) {
@@ -365,26 +373,22 @@ class LocationSentinel {
         }
 
         if (!bypassBehavioral) {
-            // Issue #220: Hindsight Correction (Rubber-Band Logic)
-            if (hindsightBuffer.isNotEmpty()) {
-                val lastRejected = hindsightBuffer.last()
-                if (isConsistentWithHindsight(lat, lng, bearing, currentSpeedMps, timestamp, lastRejected)) {
-                    val promoted = mutableListOf<EngineGeoPoint>()
-                    // "Reel in" the rubber band: process buffered points sequentially
-                    hindsightBuffer.forEach { p ->
-                        val opt = immFilter.update(p.lat, p.lng, p.accuracy, p.ts, SUSPICIOUS_Q_SCALE)
-                        promoted.add(opt)
-                        updateLastValid(p.lat, p.lng, p.alt, p.ts, p.speedMps, p.bearing)
-                    }
-                    hindsightBuffer.clear() // Issue #239: Clear buffer after promotion
-                    val optimized = immFilter.update(lat, lng, accuracy, timestamp, SUSPICIOUS_Q_SCALE)
-                    updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
-                    return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted (Hindsight)", optimized, finalJumpConfidence, promotedPoints = promoted)
+            // Issue #15: GtoEngine Trajectory Optimization
+            if (gtoEngine.evaluateTrajectory(lat, lng, bearing, currentSpeedMps, timestamp)) {
+                val promoted = mutableListOf<EngineGeoPoint>()
+                gtoEngine.getWindow().forEach { p ->
+                    val opt = immFilter.update(p.lat, p.lng, p.accuracy, p.ts, SUSPICIOUS_Q_SCALE)
+                    promoted.add(opt)
+                    updateLastValid(p.lat, p.lng, p.alt, p.ts, p.speedMps, p.bearing)
                 }
+                gtoEngine.clear()
+                val optimized = immFilter.update(lat, lng, accuracy, timestamp, SUSPICIOUS_Q_SCALE)
+                updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
+                return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted (GTO)", optimized, finalJumpConfidence, promotedPoints = promoted)
             }
 
             if (behavioralStatus == SentinelStatus.JUMP || behavioralStatus == SentinelStatus.JITTER) {
-                storeRejected(lat, lng, alt, accuracy, bearing, currentSpeedMps, timestamp)
+                gtoEngine.addPoint(lat, lng, alt, accuracy, bearing, currentSpeedMps, timestamp, currentVibrationIndex)
                 return SentinelResult(behavioralStatus, finalJumpConfidence.reason, jumpConfidence = finalJumpConfidence)
             }
 
@@ -402,20 +406,8 @@ class LocationSentinel {
 
         val optimizedPoint = immFilter.update(lat, lng, accuracy, timestamp, effectiveQScale)
         updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
-        clearRejected() // Confirm current trajectory as valid, clear potential jumps
+        gtoEngine.clear() // Confirm current trajectory as valid, clear optimization window
         return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = optimizedPoint, jumpConfidence = finalJumpConfidence)
-    }
-
-    private fun isConsistentWithHindsight(newLat: Double, newLng: Double, newBearing: Float, newSpeedMps: Double, timestamp: Long, lastRejected: RejectedPoint): Boolean {
-        val angleDiff = abs(newBearing - lastRejected.bearing).let { if (it > 180) 360 - it else it }
-        val distFromRejected = PhysicsUtils.calculateDistance(lastRejected.lat, lastRejected.lng, newLat, newLng)
-        val timeFromRejected = (timestamp - lastRejected.ts) / 1000.0
-        val impliedSpeed = distFromRejected / max(0.1, timeFromRejected)
-        
-        // Check temporal validity
-        if (timestamp <= lastRejected.ts || (timestamp - lastRejected.ts) > HINDSIGHT_MAX_AGE_MS) return false
-        
-        return angleDiff < PROMOTION_ANGLE_TOLERANCE && abs(impliedSpeed - lastRejected.speedMps) < 10.0
     }
 
     private fun runSensorSentinel(
@@ -476,21 +468,6 @@ class LocationSentinel {
         lastValidSpeedMps = speedMps; lastValidBearing = bearing
     }
 
-    private fun storeRejected(lat: Double, lng: Double, alt: Double, accuracy: Float, bearing: Float, speedMps: Double, ts: Long) {
-        // Prune old points
-        val now = ts
-        hindsightBuffer.removeAll { (now - it.ts) > HINDSIGHT_MAX_AGE_MS }
-        
-        if (hindsightBuffer.size >= HINDSIGHT_BUFFER_SIZE) {
-            hindsightBuffer.removeAt(0)
-        }
-        hindsightBuffer.add(RejectedPoint(lat, lng, alt, accuracy, bearing, speedMps, ts))
-    }
-
-    private fun clearRejected() { 
-        hindsightBuffer.clear() 
-    }
-
     fun reset() {
         lastValidTs = 0L; currentVibrationIndex = 0f; currentBaroAlt = 0f; prevValidLat = 0.0; prevValidLng = 0.0
         currentLux = 0f; isNear = true; isPowerTamper = false; currentTiltDegrees = 0f
@@ -501,7 +478,7 @@ class LocationSentinel {
         lastSitVz = 0f; lastSitVzTs = 0L; lastSitDz = 0f; lastSitBaro = 0f; lastSitTilt = 0f; lastSitShock = 0f
         gpsMotionStartTs = 0L
         lastFastPathAcousticSpikeTs = 0L
-        hindsightBuffer.clear()
+        gtoEngine.clear()
         immFilter.reset()
     }
 }

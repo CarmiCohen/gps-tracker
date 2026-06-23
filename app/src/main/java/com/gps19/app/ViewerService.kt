@@ -18,6 +18,10 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.30:
+ * - Issue #26: Explicitly initialized serviceStartRealtime in onCreate after engine initialization.
+ * v8.9.29:
+ * - Issue #23: Fixed Geofence evaluation bug; now using trackerDistToHome exclusively for Tracker geofence alarms.
  * v8.9.28:
  * - Issue #9: Hardened foreground updates with try-catch for Android 14+ resilience.
  * v8.9.27:
@@ -179,6 +183,9 @@ class ViewerService : BaseMonitorService() {
             lastServiceTickRealtime = timeProvider.elapsedRealtime()
             locationProcessor.setLastValidFixTs(timeProvider.elapsedRealtime())
             
+            // Issue #26: Ensure bootstrap starts from actual engine online point
+            serviceStartRealtime = timeProvider.elapsedRealtime()
+
             startTickLoop()
             logManager.logServiceEvent("Viewer Engine Online", important = true)
         }
@@ -401,7 +408,7 @@ class ViewerService : BaseMonitorService() {
                 isHardwareOnline = true, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
                 isJammerSuspicion = isTrackerJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled,
                 isUiVisible = isUiVisible(), 
-                distToHomeAuthority = maxOf(distToTracker, remoteHandler.trackerDistToHome ?: 0.0),
+                distToHomeAuthority = remoteHandler.trackerDistToHome ?: 0.0,
                 maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(),
                 isGpsGap = isTrackerGap,
                 isSuspicious = remoteHandler.isTrackerSuspicious, isTamperDetected = remoteHandler.isTrackerTamperDetected,

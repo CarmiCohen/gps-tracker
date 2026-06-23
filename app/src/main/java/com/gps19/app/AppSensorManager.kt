@@ -25,6 +25,9 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU and Environmental sensors.
+ * v8.9.32:
+ * - Issue #25: Redundant Barometric Baselining. Exposing absoluteAltitude to allow 
+ *   LocationSentinel to handle primary baselining.
  * v8.9.21:
  * - Issue #224: Added tilt to SensorSnapshot for forensic ribbon expansion.
  * v8.9.7:
@@ -123,6 +126,17 @@ class AppSensorManager @Inject constructor(
     var currentPressure: Float = 0f
         private set
 
+    /**
+     * absoluteAltitude: Raw barometric altitude relative to standard atmosphere (1013.25 hPa).
+     * Used as the primary input for LocationSentinel to avoid double-baselining.
+     */
+    var absoluteAltitude: Float = 0f
+        private set
+
+    /**
+     * relativeAltitude: Filtered altitude relative to a local moving baseline.
+     * Used for UI visualization and internal snapshot reporting.
+     */
     var relativeAltitude: Float = 0f
         private set
 
@@ -644,7 +658,11 @@ class AppSensorManager @Inject constructor(
 
         val currentAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure)
         val baselineAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure)
+        
+        // Issue #25: Expose absolute altitude for the engine, while keeping relative for UI/Snapshots.
+        absoluteAltitude = currentAlt
         relativeAltitude = if (isWarming) 0f else currentAlt - baselineAlt
+        
         if (abs(relativeAltitude) > secPeakLift) secPeakLift = abs(relativeAltitude)
     }
 
@@ -686,6 +704,7 @@ class AppSensorManager @Inject constructor(
     fun resetBaseline() {
         emaPressure = currentPressure
         relativeAltitude = 0f
+        absoluteAltitude = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure)
         hasInitialRotation = false
         stationaryStartTs = 0L
         currentVerticalVelocity = 0f

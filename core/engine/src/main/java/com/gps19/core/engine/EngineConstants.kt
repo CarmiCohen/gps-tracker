@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.31:
+ * - Issue #22: Added ACOUSTIC_FLOOR_MIN_DB (25.0) to prevent false triggers in silent environments.
  * v8.9.26:
  * - Issue #2: Synchronized version to v8.9.26 baseline.
  * - Issue #3: Use code precision for LAT_DEG_TO_METERS (111194.92664455874).
@@ -91,6 +93,7 @@ const val SCATTER_ANGLE_THRESHOLD = 120.0
 const val ACOUSTIC_THRESHOLD_DB_JUMP = 40.0 
 const val ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP = 20.0
 const val ACOUSTIC_MIN_THRESHOLD_DB = 50.0
+const val ACOUSTIC_FLOOR_MIN_DB = 25.0
 const val ACOUSTIC_FLOOR_CONTRACTION_EMA = 0.995f
 const val ACOUSTIC_LOCKOUT_MS = 1000L
 const val ACOUSTIC_RECOVERY_DELAY_MS = 30000L

@@ -101,6 +101,7 @@ class LocationProcessor(
         tiltDegrees: Float = 0f, acousticDb: Double = 0.0, peakShock: Float = 0f,
         acousticMinDb: Double = -1.0, peakVerticalVelocity: Float = 0f,
         plungeMatched: Boolean = false, peakVerticalVelocityTs: Long = 0L, 
+        peakVerticalDisplacement: Float = 0f,
         isSirenActive: Boolean = false, isWarming: Boolean = false,
         manualAdaptiveFloor: Float = -1f, acousticLockoutTs: Long = 0L,
         isMuzzled: Boolean = false,
@@ -109,7 +110,7 @@ class LocationProcessor(
     ): Boolean { 
         val baselineChanged = sentinel.updateSensorState(
             vibration, heading, baroAlt, lux, isNear, powerTamper, tiltDegrees, 
-            acousticDb, peakShock, acousticMinDb, peakVerticalVelocity, peakVerticalVelocityTs, plungeMatched, 0f,
+            acousticDb, peakShock, acousticMinDb, peakVerticalVelocity, peakVerticalVelocityTs, plungeMatched, peakVerticalDisplacement,
             isSirenActive, isWarming, manualAdaptiveFloor, acousticLockoutTs, isMuzzled, nowRealtime, nowWall
         )
         if (baselineChanged) {
