@@ -1,51 +1,31 @@
-# Handover: Issue Renumbering Completion (Offset +270)
+# Handover: Phase Hardening & Engine Unification
 
 ## 📌 Status Summary
-The renumbering of "New Phase" issues (originally #1–#31) to the #271–#300 range (Offset +270) is now **complete**. All active code references, proto definitions, and documentation have been synchronized. Historical references have been preserved using the `(Formerly #X)` notation where appropriate.
+The hardening phase continues with the resolution of technical debt and the unification of engine constants. Issue #304 (Tier 3 Jump Floor Contradiction) has been resolved, aligning the Jump Engine with formal specifications.
 
-## 🛠 Actions Taken
-1.  **Code Synchronization**: Updated `AppSettingsMigration.kt`, `AlarmActivity.kt`, and `TelemetryAggregator.kt` with new issue numbers.
-2.  **Schema Alignment**: Updated `app/src/main/proto/app_settings.proto` and `app/src/proto/app_settings.proto` to reflect new issue IDs for battery and network logic.
-3.  **Documentation Update**:
-    *   `Issues.md`: Synchronized the **Resolved** section with the new numbering and updated the dashboard count.
-    *   `DOCS/REQUIREMENTS_SOT.md`: Verified that issues #12 and #14 were correctly updated to #282 and #284.
-4.  **Forensic Preservation**: Added `(Formerly #X)` to renumbered items to maintain traceability to the original "New Phase" design notes.
+## 🛠 Recent Actions
+1.  **Issue #304 Fix (Tier 3 Jump Floor Contradiction)**:
+    *   Updated `PhysicsUtils.kt` and `LocationSentinel.kt` to use `JUMP_GATE_VISUAL_JITTER_METERS` (10.0m) instead of `JUMP_CHECK_MIN_DIST` (5.0m) for Tier 3 "Visual Jitter" classification.
+    *   This ensures that the "Alert Floor" for jitter is 10 meters as per the Source of Truth, while the 5 meter "Physics Floor" remains for absolute noise rejection.
+2.  **Issue #302 Fix (Behavioral Magic Numbers)**:
+    *   Moved `SUSTAINED_SPEED_THRESHOLD`, `SUSTAINED_SPEED_STATIONARY_THRESHOLD`, `STATE_CONFIDENCE_BUFFER_MS`, and `PARKING_CONFIDENCE_BUFFER_MS` from `TrackerStateManager.kt` to `EngineConstants.kt`.
+    *   Added `HIGH_SPEED_PROMOTION_THRESHOLD` (5.0f) to `EngineConstants.kt`.
+3.  **Issue #303 Fix (Trajectory Gating Multiplier)**:
+    *   Defined `TRAJECTORY_REJECTION_ACCURACY_MULT` (3.0f) in `EngineConstants.kt`.
+    *   Updated `LocationProcessor.kt` to use the new constant.
+4.  **Issue #301 Fix (Vibration Threshold)**:
+    *   Unified vibration threshold in `TrackerStateManager.kt` using `VIBRATION_STATIONARY_THRESHOLD` (0.12g).
 
-## 🗺 Mapping Reference (Offset +270)
-| Original ID | New ID | Description |
-| :--- | :--- | :--- |
-| Issue #1 | **#271** | Uptime / Sit Metadata Persistence |
-| Issue #2 | **#272** | Battery Profile / Discharge |
-| Issue #3 | **#273** | Network Signaling Integrity |
-| Issue #6 | **#276** | Xiaomi Documentation / Gating |
-| Issue #9 | **#279** | FGS Resilience |
-| Issue #11 | **#281** | SoT Naming Alignment |
-| Issue #12 | **#282** | SIT Duplicate Guard |
-| Issue #14 | **#284** | Light EMA Logic |
-| Issue #15 | **#285** | GtoEngine Implementation |
-| Issue #16 | **#286** | Hardcoded EMA Cleanup |
-| Issue #17 | **#287** | Role-Aware Titles |
-| Issue #18 | **#288** | Vertical Displacement / Xiaomi Override |
-| Issue #19 | **#289** | Revival Flag Cleanup |
-| Issue #21 | **#291** | SIT Duplicate Risk |
-| Issue #22 | **#292** | Acoustic Floor Decay |
-| Issue #23 | **#293** | Geofence Viewer Logic |
-| Issue #24 | **#294** | Viewer Offline Detection |
-| Issue #25 | **#295** | Barometric Baselining |
-| Issue #26 | **#296** | Bootstrap Point Initialization |
-| Issue #27 | **#297** | Hindsight Coverage Tests |
+## 📂 Files Updated
+- `core/engine/src/main/java/com/gps19/core/engine/PhysicsUtils.kt`
+- `core/engine/src/main/java/com/gps19/core/engine/LocationSentinel.kt`
+- `core/engine/src/main/java/com/gps19/core/engine/EngineConstants.kt`
+- `app/src/main/java/com/gps19/app/TrackerStateManager.kt`
+- `core/engine/src/main/java/com/gps19/core/engine/LocationProcessor.kt`
+- `issues.md`
 
-## 📂 Files Verified/Updated
-- `app/src/main/java/com/gps19/app/AppSettingsMigration.kt`
-- `app/src/main/java/com/gps19/app/AlarmActivity.kt`
-- `core/engine/src/main/java/com/gps19/core/engine/TelemetryAggregator.kt`
-- `app/src/main/proto/app_settings.proto`
-- `app/src/proto/app_settings.proto`
-- `Issues.md`
-- `DOCS/REQUIREMENTS_SOT.md`
-- `COMPLIANCE.md` (Already updated in previous steps)
+## 🔍 Verification Needed
+- **Rebuild**: Ensure the project compiles successfully after the logic update.
+- **Functional Check**: Verify that "Visual Jitter" (Tier 3) alerts are only triggered for movements $\ge$ 10m.
 
-## 🔍 Verification
-A project-wide grep for `Issue #([1-9]|[12][0-9]|3[01])\b` (excluding "Formerly #" and Handover notes) returns zero hits in the production source and core documentation.
-
-**Status**: ✅ **Ready for next phase.**
+**Status**: 🟢 **Issue #304 Resolved.**

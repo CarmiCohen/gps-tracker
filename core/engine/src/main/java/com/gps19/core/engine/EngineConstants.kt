@@ -3,6 +3,8 @@ package com.gps19.core.engine
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
  * v8.9.34:
+ * - Issue #302: Centralized Behavioral Magic Numbers from TrackerStateManager.
+ * - Issue #303: Unified Trajectory Rejection multiplier.
  * - Issue #263: Corrected inverted EMA constant weights (Slow factors now < Fast factors).
  * - Issue #264: Consolidated GtoEngine magic numbers (Speed thresholds).
  * v8.9.31:
@@ -122,6 +124,14 @@ const val SIT_DUPLICATE_GUARD_MS = 15000L
 const val SUSPICIOUS_Q_SCALE = 1000.0
 const val TRAJECTORY_PROMOTION_WINDOW_MS = 30000L 
 const val HIGH_ACCURACY_THRESHOLD_METERS = 35.0f
+
+/**
+ * Multiplier applied to [HIGH_ACCURACY_THRESHOLD_METERS] to determine the floor 
+ * for trajectory-based outlier rejection.
+ * Used in [LocationProcessor] to reject low-accuracy points following high-accuracy fixes.
+ */
+const val TRAJECTORY_REJECTION_ACCURACY_MULT = 3.0f
+
 const val ACCURACY_WINDOW_BUCKET_MS = 60000L
 const val ACCURACY_WINDOW_MAX_SIZE = 4
 const val GEOFENCE_ACCURACY_HYSTERESIS_MULT = 1.10f
@@ -191,6 +201,13 @@ const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 60000L
 const val PARKING_ANCHOR_MIN_DIST = 20.0
 const val PARKING_ANCHOR_FACTOR = 0.8
+
+// Behavioral State Thresholds (Issue #302)
+const val SUSTAINED_SPEED_THRESHOLD = 2 
+const val SUSTAINED_SPEED_STATIONARY_THRESHOLD = 4
+const val STATE_CONFIDENCE_BUFFER_MS = 2000L
+const val PARKING_CONFIDENCE_BUFFER_MS = 5000L
+const val HIGH_SPEED_PROMOTION_THRESHOLD = 5.0f
 
 // Throttling Limits
 const val THROTTLE_LUX_LIMIT = 50f

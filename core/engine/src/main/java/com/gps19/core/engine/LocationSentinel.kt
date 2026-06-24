@@ -6,6 +6,7 @@ import kotlin.math.*
 /**
  * LocationSentinel: A multi-layered location validation engine.
  * v8.9.34:
+ * - Issue #304: Corrected Tier 3 Jump Floor. Now uses JUMP_GATE_VISUAL_JITTER_METERS (10.0m).
  * - Issue #266: Lux EMA Implementation. Integrated Slow/Fast variants for rising/falling light.
  * v8.9.31:
  * - Issue #292: Acoustic Floor Decay Logic. Enforced ACOUSTIC_FLOOR_MIN_DB.
@@ -327,7 +328,7 @@ class LocationSentinel {
         val currentSpeedMps = dist / max(0.1, timeDeltaSec)
         
         val isTier2 = dist >= JUMP_POINT_DISTANCE_THRESHOLD && (currentSpeedMps > MAX_PHYSICAL_SPEED_MPS || augmentedScore >= 40)
-        val isTier3 = dist >= JUMP_CHECK_MIN_DIST && dist < JUMP_POINT_DISTANCE_THRESHOLD && augmentedScore >= 30
+        val isTier3 = dist >= JUMP_GATE_VISUAL_JITTER_METERS && dist < JUMP_POINT_DISTANCE_THRESHOLD && augmentedScore >= 30
         
         val finalTier = when {
             jumpConfidence.tier == 1 -> 1

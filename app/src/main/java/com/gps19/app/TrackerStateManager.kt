@@ -5,6 +5,9 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerStateManager: Logic for mapping raw telemetry to high-level behavioral states.
+ * v8.9.34:
+ * - Issue #302: Centralized Behavioral Magic Numbers to EngineConstants.
+ * - Issue #301: Unified vibration threshold with EngineConstants (0.12g).
  * v8.7.5:
  * - Constant Centralization: Inheriting core thresholds from :core:engine.
  */
@@ -15,11 +18,6 @@ object TrackerStateManager {
     private var lastMovingTs = 0L
     
     private var sustainedSpeedCount = 0
-    private const val SUSTAINED_SPEED_THRESHOLD = 2 // pulses of >2m/s
-    private const val SUSTAINED_SPEED_STATIONARY_THRESHOLD = 4 // pulses if no vibration
-
-    private const val STATE_CONFIDENCE_BUFFER_MS = 2000L
-    private const val PARKING_CONFIDENCE_BUFFER_MS = 5000L // Harder gate for Parking
 
     fun updateState(
         isVisualJump: Boolean,
@@ -46,7 +44,8 @@ object TrackerStateManager {
             sustainedSpeedCount = 0
         }
 
-        val isPhysicalMoving = vibration > (vibrationFloor * 2.0f) && vibration > 0.15f
+        // Issue #301: Use unified constants from EngineConstants
+        val isPhysicalMoving = vibration > (vibrationFloor * STATIONARY_FLOOR_MULT) && vibration > VIBRATION_STATIONARY_THRESHOLD
         
         // R880: Require more evidence to exit PARKING if not physically moving
         val requiredSustainedCount = if (currentState == TrackerState.PARKING && !isPhysicalMoving) {
@@ -55,7 +54,8 @@ object TrackerStateManager {
             SUSTAINED_SPEED_THRESHOLD
         }
 
-        val isSpeedConfirmed = (sustainedSpeedCount >= requiredSustainedCount) || (speed > 5.0f) || isTrajectoryPromoted
+        // Issue #302: Unified high speed promotion threshold
+        val isSpeedConfirmed = (sustainedSpeedCount >= requiredSustainedCount) || (speed > HIGH_SPEED_PROMOTION_THRESHOLD) || isTrajectoryPromoted
         
         // Confirmation: Must have sustained speed OR speed confirmed by vibration
         val isMovingNow = isSpeedConfirmed || (hasSpeed && isPhysicalMoving)
@@ -73,6 +73,7 @@ object TrackerStateManager {
         }
 
         // 3. Apply Confidence Buffer (Hysteresis)
+        // Issue #302: Centralized confidence buffers
         val requiredBuffer = if (targetState == TrackerState.PARKING) PARKING_CONFIDENCE_BUFFER_MS else STATE_CONFIDENCE_BUFFER_MS
 
         if (targetState == currentState || targetState == TrackerState.JUMPING) {

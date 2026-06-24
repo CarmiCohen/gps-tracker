@@ -4,6 +4,8 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: Unified physics and geodesic calculations for the Pure Logic Engine.
+ * v8.9.34:
+ * - Issue #304: Corrected Tier 3 Jump Floor. Now uses JUMP_GATE_VISUAL_JITTER_METERS (10.0m).
  * v8.9.18:
  * - Issue #219: Enhanced isVisualJump with SNR-based adaptive confidence. Detects spoofing/reflection 
  *   signatures (High SNR + Zero Vibration).
@@ -111,7 +113,7 @@ object PhysicsUtils {
         if (speedMps > JUMP_GATE_SPEED_ACCURACY_HIGH_MPS && accuracy > JUMP_GATE_ACCURACY_HIGH_THRESHOLD) score += JUMP_WEIGHT_ACCURACY_HIGH
         
         val isTier2 = dist >= JUMP_POINT_DISTANCE_THRESHOLD && (speedMps > MAX_PHYSICAL_SPEED_MPS || score >= 40)
-        val isTier3 = dist >= JUMP_CHECK_MIN_DIST && dist < JUMP_POINT_DISTANCE_THRESHOLD && score >= 30
+        val isTier3 = dist >= JUMP_GATE_VISUAL_JITTER_METERS && dist < JUMP_POINT_DISTANCE_THRESHOLD && score >= 30
         
         val isJump = isTier2 || isTier3 || score >= 50
         

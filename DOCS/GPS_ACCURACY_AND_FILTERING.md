@@ -4,7 +4,7 @@ This document describes the multi-stage filtering pipeline used to ensure high-f
 
 ## 1. The Filtering Pipeline
 1.  **Monotonic Guard**: Rejects updates with backward-moving hardware timestamps (`CLOCK_REGRESSION_GATE_MS` 100ms).
-2.  **Accuracy Gate**: Ignores fixes with accuracy > 3x the recent high-accuracy average (`HIGH_ACCURACY_THRESHOLD_METERS` 35m).
+2.  **Accuracy Gate**: Ignores fixes with accuracy > `TRAJECTORY_REJECTION_ACCURACY_MULT` (3x) the recent high-accuracy average (`HIGH_ACCURACY_THRESHOLD_METERS` 35m).
 3.  **ImmFilter (Interacting Multiple Model)**: 
     - **Stationary Model**: Aggressive smoothing for engine-idle/parking states.
     - **Kinematic Model**: High-responsiveness for active movement.

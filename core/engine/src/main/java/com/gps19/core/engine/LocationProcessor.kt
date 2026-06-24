@@ -5,6 +5,7 @@ import kotlin.math.*
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
  * v8.9.34:
+ * - Issue #303: Unified Trajectory Rejection multiplier.
  * - Issue #268: Removed redundant providedAcousticFloorDb from processGpsPoint.
  * v8.9.22:
  * - Issue #227: Implemented hindsight transition smoothing.
@@ -203,7 +204,7 @@ class LocationProcessor(
             return ProcessedLocation(rawPoint = fallbackCoordPoint, optimizedPoint = fallbackCoordPoint, status = status, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedKph(), timestamp = effectiveTs, isStalled = providedIsStalled, isClockRegression = true, receiptRealtime = nowRealtime, isTrajectoryPromoted = providedIsTrajectoryPromoted, jumpTier = providedJumpTier, isAdaptiveJump = providedIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = true, tamperDetected = providedIsTamper, jammerDetected = providedIsJammer)
         }
 
-        if (accuracy > HIGH_ACCURACY_THRESHOLD_METERS * 3 && lastHighAccTs > 0 && nowWall - lastHighAccTs < TRAJECTORY_PROMOTION_WINDOW_MS) {
+        if (accuracy > HIGH_ACCURACY_THRESHOLD_METERS * TRAJECTORY_REJECTION_ACCURACY_MULT && lastHighAccTs > 0 && nowWall - lastHighAccTs < TRAJECTORY_PROMOTION_WINDOW_MS) {
             if (PhysicsUtils.calculateDistance(lat, lng, lastHighAccLat, lastHighAccLng) > accuracy) {
                 val fallbackCoordPoint = EngineGeoPoint(if (lastLat != 0.0) lastLat else lat, if (lastLng != 0.0) lastLng else lng)
                 return ProcessedLocation(rawPoint = EngineGeoPoint(lat, lng), optimizedPoint = fallbackCoordPoint, status = SentinelStatus.VALID, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedKph(), timestamp = effectiveTs, isStalled = if (isLocal) false else providedIsStalled, receiptRealtime = nowRealtime, jumpTier = providedJumpTier, isAdaptiveJump = providedIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = false, tamperDetected = providedIsTamper, jammerDetected = providedIsJammer)
