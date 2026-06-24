@@ -6,13 +6,13 @@ This project is a **Pure Native Android Application** built with Kotlin and Jetp
 
 ## ⚖️ Project Governance & Documentation Standard
 To maintain **Forensic Integrity**, we follow a strict documentation lifecycle:
-- **Active Tracker**: [issues.md](issues.md) — Only open issues and pending hardening tasks.
-- **Audit Archive**: [COMPLIANCE.md](COMPLIANCE.md) — Verified resolutions and compliance proof.
-- **Engineering Standard**: [CONTRIBUTING.md](CONTRIBUTING.md) — Rules for moving tasks between documents.
-- **Source of Truth**: [DOCS/REQUIREMENTS_SOT.md](DOCS/REQUIREMENTS_SOT.md) — Operational specifications.
+- **Active Tracker**: [STATUS/issues.md](STATUS/issues.md) — Only open issues and pending hardening tasks.
+- **Audit Archive**: [STATUS/compliance.md](STATUS/compliance.md) — Verified resolutions and compliance proof.
+- **Engineering Standard**: [DOCS/CONTRIBUTING.md](DOCS/CONTRIBUTING.md) — Rules for moving tasks between documents.
+- **Source of Truth**: [STATUS/requirements_sot.md](STATUS/requirements_sot.md) — Operational specifications.
 
 ## Recent Changes (v8.9.27)
-- **Documentation Reorganization**: Unified all legacy history files into `COMPLIANCE.md`.
+- **Documentation Reorganization**: Unified all legacy history files into `STATUS/compliance.md`.
 - **Engineering Rule Enforcement**: Established the 3-tier documentation system to support forensic continuity.
 - **Log Spatial Anchor (Issue #208)**: Implemented coordinate-aware forensic logging.
 

@@ -1,8 +1,8 @@
-# GPS Tracker: Technical Overview (v8.9.27)
+# GPS Tracker: Technical Overview (v8.9.37)
 
 GPS Tracker is a high-assurance, native Android application designed for asset protection and remote monitoring. Unlike consumer-grade tracking apps, it prioritizes **forensic continuity**, **high availability**, and **physical security** over simple location sharing.
 
-## 1. Core Architecture (v8.9.27 Baseline)
+## 1. Core Architecture (v8.9.37 Baseline)
 The application follows a strict modular architecture to ensure logic integrity and prevent side-effect regressions.
 -   **Sacred Engine (:core:engine)**: A pure JVM library module containing all tracking math, jump detection, and physical security logic. It is physically isolated from the Android framework and uses injected `TimeProvider` for all logic.
 -   **Tracker Service**: The specialized "Black Box" role. Optimizes battery, sensor fidelity, and persistent logging. Features a 10Hz polling mode, **Escalated GPS Revival** (Issue 124), and **Muzzle Window Hardening** (Issue 191).
@@ -24,11 +24,11 @@ The Physical Sentinel is a zero-lag monitoring engine that detects unauthorized 
 ### C. Geofencing (GtoEngine)
 The **GtoEngine** logic provides a high-confidence geofence gate. It uses a 6-sigma buffer (`GEOFENCE_BUFFER_MULT`) to prevent false alarms from low-accuracy coordinates while providing sub-second projection of fence breaches.
 
-## 3. Forensic Telemetry (v8.9.27 Enhancements)
+## 3. Forensic Telemetry (v8.9.37 Enhancements)
 The system is built around "Forensic Continuity." Data is never simply "current"; it is always presented within its historical context via:
 -   **Log Spatial Anchor (v8.9.10)**: All forensic logs and critical alerts are automatically anchored with `lat`/`lng` coordinates using the last known telemetry position. This enables historical marker reconstruction on the Map even for events that occurred during relay blackouts.
 -   **Monotonic Timing**: All forensic metrics and UI lockout thresholds use `TimeProvider.elapsedRealtime()` to ensure absolute accuracy and eliminate drift.
--   **High-Availability Revival**: If the GPS hardware stalls, the system attempts a retry loop every 120s (`GPS_REVIVAL_RETRY_INTERVAL_MS`) and escalates to a **CRITICAL forensic alert** after 3 failed attempts.
+-   **High-Availability Revival**: If the GPS hardware stalls, the system attempts a retry loop every 120s (`GPS_REVIVAL_RETRY_INTERVAL_MS`) and escalates to a **CRITICAL forensic alert** after 3 failures.
 -   **Power Forensic Parity**: Full parity for battery current (`currentMa`) across all models, database (v35), and ribbons, ensuring remote power-deficit visibility.
 -   **SIT Acknowledgement**: Discrete "sitting" events are synchronized via an acknowledged loop to prevent loss during blackouts (Issue 194).
 -   **Analytical Ribbons**: High-density sparklines (4M to 7D) showing SNR, ambient noise, light, vibration, power, and connectivity patterns.
@@ -41,7 +41,7 @@ The app utilizes a custom socket-based protocol optimized for high-latency, unre
 
 ## 5. Project Governance & Compliance Framework
 To ensure that the app's high-assurance claims are auditable, the project adheres to a strict **Three-Tier Documentation Lifecycle**:
--   **Active Workspace (`issues.md`)**: Tracks only open and pending hardening tasks.
--   **Audit Archive (`COMPLIANCE.md`)**: The definitive proof of implementation. Contains the Verification Manifest and the complete Resolution Archive of all 245+ fixed issues.
--   **System Specification (`SoT.md`)**: The operational "Source of Truth" for constants and logic.
-This framework ensures that forensic history is never lost and that the active codebase is always measurable against its compliance requirements. For further details on this lifecycle, see `CONTRIBUTING.md`.
+-   **Active Workspace (`STATUS/issues.md`)**: Tracks only open and pending hardening tasks.
+-   **Audit Archive (`STATUS/compliance.md`)**: The definitive proof of implementation. Contains the Verification Manifest and the complete Resolution Archive.
+-   **System Specification (`STATUS/requirements_sot.md`)**: The operational "Source of Truth" for constants and logic.
+This framework ensures that forensic history is never lost and that the active codebase is always measurable against its compliance requirements. For further details on this lifecycle, see `DOCS/CONTRIBUTING.md`.
