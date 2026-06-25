@@ -29,7 +29,7 @@ Specialized documents for specific hardware, subsystems, or UI components.
 Whenever a significant architectural change or development "Chunk" is completed, the following updates are mandatory:
 
 1.  **History**: Log the version milestone in `STATUS/docs_history.md`.
-2.  **Issues**: Move completed tasks to the "FIXED" section in `STATUS/compliance.md`.
+2.  **Issues**: Move completed tasks to the "FIXED" section in `STATUS/compliance.md` (Issue #406).
 3.  **SoT**: Update the core constants and the **Verification Matrix** in `STATUS/requirements_sot.md`.
 4.  **README**: Update the high-level summary to reflect current version capabilities.
 5.  **Code**: Ensure source-level context (KDoc/Comments) exists at the implementation site.
@@ -41,4 +41,4 @@ To verify a build or audit a specific feature:
 3.  Execute the **Compliance Matrix** in **STATUS/requirements_sot.md (Section 10)** against the current source code to ensure architectural standards are maintained.
 
 ## 4. Forensic Unification (v8.9.37)
-As of v8.9.37, the forensic model is simplified and hardened. Forensic traceability is maintained by injecting the build version at emission points and is enhanced by **Ghost Mode UX** staleness indicators, acknowledged SIT synchronization, and **Log Spatial Anchoring** (Issue 208).
+As of v8.9.37, the forensic model is simplified and hardened. Forensic traceability is maintained by injecting the build version at emission points and is enhanced by **Ghost Mode UX** staleness indicators (Issue #193), acknowledged SIT synchronization (Issue #194), and **Log Spatial Anchoring** (Issue #208).

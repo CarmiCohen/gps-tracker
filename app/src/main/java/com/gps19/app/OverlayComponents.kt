@@ -24,6 +24,8 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * v8.9.36:
+ * - Issue #226: Intelligent Uncertainty UX - Displaying locationPendingReason in LegacyDashboardGrid.
  * v8.9.7:
  * - Issue 193: Consistently dimmed all forensic badges and labels to Slate500 when telemetry is stale (>10s).
  * v8.9.6:
@@ -88,6 +90,18 @@ fun LegacyDashboardGrid(
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
                 )
+                
+                // Issue #226: Intelligent Uncertainty UX - Propagation to Dashboard
+                if (d.isLocationPending && d.locationPendingReason != LocationPendingReason.NONE) {
+                    Text(
+                        text = "UNCERTAINTY: ${d.locationPendingReason.name.replace("_", " ")}",
+                        color = Amber500,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (d.isSuspicious) {
                         Text(text = "[SUSPICIOUS]", color = if (d.isTelemetryFresh) Amber500 else Slate500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)

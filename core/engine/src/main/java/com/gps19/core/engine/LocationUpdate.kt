@@ -5,9 +5,9 @@ import kotlinx.serialization.Serializable
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
  * v8.9.22:
- * - Issue #226: Added locationPendingReason for intelligent uncertainty UX.
+ * - Issue #326: Added locationPendingReason for intelligent uncertainty UX. (Formerly #496 / #226)
  * v8.9.21:
- * - Issue #224: Added tiltIdx and baroIdx for forensic ribbon expansion.
+ * - Issue #494: Added tiltIdx and baroIdx for forensic ribbon expansion. (Formerly #224)
  */
 @Serializable
 data class LocationUpdate(

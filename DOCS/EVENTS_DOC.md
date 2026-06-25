@@ -1,6 +1,6 @@
-# GPS Tracker - Event Log Documentation (v8.9.10)
+# GPS Tracker - Event Log Documentation (v8.9.37)
 
-This document describes all events logged by the application, their priorities, colors, and trigger conditions. As of v8.9.10, logs are enhanced with **Log Spatial Anchors**, allowing every event to be geographicaly mapped.
+This document describes all events logged by the application, their priorities, colors, and trigger conditions. As of v8.9.37, logs are fully synchronized with the hardened forensic engine and feature **Log Spatial Anchors**.
 
 ## Event Priority Levels
 1.  **CRITICAL / ALARM (Important)**: Events that trigger a siren or describe hard system failures. Always visible.
@@ -31,29 +31,29 @@ This document describes all events logged by the application, their priorities, 
 | `[SIREN] Tracker: Tilt Alert` | Important | Red | Orientation change > 15°. | Yes |
 | `[SIREN] Tracker: Acoustic Alert`| Important | Red | Noise spike > 40dB above baseline. | Yes |
 | `[SIREN] Tracker: Lift` | Important | Red | Height change > 0.8m. | Yes |
-| `[SIREN] Tracker: Xiaomi System...`| Important | Red | Background permission or autostart missing. Includes 30s Boot Grace. | Yes |
+| `[SIREN] Tracker: Xiaomi System...`| Important | Red | Background permission or autostart missing. Includes 30s Boot Grace (Issue #190). | Yes |
 
 ### 2. Physical Violation Details (Teal / Technical)
 | Event Text Pattern | Importance | Color | Technical Context |
 | :--- | :--- | :--- | :--- |
-| `[VIOLATION] Light: [X] lux` | Not Important| Teal | Triggered > 150 lux jump. |
+| `[VIOLATION] Light: [X] lux` | Not Important| Teal | Triggered > 150 lux jump (Issue #414). |
 | `[VIOLATION] Shock: [X]G` | Not Important| Teal | Triggered > 0.8g impact. |
 | `[VIOLATION] Noise: [X] dB` | Not Important| Teal | Triggered > 40dB over ambient floor. |
-| `GPS Stall: Revival attempt [X]/3`| Important | White| Periodic 120s hardware refresh. |
+| `GPS Stall: Revival attempt [X]/3`| Important | White| Periodic 120s hardware refresh (Issue #198). |
 
 ### 3. Resolved & Positive Transitions (Green / Bold)
 | Event Text Pattern | Importance | Color | Condition | Siren |
 | :--- | :--- | :--- | :--- | :--- |
 | `[RESOLVED] [System] restored...` | Important | Green | Alert condition cleared. | Stop |
-| `[STATUS] Cooling Mode Engaged` | Important | Green | Engaging 30s GPS polling. | No |
+| `[STATUS] Cooling Mode Engaged` | Important | Green | Engaging 30s GPS polling (Issue #70). | No |
 | `[STATUS] Cooling Mode Resolved` | Important | Green | Temperature < 44.0°C. | No |
 
 ---
 
 ## Technical Specifications
-- **Log Spatial Anchor (v8.9.10)**: All events are automatically tagged with `lat`/`lng` coordinates using the last known telemetry position.
-- **Monotonic Stability (Issue 125)**: All forensic timing and UI lockout windows use `elapsedRealtime`.
-- **Ghost Mode UX (Issue 193)**: Stale events (>10s) are visualized with dimmed "Ghost" status indicators.
-- **Identity Unification**: Every entry carries the mandatory `role` tag.
+- **Log Spatial Anchor**: All events are automatically tagged with `lat`/`lng` coordinates using the last known telemetry position.
+- **Monotonic Stability (Issue #125)**: All forensic timing and UI lockout windows use `elapsedRealtime`.
+- **Ghost Mode UX (Issue #193)**: Stale events (>10s) are visualized with dimmed "Ghost" status indicators.
+- **Identity Unification**: Every entry carries the mandatory `role` tag (Issue #182).
 - **Fuzzy Forensic Batching**: Consecutive similar events are grouped with `(xN)` count and total duration tracking.
-- **Muzzle Window (Issue 191)**: 2000ms suppression during sync I/O to prevent false tamper logs.
+- **Muzzle Window (Issue #191)**: 2000ms suppression during sync I/O to prevent false tamper logs.

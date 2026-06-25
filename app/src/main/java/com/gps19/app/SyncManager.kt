@@ -10,16 +10,13 @@ import timber.log.Timber
 
 /**
  * SyncManager: Handles the telemetry synchronization loop.
+ * v8.9.37:
+ * - Issue #273: Refined RTT-aware scaling with proportional delay to prevent loop saturation 
+ *   during high-latency network transitions. Synchronized with +270 audit trail.
+ * v8.9.36:
+ * - Issue #244: Implemented offline buffering fallback in pushCurrentStatus. Captures locationPendingReason for forensic continuity.
  * v8.9.33:
- * - Issue #271: Unified sync loop to use PING_INTERVAL_MS (10s) as per code-first standardization. (Formerly #1)
- * v8.9.32:
- * - Issue #244: Propagating locationPendingReason in flushPendingUpdates and offline storage.
- * v8.9.26:
- * - Issue #272: Synchronized version string to v8.9.26 baseline. (Formerly #2)
- * v8.9.21:
- * - Issue #224: Added tilt_idx and baro_idx to telemetry payloads for forensic expansion.
- * v8.9.18:
- * - Issue #221: Propagated lastValidFixRealtime for Bayesian uncertainty scaling.
+ * - Issue #271: Unified sync loop to use PING_INTERVAL_MS (10s) as per code-first standardization.
  */
 class SyncManager(
     private val context: Context,
@@ -46,12 +43,13 @@ class SyncManager(
     fun setOnSyncFinishedListener(listener: () -> Unit) { onSyncFinished = listener }
 
     /**
-     * startSyncLoop: Implements the 10s PING_INTERVAL_MS loop.
+     * startSyncLoop: Implements the PING_INTERVAL_MS loop with RTT-aware scaling (Issue #273).
      */
     fun startSyncLoop(deviceId: String, viewerId: String, isTracker: Boolean) {
         syncJob?.cancel()
         syncJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
+                val currentRtt = networkManager.getRtt()
                 if (networkManager.isConnected()) {
                     _isSyncing.value = true
                     onSyncStarted?.invoke()
@@ -65,7 +63,19 @@ class SyncManager(
                         onSyncFinished?.invoke()
                     }
                 }
-                delay(PING_INTERVAL_MS)
+
+                // Issue #273: Proportional RTT scaling. 
+                // If RTT is healthy (< 50% of MAX), use PING_INTERVAL_MS.
+                // If RTT > 50% of MAX, scale linearly up to 3x the interval.
+                val dynamicDelay = when {
+                    currentRtt > MAX_ALLOWED_RTT_MS -> PING_INTERVAL_MS * 3
+                    currentRtt > MAX_ALLOWED_RTT_MS / 2 -> {
+                        val scale = 1.0 + (currentRtt.toDouble() / MAX_ALLOWED_RTT_MS)
+                        (PING_INTERVAL_MS * scale).toLong()
+                    }
+                    else -> PING_INTERVAL_MS
+                }
+                delay(dynamicDelay)
             }
         }
     }
@@ -144,10 +154,51 @@ class SyncManager(
             isCharging = isCharging
         )
 
-        networkManager.sendTelemetry(status)
+        val success = networkManager.sendTelemetry(status)
         
         if (isTrackerMode) {
             repository.saveTrackerState(status)
+            
+            // Issue #244: If transmission fails, buffer the update locally for later synchronization.
+            if (!success) {
+                offlineRepository.addPendingStatusUpdate(PendingStatusEntity(
+                    lat = status.lat,
+                    lng = status.lng,
+                    speed = status.speed,
+                    accuracy = status.accuracy,
+                    bearing = status.bearing,
+                    battery = status.battery,
+                    temp = status.temp,
+                    isCharging = status.isCharging,
+                    timestamp = status.ts,
+                    gpsTs = loc?.time ?: 0L,
+                    satsView = status.gnssDetail?.satellites?.size ?: 0,
+                    satsUsed = status.gnssDetail?.satellites?.count { it.usedInFix } ?: 0,
+                    maxAccuracy = status.maxAccuracy,
+                    distToTracker = distToTracker,
+                    distToHome = distToHome,
+                    snrIdx = status.snrIdx,
+                    tiltIdx = status.tiltIdx,
+                    baroIdx = status.baroIdx,
+                    isBatterySteepDischarge = status.isBatterySteepDischarge,
+                    isCoolingModeActive = status.isCoolingModeActive,
+                    isSitDetected = status.isSitDetected,
+                    isSitActive = status.isSitActive,
+                    sitVz = status.sitVz,
+                    sitDz = status.sitDz,
+                    verticalVelocity = status.verticalVelocity,
+                    sitBaro = status.sitBaro,
+                    sitTilt = status.sitTilt,
+                    sitShock = status.sitShock,
+                    isStorageLow = telemetryRepository.integrityState.value.isStorageLow,
+                    isStorageCritical = telemetryRepository.integrityState.value.isStorageCritical,
+                    isPowerSaveMode = telemetryRepository.integrityState.value.isPowerSaveMode,
+                    standbyBucket = status.standbyBucket,
+                    netInterface = status.netInterface,
+                    lastValidFixRealtime = status.lastValidFixRealtime,
+                    locationPendingReason = status.locationPendingReason.name
+                ))
+            }
         }
     }
 
@@ -162,12 +213,11 @@ class SyncManager(
                 ts = entity.timestamp,
                 lat = entity.lat,
                 lng = entity.lng,
-                alt = 0.0, // Alt not in entity
+                alt = 0.0, 
                 accuracy = entity.accuracy,
                 maxAccuracy = entity.maxAccuracy,
                 speed = entity.speed,
                 bearing = entity.bearing,
-                // These are missing from entity, using defaults or basic mapping
                 vibration = 0f, 
                 heading = 0f,
                 baroAlt = 0f,

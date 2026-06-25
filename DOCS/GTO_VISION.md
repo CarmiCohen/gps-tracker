@@ -1,4 +1,4 @@
-# Vision: GtoEngine as a High-Assurance Isolated Engine (v8.9.10)
+# Vision: GtoEngine as a High-Assurance Isolated Engine (v8.9.37)
 
 This document describes the high-level vision of the **GtoEngine** as a physically isolated, intelligent component within the GPS Tracker ecosystem. It focuses on the **Isolated Engine** perspective—how the engine maintains forensic integrity by consuming raw sensor data and producing actionable security intelligence without side effects.
 
@@ -7,7 +7,7 @@ This document describes the high-level vision of the **GtoEngine** as a physical
 ## 1. The Isolated Engine Concept
 The **GtoEngine** acts as the "Sacred Vault" between raw, noisy hardware sensors and the user-facing security interface. Its primary goal is to convert **Noisy Physics** into **Clean, Actionable Security Intelligence.**
 
-With the **v8.9.10 Baseline**, the engine is strictly isolated in the `:core:engine` module (a pure JVM library). This ensures that UI or network changes cannot corrupt the underlying security math, providing a "Truth-at-Source" model.
+With the **v8.9.37 Baseline**, the engine is strictly isolated in the `:core:engine` module (a pure JVM library). This ensures that UI or network changes cannot corrupt the underlying security math, providing a "Truth-at-Source" model. (Issue #415)
 
 ```mermaid
 graph LR
@@ -43,16 +43,16 @@ graph LR
 ## 2. Resources (Inputs)
 The Isolated Engine acquires and correlates data from multiple hardware sources to build a ground-truth model of the asset:
 
-*   **GPS/GNSS**: Latitude, longitude, speed, bearing, and accuracy. Monitored for stalls with **Escalated Revival** ensuring maximum uptime.
+*   **GPS/GNSS**: Latitude, longitude, speed, bearing, and accuracy. Monitored for stalls with **Escalated Revival** (Issue #124) ensuring maximum uptime.
 *   **Satellite Health (Raw)**: SNR (Signal-to-Noise Ratio), satellites in view vs. satellites used (to detect signal interference or multipath).
-*   **Accelerometer (IMU)**: Real-time mechanical vibration signatures to determine movement states.
+*   **Accelerometer (IMU)**: Real-time mechanical vibration signatures to determine movement states (Issue #431).
 *   **Magnetometer**: Heading and local magnetic field stability to detect "Zig-Zag" scatter.
-*   **Time Context**: Provided via `TimeProvider` (injected) to ensure monotonic integrity (`elapsedRealtime`) and immunity to system clock jumps.
+*   **Time Context**: Provided via `TimeProvider` (injected) to ensure monotonic integrity (`TimeProvider.elapsedRealtime()`) and immunity to system clock jumps (Issue #413).
 
 ---
 
 ## 3. Intelligence (Outputs)
-The engine processes the inputs to produce four distinct types of intelligence for the app layer:
+The engine processes the inputs to produce distinct types of intelligence for the app layer:
 
 ### 3.1. Visualization Outputs
 *   **The Optimized Trail**: A high-fidelity "Blue Trail" where mechanical jitter and momentary GPS spikes have been mathematically smoothed away.
@@ -62,9 +62,9 @@ The engine processes the inputs to produce four distinct types of intelligence f
 
 ### 3.2. Security Alerts
 *   **Out-of-Range Detection**: A high-confidence signal that the asset has moved beyond the "Fence" radius plus its dynamic accuracy buffer.
-*   **Jamming Detection**: A specialized flag raised when satellite health is erratic/degraded while the device is otherwise healthy and online.
-*   **Signal Stalling**: Detecting when the GPS hardware has "frozen." Triggers an aggressive revival loop (60s stall / 120s retry) with critical escalation.
-*   **Log Spatial Anchor (v8.9.10)**: Every output intelligence event is geographically anchored, allowing the Map to display markers for where alerts originated.
+*   **Jamming Detection**: A specialized flag raised when satellite health is erratic/degraded while the device is otherwise healthy and online. (Issue #403)
+*   **Signal Stalling**: Detecting when the GPS hardware has "frozen." Triggers an aggressive revival loop (60s stall / 120s retry) with critical escalation. (Issue #198)
+*   **Log Spatial Anchor**: Every output intelligence event is geographically anchored, allowing the Map to display markers for where alerts originated.
 
 ---
 
@@ -79,4 +79,4 @@ The "Magic" of the GtoEngine is its ability to resolve **contradictions** betwee
 | **Theft by Loading** | Move 200m (Path = Linear) | Zero Vibration | **ALARM** (Promotion to Critical) |
 
 ## 5. Conclusion
-By treating trajectory as a **Graph** rather than a list of points, the **GtoEngine** provides the user with 100% confidence in the siren triggers. It allows the app to be "Aggressive against Thieves" while being "Forgiving to Signal Noise." In v8.9.10, this logic is strictly isolated and geographically anchored, ensuring forensic consistency.
+By treating trajectory as a **Graph** rather than a list of points, the **GtoEngine** provides the user with 100% confidence in the siren triggers. It allows the app to be "Aggressive against Thieves" while being "Forgiving to Signal Noise." In v8.9.37, this logic is strictly isolated and geographically anchored, ensuring forensic consistency.

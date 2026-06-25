@@ -1,15 +1,15 @@
-# Proposal: Enhanced Jump Detection & Logic (v8.8.35)
+# Proposal: Enhanced Jump Detection & Logic (v8.9.37)
 
-This document summarizes the improvements to the "Jump Point" detection mechanism in the GPS Tracker project. It consolidates the discussion on mathematical, behavioral, and environmental filters into a formal specification for an **Adaptive Multi-Factor Jump Engine**.
+This document summarizes the improvements to the "Jump Point" detection mechanism in the GPS Tracker project. It consolidates the mathematical, behavioral, and environmental filters into a formal specification for the **GtoEngine** (Adaptive Multi-Factor Jump Engine).
 
 ## 1. Executive Summary
 The "Jump Point" logic uses tiered speed and distance thresholds to identify erratic GPS data. While effective at preventing basic false alarms, it is designed to catch "Micro-Jitter" and "Clever Theft" where intentional signal interference might be used.
 
-The engine uses a **weighted probability model** that considers acceleration, directional consistency, distance floors, and sensor fusion. In v8.8.35, this is fully isolated in the tracking engine module and standardized with the Source of Truth.
+The engine uses a **weighted probability model** that considers acceleration, directional consistency, distance floors, and sensor fusion. In v8.9.37, this is fully isolated in the `:core:engine` module and synchronized with the Source of Truth. (Issue #415 - Formerly #285)
 
 ---
 
-## 2. Implementation State (v8.8.35)
+## 2. Implementation State (v8.9.37)
 
 | Feature | Status | Implementation |
 | :--- | :--- | :--- |
@@ -35,9 +35,9 @@ To handle different data scenarios, the system categorizes GPS updates into thre
 *   **Criteria**: Distance 100m – 2,000m OR Speed > 120 km/h (`MAX_PHYSICAL_SPEED_MPS`).
 *   **Action**: Map as **Magenta Square**; Trigger 180s "Jump Hold" in Alarm Logic.
 
-### Tier 3: Visual Jitter (Smoothing Level)
+### Tier 3: Visual Jitter (Smoothing Level) (Issue #434)
 *   **Goal**: Keep the map trail clean without delaying legitimate alarms.
-*   **Criteria**: Radial noise that doesn't meet Tier 1/2 criteria.
+*   **Criteria**: Radial noise that doesn't meet Tier 1/2 criteria. Uses `JUMP_GATE_VISUAL_JITTER_METERS` (10.0m) as rejection floor.
 *   **Action**: Exclude from Polyline; **Allow** standard 6-sample Alarm Logic (No Hold).
 
 ---
@@ -56,10 +56,10 @@ Calculate the bearing change between consecutive points.
 
 ### 4.3. Consistency Promotion (Anti-Tampering)
 If the system detects a "Jump" followed by consistent movement (speed > 2.0 m/s for > 30s `TRAJECTORY_PROMOTION_WINDOW_MS` with path efficiency > 0.1), the "Jump Hold" is immediately canceled.
-*   **Rationale**: Consistent high-speed movement represents a **Trajectory**, not a jitter. Promote to **CRITICAL ALARM** immediately.
+*   **Rationale**: Consistent high-speed movement represents a **Trajectory**, not a jitter. Promote to **CRITICAL ALARM** immediately (Issue #415).
 
 ### 4.4. Predictive Exit
 Speed-aware projection that triggers geofence alarms if the projected position (2.0s look-ahead `GEOFENCE_PREDICTIVE_LOOKAHEAD_S`) is outside the fence, provided it's not a Jump Point.
 
 ## 5. Forensic Unification
-As of v8.8.35, the forensic model has been simplified. Legacy version tags (`ver`, `vid`) have been removed from data models. Traceability is maintained at the emission layer (SyncManager/LogSink).
+As of v8.9.37, the forensic model is simplified and hardened. Legacy version tags have been removed from data models. Traceability is maintained at the emission layer and enhanced by **Log Spatial Anchors** (Issue #208).

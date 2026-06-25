@@ -4,14 +4,17 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v8.9.37:
+ * - Issue #325: Added maxAccuracy to EngineConnectionPoint for forensic ribbon uncertainty 
+ *   tracking. (Formerly #484 / #214)
  * v8.9.22:
- * - Issue #226: Added LocationPendingReason and locationPendingReason to AlarmEvaluationState.
- * - Issue #227: Added promotedPoints to SentinelResult for hindsight transition smoothing.
+ * - Issue #326: Added LocationPendingReason and locationPendingReason to AlarmEvaluationState. (Formerly #496 / #226)
+ * - Issue #327: Added promotedPoints to SentinelResult for hindsight transition smoothing. (Formerly #497 / #227)
  * v8.9.21:
- * - Issue #224: Added tiltIdx and baroIdx for forensic ribbon expansion.
+ * - Issue #494: Added tiltIdx and baroIdx for forensic ribbon expansion. (Formerly #224)
  * v8.9.18:
- * - Issue #220: Added RejectedPoint for hindsight correction.
- * - Issue #219: Added isAdaptiveJump to JumpConfidence.
+ * - Issue #490: Added RejectedPoint for hindsight correction. (Formerly #220)
+ * - Issue #489: Added isAdaptiveJump to JumpConfidence. (Formerly #219)
  * v8.9.7:
  * - Plunge Matching: Added sitVzTs to EngineConnectionPoint for forensic parity.
  */
@@ -41,7 +44,7 @@ enum class EngineXiaomiStatus {
 
 /**
  * LocationPendingReason: Contextual cause for Bayesian uncertainty expansion.
- * v8.9.22 (Issue #226)
+ * v8.9.22 (Issue #326 - Formerly #496 / #226)
  */
 enum class LocationPendingReason {
     NONE,
@@ -63,6 +66,8 @@ data class EngineConnectionPoint(
     val isGap: Boolean = false,
     val hasGps: Boolean = false,
     val gpsIndex: Float = 0f,
+    val accuracy: Float = 0f,
+    val maxAccuracy: Float = 0f,
     val noiseIdx: Float = 0f,
     val luxIdx: Float = 0f,
     val vibeIdx: Float = 0f,
@@ -188,7 +193,7 @@ data class AlarmEvaluationState(
     val appStartTime: Long,
     val isRelayConnected: Boolean, 
     val isTrackerConnected: Boolean, 
-    val discoveryPhase: DiscoveryPhase,
+    val discoveryPhase: DiscoveryPhase?,
     val isHardwareOnline: Boolean, 
     val isLocalInternetLoss: Boolean, 
     val isJammerSuspicion: Boolean,

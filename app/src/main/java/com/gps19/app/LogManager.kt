@@ -8,11 +8,11 @@ import java.util.UUID
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * v8.9.37:
+ * - Issue #325: Unified accuracy fallback logic. Strictly prioritize engine-calculated 
+ *   maxAccuracy (filtered uncertainty) over raw accuracy for consistent forensic reliability. (Formerly #484 / #214)
  * v8.9.19:
- * - Issue #223: Expanded logServiceEvent and submitToLogSink to support SNR and Vibration snapshots.
- * v8.9.17:
- * - Issue #214: Unified accuracy fallback logic to prioritize engine-calculated maxAccuracy 
- *   consistently when discrete fix accuracy is missing.
+ * - Issue #493: Expanded logServiceEvent and submitToLogSink to support SNR and Vibration snapshots. (Formerly #223)
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -57,7 +57,7 @@ class LogManager @Inject constructor(
             return
         }
 
-        // Issue 208/210/212/214: Authoritative Spatial Anchoring
+        // Issue #325: Authoritative Spatial Anchoring (Prioritizing maxAccuracy) (Formerly #484)
         var finalLat = lat
         var finalLng = lng
         var finalAccuracy = accuracy
@@ -77,14 +77,20 @@ class LogManager @Inject constructor(
             if (fallbackTelem.lat != 0.0 && fallbackTelem.lng != 0.0) {
                 finalLat = fallbackTelem.lat
                 finalLng = fallbackTelem.lng
-                if (finalAccuracy == 0f) {
-                    // Issue #214: Consistently prioritize discrete accuracy, then maxAccuracy
-                    finalAccuracy = if (fallbackTelem.accuracy > 0f) fallbackTelem.accuracy else fallbackTelem.maxAccuracy
+                // Issue #325: Strictly prioritize maxAccuracy when auto-anchoring (Formerly #484)
+                finalAccuracy = if (fallbackTelem.maxAccuracy > 0f) fallbackTelem.maxAccuracy else fallbackTelem.accuracy
+            }
+        } else {
+            // If coordinates were provided, check if we should promote to maxAccuracy
+            if (finalLat == fallbackTelem.lat && finalLng == fallbackTelem.lng) {
+                if (fallbackTelem.maxAccuracy > 0f && (finalAccuracy == 0f || finalAccuracy == fallbackTelem.accuracy)) {
+                    finalAccuracy = fallbackTelem.maxAccuracy
                 }
             }
-        } else if (finalAccuracy == 0f) {
-            // Coordinates provided but accuracy missing - use authoritative fallback
-            finalAccuracy = if (fallbackTelem.accuracy > 0f) fallbackTelem.accuracy else fallbackTelem.maxAccuracy
+            // If still 0, final fallback attempt
+            if (finalAccuracy == 0f) {
+                finalAccuracy = if (fallbackTelem.maxAccuracy > 0f) fallbackTelem.maxAccuracy else fallbackTelem.accuracy
+            }
         }
 
         val log = LogEntry(

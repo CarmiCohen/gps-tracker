@@ -15,14 +15,11 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
- * v8.9.26:
- * - Issue #245: Centralized SIT rising-edge detection. Removed redundant log/forensic triggers.
- * v8.9.22:
- * - Issue #226: Parsing location_pending_reason for intelligent uncertainty UX.
- * v8.9.21:
- * - Issue #224: Added tiltIdx and baroIdx parsing for forensic parity.
- * v8.9.18:
- * - Issue #221: Parsing lastValidFixRealtime for Bayesian uncertainty scaling.
+ * v8.9.37:
+ * - Issue #245: Centralized SIT rising-edge detection. Removed redundant log/forensic triggers. (Formerly #515)
+ * - Issue #326: Parsing location_pending_reason for intelligent uncertainty UX. (Formerly #496 / #226)
+ * - Issue #224: Added tiltIdx and baroIdx parsing for forensic parity. (Formerly #494)
+ * - Issue #221: Parsing lastValidFixRealtime for Bayesian uncertainty scaling. (Formerly #491)
  */
 class RemoteHandler(
     private val context: Context,
@@ -254,8 +251,8 @@ class RemoteHandler(
     }
 
     /**
-     * Issue 194: Reconstructs forensic state from incoming remote logs.
-     * Modified in v8.9.26: Issue #245: Removed redundant forensic trigger; handled by ViewerService tick loop.
+     * Issue #194: Reconstructs forensic state from incoming remote logs. (Formerly #464)
+     * Modified in v8.9.37: Issue #245: Removed redundant forensic trigger; handled by ViewerService tick loop. (Formerly #515)
      */
     fun handleRemoteLog(entry: LogEntry) {
         if (entry.message.contains("Sit Detected", ignoreCase = true)) {
@@ -352,7 +349,7 @@ class RemoteHandler(
             isTrackerTamperDetected = data.optBoolean("is_tamper_detected", isTrackerTamperDetected)
             isTrackerPowerTamper = data.optBoolean("is_power_tamper", isTrackerPowerTamper)
             
-            // Issue #245: Updated SIT detection to avoid redundant manual logging. 
+            // Issue #245: Updated SIT detection to avoid redundant manual logging. (Formerly #515)
             // The tracker-emitted log is already handled via CommunicationManager/RemoteLog.
             val incomingSitDetected = data.optBoolean("is_sit_detected", false)
             isTrackerSitDetected = incomingSitDetected

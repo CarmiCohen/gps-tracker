@@ -15,6 +15,8 @@ import kotlin.math.abs
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * v8.9.37:
+ * - Issue #241: Ensured snrSnapshot and vibeSnapshot parity in local database persistence and retrieval.
  * v8.9.11:
  * - Issue #212: Added accuracy mapping for forensic parity in historical recovery.
  * v8.9.10:
@@ -54,7 +56,9 @@ class LogRepository @Inject constructor(
                 role = it.role,
                 lat = it.lat,
                 lng = it.lng,
-                accuracy = it.accuracy
+                accuracy = it.accuracy,
+                snrSnapshot = it.snrSnapshot,
+                vibeSnapshot = it.vibeSnapshot
             ) 
         }
     }
@@ -84,7 +88,9 @@ class LogRepository @Inject constructor(
                             synced = initiallySynced, // Update sync status if requested
                             lat = entry.lat,
                             lng = entry.lng,
-                            accuracy = entry.accuracy
+                            accuracy = entry.accuracy,
+                            snrSnapshot = entry.snrSnapshot,
+                            vibeSnapshot = entry.vibeSnapshot
                         ))
                         return@withLock
                     }
@@ -112,7 +118,9 @@ class LogRepository @Inject constructor(
                                 synced = initiallySynced, // Reset/update sync status on merge
                                 lat = entry.lat,
                                 lng = entry.lng,
-                                accuracy = entry.accuracy
+                                accuracy = entry.accuracy,
+                                snrSnapshot = entry.snrSnapshot,
+                                vibeSnapshot = entry.vibeSnapshot
                             ))
                             return@withLock
                         }
@@ -136,7 +144,9 @@ class LogRepository @Inject constructor(
                         synced = initiallySynced,
                         lat = entry.lat,
                         lng = entry.lng,
-                        accuracy = entry.accuracy
+                        accuracy = entry.accuracy,
+                        snrSnapshot = entry.snrSnapshot,
+                        vibeSnapshot = entry.vibeSnapshot
                     ))
                     
                     logWriteCount++
@@ -159,7 +169,8 @@ class LogRepository @Inject constructor(
             isImportant = it.isImportant, id = it.deviceId, viewerId = it.viewerId, count = it.count,
             extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial,
             specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
-            lat = it.lat, lng = it.lng, accuracy = it.accuracy
+            lat = it.lat, lng = it.lng, accuracy = it.accuracy,
+            snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot
         )
     }
 
@@ -203,7 +214,9 @@ class LogRepository @Inject constructor(
             role = it.role,
             lat = it.lat,
             lng = it.lng,
-            accuracy = it.accuracy
+            accuracy = it.accuracy,
+            snrSnapshot = it.snrSnapshot,
+            vibeSnapshot = it.vibeSnapshot
         ) 
     }
 }

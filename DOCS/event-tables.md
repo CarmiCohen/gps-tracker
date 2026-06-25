@@ -1,4 +1,4 @@
-# GPS Tracker: Event and Alert Tables (v8.9.20)
+# GPS Tracker: Event and Alert Tables (v8.9.37)
 
 This document summarizes all system alerts, their trigger logic, timing, and how they are presented to the user in both the Event Log and the Red Screen (Alarm Overlay).
 
@@ -20,7 +20,7 @@ This document summarizes all system alerts, their trigger logic, timing, and how
 | **Tracker: Charger unplugged** | USB Power Off | **3 Seconds** | **3 Seconds** | Aligned with `POWER_DISCONNECT_DEBOUNCE_MS`. |
 | **Tracker: Low Battery** | Battery < 20% | Immediate | **Immediate** | Siren triggers on first packet (`CRITICAL_BATTERY_THRESHOLD`). |
 | **Tracker: High Temp** | Temp > 46.0°C | Immediate | **Immediate** | Siren triggers on first packet (`MAX_SAFE_TEMPERATURE_CELSIUS`). |
-| **Tracker: Xiaomi System** | Background Restricted | Immediate | **Immediate** | Siren triggers on background or autostart restriction detection. Includes 30s Boot Grace. |
+| **Tracker: Xiaomi System** | Background Restricted | Immediate | **Immediate** | Siren triggers on background or autostart restriction detection. Includes 30s Boot Grace (Issue #190). |
 
 ---
 
@@ -80,7 +80,7 @@ These logs track intentional user interactions. They **do not** trigger sirens o
 | :--- | :--- | :--- |
 | **Session Heartbeat (Duration: X)** | App Internal | Measures the continuous tracking time for this session. |
 | **Global System Heartbeat** | App Internal | Measures the total installation lifetime (`HEARTBEAT_INTERVAL_MS`). |
-| **MAINTENANCE: Service is healthy** | Tracker/Viewer | Confirms the service is running correctly (`SYSTEM_WATCH_DOG_INTERVAL_MS`). |
+| **MAINTENANCE: Service is healthy** | Tracker/Viewer | Confirms the service is running correctly (`SYSTEM_WATCHDOG_INTERVAL_MS`). |
 | **MAINTENANCE: RECOVERY triggered** | Watchdog | The service was stopped; the watchdog is restarting it. |
 | **MAINTENANCE: Muzzle Active** | Tracker | Sensor triggers suppressed during sync (`MUZZLE_WINDOW_DURATION_MS`). |
-| **MAINTENANCE: Log Anchor Applied** | LogManager | Confirms coordinate attachment to a system log (v8.9.10). |
+| **MAINTENANCE: Log Anchor Applied** | LogManager | Confirms coordinate attachment to a system log (v8.9.37). |

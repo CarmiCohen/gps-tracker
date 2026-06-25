@@ -6,13 +6,12 @@ import javax.inject.Singleton
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
- * Extracted from MainViewModel to resolve Issue 115 (Architectural Bloat).
- * v8.9.22:
- * - Issue #226: Mapping locationPendingReason for intelligent uncertainty UX.
- * v8.9.18:
- * - Issue #221: Mapping lastValidFixRealtime for Bayesian uncertainty scaling.
- * v8.9.5:
- * - Issue 192: Added currentMa mapping for full forensic parity.
+ * Extracted from MainViewModel to resolve Issue #322 (Architectural Bloat). (Formerly #385 / #115)
+ * v8.9.37:
+ * - Issue #325: Mapping maxAccuracy for unified accuracy fallback logic. (Formerly #484 / #214)
+ * - Issue #326: Mapping locationPendingReason for intelligent uncertainty UX. (Formerly #496 / #226)
+ * - Issue #491: Mapping lastValidFixRealtime for Bayesian uncertainty scaling. (Formerly #221)
+ * - Issue #462: Added currentMa mapping for full forensic parity. (Formerly #192)
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(
@@ -32,6 +31,7 @@ class TelemetryUseCase @Inject constructor(
             lng = if (isLocationValid) update.lng else currentLoc.lng, 
             speed = if (isLocationValid) update.speed else currentLoc.speed, 
             accuracy = if (isLocationValid) update.accuracy else currentLoc.accuracy, 
+            maxAccuracy = if (update.maxAccuracy > 0) update.maxAccuracy else currentLoc.maxAccuracy,
             bearing = if (isLocationValid) update.bearing else currentLoc.bearing, 
             timestamp = if (newTimestamp > 0) newTimestamp else currentLoc.timestamp,
             telemetryTs = if (update.ts > 0) update.ts else nowMs,
@@ -82,7 +82,9 @@ class TelemetryUseCase @Inject constructor(
 
     fun mapTrackerLocationFromStatus(status: TrackerStatus, currentLoc: LocationState): LocationState {
         return currentLoc.copy(
-            lat = status.lat, lng = status.lng, speed = status.speed, bearing = status.bearing, accuracy = status.accuracy, timestamp = status.gpsTs, 
+            lat = status.lat, lng = status.lng, speed = status.speed, bearing = status.bearing, accuracy = status.accuracy, 
+            maxAccuracy = status.maxAccuracy,
+            timestamp = status.gpsTs, 
             telemetryTs = status.ts, 
             isVisualJump = status.isJump, isTrajectoryPromoted = status.isTrajectoryPromoted,
             vibration = status.vibration, heading = status.heading, tiltDegrees = status.tiltDegrees,
@@ -119,6 +121,7 @@ class TelemetryUseCase @Inject constructor(
             lng = if (isLocationValid) update.lng else currentLoc.lng, 
             speed = if (isLocationValid) update.speed else currentLoc.speed, 
             accuracy = if (isLocationValid) update.accuracy else currentLoc.accuracy, 
+            maxAccuracy = if (update.maxAccuracy > 0) update.maxAccuracy else currentLoc.maxAccuracy,
             bearing = if (isLocationValid) update.bearing else currentLoc.bearing, 
             timestamp = if (newTimestamp > 0) newTimestamp else currentLoc.timestamp,
             telemetryTs = if (update.ts > 0) update.ts else nowMs,

@@ -1,4 +1,4 @@
-# Architectural Evolution: Monolith to Modular High-Assurance (v8.9.10)
+# Architectural Evolution: Monolith to Modular High-Assurance (v8.9.37)
 
 ## 1. The Core Idea
 The GPS Tracker app is a high-assurance tool where **reliability is forensic**. The primary problem identified was **Feature Corruption**: the app was a "Monolith" where math logic (GPS filtering), hardware management (sensors), and UI logic were tightly coupled in a single file.
@@ -27,26 +27,26 @@ We have transitioned to an architecture that treats the core tracking logic as a
 
 ### Phase 3: Physical Module Isolation
 - **Module Creation**: Moved the engine to `:core:engine`.
-- **Strict Dependencies**: Enforced JVM-only purity for the engine to prevent framework leakage.
+- **Strict Dependencies**: Enforced JVM-only purity for the engine to prevent framework leakage (Issue #100).
 
 ### Phase 4: Forensic & OEM Hardening
-- **Monotonic Unification**: All logic uses monotonic time via `TimeProvider`.
-- **Muzzle Window Implementation**: Implemented a 2000ms jitter suppression window (Issue 191).
-- **OEM Fidelity**: Specialized 10Hz polling and escalated revival for Xiaomi and Samsung.
+- **Monotonic Unification**: All logic uses monotonic time via `TimeProvider` (Issue #413).
+- **Muzzle Window Implementation**: Implemented a 2000ms jitter suppression window (Issue #191).
+- **OEM Fidelity**: Specialized 10Hz polling and escalated revival for Xiaomi and Samsung (Issue #148/#190).
 
 ### Phase 5: Domain Decoupling
-- **UseCase Extraction**: Decoupled `MainViewModel.kt` into feature-specific UseCases.
+- **UseCase Extraction**: Decoupled `MainViewModel.kt` into feature-specific UseCases (Issue #115).
 - **State Synchronization**: Unified UI state management through domain layers.
 
-### Phase 6: Forensic Simplification & UX Hardening (v8.9.10)
+### Phase 6: Forensic Simplification & UX Hardening (v8.9.37)
 - **Model Purification**: Legacy version tags removed from data models.
-- **Power Forensic Parity**: Achieved end-to-end parity for `currentMa`.
-- **Ghost Mode UX**: Visual staleness indicators for stale forensic data (>10s).
-- **SIT Acknowledgment**: Reliable sync for discrete "sitting" events.
-- **Log Spatial Anchor (Issue 208)**: Every forensic event and alert is now geographically anchored for map reconstruction.
+- **Power Forensic Parity**: Achieved end-to-end parity for `currentMa` (Issue #192).
+- **Ghost Mode UX**: Visual staleness indicators for stale forensic data > 10s (Issue #193).
+- **SIT Acknowledgment**: Reliable sync for discrete "sitting" events (Issue #194).
+- **Log Spatial Anchor**: Every forensic event and alert is now geographically anchored for map reconstruction (Issue #208).
 
 ## 4. Expected Benefits
-| Metric | Monolith (v6.8) | Modular (v8.9.10) |
+| Metric | Monolith (v6.8) | Modular (v8.9.37) |
 | :--- | :--- | :--- |
 | **Side-Effect Risk** | High (Everything touches everything) | Zero (Physically enforced isolation) |
 | **Testability** | Requires Phone/Emulator | JVM Unit Tests (<2 seconds) |
@@ -54,4 +54,4 @@ We have transitioned to an architecture that treats the core tracking logic as a
 | **Forensic Clarity** | Ambiguous | Full spatial traceability for all events |
 
 ---
-**Status:** Architecture Hardened. Logic Physically Isolated. Forensic Integrity Verified. (v8.9.10 Baseline)
+**Status:** Architecture Hardened. Logic Physically Isolated. Forensic Integrity Verified. (v8.9.37 Baseline)

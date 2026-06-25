@@ -12,8 +12,11 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * v8.9.37:
+ * - Issue #325: Added accuracy and maxAccuracy to ribbons for forensic uncertainty 
+ *   auditing. (Formerly #484 / #214)
  * v8.9.28:
- * - Issue #282: SIT Duplicate Guard. Implemented database-level sanity check to prevent redundant SIT forensic markers. (Formerly #12)
+ * - Issue #282: SIT Duplicate Guard. Implemented database-level sanity check to prevent redundant SIT forensic markers.
  * v8.9.21:
  * - Issue #224: Added tiltIdx and baroIdx to updateRibbons and backfillGaps for forensic expansion.
  * v8.9.5:
@@ -59,6 +62,8 @@ class HistoryManager(
         hasGps: Boolean,
         isTrackerMode: Boolean,
         gpsIndex: Float = 0f,
+        accuracy: Float = 0f,
+        maxAccuracy: Float = 0f,
         noiseIdx: Float = 0f,
         luxIdx: Float = 0f,
         vibeIdx: Float = 0f,
@@ -105,6 +110,8 @@ class HistoryManager(
                 hasGps = hasGps,
                 isTrackerMode = isTrackerMode,
                 gpsIndex = gpsIndex,
+                accuracy = accuracy,
+                maxAccuracy = maxAccuracy,
                 noiseIdx = noiseIdx,
                 luxIdx = luxIdx,
                 vibeIdx = vibeIdx,
@@ -137,6 +144,8 @@ class HistoryManager(
             isGap = false,
             hasGps = hasGps,
             gpsIndex = gpsIndex,
+            accuracy = accuracy,
+            maxAccuracy = maxAccuracy,
             noiseIdx = noiseIdx,
             luxIdx = luxIdx,
             vibeIdx = vibeIdx,
@@ -191,6 +200,8 @@ class HistoryManager(
         hasGps: Boolean,
         isTrackerMode: Boolean,
         gpsIndex: Float,
+        accuracy: Float,
+        maxAccuracy: Float,
         noiseIdx: Float,
         luxIdx: Float,
         vibeIdx: Float,
@@ -232,6 +243,8 @@ class HistoryManager(
             isConnected = peerAvail,
             hasGps = hasGps,
             gpsIndex = gpsIndex,
+            accuracy = accuracy,
+            maxAccuracy = maxAccuracy,
             noiseIdx = noiseIdx,
             luxIdx = luxIdx,
             vibeIdx = vibeIdx,
@@ -282,7 +295,7 @@ class HistoryManager(
 
         val acousticFloor = if (isTrackerMode) locationProcessor.getAcousticFloorDb() else 0.0
 
-        RibbonScale.values().forEach { scale ->
+        RibbonScale.entries.forEach { scale ->
             val gapPoints = aggregator.fillRealGap(scale.key, scale.intervalSeconds, lastTickTs, now, snrSamples, sensorSamples, acousticFloor)
             if (gapPoints.isNotEmpty()) {
                 repository.addHistoryPoints(scale.key, gapPoints.map { mapToAppPoint(it) })
@@ -311,7 +324,7 @@ class HistoryManager(
     private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long): Boolean {
         if (!isDetected) return false
         
-        // Issue #282: Prevent duplicates if a SIT event occurs within the guard window of the last recorded one. (Formerly #12)
+        // Issue #282: Prevent duplicates if a SIT event occurs within the guard window of the last recorded one.
         if (abs(ts - lastSitDetectedTs) < SIT_DUPLICATE_GUARD_MS) {
             return false
         }
@@ -334,6 +347,8 @@ class HistoryManager(
             hasGps = p.hasGps,
             isTick = p.isTick,
             gpsIndex = p.gpsIndex,
+            gpsAccuracy = p.accuracy,
+            maxAccuracy = p.maxAccuracy,
             noiseIdx = p.noiseIdx,
             luxIdx = p.luxIdx,
             vibeIdx = p.vibeIdx,

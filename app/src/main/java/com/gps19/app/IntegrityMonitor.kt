@@ -14,10 +14,12 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * v8.9.5:
- * - Issue 192: Exposed isCharging and maxTemperature for telemetry parity.
- * v8.8.21: Migrated to TimeProvider for all timing logic to ensure system-wide consistency.
- * v8.8.35: Issue 163 - Hardened power tamper detection and connected violation callbacks.
+ * v8.9.37:
+ * - Issue #273: Thermal Throttling logic. (Formerly #543 / #403)
+ * - Issue #192: Exposed isCharging and maxTemperature for telemetry parity. (Formerly #462)
+ * - Issue #163: Hardened power tamper detection and connected violation callbacks. (Formerly #433)
+ * v8.8.21: 
+ * - Migrated to TimeProvider for all timing logic to ensure system-wide consistency. (Issue #282 - Formerly #552)
  */
 class IntegrityMonitor(
     private val context: Context,
@@ -53,13 +55,13 @@ class IntegrityMonitor(
     var isCharging = false
         private set
 
-    // Issue #272: Battery Discharge Profiling - Now uses monotonic time (Issue #294). (Formerly #2 / #24)
+    // Issue #272: Battery Discharge Profiling - Now uses monotonic time (Issue #294). (Formerly #542 / #564 / #402)
     private val batterySamples = ConcurrentLinkedQueue<Pair<Long, Int>>()
     private var lastBatteryCheckTs = 0L
     var isBatterySteepDischarge = false
         private set
 
-    // Issue #273: Thermal Throttling (Formerly #3)
+    // Issue #273: Thermal Throttling (Formerly #543 / #403)
     var isCoolingModeActive = false
         private set
 
@@ -74,7 +76,7 @@ class IntegrityMonitor(
     }
 
     /**
-     * pollSystemStatus: Updated to take both wall and monotonic time (Issue #294). (Formerly #24)
+     * pollSystemStatus: Updated to take both wall and monotonic time (Issue #294). (Formerly #564)
      */
     fun pollSystemStatus(nowWall: Long, nowRealtime: Long) {
         val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
@@ -86,7 +88,7 @@ class IntegrityMonitor(
                 repository.saveFloatSync(MainRepository.MAX_TEMP_KEY, maxTemperature)
             }
 
-            // Issue #273: Thermal Throttling Logic (Formerly #3)
+            // Issue #273: Thermal Throttling Logic (Formerly #543 / #403)
             if (!isCoolingModeActive && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
                 isCoolingModeActive = true
                 onLogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true)
@@ -268,7 +270,7 @@ class IntegrityMonitor(
 
     /**
      * checkViolationSustained: Returns true if the violation has persisted beyond the threshold.
-     * Forensic event handling is centralized in BaseMonitorService (Issue #282). (Formerly #12)
+     * Forensic event handling is centralized in BaseMonitorService (Issue #282). (Formerly #552)
      * v8.8.21: Now uses TimeProvider for high-assurance duration checks.
      */
     fun checkViolationSustained(type: String, startTs: Long, threshold: Long): Boolean {

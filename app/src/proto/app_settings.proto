@@ -153,7 +153,7 @@ message TrackerStatusProto {
     double alt = 23;
     float max_temp = 24;
 
-    // Issue #271: Forensic Sit Metadata Persistence
+    // Issue #401: Forensic Sit Metadata Persistence (Formerly #1/#271)
     bool is_sit_detected = 25;
     int64 last_sit_ts = 26;
     float vertical_velocity = 27;
@@ -191,6 +191,6 @@ message TrackerStatusProto {
     string net_interface = 55;
     bool is_storage_low = 56;
 
-    // Issue #272: Battery Drop-off Profiling
-    bool is_battery_steep_drop = 57;
+    // Issue #402: Battery Discharge Profiling (Formerly #2/#272)
+    bool is_battery_steep_discharge = 57;
 }

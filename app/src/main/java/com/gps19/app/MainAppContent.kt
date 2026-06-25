@@ -36,18 +36,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.gps19.core.engine.LANDING_PAGE_PAUSE_MS
 import kotlinx.coroutines.delay
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * v8.9.18:
- * - Issue #221: Propagating systemPulseRealtime for Bayesian uncertainty scaling.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * v8.8.23:
- * - R925: Implemented mandatory 2,000ms landing page pause for auto-mode entry.
- * - R926: Guaranteed service start during auto-transition to prevent stale/gray data.
- * - v8.8.22: Fixed missing timeProvider in manual export calls.
+ * v8.9.37:
+ * - R925: Aligned session auto-transition delay with LANDING_PAGE_PAUSE_MS from engine constants.
  */
 @Composable
 fun MainAppContent(
@@ -94,9 +89,9 @@ fun MainAppContent(
         
         val mode = uiState.appMode
         if (mode != null) {
-            // R925: If we are on the landing page and auto-detecting a session, wait for 2s
+            // R925: If we are on the landing page and auto-detecting a session, wait for LANDING_PAGE_PAUSE_MS
             if (navController.currentDestination?.route == Screen.Landing.route) {
-                delay(2000)
+                delay(LANDING_PAGE_PAUSE_MS)
                 // R926: Ensure background service is launched during auto-transition
                 onStartService(mode)
             }

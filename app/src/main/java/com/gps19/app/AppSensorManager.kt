@@ -25,13 +25,11 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU and Environmental sensors.
+ * v8.9.34:
+ * - Issue #321: Shadow Constants Remediation. Replaced magic numbers with EngineConstants. (Formerly #706)
  * v8.9.32:
- * - Issue #295: Redundant Barometric Baselining. Exposing absoluteAltitude to allow 
+ * - Issue #565: Redundant Barometric Baselining. Exposing absoluteAltitude to allow
  *   LocationSentinel to handle primary baselining.
- * v8.9.21:
- * - Issue #224: Added tilt to SensorSnapshot for forensic ribbon expansion.
- * v8.9.7:
- * - Plunge Matching: Implemented peakVerticalVelocityTs tracking and enhanced displacement processing.
  * v8.8.21: Migrated to TimeProvider for all timing logic.
  */
 @Singleton
@@ -95,12 +93,12 @@ class AppSensorManager @Inject constructor(
     private var secSitDetected = false
 
     private var fastPathFloor: Double = -1.0
-    private var fastPathSpikeThreshold: Double = 40.0
-    private var fastPathMinDb: Double = 50.0
+    private var fastPathSpikeThreshold: Double = ACOUSTIC_THRESHOLD_DB_JUMP
+    private var fastPathMinDb: Double = ACOUSTIC_MIN_THRESHOLD_DB
     private var onAcousticSpike: (() -> Unit)? = null
 
     private var fastPathLightBaseline: Float = -1.0f
-    private var fastPathLightSpikeThreshold: Float = 150.0f
+    private var fastPathLightSpikeThreshold: Float = LIGHT_THRESHOLD_LUX_JUMP
     private var onLightSpike: (() -> Unit)? = null
     
     private var lastAcousticSpikeTs: Long = 0L
@@ -128,14 +126,12 @@ class AppSensorManager @Inject constructor(
 
     /**
      * absoluteAltitude: Raw barometric altitude relative to standard atmosphere (1013.25 hPa).
-     * Used as the primary input for LocationSentinel to avoid double-baselining.
      */
     var absoluteAltitude: Float = 0f
         private set
 
     /**
      * relativeAltitude: Filtered altitude relative to a local moving baseline.
-     * Used for UI visualization and internal snapshot reporting.
      */
     var relativeAltitude: Float = 0f
         private set
@@ -303,11 +299,11 @@ class AppSensorManager @Inject constructor(
             }
         }
         
-        if (now - lastBufferRecordTs >= 1000L) {
+        if (now - lastBufferRecordTs >= TICK_INTERVAL_MS) {
             val sitForForensics: Boolean
             synchronized(this) {
                 sitForForensics = secSitDetected
-                secSitDetected = false // Atomically clear the forensic latch
+                secSitDetected = false 
             }
 
             sensorSampleBuffer.add(SensorSnapshot(
@@ -329,7 +325,7 @@ class AppSensorManager @Inject constructor(
             secPeakLift = abs(relativeAltitude)
             secPeakDb = latestAcousticDb
             
-            while (sensorSampleBuffer.size > 0 && (wallNow - (sensorSampleBuffer.peek()?.ts ?: wallNow)) > 300000L) {
+            while (sensorSampleBuffer.size > 0 && (wallNow - (sensorSampleBuffer.peek()?.ts ?: wallNow)) > SENSOR_SAMPLE_BUFFER_MAX_AGE_MS) {
                 sensorSampleBuffer.poll()
             }
         }
@@ -355,7 +351,7 @@ class AppSensorManager @Inject constructor(
                 var audioRecord: AudioRecord? = null
                 try {
                     var attempts = 0
-                    while (attempts < 3 && isMonitoring) {
+                    while (attempts < ACOUSTIC_INIT_RETRY_COUNT && isMonitoring) {
                         val record = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
                         if (record.state == AudioRecord.STATE_INITIALIZED) {
                             audioRecord = record
@@ -363,7 +359,7 @@ class AppSensorManager @Inject constructor(
                         }
                         record.release()
                         attempts++
-                        try { Thread.sleep(200) } catch (ie: InterruptedException) { break }
+                        try { Thread.sleep(ACOUSTIC_INIT_RETRY_DELAY_MS) } catch (ie: InterruptedException) { break }
                     }
 
                     if (!isMonitoring) break
@@ -432,7 +428,7 @@ class AppSensorManager @Inject constructor(
                         } else if (read < 0) {
                             if (!isMonitoring) break
                             val errorMsg = when(read) {
-                                AudioRecord.ERROR_INVALID_OPERATION -> "INVALID_OPERATION (Contention?)"
+                                AudioRecord.ERROR_INVALID_OPERATION -> "INVALID_OPERATION"
                                 AudioRecord.ERROR_BAD_VALUE -> "BAD_VALUE"
                                 AudioRecord.ERROR_DEAD_OBJECT -> "DEAD_OBJECT"
                                 else -> "Unknown error $read"
@@ -452,7 +448,7 @@ class AppSensorManager @Inject constructor(
                     isAcousticRunning = false
                     try { audioRecord?.release() } catch (ex: Exception) {}
                     if (isMonitoring) {
-                        try { Thread.sleep(2000) } catch (ie: InterruptedException) { }
+                        try { Thread.sleep(ACOUSTIC_GENERIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { }
                     }
                 }
             }
@@ -541,7 +537,7 @@ class AppSensorManager @Inject constructor(
         val dx = x - lastAccelX
         val dy = y - lastAccelY
         val dz = z - lastAccelZ
-        val delta = (sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()) / 9.80665f
+        val delta = (sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()) / GRAVITY_EARTH
 
         synchronized(this) {
             if (delta > internalPeakVibration) internalPeakVibration = delta
@@ -563,14 +559,14 @@ class AppSensorManager @Inject constructor(
                     secSitDetected = true 
                 }
                 plungePhase = 0
-            } else if (now - lastPlungePhaseTs > 1500) {
+            } else if (now - lastPlungePhaseTs > CHAIR_PLUNGE_PHASE_TIMEOUT_MS) {
                 plungePhase = 0
             }
         }
 
         if (isStationary()) {
             if (stationaryStartTs == 0L) stationaryStartTs = now
-            else if (now - stationaryStartTs > 200) {
+            else if (now - stationaryStartTs > MUZZLE_HYSTERESIS_MS) {
                 currentVerticalVelocity = 0f
                 currentVerticalDisplacement = 0f
                 if (plungePhase != 2) plungePhase = 0 
@@ -597,13 +593,13 @@ class AppSensorManager @Inject constructor(
             currentVerticalVelocity += vz_accel * dt
             currentVerticalDisplacement += currentVerticalVelocity * dt 
             
-            if (abs(currentVerticalVelocity) > 5.0f) {
-                currentVerticalVelocity = if (currentVerticalVelocity > 0) 5.0f else -5.0f
+            if (abs(currentVerticalVelocity) > VERTICAL_VELOCITY_MAX_MPS) {
+                currentVerticalVelocity = if (currentVerticalVelocity > 0) VERTICAL_VELOCITY_MAX_MPS else -VERTICAL_VELOCITY_MAX_MPS
             }
 
             val now = timeProvider.elapsedRealtime()
             val wallNow = timeProvider.currentTimeMillis()
-            if (plungePhase > 0 && now - lastPlungePhaseTs > 1500) plungePhase = 0
+            if (plungePhase > 0 && now - lastPlungePhaseTs > CHAIR_PLUNGE_PHASE_TIMEOUT_MS) plungePhase = 0
 
             when (plungePhase) {
                 0 -> {
@@ -653,13 +649,11 @@ class AppSensorManager @Inject constructor(
         if (now - lastBaroZeroingTs > BARO_ZEROING_INTERVAL_MS && stationaryDuration >= PASSIVE_ZEROING_STATIONARY_MS) {
             emaPressure = pressure
             lastBaroZeroingTs = now
-            Timber.d("Passive Zeroing: Barometer baseline reset after interval and ${PASSIVE_ZEROING_STATIONARY_MS/1000}s confirmed stationary")
         }
 
         val currentAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure)
         val baselineAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure)
         
-        // Issue #295: Expose absolute altitude for the engine, while keeping relative for UI/Snapshots.
         absoluteAltitude = currentAlt
         relativeAltitude = if (isWarming) 0f else currentAlt - baselineAlt
         
@@ -675,7 +669,6 @@ class AppSensorManager @Inject constructor(
             if (!isWarming && stationaryStartTs != 0L && (now - stationaryStartTs > ROTATION_INIT_STATIONARY_MS)) {
                 System.arraycopy(currentMatrix, 0, initialRotationMatrix, 0, 9)
                 hasInitialRotation = true
-                Timber.d("Orientation Init: Baseline captured after confirmed 3s stationary window (post-warming)")
             }
             return
         }

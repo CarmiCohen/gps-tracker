@@ -7,7 +7,7 @@ import kotlin.math.*
  * v8.9.34:
  * - Issue #264: Consolidated magic numbers into EngineConstants.kt.
  * v8.9.28:
- * - Issue #285: Implementation of the sliding-window factor graph logic as per GTO_ENGINE_SPEC.md. (Formerly #15)
+ * - Issue #309: Implementation of the sliding-window factor graph logic as per GTO_ENGINE_SPEC.md. (Formerly #285)
  */
 class GtoEngine {
 

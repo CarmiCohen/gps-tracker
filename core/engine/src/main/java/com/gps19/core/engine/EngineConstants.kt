@@ -2,22 +2,19 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * v8.9.34:
- * - Issue #302: Centralized Behavioral Magic Numbers from TrackerStateManager.
- * - Issue #303: Unified Trajectory Rejection multiplier.
- * - Issue #263: Corrected inverted EMA constant weights (Slow factors now < Fast factors).
- * - Issue #264: Consolidated GtoEngine magic numbers (Speed thresholds).
- * v8.9.31:
- * - Issue #292: Added ACOUSTIC_FLOOR_MIN_DB (25.0) to prevent false triggers in silent environments.
- * v8.9.26:
- * - Issue #272: Synchronized version to v8.9.26 baseline.
- * - Issue #273: Use code precision for LAT_DEG_TO_METERS (111194.92664455874).
- * - Issue #275: Change the code according to SoT - Standardized Alert Titles to "Tracker:".
- * - Issue #271: Change SoT according to the code - Removed redundant ACK_SYNC_LOOP_INTERVAL_MS.
+ * v8.9.37:
+ * - Issue #315: Network Integrity & Timeout Scaling. Refined RTT scaling 
+ *   to handle high-latency scenarios. (Formerly #273 / #543 / #403)
+ * - Issue #166: Shadow Constants Remediation. Centralized magic numbers from AppSensorManager. (Formerly #436)
+ * - Issue #302: Centralized Behavioral Magic Numbers from TrackerStateManager. (Formerly #702 / #432)
+ * - Issue #303: Unified Trajectory Rejection multiplier. (Formerly #573 / #433)
+ * - R810 Split: Segregated Acoustic (L), Physical (M), and Filtering (P) requirements.
+ * - R925: Defined LANDING_PAGE_PAUSE_MS for session auto-transition.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
 const val LAT_DEG_TO_METERS = 111194.92664455874
+const val GRAVITY_EARTH = 9.80665f
 
 // Global App Defaults (Inherited by Engine)
 const val DEFAULT_LAT = 32.7940
@@ -32,6 +29,7 @@ const val ABSOLUTE_DISTANCE_CAP_METERS = 50000.0
 const val MAX_TRACTOR_ACCEL = 2.0 
 const val PARKING_ACCEL_LIMIT = 1.0
 const val ALTITUDE_VELOCITY_CAP = 10.0 
+const val VERTICAL_VELOCITY_MAX_MPS = 5.0f
 const val PROMOTION_ANGLE_TOLERANCE = 30.0 
 const val PATH_EFFICIENCY_THRESHOLD = 0.1 
 const val COMPASS_STABILITY_THRESHOLD = 20.0 
@@ -53,11 +51,11 @@ const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0f
 const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0f
 const val JUMP_GATE_VISUAL_JITTER_METERS = 10.0
 
-// Adaptive Jump Confidence (v8.9.18)
+// Adaptive Jump Confidence (v8.9.18 - Issue #219)
 const val ADAPTIVE_JUMP_SNR_THRESHOLD = 35.0f
 const val ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0f
 
-// Hindsight Correction (v8.9.18)
+// Hindsight Correction (v8.9.18 - Issue #220)
 const val HINDSIGHT_BUFFER_SIZE = 5
 const val HINDSIGHT_MAX_AGE_MS = 30000L
 
@@ -82,7 +80,7 @@ const val EFFICIENCY_MIN_TOTAL_DIST = 50.0
 const val SCATTER_MIN_SPEED_MPS = 0.5
 const val SCATTER_ANGLE_THRESHOLD = 120.0
 
-// Acoustic Monitoring (R810)
+// Acoustic Monitoring (R810-L)
 const val ACOUSTIC_THRESHOLD_DB_JUMP = 40.0 
 const val ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP = 20.0
 const val ACOUSTIC_MIN_THRESHOLD_DB = 50.0
@@ -91,8 +89,11 @@ const val ACOUSTIC_FLOOR_CONTRACTION_EMA = 0.995f
 const val ACOUSTIC_LOCKOUT_MS = 1000L
 const val ACOUSTIC_RECOVERY_DELAY_MS = 30000L
 const val ACOUSTIC_SAMPLE_RATE = 8000
+const val ACOUSTIC_INIT_RETRY_COUNT = 3
+const val ACOUSTIC_INIT_RETRY_DELAY_MS = 200L
+const val ACOUSTIC_GENERIC_RECOVERY_DELAY_MS = 2000L
 
-// Physical Security Sentinel (R810)
+// Physical Security Sentinel (R810-M)
 const val LIGHT_THRESHOLD_LUX_JUMP = 150.0f
 const val TILT_THRESHOLD_DEGREES = 15.0f
 const val BARO_LIFT_THRESHOLD_METERS = 0.8f
@@ -116,11 +117,12 @@ const val CHAIR_SIT_BARO_THRESHOLD = 0.08f
 const val CHAIR_PLUNGE_VELOCITY_THRESHOLD = 0.18f 
 const val CHAIR_PLUNGE_DISTANCE_THRESHOLD = 0.05f 
 const val CHAIR_PLUNGE_WINDOW_MS = 800L
+const val CHAIR_PLUNGE_PHASE_TIMEOUT_MS = 1500L
 const val CHAIR_SIT_COOLDOWN_MS = 5000L
 const val SIT_TRANSMISSION_LATCH_MS = 10000L
 const val SIT_DUPLICATE_GUARD_MS = 15000L
 
-// Filtering Thresholds (R810 Zero-Lag)
+// Filtering Thresholds (R810-P Zero-Lag)
 const val SUSPICIOUS_Q_SCALE = 1000.0
 const val TRAJECTORY_PROMOTION_WINDOW_MS = 30000L 
 const val HIGH_ACCURACY_THRESHOLD_METERS = 35.0f
@@ -141,11 +143,12 @@ const val GEOFENCE_HYSTERESIS_METERS = 5.0
 const val GEOFENCE_PREDICTIVE_LOOKAHEAD_S = 2.0
 const val GEOFENCE_PREDICTIVE_MIN_SPEED_MPS = 1.0
 
-// EMA Factors (Issue #263: Corrected Inversion)
+// EMA Factors (Issue #263: Corrected Inversion - Formerly #533 / #363)
 const val LUX_EMA_SLOW = 0.01f
 const val LUX_EMA_FAST = 0.1f
 const val LUX_EMA_UP_SLOW = 0.001f
 const val LUX_EMA_UP_FAST = 0.01f
+const val LUX_EMA_UP_FAST_A15 = 0.05f // Optimized for A15 LED flutter
 const val LUX_EMA_DOWN_SLOW = 0.001f
 const val LUX_EMA_DOWN_FAST = 0.02f
 const val ACOUSTIC_EMA_DOWN_SLOW = 0.001f
@@ -158,7 +161,7 @@ const val VIBRATION_EMA_UP_SLOW = 0.001f
 const val VIBRATION_EMA_UP_FAST = 0.01f
 const val BARO_EMA_SLOW = 0.001f 
 
-// GtoEngine Optimization Constants (Issue #264)
+// GtoEngine Optimization Constants (Issue #264 - Formerly #534 / #364)
 const val GTO_TOW_SPEED_THRESHOLD = 10.0
 const val GTO_KINEMATIC_SPEED_DELTA = 10.0
 const val GTO_WORK_SPEED_THRESHOLD = 5.0
@@ -192,8 +195,9 @@ const val MUZZLE_HYSTERESIS_A15_MS = 500L
 const val GPS_REVIVAL_RETRY_INTERVAL_MS = 120000L
 const val MAX_REVIVAL_ATTEMPTS = 3
 const val XIAOMI_BOOT_GRACE_MS = 30000L
+const val LANDING_PAGE_PAUSE_MS = 2000L
 
-// Xiaomi Heuristic Recovery (v8.9.18)
+// Xiaomi Heuristic Recovery (v8.9.18 - Issue #218)
 const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 15000L
 const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
 
@@ -202,7 +206,7 @@ const val GPS_SAVE_INTERVAL_MS = 60000L
 const val PARKING_ANCHOR_MIN_DIST = 20.0
 const val PARKING_ANCHOR_FACTOR = 0.8
 
-// Behavioral State Thresholds (Issue #302)
+// Behavioral State Thresholds (Issue #302 - Formerly #572 / #432)
 const val SUSTAINED_SPEED_THRESHOLD = 2 
 const val SUSTAINED_SPEED_STATIONARY_THRESHOLD = 4
 const val STATE_CONFIDENCE_BUFFER_MS = 2000L
@@ -256,13 +260,17 @@ const val RIBBON_CURRENT_SCALE_MA = 1000.0
 const val RIBBON_SIT_TILT_SCALE_DEG = 15.0f
 const val RIBBON_SIT_BARO_SCALE_METERS = 0.5f
 
+const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
+
 // Network Communication (v8.8.21)
+// Issue #315: Maximum healthy RTT for sync loop scaling. (Formerly #273 / #543 / #403)
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0
 const val NETWORK_TIMEOUT_MS = 10000
 const val NET_REJOIN_THRESHOLD_MS = 15000L
 const val NET_HEAL_THRESHOLD_MS = 45000L
+// Issue #315: Baseline sync interval. (Formerly #273 / #543 / #403)
 const val PING_INTERVAL_MS = 10000L
 const val SOCKET_TIMEOUT_MS = 60000
 const val RTT_WINDOW_SIZE = 5
@@ -278,7 +286,7 @@ const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0f
 
-// Issue 193: Unified UI Staleness Threshold (10s)
+// Issue #193: Unified UI Staleness Threshold (10s) (Formerly #463)
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 10000L
 const val GPS_UI_FAIL_THRESHOLD_MS = 10000L
 
@@ -348,7 +356,7 @@ const val WATCH_DOG_UI_GRACE_MS = 30000L
 const val SENSOR_GRACE_PERIOD_MS = 600000L
 const val TEST_ALARM_DURATION_MS = 3000L
 
-// Behavioral Debouncing (R729)
+// Behavioral Debouncing (R729 - Issue #191 - Formerly #461)
 const val PROXIMITY_DEBOUNCE_STATIONARY_A15_MS = 5000L
 const val PROXIMITY_DEBOUNCE_STATIONARY_MS = 3000L
 const val PROXIMITY_DEBOUNCE_MOVING_MS = 1000L

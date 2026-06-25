@@ -10,9 +10,8 @@ import org.junit.Test
 
 /**
  * UtilsTest: Tests for migrated utility functions.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * v8.8.36: Issue 165 - Migrated to PhysicsUtils and FormatterUtils.
+ * v8.9.37:
+ * - R810 Split: Updated future packet test to R810-N.
  */
 class UtilsTest {
 
@@ -49,7 +48,7 @@ class UtilsTest {
 
     @Test
     fun `calculateGpsIndex handles clock drift correctly`() {
-        // R810: Test negative age (future packet) up to 30s
+        // R810-N: Test negative age (future packet) up to 30s
         val futureAge = -5000L // 5s in the future
         val result = TelemetryUtils.calculateGpsIndex(futureAge, 5.0f, 15)
         

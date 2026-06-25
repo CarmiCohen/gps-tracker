@@ -5,10 +5,10 @@ import kotlin.math.*
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
  * v8.9.34:
- * - Issue #303: Unified Trajectory Rejection multiplier.
- * - Issue #268: Removed redundant providedAcousticFloorDb from processGpsPoint.
+ * - Issue #573: Unified Trajectory Rejection multiplier. (Formerly #433 / #303)
+ * - Issue #538: Removed redundant providedAcousticFloorDb from processGpsPoint. (Formerly #368 / #268)
  * v8.9.22:
- * - Issue #227: Implemented hindsight transition smoothing.
+ * - Issue #327: Implemented hindsight transition smoothing. (Formerly #497 / #227)
  */
 class LocationProcessor(
     private val listener: LocationProcessorListener,

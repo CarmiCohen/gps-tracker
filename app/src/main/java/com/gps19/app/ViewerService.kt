@@ -18,10 +18,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.37:
+ * - Issue #325: Unified accuracy fallback logic. Propagating maxAccuracy to forensic ribbons. (Formerly #484 / #214)
  * v8.9.31:
- * - Issue #301: Fixed SyncManager instantiation and pushCurrentStatus parameter mismatch.
+ * - Issue #301: Fixed SyncManager instantiation and pushCurrentStatus parameter mismatch. (Formerly #431)
  * v8.9.30:
- * - Issue #296: Explicitly initialized serviceStartRealtime in onCreate after engine initialization.
+ * - Issue #296: Explicitly initialized serviceStartRealtime in onCreate after engine initialization. (Formerly #426 / #26)
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -170,7 +172,7 @@ class ViewerService : BaseMonitorService() {
             lastServiceTickRealtime = timeProvider.elapsedRealtime()
             locationProcessor.setLastValidFixTs(timeProvider.elapsedRealtime())
             
-            // Issue #296: Ensure bootstrap starts from actual engine online point
+            // Issue #296: Ensure bootstrap starts from actual engine online point (Formerly #426 / #26)
             serviceStartRealtime = timeProvider.elapsedRealtime()
 
             startTickLoop()
@@ -350,6 +352,8 @@ class ViewerService : BaseMonitorService() {
             hasGps = trackerGpsTs > 0,
             isTrackerMode = false,
             gpsIndex = TelemetryUtils.calculateGpsIndex(gpsAge, remoteHandler.trackerMaxAccuracy, remoteHandler.trackerSatsUsed).totalIndex,
+            accuracy = remoteHandler.trackerAccuracy,
+            maxAccuracy = remoteHandler.trackerMaxAccuracy,
             noiseIdx = ((remoteHandler.trackerAcousticDb - remoteHandler.trackerAcousticFloorDb).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB).toFloat(),
             luxIdx = (log10(remoteHandler.trackerLux.toDouble() + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0).toFloat(),
             vibeIdx = (remoteHandler.trackerVibration.toDouble() / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0).toFloat(),

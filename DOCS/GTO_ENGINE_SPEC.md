@@ -1,4 +1,4 @@
-# Specification: GtoEngine (Graph Trajectory Optimization) (v8.9.10)
+# Specification: GtoEngine (Graph Trajectory Optimization) (v8.9.37)
 
 This document specifies the architecture and logic for the **GtoEngine**, an advanced optimization-based reconstruction system for tracking heavy tractor assets. 
 
@@ -20,7 +20,7 @@ The engine maintains a "Sliding Window" of nodes (GPS fixes) and "Factors" (cons
 
 ### 2.2. Factors (Constraints)
 *   **GPS Factors**: The raw coordinate and its reported accuracy.
-*   **Kinematic Factors**: Constraints based on tractor physics (Acceleration < 2.0 m/s²).
+*   **Kinematic Factors**: Constraints based on tractor physics (`MAX_TRACTOR_ACCEL` < 2.0 m/s²).
 *   **IMU Factors**: Correlation between physical vibration (Accelerometer) and movement distance.
 *   **Magnetometer Factors**: Heading consistency check.
 
@@ -31,12 +31,12 @@ The engine maintains a "Sliding Window" of nodes (GPS fixes) and "Factors" (cons
 ### 3.1. Hindsight Correction
 If a point arrives that implies a "Jump", the GtoEngine evaluates the sequence:
 *   **Scenario A**: Next points return to the origin. **Decision**: The jump was noise. It is smoothed out.
-*   **Scenario B**: Next points continue from the jump location. **Decision**: The jump was real high-speed movement. **Promotion**: The "Jump Hold" is canceled via **Trajectory Promotion**, and the alarm is triggered immediately.
+*   **Scenario B**: Next points continue from the jump location. **Decision**: The jump was real high-speed movement. **Promotion**: The "Jump Hold" is canceled via **Trajectory Promotion**, and the alarm is triggered immediately. (Issue #415 - Formerly #285)
 
 ### 3.2. Mechanical Vibration Signature
 *   **Work vs. Theft**: The engine analyzes the accelerometer frequency. 
-    *   **High-Freq Vibration + Slow Movement**: The tractor is working. Thresholds are widened to allow for "mechanical jitter."
-    *   **Zero Vibration + Fast Movement**: The tractor is being towed. Thresholds are tightened.
+    *   **High-Freq Vibration + Slow Movement**: The tractor is working. Thresholds are widened to allow for "mechanical jitter." (`GTO_WORK_SPEED_THRESHOLD` = 5.0 m/s).
+    *   **Zero Vibration + Fast Movement**: The tractor is being towed. Thresholds are tightened. (`GTO_TOW_SPEED_THRESHOLD` = 10.0 m/s).
 
 ### 3.3. Radial Jitter (Zig-Zag) Filtering
 By evaluating the graph's **Path Efficiency**, the engine calculates the ratio of `Displacement / PathLength`. If the efficiency is low, the engine "collapses" the jitter into a single stationary node.
@@ -67,4 +67,4 @@ The GtoEngine operates as a "State-Aware Optimizer":
 | **CPU Cost** | Low | Moderate (Matrix solving) |
 
 ## 6. Summary Conclusion
-The **GtoEngine** provides a "Truth-at-Source" model that understands the difference between a tractor bouncing in a field and a tractor being moved by an unauthorized party. In v8.9.10, this logic is strictly isolated and geographically anchored via **Log Spatial Anchors**, ensuring forensic integrity.
+The **GtoEngine** provides a "Truth-at-Source" model that understands the difference between a tractor bouncing in a field and a tractor being moved by an unauthorized party. In v8.9.37, this logic is strictly isolated and geographically anchored via **Log Spatial Anchors**, ensuring forensic integrity.

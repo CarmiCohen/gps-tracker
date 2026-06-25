@@ -4,6 +4,8 @@ import kotlin.math.abs
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates".
+ * v8.9.34:
+ * - Issue #436: Shadow Constants Remediation. Replaced magic numbers with EngineConstants.
  */
 object SentinelValidator {
 
@@ -28,7 +30,7 @@ object SentinelValidator {
     }
 
     fun isStationary(vibration: Float, adaptiveFloor: Float): Boolean {
-        val dynamicGate = (adaptiveFloor * STATIONARY_FLOOR_MULT).coerceIn(0.05f, VIBRATION_STATIONARY_THRESHOLD)
+        val dynamicGate = (adaptiveFloor * STATIONARY_FLOOR_MULT).coerceIn(INITIAL_VIBRATION_FLOOR, VIBRATION_STATIONARY_THRESHOLD)
         return vibration < dynamicGate
     }
 

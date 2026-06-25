@@ -10,10 +10,11 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
- * v8.9.22:
- * - Issue #226: Added locationPendingReason to DashboardState for intelligent uncertainty UX.
+ * v8.9.37:
+ * - Issue #325: Unified accuracy fallback logic. Refined accuracy display to prioritize 
+ *   maxAccuracy (filtered uncertainty) over raw accuracy consistently. (Formerly #484 / #214)
  * v8.9.6:
- * - Issue 193: Implemented isTelemetryFresh calculation for Zombie Telemetry UX mitigation.
+ * - Issue 193: Implemented is telemetryFresh calculation for Zombie Telemetry UX mitigation.
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {
@@ -98,6 +99,10 @@ class DashboardUseCase @Inject constructor() {
             }
         }
 
+        // Issue #325: Authoritative accuracy metric (Prioritize filtered maxAccuracy) (Formerly #484)
+        val authoritativeAcc = if (loc.maxAccuracy > 0) loc.maxAccuracy else loc.accuracy
+        val authoritativeViewerAcc = if (uiState.localLocation.maxAccuracy > 0) uiState.localLocation.maxAccuracy else uiState.localLocation.accuracy
+
         return DashboardState(
             trackerState = trackerState,
             isSuspicious = loc.isSuspicious,
@@ -118,11 +123,11 @@ class DashboardUseCase @Inject constructor() {
             violationPercentage = "%.1f%%".format(Locale.getDefault(), loc.violationPercentage * 100f),
             lat = gpsVal("%.6f".format(Locale.getDefault(), loc.lat)),
             lng = gpsVal("%.6f".format(Locale.getDefault(), loc.lng)),
-            trackerAccuracy = gpsVal("±%.1fm".format(Locale.getDefault(), loc.accuracy)),
+            trackerAccuracy = gpsVal("±%.1fm".format(Locale.getDefault(), authoritativeAcc)),
             satsIndex = gpsVal("${uiState.trackerSatsUsed}/${uiState.trackerSatsView}"),
             isSatsIndexWarning = (uiState.trackerSatsUsed < 4 && uiState.trackerSatsView > 0),
-            trackerMaxAcc = gpsVal("±%.1fm".format(Locale.getDefault(), uiState.maxTrackerAccuracy)),
-            viewerAccuracy = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), uiState.localLocation.accuracy),
+            trackerMaxAcc = gpsVal("±%.1fm".format(Locale.getDefault(), if (uiState.maxTrackerAccuracy > 0) uiState.maxTrackerAccuracy else authoritativeAcc)),
+            viewerAccuracy = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), authoritativeViewerAcc),
             vibration = sensorVal("%.2fG".format(Locale.getDefault(), loc.vibration)),
             heading = sensorVal("%.0f°".format(Locale.getDefault(), loc.heading)),
             tilt = sensorVal("%.1f°".format(Locale.getDefault(), loc.tiltDegrees)),

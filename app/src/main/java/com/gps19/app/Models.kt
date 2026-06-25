@@ -9,6 +9,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v8.9.37:
+ * - Issue #325: Unified accuracy fallback logic. Added maxAccuracy to ConnectionPoint 
+ *   to support forensic ribbon uncertainty visualization. (Formerly #484 / #214)
  * v8.9.22:
  * - Issue #226: Added locationPendingReason to TrackerStatus, LocationState, DashboardState, IntegrityState, and IntegrityStateUi.
  * v8.9.21:
@@ -67,7 +70,9 @@ data class AlertSettings(
 data class ConnectionPoint(
     val localId: String = UUID.randomUUID().toString(),
     val ts: Long, val rtt: Int, val localSig: Int, val remoteSig: Int,
-    val isConnected: Boolean, val isGap: Boolean = false, val gpsAccuracy: Float = 0f,
+    val isConnected: Boolean, val isGap: Boolean = false, 
+    val gpsAccuracy: Float = 0f,
+    val maxAccuracy: Float = 0f,
     val isTick: Boolean = false, val hasGps: Boolean = false, val gpsIndex: Float = 0f,
     val noiseIdx: Float = 0f, val luxIdx: Float = 0f, val vibeIdx: Float = 0f, val proxIdx: Float = 1f,
     val liftIdx: Float = 0f, val snrIdx: Float = 0f,
@@ -328,6 +333,7 @@ data class LocationState(
     val lng: Double = 0.0,
     val speed: Float = 0f,
     val accuracy: Float = 0f,
+    val maxAccuracy: Float = 0f,
     val bearing: Float = 0f,
     val timestamp: Long = 0L,
     val telemetryTs: Long = 0L, 

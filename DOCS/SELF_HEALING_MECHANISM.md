@@ -1,9 +1,9 @@
-# Self-Healing & Persistence Mechanism (v8.9.10)
+# Self-Healing & Persistence Mechanism (v8.9.37)
 
 This document describes the background persistence architecture of the GPS Tracker project, designed to ensure the background engine remains active even under aggressive OS battery management and memory pressure.
 
 ## 1. General Concept
-The project treats the tracking engine as a persistent background service. In v8.9.10, this role is split between `TrackerService` and `ViewerService`. Under R800 (Unified Back Navigation), the app is never "closed" via the UI; it is minimized or swiped away.
+The project treats the tracking engine as a persistent background service. In v8.9.37, this role is split between `TrackerService` and `ViewerService`. Under the unified navigation model, the app is never "closed" via the UI; it is minimized or swiped away.
 
 ## 2. Detailed Mechanism
 
@@ -17,21 +17,21 @@ Services maintain their own "should be running" state in persistent storage. If 
 Navigation never terminates the service. Even when "Back" is pressed at the root, the app calls `moveTaskToBack`, keeping the service alive in the foreground.
 
 ### D. Foreground Service & WakeLocks
-- **Compliance**: Correctly passes `FOREGROUND_SERVICE_TYPE_LOCATION` (and `MICROPHONE` when active) for Android 10+ compatibility.
-- **WakeLock Hardening**: Utilizes a non-reference-counted `PARTIAL_WAKE_LOCK` with a 10-minute refresh cycle.
-- **Monotonic Integrity**: Watchdog and timeout evaluations use `TimeProvider.elapsedRealtime()`.
+- **Compliance**: Correctly passes `FOREGROUND_SERVICE_TYPE_LOCATION` (and `MICROPHONE` when active) for Android 10+ compatibility (Issue #247).
+- **WakeLock Hardening**: Utilizes a non-reference-counted `PARTIAL_WAKE_LOCK` with active renewal on every service tick (Issue #148).
+- **Monotonic Integrity**: Watchdog and timeout evaluations use `TimeProvider.elapsedRealtime()` (Issue #413).
 
 ### E. Advanced Hardware Self-Healing
 - **Stall Detection**: Monitors if coordinates are frozen. Hardened to **60s** (`GPS_STALL_THRESHOLD_MS`).
-- **Retry Loop**: Attempts a hardware-level refresh every **120 seconds**.
-- **Critical Escalation**: After 3 failed attempts, a `CRITICAL: GPS_HARDWARE_LOCK` log is emitted.
-- **Log Spatial Anchor (v8.9.10)**: These critical revival and lock events are now automatically anchored with `lat`/`lng` coordinates to help forensic reconstruction.
+- **Retry Loop**: Attempts a hardware-level refresh every **120 seconds** (`GPS_REVIVAL_RETRY_INTERVAL_MS`).
+- **Critical Escalation**: After 3 failed attempts, a `CRITICAL: GPS_HARDWARE_LOCK` log is emitted (Issue #124).
+- **Log Spatial Anchor**: These critical revival and lock events are automatically anchored with `lat`/`lng` coordinates to help forensic reconstruction (Issue #208).
 
 ### F. Xiaomi Boot Resilience
-Includes `XIAOMI_BOOT_GRACE_MS` (30s) to suppress transient "System Not Ready" alarms during the MIUI/HyperOS boot transition phase.
+Includes `XIAOMI_BOOT_GRACE_MS` (30s) to suppress transient "System Not Ready" alarms during the MIUI/HyperOS boot transition phase (Issue #190).
 
 ## 3. Summary of Files Involved
 - `TrackerService.kt` / `ViewerService.kt`: Role-specific engine executors.
 - `SystemMonitor.kt`: WakeLock and Watchdog management.
 - `MainActivity.kt`: Root navigation and backgrounding logic.
-- `LogManager.kt`: Coordinate attachment for self-healing logs (v8.9.10).
+- `LogManager.kt`: Coordinate attachment for self-healing logs.
