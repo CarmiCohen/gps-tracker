@@ -6,13 +6,13 @@ import kotlin.math.*
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
  * v8.9.37:
  * - Issue #214: Added accuracy and maxAccuracy to mergeWorstCase and gap-filling logic 
- *   to support authoritative uncertainty ribbons. (Formerly #484)
+ *   to support authoritative uncertainty ribbons.
  * - Issue #291: SIT Forensic Duplicate Risk. Fixed by ensuring isSitDetected defaults to false 
- *   during backfill if samples are missing. (Formerly #561, originally #21)
+ *   during backfill if samples are missing. (Formerly #21)
  * v8.9.21:
- * - Issue #224: Added tiltIdx and baroIdx to mergeWorstCase, backfillGaps, and fillRealGap. (Formerly #494)
+ * - Issue #329: Added tiltIdx and baroIdx to mergeWorstCase, backfillGaps, and fillRealGap. (Formerly #224)
  * v8.9.5:
- * - Issue #192: Added currentMa and SIT forensic fields to mergeWorstCase for absolute parity. (Formerly #462)
+ * - Issue #337: Added currentMa and SIT forensic fields to mergeWorstCase for absolute parity. (Formerly #192)
  */
 class TelemetryAggregator {
 
@@ -109,7 +109,7 @@ class TelemetryAggregator {
             val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0f, 1f) } ?: baseTemplate.tiltIdx
             val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0f, 1f) } ?: baseTemplate.baroIdx
             
-            // Issue #291: SIT detection is a point-in-time event. (Formerly #561)
+            // Issue #291: SIT detection is a point-in-time event.
             val resolvedSit = snapshot?.isSitDetected ?: false
 
             val fillPoint = baseTemplate.copy(

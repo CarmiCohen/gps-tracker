@@ -13,9 +13,9 @@ To maintain **Forensic Integrity**, we follow a strict documentation lifecycle:
 - **Organization**: [DOCS/DOCUMENTATION_ORGANIZATION.md](DOCS/DOCUMENTATION_ORGANIZATION.md) — Detailed hierarchy.
 
 ## Recent Changes (v8.9.37)
-- **Documentation Hardening (Issue #406)**: Finalized Source of Truth alignment across all markdown files. (Formerly #276)
+- **Documentation Hardening (Issue #312)**: Finalized Source of Truth alignment across all markdown files.
 - **Forensic Unification**: Standardized forensic logging with **Log Spatial Anchors** and **Ghost Mode** staleness indicators (Issue #193).
-- **GtoEngine Implementation**: Integrated sliding-window trajectory optimization for heavy asset tracking (Issue #415).
+- **GtoEngine Implementation**: Integrated sliding-window trajectory optimization for heavy asset tracking (Issue #309).
 - **Xiaomi & Samsung Hardening**: Implemented specialized background resilience for MIUI and Samsung hardware (Issue #148/190).
 
 ## Project Core Features

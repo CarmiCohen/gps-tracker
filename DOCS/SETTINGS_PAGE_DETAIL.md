@@ -19,7 +19,7 @@ These settings define how the device identifies itself and where it sends its da
     - **Local Internet**: `INTERNET_LOSS_THRESHOLD_MS` (60s).
     - **Relay Offline**: Server unreachable despite active internet.
     - **Tracker/Viewer Offline**: Heartbeat monitoring (Tracker: 180s / Viewer: 30s).
-    - **Jammer Detection**: `JAMMER_DETECTION_THRESHOLD_MS` (180s) for sustained GPS instability (Issue #403).
+    - **Jammer Detection**: `JAMMER_DETECTION_THRESHOLD_MS` (180s) for sustained GPS instability (Issue #315).
 - **Location**: 
     - **Geofence**: Based on `GEOFENCE_BUFFER_MULT` (6.0) and predictive look-ahead.
     - **GPS Stalled**: `GPS_STALL_THRESHOLD_MS` (60s). Featuring **Escalated Revival** (Issue #124) with a 120s retry loop.
@@ -38,7 +38,7 @@ These settings define how the device identifies itself and where it sends its da
     - **Tilt Alert**: Detects orientation changes (> 15°).
     - **Acoustic Alert**: Ambient noise jump detection (40dB).
     - **Lift Alert**: Barometric pressure changes (> 0.8m).
-    - **Chair Occupied**: Advanced seat-sensing pattern matching. (Issue #412)
+    - **Chair Occupied**: Advanced seat-sensing pattern matching. (Issue #282)
 
 ### B. Sound (Sound Setup)
 - **Siren Type**: Select between "Siren", "Chimes", or "Pulse".
@@ -55,7 +55,7 @@ These settings define how the device identifies itself and where it sends its da
 - **Full Initialization**: Factory-level data reset, clears all logs/trails.
 
 ## 4. Navigation & Persistence
-- **Unified Back = Commit**: Exiting the settings screen triggers a commit to `DataStore` and re-initializes services if routing parameters changed. (Issue #413)
+- **Unified Back = Commit**: Exiting the settings screen triggers a commit to `DataStore` and re-initializes services if routing parameters changed. (Issue #283)
 
 ## 5. Summary of Actions
 - **Phone Setup**: Accesses the Setup Guide for OS-level permissions.

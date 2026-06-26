@@ -6,15 +6,15 @@ import kotlin.math.*
 /**
  * MainAlarmLogic: Detection logic for system violations.
  * v8.9.34:
- * - Issue #417: Refactored getTrackerTitle to be fully role-aware for forensic parity. (Formerly #287 / #17)
- * - Issue #402: Synchronized version to v8.9.26 baseline. (Formerly #272 / #2)
+ * - Issue #287: Refactored getTrackerTitle to be fully role-aware for forensic parity. (Formerly #17)
+ * - Issue #272: Synchronized version to v8.9.26 baseline. (Formerly #2)
  * v8.9.20:
- * - Issue #500: Updated ALERT_ID_TRACKER_CHAIR subtitle to "Chair occupancy detected" 
+ * - Issue #331: Updated ALERT_ID_TRACKER_CHAIR subtitle to "Chair occupancy detected" 
  *   for consistency with "Chair Occupied" forensic status. (Formerly #230)
  * v8.9.19:
- * - Issue #501: Implemented VISUAL_JUMP detection logic. (Formerly #231)
+ * - Issue #231: Implemented VISUAL_JUMP detection logic.
  * v8.9.18:
- * - Issue #489: Implemented Adaptive Jump Confidence. Increased JUMP_HOLD_DURATION_MS 
+ * - Issue #332: Implemented Adaptive Jump Confidence. Increased JUMP_HOLD_DURATION_MS 
  *   when isAdaptiveJump is flagged (spoofing/reflection suspicion). (Formerly #219)
  */
 object MainAlarmLogic {
@@ -248,7 +248,7 @@ object MainAlarmLogic {
 
                 val timeSinceFirst = now - state.firstViolationTs
                 
-                // Issue #489: Adaptive Jump Confidence - Double hold duration for high-SNR spoofing suspicion (Formerly #219)
+                // Issue #332: Adaptive Jump Confidence - Double hold duration for high-SNR spoofing suspicion (Formerly #219)
                 val effectiveHoldMs = if (state.isAdaptiveJump) (JUMP_HOLD_DURATION_MS * ADAPTIVE_JUMP_HOLD_MULTIPLIER).toLong() else JUMP_HOLD_DURATION_MS
                 
                 val isSustained = if (state.firstViolationWasJump) {

@@ -61,12 +61,12 @@ This document tracks all open issues, technical debt, and pending validation tas
 
 ## 🟢 Resolved (this phase)
 *   **Issue #307**: Requirements Conflict Audit. Resolved all documentation and implementation contradictions for R922 (LEDs), R925 (Timing), and R810 (IDs). (Complete)
-*   **Issue #321**: Shadow Constants Remediation. Replaced localized magic numbers with EngineConstants references inside AppSensorManager and TrackerStateManager. (Formerly #706 / #306) (Complete)
-*   **Issue #322**: Architectural Bloat: ViewModel Decoupling. Decoupled MainViewModel by moving modular tracking code into TelemetryUseCase. (Formerly #385 / #115) (Complete)
+*   **Issue #321**: Shadow Constants Remediation. Replaced localized magic numbers with EngineConstants references inside AppSensorManager and TrackerStateManager. (Formerly #306) (Complete)
+*   **Issue #322**: Architectural Bloat: ViewModel Decoupling. Decoupled MainViewModel by moving modular tracking code into TelemetryUseCase. (Formerly #115) (Complete)
 *   **Issue #305**: New Phase Renumbering Cleanup. Completed final sweep and replaced low-number or double-offset references across `TelemetryAggregator.kt`, `EngineConstants.kt`, `RemoteHandler.kt`, and documentation files to ensure exact single-hop audit traceability below the #350 baseline limit. (Complete)
 *   **Issue #214**: Unified Accuracy Fallback Logic. Audited all logging and UI components to ensure prioritization of engine-calculated `maxAccuracy`.
 *   **Issue #273**: Network Integrity & Timeout Scaling. Refined RTT scaling and synchronized `app_settings.proto` fields.
-*   **Issue #276**: Documentation Hardening. Final sweep of all `.md` files to ensure synchronization with v8.9.37 architecture and renumbered issues.
+*   **Issue #312**: Documentation Hardening. Final sweep of all `.md` files to ensure synchronization with v8.9.37 architecture and renumbered issues.
 *   **Issue #148**: Samsung A15 GPS Stalling. Enforced 1000ms polling heartbeat and implemented active WakeLock renewal on every service tick. Prevents aggressive OEM background GNSS suspension and ensures 100% background persistence on A15 hardware. (Complete)
 *   **Issue #191**: Samsung A15 Proximity Flutter. Implemented a 500ms post-sync muzzle hysteresis window to filter virtual proximity sensor noise triggered by LED/Network I/O activity. Eliminates false tamper alerts during active telemetry synchronization. (Complete)
 *   **Issue #190**: Xiaomi Autostart & Boot Resilience. Implemented robust handling for indeterminate "Unknown" status and `XIAOMI_BOOT_GRACE_MS` (30s) to suppress transient boot alarms. (Complete)

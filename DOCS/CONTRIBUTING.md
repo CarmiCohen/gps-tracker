@@ -7,7 +7,7 @@ To maintain the **Forensic Integrity** of the GPS-Tracker project, all developer
 ### 🟢 Active Workspace: `STATUS/issues.md`
 - **Purpose**: Primary tracking for the current phase (Hardening).
 - **Rule**: Only contains Open issues, Pending validation tasks, or In-Progress technical debt.
-- **Workflow**: Items are added here first. Once verified, they **must** be removed and archived.
+- **Workflow**: Items are added here first. Once verified, they **must** must be removed and archived.
 
 ### 🔵 Audit Archive: `STATUS/compliance.md`
 - **Purpose**: Formal proof of implementation and historical record.
@@ -24,5 +24,5 @@ To maintain the **Forensic Integrity** of the GPS-Tracker project, all developer
 A task is only considered "Done" when:
 1. The code is merged and verified (on hardware if required).
 2. The entry is removed from `STATUS/issues.md`.
-3. The resolution summary is appended to the **Resolution Archive** in `STATUS/compliance.md` (Issue #406).
+3. The resolution summary is appended to the **Resolution Archive** in `STATUS/compliance.md` (Issue #312).
 4. The **Verification Manifest** in `STATUS/compliance.md` is updated to reflect the new status.

@@ -29,7 +29,7 @@ Specialized documents for specific hardware, subsystems, or UI components.
 Whenever a significant architectural change or development "Chunk" is completed, the following updates are mandatory:
 
 1.  **History**: Log the version milestone in `STATUS/docs_history.md`.
-2.  **Issues**: Move completed tasks to the "FIXED" section in `STATUS/compliance.md` (Issue #406).
+2.  **Issues**: Move completed tasks to the "FIXED" section in `STATUS/compliance.md` (Issue #312).
 3.  **SoT**: Update the core constants and the **Verification Matrix** in `STATUS/requirements_sot.md`.
 4.  **README**: Update the high-level summary to reflect current version capabilities.
 5.  **Code**: Ensure source-level context (KDoc/Comments) exists at the implementation site.

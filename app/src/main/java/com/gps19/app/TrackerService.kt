@@ -22,7 +22,7 @@ import kotlin.math.*
 /**
  * TrackerService: The "Black Box" background process.
  * v8.9.37:
- * - Issue #325: Unified accuracy fallback logic. Propagating maxAccuracy to forensic ribbons. (Formerly #484)
+ * - Issue #325: Unified accuracy fallback logic. Propagating maxAccuracy to forensic ribbons. (Formerly #214)
  * - Issue #148: Samsung A15 GPS Stalling. Integrated calculateGpsInterval and WakeLock renewal.
  * - Issue #191: Proximity Flutter. Applied device-specific hysteresis via SyncManager callback.
  * v8.9.36:
@@ -504,7 +504,7 @@ class TrackerService : BaseMonitorService() {
             currentMa = integrityMonitor.getBatteryCurrent()
         )
 
-        // Issue #323: Unified Alarm Evaluation - tick loop is the authority (Formerly #365 / #265)
+        // Issue #323: Unified Alarm Evaluation - tick loop is the authority
         evaluateAlarmsInternal(nowRealtime, isSignalLoss, isJammerSuspicionActive, isGpsStalledActive, false, isViewerActive)
 
         if (serviceTickCounter % 60 == 0) { notificationManager.updatePulse(sats = gpsManager.satellitesUsed, battery = integrityMonitor.getBatteryLevel(), isSecure = !alarmManager.hasUnresolvedAlarms(), isPowerSave = integrityMonitor.isPowerSaveModeActive) }
@@ -547,7 +547,7 @@ class TrackerService : BaseMonitorService() {
                 isTrackerVisualJump = (proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER), 
                 isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false, jumpTier = proc?.jumpTier ?: 0, trackerLat = proc?.optimizedPoint?.lat ?: 0.0, 
                 trackerLng = proc?.optimizedPoint?.lng ?: 0.0, trackerAccuracy = proc?.currentAccuracy ?: 0f, 
-                maxTrackerAccuracy = proc?.maxTrackerAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), trackerLastGpsTs = proc?.timestamp ?: 0L,
+                maxTrackerAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), trackerLastGpsTs = proc?.timestamp ?: 0L,
                 trackerLastValidFixTs = locationProcessor.getLastValidFixTs(),
                 trackerSpeed = ((proc?.filteredSpeed ?: 0.0) / 3.6).toFloat(), trackerBattery = integrityMonitor.getBatteryLevel(), trackerTemp = integrityMonitor.batteryTemp,
                 isHardwareOnline = true, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),

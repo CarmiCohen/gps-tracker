@@ -50,9 +50,9 @@ import com.gps19.core.engine.*
  * MapComponents: Shared map logic for Tracker and Viewer.
  * v8.9.37:
  * - Issue #325: Unified accuracy fallback logic. Prioritized engine-calculated 
- *   maxAccuracy for uncertainty circle rendering. Fixed viewerAccuracy mapping. (Formerly #484 / #214)
+ *   maxAccuracy for uncertainty circle rendering. Fixed viewerAccuracy mapping. (Formerly #214)
  * v8.9.36:
- * - Issue #326: Intelligent Uncertainty UX - Rendering locationPendingReason on Map. (Formerly #496 / #226)
+ * - Issue #326: Intelligent Uncertainty UX - Rendering locationPendingReason on Map. (Formerly #226)
  */
 
 @Composable
@@ -88,7 +88,7 @@ fun AppMapContainer(
     
     val viewerLat = if (isTrackerMode) uiState.trackerLocation.lat else uiState.localLocation.lat
     val viewerLng = if (isTrackerMode) uiState.trackerLocation.lng else uiState.localLocation.lng
-    val viewerBearing = if (isTrackerMode) uiState.trackerLocation.bearing else uiState.localLocation.bearing
+    val viewerBearing = if (isTrackerMode) uiState.trackerLocation.bearing else uiState.trackerLocation.bearing
     val viewerAccuracy = if (isTrackerMode) uiState.trackerLocation.accuracy else uiState.localLocation.accuracy
     val viewerMaxAcc = if (isTrackerMode) uiState.trackerLocation.maxAccuracy else uiState.localLocation.maxAccuracy
     
@@ -208,7 +208,7 @@ fun AppMapContainer(
             }
         }
 
-        // Issue #326: Intelligent Uncertainty UX - Display reason overlay if pending (Formerly #496 / #226)
+        // Issue #326: Intelligent Uncertainty UX - Display reason overlay if pending (Formerly #226)
         if (trackerLocationPending && trackerLocationPendingReason != LocationPendingReason.NONE) {
             Box(modifier = Modifier.align(Alignment.Center).padding(bottom = 120.dp).background(Amber500.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                 Text(
@@ -717,6 +717,14 @@ fun MapToolsOverlay(
     val spacing = 16.dp
     val purple = Color(0xFF800080)
     
+    val currentIsTrackerMode by rememberUpdatedState(isTrackerMode)
+    val currentTrackerValid by rememberUpdatedState(trackerValid)
+    val currentViewerValid by rememberUpdatedState(viewerValid)
+    val currentShowFence by rememberUpdatedState(showFence)
+    val currentGeofenceModeState by rememberUpdatedState(geofenceMode)
+    val currentShowViolations by rememberUpdatedState(showViolations)
+    val currentShowGeofenceViolations by rememberUpdatedState(showGeofenceViolations)
+
     Column(
         modifier = Modifier
             .wrapContentWidth()

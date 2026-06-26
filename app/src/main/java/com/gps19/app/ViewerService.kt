@@ -19,11 +19,11 @@ import kotlin.math.*
 /**
  * ViewerService: Background monitoring for the Viewer role.
  * v8.9.37:
- * - Issue #325: Unified accuracy fallback logic. Propagating maxAccuracy to forensic ribbons. (Formerly #484 / #214)
+ * - Issue #325: Unified accuracy fallback logic. Propagating maxAccuracy to forensic ribbons. (Formerly #214)
  * v8.9.31:
- * - Issue #301: Fixed SyncManager instantiation and pushCurrentStatus parameter mismatch. (Formerly #431)
+ * - Issue #301: Fixed SyncManager instantiation and pushCurrentStatus parameter mismatch.
  * v8.9.30:
- * - Issue #296: Explicitly initialized serviceStartRealtime in onCreate after engine initialization. (Formerly #426 / #26)
+ * - Issue #296: Explicitly initialized serviceStartRealtime in onCreate after engine initialization. (Formerly #26)
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -172,7 +172,7 @@ class ViewerService : BaseMonitorService() {
             lastServiceTickRealtime = timeProvider.elapsedRealtime()
             locationProcessor.setLastValidFixTs(timeProvider.elapsedRealtime())
             
-            // Issue #296: Ensure bootstrap starts from actual engine online point (Formerly #426 / #26)
+            // Issue #296: Ensure bootstrap starts from actual engine online point
             serviceStartRealtime = timeProvider.elapsedRealtime()
 
             startTickLoop()

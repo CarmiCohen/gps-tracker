@@ -6,15 +6,15 @@ import kotlinx.serialization.Serializable
  * EngineModels: Data structures for the core tracking engine.
  * v8.9.37:
  * - Issue #325: Added maxAccuracy to EngineConnectionPoint for forensic ribbon uncertainty 
- *   tracking. (Formerly #484 / #214)
+ *   tracking. (Formerly #214)
  * v8.9.22:
- * - Issue #326: Added LocationPendingReason and locationPendingReason to AlarmEvaluationState. (Formerly #496 / #226)
- * - Issue #327: Added promotedPoints to SentinelResult for hindsight transition smoothing. (Formerly #497 / #227)
+ * - Issue #326: Added LocationPendingReason and locationPendingReason to AlarmEvaluationState. (Formerly #226)
+ * - Issue #327: Added promotedPoints to SentinelResult for hindsight transition smoothing. (Formerly #227)
  * v8.9.21:
- * - Issue #494: Added tiltIdx and baroIdx for forensic ribbon expansion. (Formerly #224)
+ * - Issue #329: Added tiltIdx and baroIdx for forensic ribbon expansion. (Formerly #224)
  * v8.9.18:
- * - Issue #490: Added RejectedPoint for hindsight correction. (Formerly #220)
- * - Issue #489: Added isAdaptiveJump to JumpConfidence. (Formerly #219)
+ * - Issue #334: Added RejectedPoint for hindsight correction. (Formerly #220)
+ * - Issue #332: Added isAdaptiveJump to JumpConfidence. (Formerly #219)
  * v8.9.7:
  * - Plunge Matching: Added sitVzTs to EngineConnectionPoint for forensic parity.
  */
@@ -44,7 +44,7 @@ enum class EngineXiaomiStatus {
 
 /**
  * LocationPendingReason: Contextual cause for Bayesian uncertainty expansion.
- * v8.9.22 (Issue #326 - Formerly #496 / #226)
+ * v8.9.22 (Issue #326 - Formerly #226)
  */
 enum class LocationPendingReason {
     NONE,

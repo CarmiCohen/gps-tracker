@@ -31,7 +31,7 @@ The project follows the **Model-View-ViewModel (MVVM)** architectural pattern co
 - **Specialized Sticky Services**: `TrackerService` and `ViewerService` ensure high priority and role-specific execution.
 - **WakeLock Hardening**: `SystemMonitor` implements non-reference-counted `PARTIAL_WAKE_LOCK` management with safety-timer refreshes.
 - **Watchdog Watchdogs**: Periodic system wakeups (`SYSTEM_WATCHDOG_INTERVAL_MS` 90s) to perform process health checks and self-healing restarts using exact alarms on Android 12+.
-- **Timing Integrity (Issue #102/#413)**: Standardized all duration and timeout logic to use the `TimeProvider` abstraction backed by `SystemClock.elapsedRealtime()`.
+- **Timing Integrity (Issue #102/#283)**: Standardized all duration and timeout logic to use the `TimeProvider` abstraction backed by `SystemClock.elapsedRealtime()`.
 
 ## 6. Toolchain & Modern Java/Kotlin
 - **Kotlin 2.0+ / Java 17**: Modern JVM features and coroutines (Issue #199).

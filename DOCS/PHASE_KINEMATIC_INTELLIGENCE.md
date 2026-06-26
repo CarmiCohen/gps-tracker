@@ -21,7 +21,7 @@ This document outlines the strategic objectives for the Kinematic Intelligence p
 **Context**: Rejected points are preserved as Magenta Squares but removed from the optimized trail.
 **Refinement**: Retroactive Trajectory Smoothing using `HINDSIGHT_BUFFER_SIZE` (5).
 *   **Mechanism**: If the system detects a "Jump" followed by a high-confidence trajectory that aligns with rejected points, the engine "Rubber-Bands" them back into the optimized trail.
-*   **Value**: Provides a smooth historical trace for forensics without real-time siren risks (Issue #415).
+*   **Value**: Provides a smooth historical trace for forensics without real-time siren risks (Issue #309).
 
 ## 4. Objective 4: Acoustic "Location Pending" Optimization (Issue #221)
 **Context**: Acoustic triggers fire immediately, but location can be ambiguous.

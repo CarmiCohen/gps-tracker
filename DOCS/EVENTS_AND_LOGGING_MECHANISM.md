@@ -30,7 +30,7 @@ The log overlay uses a keyword-based priority system for visual identification:
 ## 3. Storage Integrity Watchdog
 To prevent database corruption, the `IntegrityMonitor` enforces strict suppression based on available internal storage:
 - **Tier 1: Critical (< 10MB `SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB`)**: Absolute muzzle. ALL non-essential logging is halted.
-- **Tier 2: Low (< 50MB `SYSTEM_STORAGE_LOW_THRESHOLD_MB`)**: Throttled logging. Only "Important" or "Special" logs pass (Issue #403).
+- **Tier 2: Low (< 50MB `SYSTEM_STORAGE_LOW_THRESHOLD_MB`)**: Throttled logging. Only "Important" or "Special" logs pass (Issue #71).
 
 ## 4. Navigation & Context
 - **Intelligent Return**: Closing the log overlay returns the user to the previous primary screen (Map or Dashboard).
@@ -39,7 +39,7 @@ To prevent database corruption, the `IntegrityMonitor` enforces strict suppressi
 ## 5. Forensic Logic & Batching
 - **Fuzzy Matching**: Merges consecutive events with dynamic parts into a single entry using regex-based variable stripping (Issue #294).
 - **Accumulated Metrics**: Combined entries display occurrence counts `(xN)` and total active duration.
-- **Monotonic Timing (Issue #413)**: Uses `TimeProvider.elapsedRealtime()` for all forensic duration calculations.
+- **Monotonic Timing (Issue #283)**: Uses `TimeProvider.elapsedRealtime()` for all forensic duration calculations.
 
 ## 6. Forensic Unification
 Legacy version tags have been removed from data models. Traceability is maintained by injecting the build version at the emission layer and is enhanced by **acknowledged SIT synchronization** (Issue #194), **Power Forensic Parity** (Issue #192), and **Spatial Anchoring** (Issue #208).

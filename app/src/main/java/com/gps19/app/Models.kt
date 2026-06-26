@@ -11,7 +11,7 @@ import java.util.*
  * Models: UI and Persistence data structures for GPS Tracker.
  * v8.9.37:
  * - Issue #325: Unified accuracy fallback logic. Added maxAccuracy to ConnectionPoint 
- *   to support forensic ribbon uncertainty visualization. (Formerly #484 / #214)
+ *   to support forensic ribbon uncertainty visualization. (Formerly #214)
  * v8.9.22:
  * - Issue #226: Added locationPendingReason to TrackerStatus, LocationState, DashboardState, IntegrityState, and IntegrityStateUi.
  * v8.9.21:

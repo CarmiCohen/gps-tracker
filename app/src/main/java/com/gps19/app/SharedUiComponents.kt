@@ -201,7 +201,7 @@ fun GenericSensorRibbon(
                     strokeWidth = 0.5.dp.toPx()
                 )
 
-                // Time context ticks (Issue #546 alignment)
+                // Time context ticks
                 val intervalMs = when(scale) {
                     "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 1 * 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
                 }

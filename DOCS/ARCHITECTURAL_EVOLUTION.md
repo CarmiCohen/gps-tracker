@@ -30,7 +30,7 @@ We have transitioned to an architecture that treats the core tracking logic as a
 - **Strict Dependencies**: Enforced JVM-only purity for the engine to prevent framework leakage (Issue #100).
 
 ### Phase 4: Forensic & OEM Hardening
-- **Monotonic Unification**: All logic uses monotonic time via `TimeProvider` (Issue #413).
+- **Monotonic Unification**: All logic uses monotonic time via `TimeProvider` (Issue #283).
 - **Muzzle Window Implementation**: Implemented a 2000ms jitter suppression window (Issue #191).
 - **OEM Fidelity**: Specialized 10Hz polling and escalated revival for Xiaomi and Samsung (Issue #148/#190).
 

@@ -12,15 +12,15 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R810-M** | **Physical Sentinel**: Thresholds for light, tilt, baro-lift, and vibration tamper. | **Verified (EngineConstants)** |
 | **R810-N** | **Clock Integrity**: Handling of future-dated packets and clock-drift resilience. | **Verified (UtilsTest)** |
 | **R810-P** | **Processing Floor**: Zero-lag filtering thresholds and trajectory promotion gates. | **Verified (EngineConstants)** |
-| **Issue #325** | **Authoritative Spatial Anchoring**: Prioritize engine-calculated `maxAccuracy` over raw accuracy. (Formerly #484 / #214) | **Verified (LogManager/Dashboard/Map)** |
+| **Issue #325** | **Authoritative Spatial Anchoring**: Prioritize engine-calculated `maxAccuracy` over raw accuracy. (Formerly #214) | **Verified (LogManager/Dashboard/Map)** |
 | **Issue #305** | **Renumbering Cleanup**: Swept and replaced low-number or double-offset references for auditability. | **Verified (Audit Suite)** |
-| **Issue #315** | **Network Integrity Hardening**: Hardened signaling integrity flags and RTT scaling. (Formerly #273 / #403) | **Verified (SyncManager)** |
-| **Issue #284** | **Light EMA Logic**: Implemented asymmetrical rising/falling EMA factors for light baseline tracking. (Formerly #414 / #14) | **Verified (LocationSentinel)** |
+| **Issue #315** | **Network Integrity Hardening**: Hardened signaling integrity flags and RTT scaling. (Formerly #273) | **Verified (SyncManager)** |
+| **Issue #284** | **Light EMA Logic**: Implemented asymmetrical rising/falling EMA factors for light baseline tracking. (Formerly #14) | **Verified (LocationSentinel)** |
 | **Issue #263** | **EMA Stability**: EMA Slow constants must be < Fast constants to ensure correct baseline stability. (Formerly #363) | **Verified (EngineConstants)** |
 | **Issue #323** | **Evaluation Efficiency**: Alarm evaluation must be throttled to 1Hz to prevent CPU spikes during 10Hz bursts. (Formerly #365 / #265) | **Verified (TrackerService)** |
 | **Issue #324** | **Lux Adaptation**: Lux baseline must support dual-rate (Slow/Fast) adaptation based on motion state. (Formerly #366 / #266) | **Verified (LocationSentinel)** |
-| **Issue #304** | **Visual Jitter Gate**: Enforced `JUMP_GATE_VISUAL_JITTER_METERS` (10.0m) to suppress mechanical jitter in trajectory analysis. (Formerly #434) | **Verified (LocationSentinel)** |
-| **Issue #303** | **Trajectory Rejection**: Unified trajectory-based outlier rejection via `TRAJECTORY_REJECTION_ACCURACY_MULT`. (Formerly #433) | **Verified (PhysicsUtils)** |
+| **Issue #304** | **Visual Jitter Gate**: Enforced `JUMP_GATE_VISUAL_JITTER_METERS` (10.0m) to suppress mechanical jitter in trajectory analysis. | **Verified (LocationSentinel)** |
+| **Issue #303** | **Trajectory Rejection**: Unified trajectory-based outlier rejection via `TRAJECTORY_REJECTION_ACCURACY_MULT`. | **Verified (PhysicsUtils)** |
 | **R872** | **Alert Suppression**: No local alerts/sirens shall trigger on the Tracker device. New alerts must strictly respect the 2s grace period. | **Verified (BehaviorUseCase)** |
 | **R915** | **UI Responsiveness**: The Map settings toggle must reliably respond to touch events over the AndroidView. | **Verified (MapComponents)** |
 | **R916** | **Settings Persistence**: Users must be able to modify and persist IDs, distance, alert config, and sound selections at all times. | **Verified (SettingsRepository)** |
@@ -37,9 +37,9 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R867** | **Role Identity**: Default Tracker ID shall be "Ttk" and Default Viewer ID shall be "Cohen". | **Verified (SettingsRepository)** |
 | **R868** | **Telemetry Layout**: The Status Card must display `maxAccuracy` for both Tracker and Viewer roles in a unified format. | **Verified (SharedUiComponents)** |
 | **R941** | **Statistics Persistence**: Tracking forensic ribbons and statistics accumulation across app restarts using Room and DataStore. | **Verified (HistoryManager/SettingsRepository)** |
-| **Issue #312** | **Documentation Gating**: Finalized Source of Truth alignment for Xiaomi and forensic thresholds. (Formerly #406) | **Verified (Documentation)** |
-| **Issue #283** | **Timing Integrity**: Migrated to `SystemClock.elapsedRealtime()` for all debouncing and persistence timing to prevent wall-clock leaks. (Formerly #413) | **Verified (MainRepository)** |
-| **Issue #308** | **Forensic I/O**: Implemented safety-flush in service `onDestroy` and monotonic interval checks for history persistence. (Formerly #415) | **Verified (MainRepository)** |
+| **Issue #312** | **Documentation Gating**: Finalized Source of Truth alignment for Xiaomi and forensic thresholds. | **Verified (Documentation)** |
+| **Issue #283** | **Timing Integrity**: Migrated to `SystemClock.elapsedRealtime()` for all debouncing and persistence timing to prevent wall-clock leaks. | **Verified (MainRepository)** |
+| **Issue #308** | **Forensic I/O**: Implemented safety-flush in service `onDestroy` and monotonic interval checks for history persistence. | **Verified (MainRepository)** |
 | **Issue 45** | **FGS Compliance**: Correctly passing `FOREGROUND_SERVICE_TYPE_LOCATION` for Android 10+ and asserting types in callbacks. | **Verified (ViewerService)** |
 | **Issue 58** | **Module Hardening**: Converted `:core:engine` to a pure `java-library` to enforce zero Android framework dependencies. | **Verified (build.gradle)** |
 | **Issue 70** | **Thermal Throttling**: Implemented "Cooling Mode" (46°C/44°C) that throttles GPS polling to protect hardware. | **Verified (IntegrityMonitor)** |
@@ -81,44 +81,41 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 ### 2.1. Hardening Phase Resolutions (v8.9.37)
 *   **FIXED R942/R943 Status Bar Refinement** - Resolution: Dynamically renamed the peer activity badge to VWR and removed redundant DAT indicators when in Tracker mode to clarify device-local vs remote-peer health.
-*   **FIXED Requirements Conflict Audit (Issue #307)** - Resolution: Resolved all documentation and implementation contradictions:
-    *   **R922 (LED Logic)**: Refactored `SharedUiComponents.kt` to ensure Tracker shows local hardware health while Viewer remains gated by peer telemetry pulse.
-    *   **R925/R926 (Session Timing)**: Standardized 2,000ms pause via `LANDING_PAGE_PAUSE_MS` constant in `MainAppContent.kt` and `EngineConstants.kt`.
-    *   **R810 Umbrella**: Split into R810-L/M/N/P for granular auditability of sensors, logic, and testing.
-*   **FIXED Authoritative Spatial Anchoring (Issue #325)** - Resolution: Strictly prioritize engine-calculated `maxAccuracy` across all UI and logging layers to ensure forensic consistency. (Formerly #484 / #214)
+*   **FIXED Requirements Conflict Audit (Issue #307)** - Resolution: Resolved all documentation and implementation contradictions for R922 (LEDs), R925 (Timing), and R810 (IDs).
+*   **FIXED Authoritative Spatial Anchoring (Issue #325)** - Resolution: Strictly prioritize engine-calculated `maxAccuracy` across all UI and logging layers to ensure forensic consistency. (Formerly #214)
 *   **FIXED Renumbering Cleanup (Issue #305)** - Resolution: Replaced all remaining low-number or double-offset references to ensure exact audit traceability below the #350 baseline limit.
-*   **FIXED Shadow Constants Remediation (Issue #321)** - Resolution: Replaced localized magic numbers with EngineConstants references inside AppSensorManager and TrackerStateManager. (Formerly #706 / #306)
-*   **FIXED Architectural Bloat: ViewModel Decoupling (Issue #322)** - Resolution: Decoupled MainViewModel by moving modular tracking code into TelemetryUseCase and other feature UseCases. (Formerly #385 / #115)
-*   **FIXED Tier 3 Jump Floor Contradiction (Issue #304)** - Resolution: Resolved by updating `PhysicsUtils.kt` and `LocationSentinel.kt` to use `JUMP_GATE_VISUAL_JITTER_METERS` (10.0m). (Formerly #434)
-*   **FIXED Trajectory Gating Multiplier (Issue #303)** - Resolution: Resolved by unifying `TRAJECTORY_REJECTION_ACCURACY_MULT`. (Formerly #433)
-*   **FIXED Behavioral Magic Numbers (Issue #302)** - Resolution: Resolved by moving thresholds to `EngineConstants.kt`. (Formerly #432)
-*   **FIXED Vibration Threshold Inconsistency (Issue #318)** - Resolution: Unified with `VIBRATION_STATIONARY_THRESHOLD`. (Formerly #431 / #301)
+*   **FIXED Shadow Constants Remediation (Issue #321)** - Resolution: Replaced localized magic numbers with EngineConstants references inside AppSensorManager and TrackerStateManager. (Formerly #306)
+*   **FIXED Architectural Bloat: ViewModel Decoupling (Issue #322)** - Resolution: Decoupled MainViewModel by moving modular tracking code into TelemetryUseCase and other feature UseCases. (Formerly #115)
+*   **FIXED Tier 3 Jump Floor Contradiction (Issue #304)** - Resolution: Resolved by updating `PhysicsUtils.kt` and `LocationSentinel.kt` to use `JUMP_GATE_VISUAL_JITTER_METERS` (10.0m).
+*   **FIXED Trajectory Gating Multiplier (Issue #303)** - Resolution: Resolved by unifying `TRAJECTORY_REJECTION_ACCURACY_MULT`.
+*   **FIXED Behavioral Magic Numbers (Issue #302)** - Resolution: Resolved by moving thresholds to `EngineConstants.kt`.
+*   **FIXED Vibration Threshold Inconsistency (Issue #318)** - Resolution: Unified with `VIBRATION_STATIONARY_THRESHOLD`. (Formerly #301)
 *   **FIXED EMA Constant Inversion Audit (Issue #263)** - Resolution: Corrected weights in `EngineConstants.kt`. (Formerly #363)
 *   **FIXED GtoEngine Magic Number Consolidation (Issue #264)** - Resolution: Moved hardcoded speed and vibration thresholds to `EngineConstants.kt`. (Formerly #364)
 *   **FIXED TrackerService Redundant Evaluation Audit (Issue #323)** - Resolution: Optimized `TrackerService.kt`. (Formerly #365 / #265)
 *   **FIXED Lux EMA Implementation Omission (Issue #324)** - Resolution: Integrated Slow/Fast variants in `LocationSentinel.kt`. (Formerly #366 / #266)
 *   **FIXED Dead Code Cleanup (Issue #267)** - Resolution: Removed unused `isRevivalTriggered` flag. (Formerly #367)
 *   **FIXED Acoustic Floor Logic Redundancy (Issue #268)** - Resolution: Removed redundant parameter passing. (Formerly #368)
-*   **FIXED Uptime Consistency (Issue #271)** - Resolution: Consolidated redundant session timing fields into `uptimeMs`. (Formerly #401 / #1)
-*   **FIXED Battery Profile (Issue #272)** - Resolution: Implemented discharge profiling in `app_settings.proto`. (Formerly #402 / #2)
-*   **FIXED Network Integrity Hardening (Issue #315)** - Resolution: Hardened signaling integrity flags in `app_settings.proto` and refined RTT scaling. (Formerly #273 / #403 / #3)
-*   **FIXED Documentation Gating (Issue #312)** - Resolution: Implemented `ALERT_ID_XIAOMI_SYSTEM_MISSING` and updated audit docs. (Formerly #276 / #406 / #6)
-*   **FIXED Dead State Cleanup: Revival Flag (Issue #289)** - Resolution: Fixed in `TrackerService.kt`. (Formerly #419 / #19)
-*   **FIXED Redundant Barometric Baselining (Issue #295)** - Resolution: Fixed by exposing `absoluteAltitude`. (Formerly #425 / #25)
-*   **FIXED SIT Forensic Duplicate Risk (Issue #291)** - Resolution: Fixed in `TelemetryAggregator.kt`. (Formerly #421 / #21)
-*   **FIXED Acoustic Floor Decay Logic (Issue #292)** - Resolution: Fixed by enforcing `ACOUSTIC_FLOOR_MIN_DB = 25.0`. (Formerly #422 / #22)
-*   **FIXED Viewer Offline Detection Logic Gap (Issue #294)** - Resolution: Fixed by calculating Viewer connectivity status. (Formerly #424 / #24)
-*   **FIXED `serviceStartRealtime` Initialization Gap (Issue #296)** - Resolution: Fixed by explicitly initializing in services. (Formerly #426 / #26)
-*   **FIXED Vertical Displacement Failure (Issue #288)** - Resolution: Fixed by correctly bridging `AppSensorManager` and `LocationSentinel`. (Formerly #418 / #18)
-*   **FIXED Geofence Evaluation Bug (Viewer Side) (Issue #293)** - Resolution: Fixed by using `trackerDistToHome` exclusively. (Formerly #423 / #23)
-*   **FIXED Role-Aware Alert Title Visibility (Issue #287)** - Resolution: Refactored `getTrackerTitle()`. (Formerly #417 / #17)
-*   **FIXED SoT Naming Alignment (IMM) (Issue #281)** - Resolution: Aligned `DOCS/REQUIREMENTS_SOT.md` with code precision. (Formerly #411 / #11)
-*   **FIXED GtoEngine Implementation (Issue #309)** - Resolution: Implemented `GtoEngine.kt` as per trajectory optimization spec. (Formerly #285 / #415 / #15)
-*   **FIXED Hindsight Promotion Coverage (Issue #297)** - Resolution: Implemented unit test suite. (Formerly #427 / #27)
-*   **FIXED SIT Duplicate Guard (Issue #282)** - Resolution: Implemented persistent 15s sanity check. (Formerly #412 / #12)
-*   **FIXED Foreground Resilience Hardening (Issue #279)** - Resolution: `TrackerService.kt` and `ViewerService.kt` recovery pulses hardened. (Formerly #409 / #9)
-*   **FIXED Hardcoded EMA in AppSensorManager (Issue #286)** - Resolution: Replaced with `LUX_EMA_FAST`. (Formerly #416 / #16)
-*   **FIXED Light EMA Logic Inconsistency (Issue #284)** - Resolution: Implemented rising/falling EMA factors. (Formerly #414 / #14)
+*   **FIXED Uptime Consistency (Issue #271)** - Resolution: Consolidated redundant session timing fields into `uptimeMs`. (Formerly #1)
+*   **FIXED Battery Profile (Issue #272)** - Resolution: Implemented discharge profiling in `app_settings.proto`. (Formerly #2)
+*   **FIXED Network Integrity Hardening (Issue #315)** - Resolution: Hardened signaling integrity flags in `app_settings.proto` and refined RTT scaling. (Formerly #273 / #3)
+*   **FIXED Documentation Gating (Issue #312)** - Resolution: Implemented `ALERT_ID_XIAOMI_SYSTEM_MISSING` and updated audit docs. (Formerly #276 / #6)
+*   **FIXED Dead State Cleanup: Revival Flag (Issue #289)** - Resolution: Fixed in `TrackerService.kt`. (Formerly #19)
+*   **FIXED Redundant Barometric Baselining (Issue #295)** - Resolution: Fixed by exposing `absoluteAltitude`. (Formerly #25)
+*   **FIXED SIT Forensic Duplicate Risk (Issue #291)** - Resolution: Fixed in `TelemetryAggregator.kt`. (Formerly #21)
+*   **FIXED Acoustic Floor Decay Logic (Issue #292)** - Resolution: Fixed by enforcing `ACOUSTIC_FLOOR_MIN_DB = 25.0`. (Formerly #22)
+*   **FIXED Viewer Offline Detection Logic Gap (Issue #294)** - Resolution: Fixed by calculating Viewer connectivity status. (Formerly #24)
+*   **FIXED `serviceStartRealtime` Initialization Gap (Issue #296)** - Resolution: Fixed by explicitly initializing in services. (Formerly #26)
+*   **FIXED Vertical Displacement Failure (Issue #288)** - Resolution: Fixed by correctly bridging `AppSensorManager` and `LocationSentinel`. (Formerly #18)
+*   **FIXED Geofence Evaluation Bug (Viewer Side) (Issue #293)** - Resolution: Fixed by using `trackerDistToHome` exclusively. (Formerly #23)
+*   **FIXED Role-Aware Alert Title Visibility (Issue #287)** - Resolution: Refactored `getTrackerTitle()`. (Formerly #17)
+*   **FIXED SoT Naming Alignment (IMM) (Issue #281)** - Resolution: Aligned `DOCS/REQUIREMENTS_SOT.md` with code precision. (Formerly #11)
+*   **FIXED GtoEngine Implementation (Issue #309)** - Resolution: Implemented `GtoEngine.kt` as per trajectory optimization spec. (Formerly #285 / #15)
+*   **FIXED Hindsight Promotion Coverage (Issue #297)** - Resolution: Implemented unit test suite. (Formerly #27)
+*   **FIXED SIT Duplicate Guard (Issue #282)** - Resolution: Implemented persistent 15s sanity check. (Formerly #12)
+*   **FIXED Foreground Resilience Hardening (Issue #279)** - Resolution: `TrackerService.kt` and `ViewerService.kt` recovery pulses hardened. (Formerly #9)
+*   **FIXED Hardcoded EMA in AppSensorManager (Issue #286)** - Resolution: Replaced with `LUX_EMA_FAST`. (Formerly #16)
+*   **FIXED Light EMA Logic Inconsistency (Issue #284)** - Resolution: Implemented rising/falling EMA factors. (Formerly #14)
 
 ### 2.2. Previous Phase Resolutions (v8.9.22 - v8.9.27)
 *   **FIXED Constant Name Mismatch (Issue #228)** - Resolution: SoT updated to use `PING_INTERVAL_MS` (10,000ms) for both relay heartbeats and log synchronization.
@@ -232,8 +229,8 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 *   **FIXED Audit :core:engine Purity (#100)** - Resolution: Verified that no android.* dependencies remain in the core engine source code. (8.8.21)
 
 ### 2.4. Legacy Foundation Resolutions (#271 - #301 / #1 - #99)
-*   **FIXED R916: Settings Configuration Verification (Issue #302)** - Resolution: Removed role-based UI gating. (Formerly #432 / #30)
-*   **FIXED R933: Alert Grace Period (Issue #319)** - Resolution: Implemented 2s grace period (ALERT_TRIGGER_GRACE_PERIOD_MS). (Formerly #301 / #431 / #29)
+*   **FIXED R916: Settings Configuration Verification (Issue #302)** - Resolution: Removed role-based UI gating. (Formerly #30)
+*   **FIXED R933: Alert Grace Period (Issue #319)** - Resolution: Implemented 2s grace period (ALERT_TRIGGER_GRACE_PERIOD_MS). (Formerly #301 / #29)
 *   **FIXED Physical Tamper Race Condition & Trajectory Bug (Issue #320)** - Resolution: Implemented 500ms Muzzle Window and corrected LocationSentinel.storeRejected bug. (v8.8.21 / Formerly #301 / #99)
 *   **FIXED Xiaomi Instruction Traceability (Issue #300)** - Resolution: Updated MainAlarmLogic.kt for UNKNOWN MIUI status guidance. (v8.8.21 / Formerly #98)
 *   **FIXED Geofence SOT Desync (Issue #299)** - Resolution: Corrected JSON key mismatch for home_points/homePoints. (v8.8.21 / Formerly #97)
@@ -287,7 +284,7 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 *   **FIXED UI State Synchronization Gap (Sit Detection) (Issue #241)** - Resolution: Updated SIT analytical ribbon to use isSitActive. (v8.8.4 / Formerly #39)
 *   **FIXED AlarmActivity Logic Gap (Issue #240)** - Resolution: Implemented StopSiren in AlarmActivity. (v8.8.4 / Formerly #38)
 *   **FIXED R868: Tracker Line maxAccuracy UI (Issue #236)** - Resolution: Corrected accuracy display in StatusBar. (Formerly #34)
-*   **FIXED R917: Update Smoothness (Issue #400)** - Resolution: Verified update recovery infrastructure. (Formerly #300 / #28)
+*   **FIXED R917: Update Smoothness (Issue #326)** - Resolution: Verified update recovery infrastructure. (Formerly #300 / #28)
 *   **FIXED R872: Tracker Mode Alert Verification (Issue #299)** - Resolution: Suppressed local alerts in tracker mode. (Formerly #27)
 *   **FIXED Tracker Peer Pulse Logic Gap (Issue #298)** - Resolution: Corrected network callback to update lastPeerActivityTs. (Formerly #26)
 *   **FIXED Viewer GPS Stall Logic Mismatch (Issue #297)** - Resolution: Migrated to monotonic time in RemoteHandler. (Formerly #25)
@@ -301,10 +298,10 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 *   **FIXED R922: LED and Connectivity Logic (Issue #288)** - Resolution: INT LED reflects state; others gated by peer. (Formerly #16)
 *   **FIXED Forensic I/O Efficiency & Persistence (Issue #287)** - Resolution: Implemented safety-flush in service onDestroy. (Formerly #15)
 *   **FIXED Legacy Documentation & Comment Debt (Issue #286)** - Resolution: Removed stale references to monolithic AppService. (Formerly #14)
-*   **FIXED Timing Integrity Leakage (:app layer) (Issue #311)** - Resolution: Migrated to SystemClock.elapsedRealtime(). (Formerly #285 / #13)
+*   **FIXED Timing Integrity Leakage (:app layer) (Issue #311)** - Resolution: Migrated to SystemClock.elapsedRealtime(). (Formerly #13)
 *   **FIXED Xiaomi Gating (Issue #278)** - Resolution: ALERT_ID_XIAOMI_SYSTEM_MISSING implemented and gated. (v8.7.9 / Formerly #6)
 *   **FIXED Logic Color Redundancy & UI Leak (Issue #277)** - Resolution: Resolved in v8.8.1. (Formerly #5)
-*   **FIXED Discrepancies with Source of Truth (v8.7.5) (Issue #314)** - Resolution: Resolved in v8.7.7. (Formerly #276 / #4)
+*   **FIXED Discrepancies with Source of Truth (v8.7.5) (Issue #314)** - Resolution: Resolved in v8.7.7. (Formerly #4)
 *   **FIXED Module Type Constraints (Issue #275)** - Resolution: Resolved in v8.8.0. (Formerly #3)
 *   **FIXED Logic Layer \"Android Leaks\" (Issue #274)** - Resolution: Resolved in v8.7.6. (Formerly #2)
-*   **FIXED Session Lifecycle Stability (R921/R926) (Issue #317)** - Resolution: Exhaustive state reset implemented. (Formerly #273 / #1)
+*   **FIXED Session Lifecycle Stability (R921/R926) (Issue #317)** - Resolution: Exhaustive state reset implemented. (Formerly #1)

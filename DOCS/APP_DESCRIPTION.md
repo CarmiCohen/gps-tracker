@@ -27,7 +27,7 @@ The **GtoEngine** logic provides a high-confidence geofence gate. It uses a 6-si
 ## 3. Forensic Telemetry (v8.9.37 Enhancements)
 The system is built around "Forensic Continuity." Data is never simply "current"; it is always presented within its historical context via:
 -   **Log Spatial Anchor (Issue #208)**: All forensic logs and critical alerts are automatically anchored with `lat`/`lng` coordinates using the last known telemetry position. This enables historical marker reconstruction on the Map even for events that occurred during relay blackouts.
--   **Monotonic Timing (Issue #413)**: All forensic metrics and UI lockout thresholds use `TimeProvider.elapsedRealtime()` to ensure absolute accuracy and eliminate drift.
+-   **Monotonic Timing (Issue #283)**: All forensic metrics and UI lockout thresholds use `TimeProvider.elapsedRealtime()` to ensure absolute accuracy and eliminate drift.
 -   **High-Availability Revival**: If the GPS hardware stalls, the system attempts a retry loop every 120s (`GPS_REVIVAL_RETRY_INTERVAL_MS`) and escalates to a **CRITICAL forensic alert** after 3 failures.
 -   **Power Forensic Parity (Issue #192)**: Full parity for battery current (`currentMa`) across all models, database (v35), and ribbons, ensuring remote power-deficit visibility.
 -   **SIT Acknowledgement (Issue #194)**: Discrete "sitting" events are synchronized via an acknowledged loop to prevent loss during blackouts.

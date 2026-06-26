@@ -31,7 +31,7 @@ The engine maintains a "Sliding Window" of nodes (GPS fixes) and "Factors" (cons
 ### 3.1. Hindsight Correction
 If a point arrives that implies a "Jump", the GtoEngine evaluates the sequence:
 *   **Scenario A**: Next points return to the origin. **Decision**: The jump was noise. It is smoothed out.
-*   **Scenario B**: Next points continue from the jump location. **Decision**: The jump was real high-speed movement. **Promotion**: The "Jump Hold" is canceled via **Trajectory Promotion**, and the alarm is triggered immediately. (Issue #415 - Formerly #285)
+*   **Scenario B**: Next points continue from the jump location. **Decision**: The jump was real high-speed movement. **Promotion**: The "Jump Hold" is canceled via **Trajectory Promotion**, and the alarm is triggered immediately. (Issue #309)
 
 ### 3.2. Mechanical Vibration Signature
 *   **Work vs. Theft**: The engine analyzes the accelerometer frequency. 

@@ -5,7 +5,7 @@ import kotlin.math.abs
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates".
  * v8.9.34:
- * - Issue #436: Shadow Constants Remediation. Replaced magic numbers with EngineConstants.
+ * - Issue #166: Shadow Constants Remediation. Replaced magic numbers with EngineConstants.
  */
 object SentinelValidator {
 

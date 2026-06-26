@@ -26,7 +26,7 @@ The application uses a **Reactive Draft System** for managing settings.
 ### A. Draft Logic
 1.  A "Draft" copy of the settings is created in `MainViewModel`.
 2.  UI interactions modify the **Draft** only.
-3.  **Commit on Exit**: Exiting the Settings overlay triggers an atomic write to `DataStore` (Issue #413).
+3.  **Commit on Exit**: Exiting the Settings overlay triggers an atomic write to `DataStore` (Issue #283).
 
 ### B. Role Agnostic Parity
 Configuration fields are accessible and modifiable in both Tracker and Viewer roles.

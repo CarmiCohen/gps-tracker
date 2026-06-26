@@ -6,8 +6,8 @@ import com.gps19.core.engine.*
 /**
  * TrackerStateManager: Logic for mapping raw telemetry to high-level behavioral states.
  * v8.9.37:
- * - Issue #572: Centralized Behavioral Magic Numbers to EngineConstants. (Formerly #432 / #302)
- * - Issue #571: Unified vibration threshold with EngineConstants (0.12g). (Formerly #431 / #301)
+ * - Issue #302: Centralized Behavioral Magic Numbers to EngineConstants.
+ * - Issue #335: Unified vibration threshold with EngineConstants (0.12g). (Formerly #301)
  * v8.7.5:
  * - Constant Centralization: Inheriting core thresholds from :core:engine.
  */
@@ -44,7 +44,7 @@ object TrackerStateManager {
             sustainedSpeedCount = 0
         }
 
-        // Issue #571: Use unified constants from EngineConstants (Formerly #301)
+        // Issue #335: Use unified constants from EngineConstants (Formerly #301)
         val isPhysicalMoving = vibration > (vibrationFloor * STATIONARY_FLOOR_MULT) && vibration > VIBRATION_STATIONARY_THRESHOLD
         
         // R880: Require more evidence to exit PARKING if not physically moving
@@ -54,7 +54,7 @@ object TrackerStateManager {
             SUSTAINED_SPEED_THRESHOLD
         }
 
-        // Issue #572: Unified high speed promotion threshold (Formerly #302)
+        // Issue #302: Unified high speed promotion threshold
         val isSpeedConfirmed = (sustainedSpeedCount >= requiredSustainedCount) || (speed > HIGH_SPEED_PROMOTION_THRESHOLD) || isTrajectoryPromoted
         
         // Confirmation: Must have sustained speed OR speed confirmed by vibration
@@ -73,7 +73,7 @@ object TrackerStateManager {
         }
 
         // 3. Apply Confidence Buffer (Hysteresis)
-        // Issue #572: Centralized confidence buffers (Formerly #302)
+        // Issue #302: Centralized confidence buffers
         val requiredBuffer = if (targetState == TrackerState.PARKING) PARKING_CONFIDENCE_BUFFER_MS else STATE_CONFIDENCE_BUFFER_MS
 
         if (targetState == currentState || targetState == TrackerState.JUMPING) {

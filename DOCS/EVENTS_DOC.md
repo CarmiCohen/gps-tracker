@@ -36,7 +36,7 @@ This document describes all events logged by the application, their priorities, 
 ### 2. Physical Violation Details (Teal / Technical)
 | Event Text Pattern | Importance | Color | Technical Context |
 | :--- | :--- | :--- | :--- |
-| `[VIOLATION] Light: [X] lux` | Not Important| Teal | Triggered > 150 lux jump (Issue #414). |
+| `[VIOLATION] Light: [X] lux` | Not Important| Teal | Triggered > 150 lux jump (Issue #284). |
 | `[VIOLATION] Shock: [X]G` | Not Important| Teal | Triggered > 0.8g impact. |
 | `[VIOLATION] Noise: [X] dB` | Not Important| Teal | Triggered > 40dB over ambient floor. |
 | `GPS Stall: Revival attempt [X]/3`| Important | White| Periodic 120s hardware refresh (Issue #198). |

@@ -22,7 +22,7 @@ To bridge the gap between "Pure Logic" and "Real-World Side Effects" (Persistenc
 As of v8.9.37, the "Forensic Bridge" has been extended to include absolute spatial traceability.
 - **Log Spatial Anchors (Issue #208)**: Every event reported by the engine or app services is now automatically anchored with `lat`/`lng` coordinates.
 - **Pure JVM Isolation (Issue #100)**: Verified that `:core:engine` has zero `android.*` dependencies, ensuring math logic can be unit-tested in isolation (Issue #130).
-- **Time Monotonicity (Issue #413)**: All debouncing and state-machine transitions use `SystemClock.elapsedRealtime()` via `TimeProvider` to prevent wall-clock leaks.
+- **Time Monotonicity (Issue #283)**: All debouncing and state-machine transitions use `SystemClock.elapsedRealtime()` via `TimeProvider` to prevent wall-clock leaks.
 
 ## 4. Benefit Estimate
 - **Bug Regressions:** Dropped by **85%**.

@@ -21,7 +21,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 | `VIEWER_SIGNAL_LOSS_THRESHOLD_MS`| 30,000ms | Threshold for Viewer Signal Lost (Communication). |
 | `JAMMER_DETECTION_THRESHOLD_MS`| 180,000ms | Threshold for Jump Alert (sustained signal instability). |
 | `INTERNET_LOSS_THRESHOLD_MS` | 60,000ms | Threshold for Viewer Local Internet loss. |
-| `WATCH_TIMEOUT_MS` | 30,000ms | Deadline for peer activity. |
+| `WATCH_TIMEOUT_MS" | 30,000ms | Deadline for peer activity. |
 | `SYSTEM_WATCHDOG_INTERVAL_MS`| 90,000ms | Main system watchdog cycle for service health. |
 | `SYSTEM_WATCHDOG_THROTTLE_MS`| 60,000ms | Throttling window for system watchdog re-triggers. |
 | `GPS_UI_FAIL_THRESHOLD_MS` | 10,000ms | UI Staleness threshold for Position health (v8.9.10). |
@@ -242,7 +242,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Ghost Mode UI**: Visual staleness indicators applied to all sensor fields and markers when telemetry > 10s old.
 *   **Log Spatial Anchor**: All forensic logs and critical alerts are tagged with `lat`/`lng` coordinates to enable historical marker reconstruction on the map.
 *   **Accuracy Parity**: Forensic logs now include explicit `accuracy` fields, ensuring historical map markers match real-time precision.
-*   **Authoritative Spatial Anchoring**: Issue #325: Strictly prioritize engine-calculated `maxAccuracy` (filtered uncertainty) over raw `accuracy` across all UI and logging layers to ensure forensic consistency. (Formerly #484 / #214)
+*   **Authoritative Spatial Anchoring**: Issue #325: Strictly prioritize engine-calculated `maxAccuracy` (filtered uncertainty) over raw `accuracy` across all UI and logging layers to ensure forensic consistency. (Formerly #214)
 *   **Forensic Snapshots**: Log entries now include `snrSnapshot` and `vibeSnapshot` for Jump and Stall forensic enrichment (v8.9.19).
 *   **Stability Expansion**: Added `tiltIdx` and `baroIdx` to the analytical ribbons and telemetry pipeline for enhanced "SIT" event analysis (v8.9.21).
 *   **Uncertainty Context**: Propagating `locationPendingReason` for Bayesian uncertainty expansion in the UI (v8.9.36).

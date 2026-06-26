@@ -40,7 +40,7 @@ The `IntegrityMonitor` implements a dual-tier protection system based on `StatFs
 - **Tier 2: Low (< 50MB `SYSTEM_STORAGE_LOW_THRESHOLD_MB`)**: Throttled logging. Only "Important" forensic logs are allowed.
 
 ## 4. Maintenance & Archival
-- **Safety Flush (Issue #415)**: Implemented mandatory safety-flush in service `onDestroy` and monotonic interval checks to ensure no data loss during app termination.
+- **Safety Flush (Issue #308)**: Implemented mandatory safety-flush in service `onDestroy` and monotonic interval checks to ensure no data loss during app termination.
 - **Daily Cleanup**: Scheduled task at 02:05 AM (`DAILY_CLEANUP_HOUR`/`DAILY_CLEANUP_MINUTE`) to optimize database performance.
 - **Daily Archiving**: Scheduled task at 03:30 AM (`DAILY_ARCHIVE_HOUR`/`DAILY_ARCHIVE_MINUTE`) to move old forensic files to external storage.
 - **Auto-Export**: Hourly (`HEARTBEAT_INTERVAL_MS` 3.6Ms) background tasks to export telemetry snapshots. Standardized to include the mandatory `role` field.

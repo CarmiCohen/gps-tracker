@@ -10,9 +10,9 @@ import java.util.UUID
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
  * v8.9.37:
  * - Issue #325: Unified accuracy fallback logic. Strictly prioritize engine-calculated 
- *   maxAccuracy (filtered uncertainty) over raw accuracy for consistent forensic reliability. (Formerly #484 / #214)
+ *   maxAccuracy (filtered uncertainty) over raw accuracy for consistent forensic reliability. (Formerly #214)
  * v8.9.19:
- * - Issue #493: Expanded logServiceEvent and submitToLogSink to support SNR and Vibration snapshots. (Formerly #223)
+ * - Issue #333: Expanded logServiceEvent and submitToLogSink to support SNR and Vibration snapshots. (Formerly #223)
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -57,7 +57,7 @@ class LogManager @Inject constructor(
             return
         }
 
-        // Issue #325: Authoritative Spatial Anchoring (Prioritizing maxAccuracy) (Formerly #484)
+        // Issue #325: Authoritative Spatial Anchoring (Prioritizing maxAccuracy)
         var finalLat = lat
         var finalLng = lng
         var finalAccuracy = accuracy
@@ -77,7 +77,7 @@ class LogManager @Inject constructor(
             if (fallbackTelem.lat != 0.0 && fallbackTelem.lng != 0.0) {
                 finalLat = fallbackTelem.lat
                 finalLng = fallbackTelem.lng
-                // Issue #325: Strictly prioritize maxAccuracy when auto-anchoring (Formerly #484)
+                // Issue #325: Strictly prioritize maxAccuracy when auto-anchoring
                 finalAccuracy = if (fallbackTelem.maxAccuracy > 0f) fallbackTelem.maxAccuracy else fallbackTelem.accuracy
             }
         } else {

@@ -12,9 +12,9 @@ import kotlin.math.abs
  * DashboardUseCase: Logic for computing the complex dashboard display state.
  * v8.9.37:
  * - Issue #325: Unified accuracy fallback logic. Refined accuracy display to prioritize 
- *   maxAccuracy (filtered uncertainty) over raw accuracy consistently. (Formerly #484 / #214)
+ *   maxAccuracy (filtered uncertainty) over raw accuracy consistently. (Formerly #214)
  * v8.9.6:
- * - Issue 193: Implemented is telemetryFresh calculation for Zombie Telemetry UX mitigation.
+ * - Issue 193: Implemented telemetryFresh calculation for Zombie Telemetry UX mitigation.
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {
@@ -99,7 +99,7 @@ class DashboardUseCase @Inject constructor() {
             }
         }
 
-        // Issue #325: Authoritative accuracy metric (Prioritize filtered maxAccuracy) (Formerly #484)
+        // Issue #325: Authoritative accuracy metric (Prioritize filtered maxAccuracy)
         val authoritativeAcc = if (loc.maxAccuracy > 0) loc.maxAccuracy else loc.accuracy
         val authoritativeViewerAcc = if (uiState.localLocation.maxAccuracy > 0) uiState.localLocation.maxAccuracy else uiState.localLocation.accuracy
 

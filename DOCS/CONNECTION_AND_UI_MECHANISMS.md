@@ -18,7 +18,7 @@ The UI employs a tiered strategy for data freshness:
 - **Cutoff**: All telemetry is hidden (--) after 10 minutes (`SENSOR_GRACE_PERIOD_MS`) inactivity.
 
 ## 3. Forensic Continuity
-The application utilizes monotonic timing via `TimeProvider` (Issue #413) for all connectivity metrics (Drop durations, Uptime) to ensure forensic accuracy regardless of system clock adjustments.
+The application utilizes monotonic timing via `TimeProvider` (Issue #283) for all connectivity metrics (Drop durations, Uptime) to ensure forensic accuracy regardless of system clock adjustments.
 
 ## 4. Role & Identity Integrity (v8.9.37)
 Every telemetry update and log is tagged with the mandatory `role` field. The Viewer joins the Tracker's ID room to ensure bidirectional pulse reception.

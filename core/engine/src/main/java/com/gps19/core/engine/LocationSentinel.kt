@@ -6,10 +6,10 @@ import kotlin.math.*
 /**
  * LocationSentinel: A multi-layered location validation engine.
  * v8.9.34:
- * - Issue #434: Corrected Tier 3 Jump Floor. Now uses JUMP_GATE_VISUAL_JITTER_METERS (10.0m). (Formerly #304)
- * - Issue #324: Lux EMA Implementation. Integrated Slow/Fast variants for rising/falling light. (Formerly #366 / #266)
+ * - Issue #304: Corrected Tier 3 Jump Floor. Now uses JUMP_GATE_VISUAL_JITTER_METERS (10.0m).
+ * - Issue #324: Lux EMA Implementation. Integrated Slow/Fast variants for rising/falling light. (Legacy-#366 / #266)
  * v8.9.31:
- * - Issue #422: Acoustic Floor Decay Logic. Enforced ACOUSTIC_FLOOR_MIN_DB. (Formerly #292 / #22)
+ * - Issue #292: Acoustic Floor Decay Logic. Enforced ACOUSTIC_FLOOR_MIN_DB.
  */
 class LocationSentinel {
 
@@ -175,7 +175,7 @@ class LocationSentinel {
             if (!lux.isNaN()) luxBaseline = lux
         } else {
             if (!lux.isNaN()) {
-                // Issue #324: Use rising/falling EMA factors from EngineConstants (Formerly #366 / #266)
+                // Issue #324: Use rising/falling EMA factors from EngineConstants (Legacy-#366 / #266)
                 val baseAlpha = if (lux < luxBaseline) {
                     if (isStationary()) LUX_EMA_DOWN_SLOW else LUX_EMA_DOWN_FAST
                 } else {

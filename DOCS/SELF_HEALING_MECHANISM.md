@@ -19,7 +19,7 @@ Navigation never terminates the service. Even when "Back" is pressed at the root
 ### D. Foreground Service & WakeLocks
 - **Compliance**: Correctly passes `FOREGROUND_SERVICE_TYPE_LOCATION` (and `MICROPHONE` when active) for Android 10+ compatibility (Issue #247).
 - **WakeLock Hardening**: Utilizes a non-reference-counted `PARTIAL_WAKE_LOCK` with active renewal on every service tick (Issue #148).
-- **Monotonic Integrity**: Watchdog and timeout evaluations use `TimeProvider.elapsedRealtime()` (Issue #413).
+- **Monotonic Integrity**: Watchdog and timeout evaluations use `TimeProvider.elapsedRealtime()` (Issue #283).
 
 ### E. Advanced Hardware Self-Healing
 - **Stall Detection**: Monitors if coordinates are frozen. Hardened to **60s** (`GPS_STALL_THRESHOLD_MS`).

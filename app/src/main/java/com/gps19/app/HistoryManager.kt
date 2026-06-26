@@ -14,7 +14,7 @@ import kotlin.math.abs
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
  * v8.9.37:
  * - Issue #325: Added accuracy and maxAccuracy to ribbons for forensic uncertainty 
- *   auditing. (Formerly #484 / #214)
+ *   auditing. (Formerly #214)
  * v8.9.28:
  * - Issue #282: SIT Duplicate Guard. Implemented database-level sanity check to prevent redundant SIT forensic markers.
  * v8.9.21:

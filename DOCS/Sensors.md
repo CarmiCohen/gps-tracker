@@ -13,7 +13,7 @@ The system leverages a multi-sensor array to provide high-fidelity physical secu
 ## 2. Calibration Mechanisms
 *   **Muzzle Window**: A 2000ms logic gate suppresses sensor triggers during high-I/O sync operations. (Issue #191)
 *   **Passive Zeroing**: Automatically calibrates baselines after 300s of stationary state.
-*   **Chair Occupancy**: Uses multi-factor fusion (Tilt 7°, Vibration 0.35g, Baro 0.08m) to detect sitting events. (Issue #412)
+*   **Chair Occupancy**: Uses multi-factor fusion (Tilt 7°, Vibration 0.35g, Baro 0.08m) to detect sitting events. (Issue #282)
 *   **Monotonic Integrity**: All sensor-based lockout and suspicion timers use `TimeProvider.elapsedRealtime()`.
 
 ## 3. Forensic Alignment & Storage

@@ -26,9 +26,9 @@ import kotlin.math.sqrt
 /**
  * AppSensorManager: Manages IMU and Environmental sensors.
  * v8.9.34:
- * - Issue #321: Shadow Constants Remediation. Replaced magic numbers with EngineConstants. (Formerly #706)
+ * - Issue #321: Shadow Constants Remediation. Replaced magic numbers with EngineConstants.
  * v8.9.32:
- * - Issue #565: Redundant Barometric Baselining. Exposing absoluteAltitude to allow
+ * - Issue #295: Redundant Barometric Baselining. Exposing absoluteAltitude to allow
  *   LocationSentinel to handle primary baselining.
  * v8.8.21: Migrated to TimeProvider for all timing logic.
  */

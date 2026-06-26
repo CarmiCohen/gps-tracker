@@ -9,7 +9,7 @@ This document explains the specialized monitoring logic used to detect "silent" 
 - **Stall Watchdog**: The `LocationProcessor` tracks the raw hardware timestamp. If the coordinates are identical across updates while vibration sensors indicate movement, it flags a stall.
 - **UI Threshold (10s)**: The UI uses `GPS_UI_FAIL_THRESHOLD_MS` (10 seconds) as a strict "Position Health" gate. 
 - **Instant Recovery (R923)**: Freshness logic utilizes the maximum of the GPS timestamp and the telemetry arrival timestamp (`telemetryTs`) to prevent dashboard "gray-out" during link restoration.
-- **Escalated Revival (Issue #401)**: Sustained stalls beyond `GPS_STALL_THRESHOLD_MS` (60s) trigger a hardware-level refresh cycle:
+- **Escalated Revival (Issue #124)**: Sustained stalls beyond `GPS_STALL_THRESHOLD_MS` (60s) trigger a hardware-level refresh cycle:
     - **Retry Loop**: The system attempts to revive the GPS hardware every 120 seconds (`GPS_REVIVAL_RETRY_INTERVAL_MS`).
     - **Max Attempts**: After 3 failed attempts (`MAX_REVIVAL_ATTEMPTS`), the system escalates to a **CRITICAL forensic alert**.
     - **Viewer Notification**: A `CRITICAL: GPS_HARDWARE_LOCK` log is emitted to signal that manual intervention or physical relocation is required.
@@ -22,7 +22,7 @@ This document explains the specialized monitoring logic used to detect "silent" 
 - **Cross-Validation**: The system monitors the relay connection independently of the GNSS fix.
 - **Suspicion Trigger**: If the device is connected to the relay but hasn't received a fresh GPS update while high vibration indicates movement, it triggers `isJammerSuspicion`.
 - **Forensic SNR**: The system monitors the per-satellite Signal-to-Noise Ratio (`snrIdx`). Sudden SNR drops while satellites remain "in view" provide secondary confirmation.
-- **State Synchronization (Issue #403)**: Jammer violation state is centrally confirmed using `JAMMER_DETECTION_THRESHOLD_MS` (180s).
+- **State Synchronization (Issue #315)**: Jammer violation state is centrally confirmed using `JAMMER_DETECTION_THRESHOLD_MS` (180s).
 
 ## 3. Signal Loss & GPS Gap
 Determining the difference between a network drop and a GPS fix loss:

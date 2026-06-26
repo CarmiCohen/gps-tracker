@@ -4,10 +4,10 @@ package com.gps19.core.engine
  * EngineConstants: Logic-specific thresholds for the tracking engine.
  * v8.9.37:
  * - Issue #315: Network Integrity & Timeout Scaling. Refined RTT scaling 
- *   to handle high-latency scenarios. (Formerly #273 / #543 / #403)
- * - Issue #166: Shadow Constants Remediation. Centralized magic numbers from AppSensorManager. (Formerly #436)
- * - Issue #302: Centralized Behavioral Magic Numbers from TrackerStateManager. (Formerly #702 / #432)
- * - Issue #303: Unified Trajectory Rejection multiplier. (Formerly #573 / #433)
+ *   to handle high-latency scenarios. (Formerly #273 / #336)
+ * - Issue #166: Shadow Constants Remediation. Centralized magic numbers from AppSensorManager.
+ * - Issue #302: Centralized Behavioral Magic Numbers from TrackerStateManager.
+ * - Issue #303: Unified Trajectory Rejection multiplier.
  * - R810 Split: Segregated Acoustic (L), Physical (M), and Filtering (P) requirements.
  * - R925: Defined LANDING_PAGE_PAUSE_MS for session auto-transition.
  */
@@ -143,7 +143,7 @@ const val GEOFENCE_HYSTERESIS_METERS = 5.0
 const val GEOFENCE_PREDICTIVE_LOOKAHEAD_S = 2.0
 const val GEOFENCE_PREDICTIVE_MIN_SPEED_MPS = 1.0
 
-// EMA Factors (Issue #263: Corrected Inversion - Formerly #533 / #363)
+// EMA Factors (Issue #263: Corrected Inversion - Legacy-#363)
 const val LUX_EMA_SLOW = 0.01f
 const val LUX_EMA_FAST = 0.1f
 const val LUX_EMA_UP_SLOW = 0.001f
@@ -161,7 +161,7 @@ const val VIBRATION_EMA_UP_SLOW = 0.001f
 const val VIBRATION_EMA_UP_FAST = 0.01f
 const val BARO_EMA_SLOW = 0.001f 
 
-// GtoEngine Optimization Constants (Issue #264 - Formerly #534 / #364)
+// GtoEngine Optimization Constants (Issue #264 - Legacy-#364)
 const val GTO_TOW_SPEED_THRESHOLD = 10.0
 const val GTO_KINEMATIC_SPEED_DELTA = 10.0
 const val GTO_WORK_SPEED_THRESHOLD = 5.0
@@ -206,7 +206,7 @@ const val GPS_SAVE_INTERVAL_MS = 60000L
 const val PARKING_ANCHOR_MIN_DIST = 20.0
 const val PARKING_ANCHOR_FACTOR = 0.8
 
-// Behavioral State Thresholds (Issue #302 - Formerly #572 / #432)
+// Behavioral State Thresholds (Issue #302)
 const val SUSTAINED_SPEED_THRESHOLD = 2 
 const val SUSTAINED_SPEED_STATIONARY_THRESHOLD = 4
 const val STATE_CONFIDENCE_BUFFER_MS = 2000L
@@ -263,14 +263,14 @@ const val RIBBON_SIT_BARO_SCALE_METERS = 0.5f
 const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 
 // Network Communication (v8.8.21)
-// Issue #315: Maximum healthy RTT for sync loop scaling. (Formerly #273 / #543 / #403)
+// Issue #315: Maximum healthy RTT for sync loop scaling. (Formerly #273 / #336)
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0
 const val NETWORK_TIMEOUT_MS = 10000
 const val NET_REJOIN_THRESHOLD_MS = 15000L
 const val NET_HEAL_THRESHOLD_MS = 45000L
-// Issue #315: Baseline sync interval. (Formerly #273 / #543 / #403)
+// Issue #315: Baseline sync interval. (Formerly #273 / #336)
 const val PING_INTERVAL_MS = 10000L
 const val SOCKET_TIMEOUT_MS = 60000
 const val RTT_WINDOW_SIZE = 5
@@ -286,7 +286,7 @@ const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0f
 
-// Issue #193: Unified UI Staleness Threshold (10s) (Formerly #463)
+// Issue #193: Unified UI Staleness Threshold (10s) (Formerly #338)
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 10000L
 const val GPS_UI_FAIL_THRESHOLD_MS = 10000L
 
@@ -356,7 +356,7 @@ const val WATCH_DOG_UI_GRACE_MS = 30000L
 const val SENSOR_GRACE_PERIOD_MS = 600000L
 const val TEST_ALARM_DURATION_MS = 3000L
 
-// Behavioral Debouncing (R729 - Issue #191 - Formerly #461)
+// Behavioral Debouncing (R729 - Issue #191)
 const val PROXIMITY_DEBOUNCE_STATIONARY_A15_MS = 5000L
 const val PROXIMITY_DEBOUNCE_STATIONARY_MS = 3000L
 const val PROXIMITY_DEBOUNCE_MOVING_MS = 1000L
