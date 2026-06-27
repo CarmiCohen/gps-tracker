@@ -12,18 +12,18 @@ The HUD provides at-a-glance status of the primary tracking link and position he
 ### A. GPS & Movement
 - **GPS-Index**: Overall reliability score (0.0-1.0) based on age, accuracy, and satellite count.
 - **Tr Accuracy**: Current 1-sigma error in meters.
-- **Tr Max**: Worst-case accuracy recorded in the session (High-water mark). (Issue #214)
+- **Tr Max**: Worst-case accuracy recorded in the session (High-water mark). (Issue #325 / Formerly #214)
 - **Avg SNR**: Average Signal-to-Noise Ratio across used satellites.
 
 ### B. Environment (Physical Sentinel)
-- **Vibration/Tilt**: Real-time orientation and shock monitoring (Issue #282).
+- **Vibration/Tilt**: Real-time orientation and shock monitoring (Issue #318 / Formerly #282).
 - **Noise/Lux**: Ambient environmental monitoring (Issue #286).
 - **Lift**: Barometric vertical displacement monitoring.
 
 ### C. Power & Storage (v8.9.37 Hardening)
-- **Battery Drain**: Real-time current in mA (`currentMa`). (Issue #272)
+- **Battery Drain**: Real-time current in mA (`currentMa`). (Issue #192)
 - **Storage**: Binary indicator for Low/Critical disk space (50MB/10MB).
-- **Steep Discharge**: Latch for abnormal battery health events (Issue #221).
+- **Steep Discharge**: Latch for abnormal battery health events (Issue #353).
 
 ## 3. Interaction & Overlays
 - **Ribbons Button**: Toggles the sparkline visualization for forensic trends.

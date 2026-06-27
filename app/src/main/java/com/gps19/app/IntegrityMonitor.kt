@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
  * - Issue #192: Exposed isCharging and maxTemperature for telemetry parity. (Formerly #337)
  * - Issue #163: Hardened power tamper detection and connected violation callbacks.
  * v8.8.21: 
- * - Migrated to TimeProvider for all timing logic to ensure system-wide consistency. (Issue #282)
+ * - Migrated to TimeProvider for all timing logic to ensure system-wide consistency. (Issue #311 / Formerly #282)
  */
 class IntegrityMonitor(
     private val context: Context,
@@ -55,7 +55,7 @@ class IntegrityMonitor(
     var isCharging = false
         private set
 
-    // Issue #272: Battery Discharge Profiling - Now uses monotonic time (Issue #294).
+    // Issue #272: Battery Discharge Profiling - Now uses monotonic time (Issue #311).
     private val batterySamples = ConcurrentLinkedQueue<Pair<Long, Int>>()
     private var lastBatteryCheckTs = 0L
     var isBatterySteepDischarge = false
@@ -76,7 +76,7 @@ class IntegrityMonitor(
     }
 
     /**
-     * pollSystemStatus: Updated to take both wall and monotonic time (Issue #294).
+     * pollSystemStatus: Updated to take both wall and monotonic time (Issue #311).
      */
     fun pollSystemStatus(nowWall: Long, nowRealtime: Long) {
         val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
@@ -270,7 +270,7 @@ class IntegrityMonitor(
 
     /**
      * checkViolationSustained: Returns true if the violation has persisted beyond the threshold.
-     * v8.8.21: Now uses TimeProvider for high-assurance duration checks.
+     * v8.8.21: Now uses TimeProvider for high-assurance duration checks. (Issue #311)
      */
     fun checkViolationSustained(type: String, startTs: Long, threshold: Long): Boolean {
         if (startTs > 0 && (timeProvider.elapsedRealtime() - startTs) > threshold) {

@@ -18,7 +18,7 @@ import kotlin.math.abs
  * - Issue #325: Added accuracy and maxAccuracy to ribbons for forensic uncertainty 
  *   auditing. (Formerly #214)
  * v8.9.28:
- * - Issue #282: SIT Duplicate Guard. Implemented database-level sanity check to prevent redundant SIT forensic markers.
+ * - Issue #336: SIT Duplicate Guard. Implemented database-level sanity check to prevent redundant SIT forensic markers. (Formerly #282)
  * v8.9.21:
  * - Issue #224: Added tiltIdx and baroIdx to updateRibbons and backfillGaps for forensic expansion.
  * v8.9.5:
@@ -331,7 +331,7 @@ class HistoryManager(
     private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long): Boolean {
         if (!isDetected) return false
         
-        // Issue #282: Prevent duplicates if a SIT event occurs within the guard window of the last recorded one.
+        // Issue #336: Prevent duplicates if a SIT event occurs within the guard window of the last recorded one. (Formerly #282)
         if (abs(ts - lastSitDetectedTs) < SIT_DUPLICATE_GUARD_MS) {
             return false
         }

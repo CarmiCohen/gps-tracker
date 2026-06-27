@@ -24,6 +24,8 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * v8.9.40:
+ * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
  * v8.9.36:
  * - Issue #226: Intelligent Uncertainty UX - Displaying locationPendingReason in LegacyDashboardGrid.
  * v8.9.7:
@@ -79,7 +81,7 @@ fun LegacyDashboardGrid(
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                val stateColor = if (d.isGpsFresh) Lime500 else Slate500
+                val stateColor = if (d.isGpsFresh) BrandJd else Slate500
                 val isMoving = d.trackerState == TrackerState.MOVING
                 val stateText = d.trackerState.name
                 
@@ -133,7 +135,7 @@ fun LegacyDashboardGrid(
                 10 -> "ACTIVE"; 20 -> "WORKING"; 30 -> "FREQUENT"; 40 -> "RARE"; 45 -> "RESTRICTED"; else -> "U-${d.standbyBucket}"
             }
             val standbyColor = when (d.standbyBucket) {
-                10 -> Emerald500; 20 -> Lime500; 30 -> Amber500; else -> Rose500
+                10 -> Emerald500; 20 -> BrandJd; 30 -> Amber500; else -> Rose500
             }
             
             InfoRow(
@@ -153,7 +155,8 @@ fun LegacyDashboardGrid(
             )
 
             InfoRow(leftVal = d.totalUptime, leftLabel = "Uptime", leftColor = masterColor, rightVal = d.session, rightLabel = stringResource(R.string.label_session), rightColor = masterColor)
-            InfoRow(leftVal = d.engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else Lime500, rightVal = d.sinceConn, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else Emerald500)
+            InfoRow(leftVal = d.totalUptime, leftLabel = "Uptime", leftColor = masterColor, rightVal = d.session, rightLabel = stringResource(R.string.label_session), rightColor = masterColor)
+            InfoRow(leftVal = d.engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = d.sinceConn, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else Emerald500)
             
             InfoRow(
                 leftVal = d.lastChairSit, leftLabel = "Last Sit", leftColor = if(!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR), 
@@ -175,7 +178,7 @@ fun LegacyDashboardGrid(
             val ageIdxStr = "%.2f".format(Locale.getDefault(), gpsIdx.ageIndex)
             val accIdxStr = "%.2f".format(Locale.getDefault(), gpsIdx.accIndex)
             
-            InfoRow(leftVal = gpsIdxStr, leftLabel = "GPS-Index", leftColor = if(!d.isGpsFresh) Slate500 else Lime500, rightVal = d.gpsSpeed, rightLabel = "GPS Speed", rightColor = if(!d.isGpsFresh) Slate500 else Lime500, onLeftClick = onShowGnssDetail)
+            InfoRow(leftVal = gpsIdxStr, leftLabel = "GPS-Index", leftColor = if(!d.isGpsFresh) Slate500 else BrandJd, rightVal = d.gpsSpeed, rightLabel = "GPS Speed", rightColor = if(!d.isGpsFresh) Slate500 else BrandJd, onLeftClick = onShowGnssDetail)
             InfoRow(leftVal = d.satsIndex, leftLabel = "Satellites Index", leftColor = if(!d.isGpsFresh) Slate500 else if(d.isSatsIndexWarning) Rose500 else Color.White, rightVal = d.trackerAccuracy, rightLabel = "Tr Accuracy", rightColor = gpsColor)
             InfoRow(leftVal = if (isViewer) d.viewerAccuracy else "", leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerOrange, rightVal = ageIdxStr, rightLabel = "Age Index", rightColor = if(!d.isGpsFresh) Slate500 else Amber500)
             InfoRow(leftVal = accIdxStr, leftLabel = "Acc Index", leftColor = if(!d.isGpsFresh) Slate500 else Color.White, rightVal = d.snr, rightLabel = "Avg SNR", rightColor = if(!d.isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = onShowGnssDetail)
@@ -203,7 +206,7 @@ fun LegacyDashboardGrid(
                 }
             }
             
-            InfoRow(leftVal = d.trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!d.isTelemetryFresh) Slate500 else Lime500, rightVal = if (isViewer) d.viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerOrange)
+            InfoRow(leftVal = d.trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!d.isTelemetryFresh) Slate500 else BrandJd, rightVal = if (isViewer) d.viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerOrange)
 
             Spacer(Modifier.height(6.dp)); HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp); Spacer(Modifier.height(6.dp))
 
@@ -284,7 +287,7 @@ fun DebugTable(
         border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f))
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
-            Text(stringResource(R.string.log_diagnostics_title), color = Lime500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.log_diagnostics_title), color = BrandJd, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 DebugItem(stringResource(R.string.log_diag_latency), "${rtt}ms", valueColor = if (d.isLinkFresh) Color.White else Slate500)
@@ -292,7 +295,7 @@ fun DebugTable(
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 DebugItem(stringResource(R.string.log_diag_gps_age), if (gpsAgeSec >= 0) "${gpsAgeSec}s" else "--", valueColor = if (d.isGpsFresh) Color.White else Slate500)
-                DebugItem(stringResource(R.string.log_diag_sentinel), d.trackerState.name, valueColor = if (d.isGpsFresh) Lime500 else Slate500)
+                DebugItem(stringResource(R.string.log_diag_sentinel), d.trackerState.name, valueColor = if (d.isGpsFresh) BrandJd else Slate500)
             }
         }
     }

@@ -52,7 +52,7 @@ object SentinelValidator {
     }
 
     /**
-     * R729: Unified Vibration Floor Update (EMA).
+     * R730: Unified Vibration Floor Update (EMA).
      */
     fun updateVibrationFloor(currentFloor: Float, vibration: Float, isWarming: Boolean): Float {
         if (vibration.isNaN() || vibration <= 0f) return currentFloor

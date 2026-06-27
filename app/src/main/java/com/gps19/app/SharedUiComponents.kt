@@ -50,6 +50,8 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v8.9.40:
+ * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
  * v8.9.37:
  * - R942: Dynamically change TRK badge to VWR in Tracker mode.
  * - R943: Removed redundant DAT badge in Tracker mode.
@@ -487,7 +489,7 @@ fun StatusBar(
                     
                     // R942: Change TRK to VWR in tracker mode to represent remote peer.
                     val peerLabel = if (mode == "tracker") "VWR" else "TRK"
-                    StatusBadge(peerLabel, isPeerActive, activeColor = Lime500)
+                    StatusBadge(peerLabel, isPeerActive, activeColor = BrandJd)
                     
                     // R943: Hide DAT badge in Tracker mode to remove redundancy.
                     if (mode != "tracker") {
@@ -518,7 +520,7 @@ fun StatusBar(
                 Spacer(Modifier.width(8.dp))
                 
                 val isMoving = trackerState == TrackerState.MOVING
-                val stateColor = if (!isGpsActive) Slate500 else Lime500 
+                val stateColor = if (!isGpsActive) Slate500 else BrandJd 
                 
                 Text(
                     text = if (isMoving && isGpsActive) "»\u2009${trackerState.name}\u2009«" else trackerState.name,
@@ -533,25 +535,25 @@ fun StatusBar(
 
                 val animatedSpeed by animateFloatAsState(targetValue = if (speed.isNaN()) 0f else speed, animationSpec = tween(1000), label = "SpeedAnim")
                 val speedVal = if (animatedSpeed < 10.0f) String.format(Locale.getDefault(), "%.1f", animatedSpeed) else animatedSpeed.toInt().toString()
-                val speedColor = if (isGpsActive) Lime500 else Slate500
+                val speedColor = if (isGpsActive) BrandJd else Slate500
                 Text(text = "${speedVal}km/h", color = speedColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, textAlign = TextAlign.End)
             }
             Spacer(Modifier.height(3.dp))
             if (isLandscape && mode == "viewer") {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                     val vAge = now - maxOf(viewerGpsTs, viewerTelemetryTs)
-                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerOrange, overrideDistanceColor = Lime500, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = if(viewerGpsTs > 0) vAge else -1L, now = now, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isRelayConnected = isRelay) }
+                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerOrange, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = if(viewerGpsTs > 0) vAge else -1L, now = now, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isRelayConnected = isRelay) }
                     
                     val tAge = now - maxOf(lastGpsTs, trackerTelemetryTs)
-                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) Lime500 else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, now = now, trackerState = trackerState, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isRelayConnected = isRelay, isTelemetryFresh = isTelemetryFresh) }
+                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, now = now, trackerState = trackerState, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isRelayConnected = isRelay, isTelemetryFresh = isTelemetryFresh) }
                 }
             } else {
                 if (mode == "viewer") {
                     val vAge = now - maxOf(viewerGpsTs, viewerTelemetryTs)
-                    StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerOrange, overrideDistanceColor = Lime500, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = if(viewerGpsTs > 0) vAge else -1L, horizontalPadding = 8.dp, now = now, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isRelayConnected = isRelay)
+                    StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerOrange, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = if(viewerGpsTs > 0) vAge else -1L, horizontalPadding = 8.dp, now = now, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isRelayConnected = isRelay)
                     Spacer(Modifier.height(3.dp))
                 }
-                val trkColor = if (mode == "viewer" && !isPeerActive) Slate500 else Lime500 
+                val trkColor = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd
                 val tAge = now - maxOf(lastGpsTs, trackerTelemetryTs)
                 StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = trkColor, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, now = now, trackerState = trackerState, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isRelayConnected = isRelay, isTelemetryFresh = if(mode == "viewer") isTelemetryFresh else true)
             }

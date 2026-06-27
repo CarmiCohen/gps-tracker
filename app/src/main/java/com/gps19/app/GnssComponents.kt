@@ -25,6 +25,8 @@ import java.util.*
 
 /**
  * GnssComponents: Detailed satellite signal and constellation visualization.
+ * v8.9.40:
+ * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
  * Extracted from OverlayComponents for Issue 115 modularization.
  */
 
@@ -47,7 +49,7 @@ fun GnssDetailOverlay(
             ) {
                 Text(
                     text = "GNSS SATELLITE DETAIL",
-                    color = Lime500,
+                    color = BrandJd,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
@@ -95,7 +97,7 @@ fun GnssDetailOverlay(
 
 @Composable
 fun SatelliteCard(sat: SatelliteInfo) {
-    val color = if (sat.usedInFix) Lime500 else Slate500
+    val color = if (sat.usedInFix) BrandJd else Slate500
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
         border = BorderStroke(1.dp, color.copy(alpha = 0.3f))
@@ -123,7 +125,7 @@ fun SatelliteCard(sat: SatelliteInfo) {
                 Icon(
                     Icons.Default.GpsFixed,
                     null,
-                    tint = Lime500,
+                    tint = BrandJd,
                     modifier = Modifier.size(14.dp)
                 )
             }

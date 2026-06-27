@@ -18,7 +18,7 @@ interface SignalingProvider {
     fun clearRtt()
     fun emit(event: String, data: JSONObject)
     /**
-     * R404-SF: Emits a binary payload for Protobuf efficiency.
+     * R944: Emits a binary payload for Protobuf efficiency.
      */
     fun emitBinary(event: String, data: ByteArray)
     fun pushSettings()

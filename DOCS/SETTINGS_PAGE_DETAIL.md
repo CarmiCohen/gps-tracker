@@ -28,7 +28,7 @@ These settings define how the device identifies itself and where it sends its da
     - **Power Tamper**: `POWER_DISCONNECT_DEBOUNCE_MS` (3s). (Issue #163)
     - **Low Battery**: `CRITICAL_BATTERY_THRESHOLD` (20%) or charge deficit.
     - **High Temp**: `MAX_SAFE_TEMPERATURE_CELSIUS` (46.0°C).
-    - **Battery Health**: Monitors steep discharge (5% in 10m). (Issue #221)
+    - **Battery Health**: Monitors steep discharge (5% in 10m). (Issue #353)
 - **System Integrity**:
     - **System Storage Low**: Thresholds: 50MB (Low) / 10MB (Critical). (Issue #71)
     - **Xiaomi System**: Monitors background permission status. Includes `XIAOMI_BOOT_GRACE_MS` (30s). (Issue #190)
@@ -38,7 +38,7 @@ These settings define how the device identifies itself and where it sends its da
     - **Tilt Alert**: Detects orientation changes (> 15°).
     - **Acoustic Alert**: Ambient noise jump detection (40dB).
     - **Lift Alert**: Barometric pressure changes (> 0.8m).
-    - **Chair Occupied**: Advanced seat-sensing pattern matching. (Issue #282)
+    - **Chair Occupied**: Advanced seat-sensing pattern matching. (Issue #336)
 
 ### B. Sound (Sound Setup)
 - **Siren Type**: Select between "Siren", "Chimes", or "Pulse".
@@ -55,7 +55,7 @@ These settings define how the device identifies itself and where it sends its da
 - **Full Initialization**: Factory-level data reset, clears all logs/trails.
 
 ## 4. Navigation & Persistence
-- **Unified Back = Commit**: Exiting the settings screen triggers a commit to `DataStore` and re-initializes services if routing parameters changed. (Issue #283)
+- **Unified Back = Commit**: Exiting the settings screen triggers a commit to `DataStore` and re-initializes services if routing parameters changed. (**Requirement R800**)
 
 ## 5. Summary of Actions
 - **Phone Setup**: Accesses the Setup Guide for OS-level permissions.

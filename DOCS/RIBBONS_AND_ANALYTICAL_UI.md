@@ -17,7 +17,7 @@ The "Ribbons" provide a time-series view of system health across six resolutions
 *   **TI**: Tilt Index. Derived from orientation stability (`RIBBON_SIT_TILT_SCALE_DEG`).
 *   **BA**: Baro Index. Derived from altitude stability (`RIBBON_SIT_BARO_SCALE_METERS`).
 *   **CUR**: Battery Current (mA). Negative indicates drain; positive indicates charging (`RIBBON_CURRENT_SCALE_MA`).
-*   **BAT**: Steep Discharge latch status (Issue #221).
+*   **BAT**: Steep Discharge latch status (Issue #353).
 
 ## 3. UI Implementation
 - **Rendering**: Custom Canvas drawing in `SharedUiComponents.kt`.

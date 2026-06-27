@@ -25,6 +25,9 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU and Environmental sensors.
+ * v8.9.41:
+ * - Issue #340: Implemented Lux-Aware Proximity Gating for Samsung A15. Suppressing "Far" 
+ *   transitions in 0 lux to mitigate virtual sensor failure in darkness.
  * v8.9.34:
  * - Issue #321: Shadow Constants Remediation. Replaced magic numbers with EngineConstants.
  * v8.9.32:
@@ -254,6 +257,13 @@ class AppSensorManager @Inject constructor(
                 if (proximityIdx < secMinProxIdx) secMinProxIdx = proximityIdx
 
                 if (newValue != rawProximityNear) {
+                    // Issue #340: Samsung A15 Virtual Proximity failure in 0 lux.
+                    // If moving to "Far" in total darkness on A15, treat as sensor error and ignore.
+                    if (!newValue && isA15Device() && currentLux <= 0.01f) {
+                        Timber.d("Proximity: Suppressing 'Far' transition on A15 in darkness (Virtual Sensor Protection)")
+                        return
+                    }
+
                     rawProximityNear = newValue
                     proximityJob?.cancel()
                     

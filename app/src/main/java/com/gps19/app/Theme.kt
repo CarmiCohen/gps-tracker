@@ -7,24 +7,24 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * R799: Dynamic Theme based on Role (Tracker/Viewer).
+ * v8.9.40:
+ * - R865/R866 [Active]: Unified Identity Green (#367C2B) enforced.
  * v5.851a:
- * - R851a: Changed Tracker role back to Green (Lime 500/600).
+ * - R851a [Superseded]: Changed Tracker role back to Green (Replaced by R865).
  * v5.681:
  * - Refactored TrackerOrange to ViewerOrange for semantic clarity.
  * v5.625:
- * - R815: Swapped Role Identity Colors.
- * - Tracker Role: Lime500 (restored from Teal)
- * - Viewer Role: ViewerOrange
+ * - R815 [Superseded]: Swapped Role Identity Colors (Replaced by R851a).
  */
 
 private fun getDarkColorScheme(appMode: String?) = darkColorScheme(
     primary = when (appMode) {
-        "tracker" -> Lime500
+        "tracker" -> BrandJd
         "viewer" -> ViewerOrange
         else -> Slate500 
     },
     secondary = when (appMode) {
-        "tracker" -> Lime600
+        "tracker" -> BrandJdDark
         "viewer" -> ViewerOrangeDark
         else -> Slate800
     },
@@ -41,12 +41,12 @@ private fun getDarkColorScheme(appMode: String?) = darkColorScheme(
 
 private fun getLightColorScheme(appMode: String?) = lightColorScheme(
     primary = when (appMode) {
-        "tracker" -> Lime600
+        "tracker" -> BrandJdDark
         "viewer" -> ViewerOrangeDark
         else -> Slate500
     },
     secondary = when (appMode) {
-        "tracker" -> Lime500
+        "tracker" -> BrandJd
         "viewer" -> ViewerOrange
         else -> Slate400
     },

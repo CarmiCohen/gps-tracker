@@ -4,13 +4,10 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: Unified physics and geodesic calculations for the Pure Logic Engine.
- * v8.9.38:
+ * v8.9.41:
+ * - Issue #332: Refined SNR-IMU correlation for Urban Canyons. High SNR with zero vibration 
+ *   now triggers a higher score penalty and Adaptive Jump status.
  * - Issue #334: Implemented interpolateSegment for hindsight rubber-banding.
- * v8.9.34:
- * - Issue #304: Corrected Tier 3 Jump Floor. Now uses JUMP_GATE_VISUAL_JITTER_METERS (10.0m).
- * v8.9.18:
- * - Issue #219: Enhanced isVisualJump with SNR-based adaptive confidence. Detects spoofing/reflection 
- *   signatures (High SNR + Zero Vibration).
  */
 object PhysicsUtils {
 
@@ -114,12 +111,16 @@ object PhysicsUtils {
         var score = 0
         var isAdaptiveJump = false
         
-        // Sensor Fusion: GPS-IMU Discrepancy
-        if (!hasPhysicalMotion && speedMps > 10.0) { 
+        // Issue #332: Enhanced Sensor Fusion for Urban Canyons
+        // In urban canyons, multipath can produce high SNR with wild coordinate jumps.
+        // Logic: If there is no physical motion but we see significant speed (> 5m/s), penalize heavily.
+        if (!hasPhysicalMotion && speedMps > 5.0) { 
             score += JUMP_WEIGHT_SENSOR_MISMATCH
-            // Issue #219: High SNR + No Vibration = Signal Reflection/Spoofing suspicion
+            
+            // High SNR (35+) with no vibration is the "Smoking Gun" for Signal Reflection/Spoofing.
             if (snr >= ADAPTIVE_JUMP_SNR_THRESHOLD) {
                 isAdaptiveJump = true
+                score += 20 // Additional penalty for high-confidence spoofing
             }
         }
         
@@ -145,8 +146,8 @@ object PhysicsUtils {
         val isJump = isTier2 || isTier3 || score >= 50
         
         var reason = when {
-            isAdaptiveJump -> "Signal Reflection Suspicion"
-            !hasPhysicalMotion && speedMps > 10.0 -> "Sensor Mismatch Jump"
+            isAdaptiveJump -> "Signal Reflection Suspicion (High SNR)"
+            !hasPhysicalMotion && speedMps > 5.0 -> "Sensor Mismatch Jump (Urban Canyon)"
             isTier2 -> "Security Jump"
             isTier3 -> "Visual Jitter"
             score >= 50 -> "High Confidence Jump"

@@ -1,4 +1,4 @@
-# Telemetry & Status Card (HUD) Mechanism (v8.9.37)
+# Telemetry & Status Card (HUD) Mechanism (v8.9.40)
 
 This document describes the telemetry data collection, state management, and the high-fidelity UI components used to visualize the tracker's real-time status via the Status Card HUD.
 
@@ -37,7 +37,7 @@ To ensure optimal navigation ergonomics, the vertical stacking order in portrait
 
 ## 4. The Status Card HUD (`StatusBar`)
 The "Status Card" is the primary interface for telemetry.
-- **Role Identity**: Tracker-related data is rendered in **Lime500**. Viewer-related data is rendered in **ViewerOrange**.
+- **Role Identity**: Tracker-related data is rendered in **BrandJd** (#367C2B). Viewer-related data is rendered in **ViewerOrange**. (R865/R866)
 - **Visual Heartbeat**: A circular progress indicator that shrinks as data ages (10s for Position / 30s for Link).
 - **Ghost Mode UX**: HUD metrics, accuracy circles, and dashboard fields enter a dimmed "Ghost" state (Slate500) when telemetry is older than 10s (Issue #193).
 - **Instant Recovery (R923)**: Freshness logic utilizes the maximum of the position timestamp and telemetry arrival timestamp (`telemetryTs`).
@@ -47,4 +47,4 @@ The "Status Card" is the primary interface for telemetry.
 ## 5. Header Bar Navigation
 The `HeaderBar` provides immediate access to analytical tools and forensic data:
 - **Pinned Controls**: The **Log** and **Map** buttons are pinned adjacent to each other.
-- **Forensic Verification**: The build version (v8.9.37) is displayed directly in the HUD for instant build verification.
+- **Forensic Verification**: The build version (v8.9.40) is displayed directly in the HUD for instant build verification.

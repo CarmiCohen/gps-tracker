@@ -20,7 +20,7 @@ The system continuously evaluates tracking data against a set of security rules.
     - **GPS Stalled**: Hardware chip freeze detected after 60s (`GPS_STALL_THRESHOLD_MS`). (Issue #198)
         - **Escalated Revival**: System retries hardware refresh every 120s and escalates to CRITICAL after 3 failures. (Issue #124)
     - **Xiaomi Ready**: Autostart and background restriction monitoring. Includes `XIAOMI_BOOT_GRACE_MS` (30s). (Issue #190)
-- **Low Battery**: Level < 20% or steep discharge (5% in 10m). (Issue #221)
+- **Low Battery**: Level < 20% or steep discharge (5% in 10m). (Issue #353)
 
 ## 2. Audio Synthesis (`AudioSynthesizer.kt`)
 Real-time PCM generation for high-stress alerts:

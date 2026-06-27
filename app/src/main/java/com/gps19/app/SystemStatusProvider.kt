@@ -41,7 +41,7 @@ interface SystemStatusProvider {
     // v8.8.27: Unified permission state retrieval
     fun getPermissionState(): PermissionState
     
-    // R404-4: Reactive Flows for system states
+    // R945: Reactive Flows for system states
     fun observeInternetStatus(): Flow<Boolean>
     fun observeBatteryStatus(): Flow<BatteryStatus>
 }

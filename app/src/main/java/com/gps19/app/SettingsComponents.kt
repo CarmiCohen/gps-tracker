@@ -26,6 +26,8 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * v8.9.40:
+ * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
  * Extracted from OverlayComponents for Issue 115 modularization.
  */
 
@@ -50,16 +52,16 @@ fun SettingsOverlay(
                         value = uiState.draftSettings.deviceId, 
                         onValueChange = onUpdateDeviceId, 
                         label = { Text(stringResource(R.string.settings_label_tracker_id), fontSize = 12.sp) }, 
-                        leadingIcon = { Icon(Icons.Default.Agriculture, null, tint = Lime500, modifier = Modifier.size(18.dp)) }, 
+                        leadingIcon = { Icon(Icons.Default.Agriculture, null, tint = BrandJd, modifier = Modifier.size(18.dp)) }, 
                         modifier = Modifier.weight(1f), 
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Lime500, 
-                            unfocusedBorderColor = Lime500.copy(alpha = 0.5f), 
-                            focusedLabelColor = Lime500, 
-                            unfocusedLabelColor = Lime500.copy(alpha = 0.7f), 
-                            focusedTextColor = Lime500, 
-                            unfocusedTextColor = Lime500,
-                            cursorColor = Lime500
+                            focusedBorderColor = BrandJd, 
+                            unfocusedBorderColor = BrandJd.copy(alpha = 0.5f), 
+                            focusedLabelColor = BrandJd, 
+                            unfocusedLabelColor = BrandJd.copy(alpha = 0.7f), 
+                            focusedTextColor = BrandJd, 
+                            unfocusedTextColor = BrandJd,
+                            cursorColor = BrandJd
                         ), 
                         singleLine = true, 
                         textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
@@ -131,9 +133,9 @@ fun AlertManagementOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSe
     Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate900) {
         Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.alert_mgmt_title), color = ViewerOrange, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
-            Spacer(Modifier.height(16.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.alert_group_toggles), color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp); Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) { TextButton(onClick = { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(localInternet = true, serverConnection = true, relayConnection = true, jammerDetection = true, signalLoss = true, gpsStalling = true, distance = true, power = true, lowBattery = true, batteryHealth = true, highTemperature = true, longTimeGap = true, tamperAlert = true, tiltAlert = true, acousticAlert = true, liftAlert = true, chairOccupied = true, systemStorageLow = true)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_all_on), fontSize = 7.5.sp, color = Lime500) }; TextButton(onClick = { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(localInternet = false, serverConnection = false, relayConnection = false, jammerDetection = false, signalLoss = false, gpsStalling = false, distance = false, power = false, lowBattery = false, batteryHealth = false, highTemperature = false, longTimeGap = false, tamperAlert = false, tiltAlert = false, acousticAlert = false, liftAlert = false, chairOccupied = false, systemStorageLow = false)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_reset), fontSize = 7.5.sp, color = Rose500) } } }
+            Spacer(Modifier.height(16.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.alert_group_toggles), color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp); Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) { TextButton(onClick = { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(localInternet = true, serverConnection = true, relayConnection = true, jammerDetection = true, signalLoss = true, gpsStalling = true, distance = true, power = true, lowBattery = true, batteryHealth = true, highTemperature = true, longTimeGap = true, tamperAlert = true, tiltAlert = true, acousticAlert = true, liftAlert = true, chairOccupied = true, systemStorageLow = true)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_all_on), fontSize = 7.5.sp, color = BrandJd) }; TextButton(onClick = { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(localInternet = false, serverConnection = false, relayConnection = false, jammerDetection = false, signalLoss = false, gpsStalling = false, distance = false, power = false, lowBattery = false, batteryHealth = false, highTemperature = false, longTimeGap = false, tamperAlert = false, tiltAlert = false, acousticAlert = false, liftAlert = false, chairOccupied = false, systemStorageLow = false)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_reset), fontSize = 7.5.sp, color = Rose500) } } }
             
-            Spacer(Modifier.height(8.dp)); SettingsGroupHeader(stringResource(R.string.alert_group_master), Lime500)
+            Spacer(Modifier.height(8.dp)); SettingsGroupHeader(stringResource(R.string.alert_group_master), BrandJd)
             AlarmToggle(stringResource(R.string.alert_label_global_mute), uiState.draftSettings.alertSettings.globalMute) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(globalMute = it)) }
             Text(stringResource(R.string.alert_desc_global_mute), color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(start = 2.dp, bottom = 8.dp))
 
@@ -187,7 +189,7 @@ fun AlarmSoundOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSetting
     Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate900) {
         Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.sound_title), color = Violet500, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
-            Spacer(Modifier.height(24.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.sound_label_test_audio), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium); Button(onClick = onTestSiren, colors = ButtonDefaults.buttonColors(containerColor = Lime500)) { Icon(if (uiState.isSirenPlaying) Icons.Default.Stop else Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(if (uiState.isSirenPlaying) stringResource(R.string.btn_test_audio_stop) else stringResource(R.string.btn_test_audio_test)) } }
+            Spacer(Modifier.height(24.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.sound_label_test_audio), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium); Button(onClick = onTestSiren, colors = ButtonDefaults.buttonColors(containerColor = BrandJd)) { Icon(if (uiState.isSirenPlaying) Icons.Default.Stop else Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(if (uiState.isSirenPlaying) stringResource(R.string.btn_test_audio_stop) else stringResource(R.string.btn_test_audio_test)) } }
             Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_type), Amber500); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { sirenOptions.forEach { type -> FilterChip(selected = uiState.selectedSirenType == type, onClick = { onUpdateSirenType(type) }, label = { Text(type) }) } }
             Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_behaviors), ViewerOrange)
             AlarmToggle(stringResource(R.string.sound_label_vibration), settings.vibrationEnabled) { onUpdateAlertSettings(settings.copy(vibrationEnabled = it)) }

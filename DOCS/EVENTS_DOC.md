@@ -36,7 +36,7 @@ This document describes all events logged by the application, their priorities, 
 ### 2. Physical Violation Details (Teal / Technical)
 | Event Text Pattern | Importance | Color | Technical Context |
 | :--- | :--- | :--- | :--- |
-| `[VIOLATION] Light: [X] lux` | Not Important| Teal | Triggered > 150 lux jump (Issue #284). |
+| `[VIOLATION] Light: [X] lux` | Not Important| Teal | Triggered > 150 lux jump (Issue #372). |
 | `[VIOLATION] Shock: [X]G` | Not Important| Teal | Triggered > 0.8g impact. |
 | `[VIOLATION] Noise: [X] dB` | Not Important| Teal | Triggered > 40dB over ambient floor. |
 | `GPS Stall: Revival attempt [X]/3`| Important | White| Periodic 120s hardware refresh (Issue #198). |
@@ -52,7 +52,7 @@ This document describes all events logged by the application, their priorities, 
 
 ## Technical Specifications
 - **Log Spatial Anchor**: All events are automatically tagged with `lat`/`lng` coordinates using the last known telemetry position.
-- **Monotonic Stability (Issue #125)**: All forensic timing and UI lockout windows use `elapsedRealtime`.
+- **Monotonic Stability (Issue #311)**: All forensic timing and UI lockout windows use `elapsedRealtime`. (Formerly #283)
 - **Ghost Mode UX (Issue #193)**: Stale events (>10s) are visualized with dimmed "Ghost" status indicators.
 - **Identity Unification**: Every entry carries the mandatory `role` tag (Issue #182).
 - **Fuzzy Forensic Batching**: Consecutive similar events are grouped with `(xN)` count and total duration tracking.

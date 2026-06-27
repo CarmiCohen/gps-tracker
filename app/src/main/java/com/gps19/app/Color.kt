@@ -5,25 +5,30 @@ import androidx.compose.ui.graphics.Color
 /**
  * R799: New Color System.
  * Decouples Role Identity from Semantic Status.
+ * v8.9.40:
+ * - R865/R866 [Active]: Unified Identity Green (#367C2B) enforced as Tracker Primary.
  * v8.8.3:
- * - Added BrandJd (#367C2B) to synchronize with colors.xml (R866).
- * v8.8.0:
- * - Centralized FORENSIC_PINK_COLOR from :core:engine to resolve UI leak.
+ * - R866 [Active]: Added BrandJd (#367C2B) to synchronize with colors.xml.
+ * v5.851a:
+ * - R851a [Superseded]: Restored Tracker to Green (Lime 500) - Replaced by R865.
+ * v5.625:
+ * - R815 [Superseded]: Swapped Role Identity Colors - Replaced by R851a.
  */
 
 const val FORENSIC_PINK_COLOR = 0xFFF472B6.toInt()
 
 // Brand Colors
-val BrandJd = Color(0xFF367C2B) // JD Branding Green (R866)
+val BrandJd = Color(0xFF367C2B)     // JD Branding Green (R866) - Authority for R865
+val BrandJdDark = Color(0xFF2B6222) // Darker variant for UI depth
 
 // Role Colors (Identity)
 val ViewerOrange = Color(0xFFF97316)     // Orange 500 (Viewer Role primary)
 val ViewerOrangeDark = Color(0xFFEA580C) // Orange 600
 
-val Lime500 = Color(0xFF84CC16)   // Lime 500 (Tracker Role primary - R851a)
+val Lime500 = Color(0xFF84CC16)   // Lime 500 (Legacy Tracker Role primary - Superseded by BrandJd)
 val Lime600 = Color(0xFF65A30D)
 
-val Teal500 = Color(0xFF06B6D4)   // Teal 500
+val Teal500 = Color(0xFF06B6D4)   // Teal 500 (Legacy R815 role color - Superseded)
 val Teal600 = Color(0xFF0891B2)
 
 // Semantic Status Colors

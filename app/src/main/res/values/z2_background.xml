@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- R865: Unified Identity Green -->
-    <color name="z2_background">#84CC16</color>
+    <!-- R865/R866: Unified Identity Green -->
+    <color name="z2_background">#367C2B</color>
 </resources>

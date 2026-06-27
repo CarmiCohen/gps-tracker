@@ -2,14 +2,18 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * v8.9.37:
- * - Issue #315: Network Integrity & Timeout Scaling. Refined RTT scaling 
- *   to handle high-latency scenarios. (Formerly #273 / #336)
- * - Issue #166: Shadow Constants Remediation. Centralized magic numbers from AppSensorManager.
- * - Issue #302: Centralized Behavioral Magic Numbers from TrackerStateManager.
- * - Issue #303: Unified Trajectory Rejection multiplier.
- * - R810 Split: Segregated Acoustic (L), Physical (M), and Filtering (P) requirements.
- * - R925: Defined LANDING_PAGE_PAUSE_MS for session auto-transition.
+ * v8.9.41:
+ * - Issue #328: Added PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS and PENDING_UNCERTAINTY_SPEED_CAP_MPS
+ *   for velocity-aware Bayesian expansion.
+ * v8.9.40:
+ * - Issue #343: Remapped Signal Loss/Jammer Forensic Latch from #282.
+ * - Issue #344: Remapped Stall/Tamper Forensic Latch from #283.
+ * - Issue #345: Remapped Geofence Forensic Latch from #284.
+ * - Issue #311: Monotonic Timing Integrity (Formerly #283).
+ * - Issue #315: Network Integrity & Timeout Scaling. (Formerly #273).
+ * - Issue #191: Behavioral Debouncing & Muzzle Hardening (R729).
+ * - Issue #325: Authoritative Spatial Anchoring (Formerly #214).
+ * - Issue #322: Architectural Bloat / Modularization (Formerly #115 / #385).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -59,8 +63,10 @@ const val ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0f
 const val HINDSIGHT_BUFFER_SIZE = 5
 const val HINDSIGHT_MAX_AGE_MS = 30000L
 
-// Bayesian Uncertainty (Issue #221)
+// Bayesian Uncertainty (Issue #328 - Formerly #221)
 const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0f // 54 km/h conservative drift
+const val PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS = 1.5f // Minimal drift when stationary
+const val PENDING_UNCERTAINTY_SPEED_CAP_MPS = 33.3f // 120 km/h cap
 
 // ImmFilter Parameters
 const val IMM_STATIONARY_PROBABILITY = 0.8
@@ -172,7 +178,7 @@ const val DISCOVERY_PHASE_MS = 60000L
 const val JUMP_HOLD_DURATION_MS = 180000L
 const val MOVING_HOLD_DURATION_MS = 60000L
 const val STATIONARY_GPS_POLLING_MS = 20000L
-const val MOVING_GPS_POLLING_MS = 2000L 
+const val MOVING_GPS_POLLING_MS = 200L 
 const val SUSPICIOUS_GPS_POLLING_MS = 1000L
 const val HIGH_FREQUENCY_GPS_POLLING_MS = 100L
 const val A15_STABLE_GPS_POLLING_MS = 1000L
@@ -263,14 +269,14 @@ const val RIBBON_SIT_BARO_SCALE_METERS = 0.5f
 const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 
 // Network Communication (v8.8.21)
-// Issue #315: Maximum healthy RTT for sync loop scaling. (Formerly #273 / #336)
+// Issue #315: Maximum healthy RTT for sync loop scaling. (Formerly #273)
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0
 const val NETWORK_TIMEOUT_MS = 10000
 const val NET_REJOIN_THRESHOLD_MS = 15000L
 const val NET_HEAL_THRESHOLD_MS = 45000L
-// Issue #315: Baseline sync interval. (Formerly #273 / #336)
+// Issue #315: Baseline sync interval. (Formerly #273)
 const val PING_INTERVAL_MS = 10000L
 const val SOCKET_TIMEOUT_MS = 60000
 const val RTT_WINDOW_SIZE = 5
@@ -302,7 +308,7 @@ const val ALERT_ID_GPS_STALL = "GPS_STALL"
 const val ALERT_ID_TRACKER_GAP = "GPS_GAP"
 const val ALERT_ID_TRACKER_POWER = "POWER_TAMPER"
 const val ALERT_ID_TRACKER_BATTERY = "LOW_BATTERY"
-const val ALERT_ID_TRACKER_TEMP = "HIGH_TEMP"
+const val ALERT_ID_TRACKER_TEMP = "TRACKER_TEMP"
 const val ALERT_ID_TRACKER_TAMPER = "TRACKER_TAMPER"
 const val ALERT_ID_TRACKER_TILT = "TILT_ALERT"
 const val ALERT_ID_TRACKER_ACOUSTIC = "ACOUSTIC_ALERT"
@@ -356,7 +362,7 @@ const val WATCH_DOG_UI_GRACE_MS = 30000L
 const val SENSOR_GRACE_PERIOD_MS = 600000L
 const val TEST_ALARM_DURATION_MS = 3000L
 
-// Behavioral Debouncing (R729 - Issue #191)
+// R729: Behavioral Debouncing & Muzzle Hardening (Issue #191)
 const val PROXIMITY_DEBOUNCE_STATIONARY_A15_MS = 5000L
 const val PROXIMITY_DEBOUNCE_STATIONARY_MS = 3000L
 const val PROXIMITY_DEBOUNCE_MOVING_MS = 1000L

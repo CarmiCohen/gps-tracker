@@ -32,6 +32,8 @@ import java.util.*
 
 /**
  * LogComponents: UI for system logs and diagnostic history.
+ * v8.9.40:
+ * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
  * Extracted from OverlayComponents for Issue 115 modularization.
  * v8.9.22:
  * - Issue #225: Implemented LogDetailPane to render snrSnapshot and vibeSnapshot for enriched forensics.
@@ -69,7 +71,7 @@ fun LogOverlay(
                     Text("${filteredLogs.size} / ${logs.size}", color = if (isTelemetryFresh) Slate500 else Slate500.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Normal) 
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    LogFilterButton(stringResource(R.string.log_filter_details), showDetails, Lime500, onSetShowDetails)
+                    LogFilterButton(stringResource(R.string.log_filter_details), showDetails, BrandJd, onSetShowDetails)
                     LogFilterButton(stringResource(R.string.log_filter_hist), showRecovered, Amber500, onSetShowRecovered)
                     IconButton(onClick = onExport, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Download, "Save", tint = Color.White, modifier = Modifier.size(20.dp)) }
                     IconButton(onClick = onClear, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.DeleteSweep, "Clear", tint = Rose500, modifier = Modifier.size(20.dp)) }
@@ -180,7 +182,7 @@ fun LogDetailPane(log: LogEntry, onClose: () -> Unit) {
             )
 
             DetailRow(
-                label1 = "ROLE", val1 = log.role.uppercase(), color1 = if(log.role == "tracker") Lime500 else ViewerOrange,
+                label1 = "ROLE", val1 = log.role.uppercase(), color1 = if(log.role == "tracker") BrandJd else ViewerOrange,
                 label2 = "TYPE", val2 = log.type.uppercase(), color2 = Color.White
             )
         }
@@ -226,5 +228,5 @@ fun getLogRenderingConfig(log: LogEntry, isTelemetryFresh: Boolean = true): LogR
     if (msg.contains("USER ACTION") || msg.contains("VIEWER CONNECTED")) return LogRenderingConfig(ViewerOrange, FontWeight.Normal)
     if (msg.contains("TRACKER STATE") || msg.contains("TRACKER IS")) return LogRenderingConfig(Amber500, FontWeight.Bold)
     if (isImportant) return LogRenderingConfig(Emerald500, FontWeight.Bold)
-    return LogRenderingConfig(Lime500, FontWeight.Normal)
+    return LogRenderingConfig(BrandJd, FontWeight.Normal)
 }

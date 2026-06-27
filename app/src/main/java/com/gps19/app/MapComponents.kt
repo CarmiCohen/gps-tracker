@@ -48,6 +48,11 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * v8.9.41:
+ * - Issue #328: Implemented Velocity-Aware Bayesian Uncertainty Expansion. Growth rate 
+ *   now scales with last known speed (1.5m/s stationary floor, capped at 33.3m/s).
+ * v8.9.40:
+ * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
  * v8.9.37:
  * - Issue #325: Unified accuracy fallback logic. Prioritized engine-calculated 
  *   maxAccuracy for uncertainty circle rendering. Fixed viewerAccuracy mapping. (Formerly #214)
@@ -81,6 +86,7 @@ fun AppMapContainer(
     val trackerBearing = if (isTrackerMode) uiState.localLocation.bearing else uiState.trackerLocation.bearing
     val trackerAccuracy = if (isTrackerMode) uiState.localLocation.accuracy else uiState.trackerLocation.accuracy
     val trackerMaxAcc = if (isTrackerMode) uiState.localLocation.maxAccuracy else uiState.trackerLocation.maxAccuracy
+    val trackerSpeed = if (isTrackerMode) uiState.localLocation.speed else uiState.trackerLocation.speed
     
     val trackerLastValidFixRealtime = if (isTrackerMode) uiState.localLocation.lastValidFixRealtime else uiState.trackerLocation.lastValidFixRealtime
     val trackerLocationPending = if (isTrackerMode) uiState.localLocation.isLocationPending else uiState.trackerLocation.isLocationPending
@@ -88,9 +94,10 @@ fun AppMapContainer(
     
     val viewerLat = if (isTrackerMode) uiState.trackerLocation.lat else uiState.localLocation.lat
     val viewerLng = if (isTrackerMode) uiState.trackerLocation.lng else uiState.localLocation.lng
-    val viewerBearing = if (isTrackerMode) uiState.trackerLocation.bearing else uiState.trackerLocation.bearing
+    val viewerBearing = if (isTrackerMode) uiState.trackerLocation.bearing else uiState.localLocation.bearing
     val viewerAccuracy = if (isTrackerMode) uiState.trackerLocation.accuracy else uiState.localLocation.accuracy
     val viewerMaxAcc = if (isTrackerMode) uiState.trackerLocation.maxAccuracy else uiState.localLocation.maxAccuracy
+    val viewerSpeed = if (isTrackerMode) uiState.trackerLocation.speed else uiState.localLocation.speed
     
     val viewerLastValidFixRealtime = if (isTrackerMode) uiState.trackerLocation.lastValidFixRealtime else uiState.localLocation.lastValidFixRealtime
     val viewerLocationPending = if (isTrackerMode) uiState.trackerLocation.isLocationPending else uiState.localLocation.isLocationPending
@@ -137,8 +144,10 @@ fun AppMapContainer(
             isGeofenceViolationsVisible = uiState.isGeofenceViolationsVisible,
             accuracy = trackerAccuracy,
             maxAcc = trackerMaxAcc,
+            speed = trackerSpeed,
             myAccuracy = viewerAccuracy,
             myMaxAcc = viewerMaxAcc,
+            mySpeed = viewerSpeed,
             initialCenter = initialCenter,
             centeringTrackerTrigger = uiState.centeringTrackerTrigger,
             centeringViewerTrigger = uiState.centeringViewerTrigger,
@@ -258,7 +267,8 @@ fun OsmMap(
     onTap: (GeoPoint) -> Unit, isFresh: Boolean, isMeFresh: Boolean = true,
     maxD: Double, onRemoveMarker: (Int) -> Unit, violations: List<ViolationPoint>, 
     isFenceVisible: Boolean, isViolationsVisible: Boolean = true, isGeofenceViolationsVisible: Boolean = true, 
-    accuracy: Float, maxAcc: Float, myAccuracy: Float? = null, myMaxAcc: Float = 0f,
+    accuracy: Float, maxAcc: Float, speed: Float = 0f, 
+    myAccuracy: Float? = null, myMaxAcc: Float = 0f, mySpeed: Float = 0f,
     initialCenter: GeoPoint? = null, centeringTrackerTrigger: Int = 0, centeringViewerTrigger: Int = 0,
     zoomInTrigger: Int = 0, zoomOutTrigger: Int = 0,
     lastGpsTs: Long = 0L, isTrackerMode: Boolean = false,
@@ -467,6 +477,7 @@ fun OsmMap(
                     marker.setOnMarkerClickListener { mk, mv -> 
                         if (!isTrackerMode && currentGeofenceMode == GeofenceMode.REMOVE) {
                             mv.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            currentOnTap(p)
                             currentOnRemoveMarker(idx)
                             Toast.makeText(context, "Home point removed", Toast.LENGTH_SHORT).show()
                         } else if (!isTrackerMode && currentGeofenceMode == GeofenceMode.ADD) {
@@ -483,7 +494,7 @@ fun OsmMap(
 
         if (lastTrailRendered.value != trail || lastViewerTrailRendered.value != viewerTrail) {
             trailFolderRef.value?.items?.clear()
-            drawTrailToFolder(view, trailFolderRef.value!!, trail, Lime500.toArgb(), Slate500.toArgb(), trackerPolylinePool)
+            drawTrailToFolder(view, trailFolderRef.value!!, trail, BrandJd.toArgb(), Slate500.toArgb(), trackerPolylinePool)
             
             viewerTrailFolderRef.value?.items?.clear()
             drawTrailToFolder(view, viewerTrailFolderRef.value!!, viewerTrail, ViewerOrange.toArgb(), Slate500.toArgb(), viewerPolylinePool)
@@ -548,14 +559,20 @@ fun OsmMap(
                 trackerCircleRef.value?.let { p ->
                     val effectiveAccuracy = if (isLocationPending && lastValidFixRealtime > 0) {
                         val elapsedSec = (systemPulseRealtime - lastValidFixRealtime) / 1000f
-                        baseAcc + (PENDING_UNCERTAINTY_GROWTH_RATE_MPS * elapsedSec)
+                        // Issue #328: Velocity-Aware Bayesian Expansion
+                        val driftRate = if (speed > 1.0f) {
+                            speed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS)
+                        } else {
+                            PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS
+                        }
+                        baseAcc + (driftRate * elapsedSec)
                     } else {
                         baseAcc
                     }
                     
                     val circlePoints = Polygon.pointsAsCircle(GeoPoint(lat, lng), effectiveAccuracy.toDouble())
                     p.points = circlePoints.map { GeoPoint(it.latitude, it.longitude) }
-                    p.outlinePaint.color = if (isFresh) Lime500.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
+                    p.outlinePaint.color = if (isFresh) BrandJd.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                     accuracyCirclesFolderRef.value?.add(p)
                 }
             }
@@ -566,7 +583,13 @@ fun OsmMap(
                 viewerCircleRef.value?.let { p ->
                     val effectiveMyAccuracy = if (isMeLocationPending && meLastValidFixRealtime > 0) {
                         val elapsedSec = (systemPulseRealtime - meLastValidFixRealtime) / 1000f
-                        baseMyAcc + (PENDING_UNCERTAINTY_GROWTH_RATE_MPS * elapsedSec)
+                        // Issue #328: Velocity-Aware Bayesian Expansion
+                        val driftRate = if (mySpeed > 1.0f) {
+                            mySpeed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS)
+                        } else {
+                            PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS
+                        }
+                        baseMyAcc + (driftRate * elapsedSec)
                     } else {
                         baseMyAcc
                     }
@@ -645,7 +668,7 @@ private fun addTrailSegmentToFolder(view: MapView, folder: FolderOverlay, segmen
 private fun createTrackerBitmap(density: Float, isFresh: Boolean): Bitmap { 
     val sz = (32 * density).toInt(); val bitmap = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888); val canvas = Canvas(bitmap); val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     paint.style = Paint.Style.STROKE; paint.color = android.graphics.Color.WHITE; paint.strokeWidth = 1.0f * density; canvas.drawCircle(sz/2f, sz/2f, sz/2f - density, paint)
-    paint.color = if (isFresh) Lime500.toArgb() else Slate500.toArgb(); paint.strokeWidth = 3.0f * density; canvas.drawCircle(sz/2f, sz/2f, sz/2f - 3.5f * density, paint)
+    paint.color = if (isFresh) BrandJd.toArgb() else Slate500.toArgb(); paint.strokeWidth = 3.0f * density; canvas.drawCircle(sz/2f, sz/2f, sz/2f - 3.5f * density, paint)
     return bitmap
 }
 
@@ -740,7 +763,7 @@ fun MapToolsOverlay(
         
         Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
             MapToolButton(icon = Icons.Default.Person, label = "VIEWER", onClick = onCenterViewer, iconColor = if(viewerValid) ViewerOrange else Color.Gray)
-            MapToolButton(icon = Icons.Default.Agriculture, label = "TRACKER", onClick = onCenterTracker, iconColor = if(trackerValid) Lime500 else Color.Gray)
+            MapToolButton(icon = Icons.Default.Agriculture, label = "TRACKER", onClick = onCenterTracker, iconColor = if(trackerValid) BrandJd else Color.Gray)
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {

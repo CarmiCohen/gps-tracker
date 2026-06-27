@@ -30,12 +30,12 @@ We have transitioned to an architecture that treats the core tracking logic as a
 - **Strict Dependencies**: Enforced JVM-only purity for the engine to prevent framework leakage (Issue #100).
 
 ### Phase 4: Forensic & OEM Hardening
-- **Monotonic Unification**: All logic uses monotonic time via `TimeProvider` (Issue #283).
+- **Monotonic Unification**: All logic uses monotonic time via `TimeProvider` (Issue #311 / Formerly #283).
 - **Muzzle Window Implementation**: Implemented a 2000ms jitter suppression window (Issue #191).
 - **OEM Fidelity**: Specialized 10Hz polling and escalated revival for Xiaomi and Samsung (Issue #148/#190).
 
 ### Phase 5: Domain Decoupling
-- **UseCase Extraction**: Decoupled `MainViewModel.kt` into feature-specific UseCases (Issue #115).
+- **UseCase Extraction**: Decoupled `MainViewModel.kt` into feature-specific UseCases (Issue #322 / Formerly #115).
 - **State Synchronization**: Unified UI state management through domain layers.
 
 ### Phase 6: Forensic Simplification & UX Hardening (v8.9.37)
