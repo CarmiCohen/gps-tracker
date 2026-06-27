@@ -15,6 +15,9 @@ import kotlin.math.abs
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Ensured maxAccuracy 
+ *   parity in local database persistence and retrieval for forensic logs.
  * v8.9.37:
  * - Issue #241: Ensured snrSnapshot and vibeSnapshot parity in local database persistence and retrieval.
  * v8.9.11:
@@ -57,6 +60,7 @@ class LogRepository @Inject constructor(
                 lat = it.lat,
                 lng = it.lng,
                 accuracy = it.accuracy,
+                maxAccuracy = it.maxAccuracy,
                 snrSnapshot = it.snrSnapshot,
                 vibeSnapshot = it.vibeSnapshot
             ) 
@@ -89,6 +93,7 @@ class LogRepository @Inject constructor(
                             lat = entry.lat,
                             lng = entry.lng,
                             accuracy = entry.accuracy,
+                            maxAccuracy = entry.maxAccuracy,
                             snrSnapshot = entry.snrSnapshot,
                             vibeSnapshot = entry.vibeSnapshot
                         ))
@@ -119,6 +124,7 @@ class LogRepository @Inject constructor(
                                 lat = entry.lat,
                                 lng = entry.lng,
                                 accuracy = entry.accuracy,
+                                maxAccuracy = entry.maxAccuracy,
                                 snrSnapshot = entry.snrSnapshot,
                                 vibeSnapshot = entry.vibeSnapshot
                             ))
@@ -145,6 +151,7 @@ class LogRepository @Inject constructor(
                         lat = entry.lat,
                         lng = entry.lng,
                         accuracy = entry.accuracy,
+                        maxAccuracy = entry.maxAccuracy,
                         snrSnapshot = entry.snrSnapshot,
                         vibeSnapshot = entry.vibeSnapshot
                     ))
@@ -169,7 +176,7 @@ class LogRepository @Inject constructor(
             isImportant = it.isImportant, id = it.deviceId, viewerId = it.viewerId, count = it.count,
             extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial,
             specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
-            lat = it.lat, lng = it.lng, accuracy = it.accuracy,
+            lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
             snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot
         )
     }
@@ -215,6 +222,7 @@ class LogRepository @Inject constructor(
             lat = it.lat,
             lng = it.lng,
             accuracy = it.accuracy,
+            maxAccuracy = it.maxAccuracy,
             snrSnapshot = it.snrSnapshot,
             vibeSnapshot = it.vibeSnapshot
         ) 
