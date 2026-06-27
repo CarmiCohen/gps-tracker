@@ -32,13 +32,11 @@ import java.util.*
 
 /**
  * LogComponents: UI for system logs and diagnostic history.
+ * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated LogDetailPane 
+ *   to display both raw accuracy and authoritative maxAccuracy.
  * v8.9.40:
  * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
- * Extracted from OverlayComponents for Issue 115 modularization.
- * v8.9.22:
- * - Issue #225: Implemented LogDetailPane to render snrSnapshot and vibeSnapshot for enriched forensics.
- * v8.9.8: Issue 193 - Integrated Ghost Mode (Slate500) for stale telemetry.
- * v8.8.36: Issue 165 - Migrated to FormatterUtils.
  */
 
 @Composable
@@ -176,14 +174,18 @@ fun LogDetailPane(log: LogEntry, onClose: () -> Unit) {
                 label2 = "LONGITUDE", val2 = if (log.lng != 0.0) "%.6f".format(log.lng) else "--", color2 = Color.White
             )
             
+            // R325: Dual-Metric Accuracy Display
+            val accText = if (log.accuracy > 0) "%.1fm".format(log.accuracy) else "--"
+            val maxAccText = if (log.maxAccuracy > 0) "%.1fm".format(log.maxAccuracy) else "--"
+            
             DetailRow(
-                label1 = "ACCURACY", val1 = if (log.accuracy > 0) "%.1fm".format(log.accuracy) else "--", color1 = Amber500,
-                label2 = "EXTREME", val2 = log.extremeValue?.let { "%.2f".format(it) } ?: "--", color2 = Rose500
+                label1 = "RAW ACCURACY", val1 = accText, color1 = Amber500,
+                label2 = "UNCERTAINTY (MAX)", val2 = maxAccText, color2 = Teal500
             )
 
             DetailRow(
                 label1 = "ROLE", val1 = log.role.uppercase(), color1 = if(log.role == "tracker") BrandJd else ViewerOrange,
-                label2 = "TYPE", val2 = log.type.uppercase(), color2 = Color.White
+                label2 = "EXTREME VALUE", val2 = log.extremeValue?.let { "%.2f".format(it) } ?: "--", color2 = Rose500
             )
         }
     }

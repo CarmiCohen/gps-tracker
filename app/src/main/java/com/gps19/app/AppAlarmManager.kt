@@ -11,6 +11,8 @@ import kotlin.math.ceil
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
  * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated onLogEvent to include 
+ *   maxAccuracy for forensic parity.
  * - Issue #333: Forensic Log Enrichment. Added snrSnapshot and vibeSnapshot to evaluateAlarms 
  *   and onLogEvent. (Formerly #241)
  * - Issue #326: Intelligent Uncertainty UX Mapping. Propagating locationPendingReason for 
@@ -25,7 +27,7 @@ class AppAlarmManager(
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
     private val timeProvider: TimeProvider,
-    private val onLogEvent: (String, String, Boolean, Double?, String?, Long, Boolean, Int?, Double, Double, Float, Float?, Float?) -> Unit
+    private val onLogEvent: (String, String, Boolean, Double?, String?, Long, Boolean, Int?, Double, Double, Float, Float, Float?, Float?) -> Unit
 ) {
     private val activeAlarms = mutableMapOf<String, AlarmEvaluation>()
     private var lastAlarmsJson = "[]"
@@ -234,7 +236,7 @@ class AppAlarmManager(
                         eval.firstTriggerTs = now
                         eval.isResolved = false
                         triggerOccurredInThisCycle = true
-                        onLogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, snrSnapshot, vibeSnapshot)
+                        onLogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
                         
                         if (now - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) {
                             lastSirenStopTs = 0L 
@@ -248,7 +250,7 @@ class AppAlarmManager(
             } else if (eval.isTriggered) {
                 if (!eval.isResolved) {
                     eval.isResolved = true
-                    onLogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, now - eval.firstTriggerTs, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, snrSnapshot, vibeSnapshot)
+                    onLogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, now - eval.firstTriggerTs, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
                 }
                 newAlarms[type] = eval
             }

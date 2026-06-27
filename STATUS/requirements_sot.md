@@ -34,7 +34,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Ghost Mode UI**: Visual staleness indicators applied to all sensor fields and markers when telemetry > 10s old. (Issue #338)
 *   **Log Spatial Anchor**: All forensic logs and critical alerts are tagged with `lat`/`lng` coordinates to enable historical marker reconstruction on the map.
 *   **Accuracy Parity**: Forensic logs now include explicit `accuracy` fields, ensuring historical map markers match real-time precision.
-*   **Authoritative Spatial Anchoring**: Issue #325: Strictly prioritize engine-calculated `maxAccuracy` (filtered uncertainty) over raw `accuracy` across all UI and logging layers to ensure forensic consistency.
+*   **Authoritative Spatial Anchoring (R325) [Authoritative]**: The system must maintain and display both raw `accuracy` and engine-calculated `maxAccuracy` (filtered uncertainty) across all UI layers and forensic logs. However, **`maxAccuracy` is the exclusive authority** for all "out-of-range" evaluations, including Geofence transitions and Distance Violation thresholds. (Issue #325)
 *   **Forensic Snapshots**: Log entries now include `snrSnapshot` and `vibeSnapshot` for Jump and Stall forensic enrichment. (Issue #333)
 *   **Stability Expansion**: Added `tiltIdx` and `baroIdx` to the analytical ribbons and telemetry pipeline for enhanced "SIT" event analysis. (Issue #329)
 *   **Uncertainty Context**: Propagating `locationPendingReason` for Bayesian uncertainty expansion in the UI. (Issue #326)

@@ -12,8 +12,8 @@ import java.util.*
  * v8.9.42:
  * - Issue #326: Intelligent Uncertainty UX Mapping. Added locationPendingReason to 
  *   ConnectionPoint, TrackerStatus, LocationState, DashboardState, and IntegrityState. (Formerly #245 / #226)
- * - Issue #325: Unified accuracy fallback logic. Added maxAccuracy to ConnectionPoint 
- *   to support forensic ribbon uncertainty visualization. (Formerly #214)
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refactored LogEntry and 
+ *   DashboardState to support side-by-side visualization of raw accuracy vs. maxAccuracy.
  * - Issue #329: Added tiltIdx and baroIdx to ConnectionPoint, TrackerStatus, LocationState, 
  *   and IntegrityState for forensic expansion. (Formerly #224)
  * - Issue #333: Forensic Log Enrichment. Added snrSnapshot and vibeSnapshot to LogEntry. (Formerly #223)
@@ -109,6 +109,7 @@ data class LogEntry(
     val lat: Double = 0.0,
     val lng: Double = 0.0,
     val accuracy: Float = 0f,
+    val maxAccuracy: Float = 0f,
     val snrSnapshot: Float? = null,
     val vibeSnapshot: Float? = null
 ) {
@@ -125,6 +126,7 @@ data class LogEntry(
             if (lat != 0.0) put("lat", lat)
             if (lng != 0.0) put("lng", lng)
             if (accuracy != 0f) put("accuracy", accuracy)
+            if (maxAccuracy != 0f) put("max_accuracy", maxAccuracy)
             specialColor?.let { put("special_color", it) }
             extremeValue?.let { if (!it.isNaN() && !it.isInfinite()) put("extreme_value", it) }
             snrSnapshot?.let { put("snr_snapshot", it.toDouble()) }
@@ -158,6 +160,7 @@ data class LogEntry(
                 lat = obj.optDouble("lat", 0.0),
                 lng = obj.optDouble("lng", 0.0),
                 accuracy = obj.optDouble("accuracy", 0.0).toFloat(),
+                maxAccuracy = obj.optDouble("max_accuracy", 0.0).toFloat(),
                 snrSnapshot = if (obj.has("snr_snapshot")) obj.optDouble("snr_snapshot").toFloat() else null,
                 vibeSnapshot = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot").toFloat() else null
             )
@@ -366,9 +369,7 @@ data class LocationState(
     val isSitActive: Boolean = false,
     val lastSitTs: Long = 0L,
     val verticalVelocity: Float = 0f,
-    val sitVz: Float = 0f,
-    val sitVzTs: Long = 0L,
-    val sitDz: Float = 0f,
+    val sitVz: Float = 0f, val sitVzTs: Long = 0L, val sitDz: Float = 0f,
     val sitBaro: Float = 0f,
     val sitTilt: Float = 0f,
     val sitShock: Float = 0f,
@@ -604,9 +605,13 @@ data class ConnectivityState(
 )
 
 data class IntegrityStateUi(
-    val signalLoss: Boolean = false, val gpsStalled: Boolean = false, val jammerSuspicion: Boolean = false,
-    val localInternetLoss: Boolean = false, val isHardwareOnline: Boolean = true,
-    val isSuspicious: Boolean = false, val isTamperDetected: Boolean = false,
+    val signalLoss: Boolean = false,
+    val gpsStalled: Boolean = false,
+    val jammerSuspicion: Boolean = false,
+    val localInternetLoss: Boolean = false,
+    val isHardwareOnline: Boolean = true,
+    val isSuspicious: Boolean = false,
+    val isTamperDetected: Boolean = false,
     val micPending: Boolean = false,
     val isPowerTamper: Boolean = false,
     val isSitDetected: Boolean = false,

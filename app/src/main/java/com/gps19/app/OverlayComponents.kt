@@ -25,6 +25,8 @@ import com.gps19.core.engine.*
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
  * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated LegacyDashboardGrid 
+ *   to display both raw accuracy and authoritative maxAccuracy side-by-side.
  * - Issue #326: Intelligent Uncertainty UX Mapping. Displaying locationPendingReason 
  *   in LegacyDashboardGrid. (Formerly #226)
  * - Issue #338: Unified UI Staleness Threshold. Consistently dimmed all forensic badges 
@@ -178,8 +180,13 @@ fun LegacyDashboardGrid(
             val accIdxStr = "%.2f".format(Locale.getDefault(), gpsIdx.accIndex)
             
             InfoRow(leftVal = gpsIdxStr, leftLabel = "GPS-Index", leftColor = if(!d.isGpsFresh) Slate500 else BrandJd, rightVal = d.gpsSpeed, rightLabel = "GPS Speed", rightColor = if(!d.isGpsFresh) Slate500 else BrandJd, onLeftClick = onShowGnssDetail)
-            InfoRow(leftVal = d.satsIndex, leftLabel = "Satellites Index", leftColor = if(!d.isGpsFresh) Slate500 else if(d.isSatsIndexWarning) Rose500 else Color.White, rightVal = d.trackerAccuracy, rightLabel = "Tr Accuracy", rightColor = gpsColor)
-            InfoRow(leftVal = if (isViewer) d.viewerAccuracy else "", leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerOrange, rightVal = ageIdxStr, rightLabel = "Age Index", rightColor = if(!d.isGpsFresh) Slate500 else Amber500)
+            
+            // R325: Displaying both raw and authoritative accuracy side-by-side
+            val trkAccDisplay = "${d.trackerAccuracy} (${d.trackerMaxAcc})"
+            val vwrAccDisplay = if (isViewer) "${d.viewerAccuracy} (${d.viewerMaxAcc})" else ""
+
+            InfoRow(leftVal = d.satsIndex, leftLabel = "Satellites Index", leftColor = if(!d.isGpsFresh) Slate500 else if(d.isSatsIndexWarning) Rose500 else Color.White, rightVal = trkAccDisplay, rightLabel = "Tr Accuracy", rightColor = gpsColor)
+            InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerOrange, rightVal = ageIdxStr, rightLabel = "Age Index", rightColor = if(!d.isGpsFresh) Slate500 else Amber500)
             InfoRow(leftVal = accIdxStr, leftLabel = "Acc Index", leftColor = if(!d.isGpsFresh) Slate500 else Color.White, rightVal = d.snr, rightLabel = "Avg SNR", rightColor = if(!d.isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = onShowGnssDetail)
 
             Spacer(Modifier.height(6.dp)); HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp); Spacer(Modifier.height(6.dp))
@@ -237,7 +244,7 @@ private fun InfoRow(
         }
         Row(modifier = Modifier.weight(1.2f).clickable(enabled = onRightClick != null) { onRightClick?.invoke() }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) {
             if (rightVal.isNotEmpty()) {
-                Text(rightVal, color = rightColor, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, modifier = Modifier.width(85.dp))
+                Text(rightVal, color = rightColor, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, modifier = Modifier.width(105.dp))
                 Spacer(Modifier.width(2.dp))
                 Text(rightLabel, color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1)
                 if (onRightClick != null) {

@@ -50,13 +50,11 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refactored accuracy 
+ *   display to show both raw and authoritative accuracy side-by-side in StatusBar.
  * v8.9.40:
  * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
- * v8.9.37:
- * - R942: Dynamically change TRK badge to VWR in Tracker mode.
- * - R943: Removed redundant DAT badge in Tracker mode.
- * - R922: Role-aware LED Logic. Tracker shows local health; Viewer gates by peer pulse.
- * - Issue #325: Refined accuracy display to prioritize engine-calculated maxAccuracy.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -656,7 +654,12 @@ fun StatusRowData(
                 } else {
                     fun formatAcc(v: Float): String = when { v >= 10000f -> "${(v / 1000).toInt()}k"; v >= 1000f -> String.format(Locale.getDefault(), "%.1fk", v / 1000f); else -> v.toInt().toString() }
                     val accColor = if (isGpsStale || !isTelemetryFresh) Slate500 else gpsColor
-                    val accText = if (maxAccuracy > 0) "±${formatAcc(maxAccuracy)}" else if (accuracy > 0) "±${formatAcc(accuracy)}" else ""
+                    
+                    // R325: Dual-Metric Side-by-Side Visualization (Raw and Authoritative)
+                    val rawText = if (accuracy > 0) "±${formatAcc(accuracy)}" else ""
+                    val maxText = if (maxAccuracy > 0) "(±${formatAcc(maxAccuracy)})" else ""
+                    val accText = "$rawText $maxText".trim()
+
                     if (accText.isNotEmpty()) Text(
                         text = accText, 
                         color = accColor, 

@@ -22,6 +22,8 @@ import kotlin.math.*
 /**
  * TrackerService: The "Black Box" background process.
  * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated AppAlarmManager 
+ *   lambda to propagate maxAccuracy for forensic parity.
  * - Issue #339/348: SIT Logging & Offline Context. Hardened SIT logging rising-edge 
  *   latch to prevent redundant forensic logs. (Formerly #245)
  * - Issue #363: Samsung A15 Resilience. Implemented Keep-Alive WakeLock renewal and 
@@ -118,8 +120,8 @@ class TrackerService : BaseMonitorService() {
             isXiaomi = isXiaomiDevice()
             isA15 = isA15Device()
 
-            alarmManager = AppAlarmManager(this@TrackerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng, acc, snr, vibe -> 
-                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng, acc, snr, vibe)
+            alarmManager = AppAlarmManager(this@TrackerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng, acc, maxAcc, snr, vibe -> 
+                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng, acc, maxAcc, snr, vibe)
             }
             
             integrityMonitor = IntegrityMonitor(this@TrackerService, repository, timeProvider, onViolationSustained = { type ->

@@ -19,6 +19,8 @@ import kotlin.math.*
 /**
  * ViewerService: Background monitoring for the Viewer role.
  * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated AppAlarmManager 
+ *   lambda to propagate maxAccuracy for forensic parity.
  * - Issue #326: Intelligent Uncertainty UX Mapping. Synchronized locationPendingReason 
  *   propagation and forensic ribbon parity. (Formerly #245)
  * - Issue #335: serviceStartRealtime Initialization Gap. Explicitly initialized 
@@ -92,8 +94,8 @@ class ViewerService : BaseMonitorService() {
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, DEFAULT_RELAY_URL)
             configManager.isTrackerMode = false
 
-            alarmManager = AppAlarmManager(this@ViewerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng, acc, snr, vibe -> 
-                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng, acc, snr, vibe)
+            alarmManager = AppAlarmManager(this@ViewerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng, acc, maxAcc, snr, vibe -> 
+                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng, acc, maxAcc, snr, vibe)
             }
 
             integrityMonitor = IntegrityMonitor(this@ViewerService, repository, timeProvider, onViolationSustained = { }, onLogEvent = { msg, important ->

@@ -7,6 +7,9 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added maxAccuracy to LogEntity 
+ *   for forensic parity between raw GPS accuracy and engine uncertainty.
  * v8.9.38:
  * - Issue #245: Added locationPendingReason to HistoryEntity for forensic parity.
  * v8.9.24:
@@ -38,6 +41,7 @@ data class LogEntity(
     @ColumnInfo(defaultValue = "0") val lat: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val lng: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val accuracy: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val maxAccuracy: Float = 0f,
     val snrSnapshot: Float? = null,
     val vibeSnapshot: Float? = null
 )
@@ -197,7 +201,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 46, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 47, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -206,6 +210,11 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_46_47 = object : Migration(46, 47) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE logs ADD COLUMN maxAccuracy REAL NOT NULL DEFAULT 0")
+            }
+        }
         val MIGRATION_45_46 = object : Migration(45, 46) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE connection_history ADD COLUMN locationPendingReason TEXT NOT NULL DEFAULT 'NONE'")
@@ -297,7 +306,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_violations_ts ON violations (ts)")
 
                 db.execSQL("CREATE TABLE pending_status_updates_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, speed REAL NOT NULL, accuracy REAL NOT NULL, bearing REAL NOT NULL, battery INTEGER NOT NULL, temp REAL NOT NULL, isCharging INTEGER NOT NULL, timestamp INTEGER NOT NULL, satsView INTEGER NOT NULL, satsUsed INTEGER NOT NULL, maxAccuracy REAL NOT NULL, distToTracker REAL, distToHome REAL, snrIdx REAL NOT NULL, isBatterySteepDischarge INTEGER NOT NULL, isCoolingModeActive INTEGER NOT NULL, isSitDetected INTEGER NOT NULL, isSitActive INTEGER NOT NULL, sitVz REAL NOT NULL, sitVzTs INTEGER NOT NULL DEFAULT 0, sitDz REAL NOT NULL, verticalVelocity REAL NOT NULL, sitBaro REAL NOT NULL, sitTilt REAL NOT NULL, sitShock REAL NOT NULL, isStorageLow INTEGER NOT NULL, isStorageCritical INTEGER NOT NULL, isPowerSaveMode INTEGER NOT NULL, standbyBucket INTEGER NOT NULL, netInterface TEXT NOT NULL)")
-                db.execSQL("INSERT INTO pending_status_updates_new (id, lat, lng, speed, accuracy, bearing, battery, temp, isCharging, timestamp, satsView, satsUsed, maxAccuracy, distToTracker, distToHome, snrIdx, isBatterySteepDischarge, isCoolingModeActive, isSitDetected, isSitActive, sitVz, sitVzTs, sitDz, verticalVelocity, sitBaro, sitTilt, sitShock, isStorageLow, isStorageCritical, isPowerSaveMode, standbyBucket, netInterface) SELECT id, lat, lng, speed, accuracy, bearing, battery, temp, isCharging, timestamp, satsView, satsUsed, maxAccuracy, distToTracker, distToHome, snrIdx, isBatterySteepDischarge, isCoolingModeActive, isSitDetected, isSitActive, sitVz, sitVzTs, sitDz, 0, sitBaro, sitTilt, sitShock, isStorageLow, isStorageCritical, isPowerSaveMode, standbyBucket, netInterface FROM pending_status_updates")
+                db.execSQL("INSERT INTO pending_status_updates_new (id, lat, lng, speed, accuracy, bearing, battery, temp, isCharging, timestamp, satsView, satsUsed, maxAccuracy, distToTracker, distToHome, snrIdx, isBatterySteepDischarge, isCoolingModeActive, isSitDetected, isSitActive, sitVz, sitVzTs, sitDz, 0, sitBaro, sitTilt, sitShock, isStorageLow, isStorageCritical, isPowerSaveMode, standbyBucket, netInterface) SELECT id, lat, lng, speed, accuracy, bearing, battery, temp, isCharging, timestamp, satsView, satsUsed, maxAccuracy, distToTracker, distToHome, snrIdx, isBatterySteepDischarge, isCoolingModeActive, isSitDetected, isSitActive, sitVz, sitVzTs, sitDz, 0, sitBaro, sitTilt, sitShock, isStorageLow, isStorageCritical, isPowerSaveMode, standbyBucket, netInterface FROM pending_status_updates")
                 db.execSQL("DROP TABLE pending_status_updates"); db.execSQL("ALTER TABLE pending_status_updates_new RENAME TO pending_status_updates")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_status_updates_timestamp ON pending_status_updates (timestamp)")
             }

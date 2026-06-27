@@ -9,8 +9,8 @@ import java.util.UUID
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
  * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring. Strictly prioritize engine-calculated 
- *   maxAccuracy (filtered uncertainty) over raw accuracy for consistent forensic reliability. (Formerly #214)
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Preserving both raw 
+ *   accuracy and authoritative maxAccuracy in forensic logs.
  * v8.9.38:
  * - Issue #333: Enhanced auto-enrichment. Automatically populate snrSnapshot and vibeSnapshot 
  *   from latest telemetry if not explicitly provided, ensuring forensic parity.
@@ -41,6 +41,7 @@ class LogManager @Inject constructor(
         lat: Double = 0.0,
         lng: Double = 0.0,
         accuracy: Float = 0f,
+        maxAccuracy: Float = 0f,
         snr: Float? = null,
         vibe: Float? = null
     ) {
@@ -58,10 +59,11 @@ class LogManager @Inject constructor(
             return
         }
 
-        // Issue #325: Authoritative Spatial Anchoring (Prioritizing maxAccuracy)
+        // R325: Dual-Metric Forensic Anchoring
         var finalLat = lat
         var finalLng = lng
         var finalAccuracy = accuracy
+        var finalMaxAccuracy = maxAccuracy
         var finalSnr = snr
         var finalVibe = vibe
         
@@ -75,26 +77,24 @@ class LogManager @Inject constructor(
             if (tracker.lat != 0.0) tracker else local
         }
 
-        // Auto-anchor location
+        // Auto-anchor location and accuracy metrics
         if (finalLat == 0.0 && finalLng == 0.0) {
             if (fallbackTelem.lat != 0.0 && fallbackTelem.lng != 0.0) {
                 finalLat = fallbackTelem.lat
                 finalLng = fallbackTelem.lng
-                finalAccuracy = if (fallbackTelem.maxAccuracy > 0f) fallbackTelem.maxAccuracy else fallbackTelem.accuracy
+                finalAccuracy = fallbackTelem.accuracy
+                finalMaxAccuracy = fallbackTelem.maxAccuracy
             }
         } else {
-            if (finalLat == fallbackTelem.lat && finalLng == fallbackTelem.lng) {
-                if (fallbackTelem.maxAccuracy > 0f && (finalAccuracy == 0f || finalAccuracy == fallbackTelem.accuracy)) {
-                    finalAccuracy = fallbackTelem.maxAccuracy
-                }
+            if (finalAccuracy == 0f && finalLat == fallbackTelem.lat) {
+                finalAccuracy = fallbackTelem.accuracy
             }
-            if (finalAccuracy == 0f) {
-                finalAccuracy = if (fallbackTelem.maxAccuracy > 0f) fallbackTelem.maxAccuracy else fallbackTelem.accuracy
+            if (finalMaxAccuracy == 0f && finalLat == fallbackTelem.lat) {
+                finalMaxAccuracy = fallbackTelem.maxAccuracy
             }
         }
 
         // Issue #333: Forensic Enrichment Auto-Fill
-        // Note: LocationUpdate uses 'vibration' and 'snrIdx'.
         if (finalSnr == null && fallbackTelem.snrIdx > 0f) {
             finalSnr = fallbackTelem.snrIdx * RIBBON_SNR_SCALE_DB
         }
@@ -118,6 +118,7 @@ class LogManager @Inject constructor(
             lat = finalLat,
             lng = finalLng,
             accuracy = finalAccuracy,
+            maxAccuracy = finalMaxAccuracy,
             snrSnapshot = finalSnr,
             vibeSnapshot = finalVibe
         )
@@ -144,10 +145,11 @@ class LogManager @Inject constructor(
         lat: Double = 0.0,
         lng: Double = 0.0,
         accuracy: Float = 0f,
+        maxAccuracy: Float = 0f,
         snr: Float? = null,
         vibe: Float? = null
     ) {
-        submitToLogSink(m, "system", important, isSpecial = isSpecial, specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy, snr = snr, vibe = vibe)
+        submitToLogSink(m, "system", important, isSpecial = isSpecial, specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy, maxAccuracy = maxAccuracy, snr = snr, vibe = vibe)
     }
 
     suspend fun getUnsyncedLogs(limit: Int) = logRepository.getUnsyncedLogs(limit)

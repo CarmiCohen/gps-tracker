@@ -6,15 +6,12 @@ import kotlin.math.*
 /**
  * MainAlarmLogic: Detection logic for system violations.
  * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Strictly prioritizing 
+ *   maxTrackerAccuracy for all Geofence transitions (Entry and Exit).
  * - Issue #331: Refactored getTrackerTitle to be fully role-aware for forensic parity. (Formerly #287 / #17)
  * - Issue #353: Synchronized version to v8.9.26 baseline. (Formerly #272 / #2)
  * - Issue #336: Updated ALERT_ID_TRACKER_CHAIR subtitle to "Chair occupancy detected" 
  *   for consistency with "Chair Occupied" forensic status. (Formerly #331 / #230)
- * v8.9.19:
- * - Issue #231: Implemented VISUAL_JUMP detection logic.
- * v8.9.18:
- * - Issue #332: Implemented Adaptive Jump Confidence. Increased JUMP_HOLD_DURATION_MS 
- *   when isAdaptiveJump is flagged (spoofing/reflection suspicion). (Formerly #219)
  */
 object MainAlarmLogic {
 
@@ -196,6 +193,7 @@ object MainAlarmLogic {
         val tLng = state.trackerLng
         val home = state.homePoints
         val maxD = state.maxDistance
+        // R325: Using maxTrackerAccuracy as the logic authority
         val acc = state.maxTrackerAccuracy
         
         var distVal: Double? = state.distToHomeAuthority?.takeIf { it >= 0.0 }
@@ -285,7 +283,8 @@ object MainAlarmLogic {
                     )
                 )
             } else if (dValue <= (threshold - GEOFENCE_HYSTERESIS_METERS) && !isJump) {
-                if (state.wasDistanceViolated && state.trackerGpsAccuracy < RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT) {
+                // R325: Strictly prioritization of maxTrackerAccuracy for geofence entry logic.
+                if (state.wasDistanceViolated && state.maxTrackerAccuracy < RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT) {
                     state.wasDistanceViolated = false
                     reports.add(
                         ViolationReport(
