@@ -21,13 +21,15 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v8.9.39:
+ * v8.9.42:
+ * - Issue #339/348: SIT Logging & Offline Context. Hardened SIT logging rising-edge 
+ *   latch to prevent redundant forensic logs. (Formerly #245)
+ * - Issue #363: Samsung A15 Resilience. Implemented Keep-Alive WakeLock renewal and 
+ *   adaptive GPS intervals to prevent OEM background GNSS suspension. (Formerly #148)
  * - Issue #341: Implemented GPS Stability Audit. Monitoring 10Hz polling intervals for hardware gaps.
  * - Issue #342: Hardened Xiaomi Heuristic Recovery Pulse to bypass MIUI/HyperOS deep doze.
- * v8.9.38:
- * - Issue #333: Forensic Log Enrichment. Ensured SNR and Vibration snapshots are 
- *   propagated through onLogAdded and auto-enriched via LogManager.
- * - Issue #326: Synchronized locationPendingReason in evaluateAlarmsInternal for consistent UX mapping.
+ * - Issue #333: Forensic Log Enrichment. Synchronized snapshots for SNRs and Vibration.
+ * - Issue #326: Intelligent Uncertainty UX Mapping. Synchronized locationPendingReason propagation.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -309,7 +311,7 @@ class TrackerService : BaseMonitorService() {
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
         
-        // Issue #148: Keep-Alive WakeLock renewal for A15 devices to prevent GNSS suspension.
+        // Issue #363: Keep-Alive WakeLock renewal for A15 devices to prevent GNSS suspension. (Formerly #148)
         if (isA15) {
             systemMonitor.renewWakeLock()
         }
@@ -349,7 +351,7 @@ class TrackerService : BaseMonitorService() {
             lastStabilityAuditTs = nowRealtime
         }
 
-        // Issue #148: Calculate and apply device-specific GPS interval.
+        // Issue #363: Calculate and apply device-specific GPS interval. (Formerly #148)
         val flags = ServiceBehaviorUseCase.DeviceSpecialFlags(isS21FE = isS21FE, isXiaomi = isXiaomi, isA15 = isA15)
         val newInterval = behaviorUseCase.calculateGpsInterval(
             isCoolingMode = integrityMonitor.isCoolingModeActive,
@@ -441,7 +443,7 @@ class TrackerService : BaseMonitorService() {
             val proc = lastProcessedLocation
             lastSitSyncLatchTs = nowRealtime
             
-            // Issue #245: Hardened SIT logging rising-edge latch to prevent redundant forensic logs.
+            // Issue #339/348: Hardened SIT logging rising-edge latch. (Formerly #245)
             if (nowRealtime - lastSitLogTs > SIT_DUPLICATE_GUARD_MS) {
                 lastSitLogTs = nowRealtime
                 logManager.logServiceEvent("Sit Detected (Engine Pulse)", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,

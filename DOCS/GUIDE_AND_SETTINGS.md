@@ -17,8 +17,8 @@ The guide targets specific system bottlenecks:
 8.  **Notification Permission**: Required for Foreground Service visibility.
 
 ### B. Device-Specific Logic
-- **Xiaomi Detection**: Adds specialized sections for MIUI-specific permissions. Includes `ALERT_ID_XIAOMI_SYSTEM_MISSING` monitoring and manual override support. Guidance updated for v8.9.37 (Issue #190).
-- **Samsung A15 Detection**: Adjusts proximity debounce thresholds (5s - Issue #191).
+- **Xiaomi Detection**: Adds specialized sections for MIUI-specific permissions. Includes `ALERT_ID_XIAOMI_SYSTEM_MISSING` monitoring and manual override support. Guidance updated for v8.9.37 (Issue #190 - Formerly #218).
+- **Samsung A15 Detection**: Adjusts proximity debounce thresholds (Issue #363 - Formerly #148).
 
 ## 2. Setting Persistence (`MainViewModel` & `SettingsRepository`)
 The application uses a **Reactive Draft System** for managing settings.
@@ -40,4 +40,4 @@ Significant changes (Relay URL/IDs) trigger a debounced re-initialization of the
 
 ## 4. Navigation Refinement
 - **Implicit Navigation**: The Settings page uses system Back gestures as the primary "Apply" trigger.
-- **Ghost Mode UX**: Visual staleness indicators are applied globally (Issue #193).
+- **Ghost Mode UX**: Visual staleness indicators are applied globally (Issue #338 - Formerly #193).

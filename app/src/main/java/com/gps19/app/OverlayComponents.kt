@@ -24,16 +24,15 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * v8.9.42:
+ * - Issue #326: Intelligent Uncertainty UX Mapping. Displaying locationPendingReason 
+ *   in LegacyDashboardGrid. (Formerly #226)
+ * - Issue #338: Unified UI Staleness Threshold. Consistently dimmed all forensic badges 
+ *   and labels to Slate500 when telemetry is stale (>10s). (Formerly #193)
+ * - Issue #337: Forensic Power Visibility. Added currentMa to LegacyDashboardGrid 
+ *   for power parity. (Formerly #192)
  * v8.9.40:
  * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
- * v8.9.36:
- * - Issue #226: Intelligent Uncertainty UX - Displaying locationPendingReason in LegacyDashboardGrid.
- * v8.9.7:
- * - Issue 193: Consistently dimmed all forensic badges and labels to Slate500 when telemetry is stale (>10s).
- * v8.9.6:
- * - Issue 193: Implemented isTelemetryFresh usage in LegacyDashboardGrid to resolve Zombie Telemetry UX.
- * v8.9.5:
- * - Issue 192: Added currentMa to LegacyDashboardGrid for power forensic visibility.
  */
 
 @Composable
@@ -93,7 +92,7 @@ fun LegacyDashboardGrid(
                     fontFamily = FontFamily.Monospace
                 )
                 
-                // Issue #226: Intelligent Uncertainty UX - Propagation to Dashboard
+                // Issue #326: Intelligent Uncertainty UX - Propagation to Dashboard
                 if (d.isLocationPending && d.locationPendingReason != LocationPendingReason.NONE) {
                     Text(
                         text = "UNCERTAINTY: ${d.locationPendingReason.name.replace("_", " ")}",

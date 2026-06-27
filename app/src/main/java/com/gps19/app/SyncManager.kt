@@ -10,13 +10,13 @@ import timber.log.Timber
 
 /**
  * SyncManager: Handles the telemetry synchronization loop.
- * v8.9.37:
- * - Issue #273: Refined RTT-aware scaling with proportional delay to prevent loop saturation 
- *   during high-latency network transitions. Synchronized with +270 audit trail.
- * v8.9.36:
- * - Issue #244: Implemented offline buffering fallback in pushCurrentStatus. Captures locationPendingReason for forensic continuity.
- * v8.9.33:
- * - Issue #271: Unified sync loop to use PING_INTERVAL_MS (10s) as per code-first standardization.
+ * v8.9.42:
+ * - Issue #315: Network Integrity & Timeout Scaling. Refined RTT-aware scaling with 
+ *   proportional delay to prevent loop saturation. (Formerly #273)
+ * - Issue #339/348: Offline Context & Buffering. Captures locationPendingReason for 
+ *   forensic continuity during offline periods. (Formerly #244)
+ * - Issue #357: Uptime Consistency & Sync Interval. Unified sync loop to use 
+ *   PING_INTERVAL_MS (10s). (Formerly #271)
  */
 class SyncManager(
     private val context: Context,
@@ -43,7 +43,7 @@ class SyncManager(
     fun setOnSyncFinishedListener(listener: () -> Unit) { onSyncFinished = listener }
 
     /**
-     * startSyncLoop: Implements the PING_INTERVAL_MS loop with RTT-aware scaling (Issue #273).
+     * startSyncLoop: Implements the PING_INTERVAL_MS loop with RTT-aware scaling (Issue #315).
      */
     fun startSyncLoop(deviceId: String, viewerId: String, isTracker: Boolean) {
         syncJob?.cancel()
@@ -64,7 +64,7 @@ class SyncManager(
                     }
                 }
 
-                // Issue #273: Proportional RTT scaling. 
+                // Issue #315: Proportional RTT scaling. 
                 // If RTT is healthy (< 50% of MAX), use PING_INTERVAL_MS.
                 // If RTT > 50% of MAX, scale linearly up to 3x the interval.
                 val dynamicDelay = when {
@@ -159,7 +159,7 @@ class SyncManager(
         if (isTrackerMode) {
             repository.saveTrackerState(status)
             
-            // Issue #244: If transmission fails, buffer the update locally for later synchronization.
+            // Issue #339/348: If transmission fails, buffer the update locally for later synchronization.
             if (!success) {
                 offlineRepository.addPendingStatusUpdate(PendingStatusEntity(
                     lat = status.lat,

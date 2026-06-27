@@ -15,11 +15,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
- * v8.9.37:
- * - Issue #245: Centralized SIT rising-edge detection. Removed redundant log/forensic triggers.
- * - Issue #326: Parsing location_pending_reason for intelligent uncertainty UX. (Formerly #226)
+ * v8.9.42:
+ * - Issue #326: Intelligent Uncertainty UX Mapping. Parsing location_pending_reason. (Formerly #245 / #226)
  * - Issue #329: Added tiltIdx and baroIdx parsing for forensic parity. (Formerly #224)
  * - Issue #328: Parsing lastValidFixRealtime for Bayesian uncertainty scaling. (Formerly #221)
+ * v8.9.37:
+ * - Issue #339/348: Centralized SIT rising-edge detection. Removed redundant log/forensic triggers. (Formerly #245)
  */
 class RemoteHandler(
     private val context: Context,
@@ -252,7 +253,7 @@ class RemoteHandler(
 
     /**
      * Issue #194: Reconstructs forensic state from incoming remote logs.
-     * Modified in v8.9.37: Issue #245: Removed redundant forensic trigger; handled by ViewerService tick loop.
+     * Modified in v8.9.37: Issue #339/348: Removed redundant forensic trigger; handled by ViewerService tick loop.
      */
     fun handleRemoteLog(entry: LogEntry) {
         if (entry.message.contains("Sit Detected", ignoreCase = true)) {
@@ -349,7 +350,7 @@ class RemoteHandler(
             isTrackerTamperDetected = data.optBoolean("is_tamper_detected", isTrackerTamperDetected)
             isTrackerPowerTamper = data.optBoolean("is_power_tamper", isTrackerPowerTamper)
             
-            // Issue #245: Updated SIT detection to avoid redundant manual logging.
+            // Issue #339/348: Updated SIT detection to avoid redundant manual logging.
             // The tracker-emitted log is already handled via CommunicationManager/RemoteLog.
             val incomingSitDetected = data.optBoolean("is_sit_detected", false)
             isTrackerSitDetected = incomingSitDetected

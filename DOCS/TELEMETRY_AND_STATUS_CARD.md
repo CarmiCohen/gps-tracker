@@ -5,7 +5,7 @@ This document describes the telemetry data collection, state management, and the
 ## 1. Telemetry Data Engine
 The telemetry system collects data from multiple hardware and network sources:
 - **Location Data**: Latitude, longitude, speed, bearing, and accuracy. Forensic history includes raw **speed** and **bearing** for every telemetry packet.
-- **Battery & Power**: Real-time battery percentage (`BATTERY_ALARM_THRESHOLD` 99% / `CRITICAL_BATTERY_THRESHOLD` 20%), temperature, and charging state. Includes **Steep Discharge** profiling (Issue #221) and absolute parity for **battery current** (`currentMa`) (Issue #192).
+- **Battery & Power**: Real-time battery percentage (`BATTERY_ALARM_THRESHOLD` 20% / `CRITICAL_BATTERY_THRESHOLD` 20%), temperature, and charging state. Includes **Steep Discharge** profiling (Issue #353) and absolute parity for **battery current** (`currentMa`) (Issue #337 - Formerly #192).
 - **Network Health**: RTT (Round Trip Time) and relay server connectivity status.
 - **Sats Stats**: Satellites in view and used for both devices.
 - **Forensic GNSS**: Raw Signal-to-Noise Ratio (SNR) for every satellite in view (`snrIdx`), including constellation metadata.
@@ -39,7 +39,7 @@ To ensure optimal navigation ergonomics, the vertical stacking order in portrait
 The "Status Card" is the primary interface for telemetry.
 - **Role Identity**: Tracker-related data is rendered in **BrandJd** (#367C2B). Viewer-related data is rendered in **ViewerOrange**. (R865/R866)
 - **Visual Heartbeat**: A circular progress indicator that shrinks as data ages (10s for Position / 30s for Link).
-- **Ghost Mode UX**: HUD metrics, accuracy circles, and dashboard fields enter a dimmed "Ghost" state (Slate500) when telemetry is older than 10s (Issue #193).
+- **Ghost Mode UX**: HUD metrics, accuracy circles, and dashboard fields enter a dimmed "Ghost" state (Slate500) when telemetry is older than 10s (Issue #338 - Formerly #193).
 - **Instant Recovery (R923)**: Freshness logic utilizes the maximum of the position timestamp and telemetry arrival timestamp (`telemetryTs`).
 - **Thermal Monitoring**: Temperature in °C with color-coding for high heat (> 46.0°C).
 - **Interactive GNSS Label**: Tapping the "Sats" area launches the **GNSS Detail Overlay**.

@@ -10,10 +10,13 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * v8.9.37:
- * - Issue #333: Forensic Log Enrichment - Added snrSnapshot and vibeSnapshot to evaluateAlarms and onLogEvent. (Formerly #241)
- * - Issue #326: Propagating locationPendingReason for intelligent uncertainty UX. (Formerly #226)
- * - Issue #328: Added trackerLastValidFixTs to evaluateAlarms for Bayesian Gap logic. (Formerly #221)
+ * v8.9.42:
+ * - Issue #333: Forensic Log Enrichment. Added snrSnapshot and vibeSnapshot to evaluateAlarms 
+ *   and onLogEvent. (Formerly #241)
+ * - Issue #326: Intelligent Uncertainty UX Mapping. Propagating locationPendingReason for 
+ *   consistent UI display. (Formerly #226)
+ * - Issue #328: Bayesian Uncertainty. Added trackerLastValidFixTs to evaluateAlarms for 
+ *   gap-based expansion logic. (Formerly #221)
  * - Issue #213: Propagating coordinates and accuracy in onLogEvent.
  */
 class AppAlarmManager(

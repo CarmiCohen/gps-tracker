@@ -48,16 +48,15 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * v8.9.41:
- * - Issue #328: Implemented Velocity-Aware Bayesian Uncertainty Expansion. Growth rate 
- *   now scales with last known speed (1.5m/s stationary floor, capped at 33.3m/s).
+ * v8.9.42:
+ * - Issue #328: Velocity-Aware Bayesian Uncertainty Expansion. Growth rate scales 
+ *   with last known speed. (Formerly #221)
+ * - Issue #325: Authoritative Spatial Anchoring. Prioritized engine-calculated 
+ *   maxAccuracy for uncertainty circle rendering. (Formerly #214)
+ * - Issue #326: Intelligent Uncertainty UX Mapping. Rendering locationPendingReason 
+ *   on Map. (Formerly #226)
  * v8.9.40:
  * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
- * v8.9.37:
- * - Issue #325: Unified accuracy fallback logic. Prioritized engine-calculated 
- *   maxAccuracy for uncertainty circle rendering. Fixed viewerAccuracy mapping. (Formerly #214)
- * v8.9.36:
- * - Issue #326: Intelligent Uncertainty UX - Rendering locationPendingReason on Map. (Formerly #226)
  */
 
 @Composable
@@ -217,7 +216,7 @@ fun AppMapContainer(
             }
         }
 
-        // Issue #326: Intelligent Uncertainty UX - Display reason overlay if pending (Formerly #226)
+        // Issue #326: Intelligent Uncertainty UX - Display reason overlay if pending
         if (trackerLocationPending && trackerLocationPendingReason != LocationPendingReason.NONE) {
             Box(modifier = Modifier.align(Alignment.Center).padding(bottom = 120.dp).background(Amber500.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                 Text(

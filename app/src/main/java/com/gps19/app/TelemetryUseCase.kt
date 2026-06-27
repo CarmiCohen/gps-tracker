@@ -7,11 +7,12 @@ import javax.inject.Singleton
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
  * Extracted from MainViewModel to resolve Issue #322 (Architectural Bloat). (Formerly #115)
- * v8.9.37:
- * - Issue #325: Mapping maxAccuracy for unified accuracy fallback logic. (Formerly #214)
- * - Issue #326: Mapping locationPendingReason for intelligent uncertainty UX. (Formerly #226)
- * - Issue #328: Mapping lastValidFixRealtime for Bayesian uncertainty scaling. (Formerly #221)
- * - Issue #337: Added currentMa mapping for full forensic parity. (Formerly #192)
+ * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring. Mapping maxAccuracy for unified accuracy 
+ *   fallback logic. (Formerly #214)
+ * - Issue #326: Intelligent Uncertainty UX Mapping. Mapping locationPendingReason. (Formerly #226)
+ * - Issue #328: Bayesian Uncertainty. Mapping lastValidFixRealtime for expansion scaling. (Formerly #221)
+ * - Issue #337: Forensic Power Visibility. Added currentMa mapping for full parity. (Formerly #192)
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(
@@ -159,10 +160,8 @@ class TelemetryUseCase @Inject constructor(
             locationPendingReason = update.locationPendingReason,
             lastValidFixRealtime = if (update.lastValidFixRealtime > 0) update.lastValidFixRealtime else currentLoc.lastValidFixRealtime,
             isPowerSaveMode = update.isPowerSaveMode,
-            standbyBucket = update.standbyBucket,
-            netInterface = update.netInterface,
-            isStorageLow = update.isStorageLow,
-            isStorageCritical = update.isStorageCritical,
+            standbyBucket = update.standbyBucket, netInterface = update.netInterface,
+            isStorageLow = update.isStorageLow, isStorageCritical = update.isStorageCritical,
             gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail,
             snrIdx = update.snrIdx,
             isCoolingModeActive = update.isCoolingModeActive,

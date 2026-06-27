@@ -9,18 +9,15 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * v8.9.38:
- * - Issue #245: Added locationPendingReason to ConnectionPoint for forensic parity.
- * v8.9.37:
+ * v8.9.42:
+ * - Issue #326: Intelligent Uncertainty UX Mapping. Added locationPendingReason to 
+ *   ConnectionPoint, TrackerStatus, LocationState, DashboardState, and IntegrityState. (Formerly #245 / #226)
  * - Issue #325: Unified accuracy fallback logic. Added maxAccuracy to ConnectionPoint 
  *   to support forensic ribbon uncertainty visualization. (Formerly #214)
- * v8.9.22:
- * - Issue #226: Added locationPendingReason to TrackerStatus, LocationState, DashboardState, IntegrityState, and IntegrityStateUi.
- * v8.9.21:
- * - Issue #224: Added tiltIdx and baroIdx to ConnectionPoint, TrackerStatus, LocationState, and IntegrityState for forensic expansion.
- * v8.9.19:
- * - Issue #223: Added snrSnapshot and vibeSnapshot to LogEntry for forensic enrichment.
- * - Issue #222: Added isHindsightCorrected to TrailPoint for ghost-path visualization.
+ * - Issue #329: Added tiltIdx and baroIdx to ConnectionPoint, TrackerStatus, LocationState, 
+ *   and IntegrityState for forensic expansion. (Formerly #224)
+ * - Issue #333: Forensic Log Enrichment. Added snrSnapshot and vibeSnapshot to LogEntry. (Formerly #223)
+ * - Issue #334: Added isHindsightCorrected to TrailPoint for ghost-path visualization. (Formerly #222)
  */
 
 @Serializable
@@ -312,7 +309,7 @@ data class TrackerStatus(
             put("jump_tier", jumpTier)
             put("is_location_pending", isLocationPending)
             put("location_pending_reason", locationPendingReason.name)
-            put("last_valid_fix_realtime", lastValidFixRealtime)
+            put("last_valid_fixRealtime", lastValidFixRealtime)
             put("is_power_save_mode", isPowerSaveMode)
             put("standby_bucket", standbyBucket)
             put("net_interface", netInterface)

@@ -18,17 +18,19 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.42:
+ * - Issue #326: Intelligent Uncertainty UX Mapping. Synchronized locationPendingReason 
+ *   propagation and forensic ribbon parity. (Formerly #245)
+ * - Issue #335: serviceStartRealtime Initialization Gap. Explicitly initialized 
+ *   serviceStartRealtime in onCreate after engine initialization. (Formerly #296 / #26)
  * v8.9.38:
  * - Issue #333: Forensic Log Enrichment. Ensured SNR and Vibration snapshots are 
  *   propagated through onLogAdded and auto-enriched via LogManager.
- * - Issue #326: Synchronized locationPendingReason in evaluateAlarms for consistent UX mapping.
- * - Issue #245: Propagating locationPendingReason to forensic ribbons for uncertainty parity.
  * v8.9.37:
- * - Issue #325: Unified accuracy fallback logic. Propagating maxAccuracy to forensic ribbons. (Formerly #214)
+ * - Issue #325: Authoritative Spatial Anchoring. Unified accuracy fallback logic and 
+ *   maxAccuracy propagation. (Formerly #214)
  * v8.9.31:
  * - Issue #301: Fixed SyncManager instantiation and pushCurrentStatus parameter mismatch.
- * v8.9.30:
- * - Issue #296: Explicitly initialized serviceStartRealtime in onCreate after engine initialization. (Formerly #26)
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -177,7 +179,7 @@ class ViewerService : BaseMonitorService() {
             lastServiceTickRealtime = timeProvider.elapsedRealtime()
             locationProcessor.setLastValidFixTs(timeProvider.elapsedRealtime())
             
-            // Issue #296: Ensure bootstrap starts from actual engine online point
+            // Issue #335: Ensure bootstrap starts from actual engine online point
             serviceStartRealtime = timeProvider.elapsedRealtime()
 
             startTickLoop()
@@ -389,8 +391,8 @@ class ViewerService : BaseMonitorService() {
     private fun evaluateAlarmsInternal(
         nowRealtime: Long,
         isSignalLoss: Boolean,
-        isTrackerJammer: Boolean,
-        isTrackerStalling: Boolean,
+        isTrackerJammerSuspicion: Boolean,
+        isTrackerStalled: Boolean,
         isTrackerGap: Boolean,
         isTrackerConnected: Boolean
     ) {
@@ -409,7 +411,7 @@ class ViewerService : BaseMonitorService() {
                 trackerLastValidFixTs = remoteHandler.trackerLastValidFixRealtime,
                 trackerSpeed = remoteHandler.trackerSpeed, trackerBattery = remoteHandler.trackerBattery, trackerTemp = remoteHandler.trackerTemp,
                 isHardwareOnline = remoteHandler.isTrackerConnected, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
-                isJammerSuspicion = isTrackerJammer, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalling, isUiVisible = isUiVisible(),
+                isJammerSuspicion = isTrackerJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(),
                 distToHomeAuthority = remoteHandler.trackerDistToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(),
                 isGpsGap = isTrackerGap, isSuspicious = remoteHandler.isTrackerSuspicious, isTamperDetected = remoteHandler.isTrackerTamperDetected,
                 isPowerTamper = remoteHandler.isTrackerPowerTamper, trackerTiltDegrees = remoteHandler.trackerTiltDegrees, 

@@ -2,14 +2,16 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * v8.9.41:
+ * v8.9.42:
+ * - Issue #356: Aligned UI_PULSE_TIMEOUT_MS (10s) with TELEMETRY_UI_STALE_THRESHOLD_MS to prevent flicker.
+ * - Issue #354: Aligned BATTERY_ALARM_THRESHOLD (20) with architectural requirements.
  * - Issue #328: Added PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS and PENDING_UNCERTAINTY_SPEED_CAP_MPS
- *   for velocity-aware Bayesian expansion.
+ *   for velocity-aware Bayesian expansion. (Formerly #221)
  * v8.9.40:
  * - Issue #343: Remapped Signal Loss/Jammer Forensic Latch from #282.
  * - Issue #344: Remapped Stall/Tamper Forensic Latch from #283.
  * - Issue #345: Remapped Geofence Forensic Latch from #284.
- * - Issue #311: Monotonic Timing Integrity (Formerly #283).
+ * - Issue #311: Monotonic Timing Integrity (Formerly #283-A).
  * - Issue #315: Network Integrity & Timeout Scaling. (Formerly #273).
  * - Issue #191: Behavioral Debouncing & Muzzle Hardening (R729).
  * - Issue #325: Authoritative Spatial Anchoring (Formerly #214).
@@ -55,11 +57,11 @@ const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0f
 const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0f
 const val JUMP_GATE_VISUAL_JITTER_METERS = 10.0
 
-// Adaptive Jump Confidence (v8.9.18 - Issue #219)
+// Adaptive Jump Confidence (v8.9.18 - Issue #332 - Formerly #219)
 const val ADAPTIVE_JUMP_SNR_THRESHOLD = 35.0f
 const val ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0f
 
-// Hindsight Correction (v8.9.18 - Issue #220)
+// Hindsight Correction (v8.9.18 - Issue #334 - Formerly #220)
 const val HINDSIGHT_BUFFER_SIZE = 5
 const val HINDSIGHT_MAX_AGE_MS = 30000L
 
@@ -116,7 +118,7 @@ const val ROTATION_INIT_STATIONARY_MS = 3000L
 const val BARO_ZEROING_INTERVAL_MS = 600000L
 const val SPIKE_DEBOUNCE_MS = 5000L
 
-// Chair Sit Detection (R832)
+// Chair Sit Detection (R832 - Issue #336 - Formerly #331)
 const val CHAIR_SIT_TILT_THRESHOLD = 7.0f 
 const val CHAIR_SIT_VIBRATION_THRESHOLD = 0.35f 
 const val CHAIR_SIT_BARO_THRESHOLD = 0.08f 
@@ -189,7 +191,7 @@ const val GPS_STALL_THRESHOLD_MS = 60000L
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
 const val TICK_INTERVAL_MS = 1000L
 const val TICK_INTERVAL_SLOW_MS = 5000L
-const val UI_PULSE_TIMEOUT_MS = 5000L
+const val UI_PULSE_TIMEOUT_MS = 10000L
 const val FGS_STICKY_DELAY_MS = 45000L
 const val WATCH_TIMEOUT_MS = 30000L
 const val CLOCK_REGRESSION_GATE_MS = 100L
@@ -203,7 +205,7 @@ const val MAX_REVIVAL_ATTEMPTS = 3
 const val XIAOMI_BOOT_GRACE_MS = 30000L
 const val LANDING_PAGE_PAUSE_MS = 2000L
 
-// Xiaomi Heuristic Recovery (v8.9.18 - Issue #218)
+// Xiaomi Heuristic Recovery (Issue #190 - Formerly #218)
 const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 15000L
 const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
 
@@ -235,7 +237,7 @@ const val DEFAULT_ACCURACY_FALLBACK = 15.0f
 const val RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT = 20.0f
 
 // Battery thresholds (R716e)
-const val BATTERY_ALARM_THRESHOLD = 99
+const val BATTERY_ALARM_THRESHOLD = 20
 const val CRITICAL_BATTERY_THRESHOLD = 20
 const val MAX_SAFE_TEMPERATURE_CELSIUS = 46.0f
 const val MAX_SAFE_TEMPERATURE_RECOVERY = 44.0f
@@ -292,7 +294,7 @@ const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0f
 
-// Issue #193: Unified UI Staleness Threshold (10s) (Formerly #338)
+// Issue #338: Unified UI Staleness Threshold (10s) (Formerly #193)
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 10000L
 const val GPS_UI_FAIL_THRESHOLD_MS = 10000L
 

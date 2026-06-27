@@ -4,9 +4,9 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
- * v8.9.38:
- * - Issue #334: Implemented "Rubber-Band" hindsight interpolation.
- * - Issue #327: Refined transition smoothing for promoted trajectories.
+ * v8.9.42:
+ * - Issue #334: Implemented "Rubber-Band" hindsight interpolation. (Formerly #220)
+ * - Issue #327: Refined transition smoothing for promoted trajectories. (Formerly #227)
  * v8.9.34:
  * - Issue #303: Unified Trajectory Rejection multiplier.
  * - Issue #268: Removed redundant providedAcousticFloorDb from processGpsPoint.
@@ -222,7 +222,7 @@ class LocationProcessor(
         if (sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED) {
             val promotedPoints = sentinelResult.promotedPoints ?: emptyList()
             if (promotedPoints.isNotEmpty() && lastLat != 0.0) {
-                // Issue #334: Rubber-band interpolation for the gap between last valid and first promoted point.
+                // Issue #334: Rubber-band interpolation for the gap between last valid and first promoted point. (Formerly #220)
                 val firstPromoted = promotedPoints.first()
                 val interpolated = PhysicsUtils.interpolateSegment(lastLat, lastLng, lastTs, firstPromoted.lat, firstPromoted.lng, firstPromoted.ts)
                 interpolated.forEach { p ->

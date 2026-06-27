@@ -4,12 +4,12 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * v8.9.42:
+ * - Issue #326: Added locationPendingReason to mergeWorstCase and gap-filling logic for 
+ *   forensic uncertainty parity. (Formerly #245)
+ * - Issue #325: Added accuracy and maxAccuracy to mergeWorstCase and gap-filling logic 
+ *   to support authoritative uncertainty ribbons. (Formerly #214)
  * v8.9.38:
- * - Issue #245: Added locationPendingReason to mergeWorstCase and gap-filling logic for 
- *   forensic uncertainty parity.
- * v8.9.37:
- * - Issue #214: Added accuracy and maxAccuracy to mergeWorstCase and gap-filling logic 
- *   to support authoritative uncertainty ribbons.
  * - Issue #291: SIT Forensic Duplicate Risk. Fixed by ensuring isSitDetected defaults to false 
  *   during backfill if samples are missing. (Formerly #21)
  * v8.9.21:

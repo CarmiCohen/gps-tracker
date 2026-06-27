@@ -12,17 +12,16 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * v8.9.38:
- * - Issue #245: Added locationPendingReason to updateRibbons and backfillGaps for forensic parity.
- * v8.9.37:
- * - Issue #325: Added accuracy and maxAccuracy to ribbons for forensic uncertainty 
- *   auditing. (Formerly #214)
- * v8.9.28:
- * - Issue #336: SIT Duplicate Guard. Implemented database-level sanity check to prevent redundant SIT forensic markers. (Formerly #282)
- * v8.9.21:
- * - Issue #224: Added tiltIdx and baroIdx to updateRibbons and backfillGaps for forensic expansion.
- * v8.9.5:
- * - Issue 192: Added currentMa to updateRibbons and backfillGaps for forensic power parity.
+ * v8.9.42:
+ * - Issue #326: Intelligent Uncertainty UX Mapping. Added locationPendingReason to 
+ *   updateRibbons and backfillGaps for forensic parity. (Formerly #245)
+ * - Issue #325: Authoritative Spatial Anchoring. Added accuracy and maxAccuracy to 
+ *   ribbons for forensic uncertainty auditing. (Formerly #214)
+ * - Issue #336: SIT Duplicate Guard. Implemented database-level sanity check to 
+ *   prevent redundant SIT forensic markers. (Formerly #282)
+ * - Issue #329: Added tiltIdx and baroIdx to updateRibbons and backfillGaps for 
+ *   forensic expansion. (Formerly #224)
+ * - Issue #337: Added currentMa to updateRibbons and backfillGaps for forensic power parity. (Formerly #192)
  */
 class HistoryManager(
     private val context: Context,
@@ -331,7 +330,7 @@ class HistoryManager(
     private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long): Boolean {
         if (!isDetected) return false
         
-        // Issue #336: Prevent duplicates if a SIT event occurs within the guard window of the last recorded one. (Formerly #282)
+        // Issue #336: Prevent duplicates if a SIT event occurs within the guard window. (Formerly #282)
         if (abs(ts - lastSitDetectedTs) < SIT_DUPLICATE_GUARD_MS) {
             return false
         }

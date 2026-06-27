@@ -4,10 +4,11 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: Unified physics and geodesic calculations for the Pure Logic Engine.
- * v8.9.41:
- * - Issue #332: Refined SNR-IMU correlation for Urban Canyons. High SNR with zero vibration 
- *   now triggers a higher score penalty and Adaptive Jump status.
- * - Issue #334: Implemented interpolateSegment for hindsight rubber-banding.
+ * v8.9.42:
+ * - Issue #332: Adaptive Jump Confidence. Refined SNR-IMU correlation for Urban Canyons. 
+ *   High SNR with zero vibration now triggers a higher score penalty. (Formerly #219)
+ * - Issue #334: Hindsight Trajectory Correction. Implemented interpolateSegment 
+ *   for hindsight rubber-banding. (Formerly #220)
  */
 object PhysicsUtils {
 

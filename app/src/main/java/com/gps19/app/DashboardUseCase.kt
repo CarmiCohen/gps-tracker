@@ -10,11 +10,11 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
- * v8.9.37:
- * - Issue #325: Unified accuracy fallback logic. Refined accuracy display to prioritize 
+ * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring. Refined accuracy display to prioritize 
  *   maxAccuracy (filtered uncertainty) over raw accuracy consistently. (Formerly #214)
- * v8.9.6:
- * - Issue 193: Implemented telemetryFresh calculation for Zombie Telemetry UX mitigation.
+ * - Issue #338: Unified UI Staleness Threshold. Implemented telemetryFresh calculation 
+ *   for Zombie Telemetry UX mitigation. (Formerly #193 / #193-G)
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {
@@ -60,7 +60,7 @@ class DashboardUseCase @Inject constructor() {
         val telemetryAge = if (effectiveLastActivityTs > 0) now - effectiveLastActivityTs else Long.MAX_VALUE
         val isTelemetryVisible = telemetryAge < SENSOR_GRACE_PERIOD_MS
         
-        // Issue 193: Telemetry freshness threshold (10s)
+        // Issue #338: Telemetry freshness threshold (10s) (Formerly #193)
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
         
         val effectiveGpsAge = if (effectiveLastActivityTs > 0) now - effectiveLastActivityTs else Long.MAX_VALUE

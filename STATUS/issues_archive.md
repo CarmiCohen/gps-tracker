@@ -2,6 +2,22 @@
 
 This document contains archived resolutions from previous hardening phases.
 
+## Hardening Phase: v8.9.42 Resolved Items
+*   **Issue #356**: Mismatch: UI Staleness Gates. Aligned `UI_PULSE_TIMEOUT_MS` (10s) with `TELEMETRY_UI_STALE_THRESHOLD_MS` in `EngineConstants.kt`. (Complete)
+*   **Issue #355**: Terminology: Heartbeat vs Signal Loss. Aligned documentation to distinguish between hourly "Heartbeat" pulses and 180s/30s "Signal Loss" gates. (Complete)
+*   **Issue #354**: Battery Alarm Threshold. Aligned `BATTERY_ALARM_THRESHOLD` (20) with architectural requirements in `EngineConstants.kt`. (Complete)
+*   **Issue #346**: Issue Numbering & Duplicate Remediation. Resolved multiple collisions and established #300+ authoritative range. (Complete)
+*   **Issue #347**: Stale Legacy Reference Migration. Migrated all legacy references (#214, #273, #226, #224, #221, etc.) to their authoritative range across all logic files. (Complete)
+*   **Issue #340**: Samsung A15 Proximity Limitation. Implemented Lux-Locked Proximity Gating. (Formerly #180) (Complete)
+*   **Issue #332**: SNR-IMU Correlation Validation. Refined `isVisualJump` to penalize high SNR jumps without physical motion. (Formerly #219) (Complete)
+*   **Issue #328**: Acoustic "Location Pending" Optimization. Implemented Velocity-Aware Bayesian Expansion. (Formerly #221) (Complete)
+*   **Issue #341**: Physical Hardware Validation. Implemented GPS Stability Audit in `TrackerService`. (Complete)
+*   **Issue #342**: Xiaomi MIUI 14 Heuristic Recovery. Hardened "Heuristic Recovery Pulse" in `TrackerService`. (Complete)
+*   **Issue #334**: Hindsight Trajectory Correction. Implemented "Rubber-Band" interpolation. (Formerly #220) (Complete)
+*   **Issue #327**: Hindsight Transition Smoothing. Refined `LocationProcessor` for transition segments. (Formerly #227) (Complete)
+*   **Issue #333**: Forensic Log Enrichment. Implemented SNR/Vibe snapshot auto-enrichment. (Complete)
+*   **Issue #326**: Intelligent Uncertainty UX Mapping. Synchronized `locationPendingReason` propagation. (Complete)
+
 ## Hardening Phase: v8.9.38 Resolved Items
 *   **Issue #339/348**: SIT Rising-Edge & Offline Context. Hardened SIT detection triggers in `TrackerService.kt` to prevent duplicate events. Expanded `HistoryEntity` and `EngineConnectionPoint` to carry `locationPendingReason` for forensic uncertainty parity during offline periods. (Formerly #244/245) (Complete)
 *   **Issue #307**: Requirements Conflict Audit. Resolved all documentation and implementation contradictions for R922 (LEDs), R925 (Timing), and R810 (IDs). (Complete)

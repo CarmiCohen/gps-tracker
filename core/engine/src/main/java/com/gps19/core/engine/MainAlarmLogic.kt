@@ -5,12 +5,11 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
- * v8.9.34:
- * - Issue #287: Refactored getTrackerTitle to be fully role-aware for forensic parity. (Formerly #17)
- * - Issue #272: Synchronized version to v8.9.26 baseline. (Formerly #2)
- * v8.9.20:
- * - Issue #331: Updated ALERT_ID_TRACKER_CHAIR subtitle to "Chair occupancy detected" 
- *   for consistency with "Chair Occupied" forensic status. (Formerly #230)
+ * v8.9.42:
+ * - Issue #331: Refactored getTrackerTitle to be fully role-aware for forensic parity. (Formerly #287 / #17)
+ * - Issue #353: Synchronized version to v8.9.26 baseline. (Formerly #272 / #2)
+ * - Issue #336: Updated ALERT_ID_TRACKER_CHAIR subtitle to "Chair occupancy detected" 
+ *   for consistency with "Chair Occupied" forensic status. (Formerly #331 / #230)
  * v8.9.19:
  * - Issue #231: Implemented VISUAL_JUMP detection logic.
  * v8.9.18:

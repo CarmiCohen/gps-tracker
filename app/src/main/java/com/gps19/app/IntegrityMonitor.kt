@@ -14,12 +14,11 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * v8.9.37:
- * - Issue #273: Thermal Throttling logic. (Formerly #336)
- * - Issue #192: Exposed isCharging and maxTemperature for telemetry parity. (Formerly #337)
+ * v8.9.42:
+ * - Issue #352: Thermal Throttling Logic. (Formerly #272)
+ * - Issue #337: Forensic Power Parity. Exposed isCharging and maxTemperature. (Formerly #192)
+ * - Issue #311: Monotonic Timing Integrity. Migrated to TimeProvider for all timing logic. (Formerly #283-A)
  * - Issue #163: Hardened power tamper detection and connected violation callbacks.
- * v8.8.21: 
- * - Migrated to TimeProvider for all timing logic to ensure system-wide consistency. (Issue #311 / Formerly #282)
  */
 class IntegrityMonitor(
     private val context: Context,
@@ -55,13 +54,13 @@ class IntegrityMonitor(
     var isCharging = false
         private set
 
-    // Issue #272: Battery Discharge Profiling - Now uses monotonic time (Issue #311).
+    // Issue #353: Battery Health Profiling. Now uses monotonic time (Issue #311). (Formerly #272)
     private val batterySamples = ConcurrentLinkedQueue<Pair<Long, Int>>()
     private var lastBatteryCheckTs = 0L
     var isBatterySteepDischarge = false
         private set
 
-    // Issue #273: Thermal Throttling (Formerly #336)
+    // Issue #352: Thermal Throttling
     var isCoolingModeActive = false
         private set
 
@@ -88,7 +87,7 @@ class IntegrityMonitor(
                 repository.saveFloatSync(MainRepository.MAX_TEMP_KEY, maxTemperature)
             }
 
-            // Issue #273: Thermal Throttling Logic (Formerly #336)
+            // Issue #352: Thermal Throttling Logic
             if (!isCoolingModeActive && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
                 isCoolingModeActive = true
                 onLogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true)

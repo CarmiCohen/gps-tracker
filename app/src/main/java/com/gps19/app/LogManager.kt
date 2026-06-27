@@ -8,12 +8,12 @@ import java.util.UUID
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring. Strictly prioritize engine-calculated 
+ *   maxAccuracy (filtered uncertainty) over raw accuracy for consistent forensic reliability. (Formerly #214)
  * v8.9.38:
  * - Issue #333: Enhanced auto-enrichment. Automatically populate snrSnapshot and vibeSnapshot 
  *   from latest telemetry if not explicitly provided, ensuring forensic parity.
- * v8.9.37:
- * - Issue #325: Unified accuracy fallback logic. Strictly prioritize engine-calculated 
- *   maxAccuracy (filtered uncertainty) over raw accuracy for consistent forensic reliability. (Formerly #214)
  */
 @Singleton
 class LogManager @Inject constructor(
