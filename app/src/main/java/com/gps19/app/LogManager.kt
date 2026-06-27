@@ -8,11 +8,12 @@ import java.util.UUID
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * v8.9.38:
+ * - Issue #333: Enhanced auto-enrichment. Automatically populate snrSnapshot and vibeSnapshot 
+ *   from latest telemetry if not explicitly provided, ensuring forensic parity.
  * v8.9.37:
  * - Issue #325: Unified accuracy fallback logic. Strictly prioritize engine-calculated 
  *   maxAccuracy (filtered uncertainty) over raw accuracy for consistent forensic reliability. (Formerly #214)
- * v8.9.19:
- * - Issue #333: Expanded logServiceEvent and submitToLogSink to support SNR and Vibration snapshots. (Formerly #223)
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -61,6 +62,8 @@ class LogManager @Inject constructor(
         var finalLat = lat
         var finalLng = lng
         var finalAccuracy = accuracy
+        var finalSnr = snr
+        var finalVibe = vibe
         
         val local = telemetry.localLocation.value
         val tracker = telemetry.trackerLocation.value
@@ -72,25 +75,31 @@ class LogManager @Inject constructor(
             if (tracker.lat != 0.0) tracker else local
         }
 
+        // Auto-anchor location
         if (finalLat == 0.0 && finalLng == 0.0) {
-            // Auto-anchor to last known position
             if (fallbackTelem.lat != 0.0 && fallbackTelem.lng != 0.0) {
                 finalLat = fallbackTelem.lat
                 finalLng = fallbackTelem.lng
-                // Issue #325: Strictly prioritize maxAccuracy when auto-anchoring
                 finalAccuracy = if (fallbackTelem.maxAccuracy > 0f) fallbackTelem.maxAccuracy else fallbackTelem.accuracy
             }
         } else {
-            // If coordinates were provided, check if we should promote to maxAccuracy
             if (finalLat == fallbackTelem.lat && finalLng == fallbackTelem.lng) {
                 if (fallbackTelem.maxAccuracy > 0f && (finalAccuracy == 0f || finalAccuracy == fallbackTelem.accuracy)) {
                     finalAccuracy = fallbackTelem.maxAccuracy
                 }
             }
-            // If still 0, final fallback attempt
             if (finalAccuracy == 0f) {
                 finalAccuracy = if (fallbackTelem.maxAccuracy > 0f) fallbackTelem.maxAccuracy else fallbackTelem.accuracy
             }
+        }
+
+        // Issue #333: Forensic Enrichment Auto-Fill
+        // Note: LocationUpdate uses 'vibration' and 'snrIdx'.
+        if (finalSnr == null && fallbackTelem.snrIdx > 0f) {
+            finalSnr = fallbackTelem.snrIdx * RIBBON_SNR_SCALE_DB
+        }
+        if (finalVibe == null && (fallbackTelem.vibration ?: 0f) > 0f) {
+            finalVibe = fallbackTelem.vibration
         }
 
         val log = LogEntry(
@@ -109,8 +118,8 @@ class LogManager @Inject constructor(
             lat = finalLat,
             lng = finalLng,
             accuracy = finalAccuracy,
-            snrSnapshot = snr,
-            vibeSnapshot = vibe
+            snrSnapshot = finalSnr,
+            vibeSnapshot = finalVibe
         )
         
         val net = networkManager.get()

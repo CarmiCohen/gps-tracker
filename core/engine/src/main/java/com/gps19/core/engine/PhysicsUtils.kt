@@ -4,6 +4,8 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: Unified physics and geodesic calculations for the Pure Logic Engine.
+ * v8.9.38:
+ * - Issue #334: Implemented interpolateSegment for hindsight rubber-banding.
  * v8.9.34:
  * - Issue #304: Corrected Tier 3 Jump Floor. Now uses JUMP_GATE_VISUAL_JITTER_METERS (10.0m).
  * v8.9.18:
@@ -58,6 +60,31 @@ object PhysicsUtils {
         while (delta < -180) delta += 360
         while (delta > 180) delta -= 360
         return (last + delta * alpha + 360) % 360
+    }
+
+    /**
+     * Interpolates a segment between two points to prevent visual "teleporting".
+     * Part of Issue #334 / #327: Rubber-band smoothing for hindsight promotion.
+     */
+    fun interpolateSegment(
+        startLat: Double, startLng: Double, startTs: Long,
+        endLat: Double, endLng: Double, endTs: Long,
+        maxGapMeters: Double = 5.0
+    ): List<EngineGeoPoint> {
+        val dist = calculateDistance(startLat, startLng, endLat, endLng)
+        if (dist <= maxGapMeters || startTs >= endTs) return emptyList()
+
+        val steps = (dist / maxGapMeters).toInt().coerceIn(1, 10)
+        val result = mutableListOf<EngineGeoPoint>()
+        
+        for (i in 1..steps) {
+            val fraction = i.toDouble() / (steps + 1)
+            val interpLat = startLat + (endLat - startLat) * fraction
+            val interpLng = startLng + (endLng - startLng) * fraction
+            val interpTs = startTs + ((endTs - startTs) * fraction).toLong()
+            result.add(EngineGeoPoint(interpLat, interpLng, ts = interpTs))
+        }
+        return result
     }
 
     /**

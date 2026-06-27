@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.37
+# System Source of Truth (SoT) - v8.9.38
 
 This document serves as the definitive operational specification for the GPS-Tracker system.
 
@@ -211,7 +211,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ## 3. Network & Connectivity
 | Constant | Value | Description |
-| :--- | :--- | :--- |
+| :--- | :--- | : :--- |
 | `MAX_ALLOWED_RTT_MS` | 5000ms | Maximum Round Trip Time for healthy communication. |
 | `COMM_RTT_FLOOR_MS` | 150ms | Baseline floor for RTT indexing. |
 | `COMM_RTT_SCALING_FACTOR` | 2000.0 | Factor for communication quality normalization. |
@@ -226,7 +226,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ## 4. Remote Forensic Verification
 ### 4.1. Version & Role Visibility
-*   **Engine Identity**: The system operates on the v8.9.37 baseline logic.
+*   **Engine Identity**: The system operates on the v8.9.38 baseline logic.
 *   **Dynamic Versioning**: `versionCode` in `build.gradle` is generated using `git rev-list --count HEAD`. (Issue #199)
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Standardized Alert IDs**: Aligned with `EngineConstants.kt`. Includes `VISUAL_JUMP` for trajectory-based jumps.
@@ -245,7 +245,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Authoritative Spatial Anchoring**: Issue #325: Strictly prioritize engine-calculated `maxAccuracy` (filtered uncertainty) over raw `accuracy` across all UI and logging layers to ensure forensic consistency. (Formerly #214)
 *   **Forensic Snapshots**: Log entries now include `snrSnapshot` and `vibeSnapshot` for Jump and Stall forensic enrichment (v8.9.19).
 *   **Stability Expansion**: Added `tiltIdx` and `baroIdx` to the analytical ribbons and telemetry pipeline for enhanced "SIT" event analysis (v8.9.21).
-*   **Uncertainty Context**: Propagating `locationPendingReason` for Bayesian uncertainty expansion in the UI (v8.9.36).
+*   **Uncertainty Context**: Propagating `locationPendingReason` for Bayesian uncertainty expansion in the UI (v8.9.38).
 *   **Location Pending Reasons**:
     - `NONE`: No pending activity.
     - `ACOUSTIC_VIOLATION`: Monitoring recovery from audio spike.
@@ -326,7 +326,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ---
 
-## 8. Forensic Alert Manifest (v8.9.37)
+## 8. Forensic Alert Manifest (v8.9.38)
 | Alert ID | Alert Title (Standardized) | Trigger Description |
 | :--- | :--- | : :--- |
 | `LOCAL_INTERNET` | This device: Internet Lost | Local connectivity failure. |

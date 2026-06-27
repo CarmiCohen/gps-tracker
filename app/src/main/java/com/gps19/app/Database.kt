@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * v8.9.38:
+ * - Issue #245: Added locationPendingReason to HistoryEntity for forensic parity.
  * v8.9.24:
  * - Issue #244: Added locationPendingReason to PendingStatusEntity for offline uncertainty context.
  * v8.9.21:
@@ -84,7 +86,8 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "0") val sitBaro: Float = 0f,
     @ColumnInfo(defaultValue = "0") val sitTilt: Float = 0f,
     @ColumnInfo(defaultValue = "0") val sitShock: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val currentMa: Int = 0
+    @ColumnInfo(defaultValue = "0") val currentMa: Int = 0,
+    @ColumnInfo(defaultValue = "NONE") val locationPendingReason: String = "NONE"
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -194,7 +197,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 45, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 46, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -203,6 +206,11 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_45_46 = object : Migration(45, 46) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE connection_history ADD COLUMN locationPendingReason TEXT NOT NULL DEFAULT 'NONE'")
+            }
+        }
         val MIGRATION_44_45 = object : Migration(44, 45) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN locationPendingReason TEXT NOT NULL DEFAULT 'NONE'")

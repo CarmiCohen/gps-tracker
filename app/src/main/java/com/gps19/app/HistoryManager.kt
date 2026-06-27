@@ -12,6 +12,8 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * v8.9.38:
+ * - Issue #245: Added locationPendingReason to updateRibbons and backfillGaps for forensic parity.
  * v8.9.37:
  * - Issue #325: Added accuracy and maxAccuracy to ribbons for forensic uncertainty 
  *   auditing. (Formerly #214)
@@ -84,7 +86,8 @@ class HistoryManager(
         bearing: Float = 0f,
         isSitDetected: Boolean = false,
         isSitActive: Boolean = false,
-        currentMa: Int = 0
+        currentMa: Int = 0,
+        locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
     ) {
         detectClockTampering(now)
 
@@ -132,7 +135,8 @@ class HistoryManager(
                 bearing = bearing,
                 isSitDetected = isSitDetected,
                 isSitActive = isSitActive,
-                currentMa = currentMa
+                currentMa = currentMa,
+                locationPendingReason = locationPendingReason
             )
         }
 
@@ -167,7 +171,8 @@ class HistoryManager(
             isSitDetected = applySitDuplicateGuard(isSitDetected, now),
             isSitActive = isSitActive,
             isTick = false,
-            currentMa = currentMa
+            currentMa = currentMa,
+            locationPendingReason = locationPendingReason
         )
 
         processResults(aggregator.processPoint(currentPoint))
@@ -222,7 +227,8 @@ class HistoryManager(
         bearing: Float,
         isSitDetected: Boolean,
         isSitActive: Boolean,
-        currentMa: Int
+        currentMa: Int,
+        locationPendingReason: LocationPendingReason
     ) {
         val snrSamples = if (isTrackerMode && gpsManager != null) {
             gpsManager.getSnrSamples(lastTickTs + 1, now).map { EngineSnrSample(it.first, it.second) }
@@ -265,7 +271,8 @@ class HistoryManager(
             bearing = bearing,
             isSitDetected = applySitDuplicateGuard(isSitDetected, now),
             isSitActive = isSitActive,
-            currentMa = currentMa
+            currentMa = currentMa,
+            locationPendingReason = locationPendingReason
         )
 
         val results = aggregator.backfillGaps(lastTickTs, now, snrSamples, sensorSamples, acousticFloor, baseTemplate)
@@ -369,7 +376,8 @@ class HistoryManager(
             bearing = p.bearing,
             isSitDetected = p.isSitDetected,
             isSitActive = p.isSitActive,
-            currentMa = p.currentMa
+            currentMa = p.currentMa,
+            locationPendingReason = p.locationPendingReason
         )
     }
 

@@ -18,6 +18,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.38:
+ * - Issue #333: Forensic Log Enrichment. Ensured SNR and Vibration snapshots are 
+ *   propagated through onLogAdded and auto-enriched via LogManager.
+ * - Issue #326: Synchronized locationPendingReason in evaluateAlarms for consistent UX mapping.
+ * - Issue #245: Propagating locationPendingReason to forensic ribbons for uncertainty parity.
  * v8.9.37:
  * - Issue #325: Unified accuracy fallback logic. Propagating maxAccuracy to forensic ribbons. (Formerly #214)
  * v8.9.31:
@@ -223,7 +228,7 @@ class ViewerService : BaseMonitorService() {
         if ((configManager.deviceId == MainRepository.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
             configManager.deviceId = id
             networkManager.updateIdentity(id, configManager.viewerId, false)
-            lifecycleScope.launch { repository.saveString(MainRepository.TRACKER_ID_KEY, id) } 
+            lifecycleScope.launch { repository.saveString(MainRepository.VIEWER_ID_KEY, id) } 
         }
         if (sessionManager.onTrackerPulse(id, timeProvider.currentTimeMillis(), false)) {
             val proc = lastProcessedLocation
@@ -325,107 +330,53 @@ class ViewerService : BaseMonitorService() {
             filteredSpeed = proc?.filteredSpeed ?: 0.0,
             vibration = 0f, heading = 0f, baroAlt = 0f,
             lux = 0f, isNear = true, isSuspicious = false, tiltDegrees = 0f, acousticDb = 0.0, isJump = false, isTrajectoryPromoted = false,
-            jumpTier = 0, isJammer = false, isStalledRaw = false, isStalledActive = false, peakShock = 0f, peakShockTs = 0L, luxBaseline = 0f,
-            acousticFloorDb = 0.0, adaptiveVibrationFloor = 0.12f, proxIdx = 0f, proximityCm = 0f, micPending = false, isTamperDetected = false,
-            isPowerTamper = integrityMonitor.isPowerTamperDetected, isSitDetected = false, isSitActive = false, lastSitTs = 0L, receiptRealtime = 0L,
-            violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(),
-            verticalVelocity = 0f, sitVz = 0f, sitDz = 0f, sitBaro = 0f, sitTilt = 0f, sitShock = 0f, isClockRegression = false, 
-            isLocationPending = false, locationPendingReason = LocationPendingReason.NONE,
-            lastValidFixRealtime = remoteHandler.trackerLastValidFixRealtime,
-            gnssDetail = latestGnssDetail, 
-            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f), 
-            tiltIdx = 0f, baroIdx = 0f,
-            isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive,
+            jumpTier = 0, isJammer = false, isStalledRaw = false, isStalledActive = false,
+            peakShock = 0f, peakShockTs = 0L, luxBaseline = 0f, acousticFloorDb = 0.0, adaptiveVibrationFloor = 0.12f,
+            proxIdx = 1.0f, proximityCm = -1.0f, micPending = false, isTamperDetected = false, isPowerTamper = false,
+            isSitDetected = false, isSitActive = false, lastSitTs = 0L, receiptRealtime = proc?.receiptRealtime ?: 0L,
+            violationUptimeMs = 0L, violationPercentage = 0f, verticalVelocity = 0f, sitVz = 0f, sitDz = 0f,
+            sitBaro = 0f, sitTilt = 0f, sitShock = 0f, isClockRegression = proc?.isClockRegression ?: false,
+            isLocationPending = false, locationPendingReason = LocationPendingReason.NONE, lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
+            gnssDetail = latestGnssDetail,
+            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f),
+            tiltIdx = 0f, baroIdx = 0f, isBatterySteepDischarge = false, isCoolingModeActive = false,
             batteryLevel = integrityMonitor.getBatteryLevel(), batteryTemp = integrityMonitor.batteryTemp, isCharging = integrityMonitor.isCharging
         )
 
-        val trackerGpsTs = remoteHandler.trackerLastGpsTs
-        val gpsAge = if (trackerGpsTs > 0) (now - trackerGpsTs) else 3600000L
-        
+        val gpsTs = proc?.timestamp ?: 0L
+        val gpsAge = if (gpsTs > 0) (now - gpsTs) else 3600000L
         historyManager.updateRibbons(
             now = now,
             lastTickTs = lastServiceTickTs,
             serviceTickCounter = serviceTickCounter,
             rtt = networkManager.getRtt(),
             peerSignal = remoteHandler.peerSignal,
-            peerAvail = isTrackerActive,
-            hasGps = trackerGpsTs > 0,
+            peerAvail = isSocketConnected && isTrackerActive,
+            hasGps = gpsTs > 0,
             isTrackerMode = false,
-            gpsIndex = TelemetryUtils.calculateGpsIndex(gpsAge, remoteHandler.trackerMaxAccuracy, remoteHandler.trackerSatsUsed).totalIndex,
-            accuracy = remoteHandler.trackerAccuracy,
-            maxAccuracy = remoteHandler.trackerMaxAccuracy,
-            noiseIdx = ((remoteHandler.trackerAcousticDb - remoteHandler.trackerAcousticFloorDb).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB).toFloat(),
-            luxIdx = (log10(remoteHandler.trackerLux.toDouble() + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0).toFloat(),
-            vibeIdx = (remoteHandler.trackerVibration.toDouble() / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0).toFloat(),
-            proxIdx = remoteHandler.trackerProxIdx,
-            liftIdx = (abs(remoteHandler.trackerBaroAlt) / RIBBON_LIFT_SCALE_METERS).coerceIn(0f, 1f),
-            snrIdx = remoteHandler.trackerSnrIdx,
-            tiltIdx = remoteHandler.trackerTiltIdx,
-            baroIdx = remoteHandler.trackerBaroIdx,
-            verticalVelocity = remoteHandler.trackerVerticalVelocity,
-            sitVz = remoteHandler.trackerSitVz,
-            sitDz = remoteHandler.trackerSitDz,
-            sitBaro = remoteHandler.trackerSitBaro,
-            sitTilt = remoteHandler.trackerSitTilt,
-            sitShock = remoteHandler.trackerSitShock,
-            isBatterySteepDischarge = remoteHandler.isTrackerBatterySteepDischarge,
-            isCoolingModeActive = remoteHandler.isTrackerCoolingModeActive,
-            speed = remoteHandler.trackerSpeed,
-            bearing = remoteHandler.trackerBearing,
-            isSitDetected = remoteHandler.isTrackerSitDetected,
-            isSitActive = remoteHandler.isTrackerSitActive,
-            currentMa = remoteHandler.trackerCurrentMa
+            gpsIndex = TelemetryUtils.calculateGpsIndex(gpsAge, proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), lastKnownLocation?.extras?.getInt("satellites") ?: gpsManager.satellitesUsed).totalIndex,
+            accuracy = proc?.currentAccuracy ?: locationProcessor.getLastProcessedAccuracy(),
+            maxAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(),
+            noiseIdx = 0f, luxIdx = 0f, vibeIdx = 0f, proxIdx = 1f, liftIdx = 0f,
+            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f),
+            tiltIdx = 0f, baroIdx = 0f,
+            verticalVelocity = 0f, sitVz = 0f, sitDz = 0f, sitBaro = 0f, sitTilt = 0f, sitShock = 0f,
+            isBatterySteepDischarge = false, isCoolingModeActive = false,
+            speed = ((proc?.filteredSpeed ?: 0.0) / 3.6).toFloat(),
+            bearing = (lastKnownLocation?.bearing ?: 0f),
+            isSitDetected = false, isSitActive = false, currentMa = integrityMonitor.getBatteryCurrent(),
+            locationPendingReason = LocationPendingReason.NONE
         )
 
-        val xiaomiStatus = when(systemStatusProvider.isXiaomiSpecialPermissionGranted()) {
-            XiaomiPermissionStatus.GRANTED -> EngineXiaomiStatus.GRANTED
-            XiaomiPermissionStatus.DENIED -> EngineXiaomiStatus.DENIED
-            XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN
-        }
-        
-        val xiaomiAutostartStatus = when(getXiaomiAutostartStatus(this@ViewerService)) {
-            XiaomiPermissionStatus.GRANTED -> EngineXiaomiStatus.GRANTED
-            XiaomiPermissionStatus.DENIED -> EngineXiaomiStatus.DENIED
-            XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN
-        }
-
-        alarmEvalJob?.cancel()
-        alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
-            alarmManager.evaluateAlarms(
-                now = nowRealtime, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = false,
-                isRelayConnected = isSocketConnected, isTrackerConnected = isTrackerActive, isTrackerVisualJump = remoteHandler.isTrackerVisualJump,
-                isTrajectoryPromoted = remoteHandler.isTrackerTrajectoryPromoted, jumpTier = remoteHandler.trackerJumpTier,
-                trackerLat = remoteHandler.trackerLat, trackerLng = remoteHandler.trackerLng, trackerAccuracy = remoteHandler.trackerAccuracy,
-                maxTrackerAccuracy = remoteHandler.trackerMaxAccuracy, trackerLastGpsTs = remoteHandler.trackerLastGpsTs,
-                trackerLastValidFixTs = remoteHandler.trackerLastValidFixRealtime,
-                trackerSpeed = remoteHandler.trackerSpeed, trackerBattery = remoteHandler.trackerBattery, trackerTemp = remoteHandler.trackerTemp,
-                isHardwareOnline = true, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
-                isJammerSuspicion = isTrackerJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled,
-                isUiVisible = isUiVisible(), 
-                distToHomeAuthority = remoteHandler.trackerDistToHome ?: 0.0,
-                maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(),
-                isGpsGap = isTrackerGap,
-                isSuspicious = remoteHandler.isTrackerSuspicious, isTamperDetected = remoteHandler.isTrackerTamperDetected,
-                isPowerTamper = remoteHandler.isTrackerPowerTamper, trackerTiltDegrees = remoteHandler.trackerTiltDegrees, trackerAcousticDb = remoteHandler.trackerAcousticDb,
-                trackerBaroAlt = remoteHandler.trackerBaroAlt, trackerLux = remoteHandler.trackerLux, isNear = remoteHandler.isTrackerNear,
-                luxBaseline = remoteHandler.trackerLuxBaseline, acousticFloorDb = remoteHandler.trackerAcousticFloorDb, adaptiveVibrationFloor = remoteHandler.trackerAdaptiveVibrationFloor,
-                peakVibrationShock = remoteHandler.trackerPeakVibrationShock, trackerCurrentMa = remoteHandler.trackerCurrentMa, isSitActive = remoteHandler.isTrackerSitActive,
-                isLocationPending = remoteHandler.isTrackerLocationPending, isPowerSaveMode = integrityMonitor.isPowerSaveModeActive,
-                standbyBucket = integrityMonitor.currentStandbyBucket, netInterface = integrityMonitor.getActiveNetworkInterface(),
-                isStorageLow = integrityMonitor.isStorageLow, isStorageCritical = integrityMonitor.isStorageCritical,
-                isBatterySteepDischarge = remoteHandler.isTrackerBatterySteepDischarge, isCoolingModeActive = remoteHandler.isTrackerCoolingModeActive,
-                discoveryPhase = null,
-                isXiaomiDevice = isXiaomiDevice(),
-                xiaomiStatus = xiaomiStatus,
-                xiaomiAutostartStatus = xiaomiAutostartStatus,
-                isXiaomiManualOverride = isXiaomiManualOverride,
-                snrSnapshot = remoteHandler.trackerSnrIdx * RIBBON_SNR_SCALE_DB,
-                vibeSnapshot = remoteHandler.trackerVibration
-            )
-        }
+        evaluateAlarmsInternal(nowRealtime, isSignalLoss, isTrackerJammerSuspicion, isTrackerStalled, isTrackerGap, isTrackerActive)
 
         if (serviceTickCounter % 60 == 0) {
-            notificationManager.updatePulse(sats = 0, battery = integrityMonitor.getBatteryLevel(), isSecure = !alarmManager.hasUnresolvedAlarms(), isPowerSave = integrityMonitor.isPowerSaveModeActive)
+            notificationManager.updatePulse(
+                sats = gpsManager.satellitesUsed,
+                battery = integrityMonitor.getBatteryLevel(),
+                isSecure = !alarmManager.hasUnresolvedAlarms(),
+                isPowerSave = integrityMonitor.isPowerSaveModeActive
+            )
         }
 
         repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, now)
@@ -435,11 +386,54 @@ class ViewerService : BaseMonitorService() {
         serviceTickCounter++
     }
 
-    override fun onDestroy() {
-        settingsJob?.cancel()
+    private fun evaluateAlarmsInternal(
+        nowRealtime: Long,
+        isSignalLoss: Boolean,
+        isTrackerJammer: Boolean,
+        isTrackerStalling: Boolean,
+        isTrackerGap: Boolean,
+        isTrackerConnected: Boolean
+    ) {
+        val proc = lastProcessedLocation
+        val isSocketConnected = networkManager.isConnected()
+        
         alarmEvalJob?.cancel()
+        alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
+            alarmManager.evaluateAlarms(
+                now = nowRealtime, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = false,
+                isRelayConnected = isSocketConnected, isTrackerConnected = isTrackerConnected,
+                isTrackerVisualJump = remoteHandler.isTrackerVisualJump, 
+                isTrajectoryPromoted = remoteHandler.isTrackerTrajectoryPromoted, jumpTier = remoteHandler.trackerJumpTier,
+                trackerLat = remoteHandler.trackerLat, trackerLng = remoteHandler.trackerLng, trackerAccuracy = remoteHandler.trackerAccuracy,
+                maxTrackerAccuracy = remoteHandler.trackerMaxAccuracy, trackerLastGpsTs = remoteHandler.trackerLastGpsTs,
+                trackerLastValidFixTs = remoteHandler.trackerLastValidFixRealtime,
+                trackerSpeed = remoteHandler.trackerSpeed, trackerBattery = remoteHandler.trackerBattery, trackerTemp = remoteHandler.trackerTemp,
+                isHardwareOnline = remoteHandler.isTrackerConnected, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
+                isJammerSuspicion = isTrackerJammer, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalling, isUiVisible = isUiVisible(),
+                distToHomeAuthority = remoteHandler.trackerDistToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(),
+                isGpsGap = isTrackerGap, isSuspicious = remoteHandler.isTrackerSuspicious, isTamperDetected = remoteHandler.isTrackerTamperDetected,
+                isPowerTamper = remoteHandler.isTrackerPowerTamper, trackerTiltDegrees = remoteHandler.trackerTiltDegrees, 
+                trackerAcousticDb = remoteHandler.trackerAcousticDb, trackerBaroAlt = remoteHandler.trackerBaroAlt, trackerLux = remoteHandler.trackerLux,
+                isNear = remoteHandler.isTrackerNear, luxBaseline = remoteHandler.trackerLuxBaseline, acousticFloorDb = remoteHandler.trackerAcousticFloorDb,
+                adaptiveVibrationFloor = remoteHandler.trackerAdaptiveVibrationFloor, peakVibrationShock = remoteHandler.trackerPeakVibrationShock,
+                trackerCurrentMa = remoteHandler.trackerCurrentMa, isSitActive = remoteHandler.isTrackerSitActive, isLocationPending = remoteHandler.isTrackerLocationPending,
+                locationPendingReason = remoteHandler.trackerLocationPendingReason, isPowerSaveMode = remoteHandler.isTrackerPowerSaveMode,
+                standbyBucket = remoteHandler.trackerStandbyBucket, netInterface = remoteHandler.trackerNetInterface, 
+                isStorageLow = remoteHandler.isTrackerStorageLow,
+                isStorageCritical = remoteHandler.isTrackerStorageCritical, 
+                isBatterySteepDischarge = remoteHandler.isTrackerBatterySteepDischarge,
+                isCoolingModeActive = remoteHandler.isTrackerCoolingModeActive,
+                discoveryPhase = null, isXiaomiDevice = false, xiaomiStatus = EngineXiaomiStatus.UNKNOWN, xiaomiAutostartStatus = EngineXiaomiStatus.UNKNOWN, isXiaomiManualOverride = false,
+                snrSnapshot = gpsManager.averageSnr, vibeSnapshot = 0f
+            )
+        }
+    }
+
+    override fun onDestroy() {
         gpsCollectionJob?.cancel()
         gnssDetailJob?.cancel()
+        alarmEvalJob?.cancel()
+        settingsJob?.cancel()
         if (this::commandRouter.isInitialized) commandRouter.unregister()
         super.onDestroy()
     }

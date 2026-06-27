@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v8.9.38:
+ * - Issue #334: Added ts to EngineGeoPoint for hindsight rubber-banding.
+ * - Issue #245: Added locationPendingReason to EngineConnectionPoint for forensic parity.
  * v8.9.37:
  * - Issue #325: Added maxAccuracy to EngineConnectionPoint for forensic ribbon uncertainty 
  *   tracking. (Formerly #214)
@@ -20,7 +23,7 @@ import kotlinx.serialization.Serializable
  */
 
 @Serializable
-data class EngineGeoPoint(val lat: Double, val lng: Double)
+data class EngineGeoPoint(val lat: Double, val lng: Double, val ts: Long = 0L)
 
 enum class DiscoveryPhase {
     BOOTSTRAP, DISCOVERING, MONITORING
@@ -90,7 +93,8 @@ data class EngineConnectionPoint(
     val isSitDetected: Boolean = false,
     val isSitActive: Boolean = false,
     val isTick: Boolean = false,
-    val currentMa: Int = 0
+    val currentMa: Int = 0,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
 )
 
 enum class RibbonScale(val key: String, val intervalSeconds: Int) {
@@ -150,7 +154,7 @@ data class GnssDetail(
 )
 
 /**
- * RejectedPoint: Used for hindsight trajectory correction.
+ * RejectedPoint: Used for hindsight correction.
  */
 data class RejectedPoint(
     val lat: Double,

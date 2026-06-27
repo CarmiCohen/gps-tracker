@@ -21,12 +21,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v8.9.37:
- * - Issue #325: Unified accuracy fallback logic. Propagating maxAccuracy to forensic ribbons. (Formerly #214)
- * - Issue #148: Samsung A15 GPS Stalling. Integrated calculateGpsInterval and WakeLock renewal.
- * - Issue #191: Proximity Flutter. Applied device-specific hysteresis via SyncManager callback.
- * v8.9.36:
- * - Issue #245: Hardened SIT logging with strict rising-edge latch to prevent redundant forensic logs.
+ * v8.9.39:
+ * - Issue #341: Implemented GPS Stability Audit. Monitoring 10Hz polling intervals for hardware gaps.
+ * - Issue #342: Hardened Xiaomi Heuristic Recovery Pulse to bypass MIUI/HyperOS deep doze.
+ * v8.9.38:
+ * - Issue #333: Forensic Log Enrichment. Ensured SNR and Vibration snapshots are 
+ *   propagated through onLogAdded and auto-enriched via LogManager.
+ * - Issue #326: Synchronized locationPendingReason in evaluateAlarmsInternal for consistent UX mapping.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -73,6 +74,12 @@ class TrackerService : BaseMonitorService() {
     private var isA15 = false
     private var currentGpsInterval = -1L
     private var lastGpsTransitionLogTs = 0L
+
+    // Issue #341: Stability Audit State
+    private var lastGpsFixRealtime = 0L
+    private var stabilityAuditFixCount = 0
+    private var stabilityAuditViolationCount = 0
+    private var lastStabilityAuditTs = 0L
 
     private val localProcessorListener = object : LocationProcessorListener {
         override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean) {
@@ -307,6 +314,8 @@ class TrackerService : BaseMonitorService() {
             systemMonitor.renewWakeLock()
         }
 
+        // Issue #342: Xiaomi Heuristic Recovery Pulse.
+        // If the tick loop is suppressed by MIUI deep doze, trigger a "Revival Pulse" upon resumption.
         if (isXiaomi && lastServiceTickRealtime > 0) {
             val tickGap = nowRealtime - lastServiceTickRealtime
             if (tickGap > XIAOMI_SUPPRESSION_THRESHOLD_MS && nowRealtime - lastXiaomiRecoveryTs > XIAOMI_RECOVERY_COOLDOWN_MS) {
@@ -318,11 +327,26 @@ class TrackerService : BaseMonitorService() {
                     
                     gpsManager.reviveGps()
                     systemMonitor.renewWakeLock()
-                    updateForegroundServiceType()
+                    updateForegroundServiceType() // Toggling FGS type can kick the OS into process resumption
                 } catch (e: Exception) {
                     Timber.e(e, "Xiaomi heuristic recovery pulse failed")
                 }
             }
+        }
+
+        // Issue #341: GPS Stability Audit Periodic Reporter (Every 10s)
+        if (nowRealtime - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
+            if (stabilityAuditFixCount > 0) {
+                val reliability = 100f * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
+                if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
+                    val proc = lastProcessedLocation
+                    logManager.logServiceEvent("STABILITY AUDIT: Reliability ${String.format(Locale.getDefault(), "%.1f", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true,
+                        lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
+                }
+                stabilityAuditFixCount = 0
+                stabilityAuditViolationCount = 0
+            }
+            lastStabilityAuditTs = nowRealtime
         }
 
         // Issue #148: Calculate and apply device-specific GPS interval.
@@ -501,11 +525,12 @@ class TrackerService : BaseMonitorService() {
             bearing = (lastKnownLocation?.bearing ?: 0f),
             isSitDetected = latchedSitDetected,
             isSitActive = lastSitDetected,
-            currentMa = integrityMonitor.getBatteryCurrent()
+            currentMa = integrityMonitor.getBatteryCurrent(),
+            locationPendingReason = pendingReason
         )
 
         // Issue #323: Unified Alarm Evaluation - tick loop is the authority
-        evaluateAlarmsInternal(nowRealtime, isSignalLoss, isJammerSuspicionActive, isGpsStalledActive, false, isViewerActive)
+        evaluateAlarmsInternal(nowRealtime, isSignalLoss, isJammerSuspicionActive, isGpsStalledActive, false, isViewerActive, pendingReason)
 
         if (serviceTickCounter % 60 == 0) { notificationManager.updatePulse(sats = gpsManager.satellitesUsed, battery = integrityMonitor.getBatteryLevel(), isSecure = !alarmManager.hasUnresolvedAlarms(), isPowerSave = integrityMonitor.isPowerSaveModeActive) }
         
@@ -522,7 +547,8 @@ class TrackerService : BaseMonitorService() {
         isJammerSuspicion: Boolean, 
         isGpsStalling: Boolean, 
         isTamperDetected: Boolean,
-        isViewerConnected: Boolean 
+        isViewerConnected: Boolean,
+        pendingReason: LocationPendingReason
     ) {
         val proc = lastProcessedLocation
         val isSocketConnected = networkManager.isConnected()
@@ -557,7 +583,9 @@ class TrackerService : BaseMonitorService() {
                 trackerTiltDegrees = sensorManager.currentTiltDegrees, trackerAcousticDb = sensorManager.currentAcousticDb, trackerBaroAlt = sensorManager.relativeAltitude,
                 trackerLux = sensorManager.currentLux, isNear = sensorManager.isProximityNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
                 adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = locationProcessor.getPeakVibrationShock(), trackerCurrentMa = integrityMonitor.getBatteryCurrent(),
-                isSitActive = lastSitDetected, isLocationPending = pendingAcousticViolation, isPowerSaveMode = integrityMonitor.isPowerSaveModeActive,
+                isSitActive = lastSitDetected, isLocationPending = (pendingReason != LocationPendingReason.NONE), 
+                locationPendingReason = pendingReason,
+                isPowerSaveMode = integrityMonitor.isPowerSaveModeActive,
                 standbyBucket = integrityMonitor.currentStandbyBucket, netInterface = integrityMonitor.getActiveNetworkInterface(), isStorageLow = integrityMonitor.isStorageLow,
                 isStorageCritical = integrityMonitor.isStorageCritical, isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive,
                 discoveryPhase = null,
@@ -576,6 +604,21 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun onLocationChanged(location: Location) {
+        val nowRealtime = timeProvider.elapsedRealtime()
+
+        // Issue #341: GPS Stability Audit - Monitoring 10Hz polling intervals
+        if (currentGpsInterval == HIGH_FREQUENCY_GPS_POLLING_MS && lastGpsFixRealtime > 0) {
+            val gap = nowRealtime - lastGpsFixRealtime
+            stabilityAuditFixCount++
+            if (gap > GPS_STABILITY_GAP_THRESHOLD_MS) {
+                stabilityAuditViolationCount++
+                val proc = lastProcessedLocation
+                logManager.logServiceEvent("STABILITY GAP: ${gap}ms detected during 10Hz polling.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0f)
+            }
+        }
+        lastGpsFixRealtime = nowRealtime
+
         val processed = locationProcessor.processGpsPoint(
             lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedKph = location.speed.toDouble() * 3.6, 
             gpsTs = location.time, accuracy = location.accuracy, bearing = location.bearing, snr = gpsManager.averageSnr, 

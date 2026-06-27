@@ -4,6 +4,8 @@ import kotlin.math.*
 
 /**
  * ImmFilter: Interacting Multiple Model Filter.
+ * v8.9.38:
+ * - Issue #334: Propagate timestamp to EngineGeoPoint for hindsight smoothing.
  */
 class ImmFilter {
 
@@ -34,15 +36,15 @@ class ImmFilter {
     fun update(lat: Double, lng: Double, accuracy: Float, timestamp: Long, qScale: Double = 1.0): EngineGeoPoint {
         if (lastUpdateTs == 0L) {
             initModels(lat, lng, timestamp)
-            return EngineGeoPoint(lat, lng)
+            return EngineGeoPoint(lat, lng, ts = timestamp)
         }
 
         val dt = (timestamp - lastUpdateTs) / 1000.0
-        if (dt <= 0) return EngineGeoPoint(modelStationary.x, modelStationary.y)
+        if (dt <= 0) return EngineGeoPoint(modelStationary.x, modelStationary.y, ts = timestamp)
         
         if (dt > IMM_STALL_RECOVERY_DT_SEC) {
             initModels(lat, lng, timestamp)
-            return EngineGeoPoint(lat, lng)
+            return EngineGeoPoint(lat, lng, ts = timestamp)
         }
 
         // Apply Q-scaling (for suspicious state)
@@ -76,10 +78,10 @@ class ImmFilter {
 
         if (!mixedLat.isFinite() || !mixedLng.isFinite()) {
             initModels(lat, lng, timestamp)
-            return EngineGeoPoint(lat, lng)
+            return EngineGeoPoint(lat, lng, ts = timestamp)
         }
 
-        return EngineGeoPoint(mixedLat, mixedLng)
+        return EngineGeoPoint(mixedLat, mixedLng, ts = timestamp)
     }
 
     fun getEstimatedSpeedKph(): Double {

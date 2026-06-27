@@ -18,6 +18,8 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * v8.9.38:
+ * - Issue #245: Mapping locationPendingReason for HistoryEntity parity.
  * v8.9.19:
  * - Issue #222: Added isHindsightCorrected propagation to trail flows and save logic.
  * v8.9.10:
@@ -306,7 +308,8 @@ class MainRepository @Inject constructor(
                 sitBaro = entity.sitBaro,
                 sitTilt = entity.sitTilt,
                 sitShock = entity.sitShock,
-                currentMa = entity.currentMa
+                currentMa = entity.currentMa,
+                locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
             ) 
         }
     }
@@ -344,7 +347,8 @@ class MainRepository @Inject constructor(
                 sitBaro = point.sitBaro,
                 sitTilt = point.sitTilt,
                 sitShock = point.sitShock,
-                currentMa = point.currentMa
+                currentMa = point.currentMa,
+                locationPendingReason = point.locationPendingReason.name
             ))
         }
 

@@ -9,6 +9,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v8.9.38:
+ * - Issue #245: Added locationPendingReason to ConnectionPoint for forensic parity.
  * v8.9.37:
  * - Issue #325: Unified accuracy fallback logic. Added maxAccuracy to ConnectionPoint 
  *   to support forensic ribbon uncertainty visualization. (Formerly #214)
@@ -87,7 +89,8 @@ data class ConnectionPoint(
     val sitBaro: Float = 0f,
     val sitTilt: Float = 0f,
     val sitShock: Float = 0f,
-    val currentMa: Int = 0
+    val currentMa: Int = 0,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
 )
 
 data class ViolationPoint(

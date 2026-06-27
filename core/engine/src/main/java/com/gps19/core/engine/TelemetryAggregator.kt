@@ -4,6 +4,9 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * v8.9.38:
+ * - Issue #245: Added locationPendingReason to mergeWorstCase and gap-filling logic for 
+ *   forensic uncertainty parity.
  * v8.9.37:
  * - Issue #214: Added accuracy and maxAccuracy to mergeWorstCase and gap-filling logic 
  *   to support authoritative uncertainty ribbons.
@@ -50,7 +53,8 @@ class TelemetryAggregator {
             bearing = if (cur.hasGps) cur.bearing else acc.bearing,
             isSitDetected = acc.isSitDetected || cur.isSitDetected,
             isSitActive = acc.isSitActive || cur.isSitActive,
-            currentMa = min(acc.currentMa, cur.currentMa)
+            currentMa = min(acc.currentMa, cur.currentMa),
+            locationPendingReason = if (cur.locationPendingReason != LocationPendingReason.NONE) cur.locationPendingReason else acc.locationPendingReason
         )
     }
 
@@ -124,7 +128,8 @@ class TelemetryAggregator {
                 tiltIdx = resolvedTilt,
                 baroIdx = resolvedBaro,
                 isSitDetected = resolvedSit,
-                currentMa = baseTemplate.currentMa
+                currentMa = baseTemplate.currentMa,
+                locationPendingReason = baseTemplate.locationPendingReason
             )
 
             results.addAll(processPoint(fillPoint))
@@ -200,7 +205,8 @@ class TelemetryAggregator {
                 baroIdx = resolvedBaro,
                 isSitDetected = resolvedSit,
                 isSitActive = false,
-                currentMa = 0
+                currentMa = 0,
+                locationPendingReason = LocationPendingReason.NONE
             ))
             currentTs += intervalMs
         }
