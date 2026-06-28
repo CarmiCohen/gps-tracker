@@ -49,14 +49,11 @@ import com.gps19.core.engine.*
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
  * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added support for 
+ *   historical violation uncertainty circles using stored accuracy/maxAccuracy.
  * - Issue #328: Velocity-Aware Bayesian Uncertainty Expansion. Growth rate scales 
  *   with last known speed. (Formerly #221)
- * - Issue #325: Authoritative Spatial Anchoring. Prioritized engine-calculated 
- *   maxAccuracy for uncertainty circle rendering. (Formerly #214)
- * - Issue #326: Intelligent Uncertainty UX Mapping. Rendering locationPendingReason 
- *   on Map. (Formerly #226)
- * v8.9.40:
- * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
+ * - Issue #326: Intelligent Uncertainty UX Mapping. Rendering locationPendingReason on Map. (Formerly #226)
  */
 
 @Composable
@@ -95,12 +92,12 @@ fun AppMapContainer(
     val viewerLng = if (isTrackerMode) uiState.trackerLocation.lng else uiState.localLocation.lng
     val viewerBearing = if (isTrackerMode) uiState.trackerLocation.bearing else uiState.localLocation.bearing
     val viewerAccuracy = if (isTrackerMode) uiState.trackerLocation.accuracy else uiState.localLocation.accuracy
-    val viewerMaxAcc = if (isTrackerMode) uiState.trackerLocation.maxAccuracy else uiState.localLocation.maxAccuracy
+    val viewerMaxAcc = if (isTrackerMode) uiState.trackerLocation.maxAccuracy else uiState.trackerLocation.maxAccuracy
     val viewerSpeed = if (isTrackerMode) uiState.trackerLocation.speed else uiState.localLocation.speed
     
     val viewerLastValidFixRealtime = if (isTrackerMode) uiState.trackerLocation.lastValidFixRealtime else uiState.localLocation.lastValidFixRealtime
     val viewerLocationPending = if (isTrackerMode) uiState.trackerLocation.isLocationPending else uiState.localLocation.isLocationPending
-    val viewerLocationPendingReason = if (isTrackerMode) uiState.trackerLocation.locationPendingReason else uiState.localLocation.locationPendingReason
+    val viewerLocationPendingReason = if (isTrackerMode) uiState.trackerLocation.locationPendingReason else uiState.trackerLocation.locationPendingReason
     
     val trackerGpsAge = if (isTrackerMode) (if (uiState.localLocation.timestamp > 0) now - uiState.localLocation.timestamp else Long.MAX_VALUE)
                  else (if (uiState.trackerLocation.timestamp > 0) now - uiState.trackerLocation.timestamp else Long.MAX_VALUE)
@@ -325,8 +322,10 @@ fun OsmMap(
     val homeMarkersFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
     val accuracyCirclesFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
     val violationMarkersFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
+    val violationAccuracyFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
 
     val violationMarkerPool = remember { mutableStateListOf<Marker>() }
+    val violationCirclePool = remember { mutableStateListOf<Polygon>() }
     val homeMarkerPool = remember { mutableStateListOf<Marker>() }
     val trackerPolylinePool = remember { mutableStateListOf<Polyline>() }
     val viewerPolylinePool = remember { mutableStateListOf<Polyline>() }
@@ -405,9 +404,11 @@ fun OsmMap(
             accuracyCirclesFolderRef.value = FolderOverlay()
             homeMarkersFolderRef.value = FolderOverlay()
             violationMarkersFolderRef.value = FolderOverlay()
+            violationAccuracyFolderRef.value = FolderOverlay()
             
             overlays.add(trailFolderRef.value)
             overlays.add(viewerTrailFolderRef.value)
+            overlays.add(violationAccuracyFolderRef.value)
             overlays.add(violationMarkersFolderRef.value)
             overlays.add(accuracyCirclesFolderRef.value)
             overlays.add(fenceFolderRef.value)
@@ -515,8 +516,10 @@ fun OsmMap(
 
         val visibilityPair = Pair(isViolationsVisible, isGeofenceViolationsVisible)
         if (lastViolationsRendered.value != violations || lastViolationVisibility.value != visibilityPair) {
-            val folder = violationMarkersFolderRef.value!!
-            folder.items.clear()
+            val markerFolder = violationMarkersFolderRef.value!!
+            val accuracyFolder = violationAccuracyFolderRef.value!!
+            markerFolder.items.clear()
+            accuracyFolder.items.clear()
             
             val filteredViolations = violations.filter { v ->
                 val isJumpViolation = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
@@ -526,9 +529,8 @@ fun OsmMap(
 
             if (violationMarkerPool.size > filteredViolations.size + MARKER_POOL_PRUNE_THRESHOLD) {
                 val keepSize = maxOf(filteredViolations.size + 5, MARKER_POOL_PRUNE_THRESHOLD)
-                while (violationMarkerPool.size > keepSize) {
-                    violationMarkerPool.removeAt(violationMarkerPool.size - 1)
-                }
+                while (violationMarkerPool.size > keepSize) violationMarkerPool.removeAt(violationMarkerPool.size - 1)
+                while (violationCirclePool.size > keepSize) violationCirclePool.removeAt(violationCirclePool.size - 1)
             }
 
             filteredViolations.forEachIndexed { index, v ->
@@ -544,7 +546,23 @@ fun OsmMap(
                 val isJumpViolation = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
                 marker.position = v.point
                 marker.icon = BitmapDrawable(resources, if (isJumpViolation) jumpBitmap else geofenceBitmap)
-                folder.add(marker)
+                markerFolder.add(marker)
+
+                // R325: Render historical uncertainty circle for violations
+                val historicalAcc = if (v.maxAccuracy > 0f) v.maxAccuracy else v.accuracy
+                if (historicalAcc > 0f) {
+                    val circle = if (index < violationCirclePool.size) {
+                        violationCirclePool[index]
+                    } else {
+                        val p = Polygon(view).apply { fillPaint.color = 0; outlinePaint.strokeWidth = 2f; setInfoWindow(null) }
+                        violationCirclePool.add(p)
+                        p
+                    }
+                    val circlePoints = Polygon.pointsAsCircle(v.point, historicalAcc.toDouble())
+                    circle.points = circlePoints.map { GeoPoint(it.latitude, it.longitude) }
+                    circle.outlinePaint.color = (if (isJumpViolation) 0x60FF00FF else 0x60FF0000).toInt()
+                    accuracyFolder.add(circle)
+                }
             }
             
             lastViolationsRendered.value = violations.toList()

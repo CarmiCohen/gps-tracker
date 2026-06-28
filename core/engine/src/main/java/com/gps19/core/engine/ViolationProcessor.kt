@@ -1,7 +1,12 @@
 package com.gps19.core.engine
 
+import kotlin.math.max
+
 /**
  * ViolationProcessor: Pure logic for evaluating and deduplicating violations.
+ * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring. Refactored shouldRecordViolation 
+ *   to utilize authoritative maxAccuracy for spatial deduplication.
  * v8.8.21: Extracted from MainRepository to decouple logic from persistence.
  */
 class ViolationProcessor(private val timeProvider: TimeProvider) {
@@ -13,19 +18,23 @@ class ViolationProcessor(private val timeProvider: TimeProvider) {
 
     /**
      * Checks if a new violation should be recorded based on proximity and time thresholds.
+     * R325: Using maxAccuracy (uncertainty) as the spatial gate for deduplication.
      */
     fun shouldRecordViolation(
         lat: Double,
         lng: Double,
         type: String,
-        adaptiveRadius: Double
+        accuracy: Float,
+        maxAccuracy: Float
     ): Boolean {
         val nowRt = timeProvider.elapsedRealtime()
-        val fuzzyThreshold = maxOf(10.0, adaptiveRadius)
+        
+        // Logical anchor: Deduplication threshold is the greater of 10m or the authoritative uncertainty.
+        val gate = max(10.0, maxAccuracy.toDouble())
 
         if (type == lastViolationType && (nowRt - lastViolationRealtime < 5000L)) {
             val dist = PhysicsUtils.calculateDistance(lat, lng, lastViolationLat, lastViolationLng)
-            if (dist < fuzzyThreshold) return false
+            if (dist < gate) return false
         }
 
         // Update local state if it's a new unique violation

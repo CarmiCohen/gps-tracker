@@ -1,4 +1,4 @@
-# Events & Logging Mechanism (v8.9.37)
+# Events & Logging Mechanism (v8.9.42)
 
 This document describes the event tracking, persistence, and synchronized logging architecture of the GPS Tracker.
 
@@ -25,21 +25,21 @@ The log overlay uses a keyword-based priority system for visual identification:
 3.  **Success/Restored (Green / Emerald500)**: Triggered by `CONNECTED`, `RESTORED`, or the `isImportant` flag.
 4.  **User Actions (Orange / ViewerOrange)**: Triggered by the `USER ACTION` prefix.
 5.  **Forensic Details (Cyan / Teal500)**: Default color for detail logs.
-6.  **Ghost Mode UX (Issue #193)**: Visual staleness indicators are applied to log entries when telemetry is older than `TELEMETRY_UI_STALE_THRESHOLD_MS` (10s).
+6.  **Ghost Mode UX (Issue #338)**: Visual staleness indicators are applied to log entries when telemetry is older than `TELEMETRY_UI_STALE_THRESHOLD_MS` (10s).
 
 ## 3. Storage Integrity Watchdog
 To prevent database corruption, the `IntegrityMonitor` enforces strict suppression based on available internal storage:
-- **Tier 1: Critical (< 10MB `SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB`)**: Absolute muzzle. ALL non-essential logging is halted.
-- **Tier 2: Low (< 50MB `SYSTEM_STORAGE_LOW_THRESHOLD_MB`)**: Throttled logging. Only "Important" or "Special" logs pass (Issue #71).
+- **Tier 1: Critical (< 10MB `SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB`)**: Absolute muzzle. ALL non-essential logging is halted (Issue #316).
+- **Tier 2: Low (< 50MB `SYSTEM_STORAGE_LOW_THRESHOLD_MB`)**: Throttled logging. Only "Important" or "Special" logs pass.
 
 ## 4. Navigation & Context
 - **Intelligent Return**: Closing the log overlay returns the user to the previous primary screen (Map or Dashboard).
 - **Header Integration**: The Log button in the `HeaderBar` reflects the current view state.
 
 ## 5. Forensic Logic & Batching
-- **Fuzzy Matching**: Merges consecutive events with dynamic parts into a single entry using regex-based variable stripping (Issue #294).
+- **Fuzzy Matching**: Merges consecutive events with dynamic parts into a single entry using regex-based variable stripping (Issue #360).
 - **Accumulated Metrics**: Combined entries display occurrence counts `(xN)` and total active duration.
-- **Monotonic Timing (Issue #283)**: Uses `TimeProvider.elapsedRealtime()` for all forensic duration calculations.
+- **Monotonic Timing (Issue #311)**: Uses `TimeProvider.elapsedRealtime()` for all forensic duration calculations.
 
 ## 6. Forensic Unification
-Legacy version tags have been removed from data models. Traceability is maintained by injecting the build version at the emission layer and is enhanced by **acknowledged SIT synchronization** (Issue #194), **Power Forensic Parity** (Issue #192), and **Spatial Anchoring** (Issue #208).
+Legacy version tags have been removed from data models. Traceability is maintained by injecting the build version at the emission layer and is enhanced by **acknowledged SIT synchronization** (Issue #194), **Power Forensic Parity** (Issue #337), and **Spatial Anchoring** (Issue #208).

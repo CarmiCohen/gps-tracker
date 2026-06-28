@@ -1,9 +1,9 @@
-# Sensor Integration & Calibration (v8.9.37)
+# Sensor Integration & Calibration (v8.9.42)
 
-The system leverages a multi-sensor array to provide high-fidelity physical security and trajectory validation. In v8.9.37, all sensor processing is hardened with monotonic timing and strictly isolated in the `:core:engine` module.
+The system leverages a multi-sensor array to provide high-fidelity physical security and trajectory validation. In v8.9.42, all sensor processing is hardened with monotonic timing and strictly isolated in the `:core:engine` module.
 
 ## 1. Primary Sensors
-*   **GNSS (GPS/GLONASS/GALILEO)**: Primary location source. Monitored for stalls and signal gaps (`GPS_GAP_THRESHOLD_MS` 60s). Features **Escalated GPS Revival** (Issue #124 / #198) with forensic retry logging every 120s.
+*   **GNSS (GPS/GLONASS/GALILEO)**: Primary location source. Monitored for stalls and signal gaps (`GPS_GAP_THRESHOLD_MS` 60s). Features **Escalated GPS Revival** (Issue #341) with forensic retry logging every 120s.
 *   **Accelerometer**: Provides vibration data for `MOVING` vs `PARKING` state transitions. Supports shock violation detection (> 0.8g).
 *   **Barometer**: Tracks vertical displacement for "Lift" alerts and contributes to chair occupancy detection.
 *   **Magnetometer**: Heading and orientation monitoring. Used in `TILT_ALERT`.
@@ -13,11 +13,11 @@ The system leverages a multi-sensor array to provide high-fidelity physical secu
 ## 2. Calibration Mechanisms
 *   **Muzzle Window**: A 2000ms logic gate suppresses sensor triggers during high-I/O sync operations. (Issue #191)
 *   **Passive Zeroing**: Automatically calibrates baselines after 300s of stationary state.
-*   **Chair Occupancy**: Uses multi-factor fusion (Tilt 7°, Vibration 0.35g, Baro 0.08m) to detect sitting events. (Issue #282)
-*   **Monotonic Integrity**: All sensor-based lockout and suspicion timers use `TimeProvider.elapsedRealtime()`.
+*   **Chair Occupied**: Uses multi-factor fusion (Tilt 7°, Vibration 0.35g, Baro 0.08m) to detect sitting events. (Issue #336)
+*   **Monotonic Integrity**: All sensor-based lockout and suspicion timers use `TimeProvider.elapsedRealtime()` (Issue #311).
 
 ## 3. Forensic Alignment & Storage
 All sensor events are timestamped and synchronized with the analytical ribbons.
-- **Log Spatial Anchor**: Every sensor violation or detection event is now automatically anchored with `lat`/`lng` coordinates.
-- **Ghost Mode UX**: Dashboard fields enter a dimmed "Ghost" state if telemetry is older than 10s (`TELEMETRY_UI_STALE_THRESHOLD_MS`).
+- **Log Spatial Anchor**: Every sensor violation or detection event is now automatically anchored with `lat`/`lng` coordinates (Issue #208).
+- **Ghost Mode UX**: Dashboard fields enter a dimmed "Ghost" state if telemetry is older than 10s (`TELEMETRY_UI_STALE_THRESHOLD_MS`) (Issue #338).
 - **Persistence**: Sensor-derived indices are buffered and flushed to SQLite in batches.

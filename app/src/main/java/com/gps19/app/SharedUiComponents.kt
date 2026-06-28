@@ -51,6 +51,10 @@ import com.gps19.core.engine.*
 /**
  * Shared UI Components for GPS Tracker.
  * v8.9.42:
+ * - Issue #365: Enabled Local Ghost Mode in StatusBar. Removed suppression logic 
+ *   that forced isTelemetryFresh to true in tracker mode.
+ * - Issue #364: Decoupled GPS Freshness from Telemetry Pulse in GlobalStatusBar. 
+ *   GPS status now utilizes loc.timestamp exclusively.
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refactored accuracy 
  *   display to show both raw and authoritative accuracy side-by-side in StatusBar.
  * v8.9.40:
@@ -327,7 +331,8 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, title: String) {
                         
                         if (p.hasGps && p.gpsIndex > 0f) {
                             val dotRadius = (if (isLandscape) 1.dp.toPx() else 0.5.dp.toPx())
-                            val normalizedHeight = (p.gpsIndex.coerceIn(0f, 1f) * (if (isLandscape) 20.dp.toPx() else 10.dp.toPx()))
+                            val baseHeight = if (isLandscape) 20.dp.toPx() else 10.dp.toPx()
+                            val normalizedHeight = (p.gpsIndex.coerceIn(0f, 1f) * baseHeight)
                             val yPos = baseLineY - ribbonMaxHeight - (if (isLandscape) { 3.dp.toPx() } else { 1.5.dp.toPx() }) - normalizedHeight
                             val currentPos = Offset(xPos + (maxOf(1f, pointWidth) / 2f), yPos)
                             lastGpsPos?.let { lastPos ->
@@ -400,12 +405,13 @@ fun GlobalStatusBar(
     
     // R922: Role-aware health logic.
     // Tracker shows local hardware status. Viewer gates remote status by peer pulse.
+    // Issue #364: GPS status now utilizes the gpsTs exclusively.
     val isGpsActive = if (isTracker) {
         val gpsAge = if (lastGpsTs > 0) now - lastGpsTs else Long.MAX_VALUE
         gpsAge < GPS_UI_FAIL_THRESHOLD_MS
     } else {
-        val effectiveAge = if (maxOf(lastGpsTs, loc.telemetryTs) > 0) now - maxOf(lastGpsTs, loc.telemetryTs) else Long.MAX_VALUE
-        isPeerActive && effectiveAge < GPS_UI_FAIL_THRESHOLD_MS && lastGpsTs > 0
+        val gpsAge = if (lastGpsTs > 0) now - lastGpsTs else Long.MAX_VALUE
+        isPeerActive && gpsAge < GPS_UI_FAIL_THRESHOLD_MS
     }
 
     val isDataHealthy = if (isTracker) {
@@ -553,7 +559,8 @@ fun StatusBar(
                 }
                 val trkColor = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd
                 val tAge = now - maxOf(lastGpsTs, trackerTelemetryTs)
-                StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = trkColor, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, now = now, trackerState = trackerState, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isRelayConnected = isRelay, isTelemetryFresh = if(mode == "viewer") isTelemetryFresh else true)
+                // Issue #365: Enabled Local Ghost Mode in StatusBar. Removed conditional suppression.
+                StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = trkColor, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, now = now, trackerState = trackerState, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isRelayConnected = isRelay, isTelemetryFresh = isTelemetryFresh)
             }
         }
     }
@@ -626,7 +633,7 @@ fun StatusRowData(
                 }
                 Box(modifier = Modifier.width(20.dp), contentAlignment = Alignment.Center) { CommBar(commIndex, if (isTelemetryFresh) contentColor else Slate500) }
                 Spacer(Modifier.width(4.dp))
-                Box(modifier = Modifier.width(34.dp)) { if (satsView > 0) Text(text = "$satsUsed/$satsView", color = if(isGpsStale || !isTelemetryFresh) Slate500 else gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) }
+                Box(modifier = Modifier.width(34.dp)) { if (satsUsed > 0) Text(text = "$satsUsed/$satsView", color = if(isGpsStale || !isTelemetryFresh) Slate500 else gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) }
                 Box(modifier = Modifier.width(26.dp)) {
                     if (gpsAgeMs != -1L) {
                         val ageSec = (maxOf(0L, gpsAgeMs) / 1000).toInt()

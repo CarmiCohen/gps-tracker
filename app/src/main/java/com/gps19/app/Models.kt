@@ -10,6 +10,10 @@ import java.util.*
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
  * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added accuracy and 
+ *   maxAccuracy to TrailPoint for forensic path reconstruction.
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refactored ViolationPoint 
+ *   to include accuracy and maxAccuracy for map reconstruction parity.
  * - Issue #326: Intelligent Uncertainty UX Mapping. Added locationPendingReason to 
  *   ConnectionPoint, TrackerStatus, LocationState, DashboardState, and IntegrityState. (Formerly #245 / #226)
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refactored LogEntry and 
@@ -33,7 +37,9 @@ data class TrailPoint(
     val lng: Double,
     val timestamp: Long = 0L,
     val isJump: Boolean = false,
-    val isHindsightCorrected: Boolean = false
+    val isHindsightCorrected: Boolean = false,
+    val accuracy: Float = 0f,
+    val maxAccuracy: Float = 0f
 ) {
     fun toGeoPoint() = GeoPoint(lat, lng)
 }
@@ -92,7 +98,11 @@ data class ConnectionPoint(
 
 data class ViolationPoint(
     val localId: String = UUID.randomUUID().toString(),
-    val point: GeoPoint, val type: String, val ts: Long
+    val point: GeoPoint, 
+    val type: String, 
+    val ts: Long,
+    val accuracy: Float = 0f,
+    val maxAccuracy: Float = 0f
 )
 
 @Serializable
@@ -125,8 +135,8 @@ data class LogEntry(
             put("role", role)
             if (lat != 0.0) put("lat", lat)
             if (lng != 0.0) put("lng", lng)
-            if (accuracy != 0f) put("accuracy", accuracy)
-            if (maxAccuracy != 0f) put("max_accuracy", maxAccuracy)
+            if (accuracy != 0f) put("accuracy", accuracy.toDouble())
+            if (maxAccuracy != 0f) put("max_accuracy", maxAccuracy.toDouble())
             specialColor?.let { put("special_color", it) }
             extremeValue?.let { if (!it.isNaN() && !it.isInfinite()) put("extreme_value", it) }
             snrSnapshot?.let { put("snr_snapshot", it.toDouble()) }

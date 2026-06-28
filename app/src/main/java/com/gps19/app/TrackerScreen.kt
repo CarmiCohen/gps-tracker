@@ -31,14 +31,12 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * v8.9.42:
+ * - Issue #338: Ghost Mode UX. Propagated isTelemetryFresh to LogOverlay for unified staleness.
  * v8.9.18:
  * - Issue #221: Propagating systemPulseRealtime for Bayesian uncertainty scaling.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * v8.8.36:
- * - Issue 165: Migrated to PhysicsUtils for location validation.
- * v8.8.21:
- * - Timing Integrity: Passed TimeProvider to AudioSynthesizer for synchronized siren control.
  */
 
 @Composable
@@ -247,7 +245,8 @@ fun TrackerScreen(
                 onSetShowDetails = { viewModel.onEvent(UiEvent.SetLogFilterShowDetails(it)) }, 
                 onSetShowRecovered = { viewModel.onEvent(UiEvent.SetLogFilterShowRecovered(it)) },
                 appStartTime = uiState.appStartTime,
-                systemPulse = systemPulse
+                systemPulse = systemPulse,
+                isTelemetryFresh = dashboardState.isTelemetryFresh
             )
         } else if (isRibbonsVisible) {
             RibbonsOverlay(viewModel = viewModel, onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) })

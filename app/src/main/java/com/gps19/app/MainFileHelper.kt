@@ -20,13 +20,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
+ * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added accuracy and 
+ *   maxAccuracy to trail and log exports for forensic parity. Updated import logic 
+ *   to preserve forensic metrics during trail restoration.
  * v8.9.3:
  * - Issue 188: Preserved historical GPS timestamps in trail points during import/export.
- * v8.8.21: Migrated to TimeProvider for all timing logic.
- * v8.8.22:
- * - Forensic Audit: Standardized unified exports to include mandatory 'role' field 
- *   in all trail and log JSON outputs for multi-role trace stability.
- * v8.8.23: Standardized all thresholds with Requirements SoT.
  */
 object MainFileHelper {
 
@@ -147,7 +146,9 @@ object MainFileHelper {
                                 for (i in 0 until arr.length()) {
                                     val obj = arr.getJSONObject(i)
                                     val ts = obj.optLong("timestamp", 0L)
-                                    repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = false, timestamp = if (ts > 0) ts else null, force = true)
+                                    val acc = obj.optDouble("accuracy", 0.0).toFloat()
+                                    val maxAcc = obj.optDouble("max_accuracy", 0.0).toFloat()
+                                    repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = false, timestamp = if (ts > 0) ts else null, force = true, accuracy = acc, maxAccuracy = maxAcc)
                                 }
                                 filePoints += arr.length()
                             }
@@ -156,7 +157,9 @@ object MainFileHelper {
                                 for (i in 0 until arr.length()) {
                                     val obj = arr.getJSONObject(i)
                                     val ts = obj.optLong("timestamp", 0L)
-                                    repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = true, timestamp = if (ts > 0) ts else null, force = true)
+                                    val acc = obj.optDouble("accuracy", 0.0).toFloat()
+                                    val maxAcc = obj.optDouble("max_accuracy", 0.0).toFloat()
+                                    repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = true, timestamp = if (ts > 0) ts else null, force = true, accuracy = acc, maxAccuracy = maxAcc)
                                 }
                                 filePoints += arr.length()
                             }
@@ -167,7 +170,9 @@ object MainFileHelper {
                             for (i in 0 until arr.length()) {
                                 val obj = arr.getJSONObject(i)
                                 val ts = obj.optLong("timestamp", 0L)
-                                repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = isViewer, timestamp = if (ts > 0) ts else null, force = true)
+                                val acc = obj.optDouble("accuracy", 0.0).toFloat()
+                                val maxAcc = obj.optDouble("max_accuracy", 0.0).toFloat()
+                                repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = isViewer, timestamp = if (ts > 0) ts else null, force = true, accuracy = acc, maxAccuracy = maxAcc)
                             }
                             filePoints += arr.length()
                         }
@@ -326,7 +331,9 @@ object MainFileHelper {
                                 put("lat", pt.lat)
                                 put("lng", pt.lng)
                                 put("timestamp", pt.timestamp)
-                                put("role", "tracker") 
+                                put("role", "tracker")
+                                if (pt.accuracy > 0) put("accuracy", pt.accuracy.toDouble())
+                                if (pt.maxAccuracy > 0) put("max_accuracy", pt.maxAccuracy.toDouble())
                             })
                         }
                     })
@@ -336,7 +343,9 @@ object MainFileHelper {
                                 put("lat", pt.lat)
                                 put("lng", pt.lng)
                                 put("timestamp", pt.timestamp)
-                                put("role", "viewer") 
+                                put("role", "viewer")
+                                if (pt.accuracy > 0) put("accuracy", pt.accuracy.toDouble())
+                                if (pt.maxAccuracy > 0) put("max_accuracy", pt.maxAccuracy.toDouble())
                             })
                         }
                     })
@@ -399,13 +408,15 @@ object MainFileHelper {
                         put("lat", it.lat)
                         put("lng", it.lng)
                         put("timestamp", it.timestamp)
-                        put("role", source) // Standardized to include role in every entry
+                        put("role", source)
+                        if (it.accuracy > 0) put("accuracy", it.accuracy.toDouble())
+                        if (it.maxAccuracy > 0) put("max_accuracy", it.maxAccuracy.toDouble())
                     })
                 }
                 put("points", arr)
                 put("timestamp", timeProvider.currentTimeMillis())
-                put("role", source) // Mandatory role field
-                put("source", source) // Legacy source field
+                put("role", source) 
+                put("source", source)
                 put("device_id", deviceId)
             }
             val fileName = getUnifiedFileName(category, source, deviceId, isAuto, timeProvider)

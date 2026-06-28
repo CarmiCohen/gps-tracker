@@ -15,10 +15,10 @@ The system continuously evaluates tracking data against a set of security rules.
     - **Acoustic**: > 40dB jump with a 50dB absolute floor (`ACOUSTIC_MIN_THRESHOLD_DB`).
     - **Lift**: > 0.8m altitude change (`BARO_LIFT_THRESHOLD_METERS`).
 - **System Integrity**:
-    - **Storage Watchdog**: Dual-tier alerts (< 50MB Low, < 10MB Critical). (Issue #71)
-    - **Jammer Alert**: Sustained signal instability for > 180s (`JAMMER_DETECTION_THRESHOLD_MS`).
-    - **GPS Stalled**: Hardware chip freeze detected after 60s (`GPS_STALL_THRESHOLD_MS`). (Issue #198)
-        - **Escalated Revival**: System retries hardware refresh every 120s and escalates to CRITICAL after 3 failures. (Issue #124)
+    - **Storage Watchdog**: Dual-tier alerts (< 50MB Low, < 10MB Critical). (Issue #316)
+    - **Signal Loss (Jammer)**: Sustained signal instability for > 180s (`JAMMER_DETECTION_THRESHOLD_MS`). (Issue #315)
+    - **GPS Stalled**: Hardware chip freeze detected after 60s (`GPS_STALL_THRESHOLD_MS`).
+        - **Escalated Revival**: System retries hardware refresh every 120s and escalates to CRITICAL after 3 failures (Issue #341).
     - **Xiaomi Ready**: Autostart and background restriction monitoring. Includes `XIAOMI_BOOT_GRACE_MS` (30s). (Issue #190)
 - **Low Battery**: Level < 20% or steep discharge (5% in 10m). (Issue #353)
 
@@ -30,15 +30,15 @@ Real-time PCM generation for high-stress alerts:
 
 ## 3. Full-Screen Alert & UI Hardening
 When a violation is detected in Viewer mode, the system launches a high-priority Red Alert overlay:
-- **Unified Titles**: Remote alerts use "Tracker:", local alerts use "This device:". (Issue #230)
-- **Monotonic Timing**: A 30-second lockout (`ALARM_OVERLAY_THROTTLE_MS`) applies after dismissal. This timer uses `TimeProvider.elapsedRealtime()`. (Issue #125)
+- **Unified Titles**: Remote alerts use "Tracker:", local alerts use "This device:". (Issue #331)
+- **Monotonic Timing**: A 30-second lockout (`ALARM_OVERLAY_THROTTLE_MS`) applies after dismissal. This timer uses `TimeProvider.elapsedRealtime()`. (Issue #311)
 - **Violation Bypass**: The lockout prevents redundant activity launches but does *not* suppress data propagation.
 
 ## 4. Forensic Continuity
 - **Log Spatial Anchor**: Every alarm trigger and resolution is geographically anchored. The event log includes the exact location where the siren was engaged.
 - **Acoustic Lockout**: A 1-second silence window (`ACOUSTIC_LOCKOUT_MS`) prevents redundant slow-path triggers following a fast-path event.
 - **Identity Integrity**: Every alert and resolution carries the mandatory `role` field. (Issue #182)
-- **Ghost Mode UX**: When telemetry is stale (>10s), the dashboard and markers enter a dimmed state. (Issue #193)
+- **Ghost Mode UX**: When telemetry is stale (>10s), the dashboard and markers enter a dimmed state (Issue #338).
 
 ## 5. Silencing & Acknowledgment
 - **Auto-Stop**: Siren stops after 45s (`SIREN_AUTO_STOP_MS`) to protect hardware.

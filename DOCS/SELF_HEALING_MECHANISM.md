@@ -18,13 +18,13 @@ Navigation never terminates the service. Even when "Back" is pressed at the root
 
 ### D. Foreground Service & WakeLocks
 - **Compliance**: Correctly passes `FOREGROUND_SERVICE_TYPE_LOCATION` (and `MICROPHONE` when active) for Android 10+ compatibility (Issue #247).
-- **WakeLock Hardening**: Utilizes a non-reference-counted `PARTIAL_WAKE_LOCK` with active renewal on every service tick (Issue #148).
-- **Monotonic Integrity**: Watchdog and timeout evaluations use `TimeProvider.elapsedRealtime()` (Issue #283).
+- **WakeLock Hardening**: Utilizes a non-reference-counted `PARTIAL_WAKE_LOCK` with active renewal on every service tick (Issue #363).
+- **Monotonic Integrity**: Watchdog and timeout evaluations use `TimeProvider.elapsedRealtime()` (Issue #311).
 
 ### E. Advanced Hardware Self-Healing
 - **Stall Detection**: Monitors if coordinates are frozen. Hardened to **60s** (`GPS_STALL_THRESHOLD_MS`).
 - **Retry Loop**: Attempts a hardware-level refresh every **120 seconds** (`GPS_REVIVAL_RETRY_INTERVAL_MS`).
-- **Critical Escalation**: After 3 failed attempts, a `CRITICAL: GPS_HARDWARE_LOCK` log is emitted (Issue #124).
+- **Critical Escalation**: After 3 failed attempts, a `CRITICAL: GPS_HARDWARE_LOCK` log is emitted (Issue #341).
 - **Log Spatial Anchor**: These critical revival and lock events are automatically anchored with `lat`/`lng` coordinates to help forensic reconstruction (Issue #208).
 
 ### F. Xiaomi Boot Resilience

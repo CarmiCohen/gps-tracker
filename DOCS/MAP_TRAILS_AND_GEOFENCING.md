@@ -12,7 +12,7 @@ Historical movement is visualized as a "Blue Trail."
 - **Data Source**: `TrailEntity` in SQLite.
 - **Fidelity**: Supports both real-time and recovered points from offline backfill.
 - **Jump Visualization**: Rejected points are shown as **Magenta Squares** (Jumps) or **Red Circles** (Out-of-Range).
-- **Hindsight Correction**: Points promoted via the GtoEngine (Issue #285) are retroactively added to the trail to prevent "teleporting" visual artifacts.
+- **Hindsight Correction**: Points promoted via the GtoEngine (Issue #367) are retroactively added to the trail to prevent "teleporting" visual artifacts.
 
 ## 3. Geofencing (GtoEngine)
 The system enforces a safety radius around user-defined "Home Points."
@@ -21,7 +21,7 @@ The system enforces a safety radius around user-defined "Home Points."
 - **Log Spatial Anchor**: Geofence violations are geographically anchored. The red marker on the map reflects where the violation was calculated (Issue #208).
 
 ## 4. Forensic Integration
-- **SIT Markers**: Mechanical sitting events (SIT) are reconstructed on the map from synchronized forensic logs (Issue #336 / Formerly #282).
-- **Ghost Mode**: Markers and trails dim (Slate500) if the telemetry is older than 10s (`TELEMETRY_UI_STALE_THRESHOLD_MS`) (Issue #193).
-- **Uncertainty Context**: The UI displays a Bayesian uncertainty radius when the location is pending (e.g., during a `GPS_STALL` or `ACOUSTIC_VIOLATION`), with the radius expanding at a conservative rate (`PENDING_UNCERTAINTY_GROWTH_RATE_MPS`) (Issue #221).
+- **SIT Markers**: Mechanical sitting events (SIT) are reconstructed on the map from synchronized forensic logs (Issue #336).
+- **Ghost Mode**: Markers and trails dim (Slate500) if the telemetry is older than 10s (`TELEMETRY_UI_STALE_THRESHOLD_MS`) (Issue #338).
+- **Uncertainty Context**: The UI displays a Bayesian uncertainty radius when the location is pending (e.g., during a `GPS_STALL` or `ACOUSTIC_VIOLATION`), with the radius expanding at a conservative rate (`PENDING_UNCERTAINTY_GROWTH_RATE_MPS`) (Issue #328).
 - **Role Identity**: Every trail point and violation is tagged with the source role (Ttk/Cohen).

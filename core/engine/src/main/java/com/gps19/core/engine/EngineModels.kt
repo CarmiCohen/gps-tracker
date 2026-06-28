@@ -5,20 +5,27 @@ import kotlinx.serialization.Serializable
 /**
  * EngineModels: Data structures for the core tracking engine.
  * v8.9.42:
- * - Issue #334: Added ts to EngineGeoPoint for hindsight rubber-banding. (Formerly #220)
+ * - Issue #334: Added ts to EngineGeoPoint for hindsight rubber-banding.
  * - Issue #326: Added LocationPendingReason and locationPendingReason to AlarmEvaluationState 
- *   for forensic parity. (Formerly #245 / #226)
- * - Issue #325: Added maxAccuracy to EngineConnectionPoint for forensic ribbon uncertainty 
- *   tracking. (Formerly #214)
- * - Issue #327: Added promotedPoints to SentinelResult for hindsight transition smoothing. (Formerly #227)
- * - Issue #329: Added tiltIdx and baroIdx for forensic ribbon expansion. (Formerly #224)
- * - Issue #332: Added isAdaptiveJump to JumpConfidence. (Formerly #219)
+ *   for forensic parity.
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added accuracy and 
+ *   maxAccuracy to EngineGeoPoint for forensic parity in interpolated segments. 
+ *   Added maxAccuracy to EngineConnectionPoint for forensic ribbon uncertainty tracking.
+ * - Issue #327: Added promotedPoints to SentinelResult for hindsight transition smoothing.
+ * - Issue #329: Added tiltIdx and baroIdx for forensic ribbon expansion.
+ * - Issue #332: Added isAdaptiveJump to JumpConfidence.
  * v8.9.7:
  * - Plunge Matching: Added sitVzTs to EngineConnectionPoint for forensic parity.
  */
 
 @Serializable
-data class EngineGeoPoint(val lat: Double, val lng: Double, val ts: Long = 0L)
+data class EngineGeoPoint(
+    val lat: Double, 
+    val lng: Double, 
+    val ts: Long = 0L,
+    val accuracy: Float = 0f,
+    val maxAccuracy: Float = 0f
+)
 
 enum class DiscoveryPhase {
     BOOTSTRAP, DISCOVERING, MONITORING
@@ -42,7 +49,7 @@ enum class EngineXiaomiStatus {
 
 /**
  * LocationPendingReason: Contextual cause for Bayesian uncertainty expansion.
- * v8.9.22 (Issue #326 - Formerly #226)
+ * v8.9.22 (Issue #326)
  */
 enum class LocationPendingReason {
     NONE,

@@ -30,18 +30,18 @@ We have transitioned to an architecture that treats the core tracking logic as a
 - **Strict Dependencies**: Enforced JVM-only purity for the engine to prevent framework leakage (Issue #100).
 
 ### Phase 4: Forensic & OEM Hardening
-- **Monotonic Unification**: All logic uses monotonic time via `TimeProvider` (Issue #311 - Formerly #283-A).
+- **Monotonic Unification**: All logic uses monotonic time via `TimeProvider` (Issue #311).
 - **Muzzle Window Implementation**: Implemented a 2000ms jitter suppression window (Issue #191).
-- **OEM Fidelity**: Specialized 10Hz polling and escalated revival for Xiaomi and Samsung (Issue #363 - Formerly #148 / Issue #190).
+- **OEM Fidelity**: Specialized 10Hz polling and escalated revival for Xiaomi and Samsung (Issue #363 / Issue #190).
 
 ### Phase 5: Domain Decoupling
-- **UseCase Extraction**: Decoupled `MainViewModel.kt` into feature-specific UseCases (Issue #322 - Formerly #115).
+- **UseCase Extraction**: Decoupled `MainViewModel.kt` into feature-specific UseCases (Issue #322).
 - **State Synchronization**: Unified UI state management through domain layers.
 
 ### Phase 6: Forensic Simplification & UX Hardening (v8.9.37)
 - **Model Purification**: Legacy version tags removed from data models.
-- **Power Forensic Parity**: Achieved end-to-end parity for `currentMa` (Issue #337 - Formerly #192).
-- **Ghost Mode UX**: Visual staleness indicators for stale forensic data > 10s (Issue #338 - Formerly #193).
+- **Power Forensic Parity**: Achieved end-to-end parity for `currentMa` (Issue #337).
+- **Ghost Mode UX**: Visual staleness indicators for stale forensic data > 10s (Issue #338).
 - **SIT Acknowledgment**: Reliable sync for discrete "sitting" events (Issue #194).
 - **Log Spatial Anchor**: Every forensic event and alert is now geographically anchored for map reconstruction (Issue #208).
 

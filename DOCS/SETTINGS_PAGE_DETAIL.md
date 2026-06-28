@@ -18,7 +18,7 @@ These settings define how the device identifies itself and where it sends its da
 - **Communication**: 
     - **Local Internet**: `INTERNET_LOSS_THRESHOLD_MS` (60s).
     - **Relay Offline**: Server unreachable despite active internet.
-    - **Tracker/Viewer Offline**: Signal loss monitoring (Tracker: 180s / Viewer: 30s).
+    - **Tracker/Viewer Offline**: Signal Loss monitoring (Tracker: 180s / Viewer: 30s).
     - **Jammer Detection**: `JAMMER_DETECTION_THRESHOLD_MS` (180s) for sustained GPS instability (Issue #315).
 - **Location**: 
     - **Geofence**: Based on `GEOFENCE_BUFFER_MULT` (6.0) and predictive look-ahead.

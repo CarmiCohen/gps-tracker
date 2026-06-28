@@ -8,10 +8,10 @@ import kotlin.math.*
  * v8.9.42:
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Strictly prioritizing 
  *   maxTrackerAccuracy for all Geofence transitions (Entry and Exit).
- * - Issue #331: Refactored getTrackerTitle to be fully role-aware for forensic parity. (Formerly #287 / #17)
- * - Issue #353: Synchronized version to v8.9.26 baseline. (Formerly #272 / #2)
+ * - Issue #331: Refactored getTrackerTitle to be fully role-aware for forensic parity.
+ * - Issue #353: Synchronized version to v8.9.26 baseline.
  * - Issue #336: Updated ALERT_ID_TRACKER_CHAIR subtitle to "Chair occupancy detected" 
- *   for consistency with "Chair Occupied" forensic status. (Formerly #331 / #230)
+ *   for consistency with "Chair Occupied" forensic status.
  */
 object MainAlarmLogic {
 
@@ -245,7 +245,7 @@ object MainAlarmLogic {
 
                 val timeSinceFirst = now - state.firstViolationTs
                 
-                // Issue #332: Adaptive Jump Confidence - Double hold duration for high-SNR spoofing suspicion (Formerly #219)
+                // Issue #332: Adaptive Jump Confidence - Double hold duration for high-SNR spoofing suspicion
                 val effectiveHoldMs = if (state.isAdaptiveJump) (JUMP_HOLD_DURATION_MS * ADAPTIVE_JUMP_HOLD_MULTIPLIER).toLong() else JUMP_HOLD_DURATION_MS
                 
                 val isSustained = if (state.firstViolationWasJump) {

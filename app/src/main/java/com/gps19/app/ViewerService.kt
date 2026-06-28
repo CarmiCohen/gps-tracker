@@ -19,20 +19,12 @@ import kotlin.math.*
 /**
  * ViewerService: Background monitoring for the Viewer role.
  * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated AppAlarmManager 
- *   lambda to propagate maxAccuracy for forensic parity.
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated onTrailPointSaved 
+ *   to propagate both raw accuracy and maxAccuracy for forensic path parity.
  * - Issue #326: Intelligent Uncertainty UX Mapping. Synchronized locationPendingReason 
- *   propagation and forensic ribbon parity. (Formerly #245)
+ *   propagation and forensic ribbon parity.
  * - Issue #335: serviceStartRealtime Initialization Gap. Explicitly initialized 
- *   serviceStartRealtime in onCreate after engine initialization. (Formerly #296 / #26)
- * v8.9.38:
- * - Issue #333: Forensic Log Enrichment. Ensured SNR and Vibration snapshots are 
- *   propagated through onLogAdded and auto-enriched via LogManager.
- * v8.9.37:
- * - Issue #325: Authoritative Spatial Anchoring. Unified accuracy fallback logic and 
- *   maxAccuracy propagation. (Formerly #214)
- * v8.9.31:
- * - Issue #301: Fixed SyncManager instantiation and pushCurrentStatus parameter mismatch.
+ *   serviceStartRealtime in onCreate after engine initialization.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -62,8 +54,8 @@ class ViewerService : BaseMonitorService() {
     private var latestGnssDetail: GnssDetail? = null
 
     private val localProcessorListener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean) {
-            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp, isHindsightCorrected = isHindsightCorrected)
+        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean, accuracy: Float, maxAccuracy: Float) {
+            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp, isHindsightCorrected = isHindsightCorrected, accuracy = accuracy, maxAccuracy = maxAccuracy)
         }
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Float, snr: Float?, vibe: Float?) {
             val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
@@ -104,7 +96,6 @@ class ViewerService : BaseMonitorService() {
             
             locationProcessor = LocationProcessor(localProcessorListener, timeProvider)
             
-            // Load Engine State
             val savedMaxAcc = repository.getFloat(MainRepository.MAX_ACCURACY_KEY, 0f)
             val savedLastSit = repository.getLong(MainRepository.LAST_SIT_TS_KEY, 0L)
             val savedBaseline = repository.getFloat(MainRepository.CHAIR_BASELINE_TILT_KEY, -1000f)
@@ -181,7 +172,6 @@ class ViewerService : BaseMonitorService() {
             lastServiceTickRealtime = timeProvider.elapsedRealtime()
             locationProcessor.setLastValidFixTs(timeProvider.elapsedRealtime())
             
-            // Issue #335: Ensure bootstrap starts from actual engine online point
             serviceStartRealtime = timeProvider.elapsedRealtime()
 
             startTickLoop()
@@ -316,7 +306,8 @@ class ViewerService : BaseMonitorService() {
                 now = now,
                 lat = remoteHandler.trackerLat,
                 lng = remoteHandler.trackerLng,
-                accuracy = remoteHandler.trackerMaxAccuracy.toDouble(),
+                accuracy = remoteHandler.trackerAccuracy,
+                maxAccuracy = remoteHandler.trackerMaxAccuracy,
                 activeViolations = activeViolations,
                 unresolvedAlarms = unresolvedAlarms
             )

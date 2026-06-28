@@ -11,7 +11,7 @@ class ForensicIdentityTest {
     }
 
     private val listener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean) {}
+        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean, accuracy: Float, maxAccuracy: Float) {}
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Float, snr: Float?, vibe: Float?) {}
         override fun onMaxAccuracyChanged(accuracy: Float) {}
         override fun onChairBaselineChanged(baseline: Float) {}

@@ -11,6 +11,8 @@ import kotlin.math.abs
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
  * v8.9.42:
+ * - Issue #364: Decoupled GPS Freshness from Telemetry Pulse. GPS status now 
+ *   utilizes loc.timestamp exclusively to prevent stale coordinate masking.
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refined accuracy display 
  *   to show both raw accuracy and maxAccuracy (filtered uncertainty) side-by-side.
  * - Issue #338: Unified UI Staleness Threshold. Implemented telemetryFresh calculation 
@@ -63,8 +65,9 @@ class DashboardUseCase @Inject constructor() {
         // Issue #338: Telemetry freshness threshold (10s) (Formerly #193)
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
         
-        val effectiveGpsAge = if (effectiveLastActivityTs > 0) now - effectiveLastActivityTs else Long.MAX_VALUE
-        val isGpsActive = effectiveGpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
+        // Issue #364: GPS status must utilize the gpsTs exclusively.
+        val gpsAge = if (loc.timestamp > 0) now - loc.timestamp else Long.MAX_VALUE
+        val isGpsActive = gpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
 
         val chairTime = if (loc.lastSitTs > 0) {
             synchronized(timeFormatter) { timeFormatter.format(Date(loc.lastSitTs)) }

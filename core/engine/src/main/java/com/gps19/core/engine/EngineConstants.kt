@@ -6,16 +6,17 @@ package com.gps19.core.engine
  * - Issue #356: Aligned UI_PULSE_TIMEOUT_MS (10s) with TELEMETRY_UI_STALE_THRESHOLD_MS to prevent flicker.
  * - Issue #354: Aligned BATTERY_ALARM_THRESHOLD (20) with architectural requirements.
  * - Issue #328: Added PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS and PENDING_UNCERTAINTY_SPEED_CAP_MPS
- *   for velocity-aware Bayesian expansion. (Formerly #221)
+ *   for velocity-aware Bayesian expansion.
  * v8.9.40:
- * - Issue #343: Remapped Signal Loss/Jammer Forensic Latch from #282.
- * - Issue #344: Remapped Stall/Tamper Forensic Latch from #283.
- * - Issue #345: Remapped Geofence Forensic Latch from #284.
- * - Issue #311: Monotonic Timing Integrity (Formerly #283-A).
- * - Issue #315: Network Integrity & Timeout Scaling. (Formerly #273).
+ * - Issue #343: Remapped Signal Loss/Jammer Forensic Latch.
+ * - Issue #344: Remapped Stall/Tamper Forensic Latch.
+ * - Issue #345: Remapped Geofence Forensic Latch.
+ * - Issue #311: Monotonic Timing Integrity.
+ * - Issue #315: Network Signaling Integrity.
+ * - Issue #318: Unified Vibration Thresholds.
  * - Issue #191: Behavioral Debouncing & Muzzle Hardening (R729).
- * - Issue #325: Authoritative Spatial Anchoring (Formerly #214).
- * - Issue #322: Architectural Bloat / Modularization (Formerly #115 / #385).
+ * - Issue #325: Authoritative Spatial Anchoring.
+ * - Issue #322: Architectural Bloat / Modularization.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -57,15 +58,15 @@ const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0f
 const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0f
 const val JUMP_GATE_VISUAL_JITTER_METERS = 10.0
 
-// Adaptive Jump Confidence (v8.9.18 - Issue #332 - Formerly #219)
+// Adaptive Jump Confidence (v8.9.18 - Issue #332)
 const val ADAPTIVE_JUMP_SNR_THRESHOLD = 35.0f
 const val ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0f
 
-// Hindsight Correction (v8.9.18 - Issue #334 - Formerly #220)
+// Hindsight Correction (v8.9.18 - Issue #334)
 const val HINDSIGHT_BUFFER_SIZE = 5
 const val HINDSIGHT_MAX_AGE_MS = 30000L
 
-// Bayesian Uncertainty (Issue #328 - Formerly #221)
+// Bayesian Uncertainty (Issue #328)
 const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0f // 54 km/h conservative drift
 const val PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS = 1.5f // Minimal drift when stationary
 const val PENDING_UNCERTAINTY_SPEED_CAP_MPS = 33.3f // 120 km/h cap
@@ -118,7 +119,7 @@ const val ROTATION_INIT_STATIONARY_MS = 3000L
 const val BARO_ZEROING_INTERVAL_MS = 600000L
 const val SPIKE_DEBOUNCE_MS = 5000L
 
-// Chair Sit Detection (R832 - Issue #336 - Formerly #331)
+// Chair Sit Detection (R832 - Issue #336)
 const val CHAIR_SIT_TILT_THRESHOLD = 7.0f 
 const val CHAIR_SIT_VIBRATION_THRESHOLD = 0.35f 
 const val CHAIR_SIT_BARO_THRESHOLD = 0.08f 
@@ -151,7 +152,7 @@ const val GEOFENCE_HYSTERESIS_METERS = 5.0
 const val GEOFENCE_PREDICTIVE_LOOKAHEAD_S = 2.0
 const val GEOFENCE_PREDICTIVE_MIN_SPEED_MPS = 1.0
 
-// EMA Factors (Issue #263: Corrected Inversion - Legacy-#363)
+// EMA Factors (Issue #263: Corrected Inversion)
 const val LUX_EMA_SLOW = 0.01f
 const val LUX_EMA_FAST = 0.1f
 const val LUX_EMA_UP_SLOW = 0.001f
@@ -169,7 +170,7 @@ const val VIBRATION_EMA_UP_SLOW = 0.001f
 const val VIBRATION_EMA_UP_FAST = 0.01f
 const val BARO_EMA_SLOW = 0.001f 
 
-// GtoEngine Optimization Constants (Issue #264 - Legacy-#364)
+// GtoEngine Optimization Constants (Issue #264)
 const val GTO_TOW_SPEED_THRESHOLD = 10.0
 const val GTO_KINEMATIC_SPEED_DELTA = 10.0
 const val GTO_WORK_SPEED_THRESHOLD = 5.0
@@ -205,7 +206,7 @@ const val MAX_REVIVAL_ATTEMPTS = 3
 const val XIAOMI_BOOT_GRACE_MS = 30000L
 const val LANDING_PAGE_PAUSE_MS = 2000L
 
-// Xiaomi Heuristic Recovery (Issue #190 - Formerly #218)
+// Xiaomi Heuristic Recovery (Issue #190)
 const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 15000L
 const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
 
@@ -271,14 +272,14 @@ const val RIBBON_SIT_BARO_SCALE_METERS = 0.5f
 const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 
 // Network Communication (v8.8.21)
-// Issue #315: Maximum healthy RTT for sync loop scaling. (Formerly #273)
+// Issue #315: Maximum healthy RTT for sync loop scaling.
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0
 const val NETWORK_TIMEOUT_MS = 10000
 const val NET_REJOIN_THRESHOLD_MS = 15000L
 const val NET_HEAL_THRESHOLD_MS = 45000L
-// Issue #315: Baseline sync interval. (Formerly #273)
+// Issue #315: Baseline sync interval.
 const val PING_INTERVAL_MS = 10000L
 const val SOCKET_TIMEOUT_MS = 60000
 const val RTT_WINDOW_SIZE = 5
@@ -294,7 +295,7 @@ const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0f
 
-// Issue #338: Unified UI Staleness Threshold (10s) (Formerly #193)
+// Issue #338: Unified UI Staleness Threshold (10s)
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 10000L
 const val GPS_UI_FAIL_THRESHOLD_MS = 10000L
 

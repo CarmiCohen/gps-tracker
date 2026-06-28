@@ -1,31 +1,26 @@
-# GPS-Tracker (Pure Native APK)
+# GPS Tracker - High-Assurance Forensic Tracking (v8.9.42)
 
-**Version: 8.9.37**
+A modular, high-reliability Android tracking system designed for forensic continuity and behavioral analysis.
 
-This project is a **Pure Native Android Application** built with Kotlin and Jetpack Compose, designed for high-precision background tracking and remote monitoring in demanding environments.
+## 🚀 Core Features
+- **Pure Logic Engine**: Decoupled `:core:engine` module for high-assurance trajectory and violation analysis.
+- **Forensic Unification**: Standardized forensic logging with **Log Spatial Anchors** and **Ghost Mode UX** (Issue #338).
+- **Behavioral Sentinel**: Multi-sensor fusion for tamper detection, lift alerts, and chair-sit detection (Issue #336).
+- **Xiaomi & Samsung Hardening**: Implemented specialized background resilience for MIUI, HyperOS, and Samsung A15/S21 devices (Issue #190 / Issue #363).
+- **Monotonic Timing**: All logic gates and watchdog intervals use monotonic time for temporal integrity (Issue #311).
+- **Authoritative Spatial Anchoring**: Dual-metric uncertainty tracking (Accuracy vs. Max-Accuracy) (Issue #325).
 
-## ⚖️ Project Governance & Documentation Standard
-To maintain **Forensic Integrity**, we follow a strict documentation lifecycle:
-- **Active Tracker**: [STATUS/issues.md](STATUS/issues.md) — Only open issues and pending hardening tasks.
-- **Audit Archive**: [STATUS/compliance.md](STATUS/compliance.md) — Verified resolutions and compliance proof.
-- **Engineering Standard**: [DOCS/CONTRIBUTING.md](DOCS/CONTRIBUTING.md) — Rules for moving tasks between documents.
-- **Source of Truth**: [STATUS/requirements_sot.md](STATUS/requirements_sot.md) — Operational specifications.
-- **Organization**: [DOCS/DOCUMENTATION_ORGANIZATION.md](DOCS/DOCUMENTATION_ORGANIZATION.md) — Detailed hierarchy.
+## 🏗 Architecture
+The project follows a **Vault Architecture**, isolating the tracking math from the Android framework:
+- **`:app`**: Android-specific UI, Persistence, and Service management.
+- **`:core:engine`**: Pure Kotlin/Java tracking and physics logic.
 
-## Recent Changes (v8.9.37)
-- **Documentation Hardening (Issue #312)**: Finalized Source of Truth alignment across all markdown files.
-- **Forensic Unification**: Standardized forensic logging with **Log Spatial Anchors** and **Ghost Mode** staleness indicators (Issue #193).
-- **GtoEngine Implementation**: Integrated sliding-window trajectory optimization for heavy asset tracking (Issue #309).
-- **Xiaomi & Samsung Hardening**: Implemented specialized background resilience for MIUI and Samsung hardware (Issue #148/190).
+## 📌 Branding
+- **Primary Color**: JD Branding Green (**#367C2B**) - Enforced across all layers (R865/R866).
 
-## Project Core Features
-- **Pure Logic Engine (:core:engine)**: Physically isolated tracking math, free from Android framework dependencies.
-- **Zero-Lag Filtering**: Multi-layered sentinel (ImmFilter + Behavioral) for real-time jump rejection.
-- **Physical Tamper Detection**: Acoustic fast-path, light-jump detection, and 3D orientation monitoring.
-- **High-Availability**: Automated GPS revival and specialized background stabilization.
+## 🛠 Hardening Status
+- **Baseline**: v8.9.42
+- **Compliance**: Verified implementation of R568a, R729, R800, R832, R880, R944, R945.
+- **Handover Baseline**: [Handover2.md](STATUS/Handover2.md)
 
-## Technical Specifications
-- **Target SDK**: 35 (Android 15)
-- **Language**: Kotlin 2.0+ / Compose 1.7+
-- **Architecture**: Clean Architecture with Feature-based UseCases
-- **Map Engine**: osmdroid with persistent marker pooling
+For detailed technical specifications, see the [DOCS](DOCS/) directory.

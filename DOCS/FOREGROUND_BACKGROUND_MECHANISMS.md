@@ -7,8 +7,8 @@ The app is designed with a **"Reliability-First"** philosophy. Unlike typical ap
 
 ### Specialized Service Roles
 The service architecture is split into two role-based services, both extending `BaseMonitorService`:
-*   **TrackerService**: Optimized for the "Tracker" role. It focuses on battery efficiency, sensor fidelity, and high-persistence location reporting. Features 10Hz polling (`A15_STABLE_GPS_POLLING_MS` 1000ms for stable sampling) and escalated hardware revival (Issue #124).
-*   **ViewerService**: Optimized for the "Viewer" role. It manages real-time HUD telemetry, analytical ribbons, and remote data synchronization. Includes background location polling (Issue #189) for relative geofencing.
+*   **TrackerService**: Optimized for the "Tracker" role. It focuses on battery efficiency, sensor fidelity, and high-persistence location reporting. Features 10Hz polling (`A15_STABLE_GPS_POLLING_MS` 1000ms for stable sampling) and escalated hardware revival (Issue #341).
+*   **ViewerService**: Optimized for the "Viewer" role. It manages real-time HUD telemetry, analytical ribbons, and remote data synchronization. Includes background location polling for relative geofencing.
 
 ---
 
@@ -23,7 +23,7 @@ Both `TrackerService` and `ViewerService` inherit from `BaseMonitorService`, whi
 *   **START_STICKY**: If killed under extreme pressure, the OS recreates the service.
 
 ### Foreground UI Overlay
-The app utilizes `SYSTEM_ALERT_WINDOW` permissions to draw critical red-screen alerts over other apps. A mandatory lockout period of 30s (`ALARM_OVERLAY_THROTTLE_MS`) applies after dismissal (Issue #283).
+The app utilizes `SYSTEM_ALERT_WINDOW` permissions to draw critical red-screen alerts over other apps. A mandatory lockout period of 30s (`ALARM_OVERLAY_THROTTLE_MS`) applies after dismissal (Issue #311).
 
 ---
 
@@ -32,7 +32,7 @@ The app utilizes `SYSTEM_ALERT_WINDOW` permissions to draw critical red-screen a
 ### Layer 1: WakeLock Hardening
 The `SystemMonitor` manages a `PowerManager.WakeLock`. 
 *   **Implementation**: A non-reference-counted `PARTIAL_WAKE_LOCK` is acquired.
-*   **Safety-Timer Refresh**: Refreshes the timeout regardless of current state to ensure active WakeLock renewal on every service tick (Issue #148).
+*   **Safety-Timer Refresh**: Refreshes the timeout regardless of current state to ensure active WakeLock renewal on every service tick (Issue #363).
 
 ### Layer 2: The Watchdog Alarm (AlarmManager)
 The `SystemMonitor` schedules a "Watchdog Alarm" using Android's `AlarmManager`.
@@ -60,8 +60,8 @@ Proactive detection for "Zombie" TCP sockets common in mobile handovers.
 In the background, the system continuously evaluates:
 *   **Internet Integrity**: Detects local internet loss via `ALERT_ID_LOCAL_INTERNET`.
 *   **Signal Integrity**: Monitors the remote device connectivity via `WATCH_TIMEOUT_MS` (30s).
-*   **Storage Integrity (Issue #71)**: Dual-tier watchdog (`SYSTEM_STORAGE_LOW_THRESHOLD_MB`/`SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB`) protects database health.
-*   **GNSS Integrity (Issue #124)**: Detects hardware stalls and triggers hardware revival retry every 120s.
-*   **Power Integrity (Issue #192)**: Absolute parity for **battery current** (`currentMa`) across all models and the database.
+*   **Storage Integrity (Issue #316)**: Dual-tier watchdog (`SYSTEM_STORAGE_LOW_THRESHOLD_MB`/`SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB`) protects database health.
+*   **GNSS Integrity (Issue #341)**: Detects hardware stalls and triggers hardware revival retry every 120s.
+*   **Power Integrity (Issue #337)**: Absolute parity for **battery current** (`currentMa`) across all models and the database.
 *   **Log Spatial Anchor (Issue #208)**: All background integrity events (Stalls, Power, Storage) are now geographically anchored with `lat`/`lng` coordinates.
 *   **Xiaomi Boot Grace (Issue #190)**: Implemented 30s grace period (`XIAOMI_BOOT_GRACE_MS`) to suppress transient boot alarms and handle "Unknown" autostart status.

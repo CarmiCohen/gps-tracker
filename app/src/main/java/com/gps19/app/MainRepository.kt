@@ -18,8 +18,11 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
- * v8.9.38:
- * - Issue #245: Mapping locationPendingReason for HistoryEntity parity.
+ * v8.9.42:
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated addViolation, 
+ *   violationsFlow, saveTrailPoint, and history persistence to include accuracy 
+ *   and maxAccuracy for full forensic parity.
+ * - Issue #326: Mapping locationPendingReason for HistoryEntity parity. (Formerly #245)
  * v8.9.19:
  * - Issue #222: Added isHindsightCorrected propagation to trail flows and save logic.
  * v8.9.10:
@@ -116,12 +119,14 @@ class MainRepository @Inject constructor(
     val eventLogsFlow: Flow<List<LogEntry>> = logRepository.eventLogsFlow
 
     val trackerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(false).map { entities -> 
-        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected) } 
+        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected, it.accuracy, it.maxAccuracy) } 
     }
     val viewerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(true).map { entities -> 
-        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected) } 
+        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected, it.accuracy, it.maxAccuracy) } 
     }
-    val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> entities.map { ViolationPoint(point = GeoPoint(it.lat, it.lng), type = it.type, ts = it.ts) } }
+    val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> 
+        entities.map { ViolationPoint(point = GeoPoint(it.lat, it.lng), type = it.type, ts = it.ts, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy) } 
+    }
 
     private val _uiCommands = MutableSharedFlow<UiCommand>(extraBufferCapacity = 10)
     val uiCommands: SharedFlow<UiCommand> = _uiCommands.asSharedFlow()
@@ -230,7 +235,7 @@ class MainRepository @Inject constructor(
     fun clearLogs() { logRepository.clearLogs() }
     suspend fun loadAllLogsStatic(): List<LogEntry> = logRepository.loadAllLogsStatic()
 
-    fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, isJump: Boolean = false, timestamp: Long? = null, force: Boolean = false, isHindsightCorrected: Boolean = false) {
+    fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, isJump: Boolean = false, timestamp: Long? = null, force: Boolean = false, isHindsightCorrected: Boolean = false, accuracy: Float = 0f, maxAccuracy: Float = 0f) {
         if (lat == 0.0 || lng == 0.0) return
         
         val integrity = telemetry.integrityState.value
@@ -246,7 +251,9 @@ class MainRepository @Inject constructor(
             trailDao.insert(TrailEntity(
                 lat = lat, lng = lng, timestamp = wallTs, 
                 isViewerTrail = isViewer, isJump = isJump, 
-                isHindsightCorrected = isHindsightCorrected
+                isHindsightCorrected = isHindsightCorrected,
+                accuracy = accuracy,
+                maxAccuracy = maxAccuracy
             ))
             
             trailWriteCount++
@@ -264,7 +271,7 @@ class MainRepository @Inject constructor(
     }
 
     suspend fun loadTrailStatic(isViewer: Boolean): List<TrailPoint> = trailDao.getTrailStatic(isViewer).map { 
-        TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected) 
+        TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected, it.accuracy, it.maxAccuracy) 
     }
 
     suspend fun resetStats() = withContext(Dispatchers.IO) {
@@ -275,12 +282,12 @@ class MainRepository @Inject constructor(
         offlineRepository.clear()
     }
 
-    fun addViolation(lat: Double, lng: Double, type: String, adaptiveRadius: Double = 0.0, timestamp: Long? = null) {
-        if (!violationProcessor.shouldRecordViolation(lat, lng, type, adaptiveRadius)) return
+    fun addViolation(lat: Double, lng: Double, type: String, accuracy: Float = 0f, maxAccuracy: Float = 0f, adaptiveRadius: Double = 0.0, timestamp: Long? = null) {
+        if (!violationProcessor.shouldRecordViolation(lat, lng, type, accuracy, maxAccuracy)) return
 
         val wallTs = timestamp ?: timeProvider.currentTimeMillis()
         scope.launch { 
-            violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs))
+            violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
             
             violationWriteCount++
             if (violationWriteCount >= DB_PRUNE_THRESHOLD) {
@@ -294,7 +301,7 @@ class MainRepository @Inject constructor(
         l.map { entity ->
             ConnectionPoint(
                 localId = UUID.randomUUID().toString(), ts = entity.ts, rtt = entity.rtt, localSig = 10, remoteSig = entity.remoteSig,
-                isConnected = entity.isConnected, isGap = entity.isGap, gpsAccuracy = 0f, isTick = entity.isTick, 
+                isConnected = entity.isConnected, isGap = entity.isGap, gpsAccuracy = entity.accuracy, maxAccuracy = entity.maxAccuracy, isTick = entity.isTick, 
                 hasGps = entity.hasGps, gpsIndex = entity.gpsIndex,
                 noiseIdx = entity.noiseIdx, luxIdx = entity.luxIdx, vibeIdx = entity.vibeIdx, proxIdx = entity.proxIdx,
                 liftIdx = entity.liftIdx, snrIdx = entity.snrIdx,
@@ -348,7 +355,9 @@ class MainRepository @Inject constructor(
                 sitTilt = point.sitTilt,
                 sitShock = point.sitShock,
                 currentMa = point.currentMa,
-                locationPendingReason = point.locationPendingReason.name
+                locationPendingReason = point.locationPendingReason.name,
+                accuracy = point.gpsAccuracy,
+                maxAccuracy = point.maxAccuracy
             ))
         }
 
@@ -395,7 +404,7 @@ class MainRepository @Inject constructor(
                     viewerId = "SYSTEM",
                     isSpecial = true,
                     specialColor = 0xFFFFD700.toInt()
-                ), initiallySynced = true) // I/O Audit logs are local and don't need real-time sync unless recovered
+                ), initiallySynced = true) 
             }
         }
     }

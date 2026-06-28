@@ -19,8 +19,7 @@ import org.osmdroid.util.GeoPoint
  * - Issue #326: Intelligent Uncertainty UX Mapping. Parsing location_pending_reason. (Formerly #245 / #226)
  * - Issue #329: Added tiltIdx and baroIdx parsing for forensic parity. (Formerly #224)
  * - Issue #328: Parsing lastValidFixRealtime for Bayesian uncertainty scaling. (Formerly #221)
- * v8.9.37:
- * - Issue #339/348: Centralized SIT rising-edge detection. Removed redundant log/forensic triggers. (Formerly #245)
+ * - Issue #339/348: Centralized SIT rising-edge detection. Removed redundant log/forensic triggers. (Formerly #331)
  */
 class RemoteHandler(
     private val context: Context,

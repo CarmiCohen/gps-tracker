@@ -15,15 +15,15 @@ For high-frequency forensic and historical data, the app uses a **Room Database*
 - **Forensic Aggregation**: Merges consecutive events with dynamic parts into a single entry.
 - **Forensic Metrics**: Tracks `count` (occurrences) and `durationMs` (total active time).
 - **Role Identity**: Every log entry includes a mandatory `role` field.
-- **Log Spatial Anchor (v8.9.37)**: Every log entry includes `lat` and `lng` fields to support historical marker reconstruction on the map.
+- **Log Spatial Anchor (v8.9.37)**: Every log entry includes `lat` and `lng` fields to support historical marker reconstruction on the map (Issue #208).
 - **Capacity**: Sliding window of the last 1000 entries. Threshold-based pruning.
-- **Migration (v39)**: Added `lat`/`lng` columns to the `logs` table (Issue #208).
+- **Migration (v39)**: Added `lat`/`lng` columns to the `logs` table.
 
 ### B. Analytical History (`history` table)
 - **Ribbon Streams**: Stores connection and sensor indices for 4M, 16M, 1H, 4H, 24H, and 7D views.
 - **Batch Processing**: History points are buffered and flushed in batches every 5,000ms (`HISTORY_BATCH_WRITE_INTERVAL_MS`) or upon reaching 100 entries (`HISTORY_BUFFER_MAX_SIZE`).
-- **Power Forensic Parity (Issue #192)**: Includes `currentMa` (battery current) for end-to-end power visibility (DB v35).
-- **SIT Metrics (Issue #197)**: Includes `sitVzTs` for improved chair event reconstruction (DB v38).
+- **Power Forensic Parity (Issue #337)**: Includes `currentMa` (battery current) for end-to-end power visibility (DB v35).
+- **SIT Metrics (Issue #329)**: Includes `sitVzTs` for improved chair event reconstruction (DB v38).
 - **Pruning (PERF_IO)**: Pruning is triggered globally by `MainRepository` after every 50 writes (`DB_PRUNE_THRESHOLD`).
 
 ### C. Map Overlays
@@ -36,7 +36,7 @@ For high-frequency forensic and historical data, the app uses a **Room Database*
 
 ## 3. Storage Integrity Watchdog
 The `IntegrityMonitor` implements a dual-tier protection system based on `StatFs` metrics:
-- **Tier 1: Critical (< 10MB `SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB`)**: Absolute muzzle. All non-essential logging is halted.
+- **Tier 1: Critical (< 10MB `SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB`)**: Absolute muzzle. All non-essential logging is halted (Issue #316).
 - **Tier 2: Low (< 50MB `SYSTEM_STORAGE_LOW_THRESHOLD_MB`)**: Throttled logging. Only "Important" forensic logs are allowed.
 
 ## 4. Maintenance & Archival

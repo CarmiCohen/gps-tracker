@@ -37,7 +37,7 @@ If the current pressure indicates a vertical rise of more than `BARO_LIFT_THRESH
 Calculates the angular delta from the point of activation. If the device is rotated more than `TILT_THRESHOLD_DEGREES` (15°), a tilt violation is recorded.
 
 ### D. Light Jump (EMA Baseline) (Issue #372)
-Sudden light spikes over the asymmetrical rising/falling EMA baseline trigger a tamper alert. (Formerly #284)
+Sudden light spikes over the asymmetrical rising/falling EMA baseline trigger a tamper alert.
 
 ### E. Acoustic Sentinel
 Triggers are gated by `ACOUSTIC_MIN_THRESHOLD_DB` (50.0dB) absolute floor to prevent false positives in silent environments.
@@ -48,8 +48,8 @@ Vibration thresholds are dynamic and normalized against the hardware noise floor
 ## 4. Forensic Continuity (v8.9.37)
 Physical violations are logged with forensic metadata:
 1.  **Log Spatial Anchor (Issue #208)**: All tamper, lift, and tilt events are now automatically anchored with `lat`/`lng` coordinates to show exactly where the physical violation occurred.
-2.  **Monotonic Timing (Issue #311)**: All timing deltas and violation durations are calculated using `TimeProvider.elapsedRealtime()`. (Formerly #283)
-3.  **Ghost Mode UX (Issue #193)**: Visual staleness indicators are applied to all sensor-derived fields when telemetry is older than 10s.
+2.  **Monotonic Timing (Issue #311)**: All timing deltas and violation durations are calculated using `TimeProvider.elapsedRealtime()`.
+3.  **Ghost Mode UX (Issue #338)**: Visual staleness indicators are applied to all sensor-derived fields when telemetry is older than 10s.
 4.  **SIT Acknowledgment (Issue #194)**: Discrete SIT events are synchronized via a 10s acknowledged loop to ensure persistence.
 
 ## 5. State Integration

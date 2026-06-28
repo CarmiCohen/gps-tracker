@@ -11,15 +11,15 @@ This document summarizes all system alerts, their trigger logic, timing, and how
 | **This device: Internet Lost** | Hardware reports NO internet | **60 Seconds** | **60 Seconds** | Aligned with `INTERNET_LOSS_THRESHOLD_MS`. |
 | **This device: Relay Lost** | Socket FAIL | **60 Seconds** | **60 Seconds** | Aligned with `COMMUNICATION_ALARM_GRACE_PERIOD_MS`. |
 | **Tracker: Offline** | Disconnected | **60 Seconds** | **60 Seconds** | Aligned with `COMMUNICATION_ALARM_GRACE_PERIOD_MS`. |
-| **Tracker: Jammer Alert** | GPS jumps (Tier 1/2) | **180 Seconds** | **180 Seconds** | Aligned with `JAMMER_DETECTION_THRESHOLD_MS`. |
-| **Tracker: Signal Lost** | No data packets | **180 Seconds** | **180 Seconds** | Aligned with `TRACKER_SIGNAL_LOSS_THRESHOLD_MS`. |
-| **Viewer: Signal Lost** | No data packets | **30 Seconds** | **30 Seconds** | Aligned with `VIEWER_SIGNAL_LOSS_THRESHOLD_MS`. |
-| **Tracker: GPS Stalled** | No movement | **60 Seconds** | **60 Seconds** | Aligned with `GPS_STALL_THRESHOLD_MS`. |
+| **Tracker: Jammer Alert** | GPS jumps (Tier 1/2) | **180 Seconds** | **180 Seconds** | Aligned with `JAMMER_DETECTION_THRESHOLD_MS`. (Issue #315) |
+| **Tracker: Signal Loss** | No data packets | **180 Seconds** | **180 Seconds** | Aligned with `TRACKER_SIGNAL_LOSS_THRESHOLD_MS`. |
+| **Viewer: Signal Loss** | No data packets | **30 Seconds** | **30 Seconds** | Aligned with `VIEWER_SIGNAL_LOSS_THRESHOLD_MS`. |
+| **Tracker: GPS Stalled** | No movement | **60 Seconds** | **60 Seconds** | Aligned with `GPS_STALL_THRESHOLD_MS`. (Issue #341) |
 | **Tracker: GPS Gap** | Stale data (>60s) | **60 Seconds** | **60 Seconds** | Aligned with `GPS_GAP_THRESHOLD_MS`. |
 | **Tracker: Geofence** | Out of fence | **60 Seconds** | **60 Seconds** | Aligned with `BOOTSTRAP_PHASE_MS`. Requires 6 samples. |
 | **Tracker: Charger unplugged** | USB Power Off | **3 Seconds** | **3 Seconds** | Aligned with `POWER_DISCONNECT_DEBOUNCE_MS`. |
 | **Tracker: Low Battery** | Battery < 20% | Immediate | **Immediate** | Siren triggers on first packet (`CRITICAL_BATTERY_THRESHOLD`). |
-| **Tracker: High Temp** | Temp > 46.0°C | Immediate | **Immediate** | Siren triggers on first packet (`MAX_SAFE_TEMPERATURE_CELSIUS`). |
+| **Tracker: High Temp** | Temp > 46.0°C | Immediate | **Immediate** | Siren triggers on first packet (`MAX_SAFE_TEMPERATURE_CELSIUS`). (Issue #352) |
 | **Tracker: Xiaomi System** | Background Restricted | Immediate | **Immediate** | Siren triggers on background or autostart restriction detection. Includes 30s Boot Grace (Issue #190). |
 
 ---
@@ -34,8 +34,8 @@ This document summarizes all system alerts, their trigger logic, timing, and how
 | **This device: Relay Lost** | Socket State | Relay Connection Lost... | This device: Relay connection failed [The connection to the tracking server failed] |
 | **Tracker: Offline** | Peer Stream | Offline... | Remote device is not connected to relay [The tracker device has lost its connection] |
 | **Tracker: Jammer Alert** | Integrity | Jump Alert... | Device data is erratic or jumping [GPS interference detected] |
-| **Tracker: Signal Lost** | Watchdog | Signal Lost... | No data received from device for >180s [The tracker has stopped sending updates] |
-| **Viewer: Signal Lost** | Watchdog | Viewer: Signal Lost... | No data received from viewer for >30s [The monitoring viewer has stopped responding] |
+| **Tracker: Signal Loss** | Watchdog | Signal Loss... | No data received from device for >180s [The tracker has stopped sending updates] |
+| **Viewer: Signal Loss** | Watchdog | Viewer: Signal Loss... | No data received from viewer for >30s [The monitoring viewer has stopped responding] |
 | **Tracker: GPS Stalled** | Integrity | GPS Stalled... | Device GPS location has not updated [The tracker's position has frozen] |
 | **Tracker: GPS Gap** | Telemetry Age | GPS Gap... | Device GPS fix is older than 60s [Tracker location data is stale] |
 | **Tracker: Charger unplugged** | Status Flag | Tracker: Charger unplugged... | External power source removed from device [Tracker power cable disconnected] |
@@ -83,4 +83,4 @@ These logs track intentional user interactions. They **do not** trigger sirens o
 | **MAINTENANCE: Service is healthy** | Tracker/Viewer | Confirms the service is running correctly (`SYSTEM_WATCHDOG_INTERVAL_MS`). |
 | **MAINTENANCE: RECOVERY triggered** | Watchdog | The service was stopped; the watchdog is restarting it. |
 | **MAINTENANCE: Muzzle Active** | Tracker | Sensor triggers suppressed during sync (`MUZZLE_WINDOW_DURATION_MS`). |
-| **MAINTENANCE: Log Anchor Applied** | LogManager | Confirms coordinate attachment to a system log (v8.9.37). |
+| **MAINTENANCE: Log Anchor Applied** | LogManager | Confirms coordinate attachment to a system log (v8.9.37) (Issue #208). |

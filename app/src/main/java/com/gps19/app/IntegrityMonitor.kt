@@ -15,9 +15,10 @@ import java.util.concurrent.ConcurrentLinkedQueue
 /**
  * IntegrityMonitor: Tracks hardware and network health.
  * v8.9.42:
- * - Issue #352: Thermal Throttling Logic. (Formerly #272)
- * - Issue #337: Forensic Power Parity. Exposed isCharging and maxTemperature. (Formerly #192)
- * - Issue #311: Monotonic Timing Integrity. Migrated to TimeProvider for all timing logic. (Formerly #283-A)
+ * - Issue #352: Thermal Throttling Logic.
+ * - Issue #353: Battery Health Profiling.
+ * - Issue #337: Forensic Power Parity. Exposed isCharging and maxTemperature.
+ * - Issue #311: Monotonic Timing Integrity. Migrated to TimeProvider for all timing logic.
  * - Issue #163: Hardened power tamper detection and connected violation callbacks.
  */
 class IntegrityMonitor(
@@ -54,7 +55,7 @@ class IntegrityMonitor(
     var isCharging = false
         private set
 
-    // Issue #353: Battery Health Profiling. Now uses monotonic time (Issue #311). (Formerly #272)
+    // Issue #353: Battery Health Profiling. Now uses monotonic time (Issue #311).
     private val batterySamples = ConcurrentLinkedQueue<Pair<Long, Int>>()
     private var lastBatteryCheckTs = 0L
     var isBatterySteepDischarge = false

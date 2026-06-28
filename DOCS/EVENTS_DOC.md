@@ -52,8 +52,8 @@ This document describes all events logged by the application, their priorities, 
 
 ## Technical Specifications
 - **Log Spatial Anchor**: All events are automatically tagged with `lat`/`lng` coordinates using the last known telemetry position.
-- **Monotonic Stability (Issue #311)**: All forensic timing and UI lockout windows use `elapsedRealtime`. (Formerly #283)
-- **Ghost Mode UX (Issue #193)**: Stale events (>10s) are visualized with dimmed "Ghost" status indicators.
+- **Monotonic Stability (Issue #311)**: All forensic timing and UI lockout windows use `elapsedRealtime`.
+- **Ghost Mode UX (Issue #338)**: Stale events (>10s) are visualized with dimmed "Ghost" status indicators.
 - **Identity Unification**: Every entry carries the mandatory `role` tag (Issue #182).
 - **Fuzzy Forensic Batching**: Consecutive similar events are grouped with `(xN)` count and total duration tracking.
 - **Muzzle Window (Issue #191)**: 2000ms suppression during sync I/O to prevent false tamper logs.

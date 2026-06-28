@@ -27,7 +27,12 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 ## 2. Resolution Archive
 
-### 2.1. Hardening Phase Resolutions (v8.9.40)
+### 2.1. Hardening Phase Resolutions (v8.9.42)
+*   **FIXED Issue Mapping Contradictions** - Resolution: Unified authoritative issue mapping across all source files and documentation.
+    *   **Issue #335 Collision**: Disambiguated Vibration thresholds to **#318** and Service Initialization to **#335**.
+    *   **Issue #245 Mapping**: Authoritatively assigned **#326** to Intelligent Uncertainty (locationPendingReason) and **#348** to SIT Rising-Edge logic.
+    *   **Issue #272 Ambiguity**: Explicitly separated Thermal Throttling (**#352**) from Battery Health Profiling (**#353**).
+    *   **Issue #282 Collision**: Assigned **#343** to Signal Loss Forensic Latching and consolidated SIT duplicate guards under **#336**.
 *   **FIXED Requirement SOT Synchronization** - Resolution: Synchronized `requirements_sot.md` and `compliance.md` with implemented features found in source code and resources (R568a, R800, R805, R832, R853, R854, R880).
 *   **FIXED Divergent Sub-requirements Segregation (R404) (#404)** - Resolution: Resolved ID collision where R404 was used for both binary signaling and reactive flows. Mapped binary signaling to **R944** and reactive system flows to **R945**. Updated `SignalingProvider.kt`, `SystemStatusProvider.kt`, and System SoT.
 *   **FIXED Behavioral Description Overlap (R729/R730)** - Resolution: Resolved ID collision by segregating Behavioral Debouncing (R729) from Vibration EMA Floor updates (R730). Synchronized `EngineConstants.kt`, `SentinelValidator.kt`, and the System SoT.

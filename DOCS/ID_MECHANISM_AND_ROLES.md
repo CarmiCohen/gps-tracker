@@ -1,4 +1,4 @@
-# ID Mechanism & Roles (v8.9.37)
+# ID Mechanism & Roles (v8.9.42)
 
 This document describes the identity management system used to pair devices and define their behavior within the GPS Tracker ecosystem.
 
@@ -15,7 +15,7 @@ The system uses a simple string-based identification system that serves as both 
 - **Default**: `Cohen`. (Issue #174)
 - **Role**: Used to identify specific viewers when multiple phones are monitoring the same tracker.
 
-## 2. Pairing & Routing Mechanism (v8.9.37 baseline)
+## 2. Pairing & Routing Mechanism (v8.9.42 baseline)
 
 ### A. Room-Based Signaling
 The connection is established using a **Matching ID** logic:
@@ -28,8 +28,8 @@ Since the `deviceId` is chosen by the user, it acts as a shared secret.
 - **Tracker Side**: Only accepts commands or settings update packets if they are relayed into its specific room.
 - **Viewer Side**: Only processes location update or log update packets if they carry the matching `id`.
 
-## 3. Forensic Role Identification (v8.9.37)
-Every telemetry packet and forensic log entry includes a mandatory `role` field (Issue #182). In v8.9.37, every log is also **geographically anchored** with `lat`/`lng` coordinates to enable map reconstruction (Issue #208).
+## 3. Forensic Role Identification
+Every telemetry packet and forensic log entry includes a mandatory `role` field (Issue #182). Every log is also **geographically anchored** with `lat`/`lng` coordinates to enable map reconstruction (Issue #208).
 
 ## 4. Dynamic ID Management
 Users can change these IDs at any time through the "Settings" overlay:

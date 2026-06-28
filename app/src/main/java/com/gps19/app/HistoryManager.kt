@@ -14,14 +14,14 @@ import kotlin.math.abs
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
  * v8.9.42:
  * - Issue #326: Intelligent Uncertainty UX Mapping. Added locationPendingReason to 
- *   updateRibbons and backfillGaps for forensic parity. (Formerly #245)
+ *   updateRibbons and backfillGaps for forensic parity.
  * - Issue #325: Authoritative Spatial Anchoring. Added accuracy and maxAccuracy to 
- *   ribbons for forensic uncertainty auditing. (Formerly #214)
+ *   ribbons for forensic uncertainty auditing.
  * - Issue #336: SIT Duplicate Guard. Implemented database-level sanity check to 
- *   prevent redundant SIT forensic markers. (Formerly #282)
+ *   prevent redundant SIT forensic markers.
  * - Issue #329: Added tiltIdx and baroIdx to updateRibbons and backfillGaps for 
- *   forensic expansion. (Formerly #224)
- * - Issue #337: Added currentMa to updateRibbons and backfillGaps for forensic power parity. (Formerly #192)
+ *   forensic expansion.
+ * - Issue #337: Added currentMa to updateRibbons and backfillGaps for forensic power parity.
  */
 class HistoryManager(
     private val context: Context,
@@ -330,7 +330,7 @@ class HistoryManager(
     private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long): Boolean {
         if (!isDetected) return false
         
-        // Issue #336: Prevent duplicates if a SIT event occurs within the guard window. (Formerly #282)
+        // Issue #336: Prevent duplicates if a SIT event occurs within the guard window.
         if (abs(ts - lastSitDetectedTs) < SIT_DUPLICATE_GUARD_MS) {
             return false
         }

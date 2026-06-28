@@ -9,6 +9,9 @@ import kotlin.math.*
  *   High SNR with zero vibration now triggers a higher score penalty. (Formerly #219)
  * - Issue #334: Hindsight Trajectory Correction. Implemented interpolateSegment 
  *   for hindsight rubber-banding. (Formerly #220)
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated interpolateSegment 
+ *   to propagate accuracy/maxAccuracy context through hindsight segments.
+ * - Alignment: Replaced hardcoded 5.0m/s with JUMP_GATE_SENSOR_MISMATCH_MPS.
  */
 object PhysicsUtils {
 
@@ -63,10 +66,13 @@ object PhysicsUtils {
     /**
      * Interpolates a segment between two points to prevent visual "teleporting".
      * Part of Issue #334 / #327: Rubber-band smoothing for hindsight promotion.
+     * v8.9.42: Updated to propagate accuracy/maxAccuracy (Issue #325).
      */
     fun interpolateSegment(
         startLat: Double, startLng: Double, startTs: Long,
         endLat: Double, endLng: Double, endTs: Long,
+        startAcc: Float = 0f, startMaxAcc: Float = 0f,
+        endAcc: Float = 0f, endMaxAcc: Float = 0f,
         maxGapMeters: Double = 5.0
     ): List<EngineGeoPoint> {
         val dist = calculateDistance(startLat, startLng, endLat, endLng)
@@ -80,7 +86,13 @@ object PhysicsUtils {
             val interpLat = startLat + (endLat - startLat) * fraction
             val interpLng = startLng + (endLng - startLng) * fraction
             val interpTs = startTs + ((endTs - startTs) * fraction).toLong()
-            result.add(EngineGeoPoint(interpLat, interpLng, ts = interpTs))
+            val interpAcc = startAcc + (endAcc - startAcc) * fraction.toFloat()
+            val interpMaxAcc = startMaxAcc + (endMaxAcc - startMaxAcc) * fraction.toFloat()
+            
+            result.add(EngineGeoPoint(
+                interpLat, interpLng, ts = interpTs, 
+                accuracy = interpAcc, maxAccuracy = interpMaxAcc
+            ))
         }
         return result
     }
@@ -113,15 +125,12 @@ object PhysicsUtils {
         var isAdaptiveJump = false
         
         // Issue #332: Enhanced Sensor Fusion for Urban Canyons
-        // In urban canyons, multipath can produce high SNR with wild coordinate jumps.
-        // Logic: If there is no physical motion but we see significant speed (> 5m/s), penalize heavily.
-        if (!hasPhysicalMotion && speedMps > 5.0) { 
+        if (!hasPhysicalMotion && speedMps > JUMP_GATE_SENSOR_MISMATCH_MPS) { 
             score += JUMP_WEIGHT_SENSOR_MISMATCH
             
-            // High SNR (35+) with no vibration is the "Smoking Gun" for Signal Reflection/Spoofing.
             if (snr >= ADAPTIVE_JUMP_SNR_THRESHOLD) {
                 isAdaptiveJump = true
-                score += 20 // Additional penalty for high-confidence spoofing
+                score += 20
             }
         }
         
@@ -148,7 +157,7 @@ object PhysicsUtils {
         
         var reason = when {
             isAdaptiveJump -> "Signal Reflection Suspicion (High SNR)"
-            !hasPhysicalMotion && speedMps > 5.0 -> "Sensor Mismatch Jump (Urban Canyon)"
+            !hasPhysicalMotion && speedMps > JUMP_GATE_SENSOR_MISMATCH_MPS -> "Sensor Mismatch Jump (Urban Canyon)"
             isTier2 -> "Security Jump"
             isTier3 -> "Visual Jitter"
             score >= 50 -> "High Confidence Jump"

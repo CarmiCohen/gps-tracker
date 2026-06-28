@@ -9,7 +9,7 @@ This document explains the specialized monitoring logic used to detect "silent" 
 - **Stall Watchdog**: The `LocationProcessor` tracks the raw hardware timestamp. If the coordinates are identical across updates while vibration sensors indicate movement, it flags a stall.
 - **UI Threshold (10s)**: The UI uses `GPS_UI_FAIL_THRESHOLD_MS` (10 seconds) as a strict "Position Health" gate. 
 - **Instant Recovery (R923)**: Freshness logic utilizes the maximum of the GPS timestamp and the telemetry arrival timestamp (`telemetryTs`) to prevent dashboard "gray-out" during link restoration.
-- **Escalated Revival (Issue #124)**: Sustained stalls beyond `GPS_STALL_THRESHOLD_MS` (60s) trigger a hardware-level refresh cycle:
+- **Escalated Revival (Issue #341)**: Sustained stalls beyond `GPS_STALL_THRESHOLD_MS` (60s) trigger a hardware-level refresh cycle:
     - **Retry Loop**: The system attempts to revive the GPS hardware every 120 seconds (`GPS_REVIVAL_RETRY_INTERVAL_MS`).
     - **Max Attempts**: After 3 failed attempts (`MAX_REVIVAL_ATTEMPTS`), the system escalates to a **CRITICAL forensic alert**.
     - **Viewer Notification**: A `CRITICAL: GPS_HARDWARE_LOCK` log is emitted to signal that manual intervention or physical relocation is required.
@@ -34,4 +34,4 @@ Determining the difference between a network drop and a GPS fix loss:
 - **Clock Regression Guard**: Rejects updates that move backward in time (`CLOCK_REGRESSION_GATE_MS` 100ms).
 - **Data Fidelity**: All telemetry packets and history records include raw **speed** and **bearing**.
 - **Log Spatial Anchor (Issue #208)**: All system events and continuity gaps are now geographically anchored for map reconstruction.
-- **Ghost Mode UX (Issue #193)**: Visual staleness indicators applied when telemetry > 10s old (`TELEMETRY_UI_STALE_THRESHOLD_MS`).
+- **Ghost Mode UX (Issue #338)**: Visual staleness indicators applied when telemetry > 10s old (`TELEMETRY_UI_STALE_THRESHOLD_MS`).
