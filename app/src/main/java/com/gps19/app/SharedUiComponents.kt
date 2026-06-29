@@ -50,6 +50,10 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v8.9.60:
+ * - Issue #458/460: Fixed Tracker mode Ghost Mode bug. Corrected local freshness 
+ *   propagation and existence check logic.
+ * - Issue #459: Fixed Unicode literal escaping in status labels.
  * v8.9.54:
  * - Issue #427/428: Relaxed UI staleness and circular progress thresholds to 15s 
  *   to accommodate network jitter (Supersedes 10s R338 mandate).
@@ -255,7 +259,7 @@ fun GenericSensorRibbon(
                         
                         lastPos?.let { lp ->
                             if (currentPos.x - lp.x < pointWidth * 10) {
-                                drawLine(color = lineColor, start = lp, end = currentPos, strokeWidth = (if (isLandscape) 1.5.dp.toPx() else 1.dp.toPx()))
+                                drawLine(color = lineColor, start = lp, end = currentPos, strokeWidth = (if (isLandscape) { 1.5.dp.toPx() } else { 1.dp.toPx() }))
                             }
                         }
                         if (value > 0.05f) {
@@ -442,7 +446,7 @@ fun GlobalStatusBar(
         lastGpsTs = lastGpsTs,
         trackerTemp = uiState.trackerBattery.temp, viewerTemp = uiState.battery.temp, distToHome = uiState.distanceTrackerToHome, distToViewer = uiState.distanceTrackerToViewer,
         viewerSatsUsed = if (mode == "viewer") uiState.viewerSatsUsed else 0, viewerSatsView = if (mode == "viewer") uiState.viewerSatsView else 0,
-        viewerGpsTs = if (mode == "viewer") uiState.localLocation.timestamp else 0L, trackerId = uiState.deviceId, viewerId = uiState.viewerId, watchdogOk = dashboardState.watchdogOk,
+        viewerGpsTs = uiState.localLocation.timestamp, trackerId = uiState.deviceId, viewerId = uiState.viewerId, watchdogOk = dashboardState.watchdogOk,
         trackerState = dashboardState.trackerState, hasActiveAlarms = hasUnresolved, isRedScreenSuppressed = (hasUnresolved && !redScreenVisible),
         isSirenPlaying = uiState.isSirenPlaying,
         isTrackerLocPending = uiState.trackerLocation.isLocationPending, 
@@ -539,7 +543,7 @@ fun StatusBar(
                 val stateColor = if (!isGpsActive) Slate500 else BrandJd 
                 
                 Text(
-                    text = if (isMoving && isGpsActive) "»\\u2009${trackerState.name}\\u2009«" else trackerState.name,
+                    text = if (isMoving && isGpsActive) "»\u2009${trackerState.name}\u2009«" else trackerState.name,
                     color = stateColor.copy(alpha = if (isMoving && isGpsActive) movingAlpha else 1f),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
@@ -556,9 +560,9 @@ fun StatusBar(
             }
             Spacer(Modifier.height(3.dp))
 
-            // Issue #457: Local telemetry freshness calculation for consistent Ghost Mode visual.
+            // Issue #457/460: Local telemetry freshness calculation for consistent Ghost Mode visual.
             val localTelemetryAge = now - maxOf(viewerGpsTs, viewerTelemetryTs)
-            val isLocalTelemetryFresh = viewerGpsTs > 0 && localTelemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
+            val isLocalTelemetryFresh = maxOf(viewerGpsTs, viewerTelemetryTs) > 0 && localTelemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
 
             if (isLandscape && mode == "viewer") {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {

@@ -2,6 +2,11 @@
 
 **For historical records (v8.8.x and older), see [docs_history_archive.md](docs_history_archive.md).**
 
+## v8.9.60
+- **Forensic Ghost Mode Restoration (Issue #458)**: Fixed a bug where Tracker-role devices showed local status as stale. Corrected timestamp propagation in `GlobalStatusBar`.
+- **Telemetry Freshness Logic (Issue #460)**: Relaxed `isLocalTelemetryFresh` check to support sensor-only telemetry existence, preventing "Ghost Mode" before the first GPS fix.
+- **Unicode Label Fix (Issue #459)**: Corrected double-escaped thin-space characters in `StatusBar` and `GlobalStatusBar` labels.
+
 ## v8.9.54
 - **Jitter-Proof UI Staleness (Issue #427/428)**: Relaxed "Ghost Mode" and Watchdog staleness thresholds to **15s** to accommodate network jitter and prevent UI flickering. (Supersedes previous 10s mandate).
 
