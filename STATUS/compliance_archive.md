@@ -2,7 +2,16 @@
 
 This document contains the archived resolutions for the GPS-Tracker system, preserving the audit trail for past development phases. All issue numbers have been synchronized to the **under #350** baseline (Issue #305).
 
-**Total Archived Resolutions: 175**
+**Total Archived Resolutions: 182**
+
+## 2.2. Hardening Era Resolutions (v8.9.43 - v8.9.48)
+*   **FIXED Issue #438: Issue ID Mismatch (Power Forensics)** - Resolution: Unified all currentMa references to authoritative Issue #337 across source code and forensic logs. (v8.9.48)
+*   **FIXED Issue #425: R865 Color Non-Compliance** - Resolution: Swapped Emerald500 for authoritative BrandJd (#367C2B) in all status badges and map tools. (v8.9.48)
+*   **FIXED Issue #430: Zeroing Baseline Asymmetry** - Resolution: Aligned BARO_ZEROING_INTERVAL_MS (300s) with the PASSIVE_ZEROING_STATIONARY_MS baseline. (v8.9.44)
+*   **FIXED Issue #437: Acoustic Floor Calibration Logic** - Resolution: Aligned ACOUSTIC_FLOOR_MIN_DB (50dB) with the authoritative absolute safety gate. (v8.9.44)
+*   **FIXED Issue #435: Hindsight Buffer Desync** - Resolution: Expanded HINDSIGHT_BUFFER_SIZE to 10 points to align with Forensic Spec. (v8.9.43)
+*   **FIXED Issue #436: Stationary GPS Pulse Asymmetry** - Resolution: Aligned GPS_SAVE_INTERVAL_MS (20s) with STATIONARY_GPS_POLLING_MS. (v8.9.43)
+*   **FIXED Issue #426: Logic Regression - GPS Staleness Coupling** - Resolution: Decoupled GPS health from heartbeat status, ensuring TRK badge reflects local fix freshness. (v8.9.43)
 
 ## 2.3. Middle Era Resolutions (#100 - #199)
 *   **FIXED Toolchain Modernization (#199)** - Resolution: Upgraded to Java 17 and Android SDK 35. (v8.9.8)

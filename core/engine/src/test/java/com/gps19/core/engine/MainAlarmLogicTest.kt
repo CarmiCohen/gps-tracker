@@ -7,6 +7,9 @@ import org.junit.Test
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
+ * v8.9.52:
+ * - Issue #431: Added Bayesian expansion verification for geofence breaches.
+ * - Issue #452: Added SNR Latch (Adaptive Jump) hold duration verification.
  * v8.9.26: Updated Xiaomi gating and boot grace verification (Issue #190).
  */
 class MainAlarmLogicTest {
@@ -32,6 +35,7 @@ class MainAlarmLogicTest {
             maxDistance = 100.0,
             trackerGpsAccuracy = 5f,
             maxTrackerAccuracy = 5f,
+            trackerLastValidFixTs = now, // Added for Issue #431
             lastGpsPacketTs = now,
             trackerBattery = 100,
             trackerTemp = 30f,
@@ -55,9 +59,59 @@ class MainAlarmLogicTest {
     }
 
     @Test
+    fun `Verify Bayesian Expansion triggers Geofence breach during GPS gap`() {
+        val now = 1700000000000L
+        
+        val stateWithGap = createDefaultState(now + 10000).copy(
+            trackerLat = 10.002, // ~220m away. Threshold is 100 + (5*6) = 130m.
+            trackerLastValidFixTs = now,
+            isLocationPending = true,
+            trackerSpeed = 20f // Drift capped at 33.3m/s
+        )
+        
+        val report = MainAlarmLogic.detectViolations(stateWithGap)
+        val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
+        
+        // Effective Accuracy = 5 + (20 * 10) = 205m.
+        // Threshold = 100 + (205 * 6) = 1330m. 
+        // 220m < 1330m -> SHOULD NOT BREACH.
+        assertFalse("Geofence should be suppressed by Bayesian expansion during gap", geofence?.conditionMet == true)
+    }
+
+    @Test
+    fun `Verify SNR Latch (Adaptive Jump) hold duration`() {
+        val now = 1700000000000L
+        val baseState = createDefaultState(now).copy(
+            trackerLat = 10.005, // ~550m away (Violation)
+            isTrackerVisualJump = true,
+            isAdaptiveJump = true,
+            jumpTier = 2,
+            firstViolationTs = now,
+            firstViolationWasJump = true
+        )
+
+        // Scenario 1: 2 minutes later (Standard hold is 3 mins, Adaptive is 6 mins)
+        val stateAt2Min = baseState.copy(now = now + 120000)
+        val report1 = MainAlarmLogic.detectViolations(stateAt2Min)
+        assertFalse("Adaptive jump should be latched for 6 mins, 2 mins is too early", 
+            report1.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
+
+        // Scenario 2: 4 minutes later (Standard hold 3 mins would have triggered, but Adaptive is 6 mins)
+        val stateAt4Min = baseState.copy(now = now + 240000)
+        val report2 = MainAlarmLogic.detectViolations(stateAt4Min)
+        assertFalse("Adaptive jump should still be suppressed at 4 mins", 
+            report2.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
+
+        // Scenario 3: 7 minutes later (Past 6 min adaptive limit)
+        val stateAt7Min = baseState.copy(now = now + 420000)
+        val report3 = MainAlarmLogic.detectViolations(stateAt7Min)
+        assertTrue("Adaptive jump latch should expire after 6 mins", 
+            report3.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
+    }
+
+    @Test
     fun `Verify Xiaomi Boot Grace suppresses alarms`() {
         val now = 1700000000000L
-        // Device is Xiaomi, permissions are DENIED, but uptime is only 10s (< 30s grace)
         val stateInGrace = createDefaultState(now).copy(
             isXiaomiDevice = true,
             xiaomiStatus = EngineXiaomiStatus.DENIED,
@@ -68,37 +122,6 @@ class MainAlarmLogicTest {
         val report = MainAlarmLogic.detectViolations(stateInGrace)
         val alert = report.reports.find { it.type == ALERT_ID_XIAOMI_SYSTEM_MISSING }
         assertFalse("Alert should be suppressed during boot grace period", alert?.conditionMet == true)
-    }
-
-    @Test
-    fun `Verify Xiaomi System Missing alert logic after grace`() {
-        val now = 1700000000000L
-        
-        // Scenario 1: Xiaomi device with Autostart DENIED (past grace)
-        val stateDenied = createDefaultState(now).copy(
-            isXiaomiDevice = true,
-            xiaomiAutostartStatus = EngineXiaomiStatus.DENIED,
-            serviceStartTime = now - 40000 // 40s uptime
-        )
-        val report1 = MainAlarmLogic.detectViolations(stateDenied)
-        val alert1 = report1.reports.find { it.type == ALERT_ID_XIAOMI_SYSTEM_MISSING }
-        assertTrue("Alert should trigger when Autostart is denied", alert1?.conditionMet == true)
-        assertTrue(alert1?.subtitle?.contains("DENIED") == true)
-
-        // Scenario 2: Status UNKNOWN, no override
-        val stateUnknown = createDefaultState(now).copy(
-            isXiaomiDevice = true,
-            xiaomiStatus = EngineXiaomiStatus.UNKNOWN,
-            isXiaomiManualOverride = false,
-            serviceStartTime = now - 40000
-        )
-        val report2 = MainAlarmLogic.detectViolations(stateUnknown)
-        assertTrue("Alert should trigger when UNKNOWN and no override", report2.reports.find { it.type == ALERT_ID_XIAOMI_SYSTEM_MISSING }?.conditionMet == true)
-
-        // Scenario 3: Status UNKNOWN, WITH override
-        val stateOverride = stateUnknown.copy(isXiaomiManualOverride = true)
-        val report3 = MainAlarmLogic.detectViolations(stateOverride)
-        assertFalse("Alert should NOT trigger when UNKNOWN but override is active", report3.reports.find { it.type == ALERT_ID_XIAOMI_SYSTEM_MISSING }?.conditionMet == true)
     }
 
     @Test

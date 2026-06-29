@@ -10,16 +10,11 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * v8.9.52:
+ * - Issue #431: Bayesian Authority Sync. Propagating trackerLastValidFixTs.
+ * - Issue #452: SNR Latch Parity. Propagating isAdaptiveJump for 6-min hold enforcement.
  * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated onLogEvent to include 
- *   maxAccuracy for forensic parity.
- * - Issue #333: Forensic Log Enrichment. Added snrSnapshot and vibeSnapshot to evaluateAlarms 
- *   and onLogEvent. (Formerly #241)
- * - Issue #326: Intelligent Uncertainty UX Mapping. Propagating locationPendingReason for 
- *   consistent UI display. (Formerly #226)
- * - Issue #328: Bayesian Uncertainty. Added trackerLastValidFixTs to evaluateAlarms for 
- *   gap-based expansion logic. (Formerly #221)
- * - Issue #213: Propagating coordinates and accuracy in onLogEvent.
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
  */
 class AppAlarmManager(
     private val context: Context,
@@ -90,6 +85,7 @@ class AppAlarmManager(
         isTrackerVisualJump: Boolean,
         isTrajectoryPromoted: Boolean,
         jumpTier: Int = 0,
+        isAdaptiveJump: Boolean = false, // Added for Issue #452
         trackerLat: Double,
         trackerLng: Double,
         trackerAccuracy: Float,
@@ -168,10 +164,12 @@ class AppAlarmManager(
             trackerGpsAccuracy = trackerAccuracy,
             maxTrackerAccuracy = maxTrackerAccuracy,
             lastGpsPacketTs = trackerLastGpsTs,
+            trackerLastValidFixTs = trackerLastValidFixTs,
             trackerSpeed = trackerSpeed,
             isTrackerVisualJump = isTrackerVisualJump,
             isTrajectoryPromoted = isTrajectoryPromoted,
             jumpTier = jumpTier,
+            isAdaptiveJump = isAdaptiveJump, // Explicit mapping
             trackerBattery = trackerBattery,
             trackerTemp = trackerTemp,
             wasDistanceViolated = wasDistanceViolated,

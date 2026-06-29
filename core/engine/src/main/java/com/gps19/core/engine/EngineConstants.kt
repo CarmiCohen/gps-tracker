@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.52:
+ * - Issue #450: Deduplication Audit. Added DEDUPLICATION_SPATIAL_GATE_FACTOR.
  * v8.9.51:
  * - Issue #424: R747 Implementation. Standardized Alert Titles and Subtitles.
  *   Removed "Tracker:" prefixes and localized "Viewer" as "This device".
@@ -210,6 +212,7 @@ const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 20000L // Issue #436: Aligned with STATIONARY_GPS_POLLING_MS
 const val PARKING_ANCHOR_MIN_DIST = 20.0
 const val PARKING_ANCHOR_FACTOR = 0.8
+const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 // Issue #450: Authoritative multiplier
 
 // Behavioral State Thresholds (Issue #302)
 const val SUSTAINED_SPEED_THRESHOLD = 2 

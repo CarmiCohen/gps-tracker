@@ -4,10 +4,11 @@ import kotlin.math.*
 
 /**
  * GtoEngine: Graph Trajectory Optimization.
+ * v8.9.52:
+ * - Issue #435: Forensic Parity. Updated GtoNode to preserve maxAccuracy context 
+ *   during trajectory promotion.
  * v8.9.34:
  * - Issue #264: Consolidated magic numbers into EngineConstants.kt.
- * v8.9.28:
- * - Issue #309: Implementation of the sliding-window factor graph logic as per GTO_ENGINE_SPEC.md. (Formerly #285)
  */
 class GtoEngine {
 
@@ -19,6 +20,7 @@ class GtoEngine {
         val lng: Double,
         val alt: Double,
         val accuracy: Float,
+        val maxAccuracy: Float, // Added for forensic parity
         val bearing: Float,
         val speedMps: Double,
         val ts: Long,
@@ -26,14 +28,14 @@ class GtoEngine {
     )
 
     fun addPoint(
-        lat: Double, lng: Double, alt: Double, accuracy: Float, bearing: Float,
-        speedMps: Double, ts: Long, vibrationIndex: Float
+        lat: Double, lng: Double, alt: Double, accuracy: Float, maxAccuracy: Float,
+        bearing: Float, speedMps: Double, ts: Long, vibrationIndex: Float
     ) {
         window.removeAll { (ts - it.ts) > HINDSIGHT_MAX_AGE_MS }
         if (window.size >= maxWindowSize) {
             window.removeAt(0)
         }
-        window.add(GtoNode(lat, lng, alt, accuracy, bearing, speedMps, ts, vibrationIndex))
+        window.add(GtoNode(lat, lng, alt, accuracy, maxAccuracy, bearing, speedMps, ts, vibrationIndex))
     }
 
     fun evaluateTrajectory(newLat: Double, newLng: Double, newBearing: Float, newSpeedMps: Double, timestamp: Long): Boolean {

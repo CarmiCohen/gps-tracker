@@ -2,6 +2,31 @@
 
 This document contains archived resolutions from previous hardening phases.
 
+## Hardening Phase: v8.9.51 Resolved Items
+*   **Issue #422**: Documentation Desync (Forensic Baseline). Updated Database v50 specs.
+*   **Issue #366**: Resilience Hardening - High-Resilience Watchdog. Implemented Triple-Lock persistence.
+*   **Issue #424**: R747 Implementation Paradox. Standardized Alert Titles and localized Viewer hardware events.
+*   **Issue #429**: Acoustic Hysteresis Paradox. Aligned SIREN_AUTO_STOP_MS with recovery delays.
+*   **Issue #365**: Ghost Mode Status Conflict. Unified local telemetry freshness logic.
+*   **Issue #427**: UX Inconsistency - Status Badge Staleness. Aligned 10s R338 mandate.
+*   **Issue #428**: R338 Compliance Gap. Decoupled DAT badge from heartbeat.
+
+## Hardening Phase: v8.9.43 - v8.9.48 Resolved Items
+*   **Issue #438**: Issue ID Mismatch (Power Forensics). Unified all currentMa references.
+*   **Issue #425**: R865 Color Non-Compliance. Swapped Emerald500 for BrandJd (#367C2B).
+*   **Issue #421**: Role Identity Prefix Mismatch (R182). Aligned "T" and "C" prefixes.
+*   **Issue #430**: Zeroing Baseline Asymmetry. Aligned Baro intervals with stationary baseline.
+*   **Issue #437**: Acoustic Floor Calibration Logic. Aligned with 50dB safety gate.
+*   **Issue #435**: Hindsight Buffer Desync. Expanded buffer to 10 points.
+*   **Issue #436**: Stationary GPS Pulse Asymmetry. Aligned save interval with polling.
+*   **Issue #426**: Logic Regression - GPS Staleness Coupling. Decoupled GPS health from heartbeat.
+*   **Issue #423**: R325 Authority Scope Discrepancy. Hardened maxAccuracy as deduplication gate.
+*   **Issue #364**: Logic Error - GPS Freshness. Final decoupling of GPS/Heartbeat.
+*   **Issue #360**: Logic Alignment - Jump Threshold. Replaced hardcoded speed constants.
+*   **Issue #361**: Documentation Refactor. Bulk migrated legacy ID references.
+*   **Issue #362**: Regression Fix - Xiaomi Key. Corrected manual override key naming.
+*   **Audit Resolution**: Authoritatively documented Battery, Signal Loss, and Bayesian Growth in SoT.
+
 ## Hardening Phase: v8.9.42 Resolved Items
 *   **Issue #356**: Mismatch: UI Staleness Gates. Aligned `UI_PULSE_TIMEOUT_MS` (10s) with `TELEMETRY_UI_STALE_THRESHOLD_MS` in `EngineConstants.kt`. (Complete)
 *   **Issue #355**: Terminology: Heartbeat vs Signal Loss. Aligned documentation to distinguish between hourly "Heartbeat" pulses and 180s/30s "Signal Loss" gates. (Complete)

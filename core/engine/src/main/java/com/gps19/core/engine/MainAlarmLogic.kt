@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v8.9.52:
+ * - Issue #431: Bayesian Authority Sync. Implemented uncertainty expansion for geofence 
+ *   breach detection to match UI visualization and SoT mandate (Issue #328).
  * v8.9.51:
  * - Issue #424: R747 Implementation. Localized "Viewer" to "this device" and 
  *   simplified "Tracker" to "Device" in subtitles for forensic clarity.
@@ -12,7 +15,6 @@ import kotlin.math.*
  * v8.9.42:
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Strictly prioritizing 
  *   maxTrackerAccuracy for all Geofence transitions (Entry and Exit).
- * - Issue #331: Refactored getTrackerTitle to be fully role-aware for forensic parity.
  */
 object MainAlarmLogic {
 
@@ -193,7 +195,21 @@ object MainAlarmLogic {
         val tLng = state.trackerLng
         val home = state.homePoints
         val maxD = state.maxDistance
-        val acc = state.maxTrackerAccuracy
+        
+        // Issue #431: Bayesian Uncertainty Expansion (SoT R334/Issue #328)
+        var acc = state.maxTrackerAccuracy
+        if (state.isLocationPending && state.trackerLastValidFixTs > 0) {
+            val elapsedSec = (now - state.trackerLastValidFixTs) / 1000f
+            if (elapsedSec > 0) {
+                // Moving: Grows at speed or conservative constant, capped at 33.3m/s (Issue #383)
+                val driftRate = if (state.trackerSpeed > 1.0f) {
+                    state.trackerSpeed.coerceIn(PENDING_UNCERTAINTY_GROWTH_RATE_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS)
+                } else {
+                    PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS
+                }
+                acc += (driftRate * elapsedSec)
+            }
+        }
         
         var distVal: Double? = state.distToHomeAuthority?.takeIf { it >= 0.0 }
         

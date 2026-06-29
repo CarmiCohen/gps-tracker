@@ -1,4 +1,4 @@
-# GPS Accuracy & Filtering Mechanism (v8.9.37)
+# GPS Accuracy & Filtering Mechanism (v8.9.52)
 
 This document describes the multi-stage filtering pipeline used to ensure high-fidelity location tracking and jump rejection.
 
@@ -10,12 +10,18 @@ This document describes the multi-stage filtering pipeline used to ensure high-f
     - **Kinematic Model**: High-responsiveness for active movement. Uses `IMM_KINEMATIC_PROBABILITY` (0.2).
 4.  **Behavioral Sentinel (Issue #302)**: Validates GPS movement against accelerometer vibration data. Uses `VIBRATION_STATIONARY_THRESHOLD` (0.12f) to distinguish movement.
 
-## 2. Forensic Enhancements (v8.9.37)
-- **Log Spatial Anchor (Issue #208)**: All filtering events (Jumps, Outliers, Promotions) are now geographically anchored using `lat`/`lng` in the log record.
-- **Data Parity (Issue #337)**: Historical points include raw speed, bearing, and battery current (`currentMa`).
-- **Ghost Mode (Issue #338)**: Visual staleness indicators applied to markers and accuracy circles when telemetry > `TELEMETRY_UI_STALE_THRESHOLD_MS` (10s).
+## 2. Bayesian Authority (Issue #431)
+When location fixes are pending (due to stalls or violations), the system utilizes **Bayesian Uncertainty Expansion**:
+- **Expansion Rate**: Accuracy radius grows at **15.0m/s** (Moving) or **1.5m/s** (Stationary).
+- **Safety Cap**: Expansion is strictly capped at **33.3m/s** (120 km/h) to maintain threshold sanity.
+- **Enforcement**: This expanded uncertainty is the primary authority for the geofence breach logic and the visual map indicators.
 
-## 3. Jump Rejection (Sentinel Status)
-- **JUMP**: Validated GPS spike rejected by sensor cross-validation. Uses `JUMP_GATE_VISUAL_JITTER_METERS` (10.0m) as a minimum rejection floor (Issue #304).
-- **OUTLIER**: Extreme coordinate jump (> `OUTLIER_DISTANCE_THRESHOLD` 2000m) rejected by physics check.
-- **PROMOTED**: Trajectory confirmed through consistent movement within `TRAJECTORY_PROMOTION_WINDOW_MS` (30s), overriding initial jitter filters (Issue #367).
+## 3. Deduplication & Persistence (Issue #450)
+- **Authoritative Gate**: `maxAccuracy` is the exclusive spatial gate for data persistence.
+- **Sensitivity**: Movement is deduplicated using a **0.5x multiplier** of the current authoritative uncertainty (`DEDUPLICATION_SPATIAL_GATE_FACTOR`).
+
+## 4. Jump Rejection (Sentinel Status)
+- **JUMP**: Validated GPS spike rejected by sensor cross-validation. Uses `JUMP_GATE_VISUAL_JITTER_METERS` (10.0m) floor.
+- **SNR Latch (Issue #452)**: Signal reflections with high SNR (≥35) trigger a **6-minute (360s)** security hold to prevent siren flickering.
+- **OUTLIER**: Extreme coordinate jump (> 2000m) rejected by physics check.
+- **PROMOTED**: Trajectory confirmed through consistent movement within `TRAJECTORY_PROMOTION_WINDOW_MS` (30s). Promoted points strictly preserve forensic metadata (Issue #435).

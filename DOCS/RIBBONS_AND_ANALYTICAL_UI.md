@@ -1,6 +1,6 @@
-# Analytical Ribbons & Forensic UI (v8.9.37)
+# Analytical Ribbons & Forensic UI (v8.9.52)
 
-The **Analytical Ribbons** provide high-density sparkline visualizations for forensic telemetry auditing, allowing monitoring of sensor trends over time.
+The **Analytical Ribbons** provide high-density sparkline visualizations for forensic telemetry auditing, allowing monitoring of sensor trends over time. In v8.9.52, these ribbons are hardened with Dual-Metric spatial parity and monotonic timing.
 
 ## 1. The Ribbon Pipeline
 Telemetries are sampled and down-sampled into six time-scales:
@@ -21,14 +21,16 @@ Each "Ribbon" visualizes a specific forensic metric:
 - **CUR (Power Current)**: Real-time battery drain/charge in mA (Issue #337).
 - **TLT (Tilt)**: Device orientation stability.
 - **BAR (Baro Stability)**: Long-term pressure trends.
-- **BAT (Battery Health)**: Highlights steep discharge events (Issue #353).
+- **BAT (Battery Health)**: Highlights steep discharge events.
 
 ## 3. UI Implementation
 - **Ghost Mode (Issue #338)**: Sparklines dim (Slate500) if the remote device is offline > 10s (`TELEMETRY_UI_STALE_THRESHOLD_MS`).
+- **Forensic Parity (Issue #325)**: Every ribbon point carries both raw `accuracy` and authoritative `maxAccuracy` metadata to ensure the visual uncertainty matches the engine's state.
 - **Forensic Tagging**: Every point includes battery current (`currentMa`), speed, bearing, and SIT status.
 - **Interaction**: Tapping a ribbon expands it to a full-screen historical view with coordinate-aware scrubbing.
 
 ## 4. Forensic Continuity
 Ribbons are reconstructed from the `HistoryEntity` database during session resumption.
 - **Gap Handling**: Missing periods are visualized as "Gaps" in the ribbon to distinguish between "Stationary/Silent" and "Service Offline."
-- **Log Spatial Anchor**: Historical ribbon points can be correlated with forensic logs using shared timestamps and anchors (Issue #208).
+- **Log Spatial Anchor**: Historical ribbon points can be correlated with forensic logs using shared timestamps and Dual-Metric anchors (Issue #325).
+- **Monotonic Integrity**: Ribbon sampling and gap detection utilize `TimeProvider.elapsedRealtime()` to prevent distortion from system clock resets.

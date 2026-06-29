@@ -1,33 +1,32 @@
-# Connection & UI Connectivity Mechanisms (v8.9.37)
+# Connection & UI Connectivity Mechanisms (v8.9.52)
 
-This document details the strategies used to maintain stable communication between the Tracker and Viewer, and how the UI reflects this state.
+This document describes the real-time communication protocol and UI synchronization logic used to maintain low-latency situational awareness.
 
-## 1. Connectivity Model
-- **Protocol**: WebSocket (via Socket.io) for real-time telemetry.
-- **Relay Role**: Acts as a signaling server and message forwarder.
-- **Health Checks**:
-    - **Ping/Pong**: RTT measurement to the relay. Uses `PING_INTERVAL_MS` (10,000ms).
-    - **Signal Loss Monitoring**: Dead-man timer for peer activity (`WATCH_TIMEOUT_MS` 30s).
-    - **Zombie Detection**: Uses independent HTTP pulses to detect stalled TCP sockets.
+## 1. Protocol Architecture (Socket.io)
+The system uses a persistent WebSocket connection via Socket.io for all real-time events.
+- **Relay URL**: Configurable in settings. Default is the Render-hosted survival relay.
+- **Role Gating**: Tracker emits `location_update` and `log_update`. Viewer emits `command_pulse`.
+- **Sync Interval**: Baseline telemetry emission occurs every 10 seconds (`PING_INTERVAL_MS`).
+- **RTT Scaling (Issue #315)**: The sync loop dynamically scales up to 30 seconds if network round-trip time (RTT) exceeds 5000ms, preventing loop saturation on poor connections.
 
-## 2. UI Staleness & Visibility (v8.9.37)
-The UI employs a tiered strategy for data freshness:
-- **Ghost Mode (Issue #338)**: Dashboard fields, accuracy circles, and map markers enter a dimmed "Ghost" state (Slate500) when telemetry is older than **10s** (`TELEMETRY_UI_STALE_THRESHOLD_MS`).
-- **Position Health (GPS)**: Fields gray out after **10s** (`GPS_UI_FAIL_THRESHOLD_MS`). **Instant Recovery (R923)**: Recovery occurs immediately upon receipt of any telemetry packet using the maximum of GPS and arrival timestamps.
-- **Link Health (Sensors)**: Fields gray out after 30s (`WATCH_DOG_UI_GRACE_MS`) of silence.
-- **Cutoff**: All telemetry is hidden (--) after 10 minutes (`SENSOR_GRACE_PERIOD_MS`) inactivity.
+## 2. UI Staleness & Ghost Mode (R338)
+To prevent "Forensic Delusions" (trusting old data as current), the UI implements strict staleness gates:
+- **Telemetry Freshness**: If no packet is received for > 10s (`TELEMETRY_UI_STALE_THRESHOLD_MS`), HUD fields enter a dimmed "Ghost" state.
+- **GPS Health**: If the remote GPS fix is > 10s old (`GPS_UI_FAIL_THRESHOLD_MS`), the "TRK" badge transitions to FAIL.
+- **Watchdog Countdown**: A real-time visual pulse countdown synchronizes with the 10s heartbeat.
 
-## 3. Forensic Continuity
-The application utilizes monotonic timing via `TimeProvider` (Issue #311) for all connectivity metrics (Drop durations, Uptime) to ensure forensic accuracy regardless of system clock adjustments.
+## 3. High-Resilience Watchdog (Issue #366)
+Persistence is maintained through a **Triple-Lock** strategy:
+1.  **Layer 1 (Foreground)**: Sticky services with active WakeLock renewal on every tick.
+2.  **Layer 2 (System)**: `AlarmManager` schedules a hardware wakeup every 90s.
+3.  **Layer 3 (OS)**: `WorkManager` performs a periodic verification of service uptime, scheduled on application startup.
 
-## 4. Role & Identity Integrity (v8.9.37)
-Every telemetry update and log is tagged with the mandatory `role` field. The Viewer joins the Tracker's ID room to ensure bidirectional pulse reception.
-- **Acknowledged SIT Sync (Issue #194)**: Discrete SIT events are synchronized via a 10s loop to prevent forensic loss.
-- **Power Parity (Issue #337)**: Absolute parity for `currentMa` (battery current) across all models and database.
-- **Log Spatial Anchoring (Issue #208)**: All connectivity events are geographically anchored with `lat`/`lng` coordinates.
+## 4. Continuity & Recovery
+- **Zombie Detection**: If the socket is silent but HTTP health checks pass, a reconnection is forced.
+- **Merge-on-Stale**: If a coordinate update is bypassed due to clock regression, the system still merges updated sensor status (Battery, Vibration) into the forensic record.
+- **Boot Grace (Issue #190)**: Includes `XIAOMI_BOOT_GRACE_MS` (30s) to suppress transient boot alarms and allow MIUI/HyperOS stabilization.
 
-## 5. Xiaomi Readiness (v8.9.37 Baseline)
-Xiaomi devices require specific background, lock screen, and autostart permissions. 
-- **System Verification**: The system verifies autostart state via `XiaomiPermissionStatus`.
-- **Alert Guard (Issue #170/172)**: Reports `ALERT_ID_XIAOMI_SYSTEM_MISSING` only if restrictions are detected on a confirmed Xiaomi device.
-- **Boot Grace (Issue #190)**: Includes `XIAOMI_BOOT_GRACE_MS` (30s) to suppress transient boot alarms and handle "Unknown" status during startup.
+## 5. Forensic Parity
+Every UI element is mapped 1:1 to the `:core:engine` state.
+- **Dual-Metric Circles**: Map uncertainty circles reflect both raw GPS accuracy and engine `maxAccuracy`.
+- **Bayesian Visualization (Issue #431)**: When fixes are pending, map circles expand at 15m/s (capped at 33.3m/s) to visually communicate the engine's growing uncertainty.

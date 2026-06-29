@@ -23,6 +23,9 @@ import kotlin.math.min
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
+ * v8.9.52:
+ * - Issue #441: Siren Authority. Aligned log message with 30s limit and 
+ *   switched silence latch to monotonic time for Time Integrity compliance.
  * v8.8.21: Migrated to TimeProvider for all timing logic.
  */
 object AudioSynthesizer {
@@ -30,7 +33,7 @@ object AudioSynthesizer {
     private const val FADE_IN_DURATION_MS = 1000L
     private val isLooping = AtomicBoolean(false)
     private val isForced = AtomicBoolean(false)
-    private val silencedUntil = AtomicLong(0)
+    private val silencedUntilRealtime = AtomicLong(0)
     
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var sirenJob: Job? = null
@@ -38,7 +41,7 @@ object AudioSynthesizer {
     fun isPlaying(): Boolean = isLooping.get()
     fun isForced(): Boolean = isForced.get()
     
-    fun getSilencedUntil(): Long = silencedUntil.get()
+    fun getSilencedUntilRealtime(): Long = silencedUntilRealtime.get()
 
     fun playShortAlert() {
         scope.launch {
@@ -70,7 +73,7 @@ object AudioSynthesizer {
         vibrate: Boolean = false,
         timeProvider: TimeProvider
     ) {
-        if (!force && timeProvider.currentTimeMillis() < silencedUntil.get()) return
+        if (!force && timeProvider.elapsedRealtime() < silencedUntilRealtime.get()) return
         
         if (context != null && !overrideSilence) {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -89,12 +92,12 @@ object AudioSynthesizer {
             var isAutoStopped = false
             try {
                 Log.d("AudioSynthesizer", "Siren loop started: $type (force=$force, loop=$loop)")
-                val startTime = timeProvider.currentTimeMillis()
+                val startTimeRealtime = timeProvider.elapsedRealtime()
                 val vibrator = if (vibrate && context != null) context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator else null
 
                 while (isActive) {
-                    val now = timeProvider.currentTimeMillis()
-                    val elapsed = now - startTime
+                    val nowRealtime = timeProvider.elapsedRealtime()
+                    val elapsed = nowRealtime - startTimeRealtime
                     if (elapsed >= SIREN_AUTO_STOP_MS) {
                         isAutoStopped = true
                         break
@@ -134,7 +137,7 @@ object AudioSynthesizer {
                     isLooping.set(false)
                     isForced.set(false)
                     if (isAutoStopped) {
-                        Log.d("AudioSynthesizer", "Siren auto-stopped (45s limit reached). Triggering cooldown.")
+                        Log.d("AudioSynthesizer", "Siren auto-stopped (${SIREN_AUTO_STOP_MS/1000}s limit reached). Triggering cooldown.")
                         setSilence(SIREN_RESUME_COOLDOWN_MS, timeProvider)
                     }
                     Log.d("AudioSynthesizer", "Siren loop finished (flags reset)")
@@ -201,11 +204,11 @@ object AudioSynthesizer {
 
     private fun setSilence(durationMs: Long, timeProvider: TimeProvider) {
         if (durationMs > 0) {
-            val newSilence = timeProvider.currentTimeMillis() + durationMs
+            val newSilenceRealtime = timeProvider.elapsedRealtime() + durationMs
             while (true) {
-                val current = silencedUntil.get()
-                if (newSilence <= current) break
-                if (silencedUntil.compareAndSet(current, newSilence)) break
+                val current = silencedUntilRealtime.get()
+                if (newSilenceRealtime <= current) break
+                if (silencedUntilRealtime.compareAndSet(current, newSilenceRealtime)) break
             }
         }
     }
@@ -232,8 +235,8 @@ object AudioSynthesizer {
             audioTrack.play()
             
             val durationMs = (samples.size.toDouble() / SAMPLE_RATE * 1000).toLong()
-            val start = timeProvider.currentTimeMillis()
-            while (isActive && timeProvider.currentTimeMillis() - start < durationMs) {
+            val startRealtime = timeProvider.elapsedRealtime()
+            while (isActive && timeProvider.elapsedRealtime() - startRealtime < durationMs) {
                 delay(50)
             }
         } catch (e: Exception) {
@@ -280,8 +283,8 @@ object AudioSynthesizer {
             
             val durationMs = (duration * 1000).toLong()
             if (timeProvider != null) {
-                val start = timeProvider.currentTimeMillis()
-                while (isActive && timeProvider.currentTimeMillis() - start < durationMs) {
+                val startRealtime = timeProvider.elapsedRealtime()
+                while (isActive && timeProvider.elapsedRealtime() - startRealtime < durationMs) {
                     delay(10)
                 }
             } else {

@@ -1,6 +1,6 @@
-# Location Sentinel Specification (v8.9.51)
+# Location Sentinel Specification (v8.9.52)
 
-The **Location Sentinel** is a multi-modal sensor fusion engine designed to detect unauthorized physical interaction with the tracker. In v8.9.51, this logic is strictly isolated within the `:core:engine` module and geographically anchored via **Dual-Metric Spatial Anchors** (Issue #325).
+The **Location Sentinel** is a multi-modal sensor fusion engine designed to detect unauthorized physical interaction with the tracker. In v8.9.52, this logic is strictly isolated within the `:core:engine` module and geographically anchored via **Dual-Metric Spatial Anchors** (Issue #325) and **Bayesian Uncertainty Expansion** (Issue #431).
 
 ## 1. Monitored Sensors
 The Sentinel monitors the following hardware sensors:
@@ -32,27 +32,24 @@ Any of the following conditions will trigger a **Suspicious State** (forcing 1s 
 ### A. Muzzle Window (Issue #191)
 The sentinel implements a `MUZZLE_WINDOW_DURATION_MS` (2000ms) during sync operations. While `isMuzzled` is true, sensor triggers are suppressed.
 
-### B. Lift Detection (Barometer)
-Uses `BARO_LIFT_THRESHOLD_METERS` (0.8m) to detect vertical rise.
+### B. Siren Authority (Issue #441)
+Siren operations are protected by a hardware-safety **30s auto-stop** (`SIREN_AUTO_STOP_MS`) and a **15s resume cooldown**. All silence latches utilize monotonic time to prevent clock-tamper bypass.
 
-### C. Tilt Detection (Rotation Vector)
-Detects orientation changes exceeding `TILT_THRESHOLD_DEGREES` (15°).
-
-### D. Light Jump (EMA Baseline) (Issue #372)
+### C. Light Jump (EMA Baseline) (Issue #372)
 Uses asymmetrical EMA to detect sudden illumination spikes.
 
-### E. Acoustic Sentinel
+### D. Acoustic Sentinel
 Gated by `ACOUSTIC_MIN_THRESHOLD_DB` (50.0dB) to prevent false positives in silent environments.
 
-### F. Adaptive Vibration Normalization
+### E. Adaptive Vibration Normalization
 Uses `VIBRATION_STATIONARY_THRESHOLD` (0.12f) for motion discrimination (Issue #318).
 
-## 4. Forensic Continuity (v8.9.51 / DB v50)
+## 4. Forensic Continuity (v8.9.52 / DB v50)
 Physical violations are logged with extended forensic metadata:
-1.  **Dual-Metric Spatial Anchor (Issue #325)**: All tamper, lift, and tilt events are anchored with `lat`, `lng`, `accuracy`, and `maxAccuracy`. This provides a forensic audit trail of the engine's uncertainty at the exact moment of the violation.
-2.  **Monotonic Timing (Issue #311)**: All timing deltas are calculated using `TimeProvider.elapsedRealtime()`.
-3.  **Ghost Mode UX (Issue #338)**: Visual staleness indicators are applied when telemetry is older than 10s.
-4.  **SIT Acknowledgment (Issue #194)**: Discrete SIT events are synchronized via a 10s acknowledged loop.
+1.  **Dual-Metric Spatial Anchor (Issue #325)**: All tamper, lift, and tilt events are anchored with `lat`, `lng`, `accuracy`, and `maxAccuracy`. **`maxAccuracy` is the exclusive authority** for trajectory deduplication (Issue #450).
+2.  **Bayesian Uncertainty expansion (Issue #431)**: When location fixes are pending, spatial uncertainty expands at **15.0m/s** (Moving) or **1.5m/s** (Stationary), capped at **33.3m/s**. This expansion is synchronized between UI visualization and breach logic.
+3.  **Monotonic Timing (Issue #311 / Issue #441)**: All timing deltas and hardware locks are calculated using `TimeProvider.elapsedRealtime()`.
+4.  **Ghost Mode UX (Issue #338)**: Visual staleness indicators are applied when telemetry is older than 10s.
 
 ## 5. State Integration
 When a physical violation occurs:

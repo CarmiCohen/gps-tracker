@@ -1,10 +1,10 @@
-# Device-Specific Adaptations (v8.9.37)
+# Device-Specific Adaptations (v8.9.52)
 
 This document describes the specialized logic and polling configurations implemented to bypass OEM-specific background restrictions on supported hardware.
 
 ## 1. Samsung Optimization
 ### 1.1. High-Frequency Polling (Samsung S21 FE)
-To prevent the OS from suspending the location lifecycle, the `TrackerService` forces a 10Hz polling interval (`HIGH_FREQUENCY_GPS_POLLING_MS` = 100ms) on Samsung S21 FE devices.
+To prevent the OS from suspending the location lifecycle, the `TrackerService` forces a 10Hz polling interval (`HIGH_FREQUENCY_GPS_POLLING_MS` = 100ms) on Samsung S21 FE devices. (Issue #432)
 
 ### 1.2. Virtual Proximity Debouncing (Samsung A15)
 The Samsung A15 utilizes a virtual proximity sensor that is prone to "flickering" during stationary tracking.
@@ -14,16 +14,16 @@ The Samsung A15 utilizes a virtual proximity sensor that is prone to "flickering
 ### 1.3. GPS Polling Stabilization (Samsung A15)
 The system enforces a 1000ms polling interval (`A15_STABLE_GPS_POLLING_MS`) to prevent the GPS hardware from entering aggressive power-save modes. (Issue #363)
 
-## 2. Xiaomi (MIUI/HyperOS) Hardening
+## 2. Xiaomi (MIUI/HyperOS) Hardening (Issue #439)
 ### 2.1. Autostart Verification
 The system monitors `isXiaomiAutostartGranted`. If false, a critical `XIAOMI_SYSTEM_MISSING` alert is triggered.
 
 ### 2.2. Boot Resilience
-Implemented `XIAOMI_BOOT_GRACE_MS` (30s) to suppress transient "System Not Ready" alarms during the MIUI/HyperOS boot phase. (Issue #190)
+Implemented `XIAOMI_BOOT_GRACE_MS` (30s) to suppress transient "System Not Ready" alarms during the MIUI/HyperOS boot phase.
 
 ### 2.3. Heuristic Recovery Pulse
 - **Detection**: Monitors tick gaps. If the gap exceeds 15s (`XIAOMI_SUPPRESSION_THRESHOLD_MS`), suppression is assumed.
-- **Action**: Triggers a "Revival Pulse" (GPS refresh + WakeLock renewal). (Issue #190)
+- **Action**: Triggers a "Revival Pulse" (GPS refresh + WakeLock renewal). This is limited by a 60s recovery cooldown.
 
 ### 2.4. Stability Audit Suite
 Implemented a GPS Stability Audit suite in `TrackerService` to verify 10Hz persistence.
@@ -39,5 +39,5 @@ System transitions to `TICK_INTERVAL_SLOW_MS` (5s) for background idle, while ma
 
 ## 4. Detection & Watchdog
 - **GPS Availability Hardening**: GPS stall detection is 60s (`GPS_STALL_THRESHOLD_MS`) and revival retry is 120s (`GPS_REVIVAL_RETRY_INTERVAL_MS`).
-- **Log Spatial Anchor**: All OEM-specific transitions and stability logs are anchored with `lat`/`lng` coordinates.
-- **Monotonic Timing**: System monitors `ALARM_OVERLAY_THROTTLE_MS` (30s) using monotonic time to ensure UI lockout stability.
+- **Log Spatial Anchor**: All OEM-specific transitions and stability logs are anchored with Dual-Metric spatial data (Issue #325).
+- **Monotonic Timing**: Siren locks and UI overlays use `TimeProvider.elapsedRealtime()` to ensure stability under clock regression (Issue #441).

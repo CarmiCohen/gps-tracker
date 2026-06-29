@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v8.9.52:
+ * - Issue #431: Added trackerLastValidFixTs to AlarmEvaluationState for Bayesian expansion.
  * v8.9.42:
  * - Issue #334: Added ts to EngineGeoPoint for hindsight rubber-banding.
  * - Issue #326: Added LocationPendingReason and locationPendingReason to AlarmEvaluationState 
@@ -211,6 +213,7 @@ data class AlarmEvaluationState(
     val trackerGpsAccuracy: Float,
     val maxTrackerAccuracy: Float,
     val lastGpsPacketTs: Long,
+    val trackerLastValidFixTs: Long = 0L, // Added for Issue #431
     val trackerSpeed: Float = 0f,
     val isTrackerVisualJump: Boolean = false,
     val isTrajectoryPromoted: Boolean = false,

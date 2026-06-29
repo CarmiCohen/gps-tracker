@@ -5,11 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * v8.9.52:
+ * - Issue #435: Forensic Parity. Propagating maxAccuracy through processLocation 
+ *   and GtoEngine promotion for forensic continuity.
  * v8.9.34:
  * - Issue #304: Corrected Tier 3 Jump Floor. Now uses JUMP_GATE_VISUAL_JITTER_METERS (10.0m).
  * - Issue #324: Lux EMA Implementation. Integrated Slow/Fast variants for rising/falling light. (Legacy-#366 / #266)
- * v8.9.31:
- * - Issue #292: Acoustic Floor Decay Logic. Enforced ACOUSTIC_FLOOR_MIN_DB.
  */
 class LocationSentinel {
 
@@ -252,7 +253,9 @@ class LocationSentinel {
     }
 
     fun processLocation(
-        lat: Double, lng: Double, alt: Double, accuracy: Float, bearing: Float,
+        lat: Double, lng: Double, alt: Double, accuracy: Float, 
+        maxAccuracy: Float, // Issue #435
+        bearing: Float,
         snr: Float, satsUsed: Int, timestamp: Long, 
         bypassBehavioral: Boolean = false,
         isSuspicious: Boolean = false,
@@ -271,7 +274,7 @@ class LocationSentinel {
         if (lastValidTs == 0L) {
             updateLastValid(lat, lng, alt, timestamp, 0.0, bearing)
             val optimized = immFilter.update(lat, lng, accuracy, timestamp, 1.0)
-            return SentinelResult(SentinelStatus.VALID, optimizedPoint = optimized)
+            return SentinelResult(SentinelStatus.VALID, optimizedPoint = optimized.copy(accuracy = accuracy, maxAccuracy = maxAccuracy))
         }
 
         val timeDeltaMs = timestamp - lastValidTs
@@ -363,17 +366,19 @@ class LocationSentinel {
                 val promoted = mutableListOf<EngineGeoPoint>()
                 gtoEngine.getWindow().forEach { p ->
                     val opt = immFilter.update(p.lat, p.lng, p.accuracy, p.ts, SUSPICIOUS_Q_SCALE)
-                    promoted.add(opt)
+                    // Issue #435: Propagate accuracy context into promoted trajectory nodes
+                    promoted.add(opt.copy(accuracy = p.accuracy, maxAccuracy = p.maxAccuracy))
                     updateLastValid(p.lat, p.lng, p.alt, p.ts, p.speedMps, p.bearing)
                 }
                 gtoEngine.clear()
                 val optimized = immFilter.update(lat, lng, accuracy, timestamp, SUSPICIOUS_Q_SCALE)
                 updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
-                return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted (GTO)", optimized, finalJumpConfidence, promotedPoints = promoted)
+                return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted (GTO)", optimized.copy(accuracy = accuracy, maxAccuracy = maxAccuracy), finalJumpConfidence, promotedPoints = promoted)
             }
 
             if (behavioralStatus == SentinelStatus.JUMP || behavioralStatus == SentinelStatus.JITTER) {
-                gtoEngine.addPoint(lat, lng, alt, accuracy, bearing, currentSpeedMps, timestamp, currentVibrationIndex)
+                // Issue #435: Preserve maxAccuracy in the optimization window
+                gtoEngine.addPoint(lat, lng, alt, accuracy, maxAccuracy, bearing, currentSpeedMps, timestamp, currentVibrationIndex)
                 return SentinelResult(behavioralStatus, finalJumpConfidence.reason, jumpConfidence = finalJumpConfidence)
             }
 
@@ -392,7 +397,7 @@ class LocationSentinel {
         val optimizedPoint = immFilter.update(lat, lng, accuracy, timestamp, effectiveQScale)
         updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
         gtoEngine.clear()
-        return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = optimizedPoint, jumpConfidence = finalJumpConfidence)
+        return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = optimizedPoint.copy(accuracy = accuracy, maxAccuracy = maxAccuracy), jumpConfidence = finalJumpConfidence)
     }
 
     private fun runSensorSentinel(

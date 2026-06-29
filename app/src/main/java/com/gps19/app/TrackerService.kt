@@ -21,11 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.52:
+ * - Issue #452: SNR Latch Hardening. Explicitly propagating isAdaptiveJump 
+ *   to AlarmManager to ensure 6-minute hold compliance.
+ * - Fix: Corrected naming desync for peak vertical sensor consumption.
  * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated onTrailPointSaved 
- *   to propagate both accuracy and maxAccuracy for forensic path parity.
- * - Issue #339/348: SIT Logging & Offline Context. Hardened SIT logging rising-edge 
- *   latch to prevent redundant forensic logs.
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -561,7 +562,9 @@ class TrackerService : BaseMonitorService() {
                 now = nowRealtime, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = true,
                 isRelayConnected = isSocketConnected, isTrackerConnected = isViewerConnected, 
                 isTrackerVisualJump = (proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER), 
-                isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false, jumpTier = proc?.jumpTier ?: 0, trackerLat = proc?.optimizedPoint?.lat ?: 0.0, 
+                isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false, jumpTier = proc?.jumpTier ?: 0, 
+                isAdaptiveJump = proc?.isAdaptiveJump ?: false, // Issue #452
+                trackerLat = proc?.optimizedPoint?.lat ?: 0.0,
                 trackerLng = proc?.optimizedPoint?.lng ?: 0.0, trackerAccuracy = proc?.currentAccuracy ?: 0f, 
                 maxTrackerAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), trackerLastGpsTs = proc?.timestamp ?: 0L,
                 trackerLastValidFixTs = locationProcessor.getLastValidFixTs(),

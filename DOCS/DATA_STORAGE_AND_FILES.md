@@ -1,4 +1,4 @@
-# Data Storage & Files Mechanism (v8.9.51)
+# Data Storage & Files Mechanism (v8.9.52)
 
 This document describes the multi-tier storage architecture used in the GPS Tracker project: reactive preferences for configuration, a relational database for high-frequency telemetry, and external JSON files for archival.
 

@@ -4,12 +4,14 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * v8.9.52:
+ * - Issue #450: Deduplication Audit. Replaced hardcoded multiplier with 
+ *   DEDUPLICATION_SPATIAL_GATE_FACTOR.
+ * - Issue #435: Forensic Parity. Propagating maxAccuracy through sentinel 
+ *   processing for trajectory promotion continuity.
  * v8.9.43:
  * - Issue #423: Hardened R325 Deduplication Authority. Utilizing maxAccuracy 
  *   as the exclusive spatial gate for persistence and parking breakout.
- * v8.9.42:
- * - Issue #334: Implemented "Rubber-Band" hindsight interpolation.
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
  */
 class LocationProcessor(
     private val listener: LocationProcessorListener,
@@ -219,7 +221,8 @@ class LocationProcessor(
         if (providedAdaptiveVibrationFloor >= 0f) sentinel.adaptiveVibrationFloor = providedAdaptiveVibrationFloor
         if (providedAcousticLockoutTs > 0) sentinel.updateSensorState(vibration = -1f, heading = -1f, baroAlt = -1000f, acousticLockoutTs = providedAcousticLockoutTs, isMuzzled = isMuzzled, nowRealtime = nowRealtime, nowWall = nowWall)
 
-        val sentinelResult = sentinel.processLocation(lat = lat, lng = lng, alt = alt, accuracy = accuracy, bearing = bearing, snr = snr, satsUsed = satsUsed, timestamp = effectiveTs, bypassBehavioral = !isLocal, isSuspicious = isSuspicious, isMuzzled = isMuzzled, nowWall = nowWall, nowRealtime = nowRealtime)
+        // Issue #435: Propagating maxAccuracy to sentinel.processLocation
+        val sentinelResult = sentinel.processLocation(lat = lat, lng = lng, alt = alt, accuracy = accuracy, maxAccuracy = maxAccuracy, bearing = bearing, snr = snr, satsUsed = satsUsed, timestamp = effectiveTs, bypassBehavioral = !isLocal, isSuspicious = isSuspicious, isMuzzled = isMuzzled, nowWall = nowWall, nowRealtime = nowRealtime)
         
         if (sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED) {
             val promotedPoints = sentinelResult.promotedPoints ?: emptyList()
@@ -235,7 +238,7 @@ class LocationProcessor(
                 }
             }
             promotedPoints.forEach { p ->
-                listener.onTrailPointSaved(p.lat, p.lng, isViewerTrail, false, p.ts, isHindsightCorrected = true, accuracy = accuracy, maxAccuracy = maxAccuracy)
+                listener.onTrailPointSaved(p.lat, p.lng, isViewerTrail, false, p.ts, isHindsightCorrected = true, accuracy = p.accuracy, maxAccuracy = p.maxAccuracy)
             }
         }
 
@@ -313,7 +316,7 @@ class LocationProcessor(
     private fun shouldSavePoint(isSuspicious: Boolean, isThrottled: Boolean, distFromLast: Double, timeSinceLast: Long, maxAcc: Float): Boolean {
         if (isSuspicious) return true
         // Authoritative gate: The greater of the default movement threshold or the current authoritative uncertainty.
-        val spatialGate = max(ACTIVE_MOVE_THRESHOLD, maxAcc.toDouble() * 0.5) // Using 0.5x multiplier for persistence sensitivity.
+        val spatialGate = max(ACTIVE_MOVE_THRESHOLD, maxAcc.toDouble() * DEDUPLICATION_SPATIAL_GATE_FACTOR) // Issue #450
         return (distFromLast > (if (isThrottled) PARKING_ANCHOR_MIN_DIST else spatialGate) || (timeSinceLast > GPS_SAVE_INTERVAL_MS) || lastSavedTs == 0L)
     }
 

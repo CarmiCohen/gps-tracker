@@ -1,11 +1,11 @@
-# GPS Tracker: Technical Overview (v8.9.42)
+# GPS Tracker: Technical Overview (v8.9.52)
 
 GPS Tracker is a high-assurance, native Android application designed for asset protection and remote monitoring. Unlike consumer-grade tracking apps, it prioritizes **forensic continuity**, **high availability**, and **physical security** over simple location sharing.
 
-## 1. Core Architecture (v8.9.42 Baseline)
+## 1. Core Architecture (v8.9.52 Baseline)
 The application follows a strict modular architecture to ensure logic integrity and prevent side-effect regressions.
--   **Sacred Engine (:core:engine)**: A pure JVM library module containing all tracking math, jump detection, and physical security logic. It is physically isolated from the Android framework and uses injected `TimeProvider` for all logic.
--   **Tracker Service**: The specialized "Black Box" role. Optimizes battery, sensor fidelity, and persistent logging. Features a 10Hz polling mode, **Escalated GPS Revival** (Issue #341), and **Muzzle Window Hardening** (Issue #191).
+-   **Hardened Engine (:core:engine)**: A pure JVM library module containing all tracking math, jump detection, and physical security logic. It is physically isolated from the Android framework and uses monotonic `TimeProvider` for all internal logic (Issue #441).
+-   **Tracker Service**: The specialized "Black Box" role. Optimizes battery, sensor fidelity, and persistent logging. Features a 10Hz polling mode (Issue #432), **Escalated GPS Revival** (Issue #341), and **Xiaomi Recovery Pulse** (Issue #439).
 -   **Viewer Service**: The "Monitoring" role. Handles real-time telemetry sync, HUD rendering, and remote command propagation. Now includes **Background Location Polling** for relative distance calculations.
 -   **Decoupled UI**: The `MainViewModel` is decoupled into domain UseCases (Issue #322), ensuring high maintainability and testability. Includes **Ghost Mode** (Issue #338) visual staleness indicators.
 
@@ -19,29 +19,26 @@ The Physical Sentinel is a zero-lag monitoring engine that detects unauthorized 
 -   **Acoustic Fast-Path**: Detects rapid noise floor jumps (>40dB) indicative of forced entry.
 -   **Light-Jump Detection**: Monitors the ambient light sensor for sudden exposure.
 -   **3D Orientation**: Detects tilting (>15°) or lifting (>0.8m).
--   **Tamper Logic**: Integrated proximity and hardware vibration analysis to identify physical displacement.
+-   **Monotonic Hardware Locks**: Siren auto-stop (30s) and silence latches use monotonic `elapsedRealtime` to prevent clock-tamper bypass (Issue #441).
 
 ### C. Geofencing (GtoEngine)
-The **GtoEngine** logic provides a high-confidence geofence gate. It uses a 6-sigma buffer (`GEOFENCE_BUFFER_MULT`) to prevent false alarms from low-accuracy coordinates while providing sub-second projection of fence breaches.
+The **GtoEngine** logic provides a high-confidence geofence gate. It uses a 6-sigma buffer (`GEOFENCE_BUFFER_MULT`) and **Bayesian Uncertainty Expansion** (15m/s moving, capped at 33.3m/s) to prevent false alarms from fix gaps while providing sub-second projection of fence breaches (Issue #431).
 
-## 3. Forensic Telemetry (v8.9.42 Enhancements)
+## 3. Forensic Telemetry (v8.9.52 Enhancements)
 The system is built around "Forensic Continuity." Data is never simply "current"; it is always presented within its historical context via:
--   **Log Spatial Anchor (Issue #208)**: All forensic logs and critical alerts are automatically anchored with `lat`/`lng` coordinates using the last known telemetry position. This enables historical marker reconstruction on the Map even for events that occurred during relay blackouts.
--   **Monotonic Timing (Issue #311)**: All forensic metrics and UI lockout thresholds use `TimeProvider.elapsedRealtime()` to ensure absolute accuracy and eliminate drift.
--   **High-Availability Revival**: If the GPS hardware stalls, the system attempts a retry loop every 120s (`GPS_REVIVAL_RETRY_INTERVAL_MS`) and escalates to a **CRITICAL forensic alert** after 3 failures (Issue #341).
--   **Power Forensic Parity (Issue #337)**: Full parity for battery current (`currentMa`) across all models, database (v35), and ribbons, ensuring remote power-deficit visibility.
--   **SIT Acknowledgement (Issue #194)**: Discrete "sitting" events are synchronized via an acknowledged loop to prevent loss during blackouts.
--   **Analytical Ribbons**: High-density sparklines (4M to 7D) showing SNR, ambient noise, light, vibration, power, and connectivity patterns.
+-   **Dual-Metric Spatial Anchor (Issue #325)**: All forensic logs and telemetry are anchored with both raw GPS `accuracy` and authoritative engine `maxAccuracy`. This ensures perfect parity between what the user sees on the map and the engine's internal confidence.
+-   **Trajectory Forensic Parity (Issue #435)**: Points retroactively validated via "Trajectory Promotion" strictly preserve their original forensic metadata, ensuring a contiguous audit trail.
+-   **Monotonic Timing (Issue #311)**: All forensic metrics and UI lockout thresholds use monotonic time to eliminate drift and manipulation.
+-   **Power Forensic Parity (Issue #337)**: Full parity for battery current (`currentMa`) across all models, database (v50), and ribbons, ensuring remote power-deficit visibility.
 
 ## 4. Connectivity & Resilience
 The app utilizes a custom socket-based protocol optimized for high-latency, unreliable mobile networks. It features:
--   **Visual Watchdog**: A real-time countdown and **Ghost Mode** dimming showing exactly how long since the last verified packet was received.
--   **Automatic Recovery**: Specialized foreground services with sticky behavior, system-level watchdog monitoring, and **Xiaomi Boot Resilience** (Issue #190).
--   **I/O Efficiency**: Counter-based database pruning and batch-flushing ensure minimal background battery impact.
+-   **Triple-Lock Watchdog (Issue #366)**: Layered persistence using `WorkManager`, `AlarmManager`, and a 1s service heartbeat.
+-   **Visual Watchdog**: A real-time countdown and **Ghost Mode** dimming (R338) showing exactly how long since the last verified packet was received.
+-   **Automatic Recovery**: Specialized foreground services with sticky behavior and **Xiaomi Suppression Recovery** (15s detection / 60s recovery) (Issue #439).
 
 ## 5. Project Governance & Compliance Framework
 To ensure that the app's high-assurance claims are auditable, the project adheres to a strict **Three-Tier Documentation Lifecycle**:
--   **Active Workspace (`STATUS/issues.md`)**: Tracks only open and pending hardening tasks.
--   **Audit Archive (`STATUS/compliance.md`)**: The definitive proof of implementation. Contains the Verification Manifest and the complete Resolution Archive.
+-   **Active Workspace (`STATUS/issues.md`)**: Tracks only pending field validation tasks.
+-   **Audit Archive (`STATUS/compliance.md`)**: The definitive proof of implementation. Contains the Verification Manifest and the complete record of over 249 historical resolutions.
 -   **System Specification (`STATUS/requirements_sot.md`)**: The operational "Source of Truth" for constants and logic.
-This framework ensures that forensic history is never lost and that the active codebase is always measurable against its compliance requirements. For further details on this lifecycle, see `DOCS/CONTRIBUTING.md`.
