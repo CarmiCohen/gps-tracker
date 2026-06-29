@@ -25,19 +25,15 @@ data class CommitResult(
     val relayUrlChanged: Boolean = false,
     val maxDistanceChanged: Boolean = false,
     val alertsChanged: Boolean = false,
-    val anyChanged: Boolean = false
+    val anyChanged: Boolean = false,
+    val error: String? = null
 )
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
- * v8.9.5:
- * - Issue 192: Added currentMa to TrackerStatusProto persistence.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * v8.8.35: Updated to latest baseline following database schema cleanup (Issue 159).
- * v8.8.34: Removed 'ver' references (Issue 145).
- * v8.8.32 (Issue 137): Persist isCoolingModeActive and isStorageCritical.
- * v8.8.21: Migrated to TimeProvider for all timing logic.
+ * v8.9.50:
+ * - R182 Relaxation: Updated DEFAULT_TRACKER_ID and DEFAULT_VIEWER_ID to "T" and "V".
+ * - Fixed broken logic in saveLong/getLong and added uniqueness guard to commit.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -58,8 +54,11 @@ class SettingsRepository @Inject constructor(
         const val VIEWER_ID_KEY = "viewer_id"
         const val RELAY_URL_KEY = "relay_url"
         const val DEFAULT_RELAY_URL = "https://gps-survival-relay.onrender.com"
-        const val DEFAULT_TRACKER_ID = "Ttk"
-        const val DEFAULT_VIEWER_ID = "Cohen"
+        
+        // R182: Standardized default IDs
+        const val DEFAULT_TRACKER_ID = "T"
+        const val DEFAULT_VIEWER_ID = "V"
+        
         const val MAX_DISTANCE_STORAGE_KEY = "max_distance"
         const val DEFAULT_MAX_DISTANCE = 60.0
         const val MAX_ACCURACY_KEY = "max_accuracy"
@@ -561,6 +560,12 @@ class SettingsRepository @Inject constructor(
             val newRelayUrl = if (current.hasDraftRelayUrl()) current.draftRelayUrl else current.relayUrl
             val newMaxDistance = if (current.hasDraftMaxDistance()) current.draftMaxDistance else current.maxDistance
             val newAlertsProto = if (current.hasDraftAlertSettings()) current.draftAlertSettings else current.alertSettings
+
+            // R182 Uniqueness Enforcement
+            if (newTrackerId.trim().lowercase() == newViewerId.trim().lowercase()) {
+                res = CommitResult(error = "IDs must be unique")
+                return@updateData current
+            }
 
             val tChanged = newTrackerId != current.trackerId
             val vChanged = newViewerId != current.viewerId

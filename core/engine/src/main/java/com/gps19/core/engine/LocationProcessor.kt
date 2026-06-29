@@ -4,14 +4,12 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * v8.9.43:
+ * - Issue #423: Hardened R325 Deduplication Authority. Utilizing maxAccuracy 
+ *   as the exclusive spatial gate for persistence and parking breakout.
  * v8.9.42:
  * - Issue #334: Implemented "Rubber-Band" hindsight interpolation.
- * - Issue #327: Refined transition smoothing for promoted trajectories.
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Propagating 
- *   accuracy/maxAccuracy to trail points (normal and interpolated) for forensic parity.
- * v8.9.34:
- * - Issue #303: Unified Trajectory Rejection multiplier.
- * - Issue #268: Removed redundant providedAcousticFloorDb from processGpsPoint.
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
  */
 class LocationProcessor(
     private val listener: LocationProcessorListener,
@@ -255,7 +253,7 @@ class LocationProcessor(
         val fallbackPoint = EngineGeoPoint(if (lastLat != 0.0) lastLat else lat, if (lastLng != 0.0) lastLng else lng, ts = if (lastTs != 0L) lastTs else effectiveTs, accuracy = lastAcc, maxAccuracy = lastMaxAcc)
 
         if (!isSpatiallyValid) {
-            if (shouldSavePoint(isSuspicious, true, 1000.0, 0L)) listener.onTrailPointSaved(lat, lng, isViewerTrail, true, effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy)
+            if (shouldSavePoint(isSuspicious, true, 1000.0, 0L, maxAccuracy)) listener.onTrailPointSaved(lat, lng, isViewerTrail, true, effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy)
             return ProcessedLocation(rawPoint = EngineGeoPoint(lat, lng, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy), optimizedPoint = fallbackPoint, status = sentinelResult.status, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedKph(), timestamp = effectiveTs, isStalled = finalIsStalled, receiptRealtime = nowRealtime, jumpTier = finalJumpTier, isAdaptiveJump = finalIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = false, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer)
         }
 
@@ -285,12 +283,13 @@ class LocationProcessor(
         var skipPersistence = false
         if (!isSuspicious && isThrottled && stationaryProb > 0.9) {
             if (parkingAnchorPoint == null) parkingAnchorPoint = persistencePoint
-            val breakoutThreshold = max(PARKING_ANCHOR_MIN_DIST, accuracy.toDouble() * PARKING_ANCHOR_FACTOR)
+            // R325: Using maxAccuracy as the authoritative gate for parking breakout.
+            val breakoutThreshold = max(PARKING_ANCHOR_MIN_DIST, maxAccuracy.toDouble() * PARKING_ANCHOR_FACTOR)
             if (PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, persistencePoint.lat, persistencePoint.lng) < breakoutThreshold) skipPersistence = true else parkingAnchorPoint = null
         } else parkingAnchorPoint = null
 
         val timeSinceLastGpsSave = if (gpsTs > 0 && lastSavedGpsTs > 0) gpsTs - lastSavedGpsTs else 0L
-        if (shouldSavePoint(isSuspicious, isThrottled, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSave) && !skipPersistence) {
+        if (shouldSavePoint(isSuspicious, isThrottled, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSave, maxAccuracy) && !skipPersistence) {
             listener.onTrailPointSaved(persistencePoint.lat, persistencePoint.lng, isViewerTrail, false, effectiveTs, isHindsightCorrected = finalIsTrajectoryPromoted, accuracy = persistencePoint.accuracy, maxAccuracy = persistencePoint.maxAccuracy)
             lastSavedLat = persistencePoint.lat; lastSavedLng = persistencePoint.lng; lastSavedTs = nowWall; lastSavedGpsTs = gpsTs
         }
@@ -308,9 +307,14 @@ class LocationProcessor(
         )
     }
 
-    private fun shouldSavePoint(isSuspicious: Boolean, isThrottled: Boolean, distFromLast: Double, timeSinceLast: Long): Boolean {
+    /**
+     * R325: shouldSavePoint now utilizes maxAccuracy as the authoritative deduplication threshold.
+     */
+    private fun shouldSavePoint(isSuspicious: Boolean, isThrottled: Boolean, distFromLast: Double, timeSinceLast: Long, maxAcc: Float): Boolean {
         if (isSuspicious) return true
-        return (distFromLast > (if (isThrottled) PARKING_ANCHOR_MIN_DIST else ACTIVE_MOVE_THRESHOLD) || (timeSinceLast > GPS_SAVE_INTERVAL_MS) || lastSavedTs == 0L)
+        // Authoritative gate: The greater of the default movement threshold or the current authoritative uncertainty.
+        val spatialGate = max(ACTIVE_MOVE_THRESHOLD, maxAcc.toDouble() * 0.5) // Using 0.5x multiplier for persistence sensitivity.
+        return (distFromLast > (if (isThrottled) PARKING_ANCHOR_MIN_DIST else spatialGate) || (timeSinceLast > GPS_SAVE_INTERVAL_MS) || lastSavedTs == 0L)
     }
 
     private var lastDistanceToTracker: Double? = null

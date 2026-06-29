@@ -12,7 +12,7 @@ This document contains the archived resolutions for the GPS-Tracker system, pres
 *   **FIXED Room Migration Forensic Audit (Android 15) (#195)** - Resolution: Implemented full table reconstruction migration. (v8.9.6)
 *   **FIXED SIT Persistence Packet Loss Risk (#194)** - Resolution: Implemented acknowledged event synchronization pipeline. (v8.9.7)
 *   **FIXED Zombie Telemetry UX (#193)** - Resolution: Implemented visual staleness indicators ("Ghost Mode"). (v8.9.6)
-*   **FIXED Power Parity Consistency & evaluateAlarms Mismatch (#192)** - Resolution: Achieved absolute forensic parity for currentMa. (v8.9.5)
+*   **FIXED Power Parity Consistency & evaluateAlarms Mismatch (#337)** - Resolution: Achieved absolute forensic parity for currentMa. (v8.9.5) (Formerly Issue #192)
 *   **FIXED Muzzle Window Race Condition (#191)** - Resolution: Implemented deterministic Muzzle Handshake. (v8.9.6)
 *   **FIXED Xiaomi Autostart Unknown Handling (Logic) (#190)** - Resolution: Implemented robust handling for indeterminate status. Expanded technicalDetails with uptime and grace threshold (v8.9.16). (Note: Hardware verification pending).
 *   **FIXED Viewer Background Location Gap (#189)** - Resolution: Implemented 10s background polling for Viewers. (v8.9.5)

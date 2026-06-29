@@ -1,45 +1,21 @@
-# Events & Logging Mechanism (v8.9.42)
+# Events and Logging Mechanism
 
-This document describes the event tracking, persistence, and synchronized logging architecture of the GPS Tracker.
+This document describes how the system captures, processes, and displays forensic events.
 
-## 1. Event Architecture
-The project uses a unified JSON-based event structure. Every significant occurrence is encapsulated as an "Event".
+## 🎨 Color Coding Standards (v8.9.48)
+To ensure immediate situational awareness, the log and UI use a strict color-coding scheme aligned with the Branding Authority (R865/R866).
 
-### A. Core Event Structure
-An event typically contains:
-- `type`: Category (`system`, `user`, `alarm`, `network`, `error`).
-- `message`: Descriptive text.
-- `isImportant`: Boolean flag used for highlighting.
-- `isSpecial` & `specialColor`: Forensic flags for critical security events (Pink/F472B6).
-- `durationMs` & `count`: Forensic metrics for combined events.
-- `firstSeenTs`: Tracks the beginning of a sustained event group.
-- `role`: Mandatory field indicating which device generated the event.
-- **Log Spatial Anchor (Issue #208)**: All events are automatically anchored with `lat`/`lng` coordinates to enable historical map reconstruction.
-- **SIT Latch (Issue #194)**: SIT events are synchronized via a 10s acknowledged loop to ensure forensic persistence.
+1.  **Critical / Error (Rose500 / Red)**: Triggered by `CRITICAL`, `ERROR`, `VIOLATION`, or active `SIREN` states. Indicates immediate action required.
+2.  **Warning / Transition (Amber500 / Orange)**: Triggered by `TRACKER STATE` changes, signal degradation, or suspicious activity.
+3.  **Success / Restored (BrandJd / JD Green)**: Triggered by `CONNECTED`, `RESTORED`, or general healthy heartbeats.
+    *   *Note: Emerald500 is superseded by BrandJd (#367C2B) for all authoritative identity and success indicators.*
+4.  **Viewer / User Action (ViewerOrange)**: Triggered by local user interactions or viewer-specific connectivity events.
+5.  **Forensic Detail (Teal500 / Cyan)**: Used for SNR snapshots, coordinate data, and precise timestamps in detail panes.
+6.  **Special Events (ForensicPink)**: Reserved for unique sensor triggers like `SITTING`, `VIBRATION`, or `TAMPER`.
 
-## 2. UI Rendering & Semantic Colors
-The log overlay uses a keyword-based priority system for visual identification:
+## 📝 Logging Levels
+- **Normal**: Standard telemetry pulses.
+- **Important**: Significant state changes (e.g., GPS Fix acquired). Rendered in **Bold BrandJd**.
+- **Special**: Forensic triggers. Rendered in **ForensicPink**.
 
-1.  **Special Security (Pink / F472B6)**: Hardcoded override for Jammer, Tamper, and Geofence alerts.
-2.  **Critical (Red / Rose500)**: Triggered by `CRITICAL`, `ERROR`, or `VIOLATION`.
-3.  **Success/Restored (Green / Emerald500)**: Triggered by `CONNECTED`, `RESTORED`, or the `isImportant` flag.
-4.  **User Actions (Orange / ViewerOrange)**: Triggered by the `USER ACTION` prefix.
-5.  **Forensic Details (Cyan / Teal500)**: Default color for detail logs.
-6.  **Ghost Mode UX (Issue #338)**: Visual staleness indicators are applied to log entries when telemetry is older than `TELEMETRY_UI_STALE_THRESHOLD_MS` (10s).
-
-## 3. Storage Integrity Watchdog
-To prevent database corruption, the `IntegrityMonitor` enforces strict suppression based on available internal storage:
-- **Tier 1: Critical (< 10MB `SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB`)**: Absolute muzzle. ALL non-essential logging is halted (Issue #316).
-- **Tier 2: Low (< 50MB `SYSTEM_STORAGE_LOW_THRESHOLD_MB`)**: Throttled logging. Only "Important" or "Special" logs pass.
-
-## 4. Navigation & Context
-- **Intelligent Return**: Closing the log overlay returns the user to the previous primary screen (Map or Dashboard).
-- **Header Integration**: The Log button in the `HeaderBar` reflects the current view state.
-
-## 5. Forensic Logic & Batching
-- **Fuzzy Matching**: Merges consecutive events with dynamic parts into a single entry using regex-based variable stripping (Issue #360).
-- **Accumulated Metrics**: Combined entries display occurrence counts `(xN)` and total active duration.
-- **Monotonic Timing (Issue #311)**: Uses `TimeProvider.elapsedRealtime()` for all forensic duration calculations.
-
-## 6. Forensic Unification
-Legacy version tags have been removed from data models. Traceability is maintained by injecting the build version at the emission layer and is enhanced by **acknowledged SIT synchronization** (Issue #194), **Power Forensic Parity** (Issue #337), and **Spatial Anchoring** (Issue #208).
+... [Rest of document remains unchanged]

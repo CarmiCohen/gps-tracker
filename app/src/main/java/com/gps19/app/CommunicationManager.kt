@@ -15,13 +15,9 @@ import javax.inject.Inject
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * v8.9.7:
- * - Issue 194: Updated handleLogRelay to forward incoming logs to RemoteHandler for forensic reconstruction.
- * v8.8.21:
- * - Role-Based Standardization: Delegated message filtering to SignalingValidator (engine).
- * - Logic Decoupling: Delegated payload generation to SignalPayloadGenerator.
- * - Conflation Logic: Delegated message merging to SignalingMessageConflator (engine).
- * v8.8.28: Standardized signaling keys to snake_case (viewer_id, from_viewer).
+ * v8.9.51:
+ * - R182 Relaxation: Removed legacy prefix checks in updateIdentity and connect.
+ * - Cleaned up pong role detection to rely on "viewer"/"tracker" literal strings.
  */
 class CommunicationManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -81,11 +77,11 @@ class CommunicationManager @Inject constructor(
         val cleanedViewerId = viewerId.trim()
 
         if (isTracker && !SignalingConstants.isValidTrackerId(cleanedDeviceId)) {
-            logToApp("Invalid Tracker ID: $cleanedDeviceId (Missing '${SignalingConstants.TRACKER_PREFIX}' prefix)", true)
+            logToApp("Invalid Tracker ID: $cleanedDeviceId (Cannot be empty)", true)
             return
         }
         if (!isTracker && !SignalingConstants.isValidViewerId(cleanedViewerId)) {
-            logToApp("Invalid Viewer ID: $cleanedViewerId (Missing '${SignalingConstants.VIEWER_PREFIX}' prefix)", true)
+            logToApp("Invalid Viewer ID: $cleanedViewerId (Cannot be empty)", true)
             return
         }
 
@@ -349,7 +345,7 @@ class CommunicationManager @Inject constructor(
             
             if (pingDeviceId == deviceId && deviceId.isNotEmpty()) {
                 val pongViewerId = data.optString("viewer_id", "")
-                val isFromViewer = fromStr == SignalingConstants.VIEWER_PREFIX.lowercase() || fromStr == "viewer"
+                val isFromViewer = fromStr == "viewer"
                 
                 val isMyPong = if (isTrackerMode) fromStr == "tracker" else isFromViewer
                 val isPeerPong = if (isTrackerMode) isFromViewer else fromStr == "tracker"

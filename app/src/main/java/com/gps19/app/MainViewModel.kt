@@ -20,7 +20,7 @@ import java.util.Locale
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
  * v8.9.5:
- * - Issue 192: Restoring trackerCurrentMa in loadInitialData for power forensic parity.
+ * - Issue #337: Restoring trackerCurrentMa in loadInitialData for power forensic parity.
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  * v8.8.35:

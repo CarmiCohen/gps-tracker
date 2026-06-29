@@ -1,36 +1,47 @@
-# Handover Status: R325 Authoritative Spatial Anchoring & Forensic Hardening (v8.9.42)
+# Handover Status: Hardening & Forensic Alignment (v8.9.51)
 
-## 🎯 High-Level Requirement: R325 (Dual-Metric Authority)
-The system now maintains both raw `accuracy` and engine-calculated `maxAccuracy` (authoritative uncertainty) across all layers. **`maxAccuracy` is the exclusive authority** for all logic-based evaluations (Geofences, Deduplication).
+## 🎯 High-Level Requirement: Identity & Forensic Integrity
+Aligning role identification, forensic identifiers, and system resilience with the authoritative Source of Truth (SoT).
 
-## 🛠️ Work Completed (Forensic Hardening Sequence)
+## 🛠️ Work Completed (Forensic Alignment Sequence)
 
-### 1. Database & Persistence (v47 ➔ v50)
-- **v47-v49**: Added dual-metric accuracy to `logs`, `violations`, and `connection_history`.
-- **v50 (NEW)**: Added `accuracy` and `maxAccuracy` to `trail_points` table.
-- **Model Parity**: `TrailPoint` and `TrailEntity` now support dual-metric storage, enabling high-fidelity path reconstruction.
+### 1. Documentation Desync - Forensic Baseline (Issue #422)
+- **Files Affected**: `DATA_STORAGE_AND_FILES.md`, `LOCATION_SENTINEL_SPEC.md`.
+- **Change**: Updated documentation to reflect Database **Version 50** milestones.
+- **Change**: Incorporated Dual-Metric Spatial Anchors (Issue #325), Hindsight Correction (v42), Signal/Vibration Snapshots (v43), and environmental indices (v44) into the storage and sentinel specifications.
+- **Reasoning**: Resolves the documentation lag where specs described v37/v39 while the system was at v50.
 
-### 2. Logic & Hindsight Parity
-- **Rubber-Band Interpolation**: `PhysicsUtils.interpolateSegment` now performs linear interpolation for `accuracy` and `maxAccuracy`.
-- **Location Engine**: `LocationProcessor.kt` successfully propagates trajectory uncertainty context to interpolated points during hindsight promotion (Issue #334).
-- **Service Alignment**: `TrackerService` and `ViewerService` updated to utilize the hardened `onTrailPointSaved` signature.
+### 2. R747 Implementation Paradox (Issue #424)
+- **Files Affected**: `EngineConstants.kt`, `MainAlarmLogic.kt`.
+- **Change**: Standardized Alert Titles in `EngineConstants.kt` by removing redundant "Tracker:" prefixes and localizing "Viewer" as "This device" for local events.
+- **Change**: Updated Alert Subtitles in `MainAlarmLogic.kt` to use "this device" for local connectivity issues and "Device" for remote alerts.
+- **Reasoning**: Resolves the discrepancy between documented UX improvements and actual implementation.
 
-### 3. Forensic Import/Export Parity
-- **Import Logic**: `MainFileHelper.kt` updated to preserve `accuracy` and `maxAccuracy` when restoring trails from JSON backups.
-- **Export Logic**: Verified that unified forensic backups include the full spatial uncertainty context for every point in the path.
+### 3. High-Resilience Watchdog (Issue #366)
+- **Files Affected**: `GpsApplication.kt`, `BaseMonitorService.kt`.
+- **Change**: Scheduled `MaintenanceWorker` on application startup in `GpsApplication.kt` (Layer 3 Resilience).
+- **Change**: Integrated `scheduleWatchdogAlarm()` into the main service tick loop in `BaseMonitorService.kt` to maintain the heartbeat chain (Layer 2 Resilience).
+- **Reasoning**: Hardens the application against background process termination by the Android OS.
 
-### 4. UI & Visualization
-- **Historical Reconstruction**: `OsmMap` renders historical uncertainty circles for violation markers using the precision captured at the exact moment of the alert.
-- **Ghost Mode**: Propagated `isTelemetryFresh` to `LogOverlay`. Forensic logs now correctly dim to `Slate500` at the 10s threshold.
+### 4. Acoustic Hysteresis Paradox (Issue #429)
+- **Files Affected**: `EngineConstants.kt`.
+- **Change**: Aligned `SIREN_AUTO_STOP_MS` (30s) with `ACOUSTIC_RECOVERY_DELAY_MS`.
 
-## 📊 Current Status: FORENSIC HARDENED
-- **Database Schema**: v50 Stable.
-- **Logic Pipeline**: Authoritative Uncertainty fully integrated from Engine -> Repo -> UI -> Export, including interpolated segments.
-- **Build Status**: Stable.
+### 5. Ghost Mode Status Conflict (Issue #365)
+- **Files Affected**: `SharedUiComponents.kt`.
+- **Change**: Unified `isDataHealthy` logic in `GlobalStatusBar` to respect `isTelemetryFresh` for both roles.
 
-## ⚠️ Next Steps for Next Session
-1. **Live Validation**: Perform a Geofence violation on hardware and verify that the red marker's circle on the map matches the `maxAccuracy` forensic snapshot.
-2. **Import Audit**: Use a legacy JSON trail backup (pre-v50) to ensure the import logic handles missing accuracy fields gracefully (defaulting to 0).
-3. **Ghost Mode Check**: Verify the 10s dimming pulse in the HUD and Log Overlay during a real telemetry dropout.
+### 6. UI Staleness Alignment (Issue #427 / #428)
+- **Files Affected**: `EngineConstants.kt`, `SharedUiComponents.kt`.
+- **Change**: Aligned `WATCH_TIMEOUT_MS` and `WATCH_DOG_UI_GRACE_MS` to 10,000ms (10s).
 
-**Status**: R325 Hindsight Parity complete. Baseline synchronized.
+## 📊 Current Status: STANDARDS COMPLIANT
+- **Forensic Documentation (Issue #422)**: Synchronized with DB v50 - **Fixed**.
+- **R747 UI Standard (Issue #424)**: Implemented - **Fixed**.
+- **High-Resilience Watchdog (Issue #366)**: Implemented - **Fixed**.
+- **UI Staleness Threshold**: 10s (R338) - **Verified**.
+- **Build Status**: Successful.
+
+## ⚠️ Next Steps
+1. **Deduplication Audit (Issue #450)**: Verify `maxAccuracy` usage in `LocationProcessor.kt`.
+2. **Xiaomi Permission Audit (Issue #451)**: Confirm handling of `UNKNOWN` status.

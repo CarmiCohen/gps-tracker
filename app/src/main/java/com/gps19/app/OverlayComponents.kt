@@ -24,17 +24,16 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * v8.9.49:
+ * - Issue #427: Verified alignment of link freshness and activity checks with 
+ *   the authoritative 10s R338 mandate.
+ * v8.9.48:
+ * - Issue #427: Aligned dashboard peer activity check with 10s R338 threshold.
+ * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
+ *   BrandJd (#367C2B) in dashboard status and health indicators.
  * v8.9.42:
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated LegacyDashboardGrid 
  *   to display both raw accuracy and authoritative maxAccuracy side-by-side.
- * - Issue #326: Intelligent Uncertainty UX Mapping. Displaying locationPendingReason 
- *   in LegacyDashboardGrid. (Formerly #226)
- * - Issue #338: Unified UI Staleness Threshold. Consistently dimmed all forensic badges 
- *   and labels to Slate500 when telemetry is stale (>10s). (Formerly #193)
- * - Issue #337: Forensic Power Visibility. Added currentMa to LegacyDashboardGrid 
- *   for power parity. (Formerly #192)
- * v8.9.40:
- * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
  */
 
 @Composable
@@ -59,7 +58,9 @@ fun LegacyDashboardGrid(
 
     val conn = uiState.connectivity
     val isRelayOnline = conn.isRelayConnected
-    val isRemoteActive = conn.lastRemoteActivityTs > 0 && (now - conn.lastRemoteActivityTs < WATCH_TIMEOUT_MS)
+    
+    // Issue #427: Aligned with 10s R338 UI staleness mandate.
+    val isRemoteActive = conn.lastRemoteActivityTs > 0 && (now - conn.lastRemoteActivityTs < TELEMETRY_UI_STALE_THRESHOLD_MS)
     
     val isConnStale = isViewer && !isRemoteActive
     val relayColor = if (isRelayOnline && !isConnStale) Color.White else Slate500
@@ -130,24 +131,24 @@ fun LegacyDashboardGrid(
             InfoRow(leftVal = pingStr, leftLabel = stringResource(R.string.label_ping), leftColor = relayColor, rightVal = d.totalUptime, rightLabel = stringResource(R.string.label_total_monitor), rightColor = masterColor)
             
             val isUnrestricted = uiState.permissions.isBatteryWhitelisted
-            InfoRow(leftVal = d.watchdogCountdown, leftLabel = stringResource(R.string.label_watchdog), leftColor = if (isConnStale) Slate500 else (if(d.watchdogOk) Emerald500 else Rose500), rightVal = if(isUnrestricted) "UNREST" else "RESTR", rightLabel = "Batt", rightColor = if (isConnStale) Slate500 else (if(isUnrestricted) Emerald500 else Amber500))
+            InfoRow(leftVal = d.watchdogCountdown, leftLabel = stringResource(R.string.label_watchdog), leftColor = if (isConnStale) Slate500 else (if(d.watchdogOk) BrandJd else Rose500), rightVal = if(isUnrestricted) "UNREST" else "RESTR", rightLabel = "Batt", rightColor = if (isConnStale) Slate500 else (if(isUnrestricted) BrandJd else Amber500))
             
             val standbyText = when (d.standbyBucket) {
                 10 -> "ACTIVE"; 20 -> "WORKING"; 30 -> "FREQUENT"; 40 -> "RARE"; 45 -> "RESTRICTED"; else -> "U-${d.standbyBucket}"
             }
             val standbyColor = when (d.standbyBucket) {
-                10 -> Emerald500; 20 -> BrandJd; 30 -> Amber500; else -> Rose500
+                10 -> BrandJd; 20 -> BrandJd; 30 -> Amber500; else -> Rose500
             }
             
             InfoRow(
-                leftVal = if (d.isPowerSaveMode) "ON" else "OFF", leftLabel = "PwrSave", leftColor = if (d.isPowerSaveMode) Rose500 else Emerald500,
+                leftVal = if (d.isPowerSaveMode) "ON" else "OFF", leftLabel = "PwrSave", leftColor = if (d.isPowerSaveMode) Rose500 else BrandJd,
                 rightVal = standbyText, rightLabel = "Standby", rightColor = if (isConnStale) Slate500 else standbyColor
             )
             
             val (storageText, storageColor) = when {
                 d.isStorageCritical -> "CRITICAL" to Rose500
                 d.isStorageLow -> "LOW" to Amber500
-                else -> "OK" to Emerald500
+                else -> "OK" to BrandJd
             }
 
             InfoRow(
@@ -156,12 +157,11 @@ fun LegacyDashboardGrid(
             )
 
             InfoRow(leftVal = d.totalUptime, leftLabel = "Uptime", leftColor = masterColor, rightVal = d.session, rightLabel = stringResource(R.string.label_session), rightColor = masterColor)
-            InfoRow(leftVal = d.totalUptime, leftLabel = "Uptime", leftColor = masterColor, rightVal = d.session, rightLabel = stringResource(R.string.label_session), rightColor = masterColor)
-            InfoRow(leftVal = d.engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = d.sinceConn, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else Emerald500)
+            InfoRow(leftVal = d.engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = d.sinceConn, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else BrandJd)
             
             InfoRow(
                 leftVal = d.lastChairSit, leftLabel = "Last Sit", leftColor = if(!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR), 
-                rightVal = d.sinceDisco, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else Emerald500
+                rightVal = d.sinceDisco, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else BrandJd
             )
             
             InfoRow(leftVal = d.violationUptime, leftLabel = "Violation", leftColor = if (!d.isTelemetryFresh) Slate500 else Rose500, rightVal = d.violationPercentage, rightLabel = "Stress Idx", rightColor = if (!d.isTelemetryFresh) Slate500 else Rose500)
@@ -176,8 +176,6 @@ fun LegacyDashboardGrid(
             InfoRow(leftVal = d.lat, leftLabel = "Lat", leftColor = gpsColor, rightVal = d.lng, rightLabel = "Long", rightColor = gpsColor)
             
             val gpsIdxStr = "%.2f".format(Locale.getDefault(), gpsIdx.totalIndex)
-            val ageIdxStr = "%.2f".format(Locale.getDefault(), gpsIdx.ageIndex)
-            val accIdxStr = "%.2f".format(Locale.getDefault(), gpsIdx.accIndex)
             
             InfoRow(leftVal = gpsIdxStr, leftLabel = "GPS-Index", leftColor = if(!d.isGpsFresh) Slate500 else BrandJd, rightVal = d.gpsSpeed, rightLabel = "GPS Speed", rightColor = if(!d.isGpsFresh) Slate500 else BrandJd, onLeftClick = onShowGnssDetail)
             
@@ -186,8 +184,8 @@ fun LegacyDashboardGrid(
             val vwrAccDisplay = if (isViewer) "${d.viewerAccuracy} (${d.viewerMaxAcc})" else ""
 
             InfoRow(leftVal = d.satsIndex, leftLabel = "Satellites Index", leftColor = if(!d.isGpsFresh) Slate500 else if(d.isSatsIndexWarning) Rose500 else Color.White, rightVal = trkAccDisplay, rightLabel = "Tr Accuracy", rightColor = gpsColor)
-            InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerOrange, rightVal = ageIdxStr, rightLabel = "Age Index", rightColor = if(!d.isGpsFresh) Slate500 else Amber500)
-            InfoRow(leftVal = accIdxStr, leftLabel = "Acc Index", leftColor = if(!d.isGpsFresh) Slate500 else Color.White, rightVal = d.snr, rightLabel = "Avg SNR", rightColor = if(!d.isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = onShowGnssDetail)
+            InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerOrange, rightVal = "%.2f".format(Locale.getDefault(), gpsIdx.ageIndex), rightLabel = "Age Index", rightColor = if(!d.isGpsFresh) Slate500 else Amber500)
+            InfoRow(leftVal = "%.2f".format(Locale.getDefault(), gpsIdx.accIndex), leftLabel = "Acc Index", leftColor = if(!d.isGpsFresh) Slate500 else Color.White, rightVal = d.snr, rightLabel = "Avg SNR", rightColor = if(!d.isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = onShowGnssDetail)
 
             Spacer(Modifier.height(6.dp)); HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp); Spacer(Modifier.height(6.dp))
 
@@ -195,7 +193,7 @@ fun LegacyDashboardGrid(
             InfoRow(leftVal = d.tilt, leftLabel = "Tilt", leftColor = if(!d.isTelemetryFresh) Slate500 else Violet500, rightVal = d.acoustic, rightLabel = "Noise Level", rightColor = if(!d.isTelemetryFresh) Slate500 else Color(0xFF38BDF8))
             InfoRow(leftVal = d.lift, leftLabel = "Lift", leftColor = if(!d.isTelemetryFresh) Slate500 else Color(0xFFFACC15), rightVal = d.lux, rightLabel = "Lux", rightColor = if(!d.isTelemetryFresh) Slate500 else Amber500)
             
-            InfoRow(leftVal = d.proximity, leftLabel = "Proximity", leftColor = if (!d.isTelemetryFresh) Slate500 else Emerald500, rightVal = d.proximityCm, rightLabel = "Raw Prox", rightColor = if (!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR))
+            InfoRow(leftVal = d.proximity, leftLabel = "Proximity", leftColor = if (!d.isTelemetryFresh) Slate500 else BrandJd, rightVal = d.proximityCm, rightLabel = "Raw Prox", rightColor = if (!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR))
 
             if (d.chairForensics != "--") {
                 Spacer(Modifier.height(2.dp))

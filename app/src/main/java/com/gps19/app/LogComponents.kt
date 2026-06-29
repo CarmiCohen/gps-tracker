@@ -32,11 +32,12 @@ import java.util.*
 
 /**
  * LogComponents: UI for system logs and diagnostic history.
+ * v8.9.48:
+ * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
+ *   BrandJd (#367C2B) in log rendering for restored/connected events.
  * v8.9.42:
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated LogDetailPane 
  *   to display both raw accuracy and authoritative maxAccuracy.
- * v8.9.40:
- * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
  */
 
 @Composable
@@ -226,9 +227,9 @@ fun getLogRenderingConfig(log: LogEntry, isTelemetryFresh: Boolean = true): LogR
     val isImportant = log.isImportant
     val msg = message.uppercase()
     if (msg.contains("CRITICAL") || msg.contains("ERROR") || msg.contains("[SIREN]") || msg.contains("VIOLATION")) return LogRenderingConfig(Rose500, FontWeight.Bold)
-    if (msg.contains("CONNECTED") || msg.contains("RESTORED")) return LogRenderingConfig(Emerald500, FontWeight.Bold)
+    if (msg.contains("CONNECTED") || msg.contains("RESTORED")) return LogRenderingConfig(BrandJd, FontWeight.Bold)
     if (msg.contains("USER ACTION") || msg.contains("VIEWER CONNECTED")) return LogRenderingConfig(ViewerOrange, FontWeight.Normal)
     if (msg.contains("TRACKER STATE") || msg.contains("TRACKER IS")) return LogRenderingConfig(Amber500, FontWeight.Bold)
-    if (isImportant) return LogRenderingConfig(Emerald500, FontWeight.Bold)
+    if (isImportant) return LogRenderingConfig(BrandJd, FontWeight.Bold)
     return LogRenderingConfig(BrandJd, FontWeight.Normal)
 }

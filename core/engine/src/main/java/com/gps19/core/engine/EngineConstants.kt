@@ -2,21 +2,17 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * v8.9.42:
- * - Issue #356: Aligned UI_PULSE_TIMEOUT_MS (10s) with TELEMETRY_UI_STALE_THRESHOLD_MS to prevent flicker.
- * - Issue #354: Aligned BATTERY_ALARM_THRESHOLD (20) with architectural requirements.
- * - Issue #328: Added PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS and PENDING_UNCERTAINTY_SPEED_CAP_MPS
- *   for velocity-aware Bayesian expansion.
- * v8.9.40:
- * - Issue #343: Remapped Signal Loss/Jammer Forensic Latch.
- * - Issue #344: Remapped Stall/Tamper Forensic Latch.
- * - Issue #345: Remapped Geofence Forensic Latch.
- * - Issue #311: Monotonic Timing Integrity.
- * - Issue #315: Network Signaling Integrity.
- * - Issue #318: Unified Vibration Thresholds.
- * - Issue #191: Behavioral Debouncing & Muzzle Hardening (R729).
- * - Issue #325: Authoritative Spatial Anchoring.
- * - Issue #322: Architectural Bloat / Modularization.
+ * v8.9.51:
+ * - Issue #424: R747 Implementation. Standardized Alert Titles and Subtitles.
+ *   Removed "Tracker:" prefixes and localized "Viewer" as "This device".
+ * v8.9.50:
+ * - Issue #429: Aligned SIREN_AUTO_STOP_MS (30s) with ACOUSTIC_RECOVERY_DELAY_MS to resolve 
+ *   Acoustic Hysteresis Paradox.
+ * v8.9.49:
+ * - Issue #427: Aligned WATCH_TIMEOUT_MS and WATCH_DOG_UI_GRACE_MS with 10s R338 mandate.
+ * v8.9.44:
+ * - Issue #430: Aligned BARO_ZEROING_INTERVAL_MS (300s) with Passive Zeroing baseline.
+ * - Issue #437: Aligned ACOUSTIC_FLOOR_MIN_DB (50dB) with Absolute Safety Gate.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -63,7 +59,7 @@ const val ADAPTIVE_JUMP_SNR_THRESHOLD = 35.0f
 const val ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0f
 
 // Hindsight Correction (v8.9.18 - Issue #334)
-const val HINDSIGHT_BUFFER_SIZE = 5
+const val HINDSIGHT_BUFFER_SIZE = 10 // Issue #435: Forensic Parity
 const val HINDSIGHT_MAX_AGE_MS = 30000L
 
 // Bayesian Uncertainty (Issue #328)
@@ -93,7 +89,7 @@ const val SCATTER_ANGLE_THRESHOLD = 120.0
 const val ACOUSTIC_THRESHOLD_DB_JUMP = 40.0 
 const val ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP = 20.0
 const val ACOUSTIC_MIN_THRESHOLD_DB = 50.0
-const val ACOUSTIC_FLOOR_MIN_DB = 25.0
+const val ACOUSTIC_FLOOR_MIN_DB = 50.0 // Issue #437: Aligned with absolute safety gate
 const val ACOUSTIC_FLOOR_CONTRACTION_EMA = 0.995f
 const val ACOUSTIC_LOCKOUT_MS = 1000L
 const val ACOUSTIC_RECOVERY_DELAY_MS = 30000L
@@ -116,7 +112,7 @@ const val INITIAL_VIBRATION_FLOOR = 0.05f
 const val VIBRATION_WINDOW_SIZE = 5 
 const val PASSIVE_ZEROING_STATIONARY_MS = 300000L
 const val ROTATION_INIT_STATIONARY_MS = 3000L
-const val BARO_ZEROING_INTERVAL_MS = 600000L
+const val BARO_ZEROING_INTERVAL_MS = 300000L // Issue #430: Aligned with PASSIVE_ZEROING_STATIONARY_MS
 const val SPIKE_DEBOUNCE_MS = 5000L
 
 // Chair Sit Detection (R832 - Issue #336)
@@ -194,7 +190,7 @@ const val TICK_INTERVAL_MS = 1000L
 const val TICK_INTERVAL_SLOW_MS = 5000L
 const val UI_PULSE_TIMEOUT_MS = 10000L
 const val FGS_STICKY_DELAY_MS = 45000L
-const val WATCH_TIMEOUT_MS = 30000L
+const val WATCH_TIMEOUT_MS = 10000L // Issue #427: Aligned with R338
 const val CLOCK_REGRESSION_GATE_MS = 100L
 const val SENSOR_WARMING_MS = 5000L
 const val SUSPICIOUS_STATE_COOLDOWN_MS = 60000L
@@ -211,7 +207,7 @@ const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 15000L
 const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
 
 const val ACTIVE_MOVE_THRESHOLD = 2.0
-const val GPS_SAVE_INTERVAL_MS = 60000L
+const val GPS_SAVE_INTERVAL_MS = 20000L // Issue #436: Aligned with STATIONARY_GPS_POLLING_MS
 const val PARKING_ANCHOR_MIN_DIST = 20.0
 const val PARKING_ANCHOR_FACTOR = 0.8
 
@@ -322,31 +318,31 @@ const val ALERT_ID_SYSTEM_STORAGE_CRITICAL = "SYSTEM_STORAGE_CRITICAL"
 const val ALERT_ID_BATTERY_STEEP_DISCHARGE = "BATTERY_HEALTH"
 const val ALERT_ID_XIAOMI_SYSTEM_MISSING = "XIAOMI_SYSTEM_MISSING"
 
-// Alert Titles (Aligned with SoT)
+// Alert Titles (R747 Standardized)
 const val ALERT_TITLE_LOCAL_INTERNET = "This device: Internet Lost"
 const val ALERT_TITLE_RELAY_OFFLINE = "This device: Relay Lost"
-const val ALERT_TITLE_TRACKER_OFFLINE = "Tracker: Offline"
+const val ALERT_TITLE_TRACKER_OFFLINE = "Offline"
 const val ALERT_TITLE_VIEWER_OFFLINE = "Viewer: Offline"
-const val ALERT_TITLE_SIGNAL_LOSS = "Tracker: Signal Lost"
+const val ALERT_TITLE_SIGNAL_LOSS = "Signal Lost"
 const val ALERT_TITLE_VIEWER_SIGNAL_LOSS = "Viewer: Signal Lost"
-const val ALERT_TITLE_JUMP_ALERT = "Tracker: Jammer Alert"
-const val ALERT_TITLE_VISUAL_JUMP = "Tracker: Visual Jump"
-const val ALERT_TITLE_TRACKER_GEOFENCE = "Tracker: Geofence"
-const val ALERT_TITLE_GPS_STALL = "Tracker: GPS Stalled"
-const val ALERT_TITLE_TRACKER_GAP = "Tracker: GPS Gap"
+const val ALERT_TITLE_JUMP_ALERT = "Jammer Alert"
+const val ALERT_TITLE_VISUAL_JUMP = "Visual Jump"
+const val ALERT_TITLE_TRACKER_GEOFENCE = "Geofence"
+const val ALERT_TITLE_GPS_STALL = "GPS Stalled"
+const val ALERT_TITLE_TRACKER_GAP = "GPS Gap"
 const val ALERT_TITLE_VIEWER_GAP = "Viewer: GPS Gap"
-const val ALERT_TITLE_TRACKER_POWER = "Tracker: Charger unplugged"
-const val ALERT_TITLE_TRACKER_BATTERY = "Tracker: Low Battery"
-const val ALERT_TITLE_TRACKER_TEMP = "Tracker: High Temp"
-const val ALERT_TITLE_TRACKER_TAMPER = "Tracker: Tamper Detected"
-const val ALERT_TITLE_TRACKER_TILT = "Tracker: Tilt Alert"
-const val ALERT_TITLE_TRACKER_ACOUSTIC = "Tracker: Acoustic Alert"
-const val ALERT_TITLE_TRACKER_LIFT = "Tracker: Lift"
-const val ALERT_TITLE_TRACKER_CHAIR = "Tracker: Chair Occupied"
-const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "Tracker: System Storage Low"
-const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "Tracker: System Storage Critical"
-const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "Tracker: Critical Battery Health"
-const val ALERT_TITLE_XIAOMI_SYSTEM_MISSING = "Tracker: Xiaomi System Not Ready"
+const val ALERT_TITLE_TRACKER_POWER = "Charger unplugged"
+const val ALERT_TITLE_TRACKER_BATTERY = "Low Battery"
+const val ALERT_TITLE_TRACKER_TEMP = "High Temp"
+const val ALERT_TITLE_TRACKER_TAMPER = "Tamper Detected"
+const val ALERT_TITLE_TRACKER_TILT = "Tilt Alert"
+const val ALERT_TITLE_TRACKER_ACOUSTIC = "Acoustic Alert"
+const val ALERT_TITLE_TRACKER_LIFT = "Lift"
+const val ALERT_TITLE_TRACKER_CHAIR = "Chair Occupied"
+const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "System Storage Low"
+const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "System Storage Critical"
+const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "Critical Battery Health"
+const val ALERT_TITLE_XIAOMI_SYSTEM_MISSING = "Xiaomi System Not Ready"
 
 // System Watchdog & Grace Periods
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L
@@ -355,13 +351,13 @@ const val SYSTEM_WATCHDOG_THROTTLE_MS = 60000L
 const val COMMUNICATION_ALARM_GRACE_PERIOD_MS = 60000L
 const val LOCATION_ALARM_GRACE_PERIOD_MS = 30000L
 const val POWER_DISCONNECT_DEBOUNCE_MS = 3000L
-const val SIREN_AUTO_STOP_MS = 45000L
+const val SIREN_AUTO_STOP_MS = 30000L // Issue #429: Aligned with ACOUSTIC_RECOVERY_DELAY_MS
 const val SIREN_RESUME_COOLDOWN_MS = 15000L
 const val ALARM_OVERLAY_THROTTLE_MS = 30000L
 const val HEARTBEAT_INTERVAL_MS = 3600000L
 
 // UI Health & Visibility
-const val WATCH_DOG_UI_GRACE_MS = 30000L
+const val WATCH_DOG_UI_GRACE_MS = 10000L // Issue #427: Aligned with R338
 const val SENSOR_GRACE_PERIOD_MS = 600000L
 const val TEST_ALARM_DURATION_MS = 3000L
 

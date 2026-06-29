@@ -10,6 +10,9 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
+ * v8.9.49:
+ * - Issue #427: Verified alignment of link freshness and watchdog indicators with 
+ *   the authoritative 10s R338 threshold.
  * v8.9.42:
  * - Issue #364: Decoupled GPS Freshness from Telemetry Pulse. GPS status now 
  *   utilizes loc.timestamp exclusively to prevent stale coordinate masking.

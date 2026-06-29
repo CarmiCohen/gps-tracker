@@ -2,16 +2,27 @@ package com.gps19.core.engine
 
 /**
  * SignalingConstants: Core rules for relay communication and role enforcement.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * - Role-Based Standardization: Explicitly enforcing Tracker ID ("T") vs Viewer ID ("C").
+ * v8.9.50:
+ * - R182 Relaxation: IDs are now free-form strings.
+ * - Minimum length: 1 character.
+ * - Enforces uniqueness concept (Tracker ID != Viewer ID).
  */
 object SignalingConstants {
-    const val TRACKER_PREFIX = "T"
-    const val VIEWER_PREFIX = "C"
+    const val DEFAULT_TRACKER_ID = "T"
+    const val DEFAULT_VIEWER_ID = "V"
 
-    fun isValidTrackerId(id: String) = id.startsWith(TRACKER_PREFIX)
-    fun isValidViewerId(id: String) = id.startsWith(VIEWER_PREFIX)
+    /**
+     * R182: Validation relaxed to non-empty (min 1 char).
+     */
+    fun isValidTrackerId(id: String) = id.trim().isNotEmpty()
+    fun isValidViewerId(id: String) = id.trim().isNotEmpty()
+    
+    /**
+     * R182: IDs must be unique to prevent signal echoes.
+     */
+    fun areIdsUnique(trackerId: String, viewerId: String): Boolean {
+        return trackerId.trim().lowercase() != viewerId.trim().lowercase()
+    }
     
     fun getPeerTypeLabel(isTrackerMode: Boolean): String = if (isTrackerMode) "viewer" else "tracker"
     fun getOwnTypeLabel(isTrackerMode: Boolean): String = if (isTrackerMode) "tracker" else "viewer"

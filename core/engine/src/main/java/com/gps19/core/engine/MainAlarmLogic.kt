@@ -5,13 +5,14 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v8.9.51:
+ * - Issue #424: R747 Implementation. Localized "Viewer" to "this device" and 
+ *   simplified "Tracker" to "Device" in subtitles for forensic clarity.
+ * - Issue #424: Fixed getTrackerTitle to preserve "This device:" prefix as per R747 mandate.
  * v8.9.42:
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Strictly prioritizing 
  *   maxTrackerAccuracy for all Geofence transitions (Entry and Exit).
  * - Issue #331: Refactored getTrackerTitle to be fully role-aware for forensic parity.
- * - Issue #353: Synchronized version to v8.9.26 baseline.
- * - Issue #336: Updated ALERT_ID_TRACKER_CHAIR subtitle to "Chair occupancy detected" 
- *   for consistency with "Chair Occupied" forensic status.
  */
 object MainAlarmLogic {
 
@@ -28,12 +29,12 @@ object MainAlarmLogic {
         
         val isDistanceGraceActive = phase == DiscoveryPhase.BOOTSTRAP
         
-        // 1. LOCAL ALERTS
+        // 1. LOCAL ALERTS (R747: Localized to "This device")
         reports.add(
             ViolationReport(
                 type = ALERT_ID_LOCAL_INTERNET,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_LOCAL_INTERNET),
-                subtitle = if (isTracker) "Tracker lost internet connection" else "Viewer lost internet connection",
+                subtitle = "This device has no internet access",
                 conditionMet = state.isLocalInternetLoss
             )
         )
@@ -47,20 +48,19 @@ object MainAlarmLogic {
             ViolationReport(
                 type = ALERT_ID_RELAY_OFFLINE,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_RELAY_OFFLINE),
-                subtitle = "Relay server is unreachable",
+                subtitle = "Internet is OK but relay unreachable",
                 conditionMet = isRelayConditionMet
             )
         )
 
-        // 3. PEER-DEPENDENT ALERTS
+        // 3. PEER-DEPENDENT ALERTS (R747: Simplified "Tracker" to "Device")
         val shouldSuppressPeerErrors = !isInternetHardwareOk || !isRelayConnected
-        val peerLabel = if (isTracker) "Viewer" else "Tracker"
-
+        
         reports.add(
             ViolationReport(
                 type = ALERT_ID_TRACKER_OFFLINE,
                 title = getTrackerTitle(isTracker, if (isTracker) ALERT_TITLE_VIEWER_OFFLINE else ALERT_TITLE_TRACKER_OFFLINE),
-                subtitle = "$peerLabel is not connected to relay server",
+                subtitle = "Device is not connected to relay server",
                 conditionMet = canCheckPeerErrors && !state.isTrackerConnected && !shouldSuppressPeerErrors
             )
         )
@@ -69,7 +69,7 @@ object MainAlarmLogic {
             ViolationReport(
                 type = ALERT_ID_JUMP_ALERT,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_JUMP_ALERT),
-                subtitle = "GPS data is erratic or jumping",
+                subtitle = "Device data is erratic or jumping",
                 conditionMet = canCheckPeerErrors && state.isJammerSuspicion && !shouldSuppressPeerErrors
             )
         )
@@ -88,7 +88,7 @@ object MainAlarmLogic {
             ViolationReport(
                 type = ALERT_ID_SIGNAL_LOSS,
                 title = getTrackerTitle(isTracker, if (isTracker) ALERT_TITLE_VIEWER_SIGNAL_LOSS else ALERT_TITLE_SIGNAL_LOSS),
-                subtitle = "No data received from $peerLabel for >${if (isTracker) VIEWER_SIGNAL_LOSS_THRESHOLD_MS/1000 else TRACKER_SIGNAL_LOSS_THRESHOLD_MS/1000}s",
+                subtitle = "No data received from device for >${if (isTracker) VIEWER_SIGNAL_LOSS_THRESHOLD_MS/1000 else TRACKER_SIGNAL_LOSS_THRESHOLD_MS/1000}s",
                 conditionMet = canCheckPeerErrors && state.isSignalLoss && !shouldSuppressPeerErrors
             )
         )
@@ -97,7 +97,7 @@ object MainAlarmLogic {
             ViolationReport(
                 type = ALERT_ID_GPS_STALL,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_GPS_STALL),
-                subtitle = "GPS location has not updated",
+                subtitle = "Device GPS location has not updated",
                 conditionMet = canCheckPeerErrors && state.isGpsStalling && !shouldSuppressPeerErrors
             )
         )
@@ -106,7 +106,7 @@ object MainAlarmLogic {
             ViolationReport(
                 type = ALERT_ID_TRACKER_GAP,
                 title = getTrackerTitle(isTracker, if (isTracker) ALERT_TITLE_VIEWER_GAP else ALERT_TITLE_TRACKER_GAP),
-                subtitle = "GPS fix is older than ${GPS_GAP_THRESHOLD_MS / 1000}s",
+                subtitle = "Device GPS fix is older than ${GPS_GAP_THRESHOLD_MS / 1000}s",
                 conditionMet = canCheckPeerErrors && state.isGpsGap && !shouldSuppressPeerErrors
             )
         )
@@ -118,7 +118,7 @@ object MainAlarmLogic {
             ViolationReport(
                 type = ALERT_ID_TRACKER_POWER,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_POWER),
-                subtitle = "Charger unplugged",
+                subtitle = "Charger was removed from the device",
                 conditionMet = isPowerViolation
             )
         )
@@ -193,7 +193,6 @@ object MainAlarmLogic {
         val tLng = state.trackerLng
         val home = state.homePoints
         val maxD = state.maxDistance
-        // R325: Using maxTrackerAccuracy as the logic authority
         val acc = state.maxTrackerAccuracy
         
         var distVal: Double? = state.distToHomeAuthority?.takeIf { it >= 0.0 }
@@ -244,8 +243,6 @@ object MainAlarmLogic {
                 }
 
                 val timeSinceFirst = now - state.firstViolationTs
-                
-                // Issue #332: Adaptive Jump Confidence - Double hold duration for high-SNR spoofing suspicion
                 val effectiveHoldMs = if (state.isAdaptiveJump) (JUMP_HOLD_DURATION_MS * ADAPTIVE_JUMP_HOLD_MULTIPLIER).toLong() else JUMP_HOLD_DURATION_MS
                 
                 val isSustained = if (state.firstViolationWasJump) {
@@ -276,21 +273,20 @@ object MainAlarmLogic {
                     ViolationReport(
                         type = ALERT_ID_TRACKER_GEOFENCE,
                         title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_GEOFENCE),
-                        subtitle = "Tracker is ${ceil(dValue).toInt()}m away from home",
+                        subtitle = "Device is ${ceil(dValue).toInt()}m away from home",
                         conditionMet = !isDistanceGraceActive && (isSustained || isPromoted || isPredictedExit),
                         technicalDetails = geoTech,
                         extremeValue = deviation
                     )
                 )
             } else if (dValue <= (threshold - GEOFENCE_HYSTERESIS_METERS) && !isJump) {
-                // R325: Strictly prioritization of maxTrackerAccuracy for geofence entry logic.
                 if (state.wasDistanceViolated && state.maxTrackerAccuracy < RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT) {
                     state.wasDistanceViolated = false
                     reports.add(
                         ViolationReport(
                             type = ALERT_ID_TRACKER_GEOFENCE,
                             title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_GEOFENCE),
-                            subtitle = "Tracker returned to safe range (${ceil(dValue).toInt()}m)",
+                            subtitle = "Device returned to safe range (${ceil(dValue).toInt()}m)",
                             conditionMet = false
                         )
                     )
@@ -323,9 +319,9 @@ object MainAlarmLogic {
                 type = ALERT_ID_TRACKER_BATTERY,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_BATTERY),
                 subtitle = (when {
-                    isCriticalBattery -> "Deficit: ${100 - state.trackerBattery}% (Critical battery level)"
-                    isChargeDeficit -> "Deficit: ${100 - state.trackerBattery}% (Insufficient charge rate)"
-                    else -> "Deficit: ${100 - state.trackerBattery}%"
+                    isCriticalBattery -> "Device battery level is at ${state.trackerBattery}% (Critical)"
+                    isChargeDeficit -> "Charge Deficit: ${100 - state.trackerBattery}%"
+                    else -> "Device battery level is at ${state.trackerBattery}%"
                 }),
                 conditionMet = batteryConditionMet,
                 extremeValue = (100 - state.trackerBattery).toDouble()
@@ -345,7 +341,7 @@ object MainAlarmLogic {
             ViolationReport(
                 type = ALERT_ID_TRACKER_TEMP,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_TEMP),
-                subtitle = String.format(Locale.getDefault(), "Temp: %.1f°C", state.trackerTemp),
+                subtitle = String.format(Locale.getDefault(), "Device temperature reached %.1f°C", state.trackerTemp),
                 conditionMet = state.trackerTemp > MAX_SAFE_TEMPERATURE_CELSIUS || state.isCoolingModeActive,
                 extremeValue = state.trackerTemp.toDouble()
             )
@@ -380,13 +376,10 @@ object MainAlarmLogic {
         )
 
         // 7. DEVICE SPECIFIC GATING
-        
         val uptimeMs = now - state.serviceStartTime
         val isXiaomiBootGraceActive = uptimeMs < XIAOMI_BOOT_GRACE_MS
-        
         val isAutostartExplicitlyDenied = state.xiaomiAutostartStatus == EngineXiaomiStatus.DENIED
         val isSpecialExplicitlyDenied = state.xiaomiStatus == EngineXiaomiStatus.DENIED
-        
         val isAutostartIndeterminate = state.xiaomiAutostartStatus == EngineXiaomiStatus.UNKNOWN
         val isSpecialIndeterminate = state.xiaomiStatus == EngineXiaomiStatus.UNKNOWN
 
@@ -407,15 +400,12 @@ object MainAlarmLogic {
             else -> "MIUI status OK"
         }
 
-        val xiaomiTechnical = "MIUI State: autostart=${state.xiaomiAutostartStatus}, special=${state.xiaomiStatus}, override=${state.isXiaomiManualOverride}, grace=$isXiaomiBootGraceActive (Uptime: ${uptimeMs}ms, Threshold: ${XIAOMI_BOOT_GRACE_MS}ms)"
-
         reports.add(
             ViolationReport(
                 type = ALERT_ID_XIAOMI_SYSTEM_MISSING,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_XIAOMI_SYSTEM_MISSING),
                 subtitle = xiaomiSubtitle,
-                conditionMet = xiaomiViolation,
-                technicalDetails = xiaomiTechnical
+                conditionMet = xiaomiViolation
             )
         )
 
@@ -424,16 +414,15 @@ object MainAlarmLogic {
 
     /**
      * getTrackerTitle: Role-aware title normalization for forensic parity.
-     * 1. Always strips "This device:" for local clarity on both roles.
+     * 1. Preserves "This device:" as per R747 mandate to clarify locality.
      * 2. Strips the current role's prefix ("Tracker:" or "Viewer:") to keep local alerts clean.
      * 3. Preserves the peer's prefix to distinguish remote alerts.
      */
     private fun getTrackerTitle(isTracker: Boolean, title: String): String {
-        val noLocal = title.removePrefix("This device:").trim()
         return if (isTracker) {
-            noLocal.removePrefix("Tracker:").trim()
+            title.removePrefix("Tracker:").trim()
         } else {
-            noLocal.removePrefix("Viewer:").trim()
+            title.removePrefix("Viewer:").trim()
         }
     }
 

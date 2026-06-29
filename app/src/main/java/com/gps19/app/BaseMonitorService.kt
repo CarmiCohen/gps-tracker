@@ -20,12 +20,11 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * v8.9.51:
+ * - Issue #366: Resilience Hardening. Integrated scheduleWatchdogAlarm into the 
+ *   main tick loop to maintain the heartbeat chain.
  * v8.9.28:
  * - Issue #279: Hardened safeStartForeground with explicit ForegroundServiceStartNotAllowedException logging.
- * v8.9.27:
- * - Issue #218: Added safeStartForeground wrapper to handle ForegroundServiceStartNotAllowedException on Android 12+.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -83,6 +82,9 @@ abstract class BaseMonitorService : LifecycleService() {
                 val now = timeProvider.currentTimeMillis()
                 val nowRealtime = timeProvider.elapsedRealtime()
                 
+                // Issue #366: Layer 2 Watchdog - Reschedule Alarm heartbeat
+                systemMonitor.scheduleWatchdogAlarm()
+                
                 processTick(now, nowRealtime) 
                 
                 val elapsed = timeProvider.elapsedRealtime() - startTime
@@ -97,10 +99,6 @@ abstract class BaseMonitorService : LifecycleService() {
         return isUiForeground.get() && (timeProvider.currentTimeMillis() - lastUiPulseTs < UI_PULSE_TIMEOUT_MS)
     }
 
-    /**
-     * safeStartForeground: Safety wrapper for startForeground to handle Android 12+ (API 31) 
-     * background start restrictions and potential crashes.
-     */
     protected fun safeStartForeground(id: Int, notification: Notification, type: Int = 0) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && type != 0) {
@@ -119,7 +117,6 @@ abstract class BaseMonitorService : LifecycleService() {
             }
             Timber.e(e, logMsg)
             
-            // Log to forensic logs if initialized
             if (this::logManager.isInitialized) {
                 logManager.logServiceEvent("RECOVERY_WARN: $logMsg", important = true)
             }

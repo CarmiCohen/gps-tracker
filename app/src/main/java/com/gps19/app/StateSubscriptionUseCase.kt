@@ -14,7 +14,7 @@ import javax.inject.Singleton
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
  * v8.9.5:
- * - Issue 192: Propagated currentMa in observeIntegrityUpdates for power forensic parity.
+ * - Issue #337: Propagated currentMa in observeIntegrityUpdates for power forensic parity.
  * v8.8.27: Added history flow management to further decouple MainViewModel.
  */
 @Singleton

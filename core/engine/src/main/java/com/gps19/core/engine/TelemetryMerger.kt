@@ -5,7 +5,7 @@ package com.gps19.core.engine
  * v8.9.21:
  * - Issue #224: Added tiltIdx and baroIdx to the merge copy list for forensic parity.
  * v8.9.5:
- * - Issue 192: Added currentMa to the merge copy list to ensure power forensic parity.
+ * - Issue #337: Added currentMa to the merge copy list to ensure power forensic parity.
  */
 object TelemetryMerger {
 

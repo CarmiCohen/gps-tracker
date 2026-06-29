@@ -24,7 +24,7 @@
     <string name="perm_background_desc">GPS-Tracker collects location data to enable tracking your device even when the app is closed.</string>
     <string name="perm_background_btn_accept">Accept \u0026 Continue</string>
     <string name="perm_background_btn_reject">No Thanks</string>
-    <string name="perm_background_denied_toast">Background location is required for tracker.</string>
+    <string name="perm_background_denied_toast">Background location is required for device tracking.</string>
 
     <!-- Tracking Control -->
     <string name="stop_tracking_title">Stop Tracking?</string>
@@ -139,8 +139,9 @@
     <string name="log_diag_sentinel">Sentinel</string>
 
     <!-- Telemetry Labels -->
-    <string name="label_viewer">V: %1$s</string>
-    <string name="label_tracker">T: %1$s</string>
+    <!-- v8.9.47: Removed hardcoded prefixes per R182 relaxation -->
+    <string name="label_viewer">%1$s</string>
+    <string name="label_tracker">%1$s</string>
     <string name="label_last_seen">Last Seen</string>
     <string name="label_app_bruto">Bruto</string>
     <string name="label_total_monitor">Total Monitor</string>
@@ -164,9 +165,9 @@
     <string name="label_dat_badge">DAT</string>
     <string name="label_view_badge">VIEW</string>
 
-    <!-- Log/Alert Logic -->
-    <string name="log_msg_tracker_id_changed">USER ACTION: Tracker ID changed to: %1$s (Identification label updated)</string>
-    <string name="log_msg_viewer_id_changed">USER ACTION: Viewer ID changed to: %1$s (Monitoring destination updated)</string>
+    <!-- Log/Alert Logic (R747 Compliant) -->
+    <string name="log_msg_tracker_id_changed">USER ACTION: Device ID changed to: %1$s</string>
+    <string name="log_msg_viewer_id_changed">USER ACTION: Viewer ID changed to: %1$s</string>
     <string name="log_msg_relay_url_changed">USER ACTION: Relay URL changed to: %1$s (Server connection point modified)</string>
     <string name="log_msg_stats_reset">USER ACTION: Connectivity stats reset (Connectivity history has been cleared)</string>
     <string name="log_msg_logs_cleared">USER ACTION: Event logs cleared from database (All previous event history has been erased)</string>
@@ -179,6 +180,6 @@
     <string name="log_msg_relay_reset">USER ACTION: Reset to official relay: %1$s (Connection switched to production server)</string>
     <string name="log_msg_siren_stopped">USER ACTION: Siren%1$s stopped by user (Audio alarm has been manually silenced)</string>
     <string name="log_msg_trails_cleared">USER ACTION: Map trails cleared (Historical path data has been removed from display)</string>
-    <string name="log_msg_tracker_restored">CONNECTIVITY: Tracker connection restored (Communication with tracker is now active)</string>
-    <string name="log_msg_tracker_lost_watchdog">CONNECTIVITY: Tracker connection lost (Visual Watchdog) (Data stream from tracker has stopped)</string>
+    <string name="log_msg_tracker_restored">CONNECTIVITY: Device connection restored (Communication with device is now active)</string>
+    <string name="log_msg_tracker_lost_watchdog">CONNECTIVITY: Device connection lost (Visual Watchdog) (Data stream from device has stopped)</string>
 </resources>

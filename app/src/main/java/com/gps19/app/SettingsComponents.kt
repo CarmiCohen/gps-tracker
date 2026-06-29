@@ -26,9 +26,11 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * v8.9.48:
+ * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
+ *   BrandJd (#367C2B) in headers and phone setup status indicators.
  * v8.9.40:
  * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
- * Extracted from OverlayComponents for Issue 115 modularization.
  */
 
 @Composable
@@ -151,7 +153,7 @@ fun AlertManagementOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSe
             AlarmToggle(ALERT_TITLE_GPS_STALL, uiState.draftSettings.alertSettings.gpsStalling) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(gpsStalling = it)) }
             AlarmToggle(ALERT_TITLE_TRACKER_GAP, uiState.draftSettings.alertSettings.longTimeGap) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(longTimeGap = it)) }
             
-            SettingsGroupHeader(stringResource(R.string.alert_group_device), Emerald500)
+            SettingsGroupHeader(stringResource(R.string.alert_group_device), BrandJd)
             AlarmToggle(ALERT_TITLE_TRACKER_POWER, uiState.draftSettings.alertSettings.power) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(power = it)) }
             AlarmToggle(ALERT_TITLE_TRACKER_BATTERY, uiState.draftSettings.alertSettings.lowBattery) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(lowBattery = it)) }
             AlarmToggle(ALERT_TITLE_BATTERY_STEEP_DISCHARGE, uiState.draftSettings.alertSettings.batteryHealth) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(batteryHealth = it)) }
@@ -160,7 +162,7 @@ fun AlertManagementOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSe
             SettingsGroupHeader(stringResource(R.string.alert_group_integrity), Violet500)
             AlarmToggle(ALERT_TITLE_SYSTEM_STORAGE_LOW, uiState.draftSettings.alertSettings.systemStorageLow) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(systemStorageLow = it)) }
 
-            SettingsGroupHeader(stringResource(R.string.alert_group_sentinel), Emerald500)
+            SettingsGroupHeader(stringResource(R.string.alert_group_sentinel), BrandJd)
             AlarmToggle(ALERT_TITLE_TRACKER_TAMPER, uiState.draftSettings.alertSettings.tamperAlert) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(tamperAlert = it)) }
             AlarmToggle(ALERT_TITLE_TRACKER_TILT, uiState.draftSettings.alertSettings.tiltAlert) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(tiltAlert = it)) }
             AlarmToggle(ALERT_TITLE_TRACKER_ACOUSTIC, uiState.draftSettings.alertSettings.acousticAlert) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(acousticAlert = it)) }
@@ -216,7 +218,7 @@ fun PhoneSetupOverlay(
     val manufacturer = Build.MANUFACTURER.uppercase(); val model = Build.MODEL.uppercase()
     Card(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().navigationBarsPadding(), colors = CardDefaults.cardColors(containerColor = Slate950)) {
         Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column { Text("Phone Setup", color = Emerald500, fontSize = 24.sp, fontWeight = FontWeight.Bold); Text(stringResource(R.string.setup_detected_device, manufacturer, model), color = Slate500, fontSize = 10.sp) } }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column { Text("Phone Setup", color = BrandJd, fontSize = 24.sp, fontWeight = FontWeight.Bold); Text(stringResource(R.string.setup_detected_device, manufacturer, model), color = Slate500, fontSize = 10.sp) } }
             Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step1_title), getRecentsLockDescription(), {}, stringResource(R.string.setup_info_only), if (isS21FEDevice()) true else null, Icons.Default.Lock)
             Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), getBatteryOptimizationDescription(), onWhitelist, stringResource(R.string.btn_open_settings), isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!isBatteryWhitelisted) "Battery Optimization: Unrestricted mode NOT active" else null)
             Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step3_title), stringResource(R.string.setup_step3_desc), onOverlay, stringResource(R.string.btn_authorize), isOverlayGranted, Icons.Default.Layers, reason = if (!isOverlayGranted) "Appear on Top: Permission NOT granted" else null)
@@ -273,7 +275,7 @@ fun AlarmToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> U
 @Composable
 fun GuideSection(title: String, description: String, onClick: () -> Unit, buttonText: String, isCompleted: Boolean?, icon: androidx.compose.ui.graphics.vector.ImageVector, reason: String? = null) {
     val statusIcon = when(isCompleted) { true -> Icons.Default.CheckCircle; false -> Icons.Default.Warning; null -> Icons.Default.Info }; 
-    val statusColor = when(isCompleted) { true -> Emerald500; false -> Amber500; null -> Slate500 }
+    val statusColor = when(isCompleted) { true -> BrandJd; false -> Amber500; null -> Slate500 }
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) { Icon(statusIcon, null, tint = statusColor, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Icon(icon, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp) }
         if (isCompleted == false && !reason.isNullOrEmpty()) { Text("Reason: $reason", color = Amber500, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 28.dp, top = 2.dp)) }

@@ -36,7 +36,7 @@
 
 ## v8.9.5
 - **Viewer Background Location (Issue 189)**: Enabled Viewer-side location tracking and relative geofencing.
-- **Power Forensic Parity (Issue 192)**: Achieved absolute parity for battery current (`currentMa`) across models and ribbons.
+- **Power Forensic Parity (Issue #337)**: Achieved absolute parity for battery current (`currentMa`) across models and ribbons. (Formerly Issue 192)
 
 ## v8.9.4
 - **Viewer Engine State Restoration (Issue 187)**: Updated `ViewerService` to load persistent state into `LocationProcessor` on startup.

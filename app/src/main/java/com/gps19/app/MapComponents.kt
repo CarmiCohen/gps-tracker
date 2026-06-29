@@ -48,12 +48,12 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * v8.9.48:
+ * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
+ *   BrandJd (#367C2B) in Map Tool buttons (LOAD, ADD, FENCE).
  * v8.9.42:
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added support for 
  *   historical violation uncertainty circles using stored accuracy/maxAccuracy.
- * - Issue #328: Velocity-Aware Bayesian Uncertainty Expansion. Growth rate scales 
- *   with last known speed. (Formerly #221)
- * - Issue #326: Intelligent Uncertainty UX Mapping. Rendering locationPendingReason on Map. (Formerly #226)
  */
 
 @Composable
@@ -92,12 +92,12 @@ fun AppMapContainer(
     val viewerLng = if (isTrackerMode) uiState.trackerLocation.lng else uiState.localLocation.lng
     val viewerBearing = if (isTrackerMode) uiState.trackerLocation.bearing else uiState.localLocation.bearing
     val viewerAccuracy = if (isTrackerMode) uiState.trackerLocation.accuracy else uiState.localLocation.accuracy
-    val viewerMaxAcc = if (isTrackerMode) uiState.trackerLocation.maxAccuracy else uiState.trackerLocation.maxAccuracy
+    val viewerMaxAcc = if (isTrackerMode) uiState.trackerLocation.maxAccuracy else uiState.localLocation.maxAccuracy
     val viewerSpeed = if (isTrackerMode) uiState.trackerLocation.speed else uiState.localLocation.speed
     
     val viewerLastValidFixRealtime = if (isTrackerMode) uiState.trackerLocation.lastValidFixRealtime else uiState.localLocation.lastValidFixRealtime
     val viewerLocationPending = if (isTrackerMode) uiState.trackerLocation.isLocationPending else uiState.localLocation.isLocationPending
-    val viewerLocationPendingReason = if (isTrackerMode) uiState.trackerLocation.locationPendingReason else uiState.trackerLocation.locationPendingReason
+    val viewerLocationPendingReason = if (isTrackerMode) uiState.localLocation.locationPendingReason else uiState.trackerLocation.locationPendingReason
     
     val trackerGpsAge = if (isTrackerMode) (if (uiState.localLocation.timestamp > 0) now - uiState.localLocation.timestamp else Long.MAX_VALUE)
                  else (if (uiState.trackerLocation.timestamp > 0) now - uiState.trackerLocation.timestamp else Long.MAX_VALUE)
@@ -789,7 +789,7 @@ fun MapToolsOverlay(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
-            MapToolButton(icon = Icons.Default.Upload, label = "LOAD", onClick = onLoad, iconColor = Emerald500)
+            MapToolButton(icon = Icons.Default.Upload, label = "LOAD", onClick = onLoad, iconColor = BrandJd)
             MapToolButton(icon = Icons.Default.Save, label = "SAVE", onClick = onSave, iconColor = Indigo500)
         }
 
@@ -798,8 +798,8 @@ fun MapToolsOverlay(
                 icon = Icons.Default.AddLocation, 
                 label = "ADD", 
                 onClick = { if (!isTrackerMode) onSetGeofenceMode(GeofenceMode.ADD) }, 
-                iconColor = if (geofenceMode == GeofenceMode.ADD) Color.White else Emerald500,
-                containerColor = if (geofenceMode == GeofenceMode.ADD) Emerald500 else Color.Transparent
+                iconColor = if (geofenceMode == GeofenceMode.ADD) Color.White else BrandJd,
+                containerColor = if (geofenceMode == GeofenceMode.ADD) BrandJd else Color.Transparent
             )
             MapToolButton(
                 icon = Icons.Default.WrongLocation, 
@@ -811,7 +811,7 @@ fun MapToolsOverlay(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
-            MapToolButton(icon = if (showFence) Icons.Default.Visibility else Icons.Default.VisibilityOff, label = "FENCE", onClick = onToggleFence, iconColor = if (showFence) Emerald500 else Color.Gray)
+            MapToolButton(icon = if (showFence) Icons.Default.Visibility else Icons.Default.VisibilityOff, label = "FENCE", onClick = onToggleFence, iconColor = if (showFence) BrandJd else Color.Gray)
             MapToolButton(icon = Icons.Default.Delete, label = "CLEAR", onClick = { onCenterTracker(); onClear() }, iconColor = Rose500)
         }
     }

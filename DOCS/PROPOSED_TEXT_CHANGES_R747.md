@@ -1,16 +1,16 @@
-# Proposed Event & Alert Text Changes (R747) - v8.8.35
+# Event & Alert Text Changes (R747) - v8.9.51
 
-This document contains the proposed text changes for system events and alerts as part of R747. 
-**Note: This proposal was NOT implemented, but is preserved here for future reference.**
+This document contains the text changes for system events and alerts as part of R747. 
+**Status: IMPLEMENTED (v8.9.51)**
 
 ## Summary of Logic
-1.  **Viewer-Local Events**: Change "Viewer device" to "**this device**" to clarify that the issue is with the phone the user is holding.
+1.  **Viewer-Local Events**: Change "Viewer device" to "**this device**" to clarify that the issue is with the phone the user is holding. The title prefix "**This device:**" is preserved to ensure locality clarity.
 2.  **Tracker-Remote Events**: Omit the "**Tracker:**" prefix. Since the tracker's ID is usually shown in the log header, the prefix is redundant. Change internal descriptions from "Tracker" to "**Device**".
 3.  **Telemetry**: Labels in the dashboard and status bars (e.g., "Tracker Accuracy") remain unchanged for technical clarity.
 
-## Proposed Text Mapping
+## Text Mapping (Implemented)
 
-| Category | Current Text | Proposed Text |
+| Category | Current Text | New Text |
 | :--- | :--- | :--- |
 | **Viewer (Local)** | **Internet Connection Lost** | **This device: Internet Lost** |
 | Viewer (Local) | Viewer device has no internet access | This device has no internet access |
@@ -44,8 +44,8 @@ This document contains the proposed text changes for system events and alerts as
 | **Tracker (Remote)** | **Tracker: Lift** | **Lift** |
 | **Tracker (Remote)** | **Tracker: Tamper Detected** | **Tamper Detected** |
 
-## Telemetry (No Changes Proposed)
-The following labels remain as they are in the current version:
+## Telemetry (No Changes)
+The following labels remain as they are:
 *   `RTT (Tracker)`
 *   `Tracker Accuracy`
 *   `Viewer Accuracy`

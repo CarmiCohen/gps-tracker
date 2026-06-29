@@ -27,6 +27,9 @@ import com.gps19.core.engine.*
 
 /**
  * AlarmComponents: Overlay for active alarm states and sirens.
+ * v8.9.48:
+ * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
+ *   BrandJd (#367C2B) in resolved alarm status and secure state indicators.
  * Extracted from OverlayComponents for Issue 115 modularization.
  */
 
@@ -66,7 +69,7 @@ fun AlarmOverlay(
     Box(modifier = Modifier.fillMaxSize().background(bgColor)) {
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.height(16.dp))
-            Box(modifier = Modifier.size(80.dp).background(if (isMuted) Slate500.copy(alpha = 0.2f) else if (hasUnresolved) Rose500.copy(alpha = 0.4f) else Emerald500.copy(alpha = 0.4f), CircleShape).border(3.dp, if (isMuted) Slate500 else Color.White, CircleShape).padding(16.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (!isMuted && isSirenPlaying) onMute() }, contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(80.dp).background(if (isMuted) Slate500.copy(alpha = 0.2f) else if (hasUnresolved) Rose500.copy(alpha = 0.4f) else BrandJd.copy(alpha = 0.4f), CircleShape).border(3.dp, if (isMuted) Slate500 else Color.White, CircleShape).padding(16.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (!isMuted && isSirenPlaying) onMute() }, contentAlignment = Alignment.Center) {
                 Icon(if (isMuted) Icons.Default.NotificationsOff else if (hasUnresolved) Icons.Default.Warning else Icons.Default.CheckCircle, null, tint = if (isMuted) Slate500 else Color.White, modifier = Modifier.size(40.dp))
             }
             Spacer(Modifier.height(12.dp))
@@ -107,11 +110,11 @@ fun AlarmOverlay(
                     activeDisplayList.forEach { info ->
                         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = verticalPadding / 2), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(text = info.title, color = if (info.isResolved) Emerald500 else if (info.isSirenDisabled) Amber500 else Color.White, fontSize = titleFontSize, fontWeight = FontWeight.Bold, lineHeight = titleFontSize * 1.2f)
+                                Text(text = info.title, color = if (info.isResolved) BrandJd else if (info.isSirenDisabled) Amber500 else Color.White, fontSize = titleFontSize, fontWeight = FontWeight.Bold, lineHeight = titleFontSize * 1.2f)
                                 if (showSubtitle) { Text(text = info.subtitle, color = Color.White.copy(alpha = 0.8f), fontSize = subtitleFontSize, fontWeight = FontWeight.Medium, lineHeight = subtitleFontSize * 1.3f) }
                             }
                             Spacer(Modifier.width(8.dp))
-                            Icon(imageVector = if (info.isResolved) Icons.Default.CheckCircle else if (info.isSirenDisabled) Icons.Default.Info else Icons.Default.Error, contentDescription = null, tint = if (isMuted) Slate500 else if (info.isResolved) Emerald500 else if (info.isSirenDisabled) Amber500 else Rose500, modifier = Modifier.size(if (activeCount <= 6) 24.dp else 18.dp))
+                            Icon(imageVector = if (info.isResolved) Icons.Default.CheckCircle else if (info.isSirenDisabled) Icons.Default.Info else Icons.Default.Error, contentDescription = null, tint = if (isMuted) Slate500 else if (info.isResolved) BrandJd else if (info.isSirenDisabled) Amber500 else Rose500, modifier = Modifier.size(if (activeCount <= 6) 24.dp else 18.dp))
                         }
                     }
                 }
