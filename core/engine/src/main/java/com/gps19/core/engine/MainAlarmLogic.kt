@@ -6,8 +6,8 @@ import kotlin.math.*
 /**
  * MainAlarmLogic: Detection logic for system violations.
  * v8.9.52:
- * - Issue #431: Bayesian Authority Sync. Implemented uncertainty expansion for geofence 
- *   breach detection to match UI visualization and SoT mandate (Issue #328).
+ * - Issue #460: Bayesian Authority Sync. Implemented uncertainty expansion for geofence 
+ *   breach detection to match UI visualization and SoT mandate.
  * v8.9.51:
  * - Issue #424: R747 Implementation. Localized "Viewer" to "this device" and 
  *   simplified "Tracker" to "Device" in subtitles for forensic clarity.
@@ -196,7 +196,7 @@ object MainAlarmLogic {
         val home = state.homePoints
         val maxD = state.maxDistance
         
-        // Issue #431: Bayesian Uncertainty Expansion (SoT R334/Issue #328)
+        // Bayesian Uncertainty Expansion (Issue #460)
         var acc = state.maxTrackerAccuracy
         if (state.isLocationPending && state.trackerLastValidFixTs > 0) {
             val elapsedSec = (now - state.trackerLastValidFixTs) / 1000f
@@ -431,7 +431,7 @@ object MainAlarmLogic {
     /**
      * getTrackerTitle: Role-aware title normalization for forensic parity.
      * 1. Preserves "This device:" as per R747 mandate to clarify locality.
-     * 2. Strips the current role's prefix ("Tracker:" or "Viewer:") to keep local alerts clean.
+     * 2. Strips the current role's prefix ("Tracker:") or "Viewer:") to keep local alerts clean.
      * 3. Preserves the peer's prefix to distinguish remote alerts.
      */
     private fun getTrackerTitle(isTracker: Boolean, title: String): String {

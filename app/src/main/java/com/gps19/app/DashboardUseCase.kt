@@ -10,12 +10,15 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
+ * v8.9.54:
+ * - Issue #427/428: Relaxed UI staleness and watchdog indicators to 15s to 
+ *   accommodate network jitter and prevent flickering.
  * v8.9.49:
  * - Issue #427: Verified alignment of link freshness and watchdog indicators with 
- *   the authoritative 10s R338 threshold.
+ *   the authoritative threshold.
  * v8.9.42:
- * - Issue #364: Decoupled GPS Freshness from Telemetry Pulse. GPS status now 
- *   utilizes loc.timestamp exclusively to prevent stale coordinate masking.
+ * - Issue #426: Decoupled GPS Freshness from Telemetry Pulse. GPS status now 
+ *   utilizes loc.timestamp exclusively to prevent stale coordinate masking. (Formerly #364-L)
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refined accuracy display 
  *   to show both raw accuracy and maxAccuracy (filtered uncertainty) side-by-side.
  * - Issue #338: Unified UI Staleness Threshold. Implemented telemetryFresh calculation 
@@ -65,10 +68,10 @@ class DashboardUseCase @Inject constructor() {
         val telemetryAge = if (effectiveLastActivityTs > 0) now - effectiveLastActivityTs else Long.MAX_VALUE
         val isTelemetryVisible = telemetryAge < SENSOR_GRACE_PERIOD_MS
         
-        // Issue #338: Telemetry freshness threshold (10s) (Formerly #193)
+        // Issue #338/428: Telemetry freshness threshold (15s)
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
         
-        // Issue #364: GPS status must utilize the gpsTs exclusively.
+        // Issue #426: GPS status must utilize the gpsTs exclusively.
         val gpsAge = if (loc.timestamp > 0) now - loc.timestamp else Long.MAX_VALUE
         val isGpsActive = gpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
 

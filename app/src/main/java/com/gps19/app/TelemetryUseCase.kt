@@ -8,11 +8,11 @@ import javax.inject.Singleton
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
  * Extracted from MainViewModel to resolve Issue #322 (Architectural Bloat).
  * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring. Mapping maxAccuracy for unified accuracy 
- *   fallback logic.
+ * - [Baseline] Issue #325: Authoritative Spatial Anchoring. Mapping maxAccuracy for unified 
+ *   accuracy fallback logic.
  * - Issue #326: Intelligent Uncertainty UX Mapping. Mapping locationPendingReason.
  * - Issue #328: Bayesian Uncertainty. Mapping lastValidFixRealtime for expansion scaling.
- * - Issue #337: Forensic Power Visibility. Added currentMa mapping for full parity.
+ * - Issue #438: Forensic Power Visibility. Added currentMa mapping for full parity (Unified ID).
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(

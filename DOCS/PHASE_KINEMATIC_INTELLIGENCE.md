@@ -17,13 +17,13 @@ This document outlines the strategic objectives for the Kinematic Intelligence p
     *   **Scenario A**: GPS distance jump + High SNR + Zero Vibration = **Signal Reflection/Spoofing**. Uses `ADAPTIVE_JUMP_HOLD_MULTIPLIER` (2.0f) to extend `JUMP_HOLD_DURATION_MS` to a 6-minute (360s) latch.
     *   **Scenario B**: GPS distance jump + Low SNR + High Vibration = **Legitimate Movement**. Promotes to ALARM immediately via Trajectory Promotion.
 
-## 3. Objective 3: Hindsight Correction (Issue #334 / #435)
+## 3. Objective 3: Hindsight Correction (Issue #334 / #461)
 **Context**: Rejected points are preserved as Magenta Squares but removed from the optimized trail.
 **Refinement**: Retroactive Trajectory Smoothing using `HINDSIGHT_BUFFER_SIZE` (10).
 *   **Mechanism**: If the system detects a "Jump" followed by a high-confidence trajectory that aligns with rejected points, the engine "Rubber-Bands" them back into the optimized trail.
-*   **Forensic Parity**: All promoted points strictly preserve their original `accuracy` and `maxAccuracy` metadata.
+*   **Forensic Parity**: All promoted points strictly preserve their original `accuracy` and `maxAccuracy` metadata. (Issue #461 / Formerly #435)
 
-## 4. Objective 4: Bayesian Uncertainty Sync (Issue #328 / #431)
+## 4. Objective 4: Bayesian Uncertainty Sync (Issue #328 / #460)
 **Context**: Acoustic triggers fire immediately, but location can be ambiguous.
 **Refinement**: Bayesian Confidence Scaling via `PENDING_UNCERTAINTY_GROWTH_RATE_MPS` (15.0f).
 *   **Mechanism**: The "Location Pending" state reflects the *growing uncertainty* (confidence radius) based on time elapsed since the last valid GPS fix.

@@ -4,6 +4,8 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: Unified physics and geodesic calculations for the Pure Logic Engine.
+ * v8.9.48:
+ * - Issue #387: Logic Alignment - Jump Threshold. (Formerly #360-J)
  * v8.9.42:
  * - Issue #332: Adaptive Jump Confidence. Refined SNR-IMU correlation for Urban Canyons. 
  *   High SNR with zero vibration now triggers a higher score penalty. (Formerly #219)

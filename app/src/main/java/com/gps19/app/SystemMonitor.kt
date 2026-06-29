@@ -13,11 +13,19 @@ import timber.log.Timber
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
  * v8.8.21: Migrated to TimeProvider for all timing logic.
+ * v8.9.55: Issue #458: Optimized AlarmManager rescheduling with danger window.
  */
-class SystemMonitor(private val context: Context, private val timeProvider: TimeProvider) {
+class SystemMonitor(
+    private val context: Context, 
+    private val timeProvider: TimeProvider,
+    private val onLogWatchdog: ((Boolean, Int) -> Unit)? = null
+) {
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var lastScheduledWatchdogTs = 0L
+    private var nextExpectedExpiryTs = 0L
+    private var skippedCounter = 0
+    
     var jumpStateStartTs = 0L
     var gpsStallStartTs = 0L
 
@@ -57,8 +65,19 @@ class SystemMonitor(private val context: Context, private val timeProvider: Time
     fun scheduleWatchdogAlarm(force: Boolean = false) {
         val now = timeProvider.elapsedRealtime()
         
+        // Issue #458: Respect the 60-second throttle unless forced
         if (!force && lastScheduledWatchdogTs != 0L && (now - lastScheduledWatchdogTs) < SYSTEM_WATCHDOG_THROTTLE_MS) return
         
+        // Issue #458: Conservative strategy - Only reschedule if forced OR within danger window
+        val inDangerWindow = nextExpectedExpiryTs == 0L || (now + WATCHDOG_DANGER_WINDOW_MS >= nextExpectedExpiryTs)
+        
+        if (!force && !inDangerWindow) {
+            skippedCounter++
+            // NOTE: We do NOT update lastScheduledWatchdogTs here to allow subsequent checks
+            // to pass the throttle gate until the danger window is reached.
+            return
+        }
+
         val alarmManagerService = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(ACTION_ALARM_WAKEUP).setPackage(context.packageName)
         val pendingIntent = PendingIntent.getBroadcast(
@@ -84,6 +103,10 @@ class SystemMonitor(private val context: Context, private val timeProvider: Time
         }
         
         lastScheduledWatchdogTs = now
+        nextExpectedExpiryTs = triggerAt
+        
+        onLogWatchdog?.invoke(true, skippedCounter)
+        skippedCounter = 0
     }
 
     fun cancelWatchdogAlarm() {
@@ -99,6 +122,7 @@ class SystemMonitor(private val context: Context, private val timeProvider: Time
                 pendingIntent.cancel()
                 Timber.d("Watchdog alarm cancelled")
             }
+            nextExpectedExpiryTs = 0L
         } catch (e: Exception) {
             Timber.e(e, "Failed to cancel watchdog alarm")
         }

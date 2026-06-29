@@ -128,7 +128,7 @@
 
     <!-- Log Overlay -->
     <string name="log_hist_prefix">[HIST] </string>
-    <string name="log_duration_less_10s">less than 10s</string>
+    <string name="log_duration_less_15s">less than 15s</string>
     <string name="log_persistence_summary"> - persistence was %1$s, %2$.1f%% of window</string>
     <string name="log_filter_details">Details</string>
     <string name="log_filter_hist">Hist</string>

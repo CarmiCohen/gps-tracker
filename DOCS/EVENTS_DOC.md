@@ -1,6 +1,6 @@
-# GPS Tracker - Event Log Documentation (v8.9.37)
+# GPS Tracker - Event Log Documentation (v8.9.54)
 
-This document describes all events logged by the application, their priorities, colors, and trigger conditions. As of v8.9.37, logs are fully synchronized with the hardened forensic engine and feature **Log Spatial Anchors**.
+This document describes all events logged by the application, their priorities, colors, and trigger conditions. As of v8.9.54, logs are fully synchronized with the hardened forensic engine and feature a 15s jitter-buffered staleness threshold.
 
 ## Event Priority Levels
 1.  **CRITICAL / ALARM (Important)**: Events that trigger a siren or describe hard system failures. Always visible.
@@ -53,7 +53,7 @@ This document describes all events logged by the application, their priorities, 
 ## Technical Specifications
 - **Log Spatial Anchor**: All events are automatically tagged with `lat`/`lng` coordinates using the last known telemetry position.
 - **Monotonic Stability (Issue #311)**: All forensic timing and UI lockout windows use `elapsedRealtime`.
-- **Ghost Mode UX (Issue #338)**: Stale events (>10s) are visualized with dimmed "Ghost" status indicators.
+- **Ghost Mode UX (Issue #338/428)**: Stale events (>15s) are visualized with dimmed "Ghost" status indicators.
 - **Identity Unification**: Every entry carries the mandatory `role` tag (Issue #182).
 - **Fuzzy Forensic Batching**: Consecutive similar events are grouped with `(xN)` count and total duration tracking.
 - **Muzzle Window (Issue #191)**: 2000ms suppression during sync I/O to prevent false tamper logs.

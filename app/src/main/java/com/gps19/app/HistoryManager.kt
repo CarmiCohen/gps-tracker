@@ -17,8 +17,8 @@ import kotlin.math.abs
  *   updateRibbons and backfillGaps for forensic parity.
  * - Issue #325: Authoritative Spatial Anchoring. Added accuracy and maxAccuracy to 
  *   ribbons for forensic uncertainty auditing.
- * - Issue #336: SIT Duplicate Guard. Implemented database-level sanity check to 
- *   prevent redundant SIT forensic markers.
+ * - Issue #336-B: SIT Duplicate Guard. Implemented database-level sanity check to 
+ *   prevent redundant SIT forensic markers. (Formerly #336-G)
  * - Issue #329: Added tiltIdx and baroIdx to updateRibbons and backfillGaps for 
  *   forensic expansion.
  * - Issue #337: Added currentMa to updateRibbons and backfillGaps for forensic power parity.
@@ -330,7 +330,7 @@ class HistoryManager(
     private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long): Boolean {
         if (!isDetected) return false
         
-        // Issue #336: Prevent duplicates if a SIT event occurs within the guard window.
+        // Issue #336-B: Prevent duplicates if a SIT event occurs within the guard window. (Formerly #336-G)
         if (abs(ts - lastSitDetectedTs) < SIT_DUPLICATE_GUARD_MS) {
             return false
         }

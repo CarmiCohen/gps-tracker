@@ -6,8 +6,9 @@ import androidx.datastore.migrations.SharedPreferencesView
 
 /**
  * AppSettingsMigration: Migrates data from legacy SharedPreferences to DataStore.
- * v8.9.37:
- * - Issue #334: Uptime Consistency. Consolidated redundant session timing fields into uptimeMs. (Formerly #271, originally #1)
+ * v8.9.55:
+ * - Issue #357: Uptime Consistency. Consolidated redundant session timing fields into uptimeMs. 
+ *   (Formerly #271, originally #1. Corrected from conflicting ID #334)
  */
 fun AppSettingsMigration(context: Context) = SharedPreferencesMigration<AppSettings>(
     context = context,
@@ -58,6 +59,7 @@ fun AppSettingsMigration(context: Context) = SharedPreferencesMigration<AppSetti
         sharedPrefs.getBoolean("alert_distance", true).let { alertBuilder.setDistance(it) }
         sharedPrefs.getBoolean("alert_power", true).let { alertBuilder.setPower(it) }
         sharedPrefs.getBoolean("alert_low_battery", true).let { alertBuilder.setLowBattery(it) }
+        sharedPrefs.getBoolean("alert_long_time_gap", true).let { alertBuilder.setLongTimeGap(it) }
         sharedPrefs.getBoolean("alert_long_time_gap", true).let { alertBuilder.setLongTimeGap(it) }
         sharedPrefs.getBoolean("alert_high_temperature", true).let { alertBuilder.setHighTemperature(it) }
         sharedPrefs.getBoolean("alert_override_silence", true).let { alertBuilder.setOverrideSilence(it) }

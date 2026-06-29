@@ -7,7 +7,7 @@ import com.gps19.core.engine.*
  * TrackerStateManager: Logic for mapping raw telemetry to high-level behavioral states.
  * v8.9.42:
  * - Issue #302: Centralized Behavioral Magic Numbers to EngineConstants.
- * - Issue #318: Unified vibration threshold with EngineConstants (0.12g). (Formerly #301)
+ * - Issue #318: Unified vibration threshold with EngineConstants (0.12g).
  * v8.7.5:
  * - Constant Centralization: Inheriting core thresholds from :core:engine.
  */
@@ -44,7 +44,7 @@ object TrackerStateManager {
             sustainedSpeedCount = 0
         }
 
-        // Issue #318: Use unified constants from EngineConstants (Formerly #301)
+        // Issue #318: Use unified constants from EngineConstants
         val isPhysicalMoving = vibration > (vibrationFloor * STATIONARY_FLOOR_MULT) && vibration > VIBRATION_STATIONARY_THRESHOLD
         
         // R880: Require more evidence to exit PARKING if not physically moving

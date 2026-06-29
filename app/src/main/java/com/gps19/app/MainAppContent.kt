@@ -41,8 +41,9 @@ import kotlinx.coroutines.delay
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * v8.9.37:
- * - R925: Aligned session auto-transition delay with LANDING_PAGE_PAUSE_MS from engine constants.
+ * v8.9.55:
+ * - R926: Aligned session auto-transition delay with LANDING_PAGE_PAUSE_MS from engine constants.
+ *   (Supersedes legacy ID R925)
  */
 @Composable
 fun MainAppContent(
@@ -89,10 +90,9 @@ fun MainAppContent(
         
         val mode = uiState.appMode
         if (mode != null) {
-            // R925: If we are on the landing page and auto-detecting a session, wait for LANDING_PAGE_PAUSE_MS
+            // R926: Mandatory transition delay (LANDING_PAGE_PAUSE_MS) and Service Launch Integrity
             if (navController.currentDestination?.route == Screen.Landing.route) {
                 delay(LANDING_PAGE_PAUSE_MS)
-                // R926: Ensure background service is launched during auto-transition
                 onStartService(mode)
             }
         }

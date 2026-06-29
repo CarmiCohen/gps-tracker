@@ -2,6 +2,9 @@
 
 **For historical records (v8.8.x and older), see [docs_history_archive.md](docs_history_archive.md).**
 
+## v8.9.54
+- **Jitter-Proof UI Staleness (Issue #427/428)**: Relaxed "Ghost Mode" and Watchdog staleness thresholds to **15s** to accommodate network jitter and prevent UI flickering. (Supersedes previous 10s mandate).
+
 ## v8.9.38
 - **Hardening Phase Completion**: Finalized audit of all 58 resolutions in the hardening phase.
 - **SIT Rising-Edge Guard**: Implemented physical-event latches to prevent duplicate forensic logs.
@@ -17,11 +20,11 @@
 ## v8.9.9
 - **Documentation Synchronization (Issue 203)**: Synchronized all spec docs to the v8.9.9 logic baseline.
 - **Threshold Hardening (Issue 204/205)**: Aligned `REQUIREMENTS_SOT.md` with `EngineConstants.kt`. Hardened GPS Stall (60s), Revival (120s), and Muzzle Window (2000ms) thresholds.
-- **UI Staleness Unification (Issue 206)**: Unified "Ghost Mode" and "Position Health" thresholds to 10s.
+- **UI Staleness Unification (Issue 206)**: Unified "Ghost Mode" and "Position Health" thresholds to 10s. (Note: Relaxed to 15s in v8.9.54).
 
 ## v8.9.8
 - **Room Migration Registry Fix (Issue 200)**: Registered `MIGRATION_37_38` in `AppModule.kt`.
-- **Zombie Telemetry UX Sweep (Issue 193)**: Applied `Slate500` ("Ghost Mode") dimming to all stale forensic fields (>10s).
+- **Zombie Telemetry UX Sweep (Issue 193)**: Applied `Slate500` ("Ghost Mode") dimming to all stale forensic fields (>10s baseline at the time).
 - **Aggressive Stall Recovery (Issue 198)**: Shortened GPS stall detection to 60s and revival retry to 120s.
 - **Build Modernization (Issue 199)**: Upgraded project toolchain to Java 17 and Android SDK 35.
 

@@ -11,12 +11,10 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
- * v8.9.8:
- * - Issue 190: Added openXiaomiAutostartSettings to assist with MIUI verification.
- * v8.9.6:
- * - Issue 190: Added getXiaomiAutostartStatus to support indeterminate state handling.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ * v8.9.51:
+ * - Issue #455: Xiaomi Autostart & Boot Resilience. (Formerly #190)
+ * v8.9.48:
+ * - Issue #421: Role Identity Prefix Mismatch. (Formerly #182)
  */
 
 enum class XiaomiPermissionStatus {

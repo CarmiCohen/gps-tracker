@@ -5,8 +5,8 @@ import kotlin.math.*
 /**
  * GtoEngine: Graph Trajectory Optimization.
  * v8.9.52:
- * - Issue #435: Forensic Parity. Updated GtoNode to preserve maxAccuracy context 
- *   during trajectory promotion.
+ * - Issue #461: Forensic Parity. Updated GtoNode to preserve maxAccuracy context 
+ *   during trajectory promotion. (Formerly #435)
  * v8.9.34:
  * - Issue #264: Consolidated magic numbers into EngineConstants.kt.
  */

@@ -28,12 +28,12 @@ The engine maintains a "Sliding Window" of nodes (GPS fixes) and "Factors" (cons
 
 ## 3. Advanced Classification Logic
 
-### 3.1. Hindsight Correction & Promotion (Issue #435)
+### 3.1. Hindsight Correction & Promotion (Issue #461)
 If a point arrives that implies a "Jump", the GtoEngine evaluates the sequence:
 *   **Scenario A**: Next points return to the origin. **Decision**: The jump was noise. It is smoothed out.
 *   **Scenario B**: Next points continue from the jump location. **Decision**: The jump was real high-speed movement. 
 *   **Promotion**: The "Jump Hold" is canceled via **Trajectory Promotion**. Every node in the window is pushed to the forensic trail.
-*   **Forensic Parity**: All promoted nodes MUST preserve their original `accuracy` and `maxAccuracy` context to maintain audit integrity (Issue #435).
+*   **Forensic Parity**: All promoted nodes MUST preserve their original `accuracy` and `maxAccuracy` context to maintain audit integrity (Issue #461 / Formerly #435).
 
 ### 3.2. Mechanical Vibration Signature (Issue #433)
 *   **Work vs. Theft**: The engine analyzes the accelerometer frequency. 

@@ -21,10 +21,12 @@ import kotlin.math.max
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
  * v8.9.51:
- * - Issue #366: Resilience Hardening. Integrated scheduleWatchdogAlarm into the 
- *   main tick loop to maintain the heartbeat chain.
+ * - Issue #456: Resilience Hardening. Integrated scheduleWatchdogAlarm into the 
+ *   main tick loop to maintain the heartbeat chain. (Formerly #366-W)
  * v8.9.28:
  * - Issue #279: Hardened safeStartForeground with explicit ForegroundServiceStartNotAllowedException logging.
+ * v8.9.55:
+ * - Issue #458: Integrated watchdog forensic logging. (Formerly #366-W)
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -63,7 +65,14 @@ abstract class BaseMonitorService : LifecycleService() {
         super.onCreate()
         serviceStartRealtime = timeProvider.elapsedRealtime()
         notificationManager = AppNotificationManager(this)
-        systemMonitor = SystemMonitor(this, timeProvider)
+        
+        // Issue #458: Optimized watchdog with forensic reporting (v8.9.55)
+        systemMonitor = SystemMonitor(this, timeProvider) { set, skipped ->
+            if (this::logManager.isInitialized) {
+                logManager.logWatchdogPulse(set, skipped)
+            }
+        }
+
         systemMonitor.acquireWakeLock()
         
         startServiceForeground()
@@ -82,7 +91,7 @@ abstract class BaseMonitorService : LifecycleService() {
                 val now = timeProvider.currentTimeMillis()
                 val nowRealtime = timeProvider.elapsedRealtime()
                 
-                // Issue #366: Layer 2 Watchdog - Reschedule Alarm heartbeat
+                // Issue #456: Layer 2 Watchdog - Reschedule Alarm heartbeat
                 systemMonitor.scheduleWatchdogAlarm()
                 
                 processTick(now, nowRealtime) 

@@ -251,7 +251,7 @@ class RemoteHandler(
     }
 
     /**
-     * Issue #194: Reconstructs forensic state from incoming remote logs.
+     * Issue #358: Reconstructs forensic state from incoming remote logs. (Formerly #194)
      * Modified in v8.9.37: Issue #339/348: Removed redundant forensic trigger; handled by ViewerService tick loop.
      */
     fun handleRemoteLog(entry: LogEntry) {

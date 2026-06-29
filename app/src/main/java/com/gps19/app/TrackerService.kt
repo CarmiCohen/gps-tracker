@@ -25,8 +25,12 @@ import kotlin.math.*
  * - Issue #452: SNR Latch Hardening. Explicitly propagating isAdaptiveJump 
  *   to AlarmManager to ensure 6-minute hold compliance.
  * - Fix: Corrected naming desync for peak vertical sensor consumption.
+ * v8.9.51:
+ * - Issue #H-453: Samsung A15 GPS Stalling.
+ * - Issue #H-454: Samsung A15 Proximity Flutter.
+ * - Issue #H-455: Xiaomi Autostart & Boot Resilience.
  * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
+ * - [Baseline] Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {

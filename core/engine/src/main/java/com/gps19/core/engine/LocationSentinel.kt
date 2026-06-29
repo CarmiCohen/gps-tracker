@@ -6,11 +6,11 @@ import kotlin.math.*
 /**
  * LocationSentinel: A multi-layered location validation engine.
  * v8.9.52:
- * - Issue #435: Forensic Parity. Propagating maxAccuracy through processLocation 
+ * - Issue #461: Forensic Parity. Propagating maxAccuracy through processLocation 
  *   and GtoEngine promotion for forensic continuity.
  * v8.9.34:
  * - Issue #304: Corrected Tier 3 Jump Floor. Now uses JUMP_GATE_VISUAL_JITTER_METERS (10.0m).
- * - Issue #324: Lux EMA Implementation. Integrated Slow/Fast variants for rising/falling light. (Legacy-#366 / #266)
+ * - Issue #388: Lux EMA Implementation. Integrated Slow/Fast variants for rising/falling light.
  */
 class LocationSentinel {
 
@@ -176,7 +176,7 @@ class LocationSentinel {
             if (!lux.isNaN()) luxBaseline = lux
         } else {
             if (!lux.isNaN()) {
-                // Issue #324: Use rising/falling EMA factors from EngineConstants (Legacy-#366 / #266)
+                // Issue #388: Use rising/falling EMA factors from EngineConstants
                 val baseAlpha = if (lux < luxBaseline) {
                     if (isStationary()) LUX_EMA_DOWN_SLOW else LUX_EMA_DOWN_FAST
                 } else {
@@ -254,7 +254,7 @@ class LocationSentinel {
 
     fun processLocation(
         lat: Double, lng: Double, alt: Double, accuracy: Float, 
-        maxAccuracy: Float, // Issue #435
+        maxAccuracy: Float, // Issue #461
         bearing: Float,
         snr: Float, satsUsed: Int, timestamp: Long, 
         bypassBehavioral: Boolean = false,
@@ -366,7 +366,7 @@ class LocationSentinel {
                 val promoted = mutableListOf<EngineGeoPoint>()
                 gtoEngine.getWindow().forEach { p ->
                     val opt = immFilter.update(p.lat, p.lng, p.accuracy, p.ts, SUSPICIOUS_Q_SCALE)
-                    // Issue #435: Propagate accuracy context into promoted trajectory nodes
+                    // Issue #461: Propagate accuracy context into promoted trajectory nodes
                     promoted.add(opt.copy(accuracy = p.accuracy, maxAccuracy = p.maxAccuracy))
                     updateLastValid(p.lat, p.lng, p.alt, p.ts, p.speedMps, p.bearing)
                 }
@@ -377,7 +377,7 @@ class LocationSentinel {
             }
 
             if (behavioralStatus == SentinelStatus.JUMP || behavioralStatus == SentinelStatus.JITTER) {
-                // Issue #435: Preserve maxAccuracy in the optimization window
+                // Issue #461: Preserve maxAccuracy in the optimization window
                 gtoEngine.addPoint(lat, lng, alt, accuracy, maxAccuracy, bearing, currentSpeedMps, timestamp, currentVibrationIndex)
                 return SentinelResult(behavioralStatus, finalJumpConfidence.reason, jumpConfidence = finalJumpConfidence)
             }

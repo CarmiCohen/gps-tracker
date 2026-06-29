@@ -1,4 +1,4 @@
-# Info Elementary Page: Field Definitions and Functions (v8.9.37)
+# Info Elementary Page: Field Definitions and Functions (v8.9.54)
 
 This document describes the technical fields displayed on the Info (Dashboard) page of the GPS Tracker application.
 
@@ -31,7 +31,7 @@ This document describes the technical fields displayed on the Info (Dashboard) p
 *   **Tr Accuracy**: Current accuracy in meters.
 *   **Satellites Index**: Satellites used vs. in view.
 *   **Tr Max**: Worst accuracy recorded in the session (High-water mark). (Issue #325)
-*   **Age Index**: Staleness of the current position fix (10s `GPS_UI_FAIL_THRESHOLD_MS` gray-out/Ghost Mode). (Issue #338)
+*   **Age Index**: Staleness of the current position fix (15s `GPS_UI_FAIL_THRESHOLD_MS` gray-out/Ghost Mode). This includes a 5s grace period for network jitter (Issue #428).
 *   **Acc Index**: Sub-score for coordinate precision.
 *   **Avg SNR**: Average Signal-to-Noise Ratio (dB) across all used satellites. Provides a primary indicator of signal quality and potential jamming/obstruction.
 *   **Bayesian Expansion**: The UI displays spatial uncertainty growing at `PENDING_UNCERTAINTY_GROWTH_RATE_MPS` (15m/s) during blackouts if `locationPendingReason` is active. (Issue #328)
@@ -47,7 +47,7 @@ This document describes the technical fields displayed on the Info (Dashboard) p
 *   **Proximity**: Detection of device covering/handling. Hardened for Samsung A15 (Issue #363).
 
 ## 5. SIT (Sitting) Detection
-These fields are primarily visualized in the **Analytical Ribbons** overlay and track mechanical "sitting" events. (Issue #336)
+These fields are primarily visualized in the **Analytical Ribbons** overlay and track mechanical "sitting" events. (Issue #459 / Formerly #336-E)
 *   **SIT (isSitActive)**: A binary forensic latch indicating an active sitting event.
 *   **TLT Ribbon (tiltIdx)**: Forensic visualization of device orientation stability (normalized to 15°).
 *   **BAR Ribbon (baroIdx)**: Forensic visualization of barometric stability (normalized to 0.5m).
@@ -64,8 +64,8 @@ These fields are primarily visualized in the **Analytical Ribbons** overlay and 
 *   **Peak Shock**: Highest instantaneous g-force detected (> 0.8g `VIBRATION_SHOCK_THRESHOLD_G`).
 *   **Vibration Floor**: Adaptive noise-floor EMA (Issue #301).
 *   **Lux Baseline**: Environmental light EMA (dual-rate Slow/Fast). (Issue #372)
-*   **Acoustic Floor**: Ambient noise baseline EMA (Min: 25.0dB `ACOUSTIC_FLOOR_MIN_DB`). (Issue #292)
+*   **Acoustic Floor**: Ambient noise baseline EMA (Min: 50.0dB `ACOUSTIC_FLOOR_MIN_DB`). (Issue #437)
 *   **Jump Tier**: Classification of current GPS noise (1: Outlier, 2: Security, 3: Jitter).
 *   **Muzzle Window**: Unified suppression window (Issue #191). Includes 2000ms (Global), 500ms (A15 Hysteresis), and 5000ms (A15 Proximity).
 *   **Log Spatial Anchor**: All forensic logs and alerts are automatically anchored with `lat`/`lng` coordinates (Issue #208).
-*   **Identity Unification**: Standardized role identity (Ttk/Cohen) and removal of legacy `ver`/`vid` columns. (Issue #182)
+*   **Identity Unification**: Standardized role identity and removal of legacy `ver`/`vid` columns. (Issue #182)

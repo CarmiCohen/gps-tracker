@@ -22,18 +22,18 @@ The Physical Sentinel is a zero-lag monitoring engine that detects unauthorized 
 -   **Monotonic Hardware Locks**: Siren auto-stop (30s) and silence latches use monotonic `elapsedRealtime` to prevent clock-tamper bypass (Issue #441).
 
 ### C. Geofencing (GtoEngine)
-The **GtoEngine** logic provides a high-confidence geofence gate. It uses a 6-sigma buffer (`GEOFENCE_BUFFER_MULT`) and **Bayesian Uncertainty Expansion** (15m/s moving, capped at 33.3m/s) to prevent false alarms from fix gaps while providing sub-second projection of fence breaches (Issue #431).
+The **GtoEngine** logic provides a high-confidence geofence gate. It uses a 6-sigma buffer (`GEOFENCE_BUFFER_MULT`) and **Bayesian Uncertainty Expansion** (15m/s moving, capped at 33.3m/s) to prevent false alarms from fix gaps while providing sub-second projection of fence breaches (Issue #460).
 
 ## 3. Forensic Telemetry (v8.9.52 Enhancements)
 The system is built around "Forensic Continuity." Data is never simply "current"; it is always presented within its historical context via:
 -   **Dual-Metric Spatial Anchor (Issue #325)**: All forensic logs and telemetry are anchored with both raw GPS `accuracy` and authoritative engine `maxAccuracy`. This ensures perfect parity between what the user sees on the map and the engine's internal confidence.
--   **Trajectory Forensic Parity (Issue #435)**: Points retroactively validated via "Trajectory Promotion" strictly preserve their original forensic metadata, ensuring a contiguous audit trail.
+-   **Trajectory Forensic Parity (Issue #461)**: Points retroactively validated via "Trajectory Promotion" strictly preserve their original forensic metadata, ensuring a contiguous audit trail. (Formerly #435)
 -   **Monotonic Timing (Issue #311)**: All forensic metrics and UI lockout thresholds use monotonic time to eliminate drift and manipulation.
 -   **Power Forensic Parity (Issue #337)**: Full parity for battery current (`currentMa`) across all models, database (v50), and ribbons, ensuring remote power-deficit visibility.
 
 ## 4. Connectivity & Resilience
 The app utilizes a custom socket-based protocol optimized for high-latency, unreliable mobile networks. It features:
--   **Triple-Lock Watchdog (Issue #366)**: Layered persistence using `WorkManager`, `AlarmManager`, and a 1s service heartbeat.
+-   **Triple-Lock Watchdog (Issue #456)**: Layered persistence using `WorkManager`, `AlarmManager`, and a 1s service heartbeat. (Formerly #366-R)
 -   **Visual Watchdog**: A real-time countdown and **Ghost Mode** dimming (R338) showing exactly how long since the last verified packet was received.
 -   **Automatic Recovery**: Specialized foreground services with sticky behavior and **Xiaomi Suppression Recovery** (15s detection / 60s recovery) (Issue #439).
 

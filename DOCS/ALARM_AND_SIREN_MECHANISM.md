@@ -36,7 +36,7 @@ When a violation is detected, the system launches a high-priority Red Alert over
 ## 4. Forensic Continuity
 - **Log Spatial Anchor**: Every alarm trigger and resolution is geographically anchored with `accuracy` and authoritative `maxAccuracy` (Issue #325).
 - **Acoustic Lockout**: A 1-second silence window (`ACOUSTIC_LOCKOUT_MS`) prevents redundant slow-path triggers following a fast-path event.
-- **Ghost Mode UX**: When telemetry is stale (>10s), the dashboard and markers enter a dimmed state (Issue #338).
+- **Ghost Mode UX (R338)**: When telemetry is stale (**> 15s**), the dashboard and markers enter a dimmed state (Issue #338 / Issue #428).
 
 ## 5. Silencing & Acknowledgment
 - **Auto-Stop**: Siren stops after **30s** (`SIREN_AUTO_STOP_MS`) to protect hardware and match recovery delays (Issue #429).

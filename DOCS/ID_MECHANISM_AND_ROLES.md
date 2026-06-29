@@ -41,7 +41,7 @@ Users can change these IDs at any time through the "Settings" overlay:
 ## 5. UI Indicators
 - **Tracker Mode**: Shows "ID: [Name]" at the top.
 - **Viewer Mode**: Shows "Monitoring: [Tracker Name]".
-- **Ghost Mode (R338)**: Visual indicators dim to `Slate500` if the remote peer's identity pulse is > 10s old.
+- **Ghost Mode (R338)**: Visual indicators dim to `Slate500` if the remote peer's identity pulse is > 15s old. (Aligned with v8.9.54 Hardening mandate).
 
 ## 6. Summary of Architecture Involved
 - `SettingsRepository.kt`: Defines storage keys and defaults.

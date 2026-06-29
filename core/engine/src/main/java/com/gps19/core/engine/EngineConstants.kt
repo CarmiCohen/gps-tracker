@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.54:
+ * - Issue #427/428: Relaxed UI staleness and watchdog thresholds to 15s (R338) 
+ *   to prevent jitter flickering.
  * v8.9.52:
  * - Issue #450: Deduplication Audit. Added DEDUPLICATION_SPATIAL_GATE_FACTOR.
  * v8.9.51:
@@ -11,7 +14,7 @@ package com.gps19.core.engine
  * - Issue #429: Aligned SIREN_AUTO_STOP_MS (30s) with ACOUSTIC_RECOVERY_DELAY_MS to resolve 
  *   Acoustic Hysteresis Paradox.
  * v8.9.49:
- * - Issue #427: Aligned WATCH_TIMEOUT_MS and WATCH_DOG_UI_GRACE_MS with 10s R338 mandate.
+ * - Issue #427: Aligned WATCH_TIMEOUT_MS and WATCH_DOG_UI_GRACE_MS with 15s R338 mandate.
  * v8.9.44:
  * - Issue #430: Aligned BARO_ZEROING_INTERVAL_MS (300s) with Passive Zeroing baseline.
  * - Issue #437: Aligned ACOUSTIC_FLOOR_MIN_DB (50dB) with Absolute Safety Gate.
@@ -56,15 +59,15 @@ const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0f
 const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0f
 const val JUMP_GATE_VISUAL_JITTER_METERS = 10.0
 
-// Adaptive Jump Confidence (v8.9.18 - Issue #332)
+// Adaptive Jump Confidence (v8.9.18 - Issue #332 / R332)
 const val ADAPTIVE_JUMP_SNR_THRESHOLD = 35.0f
 const val ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0f
 
-// Hindsight Correction (v8.9.18 - Issue #334)
-const val HINDSIGHT_BUFFER_SIZE = 10 // Issue #435: Forensic Parity
+// Hindsight Correction (v8.9.18 - Issue #334 / R334)
+const val HINDSIGHT_BUFFER_SIZE = 10 // Issue #461: Forensic Parity
 const val HINDSIGHT_MAX_AGE_MS = 30000L
 
-// Bayesian Uncertainty (Issue #328)
+// Bayesian Uncertainty Growth (R460 / Issue #460)
 const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0f // 54 km/h conservative drift
 const val PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS = 1.5f // Minimal drift when stationary
 const val PENDING_UNCERTAINTY_SPEED_CAP_MPS = 33.3f // 120 km/h cap
@@ -117,7 +120,7 @@ const val ROTATION_INIT_STATIONARY_MS = 3000L
 const val BARO_ZEROING_INTERVAL_MS = 300000L // Issue #430: Aligned with PASSIVE_ZEROING_STATIONARY_MS
 const val SPIKE_DEBOUNCE_MS = 5000L
 
-// Chair Sit Detection (R832 - Issue #336)
+// Chair Sit Detection (R832 - Issue #459)
 const val CHAIR_SIT_TILT_THRESHOLD = 7.0f 
 const val CHAIR_SIT_VIBRATION_THRESHOLD = 0.35f 
 const val CHAIR_SIT_BARO_THRESHOLD = 0.08f 
@@ -190,9 +193,9 @@ const val GPS_STALL_THRESHOLD_MS = 60000L
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
 const val TICK_INTERVAL_MS = 1000L
 const val TICK_INTERVAL_SLOW_MS = 5000L
-const val UI_PULSE_TIMEOUT_MS = 10000L
+const val UI_PULSE_TIMEOUT_MS = 15000L // Issue #427/428: Relaxed to 15s to handle jitter
 const val FGS_STICKY_DELAY_MS = 45000L
-const val WATCH_TIMEOUT_MS = 10000L // Issue #427: Aligned with R338
+const val WATCH_TIMEOUT_MS = 15000L // Issue #427/428: Relaxed to 15s to handle network jitter
 const val CLOCK_REGRESSION_GATE_MS = 100L
 const val SENSOR_WARMING_MS = 5000L
 const val SUSPICIOUS_STATE_COOLDOWN_MS = 60000L
@@ -294,9 +297,9 @@ const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0f
 
-// Issue #338: Unified UI Staleness Threshold (10s)
-const val TELEMETRY_UI_STALE_THRESHOLD_MS = 10000L
-const val GPS_UI_FAIL_THRESHOLD_MS = 10000L
+// R338: Unified UI Staleness Threshold (15s) - Relaxed to accommodate jitter
+const val TELEMETRY_UI_STALE_THRESHOLD_MS = 15000L
+const val GPS_UI_FAIL_THRESHOLD_MS = 15000L
 
 // Alert Internal IDs (Aligned with SoT)
 const val ALERT_ID_LOCAL_INTERNET = "LOCAL_INTERNET"
@@ -351,6 +354,7 @@ const val ALERT_TITLE_XIAOMI_SYSTEM_MISSING = "Xiaomi System Not Ready"
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L
 const val SYSTEM_WATCHDOG_INTERVAL_MS = 90000L
 const val SYSTEM_WATCHDOG_THROTTLE_MS = 60000L
+const val WATCHDOG_DANGER_WINDOW_MS = 20000L
 const val COMMUNICATION_ALARM_GRACE_PERIOD_MS = 60000L
 const val LOCATION_ALARM_GRACE_PERIOD_MS = 30000L
 const val POWER_DISCONNECT_DEBOUNCE_MS = 3000L
@@ -360,7 +364,7 @@ const val ALARM_OVERLAY_THROTTLE_MS = 30000L
 const val HEARTBEAT_INTERVAL_MS = 3600000L
 
 // UI Health & Visibility
-const val WATCH_DOG_UI_GRACE_MS = 10000L // Issue #427: Aligned with R338
+const val WATCH_DOG_UI_GRACE_MS = 15000L // Issue #427/428: Relaxed to 15s
 const val SENSOR_GRACE_PERIOD_MS = 600000L
 const val TEST_ALARM_DURATION_MS = 3000L
 

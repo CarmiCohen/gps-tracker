@@ -21,8 +21,8 @@ import kotlinx.coroutines.launch
 /**
  * GpsApplication: Application entry point and global dependency management.
  * v8.9.51:
- * - Issue #366: Resilience Hardening. Scheduled MaintenanceWorker on startup 
- *   as the 3rd layer of the High-Resilience Watchdog system.
+ * - Issue #456: Resilience Hardening. Scheduled MaintenanceWorker on startup 
+ *   as the 3rd layer of the High-Resilience Watchdog system. (Formerly #366-W)
  * v8.9.2:
  * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  */
@@ -52,7 +52,7 @@ class GpsApplication : Application(), Configuration.Provider {
             Timber.plant(Timber.DebugTree())
         }
 
-        // Issue #366: Layer 3 Watchdog - WorkManager persistence
+        // Issue #456: Layer 3 Watchdog - WorkManager persistence
         MaintenanceWorker.schedule(this)
 
         // Issue 146: Move OsmDroid config to background to prevent main thread stall

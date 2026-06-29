@@ -18,13 +18,13 @@ Historical movement is visualized as a "Blue Trail."
 The system enforces a safety radius around user-defined "Home Points."
 - **Authoritative Gate**: `maxAccuracy` is the exclusive authority for geofence transitions. Thresholds use a **0.5x spatial gate** for deduplication and persistence sensitivity (Issue #450).
 - **Dynamic Buffer**: Uses a 6-sigma buffer (`GEOFENCE_BUFFER_MULT` = 6.0) based on `maxAccuracy` to prevent false alarms from signal jitter.
-- **Predictive Breach**: Calculates the time-to-exit based on current velocity. Triggers alarms 2.0s (`GEOFENCE_PREDICTIVE_LOOKAHEAD_S`) before the physical breach occurs.
+- **Predictive Breach**: Calculates the time-to-exit based on current velocity. Triggers alarms 2.0s (`GEOFENCE_PREDICTIVE_LOOKAROW_S`) before the physical breach occurs.
 - **Log Spatial Anchor**: Geofence violations are geographically anchored. The red marker on the map reflects where the violation was calculated (Issue #208).
 
 ## 4. Forensic Integration
-- **SIT Markers**: Mechanical sitting events (SIT) are reconstructed on the map from synchronized forensic logs (Issue #336).
-- **Ghost Mode**: Markers and trails dim (Slate500) if the telemetry is older than 10s (`TELEMETRY_UI_STALE_THRESHOLD_MS`) (Issue #338).
+- **SIT Markers**: Mechanical sitting events (SIT) are reconstructed on the map from synchronized forensic logs (Issue #459 / Formerly #336-E).
+- **Ghost Mode (R338)**: Markers and trails dim (Slate500) if the telemetry is older than **15s** (`TELEMETRY_UI_STALE_THRESHOLD_MS`) (Issue #338 / Issue #428).
 - **Uncertainty Context**: The UI displays a Bayesian uncertainty radius when the location is pending (e.g., during a `GPS_STALL` or `ACOUSTIC_VIOLATION`).
     - **Expansion Rate**: Conservative growth at 15.0m/s (Moving) or 1.5m/s (Stationary).
     - **Safety Cap**: Expansion is strictly capped at **33.3m/s** to maintain threshold sanity (Issue #431).
-- **Role Identity**: Every trail point and violation is tagged with the source role (Ttk/Cohen).
+- **Role Identity**: Every trail point and violation is tagged with the source role (T/V). (Standardized per R182).

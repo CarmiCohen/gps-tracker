@@ -4,8 +4,8 @@ This document provides a comprehensive breakdown of every field, toggle, and act
 
 ## 1. Primary Identity & Routing
 These settings define how the device identifies itself and where it sends its data. Available in all modes (Tracker/Viewer).
-- **Tracker ID**: A unique string used to identify the tracker's device. Default: "Ttk". (Issue #174)
-- **Viewer ID**: Identifies the monitoring phone. Default: "Cohen". (Issue #174)
+- **Tracker ID**: A unique string used to identify the tracker's device. Default: "T". (Standardized per R182)
+- **Viewer ID**: Identifies the monitoring phone. Default: "V". (Standardized per R182)
 - **Relay URL**: The address of the Socket.io server used to relay data. Default: `https://gps-survival-relay.onrender.com`. (Issue #106)
 
 ## 2. Geofencing (Fence Distance)
@@ -38,7 +38,7 @@ These settings define how the device identifies itself and where it sends its da
     - **Tilt Alert**: Detects orientation changes (> 15°).
     - **Acoustic Alert**: Ambient noise jump detection (40dB).
     - **Lift Alert**: Barometric pressure changes (> 0.8m).
-    - **Chair Occupied**: Advanced seat-sensing pattern matching. (Issue #336)
+    - **Chair Occupied**: Advanced seat-sensing pattern matching. (Issue #459 / Formerly #336-E)
 
 ### B. Sound (Sound Setup)
 - **Siren Type**: Select between "Siren", "Chimes", or "Pulse".

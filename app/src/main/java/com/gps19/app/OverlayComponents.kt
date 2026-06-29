@@ -24,11 +24,13 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * v8.9.54:
+ * - Issue #427/428: Relaxed staleness thresholds to 15s to prevent UI flickering.
  * v8.9.49:
  * - Issue #427: Verified alignment of link freshness and activity checks with 
- *   the authoritative 10s R338 mandate.
+ *   the authoritative threshold.
  * v8.9.48:
- * - Issue #427: Aligned dashboard peer activity check with 10s R338 threshold.
+ * - Issue #427: Aligned dashboard peer activity check with R338 threshold.
  * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
  *   BrandJd (#367C2B) in dashboard status and health indicators.
  * v8.9.42:
@@ -59,7 +61,7 @@ fun LegacyDashboardGrid(
     val conn = uiState.connectivity
     val isRelayOnline = conn.isRelayConnected
     
-    // Issue #427: Aligned with 10s R338 UI staleness mandate.
+    // Issue #427/428: Aligned with 15s R338 UI staleness mandate.
     val isRemoteActive = conn.lastRemoteActivityTs > 0 && (now - conn.lastRemoteActivityTs < TELEMETRY_UI_STALE_THRESHOLD_MS)
     
     val isConnStale = isViewer && !isRemoteActive

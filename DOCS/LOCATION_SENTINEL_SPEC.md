@@ -1,6 +1,6 @@
-# Location Sentinel Specification (v8.9.52)
+# Location Sentinel Specification (v8.9.54)
 
-The **Location Sentinel** is a multi-modal sensor fusion engine designed to detect unauthorized physical interaction with the tracker. In v8.9.52, this logic is strictly isolated within the `:core:engine` module and geographically anchored via **Dual-Metric Spatial Anchors** (Issue #325) and **Bayesian Uncertainty Expansion** (Issue #431).
+The **Location Sentinel** is a multi-modal sensor fusion engine designed to detect unauthorized physical interaction with the tracker. In v8.9.54, this logic is strictly isolated within the `:core:engine` module and geographically anchored via **Dual-Metric Spatial Anchors** (Issue #325) and **Bayesian Uncertainty Expansion** (Issue #431).
 
 ## 1. Monitored Sensors
 The Sentinel monitors the following hardware sensors:
@@ -20,12 +20,12 @@ Any of the following conditions will trigger a **Suspicious State** (forcing 1s 
 | **Tilt** | Δ Orientation > `TILT_THRESHOLD_DEGREES` (15°) | `Tilt Alert` | Immediate Siren |
 | **Light Jump** | Δ Lux > `LIGHT_THRESHOLD_LUX_JUMP` (150.0f) | `Tamper Detected` | Immediate Siren |
 | **Proximity** | NEAR → FAR (Debounced) | `Tamper Detected` | Immediate Siren |
-| **Acoustic (High)** | Δ Noise > `ACOUSTIC_THRESHOLD_DB_JUMP` (40.0) | `Acoustic Alert` | Immediate Siren |
-| **Acoustic (Low)** | Δ Noise > `ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP` (20.0) | `None` | Suspicious State |
+| **Acoustic (High)** | Δ Noise (Jump) > `ACOUSTIC_THRESHOLD_DB_JUMP` (40.0) | `Acoustic Alert` | Immediate Siren |
+| **Acoustic (Low)** | Δ Noise (Jump) > `ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP` (20.0) | `None` | Suspicious State |
 | **Shock** | Peak > `VIBRATION_SHOCK_THRESHOLD_G` (0.8g) | `Tamper Detected` | Immediate Siren |
 | **Vibration** | Level > `VIBRATION_SUSPICIOUS_THRESHOLD_G` (0.25g) | `None` | Suspicious State |
 
-*Note: Alert titles are standardized per R747 (Issue #424).*
+*Note: All Acoustic triggers require the absolute signal to be above the safety floor of 50dB (`ACOUSTIC_FLOOR_MIN_DB`). Alert titles are standardized per R747 (Issue #424).*
 
 ## 3. Implementation Details
 
@@ -39,17 +39,17 @@ Siren operations are protected by a hardware-safety **30s auto-stop** (`SIREN_AU
 Uses asymmetrical EMA to detect sudden illumination spikes.
 
 ### D. Acoustic Sentinel
-Gated by `ACOUSTIC_MIN_THRESHOLD_DB` (50.0dB) to prevent false positives in silent environments.
+Gated by `ACOUSTIC_MIN_THRESHOLD_DB` (50.0dB) to prevent false positives in silent environments. Thresholds are evaluated as relative **jumps** over the rolling floor.
 
 ### E. Adaptive Vibration Normalization
 Uses `VIBRATION_STATIONARY_THRESHOLD` (0.12f) for motion discrimination (Issue #318).
 
-## 4. Forensic Continuity (v8.9.52 / DB v50)
+## 4. Forensic Continuity (v8.9.54 / DB v50)
 Physical violations are logged with extended forensic metadata:
 1.  **Dual-Metric Spatial Anchor (Issue #325)**: All tamper, lift, and tilt events are anchored with `lat`, `lng`, `accuracy`, and `maxAccuracy`. **`maxAccuracy` is the exclusive authority** for trajectory deduplication (Issue #450).
 2.  **Bayesian Uncertainty expansion (Issue #431)**: When location fixes are pending, spatial uncertainty expands at **15.0m/s** (Moving) or **1.5m/s** (Stationary), capped at **33.3m/s**. This expansion is synchronized between UI visualization and breach logic.
 3.  **Monotonic Timing (Issue #311 / Issue #441)**: All timing deltas and hardware locks are calculated using `TimeProvider.elapsedRealtime()`.
-4.  **Ghost Mode UX (Issue #338)**: Visual staleness indicators are applied when telemetry is older than 10s.
+4.  **Ghost Mode UX (Issue #338)**: Visual staleness indicators are applied when telemetry is older than 15s. (Relaxed from 10s baseline in v8.9.54 to accommodate network jitter).
 
 ## 5. State Integration
 When a physical violation occurs:

@@ -1,12 +1,12 @@
-# Viewer Info Page Layout Documentation (v8.9.37)
+# Viewer Info Page Layout Documentation (v8.9.54)
 
-This document describes the modern "Telemetry-First" HUD and Dashboard layout implemented under the v8.9.37 architecture, focusing on forensic continuity, high availability, and real-time diagnostic visibility.
+This document describes the modern "Telemetry-First" HUD and Dashboard layout implemented under the v8.9.54 architecture, focusing on forensic continuity, high availability, and real-time diagnostic visibility.
 
 ## 1. Top HUD (Heads-Up Display)
 The HUD provides at-a-glance status of the primary tracking link and position health.
 - **Link Index**: Color-coded indicator of the relay connection quality (RTT-aware).
-- **Position Health**: 10s (`GPS_UI_FAIL_THRESHOLD_MS`) staleness gate. Dims to "Ghost Mode" (Issue #338) if data is stale.
-- **Forensic Identification**: The build version (v8.9.37) is displayed between Ribbons and Log buttons for audit traceability.
+- **Position Health**: 15s (`GPS_UI_FAIL_THRESHOLD_MS`) staleness gate. Dims to "Ghost Mode" (Issue #338) if data is stale. Includes a 5s grace period for network jitter (Issue #428).
+- **Forensic Identification**: The build version (v8.9.54) is displayed between Ribbons and Log buttons for audit traceability.
 
 ## 2. Dashboard Sections
 ### A. GPS & Movement
@@ -20,7 +20,7 @@ The HUD provides at-a-glance status of the primary tracking link and position he
 - **Noise/Lux**: Ambient environmental monitoring (Issue #286).
 - **Lift**: Barometric vertical displacement monitoring.
 
-### C. Power & Storage (v8.9.37 Hardening)
+### C. Power & Storage (Hardening Phase)
 - **Battery Drain**: Real-time current in mA (`currentMa`). (Issue #337)
 - **Storage**: Binary indicator for Low/Critical disk space (50MB/10MB). (Issue #316)
 - **Steep Discharge**: Latch for abnormal battery health events (Issue #353).

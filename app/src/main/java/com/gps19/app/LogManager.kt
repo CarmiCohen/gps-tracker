@@ -14,6 +14,8 @@ import java.util.UUID
  * v8.9.38:
  * - Issue #333: Enhanced auto-enrichment. Automatically populate snrSnapshot and vibeSnapshot 
  *   from latest telemetry if not explicitly provided, ensuring forensic parity.
+ * v8.9.55:
+ * - Issue #458: Added lightweight watchdog forensic logging.
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -150,6 +152,15 @@ class LogManager @Inject constructor(
         vibe: Float? = null
     ) {
         submitToLogSink(m, "system", important, isSpecial = isSpecial, specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy, maxAccuracy = maxAccuracy, snr = snr, vibe = vibe)
+    }
+
+    /**
+     * Issue #458: Lightweight watchdog frequency tracker.
+     */
+    fun logWatchdogPulse(set: Boolean, skipped: Int) {
+        if (set) {
+            submitToLogSink("Watchdog: Alarm set (skipped=$skipped)", "watchdog_stats", important = false)
+        }
     }
 
     suspend fun getUnsyncedLogs(limit: Int) = logRepository.getUnsyncedLogs(limit)

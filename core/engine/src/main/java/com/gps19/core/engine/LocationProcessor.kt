@@ -4,11 +4,14 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * v8.9.55:
+ * - Audit: Closed Issue #325 as "Architectural Implementation".
+ * - Issue #450: Authoritative "Audit & Parameter Tuning" for R325 deduplication.
  * v8.9.52:
  * - Issue #450: Deduplication Audit. Replaced hardcoded multiplier with 
  *   DEDUPLICATION_SPATIAL_GATE_FACTOR.
- * - Issue #435: Forensic Parity. Propagating maxAccuracy through sentinel 
- *   processing for trajectory promotion continuity.
+ * - Issue #461: Forensic Parity. Propagating maxAccuracy through sentinel 
+ *   processing for trajectory promotion continuity. (Formerly #435)
  * v8.9.43:
  * - Issue #423: Hardened R325 Deduplication Authority. Utilizing maxAccuracy 
  *   as the exclusive spatial gate for persistence and parking breakout.
@@ -221,13 +224,13 @@ class LocationProcessor(
         if (providedAdaptiveVibrationFloor >= 0f) sentinel.adaptiveVibrationFloor = providedAdaptiveVibrationFloor
         if (providedAcousticLockoutTs > 0) sentinel.updateSensorState(vibration = -1f, heading = -1f, baroAlt = -1000f, acousticLockoutTs = providedAcousticLockoutTs, isMuzzled = isMuzzled, nowRealtime = nowRealtime, nowWall = nowWall)
 
-        // Issue #435: Propagating maxAccuracy to sentinel.processLocation
+        // Issue #461: Propagating maxAccuracy to sentinel.processLocation (Formerly #435)
         val sentinelResult = sentinel.processLocation(lat = lat, lng = lng, alt = alt, accuracy = accuracy, maxAccuracy = maxAccuracy, bearing = bearing, snr = snr, satsUsed = satsUsed, timestamp = effectiveTs, bypassBehavioral = !isLocal, isSuspicious = isSuspicious, isMuzzled = isMuzzled, nowWall = nowWall, nowRealtime = nowRealtime)
         
         if (sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED) {
             val promotedPoints = sentinelResult.promotedPoints ?: emptyList()
             if (promotedPoints.isNotEmpty() && lastLat != 0.0) {
-                // Issue #334: Rubber-band interpolation with forensic parity (Issue #325).
+                // Issue #334: Rubber-band interpolation with forensic parity (Architectural Baseline #325).
                 val firstPromoted = promotedPoints.first()
                 val interpolated = PhysicsUtils.interpolateSegment(
                     lastLat, lastLng, lastTs, firstPromoted.lat, firstPromoted.lng, firstPromoted.ts,
@@ -286,7 +289,7 @@ class LocationProcessor(
         var skipPersistence = false
         if (!isSuspicious && isThrottled && stationaryProb > 0.9) {
             if (parkingAnchorPoint == null) parkingAnchorPoint = persistencePoint
-            // R325: Using maxAccuracy as the authoritative gate for parking breakout.
+            // R325 (Architecture): Using maxAccuracy as the authoritative gate for parking breakout.
             val breakoutThreshold = max(PARKING_ANCHOR_MIN_DIST, maxAccuracy.toDouble() * PARKING_ANCHOR_FACTOR)
             if (PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, persistencePoint.lat, persistencePoint.lng) < breakoutThreshold) skipPersistence = true else parkingAnchorPoint = null
         } else parkingAnchorPoint = null
@@ -311,7 +314,7 @@ class LocationProcessor(
     }
 
     /**
-     * R325: shouldSavePoint now utilizes maxAccuracy as the authoritative deduplication threshold.
+     * R325 (Architecture): shouldSavePoint now utilizes maxAccuracy as the authoritative deduplication threshold.
      */
     private fun shouldSavePoint(isSuspicious: Boolean, isThrottled: Boolean, distFromLast: Double, timeSinceLast: Long, maxAcc: Float): Boolean {
         if (isSuspicious) return true

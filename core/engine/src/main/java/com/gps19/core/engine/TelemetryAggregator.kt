@@ -10,8 +10,8 @@ import kotlin.math.*
  * - Issue #325: Added accuracy and maxAccuracy to mergeWorstCase and gap-filling logic 
  *   to support authoritative uncertainty ribbons.
  * v8.9.38:
- * - Issue #291: SIT Forensic Duplicate Risk. Fixed by ensuring isSitDetected defaults to false 
- *   during backfill if samples are missing.
+ * - Issue #358: SIT Forensic Duplicate Risk. Fixed by ensuring isSitDetected defaults to false 
+ *   during backfill if samples are missing. (Formerly #291)
  * v8.9.21:
  * - Issue #329: Added tiltIdx and baroIdx to mergeWorstCase, backfillGaps, and fillRealGap.
  * v8.9.5:

@@ -1,6 +1,6 @@
-# Sensor Integration & Calibration (v8.9.52)
+# Sensor Integration & Calibration (v8.9.54)
 
-The system leverages a multi-sensor array to provide high-fidelity physical security and trajectory validation. In v8.9.52, all sensor processing is hardened with monotonic timing and strictly isolated in the `:core:engine` module.
+The system leverages a multi-sensor array to provide high-fidelity physical security and trajectory validation. In v8.9.54, all sensor processing is hardened with monotonic timing and a 15s jitter-buffered staleness threshold.
 
 ## 1. Primary Sensors
 *   **GNSS (GPS/GLONASS/GALILEO)**: Primary location source. Monitored for stalls and signal gaps (`GPS_GAP_THRESHOLD_MS` 60s). Features **Escalated GPS Revival** (Issue #341) with forensic retry logging every 120s.
@@ -13,11 +13,11 @@ The system leverages a multi-sensor array to provide high-fidelity physical secu
 ## 2. Calibration Mechanisms
 *   **Muzzle Window**: A 2000ms logic gate suppresses sensor triggers during high-I/O sync operations. (Issue #191)
 *   **Passive Zeroing**: Automatically calibrates baselines after 300s of stationary state.
-*   **Chair Occupied (R832)**: Uses multi-factor fusion (Tilt 7.0°, Vibration 0.35g, Baro 0.08m, Velocity 0.18m/s) to detect sitting events. (Issue #336)
+*   **Chair Occupied (R832)**: Uses multi-factor fusion (Tilt 7.0°, Vibration 0.35g, Baro 0.08m, Velocity 0.18m/s) to detect sitting events. (Issue #459 / Formerly #336-E)
 *   **Monotonic Integrity**: All sensor-based lockout, suspicion, and siren auto-stop timers use `TimeProvider.elapsedRealtime()` (Issue #311 / Issue #441).
 
 ## 3. Forensic Alignment & Storage
 All sensor events are timestamped and synchronized with the analytical ribbons.
 - **Dual-Metric Spatial Anchor**: Every sensor violation or detection event is now automatically anchored with `lat`/`lng`, `accuracy`, and authoritative `maxAccuracy` (Issue #325).
-- **Ghost Mode UX**: Dashboard fields enter a dimmed "Ghost" state if telemetry is older than 10s (`TELEMETRY_UI_STALE_THRESHOLD_MS`) (Issue #338).
+- **Ghost Mode UX**: Dashboard fields enter a dimmed "Ghost" state if telemetry is older than 15s (`TELEMETRY_UI_STALE_THRESHOLD_MS`). This provides a 5s jitter buffer over the 10s sync heartbeat (Issue #428).
 - **Persistence**: Sensor-derived indices are buffered and flushed to SQLite in batches.

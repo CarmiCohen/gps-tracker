@@ -50,18 +50,24 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v8.9.54:
+ * - Issue #427/428: Relaxed UI staleness and circular progress thresholds to 15s 
+ *   to accommodate network jitter (Supersedes 10s R338 mandate).
+ * v8.9.51:
+ * - Issue #457: Ghost Mode Status Conflict (Fixed). Unified isDataHealthy logic to 
+ *   respect isTelemetryFresh for both Tracker and Viewer roles.
  * v8.9.50:
- * - Issue #365: Ghost Mode Status Conflict (Fixed). Unified isDataHealthy logic to 
- *   respect isTelemetryFresh for both Tracker and Viewer roles. Propagated local 
- *   telemetry freshness to local status rows in StatusBar to ensure consistent 
- *   visual staleness (Ghost Mode) for hardware sensors.
+ * - Issue #457: Ghost Mode Status Conflict (Fixed). Propagated local 
+ *   telemetry freshness to local status rows in StatusBar.
  * v8.9.49:
  * - Issue #428: Synchronized DAT badge and circular progress with the 10s R338 
  *   telemetry staleness gate. Decoupled from heartbeat/pulse.
  * - Issue #427: Aligned Watchdog and Peer activity indicators with 10s R338 mandate.
  * v8.9.48:
  * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
- *   BrandJd (#367C2B) in status badges, SIT ribbon, and connection indicators.
+ *   BrandJd (#367C2B).
+ * v8.9.43:
+ * - Issue #426: GPS status utilizes the gpsTs exclusively.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -387,7 +393,7 @@ fun GlobalStatusBar(
     val lastIncomingActivity = uiState.connectivity.lastRemoteActivityTs
     val activityAge = if (lastIncomingActivity > 0) now - lastIncomingActivity else Long.MAX_VALUE
     
-    // Issue #427/428: Aligned TRK and DAT staleness badges with 10s R338 mandate.
+    // Issue #427/428: Aligned TRK and DAT staleness badges with 15s R338 mandate.
     val isPeerActive = activityAge < TELEMETRY_UI_STALE_THRESHOLD_MS
     val isTracker = mode == "tracker"
     
@@ -409,11 +415,11 @@ fun GlobalStatusBar(
     
     // R922: Role-aware health logic.
     // Tracker shows local hardware status. Viewer gates remote status by peer pulse.
-    // Issue #364/426: GPS status utilizes the gpsTs exclusively, decoupled from peer heartbeat.
+    // Issue #426: GPS status utilizes the gpsTs exclusively, decoupled from peer heartbeat.
     val gpsAge = if (lastGpsTs > 0) now - lastGpsTs else Long.MAX_VALUE
     val isGpsActive = gpsAge < GPS_UI_FAIL_THRESHOLD_MS
 
-    // Issue #365: Unified isDataHealthy to respect isTelemetryFresh for both roles.
+    // Issue #457: Unified isDataHealthy to respect isTelemetryFresh for both roles.
     val isDataHealthy = dashboardState.isTelemetryFresh && isLocalOnline && isRelayConnected
 
     // Determine the authoritative pulse for the circular progress indicator.
@@ -468,7 +474,7 @@ fun StatusBar(
 ) {
     val age = if (lastP > 0) now - lastP else Long.MAX_VALUE 
     
-    // Issue #427/428: Aligned circular progress with 10s mandate.
+    // Issue #427/428: Aligned circular progress with 15s mandate.
     val progressValue = if (lastP > 0) maxOf(0f, minOf(1f, (TELEMETRY_UI_STALE_THRESHOLD_MS - age).toFloat() / TELEMETRY_UI_STALE_THRESHOLD_MS)) else 0f
 
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
@@ -533,7 +539,7 @@ fun StatusBar(
                 val stateColor = if (!isGpsActive) Slate500 else BrandJd 
                 
                 Text(
-                    text = if (isMoving && isGpsActive) "»\u2009${trackerState.name}\u2009«" else trackerState.name,
+                    text = if (isMoving && isGpsActive) "»\\u2009${trackerState.name}\\u2009«" else trackerState.name,
                     color = stateColor.copy(alpha = if (isMoving && isGpsActive) movingAlpha else 1f),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
@@ -550,7 +556,7 @@ fun StatusBar(
             }
             Spacer(Modifier.height(3.dp))
 
-            // Issue #365: Local telemetry freshness calculation for consistent Ghost Mode visual.
+            // Issue #457: Local telemetry freshness calculation for consistent Ghost Mode visual.
             val localTelemetryAge = now - maxOf(viewerGpsTs, viewerTelemetryTs)
             val isLocalTelemetryFresh = viewerGpsTs > 0 && localTelemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
 
@@ -571,7 +577,7 @@ fun StatusBar(
                 val trkColor = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd
                 val tAge = now - maxOf(lastGpsTs, trackerTelemetryTs)
                 
-                // Issue #365: Tracker freshness depends on role. If tracker, use local telemetry freshness.
+                // Issue #457: Tracker freshness depends on role. If tracker, use local telemetry freshness.
                 val effectiveTrkTelemetryFresh = if (mode == "tracker") isLocalTelemetryFresh else isTelemetryFresh
 
                 StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = trkColor, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, now = now, trackerState = trackerState, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isRelayConnected = isRelay, isTelemetryFresh = effectiveTrkTelemetryFresh)

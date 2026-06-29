@@ -32,6 +32,9 @@ import java.util.*
 
 /**
  * LogComponents: UI for system logs and diagnostic history.
+ * v8.9.54:
+ * - Issue #427/428: Aligned persistence duration labels with the new 15s 
+ *   jitter-buffered staleness threshold.
  * v8.9.48:
  * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
  *   BrandJd (#367C2B) in log rendering for restored/connected events.
@@ -94,7 +97,8 @@ fun LogOverlay(
                             val durationText = if (log.count > 1 && log.durationMs > 0) {
                                 val windowMs = maxOf(1000L, log.timestamp - log.firstSeenTs)
                                 val pct = (log.durationMs * 100.0 / windowMs).coerceIn(0.0, 100.0)
-                                val generalized = if (log.durationMs < 10000L) "less than 10s" else FormatterUtils.formatDurationSimple(log.durationMs)
+                                // Issue #428: Aligned with 15s jitter buffer
+                                val generalized = if (log.durationMs < 15000L) "less than 15s" else FormatterUtils.formatDurationSimple(log.durationMs)
                                 " - persistence was $generalized, ${String.format(Locale.getDefault(), "%.1f", pct)}% of window"
                             } else if (log.durationMs > 0) {
                                 " [${FormatterUtils.formatDurationSimple(log.durationMs)}]"
