@@ -13,20 +13,19 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * v8.9.5:
- * - Issue #337: Restoring trackerCurrentMa in loadInitialData for power forensic parity.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
- * v8.8.35:
- * - Issue 146: Staggered initialization to resolve startup frame skips.
- * v8.8.30: Timing Hardening - Migrated UI lockout and pulse logic to monotonic time (elapsedRealtime).
- * v8.8.32: Removed local isValidLocation in favor of PhysicsUtils.isValidLocation (Issue 144).
+ * v8.9.63:
+ * - Issue #461: Implemented UI feedback for settings uniqueness enforcement.
+ *   Error messages from commitDraftSettings are now propagated to the user via Toast.
+ * v8.9.62:
+ * - Issue #003: Optimized global timer loop. Moved behavioral state computation 
+ *   to Dispatchers.Default to resolve main thread jitter (Davey events).
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -304,6 +303,14 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             settingsUseCase.saveDraftToRepo(finalDraft)
             val result = settingsUseCase.commitDraft()
+            
+            if (result.error != null) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Commit Failed: ${result.error}", Toast.LENGTH_LONG).show()
+                }
+                return@launch
+            }
+
             if (result.anyChanged) {
                 if (result.trackerIdChanged) addPersistentLog("user", "USER ACTION: Tracker ID changed", true)
                 if (result.viewerIdChanged) addPersistentLog("user", "USER ACTION: Viewer ID changed", true)
@@ -312,7 +319,7 @@ class MainViewModel @Inject constructor(
                 if (result.trackerIdChanged || result.viewerIdChanged) {
                     repository.resetStats(); repository.sendCommand(UiCommand.StatsReset)
                     _trackerMaxTemp.value = 0f; _remoteSignal.value = 0; _trackerCurrentMa.value = 0; _gnssDetail.value = null; _trackerState.value = TrackerState.UNKNOWN
-                    updateState { current -> current.copy(trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = current.connectivity.copy(isTrackerConnected = false, lastUpdateTs = 0L, lastRemoteActivityTs = 0L), distanceTrackerToHome = null, distanceTrackerToViewer = null, maxTrackerAccuracy = 0f) }
+                    updateState { current -> current.copy(trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = current.connectivity.copy(isTrackerConnected = false, lastUpdateTs = 0L, lastRemoteActivityTs = 0L), distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, maxTrackerAccuracy = 0f) }
                 }
                 repository.sendCommand(UiCommand.SettingsUpdated)
             }
@@ -415,18 +422,26 @@ class MainViewModel @Inject constructor(
                 _systemPulse.value = now
                 _systemPulseRealtime.value = nowRealtime
                 updateState { state -> state.copy(isSirenPlaying = AudioSynthesizer.isPlaying()) }
+                
                 if (_uiState.value.appMode != null) {
                     repository.sendCommand(UiCommand.SyncRequest)
-                    val currentState = _uiState.value
                     
-                    val newState = behaviorUseCase.computeTrackerState(currentState, now)
-                    if (newState != _trackerState.value && newState != TrackerState.UNKNOWN) {
-                        addPersistentLog("event", "Tracker is $newState", true)
+                    // Issue #003: Offloading behavioral state computation to Dispatchers.Default
+                    withContext(Dispatchers.Default) {
+                        val currentState = _uiState.value
+                        val newState = behaviorUseCase.computeTrackerState(currentState, now)
+                        val shouldShowRed = behaviorUseCase.shouldShowRedScreen(currentState, nowRealtime, lastAlarmAckRealtime, _redScreenVisible.value)
+                        
+                        withContext(Dispatchers.Main) {
+                            if (newState != _trackerState.value && newState != TrackerState.UNKNOWN) {
+                                addPersistentLog("event", "Tracker is $newState", true)
+                            }
+                            _trackerState.value = newState
+                            _redScreenVisible.value = shouldShowRed
+                        }
                     }
-                    _trackerState.value = newState
-                    
-                    _redScreenVisible.value = behaviorUseCase.shouldShowRedScreen(currentState, nowRealtime, lastAlarmAckRealtime, _redScreenVisible.value)
                 }
+
                 updateState { state -> state.copy(isAlarmSilenced = behaviorUseCase.isAlarmSilenced(state.lastAlarmAckTs, now)) }
                 delay(TICK_INTERVAL_MS)
             }

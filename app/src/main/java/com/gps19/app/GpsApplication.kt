@@ -20,11 +20,12 @@ import kotlinx.coroutines.launch
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * v8.9.62:
+ * - Issue #005: Log Spillage Remediation. Silenced osmdroid debug logging and 
+ *   forced static user agent to prevent getPackageName spam.
  * v8.9.51:
  * - Issue #456: Resilience Hardening. Scheduled MaintenanceWorker on startup 
- *   as the 3rd layer of the High-Resilience Watchdog system. (Formerly #366-W)
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
+ *   as the 3rd layer of the High-Resilience Watchdog system.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -56,9 +57,13 @@ class GpsApplication : Application(), Configuration.Provider {
         MaintenanceWorker.schedule(this)
 
         // Issue 146: Move OsmDroid config to background to prevent main thread stall
+        // Issue #005: Silence osmdroid and set static user agent to stop getPackageName spam
         GlobalScope.launch(Dispatchers.IO) {
-            OsmConfig.getInstance().load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
-            OsmConfig.getInstance().userAgentValue = "GpsTracker/${BuildConfig.VERSION_NAME} (${packageName})"
+            val osmConfig = OsmConfig.getInstance()
+            osmConfig.load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
+            osmConfig.userAgentValue = "GpsTracker/${BuildConfig.VERSION_NAME} (${packageName})"
+            osmConfig.isDebugMode = false
+            osmConfig.isDebugTileProviders = false
         }
 
         Timber.plant(object : Timber.Tree() {

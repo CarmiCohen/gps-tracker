@@ -25,14 +25,11 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU and Environmental sensors.
+ * v8.9.62:
+ * - Issue #004: Refined A15 Virtual Proximity Protection. Allowing 'Far' transitions 
+ *   in darkness if the device is not stationary, improving responsiveness in dark environments.
  * v8.9.41:
- * - Issue #340: Implemented Lux-Aware Proximity Gating for Samsung A15. Suppressing "Far" 
- *   transitions in 0 lux to mitigate virtual sensor failure in darkness.
- * v8.9.34:
- * - Issue #321: Shadow Constants Remediation. Replaced magic numbers with EngineConstants.
- * v8.9.32:
- * - Issue #295: Redundant Barometric Baselining. Exposing absoluteAltitude to allow
- *   LocationSentinel to handle primary baselining.
+ * - Issue #340: Lux-Aware Proximity Gating for Samsung A15.
  * v8.8.21: Migrated to TimeProvider for all timing logic.
  */
 @Singleton
@@ -127,15 +124,9 @@ class AppSensorManager @Inject constructor(
     var currentPressure: Float = 0f
         private set
 
-    /**
-     * absoluteAltitude: Raw barometric altitude relative to standard atmosphere (1013.25 hPa).
-     */
     var absoluteAltitude: Float = 0f
         private set
 
-    /**
-     * relativeAltitude: Filtered altitude relative to a local moving baseline.
-     */
     var relativeAltitude: Float = 0f
         private set
 
@@ -257,10 +248,12 @@ class AppSensorManager @Inject constructor(
                 if (proximityIdx < secMinProxIdx) secMinProxIdx = proximityIdx
 
                 if (newValue != rawProximityNear) {
-                    // Issue #340: Samsung A15 Virtual Proximity failure in 0 lux.
-                    // If moving to "Far" in total darkness on A15, treat as sensor error and ignore.
-                    if (!newValue && isA15Device() && currentLux <= 0.01f) {
-                        Timber.d("Proximity: Suppressing 'Far' transition on A15 in darkness (Virtual Sensor Protection)")
+                    // Issue #004 / v8.9.62: Refined A15 Virtual Proximity Protection.
+                    // If moving to "Far" in darkness (Lux <= 0.01) while stationary, 
+                    // treat as virtual sensor failure and suppress. 
+                    // However, if the device IS moving, allow the transition.
+                    if (!newValue && isA15Device() && currentLux <= 0.01f && isStationary()) {
+                        Timber.d("Proximity: Suppressing 'Far' transition on A15 in darkness (Stationary Virtual Sensor Protection)")
                         return
                     }
 

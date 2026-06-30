@@ -18,6 +18,10 @@ package com.gps19.core.engine
  * v8.9.44:
  * - Issue #430: Aligned BARO_ZEROING_INTERVAL_MS (300s) with Passive Zeroing baseline.
  * - Issue #437: Aligned ACOUSTIC_FLOOR_MIN_DB (50dB) with Absolute Safety Gate.
+ * v8.9.62:
+ * - Issue #002: Harmonized UI staleness gates with stationary polling. Increased 
+ *   TELEMETRY_UI_STALE_THRESHOLD_MS and GPS_UI_FAIL_THRESHOLD_MS to 35s to 
+ *   prevent false "RED" status during 20s polling cycles.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -298,8 +302,9 @@ const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0f
 
 // R338: Unified UI Staleness Threshold (15s) - Relaxed to accommodate jitter
-const val TELEMETRY_UI_STALE_THRESHOLD_MS = 15000L
-const val GPS_UI_FAIL_THRESHOLD_MS = 15000L
+// Issue #002: Increased to 35s to cover STATIONARY_GPS_POLLING_MS (20s)
+const val TELEMETRY_UI_STALE_THRESHOLD_MS = 35000L
+const val GPS_UI_FAIL_THRESHOLD_MS = 35000L
 
 // Alert Internal IDs (Aligned with SoT)
 const val ALERT_ID_LOCAL_INTERNET = "LOCAL_INTERNET"

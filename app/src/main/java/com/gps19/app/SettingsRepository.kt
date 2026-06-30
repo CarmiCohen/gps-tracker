@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.dataStoreFile
+import com.gps19.core.engine.SignalingConstants
 import com.gps19.core.engine.TimeProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +32,8 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * v8.9.63:
+ * - Issue #461: Standardized uniqueness check using SignalingConstants.areIdsUnique.
  * v8.9.50:
  * - R182 Relaxation: Updated DEFAULT_TRACKER_ID and DEFAULT_VIEWER_ID to "T" and "V".
  * - Fixed broken logic in saveLong/getLong and added uniqueness guard to commit.
@@ -56,8 +59,8 @@ class SettingsRepository @Inject constructor(
         const val DEFAULT_RELAY_URL = "https://gps-survival-relay.onrender.com"
         
         // R182: Standardized default IDs
-        const val DEFAULT_TRACKER_ID = "T"
-        const val DEFAULT_VIEWER_ID = "V"
+        const val DEFAULT_TRACKER_ID = SignalingConstants.DEFAULT_TRACKER_ID
+        const val DEFAULT_VIEWER_ID = SignalingConstants.DEFAULT_VIEWER_ID
         
         const val MAX_DISTANCE_STORAGE_KEY = "max_distance"
         const val DEFAULT_MAX_DISTANCE = 60.0
@@ -561,8 +564,8 @@ class SettingsRepository @Inject constructor(
             val newMaxDistance = if (current.hasDraftMaxDistance()) current.draftMaxDistance else current.maxDistance
             val newAlertsProto = if (current.hasDraftAlertSettings()) current.draftAlertSettings else current.alertSettings
 
-            // R182 Uniqueness Enforcement
-            if (newTrackerId.trim().lowercase() == newViewerId.trim().lowercase()) {
+            // Issue #461: Enforce uniqueness using SignalingConstants.
+            if (!SignalingConstants.areIdsUnique(newTrackerId, newViewerId)) {
                 res = CommitResult(error = "IDs must be unique")
                 return@updateData current
             }

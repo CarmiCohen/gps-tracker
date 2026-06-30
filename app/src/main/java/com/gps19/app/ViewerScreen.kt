@@ -30,12 +30,12 @@ import com.gps19.core.engine.*
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * v8.9.63:
+ * - Issue #461: Fixed compilation error in GlobalStatusBar call.
  * v8.9.42:
  * - Issue #338: Ghost Mode UX. Propagated isTelemetryFresh to LogOverlay for unified staleness.
  * v8.9.18:
  * - Issue #221: Propagating systemPulseRealtime for Bayesian uncertainty scaling.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  */
 
 @Composable
@@ -99,7 +99,6 @@ fun ViewerScreen(
             rttFlow = viewModel.rtt,
             remoteSignalFlow = viewModel.remoteSignal,
             redScreenVisibleFlow = viewModel.redScreenVisible,
-            onEvent = { viewModel.onEvent(it) },
             modifier = Modifier.pointerInput(Unit) {
                 detectTapGestures(onTap = { viewModel.onEvent(UiEvent.SetRedScreenVisible(true)) })
             }

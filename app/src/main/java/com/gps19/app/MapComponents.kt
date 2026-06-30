@@ -48,12 +48,11 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * v8.9.48:
- * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
- *   BrandJd (#367C2B) in Map Tool buttons (LOAD, ADD, FENCE).
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added support for 
- *   historical violation uncertainty circles using stored accuracy/maxAccuracy.
+ * v8.9.62:
+ * - Issue #003: Optimized Map re-rendering. Reduced redundant folder clears to 
+ *   resolve main thread layout jitter.
+ * - Issue #005: Removed redundant userAgentValue setting in factory to eliminate 
+ *   repeated getPackageName calls and associated log spam.
  */
 
 @Composable
@@ -97,7 +96,7 @@ fun AppMapContainer(
     
     val viewerLastValidFixRealtime = if (isTrackerMode) uiState.trackerLocation.lastValidFixRealtime else uiState.localLocation.lastValidFixRealtime
     val viewerLocationPending = if (isTrackerMode) uiState.trackerLocation.isLocationPending else uiState.localLocation.isLocationPending
-    val viewerLocationPendingReason = if (isTrackerMode) uiState.localLocation.locationPendingReason else uiState.trackerLocation.locationPendingReason
+    val viewerLocationPendingReason = if (isTrackerMode) uiState.trackerLocation.locationPendingReason else uiState.localLocation.locationPendingReason
     
     val trackerGpsAge = if (isTrackerMode) (if (uiState.localLocation.timestamp > 0) now - uiState.localLocation.timestamp else Long.MAX_VALUE)
                  else (if (uiState.trackerLocation.timestamp > 0) now - uiState.trackerLocation.timestamp else Long.MAX_VALUE)
@@ -282,7 +281,6 @@ fun OsmMap(
 ) {
     val context = LocalContext.current
     val resources = remember(context) { context.resources }
-    val packageName = remember(context) { context.packageName }
 
     val currentOnTap by rememberUpdatedState(onTap)
     val currentOnRemoveMarker by rememberUpdatedState(onRemoveMarker)
@@ -381,15 +379,13 @@ fun OsmMap(
     LaunchedEffect(zoomOutTrigger) { if (zoomOutTrigger > 0) mapViewRef.value?.controller?.zoomOut() }
 
     AndroidView(factory = { 
-        org.osmdroid.config.Configuration.getInstance().userAgentValue = "GpsTracker/${BuildConfig.VERSION_NAME} ($packageName)"
-
+        // Issue #005: configuration set once in Application. Re-setting here causes log spam.
         MapView(context).apply { 
             mapViewRef.value = this
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             isClickable = true
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-            org.osmdroid.config.Configuration.getInstance().cacheMapTileCount = 50
             val sp = if (initialCenter != null && PhysicsUtils.isValidLocation(initialCenter.latitude, initialCenter.longitude)) initialCenter else GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
             controller.setZoom(18.0)
             controller.setCenter(sp)
@@ -439,6 +435,7 @@ fun OsmMap(
         val trackerValid = PhysicsUtils.isValidLocation(lat, lng)
         val meValid = myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)
 
+        // Issue #003: Optimized check to avoid redundant folder operations
         if (lastHomeRendered.value != home || lastFenceState.value != isFenceVisible) {
             fenceFolderRef.value?.items?.clear()
             val homeFolder = homeMarkersFolderRef.value!!
