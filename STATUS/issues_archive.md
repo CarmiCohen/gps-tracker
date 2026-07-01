@@ -1,5 +1,19 @@
 # Issues Archive (Historical Resolutions)
 
+## Hardening Phase: v8.9.65 Resolved Items
+*   **Issue #R325**: Samsung A15 Accuracy Truncation. Optimized status row layout width (210dp) to ensure authoritative uncertainty display fits narrow screens. (v8.9.65)
+*   **Issue #006**: Samsung A15 Main Thread Jitter. Offloaded high-frequency sensor event processing to a dedicated `HandlerThread` (`AppSensorThread`). Verified with forensic thread-logging. (v8.9.64)
+*   **Issue #007**: Connectivity Rejoin Latency. Implemented reactive `ConnectionLostCallback` for immediate signaling re-join and enforced `websocket` transport. (v8.9.64)
+*   **Issue #008**: VID_NOTES Correction. Updated note identifier to "renumv" for role alignment. (v8.9.64)
+*   **Issue #461**: Settings Uniqueness UI Feedback. Implemented error propagation from `SettingsRepository` to `MainViewModel` via Toast. (v8.9.63)
+*   **Issue #001**: Room Schema Divergence. Incremented DB to v51 and corrected historical migrations. (v8.9.62)
+*   **Issue #002**: GPS Status UI Mismatch. Increased failure thresholds to 35s to align with stationary duty cycle. (v8.9.62)
+*   **Issue #003**: Main Thread Jitter (Davey). Moved behavioral state computations to `Dispatchers.Default` in `MainViewModel`. (v8.9.62)
+*   **Issue #004**: A15 Virtual Proximity Suppression. Refined manager to allow 'Far' transitions during motion in darkness. (v8.9.62)
+*   **Issue #005**: Map Provider Log Spillage. Silenced `osmdroid` debug logs. (v8.9.62)
+
+---
+
 ## 🗺️ Legacy Issue Mapping (Authoritative Unification)
 The following legacy IDs from early development and hardening phases have been unified into the #300+ authoritative range.
 
@@ -69,5 +83,3 @@ The following legacy IDs from early development and hardening phases have been u
 ## Hardening Phase: v8.9.55 Resolved Items
 *   **Issue #452**: Forensic SNR Latch Audit. Verified logic and test parity for 6-minute adaptive hold (R332). High-SNR jumps with zero vibration now correctly trigger the 360s sustained hold. (v8.9.55)
 *   **Issue #458**: Watchdog Battery Optimization. Implemented conservative `AlarmManager` rescheduling to optimize hardware alarm cycles. (v8.9.55)
-
-[Rest of archive content...]

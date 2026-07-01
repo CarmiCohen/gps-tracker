@@ -18,9 +18,11 @@ import javax.inject.Singleton
 /**
  * High-level Network Manager for the Service.
  * Orchestrates the SignalingProvider (Socket.io) and the HTTP Keep-alive logic.
+ * v8.9.64:
+ * - Issue #007: Implemented reactive short-circuit reconnection. Now triggers 
+ *   wakeUpRelay() and signaling re-join immediately on transport loss via callback.
  * v8.8.12:
  * - Render Resilience: Implemented aggressive multi-stage wake-up for cold-starting relays.
- * - Forensic Logging: Added wake-up status reporting to LogManager.
  */
 @Singleton
 class AppNetworkManager @Inject constructor(
@@ -190,6 +192,19 @@ class AppNetworkManager @Inject constructor(
             val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
             connectivityManager.registerNetworkCallback(request, networkCallback)
         } catch (e: Exception) { Log.e("GPS19_NET", "Failed to register network callback") }
+
+        // Issue #007: Register reactive connection lost callback
+        signalingProvider.setConnectionLostCallback {
+            if (!isStopped && relayUrl.isNotEmpty()) {
+                val now = timeProvider.elapsedRealtime()
+                // Throttle reactive wake-up to once every 10s to avoid spamming during transitions
+                if (now - lastReconnectTs > 10000L) {
+                    lastReconnectTs = now
+                    Log.i("GPS19_NET", "Reactive trigger: Transport lost. Waking up relay.")
+                    wakeUpRelay()
+                }
+            }
+        }
 
         if (relayUrl.isNotEmpty()) {
             signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)

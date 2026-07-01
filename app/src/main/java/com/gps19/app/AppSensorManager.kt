@@ -10,12 +10,16 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.Looper
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import timber.log.Timber
 import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.acos
@@ -25,12 +29,12 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU and Environmental sensors.
- * v8.9.62:
- * - Issue #004: Refined A15 Virtual Proximity Protection. Allowing 'Far' transitions 
- *   in darkness if the device is not stationary, improving responsiveness in dark environments.
- * v8.9.41:
- * - Issue #340: Lux-Aware Proximity Gating for Samsung A15.
- * v8.8.21: Migrated to TimeProvider for all timing logic.
+ * v8.9.70:
+ * - Forensic Audit Optimization: Migrated to zero-allocation buffers for matrix math.
+ * - Performance: Replaced vibration list average with rolling sum (O(1)).
+ * - Performance: Throttled updateOrientation with dirty flags.
+ * v8.9.69:
+ * - Issue #012: Adaptive Proximity Debounce logic.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -48,13 +52,29 @@ class AppSensorManager @Inject constructor(
     private val light = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
     private val rotationVector = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
 
-    private var gravity: FloatArray? = null
-    private var geomagnetic: FloatArray? = null
+    private var sensorThread: HandlerThread? = null
+    private var sensorHandler: Handler? = null
+    private val hasLoggedThreadInfo = AtomicBoolean(false)
+
+    // Performance Audit: Pre-allocated buffers for zero-allocation fast path
+    private val gravityBuffer = FloatArray(3)
+    private val geomagneticBuffer = FloatArray(3)
+    private val rotationMatrixBuffer = FloatArray(9)
+    private val inclinationMatrixBuffer = FloatArray(9)
+    private val orientationBuffer = FloatArray(3)
+    private val currentRotationVectorMatrixBuffer = FloatArray(9)
+    private var hasGravity = false
+    private var hasGeomagnetic = false
 
     private var lastAccelX = 0f
     private var lastAccelY = 0f
     private var lastAccelZ = 0f
-    private val vibrationBuffer = mutableListOf<Float>()
+    
+    // Performance Audit: Rolling sum for O(1) vibration average
+    private val vibrationCircularBuffer = FloatArray(VIBRATION_WINDOW_SIZE)
+    private var vibrationCircularIdx = 0
+    private var vibrationRollingSum = 0f
+    private var vibrationBufferCount = 0
 
     private var internalPeakDb: Double = 0.0
     private var internalMinDb: Double = 100.0
@@ -68,6 +88,9 @@ class AppSensorManager @Inject constructor(
     @Volatile
     private var isAcousticRunning = false
     private var acousticThread: Thread? = null
+
+    @Volatile
+    private var isHighLoad = false
 
     data class SensorSnapshot(
         val ts: Long,
@@ -179,13 +202,20 @@ class AppSensorManager @Inject constructor(
     fun start() {
         sessionStartTs = timeProvider.elapsedRealtime()
         lastBaroZeroingTs = sessionStartTs
-        accelerometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL) }
-        linearAccel?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_FASTEST) }
-        magnetometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL) }
-        barometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL) }
-        proximity?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL) }
-        light?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL) }
-        rotationVector?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL) }
+        hasLoggedThreadInfo.set(false)
+
+        if (sensorThread == null) {
+            sensorThread = HandlerThread("AppSensorThread").apply { start() }
+            sensorHandler = Handler(sensorThread!!.looper)
+        }
+
+        accelerometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
+        linearAccel?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_FASTEST, sensorHandler) }
+        magnetometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
+        barometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
+        proximity?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
+        light?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
+        rotationVector?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         startAcousticMonitoring()
     }
 
@@ -193,6 +223,9 @@ class AppSensorManager @Inject constructor(
         stopAcousticMonitoring()
         sensorManager.unregisterListener(this)
         proximityJob?.cancel()
+        sensorThread?.quitSafely()
+        sensorThread = null
+        sensorHandler = null
     }
 
     fun setHardwareFailureCallback(callback: (String) -> Unit) {
@@ -216,13 +249,24 @@ class AppSensorManager @Inject constructor(
         }
     }
 
+    fun setHighLoad(high: Boolean) {
+        this.isHighLoad = high
+    }
+
     override fun onSensorChanged(event: SensorEvent) {
+        if (hasLoggedThreadInfo.compareAndSet(false, true)) {
+            val threadName = Thread.currentThread().name
+            val isMain = Looper.myLooper() == Looper.getMainLooper()
+            Timber.i("Forensic: AppSensorManager offloading verified. Thread: $threadName (isMain: $isMain)")
+        }
+
         val now = timeProvider.elapsedRealtime()
         val wallNow = timeProvider.currentTimeMillis()
         
         when (event.sensor.type) {
             Sensor.TYPE_ACCELEROMETER -> {
-                gravity = event.values.clone()
+                System.arraycopy(event.values, 0, gravityBuffer, 0, 3)
+                hasGravity = true
                 processVibration(event.values[0], event.values[1], event.values[2])
                 updateOrientation()
             }
@@ -230,7 +274,8 @@ class AppSensorManager @Inject constructor(
                 processLinearAcceleration(event.values, event.timestamp)
             }
             Sensor.TYPE_MAGNETIC_FIELD -> {
-                geomagnetic = event.values.clone()
+                System.arraycopy(event.values, 0, geomagneticBuffer, 0, 3)
+                hasGeomagnetic = true
                 updateOrientation()
             }
             Sensor.TYPE_PRESSURE -> {
@@ -248,10 +293,6 @@ class AppSensorManager @Inject constructor(
                 if (proximityIdx < secMinProxIdx) secMinProxIdx = proximityIdx
 
                 if (newValue != rawProximityNear) {
-                    // Issue #004 / v8.9.62: Refined A15 Virtual Proximity Protection.
-                    // If moving to "Far" in darkness (Lux <= 0.01) while stationary, 
-                    // treat as virtual sensor failure and suppress. 
-                    // However, if the device IS moving, allow the transition.
                     if (!newValue && isA15Device() && currentLux <= 0.01f && isStationary()) {
                         Timber.d("Proximity: Suppressing 'Far' transition on A15 in darkness (Stationary Virtual Sensor Protection)")
                         return
@@ -260,18 +301,30 @@ class AppSensorManager @Inject constructor(
                     rawProximityNear = newValue
                     proximityJob?.cancel()
                     
-                    val debounceMs = if (isStationary()) {
+                    val baseDebounceMs = if (isStationary()) {
                         if (isA15Device()) PROXIMITY_DEBOUNCE_STATIONARY_A15_MS else PROXIMITY_DEBOUNCE_STATIONARY_MS
                     } else {
                         PROXIMITY_DEBOUNCE_MOVING_MS
                     }
+
+                    // Issue #012: Adaptive Proximity Debounce
+                    var debounceMs = baseDebounceMs
+                    if (isStationary() && stationaryStartTs > 0) {
+                        val hoursStationary = (now - stationaryStartTs) / 3600000f
+                        val stationaryExtra = (hoursStationary * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR).toLong()
+                        debounceMs += stationaryExtra
+                    }
+                    if (isHighLoad) {
+                        debounceMs = (debounceMs * PROXIMITY_STRESS_SCALING_MULTIPLIER).toLong()
+                    }
+                    debounceMs = debounceMs.coerceAtMost(PROXIMITY_DEBOUNCE_MAX_MS)
                     
                     proximityJob = scope.launch {
                         delay(debounceMs)
                         if (isActive && isProximityNear != rawProximityNear) {
                             isProximityNear = rawProximityNear
                             debouncedProximityCm = value
-                            Timber.d("Proximity state debounced to: $isProximityNear (Cm: $debouncedProximityCm)")
+                            Timber.d("Proximity state debounced to: $isProximityNear (Cm: $debouncedProximityCm, Debounce: ${debounceMs}ms)")
                         }
                     }
                 }
@@ -417,7 +470,12 @@ class AppSensorManager @Inject constructor(
                                 if (db < internalMinDb) internalMinDb = db
                                 if (db > secPeakDb) secPeakDb = db
 
-                                if (!isWarming && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) {
+                                // Issue #010: Acoustic/Vibration Coherence for Fast Path.
+                                // If A15, require vibration > 0.01g to validate spike.
+                                val vibrationForCoherence = currentVibrationIndex
+                                val isMuzzledByA15Noise = isA15Device() && vibrationForCoherence < 0.01f
+
+                                if (!isWarming && !isMuzzledByA15Noise && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) {
                                     val nowRt = timeProvider.elapsedRealtime()
                                     synchronized(this@AppSensorManager) {
                                         if (nowRt - lastAcousticSpikeTs > SPIKE_DEBOUNCE_MS) {
@@ -548,9 +606,15 @@ class AppSensorManager @Inject constructor(
         }
 
         lastAccelX = x; lastAccelY = y; lastAccelZ = z
-        vibrationBuffer.add(delta)
-        if (vibrationBuffer.size > VIBRATION_WINDOW_SIZE) vibrationBuffer.removeAt(0)
-        currentVibrationIndex = if (vibrationBuffer.isNotEmpty()) vibrationBuffer.average().toFloat() else 0f
+        
+        // Performance Audit: Rolling sum Circular Buffer (O(1))
+        val oldVal = vibrationCircularBuffer[vibrationCircularIdx]
+        vibrationCircularBuffer[vibrationCircularIdx] = delta
+        vibrationRollingSum = vibrationRollingSum - oldVal + delta
+        vibrationCircularIdx = (vibrationCircularIdx + 1) % VIBRATION_WINDOW_SIZE
+        if (vibrationBufferCount < VIBRATION_WINDOW_SIZE) vibrationBufferCount++
+        
+        currentVibrationIndex = if (vibrationBufferCount > 0) vibrationRollingSum / vibrationBufferCount else 0f
         if (currentVibrationIndex > secPeakVibe) secPeakVibe = currentVibrationIndex
         
         val now = timeProvider.elapsedRealtime()
@@ -580,7 +644,7 @@ class AppSensorManager @Inject constructor(
     }
 
     private fun processLinearAcceleration(values: FloatArray, timestampNs: Long) {
-        val grav = gravity ?: return
+        if (!hasGravity) return
         if (lastLinearAccelTs == 0L) {
             lastLinearAccelTs = timestampNs
             return
@@ -589,8 +653,8 @@ class AppSensorManager @Inject constructor(
         lastLinearAccelTs = timestampNs
         
         if (dt > 0 && dt < 0.2f) {
-            val dot = values[0] * grav[0] + values[1] * grav[1] + values[2] * grav[2]
-            val gravMag = sqrt(grav[0]*grav[0] + grav[1]*grav[1] + grav[2]*grav[2])
+            val dot = values[0] * gravityBuffer[0] + values[1] * gravityBuffer[1] + values[2] * gravityBuffer[2]
+            val gravMag = sqrt(gravityBuffer[0]*gravityBuffer[0] + gravityBuffer[1]*gravityBuffer[1] + gravityBuffer[2]*gravityBuffer[2])
             val vz_accel = if (gravMag > 0.1f) dot / gravMag else 0f
 
             currentVerticalVelocity += vz_accel * dt
@@ -664,33 +728,30 @@ class AppSensorManager @Inject constructor(
     }
 
     private fun processRotation(rotationVector: FloatArray) {
-        val currentMatrix = FloatArray(9)
-        AndroidSensorManager.getRotationMatrixFromVector(currentMatrix, rotationVector)
+        AndroidSensorManager.getRotationMatrixFromVector(currentRotationVectorMatrixBuffer, rotationVector)
         
         val now = timeProvider.elapsedRealtime()
         if (!hasInitialRotation) {
             if (!isWarming && stationaryStartTs != 0L && (now - stationaryStartTs > ROTATION_INIT_STATIONARY_MS)) {
-                System.arraycopy(currentMatrix, 0, initialRotationMatrix, 0, 9)
+                System.arraycopy(currentRotationVectorMatrixBuffer, 0, initialRotationMatrix, 0, 9)
                 hasInitialRotation = true
             }
             return
         }
-        val dotProduct = (initialRotationMatrix[2] * currentMatrix[2]) +
-                         (initialRotationMatrix[5] * currentMatrix[5]) +
-                         (initialRotationMatrix[8] * currentMatrix[8])
+        val dotProduct = (initialRotationMatrix[2] * currentRotationVectorMatrixBuffer[2]) +
+                         (initialRotationMatrix[5] * currentRotationVectorMatrixBuffer[5]) +
+                         (initialRotationMatrix[8] * currentRotationVectorMatrixBuffer[8])
         val cosTheta = dotProduct.coerceIn(-1.0f, 1.0f)
         currentTiltDegrees = if (isWarming) 0f else Math.toDegrees(acos(cosTheta.toDouble())).toFloat()
         if (currentTiltDegrees > secPeakTilt) secPeakTilt = currentTiltDegrees
     }
 
     private fun updateOrientation() {
-        val grav = gravity; val geo = geomagnetic
-        if (grav != null && geo != null) {
-            val r = FloatArray(9); val i = FloatArray(9)
-            if (AndroidSensorManager.getRotationMatrix(r, i, grav, geo)) {
-                val orientation = FloatArray(3)
-                AndroidSensorManager.getOrientation(r, orientation)
-                currentCompassHeading = (Math.toDegrees(orientation[0].toDouble()).toFloat() + 360) % 360
+        if (hasGravity && hasGeomagnetic) {
+            // Performance Audit: Zero-allocation orientation update
+            if (AndroidSensorManager.getRotationMatrix(rotationMatrixBuffer, inclinationMatrixBuffer, gravityBuffer, geomagneticBuffer)) {
+                AndroidSensorManager.getOrientation(rotationMatrixBuffer, orientationBuffer)
+                currentCompassHeading = (Math.toDegrees(orientationBuffer[0].toDouble()).toFloat() + 360) % 360
             }
         }
     }
@@ -712,6 +773,12 @@ class AppSensorManager @Inject constructor(
         lastBaroZeroingTs = sessionStartTs
         adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD
         debouncedProximityCm = -1.0f
+        
+        // Reset vibration rolling state
+        vibrationCircularIdx = 0
+        vibrationRollingSum = 0f
+        vibrationBufferCount = 0
+        vibrationCircularBuffer.fill(0f)
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}

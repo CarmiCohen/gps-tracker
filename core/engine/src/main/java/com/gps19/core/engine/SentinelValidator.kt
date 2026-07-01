@@ -4,8 +4,10 @@ import kotlin.math.abs
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates".
- * v8.9.34:
- * - Issue #166: Shadow Constants Remediation. Replaced magic numbers with EngineConstants.
+ * v8.9.67:
+ * - Issue #010: Implemented A15 Acoustic/Vibration Coherence Check. Requires 
+ *   minimum vibration (>0.01g) to validate acoustic spikes on A15, filtering 
+ *   confirmed system-generated noise artifacts.
  */
 object SentinelValidator {
 
@@ -34,16 +36,29 @@ object SentinelValidator {
         return vibration < dynamicGate
     }
 
-    fun isAcousticViolated(peakDb: Double, floorDb: Double): Boolean {
+    /**
+     * Issue #010: A15 Coherence Check.
+     * Confirming that spikes observed during isolation are system-generated.
+     * We require a concurrent vibration floor (> 0.01g) to trust acoustic data on A15.
+     */
+    fun isAcousticViolated(peakDb: Double, floorDb: Double, isA15: Boolean = false, vibration: Float = 0f): Boolean {
         if (floorDb < 0.0) return false
         val jump = peakDb - floorDb
-        return jump > ACOUSTIC_THRESHOLD_DB_JUMP && peakDb >= ACOUSTIC_MIN_THRESHOLD_DB
+        val threshold = if (isA15) ACOUSTIC_THRESHOLD_DB_JUMP_A15 else ACOUSTIC_THRESHOLD_DB_JUMP
+        
+        if (isA15 && vibration < 0.01f) return false // Muzzle system-generated noise
+        
+        return jump > threshold && peakDb >= ACOUSTIC_MIN_THRESHOLD_DB
     }
 
-    fun isAcousticSuspicious(peakDb: Double, floorDb: Double): Boolean {
+    fun isAcousticSuspicious(peakDb: Double, floorDb: Double, isA15: Boolean = false, vibration: Float = 0f): Boolean {
         if (floorDb < 0.0) return false
         val jump = peakDb - floorDb
-        return jump > ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP && peakDb >= ACOUSTIC_MIN_THRESHOLD_DB
+        val threshold = if (isA15) (ACOUSTIC_THRESHOLD_DB_JUMP_A15 / 2.0) else ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP
+        
+        if (isA15 && vibration < 0.01f) return false // Muzzle system-generated noise
+
+        return jump > threshold && peakDb >= ACOUSTIC_MIN_THRESHOLD_DB
     }
 
     fun isLightViolated(lux: Float, luxBaseline: Float): Boolean {

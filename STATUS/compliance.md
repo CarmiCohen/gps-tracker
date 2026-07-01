@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v8.9.55
+# Compliance & Operational Requirements (Audit Baseline) - v8.9.68
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -9,48 +9,45 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | Requirement ID | Requirement Description | Implementation Status |
 | :--- | :--- | :--- |
 | **R182** | **Role Identity Standards**: Unique IDs with 'T' and 'V' prefixes for system-generated defaults. | **Verified (v8.9.53)** |
-| **R325** | **Authoritative Spatial Anchoring**: `maxAccuracy` is the exclusive authority for deduplication and geofencing. (Architecture: Issue #325 / Tuning: Issue #450) | **Verified (v8.9.52)** |
-| **R332** | **Adaptive Jump Confidence**: High-SNR/Zero-Vibe reflection detection with 6-minute hold (Issue #452). | **Verified (v8.9.55)** |
-| **R334** | **Uncertainty Hindsight**: Linear interpolation of accuracy during path reconstruction (Issue #461). | **Verified (v8.9.52)** |
-| **R338** | **Ghost Mode UI Staleness**: Visual staleness indicators (dimming) applied at 15s (Issue #427/428 jitter buffer). | **Verified (v8.9.54)** |
+| **R325** | **Authoritative Spatial Anchoring**: `maxAccuracy` is the exclusive authority. Layout optimized for narrow devices (Samsung A15). | **Verified (v8.9.65)** |
+| **R332** | **Adaptive Jump Confidence**: High-SNR/Zero-Vibe reflection detection with 6-minute hold. | **Verified (v8.9.55)** |
+| **R334** | **Uncertainty Hindsight**: Linear interpolation of accuracy during path reconstruction. | **Verified (v8.9.52)** |
+| **R338** | **Ghost Mode UI Staleness**: Visual staleness indicators (dimming) applied at 35s. | **Verified (v8.9.62)** |
 | **R441** | **Siren Timing Integrity**: Monotonic silence latches and 30s hardware protection auto-stop. | **Verified (v8.9.52)** |
-| **R460** | **Bayesian Uncertainty Expansion**: Dynamic growth (up to 33.3m/s) during fix gaps for forensic parity (Issue #460). | **Verified (v8.9.52)** |
-| **R568a** | **Last Relay Traffic Monotonic Timestamp**: Use of `elapsedRealtime` for zombie connection detection. | **Verified (v8.9.40)** |
-| **R729** | **Behavioral Debouncing & Muzzle Hardening**: Unified timing gates for alert suppression (Issue #191). | **Verified (v8.9.40)** |
-| **R730** | **Unified Vibration Floor Update (EMA)**: Dynamic floor tracking for environmental adaptation. | **Verified (v8.9.40)** |
-| **R747** | **Standardized Alert Titles**: Localized "This device" and simplified "Device" subtitles for clarity. | **Verified (v8.9.51)** |
-| **R800** | **Unified Back Navigation**: Standardized `BackHandler` usage in `AlarmActivity`. | **Verified (v8.9.40)** |
-| **R805** | **Map Marker Color Standardization**: Integration of Purple500 for marker categorization. | **Verified (v8.9.40)** |
+| **R460** | **Bayesian Uncertainty Expansion**: Dynamic growth (up to 33.3m/s) during fix gaps. | **Verified (v8.9.52)** |
+| **R747** | **Standardized Alert Titles**: Localized "This device" and simplified "Device" subtitles. | **Verified (v8.9.51)** |
+| **R810-A15**| **A15 High-Noise Profile**: Hardened sensor gates and vibration coherence for isolated A15 hardware. | **Verified (v8.9.68)** |
 | **R832** | **Chair Sit Detection Engine**: Multi-sensor fusion (tilt/vibration/baro) for occupancy detection. | **Verified (v8.9.40)** |
-| **R853** | **Atomic HomePoint Updates**: Support for atomic bulk updates of home points. | **Verified (v8.9.40)** |
-| **R854** | **Siren Master Control**: Unified UI grouping for siren alert management. | **Verified (v8.9.40)** |
-| **R865** | **Unified Identity Green**: Branding color JD Green (#367C2B) integrated as primary theme. | **Verified (v8.9.48)** |
-| **R866** | **Branding Accuracy**: JD Branding Green matches exactly #367C2B. | **Verified (v8.9.40)** |
-| **R880** | **Evidence-based Parking Exit**: Hardened behavioral state transitions in `TrackerStateManager`. | **Verified (v8.9.40)** |
-| **R917** | **Update Smoothness**: Infrastructure for session recovery after package updates (Issue #317). | **Verified (v8.9.36)** |
-| **R922** | **Role-aware LED Logic**: Tracker LEDs reflect local health; Viewer gates by peer pulse. | **Verified (v8.9.40)** |
-| **R926** | **Service Launch Integrity**: Mandatory 2,000ms landing page pause and background service launch following auto-transition. (Issue #215/320). | **Verified (v8.9.40)** |
+| **R917** | **Update Smoothness**: Infrastructure for session recovery after package updates. | **Verified (v8.9.36)** |
+| **R924** | **VID Notes Authority**: Button row displays `VID_NOTES` ("renumv") instead of version number. | **Verified (v8.9.65)** |
+| **R926** | **Service Launch Integrity**: Mandatory 2,000ms landing page pause before service launch. | **Verified (v8.9.40)** |
 | **R944** | **Binary Signaling Efficiency**: Protobuf-based binary payload emission. | **Verified (v8.9.40)** |
-| **R945** | **Reactive System State Flows**: Cold-to-hot reactive flows for hardware/system state monitoring. | **Verified (v8.9.40)** |
-| **R946** | **Watchdog Battery Optimization**: Conservative AlarmManager rescheduling using danger windows. | **Verified (v8.9.55)** |
+| **R965** | **Sensor Processing Authority**: High-frequency sensor event processing offloaded to `AppSensorThread`. | **Verified (v8.9.64)** |
+| **R966** | **Connectivity Integrity**: Reactive short-circuit reconnection trigger (immediate `wakeUpRelay`). | **Verified (v8.9.64)** |
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v8.9.55)
-*   **FIXED Issue #452: Forensic SNR Latch Audit** - Resolution: Verified 6-minute adaptive hold logic for High-SNR reflection suspicion (R332).
-*   **FIXED Issue #458: Watchdog Battery Optimization** - Resolution: Implemented a conservative rescheduling strategy in `SystemMonitor.kt` that only updates the hardware alarm within a 20s danger window or upon state change. (Formerly #366-W)
-*   **AUDIT Issue #325: R325 Architectural Baseline** - Resolution: Formally closed #325 as the "Architectural Implementation" of Dual-Metric Spatial Anchoring.
+### 2.1. Hardening Phase Resolutions (v8.9.68)
+*   **FIXED Issue #011: Suppression Forensic Labeling** - Resolution: Implemented `suppressionNote` in `SentinelResult` and logging in `TrackerService` to provide transparency for hardware-profile muzzles.
+*   **FIXED Issue #010: A15 Acoustic/Vibration Coherence** - Resolution: Implemented physical reality gate; acoustic spikes on A15 are suppressed if concurrent vibration is < 0.01g.
+*   **FIXED Issue #013: A15 GPS Heartbeat Audit** - Resolution: Implemented "Warm Handoff" via `gpsManager.kickGps()` to prevent background clock stalls during state transitions.
+*   **FIXED Issue #009: A15 Forensic Isolation Spikes** - Resolution: Increased acoustic jump thresholds to 55dB and optimized light EMA factors for Samsung A15.
 
-### 2.2. Hardening Phase Resolutions (v8.9.52 - v8.9.54)
-*   **FIXED Issue #427/428: Jitter-Proof UI Staleness** - Resolution: Relaxed `WATCH_TIMEOUT_MS` and `TELEMETRY_UI_STALE_THRESHOLD_MS` to 15s to prevent UI flickering under normal network jitter.
-*   **FIXED Issue #460: Bayesian Authority Sync** - Resolution: Integrated uncertainty expansion into `MainAlarmLogic.kt`. (Formerly #431/R460)
-*   **FIXED Issue #461: Trajectory Forensic Parity** - Resolution: Hardened GtoEngine and LocationProcessor to preserve maxAccuracy metadata. (Formerly #435)
-*   **FIXED Issue #450: R325 Tuning Authority** - Resolution: Hardened `LocationProcessor.kt` with `DEDUPLICATION_SPATIAL_GATE_FACTOR` (0.5x).
-*   **FIXED Issue #441: Siren Authority Audit** - Resolution: Refactored `AudioSynthesizer.kt` to use monotonic time for silence latches and enforced 30s auto-stop.
-*   **FIXED Issue #440: Log/UI Timing Authority** - Resolution: Verified 10s startup muzzle and 50-marker pruning.
-*   **FIXED Issue #451: Xiaomi Permission Status Reflection** - Resolution: Verified `UNKNOWN` status handling.
+### 2.2. Hardening Phase Resolutions (v8.9.65)
+*   **FIXED Issue #R325: Samsung A15 Accuracy Truncation** - Resolution: Optimized layout width constraints to ensure authoritative accuracy visibility on narrow devices.
+*   **FIXED Issue #461: Settings Uniqueness UI Feedback** - Resolution: Implemented error propagation from repository to UI via Toast.
+*   **FIXED Issue #008: VID_NOTES Correction** - Resolution: Corrected note identifier to "renumv".
 
-### 2.3. Hardening Phase Resolutions (v8.9.51)
-*   **FIXED Issue #422: Documentation Desync** - Resolution: Synchronized specs with Database v50 milestones.
-*   **FIXED Issue #424: R747 Implementation Paradox** - Resolution: Normalized Alert Titles and localized Viewer events.
-*   **FIXED Issue #429/457**: Aligned siren auto-stop and unified data health logic. (Formerly #429/365)
+### 2.3. Hardening Phase Resolutions (v8.9.64)
+*   **FIXED Issue #006: Samsung A15 Main Thread Jitter** - Resolution: Offloaded sensor callbacks to dedicated `HandlerThread`.
+*   **FIXED Issue #007: Connectivity Rejoin Latency** - Resolution: Implemented reactive connection-lost triggers and enforced `websocket` transport.
+
+### 2.4. Hardening Phase Resolutions (v8.9.62)
+*   **FIXED Issue #001: Room Schema Divergence** - Resolution: Incremented DB to v51 and corrected historical migrations.
+*   **FIXED Issue #002: GPS Status UI Mismatch** - Resolution: Increased failure thresholds to 35s to align with stationary GPS duty cycle.
+*   **FIXED Issue #003: Main Thread Jitter (Davey)** - Resolution: Moved behavioral state computations to `Dispatchers.Default`.
+*   **FIXED Issue #004: A15 Virtual Proximity Suppression** - Resolution: Refined manager to allow 'Far' transitions during motion in darkness.
+*   **FIXED Issue #005: Map Provider Log Spillage** - Resolution: Silenced osmdroid debug logs.
+*   **FIXED Issue #458: Tracker Role Ghost Mode Bug** - Resolution: Fixed timestamp propagation in GlobalStatusBar.
+*   **FIXED Issue #459: Unicode Escape Regression** - Resolution: Fixed double-escaping in labels.
+*   **FIXED Issue #460: Local Freshness Existence Logic** - Resolution: Relaxed check to include sensor-only telemetry.

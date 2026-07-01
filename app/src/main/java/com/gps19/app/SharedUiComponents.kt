@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
@@ -36,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.Modifier
 import kotlinx.coroutines.flow.StateFlow
 import java.text.SimpleDateFormat
 import java.util.*
@@ -43,15 +43,12 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v8.9.65:
+ * - Issue #R325 Validation: Optimized StatusRowData layout for narrow devices (Samsung A15). 
+ *   Reduced left-side width to 210dp to prevent accuracy truncation.
  * v8.9.63:
- * - Physical Validation: Verified R325 accuracy layout on Samsung A15.
  * - Issue #002: Aligned UI staleness logic with hardware polling. Indicators now 
  *   respect the 35s authoritative gate to prevent stationary flickering.
- * v8.9.61:
- * - R924: Replaced version display in HeaderBar with VID_NOTES.
- * v8.9.60:
- * - Issue #458/460: Fixed Tracker mode Ghost Mode bug. Corrected local freshness 
- *   propagation and existence check logic.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -198,7 +195,6 @@ fun GenericSensorRibbon(
                     strokeWidth = 0.5.dp.toPx()
                 )
 
-                // Time context ticks
                 val intervalMs = when(scale) {
                     "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 1 * 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
                 }
@@ -212,7 +208,6 @@ fun GenericSensorRibbon(
                 history.forEachIndexed { index, p ->
                     val xPos = (totalPoints - history.size + index) * pointWidth
                     
-                    // Render ticks
                     if (intervalMs > 0 && p.ts >= baseTickTs) {
                         val tickCount = (p.ts - baseTickTs) / intervalMs
                         val prevTickCount = if (index > 0) {
@@ -288,13 +283,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, title: String) {
                     }
 
                     val intervalMs = when(title) {
-                        "7D" -> 24 * 3600000L
-                        "24H" -> 6 * 3600000L
-                        "4H" -> 1 * 3600000L
-                        "1H" -> 15 * 60000L
-                        "16M" -> 4 * 60000L
-                        "4M" -> 1 * 60000L
-                        else -> 0L
+                        "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 1 * 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
                     }
                     val alignMs = when(title) {
                         "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
@@ -369,7 +358,6 @@ fun GlobalStatusBar(
     val lastIncomingActivity = uiState.connectivity.lastRemoteActivityTs
     val activityAge = if (lastIncomingActivity > 0) systemPulse - lastIncomingActivity else Long.MAX_VALUE
     
-    // Issue #002: Aligned peer activity check with hardware polling.
     val isPeerActive = activityAge < TELEMETRY_UI_STALE_THRESHOLD_MS
     
     val rtt by rttFlow.collectAsStateWithLifecycle()
@@ -387,7 +375,6 @@ fun GlobalStatusBar(
     val loc = if (mode == "viewer") uiState.trackerLocation else uiState.localLocation
     val lastGpsTs = loc.timestamp
     
-    // Issue #002: GPS status utilizes the increased 35s failure threshold.
     val gpsAge = if (lastGpsTs > 0) systemPulse - lastGpsTs else Long.MAX_VALUE
     val isGpsActive = gpsAge < GPS_UI_FAIL_THRESHOLD_MS
 
@@ -440,8 +427,6 @@ fun StatusBar(
     isTelemetryFresh: Boolean = true
 ) {
     val age = if (lastP > 0) now - lastP else Long.MAX_VALUE 
-    
-    // Issue #002: Aligned circular progress with increased 35s mandate.
     val progressValue = if (lastP > 0) maxOf(0f, minOf(1f, (TELEMETRY_UI_STALE_THRESHOLD_MS - age).toFloat() / TELEMETRY_UI_STALE_THRESHOLD_MS)) else 0f
 
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
@@ -559,7 +544,6 @@ fun StatusRowData(
 ) {
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     
-    // Issue #002: Increased failure threshold to 35s.
     val isGpsFresh = gpsAgeMs != -1L && gpsAgeMs < GPS_UI_FAIL_THRESHOLD_MS
     val isConnStale = isRemote && !isPeerActive
     val isGpsStale = !isGpsFresh
@@ -580,7 +564,9 @@ fun StatusRowData(
     )
 
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = horizontalPadding), verticalAlignment = Alignment.CenterVertically) {
-        Row(modifier = Modifier.width(224.dp), verticalAlignment = Alignment.CenterVertically) {
+        // R325: Reduced left-side width from 224dp to 210dp to ensure accuracy display 
+        // doesn't truncate on narrow devices like the Samsung A15.
+        Row(modifier = Modifier.width(210.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(modifier = Modifier.width(48.dp), verticalAlignment = Alignment.CenterVertically) {
                  val animatedLabelAlpha by animateFloatAsState(targetValue = if (isConnStale) 0.5f else 1f, label = "LabelAlpha")
                  Text(text = label, color = contentColor.copy(alpha = if (isHandshaking) handshakeAlpha else animatedLabelAlpha), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)

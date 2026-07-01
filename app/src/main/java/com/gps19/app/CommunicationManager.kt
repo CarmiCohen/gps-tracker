@@ -15,9 +15,11 @@ import javax.inject.Inject
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * v8.9.64:
+ * - Issue #007: Enforcing "websocket" transport only to bypass polling overhead.
+ * - Reduced reconnection delay to 2s for faster recovery.
  * v8.9.51:
  * - R182 Relaxation: Removed legacy prefix checks in updateIdentity and connect.
- * - Cleaned up pong role detection to rely on "viewer"/"tracker" literal strings.
  */
 class CommunicationManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -40,6 +42,8 @@ class CommunicationManager @Inject constructor(
     private val rtts = mutableListOf<Int>()
     private var lastRttInternal = 0
     private var lastRelayTrafficTs = timeProvider.elapsedRealtime()
+
+    private var onConnectionLost: (() -> Unit)? = null
 
     private val commExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped) return@CoroutineExceptionHandler
@@ -131,12 +135,12 @@ class CommunicationManager @Inject constructor(
         markTraffic() 
 
         val opts = IO.Options().apply {
-            transports = arrayOf("polling", "websocket")
+            transports = arrayOf("websocket")
             timeout = 45000 
             reconnection = true
             reconnectionAttempts = Int.MAX_VALUE
-            reconnectionDelay = 5000 
-            reconnectionDelayMax = 30000
+            reconnectionDelay = 2000 
+            reconnectionDelayMax = 10000
             randomizationFactor = 0.5
         }
 
@@ -173,12 +177,16 @@ class CommunicationManager @Inject constructor(
             val reason = args?.getOrNull(0)?.toString() ?: "unknown"
             logToApp("Relay Disconnected ($reason)", true)
             telemetryRepository.updateRelayStatus(false)
+            if (reason != "io client disconnect") {
+                onConnectionLost?.invoke()
+            }
         }
 
         s.on(Socket.EVENT_CONNECT_ERROR) { args ->
             val error = args?.getOrNull(0)?.toString() ?: "Transport Error"
             logToApp("Relay Connect Error: $error", true)
             telemetryRepository.updateRelayStatus(false)
+            onConnectionLost?.invoke()
         }
 
         s.on("location_relay") { markTraffic(); handleLocationRelay(it) }
@@ -188,6 +196,10 @@ class CommunicationManager @Inject constructor(
         s.on("viewer_status_relay") { markTraffic(); handleViewerStatusRelay(it) }
         s.on("ping_relay") { markTraffic(); handlePingRelay(it) }
         s.on("pong_relay") { markTraffic(); handlePongRelay(it) }
+    }
+
+    override fun setConnectionLostCallback(callback: () -> Unit) {
+        this.onConnectionLost = callback
     }
 
     private fun handleLocationRelay(args: Array<Any>) {
@@ -262,7 +274,6 @@ class CommunicationManager @Inject constructor(
             val entry = LogEntry.fromJSONObject(data)
             logRepository.addLog(entry)
 
-            // Issue 194: Forward to RemoteHandler for forensic reconstruction
             val wrapped = JSONObject(data.toString())
             wrapped.put("type", "remote_log")
             onRemoteUpdateWrapper.onUpdate(wrapped)

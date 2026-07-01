@@ -22,7 +22,9 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Manages hardware GPS and GNSS status.
- * v8.8.21: Migrated to TimeProvider for all timing logic.
+ * v8.9.66:
+ * - Issue #013: Added kickGps() to perform a "Warm Handoff" hardware injection 
+ *   to prevent A15 background stalling during transition.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -112,8 +114,22 @@ class GpsManager @Inject constructor(
         }
     }
 
+    /**
+     * kickGps: Injects hardware commands to wake up the GNSS chipset without 
+     * restarting the software location flow. Used for A15 warm handoffs.
+     */
+    fun kickGps() {
+        try {
+            locationManager.sendExtraCommand(LocationManager.GPS_PROVIDER, "force_time_injection", null)
+            locationManager.sendExtraCommand(LocationManager.GPS_PROVIDER, "force_xtra_injection", null)
+            Timber.d("GPS: Hardware 'Warm Kick' injected (A15 Transition Guard)")
+        } catch (e: Exception) {
+            Timber.e(e, "GPS: Warm Kick failed")
+        }
+    }
+
     fun reviveGps() {
-        Timber.w("GPS: Hardware revival triggered")
+        Timber.w("GPS: Hardware revival triggered (Full Restart)")
         try {
             locationManager.sendExtraCommand(LocationManager.GPS_PROVIDER, "delete_aiding_data", null)
             locationManager.sendExtraCommand(LocationManager.GPS_PROVIDER, "force_xtra_injection", null)
@@ -148,6 +164,8 @@ class GpsManager @Inject constructor(
                         }
                     }
 
+                    // A15 specific request tuning: Ensure updates are strictly requested 
+                    // and allow high-power background execution.
                     val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval)
                         .setMinUpdateIntervalMillis(interval / 2)
                         .setMinUpdateDistanceMeters(0.0f)

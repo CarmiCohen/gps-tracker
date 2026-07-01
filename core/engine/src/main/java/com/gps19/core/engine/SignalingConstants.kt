@@ -16,7 +16,7 @@ object SignalingConstants {
     const val DEFAULT_VIEWER_ID = "V"
     
     // R924-A: Hard-coded note for UI display.
-    const val VID_NOTES = "renumb"
+    const val VID_NOTES = "renumv"
 
     /**
      * R182: Validation relaxed to non-empty (min 1 char).

@@ -5,12 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * v8.9.52:
- * - Issue #461: Forensic Parity. Propagating maxAccuracy through processLocation 
- *   and GtoEngine promotion for forensic continuity.
- * v8.9.34:
- * - Issue #304: Corrected Tier 3 Jump Floor. Now uses JUMP_GATE_VISUAL_JITTER_METERS (10.0m).
- * - Issue #388: Lux EMA Implementation. Integrated Slow/Fast variants for rising/falling light.
+ * v8.9.68:
+ * - Issue #011: Implemented suppressionNote generation for forensic transparency 
+ *   when A15-specific muzzles (coherence, threshold) are triggered.
  */
 class LocationSentinel {
 
@@ -109,6 +106,7 @@ class LocationSentinel {
         manualAdaptiveFloor: Float = -1f,
         acousticLockoutTs: Long = 0L,
         isMuzzled: Boolean = false,
+        isA15: Boolean = false,
         nowRealtime: Long,
         nowWall: Long
     ): Boolean {
@@ -176,11 +174,10 @@ class LocationSentinel {
             if (!lux.isNaN()) luxBaseline = lux
         } else {
             if (!lux.isNaN()) {
-                // Issue #388: Use rising/falling EMA factors from EngineConstants
                 val baseAlpha = if (lux < luxBaseline) {
                     if (isStationary()) LUX_EMA_DOWN_SLOW else LUX_EMA_DOWN_FAST
                 } else {
-                    if (isStationary()) LUX_EMA_UP_SLOW else LUX_EMA_UP_FAST
+                    if (isStationary()) LUX_EMA_UP_SLOW else if (isA15) LUX_EMA_UP_FAST_A15 else LUX_EMA_UP_FAST
                 }
                 val alpha = SentinelValidator.accelerateAlpha(baseAlpha, isWarming)
                 luxBaseline = (luxBaseline * (1f - alpha)) + (lux * alpha)
@@ -260,6 +257,7 @@ class LocationSentinel {
         bypassBehavioral: Boolean = false,
         isSuspicious: Boolean = false,
         isMuzzled: Boolean = false, 
+        isA15: Boolean = false,
         nowWall: Long,
         nowRealtime: Long,
         acousticFloorDb: Double = -1.0
@@ -382,10 +380,19 @@ class LocationSentinel {
                 return SentinelResult(behavioralStatus, finalJumpConfidence.reason, jumpConfidence = finalJumpConfidence)
             }
 
-            val sensorSentinel = runSensorSentinel(lat, lng, alt, accuracy, bearing, nowRealtime, isMuzzled)
+            val sensorSentinel = runSensorSentinel(lat, lng, alt, accuracy, bearing, nowRealtime, isMuzzled, isA15)
             if (sensorSentinel.status != SentinelStatus.VALID) {
                 behavioralStatus = sensorSentinel.status
                 behavioralReason = sensorSentinel.reason
+            }
+            
+            // Issue #011: Forensic Labeling
+            if (sensorSentinel.status == SentinelStatus.VALID && sensorSentinel.suppressionNote != null) {
+                val effectiveQScale = if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0
+                val optimizedPoint = immFilter.update(lat, lng, accuracy, timestamp, effectiveQScale)
+                updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
+                gtoEngine.clear()
+                return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = optimizedPoint.copy(accuracy = accuracy, maxAccuracy = maxAccuracy), jumpConfidence = finalJumpConfidence, suppressionNote = sensorSentinel.suppressionNote)
             }
         }
 
@@ -403,7 +410,8 @@ class LocationSentinel {
     private fun runSensorSentinel(
         lat: Double, lng: Double, alt: Double, accuracy: Float, bearing: Float,
         nowRealtime: Long,
-        isMuzzled: Boolean = false 
+        isMuzzled: Boolean = false,
+        isA15: Boolean = false
     ): SentinelResult {
         if (!isMuzzled) {
             if (!isNear) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Proximity Far")
@@ -426,7 +434,24 @@ class LocationSentinel {
         if (!isMuzzled && SentinelValidator.isLightViolated(currentLux, luxBaseline)) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Light jump")
 
         val isAcousticLockedOut = (lastFastPathAcousticSpikeTs > 0 && (nowRealtime - lastFastPathAcousticSpikeTs < ACOUSTIC_LOCKOUT_MS))
-        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb)) {
+        
+        // Issue #011: Forensic Labeling for A15 Muzzles
+        if (isA15 && !isMuzzled && !isAcousticLockedOut) {
+            val jump = currentAcousticDb - acousticFloorDb
+            val rawThreshold = ACOUSTIC_THRESHOLD_DB_JUMP
+            val hardenedThreshold = ACOUSTIC_THRESHOLD_DB_JUMP_A15
+            
+            if (jump > rawThreshold && currentAcousticDb >= ACOUSTIC_MIN_THRESHOLD_DB) {
+                if (jump <= hardenedThreshold) {
+                    return SentinelResult(SentinelStatus.VALID, suppressionNote = "Acoustic spike (${String.format(Locale.getDefault(), "%.1f", currentAcousticDb)}dB) muzzled by A15 hardware profile.")
+                }
+                if (currentVibrationIndex < 0.01f) {
+                    return SentinelResult(SentinelStatus.VALID, suppressionNote = "Acoustic alert (${String.format(Locale.getDefault(), "%.1f", currentAcousticDb)}dB) suppressed on A15 due to vibration incoherence.")
+                }
+            }
+        }
+
+        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex)) {
             return SentinelResult(SentinelStatus.TAMPER_ALERT, "Acoustic alarm")
         }
 
@@ -434,7 +459,7 @@ class LocationSentinel {
             return SentinelResult(SentinelStatus.SENSOR_SUSPICIOUS, "Vibration suspicion")
         }
         
-        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb)) {
+        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex)) {
             return SentinelResult(SentinelStatus.ACOUSTIC_WARNING, "Acoustic suspicion")
         }
 

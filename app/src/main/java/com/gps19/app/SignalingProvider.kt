@@ -5,6 +5,8 @@ import org.json.JSONObject
 
 /**
  * Interface for signaling implementations (Socket.io, MQTT, etc.)
+ * v8.9.64:
+ * - Added setConnectionLostCallback for reactive reconnection triggers.
  * v8.8.21:
  * - Role-Based Standardization: Explicitly enforcing Tracker ID ("T") vs Viewer ID ("C").
  * - Delegated validation to :core:engine:SignalingConstants.
@@ -27,4 +29,9 @@ interface SignalingProvider {
      * Used for zombie connection detection.
      */
     fun getLastRelayTrafficTs(): Long
+    
+    /**
+     * Issue #007: Allows the network manager to register a reactive callback for transport failures.
+     */
+    fun setConnectionLostCallback(callback: () -> Unit)
 }

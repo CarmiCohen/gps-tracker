@@ -2,26 +2,11 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * v8.9.54:
- * - Issue #427/428: Relaxed UI staleness and watchdog thresholds to 15s (R338) 
- *   to prevent jitter flickering.
- * v8.9.52:
- * - Issue #450: Deduplication Audit. Added DEDUPLICATION_SPATIAL_GATE_FACTOR.
- * v8.9.51:
- * - Issue #424: R747 Implementation. Standardized Alert Titles and Subtitles.
- *   Removed "Tracker:" prefixes and localized "Viewer" as "This device".
- * v8.9.50:
- * - Issue #429: Aligned SIREN_AUTO_STOP_MS (30s) with ACOUSTIC_RECOVERY_DELAY_MS to resolve 
- *   Acoustic Hysteresis Paradox.
- * v8.9.49:
- * - Issue #427: Aligned WATCH_TIMEOUT_MS and WATCH_DOG_UI_GRACE_MS with 15s R338 mandate.
- * v8.9.44:
- * - Issue #430: Aligned BARO_ZEROING_INTERVAL_MS (300s) with Passive Zeroing baseline.
- * - Issue #437: Aligned ACOUSTIC_FLOOR_MIN_DB (50dB) with Absolute Safety Gate.
- * v8.9.62:
- * - Issue #002: Harmonized UI staleness gates with stationary polling. Increased 
- *   TELEMETRY_UI_STALE_THRESHOLD_MS and GPS_UI_FAIL_THRESHOLD_MS to 35s to 
- *   prevent false "RED" status during 20s polling cycles.
+ * v8.9.69:
+ * - Issue #012: Added Adaptive Proximity Debounce constants.
+ * v8.9.66:
+ * - Issue #007: Added ACOUSTIC_THRESHOLD_DB_JUMP_A15 (55dB) to mitigate system-generated 
+ *   spikes confirmed during A15 isolation testing.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -96,6 +81,7 @@ const val SCATTER_ANGLE_THRESHOLD = 120.0
 
 // Acoustic Monitoring (R810-L)
 const val ACOUSTIC_THRESHOLD_DB_JUMP = 40.0 
+const val ACOUSTIC_THRESHOLD_DB_JUMP_A15 = 55.0 // R810-A15: Higher gate for A15 internal mic resonance
 const val ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP = 20.0
 const val ACOUSTIC_MIN_THRESHOLD_DB = 50.0
 const val ACOUSTIC_FLOOR_MIN_DB = 50.0 // Issue #437: Aligned with absolute safety gate
@@ -377,6 +363,11 @@ const val TEST_ALARM_DURATION_MS = 3000L
 const val PROXIMITY_DEBOUNCE_STATIONARY_A15_MS = 5000L
 const val PROXIMITY_DEBOUNCE_STATIONARY_MS = 3000L
 const val PROXIMITY_DEBOUNCE_MOVING_MS = 1000L
+
+// Issue #012: Adaptive Proximity Debounce
+const val PROXIMITY_DEBOUNCE_MAX_MS = 15000L
+const val PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR = 2000L
+const val PROXIMITY_STRESS_SCALING_MULTIPLIER = 2.0f
 
 // History & Persistence Logic
 const val REAL_TIME_GAP_LIMIT_MS = 10000L

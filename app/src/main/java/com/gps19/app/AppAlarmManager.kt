@@ -10,6 +10,8 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * v8.9.64:
+ * - Fixed ConcurrentModificationException in updateAlarmsJson by synchronizing activeAlarms access.
  * v8.9.52:
  * - Issue #431: Bayesian Authority Sync. Propagating trackerLastValidFixTs.
  * - Issue #452: SNR Latch Parity. Propagating isAdaptiveJump for 6-min hold enforcement.
@@ -48,15 +50,21 @@ class AppAlarmManager(
     }
 
     fun hasUnresolvedAlarms(): Boolean {
-        return activeAlarms.values.any { !it.isResolved }
+        synchronized(activeAlarms) {
+            return activeAlarms.values.any { !it.isResolved }
+        }
     }
 
     fun getUnresolvedAlarmTypes(): Set<String> {
-        return activeAlarms.filterValues { !it.isResolved }.keys.toSet()
+        synchronized(activeAlarms) {
+            return activeAlarms.filterValues { !it.isResolved }.keys.toSet()
+        }
     }
 
     fun getUnresolvedAlarmsSummary(): String {
-        return activeAlarms.values.filter { !it.isResolved }.joinToString(", ") { it.title }
+        synchronized(activeAlarms) {
+            return activeAlarms.values.filter { !it.isResolved }.joinToString(", ") { it.title }
+        }
     }
 
     fun shouldPlaySiren(): Boolean {
@@ -224,7 +232,7 @@ class AppAlarmManager(
             val isSpecial = isSpecialType(type)
             val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
 
-            val eval = activeAlarms[type] ?: AlarmEvaluation(type, violation.title)
+            val eval = synchronized(activeAlarms) { activeAlarms[type] } ?: AlarmEvaluation(type, violation.title)
             
             if (violation.conditionMet && enabled) {
                 if (!eval.isTriggered || eval.isResolved) {
@@ -258,17 +266,21 @@ class AppAlarmManager(
             lastGlobalTriggerTs = now
         }
 
-        activeAlarms.clear()
-        activeAlarms.putAll(newAlarms)
+        synchronized(activeAlarms) {
+            activeAlarms.clear()
+            activeAlarms.putAll(newAlarms)
+        }
         updateAlarmsJson()
     }
 
     fun dismissResolvedAlarms() {
-        val iterator = activeAlarms.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            if (entry.value.isResolved) {
-                iterator.remove()
+        synchronized(activeAlarms) {
+            val iterator = activeAlarms.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (entry.value.isResolved) {
+                    iterator.remove()
+                }
             }
         }
         updateAlarmsJson()
@@ -276,15 +288,17 @@ class AppAlarmManager(
 
     private fun updateAlarmsJson() {
         val jsonArray = JSONArray()
-        activeAlarms.values.forEach { eval ->
-            val obj = JSONObject()
-            obj.put("type", eval.type)
-            obj.put("isTriggered", eval.isTriggered)
-            obj.put("isResolved", eval.isResolved)
-            obj.put("title", eval.title)
-            obj.put("subtitle", eval.subtitle)
-            obj.put("isSirenDisabled", currentSettings.globalMute)
-            jsonArray.put(obj)
+        synchronized(activeAlarms) {
+            activeAlarms.values.forEach { eval ->
+                val obj = JSONObject()
+                obj.put("type", eval.type)
+                obj.put("isTriggered", eval.isTriggered)
+                obj.put("isResolved", eval.isResolved)
+                obj.put("title", eval.title)
+                obj.put("subtitle", eval.subtitle)
+                obj.put("isSirenDisabled", currentSettings.globalMute)
+                jsonArray.put(obj)
+            }
         }
         lastAlarmsJson = jsonArray.toString()
     }
@@ -329,7 +343,9 @@ class AppAlarmManager(
 
     fun getLastAlarmsJson(): String = lastAlarmsJson
     fun resetEvaluation() {
-        activeAlarms.clear()
+        synchronized(activeAlarms) {
+            activeAlarms.clear()
+        }
         lastAlarmsJson = "[]"
         wasDistanceViolated = false
         distanceViolationCounter = 0

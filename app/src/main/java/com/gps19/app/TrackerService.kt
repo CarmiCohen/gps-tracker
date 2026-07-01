@@ -21,16 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v8.9.52:
- * - Issue #452: SNR Latch Hardening. Explicitly propagating isAdaptiveJump 
- *   to AlarmManager to ensure 6-minute hold compliance.
- * - Fix: Corrected naming desync for peak vertical sensor consumption.
- * v8.9.51:
- * - Issue #H-453: Samsung A15 GPS Stalling.
- * - Issue #H-454: Samsung A15 Proximity Flutter.
- * - Issue #H-455: Xiaomi Autostart & Boot Resilience.
- * v8.9.42:
- * - [Baseline] Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
+ * v8.9.69:
+ * - Issue #012: Adaptive Proximity Debounce. Propagating cooling mode (High Load) 
+ *   to AppSensorManager to scale proximity debounce duration.
+ * v8.9.68:
+ * - Issue #011: Forensic Labeling. Now logging suppression notes from the 
+ *   location sentinel to provide transparency on A15 hardware muzzles.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -310,6 +306,9 @@ class TrackerService : BaseMonitorService() {
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
         
+        // Issue #012: Propagate High Load (Cooling Mode) to sensors
+        sensorManager.setHighLoad(integrityMonitor.isCoolingModeActive)
+
         if (isA15) {
             systemMonitor.renewWakeLock()
         }
@@ -355,8 +354,15 @@ class TrackerService : BaseMonitorService() {
             deviceSpecialFlags = flags
         )
         if (newInterval != currentGpsInterval) {
+            val oldInterval = currentGpsInterval
             currentGpsInterval = newInterval
             gpsManager.setPollingInterval(newInterval)
+            
+            // Issue #013: A15 Transition Heartbeat (Warm Handoff)
+            if (isA15 && oldInterval >= STATIONARY_GPS_POLLING_MS && newInterval <= A15_STABLE_GPS_POLLING_MS) {
+                gpsManager.kickGps()
+            }
+
             if (nowRealtime - lastGpsTransitionLogTs > GPS_TRANSITION_LOG_MUZZLE_MS) {
                 lastGpsTransitionLogTs = nowRealtime
                 logManager.logServiceEvent("GPS Frequency adapted to ${newInterval}ms", important = false)
@@ -428,6 +434,7 @@ class TrackerService : BaseMonitorService() {
             plungeMatched = sensorManager.consumePlungeMatched(), 
             isSirenActive = false, isWarming = sensorManager.isWarming, manualAdaptiveFloor = sensorManager.adaptiveVibrationFloor,
             isMuzzled = isMuzzled,
+            isA15 = isA15,
             nowRealtime = nowRealtime, nowWall = now
         )
 
@@ -621,8 +628,14 @@ class TrackerService : BaseMonitorService() {
             satsUsed = location.extras?.getInt("satellites") ?: gpsManager.satellitesUsed, isViewerTrail = false, lastGpsTs = sessionManager.lastGpsTs, 
             isLocal = true, providedAdaptiveVibrationFloor = sensorManager.adaptiveVibrationFloor, 
             isSuspicious = isSuspiciousMode,
-            isMuzzled = isMuzzled
+            isMuzzled = isMuzzled,
+            isA15 = isA15
         )
+        
+        // Issue #011: Suppression Forensic Labeling
+        processed.suppressionNote?.let { note ->
+            logManager.logServiceEvent(note, important = false, lat = location.latitude, lng = location.longitude, accuracy = location.accuracy)
+        }
         
         if (!processed.isClockRegression) sessionManager.lastGpsTs = location.time
         if (!processed.isClockRegression && !processed.isStalled) { 
@@ -652,7 +665,8 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun setupPhysicalFastPaths() {
-        sensorManager.setAcousticFastPath(locationProcessor.getAcousticFloorDb(), ACOUSTIC_THRESHOLD_DB_JUMP, ACOUSTIC_MIN_THRESHOLD_DB) {
+        val acousticJump = if (isA15) ACOUSTIC_THRESHOLD_DB_JUMP_A15 else ACOUSTIC_THRESHOLD_DB_JUMP
+        sensorManager.setAcousticFastPath(locationProcessor.getAcousticFloorDb(), acousticJump, ACOUSTIC_MIN_THRESHOLD_DB) {
             triggerSuspiciousMode("Acoustic") 
             pendingAcousticViolation = true
         }
