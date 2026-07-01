@@ -10,19 +10,12 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
+ * v8.9.55:
+ * - Issue #013: Forensic UI Expansion. Added proximityDebounce and rollingVibration 
+ *   formatting for stationary scaling verification.
  * v8.9.54:
  * - Issue #427/428: Relaxed UI staleness and watchdog indicators to 15s to 
  *   accommodate network jitter and prevent flickering.
- * v8.9.49:
- * - Issue #427: Verified alignment of link freshness and watchdog indicators with 
- *   the authoritative threshold.
- * v8.9.42:
- * - Issue #426: Decoupled GPS Freshness from Telemetry Pulse. GPS status now 
- *   utilizes loc.timestamp exclusively to prevent stale coordinate masking. (Formerly #364-L)
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refined accuracy display 
- *   to show both raw accuracy and maxAccuracy (filtered uncertainty) side-by-side.
- * - Issue #338: Unified UI Staleness Threshold. Implemented telemetryFresh calculation 
- *   for Zombie Telemetry UX mitigation. (Formerly #193 / #193-G)
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {
@@ -68,10 +61,8 @@ class DashboardUseCase @Inject constructor() {
         val telemetryAge = if (effectiveLastActivityTs > 0) now - effectiveLastActivityTs else Long.MAX_VALUE
         val isTelemetryVisible = telemetryAge < SENSOR_GRACE_PERIOD_MS
         
-        // Issue #338/428: Telemetry freshness threshold (15s)
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
         
-        // Issue #426: GPS status must utilize the gpsTs exclusively.
         val gpsAge = if (loc.timestamp > 0) now - loc.timestamp else Long.MAX_VALUE
         val isGpsActive = gpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
 
@@ -108,9 +99,6 @@ class DashboardUseCase @Inject constructor() {
             }
         }
 
-        // R325: Dual-Metric Visibility.
-        // trackerAccuracy = raw GPS accuracy
-        // trackerMaxAcc = filtered engine uncertainty (authoritative for logic)
         val rawAcc = loc.accuracy
         val filteredAcc = if (loc.maxAccuracy > 0) loc.maxAccuracy else rawAcc
         
@@ -151,6 +139,8 @@ class DashboardUseCase @Inject constructor() {
             lux = sensorVal("%.0flx".format(Locale.getDefault(), loc.lux)),
             proximity = sensorVal(if (loc.isNear) "NEAR" else "FAR"),
             proximityCm = sensorVal(if (loc.proximityCm >= 0) "${loc.proximityCm.toInt()}cm" else "--"),
+            proximityDebounce = sensorVal("${loc.proximityDebounceMs}ms"),
+            rollingVibration = sensorVal("%.3fG".format(Locale.getDefault(), loc.vibrationRollingSum)),
             gpsSpeed = gpsVal("%.1fkm/h".format(Locale.getDefault(), loc.speed * 3.6f)),
             trackerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), trackerMaxTemp)),
             viewerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), localMaxTemp)),

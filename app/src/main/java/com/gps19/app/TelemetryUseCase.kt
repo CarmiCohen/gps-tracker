@@ -6,13 +6,12 @@ import javax.inject.Singleton
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
- * Extracted from MainViewModel to resolve Issue #322 (Architectural Bloat).
+ * v8.9.43:
+ * - Issue #013: Forensic UI Expansion. Mapping proximityDebounceMs and 
+ *   vibrationRollingSum for stationary scaling verification.
  * v8.9.42:
  * - [Baseline] Issue #325: Authoritative Spatial Anchoring. Mapping maxAccuracy for unified 
  *   accuracy fallback logic.
- * - Issue #326: Intelligent Uncertainty UX Mapping. Mapping locationPendingReason.
- * - Issue #328: Bayesian Uncertainty. Mapping lastValidFixRealtime for expansion scaling.
- * - Issue #438: Forensic Power Visibility. Added currentMa mapping for full parity (Unified ID).
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(
@@ -64,6 +63,9 @@ class TelemetryUseCase @Inject constructor(
             acousticFloorDb = update.acousticFloorDb ?: currentLoc.acousticFloorDb,
             adaptiveVibrationFloor = update.adaptiveVibrationFloor ?: currentLoc.adaptiveVibrationFloor,
             proxIdx = update.proxIdx ?: currentLoc.proxIdx,
+            proximityCm = update.proximityCm ?: currentLoc.proximityCm,
+            proximityDebounceMs = update.proximityDebounceMs ?: currentLoc.proximityDebounceMs,
+            vibrationRollingSum = update.vibrationRollingSum ?: currentLoc.vibrationRollingSum,
             violationUptimeMs = update.violationUptimeMs ?: currentLoc.violationUptimeMs,
             violationPercentage = update.violationPercentage ?: calculateViolationPercentage(update.violationUptimeMs, nowMs - appStartTime),
             isLocationPending = update.isLocationPending,
@@ -91,11 +93,13 @@ class TelemetryUseCase @Inject constructor(
             vibration = status.vibration, heading = status.heading, tiltDegrees = status.tiltDegrees,
             acousticDb = status.acousticDb, baroAlt = status.baroAlt, lux = status.lux, isNear = status.isNear,
             isSuspicious = status.isSuspicious, isTamperDetected = status.isTamperDetected, isPowerTamper = status.isPowerTamper,
-            isSitDetected = status.isSitDetected, lastSitTs = status.lastSitTs, verticalVelocity = status.verticalVelocity,
+            isSitDetected = status.isSitDetected, isSitActive = status.isSitActive, lastSitTs = status.lastSitTs, verticalVelocity = status.verticalVelocity,
             sitVz = status.sitVz, sitDz = status.sitDz, sitBaro = status.sitBaro, sitTilt = status.sitTilt, sitShock = status.sitShock,
             peakVibrationShock = status.peakVibrationShock, peakVibrationShockTs = status.peakVibrationShockTs,
             luxBaseline = status.luxBaseline, acousticFloorDb = status.acousticFloorDb, adaptiveVibrationFloor = status.adaptiveVibrationFloor,
-            proxIdx = status.proxIdx, violationUptimeMs = status.violationUptimeMs, violationPercentage = status.violationPercentage,
+            proxIdx = status.proxIdx, proximityCm = status.proximityCm, 
+            proximityDebounceMs = status.proximityDebounceMs, vibrationRollingSum = status.vibrationRollingSum,
+            violationUptimeMs = status.violationUptimeMs, violationPercentage = status.violationPercentage,
             isLocationPending = status.isLocationPending, 
             locationPendingReason = status.locationPendingReason,
             lastValidFixRealtime = status.lastValidFixRealtime,
@@ -154,6 +158,9 @@ class TelemetryUseCase @Inject constructor(
             acousticFloorDb = update.acousticFloorDb ?: currentLoc.acousticFloorDb,
             adaptiveVibrationFloor = update.adaptiveVibrationFloor ?: SentinelValidator.updateVibrationFloor(currentLoc.adaptiveVibrationFloor, update.vibration ?: 0f, false),
             proxIdx = update.proxIdx ?: currentLoc.proxIdx,
+            proximityCm = update.proximityCm ?: currentLoc.proximityCm,
+            proximityDebounceMs = update.proximityDebounceMs ?: currentLoc.proximityDebounceMs,
+            vibrationRollingSum = update.vibrationRollingSum ?: currentLoc.vibrationRollingSum,
             violationUptimeMs = update.violationUptimeMs ?: currentLoc.violationUptimeMs,
             violationPercentage = update.violationPercentage ?: calculateViolationPercentage(update.violationUptimeMs, nowMs - appStartTime),
             isLocationPending = update.isLocationPending,

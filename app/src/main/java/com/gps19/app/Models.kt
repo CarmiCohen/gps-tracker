@@ -9,19 +9,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v8.9.43:
+ * - Issue #013: Forensic UI Expansion. Added proximityDebounceMs and 
+ *   vibrationRollingSum to TrackerStatus, LocationState, and DashboardState.
  * v8.9.42:
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added accuracy and 
  *   maxAccuracy to TrailPoint for forensic path reconstruction.
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refactored ViolationPoint 
- *   to include accuracy and maxAccuracy for map reconstruction parity.
- * - Issue #326: Intelligent Uncertainty UX Mapping. Added locationPendingReason to 
- *   ConnectionPoint, TrackerStatus, LocationState, DashboardState, and IntegrityState. (Formerly #245 / #226)
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refactored LogEntry and 
- *   DashboardState to support side-by-side visualization of raw accuracy vs. maxAccuracy.
- * - Issue #329: Added tiltIdx and baroIdx to ConnectionPoint, TrackerStatus, LocationState, 
- *   and IntegrityState for forensic expansion. (Formerly #224)
- * - Issue #333: Forensic Log Enrichment. Added snrSnapshot and vibeSnapshot to LogEntry. (Formerly #223)
- * - Issue #334: Added isHindsightCorrected to TrailPoint for ghost-path visualization. (Formerly #222)
  */
 
 @Serializable
@@ -235,6 +228,8 @@ data class TrackerStatus(
     val adaptiveVibrationFloor: Float = 0.12f,
     val proxIdx: Float = 1.0f,
     val proximityCm: Float = -1f,
+    val proximityDebounceMs: Long = 0L,
+    val vibrationRollingSum: Float = 0f,
     val isClockRegression: Boolean = false,
     val isStalled: Boolean = false,
     val isJammer: Boolean = false,
@@ -314,6 +309,8 @@ data class TrackerStatus(
             put("adaptive_vibration_floor", adaptiveVibrationFloor.toDouble())
             put("prox_idx", proxIdx.toDouble())
             put("proximity_cm", proximityCm.toDouble())
+            put("proximity_debounce_ms", proximityDebounceMs)
+            put("vibration_rolling_sum", vibrationRollingSum.toDouble())
             put("is_clock_regression", isClockRegression)
             put("is_stalled", isStalled)
             put("is_jammer", isJammer)
@@ -371,6 +368,8 @@ data class LocationState(
     val adaptiveVibrationFloor: Float = 0.12f,
     val proxIdx: Float = 1.0f,
     val proximityCm: Float = -1.0f,
+    val proximityDebounceMs: Long = 0L,
+    val vibrationRollingSum: Float = 0f,
     val micPending: Boolean = false,
     val isPowerTamper: Boolean = false,
     val violationUptimeMs: Long = 0L,
@@ -437,6 +436,8 @@ data class DashboardState(
     val lux: String = "--",
     val proximity: String = "--",
     val proximityCm: String = "--", 
+    val proximityDebounce: String = "--",
+    val rollingVibration: String = "--",
     val gpsSpeed: String = "--",     
     val isSuspicious: Boolean = false,
     val isTamperDetected: Boolean = false,

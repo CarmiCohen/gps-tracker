@@ -21,12 +21,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.70:
+ * - Issue #013: Forensic UI Expansion. Propagating proximityDebounceMs and 
+ *   vibrationRollingSum to the sync loop for stationary scaling verification.
  * v8.9.69:
- * - Issue #012: Adaptive Proximity Debounce. Propagating cooling mode (High Load) 
- *   to AppSensorManager to scale proximity debounce duration.
- * v8.9.68:
- * - Issue #011: Forensic Labeling. Now logging suppression notes from the 
- *   location sentinel to provide transparency on A15 hardware muzzles.
+ * - Issue #012: Adaptive Proximity Debounce logic.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -306,7 +305,6 @@ class TrackerService : BaseMonitorService() {
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
         
-        // Issue #012: Propagate High Load (Cooling Mode) to sensors
         sensorManager.setHighLoad(integrityMonitor.isCoolingModeActive)
 
         if (isA15) {
@@ -358,7 +356,6 @@ class TrackerService : BaseMonitorService() {
             currentGpsInterval = newInterval
             gpsManager.setPollingInterval(newInterval)
             
-            // Issue #013: A15 Transition Heartbeat (Warm Handoff)
             if (isA15 && oldInterval >= STATIONARY_GPS_POLLING_MS && newInterval <= A15_STABLE_GPS_POLLING_MS) {
                 gpsManager.kickGps()
             }
@@ -478,6 +475,7 @@ class TrackerService : BaseMonitorService() {
             isStalledRaw = proc?.isStalled ?: false, isStalledActive = isGpsStalledActive, peakShock = locationProcessor.getPeakVibrationShock(),
             peakShockTs = locationProcessor.sentinel.peakVibrationShockTs, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
             adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = sensorManager.proximityIdx, proximityCm = sensorManager.debouncedProximityCm,
+            proximityDebounceMs = sensorManager.proximityDebounceMs, vibrationRollingSum = sensorManager.vibrationRollingSum,
             micPending = false, isTamperDetected = false, isPowerTamper = integrityMonitor.isPowerTamperDetected, 
             isSitDetected = latchedSitDetected, isSitActive = lastSitDetected, lastSitTs = locationProcessor.getLastSitTs(), receiptRealtime = proc?.receiptRealtime ?: 0L,
             violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(),
@@ -632,7 +630,6 @@ class TrackerService : BaseMonitorService() {
             isA15 = isA15
         )
         
-        // Issue #011: Suppression Forensic Labeling
         processed.suppressionNote?.let { note ->
             logManager.logServiceEvent(note, important = false, lat = location.latitude, lng = location.longitude, accuracy = location.accuracy)
         }

@@ -29,6 +29,9 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU and Environmental sensors.
+ * v8.9.71:
+ * - Forensic UI Expansion: Exposed proximityDebounceMs and vibrationRollingSum 
+ *   for real-time stationary scaling verification.
  * v8.9.70:
  * - Forensic Audit Optimization: Migrated to zero-allocation buffers for matrix math.
  * - Performance: Replaced vibration list average with rolling sum (O(1)).
@@ -73,7 +76,10 @@ class AppSensorManager @Inject constructor(
     // Performance Audit: Rolling sum for O(1) vibration average
     private val vibrationCircularBuffer = FloatArray(VIBRATION_WINDOW_SIZE)
     private var vibrationCircularIdx = 0
-    private var vibrationRollingSum = 0f
+    
+    var vibrationRollingSum = 0f
+        private set
+
     private var vibrationBufferCount = 0
 
     private var internalPeakDb: Double = 0.0
@@ -166,6 +172,9 @@ class AppSensorManager @Inject constructor(
         private set
 
     var debouncedProximityCm: Float = -1.0f
+        private set
+
+    var proximityDebounceMs: Long = 0L
         private set
 
     var currentLux: Float = 0f
@@ -308,23 +317,24 @@ class AppSensorManager @Inject constructor(
                     }
 
                     // Issue #012: Adaptive Proximity Debounce
-                    var debounceMs = baseDebounceMs
+                    var calcDebounceMs = baseDebounceMs
                     if (isStationary() && stationaryStartTs > 0) {
                         val hoursStationary = (now - stationaryStartTs) / 3600000f
                         val stationaryExtra = (hoursStationary * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR).toLong()
-                        debounceMs += stationaryExtra
+                        calcDebounceMs += stationaryExtra
                     }
                     if (isHighLoad) {
-                        debounceMs = (debounceMs * PROXIMITY_STRESS_SCALING_MULTIPLIER).toLong()
+                        calcDebounceMs = (calcDebounceMs * PROXIMITY_STRESS_SCALING_MULTIPLIER).toLong()
                     }
-                    debounceMs = debounceMs.coerceAtMost(PROXIMITY_DEBOUNCE_MAX_MS)
+                    calcDebounceMs = calcDebounceMs.coerceAtMost(PROXIMITY_DEBOUNCE_MAX_MS)
+                    proximityDebounceMs = calcDebounceMs
                     
                     proximityJob = scope.launch {
-                        delay(debounceMs)
+                        delay(calcDebounceMs)
                         if (isActive && isProximityNear != rawProximityNear) {
                             isProximityNear = rawProximityNear
                             debouncedProximityCm = value
-                            Timber.d("Proximity state debounced to: $isProximityNear (Cm: $debouncedProximityCm, Debounce: ${debounceMs}ms)")
+                            Timber.d("Proximity state debounced to: $isProximityNear (Cm: $debouncedProximityCm, Debounce: ${calcDebounceMs}ms)")
                         }
                     }
                 }
@@ -773,6 +783,7 @@ class AppSensorManager @Inject constructor(
         lastBaroZeroingTs = sessionStartTs
         adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD
         debouncedProximityCm = -1.0f
+        proximityDebounceMs = 0L
         
         // Reset vibration rolling state
         vibrationCircularIdx = 0

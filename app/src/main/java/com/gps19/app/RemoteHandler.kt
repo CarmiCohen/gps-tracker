@@ -15,11 +15,11 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v8.9.43:
+ * - Issue #013: Forensic UI Expansion. Parsing proximityDebounceMs and 
+ *   vibrationRollingSum for real-time stationary scaling verification in Viewer mode.
  * v8.9.42:
- * - Issue #326: Intelligent Uncertainty UX Mapping. Parsing location_pending_reason. (Formerly #245 / #226)
- * - Issue #329: Added tiltIdx and baroIdx parsing for forensic parity. (Formerly #224)
- * - Issue #328: Parsing lastValidFixRealtime for Bayesian uncertainty scaling. (Formerly #221)
- * - Issue #339/348: Centralized SIT rising-edge detection. Removed redundant log/forensic triggers. (Formerly #331)
+ * - Issue #326: Intelligent Uncertainty UX Mapping. Parsing location_pending_reason.
  */
 class RemoteHandler(
     private val context: Context,
@@ -103,6 +103,9 @@ class RemoteHandler(
     var trackerAcousticFloorDb = 0.0
     var trackerAdaptiveVibrationFloor = 0.12f
     var trackerProxIdx = 1.0f
+    var trackerProximityCm = -1.0f
+    var trackerProximityDebounceMs = 0L
+    var trackerVibrationRollingSum = 0f
 
     var trackerUptimeMs = 0L
     var trackerTotalDropMs = 0L
@@ -138,7 +141,9 @@ class RemoteHandler(
                 trackerAcousticDb = s.acousticDb; trackerPeakVibrationShock = s.peakVibrationShock
                 trackerPeakVibrationShockTs = s.peakVibrationShockTs; trackerLuxBaseline = s.luxBaseline
                 trackerAcousticFloorDb = s.acousticFloorDb; trackerAdaptiveVibrationFloor = s.adaptiveVibrationFloor
-                trackerProxIdx = s.proxIdx; trackerUptimeMs = s.uptimeMs; trackerTotalDropMs = s.totalDropMs
+                trackerProxIdx = s.proxIdx; trackerProximityCm = s.proximityCm
+                trackerProximityDebounceMs = s.proximityDebounceMs; trackerVibrationRollingSum = s.vibrationRollingSum
+                trackerUptimeMs = s.uptimeMs; trackerTotalDropMs = s.totalDropMs
                 trackerMaxDropMs = s.maxDropMs; trackerMaxDropTs = s.maxDropTs
                 trackerTotalConnectedMs = s.totalConnectedMs
                 trackerSessionConnectedMs = s.sessionConnectedMs; trackerLastConnTs = s.lastConnTs
@@ -166,7 +171,7 @@ class RemoteHandler(
                     gpsTs = trackerLastGpsTs, isMe = false, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
                     isJump = false, isJammer = false, isStalled = false,
                     maxAccuracy = trackerMaxAccuracy, signal = 0,
-                    vibration = trackerVibration, heading = trackerHeading, baroAlt = trackerBaroAlt,
+                    vibration = trackerVibration, heading = trackerBearing, baroAlt = trackerBaroAlt,
                     lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb,
                     peakVibrationShock = trackerPeakVibrationShock, peakVibrationShockTs = trackerPeakVibrationShockTs,
                     luxBaseline = trackerLuxBaseline, acousticFloorDb = trackerAcousticFloorDb,
@@ -175,7 +180,9 @@ class RemoteHandler(
                     isSitDetected = trackerLastSitTs > 0, isSitActive = isTrackerSitActive, lastSitTs = trackerLastSitTs,
                     verticalVelocity = trackerVerticalVelocity, sitVz = trackerSitVz, sitDz = trackerSitDz,
                     sitBaro = trackerSitBaro, sitTilt = trackerSitTilt, sitShock = trackerSitShock,
-                    proxIdx = trackerProxIdx, uptimeMs = trackerUptimeMs, totalDropMs = trackerTotalDropMs,
+                    proxIdx = trackerProxIdx, proximityCm = trackerProximityCm,
+                    proximityDebounceMs = trackerProximityDebounceMs, vibrationRollingSum = trackerVibrationRollingSum,
+                    uptimeMs = trackerUptimeMs, totalDropMs = trackerTotalDropMs,
                     maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
                     totalConnectedMs = trackerTotalConnectedMs,
                     sessionConnectedMs = trackerSessionConnectedMs, lastConnTs = trackerLastConnTs,
@@ -223,7 +230,8 @@ class RemoteHandler(
         isTrackerNear = true; trackerTiltDegrees = 0f; trackerAcousticDb = 0.0
         trackerPeakVibrationShock = 0f; trackerPeakVibrationShockTs = 0L
         trackerLuxBaseline = 0f; trackerAcousticFloorDb = 0.0
-        trackerAdaptiveVibrationFloor = 0.12f; trackerProxIdx = 1.0f
+        trackerAdaptiveVibrationFloor = 0.12f; trackerProxIdx = 1.0f; trackerProximityCm = -1.0f
+        trackerProximityDebounceMs = 0L; trackerVibrationRollingSum = 0f
         trackerUptimeMs = 0L; trackerTotalDropMs = 0L; trackerMaxDropMs = 0L
         trackerMaxDropTs = 0L
         trackerTotalConnectedMs = 0L; trackerSessionConnectedMs = 0L
@@ -250,14 +258,8 @@ class RemoteHandler(
         repository.saveDoubleSync(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
     }
 
-    /**
-     * Issue #358: Reconstructs forensic state from incoming remote logs. (Formerly #194)
-     * Modified in v8.9.37: Issue #339/348: Removed redundant forensic trigger; handled by ViewerService tick loop.
-     */
     fun handleRemoteLog(entry: LogEntry) {
         if (entry.message.contains("Sit Detected", ignoreCase = true)) {
-            // Rising-edge detection for state reconstruction.
-            // Forensic marker and logging are handled by ViewerService tick and CommunicationManager respectively.
             if (!isTrackerSitDetected) {
                 isTrackerSitDetected = true
             }
@@ -349,8 +351,6 @@ class RemoteHandler(
             isTrackerTamperDetected = data.optBoolean("is_tamper_detected", isTrackerTamperDetected)
             isTrackerPowerTamper = data.optBoolean("is_power_tamper", isTrackerPowerTamper)
             
-            // Issue #339/348: Updated SIT detection to avoid redundant manual logging.
-            // The tracker-emitted log is already handled via CommunicationManager/RemoteLog.
             val incomingSitDetected = data.optBoolean("is_sit_detected", false)
             isTrackerSitDetected = incomingSitDetected
 
@@ -485,6 +485,9 @@ class RemoteHandler(
             trackerLux = data.optDouble("lux", trackerLux.toDouble()).toFloat()
             isTrackerNear = data.optBoolean("is_near", isTrackerNear)
             trackerProxIdx = data.optDouble("prox_idx", trackerProxIdx.toDouble()).toFloat()
+            trackerProximityCm = data.optDouble("proximity_cm", trackerProximityCm.toDouble()).toFloat()
+            trackerProximityDebounceMs = data.optLong("proximity_debounce_ms", trackerProximityDebounceMs)
+            trackerVibrationRollingSum = data.optDouble("vibration_rolling_sum", trackerVibrationRollingSum.toDouble()).toFloat()
             trackerTiltDegrees = data.optDouble("tilt_degrees", trackerTiltDegrees.toDouble()).toFloat()
             trackerAcousticDb = data.optDouble("acoustic_db", trackerAcousticDb)
             trackerPeakVibrationShock = data.optDouble("peak_vibration_shock", trackerPeakVibrationShock.toDouble()).toFloat()
@@ -566,6 +569,9 @@ class RemoteHandler(
                     sitTilt = trackerSitTilt,
                     sitShock = trackerSitShock,
                     proxIdx = trackerProxIdx,
+                    proximityCm = trackerProximityCm,
+                    proximityDebounceMs = trackerProximityDebounceMs,
+                    vibrationRollingSum = trackerVibrationRollingSum,
                     uptimeMs = trackerUptimeMs, totalDropMs = trackerTotalDropMs, maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
                     totalConnectedMs = trackerTotalConnectedMs,
                     sessionConnectedMs = trackerSessionConnectedMs,
@@ -605,7 +611,9 @@ class RemoteHandler(
                     acousticDb = trackerAcousticDb, peakVibrationShock = trackerPeakVibrationShock,
                     peakVibrationShockTs = trackerPeakVibrationShockTs, luxBaseline = trackerLuxBaseline,
                     acousticFloorDb = trackerAcousticFloorDb, adaptiveVibrationFloor = trackerAdaptiveVibrationFloor,
-                    proxIdx = trackerProxIdx, isSuspicious = isTrackerSuspicious, isTamperDetected = isTrackerTamperDetected,
+                    proxIdx = trackerProxIdx, proximityCm = trackerProximityCm,
+                    proximityDebounceMs = trackerProximityDebounceMs, vibrationRollingSum = trackerVibrationRollingSum,
+                    isSuspicious = isTrackerSuspicious, isTamperDetected = isTrackerTamperDetected,
                     isTrajectoryPromoted = isTrackerTrajectoryPromoted, jumpTier = trackerJumpTier,
                     isLocationPending = isTrackerLocationPending,
                     locationPendingReason = trackerLocationPendingReason,

@@ -169,7 +169,8 @@ class LocationProcessor(
         val isSpatiallyValid: Boolean = true,
         val geofenceViolationDetected: Boolean = false,
         val tamperDetected: Boolean = false,
-        val jammerDetected: Boolean = false
+        val jammerDetected: Boolean = false,
+        val suppressionNote: String? = null
     )
 
     fun processGpsPoint(
@@ -252,7 +253,7 @@ class LocationProcessor(
 
         if (!isSpatiallyValid) {
             if (shouldSavePoint(isSuspicious, true, 1000.0, 0L, maxAccuracy)) listener.onTrailPointSaved(lat, lng, isViewerTrail, true, effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy)
-            return ProcessedLocation(rawPoint = EngineGeoPoint(lat, lng, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy), optimizedPoint = fallbackPoint, status = sentinelResult.status, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedKph(), timestamp = effectiveTs, isStalled = finalIsStalled, receiptRealtime = nowRealtime, jumpTier = finalJumpTier, isAdaptiveJump = finalIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = false, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer)
+            return ProcessedLocation(rawPoint = EngineGeoPoint(lat, lng, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy), optimizedPoint = fallbackPoint, status = sentinelResult.status, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedKph(), timestamp = effectiveTs, isStalled = finalIsStalled, receiptRealtime = nowRealtime, jumpTier = finalJumpTier, isAdaptiveJump = finalIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = false, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer, suppressionNote = sentinelResult.suppressionNote)
         }
 
         val optimized = sentinelResult.optimizedPoint ?: EngineGeoPoint(lat, lng, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy)
@@ -300,7 +301,7 @@ class LocationProcessor(
             rawPoint = EngineGeoPoint(lat, lng, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy), optimizedPoint = finalOptimized, status = sentinelResult.status,
             maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = finalFilteredSpeed, timestamp = effectiveTs, isStalled = finalIsStalled, 
             isClockRegression = false, receiptRealtime = nowRealtime, isTrajectoryPromoted = finalIsTrajectoryPromoted,
-            jumpTier = finalJumpTier, isAdaptiveJump = finalIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = true, geofenceViolationDetected = geofenceViolation, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer
+            jumpTier = finalJumpTier, isAdaptiveJump = finalIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = true, geofenceViolationDetected = geofenceViolation, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer, suppressionNote = sentinelResult.suppressionNote
         )
     }
 

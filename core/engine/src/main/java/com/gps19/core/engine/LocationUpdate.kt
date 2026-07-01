@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
+ * v8.9.23:
+ * - Issue #013: Added proximityDebounceMs and vibrationRollingSum for 
+ *   forensic UI stationary scaling verification.
  * v8.9.22:
  * - Issue #326: Added locationPendingReason for intelligent uncertainty UX.
  * v8.9.21:
@@ -37,6 +40,8 @@ data class LocationUpdate(
     val isTamperDetected: Boolean = false,
     val proxIdx: Float? = null,
     val proximityCm: Float? = null,
+    val proximityDebounceMs: Long? = null,
+    val vibrationRollingSum: Float? = null,
     val currentMa: Int = 0,
     val signal: Int? = null,
     val micPending: Boolean = false,

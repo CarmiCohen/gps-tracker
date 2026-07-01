@@ -10,13 +10,12 @@ import timber.log.Timber
 
 /**
  * SyncManager: Handles the telemetry synchronization loop.
+ * v8.9.43:
+ * - Issue #013: Forensic UI Expansion. Propagating proximityDebounceMs and 
+ *   vibrationRollingSum through the sync loop for stationary scaling verification.
  * v8.9.42:
  * - Issue #315: Network Integrity & Timeout Scaling. Refined RTT-aware scaling with 
  *   proportional delay to prevent loop saturation. (Formerly #273)
- * - Issue #339/348: Offline Context & Buffering. Captures locationPendingReason for 
- *   forensic continuity during offline periods. (Formerly #244)
- * - Issue #357: Uptime Consistency & Sync Interval. Unified sync loop to use 
- *   PING_INTERVAL_MS (10s). (Formerly #271)
  */
 class SyncManager(
     private val context: Context,
@@ -65,8 +64,6 @@ class SyncManager(
                 }
 
                 // Issue #315: Proportional RTT scaling. 
-                // If RTT is healthy (< 50% of MAX), use PING_INTERVAL_MS.
-                // If RTT > 50% of MAX, scale linearly up to 3x the interval.
                 val dynamicDelay = when {
                     currentRtt > MAX_ALLOWED_RTT_MS -> PING_INTERVAL_MS * 3
                     currentRtt > MAX_ALLOWED_RTT_MS / 2 -> {
@@ -87,6 +84,7 @@ class SyncManager(
         tiltDegrees: Float, acousticDb: Double, isJump: Boolean, isTrajectoryPromoted: Boolean, jumpTier: Int,
         isJammer: Boolean, isStalledRaw: Boolean, isStalledActive: Boolean, peakShock: Float, peakShockTs: Long,
         luxBaseline: Float, acousticFloorDb: Double, adaptiveVibrationFloor: Float, proxIdx: Float, proximityCm: Float,
+        proximityDebounceMs: Long, vibrationRollingSum: Float,
         micPending: Boolean, isTamperDetected: Boolean, isPowerTamper: Boolean, isSitDetected: Boolean, isSitActive: Boolean,
         lastSitTs: Long, receiptRealtime: Long, violationUptimeMs: Long, violationPercentage: Float,
         verticalVelocity: Float, sitVz: Float, sitDz: Float, sitBaro: Float, sitTilt: Float, sitShock: Float,
@@ -126,6 +124,8 @@ class SyncManager(
             adaptiveVibrationFloor = adaptiveVibrationFloor,
             proxIdx = proxIdx,
             proximityCm = proximityCm,
+            proximityDebounceMs = proximityDebounceMs,
+            vibrationRollingSum = vibrationRollingSum,
             isTamperDetected = isTamperDetected,
             isPowerTamper = isPowerTamper,
             isSitDetected = isSitDetected,

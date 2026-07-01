@@ -24,18 +24,11 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * v8.9.55:
+ * - Issue #013: Forensic UI Expansion. Added proximityDebounce and 
+ *   rollingVibration fields to LegacyDashboardGrid for stationary scaling verification.
  * v8.9.54:
  * - Issue #427/428: Relaxed staleness thresholds to 15s to prevent UI flickering.
- * v8.9.49:
- * - Issue #427: Verified alignment of link freshness and activity checks with 
- *   the authoritative threshold.
- * v8.9.48:
- * - Issue #427: Aligned dashboard peer activity check with R338 threshold.
- * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
- *   BrandJd (#367C2B) in dashboard status and health indicators.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated LegacyDashboardGrid 
- *   to display both raw accuracy and authoritative maxAccuracy side-by-side.
  */
 
 @Composable
@@ -61,7 +54,6 @@ fun LegacyDashboardGrid(
     val conn = uiState.connectivity
     val isRelayOnline = conn.isRelayConnected
     
-    // Issue #427/428: Aligned with 15s R338 UI staleness mandate.
     val isRemoteActive = conn.lastRemoteActivityTs > 0 && (now - conn.lastRemoteActivityTs < TELEMETRY_UI_STALE_THRESHOLD_MS)
     
     val isConnStale = isViewer && !isRemoteActive
@@ -97,7 +89,6 @@ fun LegacyDashboardGrid(
                     fontFamily = FontFamily.Monospace
                 )
                 
-                // Issue #326: Intelligent Uncertainty UX - Propagation to Dashboard
                 if (d.isLocationPending && d.locationPendingReason != LocationPendingReason.NONE) {
                     Text(
                         text = "UNCERTAINTY: ${d.locationPendingReason.name.replace("_", " ")}",
@@ -181,7 +172,6 @@ fun LegacyDashboardGrid(
             
             InfoRow(leftVal = gpsIdxStr, leftLabel = "GPS-Index", leftColor = if(!d.isGpsFresh) Slate500 else BrandJd, rightVal = d.gpsSpeed, rightLabel = "GPS Speed", rightColor = if(!d.isGpsFresh) Slate500 else BrandJd, onLeftClick = onShowGnssDetail)
             
-            // R325: Displaying both raw and authoritative accuracy side-by-side
             val trkAccDisplay = "${d.trackerAccuracy} (${d.trackerMaxAcc})"
             val vwrAccDisplay = if (isViewer) "${d.viewerAccuracy} (${d.viewerMaxAcc})" else ""
 
@@ -196,6 +186,12 @@ fun LegacyDashboardGrid(
             InfoRow(leftVal = d.lift, leftLabel = "Lift", leftColor = if(!d.isTelemetryFresh) Slate500 else Color(0xFFFACC15), rightVal = d.lux, rightLabel = "Lux", rightColor = if(!d.isTelemetryFresh) Slate500 else Amber500)
             
             InfoRow(leftVal = d.proximity, leftLabel = "Proximity", leftColor = if (!d.isTelemetryFresh) Slate500 else BrandJd, rightVal = d.proximityCm, rightLabel = "Raw Prox", rightColor = if (!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR))
+            
+            // Issue #013: Forensic UI Expansion - Stationary Scaling Metrics
+            InfoRow(
+                leftVal = d.proximityDebounce, leftLabel = "Prox Debounce", leftColor = if (!d.isTelemetryFresh) Slate500 else BrandJd,
+                rightVal = d.rollingVibration, rightLabel = "Rolling Vibe", rightColor = if (!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR)
+            )
 
             if (d.chairForensics != "--") {
                 Spacer(Modifier.height(2.dp))
