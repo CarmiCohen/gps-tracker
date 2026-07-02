@@ -7,6 +7,7 @@ import android.content.IntentFilter
 import android.os.Build
 import com.gps19.core.engine.*
 import com.gps19.core.engine.LocationProcessor // Explicit import to override local duplicate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -18,6 +19,9 @@ import timber.log.Timber
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * v8.9.72:
+ * - Issue #015: Hardened coroutine cancellation handling. Ensuring CancellationException 
+ *   is not logged as an error during service shutdown.
  * v8.8.21: Migrated to TimeProvider for all timing logic.
  * v8.8.28: Standardized signaling keys to snake_case (viewer_id, from_viewer).
  */
@@ -45,6 +49,7 @@ class CommandRouter(
 ) {
 
     private val routerExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        if (throwable is CancellationException) return@CoroutineExceptionHandler
         Timber.e(throwable, "CRITICAL: Command Router Failure")
         logManager.logServiceEvent("CRITICAL: Command Router Failure: ${throwable.message}", true)
     }
@@ -141,25 +146,31 @@ class CommandRouter(
                         }
                         is UiCommand.TriggerTestAlarm -> {
                             scope.launch {
-                                logManager.logServiceEvent("TEST ALARM: Triggering 3s physical siren", true)
-                                val sirenType = repository.getString(MainRepository.SELECTED_SIREN_KEY, "Siren")
-                                AudioSynthesizer.playSiren(
-                                    type = sirenType,
-                                    force = true,
-                                    volume = 1.0f,
-                                    overrideSilence = true,
-                                    context = context,
-                                    loop = true,
-                                    vibrate = true,
-                                    timeProvider = timeProvider
-                                )
-                                delay(3000)
-                                AudioSynthesizer.stopSiren(0, timeProvider = timeProvider)
-                                logManager.logServiceEvent("TEST ALARM: Siren stopped")
+                                try {
+                                    logManager.logServiceEvent("TEST ALARM: Triggering 3s physical siren", true)
+                                    val sirenType = repository.getString(MainRepository.SELECTED_SIREN_KEY, "Siren")
+                                    AudioSynthesizer.playSiren(
+                                        type = sirenType,
+                                        force = true,
+                                        volume = 1.0f,
+                                        overrideSilence = true,
+                                        context = context,
+                                        loop = true,
+                                        vibrate = true,
+                                        timeProvider = timeProvider
+                                    )
+                                    delay(3000)
+                                    AudioSynthesizer.stopSiren(0, timeProvider = timeProvider)
+                                    logManager.logServiceEvent("TEST ALARM: Siren stopped")
+                                } catch (e: Exception) {
+                                    if (e is CancellationException) throw e
+                                    Timber.e(e, "Error during test alarm")
+                                }
                             }
                         }
                     }
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     Timber.e(e, "Error processing UI command: ${command::class.java.simpleName}")
                     logManager.logServiceEvent("ERROR: Failed to process command ${command::class.java.simpleName}: ${e.message}", false)
                 }

@@ -21,11 +21,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.72:
+ * - Issue #015: Hardened coroutine cancellation handling in processTick and FGS updates.
  * v8.9.71:
  * - Issue #014: Fixed Foreground Service Type Mismatch on Android 14+. 
  *   Ensured LOCATION is always present and hardened background transitions.
- * v8.9.70:
- * - Issue #013: Forensic UI Expansion.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -332,6 +332,7 @@ class TrackerService : BaseMonitorService() {
                     systemMonitor.renewWakeLock()
                     updateForegroundServiceType()
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     Timber.e(e, "Xiaomi heuristic recovery pulse failed")
                 }
             }

@@ -6,6 +6,7 @@ import android.os.Looper
 import android.widget.Toast
 import com.gps19.core.engine.*
 import com.gps19.core.engine.LocationProcessor // Explicit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -15,6 +16,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v8.9.72:
+ * - Issue #015: Hardened coroutine cancellation handling. Ignoring CancellationException 
+ *   during remote parsing or DB operations to prevent shutdown noise.
  * v8.9.43:
  * - Issue #013: Forensic UI Expansion. Parsing proximityDebounceMs and 
  *   vibrationRollingSum for real-time stationary scaling verification in Viewer mode.
@@ -120,89 +124,94 @@ class RemoteHandler(
 
     init {
         scope.launch {
-            trackerLuxBaseline = repository.getFloat(MainRepository.TRACKER_LUX_BASELINE_KEY, 0f)
-            trackerAcousticFloorDb = repository.getDouble(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
-            
-            repository.loadTrackerState()?.let { s ->
-                trackerLat = s.lat; trackerLng = s.lng; trackerSpeed = s.speed; trackerBearing = s.bearing
-                trackerAccuracy = s.accuracy; trackerMaxAccuracy = s.maxAccuracy; trackerLastGpsTs = s.gpsTs; trackerBattery = s.battery
-                trackerTemp = s.temp; trackerMaxTemp = s.maxTemp; trackerCurrentMa = s.currentMa
-                isTrackerCharging = s.isCharging; trackerSatsView = s.satsView; trackerSatsUsed = s.satsUsed
-                isTrackerJammerSuspicion = false; isTrackerVisualJump = false; isTrackerTrajectoryPromoted = false
-                trackerJumpTier = 0
-                isTrackerSuspicious = s.isSuspicious; isTrackerTamperDetected = s.isTamperDetected
-                isTrackerPowerTamper = s.isPowerTamper; isTrackerSitDetected = s.isSitDetected
-                isTrackerSitActive = s.isSitActive
-                trackerLastSitTs = s.lastSitTs; trackerVerticalVelocity = s.verticalVelocity
-                trackerSitVz = s.sitVz; trackerSitDz = s.sitDz; trackerSitBaro = s.sitBaro
-                trackerSitTilt = s.sitTilt; trackerSitShock = s.sitShock
-                trackerVibration = s.vibration; trackerHeading = s.heading; trackerBaroAlt = s.baroAlt
-                trackerLux = s.lux; isTrackerNear = s.isNear; trackerTiltDegrees = s.tiltDegrees
-                trackerAcousticDb = s.acousticDb; trackerPeakVibrationShock = s.peakVibrationShock
-                trackerPeakVibrationShockTs = s.peakVibrationShockTs; trackerLuxBaseline = s.luxBaseline
-                trackerAcousticFloorDb = s.acousticFloorDb; trackerAdaptiveVibrationFloor = s.adaptiveVibrationFloor
-                trackerProxIdx = s.proxIdx; trackerProximityCm = s.proximityCm
-                trackerProximityDebounceMs = s.proximityDebounceMs; trackerVibrationRollingSum = s.vibrationRollingSum
-                trackerUptimeMs = s.uptimeMs; trackerTotalDropMs = s.totalDropMs
-                trackerMaxDropMs = s.maxDropMs; trackerMaxDropTs = s.maxDropTs
-                trackerTotalConnectedMs = s.totalConnectedMs
-                trackerSessionConnectedMs = s.sessionConnectedMs; trackerLastConnTs = s.lastConnTs
-                trackerLastDiscTs = s.lastDiscTs
-                isTrackerLocationPending = s.isLocationPending
-                trackerLocationPendingReason = s.locationPendingReason
-                trackerLocationDetail = s.gnssDetail
-                trackerSnrIdx = s.snrIdx
-                trackerTiltIdx = s.tiltIdx
-                trackerBaroIdx = s.baroIdx
-                isTrackerBatterySteepDischarge = s.isBatterySteepDischarge
-                isTrackerCoolingModeActive = s.isCoolingModeActive
+            try {
+                trackerLuxBaseline = repository.getFloat(MainRepository.TRACKER_LUX_BASELINE_KEY, 0f)
+                trackerAcousticFloorDb = repository.getDouble(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
                 
-                isTrackerPowerSaveMode = s.isPowerSaveMode
-                trackerStandbyBucket = s.standbyBucket
-                trackerNetInterface = s.netInterface
-                isTrackerStorageLow = s.isStorageLow
-                isTrackerStorageCritical = s.isStorageCritical
-                
-                trackerLastValidFixRealtime = s.lastValidFixRealtime
+                repository.loadTrackerState()?.let { s ->
+                    trackerLat = s.lat; trackerLng = s.lng; trackerSpeed = s.speed; trackerBearing = s.bearing
+                    trackerAccuracy = s.accuracy; trackerMaxAccuracy = s.maxAccuracy; trackerLastGpsTs = s.gpsTs; trackerBattery = s.battery
+                    trackerTemp = s.temp; trackerMaxTemp = s.maxTemp; trackerCurrentMa = s.currentMa
+                    isTrackerCharging = s.isCharging; trackerSatsView = s.satsView; trackerSatsUsed = s.satsUsed
+                    isTrackerJammerSuspicion = false; isTrackerVisualJump = false; isTrackerTrajectoryPromoted = false
+                    trackerJumpTier = 0
+                    isTrackerSuspicious = s.isSuspicious; isTrackerTamperDetected = s.isTamperDetected
+                    isTrackerPowerTamper = s.isPowerTamper; isTrackerSitDetected = s.isSitDetected
+                    isTrackerSitActive = s.isSitActive
+                    trackerLastSitTs = s.lastSitTs; trackerVerticalVelocity = s.verticalVelocity
+                    trackerSitVz = s.sitVz; trackerSitDz = s.sitDz; trackerSitBaro = s.sitBaro
+                    trackerSitTilt = s.sitTilt; trackerSitShock = s.sitShock
+                    trackerVibration = s.vibration; trackerHeading = s.heading; trackerBaroAlt = s.baroAlt
+                    trackerLux = s.lux; isTrackerNear = s.isNear; trackerTiltDegrees = s.tiltDegrees
+                    trackerAcousticDb = s.acousticDb; trackerPeakVibrationShock = s.peakVibrationShock
+                    trackerPeakVibrationShockTs = s.peakVibrationShockTs; trackerLuxBaseline = s.luxBaseline
+                    trackerAcousticFloorDb = s.acousticFloorDb; trackerAdaptiveVibrationFloor = s.adaptiveVibrationFloor
+                    trackerProxIdx = s.proxIdx; trackerProximityCm = s.proximityCm
+                    trackerProximityDebounceMs = s.proximityDebounceMs; trackerVibrationRollingSum = s.vibrationRollingSum
+                    trackerUptimeMs = s.uptimeMs; trackerTotalDropMs = s.totalDropMs
+                    trackerMaxDropMs = s.maxDropMs; trackerMaxDropTs = s.maxDropTs
+                    trackerTotalConnectedMs = s.totalConnectedMs
+                    trackerSessionConnectedMs = s.sessionConnectedMs; trackerLastConnTs = s.lastConnTs
+                    trackerLastDiscTs = s.lastDiscTs
+                    isTrackerLocationPending = s.isLocationPending
+                    trackerLocationPendingReason = s.locationPendingReason
+                    trackerLocationDetail = s.gnssDetail
+                    trackerSnrIdx = s.snrIdx
+                    trackerTiltIdx = s.tiltIdx
+                    trackerBaroIdx = s.baroIdx
+                    isTrackerBatterySteepDischarge = s.isBatterySteepDischarge
+                    isTrackerCoolingModeActive = s.isCoolingModeActive
+                    
+                    isTrackerPowerSaveMode = s.isPowerSaveMode
+                    trackerStandbyBucket = s.standbyBucket
+                    trackerNetInterface = s.netInterface
+                    isTrackerStorageLow = s.isStorageLow
+                    isTrackerStorageCritical = s.isStorageCritical
+                    
+                    trackerLastValidFixRealtime = s.lastValidFixRealtime
 
-                repository.updateLocation(LocationUpdate(
-                    lat = trackerLat, lng = trackerLng, speed = trackerSpeed, accuracy = trackerAccuracy, bearing = trackerBearing,
-                    battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp, isCharging = isTrackerCharging, currentMa = trackerCurrentMa,
-                    gpsTs = trackerLastGpsTs, isMe = false, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
-                    isJump = false, isJammer = false, isStalled = false,
-                    maxAccuracy = trackerMaxAccuracy, signal = 0,
-                    vibration = trackerVibration, heading = trackerBearing, baroAlt = trackerBaroAlt,
-                    lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb,
-                    peakVibrationShock = trackerPeakVibrationShock, peakVibrationShockTs = trackerPeakVibrationShockTs,
-                    luxBaseline = trackerLuxBaseline, acousticFloorDb = trackerAcousticFloorDb,
-                    adaptiveVibrationFloor = trackerAdaptiveVibrationFloor, isSuspicious = isTrackerSuspicious,
-                    isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
-                    isSitDetected = trackerLastSitTs > 0, isSitActive = isTrackerSitActive, lastSitTs = trackerLastSitTs,
-                    verticalVelocity = trackerVerticalVelocity, sitVz = trackerSitVz, sitDz = trackerSitDz,
-                    sitBaro = trackerSitBaro, sitTilt = trackerSitTilt, sitShock = trackerSitShock,
-                    proxIdx = trackerProxIdx, proximityCm = trackerProximityCm,
-                    proximityDebounceMs = trackerProximityDebounceMs, vibrationRollingSum = trackerVibrationRollingSum,
-                    uptimeMs = trackerUptimeMs, totalDropMs = trackerTotalDropMs,
-                    maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
-                    totalConnectedMs = trackerTotalConnectedMs,
-                    sessionConnectedMs = trackerSessionConnectedMs, lastConnTs = trackerLastConnTs,
-                    lastDiscTs = trackerLastDiscTs,
-                    violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage,
-                    isLocationPending = isTrackerLocationPending,
-                    locationPendingReason = trackerLocationPendingReason,
-                    lastValidFixRealtime = trackerLastValidFixRealtime,
-                    isPowerSaveMode = isTrackerPowerSaveMode,
-                    standbyBucket = trackerStandbyBucket,
-                    netInterface = trackerNetInterface,
-                    isStorageLow = isTrackerStorageLow,
-                    isStorageCritical = isTrackerStorageCritical,
-                    gnssDetail = trackerLocationDetail,
-                    snrIdx = trackerSnrIdx,
-                    tiltIdx = trackerTiltIdx,
-                    baroIdx = trackerBaroIdx,
-                    isBatterySteepDischarge = isTrackerBatterySteepDischarge,
-                    isCoolingModeActive = isTrackerCoolingModeActive
-                ))
+                    repository.updateLocation(LocationUpdate(
+                        lat = trackerLat, lng = trackerLng, speed = trackerSpeed, accuracy = trackerAccuracy, bearing = trackerBearing,
+                        battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp, isCharging = isTrackerCharging, currentMa = trackerCurrentMa,
+                        gpsTs = trackerLastGpsTs, isMe = false, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
+                        isJump = false, isJammer = false, isStalled = false,
+                        maxAccuracy = trackerMaxAccuracy, signal = 0,
+                        vibration = trackerVibration, heading = trackerBearing, baroAlt = trackerBaroAlt,
+                        lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb,
+                        peakVibrationShock = trackerPeakVibrationShock, peakVibrationShockTs = trackerPeakVibrationShockTs,
+                        luxBaseline = trackerLuxBaseline, acousticFloorDb = trackerAcousticFloorDb,
+                        adaptiveVibrationFloor = trackerAdaptiveVibrationFloor, isSuspicious = isTrackerSuspicious,
+                        isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
+                        isSitDetected = trackerLastSitTs > 0, isSitActive = isTrackerSitActive, lastSitTs = trackerLastSitTs,
+                        verticalVelocity = trackerVerticalVelocity, sitVz = trackerSitVz, sitDz = trackerSitDz,
+                        sitBaro = trackerSitBaro, sitTilt = trackerSitTilt, sitShock = trackerSitShock,
+                        proxIdx = trackerProxIdx, proximityCm = trackerProximityCm,
+                        proximityDebounceMs = trackerProximityDebounceMs, vibrationRollingSum = trackerVibrationRollingSum,
+                        uptimeMs = trackerUptimeMs, totalDropMs = trackerTotalDropMs,
+                        maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
+                        totalConnectedMs = trackerTotalConnectedMs,
+                        sessionConnectedMs = trackerSessionConnectedMs, lastConnTs = trackerLastConnTs,
+                        lastDiscTs = trackerLastDiscTs,
+                        violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage,
+                        isLocationPending = isTrackerLocationPending,
+                        locationPendingReason = trackerLocationPendingReason,
+                        lastValidFixRealtime = trackerLastValidFixRealtime,
+                        isPowerSaveMode = isTrackerPowerSaveMode,
+                        standbyBucket = trackerStandbyBucket,
+                        netInterface = trackerNetInterface,
+                        isStorageLow = isTrackerStorageLow,
+                        isStorageCritical = isTrackerStorageCritical,
+                        gnssDetail = trackerLocationDetail,
+                        snrIdx = trackerSnrIdx,
+                        tiltIdx = trackerTiltIdx,
+                        baroIdx = trackerBaroIdx,
+                        isBatterySteepDischarge = isTrackerBatterySteepDischarge,
+                        isCoolingModeActive = isTrackerCoolingModeActive
+                    ))
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Error loading initial tracker state")
             }
         }
     }
@@ -307,6 +316,7 @@ class RemoteHandler(
                     onPulse(fromId)
                     lastPeerActivityTs = nowRealtime
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     Timber.e(e, "Error parsing remote settings")
                 }
             }
@@ -390,6 +400,7 @@ class RemoteHandler(
                     }
                     trackerLocationDetail = GnssDetail(satellites = satList)
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     Timber.e(e, "Error parsing gnss_detail from remote")
                 }
             }
@@ -545,91 +556,96 @@ class RemoteHandler(
             else if (!isStalled) trackerGpsStallStartTs = 0L
 
             scope.launch {
-                repository.updateLocation(LocationUpdate(
-                    lat = trackerLat, lng = trackerLng, speed = trackerSpeed, accuracy = trackerAccuracy, bearing = trackerBearing,
-                    battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp, isCharging = isTrackerCharging, currentMa = trackerCurrentMa,
-                    gpsTs = trackerLastGpsTs, isMe = false, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
-                    isJump = isTrackerVisualJump, isTrajectoryPromoted = isTrackerTrajectoryPromoted, jumpTier = trackerJumpTier, 
-                    isJammer = isTrackerJammerSuspicion, isStalled = isStalled,
-                    maxAccuracy = trackerMaxAccuracy, signal = peerSignal,
-                    vibration = trackerVibration, heading = trackerHeading, baroAlt = trackerBaroAlt,
-                    lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb,
-                    peakVibrationShock = trackerPeakVibrationShock, peakVibrationShockTs = trackerPeakVibrationShockTs,
-                    luxBaseline = trackerLuxBaseline, acousticFloorDb = trackerAcousticFloorDb,
-                    adaptiveVibrationFloor = trackerAdaptiveVibrationFloor, isSuspicious = isTrackerSuspicious,
-                    isTamperDetected = isTrackerTamperDetected,
-                    isPowerTamper = isTrackerPowerTamper,
-                    isSitDetected = incomingSitDetected,
-                    isSitActive = isTrackerSitActive,
-                    lastSitTs = trackerLastSitTs,
-                    verticalVelocity = trackerVerticalVelocity,
-                    sitVz = trackerSitVz,
-                    sitDz = trackerSitDz,
-                    sitBaro = trackerSitBaro,
-                    sitTilt = trackerSitTilt,
-                    sitShock = trackerSitShock,
-                    proxIdx = trackerProxIdx,
-                    proximityCm = trackerProximityCm,
-                    proximityDebounceMs = trackerProximityDebounceMs,
-                    vibrationRollingSum = trackerVibrationRollingSum,
-                    uptimeMs = trackerUptimeMs, totalDropMs = trackerTotalDropMs, maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
-                    totalConnectedMs = trackerTotalConnectedMs,
-                    sessionConnectedMs = trackerSessionConnectedMs,
-                    lastConnTs = trackerLastConnTs, lastDiscTs = trackerLastDiscTs,
-                    violationUptimeMs = violationUptimeMs,
-                    violationPercentage = violationPercentage,
-                    isClockRegression = isTrackerClockRegression,
-                    isLocationPending = isTrackerLocationPending,
-                    locationPendingReason = trackerLocationPendingReason,
-                    lastValidFixRealtime = trackerLastValidFixRealtime,
-                    isPowerSaveMode = isTrackerPowerSaveMode,
-                    standbyBucket = trackerStandbyBucket,
-                    netInterface = trackerNetInterface,
-                    isStorageLow = isTrackerStorageLow,
-                    isStorageCritical = isTrackerStorageCritical,
-                    gnssDetail = trackerLocationDetail,
-                    snrIdx = trackerSnrIdx,
-                    tiltIdx = trackerTiltIdx,
-                    baroIdx = trackerBaroIdx,
-                    isBatterySteepDischarge = isTrackerBatterySteepDischarge,
-                    isCoolingModeActive = isTrackerCoolingModeActive
-                ))
-                
-                repository.saveTrackerState(TrackerStatus(
-                    lat = trackerLat, lng = trackerLng, speed = trackerSpeed, bearing = trackerBearing, accuracy = trackerAccuracy,
-                    gpsTs = trackerLastGpsTs, ts = now, battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp,
-                    isCharging = isTrackerCharging, currentMa = trackerCurrentMa, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
-                    lastConnTs = trackerLastConnTs, lastDiscTs = trackerLastDiscTs, uptimeMs = trackerUptimeMs,
-                    totalConnectedMs = trackerTotalConnectedMs,
-                    sessionConnectedMs = trackerSessionConnectedMs, totalDropMs = trackerTotalDropMs,
-                    maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
-                    violationUptimeMs = violationUptimeMs, violationPercentage = violationPercentage,
-                    isSitDetected = incomingSitDetected, isSitActive = isTrackerSitActive, lastSitTs = trackerLastSitTs, verticalVelocity = trackerVerticalVelocity,
-                    sitVz = trackerSitVz, sitDz = trackerSitDz, sitBaro = trackerSitBaro, sitTilt = trackerSitTilt, sitShock = trackerSitShock,
-                    isPowerTamper = isTrackerPowerTamper, vibration = trackerVibration, heading = trackerHeading,
-                    baroAlt = trackerBaroAlt, lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees,
-                    acousticDb = trackerAcousticDb, peakVibrationShock = trackerPeakVibrationShock,
-                    peakVibrationShockTs = trackerPeakVibrationShockTs, luxBaseline = trackerLuxBaseline,
-                    acousticFloorDb = trackerAcousticFloorDb, adaptiveVibrationFloor = trackerAdaptiveVibrationFloor,
-                    proxIdx = trackerProxIdx, proximityCm = trackerProximityCm,
-                    proximityDebounceMs = trackerProximityDebounceMs, vibrationRollingSum = trackerVibrationRollingSum,
-                    isSuspicious = isTrackerSuspicious, isTamperDetected = isTrackerTamperDetected,
-                    isTrajectoryPromoted = isTrackerTrajectoryPromoted, jumpTier = trackerJumpTier,
-                    isLocationPending = isTrackerLocationPending,
-                    locationPendingReason = trackerLocationPendingReason,
-                    lastValidFixRealtime = trackerLastValidFixRealtime,
-                    isPowerSaveMode = isTrackerPowerSaveMode,
-                    standbyBucket = trackerStandbyBucket,
-                    netInterface = trackerNetInterface,
-                    isStorageLow = isTrackerStorageLow,
-                    isStorageCritical = isTrackerStorageCritical,
-                    gnssDetail = trackerLocationDetail,
-                    snrIdx = trackerSnrIdx,
-                    tiltIdx = trackerTiltIdx,
-                    baroIdx = trackerBaroIdx,
-                    isBatterySteepDischarge = isTrackerBatterySteepDischarge,
-                    isCoolingModeActive = isTrackerCoolingModeActive
-                ))
+                try {
+                    repository.updateLocation(LocationUpdate(
+                        lat = trackerLat, lng = trackerLng, speed = trackerSpeed, accuracy = trackerAccuracy, bearing = trackerBearing,
+                        battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp, isCharging = isTrackerCharging, currentMa = trackerCurrentMa,
+                        gpsTs = trackerLastGpsTs, isMe = false, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
+                        isJump = isTrackerVisualJump, isTrajectoryPromoted = isTrackerTrajectoryPromoted, jumpTier = trackerJumpTier, 
+                        isJammer = isTrackerJammerSuspicion, isStalled = isStalled,
+                        maxAccuracy = trackerMaxAccuracy, signal = peerSignal,
+                        vibration = trackerVibration, heading = trackerHeading, baroAlt = trackerBaroAlt,
+                        lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb,
+                        peakVibrationShock = trackerPeakVibrationShock, peakVibrationShockTs = trackerPeakVibrationShockTs,
+                        luxBaseline = trackerLuxBaseline, acousticFloorDb = trackerAcousticFloorDb,
+                        adaptiveVibrationFloor = trackerAdaptiveVibrationFloor, isSuspicious = isTrackerSuspicious,
+                        isTamperDetected = isTrackerTamperDetected,
+                        isPowerTamper = isTrackerPowerTamper,
+                        isSitDetected = incomingSitDetected,
+                        isSitActive = isTrackerSitActive,
+                        lastSitTs = trackerLastSitTs,
+                        verticalVelocity = trackerVerticalVelocity,
+                        sitVz = trackerSitVz,
+                        sitDz = trackerSitDz,
+                        sitBaro = trackerSitBaro,
+                        sitTilt = trackerSitTilt,
+                        sitShock = trackerSitShock,
+                        proxIdx = trackerProxIdx,
+                        proximityCm = trackerProximityCm,
+                        proximityDebounceMs = trackerProximityDebounceMs,
+                        vibrationRollingSum = trackerVibrationRollingSum,
+                        uptimeMs = trackerUptimeMs, totalDropMs = trackerTotalDropMs, maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
+                        totalConnectedMs = trackerTotalConnectedMs,
+                        sessionConnectedMs = trackerSessionConnectedMs,
+                        lastConnTs = trackerLastConnTs, lastDiscTs = trackerLastDiscTs,
+                        violationUptimeMs = violationUptimeMs,
+                        violationPercentage = violationPercentage,
+                        isClockRegression = isTrackerClockRegression,
+                        isLocationPending = isTrackerLocationPending,
+                        locationPendingReason = trackerLocationPendingReason,
+                        lastValidFixRealtime = trackerLastValidFixRealtime,
+                        isPowerSaveMode = isTrackerPowerSaveMode,
+                        standbyBucket = trackerStandbyBucket,
+                        netInterface = trackerNetInterface,
+                        isStorageLow = isTrackerStorageLow,
+                        isStorageCritical = isTrackerStorageCritical,
+                        gnssDetail = trackerLocationDetail,
+                        snrIdx = trackerSnrIdx,
+                        tiltIdx = trackerTiltIdx,
+                        baroIdx = trackerBaroIdx,
+                        isBatterySteepDischarge = isTrackerBatterySteepDischarge,
+                        isCoolingModeActive = isTrackerCoolingModeActive
+                    ))
+                    
+                    repository.saveTrackerState(TrackerStatus(
+                        lat = trackerLat, lng = trackerLng, speed = trackerSpeed, bearing = trackerBearing, accuracy = trackerAccuracy,
+                        gpsTs = trackerLastGpsTs, ts = now, battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp,
+                        isCharging = isTrackerCharging, currentMa = trackerCurrentMa, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
+                        lastConnTs = trackerLastConnTs, lastDiscTs = trackerLastDiscTs, uptimeMs = trackerUptimeMs,
+                        totalConnectedMs = trackerTotalConnectedMs,
+                        sessionConnectedMs = trackerSessionConnectedMs, totalDropMs = trackerTotalDropMs,
+                        maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
+                        violationUptimeMs = violationUptimeMs, violationPercentage = violationPercentage,
+                        isSitDetected = incomingSitDetected, isSitActive = isTrackerSitActive, lastSitTs = trackerLastSitTs, verticalVelocity = trackerVerticalVelocity,
+                        sitVz = trackerSitVz, sitDz = trackerSitDz, sitBaro = trackerSitBaro, sitTilt = trackerSitTilt, sitShock = trackerSitShock,
+                        isPowerTamper = isTrackerPowerTamper, vibration = trackerVibration, heading = trackerHeading,
+                        baroAlt = trackerBaroAlt, lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees,
+                        acousticDb = trackerAcousticDb, peakVibrationShock = trackerPeakVibrationShock,
+                        peakVibrationShockTs = trackerPeakVibrationShockTs, luxBaseline = trackerLuxBaseline,
+                        acousticFloorDb = trackerAcousticFloorDb, adaptiveVibrationFloor = trackerAdaptiveVibrationFloor,
+                        proxIdx = trackerProxIdx, proximityCm = trackerProximityCm,
+                        proximityDebounceMs = trackerProximityDebounceMs, vibrationRollingSum = trackerVibrationRollingSum,
+                        isSuspicious = isTrackerSuspicious, isTamperDetected = isTrackerTamperDetected,
+                        isTrajectoryPromoted = isTrackerTrajectoryPromoted, jumpTier = trackerJumpTier,
+                        isLocationPending = isTrackerLocationPending,
+                        locationPendingReason = trackerLocationPendingReason,
+                        lastValidFixRealtime = trackerLastValidFixRealtime,
+                        isPowerSaveMode = isTrackerPowerSaveMode,
+                        standbyBucket = trackerStandbyBucket,
+                        netInterface = trackerNetInterface,
+                        isStorageLow = isTrackerStorageLow,
+                        isStorageCritical = isTrackerStorageCritical,
+                        gnssDetail = trackerLocationDetail,
+                        snrIdx = trackerSnrIdx,
+                        tiltIdx = trackerTiltIdx,
+                        baroIdx = trackerBaroIdx,
+                        isBatterySteepDischarge = isTrackerBatterySteepDischarge,
+                        isCoolingModeActive = isTrackerCoolingModeActive
+                    ))
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    Timber.e(e, "Error updating remote tracker state in DB")
+                }
             }
         }
     }

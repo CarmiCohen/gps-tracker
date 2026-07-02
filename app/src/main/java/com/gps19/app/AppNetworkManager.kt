@@ -18,11 +18,11 @@ import javax.inject.Singleton
 /**
  * High-level Network Manager for the Service.
  * Orchestrates the SignalingProvider (Socket.io) and the HTTP Keep-alive logic.
+ * v8.9.72:
+ * - Issue #015: Hardened coroutine cancellation handling in wakeUpRelay and keep-alive loops.
  * v8.9.64:
  * - Issue #007: Implemented reactive short-circuit reconnection. Now triggers 
  *   wakeUpRelay() and signaling re-join immediately on transport loss via callback.
- * v8.8.12:
- * - Render Resilience: Implemented aggressive multi-stage wake-up for cold-starting relays.
  */
 @Singleton
 class AppNetworkManager @Inject constructor(
@@ -84,7 +84,8 @@ class AppNetworkManager @Inject constructor(
                     try {
                         performKeepAlive()
                     } catch (e: Exception) {
-                        if (isActive && !isStopped && e !is CancellationException) {
+                        if (e is CancellationException) throw e
+                        if (isActive && !isStopped) {
                             Log.e("GPS19_NET", "Keep-alive loop internal error: ${e.message}")
                         }
                     }
@@ -175,8 +176,11 @@ class AppNetworkManager @Inject constructor(
                     conn.disconnect()
                     if (code == 200 || code == 404) return@launch 
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     Log.w("GPS19_NET", "Wake-up (Attempt ${attempt+1}): ${e.message}")
-                    logManager.logServiceEvent("Relay Wake-up (Attempt ${attempt+1}) Failed: ${e.message}", false)
+                    if (!isStopped && isActive) {
+                        logManager.logServiceEvent("Relay Wake-up (Attempt ${attempt+1}) Failed: ${e.message}", false)
+                    }
                 }
                 delay(6000)
             }

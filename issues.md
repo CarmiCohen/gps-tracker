@@ -2,13 +2,6 @@
 
 ## Open Issues
 
-### Issue #015: StandaloneCoroutine Cancellation during Service Start
-- **Description**: `JobCancellationException` observed immediately after foreground service failure.
-- **Root Cause**: Coroutine scopes tied to service lifecycle are being cancelled because the service fails to transition to the foreground.
-- **Status**: Open
-- **Priority**: High
-- **Target**: `TrackerService.kt`, `ViewerService.kt`.
-
 ### Issue #016: Main Thread Performance Bottlenecks (UI Jank)
 - **Description**: System reports skipped frames (e.g., 43 frames) during map interaction and app startup.
 - **Root Cause**: Potential heavy lifting on the main thread during `OsmMap` rendering or high-frequency `getPackageName` calls.
@@ -38,6 +31,17 @@
 - **Target**: `TrackerService.kt`.
 
 ## Resolved Issues
+
+### Issue #015: StandaloneCoroutine Cancellation during Service Start
+- **Description**: `JobCancellationException` observed immediately after foreground service failure.
+- **Root Cause**: Coroutine scopes tied to service lifecycle were being cancelled when the service failed to transition to the foreground, and generic catch blocks were logging these cancellations as errors.
+- **Implementation**: 
+    * Hardened `SyncManager`, `RemoteHandler`, and `CommandRouter` to explicitly ignore `CancellationException` in generic catch blocks.
+    * Ensured `CoroutineExceptionHandler` in `CommandRouter` filters out cancellation noise.
+    * Verified FGS update loops in `TrackerService` and `ViewerService` preserve cancellation intent without logging.
+- **Status**: Resolved
+- **Priority**: High
+- **Target**: `TrackerService.kt`, `ViewerService.kt`, `SyncManager.kt`, `RemoteHandler.kt`, `CommandRouter.kt`.
 
 ### Issue #013: Forensic UI Expansion - Stationary Scaling Visibility
 - **Description**: Expose internal stationary scaling metrics to the UI telemetry panel.

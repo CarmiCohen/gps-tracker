@@ -10,6 +10,9 @@ import timber.log.Timber
 
 /**
  * SyncManager: Handles the telemetry synchronization loop.
+ * v8.9.72:
+ * - Issue #015: Hardened coroutine cancellation handling. Ensuring CancellationException 
+ *   is not logged as a sync failure during service shutdown.
  * v8.9.43:
  * - Issue #013: Forensic UI Expansion. Propagating proximityDebounceMs and 
  *   vibrationRollingSum through the sync loop for stationary scaling verification.
@@ -56,6 +59,7 @@ class SyncManager(
                     try {
                         flushPendingUpdates(deviceId, viewerId, isTracker)
                     } catch (e: Exception) {
+                        if (e is CancellationException) throw e
                         Timber.e(e, "Failed to sync telemetry")
                     } finally {
                         _isSyncing.value = false
