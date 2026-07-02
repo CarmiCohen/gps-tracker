@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.71
+# System Source of Truth (SoT) - v8.9.73
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
@@ -18,7 +18,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Branding Authority (R865/R866)**: "Unified Identity Green" is strictly defined as **JD Branding Green (#367C2B)**. All tracker-role UI elements, icons, and status indicators must use this hex code. 
 *   **Icon Authority (R935)**: The authoritative application icon is the text-free John Deere deer logo.
 *   **Role Identity Standards (R182)**: IDs are free-form strings. Tracker and Viewer IDs must be unique from each other. Prefixes "T" (Tracker) and "V" (Viewer) are mandated standards for system-generated defaults. (v8.9.47/v8.9.53 alignment)
-*   **VID Notes Authority (R924)**: The `HeaderBar` button row displays the hard-coded `VID_NOTES` string (authoritative baseline: "renumv") instead of the application version number. (v8.9.65 alignment)
+*   **VID Notes Authority (R924)**: The `HeaderBar` button row displays the hard-coded `VID_NOTES` string (authoritative baseline: "Th1030") instead of the application version number. (v8.9.73 alignment)
 *   **Status Badge Logic (R942)**: Dynamic labels in the StatusBar (TRK/VWR) reflect the current session role and remote peer identity. In Tracker mode, the badge represents the remote Viewer.
 *   **UI Badge Redundancy (R943)**: The "DAT" (Data) badge is suppressed in Tracker mode to maintain UI cleanliness when signaling is unidirectional.
 *   **Ghost Mode UI (R338)**: Visual staleness indicators (dimming to `Slate500`) applied when telemetry > 35s old (`TELEMETRY_UI_STALE_THRESHOLD_MS`). (v8.9.62 alignment; Formerly 15s)

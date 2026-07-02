@@ -2,21 +2,19 @@ package com.gps19.core.engine
 
 /**
  * SignalingConstants: Core rules for relay communication and role enforcement.
+ * v8.9.73:
+ * - R924: Updated VID_NOTES identifier to "Th1030".
  * v8.9.63:
  * - Issue #461: Hardened uniqueness enforcement feedback.
  * v8.9.61:
  * - R924: Added VID_NOTES for UI labeling.
- * v8.9.50:
- * - R182 Relaxation: IDs are now free-form strings.
- * - Minimum length: 1 character.
- * - Enforces uniqueness concept (Tracker ID != Viewer ID).
  */
 object SignalingConstants {
     const val DEFAULT_TRACKER_ID = "T"
     const val DEFAULT_VIEWER_ID = "V"
     
     // R924-A: Hard-coded note for UI display.
-    const val VID_NOTES = "renumv"
+    const val VID_NOTES = "Th1030"
 
     /**
      * R182: Validation relaxed to non-empty (min 1 char).

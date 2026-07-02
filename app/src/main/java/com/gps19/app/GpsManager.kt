@@ -22,6 +22,9 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Manages hardware GPS and GNSS status.
+ * v8.9.72:
+ * - Issue #015: Hardened coroutine cancellation handling in getLocationFlow to 
+ *   suppress "CRITICAL" logs during service shutdown.
  * v8.9.66:
  * - Issue #013: Added kickGps() to perform a "Warm Handoff" hardware injection 
  *   to prevent A15 background stalling during transition.
@@ -124,6 +127,7 @@ class GpsManager @Inject constructor(
             locationManager.sendExtraCommand(LocationManager.GPS_PROVIDER, "force_xtra_injection", null)
             Timber.d("GPS: Hardware 'Warm Kick' injected (A15 Transition Guard)")
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Timber.e(e, "GPS: Warm Kick failed")
         }
     }
@@ -135,6 +139,7 @@ class GpsManager @Inject constructor(
             locationManager.sendExtraCommand(LocationManager.GPS_PROVIDER, "force_xtra_injection", null)
             locationManager.sendExtraCommand(LocationManager.GPS_PROVIDER, "force_time_injection", null)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Timber.e(e, "GPS: Extra command injection failed")
         }
         
@@ -149,6 +154,7 @@ class GpsManager @Inject constructor(
         try {
             locationManager.registerGnssStatusCallback(gnssStatusCallback, Handler(Looper.getMainLooper()))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Timber.e(e, "GPS: Failed to register GNSS callback")
         }
 
@@ -175,6 +181,7 @@ class GpsManager @Inject constructor(
                     try {
                         fusedLocationClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper())
                     } catch (e: Exception) {
+                        if (e is CancellationException) throw e
                         Timber.e(e, "CRITICAL: GPS Request failed")
                         close(e)
                     }
