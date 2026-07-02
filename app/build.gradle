@@ -27,7 +27,8 @@ def getGitVersionName = { ->
             commandLine 'git', 'describe', '--tags', '--always', '--dirty'
             standardOutput = stdout
         }
-        return stdout.toString().trim()
+        // v8.9.71: Added regex to strip leading 'v' or 'v.' prefixes for a clean number-only display
+        return stdout.toString().trim().replaceAll("^v\\.?+", "")
     } catch (Exception ignored) {
         return "1.0.0"
     }
@@ -56,6 +57,17 @@ android {
             minifyEnabled = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
