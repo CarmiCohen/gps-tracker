@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
-        Timber.d("MainActivity onCreate version ${BuildConfig.VERSION_NAME}")
+        Timber.d("MainActivity onCreate version ${BuildConfig.VERSION_NAME} on ${Build.MODEL}")
 
         // Handle cold-start intent
         intent?.let { handleIntent(it) }
@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
                 onRequestBatteryExemption = {
                     try {
                         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                            data = "package:$packageName".toUri()
+                            setData("package:$packageName".toUri())
                         }
                         startActivity(intent)
                     } catch (e: Exception) {
@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
                 onRequestAppInfo = {
                     try {
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = "package:$packageName".toUri()
+                            setData("package:$packageName".toUri())
                         }
                         startActivity(intent)
                     } catch (e: Exception) {
@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         try {
                             val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                data = "package:$packageName".toUri()
+                                setData("package:$packageName".toUri())
                             }
                             startActivity(intent)
                         } catch (e: Exception) {
@@ -118,7 +118,7 @@ class MainActivity : ComponentActivity() {
                         } catch (e: Exception) {
                             try {
                                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    data = "package:$packageName".toUri()
+                                    setData("package:$packageName".toUri())
                                 }
                                 startActivity(intent)
                             } catch (e2: Exception) {

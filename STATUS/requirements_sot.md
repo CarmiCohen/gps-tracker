@@ -1,11 +1,11 @@
-# System Source of Truth (SoT) - v8.9.65
+# System Source of Truth (SoT) - v8.9.71
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Module Hardening**: `:core:engine` is a pure `java-library` with zero Android dependencies. (Issue #322)
-*   **Sensor Processing Authority (R965)**: `AppSensorManager` offloads all high-frequency sensor event processing to a dedicated `HandlerThread` (`AppSensorThread`) to ensure Main Thread fluidity and eliminate vsync jitter. (Issue #006 / v8.9.64)
+*   **Sensor Processing Authority (R965)**: `AppSensorManager` offloads all high-frequency sensor event processing to a dedicated `HandlerThread` (`AppSensorThread`) to ensure Main Thread fluidity and eliminate vsync jitter. Uses zero-allocation fast-path with pre-allocated buffers and circular vibration sum. (Issue #006 / Issue #013 / v8.9.70)
 *   **Connectivity Integrity (R966)**: `AppNetworkManager` implements a short-circuit reactive reconnection trigger. The system initiates immediate `wakeUpRelay()` and signaling re-join upon transport failure, bypassing passive loops. (Issue #007 / v8.9.64)
 *   **Transport Authority**: The system strictly enforces `websocket` transport for low-latency signaling. (Issue #007 / v8.9.64)
 *   **Service Launch Integrity (R926)**: The system enforces a mandatory **2,000ms delay** during session auto-transitions before launching background services. (Issue #320; Supersedes legacy Issue #215 and legacy ID R925)
@@ -27,6 +27,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Standardized Alert Titles (R747)**: Authority resides in `EngineConstants.kt`. Localized "This device" prefix for local events; "Tracker:" prefix removed from remote events. Subtitles standardized to use "Device" instead of "Tracker". (Issue #424)
 *   **Lockout Indicator Authority (R959)**: The "LOCKOUT" badge in the StatusBar is the authoritative indicator for suppressed alarm states. (Issue #400)
 *   **Accuracy Display Optimization (R325)**: Status telemetry layout is optimized for narrow devices (min 360dp) by constraining the left-side panel to **210dp**, ensuring authoritative accuracy `(±Xm)` remains visible without truncation. (Issue #R325 / v8.9.65)
+*   **Forensic UI Visibility (R729)**: The system must expose adaptive metrics `proximityDebounceMs` and `vibrationRollingSum` to the UI dashboard to allow physical verification of stationary scaling logic. (Issue #013 / v8.9.71)
 
 ### 3. Location & Trajectory Engine
 *   **Authoritative Spatial Anchoring (R325)**: **`maxAccuracy` is the exclusive authority** for Geofence transitions, Distance Violations, and Trajectory Deduplication. Includes a **0.5x spatial gate factor** for persistence sensitivity (`DEDUPLICATION_SPATIAL_GATE_FACTOR`). (Issue #423 / Issue #450)
@@ -56,6 +57,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Vibration**: 0.8g (Shock) / 0.25g (Suspicious).
 *   **Acoustic Hysteresis**: Engine recovery gate resets at **30s**.
 *   **Muzzle & Sync Suppression (R954)**: 2000ms logic gate for sync suppression, with **200ms** recovery hysteresis to prevent race conditions during alert clearing. (Issue #376)
+*   **Forensic Labeling (R730)**: The system must log service events when hardware-specific muzzles suppress sensor violations to provide forensic transparency. (Issue #011 / v8.9.71)
 
 #### 4.2. Chair Sit Detection Engine (R832)
 *   **Fusion Logic**: Tilt (7.0°), Vibration (0.35g), Baro Plunge (0.08m), Velocity (0.18m/s).
@@ -63,7 +65,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 #### 4.3. Device-Specific Adaptations
 *   **Xiaomi Heuristic Revival (R955)**: Hardened gating using `is_xiaomi_manual_override` and autostart verification. Includes **15s suppression** and **60s recovery** gates for heuristic revival. (Issue #190 / Issue #439)
-*   **Samsung A15 Proximity Workaround (R963)**: Proximity debounce (5000ms) and post-sync hysteresis (500ms) to accommodate virtual proximity sensor limitations. Includes Lux-Aware Proximity Gating and Stationary Virtual Sensor Protection (suppressing 'Far' transitions in darkness). (v8.9.64 alignment)
+*   **Samsung A15 Proximity Workaround (R963)**: Proximity debounce with adaptive scaling based on stationary duration (`PROXIMITY_STARY_SCALING_MS_PER_HOUR`) and system load. Includes Lux-Aware Proximity Gating and Stationary Virtual Sensor Protection (suppressing 'Far' transitions in darkness). (Issue #012 / v8.9.71)
 *   **Samsung S21 FE**: Explicit background activity required for 10Hz GPS polling. (Issue #432)
 
 ### 5. System Health & Lifecycle

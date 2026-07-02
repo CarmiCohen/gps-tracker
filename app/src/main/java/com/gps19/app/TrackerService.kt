@@ -21,11 +21,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.71:
+ * - Issue #014: Fixed Foreground Service Type Mismatch on Android 14+. 
+ *   Ensured LOCATION is always present and hardened background transitions.
  * v8.9.70:
- * - Issue #013: Forensic UI Expansion. Propagating proximityDebounceMs and 
- *   vibrationRollingSum to the sync loop for stationary scaling verification.
- * v8.9.69:
- * - Issue #012: Adaptive Proximity Debounce logic.
+ * - Issue #013: Forensic UI Expansion.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -283,6 +283,7 @@ class TrackerService : BaseMonitorService() {
                     val msg = if ((type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE) != 0) "Acoustic monitoring active." else "Tracking system active."
                     safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     Timber.e(e, "Failed to update foreground service type")
                 }
             }
@@ -292,9 +293,16 @@ class TrackerService : BaseMonitorService() {
     @SuppressLint("InlinedApi")
     private fun getAvailableForegroundServiceType(): Int {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
+        
+        // Issue #014: LOCATION must always be present on API 34+ if declared in manifest.
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val hasMicPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            
+            // Issue #014: Strict background transition handling for MICROPHONE.
+            // Only add MICROPHONE if we are either in UI foreground OR already have it active.
+            // Android 14+ forbids adding MICROPHONE from background.
             if (hasMicPermission && (isUiVisible() || sensorManager.isAcousticMonitoringActive())) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE 
             }

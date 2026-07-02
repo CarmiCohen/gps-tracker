@@ -18,13 +18,10 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.71:
+ * - Issue #014: Hardened Foreground Service management for Android 14+.
  * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated onTrailPointSaved 
- *   to propagate both raw accuracy and maxAccuracy for forensic path parity.
- * - Issue #326: Intelligent Uncertainty UX Mapping. Synchronized locationPendingReason 
- *   propagation and forensic ribbon parity.
- * - Issue #335: serviceStartRealtime Initialization Gap. Explicitly initialized 
- *   serviceStartRealtime in onCreate after engine initialization.
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -267,6 +264,7 @@ class ViewerService : BaseMonitorService() {
                     val msg = "Monitoring system active."
                     safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     Timber.e(e, "Failed to update foreground service type")
                 }
             }
