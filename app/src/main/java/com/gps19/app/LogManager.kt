@@ -8,14 +8,9 @@ import java.util.UUID
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Preserving both raw 
- *   accuracy and authoritative maxAccuracy in forensic logs.
- * v8.9.38:
- * - Issue #333: Enhanced auto-enrichment. Automatically populate snrSnapshot and vibeSnapshot 
- *   from latest telemetry if not explicitly provided, ensuring forensic parity.
- * v8.9.55:
- * - Issue #458: Added lightweight watchdog forensic logging.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized accuracy and sensor snapshots 
+ *   to Double to eliminate redundant toDouble()/toFloat() conversions.
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -42,10 +37,10 @@ class LogManager @Inject constructor(
         specialColor: Int? = null,
         lat: Double = 0.0,
         lng: Double = 0.0,
-        accuracy: Float = 0f,
-        maxAccuracy: Float = 0f,
-        snr: Float? = null,
-        vibe: Float? = null
+        accuracy: Double = 0.0,
+        maxAccuracy: Double = 0.0,
+        snr: Double? = null,
+        vibe: Double? = null
     ) {
         val now = timeProvider.currentTimeMillis()
         val integrity = telemetry.integrityState.value
@@ -61,7 +56,6 @@ class LogManager @Inject constructor(
             return
         }
 
-        // R325: Dual-Metric Forensic Anchoring
         var finalLat = lat
         var finalLng = lng
         var finalAccuracy = accuracy
@@ -72,14 +66,12 @@ class LogManager @Inject constructor(
         val local = telemetry.localLocation.value
         val tracker = telemetry.trackerLocation.value
         
-        // Determine the most authoritative telemetry source for this role
         val fallbackTelem = if (configManager.isTrackerMode) {
             if (local.lat != 0.0) local else tracker
         } else {
             if (tracker.lat != 0.0) tracker else local
         }
 
-        // Auto-anchor location and accuracy metrics
         if (finalLat == 0.0 && finalLng == 0.0) {
             if (fallbackTelem.lat != 0.0 && fallbackTelem.lng != 0.0) {
                 finalLat = fallbackTelem.lat
@@ -88,19 +80,18 @@ class LogManager @Inject constructor(
                 finalMaxAccuracy = fallbackTelem.maxAccuracy
             }
         } else {
-            if (finalAccuracy == 0f && finalLat == fallbackTelem.lat) {
+            if (finalAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
                 finalAccuracy = fallbackTelem.accuracy
             }
-            if (finalMaxAccuracy == 0f && finalLat == fallbackTelem.lat) {
+            if (finalMaxAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
                 finalMaxAccuracy = fallbackTelem.maxAccuracy
             }
         }
 
-        // Issue #333: Forensic Enrichment Auto-Fill
-        if (finalSnr == null && fallbackTelem.snrIdx > 0f) {
+        if (finalSnr == null && fallbackTelem.snrIdx > 0.0) {
             finalSnr = fallbackTelem.snrIdx * RIBBON_SNR_SCALE_DB
         }
-        if (finalVibe == null && (fallbackTelem.vibration ?: 0f) > 0f) {
+        if (finalVibe == null && (fallbackTelem.vibration ?: 0.0) > 0.0) {
             finalVibe = fallbackTelem.vibration
         }
 
@@ -146,17 +137,14 @@ class LogManager @Inject constructor(
         specialColor: Int? = null,
         lat: Double = 0.0,
         lng: Double = 0.0,
-        accuracy: Float = 0f,
-        maxAccuracy: Float = 0f,
-        snr: Float? = null,
-        vibe: Float? = null
+        accuracy: Double = 0.0,
+        maxAccuracy: Double = 0.0,
+        snr: Double? = null,
+        vibe: Double? = null
     ) {
         submitToLogSink(m, "system", important, isSpecial = isSpecial, specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy, maxAccuracy = maxAccuracy, snr = snr, vibe = vibe)
     }
 
-    /**
-     * Issue #458: Lightweight watchdog frequency tracker.
-     */
     fun logWatchdogPulse(set: Boolean, skipped: Int) {
         if (set) {
             submitToLogSink("Watchdog: Alarm set (skipped=$skipped)", "watchdog_stats", important = false)

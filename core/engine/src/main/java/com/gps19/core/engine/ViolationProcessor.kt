@@ -4,10 +4,11 @@ import kotlin.math.max
 
 /**
  * ViolationProcessor: Pure logic for evaluating and deduplicating violations.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized parameters to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring. Refactored shouldRecordViolation 
- *   to utilize authoritative maxAccuracy for spatial deduplication.
- * v8.8.21: Extracted from MainRepository to decouple logic from persistence.
+ * - Issue #325: Authoritative Spatial Anchoring.
  */
 class ViolationProcessor(private val timeProvider: TimeProvider) {
 
@@ -18,26 +19,23 @@ class ViolationProcessor(private val timeProvider: TimeProvider) {
 
     /**
      * Checks if a new violation should be recorded based on proximity and time thresholds.
-     * R325: Using maxAccuracy (uncertainty) as the spatial gate for deduplication.
      */
     fun shouldRecordViolation(
         lat: Double,
         lng: Double,
         type: String,
-        accuracy: Float,
-        maxAccuracy: Float
+        accuracy: Double,
+        maxAccuracy: Double
     ): Boolean {
         val nowRt = timeProvider.elapsedRealtime()
         
-        // Logical anchor: Deduplication threshold is the greater of 10m or the authoritative uncertainty.
-        val gate = max(10.0, maxAccuracy.toDouble())
+        val gate = max(10.0, maxAccuracy)
 
         if (type == lastViolationType && (nowRt - lastViolationRealtime < 5000L)) {
             val dist = PhysicsUtils.calculateDistance(lat, lng, lastViolationLat, lastViolationLng)
             if (dist < gate) return false
         }
 
-        // Update local state if it's a new unique violation
         lastViolationLat = lat
         lastViolationLng = lng
         lastViolationRealtime = nowRt

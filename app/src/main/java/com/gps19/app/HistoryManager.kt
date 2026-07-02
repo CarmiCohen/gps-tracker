@@ -12,16 +12,12 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * v8.9.42:
- * - Issue #326: Intelligent Uncertainty UX Mapping. Added locationPendingReason to 
- *   updateRibbons and backfillGaps for forensic parity.
- * - Issue #325: Authoritative Spatial Anchoring. Added accuracy and maxAccuracy to 
- *   ribbons for forensic uncertainty auditing.
- * - Issue #336-B: SIT Duplicate Guard. Implemented database-level sanity check to 
- *   prevent redundant SIT forensic markers. (Formerly #336-G)
- * - Issue #329: Added tiltIdx and baroIdx to updateRibbons and backfillGaps for 
- *   forensic expansion.
- * - Issue #337: Added currentMa to updateRibbons and backfillGaps for forensic power parity.
+ * v8.9.77:
+ * - Issue #018: Stationary Anchor Hard-Lock. Propagating isAnchorLocked flag 
+ *   to forensic ribbons for audit transparency.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized parameters to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  */
 class HistoryManager(
     private val context: Context,
@@ -62,31 +58,32 @@ class HistoryManager(
         peerAvail: Boolean,
         hasGps: Boolean,
         isTrackerMode: Boolean,
-        gpsIndex: Float = 0f,
-        accuracy: Float = 0f,
-        maxAccuracy: Float = 0f,
-        noiseIdx: Float = 0f,
-        luxIdx: Float = 0f,
-        vibeIdx: Float = 0f,
-        proxIdx: Float = 1f,
-        liftIdx: Float = 0f,
-        snrIdx: Float = 0f,
-        tiltIdx: Float = 0f,
-        baroIdx: Float = 0f,
-        verticalVelocity: Float = 0f,
-        sitVz: Float = 0f,
-        sitDz: Float = 0f,
-        sitBaro: Float = 0f,
-        sitTilt: Float = 0f,
-        sitShock: Float = 0f,
+        gpsIndex: Double = 0.0,
+        accuracy: Double = 0.0,
+        maxAccuracy: Double = 0.0,
+        noiseIdx: Double = 0.0,
+        luxIdx: Double = 0.0,
+        vibeIdx: Double = 0.0,
+        proxIdx: Double = 1.0,
+        liftIdx: Double = 0.0,
+        snrIdx: Double = 0.0,
+        tiltIdx: Double = 0.0,
+        baroIdx: Double = 0.0,
+        verticalVelocity: Double = 0.0,
+        sitVz: Double = 0.0,
+        sitDz: Double = 0.0,
+        sitBaro: Double = 0.0,
+        sitTilt: Double = 0.0,
+        sitShock: Double = 0.0,
         isBatterySteepDischarge: Boolean = false,
         isCoolingModeActive: Boolean = false,
-        speed: Float = 0f,
-        bearing: Float = 0f,
+        speed: Double = 0.0,
+        bearing: Double = 0.0,
         isSitDetected: Boolean = false,
         isSitActive: Boolean = false,
         currentMa: Int = 0,
-        locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+        locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+        isAnchorLocked: Boolean = false
     ) {
         detectClockTampering(now)
 
@@ -135,7 +132,8 @@ class HistoryManager(
                 isSitDetected = isSitDetected,
                 isSitActive = isSitActive,
                 currentMa = currentMa,
-                locationPendingReason = locationPendingReason
+                locationPendingReason = locationPendingReason,
+                isAnchorLocked = isAnchorLocked
             )
         }
 
@@ -171,12 +169,12 @@ class HistoryManager(
             isSitActive = isSitActive,
             isTick = false,
             currentMa = currentMa,
-            locationPendingReason = locationPendingReason
+            locationPendingReason = locationPendingReason,
+            isAnchorLocked = isAnchorLocked
         )
 
         processResults(aggregator.processPoint(currentPoint))
 
-        // Only perform expensive time-based logic once per minute to avoid 1Hz Calendar allocations
         if (now - lastTimeTriggerTs >= 60000L || lastTimeTriggerTs == 0L) {
             lastTimeTriggerTs = now
             val calendar = Calendar.getInstance().apply { timeInMillis = now }
@@ -203,31 +201,32 @@ class HistoryManager(
         peerAvail: Boolean,
         hasGps: Boolean,
         isTrackerMode: Boolean,
-        gpsIndex: Float,
-        accuracy: Float,
-        maxAccuracy: Float,
-        noiseIdx: Float,
-        luxIdx: Float,
-        vibeIdx: Float,
-        proxIdx: Float,
-        liftIdx: Float,
-        snrIdx: Float,
-        tiltIdx: Float,
-        baroIdx: Float,
-        verticalVelocity: Float,
-        sitVz: Float,
-        sitDz: Float,
-        sitBaro: Float,
-        sitTilt: Float,
-        sitShock: Float,
+        gpsIndex: Double,
+        accuracy: Double,
+        maxAccuracy: Double,
+        noiseIdx: Double,
+        luxIdx: Double,
+        vibeIdx: Double,
+        proxIdx: Double,
+        liftIdx: Double,
+        snrIdx: Double,
+        tiltIdx: Double,
+        baroIdx: Double,
+        verticalVelocity: Double,
+        sitVz: Double,
+        sitDz: Double,
+        sitBaro: Double,
+        sitTilt: Double,
+        sitShock: Double,
         isBatterySteepDischarge: Boolean,
         isCoolingModeActive: Boolean,
-        speed: Float,
-        bearing: Float,
+        speed: Double,
+        bearing: Double,
         isSitDetected: Boolean,
         isSitActive: Boolean,
         currentMa: Int,
-        locationPendingReason: LocationPendingReason
+        locationPendingReason: LocationPendingReason,
+        isAnchorLocked: Boolean
     ) {
         val snrSamples = if (isTrackerMode && gpsManager != null) {
             gpsManager.getSnrSamples(lastTickTs + 1, now).map { EngineSnrSample(it.first, it.second) }
@@ -271,7 +270,8 @@ class HistoryManager(
             isSitDetected = applySitDuplicateGuard(isSitDetected, now),
             isSitActive = isSitActive,
             currentMa = currentMa,
-            locationPendingReason = locationPendingReason
+            locationPendingReason = locationPendingReason,
+            isAnchorLocked = isAnchorLocked
         )
 
         val results = aggregator.backfillGaps(lastTickTs, now, snrSamples, sensorSamples, acousticFloor, baseTemplate)
@@ -329,12 +329,9 @@ class HistoryManager(
 
     private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long): Boolean {
         if (!isDetected) return false
-        
-        // Issue #336-B: Prevent duplicates if a SIT event occurs within the guard window. (Formerly #336-G)
         if (abs(ts - lastSitDetectedTs) < SIT_DUPLICATE_GUARD_MS) {
             return false
         }
-        
         lastSitDetectedTs = ts
         scope.launch {
             repository.saveLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, ts)
@@ -376,7 +373,8 @@ class HistoryManager(
             isSitDetected = p.isSitDetected,
             isSitActive = p.isSitActive,
             currentMa = p.currentMa,
-            locationPendingReason = p.locationPendingReason
+            locationPendingReason = p.locationPendingReason,
+            isAnchorLocked = p.isAnchorLocked
         )
     }
 

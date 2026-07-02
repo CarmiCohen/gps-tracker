@@ -48,11 +48,11 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * v8.9.62:
- * - Issue #003: Optimized Map re-rendering. Reduced redundant folder clears to 
- *   resolve main thread layout jitter.
- * - Issue #005: Removed redundant userAgentValue setting in factory to eliminate 
- *   repeated getPackageName calls and associated log spam.
+ * v8.9.78:
+ * - Issue #016: Optimized trail rendering. Removed redundant O(N) count passes and minimized allocations.
+ * - Issue #018: Stationary Anchor Hard-Lock. Added visual indicator to Map UI.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double.
  */
 
 @Composable
@@ -86,7 +86,8 @@ fun AppMapContainer(
     val trackerLastValidFixRealtime = if (isTrackerMode) uiState.localLocation.lastValidFixRealtime else uiState.trackerLocation.lastValidFixRealtime
     val trackerLocationPending = if (isTrackerMode) uiState.localLocation.isLocationPending else uiState.trackerLocation.isLocationPending
     val trackerLocationPendingReason = if (isTrackerMode) uiState.localLocation.locationPendingReason else uiState.trackerLocation.locationPendingReason
-    
+    val trackerIsAnchorLocked = if (isTrackerMode) uiState.localLocation.isAnchorLocked else uiState.trackerLocation.isAnchorLocked
+
     val viewerLat = if (isTrackerMode) uiState.trackerLocation.lat else uiState.localLocation.lat
     val viewerLng = if (isTrackerMode) uiState.trackerLocation.lng else uiState.localLocation.lng
     val viewerBearing = if (isTrackerMode) uiState.trackerLocation.bearing else uiState.localLocation.bearing
@@ -164,6 +165,23 @@ fun AppMapContainer(
             meLastValidFixRealtime = viewerLastValidFixRealtime
         )
 
+        if (trackerIsAnchorLocked) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+                    .background(BrandJd, RoundedCornerShape(4.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Lock, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("ANCHOR LOCKED", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                }
+            }
+        }
+
         Text(
             text = BuildConfig.VERSION_NAME,
             color = Color.White,
@@ -212,7 +230,6 @@ fun AppMapContainer(
             }
         }
 
-        // Issue #326: Intelligent Uncertainty UX - Display reason overlay if pending
         if (trackerLocationPending && trackerLocationPendingReason != LocationPendingReason.NONE) {
             Box(modifier = Modifier.align(Alignment.Center).padding(bottom = 120.dp).background(Amber500.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                 Text(
@@ -226,9 +243,6 @@ fun AppMapContainer(
     }
 }
 
-/**
- * MapSettingsToggle: R915 improved toggle button.
- */
 @Composable
 fun MapSettingsToggle(
     isMapButtonsVisible: Boolean,
@@ -257,13 +271,13 @@ fun MapSettingsToggle(
 
 @Composable
 fun OsmMap(
-    lat: Double, lng: Double, bearing: Float, myLat: Double?, myLng: Double?, myB: Float?, 
+    lat: Double, lng: Double, bearing: Double, myLat: Double?, myLng: Double?, myB: Double?, 
     trail: List<TrailPoint>, viewerTrail: List<TrailPoint>, home: List<GeoPoint>, 
     onTap: (GeoPoint) -> Unit, isFresh: Boolean, isMeFresh: Boolean = true,
     maxD: Double, onRemoveMarker: (Int) -> Unit, violations: List<ViolationPoint>, 
     isFenceVisible: Boolean, isViolationsVisible: Boolean = true, isGeofenceViolationsVisible: Boolean = true, 
-    accuracy: Float, maxAcc: Float, speed: Float = 0f, 
-    myAccuracy: Float? = null, myMaxAcc: Float = 0f, mySpeed: Float = 0f,
+    accuracy: Double, maxAcc: Double, speed: Double = 0.0, 
+    myAccuracy: Double? = null, myMaxAcc: Double = 0.0, mySpeed: Double = 0.0,
     initialCenter: GeoPoint? = null, centeringTrackerTrigger: Int = 0, centeringViewerTrigger: Int = 0,
     zoomInTrigger: Int = 0, zoomOutTrigger: Int = 0,
     lastGpsTs: Long = 0L, isTrackerMode: Boolean = false,
@@ -379,7 +393,6 @@ fun OsmMap(
     LaunchedEffect(zoomOutTrigger) { if (zoomOutTrigger > 0) mapViewRef.value?.controller?.zoomOut() }
 
     AndroidView(factory = { 
-        // Issue #005: configuration set once in Application. Re-setting here causes log spam.
         MapView(context).apply { 
             mapViewRef.value = this
             setTileSource(TileSourceFactory.MAPNIK)
@@ -435,7 +448,6 @@ fun OsmMap(
         val trackerValid = PhysicsUtils.isValidLocation(lat, lng)
         val meValid = myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)
 
-        // Issue #003: Optimized check to avoid redundant folder operations
         if (lastHomeRendered.value != home || lastFenceState.value != isFenceVisible) {
             fenceFolderRef.value?.items?.clear()
             val homeFolder = homeMarkersFolderRef.value!!
@@ -491,20 +503,18 @@ fun OsmMap(
 
         if (lastTrailRendered.value != trail || lastViewerTrailRendered.value != viewerTrail) {
             trailFolderRef.value?.items?.clear()
-            drawTrailToFolder(view, trailFolderRef.value!!, trail, BrandJd.toArgb(), Slate500.toArgb(), trackerPolylinePool)
+            val trSegs = drawTrailToFolder(view, trailFolderRef.value!!, trail, BrandJd.toArgb(), Slate500.toArgb(), trackerPolylinePool)
             
             viewerTrailFolderRef.value?.items?.clear()
-            drawTrailToFolder(view, viewerTrailFolderRef.value!!, viewerTrail, ViewerOrange.toArgb(), Slate500.toArgb(), viewerPolylinePool)
+            val viSegs = drawTrailToFolder(view, viewerTrailFolderRef.value!!, viewerTrail, ViewerOrange.toArgb(), Slate500.toArgb(), viewerPolylinePool)
             
             lastTrailRendered.value = trail.toList()
             lastViewerTrailRendered.value = viewerTrail.toList()
 
-            val trSegs = trail.count { it.isJump } + trail.count { it.isHindsightCorrected } + 1
             if (trackerPolylinePool.size > trSegs + MARKER_POOL_PRUNE_THRESHOLD) {
                 val keep = maxOf(trSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)
                 while(trackerPolylinePool.size > keep) trackerPolylinePool.removeAt(trackerPolylinePool.size - 1)
             }
-            val viSegs = viewerTrail.count { it.isJump } + viewerTrail.count { it.isHindsightCorrected } + 1
             if (viewerPolylinePool.size > viSegs + MARKER_POOL_PRUNE_THRESHOLD) {
                 val keep = maxOf(viSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)
                 while(viewerPolylinePool.size > keep) viewerPolylinePool.removeAt(viewerPolylinePool.size - 1)
@@ -545,9 +555,8 @@ fun OsmMap(
                 marker.icon = BitmapDrawable(resources, if (isJumpViolation) jumpBitmap else geofenceBitmap)
                 markerFolder.add(marker)
 
-                // R325: Render historical uncertainty circle for violations
-                val historicalAcc = if (v.maxAccuracy > 0f) v.maxAccuracy else v.accuracy
-                if (historicalAcc > 0f) {
+                val historicalAcc = if (v.maxAccuracy > 0.0) v.maxAccuracy else v.accuracy
+                if (historicalAcc > 0.0) {
                     val circle = if (index < violationCirclePool.size) {
                         violationCirclePool[index]
                     } else {
@@ -555,7 +564,7 @@ fun OsmMap(
                         violationCirclePool.add(p)
                         p
                     }
-                    val circlePoints = Polygon.pointsAsCircle(v.point, historicalAcc.toDouble())
+                    val circlePoints = Polygon.pointsAsCircle(v.point, historicalAcc)
                     circle.points = circlePoints.map { GeoPoint(it.latitude, it.longitude) }
                     circle.outlinePaint.color = (if (isJumpViolation) 0x60FF00FF else 0x60FF0000).toInt()
                     accuracyFolder.add(circle)
@@ -568,13 +577,12 @@ fun OsmMap(
 
         accuracyCirclesFolderRef.value?.items?.clear()
         if (trackerValid) {
-            val baseAcc = if (maxAcc > 0f) maxAcc else accuracy
-            if (baseAcc > 0f) {
+            val baseAcc = if (maxAcc > 0.0) maxAcc else accuracy
+            if (baseAcc > 0.0) {
                 trackerCircleRef.value?.let { p ->
                     val effectiveAccuracy = if (isLocationPending && lastValidFixRealtime > 0) {
-                        val elapsedSec = (systemPulseRealtime - lastValidFixRealtime) / 1000f
-                        // Issue #328: Velocity-Aware Bayesian Expansion
-                        val driftRate = if (speed > 1.0f) {
+                        val elapsedSec = (systemPulseRealtime - lastValidFixRealtime) / 1000.0
+                        val driftRate = if (speed > 1.0) {
                             speed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS)
                         } else {
                             PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS
@@ -584,7 +592,7 @@ fun OsmMap(
                         baseAcc
                     }
                     
-                    val circlePoints = Polygon.pointsAsCircle(GeoPoint(lat, lng), effectiveAccuracy.toDouble())
+                    val circlePoints = Polygon.pointsAsCircle(GeoPoint(lat, lng), effectiveAccuracy)
                     p.points = circlePoints.map { GeoPoint(it.latitude, it.longitude) }
                     p.outlinePaint.color = if (isFresh) BrandJd.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                     accuracyCirclesFolderRef.value?.add(p)
@@ -592,13 +600,12 @@ fun OsmMap(
             }
         }
         if (meValid && myAccuracy != null) {
-            val baseMyAcc = if (myMaxAcc > 0f) myMaxAcc else myAccuracy
-            if (baseMyAcc > 0f) {
+            val baseMyAcc = if (myMaxAcc > 0.0) myMaxAcc else myAccuracy
+            if (baseMyAcc > 0.0) {
                 viewerCircleRef.value?.let { p ->
                     val effectiveMyAccuracy = if (isMeLocationPending && meLastValidFixRealtime > 0) {
-                        val elapsedSec = (systemPulseRealtime - meLastValidFixRealtime) / 1000f
-                        // Issue #328: Velocity-Aware Bayesian Expansion
-                        val driftRate = if (mySpeed > 1.0f) {
+                        val elapsedSec = (systemPulseRealtime - meLastValidFixRealtime) / 1000.0
+                        val driftRate = if (mySpeed > 1.0) {
                             mySpeed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS)
                         } else {
                             PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS
@@ -608,7 +615,7 @@ fun OsmMap(
                         baseMyAcc
                     }
                     
-                    val circlePoints = Polygon.pointsAsCircle(GeoPoint(myLat!!, myLng!!), effectiveMyAccuracy.toDouble())
+                    val circlePoints = Polygon.pointsAsCircle(GeoPoint(myLat!!, myLng!!), effectiveMyAccuracy)
                     p.points = circlePoints.map { GeoPoint(it.latitude, it.longitude) }
                     p.outlinePaint.color = if (isMeFresh) ViewerOrange.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                     accuracyCirclesFolderRef.value?.add(p)
@@ -636,32 +643,33 @@ fun OsmMap(
     }, modifier = Modifier.fillMaxSize())
 }
 
-private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, colorNormal: Int, colorHindsight: Int, pool: SnapshotStateList<Polyline>) {
-    if (trailPoints.isNotEmpty()) {
-        var currentSegment = mutableListOf<GeoPoint>()
-        var isCurrentSegmentHindsight = false
-        var poolIdx = 0
-        
-        trailPoints.forEachIndexed { idx, pt -> 
-            if (pt.isJump) { 
-                if (currentSegment.isNotEmpty()) { 
-                    addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++); 
-                    currentSegment = mutableListOf() 
-                } 
-            } else {
-                if (idx > 0 && pt.isHindsightCorrected != isCurrentSegmentHindsight && currentSegment.isNotEmpty()) {
-                    addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++)
-                    currentSegment = mutableListOf()
-                    currentSegment.add(trailPoints[idx-1].toGeoPoint())
-                }
-                isCurrentSegmentHindsight = pt.isHindsightCorrected
-                currentSegment.add(pt.toGeoPoint())
+private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, colorNormal: Int, colorHindsight: Int, pool: SnapshotStateList<Polyline>): Int {
+    if (trailPoints.isEmpty()) return 0
+    
+    var currentSegment = mutableListOf<GeoPoint>()
+    var isCurrentSegmentHindsight = false
+    var poolIdx = 0
+    
+    trailPoints.forEachIndexed { idx, pt -> 
+        if (pt.isJump) { 
+            if (currentSegment.isNotEmpty()) { 
+                addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++); 
+                currentSegment = mutableListOf() 
+            } 
+        } else {
+            if (idx > 0 && pt.isHindsightCorrected != isCurrentSegmentHindsight && currentSegment.isNotEmpty()) {
+                addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++)
+                currentSegment = mutableListOf()
+                currentSegment.add(trailPoints[idx-1].toGeoPoint())
             }
-        }
-        if (currentSegment.isNotEmpty()) {
-            addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++)
+            isCurrentSegmentHindsight = pt.isHindsightCorrected
+            currentSegment.add(pt.toGeoPoint())
         }
     }
+    if (currentSegment.isNotEmpty()) {
+        addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++)
+    }
+    return poolIdx
 }
 
 private fun addTrailSegmentToFolder(view: MapView, folder: FolderOverlay, segment: List<GeoPoint>, color: Int, pool: SnapshotStateList<Polyline>, poolIdx: Int) {

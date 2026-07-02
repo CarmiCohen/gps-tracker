@@ -4,10 +4,13 @@ import kotlin.math.*
 
 /**
  * TelemetryUtils: Logic for scoring and evaluating signal quality.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized GpsIndexData and parameters 
+ *   to Double to eliminate redundant toDouble()/toFloat() conversions.
  * v8.8.21: Migrated from :app to :core:engine to ensure logic purity.
  */
 
-data class GpsIndexData(val ageIndex: Float, val accIndex: Float, val satsIndex: Float, val totalIndex: Float)
+data class GpsIndexData(val ageIndex: Double, val accIndex: Double, val satsIndex: Double, val totalIndex: Double)
 
 object TelemetryUtils {
 
@@ -24,17 +27,17 @@ object TelemetryUtils {
     /**
      * Calculates the GPS-Index based on age, accuracy, and satellite count.
      */
-    fun calculateGpsIndex(gpsAgeMs: Long, maxAccuracy: Float, satsUsed: Int): GpsIndexData {
+    fun calculateGpsIndex(gpsAgeMs: Long, maxAccuracy: Double, satsUsed: Int): GpsIndexData {
         if (gpsAgeMs < -30000L) {
-            return GpsIndexData(0f, 0f, 0f, 0f)
+            return GpsIndexData(0.0, 0.0, 0.0, 0.0)
         }
 
         val ageMsValue = maxOf(0L, gpsAgeMs)
         val ageSec = maxOf(0.1, ageMsValue / 1000.0)
         val ageIndex = if (ageSec <= GPS_INDEX_AGE_EXCELLENT_SEC) 1.0 else 1.0 / (ageSec / GPS_INDEX_AGE_SCALING).coerceAtLeast(1.0)
         
-        val accIndex = if (maxAccuracy > 0f) {
-            if (maxAccuracy <= GPS_INDEX_ACCURACY_EXCELLENT_METERS) 1.0 else (GPS_INDEX_ACCURACY_EXCELLENT_METERS.toDouble() / maxAccuracy.toDouble()).coerceIn(0.01, 1.0)
+        val accIndex = if (maxAccuracy > 0.0) {
+            if (maxAccuracy <= GPS_INDEX_ACCURACY_EXCELLENT_METERS) 1.0 else (GPS_INDEX_ACCURACY_EXCELLENT_METERS / maxAccuracy).coerceIn(0.01, 1.0)
         } else 0.001 
         
         val satsIndex = if (satsUsed >= GPS_INDEX_SATS_TARGET) 1.0 else {
@@ -42,8 +45,8 @@ object TelemetryUtils {
             if (diff <= 1.0) 1.0 else 1.0 / diff
         }
         
-        val total = ((ageIndex + accIndex + satsIndex) / 3.0).toFloat()
+        val total = (ageIndex + accIndex + satsIndex) / 3.0
         
-        return GpsIndexData(ageIndex.toFloat(), accIndex.toFloat(), satsIndex.toFloat(), total)
+        return GpsIndexData(ageIndex, accIndex, satsIndex, total)
     }
 }

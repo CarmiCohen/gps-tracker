@@ -4,16 +4,11 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: Unified physics and geodesic calculations for the Pure Logic Engine.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized accuracy and SNR to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  * v8.9.48:
- * - Issue #387: Logic Alignment - Jump Threshold. (Formerly #360-J)
- * v8.9.42:
- * - Issue #332: Adaptive Jump Confidence. Refined SNR-IMU correlation for Urban Canyons. 
- *   High SNR with zero vibration now triggers a higher score penalty. (Formerly #219)
- * - Issue #334: Hindsight Trajectory Correction. Implemented interpolateSegment 
- *   for hindsight rubber-banding. (Formerly #220)
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated interpolateSegment 
- *   to propagate accuracy/maxAccuracy context through hindsight segments.
- * - Alignment: Replaced hardcoded 5.0m/s with JUMP_GATE_SENSOR_MISMATCH_MPS.
+ * - Issue #387: Logic Alignment - Jump Threshold.
  */
 object PhysicsUtils {
 
@@ -58,7 +53,7 @@ object PhysicsUtils {
         return last + alpha * (current - last)
     }
 
-    fun smoothBearing(last: Float, current: Float, alpha: Float = 0.2f): Float {
+    fun smoothBearing(last: Double, current: Double, alpha: Double = 0.2): Double {
         var delta = current - last
         while (delta < -180) delta += 360
         while (delta > 180) delta -= 360
@@ -67,14 +62,12 @@ object PhysicsUtils {
 
     /**
      * Interpolates a segment between two points to prevent visual "teleporting".
-     * Part of Issue #334 / #327: Rubber-band smoothing for hindsight promotion.
-     * v8.9.42: Updated to propagate accuracy/maxAccuracy (Issue #325).
      */
     fun interpolateSegment(
         startLat: Double, startLng: Double, startTs: Long,
         endLat: Double, endLng: Double, endTs: Long,
-        startAcc: Float = 0f, startMaxAcc: Float = 0f,
-        endAcc: Float = 0f, endMaxAcc: Float = 0f,
+        startAcc: Double = 0.0, startMaxAcc: Double = 0.0,
+        endAcc: Double = 0.0, endMaxAcc: Double = 0.0,
         maxGapMeters: Double = 5.0
     ): List<EngineGeoPoint> {
         val dist = calculateDistance(startLat, startLng, endLat, endLng)
@@ -88,8 +81,8 @@ object PhysicsUtils {
             val interpLat = startLat + (endLat - startLat) * fraction
             val interpLng = startLng + (endLng - startLng) * fraction
             val interpTs = startTs + ((endTs - startTs) * fraction).toLong()
-            val interpAcc = startAcc + (endAcc - startAcc) * fraction.toFloat()
-            val interpMaxAcc = startMaxAcc + (endMaxAcc - startMaxAcc) * fraction.toFloat()
+            val interpAcc = startAcc + (endAcc - startAcc) * fraction
+            val interpMaxAcc = startMaxAcc + (endMaxAcc - startMaxAcc) * fraction
             
             result.add(EngineGeoPoint(
                 interpLat, interpLng, ts = interpTs, 
@@ -105,8 +98,8 @@ object PhysicsUtils {
     fun isVisualJump(
         lastLat: Double, lastLng: Double, 
         newLat: Double, newLng: Double, 
-        timeDeltaMs: Long, accuracy: Float,
-        snr: Float = 0f,
+        timeDeltaMs: Long, accuracy: Double,
+        snr: Double = 0.0,
         lastSpeedMps: Double = 0.0,
         isParking: Boolean = false,
         altitudeDelta: Double = 0.0,

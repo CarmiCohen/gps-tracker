@@ -2,6 +2,7 @@ package com.gps19.app
 
 import com.gps19.core.engine.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import org.json.JSONObject
 import org.osmdroid.util.GeoPoint
 import java.text.SimpleDateFormat
@@ -9,12 +10,11 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * v8.9.43:
- * - Issue #013: Forensic UI Expansion. Added proximityDebounceMs and 
- *   vibrationRollingSum to TrackerStatus, LocationState, and DashboardState.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added accuracy and 
- *   maxAccuracy to TrailPoint for forensic path reconstruction.
+ * v8.9.78:
+ * - Issue #016: Performance Optimization. Added lazy GeoPoint caching to TrailPoint 
+ *   to eliminate thousands of object allocations per second during map updates.
+ * v8.9.77:
+ * - Issue #018: Stationary Anchor Hard-Lock. Added isAnchorLocked for forensic transparency.
  */
 
 @Serializable
@@ -31,10 +31,21 @@ data class TrailPoint(
     val timestamp: Long = 0L,
     val isJump: Boolean = false,
     val isHindsightCorrected: Boolean = false,
-    val accuracy: Float = 0f,
-    val maxAccuracy: Float = 0f
+    val accuracy: Double = 0.0,
+    val maxAccuracy: Double = 0.0
 ) {
-    fun toGeoPoint() = GeoPoint(lat, lng)
+    @Transient
+    private var _cachedGeoPoint: GeoPoint? = null
+
+    fun toGeoPoint(): GeoPoint {
+        val cached = _cachedGeoPoint
+        if (cached != null && cached.latitude == lat && cached.longitude == lng) {
+            return cached
+        }
+        val newPoint = GeoPoint(lat, lng)
+        _cachedGeoPoint = newPoint
+        return newPoint
+    }
 }
 
 @Serializable
@@ -69,24 +80,25 @@ data class ConnectionPoint(
     val localId: String = UUID.randomUUID().toString(),
     val ts: Long, val rtt: Int, val localSig: Int, val remoteSig: Int,
     val isConnected: Boolean, val isGap: Boolean = false, 
-    val gpsAccuracy: Float = 0f,
-    val maxAccuracy: Float = 0f,
-    val isTick: Boolean = false, val hasGps: Boolean = false, val gpsIndex: Float = 0f,
-    val noiseIdx: Float = 0f, val luxIdx: Float = 0f, val vibeIdx: Float = 0f, val proxIdx: Float = 1f,
-    val liftIdx: Float = 0f, val snrIdx: Float = 0f,
-    val tiltIdx: Float = 0f, val baroIdx: Float = 0f,
-    val verticalVelocity: Float = 0f,
-    val sitVz: Float = 0f, val sitVzTs: Long = 0L, val sitDz: Float = 0f,
+    val gpsAccuracy: Double = 0.0,
+    val maxAccuracy: Double = 0.0,
+    val isTick: Boolean = false, val hasGps: Boolean = false, val gpsIndex: Double = 0.0,
+    val noiseIdx: Double = 0.0, val luxIdx: Double = 0.0, val vibeIdx: Double = 0.0, val proxIdx: Double = 1.0,
+    val liftIdx: Double = 0.0, val snrIdx: Double = 0.0,
+    val tiltIdx: Double = 0.0, val baroIdx: Double = 0.0,
+    val verticalVelocity: Double = 0.0,
+    val sitVz: Double = 0.0, val sitVzTs: Long = 0L, val sitDz: Double = 0.0,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val speed: Float = 0f, val bearing: Float = 0f,
+    val speed: Double = 0.0, val bearing: Double = 0.0,
     val isSitDetected: Boolean = false,
     val isSitActive: Boolean = false,
-    val sitBaro: Float = 0f,
-    val sitTilt: Float = 0f,
-    val sitShock: Float = 0f,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0,
     val currentMa: Int = 0,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    val isAnchorLocked: Boolean = false
 )
 
 data class ViolationPoint(
@@ -94,8 +106,8 @@ data class ViolationPoint(
     val point: GeoPoint, 
     val type: String, 
     val ts: Long,
-    val accuracy: Float = 0f,
-    val maxAccuracy: Float = 0f
+    val accuracy: Double = 0.0,
+    val maxAccuracy: Double = 0.0
 )
 
 @Serializable
@@ -111,10 +123,10 @@ data class LogEntry(
     val role: String = "tracker",
     val lat: Double = 0.0,
     val lng: Double = 0.0,
-    val accuracy: Float = 0f,
-    val maxAccuracy: Float = 0f,
-    val snrSnapshot: Float? = null,
-    val vibeSnapshot: Float? = null
+    val accuracy: Double = 0.0,
+    val maxAccuracy: Double = 0.0,
+    val snrSnapshot: Double? = null,
+    val vibeSnapshot: Double? = null
 ) {
     fun toJSONObject(): JSONObject {
         return JSONObject().apply {
@@ -128,12 +140,12 @@ data class LogEntry(
             put("role", role)
             if (lat != 0.0) put("lat", lat)
             if (lng != 0.0) put("lng", lng)
-            if (accuracy != 0f) put("accuracy", accuracy.toDouble())
-            if (maxAccuracy != 0f) put("max_accuracy", maxAccuracy.toDouble())
+            if (accuracy != 0.0) put("accuracy", accuracy)
+            if (maxAccuracy != 0.0) put("max_accuracy", maxAccuracy)
             specialColor?.let { put("special_color", it) }
             extremeValue?.let { if (!it.isNaN() && !it.isInfinite()) put("extreme_value", it) }
-            snrSnapshot?.let { put("snr_snapshot", it.toDouble()) }
-            vibeSnapshot?.let { put("vibe_snapshot", it.toDouble()) }
+            snrSnapshot?.let { put("snr_snapshot", it) }
+            vibeSnapshot?.let { put("vibe_snapshot", it) }
         }
     }
 
@@ -162,10 +174,10 @@ data class LogEntry(
                 } else null,
                 lat = obj.optDouble("lat", 0.0),
                 lng = obj.optDouble("lng", 0.0),
-                accuracy = obj.optDouble("accuracy", 0.0).toFloat(),
-                maxAccuracy = obj.optDouble("max_accuracy", 0.0).toFloat(),
-                snrSnapshot = if (obj.has("snr_snapshot")) obj.optDouble("snr_snapshot").toFloat() else null,
-                vibeSnapshot = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot").toFloat() else null
+                accuracy = obj.optDouble("accuracy", 0.0),
+                maxAccuracy = obj.optDouble("max_accuracy", 0.0),
+                snrSnapshot = if (obj.has("snr_snapshot")) obj.optDouble("snr_snapshot") else null,
+                vibeSnapshot = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot") else null
             )
         }
     }
@@ -178,10 +190,10 @@ data class TrackerStatus(
     override val lat: Double = 0.0,
     override val lng: Double = 0.0,
     override val alt: Double = 0.0,
-    val speed: Float = 0f,
-    val bearing: Float = 0f,
-    val accuracy: Float = 0f,
-    val maxAccuracy: Float = 0f,
+    val speed: Double = 0.0,
+    val bearing: Double = 0.0,
+    val accuracy: Double = 0.0,
+    val maxAccuracy: Double = 0.0,
     override val gpsTs: Long = 0L,
     override val ts: Long = 0L,
     val uptimeMs: Long = 0L,
@@ -193,43 +205,43 @@ data class TrackerStatus(
     val totalConnectedMs: Long = 0L,
     val sessionConnectedMs: Long = 0L,
     val battery: Int = 100,
-    val temp: Float = 0f,
-    val maxTemp: Float = 0f,
+    val temp: Double = 0.0,
+    val maxTemp: Double = 0.0,
     val isCharging: Boolean = false,
     val currentMa: Int = 0,
     val satsView: Int = 0,
     val satsUsed: Int = 0,
-    val peakVibrationShock: Float = 0f,
+    val peakVibrationShock: Double = 0.0,
     val peakVibrationShockTs: Long = 0L,
     val isPowerTamper: Boolean = false,
     val violationUptimeMs: Long = 0L,
-    val violationPercentage: Float = 0f,
+    val violationPercentage: Double = 0.0,
     val isSitDetected: Boolean = false,
     val isSitActive: Boolean = false,
     val lastSitTs: Long = 0L,
-    val verticalVelocity: Float = 0f,
-    val sitVz: Float = 0f,
+    val verticalVelocity: Double = 0.0,
+    val sitVz: Double = 0.0,
     val sitVzTs: Long = 0L,
-    val sitDz: Float = 0f,
-    val sitBaro: Float = 0f,
-    val sitTilt: Float = 0f,
-    val sitShock: Float = 0f,
+    val sitDz: Double = 0.0,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0,
     val isSuspicious: Boolean = false,
     val isTamperDetected: Boolean = false,
-    val vibration: Float = 0f,
-    val heading: Float = 0f,
-    val tiltDegrees: Float = 0f,
+    val vibration: Double = 0.0,
+    val heading: Double = 0.0,
+    val tiltDegrees: Double = 0.0,
     val acousticDb: Double = 0.0,
-    val baroAlt: Float = 0f,
-    val lux: Float = 0f,
+    val baroAlt: Double = 0.0,
+    val lux: Double = 0.0,
     val isNear: Boolean = true,
-    val luxBaseline: Float = 0f,
+    val luxBaseline: Double = 0.0,
     val acousticFloorDb: Double = 0.0,
-    val adaptiveVibrationFloor: Float = 0.12f,
-    val proxIdx: Float = 1.0f,
-    val proximityCm: Float = -1f,
+    val adaptiveVibrationFloor: Double = 0.12,
+    val proxIdx: Double = 1.0,
+    val proximityCm: Double = -1.0,
     val proximityDebounceMs: Long = 0L,
-    val vibrationRollingSum: Float = 0f,
+    val vibrationRollingSum: Double = 0.0,
     val isClockRegression: Boolean = false,
     val isStalled: Boolean = false,
     val isJammer: Boolean = false,
@@ -245,11 +257,12 @@ data class TrackerStatus(
     val isStorageLow: Boolean = false,
     val isStorageCritical: Boolean = false,
     val gnssDetail: GnssDetail? = null,
-    val snrIdx: Float = 0f,
-    val tiltIdx: Float = 0f,
-    val baroIdx: Float = 0f,
+    val snrIdx: Double = 0.0,
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
     val isBatterySteepDischarge: Boolean = false,
-    val isCoolingModeActive: Boolean = false
+    val isCoolingModeActive: Boolean = false,
+    val isAnchorLocked: Boolean = false
 ) : SpatialAnchor {
     fun toJSONObject(fromViewer: Boolean): JSONObject {
         return JSONObject().apply {
@@ -259,10 +272,10 @@ data class TrackerStatus(
             put("lat", lat)
             put("lng", lng)
             put("alt", alt)
-            put("speed", speed.toDouble())
-            put("bearing", bearing.toDouble())
-            put("accuracy", accuracy.toDouble())
-            put("max_accuracy", maxAccuracy.toDouble())
+            put("speed", speed)
+            put("bearing", bearing)
+            put("accuracy", accuracy)
+            put("max_accuracy", maxAccuracy)
             put("gps_ts", gpsTs)
             put("ts", ts)
             put("uptime_ms", uptimeMs)
@@ -274,43 +287,43 @@ data class TrackerStatus(
             put("total_connected_ms", totalConnectedMs)
             put("session_connected_ms", sessionConnectedMs)
             put("battery", battery)
-            put("temp", temp.toDouble())
-            put("max_temp", maxTemp.toDouble())
+            put("temp", temp)
+            put("max_temp", maxTemp)
             put("is_charging", isCharging)
             put("current_ma", currentMa)
             put("sats_view", satsView)
             put("sats_used", satsUsed)
-            put("peak_vibration_shock", peakVibrationShock.toDouble())
+            put("peak_vibration_shock", peakVibrationShock)
             put("peak_shock_ts", peakVibrationShockTs)
             put("is_power_tamper", isPowerTamper)
             put("violation_uptime_ms", violationUptimeMs)
-            put("violation_percentage", violationPercentage.toDouble())
+            put("violation_percentage", violationPercentage)
             put("is_sit_detected", isSitDetected)
             put("is_sit_active", isSitActive)
             put("last_sit_ts", lastSitTs)
-            put("vertical_velocity", verticalVelocity.toDouble())
-            put("sit_vz", sitVz.toDouble())
+            put("vertical_velocity", verticalVelocity)
+            put("sit_vz", sitVz)
             put("sit_vz_ts", sitVzTs)
-            put("sit_dz", sitDz.toDouble())
-            put("sit_baro", sitBaro.toDouble())
-            put("sit_tilt", sitTilt.toDouble())
-            put("sit_shock", sitShock.toDouble())
+            put("sit_dz", sitDz)
+            put("sit_baro", sitBaro)
+            put("sit_tilt", sitTilt)
+            put("sit_shock", sitShock)
             put("is_suspicious", isSuspicious)
             put("is_tamper_detected", isTamperDetected)
-            put("vibration", vibration.toDouble())
-            put("heading", heading.toDouble())
-            put("tilt_degrees", tiltDegrees.toDouble())
+            put("vibration", vibration)
+            put("heading", heading)
+            put("tilt_degrees", tiltDegrees)
             put("acoustic_db", acousticDb)
-            put("baro_alt", baroAlt.toDouble())
-            put("lux", lux.toDouble())
+            put("baro_alt", baroAlt)
+            put("lux", lux)
             put("is_near", isNear)
-            put("lux_baseline", luxBaseline.toDouble())
+            put("lux_baseline", luxBaseline)
             put("acoustic_floor_db", acousticFloorDb)
-            put("adaptive_vibration_floor", adaptiveVibrationFloor.toDouble())
-            put("prox_idx", proxIdx.toDouble())
-            put("proximity_cm", proximityCm.toDouble())
+            put("adaptive_vibration_floor", adaptiveVibrationFloor)
+            put("prox_idx", proxIdx)
+            put("proximity_cm", proximityCm)
             put("proximity_debounce_ms", proximityDebounceMs)
-            put("vibration_rolling_sum", vibrationRollingSum.toDouble())
+            put("vibration_rolling_sum", vibrationRollingSum)
             put("is_clock_regression", isClockRegression)
             put("is_stalled", isStalled)
             put("is_jammer", isJammer)
@@ -325,11 +338,12 @@ data class TrackerStatus(
             put("net_interface", netInterface)
             put("is_storage_low", isStorageLow)
             put("is_storage_critical", isStorageCritical)
-            put("snr_idx", snrIdx.toDouble())
-            put("tilt_idx", tiltIdx.toDouble())
-            put("baro_idx", baroIdx.toDouble())
+            put("snr_idx", snrIdx)
+            put("tilt_idx", tiltIdx)
+            put("baro_idx", baroIdx)
             put("is_battery_steep_discharge", isBatterySteepDischarge)
             put("is_cooling_mode_active", isCoolingModeActive)
+            put("is_anchor_locked", isAnchorLocked)
         }
     }
 }
@@ -341,10 +355,10 @@ enum class TrackerState { MOVING, PARKING, JUMPING, OFFLINE, UNKNOWN }
 data class LocationState(
     val lat: Double = 0.0,
     val lng: Double = 0.0,
-    val speed: Float = 0f,
-    val accuracy: Float = 0f,
-    val maxAccuracy: Float = 0f,
-    val bearing: Float = 0f,
+    val speed: Double = 0.0,
+    val accuracy: Double = 0.0,
+    val maxAccuracy: Double = 0.0,
+    val bearing: Double = 0.0,
     val timestamp: Long = 0L,
     val telemetryTs: Long = 0L, 
     val isVisualJump: Boolean = false,
@@ -352,36 +366,36 @@ data class LocationState(
     val jumpTier: Int = 0,
     val isJammer: Boolean = false,
     val isStalled: Boolean = false,
-    val vibration: Float = 0f,
-    val heading: Float = 0f,
-    val tiltDegrees: Float = 0f,
+    val vibration: Double = 0.0,
+    val heading: Double = 0.0,
+    val tiltDegrees: Double = 0.0,
     val acousticDb: Double = 0.0,
-    val baroAlt: Float = 0f,
-    val lux: Float = 0f,
+    val baroAlt: Double = 0.0,
+    val lux: Double = 0.0,
     val isNear: Boolean = true,
     val isSuspicious: Boolean = false,
     val isTamperDetected: Boolean = false,
-    val peakVibrationShock: Float = 0f,
+    val peakVibrationShock: Double = 0.0,
     val peakVibrationShockTs: Long = 0L,
-    val luxBaseline: Float = 0f,
+    val luxBaseline: Double = 0.0,
     val acousticFloorDb: Double = 0.0,
-    val adaptiveVibrationFloor: Float = 0.12f,
-    val proxIdx: Float = 1.0f,
-    val proximityCm: Float = -1.0f,
+    val adaptiveVibrationFloor: Double = 0.12,
+    val proxIdx: Double = 1.0,
+    val proximityCm: Double = -1.0,
     val proximityDebounceMs: Long = 0L,
-    val vibrationRollingSum: Float = 0f,
+    val vibrationRollingSum: Double = 0.0,
     val micPending: Boolean = false,
     val isPowerTamper: Boolean = false,
     val violationUptimeMs: Long = 0L,
-    val violationPercentage: Float = 0f,
+    val violationPercentage: Double = 0.0,
     val isSitDetected: Boolean = false,
     val isSitActive: Boolean = false,
     val lastSitTs: Long = 0L,
-    val verticalVelocity: Float = 0f,
-    val sitVz: Float = 0f, val sitVzTs: Long = 0L, val sitDz: Float = 0f,
-    val sitBaro: Float = 0f,
-    val sitTilt: Float = 0f,
-    val sitShock: Float = 0f,
+    val verticalVelocity: Double = 0.0,
+    val sitVz: Double = 0.0, val sitVzTs: Long = 0L, val sitDz: Double = 0.0,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
@@ -392,12 +406,13 @@ data class LocationState(
     val isStorageLow: Boolean = false,
     val isStorageCritical: Boolean = false,
     val gnssDetail: GnssDetail? = null,
-    val snrIdx: Float = 0f,
-    val tiltIdx: Float = 0f,
-    val baroIdx: Float = 0f,
+    val snrIdx: Double = 0.0,
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val currentMa: Int = 0
+    val currentMa: Int = 0,
+    val isAnchorLocked: Boolean = false
 )
 
 data class DashboardState(
@@ -472,7 +487,8 @@ data class DashboardState(
     val isLinkVisible: Boolean = true,   
     val isBatterySteepDischarge: Boolean = false, 
     val isCoolingModeActive: Boolean = false,
-    val currentMa: String = "--"
+    val currentMa: String = "--",
+    val isAnchorLocked: Boolean = false
 )
 
 sealed class UiEvent {
@@ -568,7 +584,7 @@ sealed class UiCommand {
 data class IntegrityState(
     val signalLoss: Boolean = false, val gpsStalled: Boolean = false, val jammerSuspicion: Boolean = false,
     val localInternetLoss: Boolean = false, val isHardwareOnline: Boolean = true, val batteryLevel: Int = 100,
-    val batteryTemp: Float = 0f, val maxTemp: Float = 0f, val isCharging: Boolean = false, val currentMa: Int = 0,
+    val batteryTemp: Double = 0.0, val maxTemp: Double = 0.0, val isCharging: Boolean = false, val currentMa: Int = 0,
     val activeAlarmsJson: String? = null,
     val isSuspicious: Boolean = false,
     val isTamperDetected: Boolean = false,
@@ -577,12 +593,12 @@ data class IntegrityState(
     val isSitDetected: Boolean = false,
     val isSitActive: Boolean = false,
     val lastSitTs: Long = 0L,
-    val sitVz: Float = 0f,
+    val sitVz: Double = 0.0,
     val sitVzTs: Long = 0L,
-    val sitDz: Float = 0f,
-    val sitBaro: Float = 0f,
-    val sitTilt: Float = 0f,
-    val sitShock: Float = 0f,
+    val sitDz: Double = 0.0,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
@@ -594,19 +610,20 @@ data class IntegrityState(
     val isStorageCritical: Boolean = false,
     val isBatterySteepDischarge: Boolean = false, 
     val isCoolingModeActive: Boolean = false,
-    val tiltIdx: Float = 0f,
-    val baroIdx: Float = 0f
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
+    val isAnchorLocked: Boolean = false
 )
 
 data class StatsState(
     val totalConnectedMs: Long = 0L, val sessionConnectedMs: Long = 0L,
     val maxDropMs: Long = 0L, val maxDropTs: Long = 0L, val totalDropMs: Long = 0L,
     val uptimeMs: Long = 0L, val lastConnTs: Long = 0L, val lastDiscTs: Long = 0L,
-    val violationUptimeMs: Long = 0L, val violationPercentage: Float = 0f
+    val violationUptimeMs: Long = 0L, val violationPercentage: Double = 0.0
 )
 
 data class BatteryState(
-    val level: Int = 100, val temp: Float = 0f, val isCharging: Boolean = false, val isChargingStable: Boolean = false
+    val level: Int = 100, val temp: Double = 0.0, val isCharging: Boolean = false, val isChargingStable: Boolean = false
 )
 
 data class ConnectivityState(
@@ -640,6 +657,7 @@ data class IntegrityStateUi(
     val isBatterySteepDischarge: Boolean = false, 
     val isCoolingModeActive: Boolean = false,
     val currentMa: Int = 0,
-    val tiltIdx: Float = 0f,
-    val baroIdx: Float = 0f
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
+    val isAnchorLocked: Boolean = false
 )

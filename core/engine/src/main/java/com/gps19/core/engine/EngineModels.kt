@@ -4,8 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * v8.9.68:
- * - Issue #011: Added suppressionNote to SentinelResult for forensic transparency.
+ * v8.9.77:
+ * - Issue #018: Stationary Anchor Hard-Lock. Added isAnchorLocked to 
+ *   EngineConnectionPoint for forensic audit.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions across module boundaries.
  */
 
 @Serializable
@@ -13,8 +17,8 @@ data class EngineGeoPoint(
     val lat: Double, 
     val lng: Double, 
     val ts: Long = 0L,
-    val accuracy: Float = 0f,
-    val maxAccuracy: Float = 0f
+    val accuracy: Double = 0.0,
+    val maxAccuracy: Double = 0.0
 )
 
 enum class DiscoveryPhase {
@@ -60,33 +64,34 @@ data class EngineConnectionPoint(
     val isConnected: Boolean,
     val isGap: Boolean = false,
     val hasGps: Boolean = false,
-    val gpsIndex: Float = 0f,
-    val accuracy: Float = 0f,
-    val maxAccuracy: Float = 0f,
-    val noiseIdx: Float = 0f,
-    val luxIdx: Float = 0f,
-    val vibeIdx: Float = 0f,
-    val proxIdx: Float = 1f,
-    val liftIdx: Float = 0f,
-    val snrIdx: Float = 0f,
-    val tiltIdx: Float = 0f,
-    val baroIdx: Float = 0f,
-    val verticalVelocity: Float = 0f,
-    val sitVz: Float = 0f,
+    val gpsIndex: Double = 0.0,
+    val accuracy: Double = 0.0,
+    val maxAccuracy: Double = 0.0,
+    val noiseIdx: Double = 0.0,
+    val luxIdx: Double = 0.0,
+    val vibeIdx: Double = 0.0,
+    val proxIdx: Double = 1.0,
+    val liftIdx: Double = 0.0,
+    val snrIdx: Double = 0.0,
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
+    val verticalVelocity: Double = 0.0,
+    val sitVz: Double = 0.0,
     val sitVzTs: Long = 0L,
-    val sitDz: Float = 0f,
-    val sitBaro: Float = 0f,
-    val sitTilt: Float = 0f,
-    val sitShock: Float = 0f,
+    val sitDz: Double = 0.0,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val speed: Float = 0f,
-    val bearing: Float = 0f,
+    val speed: Double = 0.0,
+    val bearing: Double = 0.0,
     val isSitDetected: Boolean = false,
     val isSitActive: Boolean = false,
     val isTick: Boolean = false,
     val currentMa: Int = 0,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    val isAnchorLocked: Boolean = false
 )
 
 enum class RibbonScale(val key: String, val intervalSeconds: Int) {
@@ -101,15 +106,15 @@ enum class RibbonScale(val key: String, val intervalSeconds: Int) {
 /**
  * Sensor and SNR snapshots for gap filling.
  */
-data class EngineSnrSample(val ts: Long, val snr: Float)
+data class EngineSnrSample(val ts: Long, val snr: Double)
 data class EngineSensorSnapshot(
     val ts: Long,
     val acoustic: Double,
-    val lux: Float,
-    val vibe: Float,
-    val proxIdx: Float,
-    val lift: Float,
-    val tilt: Float,
+    val lux: Double,
+    val vibe: Double,
+    val proxIdx: Double,
+    val lift: Double,
+    val tilt: Double,
     val isSitDetected: Boolean
 )
 
@@ -136,7 +141,7 @@ data class JumpConfidence(
 @Serializable
 data class SatelliteInfo(
     val svid: Int,
-    val cn0: Float,
+    val cn0: Double,
     val usedInFix: Boolean,
     val constellation: Int
 )
@@ -153,8 +158,8 @@ data class RejectedPoint(
     val lat: Double,
     val lng: Double,
     val alt: Double,
-    val accuracy: Float,
-    val bearing: Float,
+    val accuracy: Double,
+    val bearing: Double,
     val speedMps: Double,
     val ts: Long
 )
@@ -199,17 +204,17 @@ data class AlarmEvaluationState(
     var powerAlarmPending: Boolean,
     val trackerLat: Double, 
     val trackerLng: Double, 
-    val trackerGpsAccuracy: Float,
-    val maxTrackerAccuracy: Float,
+    val trackerGpsAccuracy: Double,
+    val maxTrackerAccuracy: Double,
     val lastGpsPacketTs: Long,
-    val trackerLastValidFixTs: Long = 0L, // Added for Issue #431
-    val trackerSpeed: Float = 0f,
+    val trackerLastValidFixTs: Long = 0L, 
+    val trackerSpeed: Double = 0.0,
     val isTrackerVisualJump: Boolean = false,
     val isTrajectoryPromoted: Boolean = false,
     val jumpTier: Int = 0,
     val isAdaptiveJump: Boolean = false,
     val trackerBattery: Int, 
-    val trackerTemp: Float,
+    val trackerTemp: Double,
     var wasDistanceViolated: Boolean, 
     var distanceViolationCounter: Int, 
     var firstViolationTs: Long, 
@@ -220,20 +225,20 @@ data class AlarmEvaluationState(
     val isGpsGap: Boolean = false,
     val isSuspicious: Boolean = false,
     val isTamperDetected: Boolean = false,
-    val trackerTiltDegrees: Float = 0f,
+    val trackerTiltDegrees: Double = 0.0,
     val trackerAcousticDb: Double = 0.0,
-    val trackerBaroAlt: Float = 0f,
-    val trackerLux: Float = 0f,
+    val trackerBaroAlt: Double = 0.0,
+    val trackerLux: Double = 0.0,
     val isNear: Boolean = true,
-    val luxBaseline: Float = 0f,
+    val luxBaseline: Double = 0.0,
     val acousticFloorDb: Double = 0.0,
-    val adaptiveVibrationFloor: Float = 0.12f,
-    val peakVibrationShock: Float = 0f,
+    val adaptiveVibrationFloor: Double = 0.12,
+    val peakVibrationShock: Double = 0.0,
     val trackerCurrentMa: Int = 0,
     val isPowerTamper: Boolean = false,
     val isSitActive: Boolean = false,
     val lastSitTs: Long = 0L,
-    val verticalVelocity: Float = 0f,
+    val verticalVelocity: Double = 0.0,
     val sitVzTs: Long = 0L,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
@@ -248,5 +253,6 @@ data class AlarmEvaluationState(
     val isXiaomiDevice: Boolean = false,
     val xiaomiStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
     val xiaomiAutostartStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
-    val isXiaomiManualOverride: Boolean = false
+    val isXiaomiManualOverride: Boolean = false,
+    val isAnchorLocked: Boolean = false
 )

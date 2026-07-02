@@ -18,15 +18,11 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized parameters to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated addViolation, 
- *   violationsFlow, saveTrailPoint, and history persistence to include accuracy 
- *   and maxAccuracy for full forensic parity.
- * - Issue #326: Mapping locationPendingReason for HistoryEntity parity. (Formerly #245)
- * v8.9.19:
- * - Issue #222: Added isHindsightCorrected propagation to trail flows and save logic.
- * v8.9.10:
- * - Issue 208: Synchronized versioning and forensic logging baseline for release verification.
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -217,11 +213,11 @@ class MainRepository @Inject constructor(
     suspend fun loadDraftAlertSettings() = settings.loadDraftAlertSettings()
     fun clearDraftSettings() { scope.launch { settings.clearDraftSettings() } }
     
-    suspend fun saveDraftSettings(deviceId: String, viewerId: String, relayUrl: String, maxDistance: Float, alertSettings: AlertSettings) = settings.saveDraftSettings(deviceId, viewerId, relayUrl, maxDistance, alertSettings)
+    suspend fun saveDraftSettings(deviceId: String, viewerId: String, relayUrl: String, maxDistance: Double, alertSettings: AlertSettings) = settings.saveDraftSettings(deviceId, viewerId, relayUrl, maxDistance, alertSettings)
     suspend fun commitDraftSettings() = settings.commitDraftSettings()
     suspend fun hasPendingDrafts(): Boolean = settings.hasPendingDrafts()
 
-    suspend fun saveSettingsBulk(deviceId: String? = null, viewerId: String? = null, relayUrl: String? = null, maxDistance: Float? = null, alertSettings: AlertSettings? = null, homePoints: List<GeoPoint>? = null) = settings.saveSettingsBulk(deviceId, viewerId, relayUrl, maxDistance, alertSettings, homePoints)
+    suspend fun saveSettingsBulk(deviceId: String? = null, viewerId: String? = null, relayUrl: String? = null, maxDistance: Double? = null, alertSettings: AlertSettings? = null, homePoints: List<GeoPoint>? = null) = settings.saveSettingsBulk(deviceId, viewerId, relayUrl, maxDistance, alertSettings, homePoints)
 
     suspend fun saveSessionMetricsBulk(
         totalConnected: Long, uptime: Long, totalDrop: Long, 
@@ -235,7 +231,7 @@ class MainRepository @Inject constructor(
     fun clearLogs() { logRepository.clearLogs() }
     suspend fun loadAllLogsStatic(): List<LogEntry> = logRepository.loadAllLogsStatic()
 
-    fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, isJump: Boolean = false, timestamp: Long? = null, force: Boolean = false, isHindsightCorrected: Boolean = false, accuracy: Float = 0f, maxAccuracy: Float = 0f) {
+    fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, isJump: Boolean = false, timestamp: Long? = null, force: Boolean = false, isHindsightCorrected: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
         if (lat == 0.0 || lng == 0.0) return
         
         val integrity = telemetry.integrityState.value
@@ -282,7 +278,7 @@ class MainRepository @Inject constructor(
         offlineRepository.clear()
     }
 
-    fun addViolation(lat: Double, lng: Double, type: String, accuracy: Float = 0f, maxAccuracy: Float = 0f, adaptiveRadius: Double = 0.0, timestamp: Long? = null) {
+    fun addViolation(lat: Double, lng: Double, type: String, accuracy: Double = 0.0, maxAccuracy: Double = 0.0, adaptiveRadius: Double = 0.0, timestamp: Long? = null) {
         if (!violationProcessor.shouldRecordViolation(lat, lng, type, accuracy, maxAccuracy)) return
 
         val wallTs = timestamp ?: timeProvider.currentTimeMillis()

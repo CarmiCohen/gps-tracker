@@ -10,13 +10,12 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * v8.9.64:
- * - Fixed ConcurrentModificationException in updateAlarmsJson by synchronizing activeAlarms access.
- * v8.9.52:
- * - Issue #431: Bayesian Authority Sync. Propagating trackerLastValidFixTs.
- * - Issue #452: SNR Latch Parity. Propagating isAdaptiveJump for 6-min hold enforcement.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
+ * v8.9.77:
+ * - Issue #018: Stationary Anchor Hard-Lock. Propagating isAnchorLocked flag 
+ *   to AlarmEvaluationState.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized parameters to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  */
 class AppAlarmManager(
     private val context: Context,
@@ -24,7 +23,7 @@ class AppAlarmManager(
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
     private val timeProvider: TimeProvider,
-    private val onLogEvent: (String, String, Boolean, Double?, String?, Long, Boolean, Int?, Double, Double, Float, Float, Float?, Float?) -> Unit
+    private val onLogEvent: (String, String, Boolean, Double?, String?, Long, Boolean, Int?, Double, Double, Double, Double, Double?, Double?) -> Unit
 ) {
     private val activeAlarms = mutableMapOf<String, AlarmEvaluation>()
     private var lastAlarmsJson = "[]"
@@ -93,16 +92,16 @@ class AppAlarmManager(
         isTrackerVisualJump: Boolean,
         isTrajectoryPromoted: Boolean,
         jumpTier: Int = 0,
-        isAdaptiveJump: Boolean = false, // Added for Issue #452
+        isAdaptiveJump: Boolean = false,
         trackerLat: Double,
         trackerLng: Double,
-        trackerAccuracy: Float,
-        maxTrackerAccuracy: Float,
+        trackerAccuracy: Double,
+        maxTrackerAccuracy: Double,
         trackerLastGpsTs: Long,
         trackerLastValidFixTs: Long = 0L,
-        trackerSpeed: Float,
+        trackerSpeed: Double,
         trackerBattery: Int,
-        trackerTemp: Float,
+        trackerTemp: Double,
         isHardwareOnline: Boolean,
         isLocalInternetLoss: Boolean,
         isJammerSuspicion: Boolean,
@@ -115,16 +114,16 @@ class AppAlarmManager(
         isSuspicious: Boolean,
         isTamperDetected: Boolean,
         isPowerTamper: Boolean,
-        trackerTiltDegrees: Float,
+        trackerTiltDegrees: Double,
         trackerAcousticDb: Double,
-        trackerBaroAlt: Float,
-        trackerBaroAltEma: Float = 0f, 
-        trackerLux: Float,
+        trackerBaroAlt: Double,
+        trackerBaroAltEma: Double = 0.0, 
+        trackerLux: Double,
         isNear: Boolean,
-        luxBaseline: Float,
+        luxBaseline: Double,
         acousticFloorDb: Double,
-        adaptiveVibrationFloor: Float,
-        peakVibrationShock: Float,
+        adaptiveVibrationFloor: Double,
+        peakVibrationShock: Double,
         trackerCurrentMa: Int,
         isPowerSaveMode: Boolean = false,
         standbyBucket: Int = -1,
@@ -141,8 +140,9 @@ class AppAlarmManager(
         isSitActive: Boolean = false,
         isLocationPending: Boolean = false,
         locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-        snrSnapshot: Float? = null,
-        vibeSnapshot: Float? = null
+        snrSnapshot: Double? = null,
+        vibeSnapshot: Double? = null,
+        isAnchorLocked: Boolean = false
     ) {
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
         
@@ -177,7 +177,7 @@ class AppAlarmManager(
             isTrackerVisualJump = isTrackerVisualJump,
             isTrajectoryPromoted = isTrajectoryPromoted,
             jumpTier = jumpTier,
-            isAdaptiveJump = isAdaptiveJump, // Explicit mapping
+            isAdaptiveJump = isAdaptiveJump,
             trackerBattery = trackerBattery,
             trackerTemp = trackerTemp,
             wasDistanceViolated = wasDistanceViolated,
@@ -213,7 +213,8 @@ class AppAlarmManager(
             isXiaomiDevice = isXiaomiDevice,
             xiaomiStatus = xiaomiStatus,
             xiaomiAutostartStatus = xiaomiAutostartStatus,
-            isXiaomiManualOverride = isXiaomiManualOverride
+            isXiaomiManualOverride = isXiaomiManualOverride,
+            isAnchorLocked = isAnchorLocked
         )
 
         val report = MainAlarmLogic.detectViolations(evaluationState)

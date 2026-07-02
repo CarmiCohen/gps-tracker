@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized internal state to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  * v8.9.68:
  * - Issue #011: Implemented suppressionNote generation for forensic transparency 
  *   when A15-specific muzzles (coherence, threshold) are triggered.
@@ -22,21 +25,21 @@ class LocationSentinel {
     private var lastValidAlt: Double = 0.0
     private var lastValidTs: Long = 0L
     private var lastValidSpeedMps: Double = 0.0
-    private var lastValidBearing: Float = 0.0f
+    private var lastValidBearing: Double = 0.0
 
-    internal var currentVibrationIndex: Float = 0f
-    var peakVibrationShock: Float = 0f
+    internal var currentVibrationIndex: Double = 0.0
+    var peakVibrationShock: Double = 0.0
         private set
     var peakVibrationShockTs: Long = 0L
         private set
 
-    private var currentCompassHeading: Float = 0f
-    private var lastCompassHeading: Float = 0f
-    private var currentBaroAlt: Float = 0f
-    private var currentLux: Float = 0f
+    private var currentCompassHeading: Double = 0.0
+    private var lastCompassHeading: Double = 0.0
+    private var currentBaroAlt: Double = 0.0
+    private var currentLux: Double = 0.0
     private var isNear: Boolean = true
     private var isPowerTamper: Boolean = false
-    var currentTiltDegrees: Float = 0f
+    var currentTiltDegrees: Double = 0.0
         private set
     var currentAcousticDb: Double = 0.0
         private set
@@ -48,14 +51,14 @@ class LocationSentinel {
         
     var lastSitTs: Long = 0L 
     var lastSitRealtime: Long = 0L 
-    var baselineSitTilt: Float = -1f
+    var baselineSitTilt: Double = -1.0
     
-    var lastSitVz: Float = 0f
+    var lastSitVz: Double = 0.0
     var lastSitVzTs: Long = 0L
-    var lastSitDz: Float = 0f
-    var lastSitBaro: Float = 0f
-    var lastSitTilt: Float = 0f
-    var lastSitShock: Float = 0f
+    var lastSitDz: Double = 0.0
+    var lastSitBaro: Double = 0.0
+    var lastSitTilt: Double = 0.0
+    var lastSitShock: Double = 0.0
 
     private var sitDetectionCooldownTs: Long = 0L 
     private var stationaryStartTs: Long = 0L 
@@ -64,46 +67,45 @@ class LocationSentinel {
     private var gpsMotionStartTs: Long = 0L 
 
     // Dynamic Baselines
-    var luxBaseline: Float = -1f
+    var luxBaseline: Double = -1.0
         private set
-    var baroBaseline: Float = -1000f
+    var baroBaseline: Double = -1000.0
         private set
     var acousticFloorDb: Double = -1.0
         private set
-    var adaptiveVibrationFloor: Float = INITIAL_VIBRATION_FLOOR
+    var adaptiveVibrationFloor: Double = INITIAL_VIBRATION_FLOOR
         internal set
         
     private var lastAcousticContractionRealtime: Long = 0L
 
-    private var lastSnr: Float = 0f
+    private var lastSnr: Double = 0.0
     private var lastSatsUsed: Int = 0
 
-    private fun safeF(v: Float): Float = if (v.isNaN() || v.isInfinite()) 0f else v
     private fun safeD(v: Double): Double = if (v.isNaN() || v.isInfinite()) 0.0 else v
 
     fun setSpatialAnchor(lat: Double, lng: Double, alt: Double, timestamp: Long) {
         lastValidLat = lat; lastValidLng = lng; lastValidAlt = alt; lastValidTs = timestamp
-        immFilter.update(lat, lng, 10f, timestamp) 
+        immFilter.update(lat, lng, 10.0, timestamp) 
     }
 
     fun updateSensorState(
-        vibration: Float, 
-        heading: Float, 
-        baroAlt: Float, 
-        lux: Float = 0f, 
+        vibration: Double, 
+        heading: Double, 
+        baroAlt: Double, 
+        lux: Double = 0.0, 
         isNear: Boolean = true, 
         powerTamper: Boolean = false,
-        tiltDegrees: Float = 0f,
+        tiltDegrees: Double = 0.0,
         acousticDb: Double = 0.0,
-        peakShock: Float = 0f,
+        peakShock: Double = 0.0,
         acousticMinDb: Double = -1.0,
-        peakVerticalVelocity: Float = 0f,
+        peakVerticalVelocity: Double = 0.0,
         peakVerticalVelocityTs: Long = 0L,
         plungeMatched: Boolean = false,
-        peakVerticalDisplacement: Float = 0f,
+        peakVerticalDisplacement: Double = 0.0,
         isSirenActive: Boolean = false,
         isWarming: Boolean = false,
-        manualAdaptiveFloor: Float = -1f,
+        manualAdaptiveFloor: Double = -1.0,
         acousticLockoutTs: Long = 0L,
         isMuzzled: Boolean = false,
         isA15: Boolean = false,
@@ -113,7 +115,7 @@ class LocationSentinel {
         var baselineChanged = false
         
         this.lastCompassHeading = this.currentCompassHeading
-        this.currentVibrationIndex = safeF(vibration)
+        this.currentVibrationIndex = safeD(vibration)
         this.lastFastPathAcousticSpikeTs = acousticLockoutTs
         
         if (peakShock > this.peakVibrationShock && !peakShock.isNaN() && !isMuzzled) {
@@ -121,12 +123,12 @@ class LocationSentinel {
             this.peakVibrationShockTs = nowWall
         }
 
-        if (baselineSitTilt < -500f || baselineSitTilt == -1f) {
-            baselineSitTilt = safeF(tiltDegrees)
+        if (baselineSitTilt < -500.0 || baselineSitTilt == -1.0) {
+            baselineSitTilt = safeD(tiltDegrees)
             baselineChanged = true
         } else {
-            val tiltDelta = abs(safeF(tiltDegrees) - baselineSitTilt)
-            val baroDelta = if (baroBaseline > -999) abs(safeF(baroAlt) - baroBaseline) else 0f
+            val tiltDelta = abs(safeD(tiltDegrees) - baselineSitTilt)
+            val baroDelta = if (baroBaseline > -999.0) abs(safeD(baroAlt) - baroBaseline) else 0.0
             
             if (nowRealtime > sitDetectionCooldownTs && !isMuzzled) {
                 val isSpatialTriggered = (tiltDelta > CHAIR_SIT_TILT_THRESHOLD) || 
@@ -139,19 +141,19 @@ class LocationSentinel {
                     lastSitRealtime = nowRealtime
                     sitDetectionCooldownTs = nowRealtime + CHAIR_SIT_COOLDOWN_MS
                     
-                    lastSitVz = safeF(peakVerticalVelocity)
+                    lastSitVz = safeD(peakVerticalVelocity)
                     lastSitVzTs = peakVerticalVelocityTs
-                    lastSitDz = safeF(peakVerticalDisplacement)
-                    lastSitBaro = safeF(baroDelta)
-                    lastSitTilt = safeF(tiltDelta)
-                    lastSitShock = safeF(peakShock)
+                    lastSitDz = safeD(peakVerticalDisplacement)
+                    lastSitBaro = safeD(baroDelta)
+                    lastSitTilt = safeD(tiltDelta)
+                    lastSitShock = safeD(peakShock)
                 }
             }
 
             if (isStationary() && !isSitDetected) {
                 if (stationaryStartTs == 0L) stationaryStartTs = nowRealtime
                 else if (nowRealtime - stationaryStartTs > PASSIVE_ZEROING_STATIONARY_MS) {
-                    if (abs(baselineSitTilt - tiltDegrees) > 0.1f && !tiltDegrees.isNaN()) {
+                    if (abs(baselineSitTilt - tiltDegrees) > 0.1 && !tiltDegrees.isNaN()) {
                         baselineSitTilt = tiltDegrees
                         baselineChanged = true
                     }
@@ -162,12 +164,12 @@ class LocationSentinel {
             }
         }
 
-        this.currentCompassHeading = safeF(heading)
-        this.currentBaroAlt = safeF(baroAlt)
-        this.currentLux = safeF(lux)
+        this.currentCompassHeading = safeD(heading)
+        this.currentBaroAlt = safeD(baroAlt)
+        this.currentLux = safeD(lux)
         this.isNear = isNear
         this.isPowerTamper = powerTamper
-        this.currentTiltDegrees = safeF(tiltDegrees)
+        this.currentTiltDegrees = safeD(tiltDegrees)
         this.currentAcousticDb = safeD(acousticDb)
 
         if (luxBaseline < 0) {
@@ -180,16 +182,16 @@ class LocationSentinel {
                     if (isStationary()) LUX_EMA_UP_SLOW else if (isA15) LUX_EMA_UP_FAST_A15 else LUX_EMA_UP_FAST
                 }
                 val alpha = SentinelValidator.accelerateAlpha(baseAlpha, isWarming)
-                luxBaseline = (luxBaseline * (1f - alpha)) + (lux * alpha)
+                luxBaseline = (luxBaseline * (1.0 - alpha)) + (lux * alpha)
             }
         }
         
-        if (baroBaseline < -999) {
+        if (baroBaseline < -999.0) {
             if (!baroAlt.isNaN()) baroBaseline = baroAlt
         } else {
             if (!baroAlt.isNaN()) {
                 val alpha = SentinelValidator.accelerateAlpha(BARO_EMA_SLOW, isWarming)
-                baroBaseline = (baroBaseline * (1f - alpha)) + (baroAlt * alpha)
+                baroBaseline = (baroBaseline * (1.0 - alpha)) + (baroAlt * alpha)
             }
         }
 
@@ -201,10 +203,10 @@ class LocationSentinel {
                     acousticFloorDb = max(updateDb, ACOUSTIC_FLOOR_MIN_DB)
                 } else if (updateDb < acousticFloorDb) {
                     val alpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_DOWN_FAST, isWarming)
-                    acousticFloorDb = (acousticFloorDb * (1f - alpha)) + (updateDb * alpha) 
+                    acousticFloorDb = (acousticFloorDb * (1.0 - alpha)) + (updateDb * alpha) 
                 } else {
                     val alpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_UP_FAST, isWarming)
-                    acousticFloorDb = (acousticFloorDb * (1f - alpha)) + (updateDb * alpha)
+                    acousticFloorDb = (acousticFloorDb * (1.0 - alpha)) + (updateDb * alpha)
                 }
                 if (acousticFloorDb < ACOUSTIC_FLOOR_MIN_DB) acousticFloorDb = ACOUSTIC_FLOOR_MIN_DB
             }
@@ -222,10 +224,10 @@ class LocationSentinel {
             }
         }
         
-        if (manualAdaptiveFloor >= 0f) {
+        if (manualAdaptiveFloor >= 0.0) {
             this.adaptiveVibrationFloor = manualAdaptiveFloor
         } else if (!isMuzzled) { 
-            this.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(this.adaptiveVibrationFloor, vibration, isWarming)
+            this.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(this.adaptiveVibrationFloor.toFloat(), vibration.toFloat(), isWarming).toDouble()
         }
         
         return baselineChanged
@@ -238,7 +240,7 @@ class LocationSentinel {
     }
 
     fun resetChairBaseline() {
-        baselineSitTilt = -1f
+        baselineSitTilt = -1.0
     }
 
     fun getEstimatedSpeedKph(): Double = immFilter.getEstimatedSpeedKph()
@@ -250,10 +252,10 @@ class LocationSentinel {
     }
 
     fun processLocation(
-        lat: Double, lng: Double, alt: Double, accuracy: Float, 
-        maxAccuracy: Float, // Issue #461
-        bearing: Float,
-        snr: Float, satsUsed: Int, timestamp: Long, 
+        lat: Double, lng: Double, alt: Double, accuracy: Double, 
+        maxAccuracy: Double, 
+        bearing: Double,
+        snr: Double, satsUsed: Int, timestamp: Long, 
         bypassBehavioral: Boolean = false,
         isSuspicious: Boolean = false,
         isMuzzled: Boolean = false, 
@@ -292,13 +294,13 @@ class LocationSentinel {
         }
         
         val isTractorSlowOverride = gpsMotionStartTs > 0 && (nowRealtime - gpsMotionStartTs > 10000L)
-        val hasPhysicalMotion = if (isMuzzled) false else (currentVibrationIndex > (adaptiveVibrationFloor * 1.5f) || isTractorSlowOverride)
+        val hasPhysicalMotion = if (isMuzzled) false else (currentVibrationIndex > (adaptiveVibrationFloor * 1.5) || isTractorSlowOverride)
 
         val jumpConfidence = PhysicsUtils.isVisualJump(
             lastLat = lastValidLat, lastLng = lastValidLng,
             newLat = lat, newLng = lng,
-            timeDeltaMs = timeDeltaMs, accuracy = accuracy,
-            snr = snr,
+            timeDeltaMs = timeDeltaMs, accuracy = accuracy.toFloat(),
+            snr = snr.toFloat(),
             lastSpeedMps = lastValidSpeedMps,
             isParking = isParking,
             altitudeDelta = altitudeDelta,
@@ -364,7 +366,6 @@ class LocationSentinel {
                 val promoted = mutableListOf<EngineGeoPoint>()
                 gtoEngine.getWindow().forEach { p ->
                     val opt = immFilter.update(p.lat, p.lng, p.accuracy, p.ts, SUSPICIOUS_Q_SCALE)
-                    // Issue #461: Propagate accuracy context into promoted trajectory nodes
                     promoted.add(opt.copy(accuracy = p.accuracy, maxAccuracy = p.maxAccuracy))
                     updateLastValid(p.lat, p.lng, p.alt, p.ts, p.speedMps, p.bearing)
                 }
@@ -375,7 +376,6 @@ class LocationSentinel {
             }
 
             if (behavioralStatus == SentinelStatus.JUMP || behavioralStatus == SentinelStatus.JITTER) {
-                // Issue #461: Preserve maxAccuracy in the optimization window
                 gtoEngine.addPoint(lat, lng, alt, accuracy, maxAccuracy, bearing, currentSpeedMps, timestamp, currentVibrationIndex)
                 return SentinelResult(behavioralStatus, finalJumpConfidence.reason, jumpConfidence = finalJumpConfidence)
             }
@@ -386,7 +386,6 @@ class LocationSentinel {
                 behavioralReason = sensorSentinel.reason
             }
             
-            // Issue #011: Forensic Labeling
             if (sensorSentinel.status == SentinelStatus.VALID && sensorSentinel.suppressionNote != null) {
                 val effectiveQScale = if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0
                 val optimizedPoint = immFilter.update(lat, lng, accuracy, timestamp, effectiveQScale)
@@ -408,7 +407,7 @@ class LocationSentinel {
     }
 
     private fun runSensorSentinel(
-        lat: Double, lng: Double, alt: Double, accuracy: Float, bearing: Float,
+        lat: Double, lng: Double, alt: Double, accuracy: Double, bearing: Double,
         nowRealtime: Long,
         isMuzzled: Boolean = false,
         isA15: Boolean = false
@@ -416,12 +415,12 @@ class LocationSentinel {
         if (!isMuzzled) {
             if (!isNear) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Proximity Far")
             if (isPowerTamper) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Power disconnected")
-            if (SentinelValidator.isTiltViolated(currentTiltDegrees)) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Tilt detected")
-            if (SentinelValidator.isShockViolated(peakVibrationShock, adaptiveVibrationFloor)) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Shock detected")
+            if (SentinelValidator.isTiltViolated(currentTiltDegrees.toFloat())) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Tilt detected")
+            if (SentinelValidator.isShockViolated(peakVibrationShock.toFloat(), adaptiveVibrationFloor.toFloat())) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Shock detected")
             
-            if (baroBaseline > -999) {
+            if (baroBaseline > -999.0) {
                 val liftDelta = currentBaroAlt - baroBaseline
-                if (SentinelValidator.isAltitudeViolated(liftDelta)) {
+                if (SentinelValidator.isAltitudeViolated(liftDelta.toFloat())) {
                     if (currentVibrationIndex > VIBRATION_STATIONARY_THRESHOLD) {
                         return SentinelResult(SentinelStatus.TAMPER_ALERT, "Lift detected")
                     } else {
@@ -431,11 +430,10 @@ class LocationSentinel {
             }
         }
         
-        if (!isMuzzled && SentinelValidator.isLightViolated(currentLux, luxBaseline)) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Light jump")
+        if (!isMuzzled && SentinelValidator.isLightViolated(currentLux.toFloat(), luxBaseline.toFloat())) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Light jump")
 
         val isAcousticLockedOut = (lastFastPathAcousticSpikeTs > 0 && (nowRealtime - lastFastPathAcousticSpikeTs < ACOUSTIC_LOCKOUT_MS))
         
-        // Issue #011: Forensic Labeling for A15 Muzzles
         if (isA15 && !isMuzzled && !isAcousticLockedOut) {
             val jump = currentAcousticDb - acousticFloorDb
             val rawThreshold = ACOUSTIC_THRESHOLD_DB_JUMP
@@ -445,52 +443,52 @@ class LocationSentinel {
                 if (jump <= hardenedThreshold) {
                     return SentinelResult(SentinelStatus.VALID, suppressionNote = "Acoustic spike (${String.format(Locale.getDefault(), "%.1f", currentAcousticDb)}dB) muzzled by A15 hardware profile.")
                 }
-                if (currentVibrationIndex < 0.01f) {
+                if (currentVibrationIndex < 0.01) {
                     return SentinelResult(SentinelStatus.VALID, suppressionNote = "Acoustic alert (${String.format(Locale.getDefault(), "%.1f", currentAcousticDb)}dB) suppressed on A15 due to vibration incoherence.")
                 }
             }
         }
 
-        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex)) {
+        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex.toFloat())) {
             return SentinelResult(SentinelStatus.TAMPER_ALERT, "Acoustic alarm")
         }
 
-        if (!isMuzzled && SentinelValidator.isVibrationSuspicious(currentVibrationIndex, adaptiveVibrationFloor)) {
+        if (!isMuzzled && SentinelValidator.isVibrationSuspicious(currentVibrationIndex.toFloat(), adaptiveVibrationFloor.toFloat())) {
             return SentinelResult(SentinelStatus.SENSOR_SUSPICIOUS, "Vibration suspicion")
         }
         
-        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex)) {
+        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex.toFloat())) {
             return SentinelResult(SentinelStatus.ACOUSTIC_WARNING, "Acoustic suspicion")
         }
 
         return SentinelResult(SentinelStatus.VALID)
     }
 
-    fun isStationary(): Boolean = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
+    fun isStationary(): Boolean = SentinelValidator.isStationary(currentVibrationIndex.toFloat(), adaptiveVibrationFloor.toFloat())
 
     fun shouldThrottlePolling(providedIsStationary: Boolean? = null): Boolean {
         val stationary = providedIsStationary ?: isStationary()
         return stationary &&
                abs(currentCompassHeading - lastCompassHeading) < THROTTLE_COMPASS_LIMIT &&
-               (if (baroBaseline > -999) abs(currentBaroAlt - baroBaseline) < THROTTLE_BARO_LIMIT else true) &&
+               (if (baroBaseline > -999.0) abs(currentBaroAlt - baroBaseline) < THROTTLE_BARO_LIMIT else true) &&
                isNear && (currentLux - luxBaseline < THROTTLE_LUX_LIMIT) && !isPowerTamper &&
                currentTiltDegrees < THROTTLE_TILT_LIMIT && (currentAcousticDb - acousticFloorDb < THROTTLE_ACOUSTIC_LIMIT)
     }
 
-    private fun updateLastValid(lat: Double, lng: Double, alt: Double, ts: Long, speedMps: Double, bearing: Float) {
+    private fun updateLastValid(lat: Double, lng: Double, alt: Double, ts: Long, speedMps: Double, bearing: Double) {
         prevValidLat = lastValidLat; prevValidLng = lastValidLng
         lastValidLat = lat; lastValidLng = lng; lastValidAlt = alt; lastValidTs = ts
         lastValidSpeedMps = speedMps; lastValidBearing = bearing
     }
 
     fun reset() {
-        lastValidTs = 0L; currentVibrationIndex = 0f; currentBaroAlt = 0f; prevValidLat = 0.0; prevValidLng = 0.0
-        currentLux = 0f; isNear = true; isPowerTamper = false; currentTiltDegrees = 0f
-        currentAcousticDb = 0.0; luxBaseline = -1f; baroBaseline = -1000f; acousticFloorDb = -1.0
-        adaptiveVibrationFloor = INITIAL_VIBRATION_FLOOR; peakVibrationShock = 0f; peakVibrationShockTs = 0L
+        lastValidTs = 0L; currentVibrationIndex = 0.0; currentBaroAlt = 0.0; prevValidLat = 0.0; prevValidLng = 0.0
+        currentLux = 0.0; isNear = true; isPowerTamper = false; currentTiltDegrees = 0.0
+        currentAcousticDb = 0.0; luxBaseline = -1.0; baroBaseline = -1000.0; acousticFloorDb = -1.0
+        adaptiveVibrationFloor = INITIAL_VIBRATION_FLOOR; peakVibrationShock = 0.0; peakVibrationShockTs = 0L
         lastAcousticContractionRealtime = 0L
-        isSitDetected = false; lastSitTs = 0L; lastSitRealtime = 0L; baselineSitTilt = -1f; sitDetectionCooldownTs = 0L; stationaryStartTs = 0L
-        lastSitVz = 0f; lastSitVzTs = 0L; lastSitDz = 0f; lastSitBaro = 0f; lastSitTilt = 0f; lastSitShock = 0f
+        isSitDetected = false; lastSitTs = 0L; lastSitRealtime = 0L; baselineSitTilt = -1.0; sitDetectionCooldownTs = 0L; stationaryStartTs = 0L
+        lastSitVz = 0.0; lastSitVzTs = 0L; lastSitDz = 0.0; lastSitBaro = 0.0; lastSitTilt = 0.0; lastSitShock = 0.0
         gpsMotionStartTs = 0L
         lastFastPathAcousticSpikeTs = 0L
         gtoEngine.clear()

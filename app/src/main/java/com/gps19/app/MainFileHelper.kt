@@ -20,12 +20,11 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added accuracy and 
- *   maxAccuracy to trail and log exports for forensic parity. Updated import logic 
- *   to preserve forensic metrics during trail restoration.
- * v8.9.3:
- * - Issue 188: Preserved historical GPS timestamps in trail points during import/export.
+ * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
  */
 object MainFileHelper {
 
@@ -146,8 +145,8 @@ object MainFileHelper {
                                 for (i in 0 until arr.length()) {
                                     val obj = arr.getJSONObject(i)
                                     val ts = obj.optLong("timestamp", 0L)
-                                    val acc = obj.optDouble("accuracy", 0.0).toFloat()
-                                    val maxAcc = obj.optDouble("max_accuracy", 0.0).toFloat()
+                                    val acc = obj.optDouble("accuracy", 0.0)
+                                    val maxAcc = obj.optDouble("max_accuracy", 0.0)
                                     repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = false, timestamp = if (ts > 0) ts else null, force = true, accuracy = acc, maxAccuracy = maxAcc)
                                 }
                                 filePoints += arr.length()
@@ -157,8 +156,8 @@ object MainFileHelper {
                                 for (i in 0 until arr.length()) {
                                     val obj = arr.getJSONObject(i)
                                     val ts = obj.optLong("timestamp", 0L)
-                                    val acc = obj.optDouble("accuracy", 0.0).toFloat()
-                                    val maxAcc = obj.optDouble("max_accuracy", 0.0).toFloat()
+                                    val acc = obj.optDouble("accuracy", 0.0)
+                                    val maxAcc = obj.optDouble("max_accuracy", 0.0)
                                     repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = true, timestamp = if (ts > 0) ts else null, force = true, accuracy = acc, maxAccuracy = maxAcc)
                                 }
                                 filePoints += arr.length()
@@ -170,8 +169,8 @@ object MainFileHelper {
                             for (i in 0 until arr.length()) {
                                 val obj = arr.getJSONObject(i)
                                 val ts = obj.optLong("timestamp", 0L)
-                                val acc = obj.optDouble("accuracy", 0.0).toFloat()
-                                val maxAcc = obj.optDouble("max_accuracy", 0.0).toFloat()
+                                val acc = obj.optDouble("accuracy", 0.0)
+                                val maxAcc = obj.optDouble("max_accuracy", 0.0)
                                 repository.saveTrailPoint(obj.getDouble("lat"), obj.getDouble("lng"), isViewer = isViewer, timestamp = if (ts > 0) ts else null, force = true, accuracy = acc, maxAccuracy = maxAcc)
                             }
                             filePoints += arr.length()
@@ -332,8 +331,8 @@ object MainFileHelper {
                                 put("lng", pt.lng)
                                 put("timestamp", pt.timestamp)
                                 put("role", "tracker")
-                                if (pt.accuracy > 0) put("accuracy", pt.accuracy.toDouble())
-                                if (pt.maxAccuracy > 0) put("max_accuracy", pt.maxAccuracy.toDouble())
+                                if (pt.accuracy > 0) put("accuracy", pt.accuracy)
+                                if (pt.maxAccuracy > 0) put("max_accuracy", pt.maxAccuracy)
                             })
                         }
                     })
@@ -344,8 +343,8 @@ object MainFileHelper {
                                 put("lng", pt.lng)
                                 put("timestamp", pt.timestamp)
                                 put("role", "viewer")
-                                if (pt.accuracy > 0) put("accuracy", pt.accuracy.toDouble())
-                                if (pt.maxAccuracy > 0) put("max_accuracy", pt.maxAccuracy.toDouble())
+                                if (pt.accuracy > 0) put("accuracy", pt.accuracy)
+                                if (pt.maxAccuracy > 0) put("max_accuracy", pt.maxAccuracy)
                             })
                         }
                     })
@@ -409,8 +408,8 @@ object MainFileHelper {
                         put("lng", it.lng)
                         put("timestamp", it.timestamp)
                         put("role", source)
-                        if (it.accuracy > 0) put("accuracy", it.accuracy.toDouble())
-                        if (it.maxAccuracy > 0) put("max_accuracy", it.maxAccuracy.toDouble())
+                        if (it.accuracy > 0) put("accuracy", it.accuracy)
+                        if (it.maxAccuracy > 0) put("max_accuracy", it.maxAccuracy)
                     })
                 }
                 put("points", arr)

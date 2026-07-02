@@ -4,11 +4,12 @@ import kotlin.math.*
 
 /**
  * GtoEngine: Graph Trajectory Optimization.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized GtoNode fields to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  * v8.9.52:
  * - Issue #461: Forensic Parity. Updated GtoNode to preserve maxAccuracy context 
  *   during trajectory promotion. (Formerly #435)
- * v8.9.34:
- * - Issue #264: Consolidated magic numbers into EngineConstants.kt.
  */
 class GtoEngine {
 
@@ -19,17 +20,17 @@ class GtoEngine {
         val lat: Double,
         val lng: Double,
         val alt: Double,
-        val accuracy: Float,
-        val maxAccuracy: Float, // Added for forensic parity
-        val bearing: Float,
+        val accuracy: Double,
+        val maxAccuracy: Double, 
+        val bearing: Double,
         val speedMps: Double,
         val ts: Long,
-        val vibrationIndex: Float
+        val vibrationIndex: Double
     )
 
     fun addPoint(
-        lat: Double, lng: Double, alt: Double, accuracy: Float, maxAccuracy: Float,
-        bearing: Float, speedMps: Double, ts: Long, vibrationIndex: Float
+        lat: Double, lng: Double, alt: Double, accuracy: Double, maxAccuracy: Double,
+        bearing: Double, speedMps: Double, ts: Long, vibrationIndex: Double
     ) {
         window.removeAll { (ts - it.ts) > HINDSIGHT_MAX_AGE_MS }
         if (window.size >= maxWindowSize) {
@@ -38,7 +39,7 @@ class GtoEngine {
         window.add(GtoNode(lat, lng, alt, accuracy, maxAccuracy, bearing, speedMps, ts, vibrationIndex))
     }
 
-    fun evaluateTrajectory(newLat: Double, newLng: Double, newBearing: Float, newSpeedMps: Double, timestamp: Long): Boolean {
+    fun evaluateTrajectory(newLat: Double, newLng: Double, newBearing: Double, newSpeedMps: Double, timestamp: Long): Boolean {
         if (window.isEmpty()) return false
 
         val last = window.last()
@@ -50,7 +51,7 @@ class GtoEngine {
         
         if (timestamp <= last.ts || (timestamp - last.ts) > HINDSIGHT_MAX_AGE_MS) return false
         
-        val avgVibration = window.map { it.vibrationIndex }.average().toFloat()
+        val avgVibration = window.map { it.vibrationIndex }.average()
         val isTowSignature = avgVibration < VIBRATION_STATIONARY_THRESHOLD && newSpeedMps > GTO_TOW_SPEED_THRESHOLD
         val angularTolerance = if (isTowSignature) PROMOTION_ANGLE_TOLERANCE / 2.0 else PROMOTION_ANGLE_TOLERANCE
 

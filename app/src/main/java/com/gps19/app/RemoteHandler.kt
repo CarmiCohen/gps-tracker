@@ -16,14 +16,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
- * v8.9.72:
- * - Issue #015: Hardened coroutine cancellation handling. Ignoring CancellationException 
- *   during remote parsing or DB operations to prevent shutdown noise.
- * v8.9.43:
- * - Issue #013: Forensic UI Expansion. Parsing proximityDebounceMs and 
- *   vibrationRollingSum for real-time stationary scaling verification in Viewer mode.
- * v8.9.42:
- * - Issue #326: Intelligent Uncertainty UX Mapping. Parsing location_pending_reason.
+ * v8.9.77:
+ * - Issue #018: Stationary Anchor Hard-Lock. Added isTrackerAnchorLocked 
+ *   propagation for forensic audit transparency.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized internal state to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  */
 class RemoteHandler(
     private val context: Context,
@@ -45,15 +43,15 @@ class RemoteHandler(
     // Tracker State
     var trackerLat = 0.0
     var trackerLng = 0.0
-    var trackerSpeed = 0f
-    var trackerBearing = 0f 
-    var trackerAccuracy = 0f
-    var trackerMaxAccuracy = 0f
+    var trackerSpeed = 0.0
+    var trackerBearing = 0.0 
+    var trackerAccuracy = 0.0
+    var trackerMaxAccuracy = 0.0
     var trackerLastGpsTs = 0L
     var trackerLastValidFixRealtime = 0L 
     var trackerBattery = 0
-    var trackerTemp = 0f
-    var trackerMaxTemp = 0f
+    var trackerTemp = 0.0
+    var trackerMaxTemp = 0.0
     var trackerCurrentMa = 0
     var trackerSatsView = 0
     var trackerSatsUsed = 0
@@ -68,14 +66,14 @@ class RemoteHandler(
     var isTrackerSitDetected = false
     var isTrackerSitActive = false
     var trackerLastSitTs = 0L
-    var trackerVerticalVelocity = 0f
+    var trackerVerticalVelocity = 0.0
     var isTrackerClockRegression = false
     var isTrackerLocationPending = false
     var trackerLocationPendingReason = LocationPendingReason.NONE
     var trackerLocationDetail: GnssDetail? = null
-    var trackerSnrIdx = 0f
-    var trackerTiltIdx = 0f
-    var trackerBaroIdx = 0f
+    var trackerSnrIdx = 0.0
+    var trackerTiltIdx = 0.0
+    var trackerBaroIdx = 0.0
     var isTrackerBatterySteepDischarge = false 
     var isTrackerCoolingModeActive = false 
     
@@ -84,32 +82,33 @@ class RemoteHandler(
     var trackerNetInterface = "UNKNOWN"
     var isTrackerStorageLow = false
     var isTrackerStorageCritical = false
+    var isTrackerAnchorLocked = false
 
-    var trackerSitVz = 0f 
-    var trackerSitDz = 0f 
-    var trackerSitBaro = 0f 
-    var trackerSitTilt = 0f 
-    var trackerSitShock = 0f
+    var trackerSitVz = 0.0 
+    var trackerSitDz = 0.0 
+    var trackerSitBaro = 0.0 
+    var trackerSitTilt = 0.0 
+    var trackerSitShock = 0.0
 
     var trackerDistToHome: Double? = null
     var trackerDistToViewer: Double? = null
 
-    var trackerVibration = 0f
-    var trackerHeading = 0f
-    var trackerBaroAlt = 0f
-    var trackerLux = 0f
+    var trackerVibration = 0.0
+    var trackerHeading = 0.0
+    var trackerBaroAlt = 0.0
+    var trackerLux = 0.0
     var isTrackerNear = true
-    var trackerTiltDegrees = 0f
+    var trackerTiltDegrees = 0.0
     var trackerAcousticDb = 0.0
-    var trackerPeakVibrationShock = 0f
+    var trackerPeakVibrationShock = 0.0
     var trackerPeakVibrationShockTs = 0L
-    var trackerLuxBaseline = 0f
+    var trackerLuxBaseline = 0.0
     var trackerAcousticFloorDb = 0.0
-    var trackerAdaptiveVibrationFloor = 0.12f
-    var trackerProxIdx = 1.0f
-    var trackerProximityCm = -1.0f
+    var trackerAdaptiveVibrationFloor = 0.12
+    var trackerProxIdx = 1.0
+    var trackerProximityCm = -1.0
     var trackerProximityDebounceMs = 0L
-    var trackerVibrationRollingSum = 0f
+    var trackerVibrationRollingSum = 0.0
 
     var trackerUptimeMs = 0L
     var trackerTotalDropMs = 0L
@@ -125,7 +124,7 @@ class RemoteHandler(
     init {
         scope.launch {
             try {
-                trackerLuxBaseline = repository.getFloat(MainRepository.TRACKER_LUX_BASELINE_KEY, 0f)
+                trackerLuxBaseline = repository.getDouble(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0)
                 trackerAcousticFloorDb = repository.getDouble(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
                 
                 repository.loadTrackerState()?.let { s ->
@@ -167,6 +166,7 @@ class RemoteHandler(
                     trackerNetInterface = s.netInterface
                     isTrackerStorageLow = s.isStorageLow
                     isTrackerStorageCritical = s.isStorageCritical
+                    isTrackerAnchorLocked = s.isAnchorLocked
                     
                     trackerLastValidFixRealtime = s.lastValidFixRealtime
 
@@ -206,7 +206,8 @@ class RemoteHandler(
                         tiltIdx = trackerTiltIdx,
                         baroIdx = trackerBaroIdx,
                         isBatterySteepDischarge = isTrackerBatterySteepDischarge,
-                        isCoolingModeActive = isTrackerCoolingModeActive
+                        isCoolingModeActive = isTrackerCoolingModeActive,
+                        isAnchorLocked = isTrackerAnchorLocked
                     ))
                 }
             } catch (e: Exception) {
@@ -226,21 +227,21 @@ class RemoteHandler(
         lastRemotePacketTs = 0L
         peerSignal = 0
         lastPeerGpsTs = 0L
-        trackerLat = 0.0; trackerLng = 0.0; trackerSpeed = 0f; trackerBearing = 0f; trackerAccuracy = 0f
-        trackerMaxAccuracy = 0f; trackerLastGpsTs = 0L; trackerBattery = 0; trackerTemp = 0f
-        trackerMaxTemp = 0f; trackerCurrentMa = 0; trackerSatsView = 0; trackerSatsUsed = 0
+        trackerLat = 0.0; trackerLng = 0.0; trackerSpeed = 0.0; trackerBearing = 0.0; trackerAccuracy = 0.0
+        trackerMaxAccuracy = 0.0; trackerLastGpsTs = 0L; trackerBattery = 0; trackerTemp = 0.0
+        trackerMaxTemp = 0.0; trackerCurrentMa = 0; trackerSatsView = 0; trackerSatsUsed = 0
         isTrackerCharging = false; isTrackerJammerSuspicion = false; isTrackerVisualJump = false
         isTrackerTrajectoryPromoted = false; trackerJumpTier = 0; isTrackerSuspicious = false
         isTrackerTamperDetected = false; isTrackerPowerTamper = false
-        isTrackerSitDetected = false; isTrackerSitActive = false; trackerLastSitTs = 0L; trackerVerticalVelocity = 0f
-        trackerSitVz = 0f; trackerSitDz = 0f; trackerSitBaro = 0f; trackerSitTilt = 0f; trackerSitShock = 0f
+        isTrackerSitDetected = false; isTrackerSitActive = false; trackerLastSitTs = 0L; trackerVerticalVelocity = 0.0
+        trackerSitVz = 0.0; trackerSitDz = 0.0; trackerSitBaro = 0.0; trackerSitTilt = 0.0; trackerSitShock = 0.0
         trackerDistToHome = null; trackerDistToViewer = null
-        trackerVibration = 0f; trackerHeading = 0f; trackerBaroAlt = 0f; trackerLux = 0f
-        isTrackerNear = true; trackerTiltDegrees = 0f; trackerAcousticDb = 0.0
-        trackerPeakVibrationShock = 0f; trackerPeakVibrationShockTs = 0L
-        trackerLuxBaseline = 0f; trackerAcousticFloorDb = 0.0
-        trackerAdaptiveVibrationFloor = 0.12f; trackerProxIdx = 1.0f; trackerProximityCm = -1.0f
-        trackerProximityDebounceMs = 0L; trackerVibrationRollingSum = 0f
+        trackerVibration = 0.0; trackerHeading = 0.0; trackerBaroAlt = 0.0; trackerLux = 0.0
+        isTrackerNear = true; trackerTiltDegrees = 0.0; trackerAcousticDb = 0.0
+        trackerPeakVibrationShock = 0.0; trackerPeakVibrationShockTs = 0L
+        trackerLuxBaseline = 0.0; trackerAcousticFloorDb = 0.0
+        trackerAdaptiveVibrationFloor = 0.12; trackerProxIdx = 1.0; trackerProximityCm = -1.0
+        trackerProximityDebounceMs = 0L; trackerVibrationRollingSum = 0.0
         trackerUptimeMs = 0L; trackerTotalDropMs = 0L; trackerMaxDropMs = 0L
         trackerMaxDropTs = 0L
         trackerTotalConnectedMs = 0L; trackerSessionConnectedMs = 0L
@@ -251,9 +252,9 @@ class RemoteHandler(
         isTrackerLocationPending = false
         trackerLocationPendingReason = LocationPendingReason.NONE
         trackerLocationDetail = null
-        trackerSnrIdx = 0f
-        trackerTiltIdx = 0f
-        trackerBaroIdx = 0f
+        trackerSnrIdx = 0.0
+        trackerTiltIdx = 0.0
+        trackerBaroIdx = 0.0
         isTrackerBatterySteepDischarge = false
         isTrackerCoolingModeActive = false
         
@@ -262,8 +263,9 @@ class RemoteHandler(
         trackerNetInterface = "UNKNOWN"
         isTrackerStorageLow = false
         isTrackerStorageCritical = false
+        isTrackerAnchorLocked = false
         
-        repository.saveFloatSync(MainRepository.TRACKER_LUX_BASELINE_KEY, 0f)
+        repository.saveDoubleSync(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0)
         repository.saveDoubleSync(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
     }
 
@@ -366,16 +368,16 @@ class RemoteHandler(
 
             isTrackerSitActive = data.optBoolean("is_sit_active", isTrackerSitActive)
             trackerLastSitTs = data.optLong("last_sit_ts", trackerLastSitTs)
-            trackerVerticalVelocity = data.optDouble("vertical_velocity", trackerVerticalVelocity.toDouble()).toFloat()
+            trackerVerticalVelocity = data.optDouble("vertical_velocity", trackerVerticalVelocity)
             isTrackerLocationPending = data.optBoolean("is_location_pending", false)
             
             val reasonStr = data.optString("location_pending_reason", "NONE")
             trackerLocationPendingReason = try { LocationPendingReason.valueOf(reasonStr) } catch(e: Exception) { LocationPendingReason.NONE }
 
             trackerLastValidFixRealtime = data.optLong("last_valid_fix_realtime", trackerLastValidFixRealtime)
-            trackerSnrIdx = data.optDouble("snr_idx", trackerSnrIdx.toDouble()).toFloat()
-            trackerTiltIdx = data.optDouble("tilt_idx", trackerTiltIdx.toDouble()).toFloat()
-            trackerBaroIdx = data.optDouble("baro_idx", trackerBaroIdx.toDouble()).toFloat()
+            trackerSnrIdx = data.optDouble("snr_idx", trackerSnrIdx)
+            trackerTiltIdx = data.optDouble("tilt_idx", trackerTiltIdx)
+            trackerBaroIdx = data.optDouble("baro_idx", trackerBaroIdx)
             isTrackerBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false)
             isTrackerCoolingModeActive = data.optBoolean("is_cooling_mode_active", false)
             
@@ -384,6 +386,7 @@ class RemoteHandler(
             trackerNetInterface = data.optString("net_interface", trackerNetInterface)
             isTrackerStorageLow = data.optBoolean("is_storage_low", isTrackerStorageLow)
             isTrackerStorageCritical = data.optBoolean("is_storage_critical", isTrackerStorageCritical)
+            isTrackerAnchorLocked = data.optBoolean("is_anchor_locked", false)
 
             if (data.has("gnss_detail")) {
                 try {
@@ -393,7 +396,7 @@ class RemoteHandler(
                         val obj = array.getJSONObject(i)
                         satList.add(SatelliteInfo(
                             svid = obj.getInt("svid"),
-                            cn0 = obj.optDouble("cn0", 0.0).toFloat(),
+                            cn0 = obj.optDouble("cn0", 0.0),
                             usedInFix = obj.getBoolean("used_in_fix"),
                             constellation = obj.optInt("constellation", 0)
                         ))
@@ -418,7 +421,7 @@ class RemoteHandler(
                 val rawLng = data.optDouble("lng", 0.0)
                 
                 val rawSpeed = data.optDouble("speed", -1.0)
-                val rawBearing = data.optDouble("bearing", 0.0).toFloat()
+                val rawBearing = data.optDouble("bearing", 0.0)
                 val rawAccuracy = data.optDouble("accuracy", 0.0)
                 val rawMaxAcc = data.optDouble("max_accuracy", 0.0)
                 
@@ -434,13 +437,13 @@ class RemoteHandler(
                     alt = data.optDouble("alt", 0.0),
                     androidSpeedKph = if (rawSpeed >= 0.0) rawSpeed * 3.6 else 0.0,
                     gpsTs = candidateTs,
-                    accuracy = if (rawAccuracy > 0.0) rawAccuracy.toFloat() else 0f,
+                    accuracy = if (rawAccuracy > 0.0) rawAccuracy else 0.0,
                     bearing = rawBearing,
-                    snr = 0f,
+                    snr = 0.0,
                     satsUsed = data.optInt("sats_used", trackerSatsUsed),
                     isViewerTrail = false,
                     lastGpsTs = prevGpsTs,
-                    providedMaxAccuracy = rawMaxAcc.toFloat(),
+                    providedMaxAccuracy = rawMaxAcc,
                     providedIsJump = isJumpPacket,
                     providedIsTrajectoryPromoted = isTrajectoryPacket,
                     providedJumpTier = jumpTierPacket,
@@ -463,11 +466,11 @@ class RemoteHandler(
                         if (!isStalledPacket) trackerLastValidFixRealtime = nowRealtime
                     }
                     
-                    trackerSpeed = (processed.filteredSpeed / 3.6).toFloat()
+                    trackerSpeed = processed.filteredSpeed / 3.6
                     trackerBearing = rawBearing
                     
-                    if (rawAccuracy > 0.0) trackerAccuracy = rawAccuracy.toFloat()
-                    if (rawMaxAcc > 0.0) trackerMaxAccuracy = rawMaxAcc.toFloat()
+                    if (rawAccuracy > 0.0) trackerAccuracy = rawAccuracy
+                    if (rawMaxAcc > 0.0) trackerMaxAccuracy = rawMaxAcc
                     
                     trackerSatsView = data.optInt("sats_view", trackerSatsView)
                     trackerSatsUsed = data.optInt("sats_used", trackerSatsUsed)
@@ -479,35 +482,35 @@ class RemoteHandler(
             }
             
             trackerBattery = data.optInt("battery", trackerBattery)
-            trackerTemp = data.optDouble("temp", trackerTemp.toDouble()).toFloat()
-            trackerMaxTemp = data.optDouble("max_temp", trackerMaxTemp.toDouble()).toFloat()
+            trackerTemp = data.optDouble("temp", trackerTemp)
+            trackerMaxTemp = data.optDouble("max_temp", trackerMaxTemp)
             trackerCurrentMa = data.optInt("current_ma", trackerCurrentMa)
             isTrackerCharging = data.optBoolean("is_charging", isTrackerCharging)
             
-            trackerSitVz = data.optDouble("sit_vz", trackerSitVz.toDouble()).toFloat()
-            trackerSitDz = data.optDouble("sit_dz", trackerSitDz.toDouble()).toFloat()
-            trackerSitBaro = data.optDouble("sit_baro", trackerSitBaro.toDouble()).toFloat()
-            trackerSitTilt = data.optDouble("sit_tilt", trackerSitTilt.toDouble()).toFloat()
-            trackerSitShock = data.optDouble("sit_shock", trackerSitShock.toDouble()).toFloat()
+            trackerSitVz = data.optDouble("sit_vz", trackerSitVz)
+            trackerSitDz = data.optDouble("sit_dz", trackerSitDz)
+            trackerSitBaro = data.optDouble("sit_baro", trackerSitBaro)
+            trackerSitTilt = data.optDouble("sit_tilt", trackerSitTilt)
+            trackerSitShock = data.optDouble("sit_shock", trackerSitShock)
             
-            trackerVibration = data.optDouble("vibration", trackerVibration.toDouble()).toFloat()
-            trackerHeading = data.optDouble("heading", trackerHeading.toDouble()).toFloat()
-            trackerBaroAlt = data.optDouble("baro_alt", trackerBaroAlt.toDouble()).toFloat()
-            trackerLux = data.optDouble("lux", trackerLux.toDouble()).toFloat()
+            trackerVibration = data.optDouble("vibration", trackerVibration)
+            trackerHeading = data.optDouble("heading", trackerHeading)
+            trackerBaroAlt = data.optDouble("baro_alt", trackerBaroAlt)
+            trackerLux = data.optDouble("lux", trackerLux)
             isTrackerNear = data.optBoolean("is_near", isTrackerNear)
-            trackerProxIdx = data.optDouble("prox_idx", trackerProxIdx.toDouble()).toFloat()
-            trackerProximityCm = data.optDouble("proximity_cm", trackerProximityCm.toDouble()).toFloat()
+            trackerProxIdx = data.optDouble("prox_idx", trackerProxIdx)
+            trackerProximityCm = data.optDouble("proximity_cm", trackerProximityCm)
             trackerProximityDebounceMs = data.optLong("proximity_debounce_ms", trackerProximityDebounceMs)
-            trackerVibrationRollingSum = data.optDouble("vibration_rolling_sum", trackerVibrationRollingSum.toDouble()).toFloat()
-            trackerTiltDegrees = data.optDouble("tilt_degrees", trackerTiltDegrees.toDouble()).toFloat()
+            trackerVibrationRollingSum = data.optDouble("vibration_rolling_sum", trackerVibrationRollingSum)
+            trackerTiltDegrees = data.optDouble("tilt_degrees", trackerTiltDegrees)
             trackerAcousticDb = data.optDouble("acoustic_db", trackerAcousticDb)
-            trackerPeakVibrationShock = data.optDouble("peak_vibration_shock", trackerPeakVibrationShock.toDouble()).toFloat()
+            trackerPeakVibrationShock = data.optDouble("peak_vibration_shock", trackerPeakVibrationShock)
             trackerPeakVibrationShockTs = data.optLong("peak_shock_ts", trackerPeakVibrationShockTs)
             
-            val newLuxBaseline = data.optDouble("lux_baseline", trackerLuxBaseline.toDouble()).toFloat()
+            val newLuxBaseline = data.optDouble("lux_baseline", trackerLuxBaseline)
             if (newLuxBaseline != trackerLuxBaseline) {
                 trackerLuxBaseline = newLuxBaseline
-                repository.saveFloatSync(MainRepository.TRACKER_LUX_BASELINE_KEY, trackerLuxBaseline)
+                repository.saveDoubleSync(MainRepository.TRACKER_LUX_BASELINE_KEY, trackerLuxBaseline)
             }
             
             val newAcousticFloor = data.optDouble("acoustic_floor_db", trackerAcousticFloorDb)
@@ -516,7 +519,7 @@ class RemoteHandler(
                 repository.saveDoubleSync(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, trackerAcousticFloorDb)
             }
 
-            trackerAdaptiveVibrationFloor = data.optDouble("adaptive_vibration_floor", trackerAdaptiveVibrationFloor.toDouble()).toFloat()
+            trackerAdaptiveVibrationFloor = data.optDouble("adaptive_vibration_floor", trackerAdaptiveVibrationFloor)
             
             locationProcessor.updateSensorData(
                 vibration = trackerVibration,
@@ -549,7 +552,7 @@ class RemoteHandler(
             trackerLastDiscTs = data.optLong("last_disc_ts", trackerLastDiscTs)
             
             val violationUptimeMs = data.optLong("violation_uptime_ms", 0L)
-            val violationPercentage = data.optDouble("violation_percentage", 0.0).toFloat()
+            val violationPercentage = data.optDouble("violation_percentage", 0.0)
 
             val isStalled = data.optBoolean("is_stalled", false)
             if (isStalled && trackerGpsStallStartTs == 0L) trackerGpsStallStartTs = nowRealtime
@@ -604,7 +607,8 @@ class RemoteHandler(
                         tiltIdx = trackerTiltIdx,
                         baroIdx = trackerBaroIdx,
                         isBatterySteepDischarge = isTrackerBatterySteepDischarge,
-                        isCoolingModeActive = isTrackerCoolingModeActive
+                        isCoolingModeActive = isTrackerCoolingModeActive,
+                        isAnchorLocked = isTrackerAnchorLocked
                     ))
                     
                     repository.saveTrackerState(TrackerStatus(
@@ -640,7 +644,8 @@ class RemoteHandler(
                         tiltIdx = trackerTiltIdx,
                         baroIdx = trackerBaroIdx,
                         isBatterySteepDischarge = isTrackerBatterySteepDischarge,
-                        isCoolingModeActive = isTrackerCoolingModeActive
+                        isCoolingModeActive = isTrackerCoolingModeActive,
+                        isAnchorLocked = isTrackerAnchorLocked
                     ))
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e

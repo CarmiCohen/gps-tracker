@@ -29,15 +29,11 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU and Environmental sensors.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  * v8.9.71:
- * - Forensic UI Expansion: Exposed proximityDebounceMs and vibrationRollingSum 
- *   for real-time stationary scaling verification.
- * v8.9.70:
- * - Forensic Audit Optimization: Migrated to zero-allocation buffers for matrix math.
- * - Performance: Replaced vibration list average with rolling sum (O(1)).
- * - Performance: Throttled updateOrientation with dirty flags.
- * v8.9.69:
- * - Issue #012: Adaptive Proximity Debounce logic.
+ * - Forensic UI Expansion: Exposed proximityDebounceMs and vibrationRollingSum.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -74,20 +70,20 @@ class AppSensorManager @Inject constructor(
     private var lastAccelZ = 0f
     
     // Performance Audit: Rolling sum for O(1) vibration average
-    private val vibrationCircularBuffer = FloatArray(VIBRATION_WINDOW_SIZE)
+    private val vibrationCircularBuffer = DoubleArray(VIBRATION_WINDOW_SIZE)
     private var vibrationCircularIdx = 0
     
-    var vibrationRollingSum = 0f
+    var vibrationRollingSum = 0.0
         private set
 
     private var vibrationBufferCount = 0
 
     private var internalPeakDb: Double = 0.0
     private var internalMinDb: Double = 100.0
-    private var internalPeakVibration: Float = 0f
-    private var internalPeakVerticalVelocity: Float = 0f
+    private var internalPeakVibration: Double = 0.0
+    private var internalPeakVerticalVelocity: Double = 0.0
     private var internalPeakVerticalVelocityTs: Long = 0L
-    private var internalPeakVerticalDisplacement: Float = 0f
+    private var internalPeakVerticalDisplacement: Double = 0.0
     
     @Volatile
     private var isMonitoring = false
@@ -100,22 +96,22 @@ class AppSensorManager @Inject constructor(
 
     data class SensorSnapshot(
         val ts: Long,
-        val lux: Float,
-        val vibe: Float,
-        val proxIdx: Float,
-        val tilt: Float,
-        val lift: Float,
+        val lux: Double,
+        val vibe: Double,
+        val proxIdx: Double,
+        val tilt: Double,
+        val lift: Double,
         val acoustic: Double,
         val isSitDetected: Boolean = false
     )
     private val sensorSampleBuffer = ConcurrentLinkedQueue<SensorSnapshot>()
     private var lastBufferRecordTs = 0L
 
-    private var secPeakLux = 0f
-    private var secPeakVibe = 0f
-    private var secMinProxIdx = 1f
-    private var secPeakTilt = 0f
-    private var secPeakLift = 0f
+    private var secPeakLux = 0.0
+    private var secPeakVibe = 0.0
+    private var secMinProxIdx = 1.0
+    private var secPeakTilt = 0.0
+    private var secPeakLift = 0.0
     private var secPeakDb = 0.0
     
     @Volatile
@@ -126,8 +122,8 @@ class AppSensorManager @Inject constructor(
     private var fastPathMinDb: Double = ACOUSTIC_MIN_THRESHOLD_DB
     private var onAcousticSpike: (() -> Unit)? = null
 
-    private var fastPathLightBaseline: Float = -1.0f
-    private var fastPathLightSpikeThreshold: Float = LIGHT_THRESHOLD_LUX_JUMP
+    private var fastPathLightBaseline: Double = -1.0
+    private var fastPathLightSpikeThreshold: Double = LIGHT_THRESHOLD_LUX_JUMP
     private var onLightSpike: (() -> Unit)? = null
     
     private var lastAcousticSpikeTs: Long = 0L
@@ -141,22 +137,22 @@ class AppSensorManager @Inject constructor(
 
     private var onHardwareFailure: ((String) -> Unit)? = null
 
-    var currentVibrationIndex: Float = 0f
+    var currentVibrationIndex: Double = 0.0
         private set
     
-    var adaptiveVibrationFloor: Float = VIBRATION_STATIONARY_THRESHOLD
+    var adaptiveVibrationFloor: Double = VIBRATION_STATIONARY_THRESHOLD
         private set
 
-    var currentCompassHeading: Float = 0f
+    var currentCompassHeading: Double = 0.0
         private set
 
-    var currentPressure: Float = 0f
+    var currentPressure: Double = 0.0
         private set
 
-    var absoluteAltitude: Float = 0f
+    var absoluteAltitude: Double = 0.0
         private set
 
-    var relativeAltitude: Float = 0f
+    var relativeAltitude: Double = 0.0
         private set
 
     private var proximityJob: Job? = null
@@ -165,40 +161,37 @@ class AppSensorManager @Inject constructor(
     var isProximityNear: Boolean = true
         private set
 
-    var proximityIdx: Float = 1.0f
+    var proximityIdx: Double = 1.0
         private set
 
-    var currentProximityCm: Float = -1.0f
+    var currentProximityCm: Double = -1.0
         private set
 
-    var debouncedProximityCm: Float = -1.0f
+    var debouncedProximityCm: Double = -1.0
         private set
 
     var proximityDebounceMs: Long = 0L
         private set
 
-    var currentLux: Float = 0f
+    var currentLux: Double = 0.0
         private set
 
-    var currentTiltDegrees: Float = 0f
-        private set
-
-    var currentAcousticDb: Double = 0.0
+    var currentTiltDegrees: Double = 0.0
         private set
         
     var latestAcousticDb: Double = 0.0
         private set
 
-    var currentVerticalVelocity: Float = 0f
+    var currentVerticalVelocity: Double = 0.0
         private set
 
-    var currentVerticalDisplacement: Float = 0f
+    var currentVerticalDisplacement: Double = 0.0
         private set
 
     private var lastLinearAccelTs: Long = 0L
     private var stationaryStartTs: Long = 0L
 
-    private var emaPressure: Float = 0f
+    private var emaPressure: Double = 0.0
     private var lastBaroZeroingTs: Long = 0L
 
     private var initialRotationMatrix = FloatArray(9)
@@ -250,7 +243,7 @@ class AppSensorManager @Inject constructor(
         }
     }
 
-    fun setLightFastPath(baseline: Float, spikeThreshold: Float, onSpike: () -> Unit) {
+    fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: () -> Unit) {
         synchronized(this) {
             this.fastPathLightBaseline = baseline
             this.fastPathLightSpikeThreshold = spikeThreshold
@@ -288,21 +281,21 @@ class AppSensorManager @Inject constructor(
                 updateOrientation()
             }
             Sensor.TYPE_PRESSURE -> {
-                processPressure(event.values[0])
+                processPressure(event.values[0].toDouble())
             }
             Sensor.TYPE_PROXIMITY -> {
                 val maxRange = proximity?.maximumRange ?: 5f
-                val value = event.values[0]
+                val value = event.values[0].toDouble()
                 val newValue = value < maxRange
                 
                 currentProximityCm = value
-                if (debouncedProximityCm == -1.0f) debouncedProximityCm = value
+                if (debouncedProximityCm == -1.0) debouncedProximityCm = value
                 
-                proximityIdx = (1.0f - (value / maxRange)).coerceIn(0f, 1f)
+                proximityIdx = (1.0 - (value / maxRange)).coerceIn(0.0, 1.0)
                 if (proximityIdx < secMinProxIdx) secMinProxIdx = proximityIdx
 
                 if (newValue != rawProximityNear) {
-                    if (!newValue && isA15Device() && currentLux <= 0.01f && isStationary()) {
+                    if (!newValue && isA15Device() && currentLux <= 0.01 && isStationary()) {
                         Timber.d("Proximity: Suppressing 'Far' transition on A15 in darkness (Stationary Virtual Sensor Protection)")
                         return
                     }
@@ -319,7 +312,7 @@ class AppSensorManager @Inject constructor(
                     // Issue #012: Adaptive Proximity Debounce
                     var calcDebounceMs = baseDebounceMs
                     if (isStationary() && stationaryStartTs > 0) {
-                        val hoursStationary = (now - stationaryStartTs) / 3600000f
+                        val hoursStationary = (now - stationaryStartTs) / 3600000.0
                         val stationaryExtra = (hoursStationary * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR).toLong()
                         calcDebounceMs += stationaryExtra
                     }
@@ -340,7 +333,7 @@ class AppSensorManager @Inject constructor(
                 }
             }
             Sensor.TYPE_LIGHT -> {
-                val lux = event.values[0]
+                val lux = event.values[0].toDouble()
                 currentLux = lux
                 if (lux > secPeakLux) secPeakLux = lux
                 
@@ -349,7 +342,7 @@ class AppSensorManager @Inject constructor(
                         fastPathLightBaseline = lux
                     } else {
                         val alpha = SentinelValidator.accelerateAlpha(LUX_EMA_FAST, isWarming)
-                        fastPathLightBaseline = (fastPathLightBaseline * (1f - alpha)) + (lux * alpha)
+                        fastPathLightBaseline = (fastPathLightBaseline * (1.0 - alpha)) + (lux * alpha)
                         
                         if (!isWarming && onLightSpike != null && (lux - fastPathLightBaseline) > fastPathLightSpikeThreshold) {
                             if (now - lastLightSpikeTs > SPIKE_DEBOUNCE_MS) {
@@ -480,10 +473,8 @@ class AppSensorManager @Inject constructor(
                                 if (db < internalMinDb) internalMinDb = db
                                 if (db > secPeakDb) secPeakDb = db
 
-                                // Issue #010: Acoustic/Vibration Coherence for Fast Path.
-                                // If A15, require vibration > 0.01g to validate spike.
                                 val vibrationForCoherence = currentVibrationIndex
-                                val isMuzzledByA15Noise = isA15Device() && vibrationForCoherence < 0.01f
+                                val isMuzzledByA15Noise = isA15Device() && vibrationForCoherence < 0.01
 
                                 if (!isWarming && !isMuzzledByA15Noise && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) {
                                     val nowRt = timeProvider.elapsedRealtime()
@@ -564,18 +555,18 @@ class AppSensorManager @Inject constructor(
         return sensorSampleBuffer.filter { it.ts in fromTs..toTs }.map { it.ts to it.acoustic }
     }
 
-    fun consumePeakVibration(): Float {
+    fun consumePeakVibration(): Double {
         synchronized(this) {
             val p = internalPeakVibration
-            internalPeakVibration = 0f
+            internalPeakVibration = 0.0
             return p
         }
     }
 
-    fun consumePeakVerticalVelocity(): Float {
+    fun consumePeakVerticalVelocity(): Double {
         synchronized(this) {
             val p = internalPeakVerticalVelocity
-            internalPeakVerticalVelocity = 0f
+            internalPeakVerticalVelocity = 0.0
             return p
         }
     }
@@ -588,10 +579,10 @@ class AppSensorManager @Inject constructor(
         }
     }
 
-    fun consumePeakVerticalDisplacement(): Float {
+    fun consumePeakVerticalDisplacement(): Double {
         synchronized(this) {
             val p = internalPeakVerticalDisplacement
-            internalPeakVerticalDisplacement = 0f
+            internalPeakVerticalDisplacement = 0.0
             return p
         }
     }
@@ -605,10 +596,10 @@ class AppSensorManager @Inject constructor(
     }
 
     private fun processVibration(x: Float, y: Float, z: Float) {
-        val dx = x - lastAccelX
-        val dy = y - lastAccelY
-        val dz = z - lastAccelZ
-        val delta = (sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()) / GRAVITY_EARTH
+        val dx = (x - lastAccelX).toDouble()
+        val dy = (y - lastAccelY).toDouble()
+        val dz = (z - lastAccelZ).toDouble()
+        val delta = (sqrt(dx * dx + dy * dy + dz * dz)) / GRAVITY_EARTH
 
         synchronized(this) {
             if (delta > internalPeakVibration) internalPeakVibration = delta
@@ -624,7 +615,7 @@ class AppSensorManager @Inject constructor(
         vibrationCircularIdx = (vibrationCircularIdx + 1) % VIBRATION_WINDOW_SIZE
         if (vibrationBufferCount < VIBRATION_WINDOW_SIZE) vibrationBufferCount++
         
-        currentVibrationIndex = if (vibrationBufferCount > 0) vibrationRollingSum / vibrationBufferCount else 0f
+        currentVibrationIndex = if (vibrationBufferCount > 0) vibrationRollingSum / vibrationBufferCount else 0.0
         if (currentVibrationIndex > secPeakVibe) secPeakVibe = currentVibrationIndex
         
         val now = timeProvider.elapsedRealtime()
@@ -644,8 +635,8 @@ class AppSensorManager @Inject constructor(
         if (isStationary()) {
             if (stationaryStartTs == 0L) stationaryStartTs = now
             else if (now - stationaryStartTs > MUZZLE_HYSTERESIS_MS) {
-                currentVerticalVelocity = 0f
-                currentVerticalDisplacement = 0f
+                currentVerticalVelocity = 0.0
+                currentVerticalDisplacement = 0.0
                 if (plungePhase != 2) plungePhase = 0 
             }
         } else {
@@ -659,13 +650,13 @@ class AppSensorManager @Inject constructor(
             lastLinearAccelTs = timestampNs
             return
         }
-        val dt = (timestampNs - lastLinearAccelTs) / 1_000_000_000f
+        val dt = (timestampNs - lastLinearAccelTs).toDouble() / 1_000_000_000.0
         lastLinearAccelTs = timestampNs
         
-        if (dt > 0 && dt < 0.2f) {
-            val dot = values[0] * gravityBuffer[0] + values[1] * gravityBuffer[1] + values[2] * gravityBuffer[2]
-            val gravMag = sqrt(gravityBuffer[0]*gravityBuffer[0] + gravityBuffer[1]*gravityBuffer[1] + gravityBuffer[2]*gravityBuffer[2])
-            val vz_accel = if (gravMag > 0.1f) dot / gravMag else 0f
+        if (dt > 0.0 && dt < 0.2) {
+            val dot = values[0].toDouble() * gravityBuffer[0] + values[1].toDouble() * gravityBuffer[1] + values[2].toDouble() * gravityBuffer[2]
+            val gravMag = sqrt(gravityBuffer[0].toDouble()*gravityBuffer[0] + gravityBuffer[1].toDouble()*gravityBuffer[1] + gravityBuffer[2].toDouble()*gravityBuffer[2])
+            val vz_accel = if (gravMag > 0.1) dot / gravMag else 0.0
 
             currentVerticalVelocity += vz_accel * dt
             currentVerticalDisplacement += currentVerticalVelocity * dt 
@@ -683,14 +674,14 @@ class AppSensorManager @Inject constructor(
                     if (!isWarming && currentVerticalVelocity < -CHAIR_PLUNGE_VELOCITY_THRESHOLD) {
                         plungePhase = 1
                         lastPlungePhaseTs = now
-                        currentVerticalDisplacement = 0f 
+                        currentVerticalDisplacement = 0.0 
                     }
                 }
                 1 -> {
                     val timeInPhase = now - lastPlungePhaseTs
                     if (timeInPhase > CHAIR_PLUNGE_WINDOW_MS) {
                         plungePhase = 0 
-                    } else if (currentVerticalVelocity > -CHAIR_PLUNGE_VELOCITY_THRESHOLD * 0.2f) {
+                    } else if (currentVerticalVelocity > -CHAIR_PLUNGE_VELOCITY_THRESHOLD * 0.2) {
                         if (abs(currentVerticalDisplacement) > CHAIR_PLUNGE_DISTANCE_THRESHOLD) {
                             plungePhase = 2
                             lastPlungePhaseTs = now
@@ -713,12 +704,12 @@ class AppSensorManager @Inject constructor(
         }
     }
 
-    private fun processPressure(pressure: Float) {
-        if (emaPressure == 0f) emaPressure = pressure
+    private fun processPressure(pressure: Double) {
+        if (emaPressure == 0.0) emaPressure = pressure
         currentPressure = pressure
         
-        val alpha = SentinelValidator.accelerateAlpha(1f - BARO_EMA_SLOW, isWarming)
-        emaPressure = (emaPressure * (1f - alpha)) + (pressure * alpha)
+        val alpha = SentinelValidator.accelerateAlpha(1.0 - BARO_EMA_SLOW, isWarming)
+        emaPressure = (emaPressure * (1.0 - alpha)) + (pressure * alpha)
         
         val now = timeProvider.elapsedRealtime()
         val stationaryDuration = if (stationaryStartTs > 0L) now - stationaryStartTs else 0L
@@ -728,11 +719,11 @@ class AppSensorManager @Inject constructor(
             lastBaroZeroingTs = now
         }
 
-        val currentAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure)
-        val baselineAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure)
+        val currentAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure.toFloat()).toDouble()
+        val baselineAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure.toFloat()).toDouble()
         
         absoluteAltitude = currentAlt
-        relativeAltitude = if (isWarming) 0f else currentAlt - baselineAlt
+        relativeAltitude = if (isWarming) 0.0 else currentAlt - baselineAlt
         
         if (abs(relativeAltitude) > secPeakLift) secPeakLift = abs(relativeAltitude)
     }
@@ -752,7 +743,7 @@ class AppSensorManager @Inject constructor(
                          (initialRotationMatrix[5] * currentRotationVectorMatrixBuffer[5]) +
                          (initialRotationMatrix[8] * currentRotationVectorMatrixBuffer[8])
         val cosTheta = dotProduct.coerceIn(-1.0f, 1.0f)
-        currentTiltDegrees = if (isWarming) 0f else Math.toDegrees(acos(cosTheta.toDouble())).toFloat()
+        currentTiltDegrees = if (isWarming) 0.0 else Math.toDegrees(cosTheta.toDouble())
         if (currentTiltDegrees > secPeakTilt) secPeakTilt = currentTiltDegrees
     }
 
@@ -761,7 +752,7 @@ class AppSensorManager @Inject constructor(
             // Performance Audit: Zero-allocation orientation update
             if (AndroidSensorManager.getRotationMatrix(rotationMatrixBuffer, inclinationMatrixBuffer, gravityBuffer, geomagneticBuffer)) {
                 AndroidSensorManager.getOrientation(rotationMatrixBuffer, orientationBuffer)
-                currentCompassHeading = (Math.toDegrees(orientationBuffer[0].toDouble()).toFloat() + 360) % 360
+                currentCompassHeading = (Math.toDegrees(orientationBuffer[0].toDouble()) + 360.0) % 360.0
             }
         }
     }
@@ -770,26 +761,26 @@ class AppSensorManager @Inject constructor(
 
     fun resetBaseline() {
         emaPressure = currentPressure
-        relativeAltitude = 0f
-        absoluteAltitude = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure)
+        relativeAltitude = 0.0
+        absoluteAltitude = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble()
         hasInitialRotation = false
         stationaryStartTs = 0L
-        currentVerticalVelocity = 0f
-        currentVerticalDisplacement = 0f
+        currentVerticalVelocity = 0.0
+        currentVerticalDisplacement = 0.0
         plungePhase = 0
         plungeMatched = false
         secSitDetected = false
         sessionStartTs = timeProvider.elapsedRealtime()
         lastBaroZeroingTs = sessionStartTs
         adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD
-        debouncedProximityCm = -1.0f
+        debouncedProximityCm = -1.0
         proximityDebounceMs = 0L
         
         // Reset vibration rolling state
         vibrationCircularIdx = 0
-        vibrationRollingSum = 0f
+        vibrationRollingSum = 0.0
         vibrationBufferCount = 0
-        vibrationCircularBuffer.fill(0f)
+        vibrationCircularBuffer.fill(0.0)
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}

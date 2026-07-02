@@ -4,8 +4,8 @@ import kotlin.math.*
 
 /**
  * ImmFilter: Interacting Multiple Model Filter.
- * v8.9.38:
- * - Issue #334: Propagate timestamp to EngineGeoPoint for hindsight smoothing.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Accepting Double for accuracy to align with standardized telemetry types.
  */
 class ImmFilter {
 
@@ -33,18 +33,18 @@ class ImmFilter {
 
     private var lastUpdateTs = 0L
 
-    fun update(lat: Double, lng: Double, accuracy: Float, timestamp: Long, qScale: Double = 1.0): EngineGeoPoint {
+    fun update(lat: Double, lng: Double, accuracy: Double, timestamp: Long, qScale: Double = 1.0): EngineGeoPoint {
         if (lastUpdateTs == 0L) {
             initModels(lat, lng, timestamp)
-            return EngineGeoPoint(lat, lng, ts = timestamp)
+            return EngineGeoPoint(lat, lng, ts = timestamp, accuracy = accuracy)
         }
 
         val dt = (timestamp - lastUpdateTs) / 1000.0
-        if (dt <= 0) return EngineGeoPoint(modelStationary.x, modelStationary.y, ts = timestamp)
+        if (dt <= 0) return EngineGeoPoint(modelStationary.x, modelStationary.y, ts = timestamp, accuracy = accuracy)
         
         if (dt > IMM_STALL_RECOVERY_DT_SEC) {
             initModels(lat, lng, timestamp)
-            return EngineGeoPoint(lat, lng, ts = timestamp)
+            return EngineGeoPoint(lat, lng, ts = timestamp, accuracy = accuracy)
         }
 
         // Apply Q-scaling (for suspicious state)
@@ -59,7 +59,7 @@ class ImmFilter {
         predictModel(modelStationary, dt, lngDegToMeters, qSPos, qSVel)
         predictModel(modelKinematic, dt, lngDegToMeters, qKPos, qKVel)
 
-        val rVar = max(IMM_MIN_MEASUREMENT_NOISE_METERS, accuracy.toDouble()).pow(2)
+        val rVar = max(IMM_MIN_MEASUREMENT_NOISE_METERS, accuracy).pow(2)
         val currentLngDegToMeters = LAT_DEG_TO_METERS * cos(Math.toRadians(lat))
         
         val weightS = updateModel(modelStationary, lat, lng, rVar, dt, currentLngDegToMeters)
@@ -78,10 +78,10 @@ class ImmFilter {
 
         if (!mixedLat.isFinite() || !mixedLng.isFinite()) {
             initModels(lat, lng, timestamp)
-            return EngineGeoPoint(lat, lng, ts = timestamp)
+            return EngineGeoPoint(lat, lng, ts = timestamp, accuracy = accuracy)
         }
 
-        return EngineGeoPoint(mixedLat, mixedLng, ts = timestamp)
+        return EngineGeoPoint(mixedLat, mixedLng, ts = timestamp, accuracy = accuracy)
     }
 
     fun getEstimatedSpeedKph(): Double {

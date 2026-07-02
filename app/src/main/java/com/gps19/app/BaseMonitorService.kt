@@ -20,12 +20,11 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * v8.9.72:
+ * - Issue #019: Added isRecentUiPulse() to bridge Android 14+ FGS transition windows.
  * v8.9.71:
  * - Issue #014: Hardened safeStartForeground for Android 14+. Enforcing type 
  *   specification to avoid "Mismatch" and "StartNotAllowed" regressions.
- * v8.9.51:
- * - Issue #456: Resilience Hardening. Integrated scheduleWatchdogAlarm into the 
- *   main tick loop to maintain the heartbeat chain.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -105,10 +104,13 @@ abstract class BaseMonitorService : LifecycleService() {
         return isUiForeground.get() && (timeProvider.currentTimeMillis() - lastUiPulseTs < UI_PULSE_TIMEOUT_MS)
     }
 
+    protected fun isRecentUiPulse(): Boolean {
+        return (timeProvider.currentTimeMillis() - lastUiPulseTs < UI_PULSE_TIMEOUT_MS)
+    }
+
     protected fun safeStartForeground(id: Int, notification: Notification, type: Int = 0) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                // Issue #014: Android 14+ requires explicit types. Fallback to LOCATION if 0.
                 val enforcedType = if (type == 0) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else type
                 startForeground(id, notification, enforcedType)
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && type != 0) {

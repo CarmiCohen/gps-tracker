@@ -10,12 +10,11 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
+ * v8.9.78:
+ * - Issue #018: Stationary Anchor Hard-Lock. Propagated isAnchorLocked to DashboardState.
  * v8.9.55:
  * - Issue #013: Forensic UI Expansion. Added proximityDebounce and rollingVibration 
  *   formatting for stationary scaling verification.
- * v8.9.54:
- * - Issue #427/428: Relaxed UI staleness and watchdog indicators to 15s to 
- *   accommodate network jitter and prevent flickering.
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {
@@ -168,7 +167,8 @@ class DashboardUseCase @Inject constructor() {
             isCoolingModeActive = loc.isCoolingModeActive,
             currentMa = sensorVal("${loc.currentMa}mA"),
             isLocationPending = loc.isLocationPending,
-            locationPendingReason = loc.locationPendingReason
+            locationPendingReason = loc.locationPendingReason,
+            isAnchorLocked = loc.isAnchorLocked
         )
     }
 }

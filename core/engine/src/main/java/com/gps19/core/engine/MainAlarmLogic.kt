@@ -5,16 +5,12 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  * v8.9.52:
  * - Issue #460: Bayesian Authority Sync. Implemented uncertainty expansion for geofence 
- *   breach detection to match UI visualization and SoT mandate.
- * v8.9.51:
- * - Issue #424: R747 Implementation. Localized "Viewer" to "this device" and 
- *   simplified "Tracker" to "Device" in subtitles for forensic clarity.
- * - Issue #424: Fixed getTrackerTitle to preserve "This device:" prefix as per R747 mandate.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Strictly prioritizing 
- *   maxTrackerAccuracy for all Geofence transitions (Entry and Exit).
+ *   breach detection.
  */
 object MainAlarmLogic {
 
@@ -154,7 +150,7 @@ object MainAlarmLogic {
                 title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_TAMPER),
                 subtitle = tamperReason,
                 conditionMet = isTamperCondition,
-                extremeValue = maxOf(state.peakVibrationShock.toDouble(), state.trackerTiltDegrees.toDouble())
+                extremeValue = maxOf(state.peakVibrationShock, state.trackerTiltDegrees)
             )
         )
 
@@ -164,7 +160,7 @@ object MainAlarmLogic {
                 title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_TILT),
                 subtitle = String.format(Locale.getDefault(), "%.1f° tilt", state.trackerTiltDegrees),
                 conditionMet = isTilt,
-                extremeValue = state.trackerTiltDegrees.toDouble()
+                extremeValue = state.trackerTiltDegrees
             )
         )
 
@@ -186,7 +182,7 @@ object MainAlarmLogic {
                 title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_LIFT),
                 subtitle = "Lift: ${String.format(Locale.getDefault(), "%.1f", state.trackerBaroAlt)}m",
                 conditionMet = isLift,
-                extremeValue = abs(state.trackerBaroAlt).toDouble()
+                extremeValue = abs(state.trackerBaroAlt)
             )
         )
 
@@ -199,10 +195,10 @@ object MainAlarmLogic {
         // Bayesian Uncertainty Expansion (Issue #460)
         var acc = state.maxTrackerAccuracy
         if (state.isLocationPending && state.trackerLastValidFixTs > 0) {
-            val elapsedSec = (now - state.trackerLastValidFixTs) / 1000f
+            val elapsedSec = (now - state.trackerLastValidFixTs) / 1000.0
             if (elapsedSec > 0) {
                 // Moving: Grows at speed or conservative constant, capped at 33.3m/s (Issue #383)
-                val driftRate = if (state.trackerSpeed > 1.0f) {
+                val driftRate = if (state.trackerSpeed > 1.0) {
                     state.trackerSpeed.coerceIn(PENDING_UNCERTAINTY_GROWTH_RATE_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS)
                 } else {
                     PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS
@@ -340,7 +336,7 @@ object MainAlarmLogic {
                     else -> "Device battery level is at ${state.trackerBattery}%"
                 }),
                 conditionMet = batteryConditionMet,
-                extremeValue = (100 - state.trackerBattery).toDouble()
+                extremeValue = (100.0 - state.trackerBattery)
             )
         )
 
@@ -359,7 +355,7 @@ object MainAlarmLogic {
                 title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_TEMP),
                 subtitle = String.format(Locale.getDefault(), "Device temperature reached %.1f°C", state.trackerTemp),
                 conditionMet = state.trackerTemp > MAX_SAFE_TEMPERATURE_CELSIUS || state.isCoolingModeActive,
-                extremeValue = state.trackerTemp.toDouble()
+                extremeValue = state.trackerTemp
             )
         )
         
@@ -428,12 +424,6 @@ object MainAlarmLogic {
         return SystemHealthReport(reports)
     }
 
-    /**
-     * getTrackerTitle: Role-aware title normalization for forensic parity.
-     * 1. Preserves "This device:" as per R747 mandate to clarify locality.
-     * 2. Strips the current role's prefix ("Tracker:") or "Viewer:") to keep local alerts clean.
-     * 3. Preserves the peer's prefix to distinguish remote alerts.
-     */
     private fun getTrackerTitle(isTracker: Boolean, title: String): String {
         return if (isTracker) {
             title.removePrefix("Tracker:").trim()

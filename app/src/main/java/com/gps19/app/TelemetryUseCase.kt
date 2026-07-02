@@ -6,12 +6,11 @@ import javax.inject.Singleton
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
- * v8.9.43:
- * - Issue #013: Forensic UI Expansion. Mapping proximityDebounceMs and 
- *   vibrationRollingSum for stationary scaling verification.
- * v8.9.42:
- * - [Baseline] Issue #325: Authoritative Spatial Anchoring. Mapping maxAccuracy for unified 
- *   accuracy fallback logic.
+ * v8.9.78:
+ * - Issue #018: Fixed property mapping for acousticFloorDb.
+ * v8.9.77:
+ * - Issue #018: Stationary Anchor Hard-Lock. Mapping isAnchorLocked state 
+ *   for forensic transparency in UI.
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(
@@ -79,7 +78,8 @@ class TelemetryUseCase @Inject constructor(
             gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail,
             snrIdx = update.snrIdx,
             isCoolingModeActive = update.isCoolingModeActive,
-            currentMa = update.currentMa
+            currentMa = update.currentMa,
+            isAnchorLocked = update.isAnchorLocked
         )
     }
 
@@ -108,7 +108,8 @@ class TelemetryUseCase @Inject constructor(
             isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical,
             gnssDetail = status.gnssDetail, snrIdx = status.snrIdx,
             isCoolingModeActive = status.isCoolingModeActive,
-            currentMa = status.currentMa
+            currentMa = status.currentMa,
+            isAnchorLocked = status.isAnchorLocked
         )
     }
 
@@ -156,7 +157,7 @@ class TelemetryUseCase @Inject constructor(
             peakVibrationShockTs = update.peakVibrationShockTs ?: currentLoc.peakVibrationShockTs,
             luxBaseline = update.luxBaseline ?: currentLoc.luxBaseline,
             acousticFloorDb = update.acousticFloorDb ?: currentLoc.acousticFloorDb,
-            adaptiveVibrationFloor = update.adaptiveVibrationFloor ?: SentinelValidator.updateVibrationFloor(currentLoc.adaptiveVibrationFloor, update.vibration ?: 0f, false),
+            adaptiveVibrationFloor = update.adaptiveVibrationFloor ?: SentinelValidator.updateVibrationFloor(currentLoc.adaptiveVibrationFloor, update.vibration ?: 0.0, false),
             proxIdx = update.proxIdx ?: currentLoc.proxIdx,
             proximityCm = update.proximityCm ?: currentLoc.proximityCm,
             proximityDebounceMs = update.proximityDebounceMs ?: currentLoc.proximityDebounceMs,
@@ -172,7 +173,8 @@ class TelemetryUseCase @Inject constructor(
             gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail,
             snrIdx = update.snrIdx,
             isCoolingModeActive = update.isCoolingModeActive,
-            currentMa = update.currentMa
+            currentMa = update.currentMa,
+            isAnchorLocked = update.isAnchorLocked
         )
     }
 

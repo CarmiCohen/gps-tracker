@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.73
+# System Source of Truth (SoT) - v8.9.74
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
@@ -13,6 +13,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **OS Compatibility**: Authoritative baselines are **minSdk 24** and **targetSdk 35**. (v8.9.42)
 *   **Reactive System State Flows (R945)**: Implementation of cold-to-hot reactive flows for system health (Battery, Internet, Permissions) to ensure UI and forensic layers reflect real-time hardware status without polling. (Issue #404)
 *   **Watchdog Battery Optimization (R946)**: Conservative `AlarmManager` rescheduling utilizing exact alarms only when critical to system stability.
+*   **Foreground Service Transition (R967)**: The system maintains a **15-second "Recent UI Pulse" window** (`UI_PULSE_TIMEOUT_MS`) to bridge Android 14+ `MICROPHONE` type transitions. Any service-type update within this window of a UI interaction is authorized to include "While-in-Use" types to prevent background transition blocks. (Issue #019 / v8.9.74)
 
 ### 2. Branding & UI Standards
 *   **Branding Authority (R865/R866)**: "Unified Identity Green" is strictly defined as **JD Branding Green (#367C2B)**. All tracker-role UI elements, icons, and status indicators must use this hex code. 

@@ -7,20 +7,12 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added accuracy and 
- *   maxAccuracy to TrailEntity (v50) for forensic parity in interpolated segments.
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added accuracy and 
- *   maxAccuracy to HistoryEntity (v49) for forensic ribbon parity.
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added accuracy and 
- *   maxAccuracy to ViolationEntity (v48) for historical forensic parity.
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Added maxAccuracy to LogEntity 
- *   for forensic parity between raw GPS accuracy and engine uncertainty.
- * - Issue #326: Intelligent Uncertainty UX Mapping. Added locationPendingReason to 
- *   HistoryEntity and PendingStatusEntity for forensic parity. (Formerly #245 / #244)
- * v8.9.62:
- * - Issue #001: Fixed Room schema divergence. Added missing 'name' column to 
- *   pending_status_updates table (v51) with existence guard to prevent duplicate column errors.
+ * v8.9.77:
+ * - Issue #018: Stationary Anchor Hard-Lock. Added isAnchorLocked to HistoryEntity 
+ *   and PendingStatusEntity for forensic transparency (v52).
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions. (Room REAL maps to Double).
  */
 @Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
 data class LogEntity(
@@ -42,10 +34,10 @@ data class LogEntity(
     @ColumnInfo(defaultValue = "0") val synced: Boolean = false,
     @ColumnInfo(defaultValue = "0") val lat: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val lng: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val accuracy: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val maxAccuracy: Float = 0f,
-    val snrSnapshot: Float? = null,
-    val vibeSnapshot: Float? = null
+    @ColumnInfo(defaultValue = "0") val accuracy: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0,
+    val snrSnapshot: Double? = null,
+    val vibeSnapshot: Double? = null
 )
 
 @Entity(tableName = "trail_points", indices = [Index(value = ["timestamp"])])
@@ -57,8 +49,8 @@ data class TrailEntity(
     val isViewerTrail: Boolean,
     val isJump: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isHindsightCorrected: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val accuracy: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val maxAccuracy: Float = 0f
+    @ColumnInfo(defaultValue = "0") val accuracy: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0
 )
 
 @Entity(tableName = "connection_history", indices = [Index(value = ["ts"])])
@@ -71,33 +63,34 @@ data class HistoryEntity(
     val hasGps: Boolean,
     val isTick: Boolean,
     val ribbonKey: String,
-    val gpsIndex: Float = 0f,
-    val noiseIdx: Float = 0f,
-    val luxIdx: Float = 0f,
-    val vibeIdx: Float = 0f,
-    val proxIdx: Float = 1f, 
-    val liftIdx: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val snrIdx: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val tiltIdx: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val baroIdx: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val verticalVelocity: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val sitVz: Float = 0f, 
+    val gpsIndex: Double = 0.0,
+    val noiseIdx: Double = 0.0,
+    val luxIdx: Double = 0.0,
+    val vibeIdx: Double = 0.0,
+    val proxIdx: Double = 1.0, 
+    val liftIdx: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val snrIdx: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val tiltIdx: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val baroIdx: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val verticalVelocity: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val sitVz: Double = 0.0, 
     @ColumnInfo(defaultValue = "0") val sitVzTs: Long = 0L,
-    @ColumnInfo(defaultValue = "0") val sitDz: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val sitDz: Double = 0.0,
     @ColumnInfo(name = "isBatterySteepDischarge", defaultValue = "0") val isBatterySteepDischarge: Boolean = false,
     @ColumnInfo(defaultValue = "10") val remoteSig: Int = 10,
     @ColumnInfo(defaultValue = "0") val isCoolingModeActive: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val speed: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val bearing: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val speed: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val bearing: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val isSitDetected: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isSitActive: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val sitBaro: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val sitTilt: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val sitShock: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val sitBaro: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val sitTilt: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val sitShock: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val currentMa: Int = 0,
     @ColumnInfo(defaultValue = "NONE") val locationPendingReason: String = "NONE",
-    @ColumnInfo(defaultValue = "0") val accuracy: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val maxAccuracy: Float = 0f
+    @ColumnInfo(defaultValue = "0") val accuracy: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val isAnchorLocked: Boolean = false
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -107,8 +100,8 @@ data class ViolationEntity(
     val lng: Double,
     val type: String,
     val ts: Long,
-    @ColumnInfo(defaultValue = "0") val accuracy: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val maxAccuracy: Float = 0f
+    @ColumnInfo(defaultValue = "0") val accuracy: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0
 )
 
 @Entity(tableName = "pending_status_updates", indices = [Index(value = ["timestamp"])])
@@ -116,11 +109,11 @@ data class PendingStatusEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val lat: Double,
     val lng: Double,
-    val speed: Float,
-    val accuracy: Float,
-    val bearing: Float,
+    val speed: Double,
+    val accuracy: Double,
+    val bearing: Double,
     val battery: Int,
-    val temp: Float,
+    val temp: Double,
     val isCharging: Boolean,
     @ColumnInfo(defaultValue = "0") val currentMa: Int = 0,
     val timestamp: Long,
@@ -128,30 +121,31 @@ data class PendingStatusEntity(
     val satsView: Int,
     val satsUsed: Int,
     val name: String? = null,
-    val maxAccuracy: Float,
+    val maxAccuracy: Double,
     val distToTracker: Double? = null,
     val distToHome: Double? = null,
-    @ColumnInfo(defaultValue = "0") val snrIdx: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val tiltIdx: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val baroIdx: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val snrIdx: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val tiltIdx: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val baroIdx: Double = 0.0,
     @ColumnInfo(name = "isBatterySteepDischarge", defaultValue = "0") val isBatterySteepDischarge: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isCoolingModeActive: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isSitDetected: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isSitActive: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val sitVz: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val sitVz: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val sitVzTs: Long = 0L,
-    @ColumnInfo(defaultValue = "0") val sitDz: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val verticalVelocity: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val sitBaro: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val sitTilt: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val sitShock: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val sitDz: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val verticalVelocity: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val sitBaro: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val sitTilt: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val sitShock: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val isStorageLow: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isStorageCritical: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isPowerSaveMode: Boolean = false,
     @ColumnInfo(defaultValue = "-1") val standbyBucket: Int = -1,
     @ColumnInfo(defaultValue = "UNKNOWN") val netInterface: String = "UNKNOWN",
     @ColumnInfo(defaultValue = "0") val lastValidFixRealtime: Long = 0L,
-    @ColumnInfo(defaultValue = "NONE") val locationPendingReason: String = "NONE"
+    @ColumnInfo(defaultValue = "NONE") val locationPendingReason: String = "NONE",
+    @ColumnInfo(defaultValue = "0") val isAnchorLocked: Boolean = false
 )
 
 @Dao
@@ -209,7 +203,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 51, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 52, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -218,10 +212,14 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_51_52 = object : Migration(51, 52) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE connection_history ADD COLUMN isAnchorLocked INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isAnchorLocked INTEGER NOT NULL DEFAULT 0")
+            }
+        }
         val MIGRATION_50_51 = object : Migration(50, 51) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Root Cause Remediation: Restore missing 'name' column in pending_status_updates
-                // Existence guard added to prevent SQLiteException if column was created during previous destructive cycle.
                 val cursor = db.query("PRAGMA table_info(pending_status_updates)")
                 var exists = false
                 while(cursor.moveToNext()) {
@@ -340,7 +338,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_trail_points_timestamp ON trail_points (timestamp)")
 
                 db.execSQL("CREATE TABLE connection_history_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, ts INTEGER NOT NULL, rtt INTEGER NOT NULL, isConnected INTEGER NOT NULL, isGap INTEGER NOT NULL, hasGps INTEGER NOT NULL, isTick INTEGER NOT NULL, ribbonKey TEXT NOT NULL, gpsIndex REAL NOT NULL, noiseIdx REAL NOT NULL, luxIdx REAL NOT NULL, vibeIdx REAL NOT NULL, proxIdx REAL NOT NULL, liftIdx REAL NOT NULL, snrIdx REAL NOT NULL DEFAULT 0, verticalVelocity REAL NOT NULL DEFAULT 0, sitVz REAL NOT NULL DEFAULT 0, sitDz REAL NOT NULL DEFAULT 0, isBatterySteepDischarge INTEGER NOT NULL DEFAULT 0, remoteSig INTEGER NOT NULL DEFAULT 10, isCoolingModeActive INTEGER NOT NULL DEFAULT 0, speed REAL NOT NULL DEFAULT 0, bearing REAL NOT NULL DEFAULT 0, isSitDetected INTEGER NOT NULL DEFAULT 0, isSitActive INTEGER NOT NULL DEFAULT 0, sitBaro REAL NOT NULL DEFAULT 0, sitTilt REAL NOT NULL DEFAULT 0, sitShock REAL NOT NULL DEFAULT 0)")
-                db.execSQL("INSERT INTO connection_history_new (id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, 0, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock) SELECT id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, 0, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock FROM connection_history")
+                db.execSQL("INSERT INTO connection_history_new (id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, verticalVelocity, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock) SELECT id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, 0, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock FROM connection_history")
                 db.execSQL("DROP TABLE connection_history"); db.execSQL("ALTER TABLE connection_history_new RENAME TO connection_history")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_connection_history_ts ON connection_history (ts)")
 
@@ -372,7 +370,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_timestamp ON logs (timestamp)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_localId ON logs (localId)")
 
-                // Harmonize 'connection_history' table (fixing missing verticalVelocity and all defaults)
+                // Harmonize 'connection_history' table
                 db.execSQL("CREATE TABLE connection_history_v36 (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, ts INTEGER NOT NULL, rtt INTEGER NOT NULL, isConnected INTEGER NOT NULL, isGap INTEGER NOT NULL, hasGps INTEGER NOT NULL, isTick INTEGER NOT NULL, ribbonKey TEXT NOT NULL, gpsIndex REAL NOT NULL, noiseIdx REAL NOT NULL, luxIdx REAL NOT NULL, vibeIdx REAL NOT NULL, proxIdx REAL NOT NULL, liftIdx REAL NOT NULL, snrIdx REAL NOT NULL DEFAULT 0, verticalVelocity REAL NOT NULL DEFAULT 0, sitVz REAL NOT NULL DEFAULT 0, sitDz REAL NOT NULL DEFAULT 0, isBatterySteepDischarge INTEGER NOT NULL DEFAULT 0, remoteSig INTEGER NOT NULL DEFAULT 10, isCoolingModeActive INTEGER NOT NULL DEFAULT 0, speed REAL NOT NULL DEFAULT 0, bearing REAL NOT NULL DEFAULT 0, isSitDetected INTEGER NOT NULL DEFAULT 0, isSitActive INTEGER NOT NULL DEFAULT 0, sitBaro REAL NOT NULL DEFAULT 0, sitTilt REAL NOT NULL DEFAULT 0, sitShock REAL NOT NULL DEFAULT 0, currentMa INTEGER NOT NULL DEFAULT 0)")
                 val cursorH = db.query("PRAGMA table_info(connection_history)")
                 val colsH = mutableSetOf<String>(); while(cursorH.moveToNext()) colsH.add(cursorH.getString(1)); cursorH.close()
@@ -396,7 +394,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("DROP TABLE connection_history"); db.execSQL("ALTER TABLE connection_history_v36 RENAME TO connection_history")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_connection_history_ts ON connection_history (ts)")
 
-                // Harmonize 'pending_status_updates' table (Restored missing 'name' column)
+                // Harmonize 'pending_status_updates' table
                 db.execSQL("CREATE TABLE pending_status_updates_v36 (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, speed REAL NOT NULL, accuracy REAL NOT NULL, bearing REAL NOT NULL, battery INTEGER NOT NULL, temp REAL NOT NULL, isCharging INTEGER NOT NULL, currentMa INTEGER NOT NULL DEFAULT 0, timestamp INTEGER NOT NULL, gpsTs INTEGER NOT NULL DEFAULT 0, satsView INTEGER NOT NULL, satsUsed INTEGER NOT NULL, name TEXT, maxAccuracy REAL NOT NULL, distToTracker REAL, distToHome REAL, snrIdx REAL NOT NULL DEFAULT 0, isBatterySteepDischarge INTEGER NOT NULL DEFAULT 0, isCoolingModeActive INTEGER NOT NULL DEFAULT 0, isSitDetected INTEGER NOT NULL DEFAULT 0, isSitActive INTEGER NOT NULL DEFAULT 0, sitVz REAL NOT NULL DEFAULT 0, sitDz REAL NOT NULL DEFAULT 0, verticalVelocity REAL NOT NULL DEFAULT 0, sitBaro REAL NOT NULL DEFAULT 0, sitTilt REAL NOT NULL DEFAULT 0, sitShock REAL NOT NULL DEFAULT 0, isStorageLow INTEGER NOT NULL DEFAULT 0, isStorageCritical INTEGER NOT NULL DEFAULT 0, isPowerSaveMode INTEGER NOT NULL DEFAULT 0, standbyBucket INTEGER NOT NULL DEFAULT -1, netInterface TEXT NOT NULL DEFAULT 'UNKNOWN')")
                 val cursorP = db.query("PRAGMA table_info(pending_status_updates)")
                 val colsP = mutableSetOf<String>(); while(cursorP.moveToNext()) colsP.add(cursorP.getString(1)); cursorP.close()

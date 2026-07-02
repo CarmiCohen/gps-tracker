@@ -2,16 +2,19 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.76:
+ * - Issue #018: Tracker State Stability. Tightened JUMP_GATE_SENSOR_MISMATCH_MPS to 2.0 
+ *   to aggressively filter stationary drift noise in Urban Canyons.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized thresholds and constants 
+ *   to Double to align with telemetry type unification.
  * v8.9.69:
  * - Issue #012: Added Adaptive Proximity Debounce constants.
- * v8.9.66:
- * - Issue #007: Added ACOUSTIC_THRESHOLD_DB_JUMP_A15 (55dB) to mitigate system-generated 
- *   spikes confirmed during A15 isolation testing.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
 const val LAT_DEG_TO_METERS = 111194.92664455874
-const val GRAVITY_EARTH = 9.80665f
+const val GRAVITY_EARTH = 9.80665
 
 // Global App Defaults (Inherited by Engine)
 const val DEFAULT_LAT = 32.7940
@@ -26,7 +29,7 @@ const val ABSOLUTE_DISTANCE_CAP_METERS = 50000.0
 const val MAX_TRACTOR_ACCEL = 2.0 
 const val PARKING_ACCEL_LIMIT = 1.0
 const val ALTITUDE_VELOCITY_CAP = 10.0 
-const val VERTICAL_VELOCITY_MAX_MPS = 5.0f
+const val VERTICAL_VELOCITY_MAX_MPS = 5.0
 const val PROMOTION_ANGLE_TOLERANCE = 30.0 
 const val PATH_EFFICIENCY_THRESHOLD = 0.1 
 const val COMPASS_STABILITY_THRESHOLD = 20.0 
@@ -41,25 +44,25 @@ const val JUMP_WEIGHT_TRADITIONAL_SPEED = 50
 const val JUMP_WEIGHT_ACCURACY_LOW = 30
 const val JUMP_WEIGHT_ACCURACY_HIGH = 20
 
-const val JUMP_GATE_SENSOR_MISMATCH_MPS = 10.0
+const val JUMP_GATE_SENSOR_MISMATCH_MPS = 2.0
 const val JUMP_GATE_SPEED_ACCURACY_LOW_MPS = 22.2
 const val JUMP_GATE_SPEED_ACCURACY_HIGH_MPS = 8.3
-const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0f
-const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0f
+const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0
+const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0
 const val JUMP_GATE_VISUAL_JITTER_METERS = 10.0
 
 // Adaptive Jump Confidence (v8.9.18 - Issue #332 / R332)
-const val ADAPTIVE_JUMP_SNR_THRESHOLD = 35.0f
-const val ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0f
+const val ADAPTIVE_JUMP_SNR_THRESHOLD = 35.0
+const val ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0
 
 // Hindsight Correction (v8.9.18 - Issue #334 / R334)
 const val HINDSIGHT_BUFFER_SIZE = 10 // Issue #461: Forensic Parity
 const val HINDSIGHT_MAX_AGE_MS = 30000L
 
 // Bayesian Uncertainty Growth (R460 / Issue #460)
-const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0f // 54 km/h conservative drift
-const val PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS = 1.5f // Minimal drift when stationary
-const val PENDING_UNCERTAINTY_SPEED_CAP_MPS = 33.3f // 120 km/h cap
+const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0 // 54 km/h conservative drift
+const val PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS = 1.5 // Minimal drift when stationary
+const val PENDING_UNCERTAINTY_SPEED_CAP_MPS = 33.3 // 120 km/h cap
 
 // ImmFilter Parameters
 const val IMM_STATIONARY_PROBABILITY = 0.8
@@ -80,12 +83,14 @@ const val SCATTER_MIN_SPEED_MPS = 0.5
 const val SCATTER_ANGLE_THRESHOLD = 120.0
 
 // Acoustic Monitoring (R810-L)
+const val BREACH_THRESHOLD_DB_JUMP = 40.0 
+const val BREACH_THRESHOLD_DB_JUMP_A15 = 55.0 
 const val ACOUSTIC_THRESHOLD_DB_JUMP = 40.0 
-const val ACOUSTIC_THRESHOLD_DB_JUMP_A15 = 55.0 // R810-A15: Higher gate for A15 internal mic resonance
+const val ACOUSTIC_THRESHOLD_DB_JUMP_A15 = 55.0 
 const val ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP = 20.0
 const val ACOUSTIC_MIN_THRESHOLD_DB = 50.0
-const val ACOUSTIC_FLOOR_MIN_DB = 50.0 // Issue #437: Aligned with absolute safety gate
-const val ACOUSTIC_FLOOR_CONTRACTION_EMA = 0.995f
+const val ACOUSTIC_FLOOR_MIN_DB = 50.0 
+const val ACOUSTIC_FLOOR_CONTRACTION_EMA = 0.995
 const val ACOUSTIC_LOCKOUT_MS = 1000L
 const val ACOUSTIC_RECOVERY_DELAY_MS = 30000L
 const val ACOUSTIC_SAMPLE_RATE = 8000
@@ -94,28 +99,28 @@ const val ACOUSTIC_INIT_RETRY_DELAY_MS = 200L
 const val ACOUSTIC_GENERIC_RECOVERY_DELAY_MS = 2000L
 
 // Physical Security Sentinel (R810-M)
-const val LIGHT_THRESHOLD_LUX_JUMP = 150.0f
-const val TILT_THRESHOLD_DEGREES = 15.0f
-const val BARO_LIFT_THRESHOLD_METERS = 0.8f
-const val VIBRATION_SUSPICIOUS_THRESHOLD_G = 0.25f
-const val VIBRATION_SHOCK_THRESHOLD_G = 0.8f 
-const val VIBRATION_STATIONARY_THRESHOLD = 0.12f 
-const val STATIONARY_FLOOR_MULT = 1.5f
-const val VIBRATION_SHOCK_MULTIPLIER = 7.0f
-const val VIBRATION_SUSPICIOUS_MULTIPLIER = 2.5f
-const val INITIAL_VIBRATION_FLOOR = 0.05f
+const val LIGHT_THRESHOLD_LUX_JUMP = 150.0
+const val TILT_THRESHOLD_DEGREES = 15.0
+const val BARO_LIFT_THRESHOLD_METERS = 0.8
+const val VIBRATION_SUSPICIOUS_THRESHOLD_G = 0.25
+const val VIBRATION_SHOCK_THRESHOLD_G = 0.8 
+const val VIBRATION_STATIONARY_THRESHOLD = 0.12 
+const val STATIONARY_FLOOR_MULT = 1.5
+const val VIBRATION_SHOCK_MULTIPLIER = 7.0
+const val VIBRATION_SUSPICIOUS_MULTIPLIER = 2.5
+const val INITIAL_VIBRATION_FLOOR = 0.05
 const val VIBRATION_WINDOW_SIZE = 5 
 const val PASSIVE_ZEROING_STATIONARY_MS = 300000L
 const val ROTATION_INIT_STATIONARY_MS = 3000L
-const val BARO_ZEROING_INTERVAL_MS = 300000L // Issue #430: Aligned with PASSIVE_ZEROING_STATIONARY_MS
+const val BARO_ZEROING_INTERVAL_MS = 300000L 
 const val SPIKE_DEBOUNCE_MS = 5000L
 
 // Chair Sit Detection (R832 - Issue #459)
-const val CHAIR_SIT_TILT_THRESHOLD = 7.0f 
-const val CHAIR_SIT_VIBRATION_THRESHOLD = 0.35f 
-const val CHAIR_SIT_BARO_THRESHOLD = 0.08f 
-const val CHAIR_PLUNGE_VELOCITY_THRESHOLD = 0.18f 
-const val CHAIR_PLUNGE_DISTANCE_THRESHOLD = 0.05f 
+const val CHAIR_SIT_TILT_THRESHOLD = 7.0 
+const val CHAIR_SIT_VIBRATION_THRESHOLD = 0.35 
+const val CHAIR_SIT_BARO_THRESHOLD = 0.08 
+const val CHAIR_PLUNGE_VELOCITY_THRESHOLD = 0.18 
+const val CHAIR_PLUNGE_DISTANCE_THRESHOLD = 0.05 
 const val CHAIR_PLUNGE_WINDOW_MS = 800L
 const val CHAIR_PLUNGE_PHASE_TIMEOUT_MS = 1500L
 const val CHAIR_SIT_COOLDOWN_MS = 5000L
@@ -125,41 +130,41 @@ const val SIT_DUPLICATE_GUARD_MS = 15000L
 // Filtering Thresholds (R810-P Zero-Lag)
 const val SUSPICIOUS_Q_SCALE = 1000.0
 const val TRAJECTORY_PROMOTION_WINDOW_MS = 30000L 
-const val HIGH_ACCURACY_THRESHOLD_METERS = 35.0f
+const val HIGH_ACCURACY_THRESHOLD_METERS = 35.0
 
 /**
  * Multiplier applied to [HIGH_ACCURACY_THRESHOLD_METERS] to determine the floor 
  * for trajectory-based outlier rejection.
  * Used in [LocationProcessor] to reject low-accuracy points following high-accuracy fixes.
  */
-const val TRAJECTORY_REJECTION_ACCURACY_MULT = 3.0f
+const val TRAJECTORY_REJECTION_ACCURACY_MULT = 3.0
 
 const val ACCURACY_WINDOW_BUCKET_MS = 60000L
 const val ACCURACY_WINDOW_MAX_SIZE = 4
-const val GEOFENCE_ACCURACY_HYSTERESIS_MULT = 1.10f
-const val GEOFENCE_ACCURACY_EXPANSION_MULT = 1.0f
+const val GEOFENCE_ACCURACY_HYSTERESIS_MULT = 1.10
+const val GEOFENCE_ACCURACY_EXPANSION_MULT = 1.0
 const val GEOFENCE_BUFFER_MULT = 6.0
 const val GEOFENCE_HYSTERESIS_METERS = 5.0
 const val GEOFENCE_PREDICTIVE_LOOKAHEAD_S = 2.0
 const val GEOFENCE_PREDICTIVE_MIN_SPEED_MPS = 1.0
 
 // EMA Factors (Issue #263: Corrected Inversion)
-const val LUX_EMA_SLOW = 0.01f
-const val LUX_EMA_FAST = 0.1f
-const val LUX_EMA_UP_SLOW = 0.001f
-const val LUX_EMA_UP_FAST = 0.01f
-const val LUX_EMA_UP_FAST_A15 = 0.05f // Optimized for A15 LED flutter
-const val LUX_EMA_DOWN_SLOW = 0.001f
-const val LUX_EMA_DOWN_FAST = 0.02f
-const val ACOUSTIC_EMA_DOWN_SLOW = 0.001f
-const val ACOUSTIC_EMA_DOWN_FAST = 0.02f
-const val ACOUSTIC_EMA_UP_SLOW = 0.0001f
-const val ACOUSTIC_EMA_UP_FAST = 0.01f
-const val VIBRATION_EMA_DOWN_SLOW = 0.01f
-const val VIBRATION_EMA_DOWN_FAST = 0.1f
-const val VIBRATION_EMA_UP_SLOW = 0.001f
-const val VIBRATION_EMA_UP_FAST = 0.01f
-const val BARO_EMA_SLOW = 0.001f 
+const val LUX_EMA_SLOW = 0.01
+const val LUX_EMA_FAST = 0.1
+const val LUX_EMA_UP_SLOW = 0.001
+const val LUX_EMA_UP_FAST = 0.01
+const val LUX_EMA_UP_FAST_A15 = 0.05 // Optimized for A15 LED flutter
+const val LUX_EMA_DOWN_SLOW = 0.001
+const val LUX_EMA_DOWN_FAST = 0.02
+const val ACOUSTIC_EMA_DOWN_SLOW = 0.001
+const val ACOUSTIC_EMA_DOWN_FAST = 0.02
+const val ACOUSTIC_EMA_UP_SLOW = 0.0001
+const val ACOUSTIC_EMA_UP_FAST = 0.01
+const val VIBRATION_EMA_DOWN_SLOW = 0.01
+const val VIBRATION_EMA_DOWN_FAST = 0.1
+const val VIBRATION_EMA_UP_SLOW = 0.001
+const val VIBRATION_EMA_UP_FAST = 0.01
+const val BARO_EMA_SLOW = 0.001 
 
 // GtoEngine Optimization Constants (Issue #264)
 const val GTO_TOW_SPEED_THRESHOLD = 10.0
@@ -212,28 +217,28 @@ const val SUSTAINED_SPEED_THRESHOLD = 2
 const val SUSTAINED_SPEED_STATIONARY_THRESHOLD = 4
 const val STATE_CONFIDENCE_BUFFER_MS = 2000L
 const val PARKING_CONFIDENCE_BUFFER_MS = 5000L
-const val HIGH_SPEED_PROMOTION_THRESHOLD = 5.0f
+const val HIGH_SPEED_PROMOTION_THRESHOLD = 5.0
 
 // Throttling Limits
-const val THROTTLE_LUX_LIMIT = 50f
-const val THROTTLE_TILT_LIMIT = 5.0f
+const val THROTTLE_LUX_LIMIT = 50.0
+const val THROTTLE_TILT_LIMIT = 5.0
 const val THROTTLE_ACOUSTIC_LIMIT = 15.0
 const val THROTTLE_COMPASS_LIMIT = 5.0
-const val THROTTLE_BARO_LIMIT = 0.5f
+const val THROTTLE_BARO_LIMIT = 0.5
 
 // System Thresholds (Core Logic)
 const val TRACKER_SIGNAL_LOSS_THRESHOLD_MS = 180000L
 const val VIEWER_SIGNAL_LOSS_THRESHOLD_MS = 30000L
 const val INTERNET_LOSS_THRESHOLD_MS = 60000L 
 const val DISTANCE_ALARM_SAMPLES_REQUIRED = 6
-const val DEFAULT_ACCURACY_FALLBACK = 15.0f
-const val RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT = 20.0f
+const val DEFAULT_ACCURACY_FALLBACK = 15.0
+const val RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT = 20.0
 
 // Battery thresholds (R716e)
 const val BATTERY_ALARM_THRESHOLD = 20
 const val CRITICAL_BATTERY_THRESHOLD = 20
-const val MAX_SAFE_TEMPERATURE_CELSIUS = 46.0f
-const val MAX_SAFE_TEMPERATURE_RECOVERY = 44.0f
+const val MAX_SAFE_TEMPERATURE_CELSIUS = 46.0
+const val MAX_SAFE_TEMPERATURE_RECOVERY = 44.0
 const val BATTERY_STEEP_DISCHARGE_THRESHOLD = 5
 const val BATTERY_STEEP_DISCHARGE_WINDOW_MS = 600000L
 
@@ -243,23 +248,23 @@ const val SYSTEM_STORAGE_LOW_THRESHOLD_MB = 50L
 
 // GPS Polling & Filtering (v8.7.5 Centralization)
 const val GPS_SEQUENCE_TOLERANCE_MS = 60000L
-const val GPS_MIN_UPDATE_DISTANCE_METERS = 2.0f
+const val GPS_MIN_UPDATE_DISTANCE_METERS = 2.0
 
 // Analytical Index Thresholds
 const val GPS_INDEX_AGE_EXCELLENT_SEC = 5.0
 const val GPS_INDEX_AGE_SCALING = 2.0
-const val GPS_INDEX_ACCURACY_EXCELLENT_METERS = 8.0f
+const val GPS_INDEX_ACCURACY_EXCELLENT_METERS = 8.0
 const val GPS_INDEX_SATS_TARGET = 12
 
 // Forensic Ribbon Scaling
 const val RIBBON_NOISE_SCALE_DB = 40.0
 const val RIBBON_LUX_LOG_SCALE = 5.0
 const val RIBBON_VIBRATION_SCALE_G = 2.0
-const val RIBBON_LIFT_SCALE_METERS = 5.0f
-const val RIBBON_SNR_SCALE_DB = 45.0f
+const val RIBBON_LIFT_SCALE_METERS = 5.0
+const val RIBBON_SNR_SCALE_DB = 45.0
 const val RIBBON_CURRENT_SCALE_MA = 1000.0
-const val RIBBON_SIT_TILT_SCALE_DEG = 15.0f
-const val RIBBON_SIT_BARO_SCALE_METERS = 0.5f
+const val RIBBON_SIT_TILT_SCALE_DEG = 15.0
+const val RIBBON_SIT_BARO_SCALE_METERS = 0.5
 
 const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 
@@ -285,7 +290,7 @@ const val GPS_TRANSITION_LOG_MUZZLE_MS = 30000L
 const val MAX_HISTORY_POINTS_PER_RIBBONS = 240
 const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
-const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0f
+const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
 
 // R338: Unified UI Staleness Threshold (15s) - Relaxed to accommodate jitter
 // Issue #002: Increased to 35s to cover STATIONARY_GPS_POLLING_MS (20s)
@@ -349,7 +354,7 @@ const val WATCHDOG_DANGER_WINDOW_MS = 20000L
 const val COMMUNICATION_ALARM_GRACE_PERIOD_MS = 60000L
 const val LOCATION_ALARM_GRACE_PERIOD_MS = 30000L
 const val POWER_DISCONNECT_DEBOUNCE_MS = 3000L
-const val SIREN_AUTO_STOP_MS = 30000L // Issue #429: Aligned with ACOUSTIC_RECOVERY_DELAY_MS
+const val SIREN_AUTO_STOP_MS = 30000L
 const val SIREN_RESUME_COOLDOWN_MS = 15000L
 const val ALARM_OVERLAY_THROTTLE_MS = 30000L
 const val HEARTBEAT_INTERVAL_MS = 3600000L
@@ -367,7 +372,7 @@ const val PROXIMITY_DEBOUNCE_MOVING_MS = 1000L
 // Issue #012: Adaptive Proximity Debounce
 const val PROXIMITY_DEBOUNCE_MAX_MS = 15000L
 const val PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR = 2000L
-const val PROXIMITY_STRESS_SCALING_MULTIPLIER = 2.0f
+const val PROXIMITY_STRESS_SCALING_MULTIPLIER = 2.0
 
 // History & Persistence Logic
 const val REAL_TIME_GAP_LIMIT_MS = 10000L

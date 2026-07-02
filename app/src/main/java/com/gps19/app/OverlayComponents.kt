@@ -2,10 +2,12 @@ package com.gps19.app
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,11 +26,11 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * v8.9.78:
+ * - Issue #018: Stationary Anchor Hard-Lock. Added visual indicator to LegacyDashboardGrid.
  * v8.9.55:
  * - Issue #013: Forensic UI Expansion. Added proximityDebounce and 
  *   rollingVibration fields to LegacyDashboardGrid for stationary scaling verification.
- * v8.9.54:
- * - Issue #427/428: Relaxed staleness thresholds to 15s to prevent UI flickering.
  */
 
 @Composable
@@ -77,17 +79,34 @@ fun LegacyDashboardGrid(
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                val stateColor = if (d.isGpsFresh) BrandJd else Slate500
-                val isMoving = d.trackerState == TrackerState.MOVING
-                val stateText = d.trackerState.name
-                
-                Text(
-                    text = if (isMoving && d.isGpsFresh) "»\u2009$stateText\u2009«" else stateText,
-                    color = stateColor.copy(alpha = if (isMoving && d.isGpsFresh) movingAlpha else 1f),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val stateColor = if (d.isGpsFresh) BrandJd else Slate500
+                    val isMoving = d.trackerState == TrackerState.MOVING
+                    val stateText = d.trackerState.name
+                    
+                    Text(
+                        text = if (isMoving && d.isGpsFresh) "»\u2009$stateText\u2009«" else stateText,
+                        color = stateColor.copy(alpha = if (isMoving && d.isGpsFresh) movingAlpha else 1f),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    
+                    if (d.isAnchorLocked) {
+                        Spacer(Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(BrandJd, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Lock, null, tint = Color.White, modifier = Modifier.size(10.dp))
+                                Spacer(Modifier.width(2.dp))
+                                Text("LOCKED", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                            }
+                        }
+                    }
+                }
                 
                 if (d.isLocationPending && d.locationPendingReason != LocationPendingReason.NONE) {
                     Text(

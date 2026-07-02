@@ -10,15 +10,12 @@ import timber.log.Timber
 
 /**
  * SyncManager: Handles the telemetry synchronization loop.
- * v8.9.72:
- * - Issue #015: Hardened coroutine cancellation handling. Ensuring CancellationException 
- *   is not logged as a sync failure during service shutdown.
- * v8.9.43:
- * - Issue #013: Forensic UI Expansion. Propagating proximityDebounceMs and 
- *   vibrationRollingSum through the sync loop for stationary scaling verification.
- * v8.9.42:
- * - Issue #315: Network Integrity & Timeout Scaling. Refined RTT-aware scaling with 
- *   proportional delay to prevent loop saturation. (Formerly #273)
+ * v8.9.77:
+ * - Issue #018: Stationary Anchor Hard-Lock. Propagating isAnchorLocked flag 
+ *   to TrackerStatus and persistence.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized parameters to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  */
 class SyncManager(
     private val context: Context,
@@ -67,7 +64,6 @@ class SyncManager(
                     }
                 }
 
-                // Issue #315: Proportional RTT scaling. 
                 val dynamicDelay = when {
                     currentRtt > MAX_ALLOWED_RTT_MS -> PING_INTERVAL_MS * 3
                     currentRtt > MAX_ALLOWED_RTT_MS / 2 -> {
@@ -83,19 +79,20 @@ class SyncManager(
 
     suspend fun pushCurrentStatus(
         deviceId: String, viewerId: String, isTrackerMode: Boolean, loc: android.location.Location?, filtered: EngineGeoPoint?,
-        distToTracker: Double?, distToHome: Double?, maxAccuracy: Float, filteredSpeed: Double,
-        vibration: Float, heading: Float, baroAlt: Float, lux: Float, isNear: Boolean, isSuspicious: Boolean,
-        tiltDegrees: Float, acousticDb: Double, isJump: Boolean, isTrajectoryPromoted: Boolean, jumpTier: Int,
-        isJammer: Boolean, isStalledRaw: Boolean, isStalledActive: Boolean, peakShock: Float, peakShockTs: Long,
-        luxBaseline: Float, acousticFloorDb: Double, adaptiveVibrationFloor: Float, proxIdx: Float, proximityCm: Float,
-        proximityDebounceMs: Long, vibrationRollingSum: Float,
+        distToTracker: Double?, distToHome: Double?, maxAccuracy: Double, filteredSpeed: Double,
+        vibration: Double, heading: Double, baroAlt: Double, lux: Double, isNear: Boolean, isSuspicious: Boolean,
+        tiltDegrees: Double, acousticDb: Double, isJump: Boolean, isTrajectoryPromoted: Boolean, jumpTier: Int,
+        isJammer: Boolean, isStalledRaw: Boolean, isStalledActive: Boolean, peakShock: Double, peakShockTs: Long,
+        luxBaseline: Double, acousticFloorDb: Double, adaptiveVibrationFloor: Double, proxIdx: Double, proximityCm: Double,
+        proximityDebounceMs: Long, vibrationRollingSum: Double,
         micPending: Boolean, isTamperDetected: Boolean, isPowerTamper: Boolean, isSitDetected: Boolean, isSitActive: Boolean,
-        lastSitTs: Long, receiptRealtime: Long, violationUptimeMs: Long, violationPercentage: Float,
-        verticalVelocity: Float, sitVz: Float, sitDz: Float, sitBaro: Float, sitTilt: Float, sitShock: Float,
+        lastSitTs: Long, receiptRealtime: Long, violationUptimeMs: Long, violationPercentage: Double,
+        verticalVelocity: Double, sitVz: Double, sitDz: Double, sitBaro: Double, sitTilt: Double, sitShock: Double,
         isClockRegression: Boolean, isLocationPending: Boolean, locationPendingReason: LocationPendingReason,
-        lastValidFixRealtime: Long, gnssDetail: GnssDetail?, snrIdx: Float, tiltIdx: Float, baroIdx: Float,
+        lastValidFixRealtime: Long, gnssDetail: GnssDetail?, snrIdx: Double, tiltIdx: Double, baroIdx: Double,
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
-        batteryLevel: Int, batteryTemp: Float, isCharging: Boolean
+        batteryLevel: Int, batteryTemp: Double, isCharging: Boolean,
+        isAnchorLocked: Boolean = false
     ) {
         val status = TrackerStatus(
             deviceId = deviceId,
@@ -104,10 +101,10 @@ class SyncManager(
             lat = filtered?.lat ?: loc?.latitude ?: 0.0,
             lng = filtered?.lng ?: loc?.longitude ?: 0.0,
             alt = loc?.altitude ?: 0.0,
-            accuracy = loc?.accuracy ?: 0f,
+            accuracy = loc?.accuracy?.toDouble() ?: 0.0,
             maxAccuracy = maxAccuracy,
-            speed = filteredSpeed.toFloat(),
-            bearing = loc?.bearing ?: 0f,
+            speed = filteredSpeed,
+            bearing = loc?.bearing?.toDouble() ?: 0.0,
             vibration = vibration,
             heading = heading,
             baroAlt = baroAlt,
@@ -155,7 +152,8 @@ class SyncManager(
             gnssDetail = gnssDetail,
             battery = batteryLevel,
             temp = batteryTemp,
-            isCharging = isCharging
+            isCharging = isCharging,
+            isAnchorLocked = isAnchorLocked
         )
 
         val success = networkManager.sendTelemetry(status)
@@ -163,7 +161,6 @@ class SyncManager(
         if (isTrackerMode) {
             repository.saveTrackerState(status)
             
-            // Issue #339/348: If transmission fails, buffer the update locally for later synchronization.
             if (!success) {
                 offlineRepository.addPendingStatusUpdate(PendingStatusEntity(
                     lat = status.lat,
@@ -200,7 +197,8 @@ class SyncManager(
                     standbyBucket = status.standbyBucket,
                     netInterface = status.netInterface,
                     lastValidFixRealtime = status.lastValidFixRealtime,
-                    locationPendingReason = status.locationPendingReason.name
+                    locationPendingReason = status.locationPendingReason.name,
+                    isAnchorLocked = status.isAnchorLocked
                 ))
             }
         }
@@ -222,20 +220,20 @@ class SyncManager(
                 maxAccuracy = entity.maxAccuracy,
                 speed = entity.speed,
                 bearing = entity.bearing,
-                vibration = 0f, 
-                heading = 0f,
-                baroAlt = 0f,
-                lux = 0f,
+                vibration = 0.0, 
+                heading = 0.0,
+                baroAlt = 0.0,
+                lux = 0.0,
                 isNear = true,
                 isSuspicious = false,
-                tiltDegrees = 0f,
+                tiltDegrees = 0.0,
                 acousticDb = 0.0,
                 isJump = false,
                 isTrajectoryPromoted = false,
                 jumpTier = 0,
                 isJammer = false,
                 isStalled = false,
-                peakVibrationShock = 0f,
+                peakVibrationShock = 0.0,
                 peakVibrationShockTs = 0L,
                 isTamperDetected = false,
                 isPowerTamper = false,
@@ -258,7 +256,8 @@ class SyncManager(
                 isCoolingModeActive = entity.isCoolingModeActive,
                 battery = entity.battery,
                 temp = entity.temp,
-                isCharging = entity.isCharging
+                isCharging = entity.isCharging,
+                isAnchorLocked = entity.isAnchorLocked
             )
 
             if (networkManager.sendTelemetry(status)) {

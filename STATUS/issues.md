@@ -1,4 +1,4 @@
-# Hardening Phase: Primary Tracking Document (v8.9.71)
+# Hardening Phase: Primary Tracking Document (v8.9.75)
 
 This document tracks all open issues, technical debt, and pending validation tasks. Once an item is verified, it is moved to the **[compliance.md](compliance.md)** archive.
 
@@ -7,23 +7,22 @@ This document tracks all open issues, technical debt, and pending validation tas
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟡 Medium | 1 |
+| **Open Technical Issues** | 🟢 Low | 0 |
 | **Validation Tasks** | 🟡 Pending | 3 |
-| **Resolved (this session)** | 🟢 Progress | 21 |
+| **Resolved (this session)** | 🟢 Progress | 22 |
 | **Archived Resolutions** | 📁 Historical | 260 |
 
 ---
 
-## ⚠️ Newly Identified Risks & Concerns (v8.9.71)
+## ⚠️ Newly Identified Risks & Concerns (v8.9.75)
 *   **Soak Test Monitoring**: Ongoing 24-hour stability test required to monitor for `STABILITY GAP` logs under 10Hz sensor load.
 *   **UI Refresh Consistency**: Need to verify forensic fields (`Prox Debounce`, `Rolling Vibe`) respect the 15s staleness gate in low-signal conditions.
+*   **Room REAL Affinity**: Verified that standardizing on `Double` aligns with Room's `REAL` type affinity, but schema generation should be audited for non-standard migration side-effects.
 
 ---
 
 ## 🔴 Open Technical Issues
-| ID | Severity | Issue | Description |
-| :--- | :--- | :--- | :--- |
-| #014 | **Low** | **Type Safety / Conversion Optimization** | Numerous `toDouble()`/`toFloat()` conversions in the telemetry chain (identified via grep) could be cleaned up by standardizing property types across the `core:engine` and `app` modules. |
+*   *No high/medium priority technical issues open.*
 
 ## 🟡 Pending Validation (Hardening Phase)
 *   **Off-Main-Thread Sensor Stability**: Verify long-term stability of the `AppSensorThread` under sustained high-frequency sampling.
@@ -33,6 +32,7 @@ This document tracks all open issues, technical debt, and pending validation tas
 ## 🟢 Resolved (this session)
 | ID | Severity | Issue | Status | Resolution |
 | :--- | :--- | :--- | :--- | :--- |
+| #014 | **Low** | **Type Safety / Conversion Optimization** | Resolved | Standardized telemetry fields to `Double` across `core:engine` and `app` modules, removing redundant conversions. |
 | #011 | **Low** | **Suppression Forensic Labeling** | Resolved | Implemented `suppressionNote` generation in `LocationSentinel` and logging in `TrackerService`. |
 | #012 | **Low** | **Adaptive Proximity Debounce** | Resolved | Implemented stationary and stress-based scaling in `AppSensorManager`. |
 | #013 | **High** | **Forensic UI Expansion** | Resolved | Exposed internal scaling metrics to the UI dashboard and propagated them through the sync manager. |

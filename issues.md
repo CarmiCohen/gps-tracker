@@ -23,14 +23,18 @@
 - **Priority**: Medium
 - **Target**: `core:engine`.
 
+## Resolved Issues
+
 ### Issue #019: Android 14+ "While-in-Use" Permission Transition Risk
 - **Description**: Services may fail to add `MICROPHONE` type if they transition from background to "active monitoring" without a fresh UI pulse.
 - **Root Cause**: Android 14's strict enforcement of `FOREGROUND_SERVICE_TYPE_MICROPHONE` requiring a visible activity or a specific allowed transition.
-- **Status**: Open
+- **Implementation**: 
+    * Added `isRecentUiPulse()` to `BaseMonitorService` to bridge the gap between background start and UI visibility.
+    * Refined `TrackerService.getAvailableForegroundServiceType` to claim `MICROPHONE` if a UI pulse was received within `UI_PULSE_TIMEOUT_MS`.
+    * Ensured `updateForegroundServiceType()` is called immediately after async setup completion.
+- **Status**: Resolved
 - **Priority**: Medium
-- **Target**: `TrackerService.kt`.
-
-## Resolved Issues
+- **Target**: `TrackerService.kt`, `BaseMonitorService.kt`.
 
 ### Issue #015: StandaloneCoroutine Cancellation during Service Start
 - **Description**: `JobCancellationException` observed immediately after foreground service failure.

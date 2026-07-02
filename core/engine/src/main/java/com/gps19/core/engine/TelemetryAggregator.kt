@@ -4,18 +4,11 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * v8.9.75:
+ * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
+ *   to eliminate redundant toDouble()/toFloat() conversions.
  * v8.9.42:
- * - Issue #326: Added locationPendingReason to mergeWorstCase and gap-filling logic for 
- *   forensic uncertainty parity.
- * - Issue #325: Added accuracy and maxAccuracy to mergeWorstCase and gap-filling logic 
- *   to support authoritative uncertainty ribbons.
- * v8.9.38:
- * - Issue #358: SIT Forensic Duplicate Risk. Fixed by ensuring isSitDetected defaults to false 
- *   during backfill if samples are missing. (Formerly #291)
- * v8.9.21:
- * - Issue #329: Added tiltIdx and baroIdx to mergeWorstCase, backfillGaps, and fillRealGap.
- * v8.9.5:
- * - Issue #337: Added currentMa and SIT forensic fields to mergeWorstCase for absolute parity.
+ * - Issue #326: Added locationPendingReason to mergeWorstCase and gap-filling logic.
  */
 class TelemetryAggregator {
 
@@ -23,7 +16,6 @@ class TelemetryAggregator {
 
     /**
      * Merges high-resolution points into a "Worst Case" summary for lower resolutions.
-     * Logic: Take the MAX of negative metrics (RTT, Noise, Vibe, Current, Deltas, Uncertainty) and MIN of positive (Signal, SnrIdx).
      */
     fun mergeWorstCase(acc: EngineConnectionPoint, cur: EngineConnectionPoint): EngineConnectionPoint {
         return acc.copy(
@@ -102,18 +94,17 @@ class TelemetryAggregator {
         while (fillTs < now) {
             val totalSeconds = (fillTs / 1000).toInt()
             
-            val resolvedSnr = snrSamples.find { it.ts in fillTs..(fillTs + 999) }?.snr?.let { (it / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f) } ?: baseTemplate.snrIdx
+            val resolvedSnr = snrSamples.find { it.ts in fillTs..(fillTs + 999) }?.snr?.let { (it / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) } ?: baseTemplate.snrIdx
             val snapshot = sensorSamples.find { it.ts in fillTs..(fillTs + 999) }
             
-            val resolvedNoise = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB).toFloat() } ?: baseTemplate.noiseIdx
-            val resolvedLux = snapshot?.let { (log10(it.lux.toDouble() + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0).toFloat() } ?: baseTemplate.luxIdx
-            val resolvedVibe = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0).toFloat() } ?: baseTemplate.vibeIdx
+            val resolvedNoise = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: baseTemplate.noiseIdx
+            val resolvedLux = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: baseTemplate.luxIdx
+            val resolvedVibe = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: baseTemplate.vibeIdx
             val resolvedProx = snapshot?.proxIdx ?: baseTemplate.proxIdx
-            val resolvedLift = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0f, 1f) } ?: baseTemplate.liftIdx
-            val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0f, 1f) } ?: baseTemplate.tiltIdx
-            val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0f, 1f) } ?: baseTemplate.baroIdx
+            val resolvedLift = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.liftIdx
+            val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: baseTemplate.tiltIdx
+            val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.baroIdx
             
-            // SIT detection is a point-in-time event.
             val resolvedSit = snapshot?.isSitDetected ?: false
 
             val fillPoint = baseTemplate.copy(
@@ -163,29 +154,29 @@ class TelemetryAggregator {
             
             val samplesInInterval = snrSamples.filter { it.ts in currentTs..(currentTs + intervalMs - 1) }
             val resolvedSnr = if (samplesInInterval.isNotEmpty()) {
-                samplesInInterval.minOf { it.snr }.let { (it / RIBBON_SNR_SCALE_DB).coerceIn(0f, 1f) }
-            } else 0f
+                samplesInInterval.minOf { it.snr }.let { (it / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) }
+            } else 0.0
             
             val snapshotsInInterval = sensorSamples.filter { it.ts in currentTs..(currentTs + intervalMs - 1) }
             val resolvedNoise = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.acoustic }.let { ((it - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB).toFloat() }
-            } else 0f
+                snapshotsInInterval.maxOf { it.acoustic }.let { ((it - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) }
+            } else 0.0
             val resolvedLux = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.lux }.let { (log10(it.toDouble() + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0).toFloat() }
-            } else 0f
+                snapshotsInInterval.maxOf { it.lux }.let { (log10(it + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) }
+            } else 0.0
             val resolvedVibe = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.vibe }.let { (it / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0).toFloat() }
-            } else 0f
-            val resolvedProx = if (snapshotsInInterval.isNotEmpty()) snapshotsInInterval.minOf { it.proxIdx } else 1f
+                snapshotsInInterval.maxOf { it.vibe }.let { (it / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) }
+            } else 0.0
+            val resolvedProx = if (snapshotsInInterval.isNotEmpty()) snapshotsInInterval.minOf { it.proxIdx } else 1.0
             val resolvedLift = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.lift }.let { (it / RIBBON_LIFT_SCALE_METERS).coerceIn(0f, 1f) }
-            } else 0f
+                snapshotsInInterval.maxOf { it.lift }.let { (it / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) }
+            } else 0.0
             val resolvedTilt = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.tilt }.let { (it / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0f, 1f) }
-            } else 0f
+                snapshotsInInterval.maxOf { it.tilt }.let { (it / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) }
+            } else 0.0
             val resolvedBaro = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.lift }.let { (it / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0f, 1f) }
-            } else 0f
+                snapshotsInInterval.maxOf { it.lift }.let { (it / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) }
+            } else 0.0
             val resolvedSit = snapshotsInInterval.any { it.isSitDetected }
 
             gapPoints.add(EngineConnectionPoint(
