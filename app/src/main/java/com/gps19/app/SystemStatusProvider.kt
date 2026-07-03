@@ -65,7 +65,7 @@ class SystemStatusProviderImpl @Inject constructor(
 
     override fun isAutoStartGranted(): Boolean {
         return if (isXiaomiDevice()) {
-            isXiaomiAutostartGranted(context)
+            isXiaomiAutostartGranted(context, cachedPackageName)
         } else {
             isBatteryWhitelisted()
         }
@@ -109,7 +109,7 @@ class SystemStatusProviderImpl @Inject constructor(
     }
 
     override fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus {
-        return com.gps19.app.isXiaomiSpecialPermissionGranted(context)
+        return com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName)
     }
 
     override fun getPermissionState(): PermissionState {

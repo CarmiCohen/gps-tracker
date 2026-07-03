@@ -21,12 +21,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.89:
+ * - Issue #005 Hardening: Passed cachedPkgName to Xiaomi checkers to eliminate 
+ *   repetitive getPackageName() logcat spam on Samsung devices.
  * v8.9.88:
  * - Identity Persistence Fix: Corrected handleViewerPulse to check against 
  *   DEFAULT_VIEWER_ID instead of incorrectly shadowing DEFAULT_TRACKER_ID.
  * - Build Fix: Corrected sensorRepository to sensorManager in pushCurrentStatus.
- * v8.9.80:
- * - Issue #014: Type Migration Finalization.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -566,7 +567,7 @@ class TrackerService : BaseMonitorService() {
             XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN
         }
         
-        val xiaomiAutostartStatus = when(getXiaomiAutostartStatus(this)) {
+        val xiaomiAutostartStatus = when(getXiaomiAutostartStatus(this, cachedPkgName)) {
             XiaomiPermissionStatus.GRANTED -> EngineXiaomiStatus.GRANTED
             XiaomiPermissionStatus.DENIED -> EngineXiaomiStatus.DENIED
             XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN

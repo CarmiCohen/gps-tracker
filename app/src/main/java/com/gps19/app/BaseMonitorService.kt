@@ -20,11 +20,11 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * v8.9.89:
+ * - Issue #005 Hardening: Added cachedPkgName to prevent repetitive getPackageName() 
+ *   system log spam on Samsung G990/A155 devices.
  * v8.9.72:
  * - Issue #019: Added isRecentUiPulse() to bridge Android 14+ FGS transition windows.
- * v8.9.71:
- * - Issue #014: Hardened safeStartForeground for Android 14+. Enforcing type 
- *   specification to avoid "Mismatch" and "StartNotAllowed" regressions.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -40,6 +40,9 @@ abstract class BaseMonitorService : LifecycleService() {
     protected lateinit var systemMonitor: SystemMonitor
     protected lateinit var notificationManager: AppNotificationManager
     
+    // Rationale: Cache packageName to prevent repetitive getPackageName() log spam.
+    protected val cachedPkgName by lazy { packageName }
+
     protected var serviceStartRealtime = 0L
     protected var lastServiceTickTs = 0L
     protected var lastServiceTickRealtime = 0L
