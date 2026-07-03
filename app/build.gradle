@@ -27,8 +27,8 @@ def getGitVersionName = { ->
             commandLine 'git', 'describe', '--tags', '--always', '--dirty'
             standardOutput = stdout
         }
-        // v8.9.71: Added regex to strip leading 'v' or 'v.' prefixes for a clean number-only display
-        return stdout.toString().trim().replaceAll("^v\\.?+", "")
+        // Updated regex to more reliably strip 'v' or 'v.' prefixes
+        return stdout.toString().trim().replaceAll("^v[.]?", "")
     } catch (Exception ignored) {
         return "1.0.0"
     }
