@@ -12,8 +12,11 @@ import timber.log.Timber
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
- * v8.8.21: Migrated to TimeProvider for all timing logic.
- * v8.9.55: Issue #458: Optimized AlarmManager rescheduling with danger window.
+ * v8.9.87:
+ * - Issue #005 Hardening: Cached packageName to eliminate repetitive getPackageName() 
+ *   system log spam on Samsung devices.
+ * v8.9.55:
+ * - Issue #458: Optimized AlarmManager rescheduling with danger window.
  */
 class SystemMonitor(
     private val context: Context, 
@@ -26,6 +29,9 @@ class SystemMonitor(
     private var nextExpectedExpiryTs = 0L
     private var skippedCounter = 0
     
+    // Rationale: Cache packageName to prevent repetitive getPackageName() log spam.
+    private val cachedPkgName = context.packageName
+
     var jumpStateStartTs = 0L
     var gpsStallStartTs = 0L
 
@@ -73,13 +79,11 @@ class SystemMonitor(
         
         if (!force && !inDangerWindow) {
             skippedCounter++
-            // NOTE: We do NOT update lastScheduledWatchdogTs here to allow subsequent checks
-            // to pass the throttle gate until the danger window is reached.
             return
         }
 
         val alarmManagerService = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(ACTION_ALARM_WAKEUP).setPackage(context.packageName)
+        val intent = Intent(ACTION_ALARM_WAKEUP).setPackage(cachedPkgName)
         val pendingIntent = PendingIntent.getBroadcast(
             context, 0, intent, 
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -112,7 +116,7 @@ class SystemMonitor(
     fun cancelWatchdogAlarm() {
         try {
             val alarmManagerService = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val intent = Intent(ACTION_ALARM_WAKEUP).setPackage(context.packageName)
+            val intent = Intent(ACTION_ALARM_WAKEUP).setPackage(cachedPkgName)
             val pendingIntent = PendingIntent.getBroadcast(
                 context, 0, intent, 
                 PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE

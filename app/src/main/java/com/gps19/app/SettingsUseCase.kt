@@ -11,9 +11,12 @@ import javax.inject.Singleton
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
  * Handles draft lifecycle, atomic commits, and full system resets.
+ * v8.9.87:
+ * - Issue #005 Remediation: Fixed type mismatch where loadAllSettings was using 
+ *   getFloat for Double-backed distance and temperature keys.
+ * - Identity Fix: Corrected updateViewerId to save to VIEWER_ID_KEY instead of TRACKER_ID_KEY.
  * v8.9.79:
  * - Issue #014: Type Migration. Aligned maxTemp and maxDistance to Double.
- * - Issue #016: Explicitly offloaded loadAllSettings to Dispatchers.IO to prevent startup jank.
  */
 @Singleton
 class SettingsUseCase @Inject constructor(
@@ -68,15 +71,17 @@ class SettingsUseCase @Inject constructor(
         val dId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
         val vId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
         val rUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
-        val maxDist = repository.getFloat(MainRepository.MAX_DISTANCE_STORAGE_KEY, MainRepository.DEFAULT_MAX_DISTANCE.toFloat()).toDouble()
+        
+        // Fix: Use getDouble for consistency with Issue #014 standards
+        val maxDist = repository.getDouble(MainRepository.MAX_DISTANCE_STORAGE_KEY, MainRepository.DEFAULT_MAX_DISTANCE)
         val hPoints = repository.loadHomePoints()
         val aSettings = repository.loadAlertSettings()
         val mMode = repository.getAppMode()
         val sSiren = repository.getString(MainRepository.SELECTED_SIREN_KEY, "Siren")
         val lAlarmAck = repository.getLastAlarmAckTs()
-        val lMaxTemp = repository.getFloat(MainRepository.MAX_TEMP_KEY, 0f).toDouble()
-        var appStartTime = repository.getLong(MainRepository.APP_START_TIME_KEY, 0L)
+        val lMaxTemp = repository.getDouble(MainRepository.MAX_TEMP_KEY, 0.0)
         
+        var appStartTime = repository.getLong(MainRepository.APP_START_TIME_KEY, 0L)
         if (appStartTime == 0L) {
             appStartTime = timeProvider.currentTimeMillis()
             repository.saveLong(MainRepository.APP_START_TIME_KEY, appStartTime)
@@ -86,7 +91,7 @@ class SettingsUseCase @Inject constructor(
         val draftDId = repository.getString(MainRepository.DRAFT_TRACKER_ID, "")
         val draftVId = repository.getString(MainRepository.DRAFT_VIEWER_ID, "")
         val draftRUrl = repository.getString(MainRepository.DRAFT_RELAY_URL, "")
-        val draftMaxDist = repository.getFloat(MainRepository.DRAFT_MAX_DISTANCE, 0f)
+        val draftMaxDist = repository.getDouble(MainRepository.DRAFT_MAX_DISTANCE, 0.0)
         
         var draftSettings: DraftSettings? = null
         if (draftDId.isNotEmpty() || draftVId.isNotEmpty() || draftRUrl.isNotEmpty() || draftMaxDist > 0 || draftAlerts != null) {

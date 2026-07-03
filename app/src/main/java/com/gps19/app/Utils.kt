@@ -11,10 +11,11 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
+ * v8.9.87:
+ * - Issue #005 Hardening: Cached packageName to prevent repetitive getPackageName() 
+ *   system log spam on Samsung G990/A155 devices.
  * v8.9.51:
- * - Issue #455: Xiaomi Autostart & Boot Resilience. (Formerly #190)
- * v8.9.48:
- * - Issue #421: Role Identity Prefix Mismatch. (Formerly #182)
+ * - Issue #455: Xiaomi Autostart & Boot Resilience.
  */
 
 enum class XiaomiPermissionStatus {
@@ -51,11 +52,12 @@ fun isXiaomiDevice(): Boolean {
 fun isXiaomiSpecialPermissionGranted(context: Context): XiaomiPermissionStatus {
     if (!isXiaomiDevice()) return XiaomiPermissionStatus.UNKNOWN
     
+    val pkgName = context.packageName
     val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     return try {
         val checkOpMethod = ops.javaClass.getMethod("checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
-        val showOnLock = checkOpMethod.invoke(ops, 10021, android.os.Process.myUid(), context.packageName) as Int
-        val backgroundPop = checkOpMethod.invoke(ops, 10020, android.os.Process.myUid(), context.packageName) as Int
+        val showOnLock = checkOpMethod.invoke(ops, 10021, android.os.Process.myUid(), pkgName) as Int
+        val backgroundPop = checkOpMethod.invoke(ops, 10020, android.os.Process.myUid(), pkgName) as Int
         
         if (showOnLock == AppOpsManager.MODE_ALLOWED && backgroundPop == AppOpsManager.MODE_ALLOWED) {
             XiaomiPermissionStatus.GRANTED
@@ -69,10 +71,11 @@ fun isXiaomiSpecialPermissionGranted(context: Context): XiaomiPermissionStatus {
 
 fun getXiaomiAutostartStatus(context: Context): XiaomiPermissionStatus {
     if (!isXiaomiDevice()) return XiaomiPermissionStatus.UNKNOWN
+    val pkgName = context.packageName
     val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     return try {
         val checkOpMethod = ops.javaClass.getMethod("checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
-        val autostart = checkOpMethod.invoke(ops, 10008, android.os.Process.myUid(), context.packageName) as Int
+        val autostart = checkOpMethod.invoke(ops, 10008, android.os.Process.myUid(), pkgName) as Int
         if (autostart == AppOpsManager.MODE_ALLOWED) XiaomiPermissionStatus.GRANTED else XiaomiPermissionStatus.DENIED
     } catch (e: Exception) {
         XiaomiPermissionStatus.UNKNOWN

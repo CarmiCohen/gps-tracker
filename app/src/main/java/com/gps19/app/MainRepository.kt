@@ -18,10 +18,11 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * v8.9.87:
+ * - Identity Fix: Corrected DEFAULT_VIEWER_ID to use SettingsRepository.DEFAULT_VIEWER_ID ("V")
+ *   instead of incorrectly shadowing the Tracker ID ("T").
  * v8.9.79:
  * - Issue #014: Type Migration. Aligned parameters to Double to eliminate redundant conversions.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -90,7 +91,7 @@ class MainRepository @Inject constructor(
         const val LAST_SERVICE_TICK_REALTIME_KEY = SettingsRepository.LAST_SERVICE_TICK_REALTIME_KEY
         const val LAST_AUTO_SAVE_HOUR_KEY = SettingsRepository.LAST_AUTO_SAVE_HOUR_KEY
         
-        const val LAST_DAILY_ARCHIVE_DATE_KEY = SettingsRepository.LAST_DAILY_ARCHIVE_DATE_KEY
+        const val LAST_DAILY_ARCHIVE_DATE_KEY =SettingsRepository.LAST_DAILY_ARCHIVE_DATE_KEY
         const val LAST_DAILY_CLEANUP_DATE_KEY = SettingsRepository.LAST_DAILY_CLEANUP_DATE_KEY
 
         const val DRAFT_TRACKER_ID = SettingsRepository.DRAFT_TRACKER_ID

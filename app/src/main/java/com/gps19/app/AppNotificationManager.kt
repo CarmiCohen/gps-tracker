@@ -15,6 +15,9 @@ import java.util.Locale
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
+ * v8.9.87:
+ * - Issue #005 Hardening: Cached packageName to prevent repetitive getPackageName() 
+ *   system log spam on Samsung G990/A155 devices.
  * v8.9.2:
  * - Issue 183: Switched notification icons from legacy R.mipmap.z2 to R.drawable.ic_jd_logo.
  */
@@ -24,6 +27,9 @@ class AppNotificationManager(private val context: Context) {
     private val alarmChannelId = "alarm_service_channel"
     private val notificationId = 1919
     private val alarmNotificationId = 1920
+    
+    // Rationale: Cache packageName to prevent repetitive getPackageName() log spam.
+    private val cachedPkgName = context.packageName
 
     init {
         createNotificationChannels()
@@ -98,7 +104,7 @@ class AppNotificationManager(private val context: Context) {
 
         if (showPermissionAction && isXiaomiDevice()) {
             val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", context.packageName, null)
+                data = Uri.fromParts("package", cachedPkgName, null)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             val settingsPendingIntent = PendingIntent.getActivity(

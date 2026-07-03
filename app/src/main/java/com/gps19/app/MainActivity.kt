@@ -18,12 +18,16 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
- * v8.8.6: Deep-Link Cold-Start Handling (Issue #022 - Formerly 44).
+ * v8.9.87:
+ * - Issue #005 Hardening: Replaced all dynamic packageName calls with cachedPkgName 
+ *   to eliminate repetitive getPackageName() logcat spam on Samsung devices.
+ * v8.8.6: Deep-Link Cold-Start Handling (Issue #022).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private val cachedPkgName by lazy { packageName }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -63,7 +67,7 @@ class MainActivity : ComponentActivity() {
                 onRequestBatteryExemption = {
                     try {
                         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                            setData("package:$packageName".toUri())
+                            setData("package:$cachedPkgName".toUri())
                         }
                         startActivity(intent)
                     } catch (e: Exception) {
@@ -78,7 +82,7 @@ class MainActivity : ComponentActivity() {
                 },
                 onRequestOverlayPermission = {
                     try {
-                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:$packageName".toUri())
+                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:$cachedPkgName".toUri())
                         startActivity(intent)
                     } catch (e: Exception) {
                         Toast.makeText(this, "Could not open overlay settings", Toast.LENGTH_SHORT).show()
@@ -88,7 +92,7 @@ class MainActivity : ComponentActivity() {
                 onRequestAppInfo = {
                     try {
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            setData("package:$packageName".toUri())
+                            setData("package:$cachedPkgName".toUri())
                         }
                         startActivity(intent)
                     } catch (e: Exception) {
@@ -99,7 +103,7 @@ class MainActivity : ComponentActivity() {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         try {
                             val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                setData("package:$packageName".toUri())
+                                setData("package:$cachedPkgName".toUri())
                             }
                             startActivity(intent)
                         } catch (e: Exception) {
@@ -112,13 +116,13 @@ class MainActivity : ComponentActivity() {
                         try {
                             val intent = Intent("miui.intent.action.APP_PERM_EDITOR").apply {
                                 setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
-                                putExtra("extra_pkgname", packageName)
+                                putExtra("extra_pkgname", cachedPkgName)
                             }
                             startActivity(intent)
                         } catch (e: Exception) {
                             try {
                                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    setData("package:$packageName".toUri())
+                                    setData("package:$cachedPkgName".toUri())
                                 }
                                 startActivity(intent)
                             } catch (e2: Exception) {

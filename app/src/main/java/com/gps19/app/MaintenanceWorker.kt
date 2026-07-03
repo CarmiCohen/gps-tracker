@@ -16,8 +16,10 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * v8.9.87:
+ * - Issue #005 Hardening: Cached packageName to prevent repetitive getPackageName() 
+ *   system log spam on Samsung devices.
  * v8.8.21: Migrated to TimeProvider for all timing logic.
- * v8.8.23: Standardized all thresholds with Requirements SoT.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -27,6 +29,9 @@ class MaintenanceWorker @AssistedInject constructor(
     private val timeProvider: TimeProvider
 ) : CoroutineWorker(context, params) {
     
+    // Rationale: Cache packageName to prevent repetitive getPackageName() log spam.
+    private val cachedPkgName = applicationContext.packageName
+
     override suspend fun doWork(): Result {
         val savedMode = repository.getAppMode()
         
@@ -73,7 +78,7 @@ class MaintenanceWorker @AssistedInject constructor(
 
                 val serviceClass = if (savedMode == "tracker") TrackerService::class.java else ViewerService::class.java
                 val serviceIntent = Intent(applicationContext, serviceClass).apply {
-                    setPackage(applicationContext.packageName)
+                    setPackage(cachedPkgName)
                 }
                 
                 try {

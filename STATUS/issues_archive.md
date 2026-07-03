@@ -1,5 +1,19 @@
 # Issues Archive (Historical Resolutions)
 
+## Hardening Phase: v8.9.87 Resolved Items
+*   **Issue #005**: Map Provider Log Spillage. Hardened remediation by forcing a static user agent string ("GpsTracker/8.9.87") in `GpsApplication`. This eliminates repetitive `getPackageName()` calls that triggered system log spam on Samsung devices. (v8.9.87)
+*   **ID-01**: Viewer ID Identity Reversion. Fixed logic error in `SettingsRepository` where `viewerIdFlow` incorrectly defaulted to Tracker ID ("T"). Corrected `commitDraftSettings` to properly apply `draftRelayUrl` and ensured uniqueness checks do not collide on empty draft fields. (v8.9.87)
+
+## Hardening Phase: v8.9.86 Resolved Items
+*   **Issue #025**: FGS Transition Timeout. Increased `UI_PULSE_TIMEOUT_MS` to 45s to allow robust background-to-foreground service transitions on Android 14+. (v8.9.86)
+*   **Issue #024**: Accuracy Window Aliasing. Expanded `ACCURACY_WINDOW_BUCKET_MS` to 120s to ensure stationary GPS fixes do not cause window aliasing. (v8.9.85)
+*   **Issue #023**: DataStore Binary Incompatibility. Reverted tags 8, 9, 33 to float and introduced high-precision double tags 60, 61, 62 with DataMigration. (v8.9.84)
+*   **Issue #022**: Deep-Link Cold-Start Handling. Implemented intent-aware startup for direct map navigation. (v8.8.6)
+*   **Issue #021**: Map UI Infinite Loop. Fixed loop in `drawTrailToFolder` occurring with single-point segments. (v8.9.82)
+*   **Issue #020**: Map Centering Race Condition. Introduced `localLockStatus` to suspend centering upon user touch. (v8.9.83)
+*   **Issue #017**: SnapshotStateList Lock Failures. Replaced observable pools with `MutableList` in map updates. (v8.9.81)
+*   **Issue #016**: Main Thread Performance Bottlenecks. Optimized trail rendering and offloaded startup I/O. (v8.9.80)
+
 ## Hardening Phase: v8.9.78 Resolved Items
 *   **Issue #018**: Tracker Behavior Stability (Stationary Anchor Hard-Lock). Implemented coordinate clamping to `parkingAnchorPoint` when `stationaryProb > 0.9`. Added breakout logic for spatial displacements > 20m. (v8.9.78)
 *   **Issue #019**: Android 14+ "While-in-Use" Permission Transition. Implemented `isRecentUiPulse()` window (15s) to authorize background-to-foreground service transitions for sensitive types. (v8.9.78)
@@ -8,6 +22,7 @@
 *   **Issue #011**: Suppression Forensic Labeling. Implemented `suppressionNote` in `SentinelResult` to provide transparency when hardware muzzles suppress sensor violations. (v8.9.68)
 *   **Issue #010**: A15 Acoustic/Vibration Coherence. Implemented physical reality gate; acoustic spikes on A15 are suppressed if concurrent vibration is below threshold. (v8.9.68)
 *   **Issue #013**: Forensic UI Expansion. Exposed internal scaling metrics (`proximityDebounceMs`, `vibrationRollingSum`) to the UI dashboard. (v8.9.71)
+*   **Issue #012**: Adaptive Proximity Debounce. Implemented scaling in `AppSensorManager`. (v8.9.71)
 
 ## Hardening Phase: v8.9.65 Resolved Items
 *   **Issue #R325**: Samsung A15 Accuracy Truncation. Optimized status row layout width (210dp) to ensure authoritative uncertainty display fits narrow screens. (v8.9.65)
@@ -19,7 +34,9 @@
 *   **Issue #002**: GPS Status UI Mismatch. Increased failure thresholds to 35s. (v8.9.62)
 *   **Issue #003**: Main Thread Jitter (Davey). Moved behavioral state computations to `Dispatchers.Default` in `MainViewModel`. (v8.9.62)
 *   **Issue #004**: A15 Virtual Proximity Suppression. Refined manager to allow 'Far' transitions during motion in darkness. (v8.9.62)
-*   **Issue #005**: Map Provider Log Spillage. Silenced `osmdroid` debug logs. (v8.9.62)
+*   **Issue #458**: Tracker Role Ghost Mode Bug. Corrected role-aware timestamp propagation. (v8.9.62)
+*   **Issue #459**: Unicode Escape Regression. Resolved double-escaping in string literals. (v8.9.62)
+*   **Issue #460**: Local Freshness Existence Logic. Relaxed existence check to include sensor telemetry. (v8.9.62)
 
 ---
 

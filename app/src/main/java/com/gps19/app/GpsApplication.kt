@@ -20,9 +20,9 @@ import kotlinx.coroutines.launch
 
 /**
  * GpsApplication: Application entry point and global dependency management.
- * v8.9.62:
- * - Issue #005: Log Spillage Remediation. Silenced osmdroid debug logging and 
- *   forced static user agent to prevent getPackageName spam.
+ * v8.9.87:
+ * - Issue #005: Hardened log spillage remediation. Silenced osmdroid debug logging and 
+ *   forced static user agent string to prevent getPackageName spam.
  * v8.9.51:
  * - Issue #456: Resilience Hardening. Scheduled MaintenanceWorker on startup 
  *   as the 3rd layer of the High-Resilience Watchdog system.
@@ -61,7 +61,9 @@ class GpsApplication : Application(), Configuration.Provider {
         GlobalScope.launch(Dispatchers.IO) {
             val osmConfig = OsmConfig.getInstance()
             osmConfig.load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
-            osmConfig.userAgentValue = "GpsTracker/${BuildConfig.VERSION_NAME} (${packageName})"
+            // Rationale: Forced static user agent string. Avoids calling context.packageName 
+            // which triggers getPackageName logcat spam on some Samsung devices.
+            osmConfig.userAgentValue = "GpsTracker/8.9.87"
             osmConfig.isDebugMode = false
             osmConfig.isDebugTileProviders = false
         }

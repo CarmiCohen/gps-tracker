@@ -55,9 +55,12 @@ class SystemStatusProviderImpl @Inject constructor(
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     private val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+    
+    // Rationale: Cache packageName to prevent repetitive getPackageName() log spam on Samsung devices.
+    private val cachedPackageName = context.packageName
 
     override fun isBatteryWhitelisted(): Boolean {
-        return powerManager.isIgnoringBatteryOptimizations(context.packageName)
+        return powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
     }
 
     override fun isAutoStartGranted(): Boolean {

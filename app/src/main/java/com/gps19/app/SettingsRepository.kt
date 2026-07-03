@@ -33,11 +33,11 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
- * v8.9.79:
- * - Issue #014: Type Migration. Standardized maxDistance, accuracy, and temperature to Double.
- * v8.9.84:
- * - Issue #023: Fixed binary incompatibility by reverting tags 8, 9, 33 to float (legacy) 
- *   and adding new double tags 49, 50, 51 with a DataMigration.
+ * v8.9.87:
+ * - Issue #005 Logic Fix: Hardened commitDraftSettings to use effective IDs (applying defaults)
+ *   during uniqueness checks to prevent "Commit Failed" reversions on fresh installs.
+ * - Identity Fix: Ensured viewerIdFlow defaults to DEFAULT_VIEWER_ID ("V") per SoT R182.
+ * - Forensic Fix: Corrected getLong() for LAST_DISCONNECTION_TS_KEY mapping.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -46,10 +46,6 @@ class SettingsRepository @Inject constructor(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
 
-    /**
-     * Internal migration to handle the transition of fields 8, 9, and 33 from legacy float to new double.
-     * This fixes the binary incompatibility introduced in Issue #014.
-     */
     private val typeMigration = object : DataMigration<AppSettings> {
         override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
             return currentData.hasLegacyMaxDistance() || 
@@ -128,14 +124,12 @@ class SettingsRepository @Inject constructor(
         const val LAST_DAILY_ARCHIVE_DATE_KEY = "last_daily_archive_date"
         const val LAST_DAILY_CLEANUP_DATE_KEY = "last_daily_cleanup_date"
 
-        // Draft Keys
         const val DRAFT_TRACKER_ID = "draft_tracker_id"
         const val DRAFT_VIEWER_ID = "draft_viewer_id"
         const val DRAFT_RELAY_URL = "draft_relay_url"
         const val DRAFT_MAX_DISTANCE = "draft_max_distance"
 
         const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = "is_xiaomi_manual_override"
-        
         const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
     }
 
@@ -146,11 +140,9 @@ class SettingsRepository @Inject constructor(
     val isManualExitFlow: Flow<Boolean> = dataStore.data.map { it.isManualExit }
     val lastAlarmAckTsFlow: Flow<Long> = dataStore.data.map { it.lastAlarmAckTs }
     val lastSitTsFlow: Flow<Long> = dataStore.data.map { it.lastSitTs }
-    
     val homePointsFlow: Flow<List<GeoPoint>> = dataStore.data.map { it.homePointsList.map { p -> GeoPoint(p.lat, p.lng) } }
     val maxDistanceFlow: Flow<Double> = dataStore.data.map { if (it.maxDistance > 0.0) it.maxDistance else DEFAULT_MAX_DISTANCE }
     val alertSettingsFlow: Flow<AlertSettings> = dataStore.data.map { protoToAlertSettings(it.alertSettings) }
-    
     val isXiaomiManualOverrideFlow: Flow<Boolean> = dataStore.data.map { it.isXiaomiManualOverride }
 
     suspend fun saveString(keyName: String, value: String) {
@@ -201,7 +193,6 @@ class SettingsRepository @Inject constructor(
         dataStore.updateData { current ->
             val builder = current.toBuilder()
             when (keyName) {
-                // Compatibility for any keys still requiring Float
                 TRACKER_LUX_BASELINE_KEY -> builder.setTrackerLuxBaseline(value.toDouble())
             }
             builder.build()
@@ -273,7 +264,7 @@ class SettingsRepository @Inject constructor(
             TOTAL_CONNECTED_KEY -> settings.totalConnected
             UPTIME_KEY -> settings.uptime
             LAST_CONNECTION_TS_KEY -> settings.lastConnectionTs
-            LAST_DISCONNECTION_TS_KEY -> settings.lastConnectionTs
+            LAST_DISCONNECTION_TS_KEY -> settings.lastDisconnectionTs
             TOTAL_DROP_KEY -> settings.totalDrop
             MAX_DROP_KEY -> settings.maxDrop
             MAX_DROP_TS_KEY -> settings.maxDropTs
@@ -592,9 +583,15 @@ class SettingsRepository @Inject constructor(
         dataStore.updateData { current ->
             val builder = current.toBuilder()
             
-            val newTrackerId = if (current.hasDraftTrackerId()) current.draftTrackerId else current.trackerId
-            val newViewerId = if (current.hasDraftViewerId()) current.draftViewerId else current.viewerId
-            val newRelayUrl = if (current.hasDraftRelayUrl()) current.relayUrl else current.relayUrl
+            // Critical Fix: Use effective IDs (applying defaults) during uniqueness checks
+            // to prevent "Commit Failed" reversions on fresh installs where proto strings are empty.
+            val currentTrackerId = current.trackerId.ifEmpty { DEFAULT_TRACKER_ID }
+            val currentViewerId = current.viewerId.ifEmpty { DEFAULT_VIEWER_ID }
+            val currentRelayUrl = current.relayUrl.ifEmpty { DEFAULT_RELAY_URL }
+
+            val newTrackerId = if (current.hasDraftTrackerId()) current.draftTrackerId else currentTrackerId
+            val newViewerId = if (current.hasDraftViewerId()) current.draftViewerId else currentViewerId
+            val newRelayUrl = if (current.hasDraftRelayUrl()) current.draftRelayUrl else currentRelayUrl
             val newMaxDistance = if (current.hasDraftMaxDistance()) current.draftMaxDistance else current.maxDistance
             val newAlertsProto = if (current.hasDraftAlertSettings()) current.draftAlertSettings else current.alertSettings
 
@@ -603,9 +600,9 @@ class SettingsRepository @Inject constructor(
                 return@updateData current
             }
 
-            val tChanged = newTrackerId != current.trackerId
-            val vChanged = newViewerId != current.viewerId
-            val rChanged = newRelayUrl != current.relayUrl
+            val tChanged = newTrackerId != currentTrackerId
+            val vChanged = newViewerId != currentViewerId
+            val rChanged = newRelayUrl != currentRelayUrl
             val mChanged = newMaxDistance != current.maxDistance
             val aChanged = newAlertsProto != current.alertSettings
 
