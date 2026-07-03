@@ -2,6 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.86:
+ * - Issue #025: Relaxed UI_PULSE_TIMEOUT_MS to 45s to harden FGS transitions on Android 14+.
+ * v8.9.85:
+ * - Issue #024: Fixed Accuracy Window Aliasing. Increased ACCURACY_WINDOW_BUCKET_MS 
+ *   to 120s (30s buckets) to ensure stationary GPS fixes (20s) are correctly 
+ *   aggregated and preserved in the maxAccuracy sliding window.
  * v8.9.76:
  * - Issue #018: Tracker State Stability. Tightened JUMP_GATE_SENSOR_MISMATCH_MPS to 2.0 
  *   to aggressively filter stationary drift noise in Urban Canyons.
@@ -139,7 +145,8 @@ const val HIGH_ACCURACY_THRESHOLD_METERS = 35.0
  */
 const val TRAJECTORY_REJECTION_ACCURACY_MULT = 3.0
 
-const val ACCURACY_WINDOW_BUCKET_MS = 60000L
+// Issue #024: Increased to 120s to ensure buckets (30s) exceed stationary polling (20s)
+const val ACCURACY_WINDOW_BUCKET_MS = 120000L
 const val ACCURACY_WINDOW_MAX_SIZE = 4
 const val GEOFENCE_ACCURACY_HYSTERESIS_MULT = 1.10
 const val GEOFENCE_ACCURACY_EXPANSION_MULT = 1.0
@@ -188,7 +195,7 @@ const val GPS_STALL_THRESHOLD_MS = 60000L
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
 const val TICK_INTERVAL_MS = 1000L
 const val TICK_INTERVAL_SLOW_MS = 5000L
-const val UI_PULSE_TIMEOUT_MS = 15000L // Issue #427/428: Relaxed to 15s to handle jitter
+const val UI_PULSE_TIMEOUT_MS = 45000L // Issue #025: Relaxed to 45s to harden FGS transitions
 const val FGS_STICKY_DELAY_MS = 45000L
 const val WATCH_TIMEOUT_MS = 15000L // Issue #427/428: Relaxed to 15s to handle network jitter
 const val CLOCK_REGRESSION_GATE_MS = 100L

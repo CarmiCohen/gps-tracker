@@ -1,34 +1,33 @@
-# Project Issues & Hardening Tracking (v8.9.83)
+# Project Issues & Hardening Tracking (v8.9.86)
 
 This document tracks all open issues, technical debt, and pending validation tasks. 
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟢 None | 0 |
-| **Validation Tasks** | 🟡 Pending | 4 |
-| **Resolved (Total)** | 🟢 Progress | 29 |
+| **Open Technical Issues** | 🔴 High | 0 |
+| **Validation Tasks** | 🟡 Pending | 5 |
+| **Resolved (Total)** | 🟢 Progress | 32 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **DataStore Precision Migration**: Changing Proto fields from `float` to `double` (Issue #014) may cause binary incompatibility for existing stored settings. Monitor for `SerializationException` on startup.
+*   **Proto Schema Duplication**: Identical `.proto` files exist in `app/src/main/proto` and `app/src/proto`. This risks synchronization errors. Recommendation: Consolidate to a single source.
 *   **Soak Test Monitoring**: Ongoing 24-hour stability test required to monitor for `STABILITY GAP` logs under 10Hz sensor load.
 *   **UI Refresh Consistency**: Verify forensic fields (`Prox Debounce`, `Rolling Vibe`) respect the 15s staleness gate.
-*   **Breakout Sensitivity**: Monitor the 20m/0.8x breakout gate in `LocationProcessor` for "sticky" transitions.
 
 ---
 
 ## 🔴 Open Issues
-*   None.
+*   *(No open critical issues)*
 
 ---
 
 ## 🟡 Pending Validation
-*   **Proto precision upgrade**: Verify that existing `max_distance` and `max_accuracy` values are correctly interpreted after the `float` -> `double` change.
+*   **Proto precision upgrade**: Verify that existing `max_distance` and `max_accuracy` values are correctly interpreted (Migration verified in v8.9.84).
 *   **Off-Main-Thread Sensor Stability**: Verify long-term stability of the `AppSensorThread`.
 *   **Stationary Scaling Efficacy**: Confirm that `PROXIMITY_STARY_SCALING_MS_PER_HOUR` correctly scales skepticism.
-*   **A15 Forensic Suppression**: Verify `suppressionNote` visibility in the log sink.
+*   **Issue #025 Transition Verification**: Perform unattended physical tamper tests to verify FGS type escalation without `ForegroundServiceStartNotAllowedException`.
 
 ---
 
@@ -36,6 +35,9 @@ This document tracks all open issues, technical debt, and pending validation tas
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
+| **#025** | **FGS Transition Timeout** | **Resolved (v8.9.86)**. Increased `UI_PULSE_TIMEOUT_MS` to 45s. This relaxes the user-interaction pulse gate, allowing automated state transitions (e.g., Physical Tamper -> Acoustic Monitor) to successfully claim Android 14+ FGS types when the device is unattended. |
+| **#024** | **Accuracy Window Aliasing** | **Resolved (v8.9.85)**. Increased `ACCURACY_WINDOW_BUCKET_MS` to 120s (30s buckets). This ensures that stationary GPS fixes (received every 20s) do not immediately trigger new window buckets, allowing proper aggregation of maxAccuracy over a stable horizon. |
+| **#023** | **DataStore Binary Incompatibility** | **Resolved (v8.9.84)**. Reverted tags 8, 9, 33 to float (legacy) and introduced new double tags 60, 61, 62 with a robust DataMigration in `SettingsRepository`. |
 | **#022** | **Deep-Link Cold-Start Handling** | **Resolved (v8.8.6)**. Remapped from #44 to unify numbering. Implemented intent-aware startup for direct map navigation. |
 | **#021** | **Map UI Infinite Loop** | **Resolved (v8.9.82)**. Fixed a logic error in `drawTrailToFolder` (`MapComponents.kt`) that caused an infinite loop on the main thread when processing single-point trail segments during property changes. |
 | **#020** | **Map Centering Race Condition** | **Resolved (v8.9.83)**. Introduced `localLockStatus` in `MapComponents.kt` to immediately suspend centering logic upon touch detection, preventing the map from "fighting" user swiping/zooming gestures. |

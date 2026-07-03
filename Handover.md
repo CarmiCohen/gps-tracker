@@ -1,25 +1,24 @@
-# Forensic Handover - v8.9.83 (Map UI Stability Hardened)
+# Forensic Handover - v8.9.86 (FGS Hardened)
 
 ## 📌 Status: Stable / Build PASS
-Remediation of Map UI responsiveness and logic errors is complete. The map no longer hangs during interaction and gesture-fighting has been eliminated. Issue mapping corrected to preserve historical forensic integrity.
+Issue #025 (FGS Transition Timeout) has been resolved. The system now utilizes a 45s user-interaction pulse window to ensure stable Foreground Service transitions on Android 14+.
 
-### 🟢 Completed: Issue #021 (Map UI Infinite Loop)
-*   **Logic Error Resolved**: Fixed `drawTrailToFolder` in `MapComponents.kt` where `startIdx` could fail to advance during property changes on single-point segments. This ensures the UI thread never enters an infinite loop while rendering trail paths.
-
-### 🟢 Completed: Issue #020 (Map Centering Race Condition)
-*   **Zero-Latency Lock Release**: Introduced `localLockStatus` in `MapComponents.kt`. This immediately suspends centering `LaunchedEffect` logic the moment a touch is detected (`ACTION_DOWN`), bypassing ViewModel round-trip latency.
-*   **Gesture Parity**: Verified that swiping and zooming no longer "snap back" to the tracker/viewer location while the user's finger is on the screen.
+### 🟢 Completed: Issue #025 (FGS Transition Timeout)
+*   **Timeout Relaxation**: Increased `UI_PULSE_TIMEOUT_MS` from 15s to 45s in `EngineConstants.kt`.
+*   **Android 14+ Hardening**: This provides a robust window for the system to claim `MICROPHONE` and `LOCATION` FGS types during automated state transitions (e.g., Physical Tamper detection) when the device is unattended.
+*   **Consistency**: Aligned the pulse window with `FGS_STICKY_DELAY_MS` to ensure capability transitions remain valid during service updates.
 
 ### 🟢 Previously Completed
-*   **Issue #019**: Android 14+ Permission Transition (Restored).
-*   **Issue #017**: SnapshotStateList lock failures hardened using `MutableList`.
-*   **Issue #014**: Full stack standardized to `Double` for telemetry precision.
+*   **Issue #024**: Accuracy Window Aliasing resolved via bucket expansion.
+*   **Issue #023**: DataStore Binary Incompatibility resolved.
+*   **Issue #021**: Fixed Map UI infinite loop.
+*   **Issue #020**: Map centering race condition resolved.
+*   **Issue #014**: Full stack standardized to `Double`.
 
 ### 🟡 Pending Validation
-*   **Soak Test**: Monitor for `STABILITY GAP` logs during extended map usage.
-*   **Precision Audit**: Verify that the new centering logic respects `DEFAULT_ACCURACY_FALLBACK` during weak GPS signal transitions.
+*   **Soak Test Monitoring**: Ongoing 24-hour stability test for `STABILITY GAP` logs.
+*   **Transition Verification**: Perform unattended physical tamper tests to verify FGS type escalation without `ForegroundServiceStartNotAllowedException`.
 
 ### 🛠 Instructions for Resumption
-1.  **Rebuild and Deploy**: Deploy v8.9.83 to G990/A15.
-2.  **Verify UI Flow**: Rapidly swipe and zoom the map on a tracker with an active trail to confirm smooth rendering.
-3.  **Audit Logs**: Ensure `SnapshotStateList` lock verification failures have ceased in Logcat during map interactions.
+1.  **Build System**: Run `./gradlew :app:assembleDebug`.
+2.  **Verify FGS State**: In Tracker mode, trigger an "Acoustic Alert" while the app is backgrounded and verify the notification updates to "Acoustic monitoring active" without service crashes.

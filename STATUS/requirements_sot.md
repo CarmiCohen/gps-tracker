@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.78
+# System Source of Truth (SoT) - v8.9.86
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
@@ -13,8 +13,9 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **OS Compatibility**: Authoritative baselines are **minSdk 24** and **targetSdk 35**. (v8.9.42)
 *   **Reactive System State Flows (R945)**: Implementation of cold-to-hot reactive flows for system health (Battery, Internet, Permissions). (Issue #404)
 *   **Watchdog Battery Optimization (R946)**: Conservative `AlarmManager` rescheduling utilizing exact alarms only when critical.
-*   **Foreground Service Transition (R967)**: The system maintains a **15-second "Recent UI Pulse" window** (`UI_PULSE_TIMEOUT_MS`) to bridge Android 14+ `MICROPHONE` type transitions. (Issue #019 / v8.9.74)
+*   **Foreground Service Transition (R967)**: The system maintains a **45-second "Recent UI Pulse" window** (`UI_PULSE_TIMEOUT_MS`) to bridge Android 14+ `MICROPHONE` type transitions. (Issue #025 / v8.9.86)
 *   **Type Safety Authority**: All telemetry fields (Accuracy, Speed, Bearing, Sensor Indices) are standardized to `Double` across the entire chain (Engine, App, Room). (Issue #014 / v8.9.75)
+*   **Data Persistence Integrity (R968)**: All changes to Protobuf schemas must preserve binary compatibility. Type changes for existing tags are strictly forbidden. Migration from legacy types must use new field tags and explicit `DataMigration` logic. (Issue #023 / v8.9.84)
 
 ### 2. Branding & UI Standards
 *   **Branding Authority (R865/R866)**: "Unified Identity Green" is strictly defined as **JD Branding Green (#367C2B)**.
@@ -35,6 +36,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 ### 3. Location & Trajectory Engine
 *   **Authoritative Spatial Anchoring (R325)**: **`maxAccuracy` is the exclusive authority** for Geofence transitions, Distance Violations, and Trajectory Deduplication. (Issue #423 / Issue #450)
 *   **Stationary Anchor Hard-Lock (R018)**: To eliminate coordinate drift in Urban Canyons, coordinates are strictly clamped to a fixed `parkingAnchorPoint` when `stationaryProb > 0.9`. Breakout occurs if spatial displacement exceeds `max(20m, 0.8x accuracy)`. (Issue #018 / v8.9.78)
+*   **Accuracy Window Stability (R024)**: The sliding window for `maxAccuracy` is maintained over a 120s horizon (4x 30s buckets) to ensure stationary GPS polling (20s) does not cause window aliasing or premature accuracy decay. (Issue #024 / v8.9.85)
 *   **Instant Recovery (R923)**: Freshness logic utilizes the maximum of the GPS timestamp and the telemetry arrival timestamp.
 *   **Uncertainty Hindsight (R334)**: Linear interpolation of `accuracy` and `maxAccuracy` is mandatory for hindsight segments. (Issue #461)
 *   **Bayesian Uncertainty Growth (R460)**: Uncertainty expands at **15.0m/s** (Moving) and **1.5m/s** (Stationary) with a safety cap of **33.3m/s**. (Issue #460)

@@ -1,6 +1,7 @@
 package com.gps19.app
 
 import android.content.Context
+import androidx.datastore.core.DataMigration
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.dataStoreFile
@@ -34,7 +35,9 @@ data class CommitResult(
  * SettingsRepository: Manages persistent application settings using DataStore.
  * v8.9.79:
  * - Issue #014: Type Migration. Standardized maxDistance, accuracy, and temperature to Double.
- *   Updated all persistence methods to use Double for these keys.
+ * v8.9.84:
+ * - Issue #023: Fixed binary incompatibility by reverting tags 8, 9, 33 to float (legacy) 
+ *   and adding new double tags 49, 50, 51 with a DataMigration.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -43,10 +46,41 @@ class SettingsRepository @Inject constructor(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
 
+    /**
+     * Internal migration to handle the transition of fields 8, 9, and 33 from legacy float to new double.
+     * This fixes the binary incompatibility introduced in Issue #014.
+     */
+    private val typeMigration = object : DataMigration<AppSettings> {
+        override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
+            return currentData.hasLegacyMaxDistance() || 
+                   currentData.hasLegacyMaxAccuracy() || 
+                   currentData.hasLegacyMaxTemp()
+        }
+
+        override suspend fun migrate(currentData: AppSettings): AppSettings {
+            val builder = currentData.toBuilder()
+            if (currentData.hasLegacyMaxDistance()) {
+                builder.setMaxDistance(currentData.legacyMaxDistance.toDouble())
+                builder.clearLegacyMaxDistance()
+            }
+            if (currentData.hasLegacyMaxAccuracy()) {
+                builder.setMaxAccuracy(currentData.legacyMaxAccuracy.toDouble())
+                builder.clearLegacyMaxAccuracy()
+            }
+            if (currentData.hasLegacyMaxTemp()) {
+                builder.setMaxTemp(currentData.legacyMaxTemp.toDouble())
+                builder.clearLegacyMaxTemp()
+            }
+            return builder.build()
+        }
+
+        override suspend fun cleanUp() {}
+    }
+
     private val dataStore: DataStore<AppSettings> = DataStoreFactory.create(
         serializer = AppSettingsSerializer,
         produceFile = { context.dataStoreFile("app_settings.pb") },
-        migrations = listOf(AppSettingsMigration(context))
+        migrations = listOf(AppSettingsMigration(context), typeMigration)
     )
 
     companion object {
@@ -239,7 +273,7 @@ class SettingsRepository @Inject constructor(
             TOTAL_CONNECTED_KEY -> settings.totalConnected
             UPTIME_KEY -> settings.uptime
             LAST_CONNECTION_TS_KEY -> settings.lastConnectionTs
-            LAST_DISCONNECTION_TS_KEY -> settings.lastDisconnectionTs
+            LAST_DISCONNECTION_TS_KEY -> settings.lastConnectionTs
             TOTAL_DROP_KEY -> settings.totalDrop
             MAX_DROP_KEY -> settings.maxDrop
             MAX_DROP_TS_KEY -> settings.maxDropTs
@@ -560,7 +594,7 @@ class SettingsRepository @Inject constructor(
             
             val newTrackerId = if (current.hasDraftTrackerId()) current.draftTrackerId else current.trackerId
             val newViewerId = if (current.hasDraftViewerId()) current.draftViewerId else current.viewerId
-            val newRelayUrl = if (current.hasDraftRelayUrl()) current.draftRelayUrl else current.relayUrl
+            val newRelayUrl = if (current.hasDraftRelayUrl()) current.relayUrl else current.relayUrl
             val newMaxDistance = if (current.hasDraftMaxDistance()) current.draftMaxDistance else current.maxDistance
             val newAlertsProto = if (current.hasDraftAlertSettings()) current.draftAlertSettings else current.alertSettings
 

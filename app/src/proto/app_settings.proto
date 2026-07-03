@@ -5,8 +5,11 @@ option java_multiple_files = true;
 
 /**
  * AppSettings: Persistence schema for DataStore.
- * v8.9.80: Issue #014 - Type Migration Completion. Standardized all telemetry fields to double.
- * v8.9.77: Issue #018 - Added is_anchor_locked.
+ * v8.9.79: Issue #014 - Type Migration. Standardized distance, accuracy, and temperature to double.
+ * v8.9.84: Issue #023 - Binary Compatibility Fix.
+ *          - Reverted tags 8, 9, 33 to float (legacy) to prevent SerializationException.
+ *          - Added high-precision double fields at tags 60, 61, 62.
+ *          - Preserved tag 49 for is_anchor_locked.
  */
 message AppSettings {
     optional string app_mode = 1;
@@ -16,8 +19,11 @@ message AppSettings {
     optional int64 app_start_time = 5;
     optional int64 last_alarm_ack_ts = 6;
     optional int64 home_points_ts = 7;
-    optional double max_distance = 8;
-    optional double max_accuracy = 9;
+
+    // Legacy float fields (Binary compatibility for Issue #023)
+    optional float legacy_max_distance = 8;
+    optional float legacy_max_accuracy = 9;
+
     optional bool is_manual_exit = 10;
 
     reserved 11;
@@ -47,7 +53,9 @@ message AppSettings {
 
     reserved 31;
     optional int32 last_version_code = 32;
-    optional double max_temp = 33;
+
+    // Legacy float field (Binary compatibility for Issue #023)
+    optional float legacy_max_temp = 33;
 
     optional double tracker_lux_baseline = 34;
     optional double tracker_acoustic_floor = 35;
@@ -71,6 +79,11 @@ message AppSettings {
 
     optional int64 last_history_sit_ts = 48;
     optional bool is_anchor_locked = 49;
+
+    // New high-precision fields (Issue #023)
+    optional double max_distance = 60;
+    optional double max_accuracy = 61;
+    optional double max_temp = 62;
 }
 
 message RealtimeStatus {
