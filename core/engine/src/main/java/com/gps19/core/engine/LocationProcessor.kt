@@ -5,6 +5,8 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * v8.9.79:
+ * - Issue #016: Finalized Type Safety for interpolation logic. Removed legacy toFloat() casts.
  * v8.9.78:
  * - Issue #018: Stationary Anchor Breakout Refinement. Reduced breakout threshold 
  *   to 5.0m when physical motion is detected via IMU to prevent "sticky" 
@@ -234,7 +236,7 @@ class LocationProcessor(
                 val firstPromoted = promotedPoints.first()
                 val interpolated = PhysicsUtils.interpolateSegment(
                     lastLat, lastLng, lastTs, firstPromoted.lat, firstPromoted.lng, firstPromoted.ts,
-                    startAcc = lastAcc.toFloat(), startMaxAcc = lastMaxAcc.toFloat(), endAcc = accuracy.toFloat(), endMaxAcc = maxAccuracy.toFloat()
+                    startAcc = lastAcc, startMaxAcc = lastMaxAcc, endAcc = accuracy, endMaxAcc = maxAccuracy
                 )
                 interpolated.forEach { p ->
                     listener.onTrailPointSaved(p.lat, p.lng, isViewerTrail, false, p.ts, isHindsightCorrected = true, accuracy = p.accuracy, maxAccuracy = p.maxAccuracy)
@@ -368,7 +370,7 @@ class LocationProcessor(
         }
     }
     
-    fun getEstimatedBearing(): Double = sentinel.getEstimatedBearing().toDouble()
+    fun getEstimatedBearing(): Double = sentinel.getEstimatedBearing()
     fun resetFilter() { sentinel.reset() }
     fun invalidateHomePointsCache() { cachedHomePoints = null }
     fun resetStats() {

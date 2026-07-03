@@ -13,9 +13,9 @@ import javax.inject.Singleton
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * v8.9.79: Issue #014 - Type Migration: Standardized temperature fields to Double.
  * v8.9.5:
  * - Issue #337: Propagated currentMa in observeIntegrityUpdates for power forensic parity.
- * v8.8.27: Added history flow management to further decouple MainViewModel.
  */
 @Singleton
 class StateSubscriptionUseCase @Inject constructor(
@@ -157,7 +157,8 @@ class StateSubscriptionUseCase @Inject constructor(
                 isStorageLow = info.isStorageLow,
                 isStorageCritical = info.isStorageCritical,
                 isCoolingModeActive = info.isCoolingModeActive,
-                currentMa = info.currentMa
+                currentMa = info.currentMa,
+                isAnchorLocked = info.isAnchorLocked
             ),
             isLocalOnline = info.isHardwareOnline,
             batteryLevel = info.batteryLevel,
@@ -173,9 +174,9 @@ class StateSubscriptionUseCase @Inject constructor(
         val integrityUi: IntegrityStateUi,
         val isLocalOnline: Boolean,
         val batteryLevel: Int,
-        val batteryTemp: Float,
+        val batteryTemp: Double,
         val isCharging: Boolean,
-        val maxTemp: Float,
+        val maxTemp: Double,
         val activeAlarms: List<AlarmInfo>,
         val activeAlarmTypes: Set<String>
     )

@@ -11,13 +11,14 @@ class SignalingTest {
 
     @Test
     fun `SignalingConstants validates roles correctly`() {
+        // R182: Validation relaxed to non-empty
         assertTrue(SignalingConstants.isValidTrackerId("T123"))
-        assertFalse(SignalingConstants.isValidTrackerId("C123"))
-        assertFalse(SignalingConstants.isValidTrackerId("123"))
+        assertTrue(SignalingConstants.isValidTrackerId("C123"))
+        assertFalse(SignalingConstants.isValidTrackerId(" "))
 
         assertTrue(SignalingConstants.isValidViewerId("C123"))
-        assertFalse(SignalingConstants.isValidViewerId("T123"))
-        assertFalse(SignalingConstants.isValidViewerId("123"))
+        assertTrue(SignalingConstants.isValidViewerId("T123"))
+        assertFalse(SignalingConstants.isValidViewerId(""))
     }
 
     @Test
@@ -31,7 +32,7 @@ class SignalingTest {
         )
 
         assertEquals("T1", payload["id"])
-        assertEquals("C1", payload["viewer_id"]) // Fixed: viewer_id
+        assertEquals("C1", payload["viewer_id"])
         assertEquals("tracker", payload["from"])
         assertEquals(1000L, payload["ts"])
         assertEquals("1.0", payload["ver"])

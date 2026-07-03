@@ -43,12 +43,12 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v8.9.79:
+ * - Issue #014: Type Migration. Aligned with Double-precision telemetry. 
+ *   Added explicit toFloat() conversions for Compose rendering and updated 
+ *   status bars to use Double-compatible formatting.
  * v8.9.65:
- * - Issue #R325 Validation: Optimized StatusRowData layout for narrow devices (Samsung A15). 
- *   Reduced left-side width to 210dp to prevent accuracy truncation.
- * v8.9.63:
- * - Issue #002: Aligned UI staleness logic with hardware polling. Indicators now 
- *   respect the 35s authoritative gate to prevent stationary flickering.
+ * - Issue #R325 Validation: Optimized StatusRowData layout for narrow devices.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -111,20 +111,20 @@ fun AnalyticalRibbons(viewModel: MainViewModel) {
             }
         }
         
-        StatefulSensorRibbon(sensorFlow, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), valueSelector = { it.snrIdx })
-        StatefulSensorRibbon(sensorFlow, "NOI", selectedScale, lineColor = Amber500, valueSelector = { it.noiseIdx })
-        StatefulSensorRibbon(sensorFlow, "LUX", selectedScale, lineColor = Color.White, valueSelector = { it.luxIdx })
-        StatefulSensorRibbon(sensorFlow, "VIB", selectedScale, lineColor = Color.Magenta, valueSelector = { it.vibeIdx })
-        StatefulSensorRibbon(sensorFlow, "PRX", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { it.proxIdx })
-        StatefulSensorRibbon(sensorFlow, "LIF", selectedScale, lineColor = Color(0xFFFACC15), valueSelector = { it.liftIdx })
+        StatefulSensorRibbon(sensorFlow, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), valueSelector = { it.snrIdx.toFloat() })
+        StatefulSensorRibbon(sensorFlow, "NOI", selectedScale, lineColor = Amber500, valueSelector = { it.noiseIdx.toFloat() })
+        StatefulSensorRibbon(sensorFlow, "LUX", selectedScale, lineColor = Color.White, valueSelector = { it.luxIdx.toFloat() })
+        StatefulSensorRibbon(sensorFlow, "VIB", selectedScale, lineColor = Color.Magenta, valueSelector = { it.vibeIdx.toFloat() })
+        StatefulSensorRibbon(sensorFlow, "PRX", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { it.proxIdx.toFloat() })
+        StatefulSensorRibbon(sensorFlow, "LIF", selectedScale, lineColor = Color(0xFFFACC15), valueSelector = { it.liftIdx.toFloat() })
         StatefulSensorRibbon(sensorFlow, "BAT", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isBatterySteepDischarge) 1f else 0f })
         StatefulSensorRibbon(sensorFlow, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isCoolingModeActive) 1f else 0f })
-        StatefulSensorRibbon(sensorFlow, "CUR", selectedScale, lineColor = Color(0xFFFB923C), valueSelector = { (kotlin.math.abs(it.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) })
+        StatefulSensorRibbon(sensorFlow, "CUR", selectedScale, lineColor = Color(0xFFFB923C), valueSelector = { (kotlin.math.abs(it.currentMa.toDouble()).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) })
         StatefulSensorRibbon(sensorFlow, "SIT", selectedScale, lineColor = BrandJd, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isSitActive) 1f else 0f })
-        StatefulSensorRibbon(sensorFlow, "TLT", selectedScale, lineColor = Color(0xFF818CF8), valueSelector = { it.tiltIdx })
-        StatefulSensorRibbon(sensorFlow, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), valueSelector = { it.baroIdx })
-        StatefulSensorRibbon(sensorFlow, "SVZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitVz) / 2.0f).coerceIn(0f, 1f) })
-        StatefulSensorRibbon(sensorFlow, "SDZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitDz) / 0.5f).coerceIn(0f, 1f) })
+        StatefulSensorRibbon(sensorFlow, "TLT", selectedScale, lineColor = Color(0xFF818CF8), valueSelector = { it.tiltIdx.toFloat() })
+        StatefulSensorRibbon(sensorFlow, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), valueSelector = { it.baroIdx.toFloat() })
+        StatefulSensorRibbon(sensorFlow, "SVZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f) })
+        StatefulSensorRibbon(sensorFlow, "SDZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f) })
         
         HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
 
@@ -305,10 +305,10 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, title: String) {
                         
                         drawRect(pColor, Offset(xPos, baseLineY - (ribbonMaxHeight * hFactor)), Size(maxOf(1f, pointWidth), ribbonMaxHeight * hFactor))
                         
-                        if (p.hasGps && p.gpsIndex > 0f) {
+                        if (p.hasGps && p.gpsIndex > 0.0) {
                             val dotRadius = (if (isLandscape) 1.dp.toPx() else 0.5.dp.toPx())
                             val baseHeight = if (isLandscape) 20.dp.toPx() else 10.dp.toPx()
-                            val normalizedHeight = (p.gpsIndex.coerceIn(0f, 1f) * baseHeight)
+                            val normalizedHeight = (p.gpsIndex.toFloat().coerceIn(0f, 1f) * baseHeight)
                             val yPos = baseLineY - ribbonMaxHeight - (if (isLandscape) { 3.dp.toPx() } else { 1.5.dp.toPx() }) - normalizedHeight
                             val currentPos = Offset(xPos + (maxOf(1f, pointWidth) / 2f), yPos)
                             lastGpsPos?.let { lastPos ->
@@ -391,11 +391,11 @@ fun GlobalStatusBar(
         mode = mode, battery = uiState.battery.level, lastP = progressPulse, 
         commIndex = commIndex, remoteCommIndex = remoteCommIndex, remoteBattery = if (mode == "viewer") uiState.trackerBattery.level else -1, 
         isCharging = uiState.battery.isChargingStable, remoteCharging = if (mode == "viewer") uiState.trackerBattery.isChargingStable else false,
-        speed = speedValue * 3.6f, trackerAccuracy = if (mode == "viewer") uiState.trackerLocation.accuracy else uiState.localLocation.accuracy,
-        maxTrackerAccuracy = if (mode == "viewer") uiState.trackerLocation.maxAccuracy else uiState.localLocation.maxAccuracy, 
-        viewerAccuracy = if (uiState.localLocation.lat != 0.0) uiState.localLocation.accuracy else 0f,
-        maxViewerAccuracy = uiState.localLocation.maxAccuracy, now = systemPulse, satsView = uiState.trackerSatsView, satsUsed = uiState.trackerSatsUsed,
-        trackerTemp = uiState.trackerBattery.temp, viewerTemp = uiState.battery.temp, distToHome = uiState.distanceTrackerToHome, distToViewer = uiState.distanceTrackerToViewer,
+        speed = speedValue.toFloat() * 3.6f, trackerAccuracy = uiState.trackerLocation.accuracy.toFloat(),
+        maxTrackerAccuracy = uiState.trackerLocation.maxAccuracy.toFloat(), 
+        viewerAccuracy = if (uiState.localLocation.lat != 0.0) uiState.localLocation.accuracy.toFloat() else 0f,
+        maxViewerAccuracy = uiState.localLocation.maxAccuracy.toFloat(), now = systemPulse, satsView = uiState.trackerSatsView, satsUsed = uiState.trackerSatsUsed,
+        trackerTemp = uiState.trackerBattery.temp.toFloat(), viewerTemp = uiState.battery.temp.toFloat(), distToHome = uiState.distanceTrackerToHome, distToViewer = uiState.distanceTrackerToViewer,
         viewerSatsUsed = if (mode == "viewer") uiState.viewerSatsUsed else 0, viewerSatsView = if (mode == "viewer") uiState.viewerSatsView else 0,
         viewerGpsTs = uiState.localLocation.timestamp, trackerId = uiState.deviceId, viewerId = uiState.viewerId, watchdogOk = dashboardState.watchdogOk,
         trackerState = dashboardState.trackerState, hasActiveAlarms = hasUnresolved, isRedScreenSuppressed = (hasUnresolved && !redScreenVisible),

@@ -11,7 +11,9 @@ import javax.inject.Singleton
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
  * Handles draft lifecycle, atomic commits, and full system resets.
- * Extracted from MainViewModel to resolve Issue 115 (Architectural Bloat).
+ * v8.9.79:
+ * - Issue #014: Type Migration. Aligned maxTemp and maxDistance to Double.
+ * - Issue #016: Explicitly offloaded loadAllSettings to Dispatchers.IO to prevent startup jank.
  */
 @Singleton
 class SettingsUseCase @Inject constructor(
@@ -47,7 +49,7 @@ class SettingsUseCase @Inject constructor(
             deviceId = draft.deviceId.trim(),
             viewerId = draft.viewerId.trim(),
             relayUrl = draft.relayUrl.trim(),
-            maxDistance = draft.maxDistance.toFloatOrNull() ?: 0f,
+            maxDistance = draft.maxDistance.toDoubleOrNull() ?: 0.0,
             alertSettings = draft.alertSettings
         )
     }
@@ -62,7 +64,7 @@ class SettingsUseCase @Inject constructor(
         }
     }
 
-    suspend fun loadAllSettings(): InitialSettings {
+    suspend fun loadAllSettings(): InitialSettings = withContext(Dispatchers.IO) {
         val dId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
         val vId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
         val rUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
@@ -72,7 +74,7 @@ class SettingsUseCase @Inject constructor(
         val mMode = repository.getAppMode()
         val sSiren = repository.getString(MainRepository.SELECTED_SIREN_KEY, "Siren")
         val lAlarmAck = repository.getLastAlarmAckTs()
-        val lMaxTemp = repository.getFloat(MainRepository.MAX_TEMP_KEY, 0f)
+        val lMaxTemp = repository.getFloat(MainRepository.MAX_TEMP_KEY, 0f).toDouble()
         var appStartTime = repository.getLong(MainRepository.APP_START_TIME_KEY, 0L)
         
         if (appStartTime == 0L) {
@@ -99,7 +101,7 @@ class SettingsUseCase @Inject constructor(
 
         val trackerStatus = repository.loadTrackerState()
 
-        return InitialSettings(
+        InitialSettings(
             deviceId = dId, viewerId = vId, relayUrl = rUrl, maxDistance = maxDist,
             homePoints = hPoints, alertSettings = aSettings, appMode = mMode,
             selectedSirenType = sSiren, lastAlarmAckTs = lAlarmAck, maxTemp = lMaxTemp,
@@ -151,6 +153,6 @@ data class InitialSettings(
     val deviceId: String, val viewerId: String, val relayUrl: String, val maxDistance: Double,
     val homePoints: List<org.osmdroid.util.GeoPoint>, val alertSettings: AlertSettings,
     val appMode: String?, val selectedSirenType: String, val lastAlarmAckTs: Long,
-    val maxTemp: Float, val appStartTime: Long, val draftSettings: DraftSettings?,
+    val maxTemp: Double, val appStartTime: Long, val draftSettings: DraftSettings?,
     val trackerStatus: TrackerStatus?
 )

@@ -6,11 +6,10 @@ import javax.inject.Singleton
 
 /**
  * ServiceForensicUseCase: Manages state-latched violation recording for background services.
+ * v8.9.79: Issue #014 - Type Migration: Standardized accuracy to Double.
  * v8.9.42:
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refactored recordViolationMarkers 
  *   to propagate both raw accuracy and authoritative maxAccuracy for forensic parity.
- * v8.9.2:
- * - Issue 182: Synchronized source headers with v8.9.2 baseline.
  */
 @Singleton
 class ServiceForensicUseCase @Inject constructor(
@@ -22,8 +21,8 @@ class ServiceForensicUseCase @Inject constructor(
         now: Long,
         lat: Double,
         lng: Double,
-        accuracy: Float,
-        maxAccuracy: Float,
+        accuracy: Double,
+        maxAccuracy: Double,
         activeViolations: Set<String>,
         unresolvedAlarms: Set<String>
     ) {
@@ -42,7 +41,7 @@ class ServiceForensicUseCase @Inject constructor(
         handleLatch(ALERT_ID_TRACKER_GEOFENCE, ALERT_ID_TRACKER_GEOFENCE in unresolvedAlarms, lat, lng, accuracy, maxAccuracy, now)
     }
 
-    private fun handleLatch(id: String, active: Boolean, lat: Double, lng: Double, accuracy: Float, maxAccuracy: Float, now: Long) {
+    private fun handleLatch(id: String, active: Boolean, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, now: Long) {
         val wasRecorded = latches[id] ?: false
         if (active && !wasRecorded) {
             latches[id] = true

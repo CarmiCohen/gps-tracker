@@ -10,11 +10,10 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
+ * v8.9.79:
+ * - Issue #014: Type Migration. Aligned temperature parameters to Double.
  * v8.9.78:
  * - Issue #018: Stationary Anchor Hard-Lock. Propagated isAnchorLocked to DashboardState.
- * v8.9.55:
- * - Issue #013: Forensic UI Expansion. Added proximityDebounce and rollingVibration 
- *   formatting for stationary scaling verification.
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {
@@ -25,8 +24,8 @@ class DashboardUseCase @Inject constructor() {
         uiState: MainUiState, 
         now: Long, 
         trackerState: TrackerState, 
-        localMaxTemp: Float, 
-        trackerMaxTemp: Float
+        localMaxTemp: Double, 
+        trackerMaxTemp: Double
     ): DashboardState {
         val s = uiState.stats
         val ts = uiState.trackerStats
@@ -84,7 +83,7 @@ class DashboardUseCase @Inject constructor() {
 
         val bucket = if (isViewer) uiState.trackerLocation.standbyBucket else uiState.integrity.standbyBucket
         
-        val snrValue = if (loc.snrIdx > 0f && isTelemetryVisible) "${(loc.snrIdx * RIBBON_SNR_SCALE_DB).toInt()}dB" else "--"
+        val snrValue = if (loc.snrIdx > 0.0 && isTelemetryVisible) "${(loc.snrIdx * RIBBON_SNR_SCALE_DB).toInt()}dB" else "--"
 
         fun gpsVal(value: String): String = if (isGpsActive) value else "--"
         fun sensorVal(value: String): String = if (isTelemetryVisible) value else "--"
@@ -121,7 +120,7 @@ class DashboardUseCase @Inject constructor() {
             sinceConn = sinceConn,
             sinceDisco = sinceDisco,
             violationUptime = FormatterUtils.formatDurationUnified(loc.violationUptimeMs),
-            violationPercentage = "%.1f%%".format(Locale.getDefault(), loc.violationPercentage * 100f),
+            violationPercentage = "%.1f%%".format(Locale.getDefault(), loc.violationPercentage * 100.0),
             lat = gpsVal("%.6f".format(Locale.getDefault(), loc.lat)),
             lng = gpsVal("%.6f".format(Locale.getDefault(), loc.lng)),
             trackerAccuracy = gpsVal("±%.1fm".format(Locale.getDefault(), rawAcc)),
@@ -140,7 +139,7 @@ class DashboardUseCase @Inject constructor() {
             proximityCm = sensorVal(if (loc.proximityCm >= 0) "${loc.proximityCm.toInt()}cm" else "--"),
             proximityDebounce = sensorVal("${loc.proximityDebounceMs}ms"),
             rollingVibration = sensorVal("%.3fG".format(Locale.getDefault(), loc.vibrationRollingSum)),
-            gpsSpeed = gpsVal("%.1fkm/h".format(Locale.getDefault(), loc.speed * 3.6f)),
+            gpsSpeed = gpsVal("%.1fkm/h".format(Locale.getDefault(), loc.speed * 3.6)),
             trackerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), trackerMaxTemp)),
             viewerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), localMaxTemp)),
             peakShock = sensorVal("%.2fG".format(Locale.getDefault(), loc.peakVibrationShock)),

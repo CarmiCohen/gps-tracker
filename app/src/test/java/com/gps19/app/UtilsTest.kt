@@ -50,16 +50,16 @@ class UtilsTest {
     fun `calculateGpsIndex handles clock drift correctly`() {
         // R810-N: Test negative age (future packet) up to 30s
         val futureAge = -5000L // 5s in the future
-        val result = TelemetryUtils.calculateGpsIndex(futureAge, 5.0f, 15)
+        val result = TelemetryUtils.calculateGpsIndex(futureAge, 5.0, 15)
         
         // Should be treated as 0ms age (index = 1.0)
-        assertTrue("Index should be > 0 for minor future drift", result.totalIndex > 0.9f)
-        assertEquals(1.0f, result.ageIndex, 0.01f)
+        assertTrue("Index should be > 0 for minor future drift", result.totalIndex > 0.9)
+        assertEquals(1.0, result.ageIndex, 0.01)
 
         // Test extreme future drift (> 30s)
         val extremeFuture = -40000L
-        val failedResult = TelemetryUtils.calculateGpsIndex(extremeFuture, 5.0f, 15)
-        assertEquals(0f, failedResult.totalIndex, 0.001f)
+        val failedResult = TelemetryUtils.calculateGpsIndex(extremeFuture, 5.0, 15)
+        assertEquals(0.0, failedResult.totalIndex, 0.001)
     }
 
     @Test

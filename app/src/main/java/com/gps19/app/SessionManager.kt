@@ -12,6 +12,8 @@ import javax.inject.Singleton
 /**
  * SessionManager: Manages persistence counters like uptime, connection metrics, 
  * and viewer tracking.
+ * v8.9.80:
+ * - Issue #014: Type Migration. Aligned getViolationPercentage to Double.
  * v8.8.21: Migrated to TimeProvider for all timing logic to ensure system-wide consistency.
  */
 @Singleton
@@ -110,9 +112,9 @@ class SessionManager @Inject constructor(
         }
     }
 
-    fun getViolationPercentage(): Float {
-        if (uptimeMs <= 0) return 0f
-        return (violationUptimeMs.toFloat() / uptimeMs.toFloat()).coerceIn(0f, 1f)
+    fun getViolationPercentage(): Double {
+        if (uptimeMs <= 0) return 0.0
+        return (violationUptimeMs.toDouble() / uptimeMs.toDouble()).coerceIn(0.0, 1.0)
     }
 
     /**

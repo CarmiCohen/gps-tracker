@@ -5,11 +5,8 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerStateManager: Logic for mapping raw telemetry to high-level behavioral states.
- * v8.9.42:
- * - Issue #302: Centralized Behavioral Magic Numbers to EngineConstants.
- * - Issue #318: Unified vibration threshold with EngineConstants (0.12g).
- * v8.7.5:
- * - Constant Centralization: Inheriting core thresholds from :core:engine.
+ * v8.9.79:
+ * - Issue #016: Standardized telemetry parameters to Double to eliminate casting overhead.
  */
 object TrackerStateManager {
     private var currentState = TrackerState.UNKNOWN
@@ -22,9 +19,9 @@ object TrackerStateManager {
     fun updateState(
         isVisualJump: Boolean,
         isTrajectoryPromoted: Boolean,
-        speed: Float,
-        vibration: Float,
-        vibrationFloor: Float,
+        speed: Double,
+        vibration: Double,
+        vibrationFloor: Double,
         isTrackerConnected: Boolean,
         systemTimePulse: Long
     ): TrackerState {
@@ -37,7 +34,7 @@ object TrackerStateManager {
         }
 
         // 2. Multi-Factor Movement Detection
-        val hasSpeed = speed >= ACTIVE_MOVE_THRESHOLD.toFloat()
+        val hasSpeed = speed >= ACTIVE_MOVE_THRESHOLD
         if (hasSpeed) {
             sustainedSpeedCount++
         } else {
@@ -97,7 +94,7 @@ object TrackerStateManager {
         return currentState
     }
 
-    private fun logStateChange(old: TrackerState, new: TrackerState, speed: Float, promoted: Boolean) {
+    private fun logStateChange(old: TrackerState, new: TrackerState, speed: Double, promoted: Boolean) {
         Log.d("GPS19", "Tracker behavior changed: $old -> $new (Speed: ${"%.1f".format(speed)}, Promoted: $promoted)")
     }
 }

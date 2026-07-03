@@ -14,12 +14,11 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * v8.9.79:
+ * - Issue #014: Type Migration. Aligned temperature fields to Double.
  * v8.9.42:
  * - Issue #352: Thermal Throttling Logic.
  * - Issue #353: Battery Health Profiling.
- * - Issue #337: Forensic Power Parity. Exposed isCharging and maxTemperature.
- * - Issue #311: Monotonic Timing Integrity. Migrated to TimeProvider for all timing logic.
- * - Issue #163: Hardened power tamper detection and connected violation callbacks.
  */
 class IntegrityMonitor(
     private val context: Context,
@@ -28,12 +27,12 @@ class IntegrityMonitor(
     private val onViolationSustained: (String) -> Unit,
     private val onLogEvent: (String, Boolean) -> Unit
 ) {
-    var maxTemperature = 0f
+    var maxTemperature = 0.0
         private set
 
     private val sustainedViolations = mutableMapOf<String, Long>()
     
-    var batteryTemp = 0f
+    var batteryTemp = 0.0
     var isPowerTamperDetected = false
     private var lastPowerDisconnectTs = 0L
 
@@ -55,13 +54,11 @@ class IntegrityMonitor(
     var isCharging = false
         private set
 
-    // Issue #353: Battery Health Profiling. Now uses monotonic time (Issue #311).
     private val batterySamples = ConcurrentLinkedQueue<Pair<Long, Int>>()
     private var lastBatteryCheckTs = 0L
     var isBatterySteepDischarge = false
         private set
 
-    // Issue #352: Thermal Throttling
     var isCoolingModeActive = false
         private set
 
@@ -75,20 +72,16 @@ class IntegrityMonitor(
         return bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) / 1000
     }
 
-    /**
-     * pollSystemStatus: Updated to take both wall and monotonic time (Issue #311).
-     */
     fun pollSystemStatus(nowWall: Long, nowRealtime: Long) {
         val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
         
         if (intent != null) {
-            batteryTemp = (intent.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, 0)) / 10f
+            batteryTemp = (intent.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, 0)) / 10.0
             if (batteryTemp > maxTemperature) {
                 maxTemperature = batteryTemp
-                repository.saveFloatSync(MainRepository.MAX_TEMP_KEY, maxTemperature)
+                repository.saveDoubleSync(MainRepository.MAX_TEMP_KEY, maxTemperature)
             }
 
-            // Issue #352: Thermal Throttling Logic
             if (!isCoolingModeActive && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
                 isCoolingModeActive = true
                 onLogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true)
@@ -102,11 +95,10 @@ class IntegrityMonitor(
             val plugged = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
             isCharging = plugged > 0
 
-            // v8.8.35: Auto-recovery of power state in polling loop
             if (isCharging) onPowerConnected() else onPowerDisconnected()
 
             if (batteryLevel != -1 && !isCharging) {
-                if (nowRealtime - lastBatteryCheckTs > 60000L) { // Check once per minute using monotonic time
+                if (nowRealtime - lastBatteryCheckTs > 60000L) {
                     batterySamples.add(nowRealtime to batteryLevel)
                     lastBatteryCheckTs = nowRealtime
                     checkBatteryDischarge(nowRealtime)
@@ -166,7 +158,6 @@ class IntegrityMonitor(
     }
 
     private fun checkBatteryDischarge(nowRealtime: Long) {
-        // Prune old samples using monotonic time
         while (batterySamples.isNotEmpty() && (nowRealtime - batterySamples.peek()!!.first) > BATTERY_STEEP_DISCHARGE_WINDOW_MS) {
             batterySamples.poll()
         }
@@ -218,7 +209,7 @@ class IntegrityMonitor(
         }
     }
 
-    fun setMaxTemperature(temp: Float) { maxTemperature = temp }
+    fun setMaxTemperature(temp: Double) { maxTemperature = temp }
 
     fun getActiveNetworkInterface(): String {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -241,10 +232,6 @@ class IntegrityMonitor(
 
     fun isHardwareOnline(): Boolean = isInternetHardwarePresent()
 
-    /**
-     * checkInternetIntegrity: Returns true if internet is available.
-     * v8.8.2: Now uses monotonic time ('now' must be from TimeProvider.elapsedRealtime()).
-     */
     fun checkInternetIntegrity(now: Long): Boolean {
         val online = isInternetHardwarePresent()
         if (!online) {
@@ -268,10 +255,6 @@ class IntegrityMonitor(
         return silenceDelta > threshold
     }
 
-    /**
-     * checkViolationSustained: Returns true if the violation has persisted beyond the threshold.
-     * v8.8.21: Now uses TimeProvider for high-assurance duration checks. (Issue #311)
-     */
     fun checkViolationSustained(type: String, startTs: Long, threshold: Long): Boolean {
         if (startTs > 0 && (timeProvider.elapsedRealtime() - startTs) > threshold) {
             onViolationSustained(type)
@@ -302,7 +285,7 @@ class IntegrityMonitor(
 
     fun resetStats() {
         sustainedViolations.clear()
-        maxTemperature = 0f
+        maxTemperature = 0.0
         isPowerTamperDetected = false
         lastPowerDisconnectTs = 0L
         isPowerSaveModeActive = false

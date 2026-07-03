@@ -18,9 +18,8 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized parameters to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
+ * v8.9.79:
+ * - Issue #014: Type Migration. Aligned parameters to Double to eliminate redundant conversions.
  * v8.9.42:
  * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
  */

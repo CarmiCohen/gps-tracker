@@ -5,12 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * v8.9.79:
+ * - Issue #016: Finalized Double standardization for performance. Removed casting overhead.
  * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized internal state to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
+ * - Issue #014: Type Safety Optimization. Standardized internal state to Double.
  * v8.9.68:
- * - Issue #011: Implemented suppressionNote generation for forensic transparency 
- *   when A15-specific muzzles (coherence, threshold) are triggered.
+ * - Issue #011: Implemented suppressionNote generation for forensic transparency.
  */
 class LocationSentinel {
 
@@ -216,7 +216,7 @@ class LocationSentinel {
                 if (acousticFloorDb > ACOUSTIC_FLOOR_MIN_DB && lastAcousticContractionRealtime > 0) {
                     val secondsPassed = contractionElapsed / 1000.0
                     if (secondsPassed > 0) {
-                        val decayFactor = Math.pow(ACOUSTIC_FLOOR_CONTRACTION_EMA.toDouble(), secondsPassed)
+                        val decayFactor = Math.pow(ACOUSTIC_FLOOR_CONTRACTION_EMA, secondsPassed)
                         acousticFloorDb = max(acousticFloorDb * decayFactor, ACOUSTIC_FLOOR_MIN_DB)
                     }
                 }
@@ -227,7 +227,7 @@ class LocationSentinel {
         if (manualAdaptiveFloor >= 0.0) {
             this.adaptiveVibrationFloor = manualAdaptiveFloor
         } else if (!isMuzzled) { 
-            this.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(this.adaptiveVibrationFloor.toFloat(), vibration.toFloat(), isWarming).toDouble()
+            this.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(this.adaptiveVibrationFloor, currentVibrationIndex, isWarming)
         }
         
         return baselineChanged
@@ -244,7 +244,7 @@ class LocationSentinel {
     }
 
     fun getEstimatedSpeedKph(): Double = immFilter.getEstimatedSpeedKph()
-    fun getEstimatedBearing(): Float = immFilter.getEstimatedBearing()
+    fun getEstimatedBearing(): Double = immFilter.getEstimatedBearing()
     fun getStationaryProbability(): Double = immFilter.getStationaryProbability()
 
     fun getHindsightBuffer(): List<RejectedPoint> = gtoEngine.getWindow().map {
@@ -299,8 +299,8 @@ class LocationSentinel {
         val jumpConfidence = PhysicsUtils.isVisualJump(
             lastLat = lastValidLat, lastLng = lastValidLng,
             newLat = lat, newLng = lng,
-            timeDeltaMs = timeDeltaMs, accuracy = accuracy.toFloat(),
-            snr = snr.toFloat(),
+            timeDeltaMs = timeDeltaMs, accuracy = accuracy,
+            snr = snr,
             lastSpeedMps = lastValidSpeedMps,
             isParking = isParking,
             altitudeDelta = altitudeDelta,
@@ -415,12 +415,12 @@ class LocationSentinel {
         if (!isMuzzled) {
             if (!isNear) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Proximity Far")
             if (isPowerTamper) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Power disconnected")
-            if (SentinelValidator.isTiltViolated(currentTiltDegrees.toFloat())) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Tilt detected")
-            if (SentinelValidator.isShockViolated(peakVibrationShock.toFloat(), adaptiveVibrationFloor.toFloat())) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Shock detected")
+            if (SentinelValidator.isTiltViolated(currentTiltDegrees)) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Tilt detected")
+            if (SentinelValidator.isShockViolated(peakVibrationShock, adaptiveVibrationFloor)) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Shock detected")
             
             if (baroBaseline > -999.0) {
                 val liftDelta = currentBaroAlt - baroBaseline
-                if (SentinelValidator.isAltitudeViolated(liftDelta.toFloat())) {
+                if (SentinelValidator.isAltitudeViolated(liftDelta)) {
                     if (currentVibrationIndex > VIBRATION_STATIONARY_THRESHOLD) {
                         return SentinelResult(SentinelStatus.TAMPER_ALERT, "Lift detected")
                     } else {
@@ -430,7 +430,7 @@ class LocationSentinel {
             }
         }
         
-        if (!isMuzzled && SentinelValidator.isLightViolated(currentLux.toFloat(), luxBaseline.toFloat())) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Light jump")
+        if (!isMuzzled && SentinelValidator.isLightViolated(currentLux, luxBaseline)) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Light jump")
 
         val isAcousticLockedOut = (lastFastPathAcousticSpikeTs > 0 && (nowRealtime - lastFastPathAcousticSpikeTs < ACOUSTIC_LOCKOUT_MS))
         
@@ -449,22 +449,22 @@ class LocationSentinel {
             }
         }
 
-        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex.toFloat())) {
+        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex)) {
             return SentinelResult(SentinelStatus.TAMPER_ALERT, "Acoustic alarm")
         }
 
-        if (!isMuzzled && SentinelValidator.isVibrationSuspicious(currentVibrationIndex.toFloat(), adaptiveVibrationFloor.toFloat())) {
+        if (!isMuzzled && SentinelValidator.isVibrationSuspicious(currentVibrationIndex, adaptiveVibrationFloor)) {
             return SentinelResult(SentinelStatus.SENSOR_SUSPICIOUS, "Vibration suspicion")
         }
         
-        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex.toFloat())) {
+        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex)) {
             return SentinelResult(SentinelStatus.ACOUSTIC_WARNING, "Acoustic suspicion")
         }
 
         return SentinelResult(SentinelStatus.VALID)
     }
 
-    fun isStationary(): Boolean = SentinelValidator.isStationary(currentVibrationIndex.toFloat(), adaptiveVibrationFloor.toFloat())
+    fun isStationary(): Boolean = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
 
     fun shouldThrottlePolling(providedIsStationary: Boolean? = null): Boolean {
         val stationary = providedIsStationary ?: isStationary()

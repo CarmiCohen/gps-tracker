@@ -19,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,11 +47,14 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * v8.9.78:
- * - Issue #016: Optimized trail rendering. Removed redundant O(N) count passes and minimized allocations.
- * - Issue #018: Stationary Anchor Hard-Lock. Added visual indicator to Map UI.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double.
+ * v8.9.83:
+ * - Issue #020: Remediated "Fighting" Centering Logic. 
+ *   Added immediate local lock release to prevent LaunchedEffect from snapping 
+ *   map center back while user is actively swiping/zooming.
+ * v8.9.82:
+ * - Issue #021: Fixed Infinite Loop in drawTrailToFolder. 
+ *   Resolved a logic error where startIdx would not advance for single-point 
+ *   segments during property changes, blocking the UI thread.
  */
 
 @Composable
@@ -97,7 +99,7 @@ fun AppMapContainer(
     
     val viewerLastValidFixRealtime = if (isTrackerMode) uiState.trackerLocation.lastValidFixRealtime else uiState.localLocation.lastValidFixRealtime
     val viewerLocationPending = if (isTrackerMode) uiState.trackerLocation.isLocationPending else uiState.localLocation.isLocationPending
-    val viewerLocationPendingReason = if (isTrackerMode) uiState.trackerLocation.locationPendingReason else uiState.localLocation.locationPendingReason
+    val viewerLocationPendingReason = if (isTrackerMode) uiState.trackerLocation.locationPendingReason else uiState.trackerLocation.locationPendingReason
     
     val trackerGpsAge = if (isTrackerMode) (if (uiState.localLocation.timestamp > 0) now - uiState.localLocation.timestamp else Long.MAX_VALUE)
                  else (if (uiState.trackerLocation.timestamp > 0) now - uiState.trackerLocation.timestamp else Long.MAX_VALUE)
@@ -315,14 +317,16 @@ fun OsmMap(
     
     val mapEventsOverlay = remember { MapEventsOverlay(mapEventsReceiver) }
     val density = resources.displayMetrics.density
-    val trackerBitmapFresh = remember(density) { createTrackerBitmap(density, true) }
-    val trackerBitmapStale = remember(density) { createTrackerBitmap(density, false) }
-    val viewerBitmapFresh = remember(density) { createViewerBitmap(density, true) }
-    val viewerBitmapStale = remember(density) { createViewerBitmap(density, false) }
-    val jumpBitmap = remember(density) { createJumpMarkerBitmap(density) }
-    val geofenceBitmap = remember(density) { createGeofenceViolationBitmap(density) }
     
-    val homeBitmaps = remember(density) { mutableMapOf<Int, Bitmap>() }
+    // Issue #016: Cached BitmapDrawables to avoid allocation in update block
+    val trackerIconFresh = remember(density) { BitmapDrawable(resources, createTrackerBitmap(density, true)) }
+    val trackerIconStale = remember(density) { BitmapDrawable(resources, createTrackerBitmap(density, false)) }
+    val viewerIconFresh = remember(density) { BitmapDrawable(resources, createViewerBitmap(density, true)) }
+    val viewerIconStale = remember(density) { BitmapDrawable(resources, createViewerBitmap(density, false)) }
+    val jumpIcon = remember(density) { BitmapDrawable(resources, createJumpMarkerBitmap(density)) }
+    val geofenceIcon = remember(density) { BitmapDrawable(resources, createGeofenceViolationBitmap(density)) }
+    
+    val homeIcons = remember(density) { mutableMapOf<Int, BitmapDrawable>() }
 
     val trackerMarkerRef = remember { mutableStateOf<Marker?>(null) }
     val viewerMarkerRef = remember { mutableStateOf<Marker?>(null) }
@@ -336,13 +340,17 @@ fun OsmMap(
     val violationMarkersFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
     val violationAccuracyFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
 
-    val violationMarkerPool = remember { mutableStateListOf<Marker>() }
-    val violationCirclePool = remember { mutableStateListOf<Polygon>() }
-    val homeMarkerPool = remember { mutableStateListOf<Marker>() }
-    val trackerPolylinePool = remember { mutableStateListOf<Polyline>() }
-    val viewerPolylinePool = remember { mutableStateListOf<Polyline>() }
+    val violationMarkerPool = remember { mutableListOf<Marker>() }
+    val violationCirclePool = remember { mutableListOf<Polygon>() }
+    val homeMarkerPool = remember { mutableListOf<Marker>() }
+    val trackerPolylinePool = remember { mutableListOf<Polyline>() }
+    val viewerPolylinePool = remember { mutableListOf<Polyline>() }
 
     var lastTriggerTs by remember { mutableLongStateOf(0L) }
+    
+    // Issue #020: Internal lock state to provide zero-latency local feedback before ViewModel reacts.
+    val localLockStatus = remember { mutableStateOf(isLocked) }
+    LaunchedEffect(isLocked) { localLockStatus.value = isLocked }
 
     val lastTrailRendered = remember { mutableStateOf<List<TrailPoint>?>(null) }
     val lastViewerTrailRendered = remember { mutableStateOf<List<TrailPoint>?>(null) }
@@ -351,8 +359,8 @@ fun OsmMap(
     val lastFenceState = remember { mutableStateOf<Boolean?>(null) }
     val lastViolationVisibility = remember { mutableStateOf<Pair<Boolean, Boolean>?>(null) }
 
-    LaunchedEffect(isLocked, lat, lng, myLat, myLng, isFresh, isMeFresh) {
-        if (isLocked) {
+    LaunchedEffect(localLockStatus.value, lat, lng, myLat, myLng, isFresh, isMeFresh) {
+        if (localLockStatus.value) {
             if (systemPulse - lastTriggerTs < 500) return@LaunchedEffect
             val trackerValid = PhysicsUtils.isValidLocation(lat, lng)
             val meValid = myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)
@@ -437,7 +445,11 @@ fun OsmMap(
             }
             overlays.add(object : Overlay() {
                 override fun onTouchEvent(event: MotionEvent, mapView: MapView): Boolean {
-                    if (event.action == MotionEvent.ACTION_DOWN) onLockChange(false)
+                    // Issue #020: Immediate local state change to prevent center-snapping while swiping.
+                    if (event.action == MotionEvent.ACTION_DOWN) {
+                        localLockStatus.value = false
+                        onLockChange(false)
+                    }
                     return false
                 }
             })
@@ -482,7 +494,7 @@ fun OsmMap(
                         m
                     }
                     marker.position = p
-                    marker.icon = BitmapDrawable(resources, homeBitmaps.getOrPut(idx + 1) { createHomeBitmap(density, idx + 1) })
+                    marker.icon = homeIcons.getOrPut(idx + 1) { BitmapDrawable(resources, createHomeBitmap(density, idx + 1)) }
                     marker.setOnMarkerClickListener { mk, mv -> 
                         if (!isTrackerMode && currentGeofenceMode == GeofenceMode.REMOVE) {
                             mv.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -552,7 +564,7 @@ fun OsmMap(
                 }
                 val isJumpViolation = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
                 marker.position = v.point
-                marker.icon = BitmapDrawable(resources, if (isJumpViolation) jumpBitmap else geofenceBitmap)
+                marker.icon = if (isJumpViolation) jumpIcon else geofenceIcon
                 markerFolder.add(marker)
 
                 val historicalAcc = if (v.maxAccuracy > 0.0) v.maxAccuracy else v.accuracy
@@ -625,13 +637,13 @@ fun OsmMap(
 
         if (trackerValid) { 
             trackerMarker.position = GeoPoint(lat, lng)
-            trackerMarker.icon = BitmapDrawable(resources, if (isFresh) trackerBitmapFresh else trackerBitmapStale)
+            trackerMarker.icon = if (isFresh) trackerIconFresh else trackerIconStale
             if (!view.overlays.contains(trackerMarker)) view.overlays.add(trackerMarker) 
         } else view.overlays.remove(trackerMarker)
         
         if (meValid) { 
             viewerMarker.position = GeoPoint(myLat!!, myLng!!)
-            viewerMarker.icon = BitmapDrawable(resources, if (isMeFresh) viewerBitmapFresh else viewerBitmapStale)
+            viewerMarker.icon = if (isMeFresh) viewerIconFresh else viewerIconStale
             if (!view.overlays.contains(viewerMarker)) view.overlays.add(viewerMarker) 
         } else view.overlays.remove(viewerMarker)
         
@@ -643,36 +655,51 @@ fun OsmMap(
     }, modifier = Modifier.fillMaxSize())
 }
 
-private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, colorNormal: Int, colorHindsight: Int, pool: SnapshotStateList<Polyline>): Int {
+private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, colorNormal: Int, colorHindsight: Int, pool: MutableList<Polyline>): Int {
     if (trailPoints.isEmpty()) return 0
     
-    var currentSegment = mutableListOf<GeoPoint>()
-    var isCurrentSegmentHindsight = false
+    // Issue #016: Optimized segment extraction and minimized allocations.
     var poolIdx = 0
+    var startIdx = 0
     
-    trailPoints.forEachIndexed { idx, pt -> 
-        if (pt.isJump) { 
-            if (currentSegment.isNotEmpty()) { 
-                addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++); 
-                currentSegment = mutableListOf() 
-            } 
-        } else {
-            if (idx > 0 && pt.isHindsightCorrected != isCurrentSegmentHindsight && currentSegment.isNotEmpty()) {
-                addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++)
-                currentSegment = mutableListOf()
-                currentSegment.add(trailPoints[idx-1].toGeoPoint())
+    while (startIdx < trailPoints.size) {
+        val segmentPoints = mutableListOf<GeoPoint>()
+        val isHindsight = trailPoints[startIdx].isHindsightCorrected
+        
+        var currentIdx = startIdx
+        while (currentIdx < trailPoints.size) {
+            val pt = trailPoints[currentIdx]
+            if (pt.isJump && currentIdx > startIdx) break
+            if (pt.isHindsightCorrected != isHindsight && currentIdx > startIdx) break
+            
+            segmentPoints.add(pt.toGeoPoint())
+            currentIdx++
+            
+            if (pt.isJump) {
+                startIdx = currentIdx
+                break
             }
-            isCurrentSegmentHindsight = pt.isHindsightCorrected
-            currentSegment.add(pt.toGeoPoint())
+        }
+        
+        if (segmentPoints.size > 1) {
+            addTrailSegmentToFolder(view, folder, segmentPoints, if (isHindsight) colorHindsight else colorNormal, pool, poolIdx++)
+        }
+        
+        if (currentIdx == trailPoints.size) break
+        
+        // Issue #021: Guaranteed advancement of startIdx to prevent infinite loop on 1-point segments.
+        if (startIdx < currentIdx) {
+            val nextStart = if (!trailPoints[currentIdx - 1].isJump) currentIdx - 1 else currentIdx
+            startIdx = if (nextStart > startIdx) nextStart else currentIdx
+        } else {
+            startIdx++
         }
     }
-    if (currentSegment.isNotEmpty()) {
-        addTrailSegmentToFolder(view, folder, currentSegment, if (isCurrentSegmentHindsight) colorHindsight else colorNormal, pool, poolIdx++)
-    }
+
     return poolIdx
 }
 
-private fun addTrailSegmentToFolder(view: MapView, folder: FolderOverlay, segment: List<GeoPoint>, color: Int, pool: SnapshotStateList<Polyline>, poolIdx: Int) {
+private fun addTrailSegmentToFolder(view: MapView, folder: FolderOverlay, segment: List<GeoPoint>, color: Int, pool: MutableList<Polyline>, poolIdx: Int) {
     val line = if (poolIdx < pool.size) {
         pool[poolIdx]
     } else {

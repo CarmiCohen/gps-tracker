@@ -32,11 +32,9 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
- * v8.9.63:
- * - Issue #461: Standardized uniqueness check using SignalingConstants.areIdsUnique.
- * v8.9.50:
- * - R182 Relaxation: Updated DEFAULT_TRACKER_ID and DEFAULT_VIEWER_ID to "T" and "V".
- * - Fixed broken logic in saveLong/getLong and added uniqueness guard to commit.
+ * v8.9.79:
+ * - Issue #014: Type Migration. Standardized maxDistance, accuracy, and temperature to Double.
+ *   Updated all persistence methods to use Double for these keys.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -58,7 +56,6 @@ class SettingsRepository @Inject constructor(
         const val RELAY_URL_KEY = "relay_url"
         const val DEFAULT_RELAY_URL = "https://gps-survival-relay.onrender.com"
         
-        // R182: Standardized default IDs
         const val DEFAULT_TRACKER_ID = SignalingConstants.DEFAULT_TRACKER_ID
         const val DEFAULT_VIEWER_ID = SignalingConstants.DEFAULT_VIEWER_ID
         
@@ -103,7 +100,6 @@ class SettingsRepository @Inject constructor(
         const val DRAFT_RELAY_URL = "draft_relay_url"
         const val DRAFT_MAX_DISTANCE = "draft_max_distance"
 
-        // Issue 47
         const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = "is_xiaomi_manual_override"
         
         const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
@@ -118,10 +114,9 @@ class SettingsRepository @Inject constructor(
     val lastSitTsFlow: Flow<Long> = dataStore.data.map { it.lastSitTs }
     
     val homePointsFlow: Flow<List<GeoPoint>> = dataStore.data.map { it.homePointsList.map { p -> GeoPoint(p.lat, p.lng) } }
-    val maxDistanceFlow: Flow<Double> = dataStore.data.map { if (it.maxDistance > 0) it.maxDistance.toDouble() else DEFAULT_MAX_DISTANCE }
+    val maxDistanceFlow: Flow<Double> = dataStore.data.map { if (it.maxDistance > 0.0) it.maxDistance else DEFAULT_MAX_DISTANCE }
     val alertSettingsFlow: Flow<AlertSettings> = dataStore.data.map { protoToAlertSettings(it.alertSettings) }
     
-    // Issue 47
     val isXiaomiManualOverrideFlow: Flow<Boolean> = dataStore.data.map { it.isXiaomiManualOverride }
 
     suspend fun saveString(keyName: String, value: String) {
@@ -172,12 +167,8 @@ class SettingsRepository @Inject constructor(
         dataStore.updateData { current ->
             val builder = current.toBuilder()
             when (keyName) {
-                MAX_DISTANCE_STORAGE_KEY -> builder.setMaxDistance(value)
-                MAX_ACCURACY_KEY -> builder.setMaxAccuracy(value)
-                MAX_TEMP_KEY -> builder.setMaxTemp(value)
-                TRACKER_LUX_BASELINE_KEY -> builder.setTrackerLuxBaseline(value)
-                DRAFT_MAX_DISTANCE -> builder.setDraftMaxDistance(value)
-                CHAIR_BASELINE_TILT_KEY -> builder.setChairBaselineTilt(value)
+                // Compatibility for any keys still requiring Float
+                TRACKER_LUX_BASELINE_KEY -> builder.setTrackerLuxBaseline(value.toDouble())
             }
             builder.build()
         }
@@ -187,7 +178,13 @@ class SettingsRepository @Inject constructor(
         dataStore.updateData { current ->
             val builder = current.toBuilder()
             when (keyName) {
+                MAX_DISTANCE_STORAGE_KEY -> builder.setMaxDistance(value)
+                MAX_ACCURACY_KEY -> builder.setMaxAccuracy(value)
+                MAX_TEMP_KEY -> builder.setMaxTemp(value)
+                TRACKER_LUX_BASELINE_KEY -> builder.setTrackerLuxBaseline(value)
                 TRACKER_ACOUSTIC_FLOOR_KEY -> builder.setTrackerAcousticFloor(value)
+                DRAFT_MAX_DISTANCE -> builder.setDraftMaxDistance(value)
+                CHAIR_BASELINE_TILT_KEY -> builder.setChairBaselineTilt(value)
             }
             builder.build()
         }
@@ -258,12 +255,7 @@ class SettingsRepository @Inject constructor(
     suspend fun getFloat(keyName: String, default: Float): Float {
         val settings = dataStore.data.first()
         return when (keyName) {
-            MAX_DISTANCE_STORAGE_KEY -> if (settings.maxDistance > 0) settings.maxDistance else default
-            MAX_ACCURACY_KEY -> settings.maxAccuracy
-            MAX_TEMP_KEY -> if (settings.maxTemp > 0) settings.maxTemp else default
-            TRACKER_LUX_BASELINE_KEY -> settings.trackerLuxBaseline
-            DRAFT_MAX_DISTANCE -> if (settings.draftMaxDistance > 0) settings.draftMaxDistance else default
-            CHAIR_BASELINE_TILT_KEY -> if (settings.hasChairBaselineTilt()) settings.chairBaselineTilt else default
+            TRACKER_LUX_BASELINE_KEY -> settings.trackerLuxBaseline.toFloat()
             else -> default
         }
     }
@@ -271,7 +263,13 @@ class SettingsRepository @Inject constructor(
     suspend fun getDouble(keyName: String, default: Double): Double {
         val settings = dataStore.data.first()
         return when (keyName) {
+            MAX_DISTANCE_STORAGE_KEY -> if (settings.maxDistance > 0.0) settings.maxDistance else default
+            MAX_ACCURACY_KEY -> settings.maxAccuracy
+            MAX_TEMP_KEY -> if (settings.maxTemp > 0.0) settings.maxTemp else default
+            TRACKER_LUX_BASELINE_KEY -> settings.trackerLuxBaseline
             TRACKER_ACOUSTIC_FLOOR_KEY -> settings.trackerAcousticFloor
+            DRAFT_MAX_DISTANCE -> if (settings.draftMaxDistance > 0.0) settings.draftMaxDistance else default
+            CHAIR_BASELINE_TILT_KEY -> if (settings.hasChairBaselineTilt()) settings.chairBaselineTilt else default
             else -> default
         }
     }
@@ -308,7 +306,7 @@ class SettingsRepository @Inject constructor(
             val builder = current.toBuilder()
             builder.clearHomePoints().addAllHomePoints(points.map { GeoPointProto.newBuilder().setLat(it.latitude).setLng(it.longitude).build() })
             builder.setHomePointsTs(ts)
-            maxDistance?.let { builder.setMaxDistance(it.toFloat()) }
+            maxDistance?.let { builder.setMaxDistance(it) }
             builder.build()
         }
         return ts
@@ -446,6 +444,7 @@ class SettingsRepository @Inject constructor(
                     .setIsCoolingModeActive(status.isCoolingModeActive)
                     .setIsStorageCritical(status.isStorageCritical)
                     .setCurrentMa(status.currentMa)
+                    .setIsAnchorLocked(status.isAnchorLocked)
                 builder.setTrackerState(trackerBuilder.build())
                 builder.build()
             }
@@ -492,7 +491,8 @@ class SettingsRepository @Inject constructor(
             isBatterySteepDischarge = s.isBatterySteepDischarge,
             isJammer = s.isJammer,
             isCoolingModeActive = s.isCoolingModeActive,
-            currentMa = s.currentMa
+            currentMa = s.currentMa,
+            isAnchorLocked = s.isAnchorLocked
         )
     }
 
@@ -535,7 +535,7 @@ class SettingsRepository @Inject constructor(
         deviceId: String,
         viewerId: String,
         relayUrl: String,
-        maxDistance: Float,
+        maxDistance: Double,
         alertSettings: AlertSettings
     ) {
         dataStore.updateData { current ->
@@ -564,7 +564,6 @@ class SettingsRepository @Inject constructor(
             val newMaxDistance = if (current.hasDraftMaxDistance()) current.draftMaxDistance else current.maxDistance
             val newAlertsProto = if (current.hasDraftAlertSettings()) current.draftAlertSettings else current.alertSettings
 
-            // Issue #461: Enforce uniqueness using SignalingConstants.
             if (!SignalingConstants.areIdsUnique(newTrackerId, newViewerId)) {
                 res = CommitResult(error = "IDs must be unique")
                 return@updateData current
@@ -604,13 +603,12 @@ class SettingsRepository @Inject constructor(
 
     /**
      * Atomically saves multiple primary settings.
-     * R853: Added homePoints support for atomic bulk updates.
      */
     suspend fun saveSettingsBulk(
         deviceId: String? = null,
         viewerId: String? = null,
         relayUrl: String? = null,
-        maxDistance: Float? = null,
+        maxDistance: Double? = null,
         alertSettings: AlertSettings? = null,
         homePoints: List<GeoPoint>? = null
     ) {
@@ -660,11 +658,10 @@ class SettingsRepository @Inject constructor(
     suspend fun resetStatsBulk() {
         dataStore.updateData { current ->
             current.toBuilder()
-                .setMaxAccuracy(0f)
-                .setMaxTemp(0f)
+                .setMaxAccuracy(0.0)
+                .setMaxTemp(0.0)
                 .setTotalConnected(0L)
                 .setUptime(0L)
-                .setTotalDrop(0L)
                 .setTotalDrop(0L)
                 .setMaxDrop(0L)
                 .setMaxDropTs(0L)

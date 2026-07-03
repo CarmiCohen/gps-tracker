@@ -146,7 +146,7 @@ class SystemStatusProviderImpl @Inject constructor(
                 val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
                 val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
                 val pct = if (level != -1 && scale != -1) (level * 100 / scale.toFloat()).toInt() else 100
-                val temp = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10f
+                val temp = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10.0
                 val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
                 val isCharging = plugged > 0
                 val currentMa = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) / 1000
@@ -160,7 +160,7 @@ class SystemStatusProviderImpl @Inject constructor(
 
 data class BatteryStatus(
     val level: Int,
-    val temp: Float,
+    val temp: Double,
     val isCharging: Boolean,
     val currentMa: Int = 0
 )

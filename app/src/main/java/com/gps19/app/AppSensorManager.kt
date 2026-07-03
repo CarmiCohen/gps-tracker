@@ -29,11 +29,8 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU and Environmental sensors.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
- * v8.9.71:
- * - Forensic UI Expansion: Exposed proximityDebounceMs and vibrationRollingSum.
+ * v8.9.79:
+ * - Issue #016: Finalized Double standardization. Renamed latestAcousticDb to currentAcousticDb for consistency.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -179,7 +176,7 @@ class AppSensorManager @Inject constructor(
     var currentTiltDegrees: Double = 0.0
         private set
         
-    var latestAcousticDb: Double = 0.0
+    var currentAcousticDb: Double = 0.0
         private set
 
     var currentVerticalVelocity: Double = 0.0
@@ -382,7 +379,7 @@ class AppSensorManager @Inject constructor(
             secMinProxIdx = proximityIdx
             secPeakTilt = currentTiltDegrees
             secPeakLift = abs(relativeAltitude)
-            secPeakDb = latestAcousticDb
+            secPeakDb = currentAcousticDb
             
             while (sensorSampleBuffer.size > 0 && (wallNow - (sensorSampleBuffer.peek()?.ts ?: wallNow)) > SENSOR_SAMPLE_BUFFER_MAX_AGE_MS) {
                 sensorSampleBuffer.poll()
@@ -468,7 +465,7 @@ class AppSensorManager @Inject constructor(
                             }
                             val db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble() / 1.0) else 0.0
                             synchronized(this) {
-                                latestAcousticDb = db
+                                currentAcousticDb = db
                                 if (db > internalPeakDb) internalPeakDb = db
                                 if (db < internalMinDb) internalMinDb = db
                                 if (db > secPeakDb) secPeakDb = db

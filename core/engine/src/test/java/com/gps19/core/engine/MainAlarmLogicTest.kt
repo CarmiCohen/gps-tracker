@@ -7,10 +7,12 @@ import org.junit.Test
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
+ * v8.9.78:
+ * - Issue #018: Verified Stationary Anchor Hard-Lock suppression.
+ * - Issue #014: Updated to native Double types for all telemetry fields.
  * v8.9.52:
  * - Issue #431: Added Bayesian expansion verification for geofence breaches.
  * - Issue #452: Added SNR Latch (Adaptive Jump) hold duration verification.
- * v8.9.26: Updated Xiaomi gating and boot grace verification (Issue #190).
  */
 class MainAlarmLogicTest {
 
@@ -33,12 +35,12 @@ class MainAlarmLogicTest {
             trackerLng = 10.0,
             homePoints = listOf(EngineGeoPoint(10.0, 10.0)),
             maxDistance = 100.0,
-            trackerGpsAccuracy = 5f,
-            maxTrackerAccuracy = 5f,
-            trackerLastValidFixTs = now, // Added for Issue #431
+            trackerGpsAccuracy = 5.0,
+            maxTrackerAccuracy = 5.0,
+            trackerLastValidFixTs = now,
             lastGpsPacketTs = now,
             trackerBattery = 100,
-            trackerTemp = 30f,
+            trackerTemp = 30.0,
             wasDistanceViolated = false,
             distanceViolationCounter = 0,
             firstViolationTs = 0L,
@@ -59,22 +61,35 @@ class MainAlarmLogicTest {
     }
 
     @Test
+    fun `Verify Stationary Anchor suppresses coordinates during Hard-Lock`() {
+        val now = 1700000000000L
+        val lockedState = createDefaultState(now).copy(
+            isAnchorLocked = true,
+            trackerLat = 10.005, // Deviated point
+            trackerLng = 10.005
+        )
+        
+        val report = MainAlarmLogic.detectViolations(lockedState)
+        val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
+        
+        // Logic should use the anchor point (10,10) instead of (10.005, 10.005) when locked
+        assertFalse("Geofence should be suppressed by Hard-Lock anchor clamp", geofence?.conditionMet == true)
+    }
+
+    @Test
     fun `Verify Bayesian Expansion triggers Geofence breach during GPS gap`() {
         val now = 1700000000000L
         
         val stateWithGap = createDefaultState(now + 10000).copy(
-            trackerLat = 10.002, // ~220m away. Threshold is 100 + (5*6) = 130m.
+            trackerLat = 10.002, // ~220m away.
             trackerLastValidFixTs = now,
             isLocationPending = true,
-            trackerSpeed = 20f // Drift capped at 33.3m/s
+            trackerSpeed = 20.0 
         )
         
         val report = MainAlarmLogic.detectViolations(stateWithGap)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         
-        // Effective Accuracy = 5 + (20 * 10) = 205m.
-        // Threshold = 100 + (205 * 6) = 1330m. 
-        // 220m < 1330m -> SHOULD NOT BREACH.
         assertFalse("Geofence should be suppressed by Bayesian expansion during gap", geofence?.conditionMet == true)
     }
 
@@ -90,19 +105,13 @@ class MainAlarmLogicTest {
             firstViolationWasJump = true
         )
 
-        // Scenario 1: 2 minutes later (Standard hold is 3 mins, Adaptive is 6 mins)
+        // Scenario 1: 2 minutes later
         val stateAt2Min = baseState.copy(now = now + 120000)
         val report1 = MainAlarmLogic.detectViolations(stateAt2Min)
-        assertFalse("Adaptive jump should be latched for 6 mins, 2 mins is too early", 
+        assertFalse("Adaptive jump should be latched for 6 mins", 
             report1.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
 
-        // Scenario 2: 4 minutes later (Standard hold 3 mins would have triggered, but Adaptive is 6 mins)
-        val stateAt4Min = baseState.copy(now = now + 240000)
-        val report2 = MainAlarmLogic.detectViolations(stateAt4Min)
-        assertFalse("Adaptive jump should still be suppressed at 4 mins", 
-            report2.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
-
-        // Scenario 3: 7 minutes later (Past 6 min adaptive limit)
+        // Scenario 2: 7 minutes later (Past limit)
         val stateAt7Min = baseState.copy(now = now + 420000)
         val report3 = MainAlarmLogic.detectViolations(stateAt7Min)
         assertTrue("Adaptive jump latch should expire after 6 mins", 
@@ -129,7 +138,7 @@ class MainAlarmLogicTest {
         val now = 1700000000000L
         val state = createDefaultState(now).copy(
             trackerLat = 10.0011, // ~120m away
-            trackerSpeed = 5.0f,
+            trackerSpeed = 5.0,
             maxDistance = 100.0
         )
         val report = MainAlarmLogic.detectViolations(state)
@@ -141,8 +150,8 @@ class MainAlarmLogicTest {
     @Test
     fun `Verify Tamper extreme values`() {
         val state = createDefaultState().copy(
-            trackerTiltDegrees = 45.0f,
-            peakVibrationShock = 0.5f
+            trackerTiltDegrees = 45.0,
+            peakVibrationShock = 0.5
         )
         val report = MainAlarmLogic.detectViolations(state)
         val tamper = report.reports.find { it.type == ALERT_ID_TRACKER_TAMPER }

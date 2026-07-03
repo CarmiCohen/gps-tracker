@@ -5,6 +5,7 @@ option java_multiple_files = true;
 
 /**
  * AppSettings: Persistence schema for DataStore.
+ * v8.9.79: Issue #014 - Type Migration. Standardized distance, accuracy, and temperature to double.
  */
 message AppSettings {
     optional string app_mode = 1;
@@ -14,8 +15,8 @@ message AppSettings {
     optional int64 app_start_time = 5;
     optional int64 last_alarm_ack_ts = 6;
     optional int64 home_points_ts = 7;
-    optional float max_distance = 8;
-    optional float max_accuracy = 9;
+    optional double max_distance = 8;
+    optional double max_accuracy = 9;
     optional bool is_manual_exit = 10;
 
     reserved 11; // total_activity
@@ -45,28 +46,26 @@ message AppSettings {
 
     reserved 31;
     optional int32 last_version_code = 32;
-    optional float max_temp = 33;
+    optional double max_temp = 33;
 
-    optional float tracker_lux_baseline = 34;
+    optional double tracker_lux_baseline = 34;
     optional double tracker_acoustic_floor = 35;
 
     optional bool is_mic_type_started = 36;
 
-    // v5.650 Draft Fields
     optional string draft_tracker_id = 37;
     optional string draft_viewer_id = 38;
     optional string draft_relay_url = 39;
-    optional float draft_max_distance = 40;
+    optional double draft_max_distance = 40;
     optional AlertSettingsProto draft_alert_settings = 41;
 
     optional int64 last_sit_ts = 42;
-    optional float chair_baseline_tilt = 43;
+    optional double chair_baseline_tilt = 43;
 
     optional int64 violation_uptime_ms = 44;
     optional int64 last_service_tick_realtime = 45;
     optional string last_daily_archive_date = 46;
 
-    // Issue 47: Xiaomi Permission Override
     optional bool is_xiaomi_manual_override = 47;
 
     optional int64 last_history_sit_ts = 48;
@@ -78,29 +77,26 @@ message RealtimeStatus {
     bool from_viewer = 3;
     double lat = 4;
     double lng = 5;
-    float speed = 6;
-    float bearing = 7;
-    float accuracy = 8;
-    float max_accuracy = 9;
+    double speed = 6;
+    double bearing = 7;
+    double accuracy = 8;
+    double max_accuracy = 9;
     int32 battery = 10;
-    float temp = 11;
+    double temp = 11;
     bool is_charging = 12;
     int64 ts = 13;
     int64 gps_ts = 14;
     int32 sats_view = 15;
     int32 sats_used = 16;
     int64 uptime_ms = 17;
-    reserved 18; // total_activity_ms
     int64 total_connected_ms = 19;
     int64 session_connected_ms = 20;
     int64 total_drop_ms = 21;
     int64 max_drop_ms = 22;
-    reserved 23; // app_bruto_ms
     int64 last_conn_ts = 24;
     int64 last_disc_ts = 25;
     bool is_historical = 26;
     double alt = 27;
-    reserved 28; // vid
 }
 
 message GeoPointProto {
@@ -138,10 +134,10 @@ message AlertSettingsProto {
 message TrackerStatusProto {
     double lat = 1;
     double lng = 2;
-    float speed = 3;
-    float bearing = 4;
-    float accuracy = 5;
-    float max_accuracy = 22;
+    double speed = 3;
+    double bearing = 4;
+    double accuracy = 5;
+    double max_accuracy = 22;
     int64 gps_ts = 6;
     int64 ts = 7;
     int64 uptime_ms = 8;
@@ -149,66 +145,58 @@ message TrackerStatusProto {
     int64 last_disc_ts = 10;
     int64 total_drop_ms = 11;
     int64 max_drop_ms = 12;
-    reserved 13, 14; // app_bruto_ms, total_activity_ms
     int64 total_connected_ms = 15;
     int64 session_connected_ms = 16;
     int32 battery = 17;
-    float temp = 18;
+    double temp = 18;
     bool is_charging = 19;
     int32 sats_view = 20;
     int32 sats_used = 21;
     double alt = 23;
-    float max_temp = 24;
+    double max_temp = 24;
 
-    // Issue #348: Forensic Sit Metadata Persistence (Formerly #271)
     bool is_sit_detected = 25;
     int64 last_sit_ts = 26;
-    float vertical_velocity = 27;
-    float sit_vz = 28;
-    float sit_dz = 29;
-    float sit_baro = 30;
-    float sit_tilt = 31;
-    float sit_shock = 32;
+    double vertical_velocity = 27;
+    double sit_vz = 28;
+    double sit_dz = 29;
+    double sit_baro = 30;
+    double sit_tilt = 31;
+    double sit_shock = 32;
 
     int64 max_drop_ts = 33;
     int64 violation_uptime_ms = 34;
-    float violation_percentage = 35;
+    double violation_percentage = 35;
     bool is_power_tamper = 36;
 
-    float vibration = 37;
-    float heading = 38;
-    float baro_alt = 39;
-    float lux = 40;
+    double vibration = 37;
+    double heading = 38;
+    double baro_alt = 39;
+    double lux = 40;
     bool is_near = 41;
-    float tilt_degrees = 42;
+    double tilt_degrees = 42;
     double acoustic_db = 43;
-    float peak_shock = 44;
+    double peak_shock = 44;
     int64 peak_shock_ts = 45;
-    float lux_baseline = 46;
+    double lux_baseline = 46;
     double acoustic_floor = 47;
-    float adaptive_vibration_floor = 48;
-    float prox_idx = 49;
+    double adaptive_vibration_floor = 48;
+    double prox_idx = 49;
     bool is_suspicious = 50;
     bool is_tamper_detected = 51;
     string ver = 52;
 
-    // Fin 5c: OS Restrictions Persistence
     bool is_power_save_mode = 53;
     int32 standby_bucket = 54;
     string net_interface = 55;
     bool is_storage_low = 56;
 
-    // Issue #353: Battery Discharge Profiling (Formerly #272)
     bool is_battery_steep_discharge = 57;
 
-    // Issue #315: Network Signaling Integrity (Formerly #273)
     bool is_jammer = 58;
-    reserved 59; // vid
-
-    // Issue 136: AppSettings Persistence Gap
     bool is_cooling_mode_active = 60;
     bool is_storage_critical = 61;
 
-    // Issue #337: Power Forensic Consistency
     int32 current_ma = 62;
+    bool is_anchor_locked = 63;
 }

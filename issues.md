@@ -1,64 +1,63 @@
-# Project Issues
+# Project Issues & Hardening Tracking (v8.9.83)
 
-## Open Issues
+This document tracks all open issues, technical debt, and pending validation tasks. 
 
-### Issue #016: Main Thread Performance Bottlenecks (UI Jank)
-- **Description**: System reports skipped frames (e.g., 43 frames) during map interaction and app startup.
-- **Root Cause**: Potential heavy lifting on the main thread during `OsmMap` rendering or high-frequency `getPackageName` calls.
-- **Status**: Open
-- **Priority**: Medium
-- **Target**: `MapComponents.kt`, `MainActivity.kt`.
+## 📊 Hardening Progress Dashboard
+| Category | Status | Count |
+| :--- | :--- | :--- |
+| **Open Technical Issues** | 🟢 None | 0 |
+| **Validation Tasks** | 🟡 Pending | 4 |
+| **Resolved (Total)** | 🟢 Progress | 29 |
 
-### Issue #017: Compose SnapshotStateList Lock Verification Failures
-- **Description**: Runtime warnings regarding `SnapshotStateList` failing lock verification and running slower.
-- **Root Cause**: Non-optimized dex code or Proguard/R8 optimizations affecting Compose internal state management.
-- **Status**: Open
-- **Priority**: Low
-- **Target**: Global / Build Configuration.
+---
 
-### Issue #018: Tracker Behavior Stability - Inaccurate "JUMPING" states
-- **Description**: Tracker state switches to `JUMPING` with high speeds (e.g., 11.1) while stationary or during low-speed movement.
-- **Root Cause**: Location noise or filtering logic sensitivity in the core engine.
-- **Status**: Open
-- **Priority**: Medium
-- **Target**: `core:engine`.
+## ⚠️ Newly Identified Risks & Concerns
+*   **DataStore Precision Migration**: Changing Proto fields from `float` to `double` (Issue #014) may cause binary incompatibility for existing stored settings. Monitor for `SerializationException` on startup.
+*   **Soak Test Monitoring**: Ongoing 24-hour stability test required to monitor for `STABILITY GAP` logs under 10Hz sensor load.
+*   **UI Refresh Consistency**: Verify forensic fields (`Prox Debounce`, `Rolling Vibe`) respect the 15s staleness gate.
+*   **Breakout Sensitivity**: Monitor the 20m/0.8x breakout gate in `LocationProcessor` for "sticky" transitions.
 
-## Resolved Issues
+---
 
-### Issue #019: Android 14+ "While-in-Use" Permission Transition Risk
-- **Description**: Services may fail to add `MICROPHONE` type if they transition from background to "active monitoring" without a fresh UI pulse.
-- **Root Cause**: Android 14's strict enforcement of `FOREGROUND_SERVICE_TYPE_MICROPHONE` requiring a visible activity or a specific allowed transition.
-- **Implementation**: 
-    * Added `isRecentUiPulse()` to `BaseMonitorService` to bridge the gap between background start and UI visibility.
-    * Refined `TrackerService.getAvailableForegroundServiceType` to claim `MICROPHONE` if a UI pulse was received within `UI_PULSE_TIMEOUT_MS`.
-    * Ensured `updateForegroundServiceType()` is called immediately after async setup completion.
-- **Status**: Resolved
-- **Priority**: Medium
-- **Target**: `TrackerService.kt`, `BaseMonitorService.kt`.
+## 🔴 Open Issues
+*   None.
 
-### Issue #015: StandaloneCoroutine Cancellation during Service Start
-- **Description**: `JobCancellationException` observed immediately after foreground service failure.
-- **Root Cause**: Coroutine scopes tied to service lifecycle were being cancelled when the service failed to transition to the foreground, and generic catch blocks were logging these cancellations as errors.
-- **Implementation**: 
-    * Hardened `SyncManager`, `RemoteHandler`, and `CommandRouter` to explicitly ignore `CancellationException` in generic catch blocks.
-    * Ensured `CoroutineExceptionHandler` in `CommandRouter` filters out cancellation noise.
-    * Verified FGS update loops in `TrackerService` and `ViewerService` preserve cancellation intent without logging.
-- **Status**: Resolved
-- **Priority**: High
-- **Target**: `TrackerService.kt`, `ViewerService.kt`, `SyncManager.kt`, `RemoteHandler.kt`, `CommandRouter.kt`.
+---
 
-### Issue #013: Forensic UI Expansion - Stationary Scaling Visibility
-- **Description**: Expose internal stationary scaling metrics to the UI telemetry panel.
-- **Status**: Resolved
-- **Priority**: Medium
+## 🟡 Pending Validation
+*   **Proto precision upgrade**: Verify that existing `max_distance` and `max_accuracy` values are correctly interpreted after the `float` -> `double` change.
+*   **Off-Main-Thread Sensor Stability**: Verify long-term stability of the `AppSensorThread`.
+*   **Stationary Scaling Efficacy**: Confirm that `PROXIMITY_STARY_SCALING_MS_PER_HOUR` correctly scales skepticism.
+*   **A15 Forensic Suppression**: Verify `suppressionNote` visibility in the log sink.
 
-### Issue #014: Foreground Service Type Mismatch (Android 14+)
-- **Description**: Logcat reports `Failed to update foreground service type`.
-- **Root Cause**: Mismatch between `AndroidManifest.xml` foreground types and the `startForeground()` call. Android 14 also forbids adding `MICROPHONE` types from the background.
-- **Implementation**: 
-    * Hardened `BaseMonitorService.safeStartForeground` to enforce `LOCATION` type on API 34+.
-    * Added logic in `TrackerService` to only claim `MICROPHONE` if the UI is visible or it was already active, preventing illegal background transitions.
-    * Improved exception handling to preserve `CancellationException`.
-- **Status**: Resolved
-- **Priority**: High
-- **Target**: `TrackerService.kt`, `ViewerService.kt`.
+---
+
+## 🟢 Resolved Issues
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#022** | **Deep-Link Cold-Start Handling** | **Resolved (v8.8.6)**. Remapped from #44 to unify numbering. Implemented intent-aware startup for direct map navigation. |
+| **#021** | **Map UI Infinite Loop** | **Resolved (v8.9.82)**. Fixed a logic error in `drawTrailToFolder` (`MapComponents.kt`) that caused an infinite loop on the main thread when processing single-point trail segments during property changes. |
+| **#020** | **Map Centering Race Condition** | **Resolved (v8.9.83)**. Introduced `localLockStatus` in `MapComponents.kt` to immediately suspend centering logic upon touch detection, preventing the map from "fighting" user swiping/zooming gestures. |
+| **#019** | **Android 14+ Permission Transition** | **Resolved**. Added UI pulse check and refined FGS type claims in `TrackerService`. |
+| **#017** | **SnapshotStateList Lock Failures** | **Resolved (v8.9.81)**. Replaced observable `SnapshotStateList` pools in `MapComponents.kt` with standard `MutableList` to eliminate snapshot overhead in imperative update blocks. |
+| **#014** | **Type Safety / Double Migration** | **Resolved (v8.9.80)**. Standardized all telemetry fields to `Double` across Proto, Services, Repositories, and UI State. Fixed signature mismatches in `TrackerService` and `SessionManager`. |
+| **#016** | **Main Thread Performance Bottlenecks** | **Resolved**. Optimized trail rendering in `MapComponents.kt` (cached drawables, single-pass segment extraction) and offloaded startup I/O in `SettingsUseCase.kt`. |
+| **#018** | **Tracker Behavior Stability (JUMPING)** | **Resolved**. Implemented "Hard-Lock" stationary anchoring logic in `LocationProcessor.kt`. |
+| **#015** | **Coroutine Cancellation Noise** | **Resolved**. Hardened managers to ignore `CancellationException` in logs. |
+| **#013** | **Forensic UI Expansion** | **Resolved**. Exposed internal scaling metrics to the dashboard and sync manager. |
+| **#011** | **Suppression Forensic Labeling** | **Resolved**. Implemented `suppressionNote` in `LocationSentinel`. |
+| **#012** | **Adaptive Proximity Debounce** | **Resolved**. Implemented scaling in `AppSensorManager`. |
+| **#010** | **A15 Acoustic/Vibration Coherence** | **Resolved**. Implemented coherence check in Fast Path and validation. |
+| **#R325** | **Samsung A15 Accuracy Truncation** | **Resolved**. Optimized layout width constraints for narrow screens. |
+| **#006** | **Samsung A15 Main Thread Jitter** | **Resolved**. Offloaded `onSensorChanged` to `AppSensorThread`. |
+| **#007** | **Connectivity Rejoin Latency** | **Resolved**. Implemented reactive `ConnectionLostCallback`. |
+| **#461** | **Settings Uniqueness UI Feedback** | **Resolved**. Implemented error propagation to UI. |
+| **#001** | **Room Schema Divergence** | **Resolved**. Incremented DB to v51/v52 and corrected migrations. |
+| **#002** | **GPS Status UI Mismatch** | **Resolved**. Increased failure thresholds to 35s. |
+| **#003** | **Main Thread Jitter (Davey)** | **Resolved**. Moved state computations to `Dispatchers.Default`. |
+| **#004** | **A15 Virtual Proximity Suppression** | **Resolved**. Refined manager for 'Far' transitions in darkness. |
+| **#005** | **Map Provider Log Spillage** | **Resolved**. Silenced `osmdroid` logs. |
+| **#458** | **Tracker Role Ghost Mode Bug** | **Resolved**. Corrected role-aware timestamp propagation. |
+| **#459** | **Unicode Escape Regression** | **Resolved**. Resolved double-escaping in string literals. |
+| **#460** | **Local Freshness Existence Logic** | **Resolved**. Relaxed existence check to include sensor telemetry. |

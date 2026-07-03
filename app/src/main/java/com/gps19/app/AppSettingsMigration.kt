@@ -6,9 +6,8 @@ import androidx.datastore.migrations.SharedPreferencesView
 
 /**
  * AppSettingsMigration: Migrates data from legacy SharedPreferences to DataStore.
- * v8.9.55:
- * - Issue #357: Uptime Consistency. Consolidated redundant session timing fields into uptimeMs. 
- *   (Formerly #271, originally #1. Corrected from conflicting ID #334)
+ * v8.9.80:
+ * - Issue #014: Type Migration. Standardized all telemetry fields to Double for consistency.
  */
 fun AppSettingsMigration(context: Context) = SharedPreferencesMigration<AppSettings>(
     context = context,
@@ -29,8 +28,8 @@ fun AppSettingsMigration(context: Context) = SharedPreferencesMigration<AppSetti
         sharedPrefs.getLong("last_alarm_ack_ts", 0L).let { if (it > 0) builder.setLastAlarmAckTs(it) }
         sharedPrefs.getLong("home_points_ts", 0L).let { if (it > 0) builder.setHomePointsTs(it) }
         
-        sharedPrefs.getFloat("max_distance", 0f).let { if (it > 0f) builder.setMaxDistance(it) }
-        sharedPrefs.getFloat("max_accuracy", 0f).let { if (it > 0f) builder.setMaxAccuracy(it) }
+        sharedPrefs.getFloat("max_distance", 0f).let { if (it > 0f) builder.setMaxDistance(it.toDouble()) }
+        sharedPrefs.getFloat("max_accuracy", 0f).let { if (it > 0f) builder.setMaxAccuracy(it.toDouble()) }
         
         sharedPrefs.getBoolean("is_manual_exit", false).let { if (it) builder.setIsManualExit(true) }
 
@@ -44,7 +43,7 @@ fun AppSettingsMigration(context: Context) = SharedPreferencesMigration<AppSetti
         sharedPrefs.getLong("last_gps_ts", 0L).let { if (it > 0) builder.setLastGpsTs(it) }
         sharedPrefs.getString("selected_siren", null)?.let { builder.setSelectedSiren(it) }
 
-        sharedPrefs.getFloat("tracker_lux_baseline", 0f).let { if (it > 0f) builder.setTrackerLuxBaseline(it) }
+        sharedPrefs.getFloat("tracker_lux_baseline", 0f).let { if (it > 0f) builder.setTrackerLuxBaseline(it.toDouble()) }
         
         sharedPrefs.getBoolean("is_mic_type_started", false).let { if (it) builder.setIsMicTypeStarted(true) }
         sharedPrefs.getLong("last_sit_ts", 0L).let { if (it > 0) builder.setLastSitTs(it) }
@@ -59,7 +58,6 @@ fun AppSettingsMigration(context: Context) = SharedPreferencesMigration<AppSetti
         sharedPrefs.getBoolean("alert_distance", true).let { alertBuilder.setDistance(it) }
         sharedPrefs.getBoolean("alert_power", true).let { alertBuilder.setPower(it) }
         sharedPrefs.getBoolean("alert_low_battery", true).let { alertBuilder.setLowBattery(it) }
-        sharedPrefs.getBoolean("alert_long_time_gap", true).let { alertBuilder.setLongTimeGap(it) }
         sharedPrefs.getBoolean("alert_long_time_gap", true).let { alertBuilder.setLongTimeGap(it) }
         sharedPrefs.getBoolean("alert_high_temperature", true).let { alertBuilder.setHighTemperature(it) }
         sharedPrefs.getBoolean("alert_override_silence", true).let { alertBuilder.setOverrideSilence(it) }

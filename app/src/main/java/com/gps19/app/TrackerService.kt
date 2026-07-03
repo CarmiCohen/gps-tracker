@@ -21,16 +21,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v8.9.77:
- * - Issue #018: Stationary Anchor Hard-Lock. Propagating isAnchorLocked flag 
- *   to telemetry and forensic layers.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions across module boundaries.
- * - Fix: Corrected sensorManager properties (isProximityNear).
- * - Typo Fix: Corrected LocationPendingReason.JAMMER_SUSCIPION.
- * v8.9.72:
- * - Issue #019: Hardened Android 14+ MICROPHONE transition.
+ * v8.9.80:
+ * - Issue #014: Type Migration Finalization. Explicitly aligned snrSnapshot and vibeSnapshot 
+ *   to Double in evaluateAlarms call to resolve build regression.
+ * v8.9.79:
+ * - Issue #016: Finalized Double standardization to eliminate casting overhead in the fast-path.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {

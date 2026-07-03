@@ -18,7 +18,7 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
- * v8.8.6: Deep-Link Cold-Start Handling (Issue 44).
+ * v8.8.6: Deep-Link Cold-Start Handling (Issue #022 - Formerly 44).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {

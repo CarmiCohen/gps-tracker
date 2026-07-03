@@ -6,11 +6,9 @@ import javax.inject.Singleton
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
- * v8.9.78:
- * - Issue #018: Fixed property mapping for acousticFloorDb.
- * v8.9.77:
- * - Issue #018: Stationary Anchor Hard-Lock. Mapping isAnchorLocked state 
- *   for forensic transparency in UI.
+ * v8.9.79:
+ * - Issue #014: Type Migration. Standardized to Double for all telemetry mapping.
+ *   Ensured violationPercentage and accuracy fields are explicitly Double.
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(
@@ -30,7 +28,7 @@ class TelemetryUseCase @Inject constructor(
             lng = if (isLocationValid) update.lng else currentLoc.lng, 
             speed = if (isLocationValid) update.speed else currentLoc.speed, 
             accuracy = if (isLocationValid) update.accuracy else currentLoc.accuracy, 
-            maxAccuracy = if (update.maxAccuracy > 0) update.maxAccuracy else currentLoc.maxAccuracy,
+            maxAccuracy = if (update.maxAccuracy > 0.0) update.maxAccuracy else currentLoc.maxAccuracy,
             bearing = if (isLocationValid) update.bearing else currentLoc.bearing, 
             timestamp = if (newTimestamp > 0) newTimestamp else currentLoc.timestamp,
             telemetryTs = if (update.ts > 0) update.ts else nowMs,
@@ -48,7 +46,7 @@ class TelemetryUseCase @Inject constructor(
             isTamperDetected = update.isTamperDetected,
             isPowerTamper = update.isPowerTamper,
             isSitDetected = update.isSitDetected,
-            lastSitTs = update.lastSitTs ?: currentLoc.lastSitTs,
+            lastSitTs = update.lastSitTs,
             verticalVelocity = update.verticalVelocity ?: currentLoc.verticalVelocity,
             sitVz = update.sitVz ?: currentLoc.sitVz,
             sitDz = update.sitDz ?: currentLoc.sitDz,
@@ -69,7 +67,7 @@ class TelemetryUseCase @Inject constructor(
             violationPercentage = update.violationPercentage ?: calculateViolationPercentage(update.violationUptimeMs, nowMs - appStartTime),
             isLocationPending = update.isLocationPending,
             locationPendingReason = update.locationPendingReason,
-            lastValidFixRealtime = if (update.lastValidFixRealtime > 0) update.lastValidFixRealtime else currentLoc.lastValidFixRealtime,
+            lastValidFixRealtime = if (update.lastValidFixRealtime > 0L) update.lastValidFixRealtime else currentLoc.lastValidFixRealtime,
             isPowerSaveMode = update.isPowerSaveMode,
             standbyBucket = update.standbyBucket,
             netInterface = update.netInterface,
@@ -127,7 +125,7 @@ class TelemetryUseCase @Inject constructor(
             lng = if (isLocationValid) update.lng else currentLoc.lng, 
             speed = if (isLocationValid) update.speed else currentLoc.speed, 
             accuracy = if (isLocationValid) update.accuracy else currentLoc.accuracy, 
-            maxAccuracy = if (update.maxAccuracy > 0) update.maxAccuracy else currentLoc.maxAccuracy,
+            maxAccuracy = if (update.maxAccuracy > 0.0) update.maxAccuracy else currentLoc.maxAccuracy,
             bearing = if (isLocationValid) update.bearing else currentLoc.bearing, 
             timestamp = if (newTimestamp > 0) newTimestamp else currentLoc.timestamp,
             telemetryTs = if (update.ts > 0) update.ts else nowMs,
@@ -145,7 +143,7 @@ class TelemetryUseCase @Inject constructor(
             isTamperDetected = update.isTamperDetected,
             isPowerTamper = update.isPowerTamper,
             isSitDetected = update.isSitDetected,
-            lastSitTs = update.lastSitTs ?: currentLoc.lastSitTs,
+            lastSitTs = update.lastSitTs,
             verticalVelocity = update.verticalVelocity ?: currentLoc.verticalVelocity,
             sitVz = update.sitVz ?: currentLoc.sitVz,
             sitDz = update.sitDz ?: currentLoc.sitDz,
@@ -166,7 +164,7 @@ class TelemetryUseCase @Inject constructor(
             violationPercentage = update.violationPercentage ?: calculateViolationPercentage(update.violationUptimeMs, nowMs - appStartTime),
             isLocationPending = update.isLocationPending,
             locationPendingReason = update.locationPendingReason,
-            lastValidFixRealtime = if (update.lastValidFixRealtime > 0) update.lastValidFixRealtime else currentLoc.lastValidFixRealtime,
+            lastValidFixRealtime = if (update.lastValidFixRealtime > 0L) update.lastValidFixRealtime else currentLoc.lastValidFixRealtime,
             isPowerSaveMode = update.isPowerSaveMode,
             standbyBucket = update.standbyBucket, netInterface = update.netInterface,
             isStorageLow = update.isStorageLow, isStorageCritical = update.isStorageCritical,
@@ -204,8 +202,8 @@ class TelemetryUseCase @Inject constructor(
         )
     }
 
-    fun calculateViolationPercentage(violationMs: Long?, totalMs: Long): Float {
-        if (violationMs == null || totalMs <= 0) return 0f
-        return (violationMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
+    fun calculateViolationPercentage(violationMs: Long?, totalMs: Long): Double {
+        if (violationMs == null || totalMs <= 0) return 0.0
+        return (violationMs.toDouble() / totalMs.toDouble()).coerceIn(0.0, 1.0)
     }
 }

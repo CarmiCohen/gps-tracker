@@ -2,6 +2,17 @@
 
 **For historical records (v8.8.x and older), see [docs_history_archive.md](docs_history_archive.md).**
 
+## v8.9.78
+- **Stationary Anchor Hard-Lock (Issue #018)**: Implemented "Hard-Lock" coordinate clamping in `LocationProcessor.kt` to eliminate GPS drift (spaghetti trails) when stationary confidence > 0.9.
+- **Persistence Schema v52**: Incremented DB schema to include `isAnchorLocked` flag in forensic history.
+- **Android 14+ FGS Resilience (Issue #019)**: Implemented "Recent UI Pulse" window (15s) to authorized background-to-foreground transitions for sensitive types (Microphone).
+
+## v8.9.75
+- **System-Wide Type Safety (Issue #014)**: Completed full refactor of telemetry chain to native `Double` types across `:core:engine`, `:app`, and Room persistence. Eliminated conversion overhead for Accuracy, Speed, and Bearing.
+
+## v8.9.72
+- **Coroutine Resilience (Issue #015)**: Hardened `SyncManager` and `CommandRouter` to silently handle `CancellationException` during service lifecycle transitions.
+
 ## v8.9.60
 - **Forensic Ghost Mode Restoration (Issue #458)**: Fixed a bug where Tracker-role devices showed local status as stale. Corrected timestamp propagation in `GlobalStatusBar`.
 - **Telemetry Freshness Logic (Issue #460)**: Relaxed `isLocalTelemetryFresh` check to support sensor-only telemetry existence, preventing "Ghost Mode" before the first GPS fix.

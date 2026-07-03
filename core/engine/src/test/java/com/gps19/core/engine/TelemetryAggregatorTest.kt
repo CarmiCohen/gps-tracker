@@ -11,20 +11,20 @@ class TelemetryAggregatorTest {
     fun `mergeWorstCase preserves negative peaks and positive minimums`() {
         val p1 = EngineConnectionPoint(
             ts = 1000L, rtt = 100, remoteSig = 10, isConnected = true,
-            noiseIdx = 0.2f, vibeIdx = 0.1f, gpsIndex = 0.9f
+            noiseIdx = 0.2, vibeIdx = 0.1, gpsIndex = 0.9
         )
         val p2 = EngineConnectionPoint(
             ts = 2000L, rtt = 500, remoteSig = 5, isConnected = true,
-            noiseIdx = 0.8f, vibeIdx = 0.5f, gpsIndex = 0.4f
+            noiseIdx = 0.8, vibeIdx = 0.5, gpsIndex = 0.4
         )
 
         val merged = aggregator.mergeWorstCase(p1, p2)
 
         assertEquals(500, merged.rtt)          // Max RTT
         assertEquals(5, merged.remoteSig)      // Min Signal
-        assertEquals(0.8f, merged.noiseIdx)    // Max Noise
-        assertEquals(0.5f, merged.vibeIdx)     // Max Vibe
-        assertEquals(0.4f, merged.gpsIndex)    // Min GPS Index
+        assertEquals(0.8, merged.noiseIdx, 0.001)    // Max Noise
+        assertEquals(0.5, merged.vibeIdx, 0.001)     // Max Vibe
+        assertEquals(0.4, merged.gpsIndex, 0.001)    // Min GPS Index
     }
 
     @Test

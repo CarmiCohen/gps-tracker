@@ -4,6 +4,7 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Unified immutable state for the entire UI structure.
+ * v8.9.79: Issue #014 - Type Migration: Standardized accuracy fields to Double.
  * v8.8.2: Aligned default IDs with MainRepository.DEFAULT_TRACKER_ID and DEFAULT_VIEWER_ID.
  */
 data class MainUiState(
@@ -48,8 +49,8 @@ data class MainUiState(
     val isGeofenceViolationsVisible: Boolean = true,
     val isMapButtonsVisible: Boolean = false,
     val isMapLocked: Boolean = true,
-    val maxTrackerAccuracy: Float = 0f,
-    val maxViewerAccuracy: Float = 0f,
+    val maxTrackerAccuracy: Double = 0.0,
+    val maxViewerAccuracy: Double = 0.0,
     val distanceTrackerToHome: Double? = null,
     val distanceTrackerToViewer: Double? = null,
     val distanceViewerToHome: Double? = null,

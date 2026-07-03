@@ -4,6 +4,8 @@ import kotlin.math.*
 
 /**
  * ImmFilter: Interacting Multiple Model Filter.
+ * v8.9.79:
+ * - Issue #016: Standardized getEstimatedBearing to return Double.
  * v8.9.75:
  * - Issue #014: Type Safety Optimization. Accepting Double for accuracy to align with standardized telemetry types.
  */
@@ -94,12 +96,12 @@ class ImmFilter {
         return min(speedMps * 3.6, OUTLIER_SPEED_CAP_MPS * 3.6)
     }
 
-    fun getEstimatedBearing(): Float {
+    fun getEstimatedBearing(): Double {
         val mixedVx = (modelStationary.vx * modelStationary.probability) + (modelKinematic.vx * modelKinematic.probability)
         val mixedVy = (modelStationary.vy * modelStationary.probability) + (modelKinematic.vy * modelKinematic.probability)
-        if (abs(mixedVx) < 0.1 && abs(mixedVy) < 0.1) return 0f
-        var deg = Math.toDegrees(atan2(mixedVy, mixedVx)).toFloat()
-        return (deg + 360f) % 360f
+        if (abs(mixedVx) < 0.1 && abs(mixedVy) < 0.1) return 0.0
+        val deg = Math.toDegrees(atan2(mixedVy, mixedVx))
+        return (deg + 360.0) % 360.0
     }
 
     private fun initModels(lat: Double, lng: Double, ts: Long) {
