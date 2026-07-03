@@ -2,7 +2,7 @@
 
 ## Hardening Phase: v8.9.87 Resolved Items
 *   **Issue #005**: Map Provider Log Spillage. Hardened remediation by forcing a static user agent string ("GpsTracker/8.9.87") in `GpsApplication`. This eliminates repetitive `getPackageName()` calls that triggered system log spam on Samsung devices. (v8.9.87)
-*   **ID-01**: Viewer ID Identity Reversion. Fixed logic error in `SettingsRepository` where `viewerIdFlow` incorrectly defaulted to Tracker ID ("T"). Corrected `commitDraftSettings` to properly apply `draftRelayUrl` and ensured uniqueness checks do not collide on empty draft fields. (v8.9.87)
+*   **Issue #026**: Viewer ID Identity Reversion. Fixed logic error in `SettingsRepository` where `viewerIdFlow` incorrectly defaulted to Tracker ID ("T"). Corrected `commitDraftSettings` to properly apply `draftRelayUrl` and ensured uniqueness checks do not collide on empty draft fields. (v8.9.87)
 
 ## Hardening Phase: v8.9.86 Resolved Items
 *   **Issue #025**: FGS Transition Timeout. Increased `UI_PULSE_TIMEOUT_MS` to 45s to allow robust background-to-foreground service transitions on Android 14+. (v8.9.86)

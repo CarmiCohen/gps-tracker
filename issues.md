@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v8.9.87)
+# Project Issues & Hardening Tracking (v8.9.88)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending validation tasks
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 High | 0 |
 | **Validation Tasks** | 🟡 Pending | 6 |
-| **Resolved (Total)** | 🟢 Progress | 34 |
+| **Resolved (Total)** | 🟢 Progress | 35 |
 
 ---
 
@@ -34,12 +34,20 @@ This document tracks active issues, technical debt, and pending validation tasks
 
 ---
 
+## 🟢 Recently Resolved Issues (v8.9.88)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#027** | **Persistent Viewer ID Reversion** | **Resolved**. Fixed critical logic error in `ViewerService.handleTrackerPulse` where a Tracker's pulse was incorrectly being saved to `VIEWER_ID_KEY` instead of `TRACKER_ID_KEY`. Also corrected `TrackerService.handleViewerPulse` to check against `DEFAULT_VIEWER_ID` for auto-capture logic. |
+
+---
+
 ## 🟢 Recently Resolved Issues (v8.9.87)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
 | **#005** | **Map Provider Log Spillage** | **Resolved**. Hardened remediation by forcing a static user agent string ("GpsTracker/8.9.87") in `GpsApplication`. This eliminates repetitive `getPackageName()` calls that triggered system log spam on Samsung devices. |
-| **ID-01** | **Viewer ID Identity Reversion** | **Resolved**. Fixed logic error in `SettingsRepository` where `viewerIdFlow` incorrectly defaulted to Tracker ID ("T"). Corrected `commitDraftSettings` to properly apply `draftRelayUrl` and hardened uniqueness checks using effective IDs. |
+| **#026** | **Viewer ID Identity Reversion** | **Resolved**. Fixed logic error in `SettingsRepository` where `viewerIdFlow` incorrectly defaulted to Tracker ID ("T"). Corrected `commitDraftSettings` to properly apply `draftRelayUrl` and hardened uniqueness checks using effective IDs. |
 | **#025** | **FGS Transition Timeout** | **Resolved (v8.9.86)**. Increased `UI_PULSE_TIMEOUT_MS` to 45s. |
 
 **Full history available in [STATUS/issues_archive.md](STATUS/issues_archive.md).**

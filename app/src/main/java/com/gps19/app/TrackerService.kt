@@ -21,11 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.88:
+ * - Identity Persistence Fix: Corrected handleViewerPulse to check against 
+ *   DEFAULT_VIEWER_ID instead of incorrectly shadowing DEFAULT_TRACKER_ID.
+ * - Build Fix: Corrected sensorRepository to sensorManager in pushCurrentStatus.
  * v8.9.80:
- * - Issue #014: Type Migration Finalization. Explicitly aligned snrSnapshot and vibeSnapshot 
- *   to Double in evaluateAlarms call to resolve build regression.
- * v8.9.79:
- * - Issue #016: Finalized Double standardization to eliminate casting overhead in the fast-path.
+ * - Issue #014: Type Migration Finalization.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -236,7 +237,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun handleViewerPulse(id: String) {
-        if ((configManager.viewerId == MainRepository.DEFAULT_TRACKER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer" && id != MainRepository.DEFAULT_TRACKER_ID) {
+        if ((configManager.viewerId == MainRepository.DEFAULT_VIEWER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer" && id != MainRepository.DEFAULT_VIEWER_ID) {
             configManager.viewerId = id
             networkManager.updateIdentity(configManager.deviceId, id, true)
             lifecycleScope.launch { repository.saveString(MainRepository.VIEWER_ID_KEY, id) } 
