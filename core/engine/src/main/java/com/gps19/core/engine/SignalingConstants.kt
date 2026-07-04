@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * SignalingConstants: Core rules for relay communication and role enforcement.
+ * v8.9.89:
+ * - R924: Obsolete. Removed VID_NOTES.
  * v8.9.73:
  * - R924: Updated VID_NOTES identifier to "Th1030".
  * v8.9.63:
@@ -13,9 +15,6 @@ object SignalingConstants {
     const val DEFAULT_TRACKER_ID = "T"
     const val DEFAULT_VIEWER_ID = "V"
     
-    // R924-A: Hard-coded note for UI display.
-    const val VID_NOTES = "Th1030"
-
     /**
      * R182: Validation relaxed to non-empty (min 1 char).
      */

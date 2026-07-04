@@ -36,6 +36,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import kotlinx.coroutines.flow.StateFlow
 import java.text.SimpleDateFormat
 import java.util.*
@@ -43,12 +44,10 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * v8.9.79:
- * - Issue #014: Type Migration. Aligned with Double-precision telemetry. 
- *   Added explicit toFloat() conversions for Compose rendering and updated 
- *   status bars to use Double-compatible formatting.
- * v8.9.65:
- * - Issue #R325 Validation: Optimized StatusRowData layout for narrow devices.
+ * v8.9.91:
+ * - R924: Added HeaderBarPreview for Forensic Sunset verification.
+ * v8.9.89:
+ * - R924: Obsolete. Removed VID_NOTES display from HeaderBar.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -733,7 +732,6 @@ fun HeaderBar(
                     }
                 }
             }
-            Text(text = SignalingConstants.VID_NOTES, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(vertical = 4.dp))
             IconButton(onClick = { 
                 commitAnd(onL)
                 onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) 
@@ -768,7 +766,6 @@ fun HeaderBar(
                         }
                     }
                 }
-                Text(text = SignalingConstants.VID_NOTES, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(horizontal = 4.dp))
                 IconButton(onClick = { 
                     commitAnd(onL)
                     onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false))
@@ -781,4 +778,13 @@ fun HeaderBar(
             }
         }
     }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Composable
+fun HeaderBarPreview() {
+    HeaderBar(
+        uiState = MainUiState(),
+        onEvent = {}
+    )
 }

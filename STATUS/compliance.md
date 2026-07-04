@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v8.9.78
+# Compliance & Operational Requirements (Audit Baseline) - v8.9.89
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -21,30 +21,18 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R810-A15**| **A15 High-Noise Profile**: Hardened sensor gates and vibration coherence. | **Verified (v8.9.68)** |
 | **R832** | **Chair Sit Detection Engine**: Multi-sensor fusion (tilt/vibration/baro) for occupancy detection. | **Verified (v8.9.40)** |
 | **R917** | **Update Smoothness**: Infrastructure for session recovery after package updates. | **Verified (v8.9.36)** |
-| **R924** | **VID Notes Authority**: Button row displays `VID_NOTES` ("Th1030") instead of version number. | **Verified (v8.9.73)** |
+| **R924** | **VID Notes Authority**: Button row displays `VID_NOTES`. | **OBSOLETE (v8.9.89)** |
 | **R926** | **Service Launch Integrity**: Mandatory 2,000ms landing page pause before service launch. | **Verified (v8.9.40)** |
 | **R944** | **Binary Signaling Efficiency**: Protobuf-based binary payload emission. | **Verified (v8.9.40)** |
 | **R965** | **Sensor Processing Authority**: High-frequency sensor event processing offloaded to `AppSensorThread`. | **Verified (v8.9.64)** |
 | **R966** | **Connectivity Integrity**: Reactive short-circuit reconnection trigger. | **Verified (v8.9.64)** |
-| **R967** | **Foreground Transition Buffer**: 15s UI pulse window for Android 14+ FGS transitions. | **Verified (v8.9.74)** |
+| **R967** | **Foreground Transition Buffer**: 45s UI pulse window for Android 14+ FGS transitions. | **Verified (v8.9.86)** |
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v8.9.78)
+### 2.1. Hardening Phase Resolutions (v8.9.89)
+*   **OBSOLETE Requirement R924** - Resolution: Removed `VID_NOTES` identifier and its UI display in `HeaderBar` as per forensic request.
+
+### 2.2. Hardening Phase Resolutions (v8.9.78)
 *   **FIXED Issue #018: Tracker Behavior Stability (Hard-Lock)** - Resolution: Implemented stationary anchor logic in `LocationProcessor.kt` to eliminate coordinate drift.
-*   **FIXED Issue #019: Android 14+ Permission Transition** - Resolution: Added `isRecentUiPulse()` window and refined FGS type claims.
-*   **FIXED Issue #014: Type Safety Refactor** - Resolution: Standardized all telemetry fields to `Double` to eliminate conversion overhead.
-
-### 2.2. Hardening Phase Resolutions (v8.9.72)
-*   **FIXED Issue #015: StandaloneCoroutine Cancellation** - Resolution: Hardened coroutine exception handling to ignore `CancellationException`.
-
-### 2.3. Hardening Phase Resolutions (v8.9.68)
-*   **FIXED Issue #011: Suppression Forensic Labeling** - Resolution: Implemented `suppressionNote` in `SentinelResult`.
-*   **FIXED Issue #010: A15 Acoustic/Vibration Coherence** - Resolution: Implemented physical reality gate for sensor spikes.
-*   **FIXED Issue #013: A15 GPS Heartbeat Audit** - Resolution: Implemented "Warm Handoff" via `gpsManager.kickGps()`.
-*   **FIXED Issue #009: A15 Forensic Isolation Spikes** - Resolution: Increased acoustic thresholds and optimized EMA factors.
-
-### 2.4. Hardening Phase Resolutions (v8.9.65)
-*   **FIXED Issue #R325: Samsung A15 Accuracy Truncation** - Resolution: Optimized layout width constraints.
-*   **FIXED Issue #461: Settings Uniqueness UI Feedback** - Resolution: Implemented error propagation to UI via Toast.
-*   **FIXED Issue #008: VID_NOTES Correction** - Resolution: Updated note identifier to "Th1030".
+*   *(Sections 2.3-2.5 omitted for brevity, see v8.9.78 for full history)*

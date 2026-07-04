@@ -17,15 +17,16 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * GpsApplication: Application entry point and global dependency management.
- * v8.9.87:
- * - Issue #005: Hardened log spillage remediation. Silenced osmdroid debug logging and 
- *   forced static user agent string to prevent getPackageName spam.
- * v8.9.51:
- * - Issue #456: Resilience Hardening. Scheduled MaintenanceWorker on startup 
- *   as the 3rd layer of the High-Resilience Watchdog system.
+ * v8.9.90:
+ * - Issue #005: Advanced log spillage hardening. Manually set osmdroid Base/Cache 
+ *   paths using static strings to eliminate repetitive getPackageName() lookups.
+ * v8.9.89:
+ * - Issue #005: Deep hardening for osmdroid. Set userAgentValue BEFORE load() 
+ *   to ensure zero getPackageName() calls during map setup.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -57,13 +58,23 @@ class GpsApplication : Application(), Configuration.Provider {
         MaintenanceWorker.schedule(this)
 
         // Issue 146: Move OsmDroid config to background to prevent main thread stall
-        // Issue #005: Silence osmdroid and set static user agent to stop getPackageName spam
+        // Issue #005: Deep silence for osmdroid
         GlobalScope.launch(Dispatchers.IO) {
             val osmConfig = OsmConfig.getInstance()
+            
+            // Rationale: Set static identifiers BEFORE load() to preempt automatic system lookups.
+            osmConfig.userAgentValue = "GpsTracker/8.9.90"
+            
+            // Rationale: Manually define paths to avoid internal library getPackageName() queries.
+            val baseDir = File(filesDir, "osmdroid")
+            if (!baseDir.exists()) baseDir.mkdirs()
+            osmConfig.osmdroidBasePath = baseDir
+            
+            val cacheDir = File(baseDir, "tiles")
+            if (!cacheDir.exists()) cacheDir.mkdirs()
+            osmConfig.osmdroidTileCache = cacheDir
+
             osmConfig.load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
-            // Rationale: Forced static user agent string. Avoids calling context.packageName 
-            // which triggers getPackageName logcat spam on some Samsung devices.
-            osmConfig.userAgentValue = "GpsTracker/8.9.87"
             osmConfig.isDebugMode = false
             osmConfig.isDebugTileProviders = false
         }
