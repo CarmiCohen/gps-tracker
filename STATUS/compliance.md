@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v8.9.89
+# Compliance & Operational Requirements (Audit Baseline) - v8.9.95
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -18,7 +18,7 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R441** | **Siren Timing Integrity**: Monotonic silence latches and 30s hardware protection auto-stop. | **Verified (v8.9.52)** |
 | **R460** | **Bayesian Uncertainty Expansion**: Dynamic growth (up to 33.3m/s) during fix gaps. | **Verified (v8.9.52)** |
 | **R747** | **Standardized Alert Titles**: Localized "This device" and simplified "Device" subtitles. | **Verified (v8.9.51)** |
-| **R810-A15**| **A15 High-Noise Profile**: Hardened sensor gates and vibration coherence. | **Verified (v8.9.68)** |
+| **R810-A15**| **A15 High-Noise Profile**: Hardened sensor gates and vibration coherence. | **Verified (v8.9.94)** |
 | **R832** | **Chair Sit Detection Engine**: Multi-sensor fusion (tilt/vibration/baro) for occupancy detection. | **Verified (v8.9.40)** |
 | **R917** | **Update Smoothness**: Infrastructure for session recovery after package updates. | **Verified (v8.9.36)** |
 | **R924** | **VID Notes Authority**: Button row displays `VID_NOTES`. | **OBSOLETE (v8.9.89)** |
@@ -27,12 +27,22 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R965** | **Sensor Processing Authority**: High-frequency sensor event processing offloaded to `AppSensorThread`. | **Verified (v8.9.64)** |
 | **R966** | **Connectivity Integrity**: Reactive short-circuit reconnection trigger. | **Verified (v8.9.64)** |
 | **R967** | **Foreground Transition Buffer**: 45s UI pulse window for Android 14+ FGS transitions. | **Verified (v8.9.86)** |
+| **R970** | **Display State Integrity**: Suppression of telemetry artifacts during AOD transitions. | **Verified (v8.9.94)** |
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v8.9.89)
+### 2.1. Hardening Phase Resolutions (v8.9.95)
+*   **FIXED Issue #032: UI Refresh Consistency** - Resolution: Implemented 15s forensic staleness gate (WATCH_DOG_UI_GRACE_MS) in `DashboardUseCase`.
+
+### 2.2. Hardening Phase Resolutions (v8.9.94)
+*   **FIXED Issue #036: A15 Behavioral Flickering** - Resolution: Hardened R810-A15 thresholds for sensor mismatch and jitter.
+*   **FIXED Issue #037: Viewer Display State Spam** - Resolution: Implemented `DisplayListener` and R970 muzzling for Samsung AOD transitions.
+*   **FIXED Issue #038: Adaptation Instability** - Resolution: Implemented 5s adaptation muzzle for GPS polling transitions.
+
+### 2.3. Hardening Phase Resolutions (v8.9.89)
 *   **OBSOLETE Requirement R924** - Resolution: Removed `VID_NOTES` identifier and its UI display in `HeaderBar` as per forensic request.
 
-### 2.2. Hardening Phase Resolutions (v8.9.78)
+### 2.4. Hardening Phase Resolutions (v8.9.78)
 *   **FIXED Issue #018: Tracker Behavior Stability (Hard-Lock)** - Resolution: Implemented stationary anchor logic in `LocationProcessor.kt` to eliminate coordinate drift.
-*   *(Sections 2.3-2.5 omitted for brevity, see v8.9.78 for full history)*
+
+**Full history available in [issues_archive.md](issues_archive.md).**

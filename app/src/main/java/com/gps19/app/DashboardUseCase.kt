@@ -10,6 +10,9 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
+ * v8.9.95:
+ * - Issue #032: UI Refresh Consistency. Forensic fields (Prox Debounce, Rolling Vibe) 
+ *   now respect the 15s staleness gate (WATCH_DOG_UI_GRACE_MS) to ensure data veracity.
  * v8.9.79:
  * - Issue #014: Type Migration. Aligned temperature parameters to Double.
  * v8.9.78:
@@ -60,6 +63,7 @@ class DashboardUseCase @Inject constructor() {
         val isTelemetryVisible = telemetryAge < SENSOR_GRACE_PERIOD_MS
         
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
+        val isForensicFresh = telemetryAge < WATCH_DOG_UI_GRACE_MS
         
         val gpsAge = if (loc.timestamp > 0) now - loc.timestamp else Long.MAX_VALUE
         val isGpsActive = gpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
@@ -87,6 +91,7 @@ class DashboardUseCase @Inject constructor() {
 
         fun gpsVal(value: String): String = if (isGpsActive) value else "--"
         fun sensorVal(value: String): String = if (isTelemetryVisible) value else "--"
+        fun forensicVal(value: String): String = if (isForensicFresh) value else "--"
 
         fun formatDist(d: Double?): String {
             if (d == null || d.isNaN() || d == 0.0) return "--"
@@ -137,8 +142,8 @@ class DashboardUseCase @Inject constructor() {
             lux = sensorVal("%.0flx".format(Locale.getDefault(), loc.lux)),
             proximity = sensorVal(if (loc.isNear) "NEAR" else "FAR"),
             proximityCm = sensorVal(if (loc.proximityCm >= 0) "${loc.proximityCm.toInt()}cm" else "--"),
-            proximityDebounce = sensorVal("${loc.proximityDebounceMs}ms"),
-            rollingVibration = sensorVal("%.3fG".format(Locale.getDefault(), loc.vibrationRollingSum)),
+            proximityDebounce = forensicVal("${loc.proximityDebounceMs}ms"),
+            rollingVibration = forensicVal("%.3fG".format(Locale.getDefault(), loc.vibrationRollingSum)),
             gpsSpeed = gpsVal("%.1fkm/h".format(Locale.getDefault(), loc.speed * 3.6)),
             trackerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), trackerMaxTemp)),
             viewerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), localMaxTemp)),
@@ -148,7 +153,7 @@ class DashboardUseCase @Inject constructor() {
             acousticFloor = sensorVal("%.0fdB".format(Locale.getDefault(), loc.acousticFloorDb)),
             lastChairSit = sensorVal(chairTime),
             plungeSpeed = sensorVal("%.2fm/s".format(Locale.getDefault(), abs(loc.verticalVelocity))),
-            chairForensics = sensorVal(forensics),
+            chairForensics = forensicVal(forensics),
             isPowerSaveMode = if (isViewer) uiState.trackerLocation.isPowerSaveMode else uiState.integrity.isPowerSaveMode,
             standbyBucket = bucket,
             netInterface = if (isViewer) uiState.trackerLocation.netInterface else uiState.integrity.netInterface,

@@ -1,7 +1,12 @@
-# Forensic Handover - v8.9.94 (A15 & G990E Stability Hardening)
+# Forensic Handover - v8.9.95 (UI Refresh Consistency)
 
-## 📌 Status: Stable / Build PASS / Hardware Hardened
-This cycle completes the deep remediation of hardware-specific instabilities on Samsung A15 and S21 FE (G990E) devices.
+## 📌 Status: Stable / Build PASS / UI Hardened
+This cycle addresses UI refresh consistency for forensic fields on the dashboard.
+
+### 🟢 Completed: Issue #032 (UI Refresh Consistency)
+*   **Staleness Gate**: Implemented `isForensicFresh` logic in `DashboardUseCase`.
+*   **Threshold Alignment**: Synced forensic field visibility with `WATCH_DOG_UI_GRACE_MS` (15s).
+*   **Field Hardening**: `Prox Debounce`, `Rolling Vibe`, and `Chair Forensics` now correctly revert to "--" when telemetry data exceeds the 15s staleness threshold, preventing misleading data display during network or sensor gaps.
 
 ### 🟢 Completed: Issue #036 (A15 Jitter Hardening)
 *   **Hardened Gates**: Introduced `JUMP_GATE_SENSOR_MISMATCH_A15_MPS` (5.0 m/s) and `JUMP_GATE_VISUAL_JITTER_A15_METERS` (25m).
@@ -16,10 +21,11 @@ This cycle completes the deep remediation of hardware-specific instabilities on 
 *   **Adaptation Muzzle**: Implemented logic in `TrackerService` and `LocationProcessor` to increase filter skepticism during GPS polling transitions on A15.
 
 ### 🟢 Completed: Infrastructure & Deployment
-*   **Version Increment**: Bumping to **v8.9.94**.
-*   **Documentation Sync**: All 3 open technical issues marked as resolved in `issues.md`.
+*   **Version Increment**: Bumping to **v8.9.95**.
+*   **Documentation Sync**: Issue #032 marked as resolved in `issues.md`.
 
 ### 🟡 Pending Validation
+*   **Forensic Staleness**: Verify that `Prox Debounce` and `Rolling Vibe` clear within exactly 15s of tracker disconnection.
 *   **A15 Jitter Verification**: Confirm state stability on A15 Tracker under clear sky vs. indoor transition.
 *   **G990E Display Muzzle**: Verify Viewer telemetry remains silent during G990E AOD transitions.
 *   **Adaptation Settling**: Monitor logcat for "Settling A15 Polling..." messages during movement start.
@@ -27,6 +33,6 @@ This cycle completes the deep remediation of hardware-specific instabilities on 
 ### 🛠 Instructions for Resumption
 1.  **Environment**: Connect Samsung A15 (Tracker) and G990E (Viewer).
 2.  **Verification**: 
-    *   Deploy **v8.9.94**.
-    *   Audit Logcat for "Issue #037" and "Settling A15 Polling" identifiers.
+    *   Deploy **v8.9.95**.
+    *   Disconnect the tracker and verify forensic fields clear after 15 seconds.
     *   Verify the dashboard no longer flickers between states during stationary monitoring.
