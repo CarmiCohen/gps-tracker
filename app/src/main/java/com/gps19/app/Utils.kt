@@ -11,12 +11,11 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
+ * v8.9.98:
+ * - Maintenance: Aligned versioning with Identity Persistence Hardening release.
  * v8.9.89:
  * - Issue #005 Hardening: Removed all direct context.packageName calls in Xiaomi 
  *   checkers to eliminate log spillage on Samsung G990/A155 devices.
- * v8.9.87:
- * - Issue #005 Hardening: Cached packageName to prevent repetitive getPackageName() 
- *   system log spam on Samsung G990/A155 devices.
  */
 
 enum class XiaomiPermissionStatus {
