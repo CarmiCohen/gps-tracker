@@ -23,6 +23,7 @@ import kotlin.math.*
  * TrackerService: The "Black Box" background process.
  * v8.9.98:
  * - Maintenance: Aligned versioning with Identity Persistence Hardening release.
+ * - Fix: Corrected typo in evaluateAlarmsInternal (maxTrackerAccuracy -> maxAccuracy).
  * v8.9.94:
  * - Issue #038: Implemented Adaptation Muzzle for A15. Triggers a 5s settling 
  *   window during GPS polling transitions to suppress trajectory jumps.
@@ -595,7 +596,7 @@ class TrackerService : BaseMonitorService() {
                 isAdaptiveJump = proc?.isAdaptiveJump ?: false, 
                 trackerLat = proc?.optimizedPoint?.lat ?: 0.0,
                 trackerLng = proc?.optimizedPoint?.lng ?: 0.0, trackerAccuracy = proc?.currentAccuracy ?: 0.0, 
-                maxTrackerAccuracy = proc?.maxTrackerAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), trackerLastGpsTs = proc?.timestamp ?: 0L,
+                maxTrackerAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), trackerLastGpsTs = proc?.timestamp ?: 0L,
                 trackerLastValidFixTs = locationProcessor.getLastValidFixTs(),
                 trackerSpeed = (proc?.filteredSpeed ?: 0.0) / 3.6, trackerBattery = integrityMonitor.getBatteryLevel(), trackerTemp = integrityMonitor.batteryTemp,
                 isHardwareOnline = true, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
