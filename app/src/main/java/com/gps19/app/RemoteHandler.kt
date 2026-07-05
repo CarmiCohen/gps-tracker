@@ -16,12 +16,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v8.9.91:
+ * - Issue #029: Telemetry Stale Badge Fix. Explicitly setting 'ts' field in LocationUpdate 
+ *   to 'now' to ensure DAT badge turns green on packet arrival even without fresh GPS fix.
  * v8.9.77:
  * - Issue #018: Stationary Anchor Hard-Lock. Added isTrackerAnchorLocked 
  *   propagation for forensic audit transparency.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized internal state to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
  */
 class RemoteHandler(
     private val context: Context,
@@ -207,7 +207,8 @@ class RemoteHandler(
                         baroIdx = trackerBaroIdx,
                         isBatterySteepDischarge = isTrackerBatterySteepDischarge,
                         isCoolingModeActive = isTrackerCoolingModeActive,
-                        isAnchorLocked = isTrackerAnchorLocked
+                        isAnchorLocked = isTrackerAnchorLocked,
+                        ts = s.ts // Initial load from stored status
                     ))
                 }
             } catch (e: Exception) {
@@ -608,7 +609,8 @@ class RemoteHandler(
                         baroIdx = trackerBaroIdx,
                         isBatterySteepDischarge = isTrackerBatterySteepDischarge,
                         isCoolingModeActive = isTrackerCoolingModeActive,
-                        isAnchorLocked = isTrackerAnchorLocked
+                        isAnchorLocked = isTrackerAnchorLocked,
+                        ts = now // ISSUE #029 FIX: SET TELEMETRY ARRIVAL TIMESTAMP TO NOW
                     ))
                     
                     repository.saveTrackerState(TrackerStatus(

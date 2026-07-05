@@ -21,12 +21,12 @@ import java.io.File
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * v8.9.91:
+ * - Issue #005 Hardening: Moved osmdroid path configuration to a synchronous block 
+ *   before load() to ensure zero getPackageName() calls during early initialization.
  * v8.9.90:
  * - Issue #005: Advanced log spillage hardening. Manually set osmdroid Base/Cache 
  *   paths using static strings to eliminate repetitive getPackageName() lookups.
- * v8.9.89:
- * - Issue #005: Deep hardening for osmdroid. Set userAgentValue BEFORE load() 
- *   to ensure zero getPackageName() calls during map setup.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -57,23 +57,22 @@ class GpsApplication : Application(), Configuration.Provider {
         // Issue #456: Layer 3 Watchdog - WorkManager persistence
         MaintenanceWorker.schedule(this)
 
-        // Issue 146: Move OsmDroid config to background to prevent main thread stall
         // Issue #005: Deep silence for osmdroid
-        GlobalScope.launch(Dispatchers.IO) {
-            val osmConfig = OsmConfig.getInstance()
-            
-            // Rationale: Set static identifiers BEFORE load() to preempt automatic system lookups.
-            osmConfig.userAgentValue = "GpsTracker/8.9.90"
-            
-            // Rationale: Manually define paths to avoid internal library getPackageName() queries.
-            val baseDir = File(filesDir, "osmdroid")
-            if (!baseDir.exists()) baseDir.mkdirs()
-            osmConfig.osmdroidBasePath = baseDir
-            
-            val cacheDir = File(baseDir, "tiles")
-            if (!cacheDir.exists()) cacheDir.mkdirs()
-            osmConfig.osmdroidTileCache = cacheDir
+        // Rationale: We MUST set these synchronously before any OsmDroid component 
+        // can trigger the default path discovery logic which calls getPackageName().
+        val osmConfig = OsmConfig.getInstance()
+        osmConfig.userAgentValue = "GpsTracker/8.9.91"
+        
+        val baseDir = File(filesDir, "osmdroid")
+        if (!baseDir.exists()) baseDir.mkdirs()
+        osmConfig.osmdroidBasePath = baseDir
+        
+        val cacheDir = File(baseDir, "tiles")
+        if (!cacheDir.exists()) cacheDir.mkdirs()
+        osmConfig.osmdroidTileCache = cacheDir
 
+        // Background the actual preference loading as it involves I/O
+        GlobalScope.launch(Dispatchers.IO) {
             osmConfig.load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
             osmConfig.isDebugMode = false
             osmConfig.isDebugTileProviders = false
