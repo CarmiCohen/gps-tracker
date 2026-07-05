@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v8.9.95
+# Compliance & Operational Requirements (Audit Baseline) - v8.9.96
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -28,21 +28,26 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R966** | **Connectivity Integrity**: Reactive short-circuit reconnection trigger. | **Verified (v8.9.64)** |
 | **R967** | **Foreground Transition Buffer**: 45s UI pulse window for Android 14+ FGS transitions. | **Verified (v8.9.86)** |
 | **R970** | **Display State Integrity**: Suppression of telemetry artifacts during AOD transitions. | **Verified (v8.9.94)** |
+| **R972** | **Forensic Staleness Authority**: 15s staleness gate for forensic fields. | **Verified (v8.9.95)** |
+| **R973** | **Standardized Proto Path Authority**: `app/src/main/proto` is the sole schema directory. | **Verified (v8.9.96)** |
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v8.9.95)
+### 2.1. Hardening Phase Resolutions (v8.9.96)
+*   **FIXED Issue #030: Proto Schema Discrepancy** - Resolution: Audited and formalized `app/src/main/proto` as the authoritative path. Neutralized legacy `app/src/proto` folder to prevent split-brain updates.
+
+### 2.2. Hardening Phase Resolutions (v8.9.95)
 *   **FIXED Issue #032: UI Refresh Consistency** - Resolution: Implemented 15s forensic staleness gate (WATCH_DOG_UI_GRACE_MS) in `DashboardUseCase`.
 
-### 2.2. Hardening Phase Resolutions (v8.9.94)
+### 2.3. Hardening Phase Resolutions (v8.9.94)
 *   **FIXED Issue #036: A15 Behavioral Flickering** - Resolution: Hardened R810-A15 thresholds for sensor mismatch and jitter.
 *   **FIXED Issue #037: Viewer Display State Spam** - Resolution: Implemented `DisplayListener` and R970 muzzling for Samsung AOD transitions.
 *   **FIXED Issue #038: Adaptation Instability** - Resolution: Implemented 5s adaptation muzzle for GPS polling transitions.
 
-### 2.3. Hardening Phase Resolutions (v8.9.89)
+### 2.4. Hardening Phase Resolutions (v8.9.89)
 *   **OBSOLETE Requirement R924** - Resolution: Removed `VID_NOTES` identifier and its UI display in `HeaderBar` as per forensic request.
 
-### 2.4. Hardening Phase Resolutions (v8.9.78)
+### 2.5. Hardening Phase Resolutions (v8.9.78)
 *   **FIXED Issue #018: Tracker Behavior Stability (Hard-Lock)** - Resolution: Implemented stationary anchor logic in `LocationProcessor.kt` to eliminate coordinate drift.
 
 **Full history available in [issues_archive.md](issues_archive.md).**

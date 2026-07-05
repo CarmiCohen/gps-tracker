@@ -18,11 +18,12 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * v8.9.98:
+ * - Issue #027 Identity Hardening: Reinforced saveSettingsBulk with uniqueness validation 
+ *   to prevent identity cross-contamination between Tracker and Viewer roles.
  * v8.9.87:
  * - Identity Fix: Corrected DEFAULT_VIEWER_ID to use SettingsRepository.DEFAULT_VIEWER_ID ("V")
  *   instead of incorrectly shadowing the Tracker ID ("T").
- * v8.9.79:
- * - Issue #014: Type Migration. Aligned parameters to Double to eliminate redundant conversions.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -217,7 +218,25 @@ class MainRepository @Inject constructor(
     suspend fun commitDraftSettings() = settings.commitDraftSettings()
     suspend fun hasPendingDrafts(): Boolean = settings.hasPendingDrafts()
 
-    suspend fun saveSettingsBulk(deviceId: String? = null, viewerId: String? = null, relayUrl: String? = null, maxDistance: Double? = null, alertSettings: AlertSettings? = null, homePoints: List<GeoPoint>? = null) = settings.saveSettingsBulk(deviceId, viewerId, relayUrl, maxDistance, alertSettings, homePoints)
+    suspend fun saveSettingsBulk(
+        deviceId: String? = null, 
+        viewerId: String? = null, 
+        relayUrl: String? = null, 
+        maxDistance: Double? = null, 
+        alertSettings: AlertSettings? = null, 
+        homePoints: List<GeoPoint>? = null
+    ) {
+        // Issue #027 Remediate: Enforce identity uniqueness before committing bulk settings.
+        val currentTracker = deviceId ?: settings.getString(TRACKER_ID_KEY, DEFAULT_TRACKER_ID)
+        val currentViewer = viewerId ?: settings.getString(VIEWER_ID_KEY, DEFAULT_VIEWER_ID)
+        
+        if (!SignalingConstants.areIdsUnique(currentTracker, currentViewer)) {
+            Timber.e("Identity Collision in saveSettingsBulk: Rejecting update (T:$currentTracker, V:$currentViewer)")
+            return
+        }
+        
+        settings.saveSettingsBulk(deviceId, viewerId, relayUrl, maxDistance, alertSettings, homePoints)
+    }
 
     suspend fun saveSessionMetricsBulk(
         totalConnected: Long, uptime: Long, totalDrop: Long, 

@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.94
+# System Source of Truth (SoT) - v8.9.98
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
@@ -18,6 +18,9 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Document Integrity Authority (R969)**: All core documentation (`issues.md`, `requirements_sot.md`, `compliance.md`) and their archives are subject to a **Growth-Only Constraint**. Archives must never decrease in line count, and structural headers must be preserved during all automated or manual writes. (v8.9.91)
 *   **A15 Jitter Stabilization (R970)**: The system applies hardened spatial gates (5.0 m/s mismatch / 25m jitter) and a 5-second "Adaptation Muzzle" during polling transitions on Samsung A15 hardware to ensure state engine stability. (Issue #036 / Issue #038 / v8.9.94)
 *   **G990E Display Hardening (R971)**: The system implements a `DisplayListener` to detect rapid ON/DOZE toggling on Samsung S21 FE (G990E) devices and muzzles virtual proximity transitions during these cycles to eliminate telemetry noise. (Issue #037 / v8.9.94)
+*   **Forensic Staleness Authority (R972)**: The system enforces a strict 15-second staleness gate (`WATCH_DOG_UI_GRACE_MS`) for forensic fields (`Prox Debounce`, `Rolling Vibe`, `Chair Forensics`) to ensure data veracity during link gaps. (Issue #032 / v8.9.95)
+*   **Standardized Proto Path Authority (R973)**: All Protobuf schemas MUST be located in the standard `app/src/main/proto` directory. The legacy `app/src/proto` path is deprecated and must not be used for schema updates. (Issue #030 / v8.9.96)
+*   **Identity Uniqueness Authority (R974)**: The system enforces strict uniqueness between Tracker and Viewer identities at the persistence layer. `MainRepository` MUST validate that `TRACKER_ID` and `VIEWER_ID` do not collide during bulk save operations to prevent role reversion and "split-brain" states. (Issue #027 / v8.9.98)
 
 ### 2. Branding & UI Standards
 *   **Branding Authority (R865/R866)**: "Unified Identity Green" is strictly defined as **JD Branding Green (#367C2B)**.
