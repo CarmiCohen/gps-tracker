@@ -5,7 +5,7 @@ This document tracks active issues, technical debt, and pending validation tasks
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 High | 0 |
+| **Open Technical Issues** | 🔴 High | 3 |
 | **Validation Tasks** | 🟡 Pending | 10 |
 | **Resolved (Total)** | 🟢 Progress | 39 |
 
@@ -14,6 +14,9 @@ This document tracks active issues, technical debt, and pending validation tasks
 ## ⚠️ Newly Identified Risks & Concerns
 | ID | Concern | Description |
 | :--- | :--- | :--- |
+| **#036** | **A15 Tracker GPS Jitter** | Rapid toggling between `MOVING` and `JUMPING` states (0.5 - 78.5 km/h). Requires Sentinel threshold tuning in `LocationProcessor`. |
+| **#037** | **G990E Display Flickering** | Extreme `onDisplayChanged` spam (states 3/4). Possible conflict between proximity logic and Samsung AOD. |
+| **#038** | **Polling Adaptation Drift** | Frequent jumps suggest initial filtering or polling frequency adaptation on A15 is destabilizing tracking. |
 | **#030** | **Proto Schema Duplication** | Identical `.proto` files exist in `app/src/main/proto` and `app/src/proto`. Risks synchronization drift. |
 | **#031** | **Soak Test Monitoring** | Ongoing 24-hour stability test required to monitor for `STABILITY GAP` logs under 10Hz sensor load. |
 | **#032** | **UI Refresh Consistency** | Verify forensic fields (`Prox Debounce`, `Rolling Vibe`) respect the 15s staleness gate. |
@@ -21,7 +24,11 @@ This document tracks active issues, technical debt, and pending validation tasks
 ---
 
 ## 🔴 Open Issues
-*   *(No open critical issues)*
+| ID | Issue | Description |
+| :--- | :--- | :--- |
+| **#036** | **A15 Behavioral Flickering** | Tracker state engine is unstable on A15 hardware due to raw GPS jitter. |
+| **#037** | **Viewer Display State Spam** | G990E screen state toggling rapidly between ON/DOZE during monitoring. |
+| **#038** | **Adaptation Instability** | GPS polling adaptation on A15 appears to be contributing to trajectory jumps. |
 
 ---
 
