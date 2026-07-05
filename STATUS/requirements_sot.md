@@ -13,7 +13,9 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Time Integrity**: All alarm evaluations and hardware latches use monotonic time via `TimeProvider.elapsedRealtime()`. (Issue #311 / Issue #441)
 *   **Foreground Service Transition (R967)**: The system maintains a **45-second "Recent UI Pulse" window** (`UI_PULSE_TIMEOUT_MS`) to bridge Android 14+ `MICROPHONE` type transitions. (Issue #025 / v8.9.86)
 *   **Type Safety Authority**: All telemetry fields (Accuracy, Speed, Bearing, Sensor Indices) are standardized to `Double` across the entire chain (Engine, App, Room). (Issue #014 / v8.9.75)
+*   **Data Persistence Integrity (R968)**: All changes to Protobuf schemas must preserve binary compatibility. Migration from legacy types must use new field tags and explicit `DataMigration` logic. (Issue #023 / v8.9.84)
 *   **Telemetry Freshness Authority (Issue #029)**: Data health (`DAT` badge) is determined by the arrival of any telemetry packet (Sensor or GPS). `RemoteHandler` must explicitly timestamp arrival (`ts`) to ensure accurate UI staleness calculation. (v8.9.91)
+*   **Document Integrity Authority (R969)**: All core documentation (`issues.md`, `requirements_sot.md`, `compliance.md`) and their archives are subject to a **Growth-Only Constraint**. Archives must never decrease in line count, and structural headers must be preserved during all automated or manual writes. (v8.9.91)
 
 ### 2. Branding & UI Standards
 *   **Branding Authority (R865/R866)**: "Unified Identity Green" is strictly defined as **JD Branding Green (#367C2B)**.
