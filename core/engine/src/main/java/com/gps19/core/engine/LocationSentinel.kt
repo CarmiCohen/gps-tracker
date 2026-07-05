@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * v8.9.92:
+ * - Issue #036: Passed isA15 flag to PhysicsUtils.isVisualJump to enable hardened 
+ *   jitter filtering for A15 hardware.
  * v8.9.79:
  * - Issue #016: Finalized Double standardization for performance. Removed casting overhead.
  * v8.9.75:
@@ -304,7 +307,8 @@ class LocationSentinel {
             lastSpeedMps = lastValidSpeedMps,
             isParking = isParking,
             altitudeDelta = altitudeDelta,
-            hasPhysicalMotion = hasPhysicalMotion
+            hasPhysicalMotion = hasPhysicalMotion,
+            isA15 = isA15
         )
         
         var score = jumpConfidence.score
@@ -331,7 +335,7 @@ class LocationSentinel {
         val currentSpeedMps = dist / max(0.1, timeDeltaSec)
         
         val isTier2 = dist >= JUMP_POINT_DISTANCE_THRESHOLD && (currentSpeedMps > MAX_PHYSICAL_SPEED_MPS || augmentedScore >= 40)
-        val isTier3 = dist >= JUMP_GATE_VISUAL_JITTER_METERS && dist < JUMP_POINT_DISTANCE_THRESHOLD && augmentedScore >= 30
+        val isTier3 = dist >= (if (isA15) JUMP_GATE_VISUAL_JITTER_A15_METERS else JUMP_GATE_VISUAL_JITTER_METERS) && dist < JUMP_POINT_DISTANCE_THRESHOLD && augmentedScore >= 30
         
         val finalTier = when {
             jumpConfidence.tier == 1 -> 1

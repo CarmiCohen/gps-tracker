@@ -2,6 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v8.9.94:
+ * - Issue #038: Introduced ADAPTATION_SETTLING_MS (5000ms) to muzzle trajectory 
+ *   logic during GPS polling frequency transitions on A15 hardware.
+ * v8.9.92:
+ * - Issue #036: Introduced A15-specific GPS jitter hardening. Increased mismatch gate 
+ *   to 5.0 m/s and jitter floor to 25m to handle A15 raw sensor noise.
  * v8.9.86:
  * - Issue #025: Relaxed UI_PULSE_TIMEOUT_MS to 45s to harden FGS transitions on Android 14+.
  * v8.9.85:
@@ -51,11 +57,13 @@ const val JUMP_WEIGHT_ACCURACY_LOW = 30
 const val JUMP_WEIGHT_ACCURACY_HIGH = 20
 
 const val JUMP_GATE_SENSOR_MISMATCH_MPS = 2.0
+const val JUMP_GATE_SENSOR_MISMATCH_A15_MPS = 5.0 // Issue #036: Hardened for A15 jitter
 const val JUMP_GATE_SPEED_ACCURACY_LOW_MPS = 22.2
 const val JUMP_GATE_SPEED_ACCURACY_HIGH_MPS = 8.3
 const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0
 const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0
 const val JUMP_GATE_VISUAL_JITTER_METERS = 10.0
+const val JUMP_GATE_VISUAL_JITTER_A15_METERS = 25.0 // Issue #036: Hardened for A15 jitter
 
 // Adaptive Jump Confidence (v8.9.18 - Issue #332 / R332)
 const val ADAPTIVE_JUMP_SNR_THRESHOLD = 35.0
@@ -204,6 +212,7 @@ const val SUSPICIOUS_STATE_COOLDOWN_MS = 60000L
 const val MUZZLE_WINDOW_DURATION_MS = 2000L
 const val MUZZLE_HYSTERESIS_MS = 200L
 const val MUZZLE_HYSTERESIS_A15_MS = 500L
+const val ADAPTATION_SETTLING_MS = 5000L // Issue #038: Settle duration after polling change
 const val GPS_REVIVAL_RETRY_INTERVAL_MS = 120000L
 const val MAX_REVIVAL_ATTEMPTS = 3
 const val XIAOMI_BOOT_GRACE_MS = 30000L

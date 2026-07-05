@@ -6,6 +6,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager as AndroidSensorManager
+import android.hardware.display.DisplayManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -13,6 +14,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.view.Display
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -28,7 +30,11 @@ import kotlin.math.log10
 import kotlin.math.sqrt
 
 /**
- * AppSensorManager: Manages IMU and Environmental sensors.
+ * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * v8.9.93:
+ * - Issue #037: Implemented Display State Hardening. Added a DisplayListener to detect 
+ *   rapid ON/DOZE toggling on G990E devices. Introduced display-aware muzzling to 
+ *   prevent virtual proximity flickering during Samsung AOD transitions.
  * v8.9.79:
  * - Issue #016: Finalized Double standardization. Renamed latestAcousticDb to currentAcousticDb for consistency.
  */
@@ -40,6 +46,8 @@ class AppSensorManager @Inject constructor(
 ) : SensorEventListener {
 
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as AndroidSensorManager
+    private val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+    
     private val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     private val linearAccel = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
     private val magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
@@ -51,6 +59,40 @@ class AppSensorManager @Inject constructor(
     private var sensorThread: HandlerThread? = null
     private var sensorHandler: Handler? = null
     private val hasLoggedThreadInfo = AtomicBoolean(false)
+
+    // Display Monitoring Logic (Issue #037)
+    private var lastDisplayState = Display.STATE_UNKNOWN
+    private var lastDisplayTransitionTs = 0L
+    private val isDisplayFlickering = AtomicBoolean(false)
+
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) {}
+        override fun onDisplayRemoved(displayId: Int) {}
+        override fun onDisplayChanged(displayId: Int) {
+            if (displayId != Display.DEFAULT_DISPLAY) return
+            val display = displayManager.getDisplay(displayId) ?: return
+            val newState = display.state
+            
+            if (newState != lastDisplayState) {
+                val now = timeProvider.elapsedRealtime()
+                val delta = now - lastDisplayTransitionTs
+                
+                // Detect rapid toggling (ON/DOZE spam)
+                if (delta < 1000L) {
+                    if (!isDisplayFlickering.get()) {
+                        isDisplayFlickering.set(true)
+                        Timber.w("Issue #037: Rapid Display Flickering detected (${lastDisplayState} -> $newState). Engaging hardware muzzle.")
+                    }
+                } else {
+                    isDisplayFlickering.set(false)
+                }
+                
+                lastDisplayState = newState
+                lastDisplayTransitionTs = now
+                Timber.v("Display state changed: $newState (Delta: ${delta}ms)")
+            }
+        }
+    }
 
     // Performance Audit: Pre-allocated buffers for zero-allocation fast path
     private val gravityBuffer = FloatArray(3)
@@ -215,12 +257,16 @@ class AppSensorManager @Inject constructor(
         proximity?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         light?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         rotationVector?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
+        
+        displayManager.registerDisplayListener(displayListener, sensorHandler)
+        
         startAcousticMonitoring()
     }
 
     fun stop() {
         stopAcousticMonitoring()
         sensorManager.unregisterListener(this)
+        displayManager.unregisterDisplayListener(displayListener)
         proximityJob?.cancel()
         sensorThread?.quitSafely()
         sensorThread = null
@@ -292,6 +338,12 @@ class AppSensorManager @Inject constructor(
                 if (proximityIdx < secMinProxIdx) secMinProxIdx = proximityIdx
 
                 if (newValue != rawProximityNear) {
+                    // Issue #037: Muzzle 'Far' transitions during rapid display flickering (G990E logic)
+                    if (!newValue && isDisplayFlickering.get() && isStationary()) {
+                        Timber.d("Proximity: Suppressing 'Far' transition during display state spam.")
+                        return
+                    }
+
                     if (!newValue && isA15Device() && currentLux <= 0.01 && isStationary()) {
                         Timber.d("Proximity: Suppressing 'Far' transition on A15 in darkness (Stationary Virtual Sensor Protection)")
                         return

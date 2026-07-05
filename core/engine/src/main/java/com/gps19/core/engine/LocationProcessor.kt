@@ -5,15 +5,15 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * v8.9.94:
+ * - Issue #038: Implemented Adaptation Muzzle. Added isAdaptationMuzzled flag 
+ *   to processGpsPoint to increase filter skepticism during A15 polling transitions.
  * v8.9.79:
  * - Issue #016: Finalized Type Safety for interpolation logic. Removed legacy toFloat() casts.
  * v8.9.78:
  * - Issue #018: Stationary Anchor Breakout Refinement. Reduced breakout threshold 
  *   to 5.0m when physical motion is detected via IMU to prevent "sticky" 
  *   transitions when leaving buildings.
- * v8.9.77:
- * - Issue #018: Stationary Anchor Hard-Lock. Strictly clamps coordinates to 
- *   parkingAnchorPoint when stationary probability > 0.9 to eliminate drift.
  */
 class LocationProcessor(
     private val listener: LocationProcessorListener,
@@ -195,6 +195,7 @@ class LocationProcessor(
         isSuspicious: Boolean = false, 
         isMuzzled: Boolean = false,
         isA15: Boolean = false,
+        isAdaptationMuzzled: Boolean = false, // Issue #038
         nowWall: Long = timeProvider.currentTimeMillis(),
         nowRealtime: Long = timeProvider.elapsedRealtime()
     ): ProcessedLocation {
@@ -228,7 +229,12 @@ class LocationProcessor(
         if (providedAdaptiveVibrationFloor >= 0.0) sentinel.adaptiveVibrationFloor = providedAdaptiveVibrationFloor
         if (providedAcousticLockoutTs > 0) sentinel.updateSensorState(vibration = -1.0, heading = -1.0, baroAlt = -1000.0, acousticLockoutTs = providedAcousticLockoutTs, isMuzzled = isMuzzled, isA15 = isA15, nowRealtime = nowRealtime, nowWall = nowWall)
 
-        val sentinelResult = sentinel.processLocation(lat = lat, lng = lng, alt = alt, accuracy = accuracy, maxAccuracy = maxAccuracy, bearing = bearing, snr = snr, satsUsed = satsUsed, timestamp = effectiveTs, bypassBehavioral = !isLocal, isSuspicious = isSuspicious, isMuzzled = isMuzzled, isA15 = isA15, nowWall = nowWall, nowRealtime = nowRealtime)
+        val sentinelResult = sentinel.processLocation(
+            lat = lat, lng = lng, alt = alt, accuracy = accuracy, maxAccuracy = maxAccuracy, 
+            bearing = bearing, snr = snr, satsUsed = satsUsed, timestamp = effectiveTs, 
+            bypassBehavioral = !isLocal, isSuspicious = isSuspicious || isAdaptationMuzzled, // Higher skepticism during adaptation
+            isMuzzled = isMuzzled, isA15 = isA15, nowWall = nowWall, nowRealtime = nowRealtime
+        )
         
         if (sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED) {
             val promotedPoints = sentinelResult.promotedPoints ?: emptyList()
@@ -261,8 +267,8 @@ class LocationProcessor(
         val fallbackPoint = EngineGeoPoint(if (lastLat != 0.0) lastLat else lat, if (lastLng != 0.0) lastLng else lng, ts = if (lastTs != 0L) lastTs else effectiveTs, accuracy = lastAcc, maxAccuracy = lastMaxAcc)
 
         if (!isSpatiallyValid) {
-            if (shouldSavePoint(isSuspicious, true, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, lat, lng), 0L, maxAccuracy)) listener.onTrailPointSaved(lat, lng, isViewerTrail, true, effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy)
-            return ProcessedLocation(rawPoint = EngineGeoPoint(lat, lng, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy), optimizedPoint = fallbackPoint, status = sentinelResult.status, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedKph(), timestamp = effectiveTs, isStalled = finalIsStalled, receiptRealtime = nowRealtime, jumpTier = finalJumpTier, isAdaptiveJump = finalIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = false, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer, suppressionNote = sentinelResult.suppressionNote)
+            if (shouldSavePoint(isSuspicious || isAdaptationMuzzled, true, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, lat, lng), 0L, maxAccuracy)) listener.onTrailPointSaved(lat, lng, isViewerTrail, true, effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy)
+            return ProcessedLocation(rawPoint = EngineGeoPoint(lat, lng, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy), optimizedPoint = fallbackPoint, status = sentinelResult.status, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedKph(), timestamp = effectiveTs, isStalled = finalIsStalled, receiptRealtime = nowRealtime, jumpTier = finalJumpTier, isAdaptiveJump = finalIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = false, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer, suppressionNote = if (isAdaptationMuzzled && sentinelResult.status == SentinelStatus.VALID) "Filtering settled during A15 frequency adaptation." else sentinelResult.suppressionNote)
         }
 
         val optimized = sentinelResult.optimizedPoint ?: EngineGeoPoint(lat, lng, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy)
@@ -293,7 +299,7 @@ class LocationProcessor(
         
         // Issue #018: Hard-Lock logic - Behavioral Breakout Refinement
         val isPhysicallyStationary = sentinel.isStationary()
-        if (!isSuspicious && stationaryProb > 0.9) {
+        if (!isSuspicious && !isAdaptationMuzzled && stationaryProb > 0.9) {
             if (parkingAnchorPoint == null && isPhysicallyStationary) {
                 parkingAnchorPoint = persistencePoint
                 listener.onLogAdded("Stationary Anchor engaged at ${String.format(Locale.getDefault(), "%.5f, %.5f", persistencePoint.lat, persistencePoint.lng)} (Prob: ${String.format(Locale.getDefault(), "%.2f", stationaryProb)})", "system", false, false, persistencePoint.lat, persistencePoint.lng, accuracy, snr, sentinel.currentVibrationIndex)
@@ -327,7 +333,7 @@ class LocationProcessor(
         isAnchorLockedState = isAnchorLockedNow
 
         val timeSinceLastGpsSave = if (gpsTs > 0 && lastSavedGpsTs > 0) gpsTs - lastSavedGpsTs else 0L
-        if (shouldSavePoint(isSuspicious, isThrottled, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSave, maxAccuracy) && !skipPersistence) {
+        if (shouldSavePoint(isSuspicious || isAdaptationMuzzled, isThrottled, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSave, maxAccuracy) && !skipPersistence) {
             listener.onTrailPointSaved(persistencePoint.lat, persistencePoint.lng, isViewerTrail, false, effectiveTs, isHindsightCorrected = finalIsTrajectoryPromoted, accuracy = persistencePoint.accuracy, maxAccuracy = persistencePoint.maxAccuracy)
             lastSavedLat = persistencePoint.lat; lastSavedLng = persistencePoint.lng; lastSavedTs = nowWall; lastSavedGpsTs = gpsTs
         }
@@ -347,7 +353,7 @@ class LocationProcessor(
             maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = finalFilteredSpeed, timestamp = effectiveTs, isStalled = finalIsStalled, 
             isClockRegression = false, receiptRealtime = nowRealtime, isTrajectoryPromoted = finalIsTrajectoryPromoted,
             jumpTier = finalJumpTier, isAdaptiveJump = finalIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = true, geofenceViolationDetected = geofenceViolation, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer, 
-            isAnchorLocked = isAnchorLockedNow, suppressionNote = sentinelResult.suppressionNote
+            isAnchorLocked = isAnchorLockedNow, suppressionNote = if (isAdaptationMuzzled) "Settling A15 Polling..." else sentinelResult.suppressionNote
         )
     }
 

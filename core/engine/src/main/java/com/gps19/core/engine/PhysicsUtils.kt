@@ -4,6 +4,9 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: Unified physics and geodesic calculations for the Pure Logic Engine.
+ * v8.9.92:
+ * - Issue #036: Applied A15-specific hardened thresholds for sensor mismatch and 
+ *   visual jitter to stabilize tracker state on A15 hardware.
  * v8.9.75:
  * - Issue #014: Type Safety Optimization. Standardized accuracy and SNR to Double 
  *   to eliminate redundant toDouble()/toFloat() conversions.
@@ -103,7 +106,8 @@ object PhysicsUtils {
         lastSpeedMps: Double = 0.0,
         isParking: Boolean = false,
         altitudeDelta: Double = 0.0,
-        hasPhysicalMotion: Boolean = true
+        hasPhysicalMotion: Boolean = true,
+        isA15: Boolean = false
     ): JumpConfidence {
         if (lastLat == 0.0 || timeDeltaMs < 100) return JumpConfidence()
         
@@ -120,7 +124,9 @@ object PhysicsUtils {
         var isAdaptiveJump = false
         
         // Issue #332: Enhanced Sensor Fusion for Urban Canyons
-        if (!hasPhysicalMotion && speedMps > JUMP_GATE_SENSOR_MISMATCH_MPS) { 
+        // Issue #036: Hardened mismatch gate for A15
+        val mismatchGate = if (isA15) JUMP_GATE_SENSOR_MISMATCH_A15_MPS else JUMP_GATE_SENSOR_MISMATCH_MPS
+        if (!hasPhysicalMotion && speedMps > mismatchGate) { 
             score += JUMP_WEIGHT_SENSOR_MISMATCH
             
             if (snr >= ADAPTIVE_JUMP_SNR_THRESHOLD) {
@@ -146,13 +152,16 @@ object PhysicsUtils {
         if (speedMps > JUMP_GATE_SPEED_ACCURACY_HIGH_MPS && accuracy > JUMP_GATE_ACCURACY_HIGH_THRESHOLD) score += JUMP_WEIGHT_ACCURACY_HIGH
         
         val isTier2 = dist >= JUMP_POINT_DISTANCE_THRESHOLD && (speedMps > MAX_PHYSICAL_SPEED_MPS || score >= 40)
-        val isTier3 = dist >= JUMP_GATE_VISUAL_JITTER_METERS && dist < JUMP_POINT_DISTANCE_THRESHOLD && score >= 30
+        
+        // Issue #036: Hardened jitter threshold for A15
+        val jitterThreshold = if (isA15) JUMP_GATE_VISUAL_JITTER_A15_METERS else JUMP_GATE_VISUAL_JITTER_METERS
+        val isTier3 = dist >= jitterThreshold && dist < JUMP_POINT_DISTANCE_THRESHOLD && score >= 30
         
         val isJump = isTier2 || isTier3 || score >= 50
         
         var reason = when {
             isAdaptiveJump -> "Signal Reflection Suspicion (High SNR)"
-            !hasPhysicalMotion && speedMps > JUMP_GATE_SENSOR_MISMATCH_MPS -> "Sensor Mismatch Jump (Urban Canyon)"
+            !hasPhysicalMotion && speedMps > mismatchGate -> "Sensor Mismatch Jump (Urban Canyon)"
             isTier2 -> "Security Jump"
             isTier3 -> "Visual Jitter"
             score >= 50 -> "High Confidence Jump"

@@ -21,13 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.94:
+ * - Issue #038: Implemented Adaptation Muzzle for A15. Triggers a 5s settling 
+ *   window during GPS polling transitions to suppress trajectory jumps.
  * v8.9.89:
  * - Issue #005 Hardening: Passed cachedPkgName to Xiaomi checkers to eliminate 
  *   repetitive getPackageName() logcat spam on Samsung devices.
- * v8.9.88:
- * - Identity Persistence Fix: Corrected handleViewerPulse to check against 
- *   DEFAULT_VIEWER_ID instead of incorrectly shadowing DEFAULT_TRACKER_ID.
- * - Build Fix: Corrected sensorRepository to sensorManager in pushCurrentStatus.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -63,6 +62,10 @@ class TrackerService : BaseMonitorService() {
     private var pendingAcousticViolation = false
     private var isMuzzled = false
     private var muzzleReleaseJob: Job? = null
+
+    // Issue #038: Adaptation Muzzle State
+    private var isAdaptationMuzzled = false
+    private var adaptationMuzzleJob: Job? = null
     
     private var revivalAttemptCount = 0
     private var lastRevivalAttemptTs = 0L
@@ -362,8 +365,18 @@ class TrackerService : BaseMonitorService() {
             currentGpsInterval = newInterval
             gpsManager.setPollingInterval(newInterval)
             
-            if (isA15 && oldInterval >= STATIONARY_GPS_POLLING_MS && newInterval <= A15_STABLE_GPS_POLLING_MS) {
-                gpsManager.kickGps()
+            if (isA15 && oldInterval != -1L) {
+                // Issue #038: Adaptation Muzzle triggered by polling change
+                adaptationMuzzleJob?.cancel()
+                isAdaptationMuzzled = true
+                adaptationMuzzleJob = lifecycleScope.launch {
+                    delay(ADAPTATION_SETTLING_MS)
+                    isAdaptationMuzzled = false
+                }
+                
+                if (oldInterval >= STATIONARY_GPS_POLLING_MS && newInterval <= A15_STABLE_GPS_POLLING_MS) {
+                    gpsManager.kickGps()
+                }
             }
 
             if (nowRealtime - lastGpsTransitionLogTs > GPS_TRANSITION_LOG_MUZZLE_MS) {
@@ -636,7 +649,8 @@ class TrackerService : BaseMonitorService() {
             isLocal = true, providedAdaptiveVibrationFloor = sensorManager.adaptiveVibrationFloor, 
             isSuspicious = isSuspiciousMode,
             isMuzzled = isMuzzled,
-            isA15 = isA15
+            isA15 = isA15,
+            isAdaptationMuzzled = isAdaptationMuzzled // Issue #038
         )
         
         processed.suppressionNote?.let { note ->
@@ -666,6 +680,7 @@ class TrackerService : BaseMonitorService() {
         alarmEvalJob?.cancel()
         settingsJob?.cancel()
         muzzleReleaseJob?.cancel()
+        adaptationMuzzleJob?.cancel()
         if (this::commandRouter.isInitialized) commandRouter.unregister()
         super.onDestroy()
     }

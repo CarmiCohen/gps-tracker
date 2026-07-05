@@ -1,30 +1,32 @@
-# Forensic Handover - v8.9.91 (Log Spillage Hardening & R924 Purge)
+# Forensic Handover - v8.9.94 (A15 & G990E Stability Hardening)
 
-## 📌 Status: Stable / Build PASS / Logcat Audited
-This cycle completes the deep hardening of the Osmdroid configuration to eliminate system log spam and verifies the final UI purge for Requirement R924.
+## 📌 Status: Stable / Build PASS / Hardware Hardened
+This cycle completes the deep remediation of hardware-specific instabilities on Samsung A15 and S21 FE (G990E) devices.
 
-### 🟢 Completed: Issue #005 (Advanced Log Spillage Hardening)
-*   **Synchronous Path Authority**: Moved `osmdroidBasePath` and `osmdroidTileCache` assignment to a synchronous block in `GpsApplication.kt`. 
-*   **Pre-emptive Initialization**: This ensures static paths are set *before* any library components can trigger the default discovery logic, resulting in zero `getPackageName` log spam on Samsung G990/A155 devices.
-*   **User Agent Branding**: Updated User-Agent to `GpsTracker/8.9.91`.
+### 🟢 Completed: Issue #036 (A15 Jitter Hardening)
+*   **Hardened Gates**: Introduced `JUMP_GATE_SENSOR_MISMATCH_A15_MPS` (5.0 m/s) and `JUMP_GATE_VISUAL_JITTER_A15_METERS` (25m).
+*   **Jump Engine Sync**: Updated `PhysicsUtils.isVisualJump` to filter raw A15 sensor noise using these specific gates.
 
-### 🟢 Completed: Requirement R924 Sunset (VID_NOTES Removal)
-*   **UI Purge Verification**: Confirmed `SharedUiComponents.kt` no longer contains the "Th1030" identifier in the `HeaderBar`. 
-*   **Build Sync**: Version incremented to **8.9.91** to distinguish from legacy builds still showing the obsolete identifier in user screenshots.
+### 🟢 Completed: Issue #037 (Display State Hardening)
+*   **Flicker Detection**: Added `DisplayListener` to `AppSensorManager` to detect rapid ON/DOZE toggling (< 1000ms) on G990E devices.
+*   **Proximity Muzzle**: Suppressed virtual proximity "Far" transitions during Samsung AOD state spam to prevent telemetry noise.
+
+### 🟢 Completed: Issue #038 (Adaptation Stability)
+*   **Settling Window**: Added `ADAPTATION_SETTLING_MS` (5000ms).
+*   **Adaptation Muzzle**: Implemented logic in `TrackerService` and `LocationProcessor` to increase filter skepticism during GPS polling transitions on A15.
 
 ### 🟢 Completed: Infrastructure & Deployment
-*   **Deployment Success**: Verified build and deploy on `SM-G990E`.
-*   **Connectivity Audit**: Verified signaling (`TRK`) and relay (`SRV`) stability.
+*   **Version Increment**: Bumping to **v8.9.94**.
+*   **Documentation Sync**: All 3 open technical issues marked as resolved in `issues.md`.
 
 ### 🟡 Pending Validation
-*   **G990/A155 Log Audit**: Perform final verification with the v8.9.91 build to confirm total silence on `getPackageName`.
-*   **Data Health (DAT)**: Observe the `DAT` badge transition to green on the A155 tracker once a stable GPS fix is acquired.
-*   **Identity Persistence**: Confirm custom Viewer IDs persist during atomic saves (Regression check for Issue #027).
+*   **A15 Jitter Verification**: Confirm state stability on A15 Tracker under clear sky vs. indoor transition.
+*   **G990E Display Muzzle**: Verify Viewer telemetry remains silent during G990E AOD transitions.
+*   **Adaptation Settling**: Monitor logcat for "Settling A15 Polling..." messages during movement start.
 
 ### 🛠 Instructions for Resumption
-1.  **Environment**: Connect `G990` or `A155`.
+1.  **Environment**: Connect Samsung A15 (Tracker) and G990E (Viewer).
 2.  **Verification**: 
-    *   Deploy **v8.9.91**.
-    *   Verify the top `HeaderBar` no longer shows the "Th1030" identifier.
-    *   Audit Logcat for `getPackageName`. Expect **Zero** hits during Map interaction.
-3.  **Telemetry**: If the `DAT` badge is red, move the Tracker to a clear-sky area to force a GPS fix.
+    *   Deploy **v8.9.94**.
+    *   Audit Logcat for "Issue #037" and "Settling A15 Polling" identifiers.
+    *   Verify the dashboard no longer flickers between states during stationary monitoring.
