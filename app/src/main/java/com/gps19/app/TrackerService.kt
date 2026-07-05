@@ -21,6 +21,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v8.9.99:
+ * - Issue #041: Identity Hardening. Added strict validation to handleViewerPulse 
+ *   to prevent command injection or corruption from malformed peer pulses.
  * v8.9.98:
  * - Maintenance: Aligned versioning with Identity Persistence Hardening release.
  * - Fix: Corrected typo in evaluateAlarmsInternal (maxTrackerAccuracy -> maxAccuracy).
@@ -241,6 +244,11 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun handleViewerPulse(id: String) {
+        if (!SignalingConstants.isValidViewerId(id)) {
+            Timber.w("Rejecting invalid Viewer ID from pulse: $id")
+            return
+        }
+
         if ((configManager.viewerId == MainRepository.DEFAULT_VIEWER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer" && id != MainRepository.DEFAULT_VIEWER_ID) {
             configManager.viewerId = id
             networkManager.updateIdentity(configManager.deviceId, id, true)

@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.98
+# System Source of Truth (SoT) - v8.9.99
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
@@ -21,6 +21,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Forensic Staleness Authority (R972)**: The system enforces a strict 15-second staleness gate (`WATCH_DOG_UI_GRACE_MS`) for forensic fields (`Prox Debounce`, `Rolling Vibe`, `Chair Forensics`) to ensure data veracity during link gaps. (Issue #032 / v8.9.95)
 *   **Standardized Proto Path Authority (R973)**: All Protobuf schemas MUST be located in the standard `app/src/main/proto` directory. The legacy `app/src/proto` path is deprecated and must not be used for schema updates. (Issue #030 / v8.9.96)
 *   **Identity Uniqueness Authority (R974)**: The system enforces strict uniqueness between Tracker and Viewer identities at the persistence layer. `MainRepository` MUST validate that `TRACKER_ID` and `VIEWER_ID` do not collide during bulk save operations to prevent role reversion and "split-brain" states. (Issue #027 / v8.9.98)
+*   **Identity Sanitization Authority (R975)**: The system enforces a strict alphanumeric contract for all IDs (`^[a-zA-Z0-9_-]{1,32}$`). The `SettingsRepository` MUST implement automatic sanitization via migration to reset any corrupted identities to safe defaults, and all network/service handlers MUST reject pulses containing malformed IDs to prevent command injection. (Issue #041 / v8.9.99)
 
 ### 2. Branding & UI Standards
 *   **Branding Authority (R865/R866)**: "Unified Identity Green" is strictly defined as **JD Branding Green (#367C2B)**.

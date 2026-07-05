@@ -18,12 +18,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v8.9.99:
+ * - Issue #041: Identity Sanitization. Added strict validation to handleTrackerPulse 
+ *   to prevent command injection or corruption from malformed peer pulses.
  * v8.9.88:
  * - Identity Persistence Fix: Corrected handleTrackerPulse to save to TRACKER_ID_KEY 
  *   instead of incorrectly overwriting the VIEWER_ID_KEY with the peer's identity.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions across module boundaries.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -216,6 +216,11 @@ class ViewerService : BaseMonitorService() {
     }
 
     private fun handleTrackerPulse(id: String) {
+        if (!SignalingConstants.isValidTrackerId(id)) {
+            Timber.w("Rejecting invalid Tracker ID from pulse: $id")
+            return
+        }
+
         // Fix: Save peer identity to TRACKER_ID_KEY, not VIEWER_ID_KEY.
         if ((configManager.deviceId == MainRepository.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
             configManager.deviceId = id

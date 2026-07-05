@@ -18,11 +18,9 @@ import javax.inject.Singleton
 /**
  * High-level Network Manager for the Service.
  * Orchestrates the SignalingProvider (Socket.io) and the HTTP Keep-alive logic.
- * v8.9.72:
- * - Issue #015: Hardened coroutine cancellation handling in wakeUpRelay and keep-alive loops.
- * v8.9.64:
- * - Issue #007: Implemented reactive short-circuit reconnection. Now triggers 
- *   wakeUpRelay() and signaling re-join immediately on transport loss via callback.
+ * v8.9.99:
+ * - Issue #041: Identity Sanitization. Added strict ID validation before 
+ *   initiating relay connections to prevent using corrupted identities.
  */
 @Singleton
 class AppNetworkManager @Inject constructor(
@@ -61,6 +59,12 @@ class AppNetworkManager @Inject constructor(
                 val now = timeProvider.elapsedRealtime()
                 if (now - lastReconnectTs < 3000L || signalingProvider.isConnected()) return@launch
                 
+                // Issue #041: Don't reconnect if identities are corrupted
+                if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) {
+                    Log.e("GPS19_NET", "Handover aborted: Invalid identity detected (T:$deviceId, V:$viewerId)")
+                    return@launch
+                }
+
                 logManager.logServiceEvent("Network Handover: Interface Available. Reconnecting relay.", false)
                 lastReconnectTs = now
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
@@ -105,17 +109,23 @@ class AppNetworkManager @Inject constructor(
                 val latestIsTracker = latestMode == "tracker"
 
                 if (latestDeviceId != deviceId || latestViewerId != viewerId || latestRelayUrl != relayUrl || latestIsTracker != isTrackerMode) {
-                    this@AppNetworkManager.deviceId = latestDeviceId
-                    this@AppNetworkManager.viewerId = latestViewerId
-                    this@AppNetworkManager.relayUrl = latestRelayUrl
-                    this@AppNetworkManager.isTrackerMode = latestIsTracker
                     
-                    if (isActive && !isStopped) {
-                        withContext(Dispatchers.Main) {
-                            lastReconnectTs = timeProvider.elapsedRealtime()
-                            signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
-                            wakeUpRelay()
+                    // Issue #041: Only update if the new IDs are valid
+                    if (SignalingConstants.isValidTrackerId(latestDeviceId) && SignalingConstants.isValidViewerId(latestViewerId)) {
+                        this@AppNetworkManager.deviceId = latestDeviceId
+                        this@AppNetworkManager.viewerId = latestViewerId
+                        this@AppNetworkManager.relayUrl = latestRelayUrl
+                        this@AppNetworkManager.isTrackerMode = latestIsTracker
+                        
+                        if (isActive && !isStopped) {
+                            withContext(Dispatchers.Main) {
+                                lastReconnectTs = timeProvider.elapsedRealtime()
+                                signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+                                wakeUpRelay()
+                            }
                         }
+                    } else {
+                        Log.e("GPS19_NET", "Keep-alive identity update rejected: Malformed ID detected")
                     }
                     return@withContext 
                 }
@@ -145,10 +155,12 @@ class AppNetworkManager @Inject constructor(
                     }
                 } else {
                     if (isActive && !isStopped && (now - lastReconnectTs > NET_REJOIN_THRESHOLD_MS)) {
-                        withContext(Dispatchers.Main) {
-                            lastReconnectTs = now
-                            signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
-                            wakeUpRelay()
+                        if (SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
+                            withContext(Dispatchers.Main) {
+                                lastReconnectTs = now
+                                signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+                                wakeUpRelay()
+                            }
                         }
                     }
                 }
@@ -197,11 +209,9 @@ class AppNetworkManager @Inject constructor(
             connectivityManager.registerNetworkCallback(request, networkCallback)
         } catch (e: Exception) { Log.e("GPS19_NET", "Failed to register network callback") }
 
-        // Issue #007: Register reactive connection lost callback
         signalingProvider.setConnectionLostCallback {
             if (!isStopped && relayUrl.isNotEmpty()) {
                 val now = timeProvider.elapsedRealtime()
-                // Throttle reactive wake-up to once every 10s to avoid spamming during transitions
                 if (now - lastReconnectTs > 10000L) {
                     lastReconnectTs = now
                     Log.i("GPS19_NET", "Reactive trigger: Transport lost. Waking up relay.")
@@ -210,15 +220,21 @@ class AppNetworkManager @Inject constructor(
             }
         }
 
-        if (relayUrl.isNotEmpty()) {
+        if (relayUrl.isNotEmpty() && SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
             signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
             wakeUpRelay()
+        } else {
+            Log.e("GPS19_NET", "Initial start aborted: Invalid identity (T:$deviceId, V:$viewerId)")
         }
         startKeepAliveLoop()
     }
 
     fun updateIdentity(deviceId: String, viewerId: String, isTracker: Boolean) {
         if (isStopped) return
+        if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) {
+            Log.e("GPS19_NET", "Identity update rejected: Malformed ID")
+            return
+        }
         this.deviceId = deviceId; this.viewerId = viewerId; this.isTrackerMode = isTracker
         signalingProvider.updateIdentity(deviceId, viewerId, isTracker)
     }
@@ -226,8 +242,10 @@ class AppNetworkManager @Inject constructor(
     fun connect(url: String) {
         if (isStopped) return
         this.relayUrl = url; this.lastReconnectTs = timeProvider.elapsedRealtime()
-        signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
-        wakeUpRelay()
+        if (SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
+            signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+            wakeUpRelay()
+        }
     }
 
     fun stop() { 

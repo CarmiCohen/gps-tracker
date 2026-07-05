@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v8.9.96
+# Compliance & Operational Requirements (Audit Baseline) - v8.9.99
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -21,7 +21,6 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R810-A15**| **A15 High-Noise Profile**: Hardened sensor gates and vibration coherence. | **Verified (v8.9.94)** |
 | **R832** | **Chair Sit Detection Engine**: Multi-sensor fusion (tilt/vibration/baro) for occupancy detection. | **Verified (v8.9.40)** |
 | **R917** | **Update Smoothness**: Infrastructure for session recovery after package updates. | **Verified (v8.9.36)** |
-| **R924** | **VID Notes Authority**: Button row displays `VID_NOTES`. | **OBSOLETE (v8.9.89)** |
 | **R926** | **Service Launch Integrity**: Mandatory 2,000ms landing page pause before service launch. | **Verified (v8.9.40)** |
 | **R944** | **Binary Signaling Efficiency**: Protobuf-based binary payload emission. | **Verified (v8.9.40)** |
 | **R965** | **Sensor Processing Authority**: High-frequency sensor event processing offloaded to `AppSensorThread`. | **Verified (v8.9.64)** |
@@ -30,24 +29,18 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R970** | **Display State Integrity**: Suppression of telemetry artifacts during AOD transitions. | **Verified (v8.9.94)** |
 | **R972** | **Forensic Staleness Authority**: 15s staleness gate for forensic fields. | **Verified (v8.9.95)** |
 | **R973** | **Standardized Proto Path Authority**: `app/src/main/proto` is the sole schema directory. | **Verified (v8.9.96)** |
+| **R974** | **Identity Uniqueness Authority**: Strict ID uniqueness check in `MainRepository`. | **Verified (v8.9.98)** |
+| **R975** | **Identity Sanitization Authority**: Strict alphanumeric Regex validation and storage sanitization. | **Verified (v8.9.99)** |
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v8.9.96)
-*   **FIXED Issue #030: Proto Schema Discrepancy** - Resolution: Audited and formalized `app/src/main/proto` as the authoritative path. Neutralized legacy `app/src/proto` folder to prevent split-brain updates.
+### 2.1. Hardening Phase Resolutions (v8.9.99)
+*   **FIXED Issue #041: Identity Sanitization Hardening** - Resolution: Implemented R975 (Regex: `^[a-zA-Z0-9_-]{1,32}$`). Hardened `TrackerService`, `ViewerService`, and `AppNetworkManager` to reject malformed pulses. Added `identitySanitizationMigration` in `SettingsRepository` to automatically purge corrupted IDs from storage.
 
-### 2.2. Hardening Phase Resolutions (v8.9.95)
-*   **FIXED Issue #032: UI Refresh Consistency** - Resolution: Implemented 15s forensic staleness gate (WATCH_DOG_UI_GRACE_MS) in `DashboardUseCase`.
+### 2.2. Hardening Phase Resolutions (v8.9.98)
+*   **FIXED Issue #027: Identity Persistence Hardening** - Resolution: Reinforced `MainRepository.saveSettingsBulk` with atomic uniqueness validation to prevent identity cross-contamination.
 
-### 2.3. Hardening Phase Resolutions (v8.9.94)
-*   **FIXED Issue #036: A15 Behavioral Flickering** - Resolution: Hardened R810-A15 thresholds for sensor mismatch and jitter.
-*   **FIXED Issue #037: Viewer Display State Spam** - Resolution: Implemented `DisplayListener` and R970 muzzling for Samsung AOD transitions.
-*   **FIXED Issue #038: Adaptation Instability** - Resolution: Implemented 5s adaptation muzzle for GPS polling transitions.
-
-### 2.4. Hardening Phase Resolutions (v8.9.89)
-*   **OBSOLETE Requirement R924** - Resolution: Removed `VID_NOTES` identifier and its UI display in `HeaderBar` as per forensic request.
-
-### 2.5. Hardening Phase Resolutions (v8.9.78)
-*   **FIXED Issue #018: Tracker Behavior Stability (Hard-Lock)** - Resolution: Implemented stationary anchor logic in `LocationProcessor.kt` to eliminate coordinate drift.
+### 2.3. Hardening Phase Resolutions (v8.9.96)
+*   **FIXED Issue #030: Proto Schema Discrepancy** - Resolution: Audited and formalized `app/src/main/proto` as the authoritative path.
 
 **Full history available in [issues_archive.md](issues_archive.md).**

@@ -33,11 +33,12 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * v8.9.99:
+ * - Issue #041: Identity Sanitization. Added identitySanitizationMigration to 
+ *   automatically purge corrupted or shell-injected IDs (e.g., "pm clear") from storage.
  * v8.9.87:
  * - Issue #005 Logic Fix: Hardened commitDraftSettings to use effective IDs (applying defaults)
  *   during uniqueness checks to prevent "Commit Failed" reversions on fresh installs.
- * - Identity Fix: Ensured viewerIdFlow defaults to DEFAULT_VIEWER_ID ("V") per SoT R182.
- * - Forensic Fix: Corrected getLong() for LAST_DISCONNECTION_TS_KEY mapping.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -73,10 +74,44 @@ class SettingsRepository @Inject constructor(
         override suspend fun cleanUp() {}
     }
 
+    /**
+     * identitySanitizationMigration: Issue #041 Hook.
+     * Detects IDs that violate the strict alphanumeric contract (likely corruption or injection)
+     * and resets them to system defaults during the migration phase.
+     */
+    private val identitySanitizationMigration = object : DataMigration<AppSettings> {
+        override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
+            // Only migrate if an ID exists but is invalid. 
+            // Empty strings are handled by the Flow defaults later.
+            val t = currentData.trackerId
+            val v = currentData.viewerId
+            val isTrackerInvalid = t.isNotEmpty() && !SignalingConstants.isValidTrackerId(t)
+            val isViewerInvalid = v.isNotEmpty() && !SignalingConstants.isValidViewerId(v)
+            return isTrackerInvalid || isViewerInvalid
+        }
+
+        override suspend fun migrate(currentData: AppSettings): AppSettings {
+            val builder = currentData.toBuilder()
+            if (currentData.trackerId.isNotEmpty() && !SignalingConstants.isValidTrackerId(currentData.trackerId)) {
+                builder.setTrackerId(DEFAULT_TRACKER_ID)
+            }
+            if (currentData.viewerId.isNotEmpty() && !SignalingConstants.isValidViewerId(currentData.viewerId)) {
+                builder.setViewerId(DEFAULT_VIEWER_ID)
+            }
+            return builder.build()
+        }
+
+        override suspend fun cleanUp() {}
+    }
+
     private val dataStore: DataStore<AppSettings> = DataStoreFactory.create(
         serializer = AppSettingsSerializer,
         produceFile = { context.dataStoreFile("app_settings.pb") },
-        migrations = listOf(AppSettingsMigration(context), typeMigration)
+        migrations = listOf(
+            AppSettingsMigration(context), 
+            typeMigration,
+            identitySanitizationMigration
+        )
     )
 
     companion object {
@@ -596,7 +631,7 @@ class SettingsRepository @Inject constructor(
             val newAlertsProto = if (current.hasDraftAlertSettings()) current.draftAlertSettings else current.alertSettings
 
             if (!SignalingConstants.areIdsUnique(newTrackerId, newViewerId)) {
-                res = CommitResult(error = "IDs must be unique")
+                res = CommitResult(error = "IDs must be unique and alphanumeric")
                 return@updateData current
             }
 
@@ -645,8 +680,8 @@ class SettingsRepository @Inject constructor(
     ) {
         dataStore.updateData { current ->
             val builder = current.toBuilder()
-            deviceId?.let { builder.setTrackerId(it) }
-            viewerId?.let { builder.setViewerId(it) }
+            deviceId?.let { if (SignalingConstants.isValidTrackerId(it)) builder.setTrackerId(it) }
+            viewerId?.let { if (SignalingConstants.isValidViewerId(it)) builder.setViewerId(it) }
             relayUrl?.let { builder.setRelayUrl(it) }
             maxDistance?.let { builder.setMaxDistance(it) }
             alertSettings?.let { builder.setAlertSettings(alertSettingsToProto(it)) }
