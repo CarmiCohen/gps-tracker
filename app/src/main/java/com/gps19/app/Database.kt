@@ -7,12 +7,13 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * v8.9.99+:
+ * - Issue #043: Room Migration Hardening. Bumped version to 53.
+ *   Implemented comprehensive table recreation for connection_history and 
+ *   pending_status_updates to resolve schema drift and default value mismatches.
  * v8.9.77:
  * - Issue #018: Stationary Anchor Hard-Lock. Added isAnchorLocked to HistoryEntity 
- *   and PendingStatusEntity for forensic transparency (v52).
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions. (Room REAL maps to Double).
+ *   and PendingStatusEntity for forensic transparency.
  */
 @Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
 data class LogEntity(
@@ -69,28 +70,28 @@ data class HistoryEntity(
     val vibeIdx: Double = 0.0,
     val proxIdx: Double = 1.0, 
     val liftIdx: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val snrIdx: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val tiltIdx: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val baroIdx: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val verticalVelocity: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val sitVz: Double = 0.0, 
-    @ColumnInfo(defaultValue = "0") val sitVzTs: Long = 0L,
-    @ColumnInfo(defaultValue = "0") val sitDz: Double = 0.0,
-    @ColumnInfo(name = "isBatterySteepDischarge", defaultValue = "0") val isBatterySteepDischarge: Boolean = false,
-    @ColumnInfo(defaultValue = "10") val remoteSig: Int = 10,
-    @ColumnInfo(defaultValue = "0") val isCoolingModeActive: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val speed: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val bearing: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val isSitDetected: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isSitActive: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val sitBaro: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val sitTilt: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val sitShock: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val currentMa: Int = 0,
-    @ColumnInfo(defaultValue = "NONE") val locationPendingReason: String = "NONE",
-    @ColumnInfo(defaultValue = "0") val accuracy: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val isAnchorLocked: Boolean = false
+    val snrIdx: Double = 0.0,
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
+    val verticalVelocity: Double = 0.0,
+    val sitVz: Double = 0.0, 
+    val sitVzTs: Long = 0L,
+    val sitDz: Double = 0.0,
+    @ColumnInfo(name = "isBatterySteepDischarge") val isBatterySteepDischarge: Boolean = false,
+    val remoteSig: Int = 10,
+    val isCoolingModeActive: Boolean = false,
+    val speed: Double = 0.0,
+    val bearing: Double = 0.0,
+    val isSitDetected: Boolean = false,
+    val isSitActive: Boolean = false,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0,
+    val currentMa: Int = 0,
+    val locationPendingReason: String = "NONE",
+    val accuracy: Double = 0.0,
+    val maxAccuracy: Double = 0.0,
+    val isAnchorLocked: Boolean = false
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -115,37 +116,37 @@ data class PendingStatusEntity(
     val battery: Int,
     val temp: Double,
     val isCharging: Boolean,
-    @ColumnInfo(defaultValue = "0") val currentMa: Int = 0,
+    val currentMa: Int = 0,
     val timestamp: Long,
-    @ColumnInfo(defaultValue = "0") val gpsTs: Long = 0L,
+    val gpsTs: Long = 0L,
     val satsView: Int,
     val satsUsed: Int,
     val name: String? = null,
     val maxAccuracy: Double,
     val distToTracker: Double? = null,
     val distToHome: Double? = null,
-    @ColumnInfo(defaultValue = "0") val snrIdx: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val tiltIdx: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val baroIdx: Double = 0.0,
-    @ColumnInfo(name = "isBatterySteepDischarge", defaultValue = "0") val isBatterySteepDischarge: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isCoolingModeActive: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isSitDetected: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isSitActive: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val sitVz: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val sitVzTs: Long = 0L,
-    @ColumnInfo(defaultValue = "0") val sitDz: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val verticalVelocity: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val sitBaro: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val sitTilt: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val sitShock: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val isStorageLow: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isStorageCritical: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isPowerSaveMode: Boolean = false,
-    @ColumnInfo(defaultValue = "-1") val standbyBucket: Int = -1,
-    @ColumnInfo(defaultValue = "UNKNOWN") val netInterface: String = "UNKNOWN",
-    @ColumnInfo(defaultValue = "0") val lastValidFixRealtime: Long = 0L,
-    @ColumnInfo(defaultValue = "NONE") val locationPendingReason: String = "NONE",
-    @ColumnInfo(defaultValue = "0") val isAnchorLocked: Boolean = false
+    val snrIdx: Double = 0.0,
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
+    @ColumnInfo(name = "isBatterySteepDischarge") val isBatterySteepDischarge: Boolean = false,
+    val isCoolingModeActive: Boolean = false,
+    val isSitDetected: Boolean = false,
+    val isSitActive: Boolean = false,
+    val sitVz: Double = 0.0,
+    val sitVzTs: Long = 0L,
+    val sitDz: Double = 0.0,
+    val verticalVelocity: Double = 0.0,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0,
+    val isStorageLow: Boolean = false,
+    val isStorageCritical: Boolean = false,
+    val isPowerSaveMode: Boolean = false,
+    val standbyBucket: Int = -1,
+    val netInterface: String = "UNKNOWN",
+    val lastValidFixRealtime: Long = 0L,
+    val locationPendingReason: String = "NONE",
+    val isAnchorLocked: Boolean = false
 )
 
 @Dao
@@ -203,7 +204,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 52, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 53, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -212,6 +213,82 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_52_53 = object : Migration(52, 53) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #043: Harmonize connection_history
+                db.execSQL("CREATE TABLE connection_history_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, ts INTEGER NOT NULL, rtt INTEGER NOT NULL, isConnected INTEGER NOT NULL, isGap INTEGER NOT NULL, hasGps INTEGER NOT NULL, isTick INTEGER NOT NULL, ribbonKey TEXT NOT NULL, gpsIndex REAL NOT NULL, noiseIdx REAL NOT NULL, luxIdx REAL NOT NULL, vibeIdx REAL NOT NULL, proxIdx REAL NOT NULL, liftIdx REAL NOT NULL, snrIdx REAL NOT NULL, tiltIdx REAL NOT NULL, baroIdx REAL NOT NULL, verticalVelocity REAL NOT NULL, sitVz REAL NOT NULL, sitVzTs INTEGER NOT NULL, sitDz REAL NOT NULL, isBatterySteepDischarge INTEGER NOT NULL, remoteSig INTEGER NOT NULL, isCoolingModeActive INTEGER NOT NULL, speed REAL NOT NULL, bearing REAL NOT NULL, isSitDetected INTEGER NOT NULL, isSitActive INTEGER NOT NULL, sitBaro REAL NOT NULL, sitTilt REAL NOT NULL, sitShock REAL NOT NULL, currentMa INTEGER NOT NULL, locationPendingReason TEXT NOT NULL, accuracy REAL NOT NULL, maxAccuracy REAL NOT NULL, isAnchorLocked INTEGER NOT NULL)")
+                
+                // Inspect existing columns to map what we can
+                val cursorH = db.query("PRAGMA table_info(connection_history)")
+                val colsH = mutableSetOf<String>(); while(cursorH.moveToNext()) colsH.add(cursorH.getString(1)); cursorH.close()
+                
+                val selectH = "id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, " +
+                    (if (colsH.contains("snrIdx")) "snrIdx" else "0") + ", " +
+                    (if (colsH.contains("tiltIdx")) "tiltIdx" else "0") + ", " +
+                    (if (colsH.contains("baroIdx")) "baroIdx" else "0") + ", " +
+                    (if (colsH.contains("verticalVelocity")) "verticalVelocity" else "0") + ", " +
+                    (if (colsH.contains("sitVz")) "sitVz" else "0") + ", " +
+                    (if (colsH.contains("sitVzTs")) "sitVzTs" else "0") + ", " +
+                    (if (colsH.contains("sitDz")) "sitDz" else "0") + ", " +
+                    (if (colsH.contains("isBatterySteepDischarge")) "isBatterySteepDischarge" else "0") + ", " +
+                    (if (colsH.contains("remoteSig")) "remoteSig" else "10") + ", " +
+                    (if (colsH.contains("isCoolingModeActive")) "isCoolingModeActive" else "0") + ", " +
+                    (if (colsH.contains("speed")) "speed" else "0") + ", " +
+                    (if (colsH.contains("bearing")) "bearing" else "0") + ", " +
+                    (if (colsH.contains("isSitDetected")) "isSitDetected" else "0") + ", " +
+                    (if (colsH.contains("isSitActive")) "isSitActive" else "0") + ", " +
+                    (if (colsH.contains("sitBaro")) "sitBaro" else "0") + ", " +
+                    (if (colsH.contains("sitTilt")) "sitTilt" else "0") + ", " +
+                    (if (colsH.contains("sitShock")) "sitShock" else "0") + ", " +
+                    (if (colsH.contains("currentMa")) "currentMa" else "0") + ", " +
+                    (if (colsH.contains("locationPendingReason")) "locationPendingReason" else "'NONE'") + ", " +
+                    (if (colsH.contains("accuracy")) "accuracy" else "0") + ", " +
+                    (if (colsH.contains("maxAccuracy")) "maxAccuracy" else "0") + ", " +
+                    (if (colsH.contains("isAnchorLocked")) "isAnchorLocked" else "0")
+
+                db.execSQL("INSERT INTO connection_history_new SELECT $selectH FROM connection_history")
+                db.execSQL("DROP TABLE connection_history")
+                db.execSQL("ALTER TABLE connection_history_new RENAME TO connection_history")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_connection_history_ts ON connection_history (ts)")
+
+                // Issue #043: Harmonize pending_status_updates
+                db.execSQL("CREATE TABLE pending_status_updates_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, speed REAL NOT NULL, accuracy REAL NOT NULL, bearing REAL NOT NULL, battery INTEGER NOT NULL, temp REAL NOT NULL, isCharging INTEGER NOT NULL, currentMa INTEGER NOT NULL, timestamp INTEGER NOT NULL, gpsTs INTEGER NOT NULL, satsView INTEGER NOT NULL, satsUsed INTEGER NOT NULL, name TEXT, maxAccuracy REAL NOT NULL, distToTracker REAL, distToHome REAL, snrIdx REAL NOT NULL, tiltIdx REAL NOT NULL, baroIdx REAL NOT NULL, isBatterySteepDischarge INTEGER NOT NULL, isCoolingModeActive INTEGER NOT NULL, isSitDetected INTEGER NOT NULL, isSitActive INTEGER NOT NULL, sitVz REAL NOT NULL, sitVzTs INTEGER NOT NULL, sitDz REAL NOT NULL, verticalVelocity REAL NOT NULL, sitBaro REAL NOT NULL, sitTilt REAL NOT NULL, sitShock REAL NOT NULL, isStorageLow INTEGER NOT NULL, isStorageCritical INTEGER NOT NULL, isPowerSaveMode INTEGER NOT NULL, standbyBucket INTEGER NOT NULL, netInterface TEXT NOT NULL, lastValidFixRealtime INTEGER NOT NULL, locationPendingReason TEXT NOT NULL, isAnchorLocked INTEGER NOT NULL)")
+                
+                val cursorP = db.query("PRAGMA table_info(pending_status_updates)")
+                val colsP = mutableSetOf<String>(); while(cursorP.moveToNext()) colsP.add(cursorP.getString(1)); cursorP.close()
+                
+                val selectP = "id, lat, lng, speed, accuracy, bearing, battery, temp, isCharging, " +
+                    (if (colsP.contains("currentMa")) "currentMa" else "0") + ", timestamp, " +
+                    (if (colsP.contains("gpsTs")) "gpsTs" else "0") + ", satsView, satsUsed, name, maxAccuracy, distToTracker, distToHome, " +
+                    (if (colsP.contains("snrIdx")) "snrIdx" else "0") + ", " +
+                    (if (colsP.contains("tiltIdx")) "tiltIdx" else "0") + ", " +
+                    (if (colsP.contains("baroIdx")) "baroIdx" else "0") + ", " +
+                    (if (colsP.contains("isBatterySteepDischarge")) "isBatterySteepDischarge" else "0") + ", " +
+                    (if (colsP.contains("isCoolingModeActive")) "isCoolingModeActive" else "0") + ", " +
+                    (if (colsP.contains("isSitDetected")) "isSitDetected" else "0") + ", " +
+                    (if (colsP.contains("isSitActive")) "isSitActive" else "0") + ", " +
+                    (if (colsP.contains("sitVz")) "sitVz" else "0") + ", " +
+                    (if (colsP.contains("sitVzTs")) "sitVzTs" else "0") + ", " +
+                    (if (colsP.contains("sitDz")) "sitDz" else "0") + ", " +
+                    (if (colsP.contains("verticalVelocity")) "verticalVelocity" else "0") + ", " +
+                    (if (colsP.contains("sitBaro")) "sitBaro" else "0") + ", " +
+                    (if (colsP.contains("sitTilt")) "sitTilt" else "0") + ", " +
+                    (if (colsP.contains("sitShock")) "sitShock" else "0") + ", " +
+                    (if (colsP.contains("isStorageLow")) "isStorageLow" else "0") + ", " +
+                    (if (colsP.contains("isStorageCritical")) "isStorageCritical" else "0") + ", " +
+                    (if (colsP.contains("isPowerSaveMode")) "isPowerSaveMode" else "0") + ", " +
+                    (if (colsP.contains("standbyBucket")) "standbyBucket" else "-1") + ", " +
+                    (if (colsP.contains("netInterface")) "netInterface" else "'UNKNOWN'") + ", " +
+                    (if (colsP.contains("lastValidFixRealtime")) "lastValidFixRealtime" else "0") + ", " +
+                    (if (colsP.contains("locationPendingReason")) "locationPendingReason" else "'NONE'") + ", " +
+                    (if (colsP.contains("isAnchorLocked")) "isAnchorLocked" else "0")
+
+                db.execSQL("INSERT INTO pending_status_updates_new SELECT $selectP FROM pending_status_updates")
+                db.execSQL("DROP TABLE pending_status_updates")
+                db.execSQL("ALTER TABLE pending_status_updates_new RENAME TO pending_status_updates")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_status_updates_timestamp ON pending_status_updates (timestamp)")
+            }
+        }
         val MIGRATION_51_52 = object : Migration(51, 52) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE connection_history ADD COLUMN isAnchorLocked INTEGER NOT NULL DEFAULT 0")

@@ -1,18 +1,16 @@
-# Forensic Handover - v8.9.99 (Identity Sanitization COMPLETE)
+# Forensic Handover - v8.9.99 (Database & Identity Hardened)
 
-## 📌 Status: Stable / Build PASS / Identity Hardened
-This cycle resolves the critical identity corruption failure (Issue #041) where malformed pulse data injected shell commands into system identities.
+## 📌 Status: Stable / Build PASS / Schema Reconciled
+This cycle resolves critical failures in identity sanitization (#041) and database migration (#043).
+
+### 🟢 Completed: Issue #043 (Room Migration Hardening)
+*   **Root Cause Remediation**: Bumped database to **v53**. Implemented `MIGRATION_52_53` which performs a full table recreation (Create-Insert-Drop-Rename) for `connection_history` and `pending_status_updates`.
+*   **Schema Alignment**: Removed SQL-level `defaultValue` constraints from `HistoryEntity` and `PendingStatusEntity` to align with Room's "undefined" default expectation, eliminating `IllegalStateException` during initialization.
 
 ### 🟢 Completed: Issue #041 (Identity Sanitization)
-*   **Root Cause Remediation**: Established a strict alphanumeric contract in `SignalingConstants.kt` via Regex (`^[a-zA-Z0-9_-]{1,32}$`).
-*   **Automatic Recovery**: Added a DataStore migration hook in `SettingsRepository.kt` that purges corrupted IDs from storage and resets them to defaults on startup.
-*   **Service Hardening**: Pulse handlers in `TrackerService` and `ViewerService` now reject malformed peer IDs.
-*   **Network Shielding**: `AppNetworkManager` refuses to connect to the relay with unsanitized identities.
-
-### 🟢 Completed: Issue #027 (Identity Persistence)
-*   **Resolved**: Reinforced uniqueness validation to prevent role cross-contamination.
+*   **Resolved**: Implemented R975 strict alphanumeric Regex for IDs. Added automatic storage sanitization on app launch.
 
 ### 🛠 Instructions for Resumption
-1.  **Verification**: Deploy **v8.9.99**. The app will automatically clear the "pm clear" ID upon launch.
-2.  **Validation**: Verify that the Tracker can now communicate with the Viewer using a valid alphanumeric ID.
-3.  **UI Audit**: Check `issues.md` #042 regarding the lack of a "Sanitization Alert" notification for the user when a reset occurs.
+1.  **Verification**: Deploy **v8.9.99**. The app will automatically execute the schema harmonization and clear any corrupted identities.
+2.  **Database Audit**: Inspect Logcat for "Room migration successful" to confirm the v53 transition.
+3.  **UI Feedback**: Future work identified in #042 (Sanitization Visibility) and #039 (Identity Rejection Feedback).
