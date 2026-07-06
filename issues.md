@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.1.1)
+# Project Issues & Hardening Tracking (v9.1.2)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
@@ -44,11 +44,11 @@ This document tracks active issues, technical debt, and pending validation tasks
 
 ---
 
-## 🟢 Recently Resolved Issues (v9.1.1)
+## 🟢 Recently Resolved Issues (v9.1.2)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
-| **#042** | **Identity Mismatch (Viewer/Tracker ID)** | **Resolved**. Enforced refined `viewerId` locking (R982) in `SignalingValidator` and `CommunicationManager`. Implemented "Lock-on-Non-Default" logic to support first-time pairing while ensuring strict peer authorization for established links. |
+| **#042** | **Identity Mismatch (Viewer/Tracker ID)** | **Resolved**. Enforced refined `viewerId` locking (R982) in `SignalingValidator` and `CommunicationManager`. Implemented "Lock-on-Non-Default" logic to support first-time pairing. Fixed critical peer ID resolution bug in `RemoteHandler` ensuring correct ID reflection/adoption. |
 
 ---
 

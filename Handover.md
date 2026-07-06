@@ -1,20 +1,23 @@
-# Forensic Handover - v9.1.1 (Identity Locking Refinement)
+# Forensic Handover - v9.1.2 (Identity Adoption & Locking)
 
-## 📌 Status: Stable / Build PASS / Identity Lock Refined
-This cycle refines R982: Identity Locking to support first-time pairing while maintaining peer-to-peer security.
+## 📌 Status: Stable / Build PASS / Identity Adopting
+This cycle completes R982: Identity Locking and ensures the Tracker correctly reflects the Viewer ID during initial pairing.
 
-### 🟢 Completed: Requirement R982 Refinement (Lock-on-Non-Default)
-*   **Signaling Guard**: 
-    *   Updated `SignalingValidator` in `:core:engine` to allow packets if the tracker is in the "Default/Unlocked" state (Viewer ID = "V").
-    *   Once a non-default `viewerId` is adopted, the tracker transitions to a "Locked" state, exclusively processing packets from that ID.
+### 🟢 Completed: Requirement R982 Finalization (ID Reflection)
+*   **Peer ID Resolution**: 
+    *   Fixed `RemoteHandler.kt` to extract sender identity from `viewer_id` field when in Tracker mode. This enables the Tracker to "see" the Viewer's ID and adopt it.
+*   **Signaling Guard (Refined)**: 
+    *   Implemented "Lock-on-Non-Default" logic in `SignalingValidator`. Trackers are unlocked when `viewerId == "V"`.
 *   **Communication Hardening**:
-    *   Applied "Default Relaxation" to `CommunicationManager` pulse and ping handlers.
-    *   Ensured trackers can still "adopt" the first valid viewer pulse they receive.
-*   **Documentation**:
-    *   Updated `requirements_sot.md` to reflect the refined R982 behavioral authority.
-    *   Resolved the pairing regression identified during v9.1.0 testing.
+    *   Applied refined validation to `CommunicationManager`.
+    *   Fixed binary telemetry mapping bug (`lastDiscTs`).
+*   **Verification**:
+    *   Added unit tests in `SignalingTest.kt` for adoption and locking.
+    *   Resolved Issue #042 (Identity Reflection/Mismatch).
+
+### 🟢 Completed: Requirement R799e (JD Vivid Migration)
+*   **Color System Update**: Migrated Tracker identity to JD Vivid Green (#78BE20).
 
 ### 🛠 Instructions for Resumption
-1.  **Pairing Verification**: Perform a fresh install and verify the Tracker correctly adopts a custom Viewer ID on the first pulse.
-2.  **Lock Verification**: Once paired, verify the Tracker ignores a third-party Viewer attempting to send commands with a different ID.
-3.  **Audit**: Review `CommunicationManager` for any remaining legacy ID checks that bypass the `SignalingValidator`.
+1.  **Reflection Verification**: Start a fresh Tracker (ID "V"). Send a pulse from a Viewer (ID "MyPhone"). Verify the Tracker's settings now show "MyPhone".
+2.  **Security Audit**: Once paired, attempt to send a command from a different Viewer ID and verify it is rejected in logcat.

@@ -16,12 +16,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * v9.1.2:
+ * - Issue #042 Fix: Corrected peer ID resolution. Tracker mode now extracts sender 
+ *   identity from 'viewer_id' field to ensure correct ID reflection/adoption.
  * v8.9.91:
  * - Issue #029: Telemetry Stale Badge Fix. Explicitly setting 'ts' field in LocationUpdate 
  *   to 'now' to ensure DAT badge turns green on packet arrival even without fresh GPS fix.
- * v8.9.77:
- * - Issue #018: Stationary Anchor Hard-Lock. Added isTrackerAnchorLocked 
- *   propagation for forensic audit transparency.
  */
 class RemoteHandler(
     private val context: Context,
@@ -280,10 +280,18 @@ class RemoteHandler(
 
     fun handleRemoteUpdate(data: JSONObject, isTrackerMode: Boolean) {
         val fromId = data.optString("id")
+        val fromViewerId = data.optString("viewer_id")
         val fromViewer = data.optBoolean("from_viewer", false) 
         val type = data.optString("type", "")
         val now = timeProvider.currentTimeMillis()
         val nowRealtime = timeProvider.elapsedRealtime()
+
+        // Fix #042 Peer ID resolution: Tracker mode needs viewer_id, Viewer mode needs tracker (id)
+        val pulseId = if (isTrackerMode) {
+             fromViewerId.ifEmpty { fromId }
+        } else {
+             fromId
+        }
 
         if (isTrackerMode && fromViewer && type == "calibrate_chair") {
             locationProcessor.resetChairBaseline()
@@ -298,7 +306,7 @@ class RemoteHandler(
                 Toast.makeText(context, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show()
             }
 
-            onPulse(fromId)
+            onPulse(pulseId)
             lastPeerActivityTs = nowRealtime
             return
         }
@@ -316,7 +324,7 @@ class RemoteHandler(
                     val ts = data.optLong("settings_ts", 0L)
                     
                     repository.saveHomePoints(newList, if (maxDist > 0) maxDist else null, if (ts > 0) ts else null)
-                    onPulse(fromId)
+                    onPulse(pulseId)
                     lastPeerActivityTs = nowRealtime
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
@@ -328,10 +336,10 @@ class RemoteHandler(
 
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
             if (isTrackerMode && fromViewer) {
-                onPulse(fromId)
+                onPulse(pulseId)
                 lastPeerActivityTs = nowRealtime
             } else if (!isTrackerMode && !fromViewer) {
-                onPulse(fromId)
+                onPulse(pulseId)
                 lastPeerActivityTs = nowRealtime
                 isTrackerConnected = true
             }
@@ -339,7 +347,7 @@ class RemoteHandler(
         }
 
         if (isTrackerMode && fromViewer) {
-            onPulse(fromId)
+            onPulse(pulseId)
             lastPeerActivityTs = nowRealtime
             return
         }
@@ -351,7 +359,7 @@ class RemoteHandler(
             }
             if (remoteTs > 0) lastRemotePacketTs = remoteTs
 
-            onPulse(fromId)
+            onPulse(pulseId)
             lastPeerActivityTs = nowRealtime
             isTrackerConnected = true
             
