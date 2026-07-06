@@ -18,12 +18,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v9.0.2:
+ * - R951: Implemented GPS Stability Audit for Viewer local GPS.
+ * - R951: Set VIEWER_GPS_POLLING_MS to 1000L (Temporary).
  * v8.9.99:
  * - Issue #041: Identity Sanitization. Added strict validation to handleTrackerPulse 
  *   to prevent command injection or corruption from malformed peer pulses.
- * v8.9.88:
- * - Identity Persistence Fix: Corrected handleTrackerPulse to save to TRACKER_ID_KEY 
- *   instead of incorrectly overwriting the VIEWER_ID_KEY with the peer's identity.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -51,6 +51,12 @@ class ViewerService : BaseMonitorService() {
     private var lastKnownLocation: Location? = null
     private var lastProcessedLocation: LocationProcessor.ProcessedLocation? = null
     private var latestGnssDetail: GnssDetail? = null
+
+    // R951: Stability Audit State
+    private var lastGpsFixRealtime = 0L
+    private var stabilityAuditFixCount = 0
+    private var stabilityAuditViolationCount = 0
+    private var lastStabilityAuditTs = 0L
 
     private val localProcessorListener = object : LocationProcessorListener {
         override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean, accuracy: Double, maxAccuracy: Double) {
@@ -180,6 +186,20 @@ class ViewerService : BaseMonitorService() {
         val nowRealtime = timeProvider.elapsedRealtime()
         val nowWall = timeProvider.currentTimeMillis()
 
+        // R951: Stability Gap Detection (at 1Hz polling)
+        if (VIEWER_GPS_POLLING_MS == 1000L && lastGpsFixRealtime > 0) {
+            val gap = nowRealtime - lastGpsFixRealtime
+            stabilityAuditFixCount++
+            // Threshold for 1Hz is 1200ms (standard jitter allowance)
+            if (gap > 1200L) {
+                stabilityAuditViolationCount++
+                val proc = lastProcessedLocation
+                logManager.logServiceEvent("STABILITY GAP (V): ${gap}ms detected during 1Hz polling.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+            }
+        }
+        lastGpsFixRealtime = nowRealtime
+
         val processed = locationProcessor.processGpsPoint(
             lat = location.latitude,
             lng = location.longitude,
@@ -242,6 +262,8 @@ class ViewerService : BaseMonitorService() {
         sessionManager.reset()
         integrityMonitor.resetStats()
         forensicUseCase.resetLatches()
+        stabilityAuditFixCount = 0
+        stabilityAuditViolationCount = 0
         logManager.logServiceEvent("Session Terminated", false,
             lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
     }
@@ -283,6 +305,21 @@ class ViewerService : BaseMonitorService() {
 
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
+
+        // R951: Stability Audit Report
+        if (nowRealtime - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
+            if (stabilityAuditFixCount > 0) {
+                val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
+                if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
+                    val proc = lastProcessedLocation
+                    logManager.logServiceEvent("STABILITY AUDIT (V): Reliability ${String.format(Locale.getDefault(), "%.1f", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true,
+                        lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                }
+                stabilityAuditFixCount = 0
+                stabilityAuditViolationCount = 0
+            }
+            lastStabilityAuditTs = nowRealtime
+        }
 
         val isSocketConnected = networkManager.isConnected() && !transientDropDetected.getAndSet(false)
         networkManager.updateRelayStatus(isSocketConnected)

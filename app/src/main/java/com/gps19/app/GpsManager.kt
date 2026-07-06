@@ -22,11 +22,10 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Manages hardware GPS and GNSS status.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized averageSnr and samples to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
- * v8.9.72:
- * - Issue #015: Hardened coroutine cancellation handling.
+ * v9.0.1:
+ * - Issue Fix: Removed setWaitForAccurateLocation(true) to prevent location suppression 
+ *   in poor signal environments. 
+ * - Added initial lastLocation delivery to speed up UI responsiveness.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -152,13 +151,24 @@ class GpsManager @Inject constructor(
             Timber.e(e, "GPS: Failed to register GNSS callback")
         }
 
+        // Try to send last known location immediately
+        fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
+            if (loc != null) {
+                Timber.d("GPS: Delivered initial lastLocation (Acc: ${loc.accuracy})")
+                trySend(loc)
+            }
+        }
+
         val locationJob = launch {
             pollIntervalFlow.flatMapLatest { interval ->
                 callbackFlow {
                     val fusedCallback = object : LocationCallback() {
                         override fun onLocationResult(result: LocationResult) {
                             try {
-                                result.lastLocation?.let { trySend(it) }
+                                result.lastLocation?.let { 
+                                    Timber.v("GPS: New location received (Acc: ${it.accuracy})")
+                                    trySend(it) 
+                                }
                             } catch (e: Exception) {}
                         }
                     }
@@ -166,11 +176,12 @@ class GpsManager @Inject constructor(
                     val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval)
                         .setMinUpdateIntervalMillis(interval / 2)
                         .setMinUpdateDistanceMeters(0.0f)
-                        .setWaitForAccurateLocation(true)
+                        .setWaitForAccurateLocation(false) // Changed from true to ensure we get some location even if accuracy isn't perfect yet
                         .build()
 
                     try {
                         fusedLocationClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper())
+                        Timber.d("GPS: Location updates requested at ${interval}ms interval")
                     } catch (e: Exception) {
                         if (e is CancellationException) throw e
                         Timber.e(e, "CRITICAL: GPS Request failed")
