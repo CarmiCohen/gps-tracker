@@ -18,6 +18,8 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v9.0.3:
+ * - Issue #029: Fixed grayed-out viewer line by propagating local telemetry to repository.
  * v9.0.2:
  * - R951: Implemented GPS Stability Audit for Viewer local GPS.
  * - R951: Set VIEWER_GPS_POLLING_MS to 1000L (Temporary).
@@ -223,6 +225,27 @@ class ViewerService : BaseMonitorService() {
         
         lastKnownLocation = location
         lastProcessedLocation = processed
+
+        repository.updateLocation(LocationUpdate(
+            lat = location.latitude,
+            lng = location.longitude,
+            alt = location.altitude,
+            speed = location.speed.toDouble(),
+            accuracy = location.accuracy.toDouble(),
+            bearing = location.bearing.toDouble(),
+            battery = integrityMonitor.getBatteryLevel(),
+            temp = integrityMonitor.batteryTemp,
+            isCharging = integrityMonitor.isCharging,
+            gpsTs = location.time,
+            ts = nowWall,
+            isMe = true,
+            satsView = gpsManager.satellitesInView,
+            satsUsed = location.extras?.getInt("satellites") ?: gpsManager.satellitesUsed,
+            maxAccuracy = processed.maxAccuracy,
+            currentMa = integrityMonitor.getBatteryCurrent(),
+            lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
+            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
+        ))
 
         val trackerAnchor = object : SpatialAnchor {
             override val lat = remoteHandler.trackerLat
