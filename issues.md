@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.1.2)
+# Project Issues & Hardening Tracking (v9.1.4)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending validation tasks
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 High | 1 |
 | **Validation Tasks** | 🟡 Pending | 11 |
-| **Resolved (Total)** | 🟢 Progress | 56 |
+| **Resolved (Total)** | 🟢 Progress | 57 |
 
 ---
 
@@ -41,6 +41,14 @@ This document tracks active issues, technical debt, and pending validation tasks
 | **#034** | **Sensor Stability** | Verify long-term stability of the `AppSensorThread`. |
 | **#035** | **Stationary Scaling** | Confirm `PROXIMITY_STARY_SCALING_MS_PER_HOUR` correctly scales skepticism. |
 | **#027** | **Identity Persistence Stability** | Verify that the Viewer identity ("V") remains stable during prolonged tracking sessions with frequent peer reconnects (v8.9.98). |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.1.4)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#045** | **Android 15 Background FGS Hardening** | **Resolved**. Implemented state-aware foreground service type enforcement. Prevents `SecurityException` on Android 15 (SDK 35) by restricting `MICROPHONE` type to foreground/pulsed states only. Fallback to `LOCATION` for background starts (WorkManager/Boot). |
 
 ---
 

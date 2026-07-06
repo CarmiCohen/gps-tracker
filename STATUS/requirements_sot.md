@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v9.1.2
+# System Source of Truth (SoT) - v9.1.4
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
@@ -11,6 +11,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Service Launch Integrity (R926)**: The system enforces a mandatory **2,000ms delay** during session auto-transitions before launching background services. (Issue #320)
 *   **Log Spillage Remediation (Issue #005)**: The system mandates a static User Agent and **manually defined storage paths** for third-party libraries (e.g., osmdroid). Path assignment MUST be synchronous during application initialization to prevent repetitive `getPackageName()` system logcat spam on Samsung G990/A155 devices. (v8.9.91)
 *   **Time Integrity**: All alarm evaluations and hardware latches use monotonic time via `TimeProvider.elapsedRealtime()`. (Issue #311 / Issue #441)
+*   **Foreground Service Hardening (R983)**: The system strictly enforces state-aware foreground service types. On Android 15 (SDK 35), the `MICROPHONE` type is exclusively requested when the app is in the foreground or recently pulsed (`isRecentUiPulse()`). Background starts (Boot/WorkManager) are restricted to `LOCATION` to prevent `SecurityException`. (Issue #045 / v9.1.4)
 *   **Foreground Service Transition (R967)**: The system maintains a **45-second "Recent UI Pulse" window** (`UI_PULSE_TIMEOUT_MS`) to bridge Android 14+ `MICROPHONE` type transitions. (Issue #025 / v8.9.86)
 *   **Type Safety Authority**: All telemetry fields (Accuracy, Speed, Bearing, Sensor Indices) are standardized to `Double` across the entire chain (Engine, App, Room). (Issue #014 / v8.9.75)
 *   **Data Persistence Integrity (R968)**: All changes to Protobuf schemas must preserve binary compatibility. Migration from legacy types must use new field tags and explicit `DataMigration` logic. (Issue #023 / v8.9.84)

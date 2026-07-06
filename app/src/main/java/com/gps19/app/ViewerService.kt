@@ -18,14 +18,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v9.1.4:
+ * - Issue #045: Android 15 FGS Hardening. Background starts restricted to LOCATION type 
+ *   to avoid SecurityException.
  * v9.0.3:
  * - Issue #029: Fixed grayed-out viewer line by propagating local telemetry to repository.
- * v9.0.2:
- * - R951: Implemented GPS Stability Audit for Viewer local GPS.
- * - R951: Set VIEWER_GPS_POLLING_MS to 1000L (Temporary).
- * v8.9.99:
- * - Issue #041: Identity Sanitization. Added strict validation to handleTrackerPulse 
- *   to prevent command injection or corruption from malformed peer pulses.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -455,7 +452,6 @@ class ViewerService : BaseMonitorService() {
         isTrackerGap: Boolean,
         isTrackerConnected: Boolean
     ) {
-        val proc = lastProcessedLocation
         val isSocketConnected = networkManager.isConnected()
         
         alarmEvalJob?.cancel()

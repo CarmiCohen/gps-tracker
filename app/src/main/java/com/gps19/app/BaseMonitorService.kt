@@ -20,11 +20,12 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * v9.1.4:
+ * - Issue #045: Android 15 Foreground Service Hardening. Implemented state-aware 
+ *   type enforcement to prevent SecurityException on background starts.
  * v8.9.89:
  * - Issue #005 Hardening: Added cachedPkgName to prevent repetitive getPackageName() 
  *   system log spam on Samsung G990/A155 devices.
- * v8.9.72:
- * - Issue #019: Added isRecentUiPulse() to bridge Android 14+ FGS transition windows.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {

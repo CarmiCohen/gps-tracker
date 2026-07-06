@@ -21,15 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v9.1.4:
+ * - Fix: Android 15 FGS Hardening. Only requests MICROPHONE type if recently pulsed 
+ *   from UI to prevent SecurityException on background start (Issue #045).
  * v9.1.3:
  * - Fix: Propagate local telemetry to repository in onLocationChanged. This 
  *   ensures HUD satellite/age data is visible while in Tracker mode.
- * v8.9.99:
- * - Issue #041: Identity Hardening. Added strict validation to handleViewerPulse 
- *   to prevent command injection or corruption from malformed peer pulses.
- * v8.9.94:
- * - Issue #038: Implemented Adaptation Muzzle for A15. Triggers a 5s settling 
- *   window during GPS polling transitions to suppress trajectory jumps.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -311,7 +308,9 @@ class TrackerService : BaseMonitorService() {
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val hasMicPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-            if (hasMicPermission && (isRecentUiPulse() || sensorManager.isAcousticMonitoringActive())) {
+            // Android 14+ Hardening: Only request MICROPHONE type if recently pulsed from UI.
+            // This prevents SecurityException when starting from background (e.g. WorkManager/Boot).
+            if (hasMicPermission && isRecentUiPulse()) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE 
             }
         }
