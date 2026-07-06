@@ -20,6 +20,10 @@ import com.gps19.core.engine.*
 
 /**
  * LandingComponents: Initial role selection screens.
+ * v9.1.0:
+ * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
+ * v9.0.4:
+ * - R799d: Changed Viewer color to ViewerCyan.
  * v8.9.40:
  * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
  * Extracted from OverlayComponents for Issue 115 modularization.
@@ -30,7 +34,7 @@ fun LandingScreen(onMode: (String) -> Unit) {
     val versionDisplay = BuildConfig.VERSION_NAME
     Column(modifier = Modifier.fillMaxSize().background(Slate950).statusBarsPadding().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.weight(1f)); LandingButton(stringResource(R.string.landing_tracker_title), stringResource(R.string.landing_tracker_subtitle), Icons.Default.Agriculture, BrandJd) { onMode("tracker") }
-        Spacer(Modifier.height(24.dp)); LandingButton(stringResource(R.string.landing_viewer_title), stringResource(R.string.landing_viewer_subtitle), Icons.Default.Person, ViewerOrange) { onMode("viewer") }
+        Spacer(Modifier.height(24.dp)); LandingButton(stringResource(R.string.landing_viewer_title), stringResource(R.string.landing_viewer_subtitle), Icons.Default.Person, ViewerCyan) { onMode("viewer") }
         Spacer(Modifier.weight(1.2f)); Text(versionDisplay, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
     }
 }

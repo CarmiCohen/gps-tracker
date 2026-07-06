@@ -44,6 +44,8 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v9.0.4:
+ * - R799d: Changed Viewer color to ViewerCyan.
  * v8.9.91:
  * - R924: Added HeaderBarPreview for Forensic Sunset verification.
  * v8.9.89:
@@ -510,7 +512,7 @@ fun StatusBar(
             if (isLandscape && mode == "viewer") {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                     val vAge = now - viewerGpsTs
-                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerOrange, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = if(viewerGpsTs > 0) vAge else -1L, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = isLocalTelemetryFresh) }
+                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = if(viewerGpsTs > 0) vAge else -1L, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = isLocalTelemetryFresh) }
                     
                     val tAge = now - lastGpsTs
                     Box(modifier = Modifier.weight(1f)) { StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = isTelemetryFresh) }
@@ -518,7 +520,7 @@ fun StatusBar(
             } else {
                 if (mode == "viewer") {
                     val vAge = now - viewerGpsTs
-                    StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerOrange, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = if(viewerGpsTs > 0) vAge else -1L, horizontalPadding = 8.dp, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = isLocalTelemetryFresh)
+                    StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = if(viewerGpsTs > 0) vAge else -1L, horizontalPadding = 8.dp, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = isLocalTelemetryFresh)
                     Spacer(Modifier.height(3.dp))
                 }
                 val trkColor = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd

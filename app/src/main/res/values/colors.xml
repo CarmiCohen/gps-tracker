@@ -1,16 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- R865/R866 [Active]: Unified Identity Green -->
-    <!-- Supersedes R851a (Lime) and R815 (Teal) -->
-    <color name="brand_jd">#367C2B</color>
-    <color name="role_tracker">#367C2B</color>
+    <!-- R799e [Active]: JD Vivid Green -->
+    <!-- Supersedes R865/R866 authoritative green for digital vibrancy -->
+    <color name="brand_jd_vivid">#78BE20</color>
+    <color name="brand_jd">#78BE20</color>
+    <color name="role_tracker">#78BE20</color>
 
-    <!-- Theme Colors (Restored for AppTheme compatibility) -->
-    <color name="colorPrimary">#367C2B</color>
-    <color name="colorPrimaryDark">#2E6423</color>
-    <color name="colorAccent">#F97316</color>
+    <!-- Theme Colors -->
+    <color name="colorPrimary">#78BE20</color>
+    <color name="colorPrimaryDark">#367C2B</color> <!-- Keep legacy as dark variant -->
+    <color name="colorAccent">#06B6D4</color>
 
-    <color name="role_viewer">#F97316</color>
+    <!-- R799d: Viewer color changed to Cyan -->
+    <color name="role_viewer">#06B6D4</color>
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>

@@ -1,5 +1,19 @@
 # Issues Archive (Historical Resolutions)
 
+## Hardening Phase: v8.9.96 Resolved Items
+*   **Issue #030**: Proto Schema Discrepancy. Audited and confirmed `app/src/main/proto` as the authoritative schema path. Formalized R973 to prevent split-brain updates. (v8.9.96)
+*   **Issue #032**: UI Refresh Consistency. Implemented `isForensicFresh` gate in `DashboardUseCase` using `WATCH_DOG_UI_GRACE_MS` (15s). Applied to `Prox Debounce`, `Rolling Vibe`, and `Chair Forensics`. (v8.9.96)
+
+## Hardening Phase: v8.9.94 Resolved Items
+*   **Issue #038**: Adaptation Instability. Implemented a 5s "Adaptation Muzzle" in `TrackerService` triggered by GPS polling changes on A15 to prevent trajectory jumps during filter settling. (v8.9.94)
+*   **Issue #037**: Viewer Display State Spam. Added `DisplayListener` to `AppSensorManager` to detect rapid toggling. Suppressed virtual proximity triggers during Samsung AOD cycles. (v8.9.94)
+*   **Issue #036**: A15 Behavioral Flickering. Introduced A15-specific hardened thresholds for sensor mismatch (5.0 m/s) and visual jitter (25m) in `EngineConstants.kt`. (v8.9.94)
+
+## Hardening Phase: v8.9.91 - v8.9.88 Resolved Items
+*   **Issue #005**: Log Spillage Hardening. Moved osmdroid configuration to a synchronous block in `GpsApplication` to preempt discovery-driven log bursts. (v8.9.91)
+*   **Issue #028**: R924 Sunset Failure. Verified `HeaderBar` code is purged of legacy `VID_NOTES` identifiers in v8.9.91. (v8.9.89)
+*   **Issue #027**: Persistent Viewer ID Reversion. Initial logic fix in `ViewerService.handleTrackerPulse`. (v8.9.88)
+
 ## Hardening Phase: v8.9.87 Resolved Items
 *   **Issue #005**: Map Provider Log Spillage. Hardened remediation by forcing a static user agent string ("GpsTracker/8.9.87") in `GpsApplication`. This eliminates repetitive `getPackageName()` calls that triggered system log spam on Samsung devices. (v8.9.87)
 *   **Issue #026**: Viewer ID Identity Reversion. Fixed logic error in `SettingsRepository` where `viewerIdFlow` incorrectly defaulted to Tracker ID ("T"). Corrected `commitDraftSettings` to properly apply `draftRelayUrl` and ensured uniqueness checks do not collide on empty draft fields. (v8.9.87)

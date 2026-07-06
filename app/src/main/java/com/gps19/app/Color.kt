@@ -5,25 +5,26 @@ import androidx.compose.ui.graphics.Color
 /**
  * R799: New Color System.
  * Decouples Role Identity from Semantic Status.
+ * v9.1.0:
+ * - R799e [Active]: JD Vivid Green (#78BE20) introduced as primary branding.
+ * v9.0.4:
+ * - R799d: Changed Viewer color to Cyan (#06B6D4) from Orange.
  * v8.9.40:
  * - R865/R866 [Active]: Unified Identity Green (#367C2B) enforced as Tracker Primary.
  * v8.8.3:
  * - R866 [Active]: Added BrandJd (#367C2B) to synchronize with colors.xml.
- * v5.851a:
- * - R851a [Superseded]: Restored Tracker to Green (Lime 500) - Replaced by R865.
- * v5.625:
- * - R815 [Superseded]: Swapped Role Identity Colors - Replaced by R851a.
  */
 
 const val FORENSIC_PINK_COLOR = 0xFFF472B6.toInt()
 
 // Brand Colors
-val BrandJd = Color(0xFF367C2B)     // JD Branding Green (R866) - Authority for R865
-val BrandJdDark = Color(0xFF2B6222) // Darker variant for UI depth
+val BrandJdVivid = Color(0xFF78BE20) // JD Vivid Green (R799e)
+val BrandJd = BrandJdVivid           // Current Brand Authority
+val BrandJdDark = Color(0xFF367C2B)  // Legacy Green (#367C2B) preserved for depth
 
 // Role Colors (Identity)
-val ViewerOrange = Color(0xFFF97316)     // Orange 500 (Viewer Role primary)
-val ViewerOrangeDark = Color(0xFFEA580C) // Orange 600
+val ViewerCyan = Color(0xFF06B6D4)     // Cyan 500 (Viewer Role primary) (R799d)
+val ViewerCyanDark = Color(0xFF0891B2) // Cyan 600
 
 val Lime500 = Color(0xFF84CC16)   // Lime 500 (Legacy Tracker Role primary - Superseded by BrandJd)
 val Lime600 = Color(0xFF65A30D)

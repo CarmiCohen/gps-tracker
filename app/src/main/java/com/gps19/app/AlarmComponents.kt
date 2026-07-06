@@ -27,6 +27,10 @@ import com.gps19.core.engine.*
 
 /**
  * AlarmComponents: Overlay for active alarm states and sirens.
+ * v9.1.0:
+ * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
+ * v9.0.4:
+ * - R799d: Changed Viewer color to ViewerCyan.
  * v8.9.48:
  * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
  *   BrandJd (#367C2B) in resolved alarm status and secure state indicators.
@@ -123,7 +127,7 @@ fun AlarmOverlay(
             if (!isMuted && isSirenPlaying) {
                 Button(onClick = onMute, modifier = Modifier.fillMaxWidth().height(75.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.White), shape = RoundedCornerShape(24.dp)) { Text(stringResource(R.string.btn_mute_siren), color = Rose500, fontSize = 24.sp, fontWeight = FontWeight.Bold) }
             } else {
-                Button(onClick = onGoToMap, modifier = Modifier.fillMaxWidth().height(85.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerOrange.copy(alpha = 0.2f)), shape = RoundedCornerShape(24.dp), border = BorderStroke(1.dp, ViewerOrange.copy(alpha = 0.5f))) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.Map, null, tint = ViewerOrange, modifier = Modifier.size(28.dp)); Text(stringResource(R.string.btn_go_to_map), color = ViewerOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold) } }
+                Button(onClick = onGoToMap, modifier = Modifier.fillMaxWidth().height(85.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.2f)), shape = RoundedCornerShape(24.dp), border = BorderStroke(1.dp, ViewerCyan.copy(alpha = 0.5f))) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.Map, null, tint = ViewerCyan, modifier = Modifier.size(28.dp)); Text(stringResource(R.string.btn_go_to_map), color = ViewerCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold) } }
             }
             Spacer(Modifier.height(8.dp))
         }

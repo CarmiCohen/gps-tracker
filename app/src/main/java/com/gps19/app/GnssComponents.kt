@@ -25,6 +25,8 @@ import java.util.*
 
 /**
  * GnssComponents: Detailed satellite signal and constellation visualization.
+ * v9.1.0:
+ * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
  * v8.9.40:
  * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
  * Extracted from OverlayComponents for Issue 115 modularization.

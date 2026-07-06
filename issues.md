@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v8.9.99+)
+# Project Issues & Hardening Tracking (v9.1.0)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
@@ -6,8 +6,8 @@ This document tracks active issues, technical debt, and pending validation tasks
 | Category | Status | Count |
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 High | 1 |
-| **Validation Tasks** | 🟡 Pending | 11 |
-| **Resolved (Total)** | 🟢 Progress | 47 |
+| **Validation Tasks** | 🟡 Pending | 10 |
+| **Resolved (Total)** | 🟢 Progress | 55 |
 
 ---
 
@@ -35,12 +35,35 @@ This document tracks active issues, technical debt, and pending validation tasks
 | **#037** | **G990E Display Muzzle** | Verify Viewer telemetry remains silent during G990E AOD transitions. |
 | **#038** | **Adaptation Settling** | Monitor logcat for "Settling A15 Polling..." messages during movement start. |
 | **#005** | **Log Spillage Hardening** | Confirm logcat is silent on G990/A155 regarding `getPackageName` spam. |
-| **#029** | **Telemetry Health (DAT)** | Confirm `DAT` badge turns green on A155 tracker once a stable GPS fix is acquired. |
 | **#025** | **Transition Verification** | Perform unattended physical tamper tests to verify FGS type escalation on Android 14+. |
 | **#033** | **Proto Precision Upgrade** | Verify existing `max_distance` and `max_accuracy` values are correctly interpreted in UI. |
 | **#034** | **Sensor Stability** | Verify long-term stability of the `AppSensorThread`. |
 | **#035** | **Stationary Scaling** | Confirm `PROXIMITY_STARY_SCALING_MS_PER_HOUR` correctly scales skepticism. |
 | **#027** | **Identity Persistence Stability** | Verify that the Viewer identity ("V") remains stable during prolonged tracking sessions with frequent peer reconnects (v8.9.98). |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.1.0)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **R799e** | **JD Vivid Green Branding** | **Resolved**. Migrated all Tracker-role and primary branding indicators to JD Vivid Green (#78BE20). Updated `Color.kt`, `colors.xml`, and branding documentation. |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.0.4)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **R799d** | **Viewer Color Change** | **Resolved**. Migrated all Viewer-role identity indicators from Orange to Cyan (#06B6D4) system-wide. Updated `Theme.kt`, `Color.kt`, `colors.xml`, and all UI components (`Map`, `Settings`, `Log`, `Dashboard`, `Landing`, `Alarm`). |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.0.3)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#029** | **Viewer Status Line Grayed-Out** | **Resolved**. Updated `ViewerService.kt` to propagate local `LocationUpdate` telemetry to the repository. Ensures the monitoring device's local status remains active and fresh in the UI. |
 
 ---
 
@@ -85,4 +108,4 @@ This document tracks active issues, technical debt, and pending validation tasks
 | :--- | :--- | :--- |
 | **#005** | **Log Spillage Hardening** | **Resolved**. Moved osmdroid configuration to a synchronous block in `GpsApplication` to preempt discovery-driven log bursts. |
 | **#028** | **R924 Sunset Failure** | **Resolved**. Verified `HeaderBar` code is purged of legacy `VID_NOTES` identifiers in v8.9.91. |
-| **#027** | **Persistent Viewer ID Reversion** | **Resolved (Partial)**. Initial logic fix in `ViewerService.handleTrackerPulse`. (Fully hardened in v8.9.98). |
+| **#027** | **Persistent Viewer ID Reversion** | **Resolved**. Fixed logic in `ViewerService.handleTrackerPulse` (v8.9.88). |

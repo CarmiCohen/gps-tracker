@@ -26,6 +26,8 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * v9.0.4:
+ * - R799d: Changed Viewer color to ViewerCyan.
  * v8.9.78:
  * - Issue #018: Stationary Anchor Hard-Lock. Added visual indicator to LegacyDashboardGrid.
  * v8.9.55:
@@ -195,7 +197,7 @@ fun LegacyDashboardGrid(
             val vwrAccDisplay = if (isViewer) "${d.viewerAccuracy} (${d.viewerMaxAcc})" else ""
 
             InfoRow(leftVal = d.satsIndex, leftLabel = "Satellites Index", leftColor = if(!d.isGpsFresh) Slate500 else if(d.isSatsIndexWarning) Rose500 else Color.White, rightVal = trkAccDisplay, rightLabel = "Tr Accuracy", rightColor = gpsColor)
-            InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerOrange, rightVal = "%.2f".format(Locale.getDefault(), gpsIdx.ageIndex), rightLabel = "Age Index", rightColor = if(!d.isGpsFresh) Slate500 else Amber500)
+            InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerCyan, rightVal = "%.2f".format(Locale.getDefault(), gpsIdx.ageIndex), rightLabel = "Age Index", rightColor = if(!d.isGpsFresh) Slate500 else Amber500)
             InfoRow(leftVal = "%.2f".format(Locale.getDefault(), gpsIdx.accIndex), leftLabel = "Acc Index", leftColor = if(!d.isGpsFresh) Slate500 else Color.White, rightVal = d.snr, rightLabel = "Avg SNR", rightColor = if(!d.isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = onShowGnssDetail)
 
             Spacer(Modifier.height(6.dp)); HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp); Spacer(Modifier.height(6.dp))
@@ -227,7 +229,7 @@ fun LegacyDashboardGrid(
                 }
             }
             
-            InfoRow(leftVal = d.trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!d.isTelemetryFresh) Slate500 else BrandJd, rightVal = if (isViewer) d.viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerOrange)
+            InfoRow(leftVal = d.trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!d.isTelemetryFresh) Slate500 else BrandJd, rightVal = if (isViewer) d.viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerCyan)
 
             Spacer(Modifier.height(6.dp)); HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp); Spacer(Modifier.height(6.dp))
 

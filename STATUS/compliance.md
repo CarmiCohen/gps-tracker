@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v8.9.99
+# Compliance & Operational Requirements (Audit Baseline) - v9.1.0
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -14,10 +14,12 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R325** | **Authoritative Spatial Anchoring**: `maxAccuracy` is the exclusive authority. Layout optimized for narrow devices. | **Verified (v8.9.65)** |
 | **R332** | **Adaptive Jump Confidence**: High-SNR/Zero-Vibe reflection detection with 6-minute hold. | **Verified (v8.9.55)** |
 | **R334** | **Uncertainty Hindsight**: Linear interpolation of accuracy during path reconstruction. | **Verified (v8.9.52)** |
-| **R338** | **Ghost Mode UI Staleness**: Visual staleness indicators (dimming) applied at 35s. | **Verified (v8.9.62)** |
+| **R338** | **Ghost Mode UI Staleness**: Visual staleness indicators (dimming) applied at 35s. | **Verified (v9.0.3)** |
 | **R441** | **Siren Timing Integrity**: Monotonic silence latches and 30s hardware protection auto-stop. | **Verified (v8.9.52)** |
 | **R460** | **Bayesian Uncertainty Expansion**: Dynamic growth (up to 33.3m/s) during fix gaps. | **Verified (v8.9.52)** |
 | **R747** | **Standardized Alert Titles**: Localized "This device" and simplified "Device" subtitles. | **Verified (v8.9.51)** |
+| **R799d** | **Viewer Identity Color**: Viewer role identity color changed to Cyan (#06B6D4) system-wide. | **Verified (v9.0.4)** |
+| **R799e** | **JD Vivid Green Branding**: Tracker branding migrated to JD Vivid Green (#78BE20). | **Verified (v9.1.0)** |
 | **R810-A15**| **A15 High-Noise Profile**: Hardened sensor gates and vibration coherence. | **Verified (v8.9.94)** |
 | **R832** | **Chair Sit Detection Engine**: Multi-sensor fusion (tilt/vibration/baro) for occupancy detection. | **Verified (v8.9.40)** |
 | **R917** | **Update Smoothness**: Infrastructure for session recovery after package updates. | **Verified (v8.9.36)** |
@@ -34,13 +36,10 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v8.9.99)
-*   **FIXED Issue #041: Identity Sanitization Hardening** - Resolution: Implemented R975 (Regex: `^[a-zA-Z0-9_-]{1,32}$`). Hardened `TrackerService`, `ViewerService`, and `AppNetworkManager` to reject malformed pulses. Added `identitySanitizationMigration` in `SettingsRepository` to automatically purge corrupted IDs from storage.
+### 2.1. Hardening Phase Resolutions (v9.1.0)
+*   **FIXED R799e: JD Vivid Green Branding** - Resolution: Migrated all Tracker-role and primary branding indicators to JD Vivid Green (#78BE20). Updated `Color.kt`, `colors.xml`, and branding documentation.
 
-### 2.2. Hardening Phase Resolutions (v8.9.98)
-*   **FIXED Issue #027: Identity Persistence Hardening** - Resolution: Reinforced `MainRepository.saveSettingsBulk` with atomic uniqueness validation to prevent identity cross-contamination.
-
-### 2.3. Hardening Phase Resolutions (v8.9.96)
-*   **FIXED Issue #030: Proto Schema Discrepancy** - Resolution: Audited and formalized `app/src/main/proto` as the authoritative path.
+### 2.2. Hardening Phase Resolutions (v9.0.4)
+*   **FIXED R799d: Viewer Branding Migration** - Resolution: Migrated all Viewer-role identity indicators from Orange to Cyan (#06B6D4). Updated `Theme.kt`, `Color.kt`, and all UI components.
 
 **Full history available in [issues_archive.md](issues_archive.md).**

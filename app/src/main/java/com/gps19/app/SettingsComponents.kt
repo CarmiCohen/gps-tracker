@@ -26,11 +26,13 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * v9.1.0:
+ * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
+ * v9.0.4:
+ * - R799d: Changed Viewer color to ViewerCyan.
  * v8.9.48:
  * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
  *   BrandJd (#367C2B) in headers and phone setup status indicators.
- * v8.9.40:
- * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
  */
 
 @Composable
@@ -72,16 +74,16 @@ fun SettingsOverlay(
                         value = uiState.draftSettings.viewerId, 
                         onValueChange = onUpdateViewerId, 
                         label = { Text(stringResource(R.string.settings_label_viewer_id), fontSize = 12.sp) }, 
-                        leadingIcon = { Icon(Icons.Default.Person, null, tint = ViewerOrange, modifier = Modifier.size(18.dp)) }, 
+                        leadingIcon = { Icon(Icons.Default.Person, null, tint = ViewerCyan, modifier = Modifier.size(18.dp)) }, 
                         modifier = Modifier.weight(1f), 
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ViewerOrange, 
-                            unfocusedBorderColor = ViewerOrange.copy(alpha = 0.5f), 
-                            focusedLabelColor = ViewerOrange, 
-                            unfocusedLabelColor = ViewerOrange.copy(alpha = 0.7f), 
-                            focusedTextColor = ViewerOrange, 
-                            unfocusedTextColor = ViewerOrange,
-                            cursorColor = ViewerOrange
+                            focusedBorderColor = ViewerCyan, 
+                            unfocusedBorderColor = ViewerCyan.copy(alpha = 0.5f), 
+                            focusedLabelColor = ViewerCyan, 
+                            unfocusedLabelColor = ViewerCyan.copy(alpha = 0.7f), 
+                            focusedTextColor = ViewerCyan, 
+                            unfocusedTextColor = ViewerCyan,
+                            cursorColor = ViewerCyan
                         ), 
                         singleLine = true, 
                         textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
@@ -93,11 +95,11 @@ fun SettingsOverlay(
                 Spacer(Modifier.height(24.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { viewModel?.onEvent(UiEvent.SetSubSettings(SubSettings.CLEAN)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteSweep, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clean)) }
-                    Button(onClick = onShowPhoneSetup, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerOrange.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.HelpCenter, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_phone_setup)) }
+                    Button(onClick = onShowPhoneSetup, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.HelpCenter, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_phone_setup)) }
                 }
                 Spacer(Modifier.height(16.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { viewModel?.onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerOrange.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
+                    Button(onClick = { viewModel?.onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
                     Button(onClick = { viewModel?.onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.Default.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
                 }
                 Spacer(Modifier.height(24.dp))
@@ -134,7 +136,7 @@ fun CleanSetupOverlay(uiState: MainUiState, onClear: (() -> Unit)?, onReset: (()
 fun AlertManagementOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSettings) -> Unit, onCalibrateChair: () -> Unit = {}, onClose: () -> Unit) {
     Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate900) {
         Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.alert_mgmt_title), color = ViewerOrange, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.alert_mgmt_title), color = ViewerCyan, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.height(16.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.alert_group_toggles), color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp); Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) { TextButton(onClick = { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(localInternet = true, serverConnection = true, relayConnection = true, jammerDetection = true, signalLoss = true, gpsStalling = true, distance = true, power = true, lowBattery = true, batteryHealth = true, highTemperature = true, longTimeGap = true, tamperAlert = true, tiltAlert = true, acousticAlert = true, liftAlert = true, chairOccupied = true, systemStorageLow = true)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_all_on), fontSize = 7.5.sp, color = BrandJd) }; TextButton(onClick = { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(localInternet = false, serverConnection = false, relayConnection = false, jammerDetection = false, signalLoss = false, gpsStalling = false, distance = false, power = false, lowBattery = false, batteryHealth = false, highTemperature = false, longTimeGap = false, tamperAlert = false, tiltAlert = false, acousticAlert = false, liftAlert = false, chairOccupied = false, systemStorageLow = false)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_reset), fontSize = 7.5.sp, color = Rose500) } } }
             
             Spacer(Modifier.height(8.dp)); SettingsGroupHeader(stringResource(R.string.alert_group_master), BrandJd)
@@ -148,7 +150,7 @@ fun AlertManagementOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSe
             AlarmToggle(ALERT_TITLE_SIGNAL_LOSS, uiState.draftSettings.alertSettings.signalLoss) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(signalLoss = it)) }
             AlarmToggle(ALERT_TITLE_JUMP_ALERT, uiState.draftSettings.alertSettings.jammerDetection) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(jammerDetection = it)) }
             
-            SettingsGroupHeader(stringResource(R.string.alert_group_location), ViewerOrange)
+            SettingsGroupHeader(stringResource(R.string.alert_group_location), ViewerCyan)
             AlarmToggle(ALERT_TITLE_TRACKER_GEOFENCE, uiState.draftSettings.alertSettings.distance) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(distance = it)) }
             AlarmToggle(ALERT_TITLE_GPS_STALL, uiState.draftSettings.alertSettings.gpsStalling) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(gpsStalling = it)) }
             AlarmToggle(ALERT_TITLE_TRACKER_GAP, uiState.draftSettings.alertSettings.longTimeGap) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(longTimeGap = it)) }
@@ -193,11 +195,11 @@ fun AlarmSoundOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSetting
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.sound_title), color = Violet500, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.height(24.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.sound_label_test_audio), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium); Button(onClick = onTestSiren, colors = ButtonDefaults.buttonColors(containerColor = BrandJd)) { Icon(if (uiState.isSirenPlaying) Icons.Default.Stop else Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(if (uiState.isSirenPlaying) stringResource(R.string.btn_test_audio_stop) else stringResource(R.string.btn_test_audio_test)) } }
             Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_type), Amber500); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { sirenOptions.forEach { type -> FilterChip(selected = uiState.selectedSirenType == type, onClick = { onUpdateSirenType(type) }, label = { Text(type) }) } }
-            Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_behaviors), ViewerOrange)
+            Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_behaviors), ViewerCyan)
             AlarmToggle(stringResource(R.string.sound_label_vibration), settings.vibrationEnabled) { onUpdateAlertSettings(settings.copy(vibrationEnabled = it)) }
             AlarmToggle(stringResource(R.string.sound_label_override_silent), settings.overrideSilence) { onUpdateAlertSettings(settings.copy(overrideSilence = it)) }
             AlarmToggle(stringResource(R.string.sound_label_force_max), settings.useMaxVolume) { onUpdateAlertSettings(settings.copy(overrideSilence = true, useMaxVolume = it)) }
-            Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_volume_mode), ViewerOrange); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { FilterChip(selected = !settings.useCustomVolume, onClick = { onUpdateAlertSettings(settings.copy(useCustomVolume = false)) }, label = { Text(stringResource(R.string.sound_val_system_control)) }); FilterChip(selected = settings.useCustomVolume, onClick = { onUpdateAlertSettings(settings.copy(useCustomVolume = true)) }, label = { Text(stringResource(R.string.sound_val_app_control)) }) }
+            Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_volume_mode), ViewerCyan); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { FilterChip(selected = !settings.useCustomVolume, onClick = { onUpdateAlertSettings(settings.copy(useCustomVolume = false)) }, label = { Text(stringResource(R.string.sound_val_system_control)) }); FilterChip(selected = settings.useCustomVolume, onClick = { onUpdateAlertSettings(settings.copy(useCustomVolume = true)) }, label = { Text(stringResource(R.string.sound_val_app_control)) }) }
             if (settings.useCustomVolume) { Spacer(Modifier.height(16.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_app_volume), Rose500); Slider(value = settings.alarmVolume, onValueChange = onUpdateAlarmVolume, valueRange = 0f..1f, modifier = Modifier.padding(horizontal = 8.dp), colors = SliderDefaults.colors(thumbColor = Rose500, activeTrackColor = Rose500)); Text(stringResource(R.string.sound_desc_app_volume, (settings.alarmVolume * 100).toInt(), if (settings.useMaxVolume) "(Max Overridden)" else ""), color = Slate500, fontSize = 11.sp) } else { Spacer(Modifier.height(8.dp)); Text(stringResource(R.string.sound_desc_system_volume), color = Slate500, fontSize = 11.sp) }
             Spacer(Modifier.height(48.dp))
         }
@@ -260,7 +262,7 @@ fun PhoneSetupOverlay(
                 }
             }
             if (!isTrackerMode) { Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step9_title), description = stringResource(R.string.setup_step9_desc), onClick = onGoToMap, buttonText = stringResource(R.string.btn_open_map), isCompleted = homePointsCount > 0, icon = Icons.Default.Map, reason = if (homePointsCount == 0) "Geofence: No Home Points defined" else null) }
-            Spacer(Modifier.height(32.dp)); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = onRefresh, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerOrange)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh)) }; Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm)) } }
+            Spacer(Modifier.height(32.dp)); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = onRefresh, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh)) }; Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm)) } }
             Spacer(Modifier.height(24.dp))
         }
     }

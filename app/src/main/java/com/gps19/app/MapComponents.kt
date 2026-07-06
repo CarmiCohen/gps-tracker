@@ -47,6 +47,8 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * v9.0.4:
+ * - R799d: Changed Viewer color to ViewerCyan.
  * v8.9.83:
  * - Issue #020: Remediated "Fighting" Centering Logic. 
  *   Added immediate local lock release to prevent LaunchedEffect from snapping 
@@ -99,7 +101,7 @@ fun AppMapContainer(
     
     val viewerLastValidFixRealtime = if (isTrackerMode) uiState.trackerLocation.lastValidFixRealtime else uiState.localLocation.lastValidFixRealtime
     val viewerLocationPending = if (isTrackerMode) uiState.trackerLocation.isLocationPending else uiState.localLocation.isLocationPending
-    val viewerLocationPendingReason = if (isTrackerMode) uiState.trackerLocation.locationPendingReason else uiState.trackerLocation.locationPendingReason
+    val viewerLocationPendingReason = if (isTrackerMode) uiState.trackerLocation.locationPendingReason else uiState.localLocation.locationPendingReason
     
     val trackerGpsAge = if (isTrackerMode) (if (uiState.localLocation.timestamp > 0) now - uiState.localLocation.timestamp else Long.MAX_VALUE)
                  else (if (uiState.trackerLocation.timestamp > 0) now - uiState.trackerLocation.timestamp else Long.MAX_VALUE)
@@ -518,7 +520,7 @@ fun OsmMap(
             val trSegs = drawTrailToFolder(view, trailFolderRef.value!!, trail, BrandJd.toArgb(), Slate500.toArgb(), trackerPolylinePool)
             
             viewerTrailFolderRef.value?.items?.clear()
-            val viSegs = drawTrailToFolder(view, viewerTrailFolderRef.value!!, viewerTrail, ViewerOrange.toArgb(), Slate500.toArgb(), viewerPolylinePool)
+            val viSegs = drawTrailToFolder(view, viewerTrailFolderRef.value!!, viewerTrail, ViewerCyan.toArgb(), Slate500.toArgb(), viewerPolylinePool)
             
             lastTrailRendered.value = trail.toList()
             lastViewerTrailRendered.value = viewerTrail.toList()
@@ -629,7 +631,7 @@ fun OsmMap(
                     
                     val circlePoints = Polygon.pointsAsCircle(GeoPoint(myLat!!, myLng!!), effectiveMyAccuracy)
                     p.points = circlePoints.map { GeoPoint(it.latitude, it.longitude) }
-                    p.outlinePaint.color = if (isMeFresh) ViewerOrange.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
+                    p.outlinePaint.color = if (isMeFresh) ViewerCyan.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                     accuracyCirclesFolderRef.value?.add(p)
                 }
             }
@@ -724,7 +726,7 @@ private fun createTrackerBitmap(density: Float, isFresh: Boolean): Bitmap {
 private fun createViewerBitmap(density: Float, isFresh: Boolean): Bitmap {
     val sz = (20 * density).toInt(); val bitmap = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888); val canvas = Canvas(bitmap); val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     paint.style = Paint.Style.STROKE; paint.color = android.graphics.Color.WHITE; paint.strokeWidth = 1.0f * density; canvas.drawCircle(sz/2f, sz/2f, sz/2f - density, paint)
-    paint.color = if (isFresh) ViewerOrange.toArgb() else Slate500.toArgb(); paint.style = Paint.Style.FILL; canvas.drawCircle(sz/2f, sz/2f, sz/2f - 3.5f * density, paint)
+    paint.color = if (isFresh) ViewerCyan.toArgb() else Slate500.toArgb(); paint.style = Paint.Style.FILL; canvas.drawCircle(sz/2f, sz/2f, sz/2f - 3.5f * density, paint)
     return bitmap
 }
 
@@ -811,7 +813,7 @@ fun MapToolsOverlay(
         }
         
         Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
-            MapToolButton(icon = Icons.Default.Person, label = "VIEWER", onClick = onCenterViewer, iconColor = if(viewerValid) ViewerOrange else Color.Gray)
+            MapToolButton(icon = Icons.Default.Person, label = "VIEWER", onClick = onCenterViewer, iconColor = if(viewerValid) ViewerCyan else Color.Gray)
             MapToolButton(icon = Icons.Default.Agriculture, label = "TRACKER", onClick = onCenterTracker, iconColor = if(trackerValid) BrandJd else Color.Gray)
         }
 

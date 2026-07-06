@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v8.9.99
+# System Source of Truth (SoT) - v9.1.0
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
@@ -14,7 +14,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Foreground Service Transition (R967)**: The system maintains a **45-second "Recent UI Pulse" window** (`UI_PULSE_TIMEOUT_MS`) to bridge Android 14+ `MICROPHONE` type transitions. (Issue #025 / v8.9.86)
 *   **Type Safety Authority**: All telemetry fields (Accuracy, Speed, Bearing, Sensor Indices) are standardized to `Double` across the entire chain (Engine, App, Room). (Issue #014 / v8.9.75)
 *   **Data Persistence Integrity (R968)**: All changes to Protobuf schemas must preserve binary compatibility. Migration from legacy types must use new field tags and explicit `DataMigration` logic. (Issue #023 / v8.9.84)
-*   **Telemetry Freshness Authority (Issue #029)**: Data health (`DAT` badge) is determined by the arrival of any telemetry packet (Sensor or GPS). `RemoteHandler` must explicitly timestamp arrival (`ts`) to ensure accurate UI staleness calculation. (v8.9.91)
+*   **Telemetry Freshness Authority (Issue #029)**: Data health (`DAT` badge) is determined by the arrival of any telemetry packet. In Viewer mode, the service MUST propagate local updates to the repository to ensure UI freshness for the monitoring device. (v9.0.3)
 *   **Document Integrity Authority (R969)**: All core documentation (`issues.md`, `requirements_sot.md`, `compliance.md`) and their archives are subject to a **Growth-Only Constraint**. Archives must never decrease in line count, and structural headers must be preserved during all automated or manual writes. (v8.9.91)
 *   **A15 Jitter Stabilization (R970)**: The system applies hardened spatial gates (5.0 m/s mismatch / 25m jitter) and a 5-second "Adaptation Muzzle" during polling transitions on Samsung A15 hardware to ensure state engine stability. (Issue #036 / Issue #038 / v8.9.94)
 *   **G990E Display Hardening (R971)**: The system implements a `DisplayListener` to detect rapid ON/DOZE toggling on Samsung S21 FE (G990E) devices and muzzles virtual proximity transitions during these cycles to eliminate telemetry noise. (Issue #037 / v8.9.94)
@@ -24,7 +24,8 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Identity Sanitization Authority (R975)**: The system enforces a strict alphanumeric contract for all IDs (`^[a-zA-Z0-9_-]{1,32}$`). The `SettingsRepository` MUST implement automatic sanitization via migration to reset any corrupted identities to safe defaults, and all network/service handlers MUST reject pulses containing malformed IDs to prevent command injection. (Issue #041 / v8.9.99)
 
 ### 2. Branding & UI Standards
-*   **Branding Authority (R865/R866)**: "Unified Identity Green" is strictly defined as **JD Branding Green (#367C2B)**.
+*   **Branding Authority (R799e)**: "Unified Identity Green" is strictly defined as **JD Vivid Green (#78BE20)**. This supersedes R865/R866 corporate green (#367C2B) for digital interfaces. (v9.1.0)
+*   **Viewer Identity Color (R799d)**: "Viewer Role Identity" is strictly defined as **Cyan (#06B6D4)**. This supersedes any legacy orange coloring. (v9.0.4)
 *   **Icon Authority (R935)**: The authoritative application icon is the text-free John Deere deer logo.
 *   **Role Identity Standards (R182)**: IDs are free-form strings. Prefixes "T" (Tracker) and "V" (Viewer) are mandated.
 *   **VID Notes Authority (R924)**: **OBSOLETE (v8.9.89)**. The `VID_NOTES` string and its display in the `HeaderBar` have been removed.

@@ -1,6 +1,18 @@
-# Project History & Versioning (v8.9.x)
+# Project History & Versioning (v9.0.x)
 
-**For historical records (v8.8.x and older), see [docs_history_archive.md](docs_history_archive.md).**
+**For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## v9.0.3
+- **Viewer Status Restoration (Issue #029)**: Fixed a bug where the Viewer's own status line was grayed out in the UI. Updated `ViewerService.kt` to propagate local `LocationUpdate` packets to the repository, ensuring the `DAT` badge and telemetry timestamps are kept fresh.
+
+## v9.0.2
+- **GPS Stability Audit (R951)**: Implemented a monotonic reliability audit for Viewer-side GPS fixes. Detects and logs stability gaps during high-frequency polling.
+- **Polling Standard**: Standardized `VIEWER_GPS_POLLING_MS` to 1000L for increased local responsiveness.
+
+## v8.9.99
+- **Identity Sanitization (Issue #041)**: Implemented strict alphanumeric Regex validation for all IDs. Hardened services to reject malformed peer pulses.
+
+---
 
 ## v8.9.78
 - **Stationary Anchor Hard-Lock (Issue #018)**: Implemented "Hard-Lock" coordinate clamping in `LocationProcessor.kt` to eliminate GPS drift (spaghetti trails) when stationary confidence > 0.9.
@@ -43,22 +55,6 @@
 - **Zombie Telemetry UX Sweep (Issue 193)**: Applied `Slate500` ("Ghost Mode") dimming to all stale forensic fields (>10s baseline at the time).
 - **Aggressive Stall Recovery (Issue 198)**: Shortened GPS stall detection to 60s and revival retry to 120s.
 - **Build Modernization (Issue 199)**: Upgraded project toolchain to Java 17 and Android SDK 35.
-
-## v8.9.7
-- **Plunge Matching: Advanced SIT Detection (Issue 196)**: Refined the "Plunge" state machine for forensic parity.
-- **SIT Persistence Packet Loss Risk (Issue 194)**: Implemented a reliable, acknowledged event synchronization pipeline.
-- **Muzzle Window Hardening (Issue 191)**: Implemented device-specific hysteresis (500ms for A15, 200ms default) during sync I/O.
-
-## v8.9.6
-- **Room Migration Forensic Audit (Issue 195)**: Implemented Room migration (v36) with full table reconstruction.
-- **Xiaomi Indeterminate Handling (Issue 190)**: Implemented Muzzle/Override logic for Xiaomi "UNKNOWN" autostart status.
-
-## v8.9.5
-- **Viewer Background Location (Issue 189)**: Enabled Viewer-side location tracking and relative geofencing.
-- **Power Forensic Parity (Issue #337)**: Achieved absolute parity for battery current (`currentMa`) across models and ribbons. (Formerly Issue 192)
-
-## v8.9.4
-- **Viewer Engine State Restoration (Issue 187)**: Updated `ViewerService` to load persistent state into `LocationProcessor` on startup.
 
 ## v8.9.3
 - **Historical GPS Timestamp Preservation (Issue 188)**: Preserved original hardware fix timestamps during backfill.

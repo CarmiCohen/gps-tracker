@@ -1,4 +1,4 @@
-# GPS Tracker - High-Assurance Forensic Tracking (v8.9.78)
+# GPS Tracker - High-Assurance Forensic Tracking (v9.1.0)
 
 A modular, high-reliability Android tracking system designed for forensic continuity and behavioral analysis.
 
@@ -18,11 +18,11 @@ The project follows a **Vault Architecture**, isolating the tracking math from t
 - **`:core:engine`**: Pure Kotlin/Java tracking and physics logic.
 
 ## 📌 Branding
-- **Primary Color**: JD Branding Green (**#367C2B**) - Enforced across all layers (R865/R866).
+- **Primary Color**: JD Vivid Green (**#78BE20**) - Enforced across all layers (R799e).
 
 ## 🛠 Hardening Status
-- **Baseline**: v8.9.78
-- **Compliance**: Verified implementation of R014, R018, R019, R325, R441, R832, R967.
+- **Baseline**: v9.1.0
+- **Compliance**: Verified implementation of R014, R018, R019, R325, R441, R832, R967, R799d, R799e.
 - **Handover Baseline**: [Handover.md](Handover.md)
 
 For detailed technical specifications, see the [STATUS/](STATUS/) directory.

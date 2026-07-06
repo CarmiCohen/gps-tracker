@@ -32,15 +32,13 @@ import java.util.*
 
 /**
  * LogComponents: UI for system logs and diagnostic history.
- * v8.9.54:
- * - Issue #427/428: Aligned persistence duration labels with the new 15s 
- *   jitter-buffered staleness threshold.
+ * v9.1.0:
+ * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
+ * v9.0.4:
+ * - R799d: Changed Viewer color to ViewerCyan.
  * v8.9.48:
  * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
  *   BrandJd (#367C2B) in log rendering for restored/connected events.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Updated LogDetailPane 
- *   to display both raw accuracy and authoritative maxAccuracy.
  */
 
 @Composable
@@ -189,7 +187,7 @@ fun LogDetailPane(log: LogEntry, onClose: () -> Unit) {
             )
 
             DetailRow(
-                label1 = "ROLE", val1 = log.role.uppercase(), color1 = if(log.role == "tracker") BrandJd else ViewerOrange,
+                label1 = "ROLE", val1 = log.role.uppercase(), color1 = if(log.role == "tracker") BrandJd else ViewerCyan,
                 label2 = "EXTREME VALUE", val2 = log.extremeValue?.let { "%.2f".format(it) } ?: "--", color2 = Rose500
             )
         }
@@ -232,7 +230,7 @@ fun getLogRenderingConfig(log: LogEntry, isTelemetryFresh: Boolean = true): LogR
     val msg = message.uppercase()
     if (msg.contains("CRITICAL") || msg.contains("ERROR") || msg.contains("[SIREN]") || msg.contains("VIOLATION")) return LogRenderingConfig(Rose500, FontWeight.Bold)
     if (msg.contains("CONNECTED") || msg.contains("RESTORED")) return LogRenderingConfig(BrandJd, FontWeight.Bold)
-    if (msg.contains("USER ACTION") || msg.contains("VIEWER CONNECTED")) return LogRenderingConfig(ViewerOrange, FontWeight.Normal)
+    if (msg.contains("USER ACTION") || msg.contains("VIEWER CONNECTED")) return LogRenderingConfig(ViewerCyan, FontWeight.Normal)
     if (msg.contains("TRACKER STATE") || msg.contains("TRACKER IS")) return LogRenderingConfig(Amber500, FontWeight.Bold)
     if (isImportant) return LogRenderingConfig(BrandJd, FontWeight.Bold)
     return LogRenderingConfig(BrandJd, FontWeight.Normal)

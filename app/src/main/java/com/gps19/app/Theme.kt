@@ -7,25 +7,23 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * R799: Dynamic Theme based on Role (Tracker/Viewer).
+ * v9.1.0:
+ * - R799e [Active]: JD Vivid Green (#78BE20) enforced as primary branding.
+ * v9.0.4:
+ * - R799d: Changed Viewer color to Cyan (#06B6D4) from Orange.
  * v8.9.40:
  * - R865/R866 [Active]: Unified Identity Green (#367C2B) enforced.
- * v5.851a:
- * - R851a [Superseded]: Changed Tracker role back to Green (Replaced by R865).
- * v5.681:
- * - Refactored TrackerOrange to ViewerOrange for semantic clarity.
- * v5.625:
- * - R815 [Superseded]: Swapped Role Identity Colors (Replaced by R851a).
  */
 
 private fun getDarkColorScheme(appMode: String?) = darkColorScheme(
     primary = when (appMode) {
         "tracker" -> BrandJd
-        "viewer" -> ViewerOrange
+        "viewer" -> ViewerCyan
         else -> Slate500 
     },
     secondary = when (appMode) {
         "tracker" -> BrandJdDark
-        "viewer" -> ViewerOrangeDark
+        "viewer" -> ViewerCyanDark
         else -> Slate800
     },
     tertiary = Amber500,
@@ -42,12 +40,12 @@ private fun getDarkColorScheme(appMode: String?) = darkColorScheme(
 private fun getLightColorScheme(appMode: String?) = lightColorScheme(
     primary = when (appMode) {
         "tracker" -> BrandJdDark
-        "viewer" -> ViewerOrangeDark
+        "viewer" -> ViewerCyanDark
         else -> Slate500
     },
     secondary = when (appMode) {
         "tracker" -> BrandJd
-        "viewer" -> ViewerOrange
+        "viewer" -> ViewerCyan
         else -> Slate400
     },
     tertiary = Amber500,

@@ -3,9 +3,9 @@
     android:height="24dp"
     android:viewportWidth="100"
     android:viewportHeight="100">
-    <!-- R865/R866: Unified Identity Green (JD Branding Green #367C2B) -->
+    <!-- R799e [Active]: JD Vivid Green (#78BE20) -->
     <path
-        android:fillColor="#367C2B"
+        android:fillColor="#78BE20"
         android:pathData="M10,20 h80 a10,10 0 0 1 10,10 v40 a10,10 0 0 1 -10,10 h-80 a10,10 0 0 1 -10,-10 v-40 a10,10 0 0 1 10,-10 z" />
     <!-- "J" shape -->
     <path

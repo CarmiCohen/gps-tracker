@@ -2,7 +2,12 @@
 
 This document contains the archived resolutions for the GPS-Tracker system, preserving the audit trail for past development phases. All issue numbers have been synchronized to the **under #350** baseline (Issue #305).
 
-**Total Archived Resolutions: 182**
+**Total Archived Resolutions: 185**
+
+## 2.1. Hardening Era Resolutions (v8.9.98 - v9.0.3)
+*   **FIXED Issue #029: Viewer Status Line Grayed-Out** - Resolution: Updated `ViewerService.kt` to propagate local `LocationUpdate` telemetry to the repository. This ensures the Viewer's local metadata (battery, thermal, position) is processed by the UI's staleness logic, keeping the row active and colored in authoritative role colors. (v9.0.3)
+*   **FIXED Issue #041: Identity Sanitization Hardening** - Resolution: Implemented R975 (Regex: `^[a-zA-Z0-9_-]{1,32}$`). Hardened `TrackerService`, `ViewerService`, and `AppNetworkManager` to reject malformed pulses. Added `identitySanitizationMigration` in `SettingsRepository` to automatically purge corrupted IDs from storage. (v8.9.99)
+*   **FIXED Issue #027: Identity Persistence Hardening** - Resolution: Reinforced `MainRepository.saveSettingsBulk` with atomic uniqueness validation to prevent identity cross-contamination. (v8.9.98)
 
 ## 2.2. Hardening Era Resolutions (v8.9.43 - v8.9.48)
 *   **FIXED Issue #438: Issue ID Mismatch (Power Forensics)** - Resolution: Unified all currentMa references to authoritative Issue #337 across source code and forensic logs. (v8.9.48)
@@ -183,3 +188,7 @@ This document contains the archived resolutions for the GPS-Tracker system, pres
 *   **FIXED Module Type Constraints (#217)** - Resolution: Resolved module types. (Formerly #275 / #3)
 *   **FIXED Logic Layer "Android Leaks" (#216)** - Resolution: Resolved leaks. (Formerly #274 / #2)
 *   **FIXED Session Lifecycle Stability (R921/R926) (#215)** - Resolution: Exhaustive state reset. (Note: Initial baseline; superseded by R926/Issue #320). (Formerly LEGACY_#317 / LEGACY_#273 / #1)
+
+## Hardening Phase: v8.9.55 Resolved Items
+*   **Issue #452**: Forensic SNR Latch Audit. Verified 6-minute adaptive hold (R332). (v8.9.55)
+*   **Issue #458**: Watchdog Battery Optimization. Implemented conservative `AlarmManager` rescheduling. (v8.9.55)
