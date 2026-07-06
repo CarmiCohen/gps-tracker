@@ -44,12 +44,12 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v9.1.0:
+ * - R957: Redesigned Status Badges. Removed LED circles; status is now indicated 
+ *   directly by text color (Green/Red) for reduced visual clutter and a more 
+ *   modern HUD appearance.
  * v9.0.4:
  * - R799d: Changed Viewer color to ViewerCyan.
- * v8.9.91:
- * - R924: Added HeaderBarPreview for Forensic Sunset verification.
- * v8.9.89:
- * - R924: Obsolete. Removed VID_NOTES display from HeaderBar.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -332,7 +332,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, title: String) {
                                 val timeStr = if (title == "7D") dateFormatter.format(Date(p.ts)) else timeFormatter.format(Date(p.ts))
                                 drawIntoCanvas { canvas ->
                                     val finalX = xPos.coerceIn(15.dp.toPx(), size.width - 15.dp.toPx())
-                                    canvas.nativeCanvas.drawText(timeStr, finalX, baseLineY + (if (isLandscape) 14.dp.toPx() else 8.dp.toPx()), textPaint)
+                                    canvas.nativeCanvas.drawText(timeStr, finalX, baseLineY + (if (isLandscape) { 14.dp.toPx() } else { 8.dp.toPx() }), textPaint)
                                 }
                             }
                         }
@@ -451,7 +451,8 @@ fun StatusBar(
     Card(modifier = modifier.fillMaxWidth(), shape = RectangleShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = if (isLandscape) 0.7f else 0.9f)), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 3.dp)) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+                // R957: Status badges with text-based color coding (removed circle LEDs)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     StatusBadge("INT", isInternet, isBold = true)
                     StatusBadge("SRV", isRelay, isBold = true)
                     
@@ -669,10 +670,18 @@ fun CommBar(index: Int, color: Color) {
 @Composable
 fun StatusBadge(label: String, active: Boolean, activeColor: Color = BrandJd, isBold: Boolean = true) {
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(1.dp)) { 
-        Box(Modifier.size(5.dp).background(if (active) activeColor else Rose500, CircleShape))
-        Text(text = label, color = if (active) Color.White else Slate500, fontSize = 9.sp, fontWeight = if(isBold) FontWeight.Bold else FontWeight.Normal, fontFamily = FontFamily.Monospace, maxLines = 1, style = compactStyle)
-    }
+    val textColor = if (active) activeColor else Rose500
+    
+    // R957: Status is now indicated directly by the color of the text label.
+    Text(
+        text = label, 
+        color = textColor, 
+        fontSize = 9.sp, 
+        fontWeight = if(isBold) FontWeight.ExtraBold else FontWeight.Bold, 
+        fontFamily = FontFamily.Monospace, 
+        maxLines = 1, 
+        style = compactStyle
+    )
 }
 
 @Composable

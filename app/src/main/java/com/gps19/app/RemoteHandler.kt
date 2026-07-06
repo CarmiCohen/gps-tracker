@@ -16,12 +16,15 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
- * v9.1.2:
- * - Issue #042 Fix: Corrected peer ID resolution. Tracker mode now extracts sender 
- *   identity from 'viewer_id' field to ensure correct ID reflection/adoption.
+ * v9.0.5:
+ * - Fix: Propagating lastRemoteActivityTs to repository to ensure UI recognizes 
+ *   fresh telemetry and avoids "Ghost Mode" when connected.
  * v8.9.91:
  * - Issue #029: Telemetry Stale Badge Fix. Explicitly setting 'ts' field in LocationUpdate 
  *   to 'now' to ensure DAT badge turns green on packet arrival even without fresh GPS fix.
+ * v8.9.77:
+ * - Issue #018: Stationary Anchor Hard-Lock. Added isTrackerAnchorLocked 
+ *   propagation for forensic audit transparency.
  */
 class RemoteHandler(
     private val context: Context,
@@ -271,6 +274,12 @@ class RemoteHandler(
     }
 
     fun handleRemoteLog(entry: LogEntry) {
+        val now = timeProvider.currentTimeMillis()
+        val nowRealtime = timeProvider.elapsedRealtime()
+        
+        lastPeerActivityTs = nowRealtime
+        repository.updateRemoteActivity(now)
+
         if (entry.message.contains("Sit Detected", ignoreCase = true)) {
             if (!isTrackerSitDetected) {
                 isTrackerSitDetected = true
@@ -280,18 +289,10 @@ class RemoteHandler(
 
     fun handleRemoteUpdate(data: JSONObject, isTrackerMode: Boolean) {
         val fromId = data.optString("id")
-        val fromViewerId = data.optString("viewer_id")
         val fromViewer = data.optBoolean("from_viewer", false) 
         val type = data.optString("type", "")
         val now = timeProvider.currentTimeMillis()
         val nowRealtime = timeProvider.elapsedRealtime()
-
-        // Fix #042 Peer ID resolution: Tracker mode needs viewer_id, Viewer mode needs tracker (id)
-        val pulseId = if (isTrackerMode) {
-             fromViewerId.ifEmpty { fromId }
-        } else {
-             fromId
-        }
 
         if (isTrackerMode && fromViewer && type == "calibrate_chair") {
             locationProcessor.resetChairBaseline()
@@ -306,8 +307,9 @@ class RemoteHandler(
                 Toast.makeText(context, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show()
             }
 
-            onPulse(pulseId)
+            onPulse(fromId)
             lastPeerActivityTs = nowRealtime
+            repository.updateRemoteActivity(now)
             return
         }
 
@@ -324,8 +326,9 @@ class RemoteHandler(
                     val ts = data.optLong("settings_ts", 0L)
                     
                     repository.saveHomePoints(newList, if (maxDist > 0) maxDist else null, if (ts > 0) ts else null)
-                    onPulse(pulseId)
+                    onPulse(fromId)
                     lastPeerActivityTs = nowRealtime
+                    repository.updateRemoteActivity(now)
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
                     Timber.e(e, "Error parsing remote settings")
@@ -336,19 +339,22 @@ class RemoteHandler(
 
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
             if (isTrackerMode && fromViewer) {
-                onPulse(pulseId)
+                onPulse(fromId)
                 lastPeerActivityTs = nowRealtime
+                repository.updateRemoteActivity(now)
             } else if (!isTrackerMode && !fromViewer) {
-                onPulse(pulseId)
+                onPulse(fromId)
                 lastPeerActivityTs = nowRealtime
                 isTrackerConnected = true
+                repository.updateRemoteActivity(now)
             }
             return
         }
 
         if (isTrackerMode && fromViewer) {
-            onPulse(pulseId)
+            onPulse(fromId)
             lastPeerActivityTs = nowRealtime
+            repository.updateRemoteActivity(now)
             return
         }
 
@@ -359,9 +365,10 @@ class RemoteHandler(
             }
             if (remoteTs > 0) lastRemotePacketTs = remoteTs
 
-            onPulse(pulseId)
+            onPulse(fromId)
             lastPeerActivityTs = nowRealtime
             isTrackerConnected = true
+            repository.updateRemoteActivity(now)
             
             peerSignal = data.optInt("signal", 0)
             
