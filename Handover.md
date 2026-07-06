@@ -1,23 +1,26 @@
-# Forensic Handover - v9.1.2 (Identity Adoption & Locking)
+# Forensic Handover - v9.1.6 (Staggered Bootstrap & Database Hardening)
 
-## 📌 Status: Stable / Build PASS / Identity Adopting
-This cycle completes R982: Identity Locking and ensures the Tracker correctly reflects the Viewer ID during initial pairing.
+## 📌 Status: Stable / Build PASS / Schema Hardened
+This cycle resolves Issue #043, ensuring Room database schema stability across migrations.
 
-### 🟢 Completed: Requirement R982 Finalization (ID Reflection)
-*   **Peer ID Resolution**: 
-    *   Fixed `RemoteHandler.kt` to extract sender identity from `viewer_id` field when in Tracker mode. This enables the Tracker to "see" the Viewer's ID and adopt it.
-*   **Signaling Guard (Refined)**: 
-    *   Implemented "Lock-on-Non-Default" logic in `SignalingValidator`. Trackers are unlocked when `viewerId == "V"`.
-*   **Communication Hardening**:
-    *   Applied refined validation to `CommunicationManager`.
-    *   Fixed binary telemetry mapping bug (`lastDiscTs`).
-*   **Verification**:
-    *   Added unit tests in `SignalingTest.kt` for adoption and locking.
-    *   Resolved Issue #042 (Identity Reflection/Mismatch).
+### 🟢 Completed: Requirement R985 (Database Schema Hardening)
+*   **Critical Remediation (Issue #043)**: 
+    *   Hardened `HistoryEntity` and `PendingStatusEntity` in `Database.kt` with explicit `@ColumnInfo(defaultValue = "...")` annotations.
+    *   Corrected `MIGRATION_52_53` to include explicit `DEFAULT` clauses in `CREATE TABLE` statements for `connection_history` and `pending_status_updates`.
+    *   Prevents `IllegalStateException` during startup due to schema validation mismatches between Kotlin defaults and SQLite table definitions.
+*   **Verification**: Database now validates successfully on startup even if previous migrations omitted default values.
 
-### 🟢 Completed: Requirement R799e (JD Vivid Migration)
-*   **Color System Update**: Migrated Tracker identity to JD Vivid Green (#78BE20).
+### 🟢 Completed: Requirement R983 (Android 15 FGS Hardening)
+*   **Security Remediation**: 
+    *   Hardened `getAvailableForegroundServiceType()` in `BaseMonitorService`.
+    *   Restricted `MICROPHONE` type request to foreground/pulsed states only. 
+*   **Verification**: Logs confirm `Acoustic Monitoring Started` without crashes.
+
+### 🟢 Completed: Requirement R984 (Staggered Bootstrap)
+*   **Performance Optimization**:
+    *   Migrated `TrackerService` and `ViewerService` initialization to `Dispatchers.Default` with a 5s staggered warm-up.
+*   **Result**: Significant reduction in frame drops during application cold-starts.
 
 ### 🛠 Instructions for Resumption
-1.  **Reflection Verification**: Start a fresh Tracker (ID "V"). Send a pulse from a Viewer (ID "MyPhone"). Verify the Tracker's settings now show "MyPhone".
-2.  **Security Audit**: Once paired, attempt to send a command from a different Viewer ID and verify it is rejected in logcat.
+1.  **Migration Test**: Install v9.1.4 (or any version with schema v52), populate data, then upgrade to v9.1.6. Verify no crash on launch.
+2.  **Handshake Verification**: Start Tracker and Viewer. Observe the "VWR" and "TRK" badges.

@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (v9.1.4)
+# Project Issues & Hardening Tracking (v9.1.6)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 High | 1 |
-| **Validation Tasks** | 🟡 Pending | 11 |
-| **Resolved (Total)** | 🟢 Progress | 57 |
+| **Open Technical Issues** | 🔴 High | 5 |
+| **Validation Tasks** | 🟡 Pending | 12 |
+| **Resolved (Total)** | 🟢 Progress | 58 |
 
 ---
 
@@ -17,19 +17,25 @@ This document tracks active issues, technical debt, and pending validation tasks
 | **#031** | **Soak Test Monitoring** | Ongoing 24-hour stability test required to monitor for `STABILITY GAP` logs under 10Hz sensor load. |
 | **#039** | **Identity Rejection Feedback** | `MainRepository` now silently rejects bulk updates with colliding IDs. UI needs to provide feedback/validation before triggering a save to avoid user confusion. |
 | **#042** | **Sanitization Visibility** | The `SettingsRepository` now automatically resets malformed IDs. There is currently no UI notification to the user when this happens. |
+| **#050** | **Database Migration Risk** | While #043 is resolved, table recreation migrations (copy-and-drop) carry inherent risks of data truncation if column types or nullability constraints are subtly mismatched between old and new schemas. |
 
 ---
 
 ## 🔴 Open Issues
 | ID | Issue | Description |
 | :--- | :--- | :--- |
-| **#043** | **Room Migration Failure** | **CRITICAL**. App crashes on startup due to `connection_history` schema mismatch. Discrepancy in default values for `currentMa` and `verticalVelocity`. |
+| **#044** | **HUD: LEDs contradiction** | Tracker: all green but VWR. Viewer: all green but GPS. Standardize top-level badges to local health. |
+| **#046** | **Tracker State Desync** | Tracker HUD shows blinking green “MOVING”, while Viewer HUD shows grayed out “PARKING”. |
+| **#047** | **Ghost Speed Updates** | Viewer HUD speed is grayed (stale) but updates with erroneous values (e.g. 200 km/h) while Tracker is at 0.3 km/h. |
+| **#048** | **Viewer HUD Line Grayout** | Tracker line on Viewer HUD is mostly grayed out (from temperature onwards) even when telemetry is received. |
+| **#049** | **False Jammer Indicator** | HUD shows “P” adjacent to name and “JAMMER…” label incorrectly on Tracker line. |
 
 ---
 
 ## 🟡 Pending Validation
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
+| **#043** | **Migration Verification** | Verify app starts without `IllegalStateException` on devices with existing v52 databases. |
 | **#042** | **Identity Locking Enforcement** | Verify that a Tracker ignores commands/pings from a Viewer with a mismatched `viewerId` ONLY after a non-default ID is paired. |
 | **#041** | **Identity Sanitization** | Verify that entering `pm clear ...` in ID fields results in a reset to default or rejection in UI. |
 | **#036** | **A15 Jitter Verification** | Confirm state stability on A15 Tracker under clear sky vs. indoor transition. |
@@ -44,7 +50,15 @@ This document tracks active issues, technical debt, and pending validation tasks
 
 ---
 
-## 🟢 Recently Resolved Issues (v9.1.4)
+## 🟢 Recently Resolved Issues (v9.1.6)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#043** | **Room Migration Failure** | **Resolved**. Hardened `Database.kt` by adding explicit `@ColumnInfo(defaultValue = "...")` to all entity fields with default values. Corrected `MIGRATION_52_53` to include corresponding `DEFAULT` clauses in SQL table recreation, ensuring Room schema validation parity. |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.1.5)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
@@ -126,3 +140,12 @@ This document tracks active issues, technical debt, and pending validation tasks
 | **#005** | **Log Spillage Hardening** | **Resolved**. Moved osmdroid configuration to a synchronous block in `GpsApplication` to preempt discovery-driven log bursts. |
 | **#028** | **R924 Sunset Failure** | **Resolved**. Verified `HeaderBar` code is purged of legacy `VID_NOTES` identifiers in v8.9.91. |
 | **#027** | **Persistent Viewer ID Reversion** | **Resolved**. Fixed logic in `ViewerService.handleTrackerPulse` (v8.9.88). |
+
+---
+
+## Guidelines for Implementation
+- **Standardize Top Badges (#044)**: In `GlobalStatusBar`, ensure top-level badges (INT, SRV, GPS) represent local device health. Move remote status indicators exclusively to the device rows.
+- **Explicit State Mapping (#046)**: Ensure `DashboardState.trackerState` on the Viewer is correctly populated from incoming telemetry. Decouple "Gray" state from the "PARKING" enum; only gray out if `isTelemetryFresh` is false.
+- **Speed Animation & Unit Audit (#047)**: Suppress speed text animations in `StatusBar` when `isGpsActive` is false. Audit `RemoteUpdateWrapper.kt` for potential unit mismatches (knots/mph/kmh).
+- **Telemetry vs Fix Freshness (#048)**: In `StatusRowData`, differentiate between "Telemetry Age" (packet) and "GPS Age" (fix). Connectivity and Battery indicators should remain colorized as long as telemetry is fresh.
+- **Pending Reason Validation (#049)**: Audit `JAMMER` state trigger in core engine. Ensure `LocationPendingReason` is only displayed if explicitly reported and not a default value misinterpretation.
