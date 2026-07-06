@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.1.6)
+# Project Issues & Hardening Tracking (v9.1.7)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
@@ -6,8 +6,8 @@ This document tracks active issues, technical debt, and pending validation tasks
 | Category | Status | Count |
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 High | 5 |
-| **Validation Tasks** | 🟡 Pending | 12 |
-| **Resolved (Total)** | 🟢 Progress | 58 |
+| **Validation Tasks** | 🟡 Pending | 13 |
+| **Resolved (Total)** | 🟢 Progress | 59 |
 
 ---
 
@@ -35,6 +35,7 @@ This document tracks active issues, technical debt, and pending validation tasks
 ## 🟡 Pending Validation
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
+| **#014** | **Type Safety Validation** | Audit logcat for any remaining `toDouble()` or `toFloat()` warnings in performance-critical loops. |
 | **#043** | **Migration Verification** | Verify app starts without `IllegalStateException` on devices with existing v52 databases. |
 | **#042** | **Identity Locking Enforcement** | Verify that a Tracker ignores commands/pings from a Viewer with a mismatched `viewerId` ONLY after a non-default ID is paired. |
 | **#041** | **Identity Sanitization** | Verify that entering `pm clear ...` in ID fields results in a reset to default or rejection in UI. |
@@ -47,6 +48,14 @@ This document tracks active issues, technical debt, and pending validation tasks
 | **#034** | **Sensor Stability** | Verify long-term stability of the `AppSensorThread`. |
 | **#035** | **Stationary Scaling** | Confirm `PROXIMITY_STARY_SCALING_MS_PER_HOUR` correctly scales skepticism. |
 | **#027** | **Identity Persistence Stability** | Verify that the Viewer identity ("V") remains stable during prolonged tracking sessions with frequent peer reconnects (v8.9.98). |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.1.7)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#014** | **System-Wide Type Safety** | **Resolved**. Standardized all telemetry fields (Accuracy, Speed, Bearing) and sensor metrics to native `Double` types across the entire stack. Refactored `AppSensorManager`, `SyncManager`, and Service layers to eliminate redundant `toDouble()` conversions, reducing type noise and ensuring precision parity with the core engine. |
 
 ---
 

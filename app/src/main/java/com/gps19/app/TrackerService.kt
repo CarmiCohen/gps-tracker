@@ -21,12 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.1.4:
- * - Fix: Android 15 FGS Hardening. Only requests MICROPHONE type if recently pulsed 
- *   from UI to prevent SecurityException on background start (Issue #045).
- * v9.1.3:
- * - Fix: Propagate local telemetry to repository in onLocationChanged. This 
- *   ensures HUD satellite/age data is visible while in Tracker mode.
+ * v9.1.5:
+ * - Issue #046: Implemented Staggered Bootstrap. Offloaded initialization to
+ *   Dispatchers.Default and staggered manager startups to prevent CPU contention.
+ * v8.9.75 (Refined):
+ * - Issue #014: System-Wide Type Safety. Standardized all telemetry handling to Double.
+ *   Eliminated toDouble() noise when processing system Location updates.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -108,7 +108,7 @@ class TrackerService : BaseMonitorService() {
     override fun onCreate() {
         super.onCreate()
         
-        lifecycleScope.launch(serviceExceptionHandler) {
+        lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
             configManager.deviceId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
             configManager.viewerId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, DEFAULT_RELAY_URL)
@@ -136,7 +136,9 @@ class TrackerService : BaseMonitorService() {
             })
             
             locationProcessor = LocationProcessor(localProcessorListener, timeProvider)
-            
+
+            delay(1000)
+
             val savedMaxAcc = repository.getDouble(MainRepository.MAX_ACCURACY_KEY, 0.0)
             val savedLastSit = repository.getLong(MainRepository.LAST_SIT_TS_KEY, 0L)
             val savedBaseline = repository.getDouble(MainRepository.CHAIR_BASELINE_TILT_KEY, -1000.0)
@@ -156,6 +158,8 @@ class TrackerService : BaseMonitorService() {
             }
 
             sensorManager.start()
+
+            delay(1000)
             networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
             
             syncManager = SyncManager(applicationContext, networkManager, sessionManager, gpsManager, sensorManager, locationProcessor, telemetryRepository, offlineRepository, logManager, timeProvider, repository, lifecycleScope)
@@ -173,6 +177,7 @@ class TrackerService : BaseMonitorService() {
                 }
             }
             
+            delay(1000)
             syncManager.startSyncLoop(configManager.deviceId, configManager.viewerId, true)
 
             remoteHandler = RemoteHandler(this@TrackerService, repository, locationProcessor, alarmManager, sessionManager, forensicUseCase, timeProvider, lifecycleScope) { id -> handleViewerPulse(id) }
@@ -198,6 +203,7 @@ class TrackerService : BaseMonitorService() {
                     remoteHandler.handleRemoteUpdate(data, true)
                 }
 
+            delay(2000)
             gpsCollectionJob = lifecycleScope.launch { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
             gnssDetailJob = lifecycleScope.launch { gpsManager.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
 
@@ -234,9 +240,11 @@ class TrackerService : BaseMonitorService() {
             setupPhysicalFastPaths()
             startTickLoop()
             
-            updateForegroundServiceType()
+            withContext(Dispatchers.Main) {
+                updateForegroundServiceType()
+            }
             
-            logManager.logServiceEvent("Tracker Engine Online", important = true)
+            logManager.logServiceEvent("Tracker Engine Online (Staggered)", important = true)
         }
     }
 
@@ -308,8 +316,6 @@ class TrackerService : BaseMonitorService() {
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val hasMicPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-            // Android 14+ Hardening: Only request MICROPHONE type if recently pulsed from UI.
-            // This prevents SecurityException when starting from background (e.g. WorkManager/Boot).
             if (hasMicPermission && isRecentUiPulse()) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE 
             }
@@ -373,7 +379,6 @@ class TrackerService : BaseMonitorService() {
             gpsManager.setPollingInterval(newInterval)
             
             if (isA15 && oldInterval != -1L) {
-                // Issue #038: Adaptation Muzzle triggered by polling change
                 adaptationMuzzleJob?.cancel()
                 isAdaptationMuzzled = true
                 adaptationMuzzleJob = lifecycleScope.launch {
@@ -658,7 +663,7 @@ class TrackerService : BaseMonitorService() {
             isSuspicious = isSuspiciousMode,
             isMuzzled = isMuzzled,
             isA15 = isA15,
-            isAdaptationMuzzled = isAdaptationMuzzled, // Issue #038
+            isAdaptationMuzzled = isAdaptationMuzzled,
             nowRealtime = nowRealtime,
             nowWall = nowWall
         )

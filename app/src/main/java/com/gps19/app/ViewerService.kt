@@ -18,11 +18,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * v9.1.4:
- * - Issue #045: Android 15 FGS Hardening. Background starts restricted to LOCATION type 
- *   to avoid SecurityException.
- * v9.0.3:
- * - Issue #029: Fixed grayed-out viewer line by propagating local telemetry to repository.
+ * v9.1.5:
+ * - Issue #046: Implemented Staggered Bootstrap. Offloaded initialization to 
+ *   Dispatchers.Default and staggered subsystem startups.
+ * v8.9.75 (Refined):
+ * - Issue #014: System-Wide Type Safety. Standardized all telemetry handling to Double.
+ *   Eliminated toDouble() noise when processing system Location updates.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -79,7 +80,7 @@ class ViewerService : BaseMonitorService() {
     override fun onCreate() {
         super.onCreate()
         
-        lifecycleScope.launch(serviceExceptionHandler) {
+        lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
             val trackerId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
             val viewerId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
             
@@ -98,6 +99,8 @@ class ViewerService : BaseMonitorService() {
             
             locationProcessor = LocationProcessor(localProcessorListener, timeProvider)
             
+            delay(1000)
+            
             val savedMaxAcc = repository.getDouble(MainRepository.MAX_ACCURACY_KEY, 0.0)
             val savedLastSit = repository.getLong(MainRepository.LAST_SIT_TS_KEY, 0L)
             val savedBaseline = repository.getDouble(MainRepository.CHAIR_BASELINE_TILT_KEY, -1000.0)
@@ -106,6 +109,7 @@ class ViewerService : BaseMonitorService() {
             val maxDist = repository.getDouble(MainRepository.MAX_DISTANCE_STORAGE_KEY, 60.0)
             locationProcessor.loadState(savedMaxAcc, savedLastSit, savedBaseline, trackerState, homePoints, maxDist)
 
+            delay(1000)
             networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, false)
             
             syncManager = SyncManager(this@ViewerService, networkManager, sessionManager, gpsManager, null, locationProcessor, telemetryRepository, offlineRepository, logManager, timeProvider, repository, lifecycleScope)
@@ -117,6 +121,7 @@ class ViewerService : BaseMonitorService() {
                 logManager.logServiceEvent(msg, important) 
             }
 
+            delay(1000)
             commandRouter = CommandRouter(
                 this@ViewerService, configManager, logManager, networkManager, alarmManager, notificationManager, 
                 sessionManager, locationProcessor, 
@@ -142,6 +147,7 @@ class ViewerService : BaseMonitorService() {
                     }
                 }
             
+            delay(2000)
             gpsManager.setPollingInterval(VIEWER_GPS_POLLING_MS)
             gpsCollectionJob = lifecycleScope.launch { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
             gnssDetailJob = lifecycleScope.launch { gpsManager.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
@@ -177,7 +183,12 @@ class ViewerService : BaseMonitorService() {
             serviceStartRealtime = timeProvider.elapsedRealtime()
 
             startTickLoop()
-            logManager.logServiceEvent("Viewer Engine Online", important = true)
+            
+            withContext(Dispatchers.Main) {
+                updateForegroundServiceType()
+            }
+            
+            logManager.logServiceEvent("Viewer Engine Online (Staggered)", important = true)
         }
     }
 
@@ -185,11 +196,9 @@ class ViewerService : BaseMonitorService() {
         val nowRealtime = timeProvider.elapsedRealtime()
         val nowWall = timeProvider.currentTimeMillis()
 
-        // R951: Stability Gap Detection (at 1Hz polling)
         if (VIEWER_GPS_POLLING_MS == 1000L && lastGpsFixRealtime > 0) {
             val gap = nowRealtime - lastGpsFixRealtime
             stabilityAuditFixCount++
-            // Threshold for 1Hz is 1200ms (standard jitter allowance)
             if (gap > 1200L) {
                 stabilityAuditViolationCount++
                 val proc = lastProcessedLocation
@@ -261,7 +270,6 @@ class ViewerService : BaseMonitorService() {
             return
         }
 
-        // Fix: Save peer identity to TRACKER_ID_KEY, not VIEWER_ID_KEY.
         if ((configManager.deviceId == MainRepository.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
             configManager.deviceId = id
             networkManager.updateIdentity(id, configManager.viewerId, false)
@@ -326,13 +334,12 @@ class ViewerService : BaseMonitorService() {
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
 
-        // R951: Stability Audit Report
         if (nowRealtime - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
             if (stabilityAuditFixCount > 0) {
                 val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
                 if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
                     val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY AUDIT (V): Reliability ${String.format(Locale.getDefault(), "%.1f", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true,
+                    logManager.logServiceEvent("STABILITY AUDIT (V): Reliability ${String.format(Locale.getDefault(), \"%.1f\", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true,
                         lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                 }
                 stabilityAuditFixCount = 0
@@ -452,6 +459,7 @@ class ViewerService : BaseMonitorService() {
         isTrackerGap: Boolean,
         isTrackerConnected: Boolean
     ) {
+        val proc = lastProcessedLocation
         val isSocketConnected = networkManager.isConnected()
         
         alarmEvalJob?.cancel()

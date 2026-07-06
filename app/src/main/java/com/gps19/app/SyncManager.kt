@@ -13,9 +13,9 @@ import timber.log.Timber
  * v8.9.77:
  * - Issue #018: Stationary Anchor Hard-Lock. Propagating isAnchorLocked flag 
  *   to TrackerStatus and persistence.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized parameters to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
+ * v8.9.75 (Refined):
+ * - Issue #014: Type Safety Optimization. Standardized all telemetry parameters 
+ *   to Double. Eliminated toDouble() noise in the sync pipeline.
  */
 class SyncManager(
     private val context: Context,

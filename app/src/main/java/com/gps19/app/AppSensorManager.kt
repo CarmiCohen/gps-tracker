@@ -37,6 +37,9 @@ import kotlin.math.sqrt
  *   prevent virtual proximity flickering during Samsung AOD transitions.
  * v8.9.79:
  * - Issue #016: Finalized Double standardization. Renamed latestAcousticDb to currentAcousticDb for consistency.
+ * v8.9.75 (Refined):
+ * - Issue #014: System-Wide Type Safety. Standardized all internal metrics to Double. 
+ *   Conversions from Float (hardware) now happen immediately at source.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -95,6 +98,7 @@ class AppSensorManager @Inject constructor(
     }
 
     // Performance Audit: Pre-allocated buffers for zero-allocation fast path
+    // Note: Android Sensor API requires FloatArray for rotation/orientation.
     private val gravityBuffer = FloatArray(3)
     private val geomagneticBuffer = FloatArray(3)
     private val rotationMatrixBuffer = FloatArray(9)
@@ -104,9 +108,9 @@ class AppSensorManager @Inject constructor(
     private var hasGravity = false
     private var hasGeomagnetic = false
 
-    private var lastAccelX = 0f
-    private var lastAccelY = 0f
-    private var lastAccelZ = 0f
+    private var lastAccelX = 0.0
+    private var lastAccelY = 0.0
+    private var lastAccelZ = 0.0
     
     // Performance Audit: Rolling sum for O(1) vibration average
     private val vibrationCircularBuffer = DoubleArray(VIBRATION_WINDOW_SIZE)
@@ -312,7 +316,7 @@ class AppSensorManager @Inject constructor(
             Sensor.TYPE_ACCELEROMETER -> {
                 System.arraycopy(event.values, 0, gravityBuffer, 0, 3)
                 hasGravity = true
-                processVibration(event.values[0], event.values[1], event.values[2])
+                processVibration(event.values[0].toDouble(), event.values[1].toDouble(), event.values[2].toDouble())
                 updateOrientation()
             }
             Sensor.TYPE_LINEAR_ACCELERATION -> {
@@ -327,7 +331,7 @@ class AppSensorManager @Inject constructor(
                 processPressure(event.values[0].toDouble())
             }
             Sensor.TYPE_PROXIMITY -> {
-                val maxRange = proximity?.maximumRange ?: 5f
+                val maxRange = proximity?.maximumRange?.toDouble() ?: 5.0
                 val value = event.values[0].toDouble()
                 val newValue = value < maxRange
                 
@@ -644,10 +648,10 @@ class AppSensorManager @Inject constructor(
         }
     }
 
-    private fun processVibration(x: Float, y: Float, z: Float) {
-        val dx = (x - lastAccelX).toDouble()
-        val dy = (y - lastAccelY).toDouble()
-        val dz = (z - lastAccelZ).toDouble()
+    private fun processVibration(x: Double, y: Double, z: Double) {
+        val dx = x - lastAccelX
+        val dy = y - lastAccelY
+        val dz = z - lastAccelZ
         val delta = (sqrt(dx * dx + dy * dy + dz * dz)) / GRAVITY_EARTH
 
         synchronized(this) {
@@ -703,7 +707,11 @@ class AppSensorManager @Inject constructor(
         lastLinearAccelTs = timestampNs
         
         if (dt > 0.0 && dt < 0.2) {
-            val dot = values[0].toDouble() * gravityBuffer[0] + values[1].toDouble() * gravityBuffer[1] + values[2].toDouble() * gravityBuffer[2]
+            val val0 = values[0].toDouble()
+            val val1 = values[1].toDouble()
+            val val2 = values[2].toDouble()
+            
+            val dot = val0 * gravityBuffer[0] + val1 * gravityBuffer[1] + val2 * gravityBuffer[2]
             val gravMag = sqrt(gravityBuffer[0].toDouble()*gravityBuffer[0] + gravityBuffer[1].toDouble()*gravityBuffer[1] + gravityBuffer[2].toDouble()*gravityBuffer[2])
             val vz_accel = if (gravMag > 0.1) dot / gravMag else 0.0
 
@@ -768,6 +776,7 @@ class AppSensorManager @Inject constructor(
             lastBaroZeroingTs = now
         }
 
+        // Android API requires Float. Convert to Double immediately after call.
         val currentAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure.toFloat()).toDouble()
         val baselineAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure.toFloat()).toDouble()
         
