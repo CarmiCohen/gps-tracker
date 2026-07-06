@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v9.1.0
+# Compliance & Operational Requirements (Audit Baseline) - v9.1.1
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -8,6 +8,7 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 | Requirement ID | Requirement Description | Implementation Status |
 | :--- | :--- | :--- |
+| **R982** | **Identity Locking Authority**: Trackers exclusively process packets from their linked `viewerId` (with Default Relaxation for pairing). | **Verified (v9.1.1)** |
 | **R018** | **Stationary Anchor Hard-Lock**: coordinates clamped to `parkingAnchorPoint` when `stationaryProb > 0.9`. | **Verified (v8.9.78)** |
 | **R014** | **Type Safety Authority**: All telemetry fields standardized to `Double` across engine and app. | **Verified (v8.9.75)** |
 | **R182** | **Role Identity Standards**: Unique IDs with 'T' and 'V' prefixes for system-generated defaults. | **Verified (v8.9.53)** |
@@ -36,10 +37,13 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v9.1.0)
+### 2.1. Hardening Phase Resolutions (v9.1.1)
+*   **FIXED R982: Identity Locking Refinement** - Resolution: Enforced refined `viewerId` locking (R982) in `SignalingValidator` and `CommunicationManager`. Implemented "Lock-on-Non-Default" logic to support first-time pairing while ensuring strict peer authorization for established links. (Issue #042)
+
+### 2.2. Hardening Phase Resolutions (v9.1.0)
 *   **FIXED R799e: JD Vivid Green Branding** - Resolution: Migrated all Tracker-role and primary branding indicators to JD Vivid Green (#78BE20). Updated `Color.kt`, `colors.xml`, and branding documentation.
 
-### 2.2. Hardening Phase Resolutions (v9.0.4)
+### 2.3. Hardening Phase Resolutions (v9.0.4)
 *   **FIXED R799d: Viewer Branding Migration** - Resolution: Migrated all Viewer-role identity indicators from Orange to Cyan (#06B6D4). Updated `Theme.kt`, `Color.kt`, and all UI components.
 
 **Full history available in [issues_archive.md](issues_archive.md).**

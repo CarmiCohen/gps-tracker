@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.1.0)
+# Project Issues & Hardening Tracking (v9.1.1)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
@@ -6,8 +6,8 @@ This document tracks active issues, technical debt, and pending validation tasks
 | Category | Status | Count |
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 High | 1 |
-| **Validation Tasks** | 🟡 Pending | 10 |
-| **Resolved (Total)** | 🟢 Progress | 55 |
+| **Validation Tasks** | 🟡 Pending | 11 |
+| **Resolved (Total)** | 🟢 Progress | 56 |
 
 ---
 
@@ -30,6 +30,7 @@ This document tracks active issues, technical debt, and pending validation tasks
 ## 🟡 Pending Validation
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
+| **#042** | **Identity Locking Enforcement** | Verify that a Tracker ignores commands/pings from a Viewer with a mismatched `viewerId` ONLY after a non-default ID is paired. |
 | **#041** | **Identity Sanitization** | Verify that entering `pm clear ...` in ID fields results in a reset to default or rejection in UI. |
 | **#036** | **A15 Jitter Verification** | Confirm state stability on A15 Tracker under clear sky vs. indoor transition. |
 | **#037** | **G990E Display Muzzle** | Verify Viewer telemetry remains silent during G990E AOD transitions. |
@@ -40,6 +41,14 @@ This document tracks active issues, technical debt, and pending validation tasks
 | **#034** | **Sensor Stability** | Verify long-term stability of the `AppSensorThread`. |
 | **#035** | **Stationary Scaling** | Confirm `PROXIMITY_STARY_SCALING_MS_PER_HOUR` correctly scales skepticism. |
 | **#027** | **Identity Persistence Stability** | Verify that the Viewer identity ("V") remains stable during prolonged tracking sessions with frequent peer reconnects (v8.9.98). |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.1.1)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#042** | **Identity Mismatch (Viewer/Tracker ID)** | **Resolved**. Enforced refined `viewerId` locking (R982) in `SignalingValidator` and `CommunicationManager`. Implemented "Lock-on-Non-Default" logic to support first-time pairing while ensuring strict peer authorization for established links. |
 
 ---
 

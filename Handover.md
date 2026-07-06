@@ -1,20 +1,20 @@
-# Forensic Handover - v9.1.0 (Branding & UI Migration)
+# Forensic Handover - v9.1.1 (Identity Locking Refinement)
 
-## 📌 Status: Stable / Build PASS / Branding Migrated
-This cycle implements R799e: System-wide migration of Tracker JD Green from #367C2B to JD Vivid Green (#78BE20).
+## 📌 Status: Stable / Build PASS / Identity Lock Refined
+This cycle refines R982: Identity Locking to support first-time pairing while maintaining peer-to-peer security.
 
-### 🟢 Completed: Requirement R799e (JD Vivid Migration)
-*   **Color System Update**: 
-    *   Defined `BrandJdVivid` (#78BE20) in `Color.kt`.
-    *   Updated `BrandJd` to point to `BrandJdVivid`.
-    *   Preserved legacy #367C2B as `BrandJdDark` for UI depth.
-    *   Updated `colors.xml` (`brand_jd`, `role_tracker`, `colorPrimary`).
-*   **UI Implementation**: 
-    *   The transition is largely handled by the existing use of `BrandJd` and `@color/brand_jd` across the project.
-*   **Documentation Baseline**:
-    *   Updated `requirements_sot.md` to reflect the new vivid branding authority.
+### 🟢 Completed: Requirement R982 Refinement (Lock-on-Non-Default)
+*   **Signaling Guard**: 
+    *   Updated `SignalingValidator` in `:core:engine` to allow packets if the tracker is in the "Default/Unlocked" state (Viewer ID = "V").
+    *   Once a non-default `viewerId` is adopted, the tracker transitions to a "Locked" state, exclusively processing packets from that ID.
+*   **Communication Hardening**:
+    *   Applied "Default Relaxation" to `CommunicationManager` pulse and ping handlers.
+    *   Ensured trackers can still "adopt" the first valid viewer pulse they receive.
+*   **Documentation**:
+    *   Updated `requirements_sot.md` to reflect the refined R982 behavioral authority.
+    *   Resolved the pairing regression identified during v9.1.0 testing.
 
 ### 🛠 Instructions for Resumption
-1.  **Visual Audit**: Verify that the Tracker identity elements (StatusBar row, buttons, icons) reflect the more vivid #78BE20 green.
-2.  **Consistency Check**: Ensure that `colorPrimaryDark` (#367C2B) still provides enough contrast against the new primary color.
-3.  **Documentation**: Complete updates to `README.md` and `compliance.md`.
+1.  **Pairing Verification**: Perform a fresh install and verify the Tracker correctly adopts a custom Viewer ID on the first pulse.
+2.  **Lock Verification**: Once paired, verify the Tracker ignores a third-party Viewer attempting to send commands with a different ID.
+3.  **Audit**: Review `CommunicationManager` for any remaining legacy ID checks that bypass the `SignalingValidator`.

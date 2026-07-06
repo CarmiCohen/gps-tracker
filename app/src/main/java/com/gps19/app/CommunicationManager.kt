@@ -15,11 +15,11 @@ import javax.inject.Inject
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * v8.9.64:
- * - Issue #007: Enforcing "websocket" transport only to bypass polling overhead.
- * - Reduced reconnection delay to 2s for faster recovery.
- * v8.9.51:
- * - R182 Relaxation: Removed legacy prefix checks in updateIdentity and connect.
+ * v8.9.75:
+ * - Issue #042 Fix: Relaxed identity locking in handle...Relay methods to allow 
+ *   initial pairing when own viewerId is default ("V").
+ * v8.9.72:
+ * - Reverted lastDiscTs property naming to match Protobuf generated camelCase.
  */
 class CommunicationManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -54,6 +54,8 @@ class CommunicationManager @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
     private var pendingLocationUpdate: JSONObject? = null
     private var conflationJob: Job? = null
+
+    private fun isDefaultViewer(id: String) = id == SignalingConstants.DEFAULT_VIEWER_ID || id.isEmpty()
 
     private fun logToApp(message: String, important: Boolean = false) {
         if (isStopped) return
@@ -287,17 +289,18 @@ class CommunicationManager @Inject constructor(
         try {
             val data = args[0] as JSONObject
             val incomingId = data.optString("id", "").trim()
+            val incomingViewerId = data.optString("viewer_id", "").trim()
             val fromViewer = data.optBoolean("from_viewer", false)
 
             if (!SignalingValidator.shouldProcessSettingsUpdate(
                     incomingId = incomingId,
                     ownDeviceId = deviceId,
+                    incomingViewerId = incomingViewerId,
+                    ownViewerId = viewerId,
                     fromViewer = fromViewer,
                     isTrackerMode = isTrackerMode
             )) return
             
-            if (data.optString("viewer_id", "").trim().isEmpty()) return
-
             onRemoteUpdateWrapper.onUpdate(data)
         } catch (e: Exception) {
             Timber.e(e, "settings_relay parse error")
@@ -308,7 +311,13 @@ class CommunicationManager @Inject constructor(
         try {
             val data = args[0] as JSONObject
             val incomingViewerId = data.optString("viewer_id")
-            if (!isTrackerMode && incomingViewerId == viewerId) return
+            
+            // Fix #042: Identity Locking with Default Relaxation.
+            if (isTrackerMode) {
+                if (incomingViewerId != viewerId && !isDefaultViewer(viewerId)) return
+            } else {
+                if (incomingViewerId == viewerId) return
+            }
 
             onRemoteUpdateWrapper.onUpdate(JSONObject().apply {
                 put("type", "viewer_pulse"); put("viewer_id", incomingViewerId); put("from_viewer", true)
@@ -323,10 +332,14 @@ class CommunicationManager @Inject constructor(
             val data = args[0] as JSONObject
             val from = data.optString("from")
             val pingDeviceId = data.optString("id", "")
+            val incomingViewerId = data.optString("viewer_id", "")
             
             if (pingDeviceId == deviceId && deviceId.isNotEmpty()) {
                 val isViewerPing = from == SignalingConstants.getPeerTypeLabel(true)
                 val isTrackerPing = from == SignalingConstants.getOwnTypeLabel(true)
+                
+                // Fix #042: Identity Locking with Default Relaxation.
+                if (isTrackerMode && isViewerPing && incomingViewerId != viewerId && !isDefaultViewer(viewerId)) return
                 
                 if ((isTrackerMode && isViewerPing) || (!isTrackerMode && isTrackerPing)) {
                     val incomingMap = mutableMapOf<String, Any>()
@@ -338,7 +351,7 @@ class CommunicationManager @Inject constructor(
                     
                     onRemoteUpdateWrapper.onUpdate(JSONObject().apply {
                         put("type", SignalingConstants.getPulseType(isTrackerMode))
-                        put("viewer_id", data.optString("viewer_id"))
+                        put("viewer_id", incomingViewerId)
                         put("from_viewer", isViewerPing)
                     })
                 }
@@ -353,9 +366,9 @@ class CommunicationManager @Inject constructor(
             val data = args[0] as JSONObject
             val fromStr = data.optString("from")
             val pingDeviceId = data.optString("id", "")
+            val pongViewerId = data.optString("viewer_id", "")
             
             if (pingDeviceId == deviceId && deviceId.isNotEmpty()) {
-                val pongViewerId = data.optString("viewer_id", "")
                 val isFromViewer = fromStr == "viewer"
                 
                 val isMyPong = if (isTrackerMode) fromStr == "tracker" else isFromViewer
@@ -372,6 +385,9 @@ class CommunicationManager @Inject constructor(
                         telemetryRepository.updateLastRtt(lastRttInternal)
                     }
                 } else if (isPeerPong) {
+                    // Fix #042: Identity Locking with Default Relaxation.
+                    if (isTrackerMode && pongViewerId != viewerId && !isDefaultViewer(viewerId)) return
+
                     onRemoteUpdateWrapper.onUpdate(JSONObject().apply {
                         put("type", SignalingConstants.getPulseType(isTrackerMode))
                         put("viewer_id", pongViewerId)

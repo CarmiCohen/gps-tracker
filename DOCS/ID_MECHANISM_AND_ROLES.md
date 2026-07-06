@@ -1,4 +1,4 @@
-# ID Mechanism & Roles (v8.9.52)
+# ID Mechanism & Roles (v9.1.0)
 
 This document describes the identity management system used to pair devices and define their behavior within the GPS Tracker ecosystem.
 
@@ -13,9 +13,9 @@ The system uses a simple string-based identification system that serves as both 
 ### B. Viewer ID (`viewerId`)
 - **Purpose**: The identifier for the monitoring device (e.g., the owner's phone).
 - **Default**: `V` (Standardized per R182).
-- **Role**: Used to identify specific viewers when multiple phones are monitoring the same tracker.
+- **Role**: Used to identify specific viewers. **Identity Locking (R982)** ensures that only a Viewer with the matching `viewerId` can control or ping a Tracker.
 
-## 2. Pairing & Routing Mechanism (v8.9.52 baseline)
+## 2. Pairing & Routing Mechanism (v9.1.0 Hardening)
 
 ### A. Room-Based Signaling
 The connection is established using a **Matching ID** logic:
@@ -23,11 +23,12 @@ The connection is established using a **Matching ID** logic:
 2. The **Viewer** connects to the relay and also joins the room named after the *Tracker's* `deviceId`.
 3. The Relay Server broadcasts all packets (Location, Logs, etc.) only to members of that specific room.
 
-### B. Mutual Authentication
+### B. Mutual Authentication & Identity Locking (R982)
 Since the `deviceId` is chosen by the user, it acts as a shared secret.
-- **Tracker Side**: Only accepts commands or settings update packets if they are relayed into its specific room.
-- **Viewer Side**: Only processes location update or log update packets if they carry the matching `id`.
+- **Tracker Side**: Only accepts commands, pings, or settings update packets if they originate from a Viewer carrying the authorized `viewerId`. Packets from mismatched Viewer IDs are silently discarded at the signaling layer.
+- **Viewer Side**: Only processes location update or log update packets if they carry the matching `id` (Tracker ID).
 - **R182 Uniqueness**: Tracker and Viewer IDs must be unique from each other to prevent loopback forensic collisions.
+- **Identity Sanitization (R975)**: All IDs are strictly validated against the regex `^[a-zA-Z0-9_-]{1,32}$`.
 
 ## 3. Forensic Role Identification
 Every telemetry packet and forensic log entry includes a mandatory `role` field (Issue #182). Every log is also **geographically anchored** with `lat`/`lng` coordinates, `accuracy`, and authoritative `maxAccuracy` to enable forensic path reconstruction (Issue #325).
@@ -44,7 +45,7 @@ Users can change these IDs at any time through the "Settings" overlay:
 - **Ghost Mode (R338)**: Visual indicators dim to `Slate500` if the remote peer's identity pulse is > 15s old. (Aligned with v8.9.54 Hardening mandate).
 
 ## 6. Summary of Architecture Involved
-- `SettingsRepository.kt`: Defines storage keys and defaults.
-- `TrackerService.kt` / `ViewerService.kt`: Loads IDs on start.
-- `SyncManager.kt`: Handles the socket "join" and tags outgoing packets.
+- `SettingsRepository.kt`: Defines storage keys, defaults, and sanitization logic.
+- `SignalingValidator.kt`: Enforces role-based filtering and Identity Locking (R982).
+- `CommunicationManager.kt`: Implements socket listeners and applies validation logic to incoming traffic.
 - `LogManager.kt`: Attaches dual-metric anchors to forensic logs (Issue #325).
