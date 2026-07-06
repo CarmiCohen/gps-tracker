@@ -21,12 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v9.1.3:
+ * - Fix: Propagate local telemetry to repository in onLocationChanged. This 
+ *   ensures HUD satellite/age data is visible while in Tracker mode.
  * v8.9.99:
  * - Issue #041: Identity Hardening. Added strict validation to handleViewerPulse 
  *   to prevent command injection or corruption from malformed peer pulses.
- * v8.9.98:
- * - Maintenance: Aligned versioning with Identity Persistence Hardening release.
- * - Fix: Corrected typo in evaluateAlarmsInternal (maxTrackerAccuracy -> maxAccuracy).
  * v8.9.94:
  * - Issue #038: Implemented Adaptation Muzzle for A15. Triggers a 5s settling 
  *   window during GPS polling transitions to suppress trajectory jumps.
@@ -637,6 +637,7 @@ class TrackerService : BaseMonitorService() {
 
     private fun onLocationChanged(location: Location) {
         val nowRealtime = timeProvider.elapsedRealtime()
+        val nowWall = timeProvider.currentTimeMillis()
 
         if (currentGpsInterval == HIGH_FREQUENCY_GPS_POLLING_MS && lastGpsFixRealtime > 0) {
             val gap = nowRealtime - lastGpsFixRealtime
@@ -658,7 +659,9 @@ class TrackerService : BaseMonitorService() {
             isSuspicious = isSuspiciousMode,
             isMuzzled = isMuzzled,
             isA15 = isA15,
-            isAdaptationMuzzled = isAdaptationMuzzled // Issue #038
+            isAdaptationMuzzled = isAdaptationMuzzled, // Issue #038
+            nowRealtime = nowRealtime,
+            nowWall = nowWall
         )
         
         processed.suppressionNote?.let { note ->
@@ -679,6 +682,27 @@ class TrackerService : BaseMonitorService() {
         }
         
         lastKnownLocation = location; lastProcessedLocation = processed
+
+        repository.updateLocation(LocationUpdate(
+            lat = location.latitude,
+            lng = location.longitude,
+            alt = location.altitude,
+            speed = location.speed.toDouble(),
+            accuracy = location.accuracy.toDouble(),
+            bearing = location.bearing.toDouble(),
+            battery = integrityMonitor.getBatteryLevel(),
+            temp = integrityMonitor.batteryTemp,
+            isCharging = integrityMonitor.isCharging,
+            gpsTs = location.time,
+            ts = nowWall,
+            isMe = true,
+            satsView = gpsManager.satellitesInView,
+            satsUsed = location.extras?.getInt("satellites") ?: gpsManager.satellitesUsed,
+            maxAccuracy = processed.maxAccuracy,
+            currentMa = integrityMonitor.getBatteryCurrent(),
+            lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
+            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
+        ))
     }
 
     override fun onDestroy() {

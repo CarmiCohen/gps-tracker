@@ -44,6 +44,9 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v9.1.3:
+ * - Fix: Parity hardening for HUD Tracker line. Satellite and Age fields are now
+ *   always visible in Viewer mode, even with zero/stale values.
  * v9.1.0:
  * - R957: Redesigned Status Badges. Removed LED circles; status is now indicated 
  *   directly by text color (Green/Red) for reduced visual clutter and a more 
@@ -602,13 +605,13 @@ fun StatusRowData(
                 }
                 Box(modifier = Modifier.width(20.dp), contentAlignment = Alignment.Center) { CommBar(commIndex, if (isTelemetryFresh) contentColor else Slate500) }
                 Spacer(Modifier.width(4.dp))
-                Box(modifier = Modifier.width(34.dp)) { if (satsUsed > 0) Text(text = "$satsUsed/$satsView", color = if(isGpsStale || !isTelemetryFresh) Slate500 else gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) }
+                Box(modifier = Modifier.width(34.dp)) { Text(text = "$satsUsed/$satsView", color = if(isGpsStale || !isTelemetryFresh) Slate500 else gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) }
                 Box(modifier = Modifier.width(26.dp)) {
-                    if (gpsAgeMs != -1L) {
+                    val ageStr = if (gpsAgeMs != -1L) {
                         val ageSec = (maxOf(0L, gpsAgeMs) / 1000).toInt()
-                        val ageStr = when { ageSec < 100 -> "${ageSec}s"; ageSec < 3600 -> "${ageSec/60}m"; else -> ">1h" }
-                        Text(text = ageStr, color = if (isGpsStale || !isTelemetryFresh) Slate500 else gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
-                    }
+                        when { ageSec < 100 -> "${ageSec}s"; ageSec < 3600 -> "${ageSec/60}m"; else -> ">1h" }
+                    } else "--s"
+                    Text(text = ageStr, color = if (isGpsStale || !isTelemetryFresh) Slate500 else gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                 }
             }
         }

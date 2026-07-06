@@ -24,13 +24,12 @@ def getGitVersionName = { ->
     try {
         def stdout = new ByteArrayOutputStream()
         project.exec {
-            commandLine 'git', 'describe', '--tags', '--always', '--dirty'
+            commandLine 'git', 'describe', '--tags', '--always'
             standardOutput = stdout
         }
-        // Updated regex to more reliably strip 'v' or 'v.' prefixes
-        return stdout.toString().trim().replaceAll("^v[.]?", "")
+        return stdout.toString().trim().replaceFirst("^v", "")
     } catch (Exception ignored) {
-        return "1.0.0"
+        return "9.1.3"
     }
 }
 
@@ -57,17 +56,6 @@ android {
             minifyEnabled = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = '17'
-    }
-    buildFeatures {
-        compose = true
-        buildConfig = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

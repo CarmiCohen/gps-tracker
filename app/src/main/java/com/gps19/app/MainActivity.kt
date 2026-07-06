@@ -18,6 +18,8 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * v9.1.3:
+ * - Maintenance: Corrected versioning sequence and redeployed stable engine.
  * v8.9.87:
  * - Issue #005 Hardening: Replaced all dynamic packageName calls with cachedPkgName 
  *   to eliminate repetitive getPackageName() logcat spam on Samsung devices.
