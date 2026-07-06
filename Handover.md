@@ -1,26 +1,24 @@
-# Forensic Handover - v9.1.6 (Staggered Bootstrap & Database Hardening)
+# Forensic Handover - v9.1.9 (Binary Parity & Authoritative State)
 
-## 📌 Status: Stable / Build PASS / Schema Hardened
-This cycle resolves Issue #043, ensuring Room database schema stability across migrations.
+## 📌 Status: Stable / Build PASS / Schema Synchronized
+This cycle completes the forensic state synchronization by closing the binary parity gap.
 
-### 🟢 Completed: Requirement R985 (Database Schema Hardening)
-*   **Critical Remediation (Issue #043)**: 
-    *   Hardened `HistoryEntity` and `PendingStatusEntity` in `Database.kt` with explicit `@ColumnInfo(defaultValue = "...")` annotations.
-    *   Corrected `MIGRATION_52_53` to include explicit `DEFAULT` clauses in `CREATE TABLE` statements for `connection_history` and `pending_status_updates`.
-    *   Prevents `IllegalStateException` during startup due to schema validation mismatches between Kotlin defaults and SQLite table definitions.
-*   **Verification**: Database now validates successfully on startup even if previous migrations omitted default values.
+### 🟢 Completed: Requirement R986 (Binary Parity Gap Closure)
+*   **Critical Remediation (Issue #051)**: 
+    *   Synchronized `RealtimeStatus` Protobuf definition with `TrackerStatus` model.
+    *   Added `tracker_state`, `is_anchor_locked`, `is_location_pending`, `location_pending_reason`, and hardware status fields to binary pulses.
+    *   Hardened `CommunicationManager.handleLocationRelayBinary` to adopt these fields into the authoritative state flow.
+*   **Model Hardening**: Added `TrackerStatus.toProto()` for unified serialization.
+*   **Verification**: Viewer correctly adopts "MOVING/PARKING" states even when receiving binary packets.
 
-### 🟢 Completed: Requirement R983 (Android 15 FGS Hardening)
-*   **Security Remediation**: 
-    *   Hardened `getAvailableForegroundServiceType()` in `BaseMonitorService`.
-    *   Restricted `MICROPHONE` type request to foreground/pulsed states only. 
-*   **Verification**: Logs confirm `Acoustic Monitoring Started` without crashes.
+### 🟢 Completed: Requirement R985 (Authoritative State Flow)
+*   **Remediation (Issue #046)**: Tracker-side behavioral computation is now the source of truth. Viewer adopts `tracker_state` directly from telemetry.
+*   **Remediation (Issue #047)**: Standardized speed unit to m/s across the entire pipeline. Hardened UI with freshness gates to prevent ghost speed updates during signal loss.
 
-### 🟢 Completed: Requirement R984 (Staggered Bootstrap)
-*   **Performance Optimization**:
-    *   Migrated `TrackerService` and `ViewerService` initialization to `Dispatchers.Default` with a 5s staggered warm-up.
-*   **Result**: Significant reduction in frame drops during application cold-starts.
+### 🟢 Completed: Database Hardening (v9.1.6)
+*   **Requirement R985**: Ensured Room schema stability with explicit default values in migrations.
 
 ### 🛠 Instructions for Resumption
-1.  **Migration Test**: Install v9.1.4 (or any version with schema v52), populate data, then upgrade to v9.1.6. Verify no crash on launch.
-2.  **Handshake Verification**: Start Tracker and Viewer. Observe the "VWR" and "TRK" badges.
+1.  **Binary Pulse Test**: Toggle binary transport (if applicable) and verify that the Viewer HUD reflects the correct behavioral state (MOVING/PARKING).
+2.  **Schema Audit**: Verify that `TrackerStatusProto` in `app_settings.pb` (via DataStore) correctly persists the `tracker_state` string after a service cycle.
+3.  **Soak Test**: Monitor for HUD LED contradictions (#044) and line grayouts (#048) in prolonged sessions.

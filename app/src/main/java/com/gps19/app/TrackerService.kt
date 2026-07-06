@@ -21,12 +21,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.1.5:
- * - Issue #046: Implemented Staggered Bootstrap. Offloaded initialization to
- *   Dispatchers.Default and staggered manager startups to prevent CPU contention.
- * v8.9.75 (Refined):
- * - Issue #014: System-Wide Type Safety. Standardized all telemetry handling to Double.
- *   Eliminated toDouble() noise when processing system Location updates.
+ * v9.1.9:
+ * - Issue #051: Binary Parity Gap closure support. 
+ * v9.1.8:
+ * - Issue #046 Fix: Shared Behavioral State. Authoritative TrackerState broadcast.
+ * - Issue #047 Fix: Standardized to m/s. Passing raw speed to pipeline.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -448,7 +447,7 @@ class TrackerService : BaseMonitorService() {
 
         val peakDb = sensorManager.consumeAcousticPeak()
         val minDb = sensorManager.consumeAcousticMin()
-        val peakShock = sensorManager.consumePeakVibration()
+        val peakShockVal = sensorManager.consumePeakVibration()
         val peakVz = sensorManager.consumePeakVerticalVelocity()
         val peakVzTs = sensorManager.consumePeakVerticalVelocityTs()
         val peakDz = sensorManager.consumePeakVerticalDisplacement()
@@ -456,7 +455,7 @@ class TrackerService : BaseMonitorService() {
         locationProcessor.updateSensorData(
             vibration = sensorManager.currentVibrationIndex, heading = sensorManager.currentCompassHeading, baroAlt = sensorManager.absoluteAltitude,
             lux = sensorManager.currentLux, isNear = sensorManager.isProximityNear, powerTamper = integrityMonitor.isPowerTamperDetected,
-            tiltDegrees = sensorManager.currentTiltDegrees, acousticDb = peakDb, peakShock = peakShock, acousticMinDb = minDb,
+            tiltDegrees = sensorManager.currentTiltDegrees, acousticDb = peakDb, peakShock = peakShockVal, acousticMinDb = minDb,
             peakVerticalVelocity = peakVz, peakVerticalVelocityTs = peakVzTs, 
             peakVerticalDisplacement = peakDz,
             plungeMatched = sensorManager.consumePlungeMatched(), 
@@ -495,6 +494,18 @@ class TrackerService : BaseMonitorService() {
         }
 
         val proc = lastProcessedLocation
+        
+        // Issue #046: Update authoritative state on the Tracker side.
+        val currentTrackerState = TrackerStateManager.updateState(
+            isVisualJump = proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER,
+            isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false,
+            speed = proc?.filteredSpeed ?: 0.0, // Now standardized to m/s
+            vibration = sensorManager.currentVibrationIndex,
+            vibrationFloor = locationProcessor.getAdaptiveVibrationFloor(),
+            isTrackerConnected = isSocketConnected,
+            systemTimePulse = now
+        )
+
         syncManager.pushCurrentStatus(
             deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true, loc = lastKnownLocation, filtered = proc?.optimizedPoint,
             distToTracker = locationProcessor.getDistanceToTracker(), distToHome = locationProcessor.getNearestHomeDistance(),
@@ -503,8 +514,10 @@ class TrackerService : BaseMonitorService() {
             lux = sensorManager.currentLux, isNear = sensorManager.isProximityNear, isSuspicious = isSuspiciousMode, tiltDegrees = sensorManager.currentTiltDegrees,
             acousticDb = sensorManager.currentAcousticDb, isJump = (proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER), 
             isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false, jumpTier = proc?.jumpTier ?: 0, isJammer = isJammerSuspicionActive,
-            isStalledRaw = proc?.isStalled ?: false, isStalledActive = isGpsStalledActive, peakShock = locationProcessor.getPeakVibrationShock(),
-            peakShockTs = locationProcessor.sentinel.peakVibrationShockTs, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
+            isStalledRaw = proc?.isStalled ?: false, isStalledActive = isGpsStalledActive, 
+            peakShock = locationProcessor.getPeakVibrationShock(),
+            peakShockTs = locationProcessor.sentinel.peakVibrationShockTs, 
+            luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
             adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = sensorManager.proximityIdx, proximityCm = sensorManager.debouncedProximityCm,
             proximityDebounceMs = sensorManager.proximityDebounceMs, vibrationRollingSum = sensorManager.vibrationRollingSum,
             micPending = false, isTamperDetected = false, isPowerTamper = integrityMonitor.isPowerTamperDetected, 
@@ -521,7 +534,8 @@ class TrackerService : BaseMonitorService() {
             baroIdx = baroIdx,
             isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive,
             batteryLevel = integrityMonitor.getBatteryLevel(), batteryTemp = integrityMonitor.batteryTemp, isCharging = integrityMonitor.isCharging,
-            isAnchorLocked = proc?.isAnchorLocked ?: false
+            isAnchorLocked = proc?.isAnchorLocked ?: false,
+            trackerState = currentTrackerState
         )
 
         val gpsTs = proc?.timestamp ?: 0L
@@ -554,7 +568,7 @@ class TrackerService : BaseMonitorService() {
             sitShock = locationProcessor.sentinel.lastSitShock,
             isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge,
             isCoolingModeActive = integrityMonitor.isCoolingModeActive,
-            speed = (proc?.filteredSpeed ?: 0.0) / 3.6,
+            speed = proc?.filteredSpeed ?: 0.0, // Standardized to m/s
             bearing = (lastKnownLocation?.bearing?.toDouble() ?: 0.0),
             isSitDetected = latchedSitDetected,
             isSitActive = lastSitDetected,
@@ -610,7 +624,7 @@ class TrackerService : BaseMonitorService() {
                 trackerLng = proc?.optimizedPoint?.lng ?: 0.0, trackerAccuracy = proc?.currentAccuracy ?: 0.0, 
                 maxTrackerAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), trackerLastGpsTs = proc?.timestamp ?: 0L,
                 trackerLastValidFixTs = locationProcessor.getLastValidFixTs(),
-                trackerSpeed = (proc?.filteredSpeed ?: 0.0) / 3.6, trackerBattery = integrityMonitor.getBatteryLevel(), trackerTemp = integrityMonitor.batteryTemp,
+                trackerSpeed = proc?.filteredSpeed ?: 0.0, trackerBattery = integrityMonitor.getBatteryLevel(), trackerTemp = integrityMonitor.batteryTemp,
                 isHardwareOnline = true, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
                 isJammerSuspicion = isJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isGpsStalling, isUiVisible = isUiVisible(),
                 distToHomeAuthority = locationProcessor.getNearestHomeDistance(), maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), 
@@ -656,7 +670,7 @@ class TrackerService : BaseMonitorService() {
         lastGpsFixRealtime = nowRealtime
 
         val processed = locationProcessor.processGpsPoint(
-            lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedKph = location.speed.toDouble() * 3.6, 
+            lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = location.speed.toDouble(), 
             gpsTs = location.time, accuracy = location.accuracy.toDouble(), bearing = location.bearing.toDouble(), snr = gpsManager.averageSnr, 
             satsUsed = location.extras?.getInt("satellites") ?: gpsManager.satellitesUsed, isViewerTrail = false, lastGpsTs = sessionManager.lastGpsTs, 
             isLocal = true, providedAdaptiveVibrationFloor = sensorManager.adaptiveVibrationFloor, 

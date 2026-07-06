@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
+ * v9.1.8:
+ * - Issue #046: Shared Behavioral State. Added trackerState for authoritative 
+ *   broadcast from Tracker to Viewer HUD.
  * v8.9.77:
  * - Issue #018: Stationary Anchor Hard-Lock. Added isAnchorLocked for 
  *   forensic audit transparency.
@@ -73,5 +76,6 @@ data class LocationUpdate(
     val baroIdx: Double = 0.0,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val isAnchorLocked: Boolean = false
+    val isAnchorLocked: Boolean = false,
+    val trackerState: TrackerState = TrackerState.UNKNOWN
 )

@@ -15,6 +15,9 @@ import javax.inject.Inject
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * v9.1.9:
+ * - Issue #051: Binary Parity Gap. Updated handleLocationRelayBinary to extract
+ *   new forensic fields: tracker_state, is_anchor_locked, is_location_pending, etc.
  * v8.9.75:
  * - Issue #042 Fix: Relaxed identity locking in handle...Relay methods to allow 
  *   initial pairing when own viewerId is default ("V").
@@ -252,6 +255,15 @@ class CommunicationManager @Inject constructor(
                 put("total_drop_ms", status.totalDropMs); put("max_drop_ms", status.maxDropMs)
                 put("last_conn_ts", status.lastConnTs); put("last_disc_ts", status.lastDiscTs); put("is_historical", status.isHistorical)
                 put("alt", status.alt)
+                
+                // v9.1.9: Binary Parity for Forensic Fields
+                put("tracker_state", status.trackerState)
+                put("is_anchor_locked", status.isAnchorLocked)
+                put("is_location_pending", status.isLocationPending)
+                put("location_pending_reason", status.locationPendingReason)
+                put("last_valid_fixRealtime", status.lastValidFixRealtime)
+                put("is_battery_steep_discharge", status.isBatterySteepDischarge)
+                put("is_cooling_mode_active", status.isCoolingModeActive)
             }
             onRemoteUpdateWrapper.onUpdate(json)
         } catch (e: Exception) {

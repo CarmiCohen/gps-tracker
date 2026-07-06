@@ -4,10 +4,10 @@ import kotlin.math.*
 
 /**
  * ImmFilter: Interacting Multiple Model Filter.
- * v8.9.79:
- * - Issue #016: Standardized getEstimatedBearing to return Double.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Accepting Double for accuracy to align with standardized telemetry types.
+ * v9.1.8:
+ * - Issue #047: Standardized to m/s. Renamed getEstimatedSpeedKph to 
+ *   getEstimatedSpeedMps and removed internal unit conversion to prevent 
+ *   compounding multipliers.
  */
 class ImmFilter {
 
@@ -86,14 +86,14 @@ class ImmFilter {
         return EngineGeoPoint(mixedLat, mixedLng, ts = timestamp, accuracy = accuracy)
     }
 
-    fun getEstimatedSpeedKph(): Double {
+    fun getEstimatedSpeedMps(): Double {
         val mixedVx = (modelStationary.vx * modelStationary.probability) + (modelKinematic.vx * modelKinematic.probability)
         val mixedVy = (modelStationary.vy * modelStationary.probability) + (modelKinematic.vy * modelKinematic.probability)
         
         if (!mixedVx.isFinite() || !mixedVy.isFinite()) return 0.0
         
         val speedMps = sqrt(mixedVx * mixedVx + mixedVy * mixedVy)
-        return min(speedMps * 3.6, OUTLIER_SPEED_CAP_MPS * 3.6)
+        return min(speedMps, OUTLIER_SPEED_CAP_MPS)
     }
 
     fun getEstimatedBearing(): Double {

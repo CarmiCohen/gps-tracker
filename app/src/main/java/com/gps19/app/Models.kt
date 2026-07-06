@@ -10,11 +10,15 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v9.1.9:
+ * - Issue #051: Binary Parity Gap. Added TrackerStatus.toProto() to support 
+ *   binary telemetry pulses with full forensic context.
+ * v9.1.8:
+ * - Issue #046: Shared Behavioral State. Removed local TrackerState enum in favor 
+ *   of core:engine definition. Added trackerState to TrackerStatus.
  * v8.9.78:
  * - Issue #016: Performance Optimization. Added lazy GeoPoint caching to TrailPoint 
  *   to eliminate thousands of object allocations per second during map updates.
- * v8.9.77:
- * - Issue #018: Stationary Anchor Hard-Lock. Added isAnchorLocked for forensic transparency.
  */
 
 @Serializable
@@ -262,7 +266,8 @@ data class TrackerStatus(
     val baroIdx: Double = 0.0,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val isAnchorLocked: Boolean = false
+    val isAnchorLocked: Boolean = false,
+    val trackerState: TrackerState = TrackerState.UNKNOWN
 ) : SpatialAnchor {
     fun toJSONObject(fromViewer: Boolean): JSONObject {
         return JSONObject().apply {
@@ -344,13 +349,48 @@ data class TrackerStatus(
             put("is_battery_steep_discharge", isBatterySteepDischarge)
             put("is_cooling_mode_active", isCoolingModeActive)
             put("is_anchor_locked", isAnchorLocked)
+            put("tracker_state", trackerState.name)
         }
+    }
+
+    fun toProto(fromViewer: Boolean): RealtimeStatus {
+        return RealtimeStatus.newBuilder()
+            .setId(deviceId)
+            .setViewerId(viewerId)
+            .setFromViewer(fromViewer)
+            .setLat(lat)
+            .setLng(lng)
+            .setAlt(alt)
+            .setSpeed(speed)
+            .setBearing(bearing)
+            .setAccuracy(accuracy)
+            .setMaxAccuracy(maxAccuracy)
+            .setGpsTs(gpsTs)
+            .setTs(ts)
+            .setBattery(battery)
+            .setTemp(temp)
+            .setIsCharging(isCharging)
+            .setSatsView(satsView)
+            .setSatsUsed(satsUsed)
+            .setUptimeMs(uptimeMs)
+            .setTotalConnectedMs(totalConnectedMs)
+            .setSessionConnectedMs(sessionConnectedMs)
+            .setTotalDropMs(totalDropMs)
+            .setMaxDropMs(maxDropMs)
+            .setLastConnTs(lastConnTs)
+            .setLastDiscTs(lastDiscTs)
+            .setTrackerState(trackerState.name)
+            .setIsAnchorLocked(isAnchorLocked)
+            .setIsLocationPending(isLocationPending)
+            .setLocationPendingReason(locationPendingReason.name)
+            .setLastValidFixRealtime(lastValidFixRealtime)
+            .setIsBatterySteepDischarge(isBatterySteepDischarge)
+            .setIsCoolingModeActive(isCoolingModeActive)
+            .build()
     }
 }
 
 data class AlarmInfo(val title: String, val subtitle: String, val type: String = "", val isResolved: Boolean = false, val isSirenDisabled: Boolean = false)
-
-enum class TrackerState { MOVING, PARKING, JUMPING, OFFLINE, UNKNOWN }
 
 data class LocationState(
     val lat: Double = 0.0,
@@ -412,7 +452,8 @@ data class LocationState(
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
     val currentMa: Int = 0,
-    val isAnchorLocked: Boolean = false
+    val isAnchorLocked: Boolean = false,
+    val trackerState: TrackerState = TrackerState.UNKNOWN
 )
 
 data class DashboardState(

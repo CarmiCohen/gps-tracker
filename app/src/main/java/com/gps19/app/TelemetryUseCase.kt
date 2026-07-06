@@ -6,9 +6,11 @@ import javax.inject.Singleton
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * v9.1.8:
+ * - Issue #046: Shared Behavioral State. Mapped trackerState from incoming telemetry 
+ *   to ensure authoritative HUD display.
  * v8.9.79:
  * - Issue #014: Type Migration. Standardized to Double for all telemetry mapping.
- *   Ensured violationPercentage and accuracy fields are explicitly Double.
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(
@@ -77,7 +79,8 @@ class TelemetryUseCase @Inject constructor(
             snrIdx = update.snrIdx,
             isCoolingModeActive = update.isCoolingModeActive,
             currentMa = update.currentMa,
-            isAnchorLocked = update.isAnchorLocked
+            isAnchorLocked = update.isAnchorLocked,
+            trackerState = update.trackerState
         )
     }
 
@@ -107,7 +110,8 @@ class TelemetryUseCase @Inject constructor(
             gnssDetail = status.gnssDetail, snrIdx = status.snrIdx,
             isCoolingModeActive = status.isCoolingModeActive,
             currentMa = status.currentMa,
-            isAnchorLocked = status.isAnchorLocked
+            isAnchorLocked = status.isAnchorLocked,
+            trackerState = status.trackerState
         )
     }
 
@@ -172,7 +176,8 @@ class TelemetryUseCase @Inject constructor(
             snrIdx = update.snrIdx,
             isCoolingModeActive = update.isCoolingModeActive,
             currentMa = update.currentMa,
-            isAnchorLocked = update.isAnchorLocked
+            isAnchorLocked = update.isAnchorLocked,
+            trackerState = update.trackerState
         )
     }
 

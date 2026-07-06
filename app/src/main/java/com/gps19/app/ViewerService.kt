@@ -18,12 +18,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * v9.1.5:
- * - Issue #046: Implemented Staggered Bootstrap. Offloaded initialization to 
- *   Dispatchers.Default and staggered subsystem startups.
- * v8.9.75 (Refined):
- * - Issue #014: System-Wide Type Safety. Standardized all telemetry handling to Double.
- *   Eliminated toDouble() noise when processing system Location updates.
+ * v9.1.9:
+ * - Issue #051: Binary Parity Gap closure support.
+ * v9.1.8:
+ * - Issue #047: Standardized to m/s. Passing raw speed to LocationProcessor 
+ *   to maintain pipeline consistency.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -212,7 +211,7 @@ class ViewerService : BaseMonitorService() {
             lat = location.latitude,
             lng = location.longitude,
             alt = location.altitude,
-            androidSpeedKph = location.speed.toDouble() * 3.6,
+            androidSpeedMps = location.speed.toDouble(),
             gpsTs = location.time,
             accuracy = location.accuracy.toDouble(),
             bearing = location.bearing.toDouble(),
@@ -339,7 +338,7 @@ class ViewerService : BaseMonitorService() {
                 val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
                 if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
                     val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY AUDIT (V): Reliability ${String.format(Locale.getDefault(), \"%.1f\", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true,
+                    logManager.logServiceEvent("STABILITY AUDIT (V): Reliability ${String.format(Locale.getDefault(), "%.1f", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true,
                         lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                 }
                 stabilityAuditFixCount = 0
@@ -427,7 +426,7 @@ class ViewerService : BaseMonitorService() {
             tiltIdx = 0.0, baroIdx = 0.0,
             verticalVelocity = 0.0, sitVz = 0.0, sitDz = 0.0, sitBaro = 0.0, sitTilt = 0.0, sitShock = 0.0,
             isBatterySteepDischarge = false, isCoolingModeActive = false,
-            speed = (proc?.filteredSpeed ?: 0.0) / 3.6,
+            speed = proc?.filteredSpeed ?: 0.0, // Standardized to m/s
             bearing = (lastKnownLocation?.bearing?.toDouble() ?: 0.0),
             isSitDetected = false, isSitActive = false, currentMa = integrityMonitor.getBatteryCurrent(),
             locationPendingReason = LocationPendingReason.NONE
@@ -459,7 +458,6 @@ class ViewerService : BaseMonitorService() {
         isTrackerGap: Boolean,
         isTrackerConnected: Boolean
     ) {
-        val proc = lastProcessedLocation
         val isSocketConnected = networkManager.isConnected()
         
         alarmEvalJob?.cancel()

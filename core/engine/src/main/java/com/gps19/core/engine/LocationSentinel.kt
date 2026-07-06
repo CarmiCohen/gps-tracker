@@ -5,15 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * v9.1.8:
+ * - Issue #047: Standardized to m/s. Renamed getEstimatedSpeedKph to 
+ *   getEstimatedSpeedMps.
  * v8.9.92:
  * - Issue #036: Passed isA15 flag to PhysicsUtils.isVisualJump to enable hardened 
  *   jitter filtering for A15 hardware.
- * v8.9.79:
- * - Issue #016: Finalized Double standardization for performance. Removed casting overhead.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized internal state to Double.
- * v8.9.68:
- * - Issue #011: Implemented suppressionNote generation for forensic transparency.
  */
 class LocationSentinel {
 
@@ -246,7 +243,7 @@ class LocationSentinel {
         baselineSitTilt = -1.0
     }
 
-    fun getEstimatedSpeedKph(): Double = immFilter.getEstimatedSpeedKph()
+    fun getEstimatedSpeedMps(): Double = immFilter.getEstimatedSpeedMps()
     fun getEstimatedBearing(): Double = immFilter.getEstimatedBearing()
     fun getStationaryProbability(): Double = immFilter.getStationaryProbability()
 

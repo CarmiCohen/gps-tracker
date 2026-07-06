@@ -4,12 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v9.1.8:
+ * - Issue #046: Shared Behavioral State. Migrated TrackerState to engine 
+ *   to allow authoritative state broadcast from Tracker to Viewer.
  * v8.9.77:
  * - Issue #018: Stationary Anchor Hard-Lock. Added isAnchorLocked to 
  *   EngineConnectionPoint for forensic audit.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions across module boundaries.
  */
 
 @Serializable
@@ -20,6 +20,9 @@ data class EngineGeoPoint(
     val accuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0
 )
+
+@Serializable
+enum class TrackerState { MOVING, PARKING, JUMPING, OFFLINE, UNKNOWN }
 
 enum class DiscoveryPhase {
     BOOTSTRAP, DISCOVERING, MONITORING

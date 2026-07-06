@@ -16,15 +16,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
- * v9.0.5:
- * - Fix: Propagating lastRemoteActivityTs to repository to ensure UI recognizes 
- *   fresh telemetry and avoids "Ghost Mode" when connected.
- * v8.9.91:
- * - Issue #029: Telemetry Stale Badge Fix. Explicitly setting 'ts' field in LocationUpdate 
- *   to 'now' to ensure DAT badge turns green on packet arrival even without fresh GPS fix.
- * v8.9.77:
- * - Issue #018: Stationary Anchor Hard-Lock. Added isTrackerAnchorLocked 
- *   propagation for forensic audit transparency.
+ * v9.1.8:
+ * - Issue #046 Fix: Shared Behavioral State. Extracted tracker_state from remote pulse.
+ * - Issue #047 Fix: Standardized to m/s. Passing raw speed to LocationProcessor.
  */
 class RemoteHandler(
     private val context: Context,
@@ -86,6 +80,7 @@ class RemoteHandler(
     var isTrackerStorageLow = false
     var isTrackerStorageCritical = false
     var isTrackerAnchorLocked = false
+    var trackerState = TrackerState.UNKNOWN
 
     var trackerSitVz = 0.0 
     var trackerSitDz = 0.0 
@@ -170,6 +165,7 @@ class RemoteHandler(
                     isTrackerStorageLow = s.isStorageLow
                     isTrackerStorageCritical = s.isStorageCritical
                     isTrackerAnchorLocked = s.isAnchorLocked
+                    trackerState = s.trackerState
                     
                     trackerLastValidFixRealtime = s.lastValidFixRealtime
 
@@ -211,6 +207,7 @@ class RemoteHandler(
                         isBatterySteepDischarge = isTrackerBatterySteepDischarge,
                         isCoolingModeActive = isTrackerCoolingModeActive,
                         isAnchorLocked = isTrackerAnchorLocked,
+                        trackerState = trackerState,
                         ts = s.ts // Initial load from stored status
                     ))
                 }
@@ -268,6 +265,7 @@ class RemoteHandler(
         isTrackerStorageLow = false
         isTrackerStorageCritical = false
         isTrackerAnchorLocked = false
+        trackerState = TrackerState.UNKNOWN
         
         repository.saveDoubleSync(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0)
         repository.saveDoubleSync(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
@@ -404,6 +402,9 @@ class RemoteHandler(
             isTrackerStorageCritical = data.optBoolean("is_storage_critical", isTrackerStorageCritical)
             isTrackerAnchorLocked = data.optBoolean("is_anchor_locked", false)
 
+            val stateStr = data.optString("tracker_state", "UNKNOWN")
+            trackerState = try { TrackerState.valueOf(stateStr) } catch(e: Exception) { TrackerState.UNKNOWN }
+
             if (data.has("gnss_detail")) {
                 try {
                     val array = data.getJSONArray("gnss_detail")
@@ -436,7 +437,7 @@ class RemoteHandler(
                 val rawLat = data.optDouble("lat", 0.0)
                 val rawLng = data.optDouble("lng", 0.0)
                 
-                val rawSpeed = data.optDouble("speed", -1.0)
+                val rawSpeedMps = data.optDouble("speed", -1.0)
                 val rawBearing = data.optDouble("bearing", 0.0)
                 val rawAccuracy = data.optDouble("accuracy", 0.0)
                 val rawMaxAcc = data.optDouble("max_accuracy", 0.0)
@@ -451,7 +452,7 @@ class RemoteHandler(
                     lat = rawLat,
                     lng = rawLng,
                     alt = data.optDouble("alt", 0.0),
-                    androidSpeedKph = if (rawSpeed >= 0.0) rawSpeed * 3.6 else 0.0,
+                    androidSpeedMps = if (rawSpeedMps >= 0.0) rawSpeedMps else 0.0,
                     gpsTs = candidateTs,
                     accuracy = if (rawAccuracy > 0.0) rawAccuracy else 0.0,
                     bearing = rawBearing,
@@ -463,6 +464,7 @@ class RemoteHandler(
                     providedIsJump = isJumpPacket,
                     providedIsTrajectoryPromoted = isTrajectoryPacket,
                     providedJumpTier = jumpTierPacket,
+                    providedIsAdaptiveJump = data.optBoolean("is_adaptive_jump", false),
                     providedIsJammer = isJammerPacket,
                     providedIsStalled = isStalledPacket,
                     providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending,
@@ -482,7 +484,7 @@ class RemoteHandler(
                         if (!isStalledPacket) trackerLastValidFixRealtime = nowRealtime
                     }
                     
-                    trackerSpeed = processed.filteredSpeed / 3.6
+                    trackerSpeed = processed.filteredSpeed
                     trackerBearing = rawBearing
                     
                     if (rawAccuracy > 0.0) trackerAccuracy = rawAccuracy
@@ -625,6 +627,7 @@ class RemoteHandler(
                         isBatterySteepDischarge = isTrackerBatterySteepDischarge,
                         isCoolingModeActive = isTrackerCoolingModeActive,
                         isAnchorLocked = isTrackerAnchorLocked,
+                        trackerState = trackerState,
                         ts = now // ISSUE #029 FIX: SET TELEMETRY ARRIVAL TIMESTAMP TO NOW
                     ))
                     
@@ -662,7 +665,8 @@ class RemoteHandler(
                         baroIdx = trackerBaroIdx,
                         isBatterySteepDischarge = isTrackerBatterySteepDischarge,
                         isCoolingModeActive = isTrackerCoolingModeActive,
-                        isAnchorLocked = isTrackerAnchorLocked
+                        isAnchorLocked = isTrackerAnchorLocked,
+                        trackerState = trackerState
                     ))
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e

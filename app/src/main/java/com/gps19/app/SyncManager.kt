@@ -10,12 +10,12 @@ import timber.log.Timber
 
 /**
  * SyncManager: Handles the telemetry synchronization loop.
+ * v9.1.8:
+ * - Issue #046: Shared Behavioral State. Added trackerState to pushCurrentStatus 
+ *   to ensure authoritative state broadcast.
  * v8.9.77:
  * - Issue #018: Stationary Anchor Hard-Lock. Propagating isAnchorLocked flag 
  *   to TrackerStatus and persistence.
- * v8.9.75 (Refined):
- * - Issue #014: Type Safety Optimization. Standardized all telemetry parameters 
- *   to Double. Eliminated toDouble() noise in the sync pipeline.
  */
 class SyncManager(
     private val context: Context,
@@ -92,7 +92,8 @@ class SyncManager(
         lastValidFixRealtime: Long, gnssDetail: GnssDetail?, snrIdx: Double, tiltIdx: Double, baroIdx: Double,
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
         batteryLevel: Int, batteryTemp: Double, isCharging: Boolean,
-        isAnchorLocked: Boolean = false
+        isAnchorLocked: Boolean = false,
+        trackerState: TrackerState = TrackerState.UNKNOWN
     ) {
         val status = TrackerStatus(
             deviceId = deviceId,
@@ -153,7 +154,8 @@ class SyncManager(
             battery = batteryLevel,
             temp = batteryTemp,
             isCharging = isCharging,
-            isAnchorLocked = isAnchorLocked
+            isAnchorLocked = isAnchorLocked,
+            trackerState = trackerState
         )
 
         val success = networkManager.sendTelemetry(status)
@@ -198,7 +200,8 @@ class SyncManager(
                     netInterface = status.netInterface,
                     lastValidFixRealtime = status.lastValidFixRealtime,
                     locationPendingReason = status.locationPendingReason.name,
-                    isAnchorLocked = status.isAnchorLocked
+                    isAnchorLocked = status.isAnchorLocked,
+                    trackerState = status.trackerState.name
                 ))
             }
         }
@@ -257,7 +260,8 @@ class SyncManager(
                 battery = entity.battery,
                 temp = entity.temp,
                 isCharging = entity.isCharging,
-                isAnchorLocked = entity.isAnchorLocked
+                isAnchorLocked = entity.isAnchorLocked,
+                trackerState = try { TrackerState.valueOf(entity.trackerState) } catch(e: Exception) { TrackerState.UNKNOWN }
             )
 
             if (networkManager.sendTelemetry(status)) {

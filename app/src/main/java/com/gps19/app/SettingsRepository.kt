@@ -5,8 +5,7 @@ import androidx.datastore.core.DataMigration
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.dataStoreFile
-import com.gps19.core.engine.SignalingConstants
-import com.gps19.core.engine.TimeProvider
+import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,12 +32,12 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * v9.1.9:
+ * - Issue #051: Binary Parity Gap. Updated TrackerStatusProto persistence 
+ *   to include authoritative tracker_state. Fixed saveLong and lux setter syntax.
  * v8.9.99:
  * - Issue #041: Identity Sanitization. Added identitySanitizationMigration to 
  *   automatically purge corrupted or shell-injected IDs (e.g., "pm clear") from storage.
- * v8.9.87:
- * - Issue #005 Logic Fix: Hardened commitDraftSettings to use effective IDs (applying defaults)
- *   during uniqueness checks to prevent "Commit Failed" reversions on fresh installs.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -74,15 +73,8 @@ class SettingsRepository @Inject constructor(
         override suspend fun cleanUp() {}
     }
 
-    /**
-     * identitySanitizationMigration: Issue #041 Hook.
-     * Detects IDs that violate the strict alphanumeric contract (likely corruption or injection)
-     * and resets them to system defaults during the migration phase.
-     */
     private val identitySanitizationMigration = object : DataMigration<AppSettings> {
         override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
-            // Only migrate if an ID exists but is invalid. 
-            // Empty strings are handled by the Flow defaults later.
             val t = currentData.trackerId
             val v = currentData.viewerId
             val isTrackerInvalid = t.isNotEmpty() && !SignalingConstants.isValidTrackerId(t)
@@ -505,6 +497,7 @@ class SettingsRepository @Inject constructor(
                     .setIsStorageCritical(status.isStorageCritical)
                     .setCurrentMa(status.currentMa)
                     .setIsAnchorLocked(status.isAnchorLocked)
+                    .setTrackerState(status.trackerState.name)
                 builder.setTrackerState(trackerBuilder.build())
                 builder.build()
             }
@@ -552,7 +545,8 @@ class SettingsRepository @Inject constructor(
             isJammer = s.isJammer,
             isCoolingModeActive = s.isCoolingModeActive,
             currentMa = s.currentMa,
-            isAnchorLocked = s.isAnchorLocked
+            isAnchorLocked = s.isAnchorLocked,
+            trackerState = try { TrackerState.valueOf(s.trackerState) } catch (e: Exception) { TrackerState.UNKNOWN }
         )
     }
 
@@ -618,8 +612,6 @@ class SettingsRepository @Inject constructor(
         dataStore.updateData { current ->
             val builder = current.toBuilder()
             
-            // Critical Fix: Use effective IDs (applying defaults) during uniqueness checks
-            // to prevent "Commit Failed" reversions on fresh installs where proto strings are empty.
             val currentTrackerId = current.trackerId.ifEmpty { DEFAULT_TRACKER_ID }
             val currentViewerId = current.viewerId.ifEmpty { DEFAULT_VIEWER_ID }
             val currentRelayUrl = current.relayUrl.ifEmpty { DEFAULT_RELAY_URL }

@@ -6,10 +6,11 @@ import javax.inject.Singleton
 
 /**
  * BehaviorUseCase: Logic for determining high-level behavioral states and UI visibility gates.
- * Extracted from MainViewModel to resolve Issue 115 (Architectural Bloat).
+ * v9.1.8:
+ * - Issue #046: Shared Behavioral State. Updated computeTrackerState to adopt 
+ *   authoritative remote state when in Viewer mode, preventing HUD desync.
  * v8.8.30:
  * - R872: Suppressed redScreenVisible (Alarm Overlay) in Tracker mode.
- * - Monotonic Throttling: shouldShowRedScreen now uses monotonic time (elapsedRealtime) for overlay lockout.
  */
 @Singleton
 class BehaviorUseCase @Inject constructor() {
@@ -20,6 +21,11 @@ class BehaviorUseCase @Inject constructor() {
     ): TrackerState {
         val appMode = currentState.appMode ?: return TrackerState.UNKNOWN
         
+        // Issue #046 Fix: If we are a Viewer, the Tracker is the authority on its own state.
+        if (appMode == "viewer") {
+            return currentState.trackerLocation.trackerState
+        }
+
         val isConnected = if (appMode == "tracker") {
             currentState.connectivity.isRelayConnected
         } else {

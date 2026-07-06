@@ -112,6 +112,15 @@ message RealtimeStatus {
     int64 last_disc_ts = 25;
     bool is_historical = 26;
     double alt = 27;
+
+    // Parity Fields for Issue #051
+    string tracker_state = 28;
+    bool is_anchor_locked = 29;
+    bool is_location_pending = 30;
+    string location_pending_reason = 31;
+    int64 last_valid_fix_realtime = 32;
+    bool is_battery_steep_discharge = 33;
+    bool is_cooling_mode_active = 34;
 }
 
 message GeoPointProto {
@@ -214,4 +223,5 @@ message TrackerStatusProto {
 
     int32 current_ma = 62;
     bool is_anchor_locked = 63;
+    string tracker_state = 64;
 }

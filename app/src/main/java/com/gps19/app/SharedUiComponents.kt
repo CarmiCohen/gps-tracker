@@ -44,15 +44,11 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * v9.1.3:
- * - Fix: Parity hardening for HUD Tracker line. Satellite and Age fields are now
- *   always visible in Viewer mode, even with zero/stale values.
- * v9.1.0:
- * - R957: Redesigned Status Badges. Removed LED circles; status is now indicated 
- *   directly by text color (Green/Red) for reduced visual clutter and a more 
- *   modern HUD appearance.
- * v9.0.4:
- * - R799d: Changed Viewer color to ViewerCyan.
+ * v9.1.9:
+ * - Issue #051: Binary Parity Gap support.
+ * v9.1.8:
+ * - Issue #047 Fix: Standardized speed target to m/s. Implemented GPS freshness 
+ *   gate in StatusBar to zero out speed and suppress animations during signal loss.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -387,7 +383,7 @@ fun GlobalStatusBar(
     val lastTelemetryTs = maxOf(loc.timestamp, loc.telemetryTs)
     val progressPulse = if (mode == "tracker") lastIncomingActivity else lastTelemetryTs
 
-    val speedValue = if (mode == "viewer") uiState.trackerLocation.speed else uiState.localLocation.speed
+    val speedValueMps = if (mode == "viewer") uiState.trackerLocation.speed else uiState.localLocation.speed
     val hasUnresolved = uiState.activeAlarms.any { !it.isResolved }
 
     StatusBar(
@@ -395,7 +391,7 @@ fun GlobalStatusBar(
         mode = mode, battery = uiState.battery.level, lastP = progressPulse, 
         commIndex = commIndex, remoteCommIndex = remoteCommIndex, remoteBattery = if (mode == "viewer") uiState.trackerBattery.level else -1, 
         isCharging = uiState.battery.isChargingStable, remoteCharging = if (mode == "viewer") uiState.trackerBattery.isChargingStable else false,
-        speed = speedValue.toFloat() * 3.6f, trackerAccuracy = uiState.trackerLocation.accuracy.toFloat(),
+        speedMps = speedValueMps.toFloat(), trackerAccuracy = uiState.trackerLocation.accuracy.toFloat(),
         maxTrackerAccuracy = uiState.trackerLocation.maxAccuracy.toFloat(), 
         viewerAccuracy = if (uiState.localLocation.lat != 0.0) uiState.localLocation.accuracy.toFloat() else 0f,
         maxViewerAccuracy = uiState.localLocation.maxAccuracy.toFloat(), now = systemPulse, satsView = uiState.trackerSatsView, satsUsed = uiState.trackerSatsUsed,
@@ -417,7 +413,7 @@ fun GlobalStatusBar(
 fun StatusBar(
     modifier: Modifier = Modifier, isInternet: Boolean, isRelay: Boolean, isPeerActive: Boolean, isDataHealthy: Boolean, isGpsActive: Boolean,
     mode: String?, battery: Int, lastP: Long, commIndex: Int = 10, remoteCommIndex: Int = 0, remoteBattery: Int = -1, isCharging: Boolean = false,
-    remoteCharging: Boolean = false, speed: Float = 0f, trackerAccuracy: Float = 0f, maxTrackerAccuracy: Float = 0f,
+    remoteCharging: Boolean = false, speedMps: Float = 0f, trackerAccuracy: Float = 0f, maxTrackerAccuracy: Float = 0f,
     viewerAccuracy: Float = 0f, maxViewerAccuracy: Float = 0f, now: Long, satsView: Int = 0, satsUsed: Int = 0,
     trackerTemp: Float = 0f, viewerTemp: Float = 0f, distToHome: Double? = null, distToViewer: Double? = null,
     viewerSatsUsed: Int = 0, viewerSatsView: Int = 0, viewerGpsTs: Long = 0L, trackerId: String = "TRK", viewerId: String = "VIEW", watchdogOk: Boolean = true,
@@ -454,7 +450,6 @@ fun StatusBar(
     Card(modifier = modifier.fillMaxWidth(), shape = RectangleShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = if (isLandscape) 0.7f else 0.9f)), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 3.dp)) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                // R957: Status badges with text-based color coding (removed circle LEDs)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     StatusBadge("INT", isInternet, isBold = true)
                     StatusBadge("SRV", isRelay, isBold = true)
@@ -503,7 +498,10 @@ fun StatusBar(
                 
                 Spacer(Modifier.weight(1f))
 
-                val animatedSpeed by animateFloatAsState(targetValue = if (speed.isNaN()) 0f else speed, animationSpec = tween(1000), label = "SpeedAnim")
+                // Issue #047 Fix: Suppress animation and zero out speed when GPS is stale.
+                val speedTargetKph = if (isGpsActive && !speedMps.isNaN()) speedMps * 3.6f else 0f
+                val animatedSpeed by animateFloatAsState(targetValue = speedTargetKph, animationSpec = tween(1000), label = "SpeedAnim")
+                
                 val speedVal = if (animatedSpeed < 10.0f) String.format(Locale.getDefault(), "%.1f", animatedSpeed) else animatedSpeed.toInt().toString()
                 val speedColor = if (isGpsActive) BrandJd else Slate500
                 Text(text = "${speedVal}km/h", color = speedColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, textAlign = TextAlign.End)
@@ -569,8 +567,6 @@ fun StatusRowData(
     )
 
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = horizontalPadding), verticalAlignment = Alignment.CenterVertically) {
-        // R325: Reduced left-side width from 224dp to 210dp to ensure accuracy display 
-        // doesn't truncate on narrow devices like the Samsung A15.
         Row(modifier = Modifier.width(210.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(modifier = Modifier.width(48.dp), verticalAlignment = Alignment.CenterVertically) {
                  val animatedLabelAlpha by animateFloatAsState(targetValue = if (isConnStale) 0.5f else 1f, label = "LabelAlpha")
@@ -675,7 +671,6 @@ fun StatusBadge(label: String, active: Boolean, activeColor: Color = BrandJd, is
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     val textColor = if (active) activeColor else Rose500
     
-    // R957: Status is now indicated directly by the color of the text label.
     Text(
         text = label, 
         color = textColor, 
