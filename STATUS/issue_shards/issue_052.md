@@ -1,5 +1,6 @@
 # Issue #052: HUD Freshness Verification
 **Status**: Pending Validation
+**Priority**: Medium
 **Requirement**: R989
 
 ## Description

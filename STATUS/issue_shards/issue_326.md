@@ -1,12 +1,6 @@
-# Issue #326: Intelligent Uncertainty UX Mapping
-**Status**: Resolved (v9.2.2)
-**Requirement**: R326
+# Issue #326: Intelligent Uncertainty UX
+**Status**: Resolved
+**Priority**: Low
 
 ## Description
-When the device enters a "Location Pending" state (Bayesian uncertainty expansion), the system provides specific contextual reasons (e.g., GPS Stall vs. Environmental Gap) in the UI and logs.
-
-## Resolution
-- Added `GPS_GAP` to `LocationPendingReason` enum.
-- Implemented priority-based merging in `TelemetryAggregator`.
-- Propagated reasons into `ViolationReport` technical details.
-- Updated `TrackerService` to detect environmental gaps.
+Enriched Location Pending state with reasons (GPS_GAP, JAMMER) and implemented priority-based merging. (v9.2.2)
