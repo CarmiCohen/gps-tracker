@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v9.2.6
+# Compliance & Operational Requirements (Audit Baseline) - v9.2.9
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -8,6 +8,7 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 | Requirement ID | Requirement Description | Implementation Status |
 | :--- | :--- | :--- |
+| **R994** | **Screen-Off Optimization Authority**: GPS polling frequency throttled to 5s when screen is off to improve battery life. | **Verified (v9.2.9)** |
 | **R049** | **HUD Context Mapping Authority**: `GlobalStatusBar` implements mode-aware telemetry binding for local vs remote context. | **Verified (v9.2.6)** |
 | **R991** | **HUD Local Health Standardization**: Top-level status badges (INT, SRV, VWR/TRK, GPS) reflect local device health. | **Verified (v9.2.3)** |
 | **R326** | **Intelligent Uncertainty UX**: Contextual reasons (GPS GAP, JAMMER) propagated to HUD and merged via priority. | **Verified (v9.2.2)** |
@@ -40,13 +41,16 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v9.2.6)
+### 2.1. Hardening Phase Resolutions (v9.2.9)
+*   **FIXED R994: Screen-Off Optimization Authority** - Resolution: Audited WakeLocks (verified necessity). Implemented dynamic GPS down-sampling to 5000ms when screen is off using `DisplayManager` state tracking in `AppSensorManager`. (Issue R994)
+
+### 2.2. Hardening Phase Resolutions (v9.2.6)
 *   **FIXED R049: HUD Context Mapping Authority** - Resolution: Corrected `GlobalStatusBar` mapping in `SharedUiComponents.kt` to use mode-aware location context. Tracker health indicators now correctly bind to `localLocation` when in Tracker mode. (Issue #049)
 
-### 2.2. Hardening Phase Resolutions (v9.2.3)
+### 2.3. Hardening Phase Resolutions (v9.2.3)
 *   **FIXED R991: HUD Local Health Standardization** - Resolution: Standardized top-level HUD status badges to reflect local device health. Decoupled remote telemetry indicators. (Issue #044)
 
-### 2.3. Hardening Phase Resolutions (v9.2.2)
+### 2.4. Hardening Phase Resolutions (v9.2.2)
 *   **FIXED R326: Intelligent Uncertainty UX** - Resolution: Enriched the Location Pending state with specific reasons (`GPS_GAP`, `JAMMER_SUSPICION`). Implemented priority-based merging in the `TelemetryAggregator`. (Issue #326)
 
 **Full history available in [issues_archive.md](issues_archive.md).**
