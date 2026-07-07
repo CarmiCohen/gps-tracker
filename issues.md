@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.2.6)
+# Project Issues & Hardening Tracking (v9.2.7)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending validation tasks
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Clean | 0 |
 | **Validation Tasks** | 🟡 Pending | 19 |
-| **Resolved (Total)** | 🟢 Progress | 252 |
+| **Resolved (Total)** | 🟢 Progress | 253 |
 
 ---
 
@@ -55,6 +55,14 @@ This document tracks active issues, technical debt, and pending validation tasks
 
 ---
 
+## 🟢 Recently Resolved Issues (v9.2.7)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **R960** | **HUD Local Grouping** | **Resolved**. Rearranged `StatusBar` badges in `SharedUiComponents.kt` to group **INT**, **SRV**, and **GPS** together as a "Local Capability" block. Updated `HUD_LED_Specifications.md`. |
+
+---
+
 ## 🟢 Recently Resolved Issues (v9.2.6)
 
 | ID | Issue | Resolution |
@@ -68,11 +76,3 @@ This document tracks active issues, technical debt, and pending validation tasks
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
 | **#044** | **HUD: LEDs contradiction** | **Resolved**. Standardized top-level HUD badges (INT, SRV, VWR/TRK, GPS) to reflect local device health. Decoupled remote telemetry coloring (Speed, State) to remain dependent on peer GPS signal. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.2.2)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#326** | **Intelligent Uncertainty UX** | **Resolved**. Enriched Location Pending state with specific reasons (`GPS_GAP`, `JAMMER`). Implemented priority-based merging in ribbon pipeline. Corrected ID collision in docs. |

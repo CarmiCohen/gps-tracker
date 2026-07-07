@@ -44,6 +44,9 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v9.2.7:
+ * - Requirement R960: Moved GPS LED adjacent to INT/SRV to form the "Local Capability" 
+ *   block, separating hardware health from peer-dependent indicators.
  * v9.2.6:
  * - Issue #049 Fix: Corrected GlobalStatusBar mapping to use mode-aware location 
  *   for Tracker-row health and pending states. Prevents false JAMMER/P indicators 
@@ -51,14 +54,6 @@ import com.gps19.core.engine.*
  * v9.2.3:
  * - Issue #044 Fix: Standardized HUD LEDs to Local Health. Standardized GPS badge 
  *   to local signal. Peer-dependent fields (Speed, State) remain tied to remote health.
- * v9.1.9:
- * - Issue #051: Binary Parity Gap support.
- * - Issue #048 Fix: Differentiated Telemetry vs GPS Freshness in StatusRowData. 
- *   Connectivity and health indicators (Battery, Temp, Comm, Sats, Distance) now 
- *   remain colorized as long as telemetry is fresh, even if GPS fix is stale.
- * v9.1.8:
- * - Issue #047 Fix: Standardized speed target to m/s. Implemented GPS freshness 
- *   gate in StatusBar to zero out speed and suppress animations during signal loss.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -468,8 +463,10 @@ fun StatusBar(
         Column(modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 3.dp)) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // R960: Form "Local Capability" Block (INT, SRV, GPS)
                     StatusBadge("INT", isInternet, isBold = true)
                     StatusBadge("SRV", isRelay, isBold = true)
+                    StatusBadge("GPS", isLocalGpsActive)
                     
                     val peerLabel = if (mode == "tracker") "VWR" else "TRK"
                     StatusBadge(peerLabel, isPeerActive, activeColor = BrandJd)
@@ -477,9 +474,6 @@ fun StatusBar(
                     if (mode != "tracker") {
                         StatusBadge("DAT", isDataHealthy)
                     }
-
-                    // Issue #044 Fix: Top-level GPS badge now reflects local health.
-                    StatusBadge("GPS", isLocalGpsActive)
                     
                     if (hasActiveAlarms) {
                         StatusBadge("ALM", true, activeColor = Rose500.copy(alpha = alarmAlpha), isBold = true)
@@ -730,7 +724,7 @@ fun HeaderBar(
     val alertPulse = rememberInfiniteTransition(label = "AlertPulse")
     val alertAlpha by alertPulse.animateFloat(
         initialValue = 0.4f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(animation = tween(800), repeatMode = RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(animation = tween(800), repeatMode = Reverse),
         label = "Alpha"
     )
 
