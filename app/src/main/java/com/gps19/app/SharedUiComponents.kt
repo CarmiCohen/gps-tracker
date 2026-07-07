@@ -44,6 +44,9 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v9.2.3:
+ * - Issue #044 Fix: Standardized HUD LEDs to Local Health. Standardized GPS badge 
+ *   to local signal. Peer-dependent fields (Speed, State) remain tied to remote health.
  * v9.1.9:
  * - Issue #051: Binary Parity Gap support.
  * - Issue #048 Fix: Differentiated Telemetry vs GPS Freshness in StatusRowData. 
@@ -378,8 +381,12 @@ fun GlobalStatusBar(
     val loc = if (mode == "viewer") uiState.trackerLocation else uiState.localLocation
     val lastGpsTs = loc.timestamp
     
-    val gpsAge = if (lastGpsTs > 0) systemPulse - lastGpsTs else Long.MAX_VALUE
-    val isGpsActive = gpsAge < GPS_UI_FAIL_THRESHOLD_MS
+    // Issue #044: Differentiate Local vs Tracker GPS Health for HUD top-level badges.
+    val localGpsAge = if (uiState.localLocation.timestamp > 0) systemPulse - uiState.localLocation.timestamp else Long.MAX_VALUE
+    val isLocalGpsActive = localGpsAge < GPS_UI_FAIL_THRESHOLD_MS
+
+    val trackerGpsAge = if (uiState.trackerLocation.timestamp > 0) systemPulse - uiState.trackerLocation.timestamp else Long.MAX_VALUE
+    val isTrackerGpsActive = trackerGpsAge < GPS_UI_FAIL_THRESHOLD_MS
 
     val isDataHealthy = dashboardState.isTelemetryFresh && isLocalOnline && isRelayConnected
 
@@ -390,7 +397,8 @@ fun GlobalStatusBar(
     val hasUnresolved = uiState.activeAlarms.any { !it.isResolved }
 
     StatusBar(
-        modifier = modifier, isInternet = isLocalOnline, isRelay = isRelayConnected, isPeerActive = isPeerActive, isDataHealthy = isDataHealthy, isGpsActive = isGpsActive,
+        modifier = modifier, isInternet = isLocalOnline, isRelay = isRelayConnected, isPeerActive = isPeerActive, isDataHealthy = isDataHealthy, 
+        isLocalGpsActive = isLocalGpsActive, isTrackerGpsActive = isTrackerGpsActive,
         mode = mode, battery = uiState.battery.level, lastP = progressPulse, 
         commIndex = commIndex, remoteCommIndex = remoteCommIndex, remoteBattery = if (mode == "viewer") uiState.trackerBattery.level else -1, 
         isCharging = uiState.battery.isChargingStable, remoteCharging = if (mode == "viewer") uiState.trackerBattery.isChargingStable else false,
@@ -414,7 +422,8 @@ fun GlobalStatusBar(
 
 @Composable
 fun StatusBar(
-    modifier: Modifier = Modifier, isInternet: Boolean, isRelay: Boolean, isPeerActive: Boolean, isDataHealthy: Boolean, isGpsActive: Boolean,
+    modifier: Modifier = Modifier, isInternet: Boolean, isRelay: Boolean, isPeerActive: Boolean, isDataHealthy: Boolean, 
+    isLocalGpsActive: Boolean, isTrackerGpsActive: Boolean,
     mode: String?, battery: Int, lastP: Long, commIndex: Int = 10, remoteCommIndex: Int = 0, remoteBattery: Int = -1, isCharging: Boolean = false,
     remoteCharging: Boolean = false, speedMps: Float = 0f, trackerAccuracy: Float = 0f, maxTrackerAccuracy: Float = 0f,
     viewerAccuracy: Float = 0f, maxViewerAccuracy: Float = 0f, now: Long, satsView: Int = 0, satsUsed: Int = 0,
@@ -464,7 +473,8 @@ fun StatusBar(
                         StatusBadge("DAT", isDataHealthy)
                     }
 
-                    StatusBadge("GPS", isGpsActive)
+                    // Issue #044 Fix: Top-level GPS badge now reflects local health.
+                    StatusBadge("GPS", isLocalGpsActive)
                     
                     if (hasActiveAlarms) {
                         StatusBadge("ALM", true, activeColor = Rose500.copy(alpha = alarmAlpha), isBold = true)
@@ -487,12 +497,13 @@ fun StatusBar(
                 }
                 Spacer(Modifier.width(8.dp))
                 
+                // Issue #044: State label reflects Tracker health.
                 val isMoving = trackerState == TrackerState.MOVING
-                val stateColor = if (!isGpsActive) Slate500 else BrandJd 
+                val stateColor = if (!isTrackerGpsActive) Slate500 else BrandJd 
                 
                 Text(
-                    text = if (isMoving && isGpsActive) "»\u2009${trackerState.name}\u2009«" else trackerState.name,
-                    color = stateColor.copy(alpha = if (isMoving && isGpsActive) movingAlpha else 1f),
+                    text = if (isMoving && isTrackerGpsActive) "»\u2009${trackerState.name}\u2009«" else trackerState.name,
+                    color = stateColor.copy(alpha = if (isMoving && isTrackerGpsActive) movingAlpha else 1f),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
@@ -501,12 +512,13 @@ fun StatusBar(
                 
                 Spacer(Modifier.weight(1f))
 
+                // Issue #044: Speed reflects Tracker health.
                 // Issue #047 Fix: Suppress animation and zero out speed when GPS is stale.
-                val speedTargetKph = if (isGpsActive && !speedMps.isNaN()) speedMps * 3.6f else 0f
+                val speedTargetKph = if (isTrackerGpsActive && !speedMps.isNaN()) speedMps * 3.6f else 0f
                 val animatedSpeed by animateFloatAsState(targetValue = speedTargetKph, animationSpec = tween(1000), label = "SpeedAnim")
                 
                 val speedVal = if (animatedSpeed < 10.0f) String.format(Locale.getDefault(), "%.1f", animatedSpeed) else animatedSpeed.toInt().toString()
-                val speedColor = if (isGpsActive) BrandJd else Slate500
+                val speedColor = if (isTrackerGpsActive) BrandJd else Slate500
                 Text(text = "${speedVal}km/h", color = speedColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, textAlign = TextAlign.End)
             }
             Spacer(Modifier.height(3.dp))

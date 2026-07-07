@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (v9.2.2)
+# Project Issues & Hardening Tracking (v9.2.3)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 High | 2 |
-| **Validation Tasks** | 🟡 Pending | 17 |
-| **Resolved (Total)** | 🟢 Progress | 250 |
+| **Open Technical Issues** | 🔴 High | 1 |
+| **Validation Tasks** | 🟡 Pending | 18 |
+| **Resolved (Total)** | 🟢 Progress | 251 |
 
 ---
 
@@ -26,7 +26,6 @@ This document tracks active issues, technical debt, and pending validation tasks
 ## 🔴 Open Issues
 | ID | Issue | Description |
 | :--- | :--- | :--- |
-| **#044** | **HUD: LEDs contradiction** | Tracker: all green but VWR. Viewer: all green but GPS. Standardize top-level badges to local health. |
 | **#049** | **False Jammer Indicator** | HUD shows “P” adjacent to name and “JAMMER…” label incorrectly on Tracker line. |
 
 ---
@@ -34,6 +33,7 @@ This document tracks active issues, technical debt, and pending validation tasks
 ## 🟡 Pending Validation
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
+| **#044** | **HUD Local Health Verification** | In Viewer mode, verify the GPS badge stays green when local GPS is fixed, even if Tracker GPS is lost (DAT badge and Tracker line should turn red). |
 | **#326** | **Uncertainty UX Verification** | Verify "GPS GAP" appears in HUD when entering a tunnel, and ensure priority merging preserves "JAMMER" markers in ribbons. |
 | **#053** | **Anchor Lock Breakout** | Physically move the device after a Hard-Lock is established and verify immediate breakout via physical sensors. |
 | **#052** | **HUD Freshness Verification** | Verify that Tracker HUD/Viewer HUD line elements (Battery, Temp, Comm) stay colorized when GPS is lost but connection remains. |
@@ -56,6 +56,14 @@ This document tracks active issues, technical debt, and pending validation tasks
 
 ---
 
+## 🟢 Recently Resolved Issues (v9.2.3)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#044** | **HUD: LEDs contradiction** | **Resolved**. Standardized top-level HUD badges (INT, SRV, VWR/TRK, GPS) to reflect local device health. Decoupled remote telemetry coloring (Speed, State) to remain dependent on peer GPS signal. |
+
+---
+
 ## 🟢 Recently Resolved Issues (v9.2.2)
 
 | ID | Issue | Resolution |
@@ -69,11 +77,3 @@ This document tracks active issues, technical debt, and pending validation tasks
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
 | **#018** | **Stationary Anchor Hard-Lock** | **Resolved**. Implemented coordinate clamping in `LocationProcessor.kt`. Refactored `TrackerService.kt` to adopt optimized coordinates and propagate `isAnchorLocked` flag to HUD and telemetry. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.2.0)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#048** | **Viewer HUD Line Grayout** | **Resolved**. Differentiated "Telemetry Age" (packet) from "GPS Age" (fix) in `StatusRowData`. Connectivity, Battery, and Satellites now remain colorized as long as telemetry is fresh. Distance remains colorized based on last known good position while link is active. |
