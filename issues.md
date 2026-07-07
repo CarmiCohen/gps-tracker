@@ -6,14 +6,15 @@ This document tracks active issues, technical debt, and pending validation tasks
 | Category | Status | Count |
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 High | 2 |
-| **Validation Tasks** | 🟡 Pending | 18 |
-| **Resolved (Total)** | 🟢 Progress | 65 |
+| **Validation Tasks** | 🟡 Pending | 17 |
+| **Resolved (Total)** | 🟢 Progress | 250 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
 | ID | Concern | Description |
 | :--- | :--- | :--- |
+| **#055** | **Issue History Recovery** | Restored 185 "lost" legacy resolutions from `compliance_archive.md` into the primary `issues_archive.md` to maintain a 100% complete audit trail. |
 | **#054** | **Requirement ID Collision** | Discovered that Issue #326 was overloaded in `compliance.md` (mapped to both UX and Update Smoothness). Audited and corrected. |
 | **#031** | **Soak Test Monitoring** | Ongoing 24-hour stability test required to monitor for `STABILITY GAP` logs under 10Hz sensor load. |
 | **#039** | **Identity Rejection Feedback** | `MainRepository` now silently rejects bulk updates with colliding IDs. UI needs to provide feedback before triggering a save. |

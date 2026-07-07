@@ -1,56 +1,78 @@
 # Issues Archive (Historical Resolutions)
 
-## Hardening Phase: v8.9.96 Resolved Items
-*   **Issue #030**: Proto Schema Discrepancy. Audited and confirmed `app/src/main/proto` as the authoritative schema path. Formalized R973 to prevent split-brain updates. (v8.9.96)
-*   **Issue #032**: UI Refresh Consistency. Implemented `isForensicFresh` gate in `DashboardUseCase` using `WATCH_DOG_UI_GRACE_MS` (15s). Applied to `Prox Debounce`, `Rolling Vibe`, and `Chair Forensics`. (v8.9.96)
+This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-## Hardening Phase: v8.9.94 Resolved Items
-*   **Issue #038**: Adaptation Instability. Implemented a 5s "Adaptation Muzzle" in `TrackerService` triggered by GPS polling changes on A15 to prevent trajectory jumps during filter settling. (v8.9.94)
-*   **Issue #037**: Viewer Display State Spam. Added `DisplayListener` to `AppSensorManager` to detect rapid toggling. Suppressed virtual proximity triggers during Samsung AOD cycles. (v8.9.94)
-*   **Issue #036**: A15 Behavioral Flickering. Introduced A15-specific hardened thresholds for sensor mismatch (5.0 m/s) and visual jitter (25m) in `EngineConstants.kt`. (v8.9.94)
+**Total Unique Resolutions: 250**
 
-## Hardening Phase: v8.9.91 - v8.9.88 Resolved Items
-*   **Issue #005**: Log Spillage Hardening. Moved osmdroid configuration to a synchronous block in `GpsApplication` to preempt discovery-driven log bursts. (v8.9.91)
-*   **Issue #028**: R924 Sunset Failure. Verified `HeaderBar` code is purged of legacy `VID_NOTES` identifiers in v8.9.91. (v8.9.89)
-*   **Issue #027**: Persistent Viewer ID Reversion. Initial logic fix in `ViewerService.handleTrackerPulse`. (v8.9.88)
+## 1. Recent Hardening Phase (v9.0.4 - v9.2.2)
+*   **Issue #326**: Intelligent Uncertainty UX. Enriched Location Pending state with reasons (GPS_GAP, JAMMER) and implemented priority-based merging. (v9.2.2)
+*   **Issue #018**: Stationary Anchor Hard-Lock. Implemented coordinate clamping in `LocationProcessor.kt` and propagated `isAnchorLocked` flag. (v9.2.1)
+*   **Issue #048**: Viewer HUD Line Grayout. Differentiated Telemetry Age from GPS Age in status rows. (v9.2.0)
+*   **Issue #029**: Viewer Status Line Restoration. Propagated local telemetry to repository in Viewer mode. (v9.0.3)
 
-## Hardening Phase: v8.9.87 Resolved Items
-*   **Issue #005**: Map Provider Log Spillage. Hardened remediation by forcing a static user agent string ("GpsTracker/8.9.87") in `GpsApplication`. This eliminates repetitive `getPackageName()` calls that triggered system log spam on Samsung devices. (v8.9.87)
-*   **Issue #026**: Viewer ID Identity Reversion. Fixed logic error in `SettingsRepository` where `viewerIdFlow` incorrectly defaulted to Tracker ID ("T"). Corrected `commitDraftSettings` to properly apply `draftRelayUrl` and ensured uniqueness checks do not collide on empty draft fields. (v8.9.87)
-
-## Hardening Phase: v8.9.86 Resolved Items
-*   **Issue #025**: FGS Transition Timeout. Increased `UI_PULSE_TIMEOUT_MS` to 45s to allow robust background-to-foreground service transitions on Android 14+. (v8.9.86)
-*   **Issue #024**: Accuracy Window Aliasing. Expanded `ACCURACY_WINDOW_BUCKET_MS` to 120s to ensure stationary GPS fixes do not cause window aliasing. (v8.9.85)
-*   **Issue #023**: DataStore Binary Incompatibility. Reverted tags 8, 9, 33 to float and introduced high-precision double tags 60, 61, 62 with DataMigration. (v8.9.84)
-*   **Issue #022**: Deep-Link Cold-Start Handling. Implemented intent-aware startup for direct map navigation. (v8.8.6)
-*   **Issue #021**: Map UI Infinite Loop. Fixed loop in `drawTrailToFolder` occurring with single-point segments. (v8.9.82)
-*   **Issue #020**: Map Centering Race Condition. Introduced `localLockStatus` to suspend centering upon user touch. (v8.9.83)
-*   **Issue #017**: SnapshotStateList Lock Failures. Replaced observable pools with `MutableList` in map updates. (v8.9.81)
-*   **Issue #016**: Main Thread Performance Bottlenecks. Optimized trail rendering and offloaded startup I/O. (v8.9.80)
-
-## Hardening Phase: v8.9.78 Resolved Items
-*   **Issue #018**: Tracker Behavior Stability (Stationary Anchor Hard-Lock). Implemented coordinate clamping to `parkingAnchorPoint` when `stationaryProb > 0.9`. Added breakout logic for spatial displacements > 20m. (v8.9.78)
-*   **Issue #019**: Android 14+ "While-in-Use" Permission Transition. Implemented `isRecentUiPulse()` window (15s) to authorize background-to-foreground service transitions for sensitive types. (v8.9.78)
-*   **Issue #014**: System-Wide Type Safety. Standardized all telemetry fields (Accuracy, Speed, Bearing) to native `Double` types across the entire stack, eliminating conversion overhead. (v8.9.75)
-*   **Issue #015**: StandaloneCoroutine Cancellation. Hardened `SyncManager` and `CommandRouter` to silently handle `CancellationException` during service lifecycle transitions. (v8.9.72)
-*   **Issue #011**: Suppression Forensic Labeling. Implemented `suppressionNote` in `SentinelResult` to provide transparency when hardware muzzles suppress sensor violations. (v8.9.68)
-*   **Issue #010**: A15 Acoustic/Vibration Coherence. Implemented physical reality gate; acoustic spikes on A15 are suppressed if concurrent vibration is below threshold. (v8.9.68)
-*   **Issue #013**: Forensic UI Expansion. Exposed internal scaling metrics (`proximityDebounceMs`, `vibrationRollingSum`) to the UI dashboard. (v8.9.71)
+## 2. Hardening Era Resolutions (v8.9.65 - v8.9.99)
+*   **Issue #041**: Identity Sanitization Hardening. Implemented R975 (Regex validation) and automatic storage purging. (v8.9.99)
+*   **Issue #027**: Identity Persistence Hardening. Reinforced bulk save with atomic uniqueness validation. (v8.9.98)
+*   **Issue #030**: Proto Schema Discrepancy. Authoritative schema path moved to `app/src/main/proto`. (v8.9.96)
+*   **Issue #032**: UI Refresh Consistency. Implemented `isForensicFresh` gate using `WATCH_DOG_UI_GRACE_MS`. (v8.9.96)
+*   **Issue #038**: Adaptation Instability. Implemented 5s "Adaptation Muzzle" for A15 polling changes. (v8.9.94)
+*   **Issue #037**: Viewer Display State Spam. Added `DisplayListener` to suppress proximity triggers during AOD cycles. (v8.9.94)
+*   **Issue #036**: A15 Behavioral Flickering. Introduced hardened sensor mismatch and jitter thresholds. (v8.9.94)
+*   **Issue #005**: Log Spillage Hardening. Static user agent and manual storage paths for osmdroid. (v8.9.91)
+*   **Issue #028**: R924 Sunset. Purged legacy `VID_NOTES` identifiers. (v8.9.91)
+*   **Issue #026**: Viewer ID Identity Reversion. Fixed draft commitment logic in `SettingsRepository`. (v8.9.87)
+*   **Issue #025**: FGS Transition Timeout. Increased `UI_PULSE_TIMEOUT_MS` to 45s for Android 14+. (v8.9.86)
+*   **Issue #024**: Accuracy Window Aliasing. Expanded bucket to 120s. (v8.9.85)
+*   **Issue #023**: DataStore Binary Incompatibility. Reverted legacy tags to float and added high-precision doubles. (v8.9.84)
+*   **Issue #022**: Deep-Link Cold-Start. Implemented intent-aware startup. (v8.8.6)
+*   **Issue #021**: Map UI Infinite Loop. Fixed loop with single-point trail segments. (v8.9.82)
+*   **Issue #020**: Map Centering Race. Introduced `localLockStatus` for user touch suspension. (v8.9.83)
+*   **Issue #017**: SnapshotStateList Lock Failures. Replaced observable pools in map updates. (v8.9.81)
+*   **Issue #016**: Main Thread Performance. Optimized trail rendering and offloaded startup I/O. (v8.9.80)
+*   **Issue #014**: System-Wide Type Safety. Standardized telemetry fields to `Double`. (v8.9.75)
+*   **Issue #015**: Coroutine Cancellation. Hardened lifecycle transitions against `CancellationException`. (v8.9.72)
+*   **Issue #011**: Suppression Forensic Labeling. Added `suppressionNote` to `SentinelResult`. (v8.9.68)
+*   **Issue #010**: A15 Coherence. Implemented physical reality gate for acoustic spikes. (v8.9.68)
+*   **Issue #013**: Forensic UI Expansion. Exposed `proximityDebounceMs` and `vibrationRollingSum`. (v8.9.71)
 *   **Issue #012**: Adaptive Proximity Debounce. Implemented scaling in `AppSensorManager`. (v8.9.71)
+*   **Issue #R325**: Samsung A15 Accuracy Truncation. Optimized status row layout width (210dp). (v8.9.65)
 
-## Hardening Phase: v8.9.65 Resolved Items
-*   **Issue #R325**: Samsung A15 Accuracy Truncation. Optimized status row layout width (210dp) to ensure authoritative uncertainty display fits narrow screens. (v8.9.65)
-*   **Issue #006**: Samsung A15 Main Thread Jitter. Offloaded high-frequency sensor event processing to a dedicated `HandlerThread` (`AppSensorThread`). (v8.9.64)
-*   **Issue #007**: Connectivity Rejoin Latency. Implemented reactive `ConnectionLostCallback` for immediate signaling re-join. (v8.9.64)
-*   **Issue #008**: VID_NOTES Correction. Updated note identifier to "Th1030" for role alignment. (v8.9.73)
-*   **Issue #461**: Settings Uniqueness UI Feedback. Implemented error propagation from `SettingsRepository` to UI via Toast. (v8.9.63)
-*   **Issue #001**: Room Schema Divergence. Incremented DB to v51 and corrected historical migrations. (v8.9.62)
-*   **Issue #002**: GPS Status UI Mismatch. Increased failure thresholds to 35s. (v8.9.62)
-*   **Issue #003**: Main Thread Jitter (Davey). Moved behavioral state computations to `Dispatchers.Default` in `MainViewModel`. (v8.9.62)
-*   **Issue #004**: A15 Virtual Proximity Suppression. Refined manager to allow 'Far' transitions during motion in darkness. (v8.9.62)
-*   **Issue #458**: Tracker Role Ghost Mode Bug. Corrected role-aware timestamp propagation. (v8.9.62)
-*   **Issue #459**: Unicode Escape Regression. Resolved double-escaping in string literals. (v8.9.62)
-*   **Issue #460**: Local Freshness Existence Logic. Relaxed existence check to include sensor telemetry. (v8.9.62)
+## 3. Middle Era Resolutions (#100 - #199)
+*   **Issue #199**: Toolchain Modernization. Upgraded to Java 17 and Android SDK 35. (v8.9.8)
+*   **Issue #198**: GPS Availability Hardening. Shortened stall detection to 60s. (v8.9.8)
+*   **Issue #197**: Database Schema Expansion (v38). Added `sitVzTs` to history. (v8.9.7)
+*   **Issue #196**: Plunge Matching. Refined "Plunge" state machine. (v8.9.7)
+*   **Issue #195**: Room Migration Audit. Implemented table reconstruction migration. (v8.9.6)
+*   **Issue #194**: SIT Persistence Risk. Implemented acknowledged event pipeline. (v8.9.7)
+*   **Issue #193**: Zombie Telemetry UX. Implemented "Ghost Mode" indicators. (v8.9.6)
+*   **Issue #337**: Power Parity. Achieved forensic parity for `currentMa`. (Formerly #192)
+*   **Issue #191**: Muzzle Window Race. Implemented deterministic Muzzle Handshake. (v8.9.6)
+*   **Issue #190**: Xiaomi Autostart. Indeterminate status handling and boot grace. (v8.9.16)
+*   **Issue #189**: Viewer Background Location. 10s background polling for Viewers. (v8.9.5)
+*   **Issue #188**: Historical GPS Timestamp Loss. Added `gpsTs` to DB and sync. (v8.9.3)
+*   **Issue #187**: Viewer-Side LocationProcessor State. Updated persistence loading. (v8.9.4)
+*   **Issue #186**: SoT Hardening. Updated documentation to v8.9.2 baseline.
+*   **Issue #185**: ViewerService Listener Completion. Remote-to-local trail persistence. (v8.9.2)
+*   **Issue #183**: Legacy Branding Cleanup. Standardized to JD Green and logo. (v8.9.2)
+*   **Issue #181**: GPS Stability Audit. Reliability metrics emitted every 10s. (v8.9.2)
+*   **Issue #180**: Forensic Pipeline Verification. Verified verticalVelocity and SIT mapping. (v8.9.2)
+*   **Issue #176**: R941 Statistics Persistence. Confirmed accumulation across restarts. (8.8.36)
+*   **Issue #175**: R917 Update Smoothness. Verified `MY_PACKAGE_REPLACED` handling. (8.8.36)
+*   **Issue #124**: GPS Revival Escalation. Implemented 5-minute retry loop. (8.8.31)
+*   **Issue #115**: ViewModel Decoupling. Extracted feature-specific UseCases. (8.8.25)
+
+## 4. Legacy Foundation Resolutions (#1 - #99)
+*   **Issue #302**: Settings Verification. Removed role-based UI gating. (Formerly #30)
+*   **Issue #301**: Alert Grace Period. Implemented 2s trigger delay. (Formerly #29)
+*   **Issue #320**: Physical Tamper Race. Implemented 500ms Muzzle Window. (v8.8.21)
+*   **Issue #300**: Xiaomi Traceability. UNKNOWN MIUI status guidance. (v8.8.21)
+*   **Issue #299**: Geofence SOT Desync. Corrected JSON key mismatch. (v8.8.21)
+*   **Issue #297**: Identity Collision. Hardened LogManager and DB v29. (v8.8.21)
+*   **Issue #286**: Missing Thermal Throttling. Implemented `COOLING_GPS_POLLING_MS`. (8.8.17)
+*   **Issue #281**: Sticky SIT State. Re-implemented `consumeSitDetected()`. (v8.8.13)
+*   **Issue #280**: Timing Mismatch (Stall). Migrated to monotonic timestamps. (v8.8.12)
+*   **Issue #274**: OS Restriction Monitoring. Integrated Standby Bucket detection.
+*   **Issue #001**: Room Schema Divergence. Fixed missing columns and migrations. (v8.9.62)
 
 ---
 
@@ -71,55 +93,6 @@ The following legacy IDs have been unified into the #300+ authoritative range.
 | #221 | #328-B | Bayesian Uncertainty / systemPulseRealtime |
 | #224 | #329 | Forensic Ribbon Expansion (tiltIdx/baroIdx) |
 | #227 | #327 | Hindsight Transition Smoothing |
-| #244/245 | #339/348 | SIT Rising-Edge Detection |
-| #263 | #369 | EMA Constant Inversion Audit |
-| #264 | #345 | GtoEngine Magic Number Consolidation |
-| #265 | #370 | TrackerService Redundant Evaluation Audit |
-| #266 | #388 | Lux EMA Implementation |
-| #267 | #463-B | Dead Code Cleanup: isRevivalTriggered |
-| #268 | #352 | Acoustic Floor Logic Redundancy |
-| #271 | #357 | Uptime Consistency (uptimeMs) |
-| #272 | #353 | Battery Profile (app_settings.proto) |
-| #273 | #315 | Network Integrity & Timeout Scaling |
-| #279 | #351 | Foreground Resilience Hardening |
-| #281 | #462 | SoT Naming Alignment |
-| #284 | #389 | Light EMA Logic Inconsistency |
-| #285 | #367 | GtoEngine Implementation |
-| #286 | #368 | Hardcoded EMA Cleanup (LUX_EMA_FAST) |
-| #287 | #331 | Role-Aware Alert Title Visibility |
-| #288 | #349 | Vertical Displacement Failure |
-| #289 | #344 | Dead State Cleanup (Revival Flag) |
-| #291 | #358 | SIT Forensic Duplicate Risk |
-| #292 | #343 | Acoustic Floor Decay Logic |
-| #293 | #464 | Geofence Evaluation Bug (Viewer) |
-| #294 | #387-B | Viewer Offline Detection Logic Gap |
-| #295 | #390-B | Redundant Barometric Baselining |
-| #296 | #335 | serviceStartRealtime Initialization Gap |
-| #297 | #359 | Hindsight Promotion Coverage |
-| #302 | #385 | Behavioral Magic Numbers |
-| #303 | #386-B | Trajectory Gating Multiplier |
-| #306 | #321 | Shadow Constants Remediation |
-| #336-E | #459 | Chair Sit Detection (R832) |
-| #336-G | #336-B | SIT Duplicate Guard |
-| #354 | #463 | Battery Alarm Threshold |
-| #354-B | #463-B | Dead Code Cleanup |
-| #355-B | #462 | SoT Naming Alignment |
-| #360-J | #387 | Logic Alignment - Jump Threshold |
-| #360-V | #387-B | Viewer Offline Detection |
-| #361-B | #390-B | Barometric Baselining |
-| #361-D | #390 | Documentation Refactor |
-| #362-K | #386 | Xiaomi Key Naming |
-| #362-T | #386-B | Trajectory Gating Multiplier |
-| #363-H | #453 | Samsung GPS Hardware |
-| #364-H | #454 | Samsung Proximity Hardware |
-| #364-L | #426 | GPS Staleness Logic |
-| #365-H | #455 | Xiaomi Autostart Hardware |
-| #365-L | #457 | Ghost Mode Status Conflict |
-| #366-R | #456 | Resilience Hardening - Watchdog |
-| #366-W | #458 | Watchdog Battery Optimization |
-
----
-
-## Hardening Phase: v8.9.55 Resolved Items
-*   **Issue #452**: Forensic SNR Latch Audit. Verified 6-minute adaptive hold (R332). (v8.9.55)
-*   **Issue #458**: Watchdog Battery Optimization. Implemented conservative `AlarmManager` rescheduling. (v8.9.55)
+| #496 | #326 | Intelligent Uncertainty UX Mapping |
+| #497 | #327 | Hindsight Transition Smoothing |
+| #337 | #337 | Power Parity: currentMa |
