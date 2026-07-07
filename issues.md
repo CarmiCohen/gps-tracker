@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.2.8)
+# Project Issues & Hardening Tracking (v9.2.9)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
@@ -6,8 +6,8 @@ This document tracks active issues, technical debt, and pending validation tasks
 | Category | Status | Count |
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Clean | 0 |
-| **Validation Tasks** | 🟡 Pending | 20 |
-| **Resolved (Total)** | 🟢 Progress | 254 |
+| **Validation Tasks** | 🟡 Pending | 21 |
+| **Resolved (Total)** | 🟢 Progress | 255 |
 
 ---
 
@@ -31,6 +31,7 @@ This document tracks active issues, technical debt, and pending validation tasks
 ## 🟡 Pending Validation
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
+| **R994** | **Screen-Off Optimization** | Verify GPS polling frequency drops to 5s (`SCREEN_OFF_GPS_POLLING_MS`) when the screen is off. |
 | **R993** | **Notification Throttling** | Verify notification updates every 1s in foreground and 10s in background. |
 | **#049** | **Jammer Logic Verification** | In Tracker mode, verify that entering a building does not trigger a "JAMMER" label on the local row (GPS badge should turn red, but "P" badge should indicate GAP, not JAMMER). |
 | **#044** | **HUD Local Health Verification** | In Viewer mode, verify the GPS badge stays green when local GPS is fixed, even if Tracker GPS is lost (DAT badge and Tracker line should turn red). |
@@ -53,6 +54,14 @@ This document tracks active issues, technical debt, and pending validation tasks
 | **#034** | **Sensor Stability** | Verify long-term stability of the `AppSensorThread`. |
 | **#035** | **Stationary Scaling** | Confirm `PROXIMITY_STARY_SCALING_MS_PER_HOUR` correctly scales skepticism. |
 | **#027** | **Identity Persistence Stability** | Verify that the Viewer identity ("V") remains stable during prolonged tracking sessions. |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.2.9)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **R994** | **WakeLock & Screen-Off** | **Resolved**. Audited WakeLock usage (verified `PARTIAL_WAKE_LOCK` necessity). Implemented dynamic GPS polling reduction to 5000ms (`SCREEN_OFF_GPS_POLLING_MS`) when the screen is off via `DisplayManager` state tracking. |
 
 ---
 

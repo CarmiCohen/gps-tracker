@@ -21,12 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v9.2.9:
+ * - R994: Screen-Off Optimization. Integrated isScreenOn from sensorManager into 
+ *   GPS polling interval calculation to optimize battery when device is locked.
  * v9.2.8:
  * - R993: Notification Throttling. Implemented time-based throttling for 
  *   notification updates (10s background, 1s foreground).
- * v9.2.6:
- * - Forensic Stress Test: Implemented onTriggerForensicTest callback to simulate 
- *   Jammer and Stall violations for verification.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -379,6 +379,7 @@ class TrackerService : BaseMonitorService() {
             isCoolingMode = integrityMonitor.isCoolingModeActive,
             isSuspiciousMode = isSuspiciousMode,
             isStationary = sensorManager.isStationary(),
+            isScreenOn = sensorManager.isScreenOn(), // R994: Pass screen state
             nowRealtime = nowRealtime,
             deviceSpecialFlags = flags
         )
@@ -506,11 +507,10 @@ class TrackerService : BaseMonitorService() {
 
         val proc = lastProcessedLocation
         
-        // Issue #046: Update authoritative state on the Tracker side.
         val currentTrackerState = TrackerStateManager.updateState(
             isVisualJump = proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER,
             isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false,
-            speed = proc?.filteredSpeed ?: 0.0, // Now standardized to m/s
+            speed = proc?.filteredSpeed ?: 0.0,
             vibration = sensorManager.currentVibrationIndex,
             vibrationFloor = locationProcessor.getAdaptiveVibrationFloor(),
             isTrackerConnected = isSocketConnected,
@@ -579,7 +579,7 @@ class TrackerService : BaseMonitorService() {
             sitShock = locationProcessor.sentinel.lastSitShock,
             isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge,
             isCoolingModeActive = integrityMonitor.isCoolingModeActive,
-            speed = proc?.filteredSpeed ?: 0.0, // Standardized to m/s
+            speed = proc?.filteredSpeed ?: 0.0,
             bearing = (lastKnownLocation?.bearing?.toDouble() ?: 0.0),
             isSitDetected = latchedSitDetected,
             isSitActive = lastSitDetected,
@@ -590,7 +590,6 @@ class TrackerService : BaseMonitorService() {
 
         evaluateAlarmsInternal(nowRealtime, isSignalLoss, isJammerSuspicionActive, isGpsStalledActive, false, isViewerActive, pendingReason)
 
-        // R993: Throttle notification updates.
         val notificationInterval = if (isUiVisible()) TICK_INTERVAL_MS else NOTIFICATION_THROTTLE_MS
         if (now - lastNotificationUpdateTs >= notificationInterval) {
             lastNotificationUpdateTs = now

@@ -7,7 +7,10 @@ import javax.inject.Singleton
 /**
  * ServiceBehaviorUseCase: Encapsulates high-level logic for service-level state transitions.
  * Handles suspicious mode gates and dynamic GPS polling interval calculations.
- * Extracted from TrackerService to resolve Issue 115 (God Objects).
+ * v9.2.9:
+ * - R994: Screen-Off Optimization. Added isScreenOn to calculateGpsInterval to 
+ *   enforce SCREEN_OFF_GPS_POLLING_MS (5000ms) when the device is locked, 
+ *   optimizing battery without sacrificing core background tracking.
  * v8.8.35: Issue 148 - Implemented A15 stable polling (1000ms).
  */
 @Singleton
@@ -21,6 +24,7 @@ class ServiceBehaviorUseCase @Inject constructor(
         isCoolingMode: Boolean,
         isSuspiciousMode: Boolean,
         isStationary: Boolean,
+        isScreenOn: Boolean,
         nowRealtime: Long,
         deviceSpecialFlags: DeviceSpecialFlags
     ): Long {
@@ -33,6 +37,7 @@ class ServiceBehaviorUseCase @Inject constructor(
             isCoolingMode -> COOLING_GPS_POLLING_MS
             isSuspiciousMode -> SUSPICIOUS_GPS_POLLING_MS
             isStationaryState -> STATIONARY_GPS_POLLING_MS
+            !isScreenOn -> SCREEN_OFF_GPS_POLLING_MS // R994: Reduce frequency when screen is off
             deviceSpecialFlags.isA15 -> A15_STABLE_GPS_POLLING_MS
             deviceSpecialFlags.isS21FE || deviceSpecialFlags.isXiaomi -> HIGH_FREQUENCY_GPS_POLLING_MS
             else -> MOVING_GPS_POLLING_MS

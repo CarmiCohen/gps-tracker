@@ -3,6 +3,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v9.2.9:
+ * - R994: Screen-Off Optimization. Introduced SCREEN_OFF_GPS_POLLING_MS (5000ms) 
+ *   to reduce power consumption during background tracking.
  * v9.2.8:
  * - R993: Notification Throttling. Introduced NOTIFICATION_THROTTLE_MS (10000ms) 
  *   to standardize foreground service notification updates.
@@ -21,7 +24,7 @@ package com.gps19.core.engine
  * v8.9.76:
  * - Issue #018: Tracker State Stability. Tightened JUMP_GATE_SENSOR_MISMATCH_MPS to 2.0 
  *   to aggressively filter stationary drift noise in Urban Canyons.
- * v8.9.75:
+ * v8.9.75 (Refined):
  * - Issue #014: Type Safety Optimization. Standardized thresholds and constants 
  *   to Double to align with telemetry type unification.
  * v8.9.69:
@@ -201,6 +204,7 @@ const val SUSPICIOUS_GPS_POLLING_MS = 1000L
 const val HIGH_FREQUENCY_GPS_POLLING_MS = 100L
 const val A15_STABLE_GPS_POLLING_MS = 1000L
 const val COOLING_GPS_POLLING_MS = 30000L
+const val SCREEN_OFF_GPS_POLLING_MS = 5000L // R994: Reduced frequency when screen is off
 const val VIEWER_GPS_POLLING_MS = 1000L 
 const val GPS_GAP_THRESHOLD_MS = 60000L
 const val GPS_STALL_THRESHOLD_MS = 60000L

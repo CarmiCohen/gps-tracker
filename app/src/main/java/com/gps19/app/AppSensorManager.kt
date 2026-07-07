@@ -31,15 +31,13 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * v9.2.9:
+ * - R994: Screen-Off Optimization. Exposed isScreenOn via DisplayManager state tracking 
+ *   to allow GPS polling frequency reduction.
  * v8.9.93:
  * - Issue #037: Implemented Display State Hardening. Added a DisplayListener to detect 
  *   rapid ON/DOZE toggling on G990E devices. Introduced display-aware muzzling to 
  *   prevent virtual proximity flickering during Samsung AOD transitions.
- * v8.9.79:
- * - Issue #016: Finalized Double standardization. Renamed latestAcousticDb to currentAcousticDb for consistency.
- * v8.9.75 (Refined):
- * - Issue #014: System-Wide Type Safety. Standardized all internal metrics to Double. 
- *   Conversions from Float (hardware) now happen immediately at source.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -63,10 +61,21 @@ class AppSensorManager @Inject constructor(
     private var sensorHandler: Handler? = null
     private val hasLoggedThreadInfo = AtomicBoolean(false)
 
-    // Display Monitoring Logic (Issue #037)
+    // Display Monitoring Logic (Issue #037 / R994)
     private var lastDisplayState = Display.STATE_UNKNOWN
     private var lastDisplayTransitionTs = 0L
     private val isDisplayFlickering = AtomicBoolean(false)
+
+    /**
+     * R994: Returns true if the default display is in ON state.
+     */
+    fun isScreenOn(): Boolean {
+        if (lastDisplayState == Display.STATE_UNKNOWN) {
+            val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
+            if (display != null) lastDisplayState = display.state
+        }
+        return lastDisplayState == Display.STATE_ON
+    }
 
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) {}
@@ -98,7 +107,6 @@ class AppSensorManager @Inject constructor(
     }
 
     // Performance Audit: Pre-allocated buffers for zero-allocation fast path
-    // Note: Android Sensor API requires FloatArray for rotation/orientation.
     private val gravityBuffer = FloatArray(3)
     private val geomagneticBuffer = FloatArray(3)
     private val rotationMatrixBuffer = FloatArray(9)
@@ -112,7 +120,6 @@ class AppSensorManager @Inject constructor(
     private var lastAccelY = 0.0
     private var lastAccelZ = 0.0
     
-    // Performance Audit: Rolling sum for O(1) vibration average
     private val vibrationCircularBuffer = DoubleArray(VIBRATION_WINDOW_SIZE)
     private var vibrationCircularIdx = 0
     
@@ -264,6 +271,10 @@ class AppSensorManager @Inject constructor(
         
         displayManager.registerDisplayListener(displayListener, sensorHandler)
         
+        // Initialize display state
+        val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
+        if (display != null) lastDisplayState = display.state
+
         startAcousticMonitoring()
     }
 
@@ -342,7 +353,6 @@ class AppSensorManager @Inject constructor(
                 if (proximityIdx < secMinProxIdx) secMinProxIdx = proximityIdx
 
                 if (newValue != rawProximityNear) {
-                    // Issue #037: Muzzle 'Far' transitions during rapid display flickering (G990E logic)
                     if (!newValue && isDisplayFlickering.get() && isStationary()) {
                         Timber.d("Proximity: Suppressing 'Far' transition during display state spam.")
                         return
@@ -362,7 +372,6 @@ class AppSensorManager @Inject constructor(
                         PROXIMITY_DEBOUNCE_MOVING_MS
                     }
 
-                    // Issue #012: Adaptive Proximity Debounce
                     var calcDebounceMs = baseDebounceMs
                     if (isStationary() && stationaryStartTs > 0) {
                         val hoursStationary = (now - stationaryStartTs) / 3600000.0
@@ -661,7 +670,6 @@ class AppSensorManager @Inject constructor(
 
         lastAccelX = x; lastAccelY = y; lastAccelZ = z
         
-        // Performance Audit: Rolling sum Circular Buffer (O(1))
         val oldVal = vibrationCircularBuffer[vibrationCircularIdx]
         vibrationCircularBuffer[vibrationCircularIdx] = delta
         vibrationRollingSum = vibrationRollingSum - oldVal + delta
@@ -776,7 +784,6 @@ class AppSensorManager @Inject constructor(
             lastBaroZeroingTs = now
         }
 
-        // Android API requires Float. Convert to Double immediately after call.
         val currentAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure.toFloat()).toDouble()
         val baselineAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure.toFloat()).toDouble()
         
@@ -807,7 +814,6 @@ class AppSensorManager @Inject constructor(
 
     private fun updateOrientation() {
         if (hasGravity && hasGeomagnetic) {
-            // Performance Audit: Zero-allocation orientation update
             if (AndroidSensorManager.getRotationMatrix(rotationMatrixBuffer, inclinationMatrixBuffer, gravityBuffer, geomagneticBuffer)) {
                 AndroidSensorManager.getOrientation(rotationMatrixBuffer, orientationBuffer)
                 currentCompassHeading = (Math.toDegrees(orientationBuffer[0].toDouble()) + 360.0) % 360.0
@@ -834,7 +840,6 @@ class AppSensorManager @Inject constructor(
         debouncedProximityCm = -1.0
         proximityDebounceMs = 0L
         
-        // Reset vibration rolling state
         vibrationCircularIdx = 0
         vibrationRollingSum = 0.0
         vibrationBufferCount = 0
