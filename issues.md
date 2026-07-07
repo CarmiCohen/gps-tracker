@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (v9.1.9)
+# Project Issues & Hardening Tracking (v9.2.0)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 High | 3 |
-| **Validation Tasks** | 🟡 Pending | 15 |
-| **Resolved (Total)** | 🟢 Progress | 62 |
+| **Open Technical Issues** | 🔴 High | 2 |
+| **Validation Tasks** | 🟡 Pending | 16 |
+| **Resolved (Total)** | 🟢 Progress | 63 |
 
 ---
 
@@ -25,7 +25,6 @@ This document tracks active issues, technical debt, and pending validation tasks
 | ID | Issue | Description |
 | :--- | :--- | :--- |
 | **#044** | **HUD: LEDs contradiction** | Tracker: all green but VWR. Viewer: all green but GPS. Standardize top-level badges to local health. |
-| **#048** | **Viewer HUD Line Grayout** | Tracker line on Viewer HUD is mostly grayed out (from temperature onwards) even when telemetry is received. |
 | **#049** | **False Jammer Indicator** | HUD shows “P” adjacent to name and “JAMMER…” label incorrectly on Tracker line. |
 
 ---
@@ -33,6 +32,7 @@ This document tracks active issues, technical debt, and pending validation tasks
 ## 🟡 Pending Validation
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
+| **#052** | **HUD Freshness Verification** | Verify that Tracker HUD/Viewer HUD line elements (Battery, Temp, Comm) stay colorized when GPS is lost but connection remains. |
 | **#051** | **Binary Parity Verification** | Verify that a Viewer receiving a binary `location_relay_bin` pulse correctly displays the `trackerState`. |
 | **#046** | **State Sync Audit** | Verify that Tracker HUD and Viewer HUD transition between MOVING/PARKING simultaneously under load. |
 | **#047** | **Speed Zeroing Verification** | Confirm Viewer HUD speed drops to 0.0 km/h immediately when Tracker GPS is lost (DAT badge fresh, GPS badge red). |
@@ -52,121 +52,19 @@ This document tracks active issues, technical debt, and pending validation tasks
 
 ---
 
+## 🟢 Recently Resolved Issues (v9.2.0)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#048** | **Viewer HUD Line Grayout** | **Resolved**. Differentiated "Telemetry Age" (packet) from "GPS Age" (fix) in `StatusRowData`. Connectivity, Battery, and Satellites now remain colorized as long as telemetry is fresh. Distance remains colorized based on last known good position while link is active. |
+
+---
+
 ## 🟢 Recently Resolved Issues (v9.1.9)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
 | **#051** | **Binary Parity Gap** | **Resolved**. Synchronized `RealtimeStatus` and `TrackerStatusProto` in `.proto` with forensic engine fields. Updated `CommunicationManager` and `SettingsRepository` to handle new fields. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.1.8)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#046** | **Tracker State Desync** | **Resolved**. Transitioned to an authoritative state model. Migrated `TrackerState` to `core:engine`. Tracker now computes and broadcasts its behavioral state; Viewer adopts it directly. Fixed desync where Viewer showed "PARKING" while Tracker was "MOVING". |
-| **#047** | **Ghost Speed Updates** | **Resolved**. Standardized internal telemetry pipeline to raw m/s. km/h conversion is now presentation-only. Hardened `StatusBar` with a freshness gate that zeros speed and stops animation during GPS signal loss. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.1.7)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#014** | **System-Wide Type Safety** | **Resolved**. Standardized all telemetry fields (Accuracy, Speed, Bearing) and sensor metrics to native `Double` types across the entire stack. Refactored `AppSensorManager`, `SyncManager`, and Service layers to eliminate redundant `toDouble()` conversions. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.1.6)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#043** | **Room Migration Failure** | **Resolved**. Hardened `Database.kt` by adding explicit `@ColumnInfo(defaultValue = "...")` to all entity fields. Corrected `MIGRATION_52_53` to include corresponding `DEFAULT` clauses in SQL. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.1.5)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#045** | **Android 15 Background FGS Hardening** | **Resolved**. Implemented state-aware foreground service type enforcement. Prevents `SecurityException` on Android 15 by restricting `MICROPHONE` type to foreground states only. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.1.2)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#042** | **Identity Mismatch (Viewer/Tracker ID)** | **Resolved**. Enforced refined `viewerId` locking in `SignalingValidator`. Implemented "Lock-on-Non-Default" logic. Fixed critical peer ID resolution bug in `RemoteHandler`. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.1.0)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **R799e** | **JD Vivid Green Branding** | **Resolved**. Migrated all Tracker-role and primary branding indicators to JD Vivid Green (#78BE20). Updated `Color.kt`, `colors.xml`, and branding documentation. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.0.4)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **R799d** | **Viewer Color Change** | **Resolved**. Migrated all Viewer-role identity indicators from Orange to Cyan (#06B6D4) system-wide. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.0.3)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#029** | **Viewer Status Line Grayed-Out** | **Resolved**. Updated `ViewerService.kt` to propagate local `LocationUpdate` telemetry to the repository. Ensures monitoring device status remains active. |
-
----
-
-## 🟢 Recently Resolved Issues (v8.9.99)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#041** | **Identity Sanitization Hardening** | **Resolved**. Implemented R975: Strict alphanumeric Regex validation (`^[a-zA-Z0-9_-]{1,32}$`) at engine level. |
-
----
-
-## 🟢 Recently Resolved Issues (v8.9.98)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#027** | **Identity Persistence Hardening** | **Resolved**. Reinforced `MainRepository.saveSettingsBulk` with atomic uniqueness validation. |
-
----
-
-## 🟢 Recently Resolved Issues (v8.9.96)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#030** | **Proto Schema Discrepancy** | **Resolved**. Audited and confirmed `app/src/main/proto` as authoritative. |
-| **#032** | **UI Refresh Consistency** | **Resolved**. Implemented `isForensicFresh` gate in `DashboardUseCase` using `WATCH_DOG_UI_GRACE_MS` (15s). |
-
----
-
-## 🟢 Recently Resolved Issues (v8.9.94)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#038** | **Adaptation Instability** | **Resolved**. Implemented a 5s "Adaptation Muzzle" in `TrackerService` triggered by GPS polling changes on A15. |
-| **#037** | **Viewer Display State Spam** | **Resolved**. Added `DisplayListener` to detect rapid Samsung AOD toggling. |
-| **#036** | **A15 Behavioral Flickering** | **Resolved**. Introduced A15-specific hardened thresholds for sensor mismatch and visual jitter in `EngineConstants.kt`. |
-
----
-
-## 🟢 Recently Resolved Issues (v8.9.91 - v8.9.88)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#005** | **Log Spillage Hardening** | **Resolved**. Moved osmdroid configuration to a synchronous block in `GpsApplication`. |
-| **#028** | **R924 Sunset Failure** | **Resolved**. Verified `HeaderBar` code is purged of legacy `VID_NOTES` identifiers. |
-| **#027** | **Persistent Viewer ID Reversion** | **Resolved**. Fixed logic in `ViewerService.handleTrackerPulse`. |
 
 ---
 

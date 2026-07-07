@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v9.1.9
+# System Source of Truth (SoT) - v9.2.0
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
@@ -20,6 +20,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Authoritative State Model (R986)**: The `TrackerState` (MOVING, PARKING, etc.) MUST be computed exclusively by the Tracker and broadcast via telemetry. Viewers MUST adopt this reported state directly to ensure HUD synchronization and prevent "split-brain" desync. (Issue #046 / v9.1.8)
 *   **Binary Forensic Parity (R988)**: The binary telemetry contract (`RealtimeStatus`) MUST maintain field parity with the authoritative state flow. All forensic metadata, including `tracker_state`, `is_anchor_locked`, and `location_pending_reason`, MUST be synchronized in the Protobuf schema and correctly extracted by the signaling handlers to prevent data degradation during binary transport. (Issue #051 / v9.1.9)
 *   **Speed Unit Standardization (R987)**: All internal telemetry and engine pipelines MUST use raw **meters per second (m/s)** for speed. Conversion to km/h MUST be restricted to the presentation layer. The HUD MUST implement a freshness gate to zero out speed and suppress animations when GPS is stale (`isGpsActive` is false). (Issue #047 / v9.1.8)
+*   **HUD Freshness Duality (R989)**: The HUD MUST differentiate between **Telemetry Freshness** (link/packet arrival) and **GPS Freshness** (position fix age). Connectivity, Battery, and health indicators MUST remain colorized as long as telemetry is fresh, even if the GPS fix is stale. Only explicitly position-fix-dependent fields (Accuracy, GPS Age) turn gray when GPS signal is lost. (Issue #048 / v9.2.0)
 *   **Telemetry Freshness Authority (Issue #029)**: Data health (`DAT` badge) is determined by the arrival of any telemetry packet. In Viewer mode, the service MUST propagate local updates to the repository to ensure UI freshness for the monitoring device. (v9.0.3)
 *   **Document Integrity Authority (R969)**: All core documentation (`issues.md`, `requirements_sot.md`, `compliance.md`) and their archives are subject to a **Growth-Only Constraint**. Archives must never decrease in line count, and structural headers must be preserved during all automated or manual writes. (v8.9.91)
 *   **A15 Jitter Stabilization (R970)**: The system applies hardened spatial gates (5.0 m/s mismatch / 25m jitter) and a 5-second "Adaptation Muzzle" during polling transitions on Samsung A15 hardware to ensure state engine stability. (Issue #036 / Issue #038 / v8.9.94)

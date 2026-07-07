@@ -46,6 +46,9 @@ import com.gps19.core.engine.*
  * Shared UI Components for GPS Tracker.
  * v9.1.9:
  * - Issue #051: Binary Parity Gap support.
+ * - Issue #048 Fix: Differentiated Telemetry vs GPS Freshness in StatusRowData. 
+ *   Connectivity and health indicators (Battery, Temp, Comm, Sats, Distance) now 
+ *   remain colorized as long as telemetry is fresh, even if GPS fix is stale.
  * v9.1.8:
  * - Issue #047 Fix: Standardized speed target to m/s. Implemented GPS freshness 
  *   gate in StatusBar to zero out speed and suppress animations during signal loss.
@@ -556,8 +559,10 @@ fun StatusRowData(
     val isHandshaking = isConnStale
 
     val contentColor = if (isConnStale) Slate500 else color
+    // GPS color is strictly for position-fix-dependent precision indicators (Age, Accuracy)
     val gpsColor = if (isGpsStale) Slate500 else color
-    val distColor = if (isGpsStale) Slate500 else (overrideDistanceColor ?: color)
+    // Connectivity & Distance should remain colorized as long as the telemetry link is fresh
+    val distColor = if (isTelemetryFresh && !isConnStale) (overrideDistanceColor ?: color) else Slate500
 
     val infiniteTransition = rememberInfiniteTransition(label = "HandshakeAnimations")
     val handshakeAlpha by infiniteTransition.animateFloat(
@@ -601,13 +606,13 @@ fun StatusRowData(
                 }
                 Box(modifier = Modifier.width(20.dp), contentAlignment = Alignment.Center) { CommBar(commIndex, if (isTelemetryFresh) contentColor else Slate500) }
                 Spacer(Modifier.width(4.dp))
-                Box(modifier = Modifier.width(34.dp)) { Text(text = "$satsUsed/$satsView", color = if(isGpsStale || !isTelemetryFresh) Slate500 else gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) }
+                Box(modifier = Modifier.width(34.dp)) { Text(text = "$satsUsed/$satsView", color = telemetryColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) }
                 Box(modifier = Modifier.width(26.dp)) {
                     val ageStr = if (gpsAgeMs != -1L) {
                         val ageSec = (maxOf(0L, gpsAgeMs) / 1000).toInt()
                         when { ageSec < 100 -> "${ageSec}s"; ageSec < 3600 -> "${ageSec/60}m"; else -> ">1h" }
                     } else "--s"
-                    Text(text = ageStr, color = if (isGpsStale || !isTelemetryFresh) Slate500 else gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
+                    Text(text = ageStr, color = gpsColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                 }
             }
         }
@@ -627,7 +632,7 @@ fun StatusRowData(
                     )
                 } else {
                     fun formatAcc(v: Float): String = when { v >= 10000f -> "${(v / 1000).toInt()}k"; v >= 1000f -> String.format(Locale.getDefault(), "%.1fk", v / 1000f); else -> v.toInt().toString() }
-                    val accColor = if (isGpsStale || !isTelemetryFresh) Slate500 else gpsColor
+                    val accColor = if (isTelemetryFresh) gpsColor else Slate500
                     
                     val rawText = if (accuracy > 0) "±${formatAcc(accuracy)}" else ""
                     val maxText = if (maxAccuracy > 0) "(±${formatAcc(maxAccuracy)})" else ""
@@ -654,7 +659,7 @@ fun StatusRowData(
                         animatedDistance >= 1000 -> String.format(Locale.getDefault(), "%.1fkm", animatedDistance / 1000.0)
                         else -> "${animatedDistance.toInt()}m" 
                     }
-                    Text(text = distStr, color = if (isTelemetryFresh) distColor else Slate500, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1, style = compactStyle, textAlign = TextAlign.End)
+                    Text(text = distStr, color = distColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1, style = compactStyle, textAlign = TextAlign.End)
                 }
             }
         }
