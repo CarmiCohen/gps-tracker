@@ -44,6 +44,10 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v9.2.6:
+ * - Issue #049 Fix: Corrected GlobalStatusBar mapping to use mode-aware location 
+ *   for Tracker-row health and pending states. Prevents false JAMMER/P indicators 
+ *   on local tracker row. Fixed RepeatMode and variable naming issues.
  * v9.2.3:
  * - Issue #044 Fix: Standardized HUD LEDs to Local Health. Standardized GPS badge 
  *   to local signal. Peer-dependent fields (Speed, State) remain tied to remote health.
@@ -385,7 +389,8 @@ fun GlobalStatusBar(
     val localGpsAge = if (uiState.localLocation.timestamp > 0) systemPulse - uiState.localLocation.timestamp else Long.MAX_VALUE
     val isLocalGpsActive = localGpsAge < GPS_UI_FAIL_THRESHOLD_MS
 
-    val trackerGpsAge = if (uiState.trackerLocation.timestamp > 0) systemPulse - uiState.trackerLocation.timestamp else Long.MAX_VALUE
+    // Issue #049: Ensure Tracker health badge follows active context (local or remote).
+    val trackerGpsAge = if (loc.timestamp > 0) systemPulse - loc.timestamp else Long.MAX_VALUE
     val isTrackerGpsActive = trackerGpsAge < GPS_UI_FAIL_THRESHOLD_MS
 
     val isDataHealthy = dashboardState.isTelemetryFresh && isLocalOnline && isRelayConnected
@@ -402,8 +407,8 @@ fun GlobalStatusBar(
         mode = mode, battery = uiState.battery.level, lastP = progressPulse, 
         commIndex = commIndex, remoteCommIndex = remoteCommIndex, remoteBattery = if (mode == "viewer") uiState.trackerBattery.level else -1, 
         isCharging = uiState.battery.isChargingStable, remoteCharging = if (mode == "viewer") uiState.trackerBattery.isChargingStable else false,
-        speedMps = speedValueMps.toFloat(), trackerAccuracy = uiState.trackerLocation.accuracy.toFloat(),
-        maxTrackerAccuracy = uiState.trackerLocation.maxAccuracy.toFloat(), 
+        speedMps = speedValueMps.toFloat(), trackerAccuracy = loc.accuracy.toFloat(),
+        maxTrackerAccuracy = loc.maxAccuracy.toFloat(), 
         viewerAccuracy = if (uiState.localLocation.lat != 0.0) uiState.localLocation.accuracy.toFloat() else 0f,
         maxViewerAccuracy = uiState.localLocation.maxAccuracy.toFloat(), now = systemPulse, satsView = uiState.trackerSatsView, satsUsed = uiState.trackerSatsUsed,
         trackerTemp = uiState.trackerBattery.temp.toFloat(), viewerTemp = uiState.battery.temp.toFloat(), distToHome = uiState.distanceTrackerToHome, distToViewer = uiState.distanceTrackerToViewer,
@@ -411,8 +416,8 @@ fun GlobalStatusBar(
         viewerGpsTs = uiState.localLocation.timestamp, trackerId = uiState.deviceId, viewerId = uiState.viewerId, watchdogOk = dashboardState.watchdogOk,
         trackerState = dashboardState.trackerState, hasActiveAlarms = hasUnresolved, isRedScreenSuppressed = (hasUnresolved && !redScreenVisible),
         isSirenPlaying = uiState.isSirenPlaying,
-        isTrackerLocPending = uiState.trackerLocation.isLocationPending, 
-        trackerLocPendingReason = uiState.trackerLocation.locationPendingReason,
+        isTrackerLocPending = loc.isLocationPending, 
+        trackerLocPendingReason = loc.locationPendingReason,
         isViewerLocPending = uiState.localLocation.isLocationPending,
         viewerLocPendingReason = uiState.localLocation.locationPendingReason,
         lastGpsTs = lastGpsTs,

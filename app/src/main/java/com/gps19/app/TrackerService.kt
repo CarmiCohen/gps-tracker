@@ -21,6 +21,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v9.2.6:
+ * - Forensic Stress Test: Implemented onTriggerForensicTest callback to simulate 
+ *   Jammer and Stall violations for verification.
  * v9.2.2:
  * - Issue #326 Fix: Intelligent Uncertainty UX. Added GPS_GAP to pendingReason logic.
  * v9.1.9:
@@ -190,8 +193,17 @@ class TrackerService : BaseMonitorService() {
                 { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }, 
                 { onUiVisibilityChangedInternal(it) }, 
                 { transientDropDetected.set(it) }, 
-                { resetServiceTimers() }, 
-                { sensorManager.start() }
+                { resetServiceTimers() },
+                { sensorManager.start() },
+                { // TRIGGER FORENSIC TEST
+                    lifecycleScope.launch {
+                        val proc = lastProcessedLocation
+                        logManager.logServiceEvent("FORENSIC TEST: Manually injecting Jammer/Stall markers", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                            lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                        systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L // Trigger Jammer (>30s)
+                        systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L // Trigger Stall (>60s)
+                    }
+                }
             )
             commandRouter.register()
             commandRouter.startObservingCommands(lifecycleScope)

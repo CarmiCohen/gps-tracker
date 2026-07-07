@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - v9.2.3
+# System Source of Truth (SoT) - v9.2.6
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **HUD Context Mapping Authority (R049)**: The `GlobalStatusBar` MUST implement mode-aware telemetry binding. In **Tracker mode**, all tracker-line indicators (GPS, Accuracy, Pending State) and top-level GPS health badges MUST bind to the local device's `localLocation`. In **Viewer mode**, these indicators MUST bind to the remote `trackerLocation`. This ensures the HUD correctly reflects the active monitoring context and prevents stale remote data from triggering false "JAMMER" or "PENDING" indicators on a locally healthy tracker. (Issue #049 / v9.2.6)
 *   **HUD Local Health Standardization (R991)**: The top-level HUD status badges (INT, SRV, VWR/TRK, GPS) MUST reflect the **Local Health** of the device. The GPS badge specifically MUST reflect the local device's GPS fix status. Peer-dependent telemetry indicators (Speed, Tracker State) MUST remain decoupled and tied to the remote peer's GPS health to ensure data veracity. (Issue #044 / v9.2.3)
 *   **Intelligent Uncertainty UX (R326)**: The system MUST provide specific contextual reasons for Bayesian uncertainty expansion (Location Pending state). Reasons include `GPS_STALL` (hardware stall), `GPS_GAP` (environmental signal loss), `JAMMER_SUSPICION`, `SIGNAL_LOSS`, and `ACOUSTIC_VIOLATION`. These reasons MUST be prioritized during telemetry aggregation (e.g., Jammer > Stall > Gap) to ensure critical forensic markers are preserved in historical ribbons. (Issue #326 / v9.2.2)
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.

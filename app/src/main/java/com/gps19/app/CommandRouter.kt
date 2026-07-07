@@ -19,6 +19,9 @@ import timber.log.Timber
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * v9.2.6:
+ * - Forensic Stress Test: Added handling for TriggerForensicTest to simulate 
+ *   Jammer/Stall violations for verification.
  * v8.9.72:
  * - Issue #015: Hardened coroutine cancellation handling. Ensuring CancellationException 
  *   is not logged as an error during service shutdown.
@@ -45,7 +48,8 @@ class CommandRouter(
     private val onUiVisibilityChanged: (Boolean) -> Unit,
     private val onTransientDrop: (Boolean) -> Unit,
     private val onResetTimers: () -> Unit = {},
-    private val onSyncSensors: () -> Unit = {}
+    private val onSyncSensors: () -> Unit = {},
+    private val onTriggerForensicTest: () -> Unit = {}
 ) {
 
     private val routerExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -167,6 +171,9 @@ class CommandRouter(
                                     Timber.e(e, "Error during test alarm")
                                 }
                             }
+                        }
+                        is UiCommand.TriggerForensicTest -> {
+                            onTriggerForensicTest()
                         }
                     }
                 } catch (e: Exception) {

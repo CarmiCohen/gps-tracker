@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (v9.2.3)
+# Project Issues & Hardening Tracking (v9.2.6)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 High | 1 |
-| **Validation Tasks** | 🟡 Pending | 18 |
-| **Resolved (Total)** | 🟢 Progress | 251 |
+| **Open Technical Issues** | 🟢 Clean | 0 |
+| **Validation Tasks** | 🟡 Pending | 19 |
+| **Resolved (Total)** | 🟢 Progress | 252 |
 
 ---
 
@@ -24,15 +24,14 @@ This document tracks active issues, technical debt, and pending validation tasks
 ---
 
 ## 🔴 Open Issues
-| ID | Issue | Description |
-| :--- | :--- | :--- |
-| **#049** | **False Jammer Indicator** | HUD shows “P” adjacent to name and “JAMMER…” label incorrectly on Tracker line. |
+*None.*
 
 ---
 
 ## 🟡 Pending Validation
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
+| **#049** | **Jammer Logic Verification** | In Tracker mode, verify that entering a building does not trigger a "JAMMER" label on the local row (GPS badge should turn red, but "P" badge should indicate GAP, not JAMMER). |
 | **#044** | **HUD Local Health Verification** | In Viewer mode, verify the GPS badge stays green when local GPS is fixed, even if Tracker GPS is lost (DAT badge and Tracker line should turn red). |
 | **#326** | **Uncertainty UX Verification** | Verify "GPS GAP" appears in HUD when entering a tunnel, and ensure priority merging preserves "JAMMER" markers in ribbons. |
 | **#053** | **Anchor Lock Breakout** | Physically move the device after a Hard-Lock is established and verify immediate breakout via physical sensors. |
@@ -56,6 +55,14 @@ This document tracks active issues, technical debt, and pending validation tasks
 
 ---
 
+## 🟢 Recently Resolved Issues (v9.2.6)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#049** | **False Jammer Indicator** | **Resolved**. Corrected `GlobalStatusBar` mapping in `SharedUiComponents.kt` to use mode-aware location context. Tracker health indicators now correctly bind to `localLocation` when in Tracker mode. |
+
+---
+
 ## 🟢 Recently Resolved Issues (v9.2.3)
 
 | ID | Issue | Resolution |
@@ -69,11 +76,3 @@ This document tracks active issues, technical debt, and pending validation tasks
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
 | **#326** | **Intelligent Uncertainty UX** | **Resolved**. Enriched Location Pending state with specific reasons (`GPS_GAP`, `JAMMER`). Implemented priority-based merging in ribbon pipeline. Corrected ID collision in docs. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.2.1)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#018** | **Stationary Anchor Hard-Lock** | **Resolved**. Implemented coordinate clamping in `LocationProcessor.kt`. Refactored `TrackerService.kt` to adopt optimized coordinates and propagate `isAnchorLocked` flag to HUD and telemetry. |

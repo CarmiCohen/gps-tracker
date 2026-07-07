@@ -26,13 +26,13 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * v9.2.6:
+ * - Forensic Stress Test: Added onTriggerForensicTest button to PhoneSetupOverlay
+ *   to facilitate manual verification of violation latching logic.
  * v9.1.0:
  * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
  * v9.0.4:
  * - R799d: Changed Viewer color to ViewerCyan.
- * v8.9.48:
- * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
- *   BrandJd (#367C2B) in headers and phone setup status indicators.
  */
 
 @Composable
@@ -211,7 +211,9 @@ fun PhoneSetupOverlay(
     onClose: () -> Unit, onWhitelist: () -> Unit, onOverlay: () -> Unit, onAppInfo: () -> Unit, 
     onExactAlarm: () -> Unit, onXiaomi: () -> Unit, onRefresh: () -> Unit, 
     onToggleXiaomiOverride: () -> Unit = {},
-    onTestAlarm: () -> Unit, isBatteryWhitelisted: Boolean, isOverlayGranted: Boolean, 
+    onTestAlarm: () -> Unit,
+    onTriggerForensicTest: () -> Unit = {},
+    isBatteryWhitelisted: Boolean, isOverlayGranted: Boolean,
     isMicrophoneGranted: Boolean, isExactAlarmGranted: Boolean, isPostNotificationsGranted: Boolean, 
     isBackgroundLocationGranted: Boolean, xiaomiStatus: XiaomiPermissionStatus, 
     isXiaomiManualOverride: Boolean,
@@ -262,7 +264,19 @@ fun PhoneSetupOverlay(
                 }
             }
             if (!isTrackerMode) { Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step9_title), description = stringResource(R.string.setup_step9_desc), onClick = onGoToMap, buttonText = stringResource(R.string.btn_open_map), isCompleted = homePointsCount > 0, icon = Icons.Default.Map, reason = if (homePointsCount == 0) "Geofence: No Home Points defined" else null) }
-            Spacer(Modifier.height(32.dp)); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = onRefresh, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh)) }; Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm)) } }
+            Spacer(Modifier.height(32.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onRefresh, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh)) }
+                Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm)) }
+            }
+            if (isTrackerMode) {
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = onTriggerForensicTest, modifier = Modifier.fillMaxWidth().height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(FORENSIC_PINK_COLOR).copy(alpha = 0.8f))) {
+                    Icon(Icons.Default.BugReport, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("TRIGGER FORENSIC STRESS TEST", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                }
+            }
             Spacer(Modifier.height(24.dp))
         }
     }

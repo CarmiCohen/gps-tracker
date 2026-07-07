@@ -1,20 +1,22 @@
-# Forensic Handover - v9.2.3 (HUD Local Health Standardization)
+# Forensic Handover - v9.2.6 (HUD Context Mapping Authority)
 
-## 📌 Status: Stable / Build PASS / UX Consistency Implemented
-This cycle remediates the "LED Contradiction" in the HUD by standardizing top-level status badges to reflect the local device's health.
+## 📌 Status: Stable / Build PASS / Release Ready
+This cycle remediates the "False Jammer Indicator" in Tracker mode by standardizing the HUD's telemetry binding context.
 
-### 🟢 Completed: Issue #044 (HUD: LEDs contradiction)
-*   **UI/UX Standardisation**:
-    *   Updated `GlobalStatusBar` in `SharedUiComponents.kt` to differentiate between `isLocalGpsActive` and `isTrackerGpsActive`.
-    *   The top-level **GPS badge** now strictly represents the local device's GPS fix health.
-    *   The **TRK/VWR badge** continues to represent the peer's telemetry presence (Peer Active).
-    *   **Telemetry Veracity**: Maintained peer-dependent coloring for the **Speed** display and **Tracker State** label, ensuring they still turn gray (Slate500) if the remote Tracker's GPS is stale, even if the Viewer's local GPS is green.
-*   **Refactoring**:
-    *   Standardized `StatusBar` signature to accept both local and tracker GPS health flags.
+### 🟢 Completed: Issue #049 (False Jammer Indicator)
+*   **Root Cause Remediation**:
+    *   Updated `GlobalStatusBar` in `SharedUiComponents.kt` to implement **Mode-Aware Binding**.
+    *   In **Tracker mode**, the HUD now correctly binds the local device's telemetry line and top-level GPS health badges to `localLocation` instead of `trackerLocation`.
+    *   This prevents stale or empty remote state from triggering erroneous "JAMMER" labels or "P" (Pending) badges when the local hardware is healthy.
+*   **Requirement Codified**: **R049** (HUD Context Mapping Authority) added to `requirements_sot.md`.
 
-### 🟢 Completed: Issue #326 (Intelligent Uncertainty UX Mapping)
-*   **Engine Hardening**: Enriched Location Pending state with specific reasons (`GPS_GAP`, `JAMMER`).
+### 🟢 Verified: Issue #053 (Anchor Lock Breakout)
+*   **Logic Audit**: Confirmed that `LocationProcessor.kt` already contains the behavioral breakout trigger (threshold dropped to 0.0m upon physical motion detection).
 
 ### 🛠 Instructions for Resumption
-1.  **Verification of #044**: Run the app in Viewer mode. Move the Tracker indoors (GPS loss). Verify that the top-level HUD GPS badge remains **Green** (if the Viewer is outdoors), while the **DAT** badge and the **Tracker Line** indicators reflect the signal loss.
-2.  **Verification of Speed Gate**: Ensure that when the Tracker GPS is lost, the Viewer HUD speed drops to `0.0 km/h` and turns gray, regardless of the local Viewer's GPS status.
+1.  **Verification of #049**: Run the app in Tracker mode. Enter a building to induce GPS loss. Verify the top-level GPS badge turns **Red**, but the Tracker-line label remains healthy (or shows "GPS GAP") without incorrectly flagging "JAMMER".
+2.  **Verification of #044**: In Viewer mode, verify the local GPS badge stays green if the Viewer has a fix, regardless of the Tracker's signal state.
+3.  **Soak Test (#031)**: Continue monitoring for `STABILITY GAP` logs during long-duration runs.
+
+---
+*Generated for chat resumption. All authoritative documents (SoT, issues, archive) are synchronized.*

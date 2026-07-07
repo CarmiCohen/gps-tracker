@@ -1,8 +1,6 @@
 # Issue #199: Toolchain Modernization
-**Status**: Resolved (v8.9.8)
+**Status**: Resolved
+**Priority**: Low
 
 ## Description
-The project toolchain was outdated, limiting access to modern language features and SDK 35 capabilities.
-
-## Resolution
-Upgraded the project to Java 17 and Android SDK 35 across all modules.
+Upgraded the project toolchain to Java 17 and Android SDK 35 to leverage modern language features and ensure platform compliance. (v8.9.8)

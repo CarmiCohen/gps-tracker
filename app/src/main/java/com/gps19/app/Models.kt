@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v9.2.6:
+ * - Forensic Stress Test: Added TriggerForensicTest to UiCommand and UiEvent 
+ *   to allow manual verification of forensic violation latching.
  * v9.1.9:
  * - Issue #051: Binary Parity Gap. Added TrackerStatus.toProto() to support 
  *   binary telemetry pulses with full forensic context.
@@ -583,6 +586,7 @@ sealed class UiEvent {
     object CommitSettings : UiEvent()
     object RefreshPermissionStatus : UiEvent()
     object TriggerTestAlarm : UiEvent()
+    object TriggerForensicTest : UiEvent()
     data class ToggleAlertsSetup(val visible: Boolean) : UiEvent()
     data class ToggleAlarmSoundSetup(val visible: Boolean) : UiEvent()
     object ToggleTestSiren : UiEvent()
@@ -618,6 +622,7 @@ sealed class UiCommand {
     object FullInitializationReset : UiCommand()
     object CalibrateChair : UiCommand()
     object TriggerTestAlarm : UiCommand()
+    object TriggerForensicTest : UiCommand()
     object MapZoomIn : UiCommand()
     object MapZoomOut : UiCommand()
 }

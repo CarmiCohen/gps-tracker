@@ -20,6 +20,8 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * v9.2.6:
+ * - Forensic Stress Test: Added handling for TriggerForensicTest event.
  * v8.9.79:
  * - Issue #014: Type Migration. Aligned temperature and accuracy flows to Double.
  * v8.9.63:
@@ -252,6 +254,7 @@ class MainViewModel @Inject constructor(
             is UiEvent.SetLogFilterShowRecovered -> viewModelScope.launch { repository.updateLogFilters(recovered = event.show) }
             is UiEvent.RefreshPermissionStatus -> updateState { it.copy(permissions = systemStatusProvider.getPermissionState()) }
             is UiEvent.TriggerTestAlarm -> { addPersistentLog("user", "USER ACTION: Test alarm triggered", true); repository.sendCommand(UiCommand.TriggerTestAlarm) }
+            is UiEvent.TriggerForensicTest -> { addPersistentLog("user", "USER ACTION: Forensic stress test triggered", true); repository.sendCommand(UiCommand.TriggerForensicTest) }
             is UiEvent.ToggleXiaomiManualOverride -> {
                 val nextValue = !_uiState.value.permissions.isXiaomiManualOverride
                 updateState { it.copy(permissions = it.permissions.copy(isXiaomiManualOverride = nextValue)) }

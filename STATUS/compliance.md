@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v9.2.3
+# Compliance & Operational Requirements (Audit Baseline) - v9.2.6
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -8,9 +8,10 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 | Requirement ID | Requirement Description | Implementation Status |
 | :--- | :--- | :--- |
+| **R049** | **HUD Context Mapping Authority**: `GlobalStatusBar` implements mode-aware telemetry binding for local vs remote context. | **Verified (v9.2.6)** |
 | **R991** | **HUD Local Health Standardization**: Top-level status badges (INT, SRV, VWR/TRK, GPS) reflect local device health. | **Verified (v9.2.3)** |
 | **R326** | **Intelligent Uncertainty UX**: Contextual reasons (GPS GAP, JAMMER) propagated to HUD and merged via priority. | **Verified (v9.2.2)** |
-| **R982** | **Identity Locking Authority**: Trackers exclusively process packets from their linked `viewerId` (with Default Relaxation and correct field resolution). | **Verified (v9.1.2)** |
+| **R982** | **Identity Locking Authority**: Trackers exclusively process packets from their linked `viewerId`. | **Verified (v9.1.2)** |
 | **R018** | **Stationary Anchor Hard-Lock**: coordinates clamped to `parkingAnchorPoint` when `stationaryProb > 0.9`. | **Verified (v8.9.78)** |
 | **R014** | **Type Safety Authority**: All telemetry fields standardized to `Double` across engine and app. | **Verified (v8.9.75)** |
 | **R182** | **Role Identity Standards**: Unique IDs with 'T' and 'V' prefixes for system-generated defaults. | **Verified (v8.9.53)** |
@@ -39,13 +40,13 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v9.2.3)
+### 2.1. Hardening Phase Resolutions (v9.2.6)
+*   **FIXED R049: HUD Context Mapping Authority** - Resolution: Corrected `GlobalStatusBar` mapping in `SharedUiComponents.kt` to use mode-aware location context. Tracker health indicators now correctly bind to `localLocation` when in Tracker mode. (Issue #049)
+
+### 2.2. Hardening Phase Resolutions (v9.2.3)
 *   **FIXED R991: HUD Local Health Standardization** - Resolution: Standardized top-level HUD status badges to reflect local device health. Decoupled remote telemetry indicators. (Issue #044)
 
-### 2.2. Hardening Phase Resolutions (v9.2.2)
-*   **FIXED R326: Intelligent Uncertainty UX** - Resolution: Enriched the Location Pending state with specific reasons (`GPS_GAP`, `JAMMER_SUSPICION`). Implemented priority-based merging in the `TelemetryAggregator` to preserve critical forensic markers. Corrected ID collision in compliance documentation. (Issue #326)
-
-### 2.3. Hardening Phase Resolutions (v9.1.2)
-*   **FIXED R982: Identity Adoption & Locking** - Resolution: Refined Identity Locking to support "Lock-on-Non-Default" pairing. Fixed peer ID resolution in `RemoteHandler` ensuring the Tracker correctly reflects and adopts the Viewer's identity from the `viewer_id` field. (Issue #042)
+### 2.3. Hardening Phase Resolutions (v9.2.2)
+*   **FIXED R326: Intelligent Uncertainty UX** - Resolution: Enriched the Location Pending state with specific reasons (`GPS_GAP`, `JAMMER_SUSPICION`). Implemented priority-based merging in the `TelemetryAggregator`. (Issue #326)
 
 **Full history available in [issues_archive.md](issues_archive.md).**
