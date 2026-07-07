@@ -724,7 +724,7 @@ fun HeaderBar(
     val alertPulse = rememberInfiniteTransition(label = "AlertPulse")
     val alertAlpha by alertPulse.animateFloat(
         initialValue = 0.4f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(animation = tween(800), repeatMode = Reverse),
+        animationSpec = infiniteRepeatable(animation = tween(800), repeatMode = RepeatMode.Reverse),
         label = "Alpha"
     )
 

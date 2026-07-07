@@ -1,9 +1,11 @@
 
-
 package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v9.2.8:
+ * - R993: Notification Throttling. Introduced NOTIFICATION_THROTTLE_MS (10000ms) 
+ *   to standardize foreground service notification updates.
  * v8.9.94:
  * - Issue #038: Introduced ADAPTATION_SETTLING_MS (5000ms) to muzzle trajectory 
  *   logic during GPS polling frequency transitions on A15 hardware.
@@ -314,6 +316,9 @@ const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
 // Issue #002: Increased to 35s to cover STATIONARY_GPS_POLLING_MS (20s)
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 35000L
 const val GPS_UI_FAIL_THRESHOLD_MS = 35000L
+
+// R993: Notification Throttling
+const val NOTIFICATION_THROTTLE_MS = 10000L
 
 // Alert Internal IDs (Aligned with SoT)
 const val ALERT_ID_LOCAL_INTERNET = "LOCAL_INTERNET"

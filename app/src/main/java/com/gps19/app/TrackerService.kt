@@ -21,13 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v9.2.8:
+ * - R993: Notification Throttling. Implemented time-based throttling for 
+ *   notification updates (10s background, 1s foreground).
  * v9.2.6:
  * - Forensic Stress Test: Implemented onTriggerForensicTest callback to simulate 
  *   Jammer and Stall violations for verification.
- * v9.2.2:
- * - Issue #326 Fix: Intelligent Uncertainty UX. Added GPS_GAP to pendingReason logic.
- * v9.1.9:
- * - Issue #051: Binary Parity Gap closure support. 
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -591,7 +590,17 @@ class TrackerService : BaseMonitorService() {
 
         evaluateAlarmsInternal(nowRealtime, isSignalLoss, isJammerSuspicionActive, isGpsStalledActive, false, isViewerActive, pendingReason)
 
-        if (serviceTickCounter % 60 == 0) { notificationManager.updatePulse(sats = gpsManager.satellitesUsed, battery = integrityMonitor.getBatteryLevel(), isSecure = !alarmManager.hasUnresolvedAlarms(), isPowerSave = integrityMonitor.isPowerSaveModeActive) }
+        // R993: Throttle notification updates.
+        val notificationInterval = if (isUiVisible()) TICK_INTERVAL_MS else NOTIFICATION_THROTTLE_MS
+        if (now - lastNotificationUpdateTs >= notificationInterval) {
+            lastNotificationUpdateTs = now
+            notificationManager.updatePulse(
+                sats = gpsManager.satellitesUsed, 
+                battery = integrityMonitor.getBatteryLevel(), 
+                isSecure = !alarmManager.hasUnresolvedAlarms(), 
+                isPowerSave = integrityMonitor.isPowerSaveModeActive
+            )
+        }
         
         repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, now)
         repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_REALTIME_KEY, nowRealtime)

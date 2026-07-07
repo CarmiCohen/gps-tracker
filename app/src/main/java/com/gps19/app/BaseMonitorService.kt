@@ -20,6 +20,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * v9.2.8:
+ * - R993: Notification Throttling. Added lastNotificationUpdateTs to support 
+ *   time-based throttling of foreground service updates.
  * v9.1.4:
  * - Issue #045: Android 15 Foreground Service Hardening. Implemented state-aware 
  *   type enforcement to prevent SecurityException on background starts.
@@ -48,6 +51,7 @@ abstract class BaseMonitorService : LifecycleService() {
     protected var lastServiceTickTs = 0L
     protected var lastServiceTickRealtime = 0L
     protected var serviceTickCounter = 0
+    protected var lastNotificationUpdateTs = 0L
     
     protected val isUiForeground = AtomicBoolean(false)
     protected var lastUiPulseTs = 0L

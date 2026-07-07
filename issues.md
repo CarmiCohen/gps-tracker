@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.2.7)
+# Project Issues & Hardening Tracking (v9.2.8)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
@@ -6,8 +6,8 @@ This document tracks active issues, technical debt, and pending validation tasks
 | Category | Status | Count |
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Clean | 0 |
-| **Validation Tasks** | 🟡 Pending | 19 |
-| **Resolved (Total)** | 🟢 Progress | 253 |
+| **Validation Tasks** | 🟡 Pending | 20 |
+| **Resolved (Total)** | 🟢 Progress | 254 |
 
 ---
 
@@ -31,6 +31,7 @@ This document tracks active issues, technical debt, and pending validation tasks
 ## 🟡 Pending Validation
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
+| **R993** | **Notification Throttling** | Verify notification updates every 1s in foreground and 10s in background. |
 | **#049** | **Jammer Logic Verification** | In Tracker mode, verify that entering a building does not trigger a "JAMMER" label on the local row (GPS badge should turn red, but "P" badge should indicate GAP, not JAMMER). |
 | **#044** | **HUD Local Health Verification** | In Viewer mode, verify the GPS badge stays green when local GPS is fixed, even if Tracker GPS is lost (DAT badge and Tracker line should turn red). |
 | **#326** | **Uncertainty UX Verification** | Verify "GPS GAP" appears in HUD when entering a tunnel, and ensure priority merging preserves "JAMMER" markers in ribbons. |
@@ -55,24 +56,16 @@ This document tracks active issues, technical debt, and pending validation tasks
 
 ---
 
+## 🟢 Recently Resolved Issues (v9.2.8)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **R993** | **Notification Throttling** | **Resolved**. Implemented dual-rate notification refresh in `BaseMonitorService`. Standardized to 1s updates when UI is visible and 10s (`NOTIFICATION_THROTTLE_MS`) when in background. |
+
+---
+
 ## 🟢 Recently Resolved Issues (v9.2.7)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
 | **R960** | **HUD Local Grouping** | **Resolved**. Rearranged `StatusBar` badges in `SharedUiComponents.kt` to group **INT**, **SRV**, and **GPS** together as a "Local Capability" block. Updated `HUD_LED_Specifications.md`. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.2.6)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#049** | **False Jammer Indicator** | **Resolved**. Corrected `GlobalStatusBar` mapping in `SharedUiComponents.kt` to use mode-aware location context. Tracker health indicators now correctly bind to `localLocation` when in Tracker mode. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.2.3)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#044** | **HUD: LEDs contradiction** | **Resolved**. Standardized top-level HUD badges (INT, SRV, VWR/TRK, GPS) to reflect local device health. Decoupled remote telemetry coloring (Speed, State) to remain dependent on peer GPS signal. |

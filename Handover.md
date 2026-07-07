@@ -1,21 +1,23 @@
-# Forensic Handover - v9.2.7 (Local Capability Block)
+# Forensic Handover - v9.2.8 (Notification Throttling)
 
 ## 📌 Status: Stable / Build PASS / Release Ready
-This cycle implements R960, refining the HUD layout to prioritize local hardware capability status.
+This cycle implements R993, standardizing notification update frequency to balance UI responsiveness with background efficiency.
 
-### 🟢 Completed: Requirement R960 (HUD Layout Refinement)
-*   **Logical Grouping**: Updated `StatusBar` in `SharedUiComponents.kt` to move the **GPS** badge adjacent to **INT** and **SRV**.
-*   **Local Capability Block**: The HUD upper row now forms a clear "Local Health Strip" (INT, SRV, GPS) followed by peer-dependent status badges (TRK/VWR, DAT).
-*   **UX Hierarchy**: This layout allows the user to immediately distinguish between local hardware failures and remote link/peer failures.
+### 🟢 Completed: Requirement R993 (Notification Throttling)
+*   **Intelligent Throttling**: Replaced legacy 60-second modulo updates with a time-based gate in `BaseMonitorService`.
+*   **Dual-Rate Refresh**:
+    *   **Foreground (Active)**: 1-second refresh rate when the user is actively viewing the app (guarded by `isUiVisible()`).
+    *   **Background (Idle)**: 10-second refresh rate (`NOTIFICATION_THROTTLE_MS`) to reduce CPU wakeups and system log spam.
+*   **Architecture Consistency**: Implementation utilizes the `TimeProvider` for monotonic consistency and maintains zero-dependency purity in `:core:engine` by hosting the constant in `EngineConstants.kt`.
 
-### 🟢 Pre-existing State: v9.2.6
-*   **Issue #049 (False Jammer Indicator)**: Remediated via Mode-Aware Binding.
-*   **Forensic Stress Test**: Infrastructure implemented for manual violation simulation.
+### 🟢 Pre-existing State: v9.2.7
+*   **R960 (HUD Layout)**: Local capability block grouping (INT, SRV, GPS) verified.
 
 ### 🛠 Instructions for Resumption
-1.  **Verification of R960**: Run the app and verify the upper-left badge sequence is: `[INT] [SRV] [GPS] [TRK/VWR] [DAT]`.
-2.  **Verification of #049**: Verify that local GPS loss in Tracker mode does not incorrectly flag "JAMMER" on the local telemetry line.
-3.  **Soak Test (#031)**: Monitoring for `STABILITY GAP` logs.
+1.  **Verification of R993**: 
+    *   Open the app and verify the notification "Sats/Batt" pulse updates every second.
+    *   Move to the background and verify via logcat or observation that the notification updates slow down to every 10 seconds.
+2.  **Soak Test (#031)**: Monitoring for `STABILITY GAP` logs continues.
 
 ---
 *Generated for chat resumption. All authoritative documents (SoT, issues, archive) are synchronized.*

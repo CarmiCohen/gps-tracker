@@ -18,11 +18,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v9.2.8:
+ * - R993: Notification Throttling. Implemented time-based throttling for 
+ *   notification updates (10s background, 1s foreground).
  * v9.1.9:
  * - Issue #051: Binary Parity Gap closure support.
- * v9.1.8:
- * - Issue #047: Standardized to m/s. Passing raw speed to LocationProcessor 
- *   to maintain pipeline consistency.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -434,7 +434,10 @@ class ViewerService : BaseMonitorService() {
 
         evaluateAlarmsInternal(nowRealtime, isSignalLoss, isTrackerJammerSuspicion, isTrackerStalled, isTrackerGap, isTrackerActive)
 
-        if (serviceTickCounter % 60 == 0) {
+        // R993: Throttle notification updates.
+        val notificationInterval = if (isUiVisible()) TICK_INTERVAL_MS else NOTIFICATION_THROTTLE_MS
+        if (now - lastNotificationUpdateTs >= notificationInterval) {
+            lastNotificationUpdateTs = now
             notificationManager.updatePulse(
                 sats = gpsManager.satellitesUsed,
                 battery = integrityMonitor.getBatteryLevel(),

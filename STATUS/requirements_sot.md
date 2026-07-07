@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - v9.2.7
+# System Source of Truth (SoT) - v9.2.8
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Notification Throttling Authority (R993)**: The system MUST throttle foreground service notification updates to balance battery efficiency with operator awareness. Updates MUST be gated by a time-based refresh window: **1,000ms** when the UI is visible (`isUiVisible()`) and **10,000ms** (`NOTIFICATION_THROTTLE_MS`) when the app is in the background. This ensures the notification "pulse" (Sats/Batt/Status) remains fresh during active use while minimizing CPU wakeups and system overhead during long-term monitoring. (Issue R993 / v9.2.8)
 *   **HUD Local Capability Grouping (R960)**: The `GlobalStatusBar` MUST group fundamental local hardware indicators into a contiguous "Local Capability" block. The sequence MUST be **INT** (Internet), **SRV** (Relay Link), and **GPS** (Local Fix). These MUST be visually separated from peer-dependent indicators (**TRK/VWR**, **DAT**) to ensure the operator can immediately distinguish between local hardware failure and remote peer/link failure. (Issue R960 / v9.2.7)
 *   **HUD Context Mapping Authority (R049)**: The `GlobalStatusBar` MUST implement mode-aware telemetry binding. In **Tracker mode**, all tracker-line indicators (GPS, Accuracy, Pending State) and top-level GPS health badges MUST bind to the local device's `localLocation`. In **Viewer mode**, these indicators MUST bind to the remote `trackerLocation`. This ensures the HUD correctly reflects the active monitoring context. (Issue #049 / v9.2.6)
 *   **HUD Local Health Standardization (R991)**: The top-level HUD status badges (INT, SRV, VWR/TRK, GPS) MUST reflect the **Local Health** of the device. The GPS badge specifically MUST reflect the local device's GPS fix status. Peer-dependent telemetry indicators (Speed, Tracker State) MUST remain decoupled and tied to the remote peer's GPS health to ensure data veracity. (Issue #044 / v9.2.3)
