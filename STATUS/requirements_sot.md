@@ -1,11 +1,13 @@
-# System Source of Truth (SoT) - v9.2.0
+# System Source of Truth (SoT) - v9.2.2
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Intelligent Uncertainty UX (R326)**: The system MUST provide specific contextual reasons for Bayesian uncertainty expansion (Location Pending state). Reasons include `GPS_STALL` (hardware stall), `GPS_GAP` (environmental signal loss), `JAMMER_SUSPICION`, `SIGNAL_LOSS`, and `ACOUSTIC_VIOLATION`. These reasons MUST be prioritized during telemetry aggregation (e.g., Jammer > Stall > Gap) to ensure critical forensic markers are preserved in historical ribbons. (Issue #326 / v9.2.2)
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Module Hardening**: `:core:engine` is a pure `java-library` with zero Android dependencies. (Issue #322)
 *   **Sensor Processing Authority (R965)**: `AppSensorManager` offloads all high-frequency sensor event processing to a dedicated `HandlerThread` (`AppSensorThread`). (Issue #006 / Issue #013 / v8.9.70)
+*   **Stationary Anchor Hard-Lock (R990)**: The engine MUST establish a coordinate "Hard-Lock" when stationary probability exceeds 0.9 and physical sensors confirm a stationary state. During a lock, coordinates are clamped to the anchor point to eliminate HUD jitter and erroneous distance accumulation. The lock MUST release immediately (breakout threshold = 0.0m) if physical sensors detect motion, preventing "sticky" transitions when leaving buildings. (Issue #018 / v9.2.1)
 *   **Connectivity Integrity (R966)**: `AppNetworkManager` implements a short-circuit reactive reconnection trigger. (Issue #007 / v8.9.64)
 *   **Transport Authority**: The system strictly enforces `websocket` transport for low-latency signaling. (Issue #007 / v8.9.64)
 *   **Service Launch Integrity (R926)**: The system enforces a mandatory **2,000ms delay** during session auto-transitions before launching background services. (Issue #320)

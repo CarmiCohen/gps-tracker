@@ -21,11 +21,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v9.2.2:
+ * - Issue #326 Fix: Intelligent Uncertainty UX. Added GPS_GAP to pendingReason logic.
  * v9.1.9:
  * - Issue #051: Binary Parity Gap closure support. 
- * v9.1.8:
- * - Issue #046 Fix: Shared Behavioral State. Authoritative TrackerState broadcast.
- * - Issue #047 Fix: Standardized to m/s. Passing raw speed to pipeline.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -487,8 +486,9 @@ class TrackerService : BaseMonitorService() {
 
         val pendingReason = when {
             pendingAcousticViolation -> LocationPendingReason.ACOUSTIC_VIOLATION
-            isGpsStalledActive -> LocationPendingReason.GPS_STALL
             isJammerSuspicionActive -> LocationPendingReason.JAMMER_SUSPICION
+            isGpsStalledActive -> LocationPendingReason.GPS_STALL
+            isGpsGapActive -> LocationPendingReason.GPS_GAP
             isSignalLoss -> LocationPendingReason.SIGNAL_LOSS
             else -> LocationPendingReason.NONE
         }

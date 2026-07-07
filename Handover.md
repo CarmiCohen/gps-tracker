@@ -1,26 +1,22 @@
-# Forensic Handover - v9.2.0 (HUD Freshness & Hardening)
+# Forensic Handover - v9.2.2 (Intelligent Uncertainty UX)
 
-## 📌 Status: Stable / Build PASS / UI Hardened
-This cycle addresses HUD visibility issues by decoupling telemetry connection state from GPS fix age.
+## 📌 Status: Stable / Build PASS / UX Enrichment Implemented
+This cycle remediates the opacity of the "Location Pending" state by providing specific contextual reasons for Bayesian uncertainty expansion.
 
-### 🟢 Completed: Requirement R987 (HUD Telemetry Freshness)
-*   **Critical Remediation (Issue #048)**: 
-    *   Differentiated "Telemetry Age" from "GPS Fix Age" in `SharedUiComponents.kt`.
-    *   Refactored `StatusRowData` to maintain colorization for Battery, Temperature, Signal (CommBar), and Satellite counts as long as the telemetry link is fresh.
-    *   Preserved color for Distance indicator based on last known good position while telemetry is active.
-    *   Strictly isolated "Grayout" (Slate500) logic to position-dependent fields (Accuracy, GPS Age) during signal staleness.
+### 🟢 Completed: Issue #326 (Intelligent Uncertainty UX Mapping)
+*   **Engine Hardening**: 
+    *   Added `GPS_GAP` to `LocationPendingReason` enum in `EngineModels.kt` to distinguish environmental signal loss from hardware stalls.
+    *   Implemented `getHigherPriorityReason` in `TelemetryAggregator.kt` to ensure critical forensic markers (e.g., `JAMMER_SUSPICION`) are not overwritten by lower-priority reasons during ribbon aggregation.
+    *   Updated `MainAlarmLogic.kt` to propagate the specific `locationPendingReason` name into the `technicalDetails` of forensic violation reports.
+*   **Service Logic**:
+    *   Updated `TrackerService.kt` to identify and broadcast `GPS_GAP` when the elapsed time since the last valid fix exceeds thresholds, ensuring the UI accurately reflects the cause of uncertainty growth.
+*   **Documentation Remediation**:
+    *   Resolved an ID collision where Issue #326 was incorrectly attributed to Requirement R917 (Update Smoothness). 
 
-### 🟢 Completed: Requirement R986 (Binary Parity Gap Closure)
-*   **Critical Remediation (Issue #051)**: 
-    *   Synchronized `RealtimeStatus` Protobuf definition with `TrackerStatus` model.
-    *   Added `tracker_state`, `is_anchor_locked`, `is_location_pending`, `location_pending_reason`, and hardware status fields to binary pulses.
-    *   Hardened `CommunicationManager.handleLocationRelayBinary` to adopt these fields into the authoritative state flow.
-
-### 🟢 Completed: Requirement R985 (Authoritative State Flow)
-*   **Remediation (Issue #046)**: Tracker-side behavioral computation is now the source of truth. Viewer adopts `tracker_state` directly from telemetry.
-*   **Remediation (Issue #047)**: Standardized speed unit to m/s across the entire pipeline. Hardened UI with freshness gates to prevent ghost speed updates during signal loss.
+### 🟢 Completed: Requirement R990 (Stationary Anchor Hard-Lock)
+*   **Critical Remediation (Issue #018)**: 
+    *   Implemented coordinate clamping in `LocationProcessor.kt` using `parkingAnchorPoint`. (v9.2.1)
 
 ### 🛠 Instructions for Resumption
-1.  **Verification of #048**: Run the app in Viewer mode. Move the Tracker indoors (to lose GPS) but keep it online. Verify that Battery, Temp, and Signal remain green/colorized while only Accuracy and GPS Age turn gray.
-2.  **Binary Pulse Test**: Verify state adoption (MOVING/PARKING) when receiving binary packets.
-3.  **Soak Test**: Monitor for HUD LED contradictions (#044) in prolonged sessions.
+1.  **Verification of #326**: Enter a tunnel or area with poor GPS. Verify that the HUD display transitions from "±X" to the specific reason string (e.g., "GPS GAP") and that the orange "P" (Pending) indicator appears.
+2.  **Aggregation Test**: Induce a Jammer Suspicion followed by a simple Signal Loss. Verify that the historical ribbon record preserves the `JAMMER_SUSPICION` due to its higher priority.

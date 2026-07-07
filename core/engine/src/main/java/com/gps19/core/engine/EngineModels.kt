@@ -4,18 +4,21 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v9.2.2:
+ * - Issue #326: Added GPS_GAP to LocationPendingReason for environmental signal loss.
+ * v9.2.1:
+ * - Issue #018: Added alt to EngineGeoPoint to support altitude preservation 
+ *   during anchor clamping.
  * v9.1.8:
  * - Issue #046: Shared Behavioral State. Migrated TrackerState to engine 
  *   to allow authoritative state broadcast from Tracker to Viewer.
- * v8.9.77:
- * - Issue #018: Stationary Anchor Hard-Lock. Added isAnchorLocked to 
- *   EngineConnectionPoint for forensic audit.
  */
 
 @Serializable
 data class EngineGeoPoint(
     val lat: Double, 
     val lng: Double, 
+    val alt: Double = 0.0,
     val ts: Long = 0L,
     val accuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0
@@ -46,11 +49,12 @@ enum class EngineXiaomiStatus {
 
 /**
  * LocationPendingReason: Contextual cause for Bayesian uncertainty expansion.
- * v8.9.22 (Issue #326)
+ * v9.2.2 (Issue #326)
  */
 enum class LocationPendingReason {
     NONE,
     GPS_STALL,
+    GPS_GAP,
     ACOUSTIC_VIOLATION,
     SIGNAL_LOSS,
     JAMMER_SUSPICION

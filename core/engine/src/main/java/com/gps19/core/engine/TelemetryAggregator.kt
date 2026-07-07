@@ -4,11 +4,11 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * v9.2.2:
+ * - Issue #326 Fix: Intelligent Uncertainty UX. Implemented priority-based 
+ *   locationPendingReason merging to ensure severe reasons (JAMMER) are preserved.
  * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
- * v8.9.42:
- * - Issue #326: Added locationPendingReason to mergeWorstCase and gap-filling logic.
+ * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double.
  */
 class TelemetryAggregator {
 
@@ -46,8 +46,26 @@ class TelemetryAggregator {
             isSitDetected = acc.isSitDetected || cur.isSitDetected,
             isSitActive = acc.isSitActive || cur.isSitActive,
             currentMa = min(acc.currentMa, cur.currentMa),
-            locationPendingReason = if (cur.locationPendingReason != LocationPendingReason.NONE) cur.locationPendingReason else acc.locationPendingReason
+            locationPendingReason = getHigherPriorityReason(acc.locationPendingReason, cur.locationPendingReason)
         )
+    }
+
+    private fun getHigherPriorityReason(r1: LocationPendingReason, r2: LocationPendingReason): LocationPendingReason {
+        if (r1 == r2) return r1
+        val p1 = getReasonPriority(r1)
+        val p2 = getReasonPriority(r2)
+        return if (p2 >= p1) r2 else r1
+    }
+
+    private fun getReasonPriority(reason: LocationPendingReason): Int {
+        return when (reason) {
+            LocationPendingReason.NONE -> 0
+            LocationPendingReason.GPS_GAP -> 1
+            LocationPendingReason.SIGNAL_LOSS -> 2
+            LocationPendingReason.GPS_STALL -> 3
+            LocationPendingReason.ACOUSTIC_VIOLATION -> 4
+            LocationPendingReason.JAMMER_SUSPICION -> 5
+        }
     }
 
     /**

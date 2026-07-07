@@ -5,12 +5,11 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
- * v8.9.52:
- * - Issue #460: Bayesian Authority Sync. Implemented uncertainty expansion for geofence 
- *   breach detection.
+ * v9.2.2:
+ * - Issue #326 Fix: Intelligent Uncertainty UX. Included specific locationPendingReason 
+ *   in forensic technical details.
+ * v9.1.8:
+ * - Issue #047: Standardized to m/s. Raw speed adopted in geofence evaluation.
  */
 object MainAlarmLogic {
 
@@ -164,7 +163,7 @@ object MainAlarmLogic {
             )
         )
 
-        val acousticTechnical = if (state.isLocationPending) "LOCATION_PENDING: True" else null
+        val acousticTechnical = if (state.isLocationPending) "LOCATION_PENDING: ${state.locationPendingReason.name}" else null
         reports.add(
             ViolationReport(
                 type = ALERT_ID_TRACKER_ACOUSTIC,
@@ -279,7 +278,7 @@ object MainAlarmLogic {
 
                 val geoTech = String.format(Locale.getDefault(), "Dev: %.1fm (Dist: %.1fm, Fence: %.1fm) (%s)%s", 
                     maxOf(0.1, deviation), dValue, threshold, debounceStr,
-                    if (state.isLocationPending) " [LOCATION_PENDING: True]" else "")
+                    if (state.isLocationPending) " [LOCATION_PENDING: ${state.locationPendingReason.name}]" else "")
 
                 reports.add(
                     ViolationReport(

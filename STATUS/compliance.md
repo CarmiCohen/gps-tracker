@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v9.1.2
+# Compliance & Operational Requirements (Audit Baseline) - v9.2.2
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -8,6 +8,7 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 | Requirement ID | Requirement Description | Implementation Status |
 | :--- | :--- | :--- |
+| **R326** | **Intelligent Uncertainty UX**: Contextual reasons (GPS GAP, JAMMER) propagated to HUD and merged via priority. | **Verified (v9.2.2)** |
 | **R982** | **Identity Locking Authority**: Trackers exclusively process packets from their linked `viewerId` (with Default Relaxation and correct field resolution). | **Verified (v9.1.2)** |
 | **R018** | **Stationary Anchor Hard-Lock**: coordinates clamped to `parkingAnchorPoint` when `stationaryProb > 0.9`. | **Verified (v8.9.78)** |
 | **R014** | **Type Safety Authority**: All telemetry fields standardized to `Double` across engine and app. | **Verified (v8.9.75)** |
@@ -37,13 +38,13 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v9.1.2)
+### 2.1. Hardening Phase Resolutions (v9.2.2)
+*   **FIXED R326: Intelligent Uncertainty UX** - Resolution: Enriched the Location Pending state with specific reasons (`GPS_GAP`, `JAMMER_SUSPICION`). Implemented priority-based merging in the `TelemetryAggregator` to preserve critical forensic markers. Corrected ID collision in compliance documentation. (Issue #326)
+
+### 2.2. Hardening Phase Resolutions (v9.1.2)
 *   **FIXED R982: Identity Adoption & Locking** - Resolution: Refined Identity Locking to support "Lock-on-Non-Default" pairing. Fixed peer ID resolution in `RemoteHandler` ensuring the Tracker correctly reflects and adopts the Viewer's identity from the `viewer_id` field. (Issue #042)
 
-### 2.2. Hardening Phase Resolutions (v9.1.0)
+### 2.3. Hardening Phase Resolutions (v9.1.0)
 *   **FIXED R799e: JD Vivid Green Branding** - Resolution: Migrated all Tracker-role and primary branding indicators to JD Vivid Green (#78BE20). Updated `Color.kt`, `colors.xml`, and branding documentation.
-
-### 2.3. Hardening Phase Resolutions (v9.0.4)
-*   **FIXED R799d: Viewer Branding Migration** - Resolution: Migrated all Viewer-role identity indicators from Orange to Cyan (#06B6D4). Updated `Theme.kt`, `Color.kt`, and all UI components.
 
 **Full history available in [issues_archive.md](issues_archive.md).**

@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.2.0)
+# Project Issues & Hardening Tracking (v9.2.2)
 
 This document tracks active issues, technical debt, and pending validation tasks. Historical resolutions are moved to the [Issues Archive](STATUS/issues_archive.md).
 
@@ -6,14 +6,15 @@ This document tracks active issues, technical debt, and pending validation tasks
 | Category | Status | Count |
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 High | 2 |
-| **Validation Tasks** | 🟡 Pending | 16 |
-| **Resolved (Total)** | 🟢 Progress | 63 |
+| **Validation Tasks** | 🟡 Pending | 18 |
+| **Resolved (Total)** | 🟢 Progress | 65 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
 | ID | Concern | Description |
 | :--- | :--- | :--- |
+| **#054** | **Requirement ID Collision** | Discovered that Issue #326 was overloaded in `compliance.md` (mapped to both UX and Update Smoothness). Audited and corrected. |
 | **#031** | **Soak Test Monitoring** | Ongoing 24-hour stability test required to monitor for `STABILITY GAP` logs under 10Hz sensor load. |
 | **#039** | **Identity Rejection Feedback** | `MainRepository` now silently rejects bulk updates with colliding IDs. UI needs to provide feedback before triggering a save. |
 | **#042** | **Sanitization Visibility** | The `SettingsRepository` now automatically resets malformed IDs. There is currently no UI notification to the user when this happens. |
@@ -32,6 +33,8 @@ This document tracks active issues, technical debt, and pending validation tasks
 ## 🟡 Pending Validation
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
+| **#326** | **Uncertainty UX Verification** | Verify "GPS GAP" appears in HUD when entering a tunnel, and ensure priority merging preserves "JAMMER" markers in ribbons. |
+| **#053** | **Anchor Lock Breakout** | Physically move the device after a Hard-Lock is established and verify immediate breakout via physical sensors. |
 | **#052** | **HUD Freshness Verification** | Verify that Tracker HUD/Viewer HUD line elements (Battery, Temp, Comm) stay colorized when GPS is lost but connection remains. |
 | **#051** | **Binary Parity Verification** | Verify that a Viewer receiving a binary `location_relay_bin` pulse correctly displays the `trackerState`. |
 | **#046** | **State Sync Audit** | Verify that Tracker HUD and Viewer HUD transition between MOVING/PARKING simultaneously under load. |
@@ -52,23 +55,24 @@ This document tracks active issues, technical debt, and pending validation tasks
 
 ---
 
+## 🟢 Recently Resolved Issues (v9.2.2)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#326** | **Intelligent Uncertainty UX** | **Resolved**. Enriched Location Pending state with specific reasons (`GPS_GAP`, `JAMMER`). Implemented priority-based merging in ribbon pipeline. Corrected ID collision in docs. |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.2.1)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#018** | **Stationary Anchor Hard-Lock** | **Resolved**. Implemented coordinate clamping in `LocationProcessor.kt`. Refactored `TrackerService.kt` to adopt optimized coordinates and propagate `isAnchorLocked` flag to HUD and telemetry. |
+
+---
+
 ## 🟢 Recently Resolved Issues (v9.2.0)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
 | **#048** | **Viewer HUD Line Grayout** | **Resolved**. Differentiated "Telemetry Age" (packet) from "GPS Age" (fix) in `StatusRowData`. Connectivity, Battery, and Satellites now remain colorized as long as telemetry is fresh. Distance remains colorized based on last known good position while link is active. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.1.9)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#051** | **Binary Parity Gap** | **Resolved**. Synchronized `RealtimeStatus` and `TrackerStatusProto` in `.proto` with forensic engine fields. Updated `CommunicationManager` and `SettingsRepository` to handle new fields. |
-
----
-
-## Guidelines for Implementation
-- **Standardize Top Badges (#044)**: In `GlobalStatusBar`, ensure top-level badges (INT, SRV, GPS) represent local device health. Move remote status indicators exclusively to the device rows.
-- **Telemetry vs Fix Freshness (#048)**: In `StatusRowData`, differentiate between "Telemetry Age" (packet) and "GPS Age" (fix). Connectivity and Battery indicators should remain colorized as long as telemetry is fresh.
-- **Pending Reason Validation (#049)**: Audit `JAMMER` state trigger in core engine. Ensure `LocationPendingReason` is only displayed if explicitly reported.
