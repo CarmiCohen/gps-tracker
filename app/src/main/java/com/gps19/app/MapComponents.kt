@@ -48,7 +48,7 @@ import com.gps19.core.engine.*
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
  * v9.3.0:
- * - R400: Moved "UNCERTAINTY" status messages to bottom-center near map scale (Issue #496).
+ * - R400: Moved "UNCERTAINTY" status messages to bottom-center near map scale (Issue #400).
  * v9.0.4:
  * - R799d: Changed Viewer color to ViewerCyan.
  * v8.9.83:
@@ -230,7 +230,7 @@ fun AppMapContainer(
             }
         }
 
-        // R400: Move map messages to bottom-center metadata cluster near map scale (Issue #496)
+        // R400: Move map messages to bottom-center metadata cluster near map scale (Issue #400)
         if (trackerLocationPending && trackerLocationPendingReason != LocationPendingReason.NONE) {
             Box(
                 modifier = Modifier

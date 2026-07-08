@@ -2,9 +2,10 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 250**
+**Total Unique Resolutions: 251**
 
-## 1. Recent Hardening Phase (v9.0.4 - v9.2.2)
+## 1. Recent Hardening Phase (v9.0.4 - v9.3.0)
+*   **Issue #400**: Map Metadata Alignment (R400). Re-anchored Bayesian Uncertainty status messages from the map center to the bottom-center metadata cluster. (v9.3.0)
 *   **Issue #326**: Intelligent Uncertainty UX. Enriched Location Pending state with reasons (GPS_GAP, JAMMER) and implemented priority-based merging. (v9.2.2)
 *   **Issue #018**: Stationary Anchor Hard-Lock. Implemented coordinate clamping in `LocationProcessor.kt` and propagated `isAnchorLocked` flag. (v9.2.1)
 *   **Issue #048**: Viewer HUD Line Grayout. Differentiated Telemetry Age from GPS Age in status rows. (v9.2.0)

@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v9.2.9
+# Compliance & Operational Requirements (Audit Baseline) - v9.3.0
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -8,10 +8,11 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 | Requirement ID | Requirement Description | Implementation Status |
 | :--- | :--- | :--- |
-| **R994** | **Screen-Off Optimization Authority**: GPS polling frequency throttled to 5s when screen is off to improve battery life. | **Verified (v9.2.9)** |
-| **R049** | **HUD Context Mapping Authority**: `GlobalStatusBar` implements mode-aware telemetry binding for local vs remote context. | **Verified (v9.2.6)** |
-| **R991** | **HUD Local Health Standardization**: Top-level status badges (INT, SRV, VWR/TRK, GPS) reflect local device health. | **Verified (v9.2.3)** |
-| **R326** | **Intelligent Uncertainty UX**: Contextual reasons (GPS GAP, JAMMER) propagated to HUD and merged via priority. | **Verified (v9.2.2)** |
+| **R400** | **Map Metadata Alignment**: Status messages anchored to bottom-center with 80dp offset. | **Verified (v9.3.0)** |
+| **R994** | **Screen-Off Optimization Authority**: GPS polling frequency throttled to 5s when screen is off. | **Verified (v9.2.9)** |
+| **R049** | **HUD Context Mapping Authority**: `GlobalStatusBar` implements mode-aware telemetry binding. | **Verified (v9.2.6)** |
+| **R991** | **HUD Local Health Standardization**: Top-level status badges reflect local device health. | **Verified (v9.2.3)** |
+| **R326** | **Intelligent Uncertainty UX**: Contextual reasons (GPS GAP, JAMMER) propagated to HUD. | **Verified (v9.2.2)** |
 | **R982** | **Identity Locking Authority**: Trackers exclusively process packets from their linked `viewerId`. | **Verified (v9.1.2)** |
 | **R018** | **Stationary Anchor Hard-Lock**: coordinates clamped to `parkingAnchorPoint` when `stationaryProb > 0.9`. | **Verified (v8.9.78)** |
 | **R014** | **Type Safety Authority**: All telemetry fields standardized to `Double` across engine and app. | **Verified (v8.9.75)** |
@@ -25,7 +26,8 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R747** | **Standardized Alert Titles**: Localized "This device" and simplified "Device" subtitles. | **Verified (v8.9.51)** |
 | **R799d** | **Viewer Identity Color**: Viewer role identity color changed to Cyan (#06B6D4) system-wide. | **Verified (v9.0.4)** |
 | **R799e** | **JD Vivid Green Branding**: Tracker branding migrated to JD Vivid Green (#78BE20). | **Verified (v9.1.0)** |
-| **R810-A15**| **A15 High-Noise Profile**: Hardened sensor gates and vibration coherence. | **Verified (v8.9.94)** |
+| **R970** | **A15 Jitter Stabilization**: Hardened sensor gates and 5s spatial muzzling for A15. | **Verified (v8.9.94)** |
+| **R971** | **G990E Display Hardening**: Suppression of telemetry artifacts during AOD transitions. | **Verified (v8.9.94)** |
 | **R832** | **Chair Sit Detection Engine**: Multi-sensor fusion (tilt/vibration/baro) for occupancy detection. | **Verified (v8.9.40)** |
 | **R917** | **Update Smoothness**: Infrastructure for session recovery after package updates. | **Verified (v8.9.36)** |
 | **R926** | **Service Launch Integrity**: Mandatory 2,000ms landing page pause before service launch. | **Verified (v8.9.40)** |
@@ -33,7 +35,6 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R965** | **Sensor Processing Authority**: High-frequency sensor event processing offloaded to `AppSensorThread`. | **Verified (v8.9.64)** |
 | **R966** | **Connectivity Integrity**: Reactive short-circuit reconnection trigger. | **Verified (v8.9.64)** |
 | **R967** | **Foreground Transition Buffer**: 45s UI pulse window for Android 14+ FGS transitions. | **Verified (v8.9.86)** |
-| **R970** | **Display State Integrity**: Suppression of telemetry artifacts during AOD transitions. | **Verified (v8.9.94)** |
 | **R972** | **Forensic Staleness Authority**: 15s staleness gate for forensic fields. | **Verified (v8.9.95)** |
 | **R973** | **Standardized Proto Path Authority**: `app/src/main/proto` is the sole schema directory. | **Verified (v8.9.96)** |
 | **R974** | **Identity Uniqueness Authority**: Strict ID uniqueness check in `MainRepository`. | **Verified (v8.9.98)** |
@@ -41,16 +42,19 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v9.2.9)
+### 2.1. Hardening Phase Resolutions (v9.3.0)
+*   **FIXED R400: Map Metadata Alignment** - Resolution: Re-anchored Bayesian Uncertainty status messages from the map center to the bottom-center metadata cluster. Implemented an 80dp vertical offset to maintain visual separation from the `osmdroid` scale bar. (Issue #400)
+
+### 2.2. Hardening Phase Resolutions (v9.2.9)
 *   **FIXED R994: Screen-Off Optimization Authority** - Resolution: Audited WakeLocks (verified necessity). Implemented dynamic GPS down-sampling to 5000ms when screen is off using `DisplayManager` state tracking in `AppSensorManager`. (Issue R994)
 
-### 2.2. Hardening Phase Resolutions (v9.2.6)
+### 2.3. Hardening Phase Resolutions (v9.2.6)
 *   **FIXED R049: HUD Context Mapping Authority** - Resolution: Corrected `GlobalStatusBar` mapping in `SharedUiComponents.kt` to use mode-aware location context. Tracker health indicators now correctly bind to `localLocation` when in Tracker mode. (Issue #049)
 
-### 2.3. Hardening Phase Resolutions (v9.2.3)
+### 2.4. Hardening Phase Resolutions (v9.2.3)
 *   **FIXED R991: HUD Local Health Standardization** - Resolution: Standardized top-level HUD status badges to reflect local device health. Decoupled remote telemetry indicators. (Issue #044)
 
-### 2.4. Hardening Phase Resolutions (v9.2.2)
+### 2.5. Hardening Phase Resolutions (v9.2.2)
 *   **FIXED R326: Intelligent Uncertainty UX** - Resolution: Enriched the Location Pending state with specific reasons (`GPS_GAP`, `JAMMER_SUSPICION`). Implemented priority-based merging in the `TelemetryAggregator`. (Issue #326)
 
 **Full history available in [issues_archive.md](issues_archive.md).**

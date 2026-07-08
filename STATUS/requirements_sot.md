@@ -3,7 +3,7 @@
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
-*   **Map Metadata Alignment (R400)**: Map-level status messages (e.g., "UNCERTAINTY: ...") MUST be anchored to the bottom-center of the map view, in the vicinity of the map scale bar. This prevents visual occlusion of the map center and tracker focal points during Bayesian uncertainty expansion events. (Issue #496 / v9.3.0)
+*   **Map Metadata Alignment (R400)**: Map-level status messages (e.g., "UNCERTAINTY: ...") MUST be anchored to the bottom-center of the map view, in the vicinity of the map scale bar. This prevents visual occlusion of the map center and tracker focal points during Bayesian uncertainty expansion events. (Issue #400 / v9.3.0)
 *   **Screen-Off Optimization Authority (R994)**: The system MUST optimize power consumption by reducing GPS polling frequency when the device screen is off. (Issue R994 / v9.2.9)
 *   **Notification Throttling Authority (R993)**: The system MUST throttle foreground service notification updates to balance battery efficiency. (Issue R993 / v9.2.8)
 *   **HUD Local Capability Grouping (R960)**: The `GlobalStatusBar` MUST group fundamental local hardware indicators. (Issue R960 / v9.2.7)

@@ -15,7 +15,7 @@ class ForensicIdentityTest {
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Double, snr: Double?, vibe: Double?) {}
         override fun onMaxAccuracyChanged(accuracy: Double) {}
         override fun onChairBaselineChanged(baseline: Double) {}
-        override fun onGpsStallDetected(ts: Long) {}
+        override fun onGpsStallDetected(ts: Long) { }
     }
 
     private val processor = LocationProcessor(listener, timeProvider)
@@ -23,7 +23,7 @@ class ForensicIdentityTest {
     @Test
     fun `processGpsPoint handles valid point`() {
         val result = processor.processGpsPoint(
-            lat = 32.0, lng = 34.0, alt = 10.0, androidSpeedKph = 0.0,
+            lat = 32.0, lng = 34.0, alt = 10.0, androidSpeedMps = 0.0,
             gpsTs = 1000L, accuracy = 10.0, bearing = 0.0, snr = 40.0, satsUsed = 10,
             isViewerTrail = false, lastGpsTs = 0L, isLocal = true
         )
@@ -35,7 +35,7 @@ class ForensicIdentityTest {
     fun `processGpsPoint handles jump scenario`() {
         // First point to establish baseline
         processor.processGpsPoint(
-            lat = 32.0, lng = 34.0, alt = 10.0, androidSpeedKph = 0.0,
+            lat = 32.0, lng = 34.0, alt = 10.0, androidSpeedMps = 0.0,
             gpsTs = 1000L, accuracy = 10.0, bearing = 0.0, snr = 40.0, satsUsed = 10,
             isViewerTrail = false, lastGpsTs = 0L, isLocal = true
         )
@@ -43,7 +43,7 @@ class ForensicIdentityTest {
         // Second point is a massive jump (far away)
         // Note: Extreme single-point jumps are classified as OUTLIER by the current Sentinel logic
         val jumpResult = processor.processGpsPoint(
-            lat = 40.0, lng = 50.0, alt = 10.0, androidSpeedKph = 0.0,
+            lat = 40.0, lng = 50.0, alt = 10.0, androidSpeedMps = 0.0,
             gpsTs = 2000L, accuracy = 10.0, bearing = 0.0, snr = 40.0, satsUsed = 10,
             isViewerTrail = false, lastGpsTs = 1000L, isLocal = true
         )
