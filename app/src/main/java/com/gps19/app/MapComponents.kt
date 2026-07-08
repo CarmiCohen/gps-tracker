@@ -47,16 +47,12 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * v9.3.0:
+ * - R400: Moved "UNCERTAINTY" status messages to bottom-center near map scale (Issue #496).
  * v9.0.4:
  * - R799d: Changed Viewer color to ViewerCyan.
  * v8.9.83:
- * - Issue #020: Remediated "Fighting" Centering Logic. 
- *   Added immediate local lock release to prevent LaunchedEffect from snapping 
- *   map center back while user is actively swiping/zooming.
- * v8.9.82:
- * - Issue #021: Fixed Infinite Loop in drawTrailToFolder. 
- *   Resolved a logic error where startIdx would not advance for single-point 
- *   segments during property changes, blocking the UI thread.
+ * - Issue #020: Remediated "Fighting" Centering Logic.
  */
 
 @Composable
@@ -234,8 +230,15 @@ fun AppMapContainer(
             }
         }
 
+        // R400: Move map messages to bottom-center metadata cluster near map scale (Issue #496)
         if (trackerLocationPending && trackerLocationPendingReason != LocationPendingReason.NONE) {
-            Box(modifier = Modifier.align(Alignment.Center).padding(bottom = 120.dp).background(Amber500.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 80.dp)
+                    .background(Amber500.copy(alpha = 0.85f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
                 Text(
                     text = "UNCERTAINTY: ${trackerLocationPendingReason.name.replace("_", " ")}",
                     color = Color.Black,

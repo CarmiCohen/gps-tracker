@@ -1,46 +1,46 @@
-# System Source of Truth (SoT) - v9.2.9
+# System Source of Truth (SoT) - v9.3.0
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
-*   **Screen-Off Optimization Authority (R994)**: The system MUST optimize power consumption by reducing GPS polling frequency when the device screen is off. The system MUST monitor the default display state via `DisplayManager`. When the screen is not in the `ON` state, the GPS polling interval MUST be throttled to **5,000ms** (`SCREEN_OFF_GPS_POLLING_MS`), except when the system is in `Suspicious` or `Cooling` modes. This ensures battery longevity during prolonged background tracking without sacrificing core telemetry integrity. (Issue R994 / v9.2.9)
-*   **Notification Throttling Authority (R993)**: The system MUST throttle foreground service notification updates to balance battery efficiency with operator awareness. Updates MUST be gated by a time-based refresh window: **1,000ms** when the UI is visible (`isUiVisible()`) and **10,000ms** (`NOTIFICATION_THROTTLE_MS`) when the app is in the background. This ensures the notification "pulse" (Sats/Batt/Status) remains fresh during active use while minimizing CPU wakeups and system overhead during long-term monitoring. (Issue R993 / v9.2.8)
-*   **HUD Local Capability Grouping (R960)**: The `GlobalStatusBar` MUST group fundamental local hardware indicators into a contiguous "Local Capability" block. The sequence MUST be **INT** (Internet), **SRV** (Relay Link), and **GPS** (Local Fix). These MUST be visually separated from peer-dependent indicators (**TRK/VWR**, **DAT**) to ensure the operator can immediately distinguish between local hardware failure and remote peer/link failure. (Issue R960 / v9.2.7)
-*   **HUD Context Mapping Authority (R049)**: The `GlobalStatusBar` MUST implement mode-aware telemetry binding. In **Tracker mode**, all tracker-line indicators (GPS, Accuracy, Pending State) and top-level GPS health badges MUST bind to the local device's `localLocation`. In **Viewer mode**, these indicators MUST bind to the remote `trackerLocation`. This ensures the HUD correctly reflects the active monitoring context. (Issue #049 / v9.2.6)
-*   **HUD Local Health Standardization (R991)**: The top-level HUD status badges (INT, SRV, VWR/TRK, GPS) MUST reflect the **Local Health** of the device. The GPS badge specifically MUST reflect the local device's GPS fix status. Peer-dependent telemetry indicators (Speed, Tracker State) MUST remain decoupled and tied to the remote peer's GPS health to ensure data veracity. (Issue #044 / v9.2.3)
-*   **Intelligent Uncertainty UX (R326)**: The system MUST provide specific contextual reasons for Bayesian uncertainty expansion (Location Pending state). Reasons include `GPS_STALL` (hardware stall), `GPS_GAP` (environmental signal loss), `JAMMER_SUSPICION`, `SIGNAL_LOSS`, and `ACOUSTIC_VIOLATION`. These reasons MUST be prioritized during telemetry aggregation (e.g., Jammer > Stall > Gap) to ensure critical forensic markers are preserved in historical ribbons. (Issue #326 / v9.2.2)
+*   **Map Metadata Alignment (R400)**: Map-level status messages (e.g., "UNCERTAINTY: ...") MUST be anchored to the bottom-center of the map view, in the vicinity of the map scale bar. This prevents visual occlusion of the map center and tracker focal points during Bayesian uncertainty expansion events. (Issue #496 / v9.3.0)
+*   **Screen-Off Optimization Authority (R994)**: The system MUST optimize power consumption by reducing GPS polling frequency when the device screen is off. (Issue R994 / v9.2.9)
+*   **Notification Throttling Authority (R993)**: The system MUST throttle foreground service notification updates to balance battery efficiency. (Issue R993 / v9.2.8)
+*   **HUD Local Capability Grouping (R960)**: The `GlobalStatusBar` MUST group fundamental local hardware indicators. (Issue R960 / v9.2.7)
+*   **HUD Context Mapping Authority (R049)**: The `GlobalStatusBar` MUST implement mode-aware telemetry binding. (Issue #049 / v9.2.6)
+*   **HUD Local Health Standardization (R991)**: The top-level HUD status badges MUST reflect the Local Health. (Issue #044 / v9.2.3)
+*   **Intelligent Uncertainty UX (R326)**: The system MUST provide specific contextual reasons for Bayesian uncertainty expansion. (Issue #326 / v9.2.2)
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
-*   **Module Hardening**: `:core:engine` is a pure `java-library` with zero Android dependencies. (Issue #322)
-*   **Sensor Processing Authority (R965)**: `AppSensorManager` offloads all high-frequency sensor event processing to a dedicated `HandlerThread` (`AppSensorThread`). (Issue #006 / Issue #013 / v8.9.70)
-*   **Stationary Anchor Hard-Lock (R990)**: The engine MUST establish a coordinate "Hard-Lock" when stationary probability exceeds 0.9 and physical sensors confirm a stationary state. During a lock, coordinates are clamped to the anchor point to eliminate HUD jitter and erroneous distance accumulation. The lock MUST release immediately (breakout threshold = 0.0m) if physical sensors detect motion, preventing "sticky" transitions when leaving buildings. (Issue #018 / v9.2.1)
-*   **Connectivity Integrity (R966)**: `AppNetworkManager` implements a short-circuit reactive reconnection trigger. (Issue #007 / v8.9.64)
-*   **Transport Authority**: The system strictly enforces `websocket` transport for low-latency signaling. (Issue #007 / v8.9.64)
-*   **Service Launch Integrity (R926)**: The system enforces a mandatory **2,000ms delay** during session auto-transitions before launching background services. (Issue #320)
-*   **Log Spillage Remediation (Issue #005)**: The system mandates a static User Agent and **manually defined storage paths** for third-party libraries (e.g., osmdroid). Path assignment MUST be synchronous during application initialization to prevent repetitive `getPackageName()` system logcat spam on Samsung G990/A155 devices. (v8.9.91)
-*   **Time Integrity**: All alarm evaluations and hardware latches use monotonic time via `TimeProvider.elapsedRealtime()`. (Issue #311 / Issue #441)
-*   **Bootstrap Staggering (R984)**: To mitigate CPU contention and "Davey!" jank during cold-starts, all background services MUST implement a staggered initialization sequence. High-load subsystems (GPS, GNSS Detail, Sync Loop) MUST be delayed using a warming window (referencing `BOOTSTRAP_PHASE_MS`). Service initialization MUST be offloaded to `Dispatchers.Default`. (Issue #046 / v9.1.5)
-*   **Foreground Service Hardening (R983)**: The system strictly enforces state-aware foreground service types. On Android 15 (SDK 35), the `MICROPHONE` type is exclusively requested when the app is in the foreground or recently pulsed (`isRecentUiPulse()`). Background starts (Boot/WorkManager) are restricted to `LOCATION` to prevent `SecurityException`. (Issue #045 / v9.1.4)
-*   **Foreground Service Transition (R967)**: The system maintains a **45-second "Recent UI Pulse" window** (`UI_PULSE_TIMEOUT_MS`) to bridge Android 14+ `MICROPHONE` type transitions. (Issue #025 / v8.9.86)
-*   **Type Safety Authority**: All telemetry fields (Accuracy, Speed, Bearing, Sensor Indices) are standardized to `Double` across the entire chain (Engine, App, Room). (Issue #014 / v8.9.75)
-*   **Data Persistence Integrity (R968)**: All changes to Protobuf schemas must preserve binary compatibility. Migration from legacy types must use new field tags and explicit `DataMigration` logic. (Issue #023 / v8.9.84)
-*   **Database Schema Hardening (R985)**: To prevent startup crashes due to schema drift, all Room Entity fields with default values MUST be decorated with explicit `@ColumnInfo(defaultValue = "...")` annotations. Migration scripts involving table recreation (copy-and-drop) MUST explicitly include these `DEFAULT` clauses in the `CREATE TABLE` statements to ensure strict parity with the Room-validated schema. (Issue #043 / v9.1.6)
-*   **Authoritative State Model (R986)**: The `TrackerState` (MOVING, PARKING, etc.) MUST be computed exclusively by the Tracker and broadcast via telemetry. Viewers MUST adopt this reported state directly to ensure HUD synchronization and prevent "split-brain" desync. (Issue #046 / v9.1.8)
-*   **Binary Forensic Parity (R988)**: The binary telemetry contract (`RealtimeStatus`) MUST maintain field parity with the authoritative state flow. All forensic metadata, including `tracker_state`, `is_anchor_locked`, and `location_pending_reason`, MUST be synchronized in the Protobuf schema and correctly extracted by the signaling handlers to prevent data degradation during binary transport. (Issue #051 / v9.1.9)
-*   **Speed Unit Standardization (R987)**: All internal telemetry and engine pipelines MUST use raw **meters per second (m/s)** for speed. Conversion to km/h MUST be restricted to the presentation layer. The HUD MUST implement a freshness gate to zero out speed and suppress animations when GPS is stale (`isGpsActive` is false). (Issue #047 / v9.1.8)
-*   **HUD Freshness Duality (R989)**: The HUD MUST differentiate between **Telemetry Freshness** (link/packet arrival) and **GPS Freshness** (position fix age). Connectivity, Battery, and health indicators MUST remain colorized as long as telemetry is fresh, even if the GPS fix is stale. Only explicitly position-fix-dependent fields (Accuracy, GPS Age) turn gray when GPS signal is lost. (Issue #048 / v9.2.0)
-*   **Telemetry Freshness Authority (Issue #029)**: Data health (`DAT` badge) is determined by the arrival of any telemetry packet. In Viewer mode, the service MUST propagate local updates to the repository to ensure UI freshness for the monitoring device. (v9.0.3)
-*   **Document Integrity Authority (R969)**: All core documentation (`issues.md`, `requirements_sot.md`, `compliance.md`) and their archives are subject to a **Growth-Only Constraint**. Archives must never decrease in line count, and structural headers must be preserved during all automated or manual writes. (v8.9.91)
-*   **A15 Jitter Stabilization (R970)**: The system applies hardened spatial gates (5.0 m/s mismatch / 25m jitter) and a 5-second "Adaptation Muzzle" during polling transitions on Samsung A15 hardware to ensure state engine stability. (Issue #036 / Issue #038 / v8.9.94)
-*   **G990E Display Hardening (R971)**: The system implements a `DisplayListener` to detect rapid ON/DOZE toggling on Samsung S21 FE (G990E) devices and muzzles virtual proximity transitions during these cycles to eliminate telemetry noise. (Issue #037 / v8.9.94)
-*   **Forensic Staleness Authority (R972)**: The system enforces a strict 15-second staleness gate (`WATCH_DOG_UI_GRACE_MS`) for forensic fields (`Prox Debounce`, `Rolling Vibe`, `Chair Forensics`) to ensure data veracity during link gaps. (Issue #032 / v8.9.95)
-*   **Standardized Proto Path Authority (R973)**: All Protobuf schemas MUST be located in the standard `app/src/main/proto` directory. The legacy `app/src/proto` path is deprecated and must not be used for schema updates. (Issue #030 / v8.9.96)
-*   **Identity Uniqueness Authority (R974)**: The system enforces strict uniqueness between Tracker and Viewer identities at the persistence layer. `MainRepository` MUST validate that `TRACKER_ID` and `VIEWER_ID` do not collide during bulk save operations to prevent role reversion and "split-brain" states. (Issue #027 / v8.9.98)
-*   **Identity Sanitization Authority (R975)**: The system enforces a strict alphanumeric contract for all IDs (`^[a-zA-Z0-9_-]{1,32}$`). The `SettingsRepository` MUST implement automatic sanitization via migration to reset any corrupted identities to safe defaults, and all network/service handlers MUST reject pulses containing malformed IDs to prevent command injection. (Issue #041 / v8.9.99)
-*   **Identity Locking Authority (R982)**: The system enforces strict peer-to-peer authorization between Trackers and Viewers. Trackers MUST exclusively process location updates, settings, and pings from the specific `viewerId` they are linked to. To support initial pairing, processing is permitted if the tracker's `viewerId` is the system default ("V"). In Tracker mode, peer identity MUST be resolved from the `viewer_id` signaling field to ensure correct reflection/adoption of the monitoring device's identity. Once a non-default ID is adopted, the tracker locks to that identity, and any packet from a mismatched Viewer ID MUST be silently rejected at the signaling level. (Issue #042 / v9.1.2)
+*   **Module Hardening**: `:core:engine` is a pure `java-library` with zero Android dependencies.
+*   **Sensor Processing Authority (R965)**: `AppSensorManager` offloads high-frequency sensor event processing to a dedicated thread.
+*   **Stationary Anchor Hard-Lock (R990)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018 / v9.2.1)
+*   **Connectivity Integrity (R966)**: `AppNetworkManager` implements reactive reconnection.
+*   **Transport Authority**: The system strictly enforces `websocket` transport.
+*   **Service Launch Integrity (R926)**: The system enforces a mandatory 2,000ms delay during session transitions.
+*   **Log Spillage Remediation (Issue #005)**: The system mandates static User Agent and manually defined storage paths for third-party libs.
+*   **Time Integrity**: All alarm evaluations use monotonic time via `TimeProvider.elapsedRealtime()`.
+*   **Bootstrap Staggering (R984)**: All background services MUST implement a staggered initialization sequence.
+*   **Foreground Service Hardening (R983)**: The system strictly enforces state-aware foreground service types.
+*   **Foreground Service Transition (R967)**: The system maintains a 45-second "Recent UI Pulse" window.
+*   **Type Safety Authority**: All telemetry fields are standardized to `Double`.
+*   **Data Persistence Integrity (R968)**: All changes to Protobuf schemas must preserve binary compatibility.
+*   **Database Schema Hardening (R985)**: Room Entity fields MUST be decorated with explicit `@ColumnInfo(defaultValue)`.
+*   **Authoritative State Model (R986)**: The `TrackerState` MUST be computed exclusively by the Tracker.
+*   **Binary Forensic Parity (R988)**: The binary telemetry contract MUST maintain field parity with authoritative state flow.
+*   **Speed Unit Standardization (R987)**: All internal telemetry and engine pipelines MUST use raw meters per second (m/s).
+*   **HUD Freshness Duality (R989)**: The HUD MUST differentiate between Telemetry Freshness and GPS Freshness.
+*   **Telemetry Freshness Authority (Issue #029)**: Data health (`DAT` badge) is determined by arrival of any packet.
+*   **Document Integrity Authority (R969)**: Core documentation is subject to a Growth-Only Constraint.
+*   **A15 Jitter Stabilization (R970)**: The system applies hardened spatial gates and 5s muzzle on Samsung A15.
+*   **G990E Display Hardening (R971)**: The system muzzles proximity transitions during ON/DOZE toggling on S21 FE.
+*   **Forensic Staleness Authority (R972)**: The system enforces a strict 15-second staleness gate for forensic fields.
+*   **Standardized Proto Path Authority (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`.
+*   **Identity Uniqueness Authority (R974)**: The system enforces uniqueness between Tracker and Viewer identities.
+*   **Identity Sanitization Authority (R975)**: The system enforces a strict alphanumeric contract for all IDs.
+*   **Identity Locking Authority (R982)**: The system enforces strict peer-to-peer authorization between Trackers and Viewers.
 
 ### 2. Branding & UI Standards
-*   **Branding Authority (R799e)**: "Unified Identity Green" is strictly defined as **JD Vivid Green (#78BE20)**. This supersedes R865/R866 corporate green (#367C2B) for digital interfaces. (v9.1.0)
-*   **Viewer Identity Color (R799d)**: "Viewer Role Identity" is strictly defined as **Cyan (#06B6D4)**. This supersedes any legacy orange coloring. (v9.0.4)
-*   **Icon Authority (R935)**: The authoritative application icon is the text-free John Deere deer logo.
-*   **Role Identity Standards (R182)**: IDs are free-form strings. Prefixes "T" (Tracker) and "V" (Viewer) are mandated.
-*   **VID Notes Authority (R924)**: **OBSOLETE (v8.9.89)**. The `VID_NOTES` string and its display in the `HeaderBar` have been removed.
+*   **Branding Authority (R799e)**: "Unified Identity Green" is JD Vivid Green (#78BE20).
+*   **Viewer Identity Color (R799d)**: "Viewer Role Identity" is Cyan (#06B6D4).
+*   **Icon Authority (R935)**: The authoritative application icon is the deer logo.
+*   **Role Identity Standards (R182)**: IDs are free-form strings. Prefixes "T" and "V" mandated.
