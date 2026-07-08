@@ -1,6 +1,24 @@
-# Project History & Versioning (v9.0.x)
+# Project History & Versioning (v9.3.1)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## v9.3.1
+- **Proto Schema Consolidation (Issue #030 / R973)**: Resolved technical debt by consolidating all Protobuf schemas into `app/src/main/proto` and removing the legacy `app/src/proto` path. This enforces a single source of truth for DataStore and binary telemetry contracts.
+- **Map Metadata Alignment (Issue #400 / R400)**: Re-anchored Bayesian Uncertainty status messages from the map center to the bottom-center metadata cluster with a standardized 80dp vertical offset.
+- **Documentation Refactor**: Standardized the project's documentation hierarchy (Tier 1/2/3). Promoted `compliance.md` to the authoritative Verification Manifest and updated `TESTS.md` with explicit task-ID mappings for manual forensic and sensor validation.
+- **Status Integrity Restoration (#054, #055)**: Recovered 185 lost legacy resolutions and corrected Requirement ID collisions in the compliance manifest.
+
+## v9.3.0
+- **Internal Baseline**: Previous internal release.
+
+## v9.2.9
+- **Screen-Off Optimization (R994)**: Implemented dynamic GPS down-sampling (5000ms) when the device screen is off to preserve battery life during long-term tracking sessions.
+
+## v9.2.6
+- **HUD Context Mapping (R049)**: Corrected `GlobalStatusBar` binding logic to ensure mode-aware telemetry (Tracker vs. Viewer) is correctly reflected in the HUD rows.
+
+## v9.2.3
+- **HUD Health Standardization (R991)**: Standardized top-level HUD status badges to reflect the physical health of the local device.
 
 ## v9.0.3
 - **Viewer Status Restoration (Issue #029)**: Fixed a bug where the Viewer's own status line was grayed out in the UI. Updated `ViewerService.kt` to propagate local `LocationUpdate` packets to the repository, ensuring the `DAT` badge and telemetry timestamps are kept fresh.

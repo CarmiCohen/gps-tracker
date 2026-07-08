@@ -1,9 +1,9 @@
-# System Source of Truth (SoT) - v9.3.0
+# System Source of Truth (SoT) - v9.3.1
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
-*   **Map Metadata Alignment (R400)**: Map-level status messages (e.g., "UNCERTAINTY: ...") MUST be anchored to the bottom-center of the map view, in the vicinity of the map scale bar. This prevents visual occlusion of the map center and tracker focal points during Bayesian uncertainty expansion events. (Issue #400 / v9.3.0)
+*   **Map Metadata Alignment (R400)**: Map-level status messages (e.g., "UNCERTAINTY: ...") MUST be anchored to the bottom-center of the map view, in the vicinity of the map scale bar. (Issue #400 / v9.3.0)
 *   **Screen-Off Optimization Authority (R994)**: The system MUST optimize power consumption by reducing GPS polling frequency when the device screen is off. (Issue R994 / v9.2.9)
 *   **Notification Throttling Authority (R993)**: The system MUST throttle foreground service notification updates to balance battery efficiency. (Issue R993 / v9.2.8)
 *   **HUD Local Capability Grouping (R960)**: The `GlobalStatusBar` MUST group fundamental local hardware indicators. (Issue R960 / v9.2.7)
@@ -13,7 +13,8 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Module Hardening**: `:core:engine` is a pure `java-library` with zero Android dependencies.
 *   **Sensor Processing Authority (R965)**: `AppSensorManager` offloads high-frequency sensor event processing to a dedicated thread.
-*   **Stationary Anchor Hard-Lock (R990)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018 / v9.2.1)
+*   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary (`stationaryProb > 0.9`). (Issue #018 / v9.2.1)
+*   **Anchor Lock Breakout (R990)**: The engine MUST implement a displacement-weighted monitor to breakout of Hard-Locks. (Issue #062 / v9.3.0-dev)
 *   **Connectivity Integrity (R966)**: `AppNetworkManager` implements reactive reconnection.
 *   **Transport Authority**: The system strictly enforces `websocket` transport.
 *   **Service Launch Integrity (R926)**: The system enforces a mandatory 2,000ms delay during session transitions.

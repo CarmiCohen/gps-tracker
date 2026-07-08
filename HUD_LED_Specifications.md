@@ -1,6 +1,6 @@
-# HUD LED Specifications (v9.2.7)
+# HUD LED Specifications (v9.3.0)
 
-This document serves as the definitive specification for HUD indicators, standardized under **Requirement R960**.
+This document serves as the definitive specification for HUD indicators, standardized under **Requirement R960** and updated for 15s staleness logic (**R972**).
 
 ## 1. Upper Row (Global Status Bar)
 This row provides a binary "at-a-glance" status of the local device health and immediate peer presence.
@@ -12,14 +12,14 @@ Standardized under **R960**, these three badges group the fundamental local hard
 | :--- | :--- | :--- | :--- |
 | **INT** | Green (**BrandJd**) / Red (**Rose500**) | Internet | Active when the local device has internet access. |
 | **SRV** | Green (**BrandJd**) / Red (**Rose500**) | Relay Server | Active when connected to the signaling server. |
-| **GPS** | Green (**BrandJd**) / Red (**Rose500**) | **Local** GPS | Reflects the **local** device's GPS fix (Fresh if age < 10s). |
+| **GPS** | Green (**BrandJd**) / Red (**Rose500**) | **Local** GPS | Reflects the **local** device's GPS fix (Fresh if age < 15s). |
 
 ### Peer Presence Group
 Reflects the immediate status of the monitoring link and the remote entity.
 
 | Name | Appearance (Active / Inactive) | Meaning | Condition |
 | :--- | :--- | :--- | :--- |
-| **TRK / VWR** | Green (**BrandJd**) / Red (**Rose500**) | Peer Activity | **Viewer Mode (TRK):** Telemetry received in last 10s.<br>**Tracker Mode (VWR):** Viewer is actively polling. |
+| **TRK / VWR** | Green (**BrandJd**) / Red (**Rose500**) | Peer Activity | **Viewer Mode (TRK):** Telemetry received in last 15s.<br>**Tracker Mode (VWR):** Viewer is actively polling. |
 | **DAT** | Green (**BrandJd**) / Red (**Rose500**) | Data Integrity | (Viewer Mode Only) True if internet, relay, and peer are all active. |
 
 ### Safety & Integrity Group (Dynamic Center-Left)
@@ -30,15 +30,15 @@ These badges are injected dynamically immediately following the **Peer Presence*
 | **ALM** | Pulsing Red (**Rose500**) | Alarm Latch | Visible if any unresolved alarms exist in the background. |
 | **LOCKOUT** | Gray Box (**Slate500**) | UI Suppressed | A violation is active, but the user manually minimized the Red Overlay. |
 | **SIREN LOCKOUT**| Pulsing Red Box | Audio Active | Red Overlay is minimized but the **Siren is still playing**. |
-| **WATCHDOG** | OK (Green) / FAIL (Red) | Logic Pulse | Status of internal application monitoring services. |
+| **WATCHDOG** | OK (Green) / FAIL (Red) | Logic Pulse | Status of internal application monitoring services (15s heartbeat). |
 
 ### Movement & Speed (Tracker-Dependent Right Group)
 Reflects the state of the entity being tracked (remote peer or self-focus).
 
 | Name | Appearance | Condition |
 | :--- | :--- | :--- |
-| **State Label** | Green / Gray (**Slate500**) | Shows `MOVING` (pulsing) or `STATIONARY`. Turns **Gray** if Tracker GPS is stale. |
-| **Speed Value** | Green / Gray (**Slate500**) | Real-time speed. Turns **Gray** and drops to `0.0` if Tracker GPS is stale. |
+| **State Label** | Green / Gray (**Slate500**) | Shows `MOVING` (pulsing) or `STATIONARY`. Turns **Gray** if Tracker GPS is stale (>15s). |
+| **Speed Value** | Green / Gray (**Slate500**) | Real-time speed. Turns **Gray** and drops to `0.0` if Tracker GPS is stale (>15s). |
 
 ---
 
@@ -51,7 +51,7 @@ Describes the Viewer's local telemetry metrics. Base color: **Cyan (ViewerCyan)*
 *   **Temp (°):** Local battery temperature.
 *   **Comm Bar:** 10-segment local connectivity index.
 *   **Sats (X/Y):** Satellites Used / In View.
-*   **Age:** Time since last local GPS fix. Turns **Gray** if > 10s.
+*   **Age:** Time since last local GPS fix. Turns **Gray** if > 15s.
 *   **Accuracy:** Local precision. Turns **Gray** if GPS is stale.
 *   **Distance:** Distance from Tracker to Viewer (Metric calculated locally).
 
@@ -66,7 +66,7 @@ Describes the Tracker's telemetry metrics. Base color: **Green (BrandJd)**.
 
 ### Metrics & Gates
 *   **Waiting State:** Shows **">>> WAITING FOR TELEMETRY <<<"** in pulsing Gray if no data has arrived.
-*   **Connectivity Gate:** If telemetry packets stop (>10s), Label, Battery, Temp, and Comm bars turn **Gray (Slate500)**.
+*   **Connectivity Gate:** If telemetry packets stop (>15s), Label, Battery, Temp, and Comm bars turn **Gray (Slate500)**.
 *   **GPS Gate:** If the Tracker specifically loses its GPS fix (but link is still active), **only** Age and Accuracy turn **Gray**. Battery and Comm stay green.
 *   **Distance:** Distance from Tracker to its designated "Home" geofence origin.
 
@@ -75,4 +75,4 @@ Describes the Tracker's telemetry metrics. Base color: **Green (BrandJd)**.
 ## Rationale for Redundancy (Issue #044)
 The **GPS LED** (Row 1) and the **Age/Accuracy** text (Rows 2/3) are intentionally redundant to create a status hierarchy:
 1.  **The Hardware Go/No-Go (Upper Row)**: Logical consistency. Tells the user immediately if the device in their hand is currently capable of accurate positioning/geofencing.
-2.  **The Forensic Audit (Rows 2/3)**: Provides the specific metadata (staleness and precision) required to explain *why* the hardware status has changed.
+2.  **The Forensic Audit (Rows 2/3)**: Provides the specific metadata (staleness and precision) required to explain *why* the hardware status has changed. Forensic fields (e.g., `vibrationRollingSum`) also apply the 15s staleness dimming (**R972**).

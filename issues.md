@@ -5,31 +5,29 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟡 Active | 4 |
+| **Open Technical Issues** | 🟡 Active | 6 |
 | **Validation Tasks** | 🔍 Tracked | [Testing Status](STATUS/testing_status.md) |
-| **Resolved (Total)** | 🟢 Progress | 256 |
+| **Resolved (Total)** | 🟢 Progress | 259 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
 | ID | Concern | Description |
 | :--- | :--- | :--- |
-| **#055** | **Issue History Recovery** | Restored 185 "lost" legacy resolutions from `compliance_archive.md`. |
-| **#054** | **Requirement ID Collision** | Discovered that Issue #326 was overloaded in `compliance.md`. Audited and corrected. |
-| **#039** | **Identity Rejection Feedback** | `MainRepository` now silently rejects bulk updates with colliding IDs. UI feedback needed. |
-| **#042** | **Sanitization Visibility** | `SettingsRepository` automatically resets malformed IDs. No UI notification exists. |
+| **#039** | **Identity Rejection Feedback** | `MainRepository` now silently rejects bulk updates with colliding IDs. UI feedback needed. (Validation: #063) |
+| **#042** | **Sanitization Visibility** | `SettingsRepository` automatically resets malformed IDs. No UI notification exists. (Validation: #067) |
 
 ---
 
 ## 🔴 Open Issues
 | ID | Category | Description |
 | :--- | :--- | :--- |
-| **#058** | **Refactor** | **TrackerService Initialization**: Refactor `onCreate` to move manual dependency injection (IntegrityMonitor, SyncManager, etc.) into Hilt Modules to improve testability and reduce initialization bugs. |
-| **#059** | **Feature** | **Permission Health Check UI**: Implement a "Diagnostics" screen in Compose using `isXiaomiSpecialPermissionGranted` to show health indicators and "Fix" buttons for Xiaomi devices. |
-| **#061** | **Cleanup** | **Forensic Logging Consolidation**: Create a `ForensicLogUseCase` to standardize "Special Color" (Pink) logging and ensure consistent inclusion of lat/lng/accuracy/vibe data. |
-| **#062** | **Hardening** | **Dynamic Anchor Breakout**: Implement a displacement-weighted monitor for the breakout phase. If GPS displacement consistently increases while IMU `stationaryProb` remains high (sticky anchor), trigger a "soft breakout" to prevent locking the user to a stationary position on noisy hardware like the Samsung A15. |
+| **#058** | **Refactor** | **TrackerService Initialization**: Refactor `onCreate` to move manual dependency injection into Hilt Modules. (Validation: #066) |
+| **#059** | **Feature** | **Permission Health Check UI**: Implement a "Diagnostics" screen in Compose for Xiaomi special permissions. (Validation: #064) |
+| **#061** | **Cleanup** | **Forensic Logging Consolidation**: Create a `ForensicLogUseCase` to standardize "Special Color" (Pink) logging. (Validation: #065) |
+| **#062** | **Hardening** | **Dynamic Anchor Breakout**: Implement displacement-weighted monitor to prevent "sticky anchors". (Validation: #053) |
 
-*(Note: Validation-specific issues #031, #050, #056, #057 and #060 have been moved to [Testing Status](STATUS/testing_status.md))*
+*(Note: All validation-specific tasks and verification backlog are tracked in [Testing Status](STATUS/testing_status.md))*
 
 ---
 
@@ -37,7 +35,10 @@ This document tracks active issues, technical debt, and pending implementation t
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
-| **#400** | **Uncertainty UX Mapping** | **Resolved (R400)**. Re-anchored Bayesian Uncertainty status messages from the map center to the bottom-center metadata cluster. Implemented an 80dp vertical offset to maintain visual separation from the `osmdroid` scale bar. |
+| **#030** | **Proto Schema Duplication** | **Resolved (R973)**. Consolidated all schemas into `app/src/main/proto` and removed legacy path. |
+| **#055** | **Issue History Recovery** | **Resolved**. Restored 185 "lost" legacy resolutions from `compliance_archive.md`. |
+| **#054** | **Requirement ID Collision** | **Resolved**. Audited and corrected `compliance.md` where Issue #326 was overloaded. |
+| **#400** | **Uncertainty UX Mapping** | **Resolved (R400)**. Re-anchored Bayesian Uncertainty status messages to bottom-center with 80dp offset. |
 
 ---
 
@@ -45,4 +46,4 @@ This document tracks active issues, technical debt, and pending implementation t
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
-| **R994** | **WakeLock & Screen-Off** | **Resolved**. |
+| **R994** | **WakeLock & Screen-Off** | **Resolved**. Dynamic GPS down-sampling implemented. |

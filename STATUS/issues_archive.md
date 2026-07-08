@@ -2,9 +2,10 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 251**
+**Total Unique Resolutions: 252**
 
 ## 1. Recent Hardening Phase (v9.0.4 - v9.3.0)
+*   **Issue #030**: Proto Schema Duplication (R973). Consolidated all schemas into `app/src/main/proto` and deprecated the legacy `app/src/proto` path to prevent synchronization drift. (v9.3.0)
 *   **Issue #400**: Map Metadata Alignment (R400). Re-anchored Bayesian Uncertainty status messages from the map center to the bottom-center metadata cluster. (v9.3.0)
 *   **Issue #326**: Intelligent Uncertainty UX. Enriched Location Pending state with reasons (GPS_GAP, JAMMER) and implemented priority-based merging. (v9.2.2)
 *   **Issue #018**: Stationary Anchor Hard-Lock. Implemented coordinate clamping in `LocationProcessor.kt` and propagated `isAnchorLocked` flag. (v9.2.1)
@@ -14,7 +15,7 @@ This document contains the unified record of all resolved issues and technical d
 ## 2. Hardening Era Resolutions (v8.9.65 - v8.9.99)
 *   **Issue #041**: Identity Sanitization Hardening. Implemented R975 (Regex validation) and automatic storage purging. (v8.9.99)
 *   **Issue #027**: Identity Persistence Hardening. Reinforced bulk save with atomic uniqueness validation. (v8.9.98)
-*   **Issue #030**: Proto Schema Discrepancy. Authoritative schema path moved to `app/src/main/proto`. (v8.9.96)
+*   **Issue #030-Legacy**: Proto Schema Discrepancy. Authoritative schema path moved to `app/src/main/proto`. (v8.9.96)
 *   **Issue #032**: UI Refresh Consistency. Implemented `isForensicFresh` gate using `WATCH_DOG_UI_GRACE_MS`. (v8.9.96)
 *   **Issue #038**: Adaptation Instability. Implemented 5s "Adaptation Muzzle" for A15 polling changes. (v8.9.94)
 *   **Issue #037**: Viewer Display State Spam. Added `DisplayListener` to suppress proximity triggers during AOD cycles. (v8.9.94)
