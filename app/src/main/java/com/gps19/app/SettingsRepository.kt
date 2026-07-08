@@ -32,6 +32,9 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * v9.3.0:
+ * - Issue #042: Sanitization Visibility. identitySanitizationMigration now sets 
+ *   identity_sanitized flag to true when malformed IDs are reset.
  * v9.1.9:
  * - Issue #051: Binary Parity Gap. Updated TrackerStatusProto persistence 
  *   to include authoritative tracker_state. Fixed saveLong and lux setter syntax.
@@ -86,9 +89,11 @@ class SettingsRepository @Inject constructor(
             val builder = currentData.toBuilder()
             if (currentData.trackerId.isNotEmpty() && !SignalingConstants.isValidTrackerId(currentData.trackerId)) {
                 builder.setTrackerId(DEFAULT_TRACKER_ID)
+                builder.setIdentitySanitized(true)
             }
             if (currentData.viewerId.isNotEmpty() && !SignalingConstants.isValidViewerId(currentData.viewerId)) {
                 builder.setViewerId(DEFAULT_VIEWER_ID)
+                builder.setIdentitySanitized(true)
             }
             return builder.build()
         }
@@ -158,6 +163,8 @@ class SettingsRepository @Inject constructor(
 
         const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = "is_xiaomi_manual_override"
         const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
+        
+        const val IDENTITY_SANITIZED_KEY = "identity_sanitized"
     }
 
     val appModeFlow: Flow<String?> = dataStore.data.map { it.appMode.ifEmpty { null } }
@@ -171,6 +178,7 @@ class SettingsRepository @Inject constructor(
     val maxDistanceFlow: Flow<Double> = dataStore.data.map { if (it.maxDistance > 0.0) it.maxDistance else DEFAULT_MAX_DISTANCE }
     val alertSettingsFlow: Flow<AlertSettings> = dataStore.data.map { protoToAlertSettings(it.alertSettings) }
     val isXiaomiManualOverrideFlow: Flow<Boolean> = dataStore.data.map { it.isXiaomiManualOverride }
+    val identitySanitizedFlow: Flow<Boolean> = dataStore.data.map { it.identitySanitized }
 
     suspend fun saveString(keyName: String, value: String) {
         dataStore.updateData { current ->
@@ -249,6 +257,7 @@ class SettingsRepository @Inject constructor(
                 IS_MANUAL_EXIT_KEY -> builder.setIsManualExit(value)
                 IS_MIC_TYPE_STARTED_KEY -> builder.setIsMicTypeStarted(value)
                 IS_XIAOMI_MANUAL_OVERRIDE_KEY -> builder.setIsXiaomiManualOverride(value)
+                IDENTITY_SANITIZED_KEY -> builder.setIdentitySanitized(value)
             }
             builder.build()
         }
@@ -332,6 +341,7 @@ class SettingsRepository @Inject constructor(
             IS_MANUAL_EXIT_KEY -> settings.isManualExit
             IS_MIC_TYPE_STARTED_KEY -> settings.isMicTypeStarted
             IS_XIAOMI_MANUAL_OVERRIDE_KEY -> settings.isXiaomiManualOverride
+            IDENTITY_SANITIZED_KEY -> settings.identitySanitized
             else -> default
         }
     }

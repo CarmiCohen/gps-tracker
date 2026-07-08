@@ -11,6 +11,9 @@ import javax.inject.Singleton
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
  * Handles draft lifecycle, atomic commits, and full system resets.
+ * v9.3.0:
+ * - Issue #042: Sanitization Visibility. Added identitySanitized to InitialSettings 
+ *   and loadAllSettings to inform UI of automatic ID resets.
  * v8.9.87:
  * - Issue #005 Remediation: Fixed type mismatch where loadAllSettings was using 
  *   getFloat for Double-backed distance and temperature keys.
@@ -80,6 +83,7 @@ class SettingsUseCase @Inject constructor(
         val sSiren = repository.getString(MainRepository.SELECTED_SIREN_KEY, "Siren")
         val lAlarmAck = repository.getLastAlarmAckTs()
         val lMaxTemp = repository.getDouble(MainRepository.MAX_TEMP_KEY, 0.0)
+        val sanitized = repository.getBoolean(MainRepository.IDENTITY_SANITIZED_KEY, false)
         
         var appStartTime = repository.getLong(MainRepository.APP_START_TIME_KEY, 0L)
         if (appStartTime == 0L) {
@@ -111,7 +115,7 @@ class SettingsUseCase @Inject constructor(
             homePoints = hPoints, alertSettings = aSettings, appMode = mMode,
             selectedSirenType = sSiren, lastAlarmAckTs = lAlarmAck, maxTemp = lMaxTemp,
             appStartTime = appStartTime, draftSettings = draftSettings,
-            trackerStatus = trackerStatus
+            trackerStatus = trackerStatus, identitySanitized = sanitized
         )
     }
 
@@ -125,6 +129,7 @@ class SettingsUseCase @Inject constructor(
             repository.saveString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
             repository.saveString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
             repository.saveString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
+            repository.saveBoolean(MainRepository.IDENTITY_SANITIZED_KEY, false)
             repository.clearDraftSettings()
             
             val appStartTime = timeProvider.currentTimeMillis()
@@ -159,5 +164,5 @@ data class InitialSettings(
     val homePoints: List<org.osmdroid.util.GeoPoint>, val alertSettings: AlertSettings,
     val appMode: String?, val selectedSirenType: String, val lastAlarmAckTs: Long,
     val maxTemp: Double, val appStartTime: Long, val draftSettings: DraftSettings?,
-    val trackerStatus: TrackerStatus?
+    val trackerStatus: TrackerStatus?, val identitySanitized: Boolean = false
 )

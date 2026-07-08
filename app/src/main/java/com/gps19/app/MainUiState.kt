@@ -4,6 +4,7 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Unified immutable state for the entire UI structure.
+ * v9.3.0: Issue #042 - Sanitization Visibility. Added isIdentitySanitized flag.
  * v8.9.79: Issue #014 - Type Migration: Standardized accuracy fields to Double.
  * v8.8.2: Aligned default IDs with MainRepository.DEFAULT_TRACKER_ID and DEFAULT_VIEWER_ID.
  */
@@ -54,7 +55,8 @@ data class MainUiState(
     val distanceTrackerToHome: Double? = null,
     val distanceTrackerToViewer: Double? = null,
     val distanceViewerToHome: Double? = null,
-    val draftSettings: DraftSettings = DraftSettings()
+    val draftSettings: DraftSettings = DraftSettings(),
+    val isIdentitySanitized: Boolean = false
 ) {
     val isSystemReady: Boolean
         get() = permissions.isBatteryWhitelisted && 

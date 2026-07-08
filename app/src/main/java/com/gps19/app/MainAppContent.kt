@@ -41,6 +41,9 @@ import kotlinx.coroutines.delay
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * v9.3.0:
+ * - Issue #042: Sanitization Visibility. Added AlertDialog to notify user 
+ *   when malformed IDs are automatically reset.
  * v8.9.55:
  * - R926: Aligned session auto-transition delay with LANDING_PAGE_PAUSE_MS from engine constants.
  *   (Supersedes legacy ID R925)
@@ -182,6 +185,19 @@ fun MainAppContent(
                 }) { Text(stringResource(R.string.perm_background_btn_accept)) }
             },
             dismissButton = { Button(onClick = { showBackgroundDisclosure = false }) { Text(stringResource(R.string.perm_background_btn_reject)) } }
+        )
+    }
+
+    if (uiState.isIdentitySanitized) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) },
+            title = { Text(stringResource(R.string.sanitization_title)) },
+            text = { Text(stringResource(R.string.sanitization_desc)) },
+            confirmButton = {
+                Button(onClick = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) }) {
+                    Text(stringResource(R.string.btn_dismiss))
+                }
+            }
         )
     }
 

@@ -20,6 +20,9 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * v9.3.0:
+ * - Issue #042: Sanitization Visibility. Added observation of identitySanitizedFlow 
+ *   and handling for DismissIdentitySanitization event.
  * v9.2.6:
  * - Forensic Stress Test: Added handling for TriggerForensicTest event.
  * v8.9.79:
@@ -195,6 +198,10 @@ class MainViewModel @Inject constructor(
                 delay(if (_uiState.value.navigation.isPhoneSetupVisible) PERMISSION_REFRESH_INTERVAL_FAST_MS else PERMISSION_REFRESH_INTERVAL_SLOW_MS) 
             } 
         }
+
+        repository.identitySanitizedFlow.onEach { sanitized ->
+            updateState { it.copy(isIdentitySanitized = sanitized) }
+        }.launchIn(viewModelScope)
     }
 
     fun onEvent(event: UiEvent) {
@@ -259,6 +266,10 @@ class MainViewModel @Inject constructor(
                 val nextValue = !_uiState.value.permissions.isXiaomiManualOverride
                 updateState { it.copy(permissions = it.permissions.copy(isXiaomiManualOverride = nextValue)) }
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { repository.saveBoolean(MainRepository.IS_XIAOMI_MANUAL_OVERRIDE_KEY, nextValue); addPersistentLog("user", "USER ACTION: Xiaomi manual override set to $nextValue", true) }
+            }
+            is UiEvent.DismissIdentitySanitization -> {
+                updateState { it.copy(isIdentitySanitized = false) }
+                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { repository.saveBoolean(MainRepository.IDENTITY_SANITIZED_KEY, false) }
             }
             else -> {}
         }
@@ -471,7 +482,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(uiExceptionHandler) {
             val initial = settingsUseCase.loadAllSettings()
             appStartTime = initial.appStartTime
-            updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings) }
+            updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings, isIdentitySanitized = initial.identitySanitized) }
             _localMaxTemp.value = initial.maxTemp; if (initial.appMode == "tracker") _trackerMaxTemp.value = initial.maxTemp
             initial.trackerStatus?.let { status -> 
                 updateState { it.copy(trackerLocation = telemetryUseCase.mapTrackerLocationFromStatus(status, it.trackerLocation), connectivity = it.connectivity.copy(lastUpdateTs = status.ts), trackerStats = telemetryUseCase.mapStatsFromStatus(status, it.trackerStats), trackerBattery = it.trackerBattery.copy(level = status.battery, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging), trackerSatsView = status.satsView, trackerSatsUsed = status.satsUsed, maxTrackerAccuracy = if (status.maxAccuracy > 0.0) status.maxAccuracy else it.maxTrackerAccuracy) }
@@ -488,7 +499,7 @@ class MainViewModel @Inject constructor(
     fun fullInitialization(context: Context) {
         viewModelScope.launch(uiExceptionHandler) {
             appStartTime = settingsUseCase.fullInitialization(context)
-            updateState { state -> state.copy(trackerLocation = LocationState(), connectivity = ConnectivityState(), trackerBattery = BatteryState(level = -1), trackerStats = StatsState(), stats = StatsState(), trackerSatsView = 0, trackerSatsUsed = 0, viewerSatsView = 0, viewerSatsUsed = 0, distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, localLocation = LocationState(), battery = BatteryState(level = -1), maxTrackerAccuracy = 0.0, maxViewerAccuracy = 0.0, activeAlarms = emptyList(), appStartTime = appStartTime, geofenceMode = GeofenceMode.IDLE, draftSettings = DraftSettings()) }
+            updateState { state -> state.copy(trackerLocation = LocationState(), connectivity = ConnectivityState(), trackerBattery = BatteryState(level = -1), trackerStats = StatsState(), stats = StatsState(), trackerSatsView = 0, trackerSatsUsed = 0, viewerSatsView = 0, viewerSatsUsed = 0, distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, localLocation = LocationState(), battery = BatteryState(level = -1), maxTrackerAccuracy = 0.0, maxViewerAccuracy = 0.0, activeAlarms = emptyList(), appStartTime = appStartTime, geofenceMode = GeofenceMode.IDLE, draftSettings = DraftSettings(), isIdentitySanitized = false) }
             _trackerState.value = TrackerState.UNKNOWN; _redScreenVisible.value = false; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; stateSubscriptionUseCase.clearHistory(); loadInitialData()
         }
     }

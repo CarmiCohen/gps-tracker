@@ -5,9 +5,9 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟡 Active | 6 |
+| **Open Technical Issues** | 🟡 Active | 5 |
 | **Validation Tasks** | 🔍 Tracked | [Testing Status](STATUS/testing_status.md) |
-| **Resolved (Total)** | 🟢 Progress | 259 |
+| **Resolved (Total)** | 🟢 Progress | 260 |
 
 ---
 
@@ -15,7 +15,6 @@ This document tracks active issues, technical debt, and pending implementation t
 | ID | Concern | Description |
 | :--- | :--- | :--- |
 | **#039** | **Identity Rejection Feedback** | `MainRepository` now silently rejects bulk updates with colliding IDs. UI feedback needed. (Validation: #063) |
-| **#042** | **Sanitization Visibility** | `SettingsRepository` automatically resets malformed IDs. No UI notification exists. (Validation: #067) |
 
 ---
 
@@ -27,14 +26,13 @@ This document tracks active issues, technical debt, and pending implementation t
 | **#061** | **Cleanup** | **Forensic Logging Consolidation**: Create a `ForensicLogUseCase` to standardize "Special Color" (Pink) logging. (Validation: #065) |
 | **#062** | **Hardening** | **Dynamic Anchor Breakout**: Implement displacement-weighted monitor to prevent "sticky anchors". (Validation: #053) |
 
-*(Note: All validation-specific tasks and verification backlog are tracked in [Testing Status](STATUS/testing_status.md))*
-
 ---
 
 ## 🟢 Recently Resolved Issues (v9.3.0)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
+| **#042** | **Sanitization Visibility** | **Resolved**. Added `identity_sanitized` flag to DataStore and implemented UI notification (AlertDialog) to inform user of automatic ID resets. |
 | **#030** | **Proto Schema Duplication** | **Resolved (R973)**. Consolidated all schemas into `app/src/main/proto` and removed legacy path. |
 | **#055** | **Issue History Recovery** | **Resolved**. Restored 185 "lost" legacy resolutions from `compliance_archive.md`. |
 | **#054** | **Requirement ID Collision** | **Resolved**. Audited and corrected `compliance.md` where Issue #326 was overloaded. |

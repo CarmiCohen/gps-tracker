@@ -18,6 +18,8 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * v9.3.0:
+ * - Issue #042 Sanitization Visibility: Exposed identitySanitizedFlow from SettingsRepository.
  * v8.9.98:
  * - Issue #027 Identity Hardening: Reinforced saveSettingsBulk with uniqueness validation 
  *   to prevent identity cross-contamination between Tracker and Viewer roles.
@@ -102,6 +104,8 @@ class MainRepository @Inject constructor(
 
         const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = SettingsRepository.IS_XIAOMI_MANUAL_OVERRIDE_KEY
         const val LAST_HISTORY_SIT_TS_KEY = SettingsRepository.LAST_HISTORY_SIT_TS_KEY
+        
+        const val IDENTITY_SANITIZED_KEY = SettingsRepository.IDENTITY_SANITIZED_KEY
     }
 
     val isRelayConnected = telemetry.isRelayConnected
@@ -151,6 +155,7 @@ class MainRepository @Inject constructor(
     val maxDistanceFlow = settings.maxDistanceFlow
     val alertSettingsFlow = settings.alertSettingsFlow
     val isXiaomiManualOverrideFlow = settings.isXiaomiManualOverrideFlow
+    val identitySanitizedFlow = settings.identitySanitizedFlow
 
     init {
         scope.launch {

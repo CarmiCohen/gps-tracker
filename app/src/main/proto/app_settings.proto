@@ -10,6 +10,7 @@ option java_multiple_files = true;
  *          - Reverted tags 8, 9, 33 to float (legacy) to prevent SerializationException.
  *          - Added high-precision double fields at tags 60, 61, 62.
  *          - Preserved tag 49 for is_anchor_locked.
+ * v9.3.0: Issue #042 - Sanitization Visibility. Added identity_sanitized flag at tag 63.
  */
 message AppSettings {
     optional string app_mode = 1;
@@ -33,8 +34,7 @@ message AppSettings {
     optional int64 total_drop = 15;
     optional int64 uptime = 16;
     optional int64 last_connection_ts = 17;
-    optional int64 last_disconnection_ts = 18;
-    reserved 19;
+    optional int64 last_disconnection_ts = 18;    reserved 19;
     optional int64 last_gps_ts = 20;
 
     optional string selected_siren = 21;
@@ -84,6 +84,8 @@ message AppSettings {
     optional double max_distance = 60;
     optional double max_accuracy = 61;
     optional double max_temp = 62;
+
+    optional bool identity_sanitized = 63;
 }
 
 message RealtimeStatus {

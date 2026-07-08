@@ -10,6 +10,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v9.3.0:
+ * - Issue #042 Sanitization Visibility: Added DismissIdentitySanitization to UiEvent.
  * v9.2.6:
  * - Forensic Stress Test: Added TriggerForensicTest to UiCommand and UiEvent 
  *   to allow manual verification of forensic violation latching.
@@ -606,6 +608,7 @@ sealed class UiEvent {
     data class SetLogFilterShowRecovered(val show: Boolean) : UiEvent()
     data class ToggleGnssDetail(val visible: Boolean) : UiEvent()
     object ToggleXiaomiManualOverride : UiEvent()
+    object DismissIdentitySanitization : UiEvent()
 }
 
 sealed class UiCommand {
