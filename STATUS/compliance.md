@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v9.3.0
+# Compliance & Operational Requirements (Audit Baseline) - v9.3.6
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -8,6 +8,7 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 | Requirement ID | Requirement Description | Implementation Status |
 | :--- | :--- | :--- |
+| **R978** | **Service Component Injection**: Core service components MUST be field-injected via Hilt. | **Verified (v9.3.6)** |
 | **R973** | **Standardized Proto Path Authority**: `app/src/main/proto` is the sole schema directory. | **Verified (v9.3.0)** |
 | **R400** | **Map Metadata Alignment**: Status messages anchored to bottom-center with 80dp offset. | **Verified (v9.3.0)** |
 | **R994** | **Screen-Off Optimization Authority**: GPS polling frequency throttled to 5s when screen is off. | **Verified (v9.2.9)** |
@@ -30,7 +31,7 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R951** | **GPS Stability Audit**: Monotonic reliability audit for Viewer-side GPS fixes. | **Verified (v9.0.2)** |
 | **R982** | **Identity Locking Authority**: Trackers exclusively process packets from their linked `viewerId`. | **Verified (v9.1.2)** |
 | **R018** | **Stationary Anchor Hard-Lock**: coordinates clamped to `parkingAnchorPoint` when `stationaryProb > 0.9`. | **Verified (v8.9.78)** |
-| **R014** | **Type Safety Authority**: All telemetry fields standardized to `Double` across engine and app. | **Verified (v8.9.75)** |
+| **R014** | **Type Safety Authority**: All telemetry fields standardized to `Double` across engine and app. | **Verified (v9.1.7)** |
 | **R182** | **Role Identity Standards**: Unique IDs with 'T' and 'V' prefixes for system-generated defaults. | **Verified (v8.9.53)** |
 | **R325** | **Authoritative Spatial Anchoring**: `maxAccuracy` is the exclusive authority. Layout optimized for narrow devices. | **Verified (v8.9.65)** |
 | **R332** | **Adaptive Jump Confidence**: High-SNR/Zero-Vibe reflection detection with 6-minute hold. | **Verified (v8.9.55)** |
@@ -56,22 +57,25 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v9.3.0)
+### 2.1. Hardening Phase Resolutions (v9.3.6)
+*   **FIXED #058: TrackerService Initialization** - Resolution: Migrated manual dependency injection in `TrackerService` and `ViewerService` to Hilt field injection. Standardized service component initialization using `Listener` interfaces and `initialize(CoroutineScope)` methods. (Requirement R978)
+
+### 2.2. Hardening Phase Resolutions (v9.3.0)
 *   **FIXED R973: Proto Schema Duplication** - Resolution: Deprecated legacy `app/src/proto` path and consolidated all schemas into the authoritative `app/src/main/proto` directory. (Issue #030)
 *   **FIXED R400: Map Metadata Alignment** - Resolution: Re-anchored Bayesian Uncertainty status messages from the map center to the bottom-center metadata cluster. Implemented an 80dp vertical offset. (Issue #400)
 *   **FIXED #055: Issue History Recovery** - Resolution: Restored 185 "lost" legacy resolutions from `compliance_archive.md`.
 *   **FIXED #054: Requirement ID Collision** - Resolution: Audited and corrected overloaded Issue #326.
 
-### 2.2. Hardening Phase Resolutions (v9.2.9)
+### 2.3. Hardening Phase Resolutions (v9.2.9)
 *   **FIXED R994: Screen-Off Optimization Authority** - Resolution: Implemented dynamic GPS down-sampling to 5000ms when screen is off using `DisplayManager`. (Issue R994)
 
-### 2.3. Hardening Phase Resolutions (v9.2.6)
+### 2.4. Hardening Phase Resolutions (v9.2.6)
 *   **FIXED R049: HUD Context Mapping Authority** - Resolution: Corrected `GlobalStatusBar` mapping to use mode-aware location context. (Issue #049)
 
-### 2.4. Hardening Phase Resolutions (v9.2.3)
+### 2.5. Hardening Phase Resolutions (v9.2.3)
 *   **FIXED R991: HUD Local Health Standardization** - Resolution: Standardized HUD status badges to reflect local device health. (Issue #044)
 
-### 2.5. Hardening Phase Resolutions (v9.2.2)
+### 2.6. Hardening Phase Resolutions (v9.2.2)
 *   **FIXED R326: Intelligent Uncertainty UX** - Resolution: Enriched Location Pending state with reasons (`GPS_GAP`, `JAMMER`). (Issue #326)
 
 **Full history available in [issues_archive.md](issues_archive.md).**

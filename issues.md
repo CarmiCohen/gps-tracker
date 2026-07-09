@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (v9.3.2)
+# Project Issues & Hardening Tracking (v9.3.6)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Issues Archive](STATUS/issues_archive.md), and validation tasks are in [Testing Status](STATUS/testing_status.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟡 Active | 5 |
+| **Open Technical Issues** | 🟡 Active | 4 |
 | **Validation Tasks** | 🔍 Tracked | [Testing Status](STATUS/testing_status.md) |
-| **Resolved (Total)** | 🟢 Progress | 261 |
+| **Resolved (Total)** | 🟢 Progress | 262 |
 
 ---
 
@@ -21,10 +21,17 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 🔴 Open Issues
 | ID | Category | Description |
 | :--- | :--- | :--- |
-| **#058** | **Refactor** | **TrackerService Initialization**: Refactor `onCreate` to move manual dependency injection into Hilt Modules. (Validation: #066) |
 | **#059** | **Feature** | **Permission Health Check UI**: Implement a "Diagnostics" screen in Compose for Xiaomi special permissions. (Validation: #064) |
 | **#061** | **Cleanup** | **Forensic Logging Consolidation**: Create a `ForensicLogUseCase` to standardize "Special Color" (Pink) logging. (Validation: #065) |
 | **#062** | **Hardening** | **Dynamic Anchor Breakout**: Implement displacement-weighted monitor to prevent "sticky anchors". (Validation: #053) |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.3.6)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#058** | **TrackerService Initialization** | **Resolved**. Migrated manual component instantiation in `TrackerService` and `ViewerService` to Hilt field injection. Refactored `HistoryManager` and `RemoteHandler` to use `Listener` interfaces and separate `initialize(CoroutineScope)` methods to align with modern DI patterns. |
 
 ---
 

@@ -2,9 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 252**
+**Total Unique Resolutions: 254**
 
 ## 1. Recent Hardening Phase (v9.0.4 - v9.3.0)
+*   **Issue #049**: Corrected GlobalStatusBar mapping to use mode-aware location context (v9.2.6).
+*   **Issue #044**: Standardized HUD status badges to reflect local device health (v9.2.3).
 *   **Issue #030**: Proto Schema Duplication (R973). Consolidated all schemas into `app/src/main/proto` and deprecated the legacy `app/src/proto` path to prevent synchronization drift. (v9.3.0)
 *   **Issue #400**: Map Metadata Alignment (R400). Re-anchored Bayesian Uncertainty status messages from the map center to the bottom-center metadata cluster. (v9.3.0)
 *   **Issue #326**: Intelligent Uncertainty UX. Enriched Location Pending state with reasons (GPS_GAP, JAMMER) and implemented priority-based merging. (v9.2.2)
@@ -12,7 +14,8 @@ This document contains the unified record of all resolved issues and technical d
 *   **Issue #048**: Viewer HUD Line Grayout. Differentiated Telemetry Age from GPS Age in status rows. (v9.2.0)
 *   **Issue #029**: Viewer Status Line Restoration. Propagated local telemetry to repository in Viewer mode. (v9.0.3)
 
-## 2. Hardening Era Resolutions (v8.9.65 - v8.9.99)
+## 2. Hardening Era Resolutions (v8.9.65 - v9.1.7)
+*   **Issue #042**: Identity Sanitization Visibility. Implemented migration flag to notify UI of auto-sanitization events. (v9.3.0)
 *   **Issue #041**: Identity Sanitization Hardening. Implemented R975 (Regex validation) and automatic storage purging. (v8.9.99)
 *   **Issue #027**: Identity Persistence Hardening. Reinforced bulk save with atomic uniqueness validation. (v8.9.98)
 *   **Issue #030-Legacy**: Proto Schema Discrepancy. Authoritative schema path moved to `app/src/main/proto`. (v8.9.96)
@@ -31,7 +34,7 @@ This document contains the unified record of all resolved issues and technical d
 *   **Issue #020**: Map Centering Race. Introduced `localLockStatus` for user touch suspension. (v8.9.83)
 *   **Issue #017**: SnapshotStateList Lock Failures. Replaced observable pools in map updates. (v8.9.81)
 *   **Issue #016**: Main Thread Performance. Optimized trail rendering and offloaded startup I/O. (v8.9.80)
-*   **Issue #014**: System-Wide Type Safety. Standardized telemetry fields to `Double`. (v8.9.75)
+*   **Issue #014**: System-Wide Type Safety. Standardized telemetry fields to `Double`. (v9.1.7)
 *   **Issue #015**: Coroutine Cancellation. Hardened lifecycle transitions against `CancellationException`. (v8.9.72)
 *   **Issue #011**: Suppression Forensic Labeling. Added `suppressionNote` to `SentinelResult`. (v8.9.68)
 *   **Issue #010**: A15 Coherence. Implemented physical reality gate for acoustic spikes. (v8.9.68)

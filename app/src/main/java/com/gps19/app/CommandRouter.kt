@@ -6,7 +6,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import com.gps19.core.engine.*
-import com.gps19.core.engine.LocationProcessor // Explicit import to override local duplicate
+import com.gps19.core.engine.LocationProcessor
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -16,20 +17,17 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import timber.log.Timber
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
- * v9.2.6:
- * - Forensic Stress Test: Added handling for TriggerForensicTest to simulate 
- *   Jammer/Stall violations for verification.
- * v8.9.72:
- * - Issue #015: Hardened coroutine cancellation handling. Ensuring CancellationException 
- *   is not logged as an error during service shutdown.
- * v8.8.21: Migrated to TimeProvider for all timing logic.
- * v8.8.28: Standardized signaling keys to snake_case (viewer_id, from_viewer).
+ * v9.3.3:
+ * - Issue #058: Hilt Migration. Added @Inject constructor and listener interface.
  */
-class CommandRouter(
-    private val context: Context,
+@Singleton
+class CommandRouter @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val configManager: ConfigManager,
     private val logManager: LogManager,
     private val networkManager: AppNetworkManager,
@@ -41,16 +39,24 @@ class CommandRouter(
     private val repository: MainRepository,
     private val syncManager: SyncManager,
     private val integrityMonitor: IntegrityMonitor,
-    private val timeProvider: TimeProvider,
-    private val onViewerPulse: (String) -> Unit,
-    private val onWatchdogTrigger: () -> Unit,
-    private val onUiPulse: () -> Unit,
-    private val onUiVisibilityChanged: (Boolean) -> Unit,
-    private val onTransientDrop: (Boolean) -> Unit,
-    private val onResetTimers: () -> Unit = {},
-    private val onSyncSensors: () -> Unit = {},
-    private val onTriggerForensicTest: () -> Unit = {}
+    private val timeProvider: TimeProvider
 ) {
+    interface Listener {
+        fun onViewerPulse(id: String)
+        fun onWatchdogTrigger()
+        fun onUiPulse()
+        fun onUiVisibilityChanged(visible: Boolean)
+        fun onTransientDrop(drop: Boolean)
+        fun onResetTimers()
+        fun onSyncSensors()
+        fun onTriggerForensicTest()
+    }
+
+    private var listener: Listener? = null
+
+    fun setListener(listener: Listener) {
+        this.listener = listener
+    }
 
     private val routerExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException) return@CoroutineExceptionHandler
@@ -75,9 +81,9 @@ class CommandRouter(
     private val legacyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                ACTION_ALARM_WAKEUP -> onWatchdogTrigger()
+                ACTION_ALARM_WAKEUP -> listener?.onWatchdogTrigger()
                 ACTION_RELAY_STATUS -> {
-                    if (intent.getBooleanExtra("connected", false) == false) onTransientDrop(true)
+                    if (intent.getBooleanExtra("connected", false) == false) listener?.onTransientDrop(true)
                 }
             }
         }
@@ -88,8 +94,8 @@ class CommandRouter(
             .onEach { command ->
                 try {
                     when (command) {
-                        is UiCommand.SyncRequest -> onUiPulse()
-                        is UiCommand.UiVisibilityChanged -> onUiVisibilityChanged(command.visible)
+                        is UiCommand.SyncRequest -> listener?.onUiPulse()
+                        is UiCommand.UiVisibilityChanged -> listener?.onUiVisibilityChanged(command.visible)
                         is UiCommand.StopSiren -> {
                             repository.saveLongSync(MainRepository.LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
                             alarmManager.setPowerAlarmPending(false)
@@ -102,7 +108,7 @@ class CommandRouter(
                         }
                         is UiCommand.ClearTrails -> repository.clearTrails()
                         is UiCommand.StatsReset -> {
-                            onResetTimers()
+                            listener?.onResetTimers()
                             sessionManager.reset()
                             locationProcessor.resetStats()
                             remoteHandler.resetStats()
@@ -118,21 +124,21 @@ class CommandRouter(
                             }
                         }
                         is UiCommand.SettingsUpdated -> {
-                            onSyncSensors()
+                            listener?.onSyncSensors()
                             networkManager.connect(configManager.relayUrl)
                             networkManager.updateIdentity(configManager.deviceId, configManager.viewerId, configManager.isTrackerMode)
-                            syncManager.startSyncLoop(configManager.deviceId, configManager.viewerId, configManager.isTrackerMode)
+                            syncManager.startSyncLoop(scope, configManager.deviceId, configManager.viewerId, configManager.isTrackerMode)
                         }
                         is UiCommand.PushSettings -> {
                             networkManager.pushSettings()
                         }
                         is UiCommand.ZoomIn, is UiCommand.ZoomOut, is UiCommand.MapZoomIn, is UiCommand.MapZoomOut -> {}
                         is UiCommand.FullInitializationReset -> {
-                            onResetTimers()
+                            listener?.onResetTimers()
                             sessionManager.reset()
                             locationProcessor.resetStats()
                             remoteHandler.resetStats()
-                            onSyncSensors()
+                            listener?.onSyncSensors()
                         }
                         is UiCommand.CalibrateChair -> {
                             if (configManager.isTrackerMode) {
@@ -173,7 +179,7 @@ class CommandRouter(
                             }
                         }
                         is UiCommand.TriggerForensicTest -> {
-                            onTriggerForensicTest()
+                            listener?.onTriggerForensicTest()
                         }
                     }
                 } catch (e: Exception) {

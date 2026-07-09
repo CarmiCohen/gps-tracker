@@ -18,11 +18,8 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * v9.2.8:
- * - R993: Notification Throttling. Implemented time-based throttling for 
- *   notification updates (10s background, 1s foreground).
- * v9.1.9:
- * - Issue #051: Binary Parity Gap closure support.
+ * v9.3.6:
+ * - Issue #058: Hilt Migration. Updated RemoteHandler and HistoryManager initialization.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -32,13 +29,13 @@ class ViewerService : BaseMonitorService() {
     @Inject lateinit var systemStatusProvider: SystemStatusProvider
     @Inject lateinit var forensicUseCase: ServiceForensicUseCase
 
-    private lateinit var integrityMonitor: IntegrityMonitor
-    private lateinit var alarmManager: AppAlarmManager
-    private lateinit var remoteHandler: RemoteHandler
-    private lateinit var syncManager: SyncManager
-    private lateinit var commandRouter: CommandRouter
-    private lateinit var locationProcessor: LocationProcessor
-    private lateinit var historyManager: HistoryManager
+    @Inject lateinit var integrityMonitor: IntegrityMonitor
+    @Inject lateinit var alarmManager: AppAlarmManager
+    @Inject lateinit var remoteHandler: RemoteHandler
+    @Inject lateinit var syncManager: SyncManager
+    @Inject lateinit var commandRouter: CommandRouter
+    @Inject lateinit var locationProcessor: LocationProcessor
+    @Inject lateinit var historyManager: HistoryManager
     
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
@@ -88,15 +85,20 @@ class ViewerService : BaseMonitorService() {
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, DEFAULT_RELAY_URL)
             configManager.isTrackerMode = false
 
-            alarmManager = AppAlarmManager(this@ViewerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng, acc, maxAcc, snr, vibe -> 
-                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng, acc, maxAcc, snr, vibe)
-            }
+            alarmManager.setListener(object : AppAlarmManager.Listener {
+                override fun onLogEvent(type: String, message: String, important: Boolean, extremeValue: Double?, logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, snr: Double?, vibe: Double?) {
+                    logManager.submitToLogSink(message, type, important, extremeValue, logId, durationMs, isSpecial, specialColor, lat, lng, accuracy, maxAccuracy, snr, vibe)
+                }
+            })
 
-            integrityMonitor = IntegrityMonitor(this@ViewerService, repository, timeProvider, onViolationSustained = { }, onLogEvent = { msg, important ->
-                logManager.logServiceEvent(msg, important)
+            integrityMonitor.setListener(object : IntegrityMonitor.Listener {
+                override fun onViolationSustained(type: String) {}
+                override fun onLogEvent(message: String, important: Boolean) {
+                    logManager.logServiceEvent(message, important)
+                }
             })
             
-            locationProcessor = LocationProcessor(localProcessorListener, timeProvider)
+            locationProcessor.setListener(localProcessorListener)
             
             delay(1000)
             
@@ -111,29 +113,31 @@ class ViewerService : BaseMonitorService() {
             delay(1000)
             networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, false)
             
-            syncManager = SyncManager(this@ViewerService, networkManager, sessionManager, gpsManager, null, locationProcessor, telemetryRepository, offlineRepository, logManager, timeProvider, repository, lifecycleScope)
-            syncManager.startSyncLoop(configManager.deviceId, configManager.viewerId, false)
+            syncManager.startSyncLoop(lifecycleScope, configManager.deviceId, configManager.viewerId, false)
 
-            remoteHandler = RemoteHandler(this@ViewerService, repository, locationProcessor, alarmManager, sessionManager, forensicUseCase, timeProvider, lifecycleScope) { id -> handleTrackerPulse(id) }
+            remoteHandler.setListener(object : RemoteHandler.Listener {
+                override fun onPeerPulse(id: String) { handleTrackerPulse(id) }
+            })
+            remoteHandler.initialize(lifecycleScope)
 
-            historyManager = HistoryManager(this@ViewerService, repository, gpsManager, null, locationProcessor, timeProvider, lifecycleScope) { msg, important -> 
-                logManager.logServiceEvent(msg, important) 
-            }
+            historyManager.setListener(object : HistoryManager.Listener {
+                override fun onLogEvent(message: String, important: Boolean) {
+                    logManager.logServiceEvent(message, important)
+                }
+            })
+            historyManager.initialize(lifecycleScope)
 
             delay(1000)
-            commandRouter = CommandRouter(
-                this@ViewerService, configManager, logManager, networkManager, alarmManager, notificationManager, 
-                sessionManager, locationProcessor, 
-                remoteHandler, 
-                repository, syncManager, integrityMonitor, timeProvider,
-                { handleTrackerPulse(it) }, 
-                { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }, 
-                { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }, 
-                { onUiVisibilityChangedInternal(it) }, 
-                { transientDropDetected.set(it) }, 
-                { resetServiceTimers() }, 
-                { }
-            )
+            commandRouter.setListener(object : CommandRouter.Listener {
+                override fun onViewerPulse(id: String) { handleTrackerPulse(id) }
+                override fun onWatchdogTrigger() { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
+                override fun onUiPulse() { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }
+                override fun onUiVisibilityChanged(visible: Boolean) { onUiVisibilityChangedInternal(visible) }
+                override fun onTransientDrop(drop: Boolean) { transientDropDetected.set(drop) }
+                override fun onResetTimers() { resetServiceTimers() }
+                override fun onSyncSensors() { }
+                override fun onTriggerForensicTest() { }
+            })
             commandRouter.register()
             commandRouter.startObservingCommands(lifecycleScope)
 

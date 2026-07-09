@@ -7,22 +7,26 @@ import android.content.Intent
 import android.os.Build
 import android.os.PowerManager
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * v9.3.3:
+ * - Issue #058: Hilt Migration. Added @Inject constructor and setter for watchdog listener.
  * v8.9.87:
  * - Issue #005 Hardening: Cached packageName to eliminate repetitive getPackageName() 
  *   system log spam on Samsung devices.
- * v8.9.55:
- * - Issue #458: Optimized AlarmManager rescheduling with danger window.
  */
-class SystemMonitor(
-    private val context: Context, 
-    private val timeProvider: TimeProvider,
-    private val onLogWatchdog: ((Boolean, Int) -> Unit)? = null
+@Singleton
+class SystemMonitor @Inject constructor(
+    @ApplicationContext private val context: Context, 
+    private val timeProvider: TimeProvider
 ) {
+    private var onLogWatchdog: ((Boolean, Int) -> Unit)? = null
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var lastScheduledWatchdogTs = 0L
@@ -34,6 +38,10 @@ class SystemMonitor(
 
     var jumpStateStartTs = 0L
     var gpsStallStartTs = 0L
+
+    fun setWatchdogListener(listener: (Boolean, Int) -> Unit) {
+        this.onLogWatchdog = listener
+    }
 
     fun acquireWakeLock() {
         try {
@@ -71,10 +79,8 @@ class SystemMonitor(
     fun scheduleWatchdogAlarm(force: Boolean = false) {
         val now = timeProvider.elapsedRealtime()
         
-        // Issue #458: Respect the 60-second throttle unless forced
         if (!force && lastScheduledWatchdogTs != 0L && (now - lastScheduledWatchdogTs) < SYSTEM_WATCHDOG_THROTTLE_MS) return
         
-        // Issue #458: Conservative strategy - Only reschedule if forced OR within danger window
         val inDangerWindow = nextExpectedExpiryTs == 0L || (now + WATCHDOG_DANGER_WINDOW_MS >= nextExpectedExpiryTs)
         
         if (!force && !inDangerWindow) {

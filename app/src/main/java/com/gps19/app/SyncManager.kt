@@ -1,37 +1,35 @@
 package com.gps19.app
 
 import android.content.Context
-import androidx.lifecycle.LifecycleCoroutineScope
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * SyncManager: Handles the telemetry synchronization loop.
- * v9.1.8:
- * - Issue #046: Shared Behavioral State. Added trackerState to pushCurrentStatus 
- *   to ensure authoritative state broadcast.
- * v8.9.77:
- * - Issue #018: Stationary Anchor Hard-Lock. Propagating isAnchorLocked flag 
- *   to TrackerStatus and persistence.
+ * v9.3.3:
+ * - Issue #058: Hilt Migration. Added @Inject constructor and start/stop lifecycle management.
  */
-class SyncManager(
-    private val context: Context,
+@Singleton
+class SyncManager @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val networkManager: AppNetworkManager,
     private val sessionManager: SessionManager,
     private val gpsManager: GpsManager,
-    private val sensorManager: AppSensorManager?,
     private val locationProcessor: LocationProcessor,
     private val telemetryRepository: TelemetryRepository,
     private val offlineRepository: OfflineRepository,
     private val logManager: LogManager,
     private val timeProvider: TimeProvider,
-    private val repository: MainRepository,
-    private val scope: LifecycleCoroutineScope
+    private val repository: MainRepository
 ) {
     private var syncJob: Job? = null
+    private var scope: CoroutineScope? = null
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
 
@@ -42,9 +40,10 @@ class SyncManager(
     fun setOnSyncFinishedListener(listener: () -> Unit) { onSyncFinished = listener }
 
     /**
-     * startSyncLoop: Implements the PING_INTERVAL_MS loop with RTT-aware scaling (Issue #315).
+     * startSyncLoop: Implements the PING_INTERVAL_MS loop with RTT-aware scaling.
      */
-    fun startSyncLoop(deviceId: String, viewerId: String, isTracker: Boolean) {
+    fun startSyncLoop(scope: CoroutineScope, deviceId: String, viewerId: String, isTracker: Boolean) {
+        this.scope = scope
         syncJob?.cancel()
         syncJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
@@ -268,11 +267,6 @@ class SyncManager(
                 offlineRepository.deletePendingStatusUpdate(entity.id)
             }
         }
-    }
-
-    private fun isGpsStalling(loc: android.location.Location?, lastValidFixRealtime: Long): Boolean {
-        if (lastValidFixRealtime == 0L) return false
-        return (timeProvider.elapsedRealtime() - lastValidFixRealtime) > GPS_STALL_THRESHOLD_MS
     }
 
     fun stopSyncLoop() {

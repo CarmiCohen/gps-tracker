@@ -20,15 +20,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * v9.2.8:
- * - R993: Notification Throttling. Added lastNotificationUpdateTs to support 
- *   time-based throttling of foreground service updates.
- * v9.1.4:
- * - Issue #045: Android 15 Foreground Service Hardening. Implemented state-aware 
- *   type enforcement to prevent SecurityException on background starts.
- * v8.9.89:
- * - Issue #005 Hardening: Added cachedPkgName to prevent repetitive getPackageName() 
- *   system log spam on Samsung G990/A155 devices.
+ * v9.3.3:
+ * - Issue #058: Hilt Migration. Switched to @Inject for SystemMonitor and NotificationManager.
+ *   Changed field visibility to public for Dagger compatibility.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -41,10 +35,9 @@ abstract class BaseMonitorService : LifecycleService() {
     @Inject lateinit var offlineRepository: OfflineRepository
     @Inject lateinit var timeProvider: TimeProvider
     
-    protected lateinit var systemMonitor: SystemMonitor
-    protected lateinit var notificationManager: AppNotificationManager
+    @Inject lateinit var systemMonitor: SystemMonitor
+    @Inject lateinit var notificationManager: AppNotificationManager
     
-    // Rationale: Cache packageName to prevent repetitive getPackageName() log spam.
     protected val cachedPkgName by lazy { packageName }
 
     protected var serviceStartRealtime = 0L
@@ -70,9 +63,8 @@ abstract class BaseMonitorService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         serviceStartRealtime = timeProvider.elapsedRealtime()
-        notificationManager = AppNotificationManager(this)
         
-        systemMonitor = SystemMonitor(this, timeProvider) { set, skipped ->
+        systemMonitor.setWatchdogListener { set, skipped ->
             if (this::logManager.isInitialized) {
                 logManager.logWatchdogPulse(set, skipped)
             }

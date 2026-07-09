@@ -5,28 +5,37 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
-import android.os.Environment
 import android.os.PowerManager
 import android.os.StatFs
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * v8.9.79:
- * - Issue #014: Type Migration. Aligned temperature fields to Double.
- * v8.9.42:
- * - Issue #352: Thermal Throttling Logic.
- * - Issue #353: Battery Health Profiling.
+ * v9.3.3:
+ * - Issue #058: Hilt Migration. Added @Inject constructor and setter for listeners.
  */
-class IntegrityMonitor(
-    private val context: Context,
+@Singleton
+class IntegrityMonitor @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: MainRepository,
-    private val timeProvider: TimeProvider,
-    private val onViolationSustained: (String) -> Unit,
-    private val onLogEvent: (String, Boolean) -> Unit
+    private val timeProvider: TimeProvider
 ) {
+    interface Listener {
+        fun onViolationSustained(type: String)
+        fun onLogEvent(message: String, important: Boolean)
+    }
+
+    private var listener: Listener? = null
+
+    fun setListener(listener: Listener) {
+        this.listener = listener
+    }
+
     var maxTemperature = 0.0
         private set
 
@@ -84,11 +93,11 @@ class IntegrityMonitor(
 
             if (!isCoolingModeActive && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
                 isCoolingModeActive = true
-                onLogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true)
-                onViolationSustained(ALERT_ID_TRACKER_TEMP)
+                listener?.onLogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true)
+                listener?.onViolationSustained(ALERT_ID_TRACKER_TEMP)
             } else if (isCoolingModeActive && batteryTemp < MAX_SAFE_TEMPERATURE_RECOVERY) {
                 isCoolingModeActive = false
-                onLogEvent("System Info: Thermal limit recovered (${batteryTemp}°C). Normal tracking resumed.", false)
+                listener?.onLogEvent("System Info: Thermal limit recovered (${batteryTemp}°C). Normal tracking resumed.", false)
             }
 
             val batteryLevel = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
@@ -114,9 +123,9 @@ class IntegrityMonitor(
         if (currentPowerSave != isPowerSaveModeActive) {
             isPowerSaveModeActive = currentPowerSave
             if (isPowerSaveModeActive) {
-                onLogEvent("SYSTEM WARNING: Power Save Mode active. Sensors and GPS may be throttled by OS.", true)
+                listener?.onLogEvent("SYSTEM WARNING: Power Save Mode active. Sensors and GPS may be throttled by OS.", true)
             } else {
-                onLogEvent("System Info: Power Save Mode deactivated. Normal tracking resumed.", false)
+                listener?.onLogEvent("System Info: Power Save Mode deactivated. Normal tracking resumed.", false)
             }
         }
         
@@ -135,7 +144,7 @@ class IntegrityMonitor(
                 
                 if (currentStandbyBucket != -1) {
                     val isCritical = bucket >= UsageStatsManager.STANDBY_BUCKET_RARE
-                    onLogEvent("SYSTEM PRIORITY: Standby bucket changed to $bucketName. ${if(isCritical) "Background tracking may be severely limited." else ""}", isCritical)
+                    listener?.onLogEvent("SYSTEM PRIORITY: Standby bucket changed to $bucketName. ${if(isCritical) "Background tracking may be severely limited." else ""}", isCritical)
                 }
                 currentStandbyBucket = bucket
             }
@@ -143,7 +152,7 @@ class IntegrityMonitor(
 
         val newNet = getActiveNetworkInterface()
         if (newNet != currentNetInterface) {
-            onLogEvent("Network switched to $newNet", false)
+            listener?.onLogEvent("Network switched to $newNet", false)
             currentNetInterface = newNet
         }
 
@@ -152,7 +161,7 @@ class IntegrityMonitor(
         if (lastPowerDisconnectTs > 0 && !isPowerTamperDetected) {
             if (checkViolationSustained(ALERT_ID_TRACKER_POWER, lastPowerDisconnectTs, POWER_DISCONNECT_DEBOUNCE_MS)) {
                 isPowerTamperDetected = true
-                onLogEvent("Tracker power tamper confirmed (debounce met)", true)
+                listener?.onLogEvent("Tracker power tamper confirmed (debounce met)", true)
             }
         }
     }
@@ -172,8 +181,8 @@ class IntegrityMonitor(
         isBatterySteepDischarge = drop >= BATTERY_STEEP_DISCHARGE_THRESHOLD
         
         if (isBatterySteepDischarge && !wasSteep) {
-            onLogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected ($drop% in ${(nowRealtime - earliest.first) / 60000}m). System shutdown likely imminent.", true)
-            onViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE)
+            listener?.onLogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected ($drop% in ${(nowRealtime - earliest.first) / 60000}m). System shutdown likely imminent.", true)
+            listener?.onViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE)
         }
     }
 
@@ -189,19 +198,19 @@ class IntegrityMonitor(
             if (currentCritical != isStorageCritical) {
                 isStorageCritical = currentCritical
                 if (isStorageCritical) {
-                    onLogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB). ALL non-essential logging HALTED to prevent corruption.", true)
-                    onViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL)
+                    listener?.onLogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB). ALL non-essential logging HALTED to prevent corruption.", true)
+                    listener?.onViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL)
                 }
             }
 
             if (currentLow != isStorageLow) {
                 isStorageLow = currentLow
                 if (isStorageLow && !isStorageCritical) {
-                    onLogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB). Throttling logs.", true)
-                    onViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW)
+                    listener?.onLogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB). Throttling logs.", true)
+                    listener?.onViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW)
                 } else if (!isStorageLow) {
                     isStorageCritical = false
-                    onLogEvent("System Info: Storage space restored (${megabytesAvailable}MB).", false)
+                    listener?.onLogEvent("System Info: Storage space restored (${megabytesAvailable}MB).", false)
                 }
             }
         } catch (e: Exception) {
@@ -237,7 +246,7 @@ class IntegrityMonitor(
         if (!online) {
             val firstDetected = sustainedViolations.getOrPut(ALERT_ID_LOCAL_INTERNET) { now }
             if (now - firstDetected > INTERNET_LOSS_THRESHOLD_MS) {
-                onViolationSustained(ALERT_ID_LOCAL_INTERNET)
+                listener?.onViolationSustained(ALERT_ID_LOCAL_INTERNET)
                 return false
             }
         } else {
@@ -257,7 +266,7 @@ class IntegrityMonitor(
 
     fun checkViolationSustained(type: String, startTs: Long, threshold: Long): Boolean {
         if (startTs > 0 && (timeProvider.elapsedRealtime() - startTs) > threshold) {
-            onViolationSustained(type)
+            listener?.onViolationSustained(type)
             return true
         }
         return false
@@ -266,7 +275,7 @@ class IntegrityMonitor(
     fun onPowerDisconnected() {
         if (!isPowerTamperDetected && lastPowerDisconnectTs == 0L) {
             lastPowerDisconnectTs = timeProvider.elapsedRealtime()
-            onLogEvent("Tracker power unplugged, starting debounce...", false)
+            listener?.onLogEvent("Tracker power unplugged, starting debounce...", false)
         }
     }
 
@@ -274,7 +283,7 @@ class IntegrityMonitor(
         lastPowerDisconnectTs = 0L
         if (isPowerTamperDetected) {
             isPowerTamperDetected = false
-            onLogEvent("Tracker power restored", false)
+            listener?.onLogEvent("Tracker power restored", false)
         }
     }
 

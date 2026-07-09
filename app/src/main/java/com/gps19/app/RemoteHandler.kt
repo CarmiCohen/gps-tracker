@@ -5,7 +5,8 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import com.gps19.core.engine.*
-import com.gps19.core.engine.LocationProcessor // Explicit
+import com.gps19.core.engine.LocationProcessor
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -13,24 +14,31 @@ import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
 import org.osmdroid.util.GeoPoint
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
- * v9.1.8:
- * - Issue #046 Fix: Shared Behavioral State. Extracted tracker_state from remote pulse.
- * - Issue #047 Fix: Standardized to m/s. Passing raw speed to LocationProcessor.
+ * v9.3.8:
+ * - Issue #058: Hilt Migration. Refactored to use Listener interface and separate initialization.
  */
-class RemoteHandler(
-    private val context: Context,
+@Singleton
+class RemoteHandler @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: MainRepository,
     private val locationProcessor: LocationProcessor,
     private val alarmManager: AppAlarmManager,
     private val sessionManager: SessionManager,
     private val forensicUseCase: ServiceForensicUseCase,
-    private val timeProvider: TimeProvider,
-    private val scope: CoroutineScope,
-    private val onPulse: (String) -> Unit
+    private val timeProvider: TimeProvider
 ) {
+    interface Listener {
+        fun onPeerPulse(id: String)
+    }
+
+    private var scope: CoroutineScope? = null
+    private var listener: Listener? = null
+
     var isTrackerConnected = false
     var lastPeerActivityTs = 0L 
     var peerSignal = 0
@@ -119,7 +127,13 @@ class RemoteHandler(
     
     var trackerGpsStallStartTs = 0L 
 
-    init {
+    fun setListener(listener: Listener) {
+        this.listener = listener
+    }
+
+    fun initialize(scope: CoroutineScope) {
+        this.scope = scope
+        
         scope.launch {
             try {
                 trackerLuxBaseline = repository.getDouble(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0)
@@ -305,14 +319,14 @@ class RemoteHandler(
                 Toast.makeText(context, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show()
             }
 
-            onPulse(fromId)
+            listener?.onPeerPulse(fromId)
             lastPeerActivityTs = nowRealtime
             repository.updateRemoteActivity(now)
             return
         }
 
         if (isTrackerMode && fromViewer && data.has("home_points")) {
-            scope.launch {
+            scope?.launch {
                 try {
                     val array = data.getJSONArray("home_points")
                     val newList = mutableListOf<GeoPoint>()
@@ -324,7 +338,7 @@ class RemoteHandler(
                     val ts = data.optLong("settings_ts", 0L)
                     
                     repository.saveHomePoints(newList, if (maxDist > 0) maxDist else null, if (ts > 0) ts else null)
-                    onPulse(fromId)
+                    listener?.onPeerPulse(fromId)
                     lastPeerActivityTs = nowRealtime
                     repository.updateRemoteActivity(now)
                 } catch (e: Exception) {
@@ -337,11 +351,11 @@ class RemoteHandler(
 
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
             if (isTrackerMode && fromViewer) {
-                onPulse(fromId)
+                listener?.onPeerPulse(fromId)
                 lastPeerActivityTs = nowRealtime
                 repository.updateRemoteActivity(now)
             } else if (!isTrackerMode && !fromViewer) {
-                onPulse(fromId)
+                listener?.onPeerPulse(fromId)
                 lastPeerActivityTs = nowRealtime
                 isTrackerConnected = true
                 repository.updateRemoteActivity(now)
@@ -350,7 +364,7 @@ class RemoteHandler(
         }
 
         if (isTrackerMode && fromViewer) {
-            onPulse(fromId)
+            listener?.onPeerPulse(fromId)
             lastPeerActivityTs = nowRealtime
             repository.updateRemoteActivity(now)
             return
@@ -363,7 +377,7 @@ class RemoteHandler(
             }
             if (remoteTs > 0) lastRemotePacketTs = remoteTs
 
-            onPulse(fromId)
+            listener?.onPeerPulse(fromId)
             lastPeerActivityTs = nowRealtime
             isTrackerConnected = true
             repository.updateRemoteActivity(now)
@@ -576,7 +590,7 @@ class RemoteHandler(
             if (isStalled && trackerGpsStallStartTs == 0L) trackerGpsStallStartTs = nowRealtime
             else if (!isStalled) trackerGpsStallStartTs = 0L
 
-            scope.launch {
+            scope?.launch {
                 try {
                     repository.updateLocation(LocationUpdate(
                         lat = trackerLat, lng = trackerLng, speed = trackerSpeed, accuracy = trackerAccuracy, bearing = trackerBearing,
@@ -585,7 +599,7 @@ class RemoteHandler(
                         isJump = isTrackerVisualJump, isTrajectoryPromoted = isTrackerTrajectoryPromoted, jumpTier = trackerJumpTier, 
                         isJammer = isTrackerJammerSuspicion, isStalled = isStalled,
                         maxAccuracy = trackerMaxAccuracy, signal = peerSignal,
-                        vibration = trackerVibration, heading = trackerHeading, baroAlt = trackerBaroAlt,
+                        vibration = trackerVibration, heading = trackerBearing, baroAlt = trackerBaroAlt,
                         lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb,
                         peakVibrationShock = trackerPeakVibrationShock, peakVibrationShockTs = trackerPeakVibrationShockTs,
                         luxBaseline = trackerLuxBaseline, acousticFloorDb = trackerAcousticFloorDb,
@@ -628,7 +642,7 @@ class RemoteHandler(
                         isCoolingModeActive = isTrackerCoolingModeActive,
                         isAnchorLocked = isTrackerAnchorLocked,
                         trackerState = trackerState,
-                        ts = now // ISSUE #029 FIX: SET TELEMETRY ARRIVAL TIMESTAMP TO NOW
+                        ts = now
                     ))
                     
                     repository.saveTrackerState(TrackerStatus(

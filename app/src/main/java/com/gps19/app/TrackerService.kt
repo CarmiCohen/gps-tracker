@@ -21,12 +21,8 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.2.9:
- * - R994: Screen-Off Optimization. Integrated isScreenOn from sensorManager into 
- *   GPS polling interval calculation to optimize battery when device is locked.
- * v9.2.8:
- * - R993: Notification Throttling. Implemented time-based throttling for 
- *   notification updates (10s background, 1s foreground).
+ * v9.3.6:
+ * - Issue #058: Hilt Migration. Updated RemoteHandler initialization to use Listener pattern.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -38,13 +34,13 @@ class TrackerService : BaseMonitorService() {
     @Inject lateinit var forensicUseCase: ServiceForensicUseCase
     @Inject lateinit var behaviorUseCase: ServiceBehaviorUseCase
     
-    private lateinit var integrityMonitor: IntegrityMonitor
-    private lateinit var alarmManager: AppAlarmManager
-    private lateinit var historyManager: HistoryManager
-    private lateinit var locationProcessor: LocationProcessor
-    private lateinit var syncManager: SyncManager
-    private lateinit var commandRouter: CommandRouter
-    private lateinit var remoteHandler: RemoteHandler
+    @Inject lateinit var integrityMonitor: IntegrityMonitor
+    @Inject lateinit var alarmManager: AppAlarmManager
+    @Inject lateinit var historyManager: HistoryManager
+    @Inject lateinit var locationProcessor: LocationProcessor
+    @Inject lateinit var syncManager: SyncManager
+    @Inject lateinit var commandRouter: CommandRouter
+    @Inject lateinit var remoteHandler: RemoteHandler
     
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
@@ -118,24 +114,29 @@ class TrackerService : BaseMonitorService() {
             isXiaomi = isXiaomiDevice()
             isA15 = isA15Device()
 
-            alarmManager = AppAlarmManager(this@TrackerService, repository, sessionManager, notificationManager, timeProvider) { type, msg, important, extreme, logId, durationMs, special, color, lat, lng, acc, maxAcc, snr, vibe -> 
-                logManager.submitToLogSink(msg, type, important, extreme, logId, durationMs, special, color, lat, lng, acc, maxAcc, snr, vibe)
-            }
-            
-            integrityMonitor = IntegrityMonitor(this@TrackerService, repository, timeProvider, onViolationSustained = { type ->
-                if (type == ALERT_ID_TRACKER_POWER) {
-                    alarmManager.setPowerAlarmPending(true)
+            alarmManager.setListener(object : AppAlarmManager.Listener {
+                override fun onLogEvent(type: String, message: String, important: Boolean, extremeValue: Double?, logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, snr: Double?, vibe: Double?) {
+                    logManager.submitToLogSink(message, type, important, extremeValue, logId, durationMs, isSpecial, specialColor, lat, lng, accuracy, maxAccuracy, snr, vibe)
                 }
-            }, onLogEvent = { msg, important ->
-                val isSpecial = msg.contains("tamper", ignoreCase = true) || 
-                               msg.contains("confirmed", ignoreCase = true) ||
-                               msg.contains("EMERGENCY", ignoreCase = true) ||
-                               msg.contains("PRIORITY", ignoreCase = true) ||
-                               msg.contains("BUCKET", ignoreCase = true)
-                logManager.logServiceEvent(msg, important, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
             })
             
-            locationProcessor = LocationProcessor(localProcessorListener, timeProvider)
+            integrityMonitor.setListener(object : IntegrityMonitor.Listener {
+                override fun onViolationSustained(type: String) {
+                    if (type == ALERT_ID_TRACKER_POWER) {
+                        alarmManager.setPowerAlarmPending(true)
+                    }
+                }
+                override fun onLogEvent(message: String, important: Boolean) {
+                    val isSpecial = message.contains("tamper", ignoreCase = true) || 
+                                   message.contains("confirmed", ignoreCase = true) ||
+                                   message.contains("EMERGENCY", ignoreCase = true) ||
+                                   message.contains("PRIORITY", ignoreCase = true) ||
+                                   message.contains("BUCKET", ignoreCase = true)
+                    logManager.logServiceEvent(message, important, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
+                }
+            })
+            
+            locationProcessor.setListener(localProcessorListener)
 
             delay(1000)
 
@@ -153,16 +154,17 @@ class TrackerService : BaseMonitorService() {
                     lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
             }
 
-            historyManager = HistoryManager(this@TrackerService, repository, gpsManager, sensorManager, locationProcessor, timeProvider, lifecycleScope) { msg, important -> 
-                logManager.logServiceEvent(msg, important) 
-            }
+            historyManager.setListener(object : HistoryManager.Listener {
+                override fun onLogEvent(message: String, important: Boolean) {
+                    logManager.logServiceEvent(message, important)
+                }
+            })
+            historyManager.initialize(lifecycleScope)
 
             sensorManager.start()
 
             delay(1000)
             networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
-            
-            syncManager = SyncManager(applicationContext, networkManager, sessionManager, gpsManager, sensorManager, locationProcessor, telemetryRepository, offlineRepository, logManager, timeProvider, repository, lifecycleScope)
             
             syncManager.setOnSyncStartedListener {
                 muzzleReleaseJob?.cancel()
@@ -178,32 +180,31 @@ class TrackerService : BaseMonitorService() {
             }
             
             delay(1000)
-            syncManager.startSyncLoop(configManager.deviceId, configManager.viewerId, true)
+            syncManager.startSyncLoop(lifecycleScope, configManager.deviceId, configManager.viewerId, true)
 
-            remoteHandler = RemoteHandler(this@TrackerService, repository, locationProcessor, alarmManager, sessionManager, forensicUseCase, timeProvider, lifecycleScope) { id -> handleViewerPulse(id) }
+            remoteHandler.setListener(object : RemoteHandler.Listener {
+                override fun onPeerPulse(id: String) { handleViewerPulse(id) }
+            })
+            remoteHandler.initialize(lifecycleScope)
 
-            commandRouter = CommandRouter(
-                this@TrackerService, configManager, logManager, networkManager, alarmManager, notificationManager, 
-                sessionManager, locationProcessor, 
-                remoteHandler, 
-                repository, syncManager, integrityMonitor, timeProvider,
-                { handleViewerPulse(it) }, 
-                { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }, 
-                { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }, 
-                { onUiVisibilityChangedInternal(it) }, 
-                { transientDropDetected.set(it) }, 
-                { resetServiceTimers() },
-                { sensorManager.start() },
-                { // TRIGGER FORENSIC TEST
+            commandRouter.setListener(object : CommandRouter.Listener {
+                override fun onViewerPulse(id: String) = handleViewerPulse(id)
+                override fun onWatchdogTrigger() { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
+                override fun onUiPulse() { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }
+                override fun onUiVisibilityChanged(visible: Boolean) { onUiVisibilityChangedInternal(visible) }
+                override fun onTransientDrop(drop: Boolean) { transientDropDetected.set(drop) }
+                override fun onResetTimers() { resetServiceTimers() }
+                override fun onSyncSensors() { sensorManager.start() }
+                override fun onTriggerForensicTest() {
                     lifecycleScope.launch {
                         val proc = lastProcessedLocation
                         logManager.logServiceEvent("FORENSIC TEST: Manually injecting Jammer/Stall markers", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
                             lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                        systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L // Trigger Jammer (>30s)
-                        systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L // Trigger Stall (>60s)
+                        systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
+                        systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L
                     }
                 }
-            )
+            })
             commandRouter.register()
             commandRouter.startObservingCommands(lifecycleScope)
 
@@ -379,7 +380,7 @@ class TrackerService : BaseMonitorService() {
             isCoolingMode = integrityMonitor.isCoolingModeActive,
             isSuspiciousMode = isSuspiciousMode,
             isStationary = sensorManager.isStationary(),
-            isScreenOn = sensorManager.isScreenOn(), // R994: Pass screen state
+            isScreenOn = sensorManager.isScreenOn(),
             nowRealtime = nowRealtime,
             deviceSpecialFlags = flags
         )

@@ -8,27 +8,29 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
+ * v9.3.3:
+ * - Issue #058: Hilt Migration. Added @Inject constructor for DI compatibility.
  * v8.9.87:
  * - Issue #005 Hardening: Cached packageName to prevent repetitive getPackageName() 
  *   system log spam on Samsung G990/A155 devices.
- * v8.9.2:
- * - Issue 183: Switched notification icons from legacy R.mipmap.z2 to R.drawable.ic_jd_logo.
  */
-class AppNotificationManager(private val context: Context) {
+@Singleton
+class AppNotificationManager @Inject constructor(@ApplicationContext private val context: Context) {
 
     private val channelId = "location_service_channel"
     private val alarmChannelId = "alarm_service_channel"
     private val notificationId = 1919
     private val alarmNotificationId = 1920
     
-    // Rationale: Cache packageName to prevent repetitive getPackageName() log spam.
     private val cachedPkgName = context.packageName
 
     init {

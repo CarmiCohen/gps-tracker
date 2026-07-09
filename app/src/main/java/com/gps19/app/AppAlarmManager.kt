@@ -2,29 +2,43 @@ package com.gps19.app
 
 import android.content.Context
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
 import java.util.*
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * v8.9.77:
- * - Issue #018: Stationary Anchor Hard-Lock. Propagating isAnchorLocked flag 
- *   to AlarmEvaluationState.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized parameters to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
+ * v9.3.3:
+ * - Issue #058: Hilt Migration. Added @Inject constructor and listener interface.
  */
-class AppAlarmManager(
-    private val context: Context,
+@Singleton
+class AppAlarmManager @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: MainRepository,
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
-    private val timeProvider: TimeProvider,
-    private val onLogEvent: (String, String, Boolean, Double?, String?, Long, Boolean, Int?, Double, Double, Double, Double, Double?, Double?) -> Unit
+    private val timeProvider: TimeProvider
 ) {
+    interface Listener {
+        fun onLogEvent(
+            type: String, message: String, important: Boolean, extremeValue: Double?, 
+            logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, 
+            lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, 
+            snr: Double?, vibe: Double?
+        )
+    }
+
+    private var listener: Listener? = null
+
+    fun setListener(listener: Listener) {
+        this.listener = listener
+    }
+
     private val activeAlarms = mutableMapOf<String, AlarmEvaluation>()
     private var lastAlarmsJson = "[]"
     private var powerAlarmPending = false
@@ -243,7 +257,7 @@ class AppAlarmManager(
                         eval.firstTriggerTs = now
                         eval.isResolved = false
                         triggerOccurredInThisCycle = true
-                        onLogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
+                        listener?.onLogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
                         
                         if (now - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) {
                             lastSirenStopTs = 0L 
@@ -257,7 +271,7 @@ class AppAlarmManager(
             } else if (eval.isTriggered) {
                 if (!eval.isResolved) {
                     eval.isResolved = true
-                    onLogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, now - eval.firstTriggerTs, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
+                    listener?.onLogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, now - eval.firstTriggerTs, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
                 }
                 newAlarms[type] = eval
             }

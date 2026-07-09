@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - v9.3.3
+# System Source of Truth (SoT) - v9.3.6
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Service Component Injection (R978)**: All core service components (Managers, Handlers, Processors) MUST be field-injected via Hilt and initialized using a standardized `Listener` and `initialize(CoroutineScope)` pattern to ensure testability and DI compliance. (Issue #058 / v9.3.6)
 *   **Identity Rejection Feedback (R977)**: The system MUST provide explicit UI feedback (Toast and Persistent Log) when settings updates or commits are rejected due to identity collisions or validation failures. (Issue #039 / v9.3.3)
 *   **Sanitization Visibility (R976)**: The system MUST provide a UI notification (AlertDialog) when malformed Tracker or Viewer IDs are automatically reset to default values during storage migration. (Issue #042 / v9.3.1)
 *   **Map Metadata Alignment (R400)**: Map-level status messages (e.g., "UNCERTAINTY: ...") MUST be anchored to the bottom-center of the map view, in the vicinity of the map scale bar. (Issue #400 / v9.3.0)
