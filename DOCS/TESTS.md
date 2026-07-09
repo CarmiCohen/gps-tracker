@@ -1,6 +1,6 @@
 # Testing Dashboard and Telemetry (Tracker Mode)
 
-This document provides manual verification procedures. For the current testing backlog and task status, refer to [STATUS/testing_status.md](../STATUS/testing_status.md).
+This document provides manual verification procedures. For the current testing backlog and task status, refer to [STATUS/QA_VALIDATION_STATUS.md](../STATUS/QA_VALIDATION_STATUS.md).
 
 ## 1. Verify Sensor Telemetry (Task #056)
 The dashboard currently shows static values. Verify that internal sensors report data to the `MainViewModel`.

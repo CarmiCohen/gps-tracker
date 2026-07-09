@@ -21,17 +21,15 @@ import java.io.File
 
 /**
  * GpsApplication: Application entry point and global dependency management.
- * v8.9.91:
- * - Issue #005 Hardening: Moved osmdroid path configuration to a synchronous block 
- *   before load() to ensure zero getPackageName() calls during early initialization.
- * v8.9.90:
- * - Issue #005: Advanced log spillage hardening. Manually set osmdroid Base/Cache 
- *   paths using static strings to eliminate repetitive getPackageName() lookups.
+ * v9.3.6:
+ * - Issue #058: Hilt Migration. Injected LogManager directly to remove 
+ *   EntryPointAccessors from Timber tree.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var logManager: LogManager
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -42,7 +40,6 @@ class GpsApplication : Application(), Configuration.Provider {
     @InstallIn(SingletonComponent::class)
     interface GpsApplicationEntryPoint {
         fun logManager(): LogManager
-        fun networkManagerWrapper(): RemoteUpdateWrapper
         fun repository(): MainRepository
         fun timeProvider(): TimeProvider
     }
@@ -58,8 +55,6 @@ class GpsApplication : Application(), Configuration.Provider {
         MaintenanceWorker.schedule(this)
 
         // Issue #005: Deep silence for osmdroid
-        // Rationale: We MUST set these synchronously before any OsmDroid component 
-        // can trigger the default path discovery logic which calls getPackageName().
         val osmConfig = OsmConfig.getInstance()
         osmConfig.userAgentValue = "GpsTracker/8.9.91"
         
@@ -71,22 +66,17 @@ class GpsApplication : Application(), Configuration.Provider {
         if (!cacheDir.exists()) cacheDir.mkdirs()
         osmConfig.osmdroidTileCache = cacheDir
 
-        // Background the actual preference loading as it involves I/O
         GlobalScope.launch(Dispatchers.IO) {
             osmConfig.load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
             osmConfig.isDebugMode = false
             osmConfig.isDebugTileProviders = false
         }
 
+        // Issue #058: Eliminated EntryPointAccessors by using injected logManager
         Timber.plant(object : Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
                 if (priority >= Log.ERROR) {
                     try {
-                        val entryPoint = EntryPointAccessors.fromApplication(
-                            this@GpsApplication,
-                            GpsApplicationEntryPoint::class.java
-                        )
-                        val logManager = entryPoint.logManager()
                         val fullMessage = if (tag != null) "[$tag] $message" else message
                         val suffix = t?.let { ": ${it.stackTraceToString().take(500)}" } ?: ""
                         logManager.logServiceEvent("CRITICAL ERROR: $fullMessage$suffix", true)

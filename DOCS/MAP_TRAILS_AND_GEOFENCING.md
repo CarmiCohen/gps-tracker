@@ -1,4 +1,4 @@
-# Map, Trails, & Geofencing Mechanism (v8.9.78)
+# Map, Trails, & Geofencing Mechanism (v9.3.6)
 
 This document describes the mapping engine, historical trail persistence, and geofence enforcement logic.
 
@@ -30,7 +30,7 @@ The system enforces a safety radius around user-defined "Home Points."
 
 ## 5. Forensic Integration
 - **SIT Markers**: Mechanical sitting events (SIT) are reconstructed on the map from synchronized forensic logs (Issue #459 / Formerly #336-E).
-- **Ghost Mode (R338)**: Markers and trails dim (Slate500) if the telemetry is older than **15s** (`TELEMETRY_UI_STALE_THRESHOLD_MS`) (Issue #338 / Issue #428).
+- **Ghost Mode (R338)**: Markers and trails dim (Slate500) if the telemetry is older than **35s** (`TELEMETRY_UI_STALE_THRESHOLD_MS`) (Issue #338 / Issue #428).
 - **Uncertainty Context**: The UI displays a Bayesian uncertainty radius when the location is pending (e.g., during a `GPS_STALL` or `ACOUSTIC_VIOLATION`).
     - **Expansion Rate**: Conservative growth at 15.0m/s (Moving) or 1.5m/s (Stationary).
     - **Safety Cap**: Expansion is strictly capped at **33.3m/s** to maintain threshold sanity (Issue #431).

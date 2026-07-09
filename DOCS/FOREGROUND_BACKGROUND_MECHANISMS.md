@@ -1,4 +1,4 @@
-# GPS-Tracker: Foreground & Background Mechanisms (v8.9.54)
+# GPS-Tracker: Foreground & Background Mechanisms (v9.3.6)
 
 This document provides a comprehensive technical overview of how the GPS-Tracker app maintains its high-persistence state on Android using specialized service roles and a Triple-Lock Watchdog system.
 
@@ -56,11 +56,11 @@ Proactive detection for "Zombie" TCP sockets common in mobile handovers.
 
 ---
 
-## 5. Security & Integrity Monitoring (v8.9.54 Baseline)
+## 5. Security & Integrity Monitoring (v9.3.6 Baseline)
 
 In the background, the system continuously evaluates:
 *   **Internet Integrity**: Detects local internet loss via `ALERT_ID_LOCAL_INTERNET`.
-*   **Signal Integrity**: Monitors remote device connectivity. Uses 15s R338 mandate for staleness indicators. (Relaxed from 10s in v8.9.54).
+*   **Signal Integrity**: Monitors remote device connectivity. Uses 35s R338 mandate for staleness indicators.
 *   **Storage Integrity**: Dual-tier watchdog (< 50MB Low, < 10MB Critical) protects database health.
 *   **GNSS Integrity**: Detects hardware stalls and triggers revival retry every 120s (Issue #341).
 *   **Power Integrity**: Full parity for **battery current** (`currentMa`) across all forensic layers (Issue #337).

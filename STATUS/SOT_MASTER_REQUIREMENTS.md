@@ -4,9 +4,11 @@ This document serves as the definitive operational specification for the GPS-Tra
 
 ### 1. Core Architectural Baselines
 *   **Service Component Injection (R978)**: All core service components (Managers, Handlers, Processors) MUST be field-injected via Hilt and initialized using a standardized `Listener` and `initialize(CoroutineScope)` pattern to ensure testability and DI compliance. (Issue #058 / v9.3.6)
-*   **Identity Rejection Feedback (R977)**: The system MUST provide explicit UI feedback (Toast and Persistent Log) when settings updates or commits are rejected due to identity collisions or validation failures. (Issue #039 / v9.3.3)
-*   **Sanitization Visibility (R976)**: The system MUST provide a UI notification (AlertDialog) when malformed Tracker or Viewer IDs are automatically reset to default values during storage migration. (Issue #042 / v9.3.1)
+*   **Identity Rejection Feedback (R977)**: The system MUST provide explicit UI feedback (Toast and Persistent Log) when settings updates or commits are rejected due to identity collisions or validation failures. (Issue #039 / v9.3.4)
+*   **Sanitization Visibility (R976)**: The system MUST provide a UI notification (AlertDialog) when malformed Tracker or Viewer IDs are automatically reset to default values during storage migration. (Issue #042 / v9.3.2)
+*   **Forensic Logging Authority (R979)**: The system MUST use a standardized `ForensicLogUseCase` for all high-visibility (Pink) logging to ensure cross-module consistency. (Issue #061 / v9.3.6-dev)
 *   **Map Metadata Alignment (R400)**: Map-level status messages (e.g., "UNCERTAINTY: ...") MUST be anchored to the bottom-center of the map view, in the vicinity of the map scale bar. (Issue #400 / v9.3.0)
+*   **Standardized Proto Path Authority (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`. (Issue #030 / v9.3.0)
 *   **Screen-Off Optimization Authority (R994)**: The system MUST optimize power consumption by reducing GPS polling frequency when the device screen is off. (Issue R994 / v9.2.9)
 *   **Notification Throttling Authority (R993)**: The system MUST throttle foreground service notification updates to balance battery efficiency. (Issue R993 / v9.2.8)
 *   **HUD Local Capability Grouping (R960)**: The `GlobalStatusBar` MUST group fundamental local hardware indicators. (Issue R960 / v9.2.7)
@@ -17,7 +19,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Module Hardening**: `:core:engine` is a pure `java-library` with zero Android dependencies.
 *   **Sensor Processing Authority (R965)**: `AppSensorManager` offloads high-frequency sensor event processing to a dedicated thread.
 *   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary (`stationaryProb > 0.9`). (Issue #018 / v9.2.1)
-*   **Anchor Lock Breakout (R990)**: The engine MUST implement a displacement-weighted monitor to breakout of Hard-Locks. (Issue #062 / v9.3.0-dev)
+*   **Anchor Lock Breakout (R990)**: The engine MUST implement a displacement-weighted monitor to breakout of Hard-Locks. (Issue #062 / v9.3.6)
 *   **Connectivity Integrity (R966)**: `AppNetworkManager` implements reactive reconnection.
 *   **Transport Authority**: The system strictly enforces `websocket` transport.
 *   **Service Launch Integrity (R926)**: The system enforces a mandatory 2,000ms delay during session transitions.
@@ -38,7 +40,6 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **A15 Jitter Stabilization (R970)**: The system applies hardened spatial gates and 5s muzzle on Samsung A15.
 *   **G990E Display Hardening (R971)**: The system muzzles proximity transitions during ON/DOZE toggling on S21 FE.
 *   **Forensic Staleness Authority (R972)**: The system enforces a strict 15-second staleness gate for forensic fields.
-*   **Standardized Proto Path Authority (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`.
 *   **Identity Uniqueness Authority (R974)**: The system enforces uniqueness between Tracker and Viewer identities.
 *   **Identity Sanitization Authority (R975)**: The system enforces a strict alphanumeric contract for all IDs.
 *   **Identity Locking Authority (R982)**: The system enforces strict peer-to-peer authorization between Trackers and Viewers.

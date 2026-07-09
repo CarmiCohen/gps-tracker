@@ -1,6 +1,6 @@
-# Sensor Integration & Calibration (v8.9.54)
+# Sensor Integration & Calibration (v9.3.6)
 
-The system leverages a multi-sensor array to provide high-fidelity physical security and trajectory validation. In v8.9.54, all sensor processing is hardened with monotonic timing and a 15s jitter-buffered staleness threshold.
+The system leverages a multi-sensor array to provide high-fidelity physical security and trajectory validation. In v9.3.6, all sensor processing is hardened with monotonic timing and a 35s jitter-buffered staleness threshold.
 
 ## 1. Primary Sensors
 *   **GNSS (GPS/GLONASS/GALILEO)**: Primary location source. Monitored for stalls and signal gaps (`GPS_GAP_THRESHOLD_MS` 60s). Features **Escalated GPS Revival** (Issue #341) with forensic retry logging every 120s.
@@ -19,5 +19,5 @@ The system leverages a multi-sensor array to provide high-fidelity physical secu
 ## 3. Forensic Alignment & Storage
 All sensor events are timestamped and synchronized with the analytical ribbons.
 - **Dual-Metric Spatial Anchor**: Every sensor violation or detection event is now automatically anchored with `lat`/`lng`, `accuracy`, and authoritative `maxAccuracy` (Issue #325).
-- **Ghost Mode UX**: Dashboard fields enter a dimmed "Ghost" state if telemetry is older than 15s (`TELEMETRY_UI_STALE_THRESHOLD_MS`). This provides a 5s jitter buffer over the 10s sync heartbeat (Issue #428).
+- **Ghost Mode UX**: Dashboard fields enter a dimmed "Ghost" state if telemetry is older than 35s (`TELEMETRY_UI_STALE_THRESHOLD_MS`). This provides a 15s jitter buffer over the 20s stationary GPS polling (Issue #428 / R338).
 - **Persistence**: Sensor-derived indices are buffered and flushed to SQLite in batches.

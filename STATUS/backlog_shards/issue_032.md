@@ -1,5 +1,5 @@
 # Issue #032: UI Refresh Consistency
-**Status**: Resolved
+**Status**: Verified (v8.9.95)
 **Priority**: Medium
 **Requirement**: R972
 

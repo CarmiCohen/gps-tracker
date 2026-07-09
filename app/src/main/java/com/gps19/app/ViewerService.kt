@@ -8,7 +8,6 @@ import android.os.Build
 import androidx.lifecycle.lifecycleScope
 import com.gps19.core.engine.*
 import dagger.hilt.android.AndroidEntryPoint
-import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
@@ -19,24 +18,12 @@ import kotlin.math.*
 /**
  * ViewerService: Background monitoring for the Viewer role.
  * v9.3.6:
- * - Issue #058: Hilt Migration. Updated RemoteHandler and HistoryManager initialization.
+ * - Issue #058: Hilt Migration. Removed EntryPointAccessors for RemoteUpdateWrapper.
+ *   Inherits common dependencies from BaseMonitorService.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
 
-    @Inject lateinit var gpsManager: GpsManager
-    @Inject lateinit var sessionManager: SessionManager
-    @Inject lateinit var systemStatusProvider: SystemStatusProvider
-    @Inject lateinit var forensicUseCase: ServiceForensicUseCase
-
-    @Inject lateinit var integrityMonitor: IntegrityMonitor
-    @Inject lateinit var alarmManager: AppAlarmManager
-    @Inject lateinit var remoteHandler: RemoteHandler
-    @Inject lateinit var syncManager: SyncManager
-    @Inject lateinit var commandRouter: CommandRouter
-    @Inject lateinit var locationProcessor: LocationProcessor
-    @Inject lateinit var historyManager: HistoryManager
-    
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
     private var gpsCollectionJob: Job? = null
@@ -141,14 +128,14 @@ class ViewerService : BaseMonitorService() {
             commandRouter.register()
             commandRouter.startObservingCommands(lifecycleScope)
 
-            EntryPointAccessors.fromApplication(applicationContext, GpsApplication.GpsApplicationEntryPoint::class.java)
-                .networkManagerWrapper().setCallback { data -> 
-                    if (data.optString("type") == "remote_log") {
-                        remoteHandler.handleRemoteLog(LogEntry.fromJSONObject(data))
-                    } else {
-                        remoteHandler.handleRemoteUpdate(data, false)
-                    }
+            // Issue #058: Standardized DI for RemoteUpdateWrapper
+            networkManagerWrapper.setCallback { data -> 
+                if (data.optString("type") == "remote_log") {
+                    remoteHandler.handleRemoteLog(LogEntry.fromJSONObject(data))
+                } else {
+                    remoteHandler.handleRemoteUpdate(data, false)
                 }
+            }
             
             delay(2000)
             gpsManager.setPollingInterval(VIEWER_GPS_POLLING_MS)

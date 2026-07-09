@@ -7,10 +7,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
-import com.gps19.core.engine.TICK_INTERVAL_MS
-import com.gps19.core.engine.TICK_INTERVAL_SLOW_MS
-import com.gps19.core.engine.UI_PULSE_TIMEOUT_MS
-import com.gps19.core.engine.TimeProvider
+import com.gps19.core.engine.*
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import timber.log.Timber
@@ -20,9 +17,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * v9.3.3:
- * - Issue #058: Hilt Migration. Switched to @Inject for SystemMonitor and NotificationManager.
- *   Changed field visibility to public for Dagger compatibility.
+ * v9.3.6:
+ * - Issue #058: Hilt Migration. Consolidated common service dependencies and 
+ *   added RemoteUpdateWrapper for direct injection. Standardized onDestroy for shared components.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -30,6 +27,7 @@ abstract class BaseMonitorService : LifecycleService() {
     @Inject lateinit var configManager: ConfigManager
     @Inject lateinit var logManager: LogManager
     @Inject lateinit var networkManager: AppNetworkManager
+    @Inject lateinit var networkManagerWrapper: RemoteUpdateWrapper
     @Inject lateinit var repository: MainRepository
     @Inject lateinit var telemetryRepository: TelemetryRepository
     @Inject lateinit var offlineRepository: OfflineRepository
@@ -37,6 +35,19 @@ abstract class BaseMonitorService : LifecycleService() {
     
     @Inject lateinit var systemMonitor: SystemMonitor
     @Inject lateinit var notificationManager: AppNotificationManager
+
+    // Common Core Components
+    @Inject lateinit var gpsManager: GpsManager
+    @Inject lateinit var sessionManager: SessionManager
+    @Inject lateinit var systemStatusProvider: SystemStatusProvider
+    @Inject lateinit var forensicUseCase: ServiceForensicUseCase
+    @Inject lateinit var integrityMonitor: IntegrityMonitor
+    @Inject lateinit var alarmManager: AppAlarmManager
+    @Inject lateinit var historyManager: HistoryManager
+    @Inject lateinit var locationProcessor: LocationProcessor
+    @Inject lateinit var syncManager: SyncManager
+    @Inject lateinit var commandRouter: CommandRouter
+    @Inject lateinit var remoteHandler: RemoteHandler
     
     protected val cachedPkgName by lazy { packageName }
 
@@ -146,7 +157,9 @@ abstract class BaseMonitorService : LifecycleService() {
         
         runBlocking {
             withTimeoutOrNull(1000) {
-                repository.flushHistory()
+                if (this@BaseMonitorService::repository.isInitialized) {
+                    repository.flushHistory()
+                }
             }
         }
 
@@ -155,6 +168,8 @@ abstract class BaseMonitorService : LifecycleService() {
             systemMonitor.releaseWakeLock()
         }
         if (this::networkManager.isInitialized) networkManager.stop()
+        if (this::commandRouter.isInitialized) commandRouter.unregister()
+
         super.onDestroy()
     }
 

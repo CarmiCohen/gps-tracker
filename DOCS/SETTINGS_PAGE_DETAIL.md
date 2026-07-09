@@ -1,4 +1,4 @@
-# Settings Page Detailed Reference (v8.9.37)
+# Settings Page Detailed Reference (v9.3.6)
 
 This document provides a comprehensive breakdown of every field, toggle, and action available in the "Settings" overlay of the GPS Tracker application.
 
@@ -7,6 +7,13 @@ These settings define how the device identifies itself and where it sends its da
 - **Tracker ID**: A unique string used to identify the tracker's device. Default: "T". (Standardized per R182)
 - **Viewer ID**: Identifies the monitoring phone. Default: "V". (Standardized per R182)
 - **Relay URL**: The address of the Socket.io server used to relay data. Default: `https://gps-survival-relay.onrender.com`. (Issue #106)
+
+### 🛡️ Identity Validation & Hardening (v9.3.6)
+To ensure system integrity, the identity fields are subject to strict validation:
+- **Alphanumeric Contract (R975)**: All IDs must be strictly alphanumeric.
+- **Uniqueness Authority (R974)**: The system prevents the Tracker and Viewer from sharing the same ID to avoid routing loops.
+- **Collision Feedback (R977)**: If a user attempts to save a conflicting or invalid ID, the system provides immediate UI feedback (Toast) and a persistent Forensic Log entry detailing the rejection. (Issue #039)
+- **Auto-Sanitization (R976)**: During migration or app updates, malformed IDs are automatically reset to defaults. A "Sanitization Alert" (AlertDialog) notifies the user if this occurred to ensure they are aware of the identity change. (Issue #042)
 
 ## 2. Geofencing (Fence Distance)
 - **Geofence Radius**: Defines the radius (in meters) around each "Home Point." If the tracker moves beyond this distance, an alarm is triggered. Supports **Predictive Geofencing** which calculates breach 2.0s (`GEOFENCE_PREDICTIVE_LOOKAHEAD_S`) ahead of time based on velocity.

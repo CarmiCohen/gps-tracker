@@ -11,7 +11,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.gps19.core.engine.*
 import dagger.hilt.android.AndroidEntryPoint
-import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
@@ -22,25 +21,15 @@ import kotlin.math.*
 /**
  * TrackerService: The "Black Box" background process.
  * v9.3.6:
- * - Issue #058: Hilt Migration. Updated RemoteHandler initialization to use Listener pattern.
+ * - Issue #058: Hilt Migration. Removed EntryPointAccessors for RemoteUpdateWrapper.
+ *   Inherits common dependencies from BaseMonitorService.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
 
-    @Inject lateinit var gpsManager: GpsManager
     @Inject lateinit var sensorManager: AppSensorManager
-    @Inject lateinit var sessionManager: SessionManager
-    @Inject lateinit var systemStatusProvider: SystemStatusProvider
     @Inject lateinit var forensicUseCase: ServiceForensicUseCase
     @Inject lateinit var behaviorUseCase: ServiceBehaviorUseCase
-    
-    @Inject lateinit var integrityMonitor: IntegrityMonitor
-    @Inject lateinit var alarmManager: AppAlarmManager
-    @Inject lateinit var historyManager: HistoryManager
-    @Inject lateinit var locationProcessor: LocationProcessor
-    @Inject lateinit var syncManager: SyncManager
-    @Inject lateinit var commandRouter: CommandRouter
-    @Inject lateinit var remoteHandler: RemoteHandler
     
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
@@ -114,12 +103,14 @@ class TrackerService : BaseMonitorService() {
             isXiaomi = isXiaomiDevice()
             isA15 = isA15Device()
 
+            // 1. Alarm Manager Setup
             alarmManager.setListener(object : AppAlarmManager.Listener {
                 override fun onLogEvent(type: String, message: String, important: Boolean, extremeValue: Double?, logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, snr: Double?, vibe: Double?) {
                     logManager.submitToLogSink(message, type, important, extremeValue, logId, durationMs, isSpecial, specialColor, lat, lng, accuracy, maxAccuracy, snr, vibe)
                 }
             })
             
+            // 2. Integrity Monitor Setup
             integrityMonitor.setListener(object : IntegrityMonitor.Listener {
                 override fun onViolationSustained(type: String) {
                     if (type == ALERT_ID_TRACKER_POWER) {
@@ -136,6 +127,7 @@ class TrackerService : BaseMonitorService() {
                 }
             })
             
+            // 3. Location Processor Setup
             locationProcessor.setListener(localProcessorListener)
 
             delay(1000)
@@ -154,6 +146,7 @@ class TrackerService : BaseMonitorService() {
                     lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
             }
 
+            // 4. History Manager Setup
             historyManager.setListener(object : HistoryManager.Listener {
                 override fun onLogEvent(message: String, important: Boolean) {
                     logManager.logServiceEvent(message, important)
@@ -166,6 +159,7 @@ class TrackerService : BaseMonitorService() {
             delay(1000)
             networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
             
+            // 5. Sync Manager Setup
             syncManager.setOnSyncStartedListener {
                 muzzleReleaseJob?.cancel()
                 isMuzzled = true
@@ -182,11 +176,15 @@ class TrackerService : BaseMonitorService() {
             delay(1000)
             syncManager.startSyncLoop(lifecycleScope, configManager.deviceId, configManager.viewerId, true)
 
+            // 6. Remote Handler Setup
             remoteHandler.setListener(object : RemoteHandler.Listener {
-                override fun onPeerPulse(id: String) { handleViewerPulse(id) }
+                override fun onPeerPulse(id: String) {
+                    handleViewerPulse(id)
+                }
             })
             remoteHandler.initialize(lifecycleScope)
 
+            // 7. Command Router Setup
             commandRouter.setListener(object : CommandRouter.Listener {
                 override fun onViewerPulse(id: String) = handleViewerPulse(id)
                 override fun onWatchdogTrigger() { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
@@ -208,10 +206,10 @@ class TrackerService : BaseMonitorService() {
             commandRouter.register()
             commandRouter.startObservingCommands(lifecycleScope)
 
-            EntryPointAccessors.fromApplication(applicationContext, GpsApplication.GpsApplicationEntryPoint::class.java)
-                .networkManagerWrapper().setCallback { data -> 
-                    remoteHandler.handleRemoteUpdate(data, true)
-                }
+            // Issue #058: Standardized DI for RemoteUpdateWrapper
+            networkManagerWrapper.setCallback { data -> 
+                remoteHandler.handleRemoteUpdate(data, true)
+            }
 
             delay(2000)
             gpsCollectionJob = lifecycleScope.launch { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }

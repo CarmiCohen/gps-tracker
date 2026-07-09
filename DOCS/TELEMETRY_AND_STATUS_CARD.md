@@ -1,10 +1,10 @@
-# Telemetry & Status Card (v8.9.78)
+# Telemetry & Status Card (v9.3.6)
 
-The Status Card is the primary HUD for real-time tracking health. It utilizes the jitter-buffered 15s staleness threshold for all visual indicators.
+The Status Card is the primary HUD for real-time tracking health. It utilizes the jitter-buffered 35s staleness threshold for all visual indicators (R338).
 
 ## 1. Visual Freshness Indicators
-- **Visual Heartbeat**: A circular progress indicator that shrinks as data ages (15s for Position / Sensor packets).
-- **Ghost Mode UX**: HUD metrics, accuracy circles, and dashboard fields enter a dimmed "Ghost" state (Slate500) if telemetry is > 15s old.
+- **Visual Heartbeat**: A circular progress indicator that shrinks as data ages (35s for Position / Sensor packets).
+- **Ghost Mode UX**: HUD metrics, accuracy circles, and dashboard fields enter a dimmed "Ghost" state (Slate500) if telemetry is > 35s old.
 - **Link Quality**: The "DAT" (Data) badge transitions to FAIL if the link is stale or the watchdog expires.
 
 ## 2. HUD Fields

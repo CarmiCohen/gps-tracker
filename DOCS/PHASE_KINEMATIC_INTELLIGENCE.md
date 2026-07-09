@@ -1,4 +1,4 @@
-# Phase: Kinematic Intelligence & Behavioral Refinement (v8.9.52)
+# Phase: Kinematic Intelligence & Behavioral Refinement (v9.3.6)
 
 This document outlines the strategic objectives for the Kinematic Intelligence phase, focusing on deepening the **GtoEngine's** ability to resolve sensor contradictions and maintaining forensic persistence under extreme OS restrictions.
 
@@ -28,7 +28,7 @@ This document outlines the strategic objectives for the Kinematic Intelligence p
 **Refinement**: Bayesian Confidence Scaling via `PENDING_UNCERTAINTY_GROWTH_RATE_MPS` (15.0f).
 *   **Mechanism**: The "Location Pending" state reflects the *growing uncertainty* (confidence radius) based on time elapsed since the last valid GPS fix.
 *   **Safety Cap**: Uncertainty expansion is strictly capped at **33.3m/s** (120 km/h) to prevent excessive threshold inflation during long fix gaps (Issue #383).
-*   **Visual**: Uses `Ghost Mode` (Issue #338) to indicate staleness while displaying the uncertainty expanding on the map.
+*   **Visual**: Uses `Ghost Mode` (R338) to indicate staleness while displaying the uncertainty expanding on the map.
 
 ---
-*Status: Objectives integrated, hardened, and synchronized in v8.9.52 baseline.*
+*Status: Objectives integrated, hardened, and synchronized in v9.3.6 baseline.*

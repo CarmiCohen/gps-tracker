@@ -1,5 +1,5 @@
 # Issue #048: Viewer HUD Line Grayout
-**Status**: Resolved
+**Status**: Verified (v9.2.0)
 **Priority**: Medium
 **Requirement**: R989
 

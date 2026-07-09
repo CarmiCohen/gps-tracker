@@ -1,6 +1,6 @@
-# Analytical Ribbons & Forensic UI (v8.9.54)
+# Analytical Ribbons & Forensic UI (v9.3.6)
 
-The **Analytical Ribbons** provide high-density sparkline visualizations for forensic telemetry auditing, allowing monitoring of sensor trends over time. In v8.9.54, these ribbons are hardened with a 15s jitter-buffered staleness threshold.
+The **Analytical Ribbons** provide high-density sparkline visualizations for forensic telemetry auditing, allowing monitoring of sensor trends over time. In v9.3.6, these ribbons are hardened with a 35s jitter-buffered staleness threshold (R338).
 
 ## 1. The Ribbon Pipeline
 Telemetries are sampled and down-sampled into six time-scales:
@@ -24,7 +24,7 @@ Each "Ribbon" visualizes a specific forensic metric:
 - **BAT (Battery Health)**: Highlights steep discharge events.
 
 ## 3. UI Implementation
-- **Ghost Mode (Issue #338/428)**: Sparklines dim (Slate500) if the remote device is offline > 15s (`TELEMETRY_UI_STALE_THRESHOLD_MS`).
+- **Ghost Mode (R338)**: Sparklines dim (Slate500) if the remote device is offline > 35s (`TELEMETRY_UI_STALE_THRESHOLD_MS`).
 - **Forensic Parity (Issue #325)**: Every ribbon point carries both raw `accuracy` and authoritative `maxAccuracy` metadata to ensure the visual uncertainty matches the engine's state.
 - **Forensic Tagging**: Every point includes battery current (`currentMa`), speed, bearing, and SIT status.
 - **Interaction**: Tapping a ribbon expands it to a full-screen historical view with coordinate-aware scrubbing.

@@ -1,5 +1,5 @@
 # Issue #044: HUD: LEDs contradiction
-**Status**: Resolved
+**Status**: Verified (v9.2.3)
 **Priority**: High
 **Requirement**: R991
 

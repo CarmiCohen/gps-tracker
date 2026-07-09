@@ -4,28 +4,30 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
-import dagger.hilt.android.EntryPointAccessors
+import com.gps19.core.engine.TimeProvider
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.runBlocking
 import timber.log.Timber
+import javax.inject.Inject
 
 /**
  * WatchdogReceiver: Responds to watchdog alarms to ensure the service stays active.
- * v8.8.21: Migrated to TimeProvider for timing consistency.
+ * v9.3.6: Migrated to Hilt @AndroidEntryPoint.
  */
+@AndroidEntryPoint
 class WatchdogReceiver : BroadcastReceiver() {
+
+    @Inject lateinit var repository: MainRepository
+    @Inject lateinit var timeProvider: TimeProvider
+
     override fun onReceive(context: Context, intent: Intent?) {
+        super.onReceive(context, intent)
+        
         val action = intent?.action
         Timber.d("Watchdog Receiver: Action $action received")
         
         if (action == ACTION_ALARM_WAKEUP) {
             try {
-                val entryPoint = EntryPointAccessors.fromApplication(
-                    context.applicationContext,
-                    GpsApplication.GpsApplicationEntryPoint::class.java
-                )
-                val repository = entryPoint.repository()
-                val timeProvider = entryPoint.timeProvider()
-                
                 val appMode = runBlocking { repository.getAppMode() } ?: "tracker"
 
                 repository.addLog(LogEntry(
