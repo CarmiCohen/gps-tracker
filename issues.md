@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.3.0)
+# Project Issues & Hardening Tracking (v9.3.2)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Issues Archive](STATUS/issues_archive.md), and validation tasks are in [Testing Status](STATUS/testing_status.md).
 
@@ -7,14 +7,14 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟡 Active | 5 |
 | **Validation Tasks** | 🔍 Tracked | [Testing Status](STATUS/testing_status.md) |
-| **Resolved (Total)** | 🟢 Progress | 260 |
+| **Resolved (Total)** | 🟢 Progress | 261 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
 | ID | Concern | Description |
 | :--- | :--- | :--- |
-| **#039** | **Identity Rejection Feedback** | `MainRepository` now silently rejects bulk updates with colliding IDs. UI feedback needed. (Validation: #063) |
+| | | |
 
 ---
 
@@ -28,20 +28,20 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
+## 🟢 Recently Resolved Issues (v9.3.2)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#039** | **Identity Rejection Feedback** | **Resolved**. Updated `MainRepository.saveSettingsBulk` to throw `IllegalArgumentException` on identity collision. Implemented `BulkUpdateSettings` handling in `MainViewModel` with UI feedback (Toast) and persistent logging. |
+
+---
+
 ## 🟢 Recently Resolved Issues (v9.3.0)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
-| **#042** | **Sanitization Visibility** | **Resolved**. Added `identity_sanitized` flag to DataStore and implemented UI notification (AlertDialog) to inform user of automatic ID resets. |
+| **#042** | **Sanitization Visibility** | **Resolved**. Implemented `identitySanitizedFlow` in `SettingsRepository` and migration flag to notify UI of auto-sanitization events. |
 | **#030** | **Proto Schema Duplication** | **Resolved (R973)**. Consolidated all schemas into `app/src/main/proto` and removed legacy path. |
 | **#055** | **Issue History Recovery** | **Resolved**. Restored 185 "lost" legacy resolutions from `compliance_archive.md`. |
 | **#054** | **Requirement ID Collision** | **Resolved**. Audited and corrected `compliance.md` where Issue #326 was overloaded. |
 | **#400** | **Uncertainty UX Mapping** | **Resolved (R400)**. Re-anchored Bayesian Uncertainty status messages to bottom-center with 80dp offset. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.2.9)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **R994** | **WakeLock & Screen-Off** | **Resolved**. Dynamic GPS down-sampling implemented. |

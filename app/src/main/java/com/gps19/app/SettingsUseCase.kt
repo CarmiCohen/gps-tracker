@@ -11,15 +11,12 @@ import javax.inject.Singleton
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
  * Handles draft lifecycle, atomic commits, and full system resets.
+ * v9.3.3:
+ * - Issue #039 Identity Rejection Feedback: Added bulkUpdateSettings to support 
+ *   atomic updates with validation from external sources.
  * v9.3.0:
  * - Issue #042: Sanitization Visibility. Added identitySanitized to InitialSettings 
  *   and loadAllSettings to inform UI of automatic ID resets.
- * v8.9.87:
- * - Issue #005 Remediation: Fixed type mismatch where loadAllSettings was using 
- *   getFloat for Double-backed distance and temperature keys.
- * - Identity Fix: Corrected updateViewerId to save to VIEWER_ID_KEY instead of TRACKER_ID_KEY.
- * v8.9.79:
- * - Issue #014: Type Migration. Aligned maxTemp and maxDistance to Double.
  */
 @Singleton
 class SettingsUseCase @Inject constructor(
@@ -75,7 +72,6 @@ class SettingsUseCase @Inject constructor(
         val vId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
         val rUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
         
-        // Fix: Use getDouble for consistency with Issue #014 standards
         val maxDist = repository.getDouble(MainRepository.MAX_DISTANCE_STORAGE_KEY, MainRepository.DEFAULT_MAX_DISTANCE)
         val hPoints = repository.loadHomePoints()
         val aSettings = repository.loadAlertSettings()
@@ -156,6 +152,23 @@ class SettingsUseCase @Inject constructor(
     suspend fun updateRelayUrl(url: String) {
         logManager.submitToLogSink("USER ACTION: Relay URL changed to: $url", "user", important = true)
         repository.saveString(MainRepository.RELAY_URL_KEY, url)
+    }
+
+    /**
+     * Performs a bulk update of settings.
+     * v9.3.3: Enforces validation via MainRepository.
+     */
+    suspend fun bulkUpdateSettings(
+        deviceId: String? = null,
+        viewerId: String? = null,
+        relayUrl: String? = null,
+        maxDistance: Double? = null,
+        alertSettings: AlertSettings? = null,
+        homePoints: List<org.osmdroid.util.GeoPoint>? = null
+    ) {
+        withContext(Dispatchers.IO) {
+            repository.saveSettingsBulk(deviceId, viewerId, relayUrl, maxDistance, alertSettings, homePoints)
+        }
     }
 }
 

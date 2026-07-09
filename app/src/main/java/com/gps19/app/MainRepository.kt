@@ -18,14 +18,14 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * v9.3.3:
+ * - Issue #039 Identity Rejection Feedback: Updated saveSettingsBulk to throw 
+ *   IllegalArgumentException on identity collision to prevent silent failures.
  * v9.3.0:
  * - Issue #042 Sanitization Visibility: Exposed identitySanitizedFlow from SettingsRepository.
  * v8.9.98:
  * - Issue #027 Identity Hardening: Reinforced saveSettingsBulk with uniqueness validation 
  *   to prevent identity cross-contamination between Tracker and Viewer roles.
- * v8.9.87:
- * - Identity Fix: Corrected DEFAULT_VIEWER_ID to use SettingsRepository.DEFAULT_VIEWER_ID ("V")
- *   instead of incorrectly shadowing the Tracker ID ("T").
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -223,6 +223,10 @@ class MainRepository @Inject constructor(
     suspend fun commitDraftSettings() = settings.commitDraftSettings()
     suspend fun hasPendingDrafts(): Boolean = settings.hasPendingDrafts()
 
+    /**
+     * Atomically saves multiple primary settings.
+     * v9.3.3: Throws IllegalArgumentException on identity collision (Issue #039).
+     */
     suspend fun saveSettingsBulk(
         deviceId: String? = null, 
         viewerId: String? = null, 
@@ -231,13 +235,13 @@ class MainRepository @Inject constructor(
         alertSettings: AlertSettings? = null, 
         homePoints: List<GeoPoint>? = null
     ) {
-        // Issue #027 Remediate: Enforce identity uniqueness before committing bulk settings.
         val currentTracker = deviceId ?: settings.getString(TRACKER_ID_KEY, DEFAULT_TRACKER_ID)
         val currentViewer = viewerId ?: settings.getString(VIEWER_ID_KEY, DEFAULT_VIEWER_ID)
         
         if (!SignalingConstants.areIdsUnique(currentTracker, currentViewer)) {
-            Timber.e("Identity Collision in saveSettingsBulk: Rejecting update (T:$currentTracker, V:$currentViewer)")
-            return
+            val err = "Identity Collision: IDs must be unique and alphanumeric (T:$currentTracker, V:$currentViewer)"
+            Timber.e(err)
+            throw IllegalArgumentException("IDs must be unique and alphanumeric")
         }
         
         settings.saveSettingsBulk(deviceId, viewerId, relayUrl, maxDistance, alertSettings, homePoints)

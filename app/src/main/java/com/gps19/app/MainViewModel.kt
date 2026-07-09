@@ -20,15 +20,12 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * v9.3.3:
+ * - Issue #039 Identity Rejection Feedback: Implemented handling for 
+ *   BulkUpdateSettings and improved error reporting for identity collisions.
  * v9.3.0:
  * - Issue #042: Sanitization Visibility. Added observation of identitySanitizedFlow 
  *   and handling for DismissIdentitySanitization event.
- * v9.2.6:
- * - Forensic Stress Test: Added handling for TriggerForensicTest event.
- * v8.9.79:
- * - Issue #014: Type Migration. Aligned temperature and accuracy flows to Double.
- * v8.9.63:
- * - Issue #461: Implemented UI feedback for settings uniqueness enforcement.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -133,15 +130,11 @@ class MainViewModel @Inject constructor(
     init {
         viewModelScope.launch(uiExceptionHandler) {
             loadInitialData()
-            
-            // Issue 146: Staggered initialization to prevent startup frame skips
             delay(150)
             startGlobalTimer()
-            
             delay(200)
             startReactiveObservations()
-            
-            delay(1000) // History analytical ribbons can wait until UI is fully stabilized
+            delay(1000)
             stateSubscriptionUseCase.startHistoryObservations(viewModelScope)
         }
     }
@@ -271,6 +264,30 @@ class MainViewModel @Inject constructor(
                 updateState { it.copy(isIdentitySanitized = false) }
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { repository.saveBoolean(MainRepository.IDENTITY_SANITIZED_KEY, false) }
             }
+            is UiEvent.BulkUpdateSettings -> {
+                viewModelScope.launch(uiExceptionHandler) {
+                    try {
+                        settingsUseCase.bulkUpdateSettings(
+                            deviceId = event.deviceId,
+                            viewerId = event.viewerId,
+                            relayUrl = event.relayUrl,
+                            maxDistance = event.maxDistance,
+                            alertSettings = event.alertSettings,
+                            homePoints = event.homePoints
+                        )
+                        addPersistentLog("user", "USER ACTION: Bulk settings update applied", true)
+                    } catch (e: IllegalArgumentException) {
+                        val errMsg = "Bulk Update Rejected: ${e.message}"
+                        Timber.e(e, errMsg)
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, errMsg, Toast.LENGTH_LONG).show()
+                        }
+                        addPersistentLog("error", errMsg, true)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Bulk update failed")
+                    }
+                }
+            }
             else -> {}
         }
     }
@@ -320,6 +337,7 @@ class MainViewModel @Inject constructor(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Commit Failed: ${result.error}", Toast.LENGTH_LONG).show()
                 }
+                addPersistentLog("error", "Settings Commit Failed: ${result.error}", true)
                 return@launch
             }
 
@@ -437,8 +455,6 @@ class MainViewModel @Inject constructor(
                 
                 if (_uiState.value.appMode != null) {
                     repository.sendCommand(UiCommand.SyncRequest)
-                    
-                    // Issue #003: Offloading behavioral state computation to Dispatchers.Default
                     withContext(Dispatchers.Default) {
                         val currentState = _uiState.value
                         val newState = behaviorUseCase.computeTrackerState(currentState, now)
