@@ -21,7 +21,7 @@ class WatchdogReceiver : BroadcastReceiver() {
     @Inject lateinit var timeProvider: TimeProvider
 
     override fun onReceive(context: Context, intent: Intent?) {
-        super.onReceive(context, intent)
+        // Removed super.onReceive as it is an abstract method in BroadcastReceiver
         
         val action = intent?.action
         Timber.d("Watchdog Receiver: Action $action received")

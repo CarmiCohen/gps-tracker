@@ -28,7 +28,6 @@ import kotlin.math.*
 class TrackerService : BaseMonitorService() {
 
     @Inject lateinit var sensorManager: AppSensorManager
-    @Inject lateinit var forensicUseCase: ServiceForensicUseCase
     @Inject lateinit var behaviorUseCase: ServiceBehaviorUseCase
     
     private var gpsCollectionJob: Job? = null
@@ -576,7 +575,7 @@ class TrackerService : BaseMonitorService() {
             sitBaro = locationProcessor.sentinel.lastSitBaro,
             sitTilt = locationProcessor.sentinel.lastSitTilt,
             sitShock = locationProcessor.sentinel.lastSitShock,
-            isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge,
+            isBatterySteepDischarge = false,
             isCoolingModeActive = integrityMonitor.isCoolingModeActive,
             speed = proc?.filteredSpeed ?: 0.0,
             bearing = (lastKnownLocation?.bearing?.toDouble() ?: 0.0),
@@ -683,7 +682,7 @@ class TrackerService : BaseMonitorService() {
                 stabilityAuditViolationCount++
                 val proc = lastProcessedLocation
                 logManager.logServiceEvent("STABILITY GAP: ${gap}ms detected during 10Hz polling.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
-                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = location.accuracy.toDouble())
             }
         }
         lastGpsFixRealtime = nowRealtime
@@ -750,7 +749,6 @@ class TrackerService : BaseMonitorService() {
         settingsJob?.cancel()
         muzzleReleaseJob?.cancel()
         adaptationMuzzleJob?.cancel()
-        if (this::commandRouter.isInitialized) commandRouter.unregister()
         super.onDestroy()
     }
 

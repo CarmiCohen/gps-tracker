@@ -150,7 +150,7 @@ class ViewerService : BaseMonitorService() {
                 }
                 launch {
                     repository.homePointsFlow.collect { points ->
-                        locationProcessor.setHomePoints(points.map { EngineGeoPoint(it.latitude, it.longitude) })
+                        locationProcessor.setHomePoints(points.map { EngineGeoPoint(it.latitude, it.longitude) } )
                     }
                 }
                 launch {
@@ -491,7 +491,6 @@ class ViewerService : BaseMonitorService() {
         gnssDetailJob?.cancel()
         alarmEvalJob?.cancel()
         settingsJob?.cancel()
-        if (this::commandRouter.isInitialized) commandRouter.unregister()
         super.onDestroy()
     }
 }
