@@ -20,6 +20,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v9.3.9:
+ * - Issue #073 Peer Visibility Fix: Added repository.updateRemoteActivity in handleViewerPulse 
+ *   to ensure the VWR badge turns green upon receiving signaling pulses.
  * v9.3.6:
  * - Issue #058: Hilt Migration. Removed EntryPointAccessors for RemoteUpdateWrapper.
  *   Inherits common dependencies from BaseMonitorService.
@@ -260,6 +263,9 @@ class TrackerService : BaseMonitorService() {
             Timber.w("Rejecting invalid Viewer ID from pulse: $id")
             return
         }
+
+        // Issue #073: Ensure HUD acknowledges signaling pulses immediately
+        repository.updateRemoteActivity(timeProvider.currentTimeMillis())
 
         if ((configManager.viewerId == MainRepository.DEFAULT_VIEWER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer" && id != MainRepository.DEFAULT_VIEWER_ID) {
             configManager.viewerId = id
