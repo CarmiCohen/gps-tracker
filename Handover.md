@@ -1,18 +1,21 @@
-# Project Handover: Temporal Synchronization & High-Assurance Hardening (v9.3.10)
+# Project Handover: Temporal Synchronization & High-Assurance Hardening (v9.3.11)
 
 ## 📌 Forensic Status Summary
-This document provides a definitive snapshot of the project as of v9.3.10. The system has undergone a major synchronization overhaul to resolve "Gray HUD" syndrome and signaling asymmetries caused by device clock drift.
+This document provides a definitive snapshot of the project as of v9.3.11. The system has undergone a major synchronization overhaul and a logcat audit to ensure a clean forensic trail.
 
 ### 1. Architectural Baseline
-- **Current Version**: v9.3.10
+- **Current Version**: v9.3.11
 - **DI Framework**: Hilt (Fully migrated for Services, Receivers, and Application).
 - **Hardening Model**: **Receipt-Time Authority**. The system now prioritizes local arrival time over remote source timestamps for all UI health and synchronization logic.
 - **Build & Environment**: `app:installDebug` is the confirmed method for multi-device deployment. `STATUS/` directory is fully synchronized; links are clickable (Ctrl+Click).
 
-### 2. Resolved Issues (The "Clock Skew" Correction)
+### 2. Resolved Issues (The "Clock Skew" & "Log Noise" Correction)
+- **#068 (Logcat Audit - Samsung Spam)**:
+    - **Problem**: Logcat was flooded with `getPackageName: com.gps19.app` calls, obscuring forensic logs on Samsung G990/A15 devices.
+    - **Fix**: Hardened `Utils.kt` and `SystemStatusProvider` by enforcing mandatory use of cached package names in all permission checkers. Eliminated all dynamic `context.packageName` fallbacks in high-frequency execution paths.
 - **#072 (HUD Synchronization Hardening)**: 
     - **Problem**: HUD elements (Speed, State, Accuracies) turned gray (stale) because the Viewer's clock was ahead of the Tracker's GPS clock.
-    - **Fix**: Transitioned to a Receipt-Time Authority model. Implemented skew-immune age formulas in `DashboardUseCase.kt` and updated `SharedUiComponents.kt`. HUD elements now remain colorized (Green) despite device clock drift.
+    - **Fix**: Transitioned to a Receipt-Time Authority model. Implemented skew-immune age formulas in `DashboardUseCase.kt`. HUD elements now remain colorized (Green) despite device clock drift.
 - **#073 (Peer Visibility Asymmetry)**:
     - **Problem**: TRK badge was Green (Viewer side), but VWR badge was Red (Tracker side).
     - **Fix**: Updated `TrackerService.kt` to explicitly trigger `repository.updateRemoteActivity` upon signaling pulse receipt, bypassing source-timestamp drift. The "VWR" (Viewer) badge on the Tracker device now correctly turns green upon receipt of Viewer pulses.
@@ -24,16 +27,15 @@ This document provides a definitive snapshot of the project as of v9.3.10. The s
 The following tasks are prioritized for the next session:
 
 - **🟡 High Priority (Field Tests)**:
-    - **#068 (Logcat Audit)**: Silence `getPackageName: com.gps19.app` spam on Samsung SM-G990E. This is required to observe "Forensic Pink Logs" without noise.
     - **#064 (Diagnostics UI)**: Build the Compose-based "Permission Health Check" screen (Xiaomi/Samsung resilience).
-    - **#053 (Anchor Lock Breakout)**: Field verify that Hard-Locks release immediately upon movement.
+    - **#053 (Anchor Lock Breakout)**: Field verify that displacement-weighted breakout releases Hard-Locks immediately upon movement.
 - **🧪 Technical Debt / Unit Tests**:
     - **#072 (Temporal Authority Unit Test)**: Verify `isGpsFresh` handles up to 60s of skew.
     - **#066 (TrackerService Hilt Verification)**: Ensure DI stability and field injection reliability after recent service refactor.
 
 ### 4. Next Recommendation (Immediate Action)
-**Address Issue #068: Silence Logcat Spam.**
-The `getPackageName` spam is likely coming from high-frequency system API calls (e.g., in `AppNotificationManager`, `SystemStatusProvider`, or osmdroid User Agent). Silencing this is the priority to allow clear observation of "Forensic Pink Logs" during verification of map stabilization.
+**Implement Issue #064: Diagnostics UI.**
+Now that the logcat is silent, the priority shifts to building the visual "Permission Health Check" screen. This will allow the user to verify the background states (which I just hardened) directly within the app UI.
 
 ---
 
@@ -49,5 +51,5 @@ The `getPackageName` spam is likely coming from high-frequency system API calls 
     - b. Verify that ALL fixed issues are updated in `issues.md` or moved to ‘compliance.md’.
     - c. Check that no *.md or *.xml file was accidentally truncated.
     - d. Verify that there is no inconsistency with this change of the app and other code portions or documentation.
-    - e. Verify that new requirement are added to requirements_SoT.md
+    - e. Verify that new requirements are added to `STATUS/SOT_MASTER_REQUIREMENTS.md`.
     - f. Prepare a block of Git commands to stage the changes and to commit them as a new release with a tag the version and to push everything to the remote repository.

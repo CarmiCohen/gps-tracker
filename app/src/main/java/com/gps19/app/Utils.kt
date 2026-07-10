@@ -11,11 +11,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
- * v8.9.98:
- * - Maintenance: Aligned versioning with Identity Persistence Hardening release.
- * v8.9.89:
- * - Issue #005 Hardening: Removed all direct context.packageName calls in Xiaomi 
- *   checkers to eliminate log spillage on Samsung G990/A155 devices.
+ * v9.3.11:
+ * - Issue #068 Hardening: Enforced use of cachedPackageName in Xiaomi permission 
+ *   checkers to eliminate repetitive getPackageName() logcat spam on Samsung G990/A155.
  */
 
 enum class XiaomiPermissionStatus {
@@ -49,10 +47,12 @@ fun isXiaomiDevice(): Boolean {
     return m.contains("XIAOMI") || m.contains("REDMI") || m.contains("POCO")
 }
 
-fun isXiaomiSpecialPermissionGranted(context: Context, cachedPackageName: String? = null): XiaomiPermissionStatus {
+/**
+ * v9.3.11: Now requires non-null pkgName to prevent logcat spillage.
+ */
+fun isXiaomiSpecialPermissionGranted(context: Context, pkgName: String): XiaomiPermissionStatus {
     if (!isXiaomiDevice()) return XiaomiPermissionStatus.UNKNOWN
     
-    val pkgName = cachedPackageName ?: context.packageName
     val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     return try {
         val checkOpMethod = ops.javaClass.getMethod("checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
@@ -69,9 +69,8 @@ fun isXiaomiSpecialPermissionGranted(context: Context, cachedPackageName: String
     }
 }
 
-fun getXiaomiAutostartStatus(context: Context, cachedPackageName: String? = null): XiaomiPermissionStatus {
+fun getXiaomiAutostartStatus(context: Context, pkgName: String): XiaomiPermissionStatus {
     if (!isXiaomiDevice()) return XiaomiPermissionStatus.UNKNOWN
-    val pkgName = cachedPackageName ?: context.packageName
     val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     return try {
         val checkOpMethod = ops.javaClass.getMethod("checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
@@ -85,9 +84,8 @@ fun getXiaomiAutostartStatus(context: Context, cachedPackageName: String? = null
 /**
  * openXiaomiAutostartSettings: Attempts to launch the specific MIUI Autostart settings page.
  */
-fun openXiaomiAutostartSettings(context: Context, cachedPackageName: String? = null) {
+fun openXiaomiAutostartSettings(context: Context, pkgName: String) {
     if (!isXiaomiDevice()) return
-    val pkgName = cachedPackageName ?: context.packageName
     try {
         val intent = Intent()
         intent.component = ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")
@@ -109,8 +107,8 @@ fun openXiaomiAutostartSettings(context: Context, cachedPackageName: String? = n
     }
 }
 
-fun isXiaomiAutostartGranted(context: Context, cachedPackageName: String? = null): Boolean {
-    return getXiaomiAutostartStatus(context, cachedPackageName) == XiaomiPermissionStatus.GRANTED
+fun isXiaomiAutostartGranted(context: Context, pkgName: String): Boolean {
+    return getXiaomiAutostartStatus(context, pkgName) == XiaomiPermissionStatus.GRANTED
 }
 
 fun isSamsungDevice(): Boolean {

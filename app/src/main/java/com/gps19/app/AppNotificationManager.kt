@@ -17,11 +17,11 @@ import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
+ * v9.3.11:
+ * - Issue #068 Hardening: Enforced use of cachedPkgName in Xiaomi permission 
+ *   check to eliminate logcat spillage during alarm overlay triggers.
  * v9.3.3:
  * - Issue #058: Hilt Migration. Added @Inject constructor for DI compatibility.
- * v8.9.87:
- * - Issue #005 Hardening: Cached packageName to prevent repetitive getPackageName() 
- *   system log spam on Samsung G990/A155 devices.
  */
 @Singleton
 class AppNotificationManager @Inject constructor(@ApplicationContext private val context: Context) {
@@ -123,7 +123,7 @@ class AppNotificationManager @Inject constructor(@ApplicationContext private val
 
     fun showAlarmOverlay(causes: String) {
         val canDraw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
-        val xiaomiStatus = isXiaomiSpecialPermissionGranted(context)
+        val xiaomiStatus = isXiaomiSpecialPermissionGranted(context, cachedPkgName)
         
         val effectivelyBlocked = !canDraw || (isXiaomiDevice() && xiaomiStatus != XiaomiPermissionStatus.GRANTED)
 

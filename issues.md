@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.3.10)
+# Project Issues & Hardening Tracking (v9.3.11)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Resolution Archive](STATUS/RESOLUTION_ARCHIVE.md), and validation tasks are in [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md).
 
@@ -7,14 +7,14 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 3 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 264 |
+| **Resolved (Total)** | 🟢 Progress | 265 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
 | ID | Concern | Description |
 | :--- | :--- | :--- |
-| | | |
+| **C-068-1** | **Samsung System API Noise** | Even with cached package names, high-frequency calls to `Settings.canDrawOverlays` or `isIgnoringBatteryOptimizations` (every 500ms) may still trigger internal system logging on Samsung G990/A15. Risk: Logcat jitter during forensic analysis. |
 
 ---
 
@@ -24,6 +24,14 @@ This document tracks active issues, technical debt, and pending implementation t
 | **#059** | **Feature** | **Permission Health Check UI**: Implement a "Diagnostics" screen in Compose for Xiaomi special permissions. (Validation: #064) |
 | **#061** | **Cleanup** | **Forensic Logging Consolidation**: Create a `ForensicLogUseCase` to standardize "Special Color" (Pink) logging. (Validation: #065) |
 | **#062** | **Hardening** | **Dynamic Anchor Breakout**: Implement displacement-weighted monitor to prevent "sticky anchors". (Validation: #053) |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.3.11)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#068** | **Logcat Audit (Samsung Spam)** | **Resolved**. Hardened `Utils.kt` and `SystemStatusProvider` by enforcing mandatory use of cached package names in all permission checkers. Eliminated all dynamic `context.packageName` fallbacks in high-frequency paths. |
 
 ---
 
