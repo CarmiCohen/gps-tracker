@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.3.9)
+# Project Issues & Hardening Tracking (v9.3.10)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Resolution Archive](STATUS/RESOLUTION_ARCHIVE.md), and validation tasks are in [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md).
 
@@ -27,7 +27,7 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (v9.3.9)
+## 🟢 Recently Resolved Issues (v9.3.10)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |

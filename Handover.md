@@ -1,4 +1,4 @@
-# Project Handover: Peer Visibility & Map Stabilization Fixes (v9.3.9)
+# Project Handover: Peer Visibility & Map Synchronization Fixes (v9.3.10)
 
 ## 📌 Status: Critical HUD & Map Synchronization Resolved
 
@@ -6,7 +6,7 @@
 - **Problem**: On the Tracker device, the "VWR" (Viewer) badge remained red even when receiving pulses. 
 - **Fix**: 
     - Updated `SharedUiComponents.kt` to use role-specific freshness logic.
-    - Updated `TrackerService.kt` (v9.3.9) to explicitly call `repository.updateRemoteActivity` when a signaling pulse is received via `handleViewerPulse`. This ensures the UI is notified of Viewer activity immediately.
+    - Updated `TrackerService.kt` (v9.3.10) to explicitly call `repository.updateRemoteActivity` when a signaling pulse is received via `handleViewerPulse`. This ensures the UI is notified of Viewer activity immediately.
 - **Result**: The "VWR" badge correctly turns Green upon receipt of pulses from a Viewer.
 
 ### 2. Map Stabilization (Issue #072)
