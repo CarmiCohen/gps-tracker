@@ -5,9 +5,9 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 3 |
+| **Open Technical Issues** | Active | 2 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 265 |
+| **Resolved (Total)** | 🟢 Progress | 266 |
 
 ---
 
@@ -21,7 +21,6 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 🔴 Open Issues
 | ID | Category | Description |
 | :--- | :--- | :--- |
-| **#059** | **Feature** | **Permission Health Check UI**: Implement a "Diagnostics" screen in Compose for Xiaomi special permissions. (Validation: #064) |
 | **#061** | **Cleanup** | **Forensic Logging Consolidation**: Create a `ForensicLogUseCase` to standardize "Special Color" (Pink) logging. (Validation: #065) |
 | **#062** | **Hardening** | **Dynamic Anchor Breakout**: Implement displacement-weighted monitor to prevent "sticky anchors". (Validation: #053) |
 
@@ -31,6 +30,7 @@ This document tracks active issues, technical debt, and pending implementation t
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
+| **#059** | **Permission Health Check UI** | **Resolved**. Implemented a dedicated Diagnostics screen in Compose to monitor background resilience (Battery, Overlay, Alarms, Location) and hardware-specific adaptations for Xiaomi/Samsung. Integrated into NavHost and Settings. |
 | **#068** | **Logcat Audit (Samsung Spam)** | **Resolved**. Hardened `Utils.kt` and `SystemStatusProvider` by enforcing mandatory use of cached package names in all permission checkers. Eliminated all dynamic `context.packageName` fallbacks in high-frequency paths. |
 
 ---

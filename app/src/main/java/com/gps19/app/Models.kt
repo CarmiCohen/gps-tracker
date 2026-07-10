@@ -10,20 +10,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * v9.3.0:
- * - Issue #042 Sanitization Visibility: Added DismissIdentitySanitization to UiEvent.
- * v9.2.6:
- * - Forensic Stress Test: Added TriggerForensicTest to UiCommand and UiEvent 
- *   to allow manual verification of forensic violation latching.
- * v9.1.9:
- * - Issue #051: Binary Parity Gap. Added TrackerStatus.toProto() to support 
- *   binary telemetry pulses with full forensic context.
- * v9.1.8:
- * - Issue #046: Shared Behavioral State. Removed local TrackerState enum in favor 
- *   of core:engine definition. Added trackerState to TrackerStatus.
- * v8.9.78:
- * - Issue #016: Performance Optimization. Added lazy GeoPoint caching to TrailPoint 
- *   to eliminate thousands of object allocations per second during map updates.
+ * v9.3.11:
+ * - Issue #059: Changed NavigateToDiagnostics to data class for visibility control.
  */
 
 @Serializable
@@ -609,6 +597,7 @@ sealed class UiEvent {
     data class ToggleGnssDetail(val visible: Boolean) : UiEvent()
     object ToggleXiaomiManualOverride : UiEvent()
     object DismissIdentitySanitization : UiEvent()
+    data class NavigateToDiagnostics(val visible: Boolean) : UiEvent()
 }
 
 sealed class UiCommand {

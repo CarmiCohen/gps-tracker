@@ -1,29 +1,38 @@
-# Project Handover: HUD & Map Synchronization Fix (v9.3.8-dev)
+# Project Handover: Permission Health Check UI (Issue #059) - v9.3.11-dev
 
-## 📌 Status: Foundational Fixes & HUD Wiring Completed
+## 📌 Forensic Status Summary
+This document provides a comprehensive snapshot of the work-in-progress for **Issue #059 (Permission Health Check UI)**. The goal of this task is to implement a dedicated "Diagnostics" screen to monitor background resilience and device-specific permission health (Xiaomi/Samsung).
 
-### 1. The Core Issue
-Device clock skew was causing the Viewer to incorrectly flag Tracker data as "Stale" (Gray). Even small drifts (<10s) triggered the 35s staleness gate because the Viewer was comparing Remote Source Time vs Local Time.
+### 1. Architectural Changes (Implemented)
+The following modifications have been made to support the new screen and its navigation:
 
-### 2. Forensic Fixes Applied (Completed in this Session)
-- **`TelemetryUseCase.kt`**: Forced `telemetryTs` to use the local receipt timestamp (`nowMs`) for all remote updates. 
-- **`DashboardUseCase.kt`**: Updated `isTelemetryFresh` and `isGpsFresh` to use a skew-immune formula based on local arrival time.
-- **`SharedUiComponents.kt`**: Fully updated `GlobalStatusBar` and `StatusRowData` to use these new flags. **HUD elements (Speed, State, Accuracies) should now remain colorized (Green) correctly.**
+- **Navigation Route**: Added `object Diagnostics : Screen("diagnostics")` to `Navigation.kt`.
+- **UI Events**: Added `NavigateToDiagnostics` to the `UiEvent` sealed class in `Models.kt`.
+- **Navigation State**: Added `isDiagnosticsVisible: Boolean` to the `NavigationState` in `MainUiState.kt`.
+- **Navigation Logic**: Updated `NavigationUseCase.kt` to handle the `NavigateToDiagnostics` event, ensuring all other overlays are cleared when diagnostics are opened.
+- **ViewModel Integration**: Updated `MainViewModel.kt` to pipe the `NavigateToDiagnostics` event through to the `NavigationUseCase`.
+- **New Component**: Created `DiagnosticsScreen.kt`—a Compose-based UI featuring:
+    - Status indicators for Battery Optimization, Overlay, Exact Alarm, and Background Location.
+    - Xiaomi-specific "Special Status" detection and manual override toggle.
+    - Samsung-specific engine tuning detection (S21 FE / A15).
+    - Direct action buttons to system settings via existing `MainActivity` callbacks.
 
-### 3. Immediate Resumption Plan (The "Last Mile")
-The next developer should resume at these specific items:
+### 2. Remaining Tasks (Backlog)
+To complete Issue #059 (tracked via Validation #064), the following steps are required:
 
-1.  **Peer Visibility (Issue C)**:
-    - On the **Tracker** device, the "VWR" (Viewer) badge is still showing red.
-    - Investigate why the Tracker is not acknowledging pulses from the Viewer. Check if the Pulse timestamp in the signaling layer is being rejected by a similar staleness check.
-2.  **Map Stabilization**:
-    - Ensure the map marker logic (in `MapComponents.kt`) uses the receipt-validated coordinates.
-    - Confirm that the marker no longer "flickers" or jumps to wrong locations when the two devices have mismatched clocks.
+- **NavHost Registration**: Add the `DiagnosticsScreen` composable to the `NavHost` in `MainAppContent.kt`.
+- **Entry Point Integration**: Add a trigger (button or link) to navigate to the Diagnostics screen. Recommended locations:
+    - Inside `PhoneSetupOverlay` (in `SettingsComponents.kt`).
+    - As a sub-option in `SettingsOverlay`.
+- **Back Navigation**: Ensure the `onBack` callback in `MainAppContent.kt` correctly toggles the `isDiagnosticsVisible` state off.
+- **Verification**:
+    - Verify that the screen correctly reflects real-time permission changes (it currently has a REFRESH button that calls `viewModel.onEvent(UiEvent.RefreshPermissionStatus)`).
+    - Verify that Samsung/Xiaomi specific notes appear only on relevant hardware.
 
-### 4. Build & Documentation
-- **Hilt Refactor**: Complete and stable.
-- **Gradle**: `app:installDebug` confirmed working.
-- **Documentation**: All `STATUS/` links are synchronized and clickable.
+### 3. Build & Environment Status
+- **Current Version**: v9.3.11 (Hardened logcat via Issue #068).
+- **Hilt**: Fully stable.
+- **Compose**: Latest version with Material3.
 
 ---
-**Handover Snapshot Finalized. No further changes will be made in this chat.**
+**Handover Snapshot Finalized. Resume at NavHost registration in MainAppContent.kt.**

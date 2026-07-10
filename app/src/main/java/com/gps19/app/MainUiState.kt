@@ -4,9 +4,10 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Unified immutable state for the entire UI structure.
+ * v9.3.11: 
+ * - Issue #059: Added isDiagnosticsVisible to NavigationState for Permission Health Check.
  * v9.3.0: Issue #042 - Sanitization Visibility. Added isIdentitySanitized flag.
  * v8.9.79: Issue #014 - Type Migration: Standardized accuracy fields to Double.
- * v8.8.2: Aligned default IDs with MainRepository.DEFAULT_TRACKER_ID and DEFAULT_VIEWER_ID.
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -118,6 +119,7 @@ data class NavigationState(
     val isRibbonsVisible: Boolean = false,
     val isGnssDetailVisible: Boolean = false,
     val isStopTrackingConfirmationVisible: Boolean = false,
+    val isDiagnosticsVisible: Boolean = false,
     val activeSubSettings: SubSettings? = null,
     val wasMapVisibleBeforeOverlay: Boolean = true
 )

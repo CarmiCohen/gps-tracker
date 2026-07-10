@@ -41,12 +41,11 @@ import kotlinx.coroutines.delay
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * v9.3.11:
+ * - Issue #059: Integrated DiagnosticsScreen into NavHost and handled overlay visibility.
  * v9.3.0:
  * - Issue #042: Sanitization Visibility. Added AlertDialog to notify user 
  *   when malformed IDs are automatically reset.
- * v8.9.55:
- * - R926: Aligned session auto-transition delay with LANDING_PAGE_PAUSE_MS from engine constants.
- *   (Supersedes legacy ID R925)
  */
 @Composable
 fun MainAppContent(
@@ -88,10 +87,20 @@ fun MainAppContent(
 
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.isInitialized, uiState.appMode) {
+    // Navigation logic based on app mode and diagnostics visibility
+    LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible) {
         if (!uiState.isInitialized) return@LaunchedEffect
         
         val mode = uiState.appMode
+        val isDiagnostics = uiState.navigation.isDiagnosticsVisible
+
+        if (isDiagnostics) {
+            if (navController.currentDestination?.route != Screen.Diagnostics.route) {
+                navController.navigate(Screen.Diagnostics.route)
+            }
+            return@LaunchedEffect
+        }
+
         if (mode != null) {
             // R926: Mandatory transition delay (LANDING_PAGE_PAUSE_MS) and Service Launch Integrity
             if (navController.currentDestination?.route == Screen.Landing.route) {
@@ -235,6 +244,7 @@ fun MainAppContent(
                         BackHandler {
                             val nav = uiState.navigation
                             when {
+                                nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
                                 nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
                                 nav.activeSubSettings != null -> viewModel.onEvent(UiEvent.SetSubSettings(null))
                                 nav.isSettingsOpen -> { viewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
@@ -260,6 +270,7 @@ fun MainAppContent(
                         BackHandler {
                             val nav = uiState.navigation
                             when {
+                                nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
                                 nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
                                 nav.activeSubSettings != null -> viewModel.onEvent(UiEvent.SetSubSettings(null))
                                 nav.isSettingsOpen -> { viewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
@@ -281,6 +292,20 @@ fun MainAppContent(
                             onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
                         )
                     }
+                    composable(Screen.Diagnostics.route) {
+                        BackHandler {
+                            viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
+                        }
+                        DiagnosticsScreen(
+                            viewModel = viewModel,
+                            onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
+                            onRequestBatteryExemption = onRequestBatteryExemption,
+                            onRequestOverlayPermission = onRequestOverlayPermission,
+                            onRequestAppInfo = onRequestAppInfo,
+                            onRequestExactAlarm = onRequestExactAlarm,
+                            onRequestXiaomiPermission = onRequestXiaomiPermission
+                        )
+                    }
                 }
                 
                 if (uiState.navigation.isPhoneSetupVisible) {
@@ -294,6 +319,7 @@ fun MainAppContent(
                         onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, 
                         onToggleXiaomiOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onTestAlarm = { viewModel.onEvent(UiEvent.TriggerTestAlarm) },
+                        onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
                         isBatteryWhitelisted = uiState.permissions.isBatteryWhitelisted, 
                         isOverlayGranted = uiState.permissions.isOverlayGranted,
                         isMicrophoneGranted = uiState.permissions.isMicrophoneGranted,

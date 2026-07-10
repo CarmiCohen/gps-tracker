@@ -5,7 +5,8 @@ import javax.inject.Singleton
 
 /**
  * NavigationUseCase: Manages UI navigation state transitions and overlay logic.
- * Extracted from MainViewModel to resolve Issue 115 (Architectural Bloat).
+ * v9.3.11:
+ * - Issue #059: Added NavigateToDiagnostics handling for Permission Health Check.
  */
 @Singleton
 class NavigationUseCase @Inject constructor(
@@ -13,7 +14,8 @@ class NavigationUseCase @Inject constructor(
 ) {
     fun handleNavigationEvent(event: UiEvent, currentState: MainUiState): NavigationState {
         val nav = currentState.navigation
-        val isAnyOverlayOpen = nav.isLogVisible || nav.isSettingsOpen || nav.isPhoneSetupVisible || nav.isRibbonsVisible || nav.isGnssDetailVisible
+        val isAnyOverlayOpen = nav.isLogVisible || nav.isSettingsOpen || nav.isPhoneSetupVisible || 
+                               nav.isRibbonsVisible || nav.isGnssDetailVisible || nav.isDiagnosticsVisible
         
         return when (event) {
             is UiEvent.ToggleMap -> {
@@ -24,6 +26,7 @@ class NavigationUseCase @Inject constructor(
                     isPhoneSetupVisible = false, 
                     isRibbonsVisible = false, 
                     isGnssDetailVisible = false,
+                    isDiagnosticsVisible = false,
                     activeSubSettings = null, 
                     wasMapVisibleBeforeOverlay = if (event.visible) true else nav.wasMapVisibleBeforeOverlay
                 )
@@ -32,7 +35,7 @@ class NavigationUseCase @Inject constructor(
                 if (event.visible) {
                     repository.updateLogFilters(details = false, recovered = false)
                     val wasMap = if (isAnyOverlayOpen) nav.wasMapVisibleBeforeOverlay else nav.isMapVisible
-                    nav.copy(isLogVisible = true, isMapVisible = false, isSettingsOpen = false, isPhoneSetupVisible = false, isRibbonsVisible = false, isGnssDetailVisible = false, activeSubSettings = null, wasMapVisibleBeforeOverlay = wasMap)
+                    nav.copy(isLogVisible = true, isMapVisible = false, isSettingsOpen = false, isPhoneSetupVisible = false, isRibbonsVisible = false, isGnssDetailVisible = false, isDiagnosticsVisible = false, activeSubSettings = null, wasMapVisibleBeforeOverlay = wasMap)
                 } else {
                     nav.copy(isLogVisible = false, isMapVisible = nav.wasMapVisibleBeforeOverlay)
                 }
@@ -40,7 +43,7 @@ class NavigationUseCase @Inject constructor(
             is UiEvent.ToggleSettings -> { 
                 if (event.visible) {
                     val wasMap = if (isAnyOverlayOpen) nav.wasMapVisibleBeforeOverlay else nav.isMapVisible
-                    nav.copy(isSettingsOpen = true, isMapVisible = false, isLogVisible = false, isPhoneSetupVisible = false, isRibbonsVisible = false, isGnssDetailVisible = false, activeSubSettings = null, wasMapVisibleBeforeOverlay = wasMap)
+                    nav.copy(isSettingsOpen = true, isMapVisible = false, isLogVisible = false, isPhoneSetupVisible = false, isRibbonsVisible = false, isGnssDetailVisible = false, isDiagnosticsVisible = false, activeSubSettings = null, wasMapVisibleBeforeOverlay = wasMap)
                 } else {
                     nav.copy(isSettingsOpen = false, isMapVisible = nav.wasMapVisibleBeforeOverlay)
                 }
@@ -48,15 +51,23 @@ class NavigationUseCase @Inject constructor(
             is UiEvent.TogglePhoneSetup -> {
                 if (event.visible) {
                     val wasMap = if (isAnyOverlayOpen) nav.wasMapVisibleBeforeOverlay else nav.isMapVisible
-                    nav.copy(isPhoneSetupVisible = true, isMapVisible = false, isLogVisible = false, isSettingsOpen = false, isRibbonsVisible = false, isGnssDetailVisible = false, activeSubSettings = null, wasMapVisibleBeforeOverlay = wasMap)
+                    nav.copy(isPhoneSetupVisible = true, isMapVisible = false, isLogVisible = false, isSettingsOpen = false, isRibbonsVisible = false, isGnssDetailVisible = false, isDiagnosticsVisible = false, activeSubSettings = null, wasMapVisibleBeforeOverlay = wasMap)
                 } else {
                     nav.copy(isPhoneSetupVisible = false, isMapVisible = nav.wasMapVisibleBeforeOverlay)
+                }
+            }
+            is UiEvent.NavigateToDiagnostics -> {
+                if (event.visible) {
+                    val wasMap = if (isAnyOverlayOpen) nav.wasMapVisibleBeforeOverlay else nav.isMapVisible
+                    nav.copy(isDiagnosticsVisible = true, isMapVisible = false, isLogVisible = false, isSettingsOpen = false, isPhoneSetupVisible = false, isRibbonsVisible = false, isGnssDetailVisible = false, activeSubSettings = null, wasMapVisibleBeforeOverlay = wasMap)
+                } else {
+                    nav.copy(isDiagnosticsVisible = false, isMapVisible = nav.wasMapVisibleBeforeOverlay)
                 }
             }
             is UiEvent.ToggleRibbons -> {
                 if (event.visible) {
                     val wasMap = if (isAnyOverlayOpen) nav.wasMapVisibleBeforeOverlay else nav.isMapVisible
-                    nav.copy(isRibbonsVisible = true, isMapVisible = false, isLogVisible = false, isSettingsOpen = false, isPhoneSetupVisible = false, isGnssDetailVisible = false, activeSubSettings = null, wasMapVisibleBeforeOverlay = wasMap)
+                    nav.copy(isRibbonsVisible = true, isMapVisible = false, isLogVisible = false, isSettingsOpen = false, isPhoneSetupVisible = false, isGnssDetailVisible = false, isDiagnosticsVisible = false, activeSubSettings = null, wasMapVisibleBeforeOverlay = wasMap)
                 } else {
                     nav.copy(isRibbonsVisible = false, isMapVisible = nav.wasMapVisibleBeforeOverlay)
                 }

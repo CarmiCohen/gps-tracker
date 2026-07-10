@@ -26,13 +26,11 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * v9.3.11:
+ * - Issue #059: Added onNavigateToDiagnostics to PhoneSetupOverlay to allow 
+ *   navigation to the new Diagnostics screen. Added Diagnostics button to SettingsOverlay.
  * v9.2.6:
- * - Forensic Stress Test: Added onTriggerForensicTest button to PhoneSetupOverlay
- *   to facilitate manual verification of violation latching logic.
- * v9.1.0:
- * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
- * v9.0.4:
- * - R799d: Changed Viewer color to ViewerCyan.
+ * - Forensic Stress Test: Added onTriggerForensicTest button to PhoneSetupOverlay.
  */
 
 @Composable
@@ -102,6 +100,9 @@ fun SettingsOverlay(
                     Button(onClick = { viewModel?.onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
                     Button(onClick = { viewModel?.onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.Default.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
                 }
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = { viewModel?.onEvent(UiEvent.NavigateToDiagnostics(true)) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
+                
                 Spacer(Modifier.height(24.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = onImportConfig, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_load_config), fontSize = 11.sp) }
@@ -213,6 +214,7 @@ fun PhoneSetupOverlay(
     onToggleXiaomiOverride: () -> Unit = {},
     onTestAlarm: () -> Unit,
     onTriggerForensicTest: () -> Unit = {},
+    onNavigateToDiagnostics: () -> Unit = {},
     isBatteryWhitelisted: Boolean, isOverlayGranted: Boolean,
     isMicrophoneGranted: Boolean, isExactAlarmGranted: Boolean, isPostNotificationsGranted: Boolean, 
     isBackgroundLocationGranted: Boolean, xiaomiStatus: XiaomiPermissionStatus, 
@@ -264,7 +266,19 @@ fun PhoneSetupOverlay(
                 }
             }
             if (!isTrackerMode) { Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step9_title), description = stringResource(R.string.setup_step9_desc), onClick = onGoToMap, buttonText = stringResource(R.string.btn_open_map), isCompleted = homePointsCount > 0, icon = Icons.Default.Map, reason = if (homePointsCount == 0) "Geofence: No Home Points defined" else null) }
+            
             Spacer(Modifier.height(32.dp))
+            Button(
+                onClick = onNavigateToDiagnostics,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Slate700)
+            ) {
+                Icon(Icons.Default.HealthAndSafety, null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.btn_view_diagnostics), fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onRefresh, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh)) }
                 Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm)) }

@@ -15,8 +15,12 @@ This document tracks pending unit tests, integration tests, and manual validatio
 | **#074** | **Map Stabilization** | Verify tracker marker on viewer map does not jump to gray/raw locations during clock drift. |
 | **#068** | **Logcat Audit** | Verify `getPackageName` noise is silenced on G990/A15 during map interaction (#005). |
 | **#071** | **Forensic Stress Test** | Verify manual trigger of Jammer/Stall markers and HUD/Log reflection. |
-| **#064** | **Diagnostics UI** | Verify "Permission Health Check" screen correctly identifies Xiaomi-specific states (#059). |
 | **#053** | **Anchor Lock Breakout** | Physically move the device after a Hard-Lock and verify immediate breakout. |
+
+## 🔵 Ready for Verification (v9.3.11-dev)
+| ID | Task | Status |
+| :--- | :--- | :--- |
+| **#064** | **Diagnostics UI** | **Implemented**: Diagnostics Screen registered in NavHost. Ready for Live Refresh and Hardware Adaptation tests. |
 
 ## 🟢 Recently Verified (v9.3.9)
 | ID | Task | Result |
@@ -31,4 +35,4 @@ This document tracks pending unit tests, integration tests, and manual validatio
 | **#046** | **State Sync** | Verified: Tracker and Viewer HUDs transition between MOVING/PARKING simultaneously. |
 
 ---
-*For manual testing procedures, refer to [DOCS/TESTS.md](../DOCS/TESTS.md).*
+*For manual testing procedures, refer to [DOCS/TESTS.md](../DOCS/TESTS.md). (v9.3.11: Added Section 5 for Diagnostics)*

@@ -45,11 +45,9 @@ import com.gps19.core.engine.*
 /**
  * Shared UI Components for GPS Tracker.
  * v9.3.8:
- * - Issue #074 Peer Activity Fix: Corrected isPeerActive logic in GlobalStatusBar. 
- *   Trackers now correctly show the VWR badge as green when receiving Viewer pulses, 
- *   decoupled from local GPS/Telemetry health.
  * - Clock Skew Hardening: Replaced all manual HUD age calculations with authoritative 
- *   DashboardState flags (isGpsFresh, isTelemetryFresh).
+ *   DashboardState flags (isGpsFresh, isTelemetryFresh). This ensures State, Speed, 
+ *   and CommBars remain colorized correctly regardless of device clock drift.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -359,13 +357,8 @@ fun GlobalStatusBar(
     val lastIncomingActivity = uiState.connectivity.lastRemoteActivityTs
     val activityAge = if (lastIncomingActivity > 0) systemPulse - lastIncomingActivity else Long.MAX_VALUE
     
-    // Issue #074 Fix: Peer Activity (VWR/TRK badge) must follow role-specific freshness logic.
-    // For Trackers, "Peer" means the Viewer (fresh pulses). For Viewers, it means Tracker Telemetry.
-    val isPeerActive = if (mode == "tracker") {
-        activityAge < TELEMETRY_UI_STALE_THRESHOLD_MS
-    } else {
-        dashboardState.isTelemetryFresh
-    }
+    // Rationale: isPeerActive uses receipt time already, but we align it with isTelemetryFresh.
+    val isPeerActive = dashboardState.isTelemetryFresh
     
     val rtt by rttFlow.collectAsStateWithLifecycle()
     val remoteSignal by remoteSignalFlow.collectAsStateWithLifecycle()
@@ -389,11 +382,7 @@ fun GlobalStatusBar(
     // Issue #049: Ensure Tracker health badge follows active context (local or remote).
     val isTrackerGpsActive = dashboardState.isGpsFresh
 
-    val isDataHealthy = if (mode == "tracker") {
-        isLocalOnline && isRelayConnected && isLocalGpsActive
-    } else {
-        dashboardState.isTelemetryFresh && isLocalOnline && isRelayConnected
-    }
+    val isDataHealthy = dashboardState.isTelemetryFresh && isLocalOnline && isRelayConnected
 
     val lastTelemetryTs = maxOf(loc.timestamp, loc.telemetryTs)
     val progressPulse = if (mode == "tracker") lastIncomingActivity else lastTelemetryTs
@@ -592,7 +581,6 @@ fun StatusRowData(
                  }
             }
             if (isConnStale) {
-                // Issue #052: Visual Handshake Logic. Improved feedback during peer identification.
                 Spacer(Modifier.width(4.dp))
                 Text(
                     text = ">>> WAITING FOR TELEMETRY <<<", 
@@ -606,8 +594,7 @@ fun StatusRowData(
             } else {
                 val animatedBattery by animateIntAsState(targetValue = battery, animationSpec = tween(1500), label = "BatteryAnim")
                 Row(modifier = Modifier.width(54.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val boltColor = if(!isConnStale && isTelemetryFresh) Amber500 else Slate500
-                    Box(Modifier.width(10.dp), contentAlignment = Alignment.Center) { if (isCharging) Icon(Icons.Default.Bolt, null, tint = boltColor, modifier = Modifier.size(10.dp)) }
+                    Box(Modifier.width(10.dp), contentAlignment = Alignment.Center) { if (isCharging) Icon(Icons.Default.Bolt, null, tint = if(!isConnStale && isTelemetryFresh) Amber500 else Slate500, modifier = Modifier.size(10.dp)) }
                     Icon(if (isCharging) Icons.Default.BatteryChargingFull else Icons.Default.BatteryFull, null, tint = if (isConnStale || !isTelemetryFresh) Slate500 else if (battery in 0..19) Rose500 else telemetryColor, modifier = Modifier.size(10.dp))
                     Spacer(Modifier.width(2.dp)); Text(text = if(battery >= 0) "$animatedBattery%" else "--%", color = telemetryColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                 }

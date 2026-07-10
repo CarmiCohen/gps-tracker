@@ -20,12 +20,11 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * v9.3.11:
+ * - Issue #059: Added NavigateToDiagnostics handling and optimized permission refresh interval.
  * v9.3.3:
  * - Issue #039 Identity Rejection Feedback: Implemented handling for 
  *   BulkUpdateSettings and improved error reporting for identity collisions.
- * v9.3.0:
- * - Issue #042: Sanitization Visibility. Added observation of identitySanitizedFlow 
- *   and handling for DismissIdentitySanitization event.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -188,7 +187,8 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { 
             while(true) { 
                 updateState { it.copy(permissions = systemStatusProvider.getPermissionState()) }
-                delay(if (_uiState.value.navigation.isPhoneSetupVisible) PERMISSION_REFRESH_INTERVAL_FAST_MS else PERMISSION_REFRESH_INTERVAL_SLOW_MS) 
+                val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
+                delay(if (refreshFast) PERMISSION_REFRESH_INTERVAL_FAST_MS else PERMISSION_REFRESH_INTERVAL_SLOW_MS) 
             } 
         }
 
@@ -201,7 +201,8 @@ class MainViewModel @Inject constructor(
         when (event) {
             is UiEvent.ToggleMap, is UiEvent.ToggleLog, is UiEvent.ToggleSettings, 
             is UiEvent.TogglePhoneSetup, is UiEvent.ToggleRibbons, is UiEvent.SetDashboardExpanded,
-            is UiEvent.ToggleGnssDetail, is UiEvent.SetSubSettings, is UiEvent.ShowStopTrackingConfirmation -> {
+            is UiEvent.ToggleGnssDetail, is UiEvent.SetSubSettings, is UiEvent.ShowStopTrackingConfirmation,
+            is UiEvent.NavigateToDiagnostics -> {
                 if (event is UiEvent.ToggleSettings) {
                     if (event.visible) updateState { it.copy(draftSettings = settingsUseCase.prepareDraft(it)) }
                     else commitDraft()
@@ -485,7 +486,7 @@ class MainViewModel @Inject constructor(
             val home = current.homePoints.firstOrNull(); val distToHome = if (home != null) PhysicsUtils.calculateDistance(update.lat, update.lng, home.latitude, home.longitude) else null
             if (!update.isMe) {
                 _remoteSignal.value = update.signal ?: _remoteSignal.value; _trackerCurrentMa.value = update.currentMa
-                current.copy(trackerLocation = telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime), connectivity = current.connectivity.copy(isTrackerConnected = true, lastUpdateTs = nowMs, lastRemoteActivityTs = nowMs), trackerStats = telemetryUseCase.mapStats(update, current.trackerStats), trackerBattery = current.trackerBattery.copy(level = update.battery, temp = update.temp, isCharging = update.isCharging, isChargingStable = update.isCharging), trackerSatsView = update.satsView, trackerSatsUsed = update.satsUsed, distanceTrackerToHome = if (current.appMode == "viewer" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceTrackerToHome, distanceViewerToHome = if (current.appMode == "tracker" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceViewerToHome, distanceTrackerToViewer = if (PhysicsUtils.isValidLocation(current.localLocation.lat, current.localLocation.lng) && PhysicsUtils.isValidLocation(update.lat, update.lng)) PhysicsUtils.calculateDistance(update.lat, update.lng, current.localLocation.lat, current.localLocation.lng) else current.distanceTrackerToViewer, maxTrackerAccuracy = if (current.appMode == "viewer" && update.maxAccuracy > 0.0) update.maxAccuracy else current.maxTrackerAccuracy)
+                current.copy(trackerLocation = telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime), connectivity = current.connectivity.copy(isTrackerConnected = true, lastUpdateTs = nowMs, lastRemoteActivityTs = nowMs), trackerStats = telemetryUseCase.mapStats(update, current.trackerStats), trackerBattery = current.trackerBattery.copy(level = update.battery, temp = update.batteryTemp, isCharging = update.isCharging, isChargingStable = update.isCharging), trackerSatsView = update.satsView, trackerSatsUsed = update.satsUsed, distanceTrackerToHome = if (current.appMode == "viewer" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceTrackerToHome, distanceViewerToHome = if (current.appMode == "tracker" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceViewerToHome, distanceTrackerToViewer = if (PhysicsUtils.isValidLocation(current.localLocation.lat, current.localLocation.lng) && PhysicsUtils.isValidLocation(update.lat, update.lng)) PhysicsUtils.calculateDistance(update.lat, update.lng, current.localLocation.lat, current.localLocation.lng) else current.distanceTrackerToViewer, maxTrackerAccuracy = if (current.appMode == "viewer" && update.maxAccuracy > 0.0) update.maxAccuracy else current.maxTrackerAccuracy)
             } else {
                 val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng); val dToOther = if (PhysicsUtils.isValidLocation(current.trackerLocation.lat, current.trackerLocation.lng) && isLocationValid) PhysicsUtils.calculateDistance(current.trackerLocation.lat, current.trackerLocation.lng, update.lat, update.lng) else null
                 if (current.localLocation.lat != 0.0 && isLocationValid && PhysicsUtils.calculateDistance(current.localLocation.lat, current.localLocation.lng, update.lat, update.lng) > WILD_JUMP_THRESHOLD_METERS) return@updateState current

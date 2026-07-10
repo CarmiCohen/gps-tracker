@@ -30,8 +30,15 @@ Verify that the dashboard responds to "Violations" and breaks out of locks.
 * **Relates to:** Manual Validation **#031** (Soak Test Monitoring).
 
 ## 5. Diagnostics & Permissions (Task #064)
-* **Action:** Open the Diagnostics screen (if implemented) or check the "Permission Health Check".
-* **Verification:** Screen should correctly identify Xiaomi-specific states (Autostart, Battery Saver).
+* **Action:** Open **Settings** -> **Diagnostics** or **Settings** -> **Phone Setup** -> **VIEW SYSTEM DIAGNOSTICS**.
+* **Live Refresh Test:** 
+    1. Revoke "Display over other apps" in system settings.
+    2. Return to the Diagnostics screen and tap **REFRESH STATUS**.
+    3. Verify "Overlay Permission" changes to **DENIED** (Red).
+    4. Re-grant the permission and verify it returns to **GRANTED** (Green).
+* **Hardware Adaptation Test:**
+    * **Xiaomi:** Verify the "Xiaomi Special Status" section appears and accurately reflects "Other Permissions" (Lock screen/Pop-up). Test the "Manual Override" switch.
+    * **Samsung:** Verify the "Samsung Engine Tuning: ACTIVE" note appears on S21 FE or A15 devices.
 * **Relates to:** Manual Validation **#064** (Diagnostics UI).
 
 ## 6. Manual Forensic Stress Test (Task #071)

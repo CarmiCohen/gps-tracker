@@ -47,6 +47,7 @@ val Purple500 = Color(0xFF800080) // Added for R805 markers
 val Slate950 = Color(0xFF020617)
 val Slate900 = Color(0xFF0F172A)
 val Slate800 = Color(0xFF1E293B)
+val Slate700 = Color(0xFF334155) // Added for Issue #059 UI buttons
 val Slate400 = Color(0xFF94A3B8)
 val Slate100 = Color(0xFFF1F5F9)
 val White = Color(0xFFFFFFFF)

@@ -19,6 +19,7 @@
     <string name="btn_app_info">App Info</string>
     <string name="status_muted">Muted</string>
     <string name="btn_dismiss">Dismiss</string>
+    <string name="btn_diagnostics">Diagnostics</string>
 
     <!-- Permission Dialogs -->
     <string name="perm_background_title">Background Location Access</string>
@@ -126,6 +127,8 @@
     <string name="setup_step9_desc">No home points defined. Tracking will work, but distance alerts and geofence violations cannot be calculated.</string>
     <string name="btn_open_map">Open Map</string>
     <string name="btn_test_alarm">TEST ALARM</string>
+    <string name="diagnostics_title">System Diagnostics</string>
+    <string name="btn_view_diagnostics">VIEW SYSTEM DIAGNOSTICS</string>
 
     <!-- Log Overlay -->
     <string name="log_hist_prefix">[HIST] </string>
