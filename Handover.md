@@ -40,7 +40,7 @@ This document provides a definitive snapshot of the project as of v9.3.11. The s
 6. Briefly explain each action before executing it.
 7. Completion Checklist:
     - a. Rebuild the app.
-    - b. Verify `issues.md` / `compliance.md`.
+    - b. Verify `issues.md` / `STATUS/VERIFICATION_MANIFEST.md`.
     - c. Check for truncation in `*.md` or `*.xml`.
     - d. Verify consistency across documentation.
     - e. Verify requirements in `STATUS/SOT_MASTER_REQUIREMENTS.md`.

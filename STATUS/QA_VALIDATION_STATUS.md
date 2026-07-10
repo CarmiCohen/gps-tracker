@@ -13,14 +13,17 @@ This document tracks pending unit tests, integration tests, and manual validatio
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
 | **#074** | **Map Stabilization** | Verify tracker marker on viewer map does not jump to gray/raw locations during clock drift. |
-| **#068** | **Logcat Audit** | Verify `getPackageName` noise is silenced on G990/A15 during map interaction (#005). |
 | **#071** | **Forensic Stress Test** | Verify manual trigger of Jammer/Stall markers and HUD/Log reflection. |
 | **#053** | **Anchor Lock Breakout** | Physically move the device after a Hard-Lock and verify immediate breakout. |
 
-## 🔵 Ready for Verification (v9.3.11-dev)
-| ID | Task | Status |
+## 🔵 Ready for Verification
+*No tasks currently pending verification.*
+
+## 🟢 Recently Verified (v9.3.11)
+| ID | Task | Result |
 | :--- | :--- | :--- |
-| **#064** | **Diagnostics UI** | **Implemented**: Diagnostics Screen registered in NavHost. Ready for Live Refresh and Hardware Adaptation tests. |
+| **#064** | **Diagnostics UI** | **Verified**: UI correctly reflects live permission changes and hardware adaptations for Xiaomi/Samsung. |
+| **#068** | **Logcat Audit** | **Verified**: Logcat spillage for `getPackageName` is silenced on Samsung devices via identifier caching. |
 
 ## 🟢 Recently Verified (v9.3.9)
 | ID | Task | Result |
