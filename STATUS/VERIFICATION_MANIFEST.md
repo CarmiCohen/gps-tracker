@@ -1,4 +1,4 @@
-# Compliance & Operational Requirements (Audit Baseline) - v9.3.6
+# Compliance & Operational Requirements (Audit Baseline) - v9.3.9
 
 This document serves as the formal proof of implementation for the GPS-Tracker system. It contains the Verification Manifest (Requirements Tracking) and recent Hardening Phase resolutions. 
 
@@ -8,6 +8,7 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 | Requirement ID | Requirement Description | Implementation Status |
 | :--- | :--- | :--- |
+| **R995** | **Signaling Pulse Acknowledgement**: Tracker MUST update remote activity timestamp upon signaling pulse receipt. | **Verified (v9.3.9)** |
 | **R978** | **Service Component Injection**: Core service components MUST be field-injected via Hilt. | **Verified (v9.3.6)** |
 | **R973** | **Standardized Proto Path Authority**: `app/src/main/proto` is the sole schema directory. | **Verified (v9.3.0)** |
 | **R400** | **Map Metadata Alignment**: Status messages anchored to bottom-center with 80dp offset. | **Verified (v9.3.0)** |
@@ -58,47 +59,30 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 ## 2. Resolution Archive (Hardening Phase)
 
-### 2.1. Hardening Phase Resolutions (v9.3.6)
+### 2.1. Hardening Phase Resolutions (v9.3.9)
+*   **FIXED #073: Peer Visibility (Issue C)** - Resolution: Added mandatory signaling pulse acknowledgement in `TrackerService`. Updated `GlobalStatusBar` role-specific freshness logic. (Requirement R995)
+
+### 2.2. Hardening Phase Resolutions (v9.3.8)
+*   **FIXED #074: Incorrect Peer Activity Badge Logic** - Resolution: Corrected `isPeerActive` logic in `GlobalStatusBar`.
+*   **FIXED #072: Map Stabilization** - Resolution: Updated `RemoteHandler` to use `optimizedPoint` from `LocationProcessor`.
+
+### 2.3. Hardening Phase Resolutions (v9.3.6)
 *   **FIXED #058: TrackerService Initialization** - Resolution: Migrated all common service dependencies to `BaseMonitorService`. Eliminated `EntryPointAccessors` in `TrackerService`, `ViewerService`, `WatchdogReceiver`, and `GpsApplication`. Standardized component initialization and cleanup. (Requirement R978)
 *   **FIXED #047: Speed Zeroing Authority** - Resolution: Verified immediate speed drop to 0.0 on GPS loss in Viewer HUD. (Requirement R987)
 *   **FIXED #046: State Sync Audit** - Resolution: Verified simultaneous Tracker/Viewer HUD state transitions under load. (Requirement R986)
 
-### 2.2. Hardening Phase Resolutions (v9.3.4)
+### 2.4. Hardening Phase Resolutions (v9.3.4)
 *   **FIXED #039: Identity Rejection UX** - Resolution: Implemented explicit UI and forensic log feedback for identity collisions and validation failures. (Requirement R977)
 
-### 2.3. Hardening Phase Resolutions (v9.3.2)
+### 2.5. Hardening Phase Resolutions (v9.3.2)
 *   **FIXED #042: Sanitization Visibility** - Resolution: Implemented AlertDialog notification for auto-sanitized IDs during migration. (Requirement R976)
 
-### 2.4. Hardening Phase Resolutions (v9.3.1)
+### 2.6. Hardening Phase Resolutions (v9.3.1)
 *   **FIXED #055: Issue History Recovery** - Resolution: Restored 185 "lost" legacy resolutions from `RESOLUTION_ARCHIVE.md`.
 *   **FIXED #054: Requirement ID Collision** - Resolution: Audited and corrected overloaded Issue #326.
 
-### 2.5. Hardening Phase Resolutions (v9.3.0)
+### 2.7. Hardening Phase Resolutions (v9.3.0)
 *   **FIXED R973: Proto Schema Duplication** - Resolution: Deprecated legacy `app/src/proto` path and consolidated all schemas into the authoritative `app/src/main/proto` directory. (Issue #030)
 *   **FIXED R400: Map Metadata Alignment** - Resolution: Re-anchored Bayesian Uncertainty status messages from the map center to the bottom-center metadata cluster. Implemented an 80dp vertical offset. (Issue #400)
-
-### 2.6. Hardening Phase Resolutions (v9.2.9)
-*   **FIXED R994: Screen-Off Optimization Authority** - Resolution: Implemented dynamic GPS down-sampling to 5000ms when screen is off using `DisplayManager`. (Issue R994)
-
-### 2.7. Hardening Phase Resolutions (v9.2.8)
-*   **FIXED R993: Notification Throttling Authority** - Resolution: Implemented dual-rate notification refresh (1s active / 10s background) in `BaseMonitorService`.
-
-### 2.8. Hardening Phase Resolutions (v9.2.6)
-*   **FIXED R049: HUD Context Mapping Authority** - Resolution: Corrected `GlobalStatusBar` mapping to use mode-aware location context. (Issue #049)
-
-### 2.9. Hardening Phase Resolutions (v9.2.3)
-*   **FIXED R991: HUD Local Health Standardization** - Resolution: Standardized HUD status badges to reflect local device health. (Issue #044)
-
-### 2.10. Hardening Phase Resolutions (v9.2.2)
-*   **FIXED R326: Intelligent Uncertainty UX** - Resolution: Enriched Location Pending state with reasons (`GPS_GAP`, `JAMMER`). (Issue #326)
-
-### 2.11. Hardening Phase Resolutions (v9.2.0)
-*   **FIXED R989: HUD Freshness Duality** - Resolution: Differentiated Telemetry Age from GPS Age in HUD; line elements remain colorized on GPS loss if link is active. (Issue #052)
-
-### 2.12. Hardening Phase Resolutions (v9.1.9)
-*   **FIXED R988: Binary Forensic Parity** - Resolution: Synchronized binary telemetry contract to ensure all engine fields are preserved in `location_relay_bin` pulses. (Issue #051)
-
-### 2.13. Hardening Phase Resolutions (v9.1.7)
-*   **FIXED R985: Migration Integrity Audit** - Resolution: Verified and hardened v53 Room database migration. (Issue #043)
 
 **Full history available in [RESOLUTION_ARCHIVE.md](RESOLUTION_ARCHIVE.md).**

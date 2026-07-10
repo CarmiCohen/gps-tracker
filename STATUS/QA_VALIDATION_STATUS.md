@@ -12,12 +12,16 @@ This document tracks pending unit tests, integration tests, and manual validatio
 ## 🟡 Pending Manual Validation (Field Tests)
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
-| **#073** | **Peer Visibility (Issue C)** | Verify why Tracker shows "VWR" as red. Investigate pulse timestamp rejection in `RemoteHandler`. |
 | **#074** | **Map Stabilization** | Verify tracker marker on viewer map does not jump to gray/raw locations during clock drift. |
 | **#068** | **Logcat Audit** | Verify `getPackageName` noise is silenced on G990/A15 during map interaction (#005). |
 | **#071** | **Forensic Stress Test** | Verify manual trigger of Jammer/Stall markers and HUD/Log reflection. |
 | **#064** | **Diagnostics UI** | Verify "Permission Health Check" screen correctly identifies Xiaomi-specific states (#059). |
 | **#053** | **Anchor Lock Breakout** | Physically move the device after a Hard-Lock and verify immediate breakout. |
+
+## 🟢 Recently Verified (v9.3.9)
+| ID | Task | Result |
+| :--- | :--- | :--- |
+| **#073** | **Peer Visibility (Issue C)** | **Verified**: Tracker "VWR" badge now correctly turns green upon receipt of signaling pulses. |
 
 ## 🟢 Recently Verified (v9.3.8)
 | ID | Task | Result |

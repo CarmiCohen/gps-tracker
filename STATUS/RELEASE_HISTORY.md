@@ -1,6 +1,14 @@
-# Project History & Versioning (v9.3.6)
+# Project History & Versioning (v9.3.9)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## v9.3.9
+- **Peer Visibility Fix (#073 / R995)**: Resolved defect where Tracker "VWR" badge remained red during active monitoring. Implemented explicit signaling pulse acknowledgement in `TrackerService` to drive HUD freshness.
+- **HUD Logic Hardening (#074 / R980)**: Refined `isPeerActive` in `GlobalStatusBar` to use role-specific freshness logic, ensuring Tracker-side badges track Viewer pulses exclusively.
+
+## v9.3.8
+- **Map Stabilization (#072 / R981)**: Synchronized remote marker updates with `LocationProcessor.optimizedPoint` to prevent coordinate flicker and respect Stationary Anchors.
+- **HUD Synchronization**: Integrated skew-immune freshness flags across all top-level badges.
 
 ## v9.3.6
 - **Full Hilt Migration (Issue #058 / R978)**: Completed the architectural refactor of the background service layer. All 11 core components are now field-injected via Hilt into a consolidated `BaseMonitorService`.
