@@ -1,9 +1,11 @@
-# System Source of Truth (SoT) - v9.3.6
+# System Source of Truth (SoT) - v9.3.8
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
 *   **Service Component Injection (R978)**: All core service components (Managers, Handlers, Processors) MUST be field-injected via Hilt and initialized using a standardized `Listener` and `initialize(CoroutineScope)` pattern to ensure testability and DI compliance. (Issue #058 / v9.3.6)
+*   **Peer Activity HUD Authority (R980)**: The `GlobalStatusBar` MUST use role-specific freshness logic for peer badges. Trackers MUST bind the "VWR" badge to Viewer pulse activity (local receipt time), while Viewers bind the "TRK" badge to Tracker telemetry freshness. (Issue #074 / v9.3.8)
+*   **Map Marker Stability Authority (R981)**: The map system MUST use the `optimizedPoint` from `LocationProcessor` for all remote marker updates. This ensures coordinate stability by respecting Stationary Anchors and clock-regression filters. (Issue #072 / v9.3.8)
 *   **Identity Rejection Feedback (R977)**: The system MUST provide explicit UI feedback (Toast and Persistent Log) when settings updates or commits are rejected due to identity collisions or validation failures. (Issue #039 / v9.3.4)
 *   **Sanitization Visibility (R976)**: The system MUST provide a UI notification (AlertDialog) when malformed Tracker or Viewer IDs are automatically reset to default values during storage migration. (Issue #042 / v9.3.2)
 *   **Forensic Logging Authority (R979)**: The system MUST use a standardized `ForensicLogUseCase` for all high-visibility (Pink) logging to ensure cross-module consistency. (Issue #061 / v9.3.6-dev)

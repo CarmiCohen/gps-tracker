@@ -44,16 +44,12 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * v9.2.7:
- * - Requirement R960: Moved GPS LED adjacent to INT/SRV to form the "Local Capability" 
- *   block, separating hardware health from peer-dependent indicators.
- * v9.2.6:
- * - Issue #049 Fix: Corrected GlobalStatusBar mapping to use mode-aware location 
- *   for Tracker-row health and pending states. Prevents false JAMMER/P indicators 
- *   on local tracker row. Fixed RepeatMode and variable naming issues.
- * v9.2.3:
- * - Issue #044 Fix: Standardized HUD LEDs to Local Health. Standardized GPS badge 
- *   to local signal. Peer-dependent fields (Speed, State) remain tied to remote health.
+ * v9.3.8:
+ * - Issue #074 Peer Activity Fix: Corrected isPeerActive logic in GlobalStatusBar. 
+ *   Trackers now correctly show the VWR badge as green when receiving Viewer pulses, 
+ *   decoupled from local GPS/Telemetry health.
+ * - Clock Skew Hardening: Replaced all manual HUD age calculations with authoritative 
+ *   DashboardState flags (isGpsFresh, isTelemetryFresh).
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -363,7 +359,13 @@ fun GlobalStatusBar(
     val lastIncomingActivity = uiState.connectivity.lastRemoteActivityTs
     val activityAge = if (lastIncomingActivity > 0) systemPulse - lastIncomingActivity else Long.MAX_VALUE
     
-    val isPeerActive = activityAge < TELEMETRY_UI_STALE_THRESHOLD_MS
+    // Issue #074 Fix: Peer Activity (VWR/TRK badge) must follow role-specific freshness logic.
+    // For Trackers, "Peer" means the Viewer (fresh pulses). For Viewers, it means Tracker Telemetry.
+    val isPeerActive = if (mode == "tracker") {
+        activityAge < TELEMETRY_UI_STALE_THRESHOLD_MS
+    } else {
+        dashboardState.isTelemetryFresh
+    }
     
     val rtt by rttFlow.collectAsStateWithLifecycle()
     val remoteSignal by remoteSignalFlow.collectAsStateWithLifecycle()
@@ -381,14 +383,17 @@ fun GlobalStatusBar(
     val lastGpsTs = loc.timestamp
     
     // Issue #044: Differentiate Local vs Tracker GPS Health for HUD top-level badges.
-    val localGpsAge = if (uiState.localLocation.timestamp > 0) systemPulse - uiState.localLocation.timestamp else Long.MAX_VALUE
-    val isLocalGpsActive = localGpsAge < GPS_UI_FAIL_THRESHOLD_MS
+    // Fixed: Now relies on dashboardState skew-immune logic.
+    val isLocalGpsActive = if (mode == "tracker") dashboardState.isGpsFresh else (systemPulse - uiState.localLocation.timestamp < GPS_UI_FAIL_THRESHOLD_MS)
 
     // Issue #049: Ensure Tracker health badge follows active context (local or remote).
-    val trackerGpsAge = if (loc.timestamp > 0) systemPulse - loc.timestamp else Long.MAX_VALUE
-    val isTrackerGpsActive = trackerGpsAge < GPS_UI_FAIL_THRESHOLD_MS
+    val isTrackerGpsActive = dashboardState.isGpsFresh
 
-    val isDataHealthy = dashboardState.isTelemetryFresh && isLocalOnline && isRelayConnected
+    val isDataHealthy = if (mode == "tracker") {
+        isLocalOnline && isRelayConnected && isLocalGpsActive
+    } else {
+        dashboardState.isTelemetryFresh && isLocalOnline && isRelayConnected
+    }
 
     val lastTelemetryTs = maxOf(loc.timestamp, loc.telemetryTs)
     val progressPulse = if (mode == "tracker") lastIncomingActivity else lastTelemetryTs
@@ -416,7 +421,8 @@ fun GlobalStatusBar(
         isViewerLocPending = uiState.localLocation.isLocationPending,
         viewerLocPendingReason = uiState.localLocation.locationPendingReason,
         lastGpsTs = lastGpsTs,
-        isTelemetryFresh = dashboardState.isTelemetryFresh
+        isTelemetryFresh = dashboardState.isTelemetryFresh,
+        isGpsFresh = dashboardState.isGpsFresh
     )
 }
 
@@ -436,7 +442,8 @@ fun StatusBar(
     isViewerLocPending: Boolean = false,
     viewerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     lastGpsTs: Long = 0L,
-    isTelemetryFresh: Boolean = true
+    isTelemetryFresh: Boolean = true,
+    isGpsFresh: Boolean = true
 ) {
     val age = if (lastP > 0) now - lastP else Long.MAX_VALUE 
     val progressValue = if (lastP > 0) maxOf(0f, minOf(1f, (TELEMETRY_UI_STALE_THRESHOLD_MS - age).toFloat() / TELEMETRY_UI_STALE_THRESHOLD_MS)) else 0f
@@ -512,7 +519,6 @@ fun StatusBar(
                 Spacer(Modifier.weight(1f))
 
                 // Issue #044: Speed reflects Tracker health.
-                // Issue #047 Fix: Suppress animation and zero out speed when GPS is stale.
                 val speedTargetKph = if (isTrackerGpsActive && !speedMps.isNaN()) speedMps * 3.6f else 0f
                 val animatedSpeed by animateFloatAsState(targetValue = speedTargetKph, animationSpec = tween(1000), label = "SpeedAnim")
                 
@@ -522,29 +528,28 @@ fun StatusBar(
             }
             Spacer(Modifier.height(3.dp))
 
-            val localTelemetryAge = now - viewerGpsTs
-            val isLocalTelemetryFresh = viewerGpsTs > 0 && localTelemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
-
             if (isLandscape && mode == "viewer") {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                    val vAge = now - viewerGpsTs
-                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = if(viewerGpsTs > 0) vAge else -1L, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = isLocalTelemetryFresh) }
+                    val vAge = if(viewerGpsTs > 0) now - viewerGpsTs else -1L
+                    val isLocalTelemetryFresh = viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)
                     
-                    val tAge = now - lastGpsTs
-                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = isTelemetryFresh) }
+                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = vAge, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = isLocalTelemetryFresh, isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS) }
+                    
+                    val tAge = if(lastGpsTs > 0) now - lastGpsTs else -1L
+                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = isTelemetryFresh, isGpsFresh = isGpsFresh) }
                 }
             } else {
                 if (mode == "viewer") {
-                    val vAge = now - viewerGpsTs
-                    StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = if(viewerGpsTs > 0) vAge else -1L, horizontalPadding = 8.dp, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = isLocalTelemetryFresh)
+                    val vAge = if(viewerGpsTs > 0) now - viewerGpsTs else -1L
+                    val isLocalTelemetryFresh = viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)
+                    StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = vAge, horizontalPadding = 8.dp, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = isLocalTelemetryFresh, isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS)
                     Spacer(Modifier.height(3.dp))
                 }
                 val trkColor = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd
-                val tAge = now - lastGpsTs
-                
-                val effectiveTrkTelemetryFresh = if (mode == "tracker") isLocalTelemetryFresh else isTelemetryFresh
+                val tAge = if(lastGpsTs > 0) now - lastGpsTs else -1L
+                val effectiveTrkTelemetryFresh = if (mode == "tracker") (viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isTelemetryFresh
 
-                StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = trkColor, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = if(lastGpsTs > 0) tAge else -1L, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = effectiveTrkTelemetryFresh)
+                StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = trkColor, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = effectiveTrkTelemetryFresh, isGpsFresh = isGpsFresh)
             }
         }
     }
@@ -557,22 +562,15 @@ fun StatusRowData(
     isRemote: Boolean = false, isPeerActive: Boolean = true, overrideDistanceColor: Color? = null, 
     isLocPending: Boolean = false,
     locPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    isTelemetryFresh: Boolean = true
+    isTelemetryFresh: Boolean = true,
+    isGpsFresh: Boolean = true
 ) {
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     
-    val isGpsFresh = gpsAgeMs != -1L && gpsAgeMs < GPS_UI_FAIL_THRESHOLD_MS
     val isConnStale = isRemote && !isPeerActive
-    val isGpsStale = !isGpsFresh
-    
     val telemetryColor = if (isTelemetryFresh && !isConnStale) color else Slate500
-
-    val isHandshaking = isConnStale
-
     val contentColor = if (isConnStale) Slate500 else color
-    // GPS color is strictly for position-fix-dependent precision indicators (Age, Accuracy)
-    val gpsColor = if (isGpsStale) Slate500 else color
-    // Connectivity & Distance should remain colorized as long as the telemetry link is fresh
+    val gpsColor = if (!isGpsFresh) Slate500 else color
     val distColor = if (isTelemetryFresh && !isConnStale) (overrideDistanceColor ?: color) else Slate500
 
     val infiniteTransition = rememberInfiniteTransition(label = "HandshakeAnimations")
@@ -586,14 +584,15 @@ fun StatusRowData(
         Row(modifier = Modifier.width(210.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(modifier = Modifier.width(48.dp), verticalAlignment = Alignment.CenterVertically) {
                  val animatedLabelAlpha by animateFloatAsState(targetValue = if (isConnStale) 0.5f else 1f, label = "LabelAlpha")
-                 Text(text = label, color = contentColor.copy(alpha = if (isHandshaking) handshakeAlpha else animatedLabelAlpha), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 Text(text = label, color = contentColor.copy(alpha = if (isConnStale) handshakeAlpha else animatedLabelAlpha), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                  if (isLocPending) {
                      Box(Modifier.padding(start = 1.dp).background(Amber500, RoundedCornerShape(1.dp)).padding(horizontal = 1.dp)) {
                          Text("P", color = Color.Black, fontSize = 7.sp, fontWeight = FontWeight.Bold, style = compactStyle)
                      }
                  }
             }
-            if (isHandshaking) {
+            if (isConnStale) {
+                // Issue #052: Visual Handshake Logic. Improved feedback during peer identification.
                 Spacer(Modifier.width(4.dp))
                 Text(
                     text = ">>> WAITING FOR TELEMETRY <<<", 
@@ -607,7 +606,8 @@ fun StatusRowData(
             } else {
                 val animatedBattery by animateIntAsState(targetValue = battery, animationSpec = tween(1500), label = "BatteryAnim")
                 Row(modifier = Modifier.width(54.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.width(10.dp), contentAlignment = Alignment.Center) { if (isCharging) Icon(Icons.Default.Bolt, null, tint = if(!isConnStale && isTelemetryFresh) Amber500 else Slate500, modifier = Modifier.size(10.dp)) }
+                    val boltColor = if(!isConnStale && isTelemetryFresh) Amber500 else Slate500
+                    Box(Modifier.width(10.dp), contentAlignment = Alignment.Center) { if (isCharging) Icon(Icons.Default.Bolt, null, tint = boltColor, modifier = Modifier.size(10.dp)) }
                     Icon(if (isCharging) Icons.Default.BatteryChargingFull else Icons.Default.BatteryFull, null, tint = if (isConnStale || !isTelemetryFresh) Slate500 else if (battery in 0..19) Rose500 else telemetryColor, modifier = Modifier.size(10.dp))
                     Spacer(Modifier.width(2.dp)); Text(text = if(battery >= 0) "$animatedBattery%" else "--%", color = telemetryColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                 }
@@ -628,7 +628,7 @@ fun StatusRowData(
             }
         }
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
-            if (!isHandshaking) {
+            if (!isConnStale) {
                 if (isLocPending && locPendingReason != LocationPendingReason.NONE) {
                     Text(
                         text = locPendingReason.name.replace("_", " "),

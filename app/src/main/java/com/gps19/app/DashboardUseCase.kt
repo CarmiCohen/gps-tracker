@@ -10,13 +10,10 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
- * v8.9.95:
- * - Issue #032: UI Refresh Consistency. Forensic fields (Prox Debounce, Rolling Vibe) 
- *   now respect the 15s staleness gate (WATCH_DOG_UI_GRACE_MS) to ensure data veracity.
- * v8.9.79:
- * - Issue #014: Type Migration. Aligned temperature parameters to Double.
- * v8.9.78:
- * - Issue #018: Stationary Anchor Hard-Lock. Propagated isAnchorLocked to DashboardState.
+ * v9.3.8:
+ * - Clock Skew Hardening: Link health (isTelemetryFresh) and GPS health (isGpsFresh) 
+ *   now use a receipt-based skew-immune formula. This prevents HUD elements from 
+ *   turning gray due to mismatched device clocks.
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {
@@ -58,15 +55,20 @@ class DashboardUseCase @Inject constructor() {
 
         val loc = if (isViewer) uiState.trackerLocation else uiState.localLocation
         
-        val effectiveLastActivityTs = maxOf(loc.timestamp, loc.telemetryTs)
-        val telemetryAge = if (effectiveLastActivityTs > 0) now - effectiveLastActivityTs else Long.MAX_VALUE
-        val isTelemetryVisible = telemetryAge < SENSOR_GRACE_PERIOD_MS
+        // Skew-Immune Freshness Calculation
+        // 1. Link Age: How long since we last heard from the remote device (receipt time)
+        val telemetryAge = if (loc.telemetryTs > 0) now - loc.telemetryTs else Long.MAX_VALUE
         
+        // 2. Data Age: How old was the GPS fix relative to the source clock at transmission time
+        val sourceGpsAge = if (loc.telemetryTs > 0 && loc.timestamp > 0) maxOf(0L, loc.telemetryTs - loc.timestamp) else 0L
+        
+        // 3. Total Effective Age: Local arrival delay + Source acquisition delay
+        val totalGpsAge = telemetryAge + sourceGpsAge
+
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
+        val isGpsActive = totalGpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
+        val isTelemetryVisible = telemetryAge < SENSOR_GRACE_PERIOD_MS
         val isForensicFresh = telemetryAge < WATCH_DOG_UI_GRACE_MS
-        
-        val gpsAge = if (loc.timestamp > 0) now - loc.timestamp else Long.MAX_VALUE
-        val isGpsActive = gpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
 
         val chairTime = if (loc.lastSitTs > 0) {
             synchronized(timeFormatter) { timeFormatter.format(Date(loc.lastSitTs)) }
@@ -77,7 +79,6 @@ class DashboardUseCase @Inject constructor() {
         } else "--"
 
         val isSitActive = loc.isSitDetected || (loc.lastSitTs > 0 && (now - loc.lastSitTs < SUSPICIOUS_STATE_COOLDOWN_MS))
-
         val isTrackerOffline = isViewer && (trackerState == TrackerState.UNKNOWN)
         val engineVer = if (isViewer) {
             if (isTrackerOffline) "${BuildConfig.VERSION_NAME} (Last)" else BuildConfig.VERSION_NAME
@@ -86,7 +87,6 @@ class DashboardUseCase @Inject constructor() {
         }
 
         val bucket = if (isViewer) uiState.trackerLocation.standbyBucket else uiState.integrity.standbyBucket
-        
         val snrValue = if (loc.snrIdx > 0.0 && isTelemetryVisible) "${(loc.snrIdx * RIBBON_SNR_SCALE_DB).toInt()}dB" else "--"
 
         fun gpsVal(value: String): String = if (isGpsActive) value else "--"
@@ -105,9 +105,6 @@ class DashboardUseCase @Inject constructor() {
         val rawAcc = loc.accuracy
         val filteredAcc = if (loc.maxAccuracy > 0) loc.maxAccuracy else rawAcc
         
-        val rawViewerAcc = uiState.localLocation.accuracy
-        val filteredViewerAcc = if (uiState.localLocation.maxAccuracy > 0) uiState.localLocation.maxAccuracy else rawViewerAcc
-
         return DashboardState(
             trackerState = trackerState,
             isSuspicious = loc.isSuspicious,
@@ -132,8 +129,8 @@ class DashboardUseCase @Inject constructor() {
             trackerMaxAcc = gpsVal("±%.1fm".format(Locale.getDefault(), filteredAcc)),
             satsIndex = gpsVal("${uiState.trackerSatsUsed}/${uiState.trackerSatsView}"),
             isSatsIndexWarning = (uiState.trackerSatsUsed < 4 && uiState.trackerSatsView > 0),
-            viewerAccuracy = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), rawViewerAcc),
-            viewerMaxAcc = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), filteredViewerAcc),
+            viewerAccuracy = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), uiState.localLocation.accuracy),
+            viewerMaxAcc = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), if(uiState.localLocation.maxAccuracy > 0) uiState.localLocation.maxAccuracy else uiState.localLocation.accuracy),
             vibration = sensorVal("%.2fG".format(Locale.getDefault(), loc.vibration)),
             heading = sensorVal("%.0f°".format(Locale.getDefault(), loc.heading)),
             tilt = sensorVal("%.1f°".format(Locale.getDefault(), loc.tiltDegrees)),

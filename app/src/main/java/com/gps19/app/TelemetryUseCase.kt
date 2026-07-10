@@ -6,11 +6,11 @@ import javax.inject.Singleton
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * v9.3.8:
+ * - Clock Skew Hardening: Forced remote updates to use local receipt time (nowMs) 
+ *   for telemetryTs to ensure HUD freshness (Green vs Gray) is immune to device clock drift.
  * v9.1.8:
- * - Issue #046: Shared Behavioral State. Mapped trackerState from incoming telemetry 
- *   to ensure authoritative HUD display.
- * v8.9.79:
- * - Issue #014: Type Migration. Standardized to Double for all telemetry mapping.
+ * - Issue #046: Shared Behavioral State. Mapped trackerState from incoming telemetry.
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(
@@ -25,6 +25,10 @@ class TelemetryUseCase @Inject constructor(
         val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng)
         val newTimestamp = update.gpsTs
         
+        // For remote data, telemetryTs MUST be the local receipt time (nowMs)
+        // to prevent clock skew from turning the HUD gray.
+        val effectiveTelemetryTs = if (!update.isMe) nowMs else (if (update.ts > 0) update.ts else nowMs)
+        
         return currentLoc.copy(
             lat = if (isLocationValid) update.lat else currentLoc.lat, 
             lng = if (isLocationValid) update.lng else currentLoc.lng, 
@@ -33,7 +37,7 @@ class TelemetryUseCase @Inject constructor(
             maxAccuracy = if (update.maxAccuracy > 0.0) update.maxAccuracy else currentLoc.maxAccuracy,
             bearing = if (isLocationValid) update.bearing else currentLoc.bearing, 
             timestamp = if (newTimestamp > 0) newTimestamp else currentLoc.timestamp,
-            telemetryTs = if (update.ts > 0) update.ts else nowMs,
+            telemetryTs = effectiveTelemetryTs,
             isVisualJump = update.isJump,
             isTrajectoryPromoted = update.isTrajectoryPromoted,
             isJammer = update.isJammer, isStalled = update.isStalled,

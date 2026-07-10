@@ -20,6 +20,9 @@ import javax.inject.Singleton
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
  * v9.3.8:
+ * - Issue #072 Map Stabilization: Updated handleRemoteUpdate to use optimizedPoint 
+ *   from LocationProcessor. This ensures features like the Stationary Anchor 
+ *   are respected in the UI and persistence layers.
  * - Issue #058: Hilt Migration. Refactored to use Listener interface and separate initialization.
  */
 @Singleton
@@ -489,28 +492,26 @@ class RemoteHandler @Inject constructor(
 
                 isTrackerClockRegression = processed.isClockRegression
 
-                if (!processed.isClockRegression) {
-                    if (rawLat != 0.0 && rawLng != 0.0) {
-                        trackerLat = rawLat
-                        trackerLng = rawLng
-                        trackerLastGpsTs = candidateTs
-                        lastPeerGpsTs = trackerLastGpsTs
-                        if (!isStalledPacket) trackerLastValidFixRealtime = nowRealtime
-                    }
-                    
-                    trackerSpeed = processed.filteredSpeed
-                    trackerBearing = rawBearing
-                    
-                    if (rawAccuracy > 0.0) trackerAccuracy = rawAccuracy
-                    if (rawMaxAcc > 0.0) trackerMaxAccuracy = rawMaxAcc
-                    
-                    trackerSatsView = data.optInt("sats_view", trackerSatsView)
-                    trackerSatsUsed = data.optInt("sats_used", trackerSatsUsed)
-                    isTrackerJammerSuspicion = isJammerPacket
-                    isTrackerVisualJump = isJumpPacket
-                    isTrackerTrajectoryPromoted = isTrajectoryPacket
-                    trackerJumpTier = jumpTierPacket
+                if (processed.optimizedPoint.lat != 0.0 && processed.optimizedPoint.lng != 0.0) {
+                    trackerLat = processed.optimizedPoint.lat
+                    trackerLng = processed.optimizedPoint.lng
+                    trackerLastGpsTs = processed.optimizedPoint.ts
+                    lastPeerGpsTs = trackerLastGpsTs
+                    if (!processed.isStalled) trackerLastValidFixRealtime = nowRealtime
                 }
+                
+                trackerSpeed = processed.filteredSpeed
+                trackerBearing = rawBearing
+                
+                if (rawAccuracy > 0.0) trackerAccuracy = rawAccuracy
+                if (rawMaxAcc > 0.0) trackerMaxAccuracy = rawMaxAcc
+                
+                trackerSatsView = data.optInt("sats_view", trackerSatsView)
+                trackerSatsUsed = data.optInt("sats_used", trackerSatsUsed)
+                isTrackerJammerSuspicion = isJammerPacket
+                isTrackerVisualJump = isJumpPacket
+                isTrackerTrajectoryPromoted = isTrajectoryPacket
+                trackerJumpTier = jumpTierPacket
             }
             
             trackerBattery = data.optInt("battery", trackerBattery)

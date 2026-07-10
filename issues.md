@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.3.6)
+# Project Issues & Hardening Tracking (v9.3.8)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Resolution Archive](STATUS/RESOLUTION_ARCHIVE.md), and validation tasks are in [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 3 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 260 |
+| **Resolved (Total)** | 🟢 Progress | 263 |
 
 ---
 
@@ -24,6 +24,16 @@ This document tracks active issues, technical debt, and pending implementation t
 | **#059** | **Feature** | **Permission Health Check UI**: Implement a "Diagnostics" screen in Compose for Xiaomi special permissions. (Validation: #064) |
 | **#061** | **Cleanup** | **Forensic Logging Consolidation**: Create a `ForensicLogUseCase` to standardize "Special Color" (Pink) logging. (Validation: #065) |
 | **#062** | **Hardening** | **Dynamic Anchor Breakout**: Implement displacement-weighted monitor to prevent "sticky anchors". (Validation: #053) |
+
+---
+
+## 🟢 Recently Resolved Issues (v9.3.8)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **#074** | **Incorrect Peer Activity Badge Logic** | **Resolved**. Corrected `isPeerActive` logic in `GlobalStatusBar`. On Trackers, the `VWR` badge now tracks Viewer pulse activity via local receipt time, decoupled from local GPS health. |
+| **#073** | **Peer Visibility (Issue C)** | **Resolved**. Fixed logic shadowing in HUD. Tracker now correctly displays green "VWR" badge upon receiving Viewer pulses. |
+| **#072** | **Map Stabilization** | **Resolved**. Updated `RemoteHandler` to use `optimizedPoint` from `LocationProcessor`. This ensures remote markers respect Stationary Anchors and clock-regression filters, eliminating flicker. |
 
 ---
 
