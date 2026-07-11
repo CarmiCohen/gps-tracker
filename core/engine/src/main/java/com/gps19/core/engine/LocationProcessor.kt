@@ -5,9 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
- * v9.3.3:
- * - Issue #058: Hilt Migration. Reverted @Inject as it resides in pure engine module.
- *   Provider logic moved to app-level ServiceModule.
+ * v9.3.15:
+ * - Hardening: Standardized internal math to Double. Streamlined accuracy 
+ *   windowing to maintain Double precision (0.1m) without integer rounding jitter.
+ * v9.3.13:
+ * - Issue #062: Dynamic Anchor Breakout. Implemented displacement-weighted 
+ *   monitor to prevent "sticky anchors" while maintaining drift stability.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -46,6 +49,8 @@ class LocationProcessor(
 
     private var parkingAnchorPoint: EngineGeoPoint? = null
     private var isAnchorLockedState: Boolean = false
+    private var anchorEscapeScore: Double = 0.0
+    private val anchorTrendPoints = mutableListOf<EngineGeoPoint>()
 
     fun loadState(
         savedMaxAccuracy: Double,
@@ -148,9 +153,12 @@ class LocationProcessor(
             val currentMax = if (accuracyWindow.isNotEmpty()) accuracyWindow.last() else 0.0
             if (acc > currentMax * GEOFENCE_ACCURACY_HYSTERESIS_MULT) accuracyWindow[accuracyWindow.lastIndex] = acc
         }
+        
+        // Standardized: Round to 1 decimal place (0.1m precision) instead of Int
         val rawMax = accuracyWindow.maxOrNull() ?: acc
-        val newMax = rawMax.roundToInt().toDouble()
-        if (newMax != maxAccuracy) {
+        val newMax = (rawMax * 10.0).roundToLong() / 10.0
+        
+        if (abs(newMax - maxAccuracy) > 0.05) {
             maxAccuracy = newMax
             listener?.onMaxAccuracyChanged(maxAccuracy)
         }
@@ -219,7 +227,7 @@ class LocationProcessor(
         if (accuracy > HIGH_ACCURACY_THRESHOLD_METERS * TRAJECTORY_REJECTION_ACCURACY_MULT && lastHighAccTs > 0 && nowWall - lastHighAccTs < TRAJECTORY_PROMOTION_WINDOW_MS) {
             if (PhysicsUtils.calculateDistance(lat, lng, lastHighAccLat, lastHighAccLng) > accuracy) {
                 val fallbackCoordPoint = EngineGeoPoint(if (lastLat != 0.0) lastLat else lat, if (lastLng != 0.0) lastLng else lng, alt = alt, ts = if (lastTs != 0L) lastTs else effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy)
-                return ProcessedLocation(rawPoint = EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy), optimizedPoint = fallbackCoordPoint, status = SentinelStatus.VALID, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedMps(), timestamp = effectiveTs, isStalled = if (isLocal) false else providedIsStalled, receiptRealtime = nowRealtime, jumpTier = providedJumpTier, isAdaptiveJump = providedIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = false, tamperDetected = providedIsTamper, jammerDetected = providedIsJammer)
+                return ProcessedLocation(rawPoint = EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy), optimizedPoint = fallbackCoordPoint, status = SentinelStatus.VALID, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedMps(), timestamp = effectiveTs, isStalled = if (isLocal) false else providedIsStalled, receiptRealtime = nowRealtime, jumpTier = providedJumpTier, isAdaptiveJump = providedIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = false, tamperDetected = providedIsTamper, jammerDetected = providedIsTamper)
             }
         }
         
@@ -301,37 +309,73 @@ class LocationProcessor(
         var skipPersistence = false
         var isAnchorLockedNow = false
         
-        // Issue #018: Hard-Lock logic - Behavioral Breakout Refinement
+        // Issue #062: Dynamic Anchor Breakout logic
         val isPhysicallyStationary = sentinel.isStationary()
+        val estimatedSpeed = sentinel.getEstimatedSpeedMps()
+        
         if (!isSuspicious && !isAdaptationMuzzled && stationaryProb > 0.9) {
             if (parkingAnchorPoint == null && isPhysicallyStationary) {
                 parkingAnchorPoint = persistencePoint
+                anchorEscapeScore = 0.0
+                anchorTrendPoints.clear()
                 listener?.onLogAdded("Stationary Anchor engaged at ${String.format(Locale.getDefault(), "%.5f, %.5f", persistencePoint.lat, persistencePoint.lng)} (Prob: ${String.format(Locale.getDefault(), "%.2f", stationaryProb)})", "system", false, false, persistencePoint.lat, persistencePoint.lng, accuracy, snr, sentinel.currentVibrationIndex)
             }
             
             if (parkingAnchorPoint != null) {
-                var breakoutThreshold = max(PARKING_ANCHOR_MIN_DIST, maxAccuracy * PARKING_ANCHOR_FACTOR)
-                if (!isPhysicallyStationary) {
-                    // Issue #018: Force immediate breakout if physical motion is detected 
-                    // to prevent "sticky" anchor transitions when leaving a building.
-                    breakoutThreshold = 0.0 
-                }
-                
+                val breakoutThreshold = max(PARKING_ANCHOR_MIN_DIST, maxAccuracy * PARKING_ANCHOR_FACTOR)
                 val distFromAnchor = PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, persistencePoint.lat, persistencePoint.lng)
                 
-                if (distFromAnchor < breakoutThreshold) {
+                // Displacement-Weighted Scoring
+                if (!isPhysicallyStationary) {
+                    // Force immediate breakout if physical motion (vibration) is confirmed
+                    anchorEscapeScore = ANCHOR_ESCAPE_SCORE_THRESHOLD
+                } else {
+                    // 1. Accumulate score based on distance in the "Transition Zone"
+                    val transitionZoneStart = breakoutThreshold * ANCHOR_TRANSITION_ZONE_START
+                    if (distFromAnchor > transitionZoneStart) {
+                        val zoneProgress = (distFromAnchor - transitionZoneStart) / (breakoutThreshold - transitionZoneStart)
+                        anchorEscapeScore += (zoneProgress * 25.0).coerceIn(0.0, 50.0)
+                    } else {
+                        // Decay score if we retreat back towards the anchor
+                        anchorEscapeScore = (anchorEscapeScore * 0.8).coerceAtLeast(0.0)
+                    }
+
+                    // 2. Accumulate score based on estimated speed (IMM Filter authority)
+                    anchorEscapeScore += estimatedSpeed * ANCHOR_VELOCITY_WEIGHT_MPS
+
+                    // 3. Trend analysis: Consistent movement away from anchor
+                    anchorTrendPoints.add(persistencePoint)
+                    if (anchorTrendPoints.size > ANCHOR_TREND_WINDOW_SIZE) anchorTrendPoints.removeAt(0)
+                    
+                    if (anchorTrendPoints.size >= ANCHOR_TREND_WINDOW_SIZE) {
+                        val d1 = PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, anchorTrendPoints[0].lat, anchorTrendPoints[0].lng)
+                        val d2 = PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, anchorTrendPoints[1].lat, anchorTrendPoints[1].lng)
+                        val d3 = PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, anchorTrendPoints[2].lat, anchorTrendPoints[2].lng)
+                        
+                        if (d3 > d2 && d2 > d1 && d3 > transitionZoneStart) {
+                            anchorEscapeScore += 30.0 // Bonus for consistent trend
+                        }
+                    }
+                }
+                
+                if (anchorEscapeScore < ANCHOR_ESCAPE_SCORE_THRESHOLD && distFromAnchor < breakoutThreshold) {
                     skipPersistence = true 
                     isAnchorLockedNow = true
                 } else {
-                    // Breakout detected - reset anchor
-                    listener?.onLogAdded("Stationary Anchor breakout: Distance ${String.format(Locale.getDefault(), "%.1f", distFromAnchor)}m exceeds threshold ${String.format(Locale.getDefault(), "%.1f", breakoutThreshold)}m", "system", false, false, persistencePoint.lat, persistencePoint.lng, accuracy, snr, sentinel.currentVibrationIndex)
+                    // Breakout detected
+                    val reason = if (!isPhysicallyStationary) "Physical Motion" else if (anchorEscapeScore >= ANCHOR_ESCAPE_SCORE_THRESHOLD) "Displacement Trend (Score: ${anchorEscapeScore.toInt()})" else "Distance Threshold"
+                    listener?.onLogAdded("Stationary Anchor breakout ($reason): Distance ${String.format(Locale.getDefault(), "%.1f", distFromAnchor)}m", "system", false, false, persistencePoint.lat, persistencePoint.lng, accuracy, snr, sentinel.currentVibrationIndex)
                     parkingAnchorPoint = null
+                    anchorEscapeScore = 0.0
+                    anchorTrendPoints.clear()
                 }
             }
         } else {
             if (parkingAnchorPoint != null) {
                 listener?.onLogAdded("Stationary Anchor released (Prob: ${String.format(Locale.getDefault(), "%.2f", stationaryProb)})", "system", false, false, persistencePoint.lat, persistencePoint.lng, accuracy, snr, sentinel.currentVibrationIndex)
                 parkingAnchorPoint = null
+                anchorEscapeScore = 0.0
+                anchorTrendPoints.clear()
             }
         }
         isAnchorLockedState = isAnchorLockedNow
@@ -390,6 +434,8 @@ class LocationProcessor(
         lastSavedLat = 0.0; lastSavedLng = 0.0; lastSavedTs = 0L; lastSavedGpsTs = 0L
         lastHighAccLat = 0.0; lastHighAccLng = 0.0; lastHighAccTs = 0L; lastValidFixTs = 0L; parkingAnchorPoint = null
         isAnchorLockedState = false
+        anchorEscapeScore = 0.0
+        anchorTrendPoints.clear()
         invalidateHomePointsCache(); sentinel.reset(); 
         listener?.onMaxAccuracyChanged(0.0)
     }

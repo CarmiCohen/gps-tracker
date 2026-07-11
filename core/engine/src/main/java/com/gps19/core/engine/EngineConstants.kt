@@ -3,32 +3,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v9.3.13:
+ * - Issue #062: Dynamic Anchor Breakout. Added constants for displacement-weighted 
+ *   monitor to prevent "sticky anchors".
  * v9.2.9:
  * - R994: Screen-Off Optimization. Introduced SCREEN_OFF_GPS_POLLING_MS (5000ms) 
  *   to reduce power consumption during background tracking.
- * v9.2.8:
- * - R993: Notification Throttling. Introduced NOTIFICATION_THROTTLE_MS (10000ms) 
- *   to standardize foreground service notification updates.
- * v8.9.94:
- * - Issue #038: Introduced ADAPTATION_SETTLING_MS (5000ms) to muzzle trajectory 
- *   logic during GPS polling frequency transitions on A15 hardware.
- * v8.9.92:
- * - Issue #036: Introduced A15-specific GPS jitter hardening. Increased mismatch gate 
- *   to 5.0 m/s and jitter floor to 25m to handle A15 raw sensor noise.
- * v8.9.86:
- * - Issue #025: Relaxed UI_PULSE_TIMEOUT_MS to 45s to harden FGS transitions on Android 14+.
- * v8.9.85:
- * - Issue #024: Fixed Accuracy Window Aliasing. Increased ACCURACY_WINDOW_BUCKET_MS 
- *   to 120s (30s buckets) to ensure stationary GPS fixes (20s) are correctly 
- *   aggregated and preserved in the maxAccuracy sliding window.
- * v8.9.76:
- * - Issue #018: Tracker State Stability. Tightened JUMP_GATE_SENSOR_MISMATCH_MPS to 2.0 
- *   to aggressively filter stationary drift noise in Urban Canyons.
- * v8.9.75 (Refined):
- * - Issue #014: Type Safety Optimization. Standardized thresholds and constants 
- *   to Double to align with telemetry type unification.
- * v8.9.69:
- * - Issue #012: Added Adaptive Proximity Debounce constants.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -232,8 +212,15 @@ const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
 
 const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 20000L // Issue #436: Aligned with STATIONARY_GPS_POLLING_MS
+
+// Stationary Anchor Monitor (Issue #062)
 const val PARKING_ANCHOR_MIN_DIST = 20.0
 const val PARKING_ANCHOR_FACTOR = 0.8
+const val ANCHOR_ESCAPE_SCORE_THRESHOLD = 100.0
+const val ANCHOR_TREND_WINDOW_SIZE = 3
+const val ANCHOR_TRANSITION_ZONE_START = 0.7 // Start accumulating score at 70% of threshold
+const val ANCHOR_VELOCITY_WEIGHT_MPS = 15.0 // Score points per m/s of estimated speed
+
 const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 // Issue #450: Authoritative multiplier
 
 // Behavioral State Thresholds (Issue #302)

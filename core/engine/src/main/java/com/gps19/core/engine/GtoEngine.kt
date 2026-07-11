@@ -4,12 +4,9 @@ import kotlin.math.*
 
 /**
  * GtoEngine: Graph Trajectory Optimization.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized GtoNode fields to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
- * v8.9.52:
- * - Issue #461: Forensic Parity. Updated GtoNode to preserve maxAccuracy context 
- *   during trajectory promotion. (Formerly #435)
+ * v9.3.15:
+ * - Hardening: Finalized Double standardization. Eliminated redundant 
+ *   conversions in trajectory evaluation.
  */
 class GtoEngine {
 

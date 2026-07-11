@@ -18,14 +18,12 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * v9.3.15:
+ * - Hardening: Removed redundant Float accessors in alignment with SettingsRepository 
+ *   Double standardization.
  * v9.3.3:
  * - Issue #039 Identity Rejection Feedback: Updated saveSettingsBulk to throw 
  *   IllegalArgumentException on identity collision to prevent silent failures.
- * v9.3.0:
- * - Issue #042 Sanitization Visibility: Exposed identitySanitizedFlow from SettingsRepository.
- * v8.9.98:
- * - Issue #027 Identity Hardening: Reinforced saveSettingsBulk with uniqueness validation 
- *   to prevent identity cross-contamination between Tracker and Viewer roles.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -176,8 +174,6 @@ class MainRepository @Inject constructor(
         if (key == LAST_ALARM_ACK_TS_KEY) lastAlarmAckTs = value
         scope.launch { settings.saveLong(key, value) }
     }
-    suspend fun saveFloat(key: String, value: Float) = settings.saveFloat(key, value)
-    fun saveFloatSync(key: String, value: Float) { scope.launch { settings.saveFloat(key, value) } }
     suspend fun saveDouble(key: String, value: Double) = settings.saveDouble(key, value)
     fun saveDoubleSync(key: String, value: Double) { scope.launch { settings.saveDouble(key, value) } }
     suspend fun saveBoolean(key: String, value: Boolean) = settings.saveBoolean(key, value)
@@ -187,7 +183,6 @@ class MainRepository @Inject constructor(
 
     suspend fun getString(key: String, default: String) = settings.getString(key, default)
     suspend fun getLong(keyName: String, default: Long) = settings.getLong(keyName, default)
-    suspend fun getFloat(keyName: String, default: Float) = settings.getFloat(keyName, default)
     suspend fun getDouble(key: String, default: Double) = settings.getDouble(key, default)
     suspend fun getInt(key: String, default: Int): Int = settings.getInt(key, default)
     suspend fun getBoolean(key: String, default: Boolean): Boolean = settings.getBoolean(key, default)

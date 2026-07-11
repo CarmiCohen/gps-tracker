@@ -10,14 +10,15 @@ import kotlin.math.abs
 
 /**
  * DashboardUseCase: Logic for computing the complex dashboard display state.
+ * v9.3.12:
+ * - Temporal Authority (#075): Finalized skew-immune receipt-based freshness logic.
  * v9.3.8:
  * - Clock Skew Hardening: Link health (isTelemetryFresh) and GPS health (isGpsFresh) 
- *   now use a receipt-based skew-immune formula. This prevents HUD elements from 
- *   turning gray due to mismatched device clocks.
+ *   now use a receipt-based skew-immune formula.
  */
 @Singleton
 class DashboardUseCase @Inject constructor() {
-
+    // ... (rest of the file content remains the same)
     private val timeFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
     fun computeDashboardState(

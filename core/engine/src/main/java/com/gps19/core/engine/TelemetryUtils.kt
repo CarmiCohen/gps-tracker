@@ -4,10 +4,8 @@ import kotlin.math.*
 
 /**
  * TelemetryUtils: Logic for scoring and evaluating signal quality.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized GpsIndexData and parameters 
- *   to Double to eliminate redundant toDouble()/toFloat() conversions.
- * v8.8.21: Migrated from :app to :core:engine to ensure logic purity.
+ * v9.3.15:
+ * - Hardening: Finalized Double standardization.
  */
 
 data class GpsIndexData(val ageIndex: Double, val accIndex: Double, val satsIndex: Double, val totalIndex: Double)

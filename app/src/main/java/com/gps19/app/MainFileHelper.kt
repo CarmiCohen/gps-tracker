@@ -20,11 +20,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric).
+ * v9.3.15:
+ * - Hardening: Finalized Double standardization. Eliminated redundant boundary 
+ *   conversions in export/import paths.
  */
 object MainFileHelper {
 

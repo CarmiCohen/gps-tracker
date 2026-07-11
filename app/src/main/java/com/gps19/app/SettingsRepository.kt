@@ -32,15 +32,12 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
- * v9.3.0:
- * - Issue #042: Sanitization Visibility. identitySanitizationMigration now sets 
- *   identity_sanitized flag to true when malformed IDs are reset.
- * v9.1.9:
- * - Issue #051: Binary Parity Gap. Updated TrackerStatusProto persistence 
- *   to include authoritative tracker_state. Fixed saveLong and lux setter syntax.
- * v8.9.99:
- * - Issue #041: Identity Sanitization. Added identitySanitizationMigration to 
- *   automatically purge corrupted or shell-injected IDs (e.g., "pm clear") from storage.
+ * v9.3.15:
+ * - Hardening: Standardized all telemetry and baseline persistence to Double. 
+ *   Removed redundant Float accessors to eliminate conversion jitter.
+ * v9.3.12:
+ * - Proto Precision (#076): Verified Requirement R968. Ensured max_distance and 
+ *   max_accuracy are correctly persisted and propagated to UI.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -224,16 +221,6 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    suspend fun saveFloat(keyName: String, value: Float) {
-        dataStore.updateData { current ->
-            val builder = current.toBuilder()
-            when (keyName) {
-                TRACKER_LUX_BASELINE_KEY -> builder.setTrackerLuxBaseline(value.toDouble())
-            }
-            builder.build()
-        }
-    }
-
     suspend fun saveDouble(keyName: String, value: Double) {
         dataStore.updateData { current ->
             val builder = current.toBuilder()
@@ -309,14 +296,6 @@ class SettingsRepository @Inject constructor(
             VIOLATION_UPTIME_MS_KEY -> settings.violationUptimeMs
             LAST_SERVICE_TICK_REALTIME_KEY -> settings.lastServiceTickRealtime
             LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else default
-            else -> default
-        }
-    }
-
-    suspend fun getFloat(keyName: String, default: Float): Float {
-        val settings = dataStore.data.first()
-        return when (keyName) {
-            TRACKER_LUX_BASELINE_KEY -> settings.trackerLuxBaseline.toFloat()
             else -> default
         }
     }

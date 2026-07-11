@@ -1,88 +1,44 @@
-# Project Issues & Hardening Tracking (v9.3.11)
+# Project Issues & Hardening Tracking (v9.3.15)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Resolution Archive](STATUS/RESOLUTION_ARCHIVE.md), and validation tasks are in [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 2 |
+| **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 266 |
+| **Resolved (Total)** | 🟢 Progress | 274 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-| ID | Concern | Description |
-| :--- | :--- | :--- |
-| **C-068-1** | **Samsung System API Noise** | Even with cached package names, high-frequency calls to `Settings.canDrawOverlays` or `isIgnoringBatteryOptimizations` (every 500ms) may still trigger internal system logging on Samsung G990/A15. Risk: Logcat jitter during forensic analysis. |
+*No newly identified risks.*
 
 ---
 
 ## 🔴 Open Issues
-| ID | Category | Description |
-| :--- | :--- | :--- |
-| **#061** | **Cleanup** | **Forensic Logging Consolidation**: Create a `ForensicLogUseCase` to standardize "Special Color" (Pink) logging. (Validation: #065) |
-| **#062** | **Hardening** | **Dynamic Anchor Breakout**: Implement displacement-weighted monitor to prevent "sticky anchors". (Validation: #053) |
+*No open technical issues.*
 
 ---
 
-## 🟢 Recently Resolved Issues (v9.3.11)
+## 🟢 Recently Resolved Issues (v9.3.15)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
-| **#059** | **Permission Health Check UI** | **Resolved**. Implemented a dedicated Diagnostics screen in Compose to monitor background resilience (Battery, Overlay, Alarms, Location) and hardware-specific adaptations for Xiaomi/Samsung. Integrated into NavHost and Settings. |
-| **#068** | **Logcat Audit (Samsung Spam)** | **Resolved**. Hardened `Utils.kt` and `SystemStatusProvider` by enforcing mandatory use of cached package names in all permission checkers. Eliminated all dynamic `context.packageName` fallbacks in high-frequency paths. |
+| **#077** | **Type Safety Hardening** | **Resolved**. Systematic audit and elimination of redundant `toDouble()`/`toFloat()` conversions across core engine and app modules. Implemented `Double` pre-buffering in `AppSensorManager` and captured boundary conversions at the source in `TrackerService`. Standardized all persistence to `Double` in `SettingsRepository`. |
 
 ---
 
-## 🟢 Recently Resolved Issues (v9.3.10)
+## 🟢 Recently Resolved Issues (v9.3.14)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
-| **#073** | **Peer Visibility (Issue C)** | **Resolved**. Fixed logic shadowing in HUD and added missing signaling pulse acknowledgment in `TrackerService`. The "VWR" badge now correctly reflects Viewer activity on the Tracker device. |
+| **C-068-1** | **Samsung System API Noise** | **Resolved**. Implemented comprehensive 10s TTL caching for all permission and system status checks in `SystemStatusProviderImpl.kt`. Switched high-frequency paths in `TrackerService` and `MainViewModel` to use cached states, eliminating Logcat jitter on Samsung G990/A15. |
 
 ---
 
-## 🟢 Recently Resolved Issues (v9.3.8)
+## 🟢 Recently Resolved Issues (v9.3.13)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
-| **#074** | **Incorrect Peer Activity Badge Logic** | **Resolved**. Corrected `isPeerActive` logic in `GlobalStatusBar`. On Trackers, the `VWR` badge now tracks Viewer pulse activity via local receipt time, decoupled from local GPS health. |
-| **#072** | **Map Stabilization** | **Resolved**. Updated `RemoteHandler` to use `optimizedPoint` from `LocationProcessor`. This ensures remote markers respect Stationary Anchors and clock-regression filters, eliminating flicker. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.3.6)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#058** | **TrackerService Initialization** | **Resolved**. Finalized Hilt migration by moving all common dependencies to `BaseMonitorService`. Eliminated `EntryPointAccessors` in `TrackerService`, `ViewerService`, `WatchdogReceiver`, and `GpsApplication`. Standardized component initialization and cleanup. |
-| **#047** | **Speed Zeroing Authority** | **Resolved**. Verified immediate speed drop to 0.0 on GPS loss in Viewer HUD. (Requirement R987) |
-| **#046** | **State Sync Audit** | **Resolved**. Verified simultaneous Tracker/Viewer HUD state transitions under load. (Requirement R986) |
-
----
-
-## 🟢 Recently Resolved Issues (v9.3.4)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#039** | **Identity Rejection Feedback** | **Resolved**. Updated `MainRepository.saveSettingsBulk` to throw `IllegalArgumentException` on identity collision. Implemented `BulkUpdateSettings` handling in `MainViewModel` with UI feedback (Toast) and persistent logging. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.3.2)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#042** | **Sanitization Visibility** | **Resolved**. Implemented `identitySanitizedFlow` in `SettingsRepository` and migration flag to notify UI of auto-sanitization events. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.3.0)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#030** | **Proto Schema Duplication** | **Resolved (R973)**. Consolidated all schemas into `app/src/main/proto` and removed legacy path. |
-| **#055** | **Issue History Recovery** | **Resolved**. Restored 185 "lost" legacy resolutions from the legacy archive. |
-| **#054** | **Requirement ID Collision** | **Resolved**. Audited and corrected `VERIFICATION_MANIFEST.md` where Issue #326 was overloaded. |
-| **#400** | **Uncertainty UX Mapping** | **Resolved (R400)**. Re-anchored Bayesian Uncertainty status messages to bottom-center with 80dp offset. |
+| **#062** | **Hardening** | **Resolved**. Implemented **Dynamic Anchor Breakout**: A displacement-weighted monitor in `LocationProcessor.kt` that uses trend analysis, velocity integration (IMM), and escape scoring to prevent "sticky anchors". (Validation: #053) |

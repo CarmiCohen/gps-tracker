@@ -8,9 +8,9 @@ import java.util.UUID
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized accuracy and sensor snapshots 
- *   to Double to eliminate redundant toDouble()/toFloat() conversions.
+ * v9.3.15:
+ * - Hardening: Finalized Double standardization. Eliminated redundant boundary 
+ *   conversions in telemetry logging paths.
  */
 @Singleton
 class LogManager @Inject constructor(

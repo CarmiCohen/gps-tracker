@@ -4,6 +4,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Unified immutable state for the entire UI structure.
+ * v9.3.14:
+ * - Issue C-068-1: Added xiaomiAutostartStatus to PermissionState for TTL caching.
  * v9.3.11: 
  * - Issue #059: Added isDiagnosticsVisible to NavigationState for Permission Health Check.
  * v9.3.0: Issue #042 - Sanitization Visibility. Added isIdentitySanitized flag.
@@ -110,6 +112,7 @@ data class PermissionState(
     val isPostNotificationsGranted: Boolean = true,
     val isBackgroundLocationGranted: Boolean = true,
     val xiaomiStatus: XiaomiPermissionStatus = XiaomiPermissionStatus.UNKNOWN,
+    val xiaomiAutostartStatus: XiaomiPermissionStatus = XiaomiPermissionStatus.UNKNOWN,
     val isXiaomiManualOverride: Boolean = false
 )
 

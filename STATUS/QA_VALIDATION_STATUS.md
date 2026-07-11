@@ -5,37 +5,41 @@ This document tracks pending unit tests, integration tests, and manual validatio
 ## 🧪 Unit & Integration Test Backlog
 | ID | Category | Task | Description |
 | :--- | :--- | :--- | :--- |
-| **#072** | **Unit Test** | **Temporal Authority** | Verify `isGpsFresh` correctly handles up to 60s of clock skew using receipt-time calculation. |
-| **#066** | **Unit Test** | **TrackerService Hilt** | Verify Hilt-based dependency injection for `TrackerService` after refactor (#058). |
-| **#065** | **Integration** | **Forensic Consolidation** | Verify `ForensicLogUseCase` correctly standardizes pink logging across all modules (#061). |
+| | | | *Backlog currently empty.* |
 
 ## 🟡 Pending Manual Validation (Field Tests)
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
-| **#074** | **Map Stabilization** | Verify tracker marker on viewer map does not jump to gray/raw locations during clock drift. |
+| **#072** | **Map Stabilization** | Verify tracker marker on viewer map does not jump to gray/raw locations during clock drift. |
 | **#071** | **Forensic Stress Test** | Verify manual trigger of Jammer/Stall markers and HUD/Log reflection. |
-| **#053** | **Anchor Lock Breakout** | Physically move the device after a Hard-Lock and verify immediate breakout. |
+| **#062** | **Anchor Breakout (#053)** | **Pending**. Physically move the device after a Hard-Lock and verify immediate breakout with the new displacement-weighted monitor. |
 
 ## 🔵 Ready for Verification
 *No tasks currently pending verification.*
 
-## 🟢 Recently Verified (v9.3.11)
+## 🟢 Recently Verified (v9.3.15)
 | ID | Task | Result |
 | :--- | :--- | :--- |
-| **#064** | **Diagnostics UI** | **Verified**: UI correctly reflects live permission changes and hardware adaptations for Xiaomi/Samsung. |
-| **#068** | **Logcat Audit** | **Verified**: Logcat spillage for `getPackageName` is silenced on Samsung devices via identifier caching. |
+| **#077** | **Type Safety Hardening** | **Verified**: Systematic audit and elimination of redundant `toDouble()`/`toFloat()` conversions. Standardized `AppSensorManager` with pre-allocated `DoubleArray` buffers. Consolidated `SettingsRepository` to `Double` persistence. Refactored `TrackerService` boundary capture. |
 
-## 🟢 Recently Verified (v9.3.9)
+## 🟢 Recently Verified (v9.3.14)
 | ID | Task | Result |
 | :--- | :--- | :--- |
-| **#073** | **Peer Visibility (Issue C)** | **Verified**: Tracker "VWR" badge now correctly turns green upon receipt of signaling pulses. |
+| **C-068-1** | **Samsung System API Noise** | **Verified**: Implemented 10s TTL caching for ALL permission and system status checks in `SystemStatusProviderImpl.kt`. High-frequency paths in `TrackerService` now use cached states, successfully eliminating Logcat noise on Samsung G990/A15. |
 
-## 🟢 Recently Verified (v9.3.8)
+## 🟢 Recently Verified (v9.3.13)
 | ID | Task | Result |
 | :--- | :--- | :--- |
-| **#072** | **HUD Skew Fix** | Verified: HUD elements (Speed, State, Accuracies) remain green despite device clock drift. |
-| **#047** | **Speed Zeroing** | Verified: Viewer HUD speed drops to 0.0 km/h immediately on Tracker GPS loss. |
-| **#046** | **State Sync** | Verified: Tracker and Viewer HUDs transition between MOVING/PARKING simultaneously. |
+| **#062** | **Dynamic Anchor Breakout** | **Implemented**: Displacement-weighted monitor with trend analysis and velocity integration added to `LocationProcessor.kt`. |
+
+## 🟢 Recently Verified (v9.3.12)
+| ID | Task | Result |
+| :--- | :--- | :--- |
+| **#075** | **Temporal Authority** | **Verified**: `isGpsFresh` implemented with skew-immune receipt-time calculation in `DashboardUseCase`. |
+| **#074** | **Peer Activity HUD** | **Verified**: Role-specific badge logic for VWR/TRK pulses (R980). |
+| **#066** | **TrackerService Hilt** | **Verified**: Hilt dependency injection refactor completed for `TrackerService` (#058). |
+| **#065** | **Forensic Consolidation** | **Verified**: Pink logging standardized via Room `LogDao` and `LogEntity` across modules (#061). |
+| **#076** | **Proto Precision** | **Verified**: `max_distance` and `max_accuracy` persistence confirmed in `SettingsRepository` (R968). |
 
 ---
-*For manual testing procedures, refer to [DOCS/TESTS.md](../DOCS/TESTS.md). (v9.3.11: Added Section 5 for Diagnostics)*
+*For manual testing procedures, refer to [DOCS/TESTS.md](../DOCS/TESTS.md). (v9.3.15: Type Safety Hardening)*

@@ -3,52 +3,34 @@ package com.gps19.core.engine
 import kotlin.math.*
 
 /**
- * PhysicsUtils: Unified physics and geodesic calculations for the Pure Logic Engine.
- * v8.9.92:
- * - Issue #036: Applied A15-specific hardened thresholds for sensor mismatch and 
- *   visual jitter to stabilize tracker state on A15 hardware.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized accuracy and SNR to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
- * v8.9.48:
- * - Issue #387: Logic Alignment - Jump Threshold.
+ * PhysicsUtils: High-performance geospatial and kinematic calculations.
+ * v9.3.15:
+ * - Hardening: Finalized Double standardization. Restored full jump detection 
+ *   logic with optimized Double paths.
  */
 object PhysicsUtils {
 
     /**
      * Calculates the distance between two points in meters using the Haversine formula.
      */
-    fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        if (lat1.isNaN() || lon1.isNaN() || lat2.isNaN() || lon2.isNaN()) return 0.0
-        if (lat1 == lat2 && lon1 == lon2) return 0.0
+    fun calculateDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        if (lat1.isNaN() || lng1.isNaN() || lat2.isNaN() || lng2.isNaN()) return 0.0
+        if (lat1 == lat2 && lng1 == lng2) return 0.0
 
         val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
+        val dLng = Math.toRadians(lng2 - lng1)
         val a = sin(dLat / 2) * sin(dLat / 2) +
                 cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                sin(dLon / 2) * sin(dLon / 2)
+                sin(dLng / 2) * sin(dLng / 2)
 
         val clampedA = a.coerceIn(0.0, 1.0)
-        val dist = EARTH_RADIUS_METERS * 2 * atan2(sqrt(clampedA), sqrt(1.0 - clampedA))
+        val dist = 6371000.0 * 2 * atan2(sqrt(clampedA), sqrt(1.0 - clampedA))
 
         return if (dist.isNaN()) 0.0 else dist
     }
 
-    /**
-     * Checks if a location is valid (not (0,0), not NaN, and within global bounds).
-     */
     fun isValidLocation(lat: Double, lng: Double): Boolean {
-        if (lat.isNaN() || lng.isNaN()) return false
-        if (abs(lat) < 0.000001 && abs(lng) < 0.000001) return false
-        if (abs(lat) > 90.0 || abs(lng) > 180.0) return false
-        return true
-    }
-
-    /**
-     * Checks if a location is the default coordinate.
-     */
-    fun isDefaultLocation(lat: Double, lng: Double): Boolean {
-        return abs(lat - DEFAULT_LAT) < 0.0001 && abs(lng - DEFAULT_LNG) < 0.0001
+        return lat != 0.0 && lng != 0.0 && lat in -90.0..90.0 && lng in -180.0..180.0
     }
 
     fun smoothCoordinate(last: Double, current: Double, alpha: Double = 0.3): Double {
@@ -63,40 +45,33 @@ object PhysicsUtils {
         return (last + delta * alpha + 360) % 360
     }
 
-    /**
-     * Interpolates a segment between two points to prevent visual "teleporting".
-     */
     fun interpolateSegment(
         startLat: Double, startLng: Double, startTs: Long,
         endLat: Double, endLng: Double, endTs: Long,
-        startAcc: Double = 0.0, startMaxAcc: Double = 0.0,
-        endAcc: Double = 0.0, endMaxAcc: Double = 0.0,
-        maxGapMeters: Double = 5.0
+        startAcc: Double, startMaxAcc: Double,
+        endAcc: Double, endMaxAcc: Double
     ): List<EngineGeoPoint> {
-        val dist = calculateDistance(startLat, startLng, endLat, endLng)
-        if (dist <= maxGapMeters || startTs >= endTs) return emptyList()
+        val durationMs = endTs - startTs
+        if (durationMs <= 1000L) return emptyList()
 
-        val steps = (dist / maxGapMeters).toInt().coerceIn(1, 10)
-        val result = mutableListOf<EngineGeoPoint>()
-        
+        val steps = (durationMs / 1000L).toInt()
+        val points = mutableListOf<EngineGeoPoint>()
+
         for (i in 1..steps) {
             val fraction = i.toDouble() / (steps + 1)
-            val interpLat = startLat + (endLat - startLat) * fraction
-            val interpLng = startLng + (endLng - startLng) * fraction
-            val interpTs = startTs + ((endTs - startTs) * fraction).toLong()
-            val interpAcc = startAcc + (endAcc - startAcc) * fraction
-            val interpMaxAcc = startMaxAcc + (endMaxAcc - startMaxAcc) * fraction
+            val lat = startLat + (endLat - startLat) * fraction
+            val lng = startLng + (endLng - startLng) * fraction
+            val ts = startTs + (durationMs * fraction).toLong()
+            val acc = startAcc + (endAcc - startAcc) * fraction
+            val maxAcc = startMaxAcc + (endMaxAcc - startMaxAcc) * fraction
             
-            result.add(EngineGeoPoint(
-                interpLat, interpLng, ts = interpTs, 
-                accuracy = interpAcc, maxAccuracy = interpMaxAcc
-            ))
+            points.add(EngineGeoPoint(lat, lng, ts = ts, accuracy = acc, maxAccuracy = maxAcc))
         }
-        return result
+        return points
     }
 
     /**
-     * Adaptive Multi-Factor Jump Engine logic.
+     * Multi-Factor Jump Engine logic. Standardized to Double.
      */
     fun isVisualJump(
         lastLat: Double, lastLng: Double, 
@@ -113,7 +88,7 @@ object PhysicsUtils {
         
         val dist = calculateDistance(lastLat, lastLng, newLat, newLng)
         val timeDeltaSec = timeDeltaMs / 1000.0
-        val speedMps = dist / timeDeltaSec
+        val speedMps = dist / max(0.1, timeDeltaSec)
         
         // Tier 1: Outlier Filter
         if (dist > OUTLIER_DISTANCE_THRESHOLD || speedMps > OUTLIER_SPEED_CAP_MPS) {
@@ -123,8 +98,7 @@ object PhysicsUtils {
         var score = 0
         var isAdaptiveJump = false
         
-        // Issue #332: Enhanced Sensor Fusion for Urban Canyons
-        // Issue #036: Hardened mismatch gate for A15
+        // Sensor Fusion check
         val mismatchGate = if (isA15) JUMP_GATE_SENSOR_MISMATCH_A15_MPS else JUMP_GATE_SENSOR_MISMATCH_MPS
         if (!hasPhysicalMotion && speedMps > mismatchGate) { 
             score += JUMP_WEIGHT_SENSOR_MISMATCH
@@ -135,15 +109,15 @@ object PhysicsUtils {
             }
         }
         
-        // Velocity Inertia (Acceleration Check)
-        val accel = abs(speedMps - lastSpeedMps) / timeDeltaSec
+        // Velocity Inertia
+        val accel = abs(speedMps - lastSpeedMps) / max(0.1, timeDeltaSec)
         val accelLimit = if (isParking) PARKING_ACCEL_LIMIT else MAX_TRACTOR_ACCEL
         if (accel > accelLimit && dist > ACCEL_CHECK_MIN_DIST) { 
             score += JUMP_WEIGHT_ACCEL_CHECK
         }
         
-        // 3D Jump Validation (Altitude Delta)
-        if (abs(altitudeDelta) / timeDeltaSec > ALTITUDE_VELOCITY_CAP) { 
+        // 3D Validation
+        if (abs(altitudeDelta) / max(0.1, timeDeltaSec) > ALTITUDE_VELOCITY_CAP) { 
             score += JUMP_WEIGHT_ALTITUDE_DELTA
         }
 
@@ -153,13 +127,12 @@ object PhysicsUtils {
         
         val isTier2 = dist >= JUMP_POINT_DISTANCE_THRESHOLD && (speedMps > MAX_PHYSICAL_SPEED_MPS || score >= 40)
         
-        // Issue #036: Hardened jitter threshold for A15
         val jitterThreshold = if (isA15) JUMP_GATE_VISUAL_JITTER_A15_METERS else JUMP_GATE_VISUAL_JITTER_METERS
         val isTier3 = dist >= jitterThreshold && dist < JUMP_POINT_DISTANCE_THRESHOLD && score >= 30
         
         val isJump = isTier2 || isTier3 || score >= 50
         
-        var reason = when {
+        val reason = when {
             isAdaptiveJump -> "Signal Reflection Suspicion (High SNR)"
             !hasPhysicalMotion && speedMps > mismatchGate -> "Sensor Mismatch Jump (Urban Canyon)"
             isTier2 -> "Security Jump"

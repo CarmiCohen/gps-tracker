@@ -1,14 +1,15 @@
-# Issue #058: TrackerService Initialization (Hilt Migration)
-**Status**: Resolved (v9.3.6)
-**Priority**: High
-**Requirement**: R978
+# Issue #058: TrackerService Hilt Refactor (R978)
+**Status: RESOLVED (v9.3.12)**
+**Component: :app**
 
 ## Description
-Refactor `TrackerService`, `ViewerService`, and common infrastructure to use Hilt dependency injection. Eliminate manual dependency instantiation and `EntryPointAccessors`.
+Finalize the migration of background services to Hilt-based dependency injection. This involves removing legacy `EntryPointAccessors` and standardizing the initialization/cleanup lifecycle via `BaseMonitorService`.
 
-## Resolution
-- Consolidated 11 core components into `BaseMonitorService` using `@Inject`.
-- Standardized initialization using `Listener` and `initialize(CoroutineScope)` patterns.
-- Migrated `WatchdogReceiver` to `@AndroidEntryPoint`.
-- Removed `EntryPointAccessors` from services and `GpsApplication`.
-- Verified service lifecycle stability across role transitions.
+## Verification Path
+- [x] Migrate `TrackerService` to `@AndroidEntryPoint`.
+- [x] Inject `MainRepository`, `AppNotificationManager`, and `LocationProcessor` via field injection.
+- [x] Standardize `initialize(CoroutineScope)` pattern across all service components.
+- [x] Verify no injection failures during service start on Samsung/Xiaomi devices.
+
+## Resolution Summary
+Refactor completed in v9.3.12. Legacy accessors removed from all service roles. Background lifecycle now strictly DI-compliant.

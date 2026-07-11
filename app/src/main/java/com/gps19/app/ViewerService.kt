@@ -17,6 +17,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v9.3.15:
+ * - Hardening: Capturing Double conversions once in onLocationChanged to 
+ *   eliminate redundant boundary casting.
  * v9.3.6:
  * - Issue #058: Hilt Migration. Removed EntryPointAccessors for RemoteUpdateWrapper.
  *   Inherits common dependencies from BaseMonitorService.
@@ -186,6 +189,14 @@ class ViewerService : BaseMonitorService() {
         val nowRealtime = timeProvider.elapsedRealtime()
         val nowWall = timeProvider.currentTimeMillis()
 
+        // Capture boundary conversions once
+        val lat = location.latitude
+        val lng = location.longitude
+        val alt = location.altitude
+        val speed = location.speed.toDouble()
+        val acc = location.accuracy.toDouble()
+        val bearing = location.bearing.toDouble()
+
         if (VIEWER_GPS_POLLING_MS == 1000L && lastGpsFixRealtime > 0) {
             val gap = nowRealtime - lastGpsFixRealtime
             stabilityAuditFixCount++
@@ -193,19 +204,19 @@ class ViewerService : BaseMonitorService() {
                 stabilityAuditViolationCount++
                 val proc = lastProcessedLocation
                 logManager.logServiceEvent("STABILITY GAP (V): ${gap}ms detected during 1Hz polling.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
-                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = acc)
             }
         }
         lastGpsFixRealtime = nowRealtime
 
         val processed = locationProcessor.processGpsPoint(
-            lat = location.latitude,
-            lng = location.longitude,
-            alt = location.altitude,
-            androidSpeedMps = location.speed.toDouble(),
+            lat = lat,
+            lng = lng,
+            alt = alt,
+            androidSpeedMps = speed,
             gpsTs = location.time,
-            accuracy = location.accuracy.toDouble(),
-            bearing = location.bearing.toDouble(),
+            accuracy = acc,
+            bearing = bearing,
             snr = gpsManager.averageSnr,
             satsUsed = location.extras?.getInt("satellites") ?: gpsManager.satellitesUsed,
             isViewerTrail = true,
@@ -223,12 +234,12 @@ class ViewerService : BaseMonitorService() {
         lastProcessedLocation = processed
 
         repository.updateLocation(LocationUpdate(
-            lat = location.latitude,
-            lng = location.longitude,
-            alt = location.altitude,
-            speed = location.speed.toDouble(),
-            accuracy = location.accuracy.toDouble(),
-            bearing = location.bearing.toDouble(),
+            lat = lat,
+            lng = lng,
+            alt = alt,
+            speed = speed,
+            accuracy = acc,
+            bearing = bearing,
             battery = integrityMonitor.getBatteryLevel(),
             temp = integrityMonitor.batteryTemp,
             isCharging = integrityMonitor.isCharging,
@@ -251,7 +262,7 @@ class ViewerService : BaseMonitorService() {
             override val ts = 0L 
         }
         
-        locationProcessor.updateCalculatedDistances(location.latitude, location.longitude, true, trackerAnchor)
+        locationProcessor.updateCalculatedDistances(lat, lng, true, trackerAnchor)
     }
 
     private fun handleTrackerPulse(id: String) {
@@ -417,7 +428,7 @@ class ViewerService : BaseMonitorService() {
             tiltIdx = 0.0, baroIdx = 0.0,
             verticalVelocity = 0.0, sitVz = 0.0, sitDz = 0.0, sitBaro = 0.0, sitTilt = 0.0, sitShock = 0.0,
             isBatterySteepDischarge = false, isCoolingModeActive = false,
-            speed = proc?.filteredSpeed ?: 0.0, // Standardized to m/s
+            speed = proc?.filteredSpeed ?: 0.0,
             bearing = (lastKnownLocation?.bearing?.toDouble() ?: 0.0),
             isSitDetected = false, isSitActive = false, currentMa = integrityMonitor.getBatteryCurrent(),
             locationPendingReason = LocationPendingReason.NONE

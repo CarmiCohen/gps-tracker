@@ -4,15 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
+ * v9.3.15:
+ * - Hardening: Finalized Double standardization. Eliminated redundant 
+ *   conversions across module boundaries.
  * v9.1.8:
  * - Issue #046: Shared Behavioral State. Added trackerState for authoritative 
  *   broadcast from Tracker to Viewer HUD.
- * v8.9.77:
- * - Issue #018: Stationary Anchor Hard-Lock. Added isAnchorLocked for 
- *   forensic audit transparency.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions across module boundaries.
  */
 @Serializable
 data class LocationUpdate(

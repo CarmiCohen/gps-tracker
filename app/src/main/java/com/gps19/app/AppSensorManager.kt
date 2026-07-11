@@ -31,13 +31,10 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * v9.2.9:
- * - R994: Screen-Off Optimization. Exposed isScreenOn via DisplayManager state tracking 
- *   to allow GPS polling frequency reduction.
- * v8.9.93:
- * - Issue #037: Implemented Display State Hardening. Added a DisplayListener to detect 
- *   rapid ON/DOZE toggling on G990E devices. Introduced display-aware muzzling to 
- *   prevent virtual proximity flickering during Samsung AOD transitions.
+ * v9.3.15:
+ * - Hardening: Standardized all high-frequency math to Double.
+ *   Implemented gravityBufferDouble/geomagneticBufferDouble to eliminate redundant 
+ *   toDouble() conversions in the sensor loop.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -109,6 +106,9 @@ class AppSensorManager @Inject constructor(
     // Performance Audit: Pre-allocated buffers for zero-allocation fast path
     private val gravityBuffer = FloatArray(3)
     private val geomagneticBuffer = FloatArray(3)
+    private val gravityBufferDouble = DoubleArray(3)
+    private val geomagneticBufferDouble = DoubleArray(3)
+
     private val rotationMatrixBuffer = FloatArray(9)
     private val inclinationMatrixBuffer = FloatArray(9)
     private val orientationBuffer = FloatArray(3)
@@ -207,6 +207,7 @@ class AppSensorManager @Inject constructor(
 
     private var proximityJob: Job? = null
     private var rawProximityNear: Boolean = true
+    private var proximityMaxRange = 5.0
 
     var isProximityNear: Boolean = true
         private set
@@ -255,6 +256,7 @@ class AppSensorManager @Inject constructor(
         sessionStartTs = timeProvider.elapsedRealtime()
         lastBaroZeroingTs = sessionStartTs
         hasLoggedThreadInfo.set(false)
+        proximityMaxRange = proximity?.maximumRange?.toDouble() ?: 5.0
 
         if (sensorThread == null) {
             sensorThread = HandlerThread("AppSensorThread").apply { start() }
@@ -322,34 +324,50 @@ class AppSensorManager @Inject constructor(
 
         val now = timeProvider.elapsedRealtime()
         val wallNow = timeProvider.currentTimeMillis()
+        val values = event.values
         
         when (event.sensor.type) {
             Sensor.TYPE_ACCELEROMETER -> {
-                System.arraycopy(event.values, 0, gravityBuffer, 0, 3)
+                val v0 = values[0].toDouble()
+                val v1 = values[1].toDouble()
+                val v2 = values[2].toDouble()
+                
+                gravityBuffer[0] = values[0]
+                gravityBuffer[1] = values[1]
+                gravityBuffer[2] = values[2]
+                gravityBufferDouble[0] = v0
+                gravityBufferDouble[1] = v1
+                gravityBufferDouble[2] = v2
+                
                 hasGravity = true
-                processVibration(event.values[0].toDouble(), event.values[1].toDouble(), event.values[2].toDouble())
+                processVibration(v0, v1, v2)
                 updateOrientation()
             }
             Sensor.TYPE_LINEAR_ACCELERATION -> {
-                processLinearAcceleration(event.values, event.timestamp)
+                processLinearAcceleration(values[0].toDouble(), values[1].toDouble(), values[2].toDouble(), event.timestamp)
             }
             Sensor.TYPE_MAGNETIC_FIELD -> {
-                System.arraycopy(event.values, 0, geomagneticBuffer, 0, 3)
+                geomagneticBuffer[0] = values[0]
+                geomagneticBuffer[1] = values[1]
+                geomagneticBuffer[2] = values[2]
+                geomagneticBufferDouble[0] = values[0].toDouble()
+                geomagneticBufferDouble[1] = values[1].toDouble()
+                geomagneticBufferDouble[2] = values[2].toDouble()
+                
                 hasGeomagnetic = true
                 updateOrientation()
             }
             Sensor.TYPE_PRESSURE -> {
-                processPressure(event.values[0].toDouble())
+                processPressure(values[0].toDouble())
             }
             Sensor.TYPE_PROXIMITY -> {
-                val maxRange = proximity?.maximumRange?.toDouble() ?: 5.0
-                val value = event.values[0].toDouble()
-                val newValue = value < maxRange
+                val value = values[0].toDouble()
+                val newValue = value < proximityMaxRange
                 
                 currentProximityCm = value
                 if (debouncedProximityCm == -1.0) debouncedProximityCm = value
                 
-                proximityIdx = (1.0 - (value / maxRange)).coerceIn(0.0, 1.0)
+                proximityIdx = (1.0 - (value / proximityMaxRange)).coerceIn(0.0, 1.0)
                 if (proximityIdx < secMinProxIdx) secMinProxIdx = proximityIdx
 
                 if (newValue != rawProximityNear) {
@@ -395,7 +413,7 @@ class AppSensorManager @Inject constructor(
                 }
             }
             Sensor.TYPE_LIGHT -> {
-                val lux = event.values[0].toDouble()
+                val lux = values[0].toDouble()
                 currentLux = lux
                 if (lux > secPeakLux) secPeakLux = lux
                 
@@ -416,7 +434,7 @@ class AppSensorManager @Inject constructor(
                 }
             }
             Sensor.TYPE_ROTATION_VECTOR -> {
-                processRotation(event.values)
+                processRotation(values)
             }
         }
         
@@ -661,7 +679,8 @@ class AppSensorManager @Inject constructor(
         val dx = x - lastAccelX
         val dy = y - lastAccelY
         val dz = z - lastAccelZ
-        val delta = (sqrt(dx * dx + dy * dy + dz * dz)) / GRAVITY_EARTH
+        // Standardized to Double math
+        val delta = (sqrt(dx * dx + dy * dy + dz * dz)) / 9.80665
 
         synchronized(this) {
             if (delta > internalPeakVibration) internalPeakVibration = delta
@@ -705,7 +724,7 @@ class AppSensorManager @Inject constructor(
         }
     }
 
-    private fun processLinearAcceleration(values: FloatArray, timestampNs: Long) {
+    private fun processLinearAcceleration(val0: Double, val1: Double, val2: Double, timestampNs: Long) {
         if (!hasGravity) return
         if (lastLinearAccelTs == 0L) {
             lastLinearAccelTs = timestampNs
@@ -715,12 +734,8 @@ class AppSensorManager @Inject constructor(
         lastLinearAccelTs = timestampNs
         
         if (dt > 0.0 && dt < 0.2) {
-            val val0 = values[0].toDouble()
-            val val1 = values[1].toDouble()
-            val val2 = values[2].toDouble()
-            
-            val dot = val0 * gravityBuffer[0] + val1 * gravityBuffer[1] + val2 * gravityBuffer[2]
-            val gravMag = sqrt(gravityBuffer[0].toDouble()*gravityBuffer[0] + gravityBuffer[1].toDouble()*gravityBuffer[1] + gravityBuffer[2].toDouble()*gravityBuffer[2])
+            val dot = val0 * gravityBufferDouble[0] + val1 * gravityBufferDouble[1] + val2 * gravityBufferDouble[2]
+            val gravMag = sqrt(gravityBufferDouble[0] * gravityBufferDouble[0] + gravityBufferDouble[1] * gravityBufferDouble[1] + gravityBufferDouble[2] * gravityBufferDouble[2])
             val vz_accel = if (gravMag > 0.1) dot / gravMag else 0.0
 
             currentVerticalVelocity += vz_accel * dt

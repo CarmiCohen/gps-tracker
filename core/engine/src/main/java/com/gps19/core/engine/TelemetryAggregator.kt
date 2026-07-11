@@ -4,11 +4,12 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * v9.3.12:
+ * - Forensic Consolidation (#065): Standardized locationPendingReason priority 
+ *   merging to support unified pink logging across modules.
  * v9.2.2:
  * - Issue #326 Fix: Intelligent Uncertainty UX. Implemented priority-based 
  *   locationPendingReason merging to ensure severe reasons (JAMMER) are preserved.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized telemetry fields to Double.
  */
 class TelemetryAggregator {
 

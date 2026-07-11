@@ -20,6 +20,11 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * v9.3.14:
+ * - Issue C-068-1: Implemented forced permission refresh to bypass TTL cache.
+ * v9.3.12:
+ * - Hilt Refactor (#066): Standardized injection and lifecycle management.
+ * - Temporal Authority (#075): Integrated skew-immune freshness flags.
  * v9.3.11:
  * - Issue #059: Added NavigateToDiagnostics handling and optimized permission refresh interval.
  * v9.3.3:
@@ -253,7 +258,7 @@ class MainViewModel @Inject constructor(
             }
             is UiEvent.SetLogFilterShowDetails -> viewModelScope.launch { repository.updateLogFilters(details = event.show) }
             is UiEvent.SetLogFilterShowRecovered -> viewModelScope.launch { repository.updateLogFilters(recovered = event.show) }
-            is UiEvent.RefreshPermissionStatus -> updateState { it.copy(permissions = systemStatusProvider.getPermissionState()) }
+            is UiEvent.RefreshPermissionStatus -> updateState { it.copy(permissions = systemStatusProvider.getPermissionState(forceRefresh = true)) }
             is UiEvent.TriggerTestAlarm -> { addPersistentLog("user", "USER ACTION: Test alarm triggered", true); repository.sendCommand(UiCommand.TriggerTestAlarm) }
             is UiEvent.TriggerForensicTest -> { addPersistentLog("user", "USER ACTION: Forensic stress test triggered", true); repository.sendCommand(UiCommand.TriggerForensicTest) }
             is UiEvent.ToggleXiaomiManualOverride -> {

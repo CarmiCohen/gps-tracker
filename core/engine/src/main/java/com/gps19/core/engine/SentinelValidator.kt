@@ -4,11 +4,9 @@ import kotlin.math.abs
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates".
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized parameters to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
- * v8.9.67:
- * - Issue #010: Implemented A15 Acoustic/Vibration Coherence Check.
+ * v9.3.15:
+ * - Hardening: Finalized Double standardization. Eliminated redundant type 
+ *   conversions in sentinel gate evaluations.
  */
 object SentinelValidator {
 

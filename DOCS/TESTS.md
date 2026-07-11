@@ -5,8 +5,6 @@ This document provides manual verification procedures. For the current testing b
 ## 1. Verify Sensor Telemetry (Task #056)
 The dashboard currently shows static values. Verify that internal sensors report data to the `MainViewModel`.
 * **Action:** Move the device or cover the light sensor to see if `Vibration`, `Tilt`, or `Lux` change.
-* **Acoustic Check:** Clap near the device. Observe the "Acoustic" bar (yellow/orange ribbon). It should pulse or jump. If not moving, `AppSensorManager` is not registering peaks.
-* **Peak Test:** Try a sharper sound or tap the frame near the mic while the phone is on a soft surface (to isolate from vibration).
 * **Logcat Verification:** `adb logcat -s AppSensorManager TrackerService`
 * **Relates to:** Integration Test **#056** (Forensic Pipeline).
 
@@ -14,7 +12,6 @@ The dashboard currently shows static values. Verify that internal sensors report
 Verify that the dashboard responds to "Violations" and breaks out of locks.
 * **Action:** Briefly shake the device to trigger a `MOVING` state or `Vibration` alert.
 * **Anchor Test:** Physically move the device after a Hard-Lock and verify immediate breakout.
-* **Muzzle Watch:** Monitor for the "GPS: Polling interval" log or map pulse; verify the "muzzle" logic runs checks at these points.
 * **Verification:** Dashboard should highlight the triggered alert in **Red** (or **Pink** for forensics).
 * **Relates to:** Manual Validation **#053** (Anchor Lock Breakout).
 
@@ -27,7 +24,6 @@ Verify that the dashboard responds to "Violations" and breaks out of locks.
 ## 4. Monitor UI Performance (Task #031)
 * **Action:** Observe if the UI remains fluid while telemetry is active over an extended period.
 * **Verification:** Check logs for "Skipped frames" or "Davey" events during active sensor streaming.
-* **Relates to:** Manual Validation **#031** (Soak Test Monitoring).
 
 ## 5. Diagnostics & Permissions (Task #064)
 * **Action:** Open **Settings** -> **Diagnostics** or **Settings** -> **Phone Setup** -> **VIEW SYSTEM DIAGNOSTICS**.
@@ -35,18 +31,21 @@ Verify that the dashboard responds to "Violations" and breaks out of locks.
     1. Revoke "Display over other apps" in system settings.
     2. Return to the Diagnostics screen and tap **REFRESH STATUS**.
     3. Verify "Overlay Permission" changes to **DENIED** (Red).
-    4. Re-grant the permission and verify it returns to **GRANTED** (Green).
-* **Hardware Adaptation Test:**
-    * **Xiaomi:** Verify the "Xiaomi Special Status" section appears and accurately reflects "Other Permissions" (Lock screen/Pop-up). Test the "Manual Override" switch.
-    * **Samsung:** Verify the "Samsung Engine Tuning: ACTIVE" note appears on S21 FE or A15 devices.
 * **Relates to:** Manual Validation **#064** (Diagnostics UI).
 
 ## 6. Manual Forensic Stress Test (Task #071)
-* **Setup:** Tap the ⚠️ icon (if system issues exist) or go to Settings -> Phone Setup.
+* **Setup:** Tap the ⚠️ icon or go to Settings -> Phone Setup.
 * **Action:** Click the pink **TRIGGER FORENSIC STRESS TEST** button.
 * **Verify Latching:**
     * Open the Log Overlay. Look for `FORENSIC TEST: Manually injecting Jammer/Stall markers`.
     * Verify `JAMMER SUSPICION` and `GPS STALL` violations appear in the log.
-    * Verify the "P" badge appears on the HUD with the appropriate reason.
-    * Check the Ribbons Overlay (SNR or Connection) to ensure the violation state is persisted.
 * **Relates to:** Manual Validation **#071**.
+
+## 7. Architectural Integrity (v9.3.12 Hardening)
+* **Temporal Authority (#075):**
+    * **Setup:** Manually change the system time on the Viewer device by -2 minutes relative to the Tracker.
+    * **Verify:** Marker and HUD elements MUST remain Green. The `isGpsFresh` calculation should now rely on receipt-time deltas rather than absolute system time comparisons.
+* **DI/Hilt Stability (#066):**
+    * **Action:** Cold-start the `TrackerService` from a killed state (swipe away from recents).
+    * **Verify:** Check Logcat for `@AndroidEntryPoint` initialization. Ensure no `IllegalStateException` occurs during `HistoryDao` or `LogDao` injection.
+* **Relates to:** Milestone **v9.3.12** Verification.

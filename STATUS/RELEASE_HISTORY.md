@@ -1,6 +1,16 @@
-# Project History & Versioning (v9.3.9)
+# Project History & Versioning (v9.3.12)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## v9.3.12
+- **Temporal Authority (#075)**: Implemented skew-immune receipt-time calculation in `DashboardUseCase` to ensure GPS freshness remains accurate despite device clock drift.
+- **TrackerService Hilt (#066)**: Finalized Hilt dependency injection refactor for the background service layer, completing the migration from legacy EntryPoints.
+- **Forensic Consolidation (#065)**: Standardized forensic "pink" logging and data persistence via Room `LogDao` and `LogEntity` across all modules.
+- **Proto Precision (#076)**: Verified end-to-end persistence and UI propagation of `max_distance` and `max_accuracy` settings (Requirement R968).
+
+## v9.3.11
+- **Diagnostics UI (#064)**: Enhanced diagnostics screen to reflect live hardware adaptations and permission states for Samsung and Xiaomi devices.
+- **Logcat Audit (#068)**: Silenced Samsung-specific `getPackageName` logcat spillage via identifier caching in the service layer.
 
 ## v9.3.9
 - **Peer Visibility Fix (#073 / R995)**: Resolved defect where Tracker "VWR" badge remained red during active monitoring. Implemented explicit signaling pulse acknowledgement in `TrackerService` to drive HUD freshness.

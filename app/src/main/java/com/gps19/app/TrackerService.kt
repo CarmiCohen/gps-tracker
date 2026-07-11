@@ -20,12 +20,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.3.9:
- * - Issue #073 Peer Visibility Fix: Added repository.updateRemoteActivity in handleViewerPulse 
- *   to ensure the VWR badge turns green upon receiving signaling pulses.
- * v9.3.6:
- * - Issue #058: Hilt Migration. Removed EntryPointAccessors for RemoteUpdateWrapper.
- *   Inherits common dependencies from BaseMonitorService.
+ * v9.3.15:
+ * - Hardening: Capturing Double conversions once in onLocationChanged to 
+ *   eliminate redundant boundary casting.
+ * v9.3.14:
+ * - Issue C-068-1: Switched to cached permission states from SystemStatusProvider 
+ *   to eliminate high-frequency system API noise.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -624,13 +624,16 @@ class TrackerService : BaseMonitorService() {
         val proc = lastProcessedLocation
         val isSocketConnected = networkManager.isConnected()
         
-        val xiaomiStatus = when(systemStatusProvider.isXiaomiSpecialPermissionGranted()) {
+        // Issue C-068-1: Use centralized cached permission state
+        val permState = systemStatusProvider.getPermissionState()
+        
+        val xiaomiStatus = when(permState.xiaomiStatus) {
             XiaomiPermissionStatus.GRANTED -> EngineXiaomiStatus.GRANTED
             XiaomiPermissionStatus.DENIED -> EngineXiaomiStatus.DENIED
             XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN
         }
         
-        val xiaomiAutostartStatus = when(getXiaomiAutostartStatus(this, cachedPkgName)) {
+        val xiaomiAutostartStatus = when(permState.xiaomiAutostartStatus) {
             XiaomiPermissionStatus.GRANTED -> EngineXiaomiStatus.GRANTED
             XiaomiPermissionStatus.DENIED -> EngineXiaomiStatus.DENIED
             XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN
@@ -681,6 +684,14 @@ class TrackerService : BaseMonitorService() {
         val nowRealtime = timeProvider.elapsedRealtime()
         val nowWall = timeProvider.currentTimeMillis()
 
+        // Capture boundary conversions once
+        val lat = location.latitude
+        val lng = location.longitude
+        val alt = location.altitude
+        val speed = location.speed.toDouble()
+        val acc = location.accuracy.toDouble()
+        val bearing = location.bearing.toDouble()
+
         if (currentGpsInterval == HIGH_FREQUENCY_GPS_POLLING_MS && lastGpsFixRealtime > 0) {
             val gap = nowRealtime - lastGpsFixRealtime
             stabilityAuditFixCount++
@@ -688,14 +699,14 @@ class TrackerService : BaseMonitorService() {
                 stabilityAuditViolationCount++
                 val proc = lastProcessedLocation
                 logManager.logServiceEvent("STABILITY GAP: ${gap}ms detected during 10Hz polling.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
-                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = location.accuracy.toDouble())
+                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = acc)
             }
         }
         lastGpsFixRealtime = nowRealtime
 
         val processed = locationProcessor.processGpsPoint(
-            lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = location.speed.toDouble(), 
-            gpsTs = location.time, accuracy = location.accuracy.toDouble(), bearing = location.bearing.toDouble(), snr = gpsManager.averageSnr, 
+            lat = lat, lng = lng, alt = alt, androidSpeedMps = speed, 
+            gpsTs = location.time, accuracy = acc, bearing = bearing, snr = gpsManager.averageSnr, 
             satsUsed = location.extras?.getInt("satellites") ?: gpsManager.satellitesUsed, isViewerTrail = false, lastGpsTs = sessionManager.lastGpsTs, 
             isLocal = true, providedAdaptiveVibrationFloor = sensorManager.adaptiveVibrationFloor, 
             isSuspicious = isSuspiciousMode,
@@ -707,7 +718,7 @@ class TrackerService : BaseMonitorService() {
         )
         
         processed.suppressionNote?.let { note ->
-            logManager.logServiceEvent(note, important = false, lat = location.latitude, lng = location.longitude, accuracy = location.accuracy.toDouble())
+            logManager.logServiceEvent(note, important = false, lat = lat, lng = lng, accuracy = acc)
         }
         
         if (!processed.isClockRegression) sessionManager.lastGpsTs = location.time
@@ -726,12 +737,12 @@ class TrackerService : BaseMonitorService() {
         lastKnownLocation = location; lastProcessedLocation = processed
 
         repository.updateLocation(LocationUpdate(
-            lat = location.latitude,
-            lng = location.longitude,
-            alt = location.altitude,
-            speed = location.speed.toDouble(),
-            accuracy = location.accuracy.toDouble(),
-            bearing = location.bearing.toDouble(),
+            lat = lat,
+            lng = lng,
+            alt = alt,
+            speed = speed,
+            accuracy = acc,
+            bearing = bearing,
             battery = integrityMonitor.getBatteryLevel(),
             temp = integrityMonitor.batteryTemp,
             isCharging = integrityMonitor.isCharging,

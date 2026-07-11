@@ -15,14 +15,12 @@ import javax.inject.Inject
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * v9.3.15:
+ * - Hardening: Updated pushSettings to use getDouble for max_distance, 
+ *   eliminating redundant Float conversion in signaling path.
  * v9.1.9:
  * - Issue #051: Binary Parity Gap. Updated handleLocationRelayBinary to extract
  *   new forensic fields: tracker_state, is_anchor_locked, is_location_pending, etc.
- * v8.9.75:
- * - Issue #042 Fix: Relaxed identity locking in handle...Relay methods to allow 
- *   initial pairing when own viewerId is default ("V").
- * v8.9.72:
- * - Reverted lastDiscTs property naming to match Protobuf generated camelCase.
  */
 class CommunicationManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -468,7 +466,7 @@ class CommunicationManager @Inject constructor(
                 homePoints.forEach { array.put(JSONObject().apply { put("lat", it.latitude); put("lng", it.longitude) }) }
                 socket?.emit("settings_update", JSONObject().apply {
                     put("home_points", array); put("settings_ts", settingsRepository.getLong(SettingsRepository.HOME_POINTS_TS_KEY, 0L))
-                    put("max_dist", settingsRepository.getFloat(SettingsRepository.MAX_DISTANCE_STORAGE_KEY, 60f).toDouble())
+                    put("max_dist", settingsRepository.getDouble(SettingsRepository.MAX_DISTANCE_STORAGE_KEY, 60.0))
                     put("id", deviceId); put("viewer_id", viewerId); put("from_viewer", true)
                 })
             } catch (e: Exception) { 
