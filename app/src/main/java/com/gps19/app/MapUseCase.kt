@@ -6,6 +6,8 @@ import javax.inject.Singleton
 /**
  * MapUseCase: Logic for map-related UI state transitions and triggers.
  * Extracted from MainViewModel to resolve Issue 115 (Architectural Bloat).
+ * v9.3.16:
+ * - Issue #078: Implemented MapFollowMode state transitions to fix centering conflicts.
  */
 @Singleton
 class MapUseCase @Inject constructor() {
@@ -18,8 +20,16 @@ class MapUseCase @Inject constructor() {
             is UiEvent.SetMapLocked -> currentState.copy(isMapLocked = event.locked)
             is UiEvent.MapZoomIn -> currentState.copy(zoomInTrigger = currentState.zoomInTrigger + 1)
             is UiEvent.MapZoomOut -> currentState.copy(zoomOutTrigger = currentState.zoomOutTrigger + 1)
-            is UiEvent.CenterTracker -> currentState.copy(centeringTrackerTrigger = currentState.centeringTrackerTrigger + 1, isMapLocked = true)
-            is UiEvent.CenterViewer -> currentState.copy(centeringViewerTrigger = currentState.centeringViewerTrigger + 1, isMapLocked = true)
+            is UiEvent.CenterTracker -> currentState.copy(
+                centeringTrackerTrigger = currentState.centeringTrackerTrigger + 1, 
+                isMapLocked = true,
+                mapFollowMode = MapFollowMode.AUTO
+            )
+            is UiEvent.CenterViewer -> currentState.copy(
+                centeringViewerTrigger = currentState.centeringViewerTrigger + 1, 
+                isMapLocked = true,
+                mapFollowMode = MapFollowMode.VIEWER
+            )
             else -> currentState
         }
     }

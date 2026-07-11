@@ -4,6 +4,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Unified immutable state for the entire UI structure.
+ * v9.3.16:
+ * - Issue #078: Introduced MapFollowMode to prevent map centering conflicts.
  * v9.3.14:
  * - Issue C-068-1: Added xiaomiAutostartStatus to PermissionState for TTL caching.
  * v9.3.11: 
@@ -53,6 +55,7 @@ data class MainUiState(
     val isGeofenceViolationsVisible: Boolean = true,
     val isMapButtonsVisible: Boolean = false,
     val isMapLocked: Boolean = true,
+    val mapFollowMode: MapFollowMode = MapFollowMode.AUTO,
     val maxTrackerAccuracy: Double = 0.0,
     val maxViewerAccuracy: Double = 0.0,
     val distanceTrackerToHome: Double? = null,
@@ -94,6 +97,8 @@ data class MainUiState(
             return count
         }
 }
+
+enum class MapFollowMode { TRACKER, VIEWER, AUTO }
 
 enum class GeofenceMode { IDLE, ADD, REMOVE }
 

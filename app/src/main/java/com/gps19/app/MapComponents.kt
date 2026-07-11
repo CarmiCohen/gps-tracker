@@ -47,6 +47,8 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * v9.3.16:
+ * - Issue #078: Implemented MapFollowMode awareness in centering lock logic.
  * v9.3.8:
  * - Issue #072 Clock Skew Hardening: Transitioned map freshness calculations 
  *   to a Receipt-Time Authority model to prevent markers from turning gray due 
@@ -122,7 +124,7 @@ fun AppMapContainer(
             accuracy = trackerAccuracy, maxAcc = trackerMaxAcc, speed = trackerSpeed, myAccuracy = viewerAccuracy, myMaxAcc = viewerMaxAcc, mySpeed = viewerSpeed,
             initialCenter = initialCenter, centeringTrackerTrigger = uiState.centeringTrackerTrigger, centeringViewerTrigger = uiState.centeringViewerTrigger,
             zoomInTrigger = uiState.zoomInTrigger, zoomOutTrigger = uiState.zoomOutTrigger, lastGpsTs = trackerLoc.timestamp, isTrackerMode = isTrackerMode,
-            isLocked = uiState.isMapLocked, onLockChange = { onEvent(UiEvent.SetMapLocked(it)) }, mapViewRef = mapViewRef, geofenceMode = uiState.geofenceMode,
+            isLocked = uiState.isMapLocked, mapFollowMode = uiState.mapFollowMode, onLockChange = { onEvent(UiEvent.SetMapLocked(it)) }, mapViewRef = mapViewRef, geofenceMode = uiState.geofenceMode,
             systemPulse = now, systemPulseRealtime = systemPulseRealtime, isLocationPending = trackerLocationPending, locationPendingReason = trackerLocationPendingReason,
             lastValidFixRealtime = trackerLastValidFixRealtime, isMeLocationPending = viewerLocationPending, meLocationPendingReason = viewerLocationPendingReason, meLastValidFixRealtime = viewerLastValidFixRealtime
         )
@@ -184,7 +186,8 @@ fun OsmMap(
     initialCenter: GeoPoint? = null, centeringTrackerTrigger: Int = 0, centeringViewerTrigger: Int = 0,
     zoomInTrigger: Int = 0, zoomOutTrigger: Int = 0,
     lastGpsTs: Long = 0L, isTrackerMode: Boolean = false,
-    isLocked: Boolean = true, onLockChange: (Boolean) -> Unit = {},
+    isLocked: Boolean = true, mapFollowMode: MapFollowMode = MapFollowMode.AUTO,
+    onLockChange: (Boolean) -> Unit = {},
     mapViewRef: MutableState<MapView?> = remember { mutableStateOf(null) },
     geofenceMode: GeofenceMode = GeofenceMode.IDLE,
     systemPulse: Long = 0L,
@@ -235,21 +238,33 @@ fun OsmMap(
     val lastHomeRendered = remember { mutableStateOf<List<GeoPoint>?>(null) }; val lastViolationsRendered = remember { mutableStateOf<List<ViolationPoint>?>(null) }
     val lastFenceState = remember { mutableStateOf<Boolean?>(null) }; val lastViolationVisibility = remember { mutableStateOf<Pair<Boolean, Boolean>?>(null) }
 
-    LaunchedEffect(localLockStatus.value, lat, lng, myLat, myLng, isFresh, isMeFresh) {
+    LaunchedEffect(localLockStatus.value, lat, lng, myLat, myLng, isFresh, isMeFresh, mapFollowMode) {
         if (localLockStatus.value) {
             if (systemPulse - lastTriggerTs < 500) return@LaunchedEffect
-            val trackerValid = PhysicsUtils.isValidLocation(lat, lng); val meValid = myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)
+            val trackerValid = PhysicsUtils.isValidLocation(lat, lng)
+            val meValid = myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)
             val view = mapViewRef.value ?: return@LaunchedEffect
-            if (trackerValid && meValid && isFresh && isMeFresh) {
-                val dist = PhysicsUtils.calculateDistance(lat, lng, myLat!!, myLng!!)
-                if (dist in 100.0..100000.0) {
-                    val box = BoundingBox.fromGeoPoints(listOf(GeoPoint(lat, lng), GeoPoint(myLat, myLng)))
-                    view.zoomToBoundingBox(box.increaseByScale(1.4f), false)
-                    if (view.zoomLevelDouble > 18.0) view.controller.setZoom(18.0)
-                } else view.controller.setCenter(GeoPoint(lat, lng))
-            } else if (trackerValid || meValid) {
-                val center = if (trackerValid) GeoPoint(lat, lng) else GeoPoint(myLat!!, myLng!!)
-                view.controller.setCenter(center)
+            
+            when (mapFollowMode) {
+                MapFollowMode.VIEWER -> {
+                    if (meValid) view.controller.setCenter(GeoPoint(myLat!!, myLng!!))
+                }
+                MapFollowMode.TRACKER -> {
+                    if (trackerValid) view.controller.setCenter(GeoPoint(lat, lng))
+                }
+                MapFollowMode.AUTO -> {
+                    if (trackerValid && meValid && isFresh && isMeFresh) {
+                        val dist = PhysicsUtils.calculateDistance(lat, lng, myLat!!, myLng!!)
+                        if (dist in 100.0..100000.0) {
+                            val box = BoundingBox.fromGeoPoints(listOf(GeoPoint(lat, lng), GeoPoint(myLat, myLng)))
+                            view.zoomToBoundingBox(box.increaseByScale(1.4f), false)
+                            if (view.zoomLevelDouble > 18.0) view.controller.setZoom(18.0)
+                        } else view.controller.setCenter(GeoPoint(lat, lng))
+                    } else if (trackerValid || meValid) {
+                        val center = if (trackerValid) GeoPoint(lat, lng) else GeoPoint(myLat!!, myLng!!)
+                        view.controller.setCenter(center)
+                    }
+                }
             }
         }
     }

@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - v9.3.15
+# System Source of Truth (SoT) - v9.3.16
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Map Follow Mode Persistence (R981b)**: The map system MUST respect the user's manual focus intent (Tracker, Viewer, or Auto) by persisting a `MapFollowMode` state. The auto-centering logic MUST NOT override the manual focus choice until the user explicitly changes the follow target or returns to `AUTO` mode. (Issue #078 / v9.3.16 Verified)
 *   **Type Safety Authority (R999)**: All internal telemetry, sensor data, and engine pipelines MUST use `Double` precision. Redundant `toDouble()`/`toFloat()` conversions MUST be eliminated by capturing system API values (Floats) exactly once at the entry boundary. All persistence and signaling fields MUST maintain `Double` parity to prevent precision jitter. (Issue #077 / v9.3.15 Verified)
 *   **System API Throttling (R998)**: The system MUST enforce a minimum 10,000ms TTL (Time-To-Live) cache for all system API permission and status checks. This is CRITICAL to eliminate internal logcat jitter on Samsung G990/A15 and Xiaomi devices. (Issue C-068-1 / v9.3.14 Verified)
 *   **Dynamic Anchor Breakout (R990c)**: The engine MUST implement a displacement-weighted monitor to prevent "sticky anchors". This monitor MUST integrate cumulative displacement trends, IMM-filter velocity estimates, and physical motion triggers. (Issue #062 / v9.3.13 Verified)
