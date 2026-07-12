@@ -5,11 +5,12 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v9.3.16:
+ * - Requirement R999b: Standardized lift detection to use barometer delta 
+ *   (Absolute - EMA) instead of raw absolute altitude.
  * v9.2.2:
  * - Issue #326 Fix: Intelligent Uncertainty UX. Included specific locationPendingReason 
  *   in forensic technical details.
- * v9.1.8:
- * - Issue #047: Standardized to m/s. Raw speed adopted in geofence evaluation.
  */
 object MainAlarmLogic {
 
@@ -123,7 +124,11 @@ object MainAlarmLogic {
         val isShock = SentinelValidator.isShockViolated(state.peakVibrationShock, state.adaptiveVibrationFloor)
         val isTilt = SentinelValidator.isTiltViolated(state.trackerTiltDegrees)
         val isAcousticMet = SentinelValidator.isAcousticViolated(state.trackerAcousticDb, state.acousticFloorDb)
-        val isLift = SentinelValidator.isLiftViolated(state.trackerBaroAlt)
+        
+        // Requirement R999b: Calculate delta relative to baseline for lift detection
+        val liftDelta = if (state.trackerBaroAltEma > -999.0) state.trackerBaroAlt - state.trackerBaroAltEma else 0.0
+        val isLift = SentinelValidator.isLiftViolated(liftDelta)
+        
         val isLightMet = SentinelValidator.isLightViolated(state.trackerLux, state.luxBaseline)
 
         val isTamperCondition = state.isTamperDetected || 
@@ -137,7 +142,7 @@ object MainAlarmLogic {
             !state.isNear -> "Proximity sensor cleared"
             isTilt -> String.format(Locale.getDefault(), "%.1f° tilt", state.trackerTiltDegrees)
             isAcousticMet -> String.format(Locale.getDefault(), "%.1f dB peak", state.trackerAcousticDb)
-            isLift -> "Lift: ${String.format(Locale.getDefault(), "%.1f", state.trackerBaroAlt)}m"
+            isLift -> "Lift: ${String.format(Locale.getDefault(), "%.1f", liftDelta)}m"
             state.isPowerTamper -> "Power source tamper"
             state.isTamperDetected -> "Hardware tamper flag"
             else -> "Device handled or uncovered"
@@ -179,9 +184,9 @@ object MainAlarmLogic {
             ViolationReport(
                 type = ALERT_ID_TRACKER_LIFT,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_LIFT),
-                subtitle = "Lift: ${String.format(Locale.getDefault(), "%.1f", state.trackerBaroAlt)}m",
+                subtitle = "Lift: ${String.format(Locale.getDefault(), "%.1f", liftDelta)}m",
                 conditionMet = isLift,
-                extremeValue = abs(state.trackerBaroAlt)
+                extremeValue = abs(liftDelta)
             )
         )
 

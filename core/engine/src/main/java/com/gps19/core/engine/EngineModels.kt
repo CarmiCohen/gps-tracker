@@ -4,14 +4,14 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v9.3.16:
+ * - Requirement R999b: Added trackerBaroAltEma to AlarmEvaluationState to support 
+ *   synchronized barometer violation detection.
  * v9.2.2:
  * - Issue #326: Added GPS_GAP to LocationPendingReason for environmental signal loss.
  * v9.2.1:
  * - Issue #018: Added alt to EngineGeoPoint to support altitude preservation 
  *   during anchor clamping.
- * v9.1.8:
- * - Issue #046: Shared Behavioral State. Migrated TrackerState to engine 
- *   to allow authoritative state broadcast from Tracker to Viewer.
  */
 
 @Serializable
@@ -235,6 +235,7 @@ data class AlarmEvaluationState(
     val trackerTiltDegrees: Double = 0.0,
     val trackerAcousticDb: Double = 0.0,
     val trackerBaroAlt: Double = 0.0,
+    val trackerBaroAltEma: Double = 0.0,
     val trackerLux: Double = 0.0,
     val isNear: Boolean = true,
     val luxBaseline: Double = 0.0,

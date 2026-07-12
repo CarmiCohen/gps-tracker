@@ -44,10 +44,12 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v9.3.15:
+ * - Hardening: Finalized Double standardization. Streamlined UI-layer Float 
+ *   conversions for Compose rendering compatibility. Fixed satsUsed parameter mismatch.
  * v9.3.8:
  * - Clock Skew Hardening: Replaced all manual HUD age calculations with authoritative 
- *   DashboardState flags (isGpsFresh, isTelemetryFresh). This ensures State, Speed, 
- *   and CommBars remain colorized correctly regardless of device clock drift.
+ *   DashboardState flags.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -118,7 +120,7 @@ fun AnalyticalRibbons(viewModel: MainViewModel) {
         StatefulSensorRibbon(sensorFlow, "LIF", selectedScale, lineColor = Color(0xFFFACC15), valueSelector = { it.liftIdx.toFloat() })
         StatefulSensorRibbon(sensorFlow, "BAT", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isBatterySteepDischarge) 1f else 0f })
         StatefulSensorRibbon(sensorFlow, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isCoolingModeActive) 1f else 0f })
-        StatefulSensorRibbon(sensorFlow, "CUR", selectedScale, lineColor = Color(0xFFFB923C), valueSelector = { (kotlin.math.abs(it.currentMa.toDouble()).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) })
+        StatefulSensorRibbon(sensorFlow, "CUR", selectedScale, lineColor = Color(0xFFFB923C), valueSelector = { (kotlin.math.abs(it.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) })
         StatefulSensorRibbon(sensorFlow, "SIT", selectedScale, lineColor = BrandJd, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isSitActive) 1f else 0f })
         StatefulSensorRibbon(sensorFlow, "TLT", selectedScale, lineColor = Color(0xFF818CF8), valueSelector = { it.tiltIdx.toFloat() })
         StatefulSensorRibbon(sensorFlow, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), valueSelector = { it.baroIdx.toFloat() })
@@ -355,7 +357,6 @@ fun GlobalStatusBar(
     val isLocalOnline = uiState.connectivity.isLocalOnline
     val isRelayConnected = uiState.connectivity.isRelayConnected
     val lastIncomingActivity = uiState.connectivity.lastRemoteActivityTs
-    val activityAge = if (lastIncomingActivity > 0) systemPulse - lastIncomingActivity else Long.MAX_VALUE
     
     // Rationale: isPeerActive uses receipt time already, but we align it with isTelemetryFresh.
     val isPeerActive = dashboardState.isTelemetryFresh

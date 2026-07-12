@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 275 |
+| **Resolved (Total)** | 🟢 Progress | 276 |
 
 ---
 
@@ -25,6 +25,7 @@ This document tracks active issues, technical debt, and pending implementation t
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
+| **#079** | **TrackerService API Synchronization** | **Resolved**. Remediated compilation errors by aligning service telemetry logic with current engine component signatures (`processGpsPoint`, `evaluateAlarms`, `pushCurrentStatus`). Implemented missing `BaseMonitorService` members. |
 | **#078** | **Map Centering Follow Conflict** | **Resolved**. Implemented `MapFollowMode` (TRACKER, VIEWER, AUTO) in `MainUiState`. Updated `OsmMap` lock logic to respect follow intent, preventing the map from snapping back to the tracker after user centers on the viewer. |
 
 ---

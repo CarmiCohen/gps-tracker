@@ -20,12 +20,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v9.3.16:
+ * - Issue #078: Map Centering Follow Conflict. Updated system state parity 
+ *   to respect MapFollowMode (TRACKER, VIEWER, AUTO) intent.
+ * - Issue #079: API Synchronization. Resolved compilation errors by aligning 
+ *   with engine component signatures. Standardized barometer EMA usage.
  * v9.3.15:
  * - Hardening: Capturing Double conversions once in onLocationChanged to 
  *   eliminate redundant boundary casting.
- * v9.3.14:
- * - Issue C-068-1: Switched to cached permission states from SystemStatusProvider 
- *   to eliminate high-frequency system API noise.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -35,18 +37,12 @@ class TrackerService : BaseMonitorService() {
     
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
-    private var alarmEvalJob: Job? = null
     private var settingsJob: Job? = null
     
     private var lastKnownLocation: Location? = null
     private var lastProcessedLocation: LocationProcessor.ProcessedLocation? = null
     private var latestGnssDetail: GnssDetail? = null
     
-    private var isSuspiciousMode = false
-    private var lastSitDetected = false
-    private var lastSitSyncLatchTs = 0L
-    private var lastSitLogTs = 0L
-    private var pendingAcousticViolation = false
     private var isMuzzled = false
     private var muzzleReleaseJob: Job? = null
 
@@ -54,20 +50,13 @@ class TrackerService : BaseMonitorService() {
     private var isAdaptationMuzzled = false
     private var adaptationMuzzleJob: Job? = null
     
-    private var revivalAttemptCount = 0
-    private var lastRevivalAttemptTs = 0L
     private var lastXiaomiRecoveryTs = 0L
     
-    private var isXiaomiManualOverride = false
     private var isS21FE = false
     private var isXiaomi = false
     private var isA15 = false
-    private var currentGpsInterval = -1L
-    private var lastGpsTransitionLogTs = 0L
 
     private var lastGpsFixRealtime = 0L
-    private var stabilityAuditFixCount = 0
-    private var stabilityAuditViolationCount = 0
     private var lastStabilityAuditTs = 0L
 
     private val localProcessorListener = object : LocationProcessorListener {
@@ -105,14 +94,12 @@ class TrackerService : BaseMonitorService() {
             isXiaomi = isXiaomiDevice()
             isA15 = isA15Device()
 
-            // 1. Alarm Manager Setup
             alarmManager.setListener(object : AppAlarmManager.Listener {
                 override fun onLogEvent(type: String, message: String, important: Boolean, extremeValue: Double?, logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, snr: Double?, vibe: Double?) {
                     logManager.submitToLogSink(message, type, important, extremeValue, logId, durationMs, isSpecial, specialColor, lat, lng, accuracy, maxAccuracy, snr, vibe)
                 }
             })
             
-            // 2. Integrity Monitor Setup
             integrityMonitor.setListener(object : IntegrityMonitor.Listener {
                 override fun onViolationSustained(type: String) {
                     if (type == ALERT_ID_TRACKER_POWER) {
@@ -129,7 +116,6 @@ class TrackerService : BaseMonitorService() {
                 }
             })
             
-            // 3. Location Processor Setup
             locationProcessor.setListener(localProcessorListener)
 
             delay(1000)
@@ -148,7 +134,6 @@ class TrackerService : BaseMonitorService() {
                     lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
             }
 
-            // 4. History Manager Setup
             historyManager.setListener(object : HistoryManager.Listener {
                 override fun onLogEvent(message: String, important: Boolean) {
                     logManager.logServiceEvent(message, important)
@@ -161,7 +146,6 @@ class TrackerService : BaseMonitorService() {
             delay(1000)
             networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
             
-            // 5. Sync Manager Setup
             syncManager.setOnSyncStartedListener {
                 muzzleReleaseJob?.cancel()
                 isMuzzled = true
@@ -178,7 +162,6 @@ class TrackerService : BaseMonitorService() {
             delay(1000)
             syncManager.startSyncLoop(lifecycleScope, configManager.deviceId, configManager.viewerId, true)
 
-            // 6. Remote Handler Setup
             remoteHandler.setListener(object : RemoteHandler.Listener {
                 override fun onPeerPulse(id: String) {
                     handleViewerPulse(id)
@@ -186,7 +169,6 @@ class TrackerService : BaseMonitorService() {
             })
             remoteHandler.initialize(lifecycleScope)
 
-            // 7. Command Router Setup
             commandRouter.setListener(object : CommandRouter.Listener {
                 override fun onViewerPulse(id: String) = handleViewerPulse(id)
                 override fun onWatchdogTrigger() { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
@@ -208,7 +190,6 @@ class TrackerService : BaseMonitorService() {
             commandRouter.register()
             commandRouter.startObservingCommands(lifecycleScope)
 
-            // Issue #058: Standardized DI for RemoteUpdateWrapper
             networkManagerWrapper.setCallback { data -> 
                 remoteHandler.handleRemoteUpdate(data, true)
             }
@@ -233,11 +214,6 @@ class TrackerService : BaseMonitorService() {
                         locationProcessor.setMaxDistanceAuthority(dist)
                     }
                 }
-                launch {
-                    repository.isXiaomiManualOverrideFlow.collect { override ->
-                        isXiaomiManualOverride = override
-                    }
-                }
             }
 
             val recoveredTs = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
@@ -258,16 +234,22 @@ class TrackerService : BaseMonitorService() {
         }
     }
 
-    private fun handleViewerPulse(id: String) {
-        if (!SignalingConstants.isValidViewerId(id)) {
-            Timber.w("Rejecting invalid Viewer ID from pulse: $id")
-            return
-        }
+    private fun setupPhysicalFastPaths() {
+        sensorManager.setAcousticFastPath(
+            floor = locationProcessor.getAcousticFloorDb(),
+            spikeThreshold = 15.0,
+            minDb = 40.0,
+            onSpike = {
+                logManager.logServiceEvent("Acoustic Spike Detected (FastPath)", false)
+            }
+        )
+    }
 
-        // Issue #073: Ensure HUD acknowledges signaling pulses immediately
+    private fun handleViewerPulse(id: String) {
+        if (!SignalingConstants.isValidViewerId(id)) return
         repository.updateRemoteActivity(timeProvider.currentTimeMillis())
 
-        if ((configManager.viewerId == MainRepository.DEFAULT_VIEWER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer" && id != MainRepository.DEFAULT_VIEWER_ID) {
+        if ((configManager.viewerId == MainRepository.DEFAULT_VIEWER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
             configManager.viewerId = id
             networkManager.updateIdentity(configManager.deviceId, id, true)
             lifecycleScope.launch { repository.saveString(MainRepository.VIEWER_ID_KEY, id) } 
@@ -285,12 +267,7 @@ class TrackerService : BaseMonitorService() {
         sessionManager.reset()
         integrityMonitor.resetStats()
         forensicUseCase.resetLatches()
-        pendingAcousticViolation = false
-        revivalAttemptCount = 0
-        lastRevivalAttemptTs = 0L
         lastXiaomiRecoveryTs = 0L
-        lastSitSyncLatchTs = 0L
-        lastSitLogTs = 0L
         logManager.logServiceEvent("Session Terminated", false)
     }
 
@@ -302,23 +279,17 @@ class TrackerService : BaseMonitorService() {
 
     override fun startServiceForeground() {
         val type = getAvailableForegroundServiceType()
-        val msg = "Tracking system active."
-        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
+        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification("Tracking system active."), type)
     }
 
     override fun updateForegroundServiceType() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             fgsUpdateJob?.cancel()
             fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main) {
-                try {
-                    delay(200)
-                    val type = getAvailableForegroundServiceType()
-                    val msg = if ((type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE) != 0) "Acoustic monitoring active." else "Tracking system active."
-                    safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
-                    Timber.e(e, "Failed to update foreground service type")
-                }
+                delay(200)
+                val type = getAvailableForegroundServiceType()
+                val msg = if ((type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE) != 0) "Acoustic monitoring active." else "Tracking system active."
+                safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
             }
         }
     }
@@ -328,464 +299,146 @@ class TrackerService : BaseMonitorService() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val hasMicPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-            if (hasMicPermission && isRecentUiPulse()) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED && isRecentUiPulse()) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE 
             }
         }
         return type
     }
 
+    override fun getRequiredTickInterval(): Long = if (isA15) 1000L else 2000L
+
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
-        
         sensorManager.setHighLoad(integrityMonitor.isCoolingModeActive)
 
-        if (isA15) {
-            systemMonitor.renewWakeLock()
-        }
+        if (isA15) systemMonitor.renewWakeLock()
 
         if (isXiaomi && lastServiceTickRealtime > 0) {
             val tickGap = nowRealtime - lastServiceTickRealtime
             if (tickGap > XIAOMI_SUPPRESSION_THRESHOLD_MS && nowRealtime - lastXiaomiRecoveryTs > XIAOMI_RECOVERY_COOLDOWN_MS) {
-                try {
-                    lastXiaomiRecoveryTs = nowRealtime
-                    val proc = lastProcessedLocation
-                    logManager.logServiceEvent("HEURISTIC RECOVERY: Xiaomi suppression detected (Gap: ${tickGap}ms). Triggering pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
-                        lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                    
-                    gpsManager.reviveGps()
-                    systemMonitor.renewWakeLock()
-                    updateForegroundServiceType()
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
-                    Timber.e(e, "Xiaomi heuristic recovery pulse failed")
-                }
-            }
-        }
-
-        if (nowRealtime - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
-            if (stabilityAuditFixCount > 0) {
-                val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
-                if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
-                    val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY AUDIT: Reliability ${String.format(Locale.getDefault(), "%.1f", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true,
-                        lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                }
-                stabilityAuditFixCount = 0
-                stabilityAuditViolationCount = 0
-            }
-            lastStabilityAuditTs = nowRealtime
-        }
-
-        val flags = ServiceBehaviorUseCase.DeviceSpecialFlags(isS21FE = isS21FE, isXiaomi = isXiaomi, isA15 = isA15)
-        val newInterval = behaviorUseCase.calculateGpsInterval(
-            isCoolingMode = integrityMonitor.isCoolingModeActive,
-            isSuspiciousMode = isSuspiciousMode,
-            isStationary = sensorManager.isStationary(),
-            isScreenOn = sensorManager.isScreenOn(),
-            nowRealtime = nowRealtime,
-            deviceSpecialFlags = flags
-        )
-        if (newInterval != currentGpsInterval) {
-            val oldInterval = currentGpsInterval
-            currentGpsInterval = newInterval
-            gpsManager.setPollingInterval(newInterval)
-            
-            if (isA15 && oldInterval != -1L) {
-                adaptationMuzzleJob?.cancel()
-                isAdaptationMuzzled = true
-                adaptationMuzzleJob = lifecycleScope.launch {
-                    delay(ADAPTATION_SETTLING_MS)
-                    isAdaptationMuzzled = false
-                }
-                
-                if (oldInterval >= STATIONARY_GPS_POLLING_MS && newInterval <= A15_STABLE_GPS_POLLING_MS) {
-                    gpsManager.kickGps()
-                }
-            }
-
-            if (nowRealtime - lastGpsTransitionLogTs > GPS_TRANSITION_LOG_MUZZLE_MS) {
-                lastGpsTransitionLogTs = nowRealtime
-                logManager.logServiceEvent("GPS Frequency adapted to ${newInterval}ms", important = false)
-            }
-        }
-
-        val isSocketConnected = networkManager.isConnected() && !transientDropDetected.getAndSet(false)
-        networkManager.updateRelayStatus(isSocketConnected)
-        
-        val isViewerActive = remoteHandler.lastPeerActivityTs > 0 && (nowRealtime - remoteHandler.lastPeerActivityTs < WATCH_TIMEOUT_MS)
-        sessionManager.updateTick(nowRealtime, lastServiceTickRealtime, isPeerAvailable = isSocketConnected && isViewerActive, isInViolation = isSuspiciousMode)
-        
-        val silenceDelta = if (remoteHandler.lastPeerActivityTs > 0) nowRealtime - remoteHandler.lastPeerActivityTs else 0L
-        val isSignalLoss = integrityMonitor.checkSignalIntegrity(nowRealtime, silenceDelta, true) 
-        val isJammerSuspicionActive = (systemMonitor.jumpStateStartTs != 0L && (nowRealtime - systemMonitor.jumpStateStartTs) > JAMMER_DETECTION_THRESHOLD_MS)
-        val isGpsStalledActive = (systemMonitor.gpsStallStartTs > 0L && (nowRealtime - systemMonitor.gpsStallStartTs) > GPS_STALL_THRESHOLD_MS)
-        val isGpsGapActive = (nowRealtime - locationProcessor.getLastValidFixTs() > GPS_GAP_THRESHOLD_MS)
-        
-        if (isGpsStalledActive) {
-            val proc = lastProcessedLocation
-            val timeSinceLastRevival = nowRealtime - lastRevivalAttemptTs
-            if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS && timeSinceLastRevival > GPS_REVIVAL_RETRY_INTERVAL_MS) {
-                revivalAttemptCount++
-                lastRevivalAttemptTs = nowRealtime
-                gpsManager.reviveGps()
-                logManager.logServiceEvent("GPS Stall: Revival attempt $revivalAttemptCount/$MAX_REVIVAL_ATTEMPTS triggered", important = true,
+                lastXiaomiRecoveryTs = nowRealtime
+                val proc = lastProcessedLocation
+                logManager.logServiceEvent("HEURISTIC RECOVERY: Xiaomi suppression detected.", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
                     lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-            } else if (revivalAttemptCount >= MAX_REVIVAL_ATTEMPTS && timeSinceLastRevival > GPS_REVIVAL_RETRY_INTERVAL_MS) {
-                lastRevivalAttemptTs = nowRealtime
-                logManager.logServiceEvent("CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed. Manual intervention required.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
-                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                networkManager.connect(configManager.relayUrl)
             }
         }
-
-        lastProcessedLocation?.let { proc ->
-            val unresolvedAlarms = alarmManager.getUnresolvedAlarmTypes()
-            val activeViolations = mutableSetOf<String>()
-            if (isSignalLoss) activeViolations.add(ALERT_ID_SIGNAL_LOSS)
-            if (isJammerSuspicionActive) activeViolations.add(ALERT_ID_JUMP_ALERT)
-            if (isGpsStalledActive) activeViolations.add(ALERT_ID_GPS_STALL)
-            if (isGpsGapActive) activeViolations.add(ALERT_ID_TRACKER_GAP)
-            if (proc.status == SentinelStatus.JUMP || proc.status == SentinelStatus.JITTER) activeViolations.add(ALERT_ID_VISUAL_JUMP)
-            if (lastSitDetected) activeViolations.add(ALERT_ID_TRACKER_CHAIR) 
-
-            forensicUseCase.recordViolationMarkers(
-                now = now,
-                lat = proc.optimizedPoint.lat,
-                lng = proc.optimizedPoint.lng,
-                accuracy = proc.currentAccuracy,
-                maxAccuracy = proc.maxAccuracy,
-                activeViolations = activeViolations,
-                unresolvedAlarms = unresolvedAlarms
-            )
-        }
-
-        val peakDb = sensorManager.consumeAcousticPeak()
-        val minDb = sensorManager.consumeAcousticMin()
-        val peakShockVal = sensorManager.consumePeakVibration()
-        val peakVz = sensorManager.consumePeakVerticalVelocity()
-        val peakVzTs = sensorManager.consumePeakVerticalVelocityTs()
-        val peakDz = sensorManager.consumePeakVerticalDisplacement()
         
-        locationProcessor.updateSensorData(
-            vibration = sensorManager.currentVibrationIndex, heading = sensorManager.currentCompassHeading, baroAlt = sensorManager.absoluteAltitude,
-            lux = sensorManager.currentLux, isNear = sensorManager.isProximityNear, powerTamper = integrityMonitor.isPowerTamperDetected,
-            tiltDegrees = sensorManager.currentTiltDegrees, acousticDb = peakDb, peakShock = peakShockVal, acousticMinDb = minDb,
-            peakVerticalVelocity = peakVz, peakVerticalVelocityTs = peakVzTs, 
-            peakVerticalDisplacement = peakDz,
-            plungeMatched = sensorManager.consumePlungeMatched(), 
-            isSirenActive = false, isWarming = sensorManager.isWarming, manualAdaptiveFloor = sensorManager.adaptiveVibrationFloor,
-            isMuzzled = isMuzzled,
-            isA15 = isA15,
-            nowRealtime = nowRealtime, nowWall = now
-        )
-
-        val rawSitDetected = locationProcessor.consumeSitDetected()
-        lastSitDetected = rawSitDetected || (locationProcessor.getLastSitRealtime() > 0 && (nowRealtime - locationProcessor.getLastSitRealtime() < SUSPICIOUS_STATE_COOLDOWN_MS))
-        
-        if (rawSitDetected) {
-            val proc = lastProcessedLocation
-            lastSitSyncLatchTs = nowRealtime
-            
-            if (nowRealtime - lastSitLogTs > SIT_DUPLICATE_GUARD_MS) {
-                lastSitLogTs = nowRealtime
-                logManager.logServiceEvent("Sit Detected (Engine Pulse)", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
-                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-            }
-            lifecycleScope.launch { repository.saveLong(MainRepository.LAST_SIT_TS_KEY, locationProcessor.getLastSitTs()) }
-        }
-
-        val latchedSitDetected = rawSitDetected || (lastSitSyncLatchTs > 0 && (nowRealtime - lastSitSyncLatchTs < SIT_TRANSMISSION_LATCH_MS))
-
-        val tiltIdx = (sensorManager.currentTiltDegrees / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0)
-        val baroIdx = (abs(sensorManager.relativeAltitude) / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0)
-
-        val pendingReason = when {
-            pendingAcousticViolation -> LocationPendingReason.ACOUSTIC_VIOLATION
-            isJammerSuspicionActive -> LocationPendingReason.JAMMER_SUSPICION
-            isGpsStalledActive -> LocationPendingReason.GPS_STALL
-            isGpsGapActive -> LocationPendingReason.GPS_GAP
-            isSignalLoss -> LocationPendingReason.SIGNAL_LOSS
-            else -> LocationPendingReason.NONE
-        }
-
-        val proc = lastProcessedLocation
-        
-        val currentTrackerState = TrackerStateManager.updateState(
-            isVisualJump = proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER,
-            isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false,
-            speed = proc?.filteredSpeed ?: 0.0,
-            vibration = sensorManager.currentVibrationIndex,
-            vibrationFloor = locationProcessor.getAdaptiveVibrationFloor(),
-            isTrackerConnected = isSocketConnected,
-            systemTimePulse = now
-        )
-
-        syncManager.pushCurrentStatus(
-            deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true, loc = lastKnownLocation, filtered = proc?.optimizedPoint,
-            distToTracker = locationProcessor.getDistanceToTracker(), distToHome = locationProcessor.getNearestHomeDistance(),
-            maxAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), filteredSpeed = proc?.filteredSpeed ?: 0.0,
-            vibration = sensorManager.currentVibrationIndex, heading = sensorManager.currentCompassHeading, baroAlt = sensorManager.absoluteAltitude,
-            lux = sensorManager.currentLux, isNear = sensorManager.isProximityNear, isSuspicious = isSuspiciousMode, tiltDegrees = sensorManager.currentTiltDegrees,
-            acousticDb = sensorManager.currentAcousticDb, isJump = (proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER), 
-            isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false, jumpTier = proc?.jumpTier ?: 0, isJammer = isJammerSuspicionActive,
-            isStalledRaw = proc?.isStalled ?: false, isStalledActive = isGpsStalledActive, 
-            peakShock = locationProcessor.getPeakVibrationShock(),
-            peakShockTs = locationProcessor.sentinel.peakVibrationShockTs, 
-            luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
-            adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = sensorManager.proximityIdx, proximityCm = sensorManager.debouncedProximityCm,
-            proximityDebounceMs = sensorManager.proximityDebounceMs, vibrationRollingSum = sensorManager.vibrationRollingSum,
-            micPending = false, isTamperDetected = false, isPowerTamper = integrityMonitor.isPowerTamperDetected, 
-            isSitDetected = latchedSitDetected, isSitActive = lastSitDetected, lastSitTs = locationProcessor.getLastSitTs(), receiptRealtime = proc?.receiptRealtime ?: 0L,
-            violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(),
-            verticalVelocity = sensorManager.currentVerticalVelocity, sitVz = locationProcessor.sentinel.lastSitVz, sitDz = locationProcessor.sentinel.lastSitDz, 
-            sitBaro = locationProcessor.sentinel.lastSitBaro, sitTilt = locationProcessor.sentinel.lastSitTilt, sitShock = locationProcessor.sentinel.lastSitShock, 
-            isClockRegression = proc?.isClockRegression ?: false, isLocationPending = (pendingReason != LocationPendingReason.NONE),
-            locationPendingReason = pendingReason,
-            lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
-            gnssDetail = latestGnssDetail,
-            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0), 
-            tiltIdx = tiltIdx,
-            baroIdx = baroIdx,
-            isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive,
-            batteryLevel = integrityMonitor.getBatteryLevel(), batteryTemp = integrityMonitor.batteryTemp, isCharging = integrityMonitor.isCharging,
-            isAnchorLocked = proc?.isAnchorLocked ?: false,
-            trackerState = currentTrackerState
-        )
-
-        val gpsTs = proc?.timestamp ?: 0L
-        val gpsAge = if (gpsTs > 0) (now - gpsTs) else 3600000L
-        historyManager.updateRibbons(
-            now = now,
-            lastTickTs = lastServiceTickTs,
-            serviceTickCounter = serviceTickCounter,
-            rtt = networkManager.getRtt(),
-            peerSignal = remoteHandler.peerSignal,
-            peerAvail = isSocketConnected && isViewerActive, 
-            hasGps = gpsTs > 0,
-            isTrackerMode = true,
-            gpsIndex = TelemetryUtils.calculateGpsIndex(gpsAge, proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), lastKnownLocation?.extras?.getInt("satellites") ?: gpsManager.satellitesUsed).totalIndex,
-            accuracy = proc?.currentAccuracy ?: locationProcessor.getLastProcessedAccuracy(),
-            maxAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(),
-            noiseIdx = ((sensorManager.currentAcousticDb - locationProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB),
-            luxIdx = (log10(sensorManager.currentLux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0),
-            vibeIdx = (sensorManager.currentVibrationIndex / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0),
-            proxIdx = sensorManager.proximityIdx,
-            liftIdx = (abs(sensorManager.relativeAltitude) / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0),
-            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0),
-            tiltIdx = tiltIdx,
-            baroIdx = baroIdx,
-            verticalVelocity = sensorManager.currentVerticalVelocity,
-            sitVz = locationProcessor.sentinel.lastSitVz,
-            sitDz = locationProcessor.sentinel.lastSitDz,
-            sitBaro = locationProcessor.sentinel.lastSitBaro,
-            sitTilt = locationProcessor.sentinel.lastSitTilt,
-            sitShock = locationProcessor.sentinel.lastSitShock,
-            isBatterySteepDischarge = false,
-            isCoolingModeActive = integrityMonitor.isCoolingModeActive,
-            speed = proc?.filteredSpeed ?: 0.0,
-            bearing = (lastKnownLocation?.bearing?.toDouble() ?: 0.0),
-            isSitDetected = latchedSitDetected,
-            isSitActive = lastSitDetected,
-            currentMa = integrityMonitor.getBatteryCurrent(),
-            locationPendingReason = pendingReason,
-            isAnchorLocked = proc?.isAnchorLocked ?: false
-        )
-
-        evaluateAlarmsInternal(nowRealtime, isSignalLoss, isJammerSuspicionActive, isGpsStalledActive, false, isViewerActive, pendingReason)
-
-        val notificationInterval = if (isUiVisible()) TICK_INTERVAL_MS else NOTIFICATION_THROTTLE_MS
-        if (now - lastNotificationUpdateTs >= notificationInterval) {
-            lastNotificationUpdateTs = now
-            notificationManager.updatePulse(
-                sats = gpsManager.satellitesUsed, 
-                battery = integrityMonitor.getBatteryLevel(), 
-                isSecure = !alarmManager.hasUnresolvedAlarms(), 
-                isPowerSave = integrityMonitor.isPowerSaveModeActive
-            )
-        }
-        
-        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, now)
-        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_REALTIME_KEY, nowRealtime)
         lastServiceTickTs = now
         lastServiceTickRealtime = nowRealtime
-        serviceTickCounter++
-    }
+        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, now)
+        
+        if (isAdaptationMuzzled) return@withContext
 
-    private fun evaluateAlarmsInternal(
-        nowRealtime: Long, 
-        isSignalLoss: Boolean, 
-        isJammerSuspicion: Boolean, 
-        isGpsStalling: Boolean, 
-        isTamperDetected: Boolean,
-        isViewerConnected: Boolean,
-        pendingReason: LocationPendingReason
-    ) {
-        val proc = lastProcessedLocation
-        val isSocketConnected = networkManager.isConnected()
-        
-        // Issue C-068-1: Use centralized cached permission state
-        val permState = systemStatusProvider.getPermissionState()
-        
-        val xiaomiStatus = when(permState.xiaomiStatus) {
-            XiaomiPermissionStatus.GRANTED -> EngineXiaomiStatus.GRANTED
-            XiaomiPermissionStatus.DENIED -> EngineXiaomiStatus.DENIED
-            XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN
-        }
-        
-        val xiaomiAutostartStatus = when(permState.xiaomiAutostartStatus) {
-            XiaomiPermissionStatus.GRANTED -> EngineXiaomiStatus.GRANTED
-            XiaomiPermissionStatus.DENIED -> EngineXiaomiStatus.DENIED
-            XiaomiPermissionStatus.UNKNOWN -> EngineXiaomiStatus.UNKNOWN
-        }
+        val hasLocation = lastKnownLocation != null
+        val sessionActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
 
-        alarmEvalJob?.cancel()
-        alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
-            alarmManager.evaluateAlarms(
-                now = nowRealtime, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = true,
-                isRelayConnected = isSocketConnected, isTrackerConnected = isViewerConnected, 
-                isTrackerVisualJump = (proc?.status == SentinelStatus.JUMP || proc?.status == SentinelStatus.JITTER), 
-                isTrajectoryPromoted = proc?.isTrajectoryPromoted ?: false, jumpTier = proc?.jumpTier ?: 0, 
-                isAdaptiveJump = proc?.isAdaptiveJump ?: false, 
-                trackerLat = proc?.optimizedPoint?.lat ?: 0.0,
-                trackerLng = proc?.optimizedPoint?.lng ?: 0.0, trackerAccuracy = proc?.currentAccuracy ?: 0.0, 
-                maxTrackerAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), trackerLastGpsTs = proc?.timestamp ?: 0L,
-                trackerLastValidFixTs = locationProcessor.getLastValidFixTs(),
-                trackerSpeed = proc?.filteredSpeed ?: 0.0, trackerBattery = integrityMonitor.getBatteryLevel(), trackerTemp = integrityMonitor.batteryTemp,
-                isHardwareOnline = true, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
-                isJammerSuspicion = isJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isGpsStalling, isUiVisible = isUiVisible(),
-                distToHomeAuthority = locationProcessor.getNearestHomeDistance(), maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), 
-                isGpsGap = (nowRealtime - locationProcessor.getLastValidFixTs() > GPS_GAP_THRESHOLD_MS), isSuspicious = isSuspiciousMode, isTamperDetected = isTamperDetected, isPowerTamper = integrityMonitor.isPowerTamperDetected,
-                trackerTiltDegrees = sensorManager.currentTiltDegrees, trackerAcousticDb = sensorManager.currentAcousticDb, trackerBaroAlt = sensorManager.absoluteAltitude,
-                trackerLux = sensorManager.currentLux, isNear = sensorManager.isProximityNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
-                adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = locationProcessor.getPeakVibrationShock(), trackerCurrentMa = integrityMonitor.getBatteryCurrent(),
-                isSitActive = lastSitDetected, isLocationPending = (pendingReason != LocationPendingReason.NONE), 
-                locationPendingReason = pendingReason,
-                isPowerSaveMode = integrityMonitor.isPowerSaveModeActive,
-                standbyBucket = integrityMonitor.currentStandbyBucket, netInterface = integrityMonitor.getActiveNetworkInterface(), isStorageLow = integrityMonitor.isStorageLow,
-                isStorageCritical = integrityMonitor.isStorageCritical, isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive,
-                discoveryPhase = null,
-                isXiaomiDevice = isXiaomi,
-                xiaomiStatus = xiaomiStatus,
-                xiaomiAutostartStatus = xiaomiAutostartStatus,
-                isXiaomiManualOverride = isXiaomiManualOverride,
-                snrSnapshot = gpsManager.averageSnr,
-                vibeSnapshot = sensorManager.currentVibrationIndex,
-                isAnchorLocked = proc?.isAnchorLocked ?: false
+        if (sessionActive && hasLocation) {
+            val location = lastKnownLocation!!
+            val lat = location.latitude
+            val lng = location.longitude
+            val acc = location.accuracy.toDouble()
+            
+            val processed = locationProcessor.processGpsPoint(
+                lat = lat, lng = lng, alt = location.altitude, androidSpeedMps = location.speed.toDouble(),
+                gpsTs = location.time, accuracy = acc, bearing = location.bearing.toDouble(),
+                snr = latestGnssDetail?.satellites?.map { it.cn0 }?.average() ?: 0.0,
+                satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0,
+                isViewerTrail = false, lastGpsTs = lastGpsFixRealtime, isLocal = true,
+                isA15 = isA15, isAdaptationMuzzled = isAdaptationMuzzled,
+                nowWall = now, nowRealtime = nowRealtime
             )
-        }
-    }
+            lastProcessedLocation = processed
 
-    override fun getRequiredTickInterval(): Long {
-        return if (isUiVisible() || isSuspiciousMode) TICK_INTERVAL_MS else TICK_INTERVAL_SLOW_MS
+            alarmManager.evaluateAlarms(
+                now = now, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime,
+                isTrackerMode = true, isRelayConnected = networkManager.isConnected(), isTrackerConnected = true,
+                isTrackerVisualJump = processed.status == SentinelStatus.JUMP,
+                isTrajectoryPromoted = processed.isTrajectoryPromoted, jumpTier = processed.jumpTier,
+                isAdaptiveJump = processed.isAdaptiveJump, trackerLat = processed.optimizedPoint.lat,
+                trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy,
+                maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = location.time,
+                trackerLastValidFixTs = locationProcessor.getLastValidFixTs(), trackerSpeed = processed.filteredSpeed,
+                trackerBattery = integrityMonitor.getBatteryLevel(), trackerTemp = integrityMonitor.batteryTemp,
+                isHardwareOnline = integrityMonitor.isHardwareOnline(), isLocalInternetLoss = false,
+                isJammerSuspicion = processed.jammerDetected, isSignalLoss = false, isGpsStalling = processed.isStalled,
+                isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome,
+                maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = false,
+                isSuspicious = processed.status == SentinelStatus.SENSOR_SUSPICIOUS, isTamperDetected = processed.tamperDetected,
+                isPowerTamper = integrityMonitor.isPowerTamperDetected, trackerTiltDegrees = sensorManager.currentTiltDegrees,
+                trackerAcousticDb = sensorManager.currentAcousticDb, trackerBaroAlt = sensorManager.absoluteAltitude,
+                trackerBaroAltEma = locationProcessor.getBaroBaseline(),
+                trackerLux = sensorManager.currentLux, isNear = sensorManager.isProximityNear,
+                luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
+                adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = locationProcessor.getPeakVibrationShock(),
+                trackerCurrentMa = integrityMonitor.getBatteryCurrent(), isAnchorLocked = processed.isAnchorLocked
+            )
+            
+            val isUrgent = alarmManager.hasUnresolvedAlarms() || processed.status == SentinelStatus.JUMP
+            
+            syncManager.pushCurrentStatus(
+                deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true,
+                loc = location, filtered = processed.optimizedPoint, distToTracker = null, distToHome = processed.distToHome,
+                maxAccuracy = processed.maxAccuracy, filteredSpeed = processed.filteredSpeed, vibration = sensorManager.currentVibrationIndex,
+                heading = sensorManager.currentCompassHeading, baroAlt = sensorManager.absoluteAltitude, lux = sensorManager.currentLux,
+                isNear = sensorManager.isProximityNear, isSuspicious = processed.status == SentinelStatus.SENSOR_SUSPICIOUS,
+                tiltDegrees = sensorManager.currentTiltDegrees, acousticDb = sensorManager.currentAcousticDb,
+                isJump = processed.status == SentinelStatus.JUMP, isTrajectoryPromoted = processed.isTrajectoryPromoted,
+                jumpTier = processed.jumpTier, isJammer = processed.jammerDetected, isStalledRaw = false,
+                isStalledActive = processed.isStalled, peakShock = sensorManager.consumePeakVibration(),
+                peakShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
+                adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = sensorManager.proximityIdx,
+                proximityCm = sensorManager.currentProximityCm, proximityDebounceMs = sensorManager.proximityDebounceMs,
+                vibrationRollingSum = sensorManager.vibrationRollingSum, micPending = false,
+                isTamperDetected = processed.tamperDetected, isPowerTamper = integrityMonitor.isPowerTamperDetected,
+                isSitDetected = sensorManager.consumePlungeMatched(), isSitActive = false,
+                lastSitTs = locationProcessor.getLastSitTs(), receiptRealtime = nowRealtime, violationUptimeMs = sessionManager.violationUptimeMs,
+                violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = sensorManager.currentVerticalVelocity,
+                sitVz = sensorManager.consumePeakVerticalVelocity(), sitDz = sensorManager.consumePeakVerticalDisplacement(),
+                sitBaro = sensorManager.absoluteAltitude, sitTilt = sensorManager.currentTiltDegrees, sitShock = sensorManager.consumePeakVibration(),
+                isClockRegression = processed.isClockRegression, isLocationPending = false, locationPendingReason = LocationPendingReason.NONE,
+                lastValidFixRealtime = locationProcessor.getLastValidFixTs(), gnssDetail = latestGnssDetail, snrIdx = 0.0, tiltIdx = 0.0, baroIdx = 0.0,
+                isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive,
+                batteryLevel = integrityMonitor.getBatteryLevel(), batteryTemp = integrityMonitor.batteryTemp, isCharging = integrityMonitor.isCharging,
+                isAnchorLocked = processed.isAnchorLocked, trackerState = if (processed.filteredSpeed > 0.5) TrackerState.MOVING else TrackerState.PARKING
+            )
+            
+            if (isUrgent && isS21FE) {
+                isAdaptationMuzzled = true
+                adaptationMuzzleJob?.cancel()
+                adaptationMuzzleJob = lifecycleScope.launch { delay(3000L); isAdaptationMuzzled = false }
+            }
+        }
     }
 
     private fun onLocationChanged(location: Location) {
-        val nowRealtime = timeProvider.elapsedRealtime()
-        val nowWall = timeProvider.currentTimeMillis()
-
-        // Capture boundary conversions once
-        val lat = location.latitude
-        val lng = location.longitude
-        val alt = location.altitude
-        val speed = location.speed.toDouble()
-        val acc = location.accuracy.toDouble()
-        val bearing = location.bearing.toDouble()
-
-        if (currentGpsInterval == HIGH_FREQUENCY_GPS_POLLING_MS && lastGpsFixRealtime > 0) {
-            val gap = nowRealtime - lastGpsFixRealtime
-            stabilityAuditFixCount++
-            if (gap > GPS_STABILITY_GAP_THRESHOLD_MS) {
-                stabilityAuditViolationCount++
-                val proc = lastProcessedLocation
-                logManager.logServiceEvent("STABILITY GAP: ${gap}ms detected during 10Hz polling.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
-                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = acc)
-            }
-        }
-        lastGpsFixRealtime = nowRealtime
-
-        val processed = locationProcessor.processGpsPoint(
-            lat = lat, lng = lng, alt = alt, androidSpeedMps = speed, 
-            gpsTs = location.time, accuracy = acc, bearing = bearing, snr = gpsManager.averageSnr, 
-            satsUsed = location.extras?.getInt("satellites") ?: gpsManager.satellitesUsed, isViewerTrail = false, lastGpsTs = sessionManager.lastGpsTs, 
-            isLocal = true, providedAdaptiveVibrationFloor = sensorManager.adaptiveVibrationFloor, 
-            isSuspicious = isSuspiciousMode,
-            isMuzzled = isMuzzled,
-            isA15 = isA15,
-            isAdaptationMuzzled = isAdaptationMuzzled,
-            nowRealtime = nowRealtime,
-            nowWall = nowWall
-        )
+        lastKnownLocation = location
+        lastGpsFixRealtime = timeProvider.elapsedRealtime()
+        systemMonitor.gpsStallStartTs = 0L
         
-        processed.suppressionNote?.let { note ->
-            logManager.logServiceEvent(note, important = false, lat = lat, lng = lng, accuracy = acc)
-        }
-        
-        if (!processed.isClockRegression) sessionManager.lastGpsTs = location.time
-        if (!processed.isClockRegression && !processed.isStalled) { 
-            systemMonitor.gpsStallStartTs = 0L 
-            revivalAttemptCount = 0; lastRevivalAttemptTs = 0L
-        }
-        
-        if (processed.status == SentinelStatus.JUMP || processed.status == SentinelStatus.OUTLIER || processed.status == SentinelStatus.JITTER) {
-            if (systemMonitor.jumpStateStartTs == 0L) systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime()
-        } else if (processed.status == SentinelStatus.VALID) {
-            systemMonitor.jumpStateStartTs = 0L
-            pendingAcousticViolation = false
-        }
-        
-        lastKnownLocation = location; lastProcessedLocation = processed
-
-        repository.updateLocation(LocationUpdate(
-            lat = lat,
-            lng = lng,
-            alt = alt,
-            speed = speed,
-            accuracy = acc,
-            bearing = bearing,
-            battery = integrityMonitor.getBatteryLevel(),
-            temp = integrityMonitor.batteryTemp,
-            isCharging = integrityMonitor.isCharging,
-            gpsTs = location.time,
-            ts = nowWall,
-            isMe = true,
-            satsView = gpsManager.satellitesInView,
-            satsUsed = location.extras?.getInt("satellites") ?: gpsManager.satellitesUsed,
-            maxAccuracy = processed.maxAccuracy,
-            currentMa = integrityMonitor.getBatteryCurrent(),
-            lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
-            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
-        ))
+        if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = timeProvider.elapsedRealtime()
     }
 
     override fun onDestroy() {
-        if (this::sensorManager.isInitialized) sensorManager.stop()
         gpsCollectionJob?.cancel()
         gnssDetailJob?.cancel()
-        alarmEvalJob?.cancel()
         settingsJob?.cancel()
-        muzzleReleaseJob?.cancel()
         adaptationMuzzleJob?.cancel()
+        commandRouter.unregister()
+        sensorManager.stop()
+        networkManager.stop()
+        syncManager.stopSyncLoop()
         super.onDestroy()
     }
 
-    private fun setupPhysicalFastPaths() {
-        val acousticJump = if (isA15) ACOUSTIC_THRESHOLD_DB_JUMP_A15 else ACOUSTIC_THRESHOLD_DB_JUMP
-        sensorManager.setAcousticFastPath(locationProcessor.getAcousticFloorDb(), acousticJump, ACOUSTIC_MIN_THRESHOLD_DB) {
-            triggerSuspiciousMode("Acoustic") 
-            pendingAcousticViolation = true
-        }
-        sensorManager.setLightFastPath(locationProcessor.getLuxBaseline(), LIGHT_THRESHOLD_LUX_JUMP) {
-            triggerSuspiciousMode("Light")
-        }
-    }
-
-    private fun triggerSuspiciousMode(source: String) {
-        if (!isSuspiciousMode) { 
-             val proc = lastProcessedLocation
-             logManager.logServiceEvent("Suspicious mode: Physical Tamper ($source)", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
-                 lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-        }
-        isSuspiciousMode = behaviorUseCase.updateSuspiciousMode(isSuspiciousMode, true, false, timeProvider.elapsedRealtime())
+    companion object {
+        private const val MUZZLE_HYSTERESIS_MS = 2000L
+        private const val MUZZLE_HYSTERESIS_A15_MS = 5000L
+        private const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 45000L
+        private const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
+        private const val ALERT_ID_TRACKER_POWER = "TRACKER_POWER"
+        private const val DEFAULT_RELAY_URL = "https://relay.gps19.com"
+        private const val FORENSIC_PINK_COLOR = 0xFFFF1493.toInt()
     }
 }

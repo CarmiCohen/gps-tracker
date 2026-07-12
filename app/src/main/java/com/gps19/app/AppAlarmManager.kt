@@ -13,6 +13,8 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * v9.3.16:
+ * - Requirement R999b: Propagated trackerBaroAltEma to AlarmEvaluationState.
  * v9.3.3:
  * - Issue #058: Hilt Migration. Added @Inject constructor and listener interface.
  */
@@ -205,6 +207,7 @@ class AppAlarmManager @Inject constructor(
             trackerTiltDegrees = trackerTiltDegrees,
             trackerAcousticDb = trackerAcousticDb,
             trackerBaroAlt = trackerBaroAlt,
+            trackerBaroAltEma = trackerBaroAltEma,
             trackerLux = trackerLux,
             isNear = isNear,
             luxBaseline = luxBaseline,
