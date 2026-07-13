@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - v9.3.16
+# System Source of Truth (SoT) - v9.3.17
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Startup Heartbeat Relaxation (R403)**: The system MUST use a 2000ms heartbeat interval (`TICK_INTERVAL_MS`) to reduce CPU pressure and skip frames during the application startup phase. This is CRITICAL to prevent ANRs on resource-constrained devices or during heavy initialization. (v9.3.17)
 *   **System API Synchronization Authority (R999b)**: The background service layer MUST maintain strict signature parity with the `:core:engine` telemetry pipeline. All location processing, alarm evaluation, and sync submissions MUST use the authoritative engine method signatures (`processGpsPoint`, `evaluateAlarms`, `pushCurrentStatus`) to ensure type safety and cross-module consistency. (Issue #079 / v9.3.16)
 *   **Map Follow Mode Persistence (R981b)**: The map system MUST respect the user's manual focus intent (Tracker, Viewer, or Auto) by persisting a `MapFollowMode` state. The auto-centering logic MUST NOT override the manual focus choice until the user explicitly changes the follow target or returns to `AUTO` mode. (Issue #078 / v9.3.16 Verified)
 *   **Type Safety Authority (R999)**: All internal telemetry, sensor data, and engine pipelines MUST use `Double` precision. Redundant `toDouble()`/`toFloat()` conversions MUST be eliminated by capturing system API values (Floats) exactly once at the entry boundary. All persistence and signaling fields MUST maintain `Double` parity to prevent precision jitter. (Issue #077 / v9.3.15 Verified)

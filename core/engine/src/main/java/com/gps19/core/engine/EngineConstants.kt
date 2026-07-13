@@ -3,6 +3,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v9.3.17:
+ * - R403: Startup ANR Remediation. Increased TICK_INTERVAL_MS from 1s to 2s 
+ *   to reduce startup frame pressure and eliminate ANRs during initialization.
  * v9.3.13:
  * - Issue #062: Dynamic Anchor Breakout. Added constants for displacement-weighted 
  *   monitor to prevent "sticky anchors".
@@ -189,7 +192,7 @@ const val VIEWER_GPS_POLLING_MS = 1000L
 const val GPS_GAP_THRESHOLD_MS = 60000L
 const val GPS_STALL_THRESHOLD_MS = 60000L
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
-const val TICK_INTERVAL_MS = 1000L
+const val TICK_INTERVAL_MS = 2000L // R403: Relaxed from 1s to 2s to prevent startup ANR
 const val TICK_INTERVAL_SLOW_MS = 5000L
 const val UI_PULSE_TIMEOUT_MS = 45000L // Issue #025: Relaxed to 45s to harden FGS transitions
 const val FGS_STICKY_DELAY_MS = 45000L

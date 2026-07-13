@@ -17,12 +17,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v9.3.17:
+ * - R403: Startup ANR Remediation. Relaxed tick interval to TICK_INTERVAL_MS (2s) 
+ *   to skip startup frames and ensure stability.
  * v9.3.15:
  * - Hardening: Capturing Double conversions once in onLocationChanged to 
  *   eliminate redundant boundary casting.
- * v9.3.6:
- * - Issue #058: Hilt Migration. Removed EntryPointAccessors for RemoteUpdateWrapper.
- *   Inherits common dependencies from BaseMonitorService.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {

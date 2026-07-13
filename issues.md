@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.3.16)
+# Project Issues & Hardening Tracking (v9.3.17)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Resolution Archive](STATUS/RESOLUTION_ARCHIVE.md), and validation tasks are in [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 276 |
+| **Resolved (Total)** | 🟢 Progress | 277 |
 
 ---
 
@@ -21,17 +21,17 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
+## 🟢 Recently Resolved Issues (v9.3.17)
+
+| ID | Issue | Resolution |
+| :--- | :--- | :--- |
+| **R403** | **Startup ANR Remediation** | **Resolved**. Increased global heartbeat (`TICK_INTERVAL_MS`) from 1s to 2s to skip startup frames and reduce main thread pressure during initialization. Standardized `TrackerService` to use the global constant. |
+
+---
+
 ## 🟢 Recently Resolved Issues (v9.3.16)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
 | **#079** | **TrackerService API Synchronization** | **Resolved**. Remediated compilation errors by aligning service telemetry logic with current engine component signatures (`processGpsPoint`, `evaluateAlarms`, `pushCurrentStatus`). Implemented missing `BaseMonitorService` members. |
 | **#078** | **Map Centering Follow Conflict** | **Resolved**. Implemented `MapFollowMode` (TRACKER, VIEWER, AUTO) in `MainUiState`. Updated `OsmMap` lock logic to respect follow intent, preventing the map from snapping back to the tracker after user centers on the viewer. |
-
----
-
-## 🟢 Recently Resolved Issues (v9.3.15)
-
-| ID | Issue | Resolution |
-| :--- | :--- | :--- |
-| **#077** | **Type Safety Hardening** | **Resolved**. Systematic audit and elimination of redundant `toDouble()`/`toFloat()` conversions across core engine and app modules. Implemented `Double` pre-buffering in `AppSensorManager` and captured boundary conversions at the source in `TrackerService`. Standardized all persistence to `Double` in `SettingsRepository`. |

@@ -20,6 +20,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v9.3.17:
+ * - R403: Startup ANR Remediation. Relaxed tick interval to TICK_INTERVAL_MS (2s) 
+ *   for all devices including A15 to skip startup frames and ensure stability.
  * v9.3.16:
  * - Issue #078: Map Centering Follow Conflict. Updated system state parity 
  *   to respect MapFollowMode (TRACKER, VIEWER, AUTO) intent.
@@ -306,7 +309,7 @@ class TrackerService : BaseMonitorService() {
         return type
     }
 
-    override fun getRequiredTickInterval(): Long = if (isA15) 1000L else 2000L
+    override fun getRequiredTickInterval(): Long = TICK_INTERVAL_MS
 
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
