@@ -2,8 +2,11 @@ package com.gps19.app
 
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.StatFs
@@ -16,8 +19,9 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * v9.3.3:
- * - Issue #058: Hilt Migration. Added @Inject constructor and setter for listeners.
+ * v9.3.25:
+ * - R996: Logcat Forensic Integrity. Cached system services and implemented 
+ *   a 10s TTL for system status polling to eliminate Samsung getPackageName noise.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -32,6 +36,16 @@ class IntegrityMonitor @Inject constructor(
 
     private var listener: Listener? = null
 
+    private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+    private val usageStatsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+    } else null
+
+    private var lastFullPollTs = 0L
+    private val POLL_TTL_MS = 10_000L
+
     fun setListener(listener: Listener) {
         this.listener = listener
     }
@@ -42,6 +56,7 @@ class IntegrityMonitor @Inject constructor(
     private val sustainedViolations = mutableMapOf<String, Long>()
     
     var batteryTemp = 0.0
+    var batteryLevel = -1
     var isPowerTamperDetected = false
     private var lastPowerDisconnectTs = 0L
 
@@ -72,20 +87,26 @@ class IntegrityMonitor @Inject constructor(
         private set
 
     fun getBatteryLevel(): Int {
-        val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
-        return intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        if (batteryLevel == -1) {
+            val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            batteryLevel = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        }
+        return batteryLevel
     }
 
     fun getBatteryCurrent(): Int {
-        val bm = context.getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager
-        return bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) / 1000
+        return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) / 1000
     }
 
     fun pollSystemStatus(nowWall: Long, nowRealtime: Long) {
-        val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+        val delta = nowRealtime - lastFullPollTs
+        if (delta < POLL_TTL_MS && lastFullPollTs != 0L) return
+        lastFullPollTs = nowRealtime
+
+        val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         
         if (intent != null) {
-            batteryTemp = (intent.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, 0)) / 10.0
+            batteryTemp = (intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)) / 10.0
             if (batteryTemp > maxTemperature) {
                 maxTemperature = batteryTemp
                 repository.saveDoubleSync(MainRepository.MAX_TEMP_KEY, maxTemperature)
@@ -100,8 +121,8 @@ class IntegrityMonitor @Inject constructor(
                 listener?.onLogEvent("System Info: Thermal limit recovered (${batteryTemp}°C). Normal tracking resumed.", false)
             }
 
-            val batteryLevel = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
-            val plugged = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
+            batteryLevel = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
             isCharging = plugged > 0
 
             if (isCharging) onPowerConnected() else onPowerDisconnected()
@@ -118,8 +139,7 @@ class IntegrityMonitor @Inject constructor(
             }
         }
 
-        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-        val currentPowerSave = pm.isPowerSaveMode
+        val currentPowerSave = powerManager.isPowerSaveMode
         if (currentPowerSave != isPowerSaveModeActive) {
             isPowerSaveModeActive = currentPowerSave
             if (isPowerSaveModeActive) {
@@ -129,9 +149,8 @@ class IntegrityMonitor @Inject constructor(
             }
         }
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-            val bucket = usm.appStandbyBucket
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && usageStatsManager != null) {
+            val bucket = usageStatsManager.appStandbyBucket
             if (bucket != currentStandbyBucket) {
                 val bucketName = when (bucket) {
                     UsageStatsManager.STANDBY_BUCKET_ACTIVE -> "ACTIVE"
@@ -221,9 +240,8 @@ class IntegrityMonitor @Inject constructor(
     fun setMaxTemperature(temp: Double) { maxTemperature = temp }
 
     fun getActiveNetworkInterface(): String {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val activeNetwork = cm.activeNetwork ?: return "OFFLINE"
-        val caps = cm.getNetworkCapabilities(activeNetwork) ?: return "NONE"
+        val activeNetwork = connectivityManager.activeNetwork ?: return "OFFLINE"
+        val caps = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return "NONE"
         return when {
             caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WIFI"
             caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "MOBILE"
@@ -233,9 +251,8 @@ class IntegrityMonitor @Inject constructor(
     }
 
     fun isInternetHardwarePresent(): Boolean {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val activeNetwork = cm.activeNetwork ?: return false
-        val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
+        val activeNetwork = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
@@ -305,5 +322,6 @@ class IntegrityMonitor @Inject constructor(
         batterySamples.clear()
         isBatterySteepDischarge = false
         isCoolingModeActive = false
+        lastFullPollTs = 0L
     }
 }

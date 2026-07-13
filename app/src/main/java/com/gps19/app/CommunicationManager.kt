@@ -19,6 +19,7 @@ import javax.inject.Inject
  * - R988: Implemented routingId-aware emitBinary for optimized relay routing.
  * - Protocol Optimization: Updated handleLocationRelayBinary to map Protobuf 
  *   Enums (state, pending_reason) back to internal strings for app-wide compatibility.
+ * - Forensic Audit: Added logging for binary emissions to verify R988 activation.
  */
 class CommunicationManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -426,6 +427,8 @@ class CommunicationManager @Inject constructor(
 
     override fun emitBinary(event: String, routingId: String, data: ByteArray) {
         if (isStopped) return
+        // R988: Pass routingId separately to relay for efficient room broadcasting
+        Log.d("GPS19_COMM", "EMIT BINARY: $event for $routingId (${data.size} bytes)")
         socket?.emit(event, routingId, data) 
     }
 

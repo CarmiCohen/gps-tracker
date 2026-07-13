@@ -15,11 +15,10 @@ import javax.inject.Singleton
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
- * v9.3.3:
- * - Issue #058: Hilt Migration. Added @Inject constructor and setter for watchdog listener.
- * v8.9.87:
- * - Issue #005 Hardening: Cached packageName to eliminate repetitive getPackageName() 
- *   system log spam on Samsung devices.
+ * v9.3.25:
+ * - R996: Logcat Forensic Integrity. Throttled WakeLock renewal to 5 minutes 
+ *   to eliminate repetitive getPackageName() system logs on Samsung devices.
+ * - Issue #058: Hilt Migration. Added @Inject constructor.
  */
 @Singleton
 class SystemMonitor @Inject constructor(
@@ -28,12 +27,15 @@ class SystemMonitor @Inject constructor(
 ) {
     private var onLogWatchdog: ((Boolean, Int) -> Unit)? = null
 
+    private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     private var wakeLock: PowerManager.WakeLock? = null
     private var lastScheduledWatchdogTs = 0L
     private var nextExpectedExpiryTs = 0L
     private var skippedCounter = 0
     
-    // Rationale: Cache packageName to prevent repetitive getPackageName() log spam.
+    private var lastWakeLockRenewalTs = 0L
+    private val WAKELOCK_RENEWAL_TTL_MS = 300_000L // 5 minutes
+
     private val cachedPkgName = context.packageName
 
     var jumpStateStartTs = 0L
@@ -43,16 +45,25 @@ class SystemMonitor @Inject constructor(
         this.onLogWatchdog = listener
     }
 
-    fun acquireWakeLock() {
+    /**
+     * acquireWakeLock: Acquires or renews the partial wake lock.
+     * v9.3.25: Implements TTL throttling to prevent logcat noise.
+     */
+    fun acquireWakeLock(force: Boolean = false) {
+        val now = timeProvider.elapsedRealtime()
+        if (!force && lastWakeLockRenewalTs != 0L && (now - lastWakeLockRenewalTs < WAKELOCK_RENEWAL_TTL_MS)) {
+            return
+        }
+
         try {
-            val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
             if (wakeLock == null) {
-                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GPSTracker:MainLock").apply {
+                wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GPSTracker:MainLock").apply {
                     setReferenceCounted(false)
                 }
             }
             
             wakeLock?.acquire(WAKELOCK_TIMEOUT_MS) 
+            lastWakeLockRenewalTs = now
             Timber.d("WakeLock acquired/renewed for ${WAKELOCK_TIMEOUT_MS/1000}s")
         } catch (e: Exception) {
             Timber.e(e, "Failed to acquire WakeLock")
@@ -60,7 +71,7 @@ class SystemMonitor @Inject constructor(
     }
 
     fun renewWakeLock() {
-        acquireWakeLock()
+        acquireWakeLock(force = false)
     }
 
     fun releaseWakeLock() {
@@ -73,6 +84,7 @@ class SystemMonitor @Inject constructor(
             Timber.e(e, "Error releasing WakeLock")
         } finally {
             wakeLock = null
+            lastWakeLockRenewalTs = 0L
         }
     }
 
