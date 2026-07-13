@@ -5,12 +5,9 @@ option java_multiple_files = true;
 
 /**
  * AppSettings: Persistence schema for DataStore.
- * v8.9.79: Issue #014 - Type Migration. Standardized distance, accuracy, and temperature to double.
- * v8.9.84: Issue #023 - Binary Compatibility Fix.
- *          - Reverted tags 8, 9, 33 to float (legacy) to prevent SerializationException.
- *          - Added high-precision double fields at tags 60, 61, 62.
- *          - Preserved tag 49 for is_anchor_locked.
- * v9.3.0: Issue #042 - Sanitization Visibility. Added identity_sanitized flag at tag 63.
+ * v9.3.25:
+ * - R988: Optimized RealtimeStatus Protobuf schema. Converted state and reason
+ *   to Enums to reduce binary payload size for high-frequency pulses.
  */
 message AppSettings {
     optional string app_mode = 1;
@@ -88,6 +85,23 @@ message AppSettings {
     optional bool identity_sanitized = 63;
 }
 
+enum TrackerStateProto {
+    TS_UNKNOWN = 0;
+    TS_MOVING = 1;
+    TS_PARKING = 2;
+    TS_JUMPING = 3;
+    TS_OFFLINE = 4;
+}
+
+enum LocationPendingReasonProto {
+    LPR_NONE = 0;
+    LPR_GPS_STALL = 1;
+    LPR_GPS_GAP = 2;
+    LPR_ACOUSTIC_VIOLATION = 3;
+    LPR_SIGNAL_LOSS = 4;
+    LPR_JAMMER_SUSPICION = 5;
+}
+
 message RealtimeStatus {
     string id = 1;
     string viewer_id = 2;
@@ -115,11 +129,12 @@ message RealtimeStatus {
     bool is_historical = 26;
     double alt = 27;
 
-    // Parity Fields for Issue #051
-    string tracker_state = 28;
+    // v9.3.25: Optimized for binary throughput (R988)
+    TrackerStateProto state = 28;
     bool is_anchor_locked = 29;
     bool is_location_pending = 30;
-    string location_pending_reason = 31;
+    LocationPendingReasonProto pending_reason = 31;
+
     int64 last_valid_fix_realtime = 32;
     bool is_battery_steep_discharge = 33;
     bool is_cooling_mode_active = 34;

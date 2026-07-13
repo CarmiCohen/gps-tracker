@@ -18,6 +18,9 @@ import javax.inject.Singleton
 /**
  * High-level Network Manager for the Service.
  * Orchestrates the SignalingProvider (Socket.io) and the HTTP Keep-alive logic.
+ * v9.3.25:
+ * - R988: Activated binary telemetry channel for trackers to reduce relay overhead.
+ * - R988: Implemented routingId-aware emitBinary calls.
  * v8.9.99:
  * - Issue #041: Identity Sanitization. Added strict ID validation before 
  *   initiating relay connections to prevent using corrupted identities.
@@ -59,7 +62,6 @@ class AppNetworkManager @Inject constructor(
                 val now = timeProvider.elapsedRealtime()
                 if (now - lastReconnectTs < 3000L || signalingProvider.isConnected()) return@launch
                 
-                // Issue #041: Don't reconnect if identities are corrupted
                 if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) {
                     Log.e("GPS19_NET", "Handover aborted: Invalid identity detected (T:$deviceId, V:$viewerId)")
                     return@launch
@@ -110,7 +112,6 @@ class AppNetworkManager @Inject constructor(
 
                 if (latestDeviceId != deviceId || latestViewerId != viewerId || latestRelayUrl != relayUrl || latestIsTracker != isTrackerMode) {
                     
-                    // Issue #041: Only update if the new IDs are valid
                     if (SignalingConstants.isValidTrackerId(latestDeviceId) && SignalingConstants.isValidViewerId(latestViewerId)) {
                         this@AppNetworkManager.deviceId = latestDeviceId
                         this@AppNetworkManager.viewerId = latestViewerId
@@ -264,9 +265,9 @@ class AppNetworkManager @Inject constructor(
         signalingProvider.emit(event, data)
     }
 
-    fun emitBinary(event: String, data: ByteArray) {
+    fun emitBinary(event: String, routingId: String, data: ByteArray) {
         if (isStopped) return
-        signalingProvider.emitBinary(event, data)
+        signalingProvider.emitBinary(event, routingId, data)
     }
 
     fun pushSettings() {
@@ -278,7 +279,13 @@ class AppNetworkManager @Inject constructor(
 
     fun sendTelemetry(status: TrackerStatus): Boolean {
         if (!isConnected()) return false
-        emit("location_update", status.toJSONObject(fromViewer = !isTrackerMode))
+        // R988: Activate optimized binary telemetry for trackers.
+        if (isTrackerMode) {
+            val routingId = SignalingConstants.getTransmissionId(deviceId)
+            emitBinary("location_update_bin", routingId, status.toProto(fromViewer = false).toByteArray())
+        } else {
+            emit("location_update", status.toJSONObject(fromViewer = true))
+        }
         return true
     }
 }

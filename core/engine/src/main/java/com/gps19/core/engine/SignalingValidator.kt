@@ -2,15 +2,21 @@ package com.gps19.core.engine
 
 /**
  * SignalingValidator: Pure logic for enforcing role-based message filtering.
- * v8.9.5:
- * - Identity Lock Relaxation: Allows processing if ownViewerId is default ("V") 
- *   to support first-time pairing/adoption logic.
- * v8.9.0:
- * - Identity Lock: Enforced strict viewerId matching for trackers.
+ * v9.3.22:
+ * - Legacy Compatibility: Support both "viewer" and "client" labels.
+ * - Alias-Aware Matching: Integrated SignalingConstants.isTrackerMatch and 
+ *   isViewerMatch to support cross-version identity mapping (e.g. T vs Trk).
  */
 object SignalingValidator {
 
     private fun isDefault(id: String) = id == SignalingConstants.DEFAULT_VIEWER_ID || id.isEmpty()
+
+    /**
+     * R182: Helper to handle legacy role labels.
+     */
+    fun isViewerRole(role: String?): Boolean {
+        return role == "viewer" || role == "client"
+    }
 
     /**
      * Determines if a location update should be processed by the current device.
@@ -23,15 +29,15 @@ object SignalingValidator {
         ownViewerId: String, // Our own viewer ID
         isTrackerMode: Boolean
     ): Boolean {
-        if (incomingId != ownDeviceId || ownDeviceId.isEmpty()) return false
+        if (!SignalingConstants.isTrackerMatch(incomingId, ownDeviceId)) return false
 
         // Tracker: Only process updates from the specific authorized viewer or if not yet locked.
         if (isTrackerMode) {
-            return isFromViewer && (viewerId == ownViewerId || isDefault(ownViewerId))
+            return isFromViewer && (SignalingConstants.isViewerMatch(viewerId, ownViewerId) || isDefault(ownViewerId))
         }
         
         // Viewer: Do NOT process updates that come from MYSELF (echo suppression).
-        if (!isTrackerMode && isFromViewer && viewerId == ownViewerId) return false
+        if (!isTrackerMode && isFromViewer && SignalingConstants.isViewerMatch(viewerId, ownViewerId)) return false
 
         return true
     }
@@ -47,10 +53,10 @@ object SignalingValidator {
         fromViewer: Boolean,
         isTrackerMode: Boolean
     ): Boolean {
-        if (incomingId != ownDeviceId || ownDeviceId.isEmpty()) return false
+        if (!SignalingConstants.isTrackerMatch(incomingId, ownDeviceId)) return false
         
         // Only Trackers process incoming settings updates, and they must come from the AUTHORIZED or UNLOCKED Viewer.
-        return isTrackerMode && fromViewer && (incomingViewerId == ownViewerId || isDefault(ownViewerId))
+        return isTrackerMode && fromViewer && (SignalingConstants.isViewerMatch(incomingViewerId, ownViewerId) || isDefault(ownViewerId))
     }
     
     /**
@@ -63,15 +69,15 @@ object SignalingValidator {
         ownViewerId: String,
         isTrackerMode: Boolean
     ): Boolean {
-        if (incomingId != ownDeviceId || ownDeviceId.isEmpty()) return false
+        if (!SignalingConstants.isTrackerMatch(incomingId, ownDeviceId)) return false
 
         // Tracker handles logs from its specific authorized viewer or if not yet locked.
         if (isTrackerMode) {
-            return incomingViewerId == ownViewerId || isDefault(ownViewerId)
+            return SignalingConstants.isViewerMatch(incomingViewerId, ownViewerId) || isDefault(ownViewerId)
         }
 
         // Viewer handles logs from tracker or other viewers, but suppresses its own.
-        if (incomingViewerId == ownViewerId) return false
+        if (SignalingConstants.isViewerMatch(incomingViewerId, ownViewerId)) return false
         
         return true
     }

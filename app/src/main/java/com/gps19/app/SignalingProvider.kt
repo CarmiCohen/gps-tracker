@@ -5,6 +5,8 @@ import org.json.JSONObject
 
 /**
  * Interface for signaling implementations (Socket.io, MQTT, etc.)
+ * v9.3.25:
+ * - R988: Added routingId to emitBinary to support server-side routing without Protobuf parsing.
  * v8.9.64:
  * - Added setConnectionLostCallback for reactive reconnection triggers.
  * v8.8.21:
@@ -20,9 +22,10 @@ interface SignalingProvider {
     fun clearRtt()
     fun emit(event: String, data: JSONObject)
     /**
-     * R944: Emits a binary payload for Protobuf efficiency.
+     * R988: Emits a binary payload for Protobuf efficiency.
+     * @param routingId The target room/ID for the relay to broadcast to.
      */
-    fun emitBinary(event: String, data: ByteArray)
+    fun emitBinary(event: String, routingId: String, data: ByteArray)
     fun pushSettings()
     /**
      * R568a: Returns the monotonic timestamp (elapsedRealtime) of the last message received from the relay.

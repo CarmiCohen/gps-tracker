@@ -10,8 +10,10 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * v9.3.11:
- * - Issue #059: Changed NavigateToDiagnostics to data class for visibility control.
+ * v9.3.25:
+ * - Protocol Optimization: Migrated to Enum-based binary serialization for 
+ *   tracker state and pending reasons to further reduce heartbeat footprint.
+ * - Bugfix: Corrected isBatterySteepDischarge naming in ConnectionPoint.
  */
 
 @Serializable
@@ -130,7 +132,9 @@ data class LogEntry(
             put("localId", localId); put("timestamp", timestamp)
             put("localTime", SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(timestamp)))
             put("message", message); put("type", type); put("isImportant", isImportant)
-            put("id", id); put("viewer_id", viewerId); put("count", count)
+            put("id", SignalingConstants.getTransmissionId(id))
+            put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
+            put("count", count)
             put("duration_ms", durationMs)
             put("is_special", isSpecial)
             put("first_seen_ts", if (firstSeenTs == 0L) timestamp else firstSeenTs)
@@ -264,8 +268,8 @@ data class TrackerStatus(
 ) : SpatialAnchor {
     fun toJSONObject(fromViewer: Boolean): JSONObject {
         return JSONObject().apply {
-            put("id", deviceId)
-            put("viewer_id", viewerId)
+            put("id", SignalingConstants.getTransmissionId(deviceId))
+            put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
             put("from_viewer", fromViewer)
             put("lat", lat)
             put("lng", lng)
@@ -348,8 +352,8 @@ data class TrackerStatus(
 
     fun toProto(fromViewer: Boolean): RealtimeStatus {
         return RealtimeStatus.newBuilder()
-            .setId(deviceId)
-            .setViewerId(viewerId)
+            .setId(SignalingConstants.getTransmissionId(deviceId))
+            .setViewerId(SignalingConstants.getTransmissionId(viewerId))
             .setFromViewer(fromViewer)
             .setLat(lat)
             .setLng(lng)
@@ -372,14 +376,58 @@ data class TrackerStatus(
             .setMaxDropMs(maxDropMs)
             .setLastConnTs(lastConnTs)
             .setLastDiscTs(lastDiscTs)
-            .setTrackerState(trackerState.name)
+            .setState(mapTrackerStateToProto(trackerState))
             .setIsAnchorLocked(isAnchorLocked)
             .setIsLocationPending(isLocationPending)
-            .setLocationPendingReason(locationPendingReason.name)
+            .setPendingReason(mapPendingReasonToProto(locationPendingReason))
             .setLastValidFixRealtime(lastValidFixRealtime)
             .setIsBatterySteepDischarge(isBatterySteepDischarge)
             .setIsCoolingModeActive(isCoolingModeActive)
             .build()
+    }
+
+    private fun mapTrackerStateToProto(state: TrackerState): TrackerStateProto {
+        return when(state) {
+            TrackerState.MOVING -> TrackerStateProto.TS_MOVING
+            TrackerState.PARKING -> TrackerStateProto.TS_PARKING
+            TrackerState.JUMPING -> TrackerStateProto.TS_JUMPING
+            TrackerState.OFFLINE -> TrackerStateProto.TS_OFFLINE
+            else -> TrackerStateProto.TS_UNKNOWN
+        }
+    }
+
+    private fun mapPendingReasonToProto(reason: LocationPendingReason): LocationPendingReasonProto {
+        return when(reason) {
+            LocationPendingReason.GPS_STALL -> LocationPendingReasonProto.LPR_GPS_STALL
+            LocationPendingReason.GPS_GAP -> LocationPendingReasonProto.LPR_GPS_GAP
+            LocationPendingReason.ACOUSTIC_VIOLATION -> LocationPendingReasonProto.LPR_ACOUSTIC_VIOLATION
+            LocationPendingReason.SIGNAL_LOSS -> LocationPendingReasonProto.LPR_SIGNAL_LOSS
+            LocationPendingReason.JAMMER_SUSPICION -> LocationPendingReasonProto.LPR_JAMMER_SUSPICION
+            else -> LocationPendingReasonProto.LPR_NONE
+        }
+    }
+
+    companion object {
+        fun mapProtoToTrackerState(proto: TrackerStateProto): TrackerState {
+            return when(proto) {
+                TrackerStateProto.TS_MOVING -> TrackerState.MOVING
+                TrackerStateProto.TS_PARKING -> TrackerState.PARKING
+                TrackerStateProto.TS_JUMPING -> TrackerState.JUMPING
+                TrackerStateProto.TS_OFFLINE -> TrackerState.OFFLINE
+                else -> TrackerState.UNKNOWN
+            }
+        }
+
+        fun mapProtoToPendingReason(proto: LocationPendingReasonProto): LocationPendingReason {
+            return when(proto) {
+                LocationPendingReasonProto.LPR_GPS_STALL -> LocationPendingReason.GPS_STALL
+                LocationPendingReasonProto.LPR_GPS_GAP -> LocationPendingReason.GPS_GAP
+                LocationPendingReasonProto.LPR_ACOUSTIC_VIOLATION -> LocationPendingReason.ACOUSTIC_VIOLATION
+                LocationPendingReasonProto.LPR_SIGNAL_LOSS -> LocationPendingReason.SIGNAL_LOSS
+                LocationPendingReasonProto.LPR_JAMMER_SUSPICION -> LocationPendingReason.JAMMER_SUSPICION
+                else -> LocationPendingReason.NONE
+            }
+        }
     }
 }
 

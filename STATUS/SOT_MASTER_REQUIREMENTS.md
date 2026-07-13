@@ -1,8 +1,10 @@
-# System Source of Truth (SoT) - v9.3.20 (Development)
+# System Source of Truth (SoT) - v9.3.25 (Development)
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Binary Telemetry Authority (R988)**: The system MUST prioritize binary Protobuf-based telemetry (`location_update_bin`) for high-frequency tracker updates to minimize relay bandwidth and improve device performance on battery-constrained devices like the Samsung A15. The schema MUST use optimized Enums for states and reasons to minimize binary footprint. (v9.3.25)
+*   **Alias-Aware Identity Uniqueness (R182b)**: The system MUST enforce identity uniqueness that accounts for reserved legacy aliases (`T`, `V`, `Trk`, `viewer`). Tracker and Viewer IDs MUST NOT conflict with these reserved sets to ensure bidirectional backward compatibility with legacy versions (v9.3.7). (v9.3.25)
 *   **Samsung A15 Hardening Authority (R405)**: The system MUST prioritize background persistence on Samsung A15 devices through three combined mechanisms: (1) Mandatory prompt for `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, (2) A unified 2000ms system heartbeat, and (3) A continuous low-power hardware sensor subscription (`TYPE_STEP_DETECTOR`). This authority replaces all previous device-specific `Build.MODEL` logic branching in the engine and service layers. (v9.3.20)
 *   **Relay Configuration Authority (R404)**: The system MUST enforce a centralized relay configuration. Background services MUST NOT use local hardcoded Relay URL literals and MUST fall back to the authoritative `MainRepository.DEFAULT_RELAY_URL` to ensure connection integrity across all roles. (v9.3.18)
 *   **Forensic Visual Authority (R404b)**: The system MUST use a standardized `FORENSIC_PINK_COLOR` (#FF1493) for all forensic events and markers to ensure visual consistency across Tracker and Viewer roles. (v9.3.18)

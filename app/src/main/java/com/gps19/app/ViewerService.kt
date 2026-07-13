@@ -17,11 +17,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v9.3.25:
+ * - R405: Samsung A15 Stability Hardening. Integrated wake-lock renewal 
+ *   into processTick to prevent background suppression on Samsung devices.
  * v9.3.18:
  * - R404: Legacy Relay URL Fallback Remediation. Synchronized with MainRepository.DEFAULT_RELAY_URL.
- * v9.3.17:
- * - R403: Startup ANR Remediation. Integrated dynamic heartbeat logic and 
- *   centralized stability audit thresholds.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -130,7 +130,6 @@ class ViewerService : BaseMonitorService() {
             commandRouter.register()
             commandRouter.startObservingCommands(lifecycleScope)
 
-            // Issue #058: Standardized DI for RemoteUpdateWrapper
             networkManagerWrapper.setCallback { data -> 
                 if (data.optString("type") == "remote_log") {
                     remoteHandler.handleRemoteLog(LogEntry.fromJSONObject(data))
@@ -188,7 +187,6 @@ class ViewerService : BaseMonitorService() {
         val nowRealtime = timeProvider.elapsedRealtime()
         val nowWall = timeProvider.currentTimeMillis()
 
-        // Capture boundary conversions once
         val lat = location.latitude
         val lng = location.longitude
         val alt = location.altitude
@@ -196,12 +194,10 @@ class ViewerService : BaseMonitorService() {
         val acc = location.accuracy.toDouble()
         val bearing = location.bearing.toDouble()
 
-        // R403: Stability Audit Alignment
         val currentHeartbeat = getRequiredTickInterval()
         if (VIEWER_GPS_POLLING_MS == TICK_INTERVAL_MS && lastGpsFixRealtime > 0) {
             val gap = nowRealtime - lastGpsFixRealtime
             stabilityAuditFixCount++
-            // Tolerate jitter based on the current active heartbeat
             if (gap > currentHeartbeat + GPS_STABILITY_GAP_THRESHOLD_MS) {
                 stabilityAuditViolationCount++
                 val proc = lastProcessedLocation
@@ -339,6 +335,9 @@ class ViewerService : BaseMonitorService() {
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
 
+        // R405: Samsung Stability Hardening. Renew WakeLock every tick.
+        if (isSamsungDevice()) systemMonitor.renewWakeLock()
+
         if (nowRealtime - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
             if (stabilityAuditFixCount > 0) {
                 val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
@@ -440,7 +439,6 @@ class ViewerService : BaseMonitorService() {
 
         evaluateAlarmsInternal(nowRealtime, isSignalLoss, isTrackerJammerSuspicion, isTrackerStalled, isTrackerGap, isTrackerActive)
 
-        // R993: Throttle notification updates.
         val notificationInterval = if (isUiVisible()) TICK_INTERVAL_MS else NOTIFICATION_THROTTLE_MS
         if (now - lastNotificationUpdateTs >= notificationInterval) {
             lastNotificationUpdateTs = now

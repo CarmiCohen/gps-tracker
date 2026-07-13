@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * SignalPayloadGenerator: Pure Kotlin logic for constructing relay messages.
+ * v9.3.24:
+ * - Protocol Optimization: Integrated SignalingConstants.getTransmissionId() 
+ *   to ensure legacy version compatibility (T -> Trk, V -> viewer).
  * v8.8.21:
  * - Decentralized signaling: Moved payload construction from :app to :core:engine.
  * v8.8.28: Standardized signaling keys to snake_case (viewer_id).
@@ -17,8 +20,8 @@ object SignalPayloadGenerator {
         version: String
     ): Map<String, Any> {
         return mapOf(
-            "id" to deviceId,
-            "viewer_id" to viewerId,
+            "id" to SignalingConstants.getTransmissionId(deviceId),
+            "viewer_id" to SignalingConstants.getTransmissionId(viewerId),
             "from" to SignalingConstants.getOwnTypeLabel(isTracker),
             "ts" to timestamp,
             "ver" to version
@@ -34,18 +37,19 @@ object SignalPayloadGenerator {
         ownDeviceId: String,
         isTracker: Boolean
     ): Map<String, Any>? {
+        // We match against the raw ownDeviceId (alias-aware match happened in CommManager)
         val pingId = incomingPing["id"] as? String ?: return null
-        if (pingId != ownDeviceId) return null
+        if (!SignalingConstants.isTrackerMatch(pingId, ownDeviceId)) return null
 
-        // We essentially return the ping data back as a pong, 
-        // but it's now wrapped in the pong_cmd event.
+        // We return the incoming ping data as the basis for the pong.
+        // It already has the transmission IDs that the requester used.
         return incomingPing
     }
 
     fun createViewerPulseUpdate(viewerId: String, isFromViewer: Boolean): Map<String, Any> {
         return mapOf(
             "type" to "viewer_pulse",
-            "viewer_id" to viewerId,
+            "viewer_id" to SignalingConstants.getTransmissionId(viewerId),
             "from_viewer" to isFromViewer
         )
     }
@@ -53,7 +57,7 @@ object SignalPayloadGenerator {
     fun createTrackerPulseUpdate(viewerId: String, isFromViewer: Boolean): Map<String, Any> {
         return mapOf(
             "type" to "tracker_pulse",
-            "viewer_id" to viewerId,
+            "viewer_id" to SignalingConstants.getTransmissionId(viewerId),
             "from_viewer" to isFromViewer
         )
     }

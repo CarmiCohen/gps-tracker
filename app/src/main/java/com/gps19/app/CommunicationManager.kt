@@ -15,12 +15,10 @@ import javax.inject.Inject
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * v9.3.15:
- * - Hardening: Updated pushSettings to use getDouble for max_distance, 
- *   eliminating redundant Float conversion in signaling path.
- * v9.1.9:
- * - Issue #051: Binary Parity Gap. Updated handleLocationRelayBinary to extract
- *   new forensic fields: tracker_state, is_anchor_locked, is_location_pending, etc.
+ * v9.3.25:
+ * - R988: Implemented routingId-aware emitBinary for optimized relay routing.
+ * - Protocol Optimization: Updated handleLocationRelayBinary to map Protobuf 
+ *   Enums (state, pending_reason) back to internal strings for app-wide compatibility.
  */
 class CommunicationManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -60,7 +58,7 @@ class CommunicationManager @Inject constructor(
 
     private fun logToApp(message: String, important: Boolean = false) {
         if (isStopped) return
-        Log.d("GPS19_COMM", message)
+        Log.i("GPS19_COMM", message)
         logManager.submitToLogSink(message, "system", important)
     }
 
@@ -72,7 +70,7 @@ class CommunicationManager @Inject constructor(
 
     private fun createJoinPayload(): JSONObject {
         return JSONObject().apply {
-            put("id", deviceId)
+            put("id", SignalingConstants.getTransmissionId(deviceId))
             put("role", if (isTrackerMode) "tracker" else "viewer")
             put("ver", BuildConfig.VERSION_NAME)
         }
@@ -100,11 +98,13 @@ class CommunicationManager @Inject constructor(
         
         if ((idChanged || force) && isConnected()) {
             if (idChanged && oldId.isNotEmpty()) {
-                logToApp("Identity changed. Leaving $oldId", true)
-                socket?.emit("leave", oldId)
+                val transOld = SignalingConstants.getTransmissionId(oldId)
+                logToApp("Identity changed. Leaving $transOld", true)
+                socket?.emit("leave", transOld)
             }
             if (this.deviceId.isNotEmpty()) {
-                logToApp("Joining room: ${this.deviceId} (Force: $force)", force)
+                val transNew = SignalingConstants.getTransmissionId(this.deviceId)
+                logToApp("Joining room: $transNew (Force: $force)", force)
                 socket?.emit("join", createJoinPayload())
             }
         }
@@ -210,7 +210,7 @@ class CommunicationManager @Inject constructor(
             val data = args[0] as JSONObject
             val incomingId = data.optString("id")
             val incomingViewerId = data.optString("viewer_id")
-            val fromViewer = data.optBoolean("from_viewer", false)
+            val fromViewer = data.optBoolean("from_viewer", SignalingValidator.isViewerRole(data.optString("from")))
 
             if (!SignalingValidator.shouldProcessLocationUpdate(
                     incomingId = incomingId,
@@ -254,11 +254,12 @@ class CommunicationManager @Inject constructor(
                 put("last_conn_ts", status.lastConnTs); put("last_disc_ts", status.lastDiscTs); put("is_historical", status.isHistorical)
                 put("alt", status.alt)
                 
-                // v9.1.9: Binary Parity for Forensic Fields
-                put("tracker_state", status.trackerState)
+                // v9.3.25: Reverse map Enums to strings for app compatibility
+                put("tracker_state", TrackerStatus.mapProtoToTrackerState(status.state).name)
                 put("is_anchor_locked", status.isAnchorLocked)
                 put("is_location_pending", status.isLocationPending)
-                put("location_pending_reason", status.locationPendingReason)
+                put("location_pending_reason", TrackerStatus.mapProtoToPendingReason(status.pendingReason).name)
+                
                 put("last_valid_fixRealtime", status.lastValidFixRealtime)
                 put("is_battery_steep_discharge", status.isBatterySteepDischarge)
                 put("is_cooling_mode_active", status.isCoolingModeActive)
@@ -300,7 +301,7 @@ class CommunicationManager @Inject constructor(
             val data = args[0] as JSONObject
             val incomingId = data.optString("id", "").trim()
             val incomingViewerId = data.optString("viewer_id", "").trim()
-            val fromViewer = data.optBoolean("from_viewer", false)
+            val fromViewer = data.optBoolean("from_viewer", SignalingValidator.isViewerRole(data.optString("from")))
 
             if (!SignalingValidator.shouldProcessSettingsUpdate(
                     incomingId = incomingId,
@@ -322,15 +323,17 @@ class CommunicationManager @Inject constructor(
             val data = args[0] as JSONObject
             val incomingViewerId = data.optString("viewer_id")
             
-            // Fix #042: Identity Locking with Default Relaxation.
             if (isTrackerMode) {
-                if (incomingViewerId != viewerId && !isDefaultViewer(viewerId)) return
+                if (!SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
             } else {
-                if (incomingViewerId == viewerId) return
+                if (SignalingConstants.isViewerMatch(incomingViewerId, viewerId)) return
             }
 
             onRemoteUpdateWrapper.onUpdate(JSONObject().apply {
-                put("type", "viewer_pulse"); put("viewer_id", incomingViewerId); put("from_viewer", true)
+                put("type", "viewer_pulse")
+                put("id", deviceId) 
+                put("viewer_id", incomingViewerId)
+                put("from_viewer", true)
             })
         } catch (e: Exception) {
             Timber.e(e, "viewer_status_relay parse error")
@@ -344,12 +347,11 @@ class CommunicationManager @Inject constructor(
             val pingDeviceId = data.optString("id", "")
             val incomingViewerId = data.optString("viewer_id", "")
             
-            if (pingDeviceId == deviceId && deviceId.isNotEmpty()) {
-                val isViewerPing = from == SignalingConstants.getPeerTypeLabel(true)
+            if (SignalingConstants.isTrackerMatch(pingDeviceId, deviceId) && deviceId.isNotEmpty()) {
+                val isViewerPing = SignalingValidator.isViewerRole(from)
                 val isTrackerPing = from == SignalingConstants.getOwnTypeLabel(true)
                 
-                // Fix #042: Identity Locking with Default Relaxation.
-                if (isTrackerMode && isViewerPing && incomingViewerId != viewerId && !isDefaultViewer(viewerId)) return
+                if (isTrackerMode && isViewerPing && !SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
                 
                 if ((isTrackerMode && isViewerPing) || (!isTrackerMode && isTrackerPing)) {
                     val incomingMap = mutableMapOf<String, Any>()
@@ -361,6 +363,7 @@ class CommunicationManager @Inject constructor(
                     
                     onRemoteUpdateWrapper.onUpdate(JSONObject().apply {
                         put("type", SignalingConstants.getPulseType(isTrackerMode))
+                        put("id", deviceId)
                         put("viewer_id", incomingViewerId)
                         put("from_viewer", isViewerPing)
                     })
@@ -378,15 +381,15 @@ class CommunicationManager @Inject constructor(
             val pingDeviceId = data.optString("id", "")
             val pongViewerId = data.optString("viewer_id", "")
             
-            if (pingDeviceId == deviceId && deviceId.isNotEmpty()) {
-                val isFromViewer = fromStr == "viewer"
+            if (SignalingConstants.isTrackerMatch(pingDeviceId, deviceId) && deviceId.isNotEmpty()) {
+                val isFromViewer = SignalingValidator.isViewerRole(fromStr)
                 
                 val isMyPong = if (isTrackerMode) fromStr == "tracker" else isFromViewer
                 val isPeerPong = if (isTrackerMode) isFromViewer else fromStr == "tracker"
 
                 if (isMyPong) {
                     onRemoteUpdateWrapper.onUpdate(JSONObject().apply { 
-                        put("type", "pong_activity"); put("viewer_id", pongViewerId); put("from_viewer", isFromViewer) 
+                        put("type", "pong_activity"); put("id", deviceId); put("viewer_id", pongViewerId); put("from_viewer", isFromViewer) 
                     })
                     val rtt = (timeProvider.currentTimeMillis() - data.optLong("ts")).toInt()
                     if (rtt > 0) {
@@ -395,11 +398,11 @@ class CommunicationManager @Inject constructor(
                         telemetryRepository.updateLastRtt(lastRttInternal)
                     }
                 } else if (isPeerPong) {
-                    // Fix #042: Identity Locking with Default Relaxation.
-                    if (isTrackerMode && pongViewerId != viewerId && !isDefaultViewer(viewerId)) return
+                    if (isTrackerMode && !SignalingConstants.isViewerMatch(pongViewerId, viewerId) && !isDefaultViewer(viewerId)) return
 
                     onRemoteUpdateWrapper.onUpdate(JSONObject().apply {
                         put("type", SignalingConstants.getPulseType(isTrackerMode))
+                        put("id", deviceId)
                         put("viewer_id", pongViewerId)
                         put("from_viewer", isFromViewer)
                     })
@@ -421,9 +424,9 @@ class CommunicationManager @Inject constructor(
         if (event == "location_update") { emitLocationConflated(data) } else { socket?.emit(event, data) }
     }
 
-    override fun emitBinary(event: String, data: ByteArray) {
+    override fun emitBinary(event: String, routingId: String, data: ByteArray) {
         if (isStopped) return
-        socket?.emit(event, data) 
+        socket?.emit(event, routingId, data) 
     }
 
     private fun emitLocationConflated(data: JSONObject) {
@@ -467,7 +470,9 @@ class CommunicationManager @Inject constructor(
                 socket?.emit("settings_update", JSONObject().apply {
                     put("home_points", array); put("settings_ts", settingsRepository.getLong(SettingsRepository.HOME_POINTS_TS_KEY, 0L))
                     put("max_dist", settingsRepository.getDouble(SettingsRepository.MAX_DISTANCE_STORAGE_KEY, 60.0))
-                    put("id", deviceId); put("viewer_id", viewerId); put("from_viewer", true)
+                    put("id", SignalingConstants.getTransmissionId(deviceId))
+                    put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
+                    put("from_viewer", true)
                 })
             } catch (e: Exception) { 
                 if (e is CancellationException) throw e

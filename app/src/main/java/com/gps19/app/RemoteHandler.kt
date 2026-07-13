@@ -19,11 +19,9 @@ import javax.inject.Singleton
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
- * v9.3.8:
- * - Issue #072 Map Stabilization: Updated handleRemoteUpdate to use optimizedPoint 
- *   from LocationProcessor. This ensures features like the Stationary Anchor 
- *   are respected in the UI and persistence layers.
- * - Issue #058: Hilt Migration. Refactored to use Listener interface and separate initialization.
+ * v9.3.23:
+ * - Robust Aliasing: Fixed peer ID extraction. Trackers now correctly pass 
+ *   'viewer_id' to the pulse listener instead of their own 'id'.
  */
 @Singleton
 class RemoteHandler @Inject constructor(
@@ -304,10 +302,18 @@ class RemoteHandler @Inject constructor(
 
     fun handleRemoteUpdate(data: JSONObject, isTrackerMode: Boolean) {
         val fromId = data.optString("id")
+        val fromViewerId = data.optString("viewer_id") // R182: Explicitly extract viewer ID
         val fromViewer = data.optBoolean("from_viewer", false) 
         val type = data.optString("type", "")
         val now = timeProvider.currentTimeMillis()
         val nowRealtime = timeProvider.elapsedRealtime()
+
+        // R182: Correct peer ID determination based on mode.
+        val peerId = if (isTrackerMode) {
+            if (fromViewerId.isNotEmpty()) fromViewerId else fromId
+        } else {
+            fromId
+        }
 
         if (isTrackerMode && fromViewer && type == "calibrate_chair") {
             locationProcessor.resetChairBaseline()
@@ -322,7 +328,7 @@ class RemoteHandler @Inject constructor(
                 Toast.makeText(context, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show()
             }
 
-            listener?.onPeerPulse(fromId)
+            listener?.onPeerPulse(peerId)
             lastPeerActivityTs = nowRealtime
             repository.updateRemoteActivity(now)
             return
@@ -341,7 +347,7 @@ class RemoteHandler @Inject constructor(
                     val ts = data.optLong("settings_ts", 0L)
                     
                     repository.saveHomePoints(newList, if (maxDist > 0) maxDist else null, if (ts > 0) ts else null)
-                    listener?.onPeerPulse(fromId)
+                    listener?.onPeerPulse(peerId)
                     lastPeerActivityTs = nowRealtime
                     repository.updateRemoteActivity(now)
                 } catch (e: Exception) {
@@ -354,11 +360,11 @@ class RemoteHandler @Inject constructor(
 
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
             if (isTrackerMode && fromViewer) {
-                listener?.onPeerPulse(fromId)
+                listener?.onPeerPulse(peerId)
                 lastPeerActivityTs = nowRealtime
                 repository.updateRemoteActivity(now)
             } else if (!isTrackerMode && !fromViewer) {
-                listener?.onPeerPulse(fromId)
+                listener?.onPeerPulse(peerId)
                 lastPeerActivityTs = nowRealtime
                 isTrackerConnected = true
                 repository.updateRemoteActivity(now)
@@ -367,7 +373,7 @@ class RemoteHandler @Inject constructor(
         }
 
         if (isTrackerMode && fromViewer) {
-            listener?.onPeerPulse(fromId)
+            listener?.onPeerPulse(peerId)
             lastPeerActivityTs = nowRealtime
             repository.updateRemoteActivity(now)
             return
@@ -380,7 +386,7 @@ class RemoteHandler @Inject constructor(
             }
             if (remoteTs > 0) lastRemotePacketTs = remoteTs
 
-            listener?.onPeerPulse(fromId)
+            listener?.onPeerPulse(peerId)
             lastPeerActivityTs = nowRealtime
             isTrackerConnected = true
             repository.updateRemoteActivity(now)

@@ -32,12 +32,15 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * v9.3.25:
+ * - UI Feedback (#088): Refined commitDraftSettings error message to clarify 
+ *   reservation of legacy aliases (T/V/Trk/viewer) for backward compatibility.
+ * v9.3.24:
+ * - Draft Commit UI: Enhanced commitDraftSettings with specific error feedback 
+ *   for alias-aware identity uniqueness (Requirement R182).
  * v9.3.15:
  * - Hardening: Standardized all telemetry and baseline persistence to Double. 
  *   Removed redundant Float accessors to eliminate conversion jitter.
- * v9.3.12:
- * - Proto Precision (#076): Verified Requirement R968. Ensured max_distance and 
- *   max_accuracy are correctly persisted and propagated to UI.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -611,8 +614,9 @@ class SettingsRepository @Inject constructor(
             val newMaxDistance = if (current.hasDraftMaxDistance()) current.draftMaxDistance else current.maxDistance
             val newAlertsProto = if (current.hasDraftAlertSettings()) current.draftAlertSettings else current.alertSettings
 
+            // v9.3.25: Refined Alias-Aware Uniqueness Check
             if (!SignalingConstants.areIdsUnique(newTrackerId, newViewerId)) {
-                res = CommitResult(error = "IDs must be unique and alphanumeric")
+                res = CommitResult(error = "Identity Conflict: Some IDs (e.g., 'viewer', 'Trk') are reserved for cross-version compatibility. Please choose unique IDs.")
                 return@updateData current
             }
 
