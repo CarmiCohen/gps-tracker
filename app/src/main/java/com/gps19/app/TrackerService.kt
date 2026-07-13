@@ -20,7 +20,7 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.3.17:
+ * v9.3.18:
  * - R404: Legacy Relay URL Fallback Remediation. Synchronized with MainRepository.DEFAULT_RELAY_URL.
  * - R403: Startup ANR Remediation. Integrated centralized getActiveHeartbeatInterval 
  *   to ensure dynamic recovery from 2s (startup) to 1s (standard) heartbeat.

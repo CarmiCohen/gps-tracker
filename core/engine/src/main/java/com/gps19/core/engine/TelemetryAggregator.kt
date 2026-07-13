@@ -4,12 +4,11 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * v9.3.18:
+ * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
  * v9.3.17:
  * - R403: Heartbeat Alignment. Replaced hardcoded 1000L with TICK_INTERVAL_MS 
  *   to ensure gap-filling logic respects the system heartbeat configuration.
- * v9.3.12:
- * - Forensic Consolidation (#065): Standardized locationPendingReason priority 
- *   merging to support unified pink logging across modules.
  */
 class TelemetryAggregator {
 

@@ -20,6 +20,8 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Manages hardware GPS and GNSS status.
+ * v9.3.18:
+ * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
  * v9.3.17:
  * - R403: Heartbeat Alignment. Replaced hardcoded 1000L with TICK_INTERVAL_MS 
  *   to ensure SNR sampling rate respects the system heartbeat configuration.

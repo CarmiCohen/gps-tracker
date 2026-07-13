@@ -3,6 +3,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v9.3.18:
+ * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
  * v9.3.17:
  * - R403: Startup ANR Remediation. centralizing dynamic heartbeat logic.
  *   Introduced STARTUP_TICK_INTERVAL_MS (2s) and DEFAULT_TICK_INTERVAL_MS (2s).

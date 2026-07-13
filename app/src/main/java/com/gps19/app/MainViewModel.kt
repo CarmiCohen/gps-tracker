@@ -20,6 +20,8 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * v9.3.18:
+ * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
  * v9.3.17:
  * - R403: Startup ANR Remediation. Implemented dynamic heartbeat in startGlobalTimer.
  *   UI refresh rate is relaxed to STARTUP_TICK_INTERVAL_MS (2s) during bootstrap.

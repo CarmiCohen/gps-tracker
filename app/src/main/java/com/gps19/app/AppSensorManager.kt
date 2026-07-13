@@ -31,6 +31,8 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * v9.3.18:
+ * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
  * v9.3.17:
  * - R403: Heartbeat Alignment. Replaced hardcoded 1000L with TICK_INTERVAL_MS 
  *   to ensure sensor snapshot recording respects the system heartbeat logic.

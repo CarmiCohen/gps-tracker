@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.3.17)
+# Project Issues & Hardening Tracking (v9.3.18)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Resolution Archive](STATUS/RESOLUTION_ARCHIVE.md), and validation tasks are in [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md).
 
@@ -21,12 +21,12 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (v9.3.17)
+## 🟢 Recently Resolved Issues (v9.3.18)
 
 | ID | Issue | Resolution |
 | :--- | :--- | :--- |
 | **R404** | **Legacy Relay URL Fallback** | **Resolved**. Removed hardcoded legacy URL (`relay.gps19.com`) from `TrackerService`. Synchronized all service fallbacks to use `MainRepository.DEFAULT_RELAY_URL` pointing to the Render server. |
-| **R403** | **Startup ANR Remediation** | **Resolved**. Increased global heartbeat (`TICK_INTERVAL_MS`) from 1s to 2s to skip startup frames and reduce main thread pressure during initialization. Standardized `TrackerService` to use the global constant. |
+| **R403** | **Startup ANR Remediation** | **Resolved**. Implemented dynamic recovery logic. System uses a 2s heartbeat during the first 60s of operation to skip frames and reduce pressure, then switches back to 1s for high-fidelity tracking. |
 
 ---
 

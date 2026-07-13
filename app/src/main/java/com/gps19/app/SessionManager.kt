@@ -7,6 +7,8 @@ import javax.inject.Singleton
 
 /**
  * SessionManager: Tracks session-level state and uptime metrics.
+ * v9.3.18:
+ * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
  * v9.3.17:
  * - R403: Heartbeat Alignment. Replaced hardcoded 1000L increment with 
  *   TICK_INTERVAL_MS to ensure consistent uptime accounting.

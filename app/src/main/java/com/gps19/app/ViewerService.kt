@@ -17,8 +17,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * v9.3.17:
+ * v9.3.18:
  * - R404: Legacy Relay URL Fallback Remediation. Synchronized with MainRepository.DEFAULT_RELAY_URL.
+ * v9.3.17:
  * - R403: Startup ANR Remediation. Integrated dynamic heartbeat logic and 
  *   centralized stability audit thresholds.
  */
