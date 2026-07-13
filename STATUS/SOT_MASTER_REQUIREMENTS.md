@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - v9.3.18
+# System Source of Truth (SoT) - v9.3.19 (Development)
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 

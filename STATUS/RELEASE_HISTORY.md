@@ -1,6 +1,11 @@
-# Project History & Versioning (v9.3.12)
+# Project History & Versioning (v9.3.19)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## v9.3.18
+- **Startup ANR Remediation (R403)**: Implemented dynamic heartbeat recovery logic. The system now uses a 2s heartbeat (`STARTUP_TICK_INTERVAL_MS`) during the first 60 seconds of operation to reduce CPU pressure and skip frames, automatically reverting to 1s for high-fidelity tracking.
+- **Relay Configuration Authority (R404)**: Eliminated hardcoded legacy relay URLs from background services. All components now fall back to the authoritative `MainRepository.DEFAULT_RELAY_URL` (Render server).
+- **Forensic Visual Standardization (R404b)**: Synchronized `FORENSIC_PINK_COLOR` (#FF1493) across all modules and removed shadowed color constants.
 
 ## v9.3.12
 - **Temporal Authority (#075)**: Implemented skew-immune receipt-time calculation in `DashboardUseCase` to ensure GPS freshness remains accurate despite device clock drift.
