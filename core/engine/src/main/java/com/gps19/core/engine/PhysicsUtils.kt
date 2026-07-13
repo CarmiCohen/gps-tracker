@@ -4,9 +4,8 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: High-performance geospatial and kinematic calculations.
- * v9.3.15:
- * - Hardening: Finalized Double standardization. Restored full jump detection 
- *   logic with optimized Double paths.
+ * v9.3.20:
+ * - R405: Samsung A15 Hardening. Unified jump gates and removed isA15 branching.
  */
 object PhysicsUtils {
 
@@ -72,6 +71,7 @@ object PhysicsUtils {
 
     /**
      * Multi-Factor Jump Engine logic. Standardized to Double.
+     * R405: Removed device-specific (A15) threshold branching.
      */
     fun isVisualJump(
         lastLat: Double, lastLng: Double, 
@@ -81,8 +81,7 @@ object PhysicsUtils {
         lastSpeedMps: Double = 0.0,
         isParking: Boolean = false,
         altitudeDelta: Double = 0.0,
-        hasPhysicalMotion: Boolean = true,
-        isA15: Boolean = false
+        hasPhysicalMotion: Boolean = true
     ): JumpConfidence {
         if (lastLat == 0.0 || timeDeltaMs < 100) return JumpConfidence()
         
@@ -99,7 +98,7 @@ object PhysicsUtils {
         var isAdaptiveJump = false
         
         // Sensor Fusion check
-        val mismatchGate = if (isA15) JUMP_GATE_SENSOR_MISMATCH_A15_MPS else JUMP_GATE_SENSOR_MISMATCH_MPS
+        val mismatchGate = JUMP_GATE_SENSOR_MISMATCH_MPS
         if (!hasPhysicalMotion && speedMps > mismatchGate) { 
             score += JUMP_WEIGHT_SENSOR_MISMATCH
             
@@ -127,7 +126,7 @@ object PhysicsUtils {
         
         val isTier2 = dist >= JUMP_POINT_DISTANCE_THRESHOLD && (speedMps > MAX_PHYSICAL_SPEED_MPS || score >= 40)
         
-        val jitterThreshold = if (isA15) JUMP_GATE_VISUAL_JITTER_A15_METERS else JUMP_GATE_VISUAL_JITTER_METERS
+        val jitterThreshold = JUMP_GATE_VISUAL_JITTER_METERS
         val isTier3 = dist >= jitterThreshold && dist < JUMP_POINT_DISTANCE_THRESHOLD && score >= 30
         
         val isJump = isTier2 || isTier3 || score >= 50

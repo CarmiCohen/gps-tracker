@@ -21,7 +21,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
- * v9.3.11: Issue #059 - Initial implementation for Xiaomi/Samsung resilience.
+ * v9.3.20:
+ * - R405: Samsung Hardening. Unified engine status display and removed A15-specific jitter notes.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,10 +126,9 @@ fun DiagnosticsScreen(
             }
 
             if (isSamsungDevice()) {
-                val s21Note = if (isS21FEDevice()) " (S21 FE Optimization Active)" else ""
-                val a15Note = if (isA15Device()) " (A15 Jitter Filter Active)" else ""
+                val samsungNote = if (isS21FEDevice()) " (S21 FE Optimized)" else " (Standard Hardening)"
                 Text(
-                    text = "Samsung Engine Tuning: ACTIVE$s21Note$a15Note",
+                    text = "Samsung Engine Tuning: ACTIVE$samsungNote",
                     color = Color.Cyan,
                     fontSize = 12.sp
                 )

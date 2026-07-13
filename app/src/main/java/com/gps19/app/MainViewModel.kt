@@ -20,13 +20,8 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * v9.3.18:
- * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
- * v9.3.17:
- * - R403: Startup ANR Remediation. Implemented dynamic heartbeat in startGlobalTimer.
- *   UI refresh rate is relaxed to STARTUP_TICK_INTERVAL_MS (2s) during bootstrap.
- * v9.3.14:
- * - Issue C-068-1: Implemented forced permission refresh to bypass TTL cache.
+ * v9.3.20:
+ * - R405: Samsung A15 Power Hardening. Unified heartbeat to 2s.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -475,9 +470,8 @@ class MainViewModel @Inject constructor(
 
                 updateState { state -> state.copy(isAlarmSilenced = behaviorUseCase.isAlarmSilenced(state.lastAlarmAckTs, now)) }
                 
-                // R403: Dynamic heartbeat for UI timer.
-                val elapsed = now - appStartTime
-                val currentInterval = if (elapsed < BOOTSTRAP_PHASE_MS) STARTUP_TICK_INTERVAL_MS else TICK_INTERVAL_MS
+                // R405: Unified 2s heartbeat for UI timer.
+                val currentInterval = getActiveHeartbeatInterval(0)
                 delay(currentInterval)
             }
         }
@@ -489,14 +483,40 @@ class MainViewModel @Inject constructor(
         if (_uiState.value.appMode == "tracker") _trackerMaxTemp.value = update.maxTemp
 
         updateState { current ->
-            val home = current.homePoints.firstOrNull(); val distToHome = if (home != null) PhysicsUtils.calculateDistance(update.lat, update.lng, home.latitude, home.longitude) else null
+            val home = current.homePoints.firstOrNull()
+            val distToHome = if (home != null) PhysicsUtils.calculateDistance(update.lat, update.lng, home.latitude, home.longitude) else null
             if (!update.isMe) {
-                _remoteSignal.value = update.signal ?: _remoteSignal.value; _trackerCurrentMa.value = update.currentMa
-                current.copy(trackerLocation = telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime), connectivity = current.connectivity.copy(isTrackerConnected = true, lastUpdateTs = nowMs, lastRemoteActivityTs = nowMs), trackerStats = telemetryUseCase.mapStats(update, current.trackerStats), trackerBattery = current.trackerBattery.copy(level = update.battery, temp = update.temp, isCharging = update.isCharging, isChargingStable = update.isCharging), trackerSatsView = update.satsView, trackerSatsUsed = update.satsUsed, distanceTrackerToHome = if (current.appMode == "viewer" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceTrackerToHome, distanceViewerToHome = if (current.appMode == "tracker" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceViewerToHome, distanceTrackerToViewer = if (PhysicsUtils.isValidLocation(current.localLocation.lat, current.localLocation.lng) && PhysicsUtils.isValidLocation(update.lat, update.lng)) PhysicsUtils.calculateDistance(update.lat, update.lng, current.localLocation.lat, current.localLocation.lng) else current.distanceTrackerToViewer, maxTrackerAccuracy = if (current.appMode == "viewer" && update.maxAccuracy > 0.0) update.maxAccuracy else current.maxTrackerAccuracy)
+                _remoteSignal.value = update.signal ?: _remoteSignal.value
+                _trackerCurrentMa.value = update.currentMa
+                current.copy(
+                    trackerLocation = telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime),
+                    connectivity = current.connectivity.copy(isTrackerConnected = true, lastUpdateTs = nowMs, lastRemoteActivityTs = nowMs),
+                    trackerStats = telemetryUseCase.mapStats(update, current.trackerStats),
+                    trackerBattery = if (current.appMode == "tracker") current.trackerBattery.copy(level = update.battery, temp = update.temp, isCharging = update.isCharging, isChargingStable = update.isCharging) else current.trackerBattery,
+                    trackerSatsView = update.satsView,
+                    trackerSatsUsed = update.satsUsed,
+                    distanceTrackerToHome = if (current.appMode == "viewer" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceTrackerToHome,
+                    distanceViewerToHome = if (current.appMode == "tracker" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceViewerToHome,
+                    distanceTrackerToViewer = if (PhysicsUtils.isValidLocation(current.localLocation.lat, current.localLocation.lng) && PhysicsUtils.isValidLocation(update.lat, update.lng)) PhysicsUtils.calculateDistance(update.lat, update.lng, current.localLocation.lat, current.localLocation.lng) else current.distanceTrackerToViewer,
+                    maxTrackerAccuracy = if (current.appMode == "viewer" && update.maxAccuracy > 0.0) update.maxAccuracy else current.maxTrackerAccuracy
+                )
             } else {
-                val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng); val dToOther = if (PhysicsUtils.isValidLocation(current.trackerLocation.lat, current.trackerLocation.lng) && isLocationValid) PhysicsUtils.calculateDistance(current.trackerLocation.lat, current.trackerLocation.lng, update.lat, update.lng) else null
+                val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng)
+                val dToOther = if (PhysicsUtils.isValidLocation(current.trackerLocation.lat, current.trackerLocation.lng) && isLocationValid) PhysicsUtils.calculateDistance(current.trackerLocation.lat, current.trackerLocation.lng, update.lat, update.lng) else null
                 if (current.localLocation.lat != 0.0 && isLocationValid && PhysicsUtils.calculateDistance(current.localLocation.lat, current.localLocation.lng, update.lat, update.lng) > WILD_JUMP_THRESHOLD_METERS) return@updateState current
-                current.copy(localLocation = telemetryUseCase.mapLocalLocation(update, current.localLocation, nowMs, appStartTime), viewerSatsView = if (current.appMode == "viewer") update.satsView else current.viewerSatsView, viewerSatsUsed = if (current.appMode == "viewer") update.satsUsed else current.viewerSatsUsed, trackerSatsView = if (current.appMode == "tracker") update.satsView else current.trackerSatsView, trackerSatsUsed = if (current.appMode == "tracker") update.satsUsed else current.trackerSatsUsed, distanceTrackerToHome = if (current.appMode == "tracker" && isLocationValid) distToHome else current.distanceTrackerToHome, distanceViewerToHome = if (current.appMode == "viewer" && isLocationValid) distToHome else current.distanceViewerToHome, distanceTrackerToViewer = if (isLocationValid) dToOther else current.distanceTrackerToViewer, maxTrackerAccuracy = if (current.appMode == "tracker" && update.maxAccuracy > 0.0) update.maxAccuracy else current.maxTrackerAccuracy, maxViewerAccuracy = if (current.appMode == "viewer" && update.maxAccuracy > 0.0) update.maxAccuracy else current.maxViewerAccuracy, stats = telemetryUseCase.mapStats(update, current.stats))
+                current.copy(
+                    localLocation = telemetryUseCase.mapLocalLocation(update, current.localLocation, nowMs, appStartTime),
+                    viewerSatsView = if (current.appMode == "viewer") update.satsView else current.viewerSatsView,
+                    viewerSatsUsed = if (current.appMode == "viewer") update.satsUsed else current.viewerSatsUsed,
+                    trackerSatsView = if (current.appMode == "tracker") update.satsView else current.trackerSatsView,
+                    trackerSatsUsed = if (current.appMode == "tracker") update.satsUsed else current.trackerSatsUsed,
+                    distanceTrackerToHome = if (current.appMode == "tracker" && isLocationValid) distToHome else current.distanceTrackerToHome,
+                    distanceViewerToHome = if (current.appMode == "viewer" && isLocationValid) distToHome else current.distanceViewerToHome,
+                    distanceTrackerToViewer = if (isLocationValid) dToOther else current.distanceTrackerToViewer,
+                    maxTrackerAccuracy = if (current.appMode == "tracker" && update.maxAccuracy > 0.0) update.maxAccuracy else current.maxTrackerAccuracy,
+                    maxViewerAccuracy = if (current.appMode == "viewer" && update.maxAccuracy > 0.0) update.maxAccuracy else current.maxViewerAccuracy,
+                    stats = telemetryUseCase.mapStats(update, current.stats)
+                )
             }
         }
     }

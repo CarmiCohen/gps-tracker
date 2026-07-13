@@ -20,10 +20,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.3.18:
- * - R404: Legacy Relay URL Fallback Remediation. Synchronized with MainRepository.DEFAULT_RELAY_URL.
- * - R403: Startup ANR Remediation. Integrated centralized getActiveHeartbeatInterval 
- *   to ensure dynamic recovery from 2s (startup) to 1s (standard) heartbeat.
+ * v9.3.20:
+ * - R405: Samsung A15 Power Hardening. Unified heartbeat to 2s and removed 
+ *   device-specific timing branching and A15 flags.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -50,7 +49,6 @@ class TrackerService : BaseMonitorService() {
     
     private var isS21FE = false
     private var isXiaomi = false
-    private var isA15 = false
 
     private var lastGpsFixRealtime = 0L
     private var lastStabilityAuditTs = 0L
@@ -88,7 +86,6 @@ class TrackerService : BaseMonitorService() {
             
             isS21FE = isS21FEDevice()
             isXiaomi = isXiaomiDevice()
-            isA15 = isA15Device()
 
             alarmManager.setListener(object : AppAlarmManager.Listener {
                 override fun onLogEvent(type: String, message: String, important: Boolean, extremeValue: Double?, logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, snr: Double?, vibe: Double?) {
@@ -149,8 +146,7 @@ class TrackerService : BaseMonitorService() {
             syncManager.setOnSyncFinishedListener {
                 muzzleReleaseJob?.cancel()
                 muzzleReleaseJob = lifecycleScope.launch {
-                    val hysteresis = if (isA15) MUZZLE_HYSTERESIS_A15_MS else MUZZLE_HYSTERESIS_MS
-                    delay(hysteresis)
+                    delay(MUZZLE_HYSTERESIS_MS)
                     isMuzzled = false
                 }
             }
@@ -304,14 +300,14 @@ class TrackerService : BaseMonitorService() {
 
     override fun getRequiredTickInterval(): Long {
         val elapsed = timeProvider.elapsedRealtime() - serviceStartRealtime
-        return getActiveHeartbeatInterval(elapsed, isHighResDevice = isA15)
+        return getActiveHeartbeatInterval(elapsed)
     }
 
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
         sensorManager.setHighLoad(integrityMonitor.isCoolingModeActive)
 
-        if (isA15) systemMonitor.renewWakeLock()
+        if (isSamsungDevice()) systemMonitor.renewWakeLock()
 
         if (isXiaomi && lastServiceTickRealtime > 0) {
             val tickGap = nowRealtime - lastServiceTickRealtime
@@ -345,7 +341,7 @@ class TrackerService : BaseMonitorService() {
                 snr = latestGnssDetail?.satellites?.map { it.cn0 }?.average() ?: 0.0,
                 satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0,
                 isViewerTrail = false, lastGpsTs = lastGpsFixRealtime, isLocal = true,
-                isA15 = isA15, isAdaptationMuzzled = isAdaptationMuzzled,
+                isAdaptationMuzzled = isAdaptationMuzzled,
                 nowWall = now, nowRealtime = nowRealtime
             )
             lastProcessedLocation = processed
@@ -433,7 +429,6 @@ class TrackerService : BaseMonitorService() {
 
     companion object {
         private const val MUZZLE_HYSTERESIS_MS = 2000L
-        private const val MUZZLE_HYSTERESIS_A15_MS = 5000L
         private const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 45000L
         private const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
         private const val ALERT_ID_TRACKER_POWER = "TRACKER_POWER"

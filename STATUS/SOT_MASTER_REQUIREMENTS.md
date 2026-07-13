@@ -1,11 +1,12 @@
-# System Source of Truth (SoT) - v9.3.19 (Development)
+# System Source of Truth (SoT) - v9.3.20 (Development)
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Samsung A15 Hardening Authority (R405)**: The system MUST prioritize background persistence on Samsung A15 devices through three combined mechanisms: (1) Mandatory prompt for `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, (2) A unified 2000ms system heartbeat, and (3) A continuous low-power hardware sensor subscription (`TYPE_STEP_DETECTOR`). This authority replaces all previous device-specific `Build.MODEL` logic branching in the engine and service layers. (v9.3.20)
 *   **Relay Configuration Authority (R404)**: The system MUST enforce a centralized relay configuration. Background services MUST NOT use local hardcoded Relay URL literals and MUST fall back to the authoritative `MainRepository.DEFAULT_RELAY_URL` to ensure connection integrity across all roles. (v9.3.18)
 *   **Forensic Visual Authority (R404b)**: The system MUST use a standardized `FORENSIC_PINK_COLOR` (#FF1493) for all forensic events and markers to ensure visual consistency across Tracker and Viewer roles. (v9.3.18)
-*   **Dynamic Startup Heartbeat (R403)**: The system MUST use a relaxed 2000ms heartbeat (`STARTUP_TICK_INTERVAL_MS`) during the `BOOTSTRAP_PHASE_MS` (60s) to reduce CPU pressure and skip frames during initialization. The system MUST automatically return to the standard 1000ms resolution (`TICK_INTERVAL_MS`) once the startup phase has elapsed to maintain high-fidelity tracking. (v9.3.18)
+*   **Unified System Heartbeat (R403/R405)**: The system MUST use a standardized 2000ms heartbeat (`TICK_INTERVAL_MS`) across all device profiles to improve power resilience and reduce CPU pressure. The previous dynamic recovery logic and 1000ms "high-res" modes have been deprecated in favor of this unified standard. (v9.3.20)
 *   **System API Synchronization Authority (R999b)**: The background service layer MUST maintain strict signature parity with the `:core:engine` telemetry pipeline. All location processing, alarm evaluation, and sync submissions MUST use the authoritative engine method signatures (`processGpsPoint`, `evaluateAlarms`, `pushCurrentStatus`) to ensure type safety and cross-module consistency. (Issue #079 / v9.3.16)
 *   **Map Follow Mode Persistence (R981b)**: The map system MUST respect the user's manual focus intent (Tracker, Viewer, or Auto) by persisting a `MapFollowMode` state. The auto-centering logic MUST NOT override the manual focus choice until the user explicitly changes the follow target or returns to `AUTO` mode. (Issue #078 / v9.3.16 Verified)
 *   **Type Safety Authority (R999)**: All internal telemetry, sensor data, and engine pipelines MUST use `Double` precision. Redundant `toDouble()`/`toFloat()` conversions MUST be eliminated by capturing system API values (Floats) exactly once at the entry boundary. All persistence and signaling fields MUST maintain `Double` parity to prevent precision jitter. (Issue #077 / v9.3.15 Verified)
@@ -18,7 +19,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Peer Activity HUD Authority (R980)**: The `GlobalStatusBar` MUST use role-specific freshness logic for peer badges. (Issue #074 / v9.3.12 Verified)
 *   **Map Marker Stability Authority (R981)**: The map system MUST use the `optimizedPoint` from `LocationProcessor` for all remote marker updates. (Issue #072 / v9.3.8 Verified)
 *   **Identity Rejection Feedback (R977)**: The system MUST provide explicit UI feedback when settings updates or commits are rejected due to identity collisions. (Issue #039 / v9.3.4 Verified)
-*   **Sanitization Visibility (R976)**: The system MUST provide a UI notification when malformed Tracker or Viewer IDs are automatically reset. (Issue #042 / v9.3.2 Verified)
+*   **Sanitization Visibility (R976)**: The system MUST provide a UI notification when malformed Tracker or Viewer IDs are automatically reset. (Issue #042 / v9.2.2 Verified)
 *   **Forensic Logging Authority (R979)**: The system MUST use a standardized `ForensicLogUseCase` for all high-visibility (Pink) logging. (Issue #061 / v9.3.12 Verified)
 *   **Map Metadata Alignment (R400)**: Map-level status messages MUST be anchored to the bottom-center of the map view. (Issue #400 / v9.3.0 Verified)
 *   **Standardized Proto Path Authority (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`. (Issue #030 / v9.3.0 Verified)

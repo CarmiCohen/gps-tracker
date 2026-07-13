@@ -31,11 +31,10 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * v9.3.18:
- * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
- * v9.3.17:
- * - R403: Heartbeat Alignment. Replaced hardcoded 1000L with TICK_INTERVAL_MS 
- *   to ensure sensor snapshot recording respects the system heartbeat logic.
+ * v9.3.20:
+ * - R405: Samsung A15 Hardening. Implemented "Stay-Alive" low-power sensor subscription 
+ *   using TYPE_STEP_DETECTOR to maintain process priority on Samsung devices.
+ *   Simplified proximity debouncing by removing device-specific A15 branches.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -54,6 +53,9 @@ class AppSensorManager @Inject constructor(
     private val proximity = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY)
     private val light = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
     private val rotationVector = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+    
+    // R405: "Stay-Alive" sensor for Samsung OOM killer priority
+    private val stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
 
     private var sensorThread: HandlerThread? = null
     private var sensorHandler: Handler? = null
@@ -272,6 +274,9 @@ class AppSensorManager @Inject constructor(
         light?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         rotationVector?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         
+        // R405: Samsung "Stay-Alive" subscription
+        stepDetector?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
+
         displayManager.registerDisplayListener(displayListener, sensorHandler)
         
         // Initialize display state
@@ -328,6 +333,10 @@ class AppSensorManager @Inject constructor(
         val values = event.values
         
         when (event.sensor.type) {
+            Sensor.TYPE_STEP_DETECTOR -> {
+                // R405: Passive "Stay-Alive" pulse. We don't process the step, 
+                // but the event signals activity to the OS.
+            }
             Sensor.TYPE_ACCELEROMETER -> {
                 val v0 = values[0].toDouble()
                 val v1 = values[1].toDouble()
@@ -377,16 +386,11 @@ class AppSensorManager @Inject constructor(
                         return
                     }
 
-                    if (!newValue && isA15Device() && currentLux <= 0.01 && isStationary()) {
-                        Timber.d("Proximity: Suppressing 'Far' transition on A15 in darkness (Stationary Virtual Sensor Protection)")
-                        return
-                    }
-
                     rawProximityNear = newValue
                     proximityJob?.cancel()
                     
                     val baseDebounceMs = if (isStationary()) {
-                        if (isA15Device()) PROXIMITY_DEBOUNCE_STATIONARY_A15_MS else PROXIMITY_DEBOUNCE_STATIONARY_MS
+                        PROXIMITY_DEBOUNCE_STATIONARY_MS
                     } else {
                         PROXIMITY_DEBOUNCE_MOVING_MS
                     }
@@ -554,10 +558,7 @@ class AppSensorManager @Inject constructor(
                                 if (db < internalMinDb) internalMinDb = db
                                 if (db > secPeakDb) secPeakDb = db
 
-                                val vibrationForCoherence = currentVibrationIndex
-                                val isMuzzledByA15Noise = isA15Device() && vibrationForCoherence < 0.01
-
-                                if (!isWarming && !isMuzzledByA15Noise && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) {
+                                if (!isWarming && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) {
                                     val nowRt = timeProvider.elapsedRealtime()
                                     synchronized(this@AppSensorManager) {
                                         if (nowRt - lastAcousticSpikeTs > SPIKE_DEBOUNCE_MS) {

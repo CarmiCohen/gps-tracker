@@ -5,12 +5,8 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * v9.1.8:
- * - Issue #047: Standardized to m/s. Renamed getEstimatedSpeedKph to 
- *   getEstimatedSpeedMps.
- * v8.9.92:
- * - Issue #036: Passed isA15 flag to PhysicsUtils.isVisualJump to enable hardened 
- *   jitter filtering for A15 hardware.
+ * v9.3.20:
+ * - R405: Samsung A15 Hardening. Removed device-specific isA15 branching and simplified thresholds.
  */
 class LocationSentinel {
 
@@ -108,7 +104,6 @@ class LocationSentinel {
         manualAdaptiveFloor: Double = -1.0,
         acousticLockoutTs: Long = 0L,
         isMuzzled: Boolean = false,
-        isA15: Boolean = false,
         nowRealtime: Long,
         nowWall: Long
     ): Boolean {
@@ -179,7 +174,7 @@ class LocationSentinel {
                 val baseAlpha = if (lux < luxBaseline) {
                     if (isStationary()) LUX_EMA_DOWN_SLOW else LUX_EMA_DOWN_FAST
                 } else {
-                    if (isStationary()) LUX_EMA_UP_SLOW else if (isA15) LUX_EMA_UP_FAST_A15 else LUX_EMA_UP_FAST
+                    if (isStationary()) LUX_EMA_UP_SLOW else LUX_EMA_UP_FAST
                 }
                 val alpha = SentinelValidator.accelerateAlpha(baseAlpha, isWarming)
                 luxBaseline = (luxBaseline * (1.0 - alpha)) + (lux * alpha)
@@ -259,7 +254,6 @@ class LocationSentinel {
         bypassBehavioral: Boolean = false,
         isSuspicious: Boolean = false,
         isMuzzled: Boolean = false, 
-        isA15: Boolean = false,
         nowWall: Long,
         nowRealtime: Long,
         acousticFloorDb: Double = -1.0
@@ -304,8 +298,7 @@ class LocationSentinel {
             lastSpeedMps = lastValidSpeedMps,
             isParking = isParking,
             altitudeDelta = altitudeDelta,
-            hasPhysicalMotion = hasPhysicalMotion,
-            isA15 = isA15
+            hasPhysicalMotion = hasPhysicalMotion
         )
         
         var score = jumpConfidence.score
@@ -332,7 +325,7 @@ class LocationSentinel {
         val currentSpeedMps = dist / max(0.1, timeDeltaSec)
         
         val isTier2 = dist >= JUMP_POINT_DISTANCE_THRESHOLD && (currentSpeedMps > MAX_PHYSICAL_SPEED_MPS || augmentedScore >= 40)
-        val isTier3 = dist >= (if (isA15) JUMP_GATE_VISUAL_JITTER_A15_METERS else JUMP_GATE_VISUAL_JITTER_METERS) && dist < JUMP_POINT_DISTANCE_THRESHOLD && augmentedScore >= 30
+        val isTier3 = dist >= JUMP_GATE_VISUAL_JITTER_METERS && dist < JUMP_POINT_DISTANCE_THRESHOLD && augmentedScore >= 30
         
         val finalTier = when {
             jumpConfidence.tier == 1 -> 1
@@ -381,7 +374,7 @@ class LocationSentinel {
                 return SentinelResult(behavioralStatus, finalJumpConfidence.reason, jumpConfidence = finalJumpConfidence)
             }
 
-            val sensorSentinel = runSensorSentinel(lat, lng, alt, accuracy, bearing, nowRealtime, isMuzzled, isA15)
+            val sensorSentinel = runSensorSentinel(lat, lng, alt, accuracy, bearing, nowRealtime, isMuzzled)
             if (sensorSentinel.status != SentinelStatus.VALID) {
                 behavioralStatus = sensorSentinel.status
                 behavioralReason = sensorSentinel.reason
@@ -410,8 +403,7 @@ class LocationSentinel {
     private fun runSensorSentinel(
         lat: Double, lng: Double, alt: Double, accuracy: Double, bearing: Double,
         nowRealtime: Long,
-        isMuzzled: Boolean = false,
-        isA15: Boolean = false
+        isMuzzled: Boolean = false
     ): SentinelResult {
         if (!isMuzzled) {
             if (!isNear) return SentinelResult(SentinelStatus.TAMPER_ALERT, "Proximity Far")
@@ -435,22 +427,7 @@ class LocationSentinel {
 
         val isAcousticLockedOut = (lastFastPathAcousticSpikeTs > 0 && (nowRealtime - lastFastPathAcousticSpikeTs < ACOUSTIC_LOCKOUT_MS))
         
-        if (isA15 && !isMuzzled && !isAcousticLockedOut) {
-            val jump = currentAcousticDb - acousticFloorDb
-            val rawThreshold = ACOUSTIC_THRESHOLD_DB_JUMP
-            val hardenedThreshold = ACOUSTIC_THRESHOLD_DB_JUMP_A15
-            
-            if (jump > rawThreshold && currentAcousticDb >= ACOUSTIC_MIN_THRESHOLD_DB) {
-                if (jump <= hardenedThreshold) {
-                    return SentinelResult(SentinelStatus.VALID, suppressionNote = "Acoustic spike (${String.format(Locale.getDefault(), "%.1f", currentAcousticDb)}dB) muzzled by A15 hardware profile.")
-                }
-                if (currentVibrationIndex < 0.01) {
-                    return SentinelResult(SentinelStatus.VALID, suppressionNote = "Acoustic alert (${String.format(Locale.getDefault(), "%.1f", currentAcousticDb)}dB) suppressed on A15 due to vibration incoherence.")
-                }
-            }
-        }
-
-        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex)) {
+        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb, currentVibrationIndex)) {
             return SentinelResult(SentinelStatus.TAMPER_ALERT, "Acoustic alarm")
         }
 
@@ -458,7 +435,7 @@ class LocationSentinel {
             return SentinelResult(SentinelStatus.SENSOR_SUSPICIOUS, "Vibration suspicion")
         }
         
-        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb, isA15, currentVibrationIndex)) {
+        if (!isMuzzled && !isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb, currentVibrationIndex)) {
             return SentinelResult(SentinelStatus.ACOUSTIC_WARNING, "Acoustic suspicion")
         }
 

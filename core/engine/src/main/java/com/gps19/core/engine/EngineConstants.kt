@@ -3,12 +3,11 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v9.3.20:
+ * - R405: Heartbeat Unification. Standardized TICK_INTERVAL_MS to 2000ms (2s) 
+ *   to simplify logic and improve power resilience across all devices (including A15).
  * v9.3.18:
  * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
- * v9.3.17:
- * - R403: Startup ANR Remediation. centralizing dynamic heartbeat logic.
- *   Introduced STARTUP_TICK_INTERVAL_MS (2s) and DEFAULT_TICK_INTERVAL_MS (2s).
- *   Added getHeartbeatInterval helper for cross-component synchronization.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -189,9 +188,11 @@ const val VIEWER_GPS_POLLING_MS = 1000L
 const val GPS_GAP_THRESHOLD_MS = 60000L
 const val GPS_STALL_THRESHOLD_MS = 60000L
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
-const val TICK_INTERVAL_MS = 1000L
+
+// R405: Unified 2s heartbeat for all devices.
+const val TICK_INTERVAL_MS = 2000L
 const val DEFAULT_TICK_INTERVAL_MS = 2000L 
-const val STARTUP_TICK_INTERVAL_MS = 2000L // R403: Relaxed heartbeat for startup performance
+const val STARTUP_TICK_INTERVAL_MS = 2000L 
 const val TICK_INTERVAL_SLOW_MS = 5000L
 const val UI_PULSE_TIMEOUT_MS = 45000L // Issue #025: Relaxed to 45s to harden FGS transitions
 const val FGS_STICKY_DELAY_MS = 45000L
@@ -209,11 +210,11 @@ const val XIAOMI_BOOT_GRACE_MS = 30000L
 const val LANDING_PAGE_PAUSE_MS = 2000L
 
 /**
- * R403: Returns the active system heartbeat interval based on initialization state.
+ * R405: Returns the unified heartbeat interval.
+ * Device-specific (A15) branching removed in favor of 2s standard + battery optimization.
  */
-fun getActiveHeartbeatInterval(elapsedMs: Long, isHighResDevice: Boolean = true): Long {
-    if (elapsedMs < BOOTSTRAP_PHASE_MS) return STARTUP_TICK_INTERVAL_MS
-    return if (isHighResDevice) TICK_INTERVAL_MS else DEFAULT_TICK_INTERVAL_MS
+fun getActiveHeartbeatInterval(elapsedMs: Long, isHighResDevice: Boolean = false): Long {
+    return TICK_INTERVAL_MS
 }
 
 // Xiaomi Heuristic Recovery (Issue #190)

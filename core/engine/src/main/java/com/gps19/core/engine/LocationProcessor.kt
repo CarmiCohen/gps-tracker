@@ -5,11 +5,10 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * v9.3.20:
+ * - R405 Hardening: Removed redundant isA15 parameters and simplified engine logic.
  * v9.3.16:
  * - Hardening: Added getBaroBaseline() to satisfy R999b synchronization.
- * v9.3.15:
- * - Hardening: Standardized internal math to Double. Streamlined accuracy 
- *   windowing to maintain Double precision (0.1m) without integer rounding jitter.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -117,14 +116,13 @@ class LocationProcessor(
         isSirenActive: Boolean = false, isWarming: Boolean = false,
         manualAdaptiveFloor: Double = -1.0, acousticLockoutTs: Long = 0L,
         isMuzzled: Boolean = false,
-        isA15: Boolean = false,
         nowRealtime: Long = timeProvider.elapsedRealtime(),
         nowWall: Long = timeProvider.currentTimeMillis()
     ): Boolean { 
         val baselineChanged = sentinel.updateSensorState(
             vibration, heading, baroAlt, lux, isNear, powerTamper, tiltDegrees, 
             acousticDb, peakShock, acousticMinDb, peakVerticalVelocity, peakVerticalVelocityTs, plungeMatched, peakVerticalDisplacement,
-            isSirenActive, isWarming, manualAdaptiveFloor, acousticLockoutTs, isMuzzled, isA15, nowRealtime, nowWall
+            isSirenActive, isWarming, manualAdaptiveFloor, acousticLockoutTs, isMuzzled, nowRealtime, nowWall
         )
         if (baselineChanged) {
             listener?.onChairBaselineChanged(sentinel.baselineSitTilt)
@@ -200,7 +198,6 @@ class LocationProcessor(
         providedAcousticLockoutTs: Long = 0L,
         isSuspicious: Boolean = false, 
         isMuzzled: Boolean = false,
-        isA15: Boolean = false,
         isAdaptationMuzzled: Boolean = false,
         nowWall: Long = timeProvider.currentTimeMillis(),
         nowRealtime: Long = timeProvider.elapsedRealtime()
@@ -233,13 +230,13 @@ class LocationProcessor(
         if (accuracy <= HIGH_ACCURACY_THRESHOLD_METERS) { lastHighAccLat = lat; lastHighAccLng = lng; lastHighAccTs = nowWall }
         if (isLocal) updateWindowedAccuracy(accuracy) else if (providedMaxAccuracy > 0.0) maxAccuracy = providedMaxAccuracy
         if (providedAdaptiveVibrationFloor >= 0.0) sentinel.adaptiveVibrationFloor = providedAdaptiveVibrationFloor
-        if (providedAcousticLockoutTs > 0) sentinel.updateSensorState(vibration = -1.0, heading = -1.0, baroAlt = -1000.0, acousticLockoutTs = providedAcousticLockoutTs, isMuzzled = isMuzzled, isA15 = isA15, nowRealtime = nowRealtime, nowWall = nowWall)
+        if (providedAcousticLockoutTs > 0) sentinel.updateSensorState(vibration = -1.0, heading = -1.0, baroAlt = -1000.0, acousticLockoutTs = providedAcousticLockoutTs, isMuzzled = isMuzzled, nowRealtime = nowRealtime, nowWall = nowWall)
 
         val sentinelResult = sentinel.processLocation(
             lat = lat, lng = lng, alt = alt, accuracy = accuracy, maxAccuracy = maxAccuracy, 
             bearing = bearing, snr = snr, satsUsed = satsUsed, timestamp = effectiveTs, 
             bypassBehavioral = !isLocal, isSuspicious = isSuspicious || isAdaptationMuzzled,
-            isMuzzled = isMuzzled, isA15 = isA15, nowWall = nowWall, nowRealtime = nowRealtime
+            isMuzzled = isMuzzled, nowWall = nowWall, nowRealtime = nowRealtime
         )
         
         if (sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED) {
@@ -277,7 +274,7 @@ class LocationProcessor(
 
         if (!isSpatiallyValid) {
             if (shouldSavePoint(isSuspicious || isAdaptationMuzzled, true, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, lat, lng), 0L, maxAccuracy)) listener?.onTrailPointSaved(lat, lng, isViewerTrail, true, effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy)
-            return ProcessedLocation(rawPoint = EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy), optimizedPoint = fallbackPoint, status = finalStatus, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedMps(), timestamp = effectiveTs, isStalled = finalIsStalled, receiptRealtime = nowRealtime, jumpTier = finalJumpTier, isAdaptiveJump = finalIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = false, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer, suppressionNote = if (isAdaptationMuzzled && sentinelResult.status == SentinelStatus.VALID) "Filtering settled during A15 frequency adaptation." else sentinelResult.suppressionNote)
+            return ProcessedLocation(rawPoint = EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy), optimizedPoint = fallbackPoint, status = finalStatus, maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = sentinel.getEstimatedSpeedMps(), timestamp = effectiveTs, isStalled = finalIsStalled, receiptRealtime = nowRealtime, jumpTier = finalJumpTier, isAdaptiveJump = finalIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = false, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer, suppressionNote = sentinelResult.suppressionNote)
         }
 
         val optimized = sentinelResult.optimizedPoint ?: EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy)
@@ -385,7 +382,7 @@ class LocationProcessor(
             maxAccuracy = maxAccuracy, currentAccuracy = accuracy, filteredSpeed = finalFilteredSpeed, timestamp = effectiveTs, isStalled = finalIsStalled, 
             isClockRegression = false, receiptRealtime = nowRealtime, isTrajectoryPromoted = finalIsTrajectoryPromoted,
             jumpTier = finalJumpTier, isAdaptiveJump = finalIsAdaptiveJump, distToHome = lastNearestHomeDistance, isSpatiallyValid = true, geofenceViolationDetected = geofenceViolation, tamperDetected = finalIsTamper, jammerDetected = finalIsJammer, 
-            isAnchorLocked = isAnchorLockedNow, suppressionNote = if (isAdaptationMuzzled) "Settling A15 Polling..." else sentinelResult.suppressionNote
+            isAnchorLocked = isAnchorLockedNow, suppressionNote = sentinelResult.suppressionNote
         )
     }
 

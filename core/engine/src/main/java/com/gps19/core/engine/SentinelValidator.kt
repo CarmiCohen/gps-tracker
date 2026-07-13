@@ -4,9 +4,9 @@ import kotlin.math.abs
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates".
- * v9.3.15:
- * - Hardening: Finalized Double standardization. Eliminated redundant type 
- *   conversions in sentinel gate evaluations.
+ * v9.3.20:
+ * - R405: Samsung A15 Hardening. Removed device-specific isA15 branching. 
+ *   Simplified acoustic validation to a single standard.
  */
 object SentinelValidator {
 
@@ -36,26 +36,21 @@ object SentinelValidator {
     }
 
     /**
-     * Issue #010: A15 Coherence Check.
-     * Confirming that spikes observed during isolation are system-generated.
-     * We require a concurrent vibration floor (> 0.01g) to trust acoustic data on A15.
+     * R405: Unified acoustic validation.
+     * Removed isA15 device-specific coherence checks.
      */
-    fun isAcousticViolated(peakDb: Double, floorDb: Double, isA15: Boolean = false, vibration: Double = 0.0): Boolean {
+    fun isAcousticViolated(peakDb: Double, floorDb: Double, vibration: Double = 0.0): Boolean {
         if (floorDb < 0.0) return false
         val jump = peakDb - floorDb
-        val threshold = if (isA15) ACOUSTIC_THRESHOLD_DB_JUMP_A15 else ACOUSTIC_THRESHOLD_DB_JUMP
-        
-        if (isA15 && vibration < 0.01) return false // Muzzle system-generated noise
+        val threshold = ACOUSTIC_THRESHOLD_DB_JUMP
         
         return jump > threshold && peakDb >= ACOUSTIC_MIN_THRESHOLD_DB
     }
 
-    fun isAcousticSuspicious(peakDb: Double, floorDb: Double, isA15: Boolean = false, vibration: Double = 0.0): Boolean {
+    fun isAcousticSuspicious(peakDb: Double, floorDb: Double, vibration: Double = 0.0): Boolean {
         if (floorDb < 0.0) return false
         val jump = peakDb - floorDb
-        val threshold = if (isA15) (ACOUSTIC_THRESHOLD_DB_JUMP_A15 / 2.0) else ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP
-        
-        if (isA15 && vibration < 0.01) return false // Muzzle system-generated noise
+        val threshold = ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP
 
         return jump > threshold && peakDb >= ACOUSTIC_MIN_THRESHOLD_DB
     }
