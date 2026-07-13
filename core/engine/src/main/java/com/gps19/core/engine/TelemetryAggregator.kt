@@ -4,12 +4,12 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * v9.3.17:
+ * - R403: Heartbeat Alignment. Replaced hardcoded 1000L with TICK_INTERVAL_MS 
+ *   to ensure gap-filling logic respects the system heartbeat configuration.
  * v9.3.12:
  * - Forensic Consolidation (#065): Standardized locationPendingReason priority 
  *   merging to support unified pink logging across modules.
- * v9.2.2:
- * - Issue #326 Fix: Intelligent Uncertainty UX. Implemented priority-based 
- *   locationPendingReason merging to ensure severe reasons (JAMMER) are preserved.
  */
 class TelemetryAggregator {
 
@@ -74,7 +74,7 @@ class TelemetryAggregator {
      */
     fun processPoint(point: EngineConnectionPoint): List<Pair<RibbonScale, EngineConnectionPoint>> {
         val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
-        val totalSeconds = (point.ts / 1000).toInt()
+        val totalSeconds = (point.ts / TICK_INTERVAL_MS).toInt()
 
         RibbonScale.entries.forEach { scale ->
             if (scale == RibbonScale.FOUR_MIN) {
@@ -108,13 +108,13 @@ class TelemetryAggregator {
         baseTemplate: EngineConnectionPoint
     ): List<Pair<RibbonScale, EngineConnectionPoint>> {
         val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
-        var fillTs = lastTickTs + 1000L
+        var fillTs = lastTickTs + TICK_INTERVAL_MS
 
         while (fillTs < now) {
-            val totalSeconds = (fillTs / 1000).toInt()
+            val totalSeconds = (fillTs / TICK_INTERVAL_MS).toInt()
             
-            val resolvedSnr = snrSamples.find { it.ts in fillTs..(fillTs + 999) }?.snr?.let { (it / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) } ?: baseTemplate.snrIdx
-            val snapshot = sensorSamples.find { it.ts in fillTs..(fillTs + 999) }
+            val resolvedSnr = snrSamples.find { it.ts in fillTs..(fillTs + TICK_INTERVAL_MS - 1) }?.snr?.let { (it / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) } ?: baseTemplate.snrIdx
+            val snapshot = sensorSamples.find { it.ts in fillTs..(fillTs + TICK_INTERVAL_MS - 1) }
             
             val resolvedNoise = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: baseTemplate.noiseIdx
             val resolvedLux = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: baseTemplate.luxIdx
@@ -143,7 +143,7 @@ class TelemetryAggregator {
             )
 
             results.addAll(processPoint(fillPoint))
-            fillTs += 1000L
+            fillTs += TICK_INTERVAL_MS
         }
         return results
     }
@@ -160,7 +160,7 @@ class TelemetryAggregator {
         sensorSamples: List<EngineSensorSnapshot>,
         acousticFloor: Double
     ): List<EngineConnectionPoint> {
-        val intervalMs = intervalSeconds * 1000L
+        val intervalMs = intervalSeconds * TICK_INTERVAL_MS
         val maxGapMs = intervalMs * 240
         val effectiveStartTs = maxOf(lastTickTs, now - maxGapMs)
 
@@ -169,7 +169,7 @@ class TelemetryAggregator {
 
         val gapPoints = mutableListOf<EngineConnectionPoint>()
         while (currentTs < now) {
-            val totalSeconds = (currentTs / 1000).toInt()
+            val totalSeconds = (currentTs / TICK_INTERVAL_MS).toInt()
             
             val samplesInInterval = snrSamples.filter { it.ts in currentTs..(currentTs + intervalMs - 1) }
             val resolvedSnr = if (samplesInInterval.isNotEmpty()) {
@@ -224,9 +224,9 @@ class TelemetryAggregator {
     }
 
     private fun alignToInterval(timestamp: Long, intervalSeconds: Int): Long {
-        val totalSec = (timestamp / 1000).toInt()
+        val totalSec = (timestamp / TICK_INTERVAL_MS).toInt()
         val secondsToNextAlignment = (intervalSeconds - (totalSec % intervalSeconds)) % intervalSeconds
-        return timestamp + (secondsToNextAlignment * 1000L)
+        return timestamp + (secondsToNextAlignment * TICK_INTERVAL_MS)
     }
 
     private fun getScaleByKey(key: String) = RibbonScale.entries.find { it.key == key } ?: RibbonScale.FOUR_MIN

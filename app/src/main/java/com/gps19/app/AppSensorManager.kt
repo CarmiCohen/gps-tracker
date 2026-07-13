@@ -31,10 +31,9 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * v9.3.15:
- * - Hardening: Standardized all high-frequency math to Double.
- *   Implemented gravityBufferDouble/geomagneticBufferDouble to eliminate redundant 
- *   toDouble() conversions in the sensor loop.
+ * v9.3.17:
+ * - R403: Heartbeat Alignment. Replaced hardcoded 1000L with TICK_INTERVAL_MS 
+ *   to ensure sensor snapshot recording respects the system heartbeat logic.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -407,7 +406,7 @@ class AppSensorManager @Inject constructor(
                         if (isActive && isProximityNear != rawProximityNear) {
                             isProximityNear = rawProximityNear
                             debouncedProximityCm = value
-                            Timber.d("Proximity state debounced to: $isProximityNear (Cm: $debouncedProximityCm, Debounce: ${calcDebounceMs}ms)")
+                            Timber.d("Proximity state debounced to: $isProximityNear (Cm: $debouncedProximityCm, Decounce: ${calcDebounceMs}ms)")
                         }
                     }
                 }

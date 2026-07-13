@@ -20,16 +20,11 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * v9.3.17:
+ * - R403: Startup ANR Remediation. Implemented dynamic heartbeat in startGlobalTimer.
+ *   UI refresh rate is relaxed to STARTUP_TICK_INTERVAL_MS (2s) during bootstrap.
  * v9.3.14:
  * - Issue C-068-1: Implemented forced permission refresh to bypass TTL cache.
- * v9.3.12:
- * - Hilt Refactor (#066): Standardized injection and lifecycle management.
- * - Temporal Authority (#075): Integrated skew-immune freshness flags.
- * v9.3.11:
- * - Issue #059: Added NavigateToDiagnostics handling and optimized permission refresh interval.
- * v9.3.3:
- * - Issue #039 Identity Rejection Feedback: Implemented handling for 
- *   BulkUpdateSettings and improved error reporting for identity collisions.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -477,7 +472,11 @@ class MainViewModel @Inject constructor(
                 }
 
                 updateState { state -> state.copy(isAlarmSilenced = behaviorUseCase.isAlarmSilenced(state.lastAlarmAckTs, now)) }
-                delay(TICK_INTERVAL_MS)
+                
+                // R403: Dynamic heartbeat for UI timer.
+                val elapsed = now - appStartTime
+                val currentInterval = if (elapsed < BOOTSTRAP_PHASE_MS) STARTUP_TICK_INTERVAL_MS else TICK_INTERVAL_MS
+                delay(currentInterval)
             }
         }
     }

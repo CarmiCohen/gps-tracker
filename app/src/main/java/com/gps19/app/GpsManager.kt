@@ -8,9 +8,7 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.*
 import com.google.android.gms.location.*
-import com.gps19.core.engine.GnssDetail
-import com.gps19.core.engine.SatelliteInfo
-import com.gps19.core.engine.TimeProvider
+import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
@@ -22,10 +20,9 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Manages hardware GPS and GNSS status.
- * v9.0.1:
- * - Issue Fix: Removed setWaitForAccurateLocation(true) to prevent location suppression 
- *   in poor signal environments. 
- * - Added initial lastLocation delivery to speed up UI responsiveness.
+ * v9.3.17:
+ * - R403: Heartbeat Alignment. Replaced hardcoded 1000L with TICK_INTERVAL_MS 
+ *   to ensure SNR sampling rate respects the system heartbeat configuration.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -52,7 +49,7 @@ class GpsManager @Inject constructor(
     private val _gnssDetailFlow = MutableStateFlow<GnssDetail?>(null)
     val gnssDetailFlow: StateFlow<GnssDetail?> = _gnssDetailFlow.asStateFlow()
 
-    private val pollIntervalFlow = MutableStateFlow(1000L)
+    private val pollIntervalFlow = MutableStateFlow(TICK_INTERVAL_MS)
 
     private val gnssStatusCallback = object : GnssStatus.Callback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
@@ -83,7 +80,7 @@ class GpsManager @Inject constructor(
             satellitesUsed = used
             averageSnr = if (snrCount > 0) snrSum / snrCount else 0.0
             
-            if (now - lastBufferRecordTs >= 1000L) {
+            if (now - lastBufferRecordTs >= TICK_INTERVAL_MS) {
                 val snrToStore = if (secMinSnrAccumulator > 99.0) averageSnr else secMinSnrAccumulator
                 snrBuffer.add(now to snrToStore)
                 lastBufferRecordTs = now

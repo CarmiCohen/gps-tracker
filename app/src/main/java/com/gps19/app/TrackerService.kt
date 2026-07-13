@@ -21,16 +21,11 @@ import kotlin.math.*
 /**
  * TrackerService: The "Black Box" background process.
  * v9.3.17:
- * - R403: Startup ANR Remediation. Relaxed tick interval to TICK_INTERVAL_MS (2s) 
- *   for all devices including A15 to skip startup frames and ensure stability.
+ * - R403: Startup ANR Remediation. Integrated centralized getActiveHeartbeatInterval 
+ *   to ensure dynamic recovery from 2s (startup) to 1s (standard) heartbeat.
  * v9.3.16:
  * - Issue #078: Map Centering Follow Conflict. Updated system state parity 
  *   to respect MapFollowMode (TRACKER, VIEWER, AUTO) intent.
- * - Issue #079: API Synchronization. Resolved compilation errors by aligning 
- *   with engine component signatures. Standardized barometer EMA usage.
- * v9.3.15:
- * - Hardening: Capturing Double conversions once in onLocationChanged to 
- *   eliminate redundant boundary casting.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -309,7 +304,10 @@ class TrackerService : BaseMonitorService() {
         return type
     }
 
-    override fun getRequiredTickInterval(): Long = TICK_INTERVAL_MS
+    override fun getRequiredTickInterval(): Long {
+        val elapsed = timeProvider.elapsedRealtime() - serviceStartRealtime
+        return getActiveHeartbeatInterval(elapsed, isHighResDevice = isA15)
+    }
 
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)

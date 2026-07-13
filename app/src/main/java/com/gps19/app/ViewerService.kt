@@ -18,11 +18,8 @@ import kotlin.math.*
 /**
  * ViewerService: Background monitoring for the Viewer role.
  * v9.3.17:
- * - R403: Startup ANR Remediation. Relaxed tick interval to TICK_INTERVAL_MS (2s) 
- *   to skip startup frames and ensure stability.
- * v9.3.15:
- * - Hardening: Capturing Double conversions once in onLocationChanged to 
- *   eliminate redundant boundary casting.
+ * - R403: Startup ANR Remediation. Integrated dynamic heartbeat logic and 
+ *   centralized stability audit thresholds.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -197,13 +194,16 @@ class ViewerService : BaseMonitorService() {
         val acc = location.accuracy.toDouble()
         val bearing = location.bearing.toDouble()
 
-        if (VIEWER_GPS_POLLING_MS == 1000L && lastGpsFixRealtime > 0) {
+        // R403: Stability Audit Alignment
+        val currentHeartbeat = getRequiredTickInterval()
+        if (VIEWER_GPS_POLLING_MS == TICK_INTERVAL_MS && lastGpsFixRealtime > 0) {
             val gap = nowRealtime - lastGpsFixRealtime
             stabilityAuditFixCount++
-            if (gap > 1200L) {
+            // Tolerate jitter based on the current active heartbeat
+            if (gap > currentHeartbeat + GPS_STABILITY_GAP_THRESHOLD_MS) {
                 stabilityAuditViolationCount++
                 val proc = lastProcessedLocation
-                logManager.logServiceEvent("STABILITY GAP (V): ${gap}ms detected during 1Hz polling.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                logManager.logServiceEvent("STABILITY GAP (V): ${gap}ms detected during logic pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
                     lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = acc)
             }
         }
@@ -329,6 +329,8 @@ class ViewerService : BaseMonitorService() {
     }
     
     override fun getRequiredTickInterval(): Long {
+        val elapsed = timeProvider.elapsedRealtime() - serviceStartRealtime
+        if (elapsed < BOOTSTRAP_PHASE_MS) return STARTUP_TICK_INTERVAL_MS
         return if (isUiVisible()) TICK_INTERVAL_MS else TICK_INTERVAL_SLOW_MS
     }
 

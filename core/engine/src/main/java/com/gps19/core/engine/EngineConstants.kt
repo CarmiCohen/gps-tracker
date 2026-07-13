@@ -4,14 +4,9 @@ package com.gps19.core.engine
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
  * v9.3.17:
- * - R403: Startup ANR Remediation. Increased TICK_INTERVAL_MS from 1s to 2s 
- *   to reduce startup frame pressure and eliminate ANRs during initialization.
- * v9.3.13:
- * - Issue #062: Dynamic Anchor Breakout. Added constants for displacement-weighted 
- *   monitor to prevent "sticky anchors".
- * v9.2.9:
- * - R994: Screen-Off Optimization. Introduced SCREEN_OFF_GPS_POLLING_MS (5000ms) 
- *   to reduce power consumption during background tracking.
+ * - R403: Startup ANR Remediation. centralizing dynamic heartbeat logic.
+ *   Introduced STARTUP_TICK_INTERVAL_MS (2s) and DEFAULT_TICK_INTERVAL_MS (2s).
+ *   Added getHeartbeatInterval helper for cross-component synchronization.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -192,7 +187,9 @@ const val VIEWER_GPS_POLLING_MS = 1000L
 const val GPS_GAP_THRESHOLD_MS = 60000L
 const val GPS_STALL_THRESHOLD_MS = 60000L
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
-const val TICK_INTERVAL_MS = 2000L // R403: Relaxed from 1s to 2s to prevent startup ANR
+const val TICK_INTERVAL_MS = 1000L
+const val DEFAULT_TICK_INTERVAL_MS = 2000L 
+const val STARTUP_TICK_INTERVAL_MS = 2000L // R403: Relaxed heartbeat for startup performance
 const val TICK_INTERVAL_SLOW_MS = 5000L
 const val UI_PULSE_TIMEOUT_MS = 45000L // Issue #025: Relaxed to 45s to harden FGS transitions
 const val FGS_STICKY_DELAY_MS = 45000L
@@ -208,6 +205,14 @@ const val GPS_REVIVAL_RETRY_INTERVAL_MS = 120000L
 const val MAX_REVIVAL_ATTEMPTS = 3
 const val XIAOMI_BOOT_GRACE_MS = 30000L
 const val LANDING_PAGE_PAUSE_MS = 2000L
+
+/**
+ * R403: Returns the active system heartbeat interval based on initialization state.
+ */
+fun getActiveHeartbeatInterval(elapsedMs: Long, isHighResDevice: Boolean = true): Long {
+    if (elapsedMs < BOOTSTRAP_PHASE_MS) return STARTUP_TICK_INTERVAL_MS
+    return if (isHighResDevice) TICK_INTERVAL_MS else DEFAULT_TICK_INTERVAL_MS
+}
 
 // Xiaomi Heuristic Recovery (Issue #190)
 const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 15000L

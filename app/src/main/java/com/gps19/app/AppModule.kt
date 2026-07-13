@@ -106,17 +106,6 @@ abstract class AppModule {
 
         @Provides
         @Singleton
-        fun provideSessionManager(
-            repository: MainRepository, 
-            @ApplicationScope scope: CoroutineScope, 
-            logManager: LogManager,
-            timeProvider: TimeProvider
-        ): SessionManager {
-            return SessionManager(repository, scope, logManager, timeProvider)
-        }
-
-        @Provides
-        @Singleton
         fun provideLocationProcessor(timeProvider: TimeProvider): LocationProcessor {
             return LocationProcessor(timeProvider)
         }
