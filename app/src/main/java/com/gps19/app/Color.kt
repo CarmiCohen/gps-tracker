@@ -15,7 +15,8 @@ import androidx.compose.ui.graphics.Color
  * - R866 [Active]: Added BrandJd (#367C2B) to synchronize with colors.xml.
  */
 
-const val FORENSIC_PINK_COLOR = 0xFFF472B6.toInt()
+// Forensic Authority: Standardized to DeepPink for high-visibility event marking.
+const val FORENSIC_PINK_COLOR = 0xFFFF1493.toInt()
 
 // Brand Colors
 val BrandJdVivid = Color(0xFF78BE20) // JD Vivid Green (R799e)

@@ -21,11 +21,9 @@ import kotlin.math.*
 /**
  * TrackerService: The "Black Box" background process.
  * v9.3.17:
+ * - R404: Legacy Relay URL Fallback Remediation. Synchronized with MainRepository.DEFAULT_RELAY_URL.
  * - R403: Startup ANR Remediation. Integrated centralized getActiveHeartbeatInterval 
  *   to ensure dynamic recovery from 2s (startup) to 1s (standard) heartbeat.
- * v9.3.16:
- * - Issue #078: Map Centering Follow Conflict. Updated system state parity 
- *   to respect MapFollowMode (TRACKER, VIEWER, AUTO) intent.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -85,7 +83,7 @@ class TrackerService : BaseMonitorService() {
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
             configManager.deviceId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
             configManager.viewerId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
-            configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, DEFAULT_RELAY_URL)
+            configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
             configManager.isTrackerMode = true
             
             isS21FE = isS21FEDevice()
@@ -439,7 +437,5 @@ class TrackerService : BaseMonitorService() {
         private const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 45000L
         private const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
         private const val ALERT_ID_TRACKER_POWER = "TRACKER_POWER"
-        private const val DEFAULT_RELAY_URL = "https://relay.gps19.com"
-        private const val FORENSIC_PINK_COLOR = 0xFFFF1493.toInt()
     }
 }

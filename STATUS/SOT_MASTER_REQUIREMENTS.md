@@ -3,6 +3,8 @@
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Relay Configuration Authority (R404)**: The system MUST enforce a centralized relay configuration. Background services MUST NOT use local hardcoded Relay URL literals and MUST fall back to the authoritative `MainRepository.DEFAULT_RELAY_URL` to ensure connection integrity across all roles. (v9.3.17)
+*   **Forensic Visual Authority (R404b)**: The system MUST use a standardized `FORENSIC_PINK_COLOR` (#FF1493) for all forensic events and markers to ensure visual consistency across Tracker and Viewer roles. (v9.3.17)
 *   **Dynamic Startup Heartbeat (R403)**: The system MUST use a relaxed 2000ms heartbeat (`STARTUP_TICK_INTERVAL_MS`) during the `BOOTSTRAP_PHASE_MS` (60s) to reduce CPU pressure and skip frames during initialization. The system MUST automatically return to the standard 1000ms resolution (`TICK_INTERVAL_MS`) once the startup phase has elapsed to maintain high-fidelity tracking. (v9.3.17)
 *   **System API Synchronization Authority (R999b)**: The background service layer MUST maintain strict signature parity with the `:core:engine` telemetry pipeline. All location processing, alarm evaluation, and sync submissions MUST use the authoritative engine method signatures (`processGpsPoint`, `evaluateAlarms`, `pushCurrentStatus`) to ensure type safety and cross-module consistency. (Issue #079 / v9.3.16)
 *   **Map Follow Mode Persistence (R981b)**: The map system MUST respect the user's manual focus intent (Tracker, Viewer, or Auto) by persisting a `MapFollowMode` state. The auto-centering logic MUST NOT override the manual focus choice until the user explicitly changes the follow target or returns to `AUTO` mode. (Issue #078 / v9.3.16 Verified)
@@ -26,4 +28,3 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **HUD Context Mapping Authority (R049)**: The `GlobalStatusBar` MUST implement mode-aware telemetry binding. (Issue #049 / v9.2.6 Verified)
 *   **HUD Local Health Standardization (R991)**: The top-level HUD status badges MUST reflect the Local Health. (Issue #044 / v9.2.3 Verified)
 *   **Intelligent Uncertainty UX (R326)**: The system MUST provide specific contextual reasons for Bayesian uncertainty expansion. (Issue #326 / v9.2.2 Verified)
-... [Historical requirements omitted for brevity]

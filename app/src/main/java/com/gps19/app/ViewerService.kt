@@ -18,6 +18,7 @@ import kotlin.math.*
 /**
  * ViewerService: Background monitoring for the Viewer role.
  * v9.3.17:
+ * - R404: Legacy Relay URL Fallback Remediation. Synchronized with MainRepository.DEFAULT_RELAY_URL.
  * - R403: Startup ANR Remediation. Integrated dynamic heartbeat logic and 
  *   centralized stability audit thresholds.
  */
@@ -69,7 +70,7 @@ class ViewerService : BaseMonitorService() {
             
             configManager.deviceId = trackerId
             configManager.viewerId = viewerId
-            configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, DEFAULT_RELAY_URL)
+            configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
             configManager.isTrackerMode = false
 
             alarmManager.setListener(object : AppAlarmManager.Listener {
