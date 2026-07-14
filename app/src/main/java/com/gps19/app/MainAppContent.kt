@@ -41,11 +41,10 @@ import kotlinx.coroutines.delay
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * v9.3.11:
- * - Issue #059: Integrated DiagnosticsScreen into NavHost and handled overlay visibility.
- * v9.3.0:
- * - Issue #042: Sanitization Visibility. Added AlertDialog to notify user 
- *   when malformed IDs are automatically reset.
+ * v9.3.36:
+ * - Issue #092: Refined Landing Page logic. 2s delay (LANDING_PAGE_PAUSE_MS) now 
+ *   applies only to automatic mode restoration. Manual selection is immediate.
+ * - Performance: Resolved redundant Service launch sequence.
  */
 @Composable
 fun MainAppContent(
@@ -86,6 +85,7 @@ fun MainAppContent(
     }
 
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
+    var isManualSelectionInProgress by remember { mutableStateOf(false) }
 
     // Navigation logic based on app mode and diagnostics visibility
     LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible) {
@@ -102,8 +102,8 @@ fun MainAppContent(
         }
 
         if (mode != null) {
-            // R926: Mandatory transition delay (LANDING_PAGE_PAUSE_MS) and Service Launch Integrity
-            if (navController.currentDestination?.route == Screen.Landing.route) {
+            // R926/Issue #092: 2s delay applies only to automatic restoration (cold boot with saved mode)
+            if (navController.currentDestination?.route == Screen.Landing.route && !isManualSelectionInProgress) {
                 delay(LANDING_PAGE_PAUSE_MS)
                 onStartService(mode)
             }
@@ -121,6 +121,7 @@ fun MainAppContent(
                 }
             }
             null -> {
+                isManualSelectionInProgress = false
                 if (navController.currentDestination?.route != Screen.Landing.route) {
                     navController.navigate(Screen.Landing.route) { popUpTo(0) { inclusive = true } }
                 }
@@ -155,11 +156,13 @@ fun MainAppContent(
     val backgroundPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) {
             viewModel.pendingMode?.let { mode ->
+                isManualSelectionInProgress = true
                 viewModel.onEvent(UiEvent.SetAppMode(mode))
                 onStartService(mode)
                 viewModel.pendingMode = null
             }
         } else {
+            isManualSelectionInProgress = false
             Toast.makeText(activity, context.getString(R.string.perm_background_denied_toast), Toast.LENGTH_LONG).show()
         }
     }
@@ -182,7 +185,7 @@ fun MainAppContent(
 
     if (showBackgroundDisclosure) {
         AlertDialog(
-            onDismissRequest = { showBackgroundDisclosure = false },
+            onDismissRequest = { showBackgroundDisclosure = false; isManualSelectionInProgress = false },
             title = { Text(stringResource(R.string.perm_background_title)) },
             text = { Text(stringResource(R.string.perm_background_desc)) },
             confirmButton = {
@@ -193,7 +196,12 @@ fun MainAppContent(
                     }
                 }) { Text(stringResource(R.string.perm_background_btn_accept)) }
             },
-            dismissButton = { Button(onClick = { showBackgroundDisclosure = false }) { Text(stringResource(R.string.perm_background_btn_reject)) } }
+            dismissButton = { 
+                Button(onClick = { 
+                    showBackgroundDisclosure = false
+                    isManualSelectionInProgress = false
+                }) { Text(stringResource(R.string.perm_background_btn_reject)) } 
+            }
         )
     }
 
@@ -231,11 +239,14 @@ fun MainAppContent(
                         LandingScreen { mode -> 
                             if (hasRequiredPermissions(mode)) { 
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                                    isManualSelectionInProgress = true
                                     viewModel.pendingMode = mode; showBackgroundDisclosure = true
                                 } else {
+                                    isManualSelectionInProgress = true
                                     viewModel.onEvent(UiEvent.SetAppMode(mode)); onStartService(mode)
                                 }
                             } else { 
+                                isManualSelectionInProgress = true
                                 viewModel.pendingMode = mode; checkAndRequestPermissions(mode)
                             } 
                         }
@@ -311,7 +322,7 @@ fun MainAppContent(
                 if (uiState.navigation.isPhoneSetupVisible) {
                     PhoneSetupOverlay(
                         onClose = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)) }, 
-                        onWhitelist = { onRequestBatteryExemption() }, 
+                        onWhitelist = { onRequestBatteryExemption() },
                         onOverlay = { onRequestOverlayPermission() }, 
                         onAppInfo = { onRequestAppInfo() },
                         onExactAlarm = { onRequestExactAlarm() },

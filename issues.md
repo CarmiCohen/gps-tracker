@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (v9.3.25)
+# Project Issues & Hardening Tracking (v9.3.36)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Resolution Archive](STATUS/RESOLUTION_ARCHIVE.md), and validation tasks are in [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 282 |
+| **Resolved (Total)** | 🟢 Progress | 283 |
 
 ---
 
@@ -18,6 +18,14 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ## 🔴 Open Issues
 *No open technical issues.*
+
+---
+
+## 🟢 Recently Resolved Issues (v9.3.36)
+*   **Issue #092**: Landing Page Responsiveness & Redundant Service Startup.
+    *   Eliminated mandatory 2s delay for manual role selection in `MainAppContent.kt`.
+    *   Optimized `LaunchedEffect` to prevent redundant service calls during manual selection.
+    *   Formalized requirement **R925** in `SOT_MASTER_REQUIREMENTS.md`.
 
 ---
 
