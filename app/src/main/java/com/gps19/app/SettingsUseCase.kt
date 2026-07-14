@@ -11,16 +11,16 @@ import javax.inject.Singleton
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
  * Handles draft lifecycle, atomic commits, and full system resets.
+ * v9.3.27:
+ * - Performance (#092): Refactored loadAllSettings to use getSettingsSnapshot() 
+ *   and SettingsMapper, reducing startup I/O from ~15 reads to 1.
  * v9.3.3:
- * - Issue #039 Identity Rejection Feedback: Added bulkUpdateSettings to support 
- *   atomic updates with validation from external sources.
- * v9.3.0:
- * - Issue #042: Sanitization Visibility. Added identitySanitized to InitialSettings 
- *   and loadAllSettings to inform UI of automatic ID resets.
+ * - Issue #039 Identity Rejection Feedback: Added bulkUpdateSettings.
  */
 @Singleton
 class SettingsUseCase @Inject constructor(
     private val repository: MainRepository,
+    private val settingsRepository: SettingsRepository,
     private val timeProvider: TimeProvider,
     private val logManager: LogManager
 ) {
@@ -68,43 +68,39 @@ class SettingsUseCase @Inject constructor(
     }
 
     suspend fun loadAllSettings(): InitialSettings = withContext(Dispatchers.IO) {
-        val dId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
-        val vId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
-        val rUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
+        val s = settingsRepository.getSettingsSnapshot()
         
-        val maxDist = repository.getDouble(MainRepository.MAX_DISTANCE_STORAGE_KEY, MainRepository.DEFAULT_MAX_DISTANCE)
-        val hPoints = repository.loadHomePoints()
-        val aSettings = repository.loadAlertSettings()
-        val mMode = repository.getAppMode()
-        val sSiren = repository.getString(MainRepository.SELECTED_SIREN_KEY, "Siren")
-        val lAlarmAck = repository.getLastAlarmAckTs()
-        val lMaxTemp = repository.getDouble(MainRepository.MAX_TEMP_KEY, 0.0)
-        val sanitized = repository.getBoolean(MainRepository.IDENTITY_SANITIZED_KEY, false)
+        val dId = s.trackerId.ifEmpty { SettingsRepository.DEFAULT_TRACKER_ID }
+        val vId = s.viewerId.ifEmpty { SettingsRepository.DEFAULT_VIEWER_ID }
+        val rUrl = s.relayUrl.ifEmpty { SettingsRepository.DEFAULT_RELAY_URL }
         
-        var appStartTime = repository.getLong(MainRepository.APP_START_TIME_KEY, 0L)
+        val maxDist = if (s.maxDistance > 0.0) s.maxDistance else SettingsRepository.DEFAULT_MAX_DISTANCE
+        val hPoints = s.homePointsList.map { org.osmdroid.util.GeoPoint(it.lat, it.lng) }
+        val aSettings = SettingsMapper.protoToAlertSettings(s.alertSettings)
+        val mMode = s.appMode.ifEmpty { null }
+        val sSiren = s.selectedSiren.ifEmpty { "Siren" }
+        val lAlarmAck = s.lastAlarmAckTs
+        val lMaxTemp = s.maxTemp
+        val sanitized = s.identitySanitized
+        
+        var appStartTime = s.appStartTime
         if (appStartTime == 0L) {
             appStartTime = timeProvider.currentTimeMillis()
             repository.saveLong(MainRepository.APP_START_TIME_KEY, appStartTime)
         }
 
-        val draftAlerts = repository.loadDraftAlertSettings()
-        val draftDId = repository.getString(MainRepository.DRAFT_TRACKER_ID, "")
-        val draftVId = repository.getString(MainRepository.DRAFT_VIEWER_ID, "")
-        val draftRUrl = repository.getString(MainRepository.DRAFT_RELAY_URL, "")
-        val draftMaxDist = repository.getDouble(MainRepository.DRAFT_MAX_DISTANCE, 0.0)
-        
         var draftSettings: DraftSettings? = null
-        if (draftDId.isNotEmpty() || draftVId.isNotEmpty() || draftRUrl.isNotEmpty() || draftMaxDist > 0 || draftAlerts != null) {
+        if (s.hasDraftTrackerId() || s.hasDraftViewerId() || s.hasDraftRelayUrl() || s.draftMaxDistance > 0 || s.hasDraftAlertSettings()) {
             draftSettings = DraftSettings(
-                deviceId = if (draftDId.isNotEmpty()) draftDId else dId,
-                viewerId = if (draftVId.isNotEmpty()) draftVId else vId,
-                relayUrl = if (draftRUrl.isNotEmpty()) draftRUrl else rUrl,
-                maxDistance = if (draftMaxDist > 0) draftMaxDist.toInt().toString() else if (maxDist > 0) maxDist.toInt().toString() else "",
-                alertSettings = draftAlerts ?: aSettings
+                deviceId = if (s.hasDraftTrackerId()) s.draftTrackerId else dId,
+                viewerId = if (s.hasDraftViewerId()) s.draftViewerId else vId,
+                relayUrl = if (s.hasDraftRelayUrl()) s.draftRelayUrl else rUrl,
+                maxDistance = if (s.draftMaxDistance > 0) s.draftMaxDistance.toInt().toString() else if (maxDist > 0) maxDist.toInt().toString() else "",
+                alertSettings = if (s.hasDraftAlertSettings()) SettingsMapper.protoToAlertSettings(s.draftAlertSettings) else aSettings
             )
         }
 
-        val trackerStatus = repository.loadTrackerState()
+        val trackerStatus = if (s.hasTrackerState()) SettingsMapper.mapTrackerStatusFromProto(s.trackerState) else null
 
         InitialSettings(
             deviceId = dId, viewerId = vId, relayUrl = rUrl, maxDistance = maxDist,

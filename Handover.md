@@ -1,40 +1,32 @@
-# Project Handover: Samsung A15 Hardening & Cross-Version Signaling (v9.3.25)
+# Project Handover: GPS Tracker Forensic Status
 
-## 📌 Status Summary
-This document provides a comprehensive forensic snapshot of the project as of **v9.3.25**. The current cycle has optimized high-frequency telemetry via binary Protobuf activation, hardened background persistence for the Samsung A15, and eliminated redundant logcat noise.
+## Current Status (v9.3.29)
+The application has undergone a series of "Forensic Hardening" fixes to resolve critical startup ANRs and landing page hangs. The system is currently stable, deployed, and tracking.
 
-### 1. Architectural Baseline (v9.3.25)
-- **Deployment Device**: Samsung Galaxy A15 (SM-A155F / R58X40GV2AR)
-- **Current Role**: Tracker Mode
-- **Standardized Heartbeat**: 2000ms (TICK_INTERVAL_MS)
-- **Relay Endpoint**: `https://gps-survival-relay.onrender.com`
+## Critical Fixes Applied
 
-### 2. Major Resolutions (v9.3.25)
+### 1. ANR & Thread Congestion (Issue #092)
+- **Problem:** `SettingsRepository` returned `0` for unset timestamps. `TelemetryAggregator` used these in `while` loops to backfill gaps from 1970 to the present on the main thread, causing an infinite-loop-like hang.
+- **Solution:** 
+    - Corrected default value handling in `SettingsRepository.kt`.
+    - Added a safety cap of **1,000 points** to backfill loops in `TelemetryAggregator.kt`.
+    - Implemented `getSettingsSnapshot()` in `SettingsRepository` to reduce startup I/O from ~15 reads down to a single cycle.
 
-#### 🚀 Binary Telemetry Activation (R988)
-- **Optimized Protocol**: Migrated `trackerState` and `locationPendingReason` to Protobuf Enums. Activated `location_update_bin` for all tracker transmissions, reducing bandwidth by ~70%.
-- **Binary Routing**: Updated `relay-server/index.js` to route binary packets using an explicit `routingId`, bypassing server-side decoding.
+### 2. Architecture & Performance
+- **SettingsMapper:** Created `SettingsMapper.kt` to handle all Proto <-> Domain model conversions, decoupling DataStore implementation from business logic.
+- **MainViewModel Hardening:** Offloaded permission state polling (which involves synchronous system IPC calls) to `Dispatchers.IO` to keep the UI thread responsive.
+- **Startup Guard:** Added initialization checks to the `startGlobalTimer` loop to prevent background logic from firing before the app is fully ready.
 
-#### 🛡️ Samsung A15 Persistence (R405)
-- **Stay-Alive Fallback**: Implemented a passive accelerometer pulse in `AppSensorManager.kt` to maintain process priority on A15 variants without hardware step detectors.
-- **Service Hardening**: Standardized WakeLock renewal in both `TrackerService` and `ViewerService`.
+### 3. Forensic Parity
+- **Tracker Telemetry:** Integrated `historyManager.updateRibbons` into `TrackerService.kt`. Telemetry recording is now active in both Tracker and Viewer modes.
+- **Samsung Hardening:** Added `Mutex` to `SystemStatusProvider` to prevent IPC congestion on devices that log excessively during permission checks (A15/G990).
 
-#### 🧹 Logcat Forensic Integrity (R996)
-- **Noise Elimination**: Cached `PowerManager`, `BatteryManager`, and `UsageStatsManager` in `IntegrityMonitor` and `SystemMonitor`.
-- **Throttled Polling**: Implemented a 10s TTL for system status polling and a 5m TTL for WakeLock renewals to eliminate repetitive `getPackageName` system logs.
+## Environment Info
+- **Project Root:** `C:/CCwork/Android Projects/gps-tracker`
+- **Modules:** `:app` (Android), `:core:engine` (Kotlin)
+- **Primary Device:** Samsung A15 (R58X40GV2AR)
 
-#### 🛠️ UI & Identity (R182b)
-- **Refined Feedback**: Enhanced ID collision errors to explicitly mention reserved legacy aliases (`T`, `V`, `Trk`, `viewer`).
-
-### 3. Active Status
-- **Relay Status**: Connected (Binary routing verified).
-- **Samsung A15**: Process persistence confirmed via throttled WakeLock strategy and Stay-Alive fallback.
-- **Build Status**: Verified (assembleDebug successful).
-
-### 4. Remaining Tasks for v9.3.26
-- [ ] **GPS Optimization**: Review `GpsManager.kt` for any remaining high-frequency system API calls that trigger logcat noise.
-
-### 📂 Key Modified Files
-- `relay-server`: `index.js`
-- `app`: `CommunicationManager.kt`, `AppNetworkManager.kt`, `SettingsRepository.kt`, `AppSensorManager.kt`, `ViewerService.kt`, `IntegrityMonitor.kt`, `SystemMonitor.kt`, `Models.kt`
-- `core:engine`: `app_settings.proto`, `SOT_MASTER_REQUIREMENTS.md`
+## Next Steps for New Chat
+1. **Validation:** Verify that `historyManager` batch writes are not hitting the 500ms warning threshold in Tracker mode.
+2. **UI:** Monitor the transition from Landing -> Tracker/Viewer to ensure the 2s delay (`LANDING_PAGE_PAUSE_MS`) remains sufficient for DataStore stabilization.
+3. **Identity:** Check for any "Identity Collision" errors in logs, as the new `SettingsRepository` logic enforces stricter alphanumeric uniqueness.

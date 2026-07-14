@@ -56,7 +56,7 @@ class IntegrityMonitor @Inject constructor(
     private val sustainedViolations = mutableMapOf<String, Long>()
     
     var batteryTemp = 0.0
-    var batteryLevel = -1
+    private var _batteryLevel = -1
     var isPowerTamperDetected = false
     private var lastPowerDisconnectTs = 0L
 
@@ -87,11 +87,11 @@ class IntegrityMonitor @Inject constructor(
         private set
 
     fun getBatteryLevel(): Int {
-        if (batteryLevel == -1) {
+        if (_batteryLevel == -1) {
             val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            batteryLevel = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            _batteryLevel = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         }
-        return batteryLevel
+        return _batteryLevel
     }
 
     fun getBatteryCurrent(): Int {
@@ -121,15 +121,15 @@ class IntegrityMonitor @Inject constructor(
                 listener?.onLogEvent("System Info: Thermal limit recovered (${batteryTemp}°C). Normal tracking resumed.", false)
             }
 
-            batteryLevel = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            _batteryLevel = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
             val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
             isCharging = plugged > 0
 
             if (isCharging) onPowerConnected() else onPowerDisconnected()
 
-            if (batteryLevel != -1 && !isCharging) {
+            if (_batteryLevel != -1 && !isCharging) {
                 if (nowRealtime - lastBatteryCheckTs > 60000L) {
-                    batterySamples.add(nowRealtime to batteryLevel)
+                    batterySamples.add(nowRealtime to _batteryLevel)
                     lastBatteryCheckTs = nowRealtime
                     checkBatteryDischarge(nowRealtime)
                 }
@@ -323,5 +323,6 @@ class IntegrityMonitor @Inject constructor(
         isBatterySteepDischarge = false
         isCoolingModeActive = false
         lastFullPollTs = 0L
+        _batteryLevel = -1
     }
 }

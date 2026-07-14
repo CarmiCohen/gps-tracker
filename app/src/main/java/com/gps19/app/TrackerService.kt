@@ -20,9 +20,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v9.3.28:
+ * - Forensic Parity (#092): Integrated historyManager.updateRibbons into processTick 
+ *   to ensure telemetry recording is active in Tracker mode.
  * v9.3.20:
- * - R405: Samsung A15 Power Hardening. Unified heartbeat to 2s and removed 
- *   device-specific timing branching and A15 flags.
+ * - R405: Samsung A15 Power Hardening. Unified heartbeat to 2s.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -320,16 +322,16 @@ class TrackerService : BaseMonitorService() {
             }
         }
         
-        lastServiceTickTs = now
-        lastServiceTickRealtime = nowRealtime
-        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, now)
+        val isSocketConnected = networkManager.isConnected() && !transientDropDetected.getAndSet(false)
+        networkManager.updateRelayStatus(isSocketConnected)
         
+        val isViewerActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
+        sessionManager.updateTick(nowRealtime, lastServiceTickRealtime, isPeerAvailable = isSocketConnected && isViewerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
+
         if (isAdaptationMuzzled) return@withContext
 
         val hasLocation = lastKnownLocation != null
-        val sessionActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
-
-        if (sessionActive && hasLocation) {
+        if (isViewerActive && hasLocation) {
             val location = lastKnownLocation!!
             val lat = location.latitude
             val lng = location.longitude
@@ -399,12 +401,71 @@ class TrackerService : BaseMonitorService() {
                 isAnchorLocked = processed.isAnchorLocked, trackerState = if (processed.filteredSpeed > 0.5) TrackerState.MOVING else TrackerState.PARKING
             )
             
+            historyManager.updateRibbons(
+                now = now,
+                lastTickTs = lastServiceTickTs,
+                serviceTickCounter = serviceTickCounter,
+                rtt = networkManager.getRtt(),
+                peerSignal = 10,
+                peerAvail = isSocketConnected && isViewerActive,
+                hasGps = true,
+                isTrackerMode = true,
+                gpsIndex = TelemetryUtils.calculateGpsIndex(now - location.time, processed.maxAccuracy, latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0).totalIndex,
+                accuracy = processed.currentAccuracy,
+                maxAccuracy = processed.maxAccuracy,
+                noiseIdx = (sensorManager.currentAcousticDb - locationProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB,
+                luxIdx = log10(sensorManager.currentLux + 1.0) / RIBBON_LUX_LOG_SCALE,
+                vibeIdx = sensorManager.currentVibrationIndex / RIBBON_VIBRATION_SCALE_G,
+                proxIdx = sensorManager.proximityIdx,
+                liftIdx = (sensorManager.absoluteAltitude - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS,
+                snrIdx = (latestGnssDetail?.satellites?.map { it.cn0 }?.average() ?: 0.0) / RIBBON_SNR_SCALE_DB,
+                tiltIdx = abs(sensorManager.currentTiltDegrees - locationProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG,
+                baroIdx = (sensorManager.absoluteAltitude - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS,
+                verticalVelocity = sensorManager.currentVerticalVelocity,
+                sitVz = sensorManager.consumePeakVerticalVelocity(),
+                sitDz = sensorManager.consumePeakVerticalDisplacement(),
+                sitBaro = sensorManager.absoluteAltitude,
+                sitTilt = sensorManager.currentTiltDegrees,
+                sitShock = sensorManager.consumePeakVibration(),
+                isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge,
+                isCoolingModeActive = integrityMonitor.isCoolingModeActive,
+                speed = processed.filteredSpeed,
+                bearing = location.bearing.toDouble(),
+                isSitDetected = sensorManager.consumePlungeMatched(),
+                isSitActive = false,
+                currentMa = integrityMonitor.getBatteryCurrent(),
+                locationPendingReason = LocationPendingReason.NONE,
+                isAnchorLocked = processed.isAnchorLocked
+            )
+
             if (isUrgent && isS21FE) {
                 isAdaptationMuzzled = true
                 adaptationMuzzleJob?.cancel()
                 adaptationMuzzleJob = lifecycleScope.launch { delay(3000L); isAdaptationMuzzled = false }
             }
+        } else {
+            // Background idle recording
+            historyManager.updateRibbons(
+                now = now,
+                lastTickTs = lastServiceTickTs,
+                serviceTickCounter = serviceTickCounter,
+                rtt = networkManager.getRtt(),
+                peerSignal = 0,
+                peerAvail = isSocketConnected && isViewerActive,
+                hasGps = false,
+                isTrackerMode = true,
+                noiseIdx = (sensorManager.currentAcousticDb - locationProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB,
+                luxIdx = log10(sensorManager.currentLux + 1.0) / RIBBON_LUX_LOG_SCALE,
+                vibeIdx = sensorManager.currentVibrationIndex / RIBBON_VIBRATION_SCALE_G,
+                proxIdx = sensorManager.proximityIdx,
+                currentMa = integrityMonitor.getBatteryCurrent()
+            )
         }
+
+        lastServiceTickTs = now
+        lastServiceTickRealtime = nowRealtime
+        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, now)
+        serviceTickCounter++
     }
 
     private fun onLocationChanged(location: Location) {
@@ -431,6 +492,5 @@ class TrackerService : BaseMonitorService() {
         private const val MUZZLE_HYSTERESIS_MS = 2000L
         private const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 45000L
         private const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
-        private const val ALERT_ID_TRACKER_POWER = "TRACKER_POWER"
     }
 }

@@ -4,15 +4,19 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * v9.3.26:
+ * - ANR Hardening (#092): Added MAX_BACKFILL_POINTS (1000) cap to loops to 
+ *   prevent main thread hangs during cold-starts with stale timestamps.
  * v9.3.18:
  * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
- * v9.3.17:
- * - R403: Heartbeat Alignment. Replaced hardcoded 1000L with TICK_INTERVAL_MS 
- *   to ensure gap-filling logic respects the system heartbeat configuration.
  */
 class TelemetryAggregator {
 
     private val accumulators = mutableMapOf<String, EngineConnectionPoint>()
+    
+    companion object {
+        private const val MAX_BACKFILL_POINTS = 1000
+    }
 
     /**
      * Merges high-resolution points into a "Worst Case" summary for lower resolutions.
@@ -108,8 +112,9 @@ class TelemetryAggregator {
     ): List<Pair<RibbonScale, EngineConnectionPoint>> {
         val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
         var fillTs = lastTickTs + TICK_INTERVAL_MS
+        var pointsGenerated = 0
 
-        while (fillTs < now) {
+        while (fillTs < now && pointsGenerated < MAX_BACKFILL_POINTS) {
             val totalSeconds = (fillTs / TICK_INTERVAL_MS).toInt()
             
             val resolvedSnr = snrSamples.find { it.ts in fillTs..(fillTs + TICK_INTERVAL_MS - 1) }?.snr?.let { (it / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) } ?: baseTemplate.snrIdx
@@ -143,6 +148,7 @@ class TelemetryAggregator {
 
             results.addAll(processPoint(fillPoint))
             fillTs += TICK_INTERVAL_MS
+            pointsGenerated++
         }
         return results
     }
@@ -167,7 +173,9 @@ class TelemetryAggregator {
         if (currentTs <= lastTickTs) currentTs += intervalMs
 
         val gapPoints = mutableListOf<EngineConnectionPoint>()
-        while (currentTs < now) {
+        var pointsGenerated = 0
+        
+        while (currentTs < now && pointsGenerated < MAX_BACKFILL_POINTS) {
             val totalSeconds = (currentTs / TICK_INTERVAL_MS).toInt()
             
             val samplesInInterval = snrSamples.filter { it.ts in currentTs..(currentTs + intervalMs - 1) }
@@ -218,6 +226,7 @@ class TelemetryAggregator {
                 locationPendingReason = LocationPendingReason.NONE
             ))
             currentTs += intervalMs
+            pointsGenerated++
         }
         return gapPoints
     }

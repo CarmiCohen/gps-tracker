@@ -32,15 +32,10 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
- * v9.3.25:
- * - UI Feedback (#088): Refined commitDraftSettings error message to clarify 
- *   reservation of legacy aliases (T/V/Trk/viewer) for backward compatibility.
- * v9.3.24:
- * - Draft Commit UI: Enhanced commitDraftSettings with specific error feedback 
- *   for alias-aware identity uniqueness (Requirement R182).
- * v9.3.15:
- * - Hardening: Standardized all telemetry and baseline persistence to Double. 
- *   Removed redundant Float accessors to eliminate conversion jitter.
+ * v9.3.28:
+ * - ANR Hardening (#092): Finalized single-cycle I/O with getSettingsSnapshot() 
+ *   and corrected default value logic to prevent infinite telemetry loops.
+ * - Architecture: Consolidated conversion logic into SettingsMapper.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -176,9 +171,11 @@ class SettingsRepository @Inject constructor(
     val lastSitTsFlow: Flow<Long> = dataStore.data.map { it.lastSitTs }
     val homePointsFlow: Flow<List<GeoPoint>> = dataStore.data.map { it.homePointsList.map { p -> GeoPoint(p.lat, p.lng) } }
     val maxDistanceFlow: Flow<Double> = dataStore.data.map { if (it.maxDistance > 0.0) it.maxDistance else DEFAULT_MAX_DISTANCE }
-    val alertSettingsFlow: Flow<AlertSettings> = dataStore.data.map { protoToAlertSettings(it.alertSettings) }
+    val alertSettingsFlow: Flow<AlertSettings> = dataStore.data.map { SettingsMapper.protoToAlertSettings(it.alertSettings) }
     val isXiaomiManualOverrideFlow: Flow<Boolean> = dataStore.data.map { it.isXiaomiManualOverride }
     val identitySanitizedFlow: Flow<Boolean> = dataStore.data.map { it.identitySanitized }
+
+    suspend fun getSettingsSnapshot(): AppSettings = dataStore.data.first()
 
     suspend fun saveString(keyName: String, value: String) {
         dataStore.updateData { current ->
@@ -266,23 +263,24 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getString(keyName: String, default: String): String {
         val settings = dataStore.data.first()
-        return when (keyName) {
-            TRACKER_ID_KEY -> settings.trackerId.ifEmpty { default }
-            VIEWER_ID_KEY -> settings.viewerId.ifEmpty { default }
-            RELAY_URL_KEY -> settings.relayUrl.ifEmpty { default }
-            SELECTED_SIREN_KEY -> settings.selectedSiren.ifEmpty { default }
+        val value = when (keyName) {
+            TRACKER_ID_KEY -> settings.trackerId
+            VIEWER_ID_KEY -> settings.viewerId
+            RELAY_URL_KEY -> settings.relayUrl
+            SELECTED_SIREN_KEY -> settings.selectedSiren
             DRAFT_TRACKER_ID -> settings.draftTrackerId
             DRAFT_VIEWER_ID -> settings.draftViewerId
             DRAFT_RELAY_URL -> settings.draftRelayUrl
-            LAST_DAILY_ARCHIVE_DATE_KEY -> settings.lastDailyArchiveDate.ifEmpty { default }
-            LAST_DAILY_CLEANUP_DATE_KEY -> settings.lastDailyCleanupDate.ifEmpty { default }
-            else -> default
+            LAST_DAILY_ARCHIVE_DATE_KEY -> settings.lastDailyArchiveDate
+            LAST_DAILY_CLEANUP_DATE_KEY -> settings.lastDailyCleanupDate
+            else -> ""
         }
+        return value.ifEmpty { default }
     }
 
     suspend fun getLong(keyName: String, default: Long): Long {
         val settings = dataStore.data.first()
-        return when (keyName) {
+        val value = when (keyName) {
             LAST_ALARM_ACK_TS_KEY -> settings.lastAlarmAckTs
             HOME_POINTS_TS_KEY -> settings.homePointsTs
             LAST_SERVICE_TICK_TS_KEY -> settings.lastServiceTickTs
@@ -295,26 +293,28 @@ class SettingsRepository @Inject constructor(
             MAX_DROP_KEY -> settings.maxDrop
             MAX_DROP_TS_KEY -> settings.maxDropTs
             LAST_GPS_TS_KEY -> settings.lastGpsTs
-            LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else default
+            LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else 0L
             VIOLATION_UPTIME_MS_KEY -> settings.violationUptimeMs
             LAST_SERVICE_TICK_REALTIME_KEY -> settings.lastServiceTickRealtime
-            LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else default
-            else -> default
+            LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else 0L
+            else -> 0L
         }
+        return if (value == 0L) default else value
     }
 
     suspend fun getDouble(keyName: String, default: Double): Double {
         val settings = dataStore.data.first()
-        return when (keyName) {
-            MAX_DISTANCE_STORAGE_KEY -> if (settings.maxDistance > 0.0) settings.maxDistance else default
+        val value = when (keyName) {
+            MAX_DISTANCE_STORAGE_KEY -> settings.maxDistance
             MAX_ACCURACY_KEY -> settings.maxAccuracy
-            MAX_TEMP_KEY -> if (settings.maxTemp > 0.0) settings.maxTemp else default
+            MAX_TEMP_KEY -> settings.maxTemp
             TRACKER_LUX_BASELINE_KEY -> settings.trackerLuxBaseline
             TRACKER_ACOUSTIC_FLOOR_KEY -> settings.trackerAcousticFloor
-            DRAFT_MAX_DISTANCE -> if (settings.draftMaxDistance > 0.0) settings.draftMaxDistance else default
-            CHAIR_BASELINE_TILT_KEY -> if (settings.hasChairBaselineTilt()) settings.chairBaselineTilt else default
-            else -> default
+            DRAFT_MAX_DISTANCE -> settings.draftMaxDistance
+            CHAIR_BASELINE_TILT_KEY -> if (settings.hasChairBaselineTilt()) settings.chairBaselineTilt else -1000.0
+            else -> 0.0
         }
+        return if (value == 0.0 || value == -1000.0) default else value
     }
 
     suspend fun getBoolean(keyName: String, default: Boolean): Boolean {
@@ -330,11 +330,12 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getInt(keyName: String, default: Int): Int {
         val settings = dataStore.data.first()
-        return when (keyName) {
+        val value = when (keyName) {
             LAST_AUTO_SAVE_HOUR_KEY -> settings.lastAutoSaveHour
             LAST_VERSION_CODE_KEY -> settings.lastVersionCode
-            else -> default
+            else -> -1
         }
+        return if (value == -1) default else value
     }
 
     suspend fun getAppMode(): String? = dataStore.data.first().appMode.ifEmpty { null }
@@ -358,139 +359,20 @@ class SettingsRepository @Inject constructor(
 
     suspend fun loadAlertSettings(): AlertSettings {
         val s = dataStore.data.first().alertSettings
-        return protoToAlertSettings(s)
-    }
-
-    private fun protoToAlertSettings(s: AlertSettingsProto): AlertSettings {
-        return AlertSettings(
-            localInternet = s.localInternet,
-            serverConnection = s.serverConnection,
-            relayConnection = s.relayConnection,
-            jammerDetection = s.jammerDetection,
-            signalLoss = s.signalLoss,
-            gpsStalling = s.gpsStalling,
-            distance = s.distance,
-            power = s.power,
-            lowBattery = s.lowBattery,
-            batteryHealth = s.batteryHealth,
-            longTimeGap = s.longTimeGap,
-            highTemperature = s.highTemperature,
-            overrideSilence = s.overrideSilence,
-            useMaxVolume = s.useMaxVolume,
-            vibrationEnabled = s.vibrationEnabled,
-            alarmVolume = s.alarmVolume,
-            useCustomVolume = s.useCustomVolume,
-            tiltAlert = s.tiltAlert,
-            acousticAlert = s.acousticAlert,
-            liftAlert = s.liftAlert,
-            tamperAlert = s.tamperAlert,
-            chairOccupied = s.chairOccupied,
-            globalMute = s.globalMute,
-            systemStorageLow = s.systemStorageLow
-        )
+        return SettingsMapper.protoToAlertSettings(s)
     }
 
     suspend fun saveAlertSettings(s: AlertSettings) {
         dataStore.updateData { current ->
-            current.toBuilder().setAlertSettings(alertSettingsToProto(s)).build()
+            current.toBuilder().setAlertSettings(SettingsMapper.alertSettingsToProto(s)).build()
         }
-    }
-
-    private fun alertSettingsToProto(s: AlertSettings): AlertSettingsProto {
-        return AlertSettingsProto.newBuilder()
-            .setLocalInternet(s.localInternet)
-            .setServerConnection(s.serverConnection)
-            .setRelayConnection(s.relayConnection)
-            .setJammerDetection(s.jammerDetection)
-            .setSignalLoss(s.signalLoss)
-            .setGpsStalling(s.gpsStalling)
-            .setDistance(s.distance)
-            .setPower(s.power)
-            .setLowBattery(s.lowBattery)
-            .setBatteryHealth(s.batteryHealth)
-            .setLongTimeGap(s.longTimeGap)
-            .setHighTemperature(s.highTemperature)
-            .setOverrideSilence(s.overrideSilence)
-            .setUseMaxVolume(s.useMaxVolume)
-            .setVibrationEnabled(s.vibrationEnabled)
-            .setAlarmVolume(s.alarmVolume)
-            .setUseCustomVolume(s.useCustomVolume)
-            .setTiltAlert(s.tiltAlert)
-            .setAcousticAlert(s.acousticAlert)
-            .setLiftAlert(s.liftAlert)
-            .setTamperAlert(s.tamperAlert)
-            .setChairOccupied(s.chairOccupied)
-            .setGlobalMute(s.globalMute)
-            .setSystemStorageLow(s.systemStorageLow)
-            .build()
     }
 
     fun saveTrackerState(status: TrackerStatus) {
         scope.launch {
             dataStore.updateData { current ->
                 val builder = current.toBuilder()
-                val trackerBuilder = TrackerStatusProto.newBuilder()
-                    .setLat(status.lat)
-                    .setLng(status.lng)
-                    .setAlt(status.alt)
-                    .setSpeed(status.speed)
-                    .setBearing(status.bearing)
-                    .setAccuracy(status.accuracy)
-                    .setMaxAccuracy(status.maxAccuracy)
-                    .setGpsTs(status.gpsTs)
-                    .setTs(status.ts)
-                    .setBattery(status.battery)
-                    .setTemp(status.temp)
-                    .setMaxTemp(status.maxTemp)
-                    .setIsCharging(status.isCharging)
-                    .setSatsView(status.satsView)
-                    .setSatsUsed(status.satsUsed)
-                    .setLastConnTs(status.lastConnTs)
-                    .setLastDiscTs(status.lastDiscTs)
-                    .setUptimeMs(status.uptimeMs)
-                    .setTotalConnectedMs(status.totalConnectedMs)
-                    .setSessionConnectedMs(status.sessionConnectedMs)
-                    .setTotalDropMs(status.totalDropMs)
-                    .setMaxDropMs(status.maxDropMs)
-                    .setMaxDropTs(status.maxDropTs)
-                    .setViolationUptimeMs(status.violationUptimeMs)
-                    .setViolationPercentage(status.violationPercentage)
-                    .setIsSitDetected(status.isSitDetected)
-                    .setLastSitTs(status.lastSitTs)
-                    .setVerticalVelocity(status.verticalVelocity)
-                    .setSitVz(status.sitVz)
-                    .setSitDz(status.sitDz)
-                    .setSitBaro(status.sitBaro)
-                    .setSitTilt(status.sitTilt)
-                    .setSitShock(status.sitShock)
-                    .setIsPowerTamper(status.isPowerTamper)
-                    .setVibration(status.vibration)
-                    .setHeading(status.heading)
-                    .setBaroAlt(status.baroAlt)
-                    .setLux(status.lux)
-                    .setIsNear(status.isNear)
-                    .setTiltDegrees(status.tiltDegrees)
-                    .setAcousticDb(status.acousticDb)
-                    .setPeakShock(status.peakVibrationShock)
-                    .setPeakShockTs(status.peakVibrationShockTs)
-                    .setLuxBaseline(status.luxBaseline)
-                    .setAcousticFloor(status.acousticFloorDb)
-                    .setAdaptiveVibrationFloor(status.adaptiveVibrationFloor)
-                    .setProxIdx(status.proxIdx)
-                    .setIsSuspicious(status.isSuspicious)
-                    .setIsTamperDetected(status.isTamperDetected)
-                    .setIsPowerSaveMode(status.isPowerSaveMode)
-                    .setStandbyBucket(status.standbyBucket)
-                    .setNetInterface(status.netInterface)
-                    .setIsStorageLow(status.isStorageLow)
-                    .setIsBatterySteepDischarge(status.isBatterySteepDischarge)
-                    .setIsJammer(status.isJammer)
-                    .setIsCoolingModeActive(status.isCoolingModeActive)
-                    .setIsStorageCritical(status.isStorageCritical)
-                    .setCurrentMa(status.currentMa)
-                    .setIsAnchorLocked(status.isAnchorLocked)
-                    .setTrackerState(status.trackerState.name)
-                builder.setTrackerState(trackerBuilder.build())
+                builder.setTrackerState(SettingsMapper.mapTrackerStatusToProto(status))
                 builder.build()
             }
         }
@@ -499,58 +381,18 @@ class SettingsRepository @Inject constructor(
     suspend fun loadTrackerState(): TrackerStatus? {
         val settings = dataStore.data.first()
         if (!settings.hasTrackerState()) return null
-        val s = settings.trackerState
-        return TrackerStatus(
-            lat = s.lat, lng = s.lng, alt = s.alt,
-            speed = s.speed, bearing = s.bearing, accuracy = s.accuracy, maxAccuracy = s.maxAccuracy,
-            gpsTs = s.gpsTs, ts = s.ts, battery = s.battery, temp = s.temp, maxTemp = s.maxTemp, isCharging = s.isCharging,
-            satsView = s.satsView, satsUsed = s.satsUsed,
-            lastConnTs = s.lastConnTs, lastDiscTs = s.lastDiscTs,
-            uptimeMs = s.uptimeMs,
-            totalConnectedMs = s.totalConnectedMs, sessionConnectedMs = s.sessionConnectedMs,
-            totalDropMs = s.totalDropMs, maxDropMs = s.maxDropMs,
-            maxDropTs = s.maxDropTs, violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage,
-            isSitDetected = s.isSitDetected, lastSitTs = s.lastSitTs, verticalVelocity = s.verticalVelocity,
-            sitVz = s.sitVz, sitDz = s.sitDz, sitBaro = s.sitBaro, sitTilt = s.sitTilt, sitShock = s.sitShock,
-            isPowerTamper = s.isPowerTamper,
-            vibration = s.vibration,
-            heading = s.heading,
-            baroAlt = s.baroAlt,
-            lux = s.lux,
-            isNear = s.isNear,
-            tiltDegrees = s.tiltDegrees,
-            acousticDb = s.acousticDb,
-            peakVibrationShock = s.peakShock,
-            peakVibrationShockTs = s.peakShockTs,
-            luxBaseline = s.luxBaseline,
-            acousticFloorDb = s.acousticFloor,
-            adaptiveVibrationFloor = s.adaptiveVibrationFloor,
-            proxIdx = s.proxIdx,
-            isSuspicious = s.isSuspicious,
-            isTamperDetected = s.isTamperDetected,
-            isPowerSaveMode = s.isPowerSaveMode,
-            standbyBucket = s.standbyBucket,
-            netInterface = s.netInterface,
-            isStorageLow = s.isStorageLow,
-            isStorageCritical = s.isStorageCritical,
-            isBatterySteepDischarge = s.isBatterySteepDischarge,
-            isJammer = s.isJammer,
-            isCoolingModeActive = s.isCoolingModeActive,
-            currentMa = s.currentMa,
-            isAnchorLocked = s.isAnchorLocked,
-            trackerState = try { TrackerState.valueOf(s.trackerState) } catch (e: Exception) { TrackerState.UNKNOWN }
-        )
+        return SettingsMapper.mapTrackerStatusFromProto(settings.trackerState)
     }
 
     suspend fun saveDraftAlertSettings(s: AlertSettings) {
         dataStore.updateData { current ->
-            current.toBuilder().setDraftAlertSettings(alertSettingsToProto(s)).build()
+            current.toBuilder().setDraftAlertSettings(SettingsMapper.alertSettingsToProto(s)).build()
         }
     }
 
     suspend fun loadDraftAlertSettings(): AlertSettings? {
         val s = dataStore.data.first()
-        return if (s.hasDraftAlertSettings()) protoToAlertSettings(s.draftAlertSettings) else null
+        return if (s.hasDraftAlertSettings()) SettingsMapper.protoToAlertSettings(s.draftAlertSettings) else null
     }
 
     suspend fun clearDraftSettings() {
@@ -590,7 +432,7 @@ class SettingsRepository @Inject constructor(
                 .setDraftViewerId(viewerId)
                 .setDraftRelayUrl(relayUrl)
                 .setDraftMaxDistance(maxDistance)
-                .setDraftAlertSettings(alertSettingsToProto(alertSettings))
+                .setDraftAlertSettings(SettingsMapper.alertSettingsToProto(alertSettings))
                 .build()
         }
     }
@@ -669,7 +511,7 @@ class SettingsRepository @Inject constructor(
             viewerId?.let { if (SignalingConstants.isValidViewerId(it)) builder.setViewerId(it) }
             relayUrl?.let { builder.setRelayUrl(it) }
             maxDistance?.let { builder.setMaxDistance(it) }
-            alertSettings?.let { builder.setAlertSettings(alertSettingsToProto(it)) }
+            alertSettings?.let { builder.setAlertSettings(SettingsMapper.alertSettingsToProto(it)) }
             homePoints?.let { pts ->
                 builder.clearHomePoints().addAllHomePoints(pts.map { GeoPointProto.newBuilder().setLat(it.latitude).setLng(it.longitude).build() })
                 builder.setHomePointsTs(timeProvider.currentTimeMillis())

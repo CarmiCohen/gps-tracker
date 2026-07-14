@@ -23,7 +23,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -58,82 +60,59 @@ class SystemStatusProviderImpl @Inject constructor(
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     private val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
     
-    // Rationale: Cache packageName to prevent repetitive getPackageName() log spam on Samsung devices.
     private val cachedPackageName = context.packageName
 
-    // R980 / C-068-1: Throttling Permission Checks
-    // Samsung devices (G990/A15) log every call to canDrawOverlays/isIgnoringBatteryOptimizations.
-    // We use a 10s TTL to prevent Logcat jitter while maintaining UI responsiveness.
     private var lastFullRefreshTime: Long = 0
     private var cachedState: PermissionState? = null
+    private val permissionMutex = Mutex()
     
     private val PERMISSION_TTL_MS = 10_000L
 
-    override fun isBatteryWhitelisted(): Boolean {
-        return getPermissionState().isBatteryWhitelisted
-    }
-
-    override fun isAutoStartGranted(): Boolean {
-        return getPermissionState().isAutoStartGranted
-    }
-
-    override fun isOverlayGranted(): Boolean {
-        return getPermissionState().isOverlayGranted
-    }
-
-    override fun isMicrophoneGranted(): Boolean {
-        return getPermissionState().isMicrophoneGranted
-    }
-
-    override fun isExactAlarmGranted(): Boolean {
-        return getPermissionState().isExactAlarmGranted
-    }
-
-    override fun isPostNotificationsGranted(): Boolean {
-        return getPermissionState().isPostNotificationsGranted
-    }
-
-    override fun isBackgroundLocationGranted(): Boolean {
-        return getPermissionState().isBackgroundLocationGranted
-    }
+    override fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
+    override fun isAutoStartGranted(): Boolean = getPermissionState().isAutoStartGranted
+    override fun isOverlayGranted(): Boolean = getPermissionState().isOverlayGranted
+    override fun isMicrophoneGranted(): Boolean = getPermissionState().isMicrophoneGranted
+    override fun isExactAlarmGranted(): Boolean = getPermissionState().isExactAlarmGranted
+    override fun isPostNotificationsGranted(): Boolean = getPermissionState().isPostNotificationsGranted
+    override fun isBackgroundLocationGranted(): Boolean = getPermissionState().isBackgroundLocationGranted
 
     override fun isLocalOnline(): Boolean {
         val caps = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
         return caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
 
-    override fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus {
-        return getPermissionState().xiaomiStatus
-    }
+    override fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus = getPermissionState().xiaomiStatus
 
     /**
-     * getPermissionState: Implements v9.3.14 Hardening (Issue C-068-1).
-     * Centralized TTL caching for ALL permission checks to eliminate Samsung system API noise.
+     * getPermissionState: Implements v9.3.29 Hardening (#092).
+     * Added Mutex to prevent IPC congestion during concurrent calls from multiple threads.
      */
-    override fun getPermissionState(forceRefresh: Boolean): PermissionState {
-        val now = SystemClock.elapsedRealtime()
-        val current = cachedState
-        
-        if (!forceRefresh && current != null && (now - lastFullRefreshTime < PERMISSION_TTL_MS)) {
-            return current
-        }
+    override fun getPermissionState(forceRefresh: Boolean): PermissionState = runBlocking {
+        permissionMutex.withLock {
+            val now = SystemClock.elapsedRealtime()
+            val current = cachedState
+            
+            if (!forceRefresh && current != null && (now - lastFullRefreshTime < PERMISSION_TTL_MS)) {
+                return@runBlocking current
+            }
 
-        // Perform actual system calls
-        val newState = PermissionState(
-            isBatteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName),
-            isAutoStartGranted = if (isXiaomiDevice()) isXiaomiAutostartGranted(context, cachedPackageName) else powerManager.isIgnoringBatteryOptimizations(cachedPackageName),
-            isOverlayGranted = Settings.canDrawOverlays(context),
-            isMicrophoneGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
-            isExactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true,
-            isPostNotificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true,
-            isBackgroundLocationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true,
-            xiaomiStatus = com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName),
-            xiaomiAutostartStatus = com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName)
-        )
-        
-        cachedState = newState
-        lastFullRefreshTime = now
-        return newState
+            // Perform actual system calls
+            val newState = PermissionState(
+                isBatteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName),
+                isAutoStartGranted = if (isXiaomiDevice()) isXiaomiAutostartGranted(context, cachedPackageName) else powerManager.isIgnoringBatteryOptimizations(cachedPackageName),
+                isOverlayGranted = Settings.canDrawOverlays(context),
+                isMicrophoneGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
+                isExactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true,
+                isPostNotificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true,
+                isBackgroundLocationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true,
+                xiaomiStatus = com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName),
+                xiaomiAutostartStatus = com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName)
+            )
+            
+            cachedState = newState
+            lastFullRefreshTime = now
+            newState
+        }
     }
 
     override fun observeInternetStatus(): Flow<Boolean> = callbackFlow {

@@ -20,8 +20,11 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * v9.3.20:
- * - R405: Samsung A15 Power Hardening. Unified heartbeat to 2s.
+ * v9.3.29:
+ * - ANR Hardening (#092): Offloaded permission state polling to Dispatchers.IO 
+ *   to prevent system IPC calls from blocking the Main thread.
+ * v9.3.26:
+ * - ANR Recovery: Guarded startGlobalTimer logic with initialization check.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -181,9 +184,12 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { repository.trackerLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
         viewModelScope.launch { repository.connectedViewers.collect { viewers -> updateState { it.copy(connectivity = it.connectivity.copy(connectedViewers = viewers)) } } }
 
-        viewModelScope.launch { 
+        viewModelScope.launch(Dispatchers.IO) { 
             while(true) { 
-                updateState { it.copy(permissions = systemStatusProvider.getPermissionState()) }
+                val newState = systemStatusProvider.getPermissionState()
+                withContext(Dispatchers.Main) {
+                    updateState { it.copy(permissions = newState) }
+                }
                 val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
                 delay(if (refreshFast) PERMISSION_REFRESH_INTERVAL_FAST_MS else PERMISSION_REFRESH_INTERVAL_SLOW_MS) 
             } 
@@ -250,7 +256,10 @@ class MainViewModel @Inject constructor(
             }
             is UiEvent.SetLogFilterShowDetails -> viewModelScope.launch { repository.updateLogFilters(details = event.show) }
             is UiEvent.SetLogFilterShowRecovered -> viewModelScope.launch { repository.updateLogFilters(recovered = event.show) }
-            is UiEvent.RefreshPermissionStatus -> updateState { it.copy(permissions = systemStatusProvider.getPermissionState(forceRefresh = true)) }
+            is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
+                val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
+                withContext(Dispatchers.Main) { updateState { it.copy(permissions = newState) } }
+            }
             is UiEvent.TriggerTestAlarm -> { addPersistentLog("user", "USER ACTION: Test alarm triggered", true); repository.sendCommand(UiCommand.TriggerTestAlarm) }
             is UiEvent.TriggerForensicTest -> { addPersistentLog("user", "USER ACTION: Forensic stress test triggered", true); repository.sendCommand(UiCommand.TriggerForensicTest) }
             is UiEvent.ToggleXiaomiManualOverride -> {
@@ -445,13 +454,14 @@ class MainViewModel @Inject constructor(
     private fun startGlobalTimer() {
         viewModelScope.launch(Dispatchers.Main + uiExceptionHandler) {
             while (true) {
-                val now = timeProvider.currentTimeMillis()
-                val nowRealtime = timeProvider.elapsedRealtime()
-                _systemPulse.value = now
-                _systemPulseRealtime.value = nowRealtime
-                updateState { state -> state.copy(isSirenPlaying = AudioSynthesizer.isPlaying()) }
-                
-                if (_uiState.value.appMode != null) {
+                val stateSnapshot = _uiState.value
+                if (stateSnapshot.isInitialized && stateSnapshot.appMode != null) {
+                    val now = timeProvider.currentTimeMillis()
+                    val nowRealtime = timeProvider.elapsedRealtime()
+                    _systemPulse.value = now
+                    _systemPulseRealtime.value = nowRealtime
+                    updateState { state -> state.copy(isSirenPlaying = AudioSynthesizer.isPlaying()) }
+                    
                     repository.sendCommand(UiCommand.SyncRequest)
                     withContext(Dispatchers.Default) {
                         val currentState = _uiState.value
@@ -466,10 +476,9 @@ class MainViewModel @Inject constructor(
                             _redScreenVisible.value = shouldShowRed
                         }
                     }
+                    updateState { state -> state.copy(isAlarmSilenced = behaviorUseCase.isAlarmSilenced(state.lastAlarmAckTs, now)) }
                 }
 
-                updateState { state -> state.copy(isAlarmSilenced = behaviorUseCase.isAlarmSilenced(state.lastAlarmAckTs, now)) }
-                
                 // R405: Unified 2s heartbeat for UI timer.
                 val currentInterval = getActiveHeartbeatInterval(0)
                 delay(currentInterval)
