@@ -1,48 +1,31 @@
 # Project Handover: GPS Tracker Forensic Status
 
-## Current Status (v9.3.36)
-The application has undergone forensic hardening to resolve landing page unresponsiveness and redundant service startups. Navigation is now immediate for user selections.
+## Current Status (v9.4.0)
+The application has undergone structural simplification as part of the R406 plan. Issue #501 (Unified Heartbeat) has been fully implemented, standardizing the system timing to a 2s cycle.
 
-## Critical Fixes Applied
+## Critical Fixes & Simplifications Applied
 
-### 1. Landing Page Responsiveness (Issue #092)
-- **Problem:** A mandatory 2s delay (`LANDING_PAGE_PAUSE_MS`) was applied to all transitions from the landing page, making the UI feel frozen during manual selection. Redundant service starts were also detected.
+### 1. Unified Heartbeat (Issue #501 / R406a)
+- **Problem:** Fragmented timing model with multiple GPS polling intervals (200ms to 20s) and varying heartbeat rates created complexity and OS suppression risks.
 - **Solution:** 
-    - Refactored `MainAppContent.kt` to differentiate between manual and automatic transitions.
-    - **Manual Selection:** Navigates and starts the service immediately upon user tap.
-    - **Automatic Restoration:** Maintains the 2s delay to ensure DataStore stabilization during cold starts.
-    - Eliminated redundant `onStartService` calls in the `LaunchedEffect` block.
+    - Standardized all periodic tasks, hardware polling, and logic cycles to a unified **2000ms (2s)** heartbeat (`TICK_INTERVAL_MS`).
+    - **EngineConstants.kt:** Removed all redundant polling constants (`MOVING_GPS_POLLING_MS`, `STATIONARY_GPS_POLLING_MS`, etc.).
+    - **ServiceBehaviorUseCase.kt:** Eliminated dynamic interval calculation logic.
+    - **GpsManager.kt:** Hardcoded the Fused Location Provider to a 2s interval and removed dynamic polling flows.
+    - **Tracker/Viewer Services:** Standardized loops and `getRequiredTickInterval()` to the 2s standard.
 
-### 2. ANR & Thread Congestion
-- **Backfill Safety:** Added a 1,000-point cap to loops in `TelemetryAggregator.kt` to prevent main thread hangs during cold starts with stale timestamps.
-- **I/O Optimization:** Implemented `getSettingsSnapshot()` in `SettingsRepository` to reduce startup I/O to a single cycle.
-- **Permission Offloading:** Offloaded permission IPC calls in `MainViewModel` to `Dispatchers.IO`.
-
-### 3. Forensic Parity
-- **Tracker Telemetry:** Integrated `historyManager.updateRibbons` into `TrackerService.kt`. Telemetry recording is now active in both Tracker and Viewer modes.
-- **Samsung Hardening:** Added `Mutex` to `SystemStatusProvider` to prevent IPC congestion on A15/G990 devices.
+### 2. Landing Page Responsiveness (Issue #092)
+- Refactored `MainAppContent.kt` for immediate manual selection while maintaining a 2s delay for automatic restoration.
 
 ## Environment Info
 - **Project Root:** `C:/CCwork/Android Projects/gps-tracker`
 - **Modules:** `:app` (Android), `:core:engine` (Kotlin)
 - **Primary Device:** Samsung A15 (R58X40GV2AR)
 
-## Guidelines for Implementation
-1. Display the selected issue here before starting the fix.
-2. Remediate the issues using only root-cause-oriented solutions, keep consistency with the project's architecture, design principles, and long-term maintainability objectives. Avoid temporary mitigations or workaround-based implementations.
-3. Document any newly identified concerns in `issues.md`. Concerns include - risks, defects, inconsistencies.
-4. Record all fixed issues in the relevant status tracking file and mark them as resolved.
-5. Update `Handover.md` after each modification to any `.kt` file.
-6. Briefly explain each action before executing it.
-7. Completion:
-    - a. Rebuild the app.
-    - b. Verify that ALL fixed issues are updated in `issues.md` or another status tracking md file’.
-    - c. Check that no *.md or *.xml file was accidentally truncated.
-    - d. Verify that there is no inconsistency with this change of the app and other code portions or documentation.
-    - e. Verify that new requirements are added to STATUS/SOT_MASTER_REQUIREMENTS.md .
-    - f. Prepare a block of Git commands to stage the changes and to commit them as a new release with a tag the version and to push everything to the remote repository.
+## Newly Identified Risks
+- **Reduced Telemetry Density:** Standardizing to 2s removes the 200ms high-frequency mode. High-speed trail granularity may be slightly reduced, but stability and battery life are significantly improved.
 
-## Next Steps for New Chat
-1. **Validation:** Verify the immediate transition on the landing page across different hardware.
-2. **UI Stability:** Ensure the 2s delay for automatic switching remains sufficient for cold-boot stability.
-3. **Identity Check:** Monitor for "Identity Collision" errors, as the logic now enforces stricter alphanumeric uniqueness.
+## Next Steps
+1. **Validation:** Verify location update stability on 2s interval across different motion states.
+2. **Issue #502 (Device Independency):** Proceed with removing vendor-specific logic from the engine.
+3. **Issue #504 (Kalman Filter Removal):** Plan for replacing `ImmFilter` with simpler EMA smoothing as per the simplification roadmap.

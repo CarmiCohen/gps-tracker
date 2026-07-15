@@ -3,11 +3,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * v9.4.0:
+ * - R406a: Unified Heartbeat (Issue #501). Standardized TICK_INTERVAL_MS to 2000ms.
+ *   Removed all variable GPS polling constants (MOVING, STATIONARY, etc.).
  * v9.3.20:
  * - R405: Heartbeat Unification. Standardized TICK_INTERVAL_MS to 2000ms (2s) 
  *   to simplify logic and improve power resilience across all devices (including A15).
- * v9.3.18:
- * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -177,23 +178,12 @@ const val BOOTSTRAP_PHASE_MS = 60000L
 const val DISCOVERY_PHASE_MS = 60000L
 const val JUMP_HOLD_DURATION_MS = 180000L
 const val MOVING_HOLD_DURATION_MS = 60000L
-const val STATIONARY_GPS_POLLING_MS = 20000L
-const val MOVING_GPS_POLLING_MS = 200L 
-const val SUSPICIOUS_GPS_POLLING_MS = 1000L
-const val HIGH_FREQUENCY_GPS_POLLING_MS = 100L
-const val A15_STABLE_GPS_POLLING_MS = 1000L
-const val COOLING_GPS_POLLING_MS = 30000L
-const val SCREEN_OFF_GPS_POLLING_MS = 5000L // R994: Reduced frequency when screen is off
-const val VIEWER_GPS_POLLING_MS = 1000L 
 const val GPS_GAP_THRESHOLD_MS = 60000L
 const val GPS_STALL_THRESHOLD_MS = 60000L
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
 
-// R405: Unified 2s heartbeat for all devices.
+// R406a: Unified 2s heartbeat for all tasks and devices.
 const val TICK_INTERVAL_MS = 2000L
-const val DEFAULT_TICK_INTERVAL_MS = 2000L 
-const val STARTUP_TICK_INTERVAL_MS = 2000L 
-const val TICK_INTERVAL_SLOW_MS = 5000L
 const val UI_PULSE_TIMEOUT_MS = 45000L // Issue #025: Relaxed to 45s to harden FGS transitions
 const val FGS_STICKY_DELAY_MS = 45000L
 const val WATCH_TIMEOUT_MS = 15000L // Issue #427/428: Relaxed to 15s to handle network jitter
@@ -209,20 +199,12 @@ const val MAX_REVIVAL_ATTEMPTS = 3
 const val XIAOMI_BOOT_GRACE_MS = 30000L
 const val LANDING_PAGE_PAUSE_MS = 2000L
 
-/**
- * R405: Returns the unified heartbeat interval.
- * Device-specific (A15) branching removed in favor of 2s standard + battery optimization.
- */
-fun getActiveHeartbeatInterval(elapsedMs: Long, isHighResDevice: Boolean = false): Long {
-    return TICK_INTERVAL_MS
-}
-
 // Xiaomi Heuristic Recovery (Issue #190)
 const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 15000L
 const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
 
 const val ACTIVE_MOVE_THRESHOLD = 2.0
-const val GPS_SAVE_INTERVAL_MS = 20000L // Issue #436: Aligned with STATIONARY_GPS_POLLING_MS
+const val GPS_SAVE_INTERVAL_MS = 20000L // Issue #436: Aligned with TICK_INTERVAL_MS x 10
 
 // Stationary Anchor Monitor (Issue #062)
 const val PARKING_ANCHOR_MIN_DIST = 20.0
@@ -315,7 +297,7 @@ const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
 
 // R338: Unified UI Staleness Threshold (15s) - Relaxed to accommodate jitter
-// Issue #002: Increased to 35s to cover STATIONARY_GPS_POLLING_MS (20s)
+// Issue #002: Increased to 35s to cover unified heartbeat logic
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 35000L
 const val GPS_UI_FAIL_THRESHOLD_MS = 35000L
 

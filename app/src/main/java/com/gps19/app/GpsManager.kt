@@ -20,11 +20,9 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Manages hardware GPS and GNSS status.
- * v9.3.18:
- * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
- * v9.3.17:
- * - R403: Heartbeat Alignment. Replaced hardcoded 1000L with TICK_INTERVAL_MS 
- *   to ensure SNR sampling rate respects the system heartbeat configuration.
+ * v9.4.0:
+ * - R406a: Unified Heartbeat (Issue #501). Standardized GPS polling to 2s.
+ *   Removed pollIntervalFlow and setPollingInterval to simplify logic.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -50,8 +48,6 @@ class GpsManager @Inject constructor(
 
     private val _gnssDetailFlow = MutableStateFlow<GnssDetail?>(null)
     val gnssDetailFlow: StateFlow<GnssDetail?> = _gnssDetailFlow.asStateFlow()
-
-    private val pollIntervalFlow = MutableStateFlow(TICK_INTERVAL_MS)
 
     private val gnssStatusCallback = object : GnssStatus.Callback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
@@ -107,13 +103,6 @@ class GpsManager @Inject constructor(
         return snrBuffer.filter { it.first in fromTs..toTs }
     }
 
-    fun setPollingInterval(intervalMs: Long) {
-        if (pollIntervalFlow.value != intervalMs) {
-            Timber.d("GPS: Polling interval changed to ${intervalMs}ms")
-            pollIntervalFlow.value = intervalMs
-        }
-    }
-
     fun kickGps() {
         try {
             locationManager.sendExtraCommand(LocationManager.GPS_PROVIDER, "force_time_injection", null)
@@ -134,15 +123,10 @@ class GpsManager @Inject constructor(
             if (e is CancellationException) throw e
             Timber.e(e, "GPS: Extra command injection failed")
         }
-        
-        val currentInterval = pollIntervalFlow.value
-        pollIntervalFlow.value = currentInterval + 1
-        pollIntervalFlow.value = currentInterval
     }
 
     @SuppressLint("MissingPermission")
-    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    fun getLocationFlow(): Flow<Location> = channelFlow {
+    fun getLocationFlow(): Flow<Location> = callbackFlow {
         try {
             locationManager.registerGnssStatusCallback(gnssStatusCallback, Handler(Looper.getMainLooper()))
         } catch (e: Exception) {
@@ -158,49 +142,35 @@ class GpsManager @Inject constructor(
             }
         }
 
-        val locationJob = launch {
-            pollIntervalFlow.flatMapLatest { interval ->
-                callbackFlow {
-                    val fusedCallback = object : LocationCallback() {
-                        override fun onLocationResult(result: LocationResult) {
-                            try {
-                                result.lastLocation?.let { 
-                                    Timber.v("GPS: New location received (Acc: ${it.accuracy})")
-                                    trySend(it) 
-                                }
-                            } catch (e: Exception) {}
-                        }
+        val fusedCallback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                try {
+                    result.lastLocation?.let { 
+                        Timber.v("GPS: New location received (Acc: ${it.accuracy})")
+                        trySend(it) 
                     }
-
-                    val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval)
-                        .setMinUpdateIntervalMillis(interval / 2)
-                        .setMinUpdateDistanceMeters(0.0f)
-                        .setWaitForAccurateLocation(false) // Changed from true to ensure we get some location even if accuracy isn't perfect yet
-                        .build()
-
-                    try {
-                        fusedLocationClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper())
-                        Timber.d("GPS: Location updates requested at ${interval}ms interval")
-                    } catch (e: Exception) {
-                        if (e is CancellationException) throw e
-                        Timber.e(e, "CRITICAL: GPS Request failed")
-                        close(e)
-                    }
-
-                    awaitClose {
-                        try {
-                            fusedLocationClient.removeLocationUpdates(fusedCallback)
-                        } catch (e: Exception) {}
-                    }
-                }
-            }.collect { 
-                send(it)
+                } catch (e: Exception) {}
             }
         }
 
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, TICK_INTERVAL_MS)
+            .setMinUpdateIntervalMillis(TICK_INTERVAL_MS / 2)
+            .setMinUpdateDistanceMeters(0.0f)
+            .setWaitForAccurateLocation(false)
+            .build()
+
+        try {
+            fusedLocationClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper())
+            Timber.d("GPS: Location updates requested at ${TICK_INTERVAL_MS}ms interval")
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Timber.e(e, "CRITICAL: GPS Request failed")
+            close(e)
+        }
+
         awaitClose {
-            locationJob.cancel()
             try {
+                fusedLocationClient.removeLocationUpdates(fusedCallback)
                 locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
             } catch (e: Exception) {}
         }

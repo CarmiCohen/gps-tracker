@@ -1,6 +1,6 @@
-# Location Sentinel Specification (v8.9.54)
+# Location Sentinel Specification (v9.4.0)
 
-The **Location Sentinel** is a multi-modal sensor fusion engine designed to detect unauthorized physical interaction with the tracker. In v8.9.54, this logic is strictly isolated within the `:core:engine` module and geographically anchored via **Dual-Metric Spatial Anchors** (Issue #325) and **Bayesian Uncertainty Expansion** (Issue #431).
+The **Location Sentinel** is a multi-modal sensor fusion engine designed to detect unauthorized physical interaction with the tracker. In v9.4.0, the sentinel is fully integrated into the unified 2s heartbeat timing model.
 
 ## 1. Monitored Sensors
 The Sentinel monitors the following hardware sensors:
@@ -12,7 +12,7 @@ The Sentinel monitors the following hardware sensors:
 6.  **Accelerometer**: Continuous vibration and shock indexing.
 
 ## 2. Violation Logic (Hard Gates)
-Any of the following conditions will trigger a **Suspicious State** (forcing 1s GPS polling) and an optional **Immediate Siren**. These thresholds are defined in `EngineConstants.kt`.
+Any of the following conditions will trigger a **Suspicious State** and an optional **Immediate Siren**. These thresholds are defined in `EngineConstants.kt`.
 
 | Condition | Threshold | Alert Title | Action |
 | :--- | :--- | :--- | :--- |
@@ -41,18 +41,15 @@ Uses asymmetrical EMA to detect sudden illumination spikes.
 ### D. Acoustic Sentinel
 Gated by `ACOUSTIC_MIN_THRESHOLD_DB` (50.0dB) to prevent false positives in silent environments. Thresholds are evaluated as relative **jumps** over the rolling floor.
 
-### E. Adaptive Vibration Normalization
-Uses `VIBRATION_STATIONARY_THRESHOLD` (0.12f) for motion discrimination (Issue #318).
-
-## 4. Forensic Continuity (v8.9.54 / DB v50)
+## 4. Forensic Continuity (v9.4.0)
 Physical violations are logged with extended forensic metadata:
 1.  **Dual-Metric Spatial Anchor (Issue #325)**: All tamper, lift, and tilt events are anchored with `lat`, `lng`, `accuracy`, and `maxAccuracy`. **`maxAccuracy` is the exclusive authority** for trajectory deduplication (Issue #450).
 2.  **Bayesian Uncertainty expansion (Issue #431)**: When location fixes are pending, spatial uncertainty expands at **15.0m/s** (Moving) or **1.5m/s** (Stationary), capped at **33.3m/s**. This expansion is synchronized between UI visualization and breach logic.
 3.  **Monotonic Timing (Issue #311 / Issue #441)**: All timing deltas and hardware locks are calculated using `TimeProvider.elapsedRealtime()`.
-4.  **Ghost Mode UX (Issue #338)**: Visual staleness indicators are applied when telemetry is older than 15s. (Relaxed from 10s baseline in v8.9.54 to accommodate network jitter).
+4.  **Ghost Mode UX (Issue #338)**: Visual staleness indicators are applied when telemetry is older than 35s (aligned with unified heartbeat + jitter tolerance).
 
-## 5. State Integration
+## 5. State Integration (Issue #501)
 When a physical violation occurs:
 1.  The system transitions to `SUSPICIOUS` state.
-2.  GPS polling increases to `SUSPICIOUS_GPS_POLLING_MS` (1000ms).
-3.  Kalman/ImmFilter Process Noise (Q) is scaled up via `SUSPICIOUS_Q_SCALE` (1000.0).
+2.  GPS polling remains at the unified **2000ms** (`TICK_INTERVAL_MS`) to maintain background stability and avoid OS-level suppression.
+3.  Kalman/ImmFilter Process Noise (Q) is scaled up via `SUSPICIOUS_Q_SCALE` (1000.0) to allow for faster adaptation to potential movement.

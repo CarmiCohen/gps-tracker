@@ -20,11 +20,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.3.28:
- * - Forensic Parity (#092): Integrated historyManager.updateRibbons into processTick 
- *   to ensure telemetry recording is active in Tracker mode.
- * v9.3.20:
- * - R405: Samsung A15 Power Hardening. Unified heartbeat to 2s.
+ * v9.4.0:
+ * - R406a: Unified Heartbeat (Issue #501). Standardized loop and polling to 2s.
+ *   Removed variable interval logic and device-specific polling adaptations.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -301,8 +299,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     override fun getRequiredTickInterval(): Long {
-        val elapsed = timeProvider.elapsedRealtime() - serviceStartRealtime
-        return getActiveHeartbeatInterval(elapsed)
+        return TICK_INTERVAL_MS
     }
 
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {

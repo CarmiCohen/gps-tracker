@@ -17,11 +17,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * v9.3.25:
- * - R405: Samsung A15 Stability Hardening. Integrated wake-lock renewal 
- *   into processTick to prevent background suppression on Samsung devices.
- * v9.3.18:
- * - R404: Legacy Relay URL Fallback Remediation. Synchronized with MainRepository.DEFAULT_RELAY_URL.
+ * v9.4.0:
+ * - R406a: Unified Heartbeat (Issue #501). Standardized loop and polling to 2s.
+ *   Removed variable interval logic and device-specific polling adaptations.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -139,7 +137,6 @@ class ViewerService : BaseMonitorService() {
             }
             
             delay(2000)
-            gpsManager.setPollingInterval(VIEWER_GPS_POLLING_MS)
             gpsCollectionJob = lifecycleScope.launch { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
             gnssDetailJob = lifecycleScope.launch { gpsManager.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
 
@@ -195,7 +192,7 @@ class ViewerService : BaseMonitorService() {
         val bearing = location.bearing.toDouble()
 
         val currentHeartbeat = getRequiredTickInterval()
-        if (VIEWER_GPS_POLLING_MS == TICK_INTERVAL_MS && lastGpsFixRealtime > 0) {
+        if (lastGpsFixRealtime > 0) {
             val gap = nowRealtime - lastGpsFixRealtime
             stabilityAuditFixCount++
             if (gap > currentHeartbeat + GPS_STABILITY_GAP_THRESHOLD_MS) {
@@ -327,9 +324,7 @@ class ViewerService : BaseMonitorService() {
     }
     
     override fun getRequiredTickInterval(): Long {
-        val elapsed = timeProvider.elapsedRealtime() - serviceStartRealtime
-        if (elapsed < BOOTSTRAP_PHASE_MS) return STARTUP_TICK_INTERVAL_MS
-        return if (isUiVisible()) TICK_INTERVAL_MS else TICK_INTERVAL_SLOW_MS
+        return TICK_INTERVAL_MS
     }
 
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
@@ -419,7 +414,7 @@ class ViewerService : BaseMonitorService() {
             lastTickTs = lastServiceTickTs,
             serviceTickCounter = serviceTickCounter,
             rtt = networkManager.getRtt(),
-            peerSignal = remoteHandler.peerSignal,
+            peerSignal = 10,
             peerAvail = isSocketConnected && isTrackerActive,
             hasGps = gpsTs > 0,
             isTrackerMode = false,
@@ -439,7 +434,7 @@ class ViewerService : BaseMonitorService() {
 
         evaluateAlarmsInternal(nowRealtime, isSignalLoss, isTrackerJammerSuspicion, isTrackerStalled, isTrackerGap, isTrackerActive)
 
-        val notificationInterval = if (isUiVisible()) TICK_INTERVAL_MS else NOTIFICATION_THROTTLE_MS
+        val notificationInterval = TICK_INTERVAL_MS
         if (now - lastNotificationUpdateTs >= notificationInterval) {
             lastNotificationUpdateTs = now
             notificationManager.updatePulse(

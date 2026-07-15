@@ -20,9 +20,8 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * v9.3.39:
- * - Issue #092: Implemented reactive SetPendingMode handler to resolve 
- *   navigation stalls during permission hand-offs.
+ * vJuly.11.01:
+ * - R406a: Unified Heartbeat (Issue #501). Standardized global timer to TICK_INTERVAL_MS (2s).
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -314,7 +313,7 @@ class MainViewModel @Inject constructor(
                 }
                 is UiEvent.SetViewerId -> {
                     settingsUseCase.updateViewerId(event.id)
-                    updateState { it.copy(viewerId = event.id) }; repository.resetStats(); repository.sendCommand(UiCommand.StatsReset); repository.sendCommand(UiCommand.SettingsUpdated)
+                    updateState { it.copy(viewerId = event.id) }; repository.resetStats(); repository.resetStats(); repository.sendCommand(UiCommand.StatsReset); repository.sendCommand(UiCommand.SettingsUpdated)
                 }
                 is UiEvent.SetRelayUrl -> {
                     settingsUseCase.updateRelayUrl(event.url)
@@ -372,7 +371,7 @@ class MainViewModel @Inject constructor(
     private fun updateDraft(update: (DraftSettings) -> DraftSettings) {
         updateState { it.copy(draftSettings = update(it.draftSettings)) }
         autoSaveJob?.cancel()
-        autoSaveJob = viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { delay(300); settingsUseCase.saveDraftToRepo(_uiState.value.draftSettings) }
+        autoSaveJob = viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { delay(300L); settingsUseCase.saveDraftToRepo(_uiState.value.draftSettings) }
     }
 
     private fun handleAlarmEvent(event: UiEvent) {
@@ -484,8 +483,7 @@ class MainViewModel @Inject constructor(
                     updateState { state -> state.copy(isAlarmSilenced = behaviorUseCase.isAlarmSilenced(state.lastAlarmAckTs, now)) }
                 }
 
-                val currentInterval = getActiveHeartbeatInterval(0)
-                delay(currentInterval)
+                delay(TICK_INTERVAL_MS)
             }
         }
     }
