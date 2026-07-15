@@ -20,11 +20,9 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * v9.3.29:
- * - ANR Hardening (#092): Offloaded permission state polling to Dispatchers.IO 
- *   to prevent system IPC calls from blocking the Main thread.
- * v9.3.26:
- * - ANR Recovery: Guarded startGlobalTimer logic with initialization check.
+ * v9.3.39:
+ * - Issue #092: Implemented reactive SetPendingMode handler to resolve 
+ *   navigation stalls during permission hand-offs.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -119,7 +117,6 @@ class MainViewModel @Inject constructor(
     val history24HFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("24H")
     val history7DFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("7D")
 
-    var pendingMode: String? = null
     var appStartTime: Long = 0L
     private var autoSaveJob: Job? = null
     private var lastKnownAlarmTypes: Set<String> = emptySet()
@@ -129,32 +126,33 @@ class MainViewModel @Inject constructor(
     init {
         viewModelScope.launch(uiExceptionHandler) {
             loadInitialData()
-            delay(150)
-            startGlobalTimer()
-            delay(200)
             startReactiveObservations()
-            delay(1000)
+            startGlobalTimer()
             stateSubscriptionUseCase.startHistoryObservations(viewModelScope)
         }
     }
 
     private fun startReactiveObservations() {
         stateSubscriptionUseCase.observeRepositorySettings()
+            .distinctUntilChanged()
             .onEach { update ->
                 updateState { it.copy(
                     deviceId = update.trackerId, viewerId = update.viewerId, relayUrl = update.relayUrl,
                     maxDistance = update.maxDistance, homePoints = update.homePoints, lastAlarmAckTs = update.lastAlarmAckTs,
+                    appMode = update.appMode,
                     permissions = it.permissions.copy(isXiaomiManualOverride = update.isXiaomiManualOverride)
                 )}
             }.launchIn(viewModelScope)
 
         stateSubscriptionUseCase.observeConnectivityBasics()
+            .distinctUntilChanged()
             .onEach { update ->
                 _rtt.value = update.lastRtt
                 updateState { it.copy(connectivity = it.connectivity.copy(isRelayConnected = update.isRelayConnected, lastRemoteActivityTs = update.lastRemoteActivityTs))}
             }.launchIn(viewModelScope)
 
         stateSubscriptionUseCase.observeIntegrityUpdates()
+            .distinctUntilChanged()
             .onEach { update ->
                 updateState { current -> current.copy(
                     integrity = update.integrityUi,
@@ -168,18 +166,24 @@ class MainViewModel @Inject constructor(
                 if (_uiState.value.appMode == "tracker") _trackerMaxTemp.value = update.maxTemp
             }.launchIn(viewModelScope)
 
-        stateSubscriptionUseCase.observeInternetStatus().onEach { online -> updateState { it.copy(connectivity = it.connectivity.copy(isLocalOnline = online)) } }.launchIn(viewModelScope)
-        stateSubscriptionUseCase.observeBatteryStatus().onEach { status -> 
-            updateState { current -> current.copy(
-                battery = current.battery.copy(level = status.level, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging),
-                trackerBattery = if (current.appMode == "tracker") current.trackerBattery.copy(level = status.level, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging) else current.trackerBattery
-            ) } 
-            _currentMa.value = status.currentMa
-        }.launchIn(viewModelScope)
+        stateSubscriptionUseCase.observeInternetStatus()
+            .distinctUntilChanged()
+            .onEach { online -> updateState { it.copy(connectivity = it.connectivity.copy(isLocalOnline = online)) } }.launchIn(viewModelScope)
+            
+        stateSubscriptionUseCase.observeBatteryStatus()
+            .distinctUntilChanged()
+            .onEach { status -> 
+                updateState { current -> current.copy(
+                    battery = current.battery.copy(level = status.level, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging),
+                    trackerBattery = if (current.appMode == "tracker") current.trackerBattery.copy(level = status.level, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging) else current.trackerBattery
+                ) } 
+                _currentMa.value = status.currentMa
+            }.launchIn(viewModelScope)
 
-        stateSubscriptionUseCase.observeGnssDetail().onEach { _gnssDetail.value = it }.launchIn(viewModelScope)
-        stateSubscriptionUseCase.observeGpsIndex().onEach { _gpsIndexData.value = it }.launchIn(viewModelScope)
+        stateSubscriptionUseCase.observeGnssDetail().distinctUntilChanged().onEach { _gnssDetail.value = it }.launchIn(viewModelScope)
+        stateSubscriptionUseCase.observeGpsIndex().distinctUntilChanged().onEach { _gpsIndexData.value = it }.launchIn(viewModelScope)
 
+        // Note: StateFlow sources from repository already imply distinctUntilChanged behavior.
         viewModelScope.launch { repository.localLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
         viewModelScope.launch { repository.trackerLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
         viewModelScope.launch { repository.connectedViewers.collect { viewers -> updateState { it.copy(connectivity = it.connectivity.copy(connectedViewers = viewers)) } } }
@@ -195,7 +199,7 @@ class MainViewModel @Inject constructor(
             } 
         }
 
-        repository.identitySanitizedFlow.onEach { sanitized ->
+        repository.identitySanitizedFlow.distinctUntilChanged().onEach { sanitized ->
             updateState { it.copy(isIdentitySanitized = sanitized) }
         }.launchIn(viewModelScope)
     }
@@ -212,6 +216,7 @@ class MainViewModel @Inject constructor(
                 }
                 updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
             }
+            is UiEvent.SetPendingMode -> updateNavigation { it.copy(pendingMode = event.mode) }
             is UiEvent.SetRedScreenVisible -> _redScreenVisible.value = event.visible
             is UiEvent.SetUiVisible -> {
                 repository.sendCommand(UiCommand.UiVisibilityChanged(event.visible))
@@ -479,7 +484,6 @@ class MainViewModel @Inject constructor(
                     updateState { state -> state.copy(isAlarmSilenced = behaviorUseCase.isAlarmSilenced(state.lastAlarmAckTs, now)) }
                 }
 
-                // R405: Unified 2s heartbeat for UI timer.
                 val currentInterval = getActiveHeartbeatInterval(0)
                 delay(currentInterval)
             }
@@ -530,20 +534,19 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun loadInitialData() {
-        viewModelScope.launch(uiExceptionHandler) {
-            val initial = settingsUseCase.loadAllSettings()
-            appStartTime = initial.appStartTime
-            updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings, isIdentitySanitized = initial.identitySanitized) }
-            _localMaxTemp.value = initial.maxTemp; if (initial.appMode == "tracker") _trackerMaxTemp.value = initial.maxTemp
-            initial.trackerStatus?.let { status -> 
-                updateState { it.copy(trackerLocation = telemetryUseCase.mapTrackerLocationFromStatus(status, it.trackerLocation), connectivity = it.connectivity.copy(lastUpdateTs = status.ts), trackerStats = telemetryUseCase.mapStatsFromStatus(status, it.trackerStats), trackerBattery = it.trackerBattery.copy(level = status.battery, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging), trackerSatsView = status.satsView, trackerSatsUsed = status.satsUsed, maxTrackerAccuracy = if (status.maxAccuracy > 0.0) status.maxAccuracy else it.maxTrackerAccuracy) }
-                _trackerMaxTemp.value = status.maxTemp
-                _trackerCurrentMa.value = status.currentMa
-                if (_uiState.value.appMode == "tracker") _localMaxTemp.value = status.maxTemp 
-            }
-            updateState { it.copy(isInitialized = true) }
+    private suspend fun loadInitialData() {
+        val initial = settingsUseCase.loadAllSettings()
+        appStartTime = initial.appStartTime
+        updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings, isIdentitySanitized = initial.identitySanitized) }
+        _localMaxTemp.value = initial.maxTemp; if (initial.appMode == "tracker") _trackerMaxTemp.value = initial.maxTemp
+        initial.trackerStatus?.let { status -> 
+            updateState { it.copy(trackerLocation = telemetryUseCase.mapTrackerLocationFromStatus(status, it.trackerLocation), connectivity = it.connectivity.copy(lastUpdateTs = status.ts), trackerStats = telemetryUseCase.mapStatsFromStatus(status, it.trackerStats), trackerBattery = it.trackerBattery.copy(level = status.battery, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging), trackerSatsView = status.satsView, trackerSatsUsed = status.satsUsed, maxTrackerAccuracy = if (status.maxAccuracy > 0.0) status.maxAccuracy else it.maxTrackerAccuracy) }
+            _trackerMaxTemp.value = status.maxTemp
+            _trackerCurrentMa.value = status.currentMa
+            if (_uiState.value.appMode == "tracker") _localMaxTemp.value = status.maxTemp 
         }
+        
+        updateState { it.copy(isInitialized = true) }
     }
 
     fun addPersistentLog(type: String, message: String, isImportant: Boolean = false, isSpecial: Boolean = false, specialColor: Int? = null) { logManager.submitToLogSink(message, type, important = isImportant, isSpecial = isSpecial, specialColor = specialColor) }

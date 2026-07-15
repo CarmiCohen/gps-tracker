@@ -10,10 +10,11 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * v9.3.39:
+ * - Issue #092: Added SetPendingMode to UiEvent for reactive navigation.
  * v9.3.25:
  * - Protocol Optimization: Migrated to Enum-based binary serialization for 
  *   tracker state and pending reasons to further reduce heartbeat footprint.
- * - Bugfix: Corrected isBatterySteepDischarge naming in ConnectionPoint.
  */
 
 @Serializable
@@ -584,6 +585,7 @@ sealed class UiEvent {
     data class SetUiVisible(val visible: Boolean) : UiEvent()
     object DismissAlarms : UiEvent()
     data class SetAppMode(val mode: String?) : UiEvent()
+    data class SetPendingMode(val mode: String?) : UiEvent()
     data class SetSystemActive(val active: Boolean) : UiEvent()
     data class StopSiren(val causes: String? = null) : UiEvent()
     object ResetStats : UiEvent()

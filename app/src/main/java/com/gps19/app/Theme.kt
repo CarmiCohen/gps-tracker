@@ -3,16 +3,14 @@ package com.gps19.app
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 
 /**
  * R799: Dynamic Theme based on Role (Tracker/Viewer).
- * v9.1.0:
- * - R799e [Active]: JD Vivid Green (#78BE20) enforced as primary branding.
- * v9.0.4:
- * - R799d: Changed Viewer color to Cyan (#06B6D4) from Orange.
- * v8.9.40:
- * - R865/R866 [Active]: Unified Identity Green (#367C2B) enforced.
+ * v9.3.31:
+ * - Performance Hardening (#092): Added remember { } block to ColorScheme 
+ *   to prevent full-app recomposition loops and allocation storms.
  */
 
 private fun getDarkColorScheme(appMode: String?) = darkColorScheme(
@@ -32,7 +30,7 @@ private fun getDarkColorScheme(appMode: String?) = darkColorScheme(
     onPrimary = Color.White,
     onSecondary = Color.White,
     onTertiary = Color.Black,
-    onBackground = White,
+    onBackground = Color.White,
     onSurface = Slate400,
     error = Rose500 
 )
@@ -65,7 +63,10 @@ fun GpsTrackerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) getDarkColorScheme(appMode) else getLightColorScheme(appMode)
+    // R920: Stabilize color scheme to prevent allocation storms during telemetry updates.
+    val colorScheme = remember(appMode, darkTheme) {
+        if (darkTheme) getDarkColorScheme(appMode) else getLightColorScheme(appMode)
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,

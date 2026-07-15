@@ -13,6 +13,8 @@ import javax.inject.Singleton
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * v9.3.37:
+ * - Issue #092: Added appMode to observeRepositorySettings for reactive UI synchronization.
  * v8.9.79: Issue #014 - Type Migration: Standardized temperature fields to Double.
  * v8.9.5:
  * - Issue #337: Propagated currentMa in observeIntegrityUpdates for power forensic parity.
@@ -85,7 +87,8 @@ class StateSubscriptionUseCase @Inject constructor(
             repository.maxDistanceFlow,
             repository.homePointsFlow,
             repository.isXiaomiManualOverrideFlow,
-            repository.lastAlarmAckTsFlow
+            repository.lastAlarmAckTsFlow,
+            repository.appModeFlow
         ) { args: Array<Any?> ->
             SettingsUpdate(
                 trackerId = args[0] as String,
@@ -94,7 +97,8 @@ class StateSubscriptionUseCase @Inject constructor(
                 maxDistance = args[3] as Double,
                 homePoints = args[4] as List<GeoPoint>,
                 isXiaomiManualOverride = args[5] as Boolean,
-                lastAlarmAckTs = args[6] as Long
+                lastAlarmAckTs = args[6] as Long,
+                appMode = args[7] as String?
             )
         }
     }
@@ -188,7 +192,8 @@ class StateSubscriptionUseCase @Inject constructor(
         val maxDistance: Double,
         val homePoints: List<GeoPoint>,
         val isXiaomiManualOverride: Boolean,
-        val lastAlarmAckTs: Long
+        val lastAlarmAckTs: Long,
+        val appMode: String?
     )
 
     data class ConnectivityUpdate(

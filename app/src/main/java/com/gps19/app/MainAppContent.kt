@@ -38,13 +38,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.gps19.core.engine.LANDING_PAGE_PAUSE_MS
 import kotlinx.coroutines.delay
+import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * v9.3.36:
- * - Issue #092: Refined Landing Page logic. 2s delay (LANDING_PAGE_PAUSE_MS) now 
- *   applies only to automatic mode restoration. Manual selection is immediate.
- * - Performance: Resolved redundant Service launch sequence.
+ * v9.3.39:
+ * - Issue #092: Migrated to reactive pendingMode for reliable auto-transitions.
+ * - Issue #092: Fixed race condition in isManualSelectionInProgress flag reset.
  */
 @Composable
 fun MainAppContent(
@@ -87,8 +87,40 @@ fun MainAppContent(
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
     var isManualSelectionInProgress by remember { mutableStateOf(false) }
 
+    fun hasRequiredPermissions(mode: String): Boolean {
+        val fineLocation = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val coarseLocation = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        
+        val audio = if (mode == "tracker") {
+            ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        } else true
+        
+        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else true
+        
+        return fineLocation && coarseLocation && audio && notification
+    }
+
+    // R926/Issue #092: Automatic transition once required permissions are granted
+    LaunchedEffect(uiState.permissions, uiState.navigation.pendingMode) {
+        val mode = uiState.navigation.pendingMode
+        if (mode != null && hasRequiredPermissions(mode)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
+                ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                showBackgroundDisclosure = true
+            } else {
+                Timber.d("Proceeding to mode $mode after permission grant")
+                isManualSelectionInProgress = true
+                viewModel.onEvent(UiEvent.SetAppMode(mode))
+                onStartService(mode)
+                viewModel.onEvent(UiEvent.SetPendingMode(null))
+            }
+        }
+    }
+
     // Navigation logic based on app mode and diagnostics visibility
-    LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible) {
+    LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible, isManualSelectionInProgress) {
         if (!uiState.isInitialized) return@LaunchedEffect
         
         val mode = uiState.appMode
@@ -102,8 +134,8 @@ fun MainAppContent(
         }
 
         if (mode != null) {
-            // R926/Issue #092: 2s delay applies only to automatic restoration (cold boot with saved mode)
             if (navController.currentDestination?.route == Screen.Landing.route && !isManualSelectionInProgress) {
+                Timber.d("Automatic restoration: waiting ${LANDING_PAGE_PAUSE_MS}ms")
                 delay(LANDING_PAGE_PAUSE_MS)
                 onStartService(mode)
             }
@@ -121,7 +153,10 @@ fun MainAppContent(
                 }
             }
             null -> {
-                isManualSelectionInProgress = false
+                // v9.3.39: Only reset flag if no selection is currently pending
+                if (uiState.navigation.pendingMode == null) {
+                    isManualSelectionInProgress = false
+                }
                 if (navController.currentDestination?.route != Screen.Landing.route) {
                     navController.navigate(Screen.Landing.route) { popUpTo(0) { inclusive = true } }
                 }
@@ -155,32 +190,16 @@ fun MainAppContent(
 
     val backgroundPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) {
-            viewModel.pendingMode?.let { mode ->
+            uiState.navigation.pendingMode?.let { mode ->
                 isManualSelectionInProgress = true
                 viewModel.onEvent(UiEvent.SetAppMode(mode))
                 onStartService(mode)
-                viewModel.pendingMode = null
+                viewModel.onEvent(UiEvent.SetPendingMode(null))
             }
         } else {
             isManualSelectionInProgress = false
             Toast.makeText(activity, context.getString(R.string.perm_background_denied_toast), Toast.LENGTH_LONG).show()
         }
-    }
-
-    fun hasRequiredPermissions(mode: String): Boolean {
-        val fineLocation = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarseLocation = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        
-        // RECORD_AUDIO is only required for Tracker mode
-        val audio = if (mode == "tracker") {
-            ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        } else true
-        
-        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        } else true
-        
-        return fineLocation && coarseLocation && audio && notification
     }
 
     if (showBackgroundDisclosure) {
@@ -240,14 +259,14 @@ fun MainAppContent(
                             if (hasRequiredPermissions(mode)) { 
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                                     isManualSelectionInProgress = true
-                                    viewModel.pendingMode = mode; showBackgroundDisclosure = true
+                                    viewModel.onEvent(UiEvent.SetPendingMode(mode)); showBackgroundDisclosure = true
                                 } else {
                                     isManualSelectionInProgress = true
                                     viewModel.onEvent(UiEvent.SetAppMode(mode)); onStartService(mode)
                                 }
                             } else { 
                                 isManualSelectionInProgress = true
-                                viewModel.pendingMode = mode; checkAndRequestPermissions(mode)
+                                viewModel.onEvent(UiEvent.SetPendingMode(mode)); checkAndRequestPermissions(mode)
                             } 
                         }
                     }
@@ -295,6 +314,7 @@ fun MainAppContent(
                             uiState = uiState, viewModel = viewModel, logs = eventLogs, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
                             systemPulse = systemPulse, systemPulseRealtime = systemPulseRealtime,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
+                            // Corrected onToggleLog to prevent infinite loop or wrong state
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
                             onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
                             onExit = onCleanupAndExit,

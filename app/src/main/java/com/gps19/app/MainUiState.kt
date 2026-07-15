@@ -4,14 +4,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Unified immutable state for the entire UI structure.
- * v9.3.16:
- * - Issue #078: Introduced MapFollowMode to prevent map centering conflicts.
- * v9.3.14:
- * - Issue C-068-1: Added xiaomiAutostartStatus to PermissionState for TTL caching.
- * v9.3.11: 
- * - Issue #059: Added isDiagnosticsVisible to NavigationState for Permission Health Check.
- * v9.3.0: Issue #042 - Sanitization Visibility. Added isIdentitySanitized flag.
- * v8.9.79: Issue #014 - Type Migration: Standardized accuracy fields to Double.
+ * v9.3.39:
+ * - Issue #092: Added pendingMode to NavigationState to facilitate reactive 
+ *   auto-transitions after permission grants.
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -129,7 +124,8 @@ data class NavigationState(
     val isStopTrackingConfirmationVisible: Boolean = false,
     val isDiagnosticsVisible: Boolean = false,
     val activeSubSettings: SubSettings? = null,
-    val wasMapVisibleBeforeOverlay: Boolean = true
+    val wasMapVisibleBeforeOverlay: Boolean = true,
+    val pendingMode: String? = null
 )
 
 enum class SubSettings { ALERTS, SOUND, CLEAN }
