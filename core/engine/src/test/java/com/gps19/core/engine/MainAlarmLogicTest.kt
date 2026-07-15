@@ -7,12 +7,10 @@ import org.junit.Test
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
- * v8.9.78:
- * - Issue #018: Verified Stationary Anchor Hard-Lock suppression.
- * - Issue #014: Updated to native Double types for all telemetry fields.
- * v8.9.52:
- * - Issue #431: Added Bayesian expansion verification for geofence breaches.
- * - Issue #452: Added SNR Latch (Adaptive Jump) hold duration verification.
+ * v9.4.0:
+ * - Issue #502: Device Independency. Updated tests to use HardwareCapabilities abstraction.
+ * v9.3.16:
+ * - R999b: Barometer EMA lift detection support.
  */
 class MainAlarmLogicTest {
 
@@ -46,10 +44,12 @@ class MainAlarmLogicTest {
             firstViolationTs = 0L,
             firstViolationWasJump = false,
             isTrackerMode = true,
-            isXiaomiDevice = false,
-            xiaomiStatus = EngineXiaomiStatus.GRANTED,
-            xiaomiAutostartStatus = EngineXiaomiStatus.GRANTED,
-            isXiaomiManualOverride = false
+            capabilities = HardwareCapabilities(
+                hasBackgroundRestriction = false,
+                backgroundStatus = CapabilityStatus.GRANTED,
+                autostartStatus = CapabilityStatus.GRANTED,
+                isManualOverrideActive = false
+            )
         )
     }
 
@@ -119,17 +119,19 @@ class MainAlarmLogicTest {
     }
 
     @Test
-    fun `Verify Xiaomi Boot Grace suppresses alarms`() {
+    fun `Verify Hardware Boot Grace suppresses alarms`() {
         val now = 1700000000000L
         val stateInGrace = createDefaultState(now).copy(
-            isXiaomiDevice = true,
-            xiaomiStatus = EngineXiaomiStatus.DENIED,
-            xiaomiAutostartStatus = EngineXiaomiStatus.DENIED,
+            capabilities = HardwareCapabilities(
+                hasBackgroundRestriction = true,
+                backgroundStatus = CapabilityStatus.DENIED,
+                autostartStatus = CapabilityStatus.DENIED
+            ),
             serviceStartTime = now - 10000 // 10s uptime
         )
         
         val report = MainAlarmLogic.detectViolations(stateInGrace)
-        val alert = report.reports.find { it.type == ALERT_ID_XIAOMI_SYSTEM_MISSING }
+        val alert = report.reports.find { it.type == ALERT_ID_HARDWARE_CONFIGURATION }
         assertFalse("Alert should be suppressed during boot grace period", alert?.conditionMet == true)
     }
 

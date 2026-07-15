@@ -5,12 +5,10 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
- * v9.3.16:
- * - Requirement R999b: Standardized lift detection to use barometer delta 
- *   (Absolute - EMA) instead of raw absolute altitude.
- * v9.2.2:
- * - Issue #326 Fix: Intelligent Uncertainty UX. Included specific locationPendingReason 
- *   in forensic technical details.
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted logic from geofence evaluation.
+ * July.1.12:
+ * - Issue #502: Device Independency. Genericized hardware gating using HardwareCapabilities.
  */
 object MainAlarmLogic {
 
@@ -240,7 +238,6 @@ object MainAlarmLogic {
             val dValue = distVal
             val isJump = state.isTrackerVisualJump
             val jumpTier = state.jumpTier
-            val isPromoted = state.isTrajectoryPromoted
             val isPredictedExit = dValue > predictiveThreshold && state.trackerSpeed > GEOFENCE_PREDICTIVE_MIN_SPEED_MPS
 
             if (dValue > threshold || (isPredictedExit && !isJump)) {
@@ -249,7 +246,7 @@ object MainAlarmLogic {
                     state.firstViolationWasJump = isJump && (jumpTier == 1 || jumpTier == 2)
                 }
                 
-                if (isPromoted || isPredictedExit) {
+                if (isPredictedExit) {
                     state.wasDistanceViolated = true
                     state.firstViolationWasJump = false 
                 }
@@ -267,7 +264,7 @@ object MainAlarmLogic {
                     state.distanceViolationCounter >= DISTANCE_ALARM_SAMPLES_REQUIRED
                 }
 
-                if (isSustained || isPromoted || isPredictedExit) {
+                if (isSustained || isPredictedExit) {
                     state.wasDistanceViolated = true
                 }
                 
@@ -275,7 +272,6 @@ object MainAlarmLogic {
                 val durationSec = timeSinceFirst / 1000
                 val debounceStr = when {
                     isPredictedExit -> "PREDICTIVE EXIT (${String.format(Locale.getDefault(), "%.1f", state.trackerSpeed * 3.6)} km/h)"
-                    isPromoted -> "TRAJECTORY PROMOTED"
                     isSustained -> "ALARM ACTIVE"
                     state.firstViolationWasJump -> "Jump Hold: ${durationSec}s/${effectiveHoldMs/1000}s${if (state.isAdaptiveJump) " (Adaptive)" else ""}"
                     else -> "Wait: ${state.distanceViolationCounter}/$DISTANCE_ALARM_SAMPLES_REQUIRED"
@@ -290,7 +286,7 @@ object MainAlarmLogic {
                         type = ALERT_ID_TRACKER_GEOFENCE,
                         title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_GEOFENCE),
                         subtitle = "Device is ${ceil(dValue).toInt()}m away from home",
-                        conditionMet = !isDistanceGraceActive && (isSustained || isPromoted || isPredictedExit),
+                        conditionMet = !isDistanceGraceActive && (isSustained || isPredictedExit),
                         technicalDetails = geoTech,
                         extremeValue = deviation
                     )
@@ -391,37 +387,38 @@ object MainAlarmLogic {
             )
         )
 
-        // 7. DEVICE SPECIFIC GATING
+        // 7. HARDWARE CONFIGURATION GATING (Issue #502)
         val uptimeMs = now - state.serviceStartTime
-        val isXiaomiBootGraceActive = uptimeMs < XIAOMI_BOOT_GRACE_MS
-        val isAutostartExplicitlyDenied = state.xiaomiAutostartStatus == EngineXiaomiStatus.DENIED
-        val isSpecialExplicitlyDenied = state.xiaomiStatus == EngineXiaomiStatus.DENIED
-        val isAutostartIndeterminate = state.xiaomiAutostartStatus == EngineXiaomiStatus.UNKNOWN
-        val isSpecialIndeterminate = state.xiaomiStatus == EngineXiaomiStatus.UNKNOWN
+        val isBootGraceActive = uptimeMs < HARDWARE_BOOT_GRACE_MS
+        val caps = state.capabilities
+        
+        val isExplicitlyDenied = caps.backgroundStatus == CapabilityStatus.DENIED || 
+                                 caps.autostartStatus == CapabilityStatus.DENIED
+        val isIndeterminate = caps.backgroundStatus == CapabilityStatus.UNKNOWN || 
+                             caps.autostartStatus == CapabilityStatus.UNKNOWN
 
-        val xiaomiViolation = if (state.isXiaomiDevice && !isXiaomiBootGraceActive) {
+        val configViolation = if (caps.hasBackgroundRestriction && !isBootGraceActive) {
             when {
-                isAutostartExplicitlyDenied || isSpecialExplicitlyDenied -> true
-                isAutostartIndeterminate || isSpecialIndeterminate -> !state.isXiaomiManualOverride
-                else -> false // Both GRANTED
+                isExplicitlyDenied -> true
+                isIndeterminate -> !caps.isManualOverrideActive
+                else -> false
             }
         } else false
-        
-        val xiaomiSubtitle = when {
-            !state.isXiaomiDevice -> "Not a Xiaomi device"
-            isXiaomiBootGraceActive -> "MIUI status stabilizing..."
-            isAutostartExplicitlyDenied -> "MIUI Autostart explicitly DENIED - Enable in Phone Setup"
-            isSpecialExplicitlyDenied -> "MIUI background permissions explicitly DENIED"
-            isAutostartIndeterminate || isSpecialIndeterminate -> "MIUI status UNKNOWN - Toggle manual override in Phone Setup"
-            else -> "MIUI status OK"
+
+        val configSubtitle = when {
+            !caps.hasBackgroundRestriction -> "Hardware configuration OK"
+            isBootGraceActive -> "Hardware status stabilizing..."
+            isExplicitlyDenied -> "Background/Autostart explicitly DENIED - Enable in Phone Setup"
+            isIndeterminate -> "Hardware status UNKNOWN - Toggle manual override in Phone Setup"
+            else -> "Hardware configuration OK"
         }
 
         reports.add(
             ViolationReport(
-                type = ALERT_ID_XIAOMI_SYSTEM_MISSING,
-                title = getTrackerTitle(isTracker, ALERT_TITLE_XIAOMI_SYSTEM_MISSING),
-                subtitle = xiaomiSubtitle,
-                conditionMet = xiaomiViolation
+                type = ALERT_ID_HARDWARE_CONFIGURATION,
+                title = getTrackerTitle(isTracker, ALERT_TITLE_HARDWARE_CONFIGURATION),
+                subtitle = configSubtitle,
+                conditionMet = configViolation
             )
         )
 

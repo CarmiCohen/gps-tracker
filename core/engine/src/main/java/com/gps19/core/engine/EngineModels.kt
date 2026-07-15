@@ -4,14 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * v9.3.16:
- * - Requirement R999b: Added trackerBaroAltEma to AlarmEvaluationState to support 
- *   synchronized barometer violation detection.
- * v9.2.2:
- * - Issue #326: Added GPS_GAP to LocationPendingReason for environmental signal loss.
- * v9.2.1:
- * - Issue #018: Added alt to EngineGeoPoint to support altitude preservation 
- *   during anchor clamping.
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed RejectedPoint and trajectory-specific result fields.
+ * July.1.12:
+ * - Issue #504: Kalman Filter Removal. Relies on EMA smoothing.
+ * July.1.11:
+ * - Issue #502: Device Independency. Replaced vendor-specific flags with HardwareCapabilities abstraction.
  */
 
 @Serializable
@@ -39,17 +37,32 @@ enum class SentinelStatus {
     JAMMER_SUSPICION,
     TAMPER_ALERT,
     ACOUSTIC_WARNING,
-    SENSOR_SUSPICIOUS,
-    TRAJECTORY_PROMOTED
+    SENSOR_SUSPICIOUS
 }
 
-enum class EngineXiaomiStatus {
+/**
+ * CapabilityStatus: Status of a specific hardware or OS capability/permission.
+ */
+enum class CapabilityStatus {
     GRANTED, DENIED, UNKNOWN
 }
 
 /**
+ * HardwareCapabilities: Abstract representation of device-specific behaviors and restrictions.
+ */
+@Serializable
+data class HardwareCapabilities(
+    val hasBackgroundRestriction: Boolean = false,
+    val backgroundStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
+    val autostartStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
+    val requiresWakeLockRenewal: Boolean = false,
+    val requiresAdaptationMuzzle: Boolean = false,
+    val requiresExtraTopPadding: Boolean = false,
+    val isManualOverrideActive: Boolean = false
+)
+
+/**
  * LocationPendingReason: Contextual cause for Bayesian uncertainty expansion.
- * v9.2.2 (Issue #326)
  */
 enum class LocationPendingReason {
     NONE,
@@ -131,7 +144,6 @@ data class SentinelResult(
     val reason: String = "",
     val optimizedPoint: EngineGeoPoint? = null,
     val jumpConfidence: JumpConfidence? = null,
-    val promotedPoints: List<EngineGeoPoint>? = null,
     val suppressionNote: String? = null
 )
 
@@ -156,19 +168,6 @@ data class SatelliteInfo(
 @Serializable
 data class GnssDetail(
     val satellites: List<SatelliteInfo> = emptyList()
-)
-
-/**
- * RejectedPoint: Used for hindsight correction.
- */
-data class RejectedPoint(
-    val lat: Double,
-    val lng: Double,
-    val alt: Double,
-    val accuracy: Double,
-    val bearing: Double,
-    val speedMps: Double,
-    val ts: Long
 )
 
 /**
@@ -217,7 +216,6 @@ data class AlarmEvaluationState(
     val trackerLastValidFixTs: Long = 0L, 
     val trackerSpeed: Double = 0.0,
     val isTrackerVisualJump: Boolean = false,
-    val isTrajectoryPromoted: Boolean = false,
     val jumpTier: Int = 0,
     val isAdaptiveJump: Boolean = false,
     val trackerBattery: Int, 
@@ -258,9 +256,6 @@ data class AlarmEvaluationState(
     val isTrackerMode: Boolean = true,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val isXiaomiDevice: Boolean = false,
-    val xiaomiStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
-    val xiaomiAutostartStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
-    val isXiaomiManualOverride: Boolean = false,
+    val capabilities: HardwareCapabilities = HardwareCapabilities(),
     val isAnchorLocked: Boolean = false
 )

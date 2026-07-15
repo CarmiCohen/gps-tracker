@@ -6,11 +6,14 @@ import android.content.Context
 import android.content.Intent
 import android.location.GnssStatus
 import android.os.Build
+import android.widget.Toast
 import com.gps19.core.engine.*
 import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
+ * v9.4.0:
+ * - Issue #502: Device Independency. Added openHardwareSettings to encapsulate vendor quirks.
  * v9.3.11:
  * - Issue #068 Hardening: Enforced use of cachedPackageName in Xiaomi permission 
  *   checkers to eliminate repetitive getPackageName() logcat spam on Samsung G990/A155.
@@ -78,6 +81,37 @@ fun getXiaomiAutostartStatus(context: Context, pkgName: String): XiaomiPermissio
         if (autostart == AppOpsManager.MODE_ALLOWED) XiaomiPermissionStatus.GRANTED else XiaomiPermissionStatus.DENIED
     } catch (e: Exception) {
         XiaomiPermissionStatus.UNKNOWN
+    }
+}
+
+/**
+ * openHardwareSettings: Brand-agnostic entry point for hardware-specific permission managers.
+ * v9.4.0 (Issue #502)
+ */
+fun openHardwareSettings(context: Context, pkgName: String) {
+    if (isXiaomiDevice()) {
+        try {
+            val intent = Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+                setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
+                putExtra("extra_pkgname", pkgName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            return
+        } catch (e: Exception) {
+            // Fall through to generic details
+        }
+    }
+    
+    // Default fallback to standard App Info
+    try {
+        val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = android.net.Uri.fromParts("package", pkgName, null)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "Could not open system settings", Toast.LENGTH_SHORT).show()
     }
 }
 

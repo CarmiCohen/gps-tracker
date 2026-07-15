@@ -17,6 +17,7 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import com.gps19.core.engine.CapabilityStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -39,10 +40,9 @@ interface SystemStatusProvider {
     fun isPostNotificationsGranted(): Boolean
     fun isBackgroundLocationGranted(): Boolean
     fun isLocalOnline(): Boolean
-    fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus
     
     /**
-     * v9.3.30: Converted to suspend to eliminate runBlocking deadlocks (#092).
+     * v9.4.0: Genericized permission state for Issue #502.
      */
     suspend fun getPermissionState(forceRefresh: Boolean = false): PermissionState
     
@@ -81,8 +81,6 @@ class SystemStatusProviderImpl @Inject constructor(
         return caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
 
-    override fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus = cachedState?.xiaomiStatus ?: XiaomiPermissionStatus.UNKNOWN
-
     override suspend fun getPermissionState(forceRefresh: Boolean): PermissionState = permissionMutex.withLock {
         val now = SystemClock.elapsedRealtime()
         val current = cachedState
@@ -92,21 +90,42 @@ class SystemStatusProviderImpl @Inject constructor(
         }
 
         return withContext(Dispatchers.IO) {
+            val isXiaomi = isXiaomiDevice()
+            val isSamsung = isSamsungDevice()
+            val isS21FE = isS21FEDevice()
+            
+            val xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
+            val xiaomiAutostart = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
+
             val newState = PermissionState(
                 isBatteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName),
-                isAutoStartGranted = if (isXiaomiDevice()) isXiaomiAutostartGranted(context, cachedPackageName) else powerManager.isIgnoringBatteryOptimizations(cachedPackageName),
+                isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, cachedPackageName) else powerManager.isIgnoringBatteryOptimizations(cachedPackageName),
                 isOverlayGranted = Settings.canDrawOverlays(context),
                 isMicrophoneGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
                 isExactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true,
                 isPostNotificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true,
                 isBackgroundLocationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true,
-                xiaomiStatus = com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName),
-                xiaomiAutostartStatus = com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName)
+                
+                hasBackgroundRestriction = isXiaomi,
+                backgroundStatus = toCapabilityStatus(xiaomiStatus),
+                autostartStatus = toCapabilityStatus(xiaomiAutostart),
+                isManualOverride = false, // Will be updated by UI/Settings if needed
+                requiresWakeLockRenewal = isSamsung,
+                requiresExtraTopPadding = isXiaomi,
+                requiresAdaptationMuzzle = isS21FE
             )
             
             cachedState = newState
             lastFullRefreshTime = now
             newState
+        }
+    }
+
+    private fun toCapabilityStatus(status: XiaomiPermissionStatus): CapabilityStatus {
+        return when (status) {
+            XiaomiPermissionStatus.GRANTED -> CapabilityStatus.GRANTED
+            XiaomiPermissionStatus.DENIED -> CapabilityStatus.DENIED
+            XiaomiPermissionStatus.UNKNOWN -> CapabilityStatus.UNKNOWN
         }
     }
 

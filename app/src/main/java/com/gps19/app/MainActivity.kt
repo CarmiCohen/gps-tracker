@@ -18,10 +18,8 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
- * v9.3.20:
- * - R405: Samsung A15 Power Hardening. Added proactive battery optimization check.
- * v9.1.3:
- * - Maintenance: Corrected versioning sequence and redeployed stable engine.
+ * v9.4.0:
+ * - Issue #502: Device Independency. Genericized hardware permission handling.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -96,25 +94,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 },
-                onRequestXiaomiPermission = {
-                    if (isXiaomiDevice()) {
-                        try {
-                            val intent = Intent("miui.intent.action.APP_PERM_EDITOR").apply {
-                                setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
-                                putExtra("extra_pkgname", cachedPkgName)
-                            }
-                            startActivity(intent)
-                        } catch (e: Exception) {
-                            try {
-                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    setData("package:$cachedPkgName".toUri())
-                                }
-                                startActivity(intent)
-                            } catch (e2: Exception) {
-                                Toast.makeText(this, "Xiaomi settings launch failed", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
+                onRequestHardwarePermission = {
+                    openHardwareSettings(this, cachedPkgName)
                 },
                 checkAndRequestPermissions = { mode ->
                     val permissions = mutableListOf(
@@ -172,11 +153,10 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
         
-        // R405: Proactive check for Samsung A15 hardening
-        if (isA15Device() && !viewModel.uiState.value.permissions.isBatteryWhitelisted) {
-            Timber.i("R405: Samsung A15 detected without battery exemption. Prompting user.")
-            // We don't auto-launch every time, but ensure UI knows it's critical.
-            // In a real implementation, you might show a specific dialog here.
+        // Issue #502: Genericized proactive check for hardware hardening
+        val perms = viewModel.uiState.value.permissions
+        if (perms.requiresWakeLockRenewal && !perms.isBatteryWhitelisted) {
+            Timber.i("Hardware requires battery exemption for stable background execution. Prompting user.")
         }
     }
 }

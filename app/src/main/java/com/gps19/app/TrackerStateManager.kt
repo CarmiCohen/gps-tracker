@@ -5,8 +5,8 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerStateManager: Logic for mapping raw telemetry to high-level behavioral states.
- * v8.9.79:
- * - Issue #016: Standardized telemetry parameters to Double to eliminate casting overhead.
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted from state logic.
  */
 object TrackerStateManager {
     private var currentState = TrackerState.UNKNOWN
@@ -18,7 +18,6 @@ object TrackerStateManager {
 
     fun updateState(
         isVisualJump: Boolean,
-        isTrajectoryPromoted: Boolean,
         speed: Double,
         vibration: Double,
         vibrationFloor: Double,
@@ -52,7 +51,7 @@ object TrackerStateManager {
         }
 
         // Issue #302: Unified high speed promotion threshold
-        val isSpeedConfirmed = (sustainedSpeedCount >= requiredSustainedCount) || (speed > HIGH_SPEED_PROMOTION_THRESHOLD) || isTrajectoryPromoted
+        val isSpeedConfirmed = (sustainedSpeedCount >= requiredSustainedCount) || (speed > HIGH_SPEED_PROMOTION_THRESHOLD)
         
         // Confirmation: Must have sustained speed OR speed confirmed by vibration
         val isMovingNow = isSpeedConfirmed || (hasSpeed && isPhysicalMoving)
@@ -64,7 +63,7 @@ object TrackerStateManager {
         val inMovingHold = lastMovingTs > 0L && (systemTimePulse - lastMovingTs < MOVING_HOLD_DURATION_MS)
         
         val targetState = when {
-            isVisualJump && !isTrajectoryPromoted -> TrackerState.JUMPING
+            isVisualJump -> TrackerState.JUMPING
             isMovingNow || inMovingHold -> TrackerState.MOVING
             else -> TrackerState.PARKING
         }
@@ -75,7 +74,7 @@ object TrackerStateManager {
 
         if (targetState == currentState || targetState == TrackerState.JUMPING) {
             if (targetState != currentState) {
-                logStateChange(currentState, targetState, speed, isTrajectoryPromoted)
+                logStateChange(currentState, targetState, speed)
                 currentState = targetState
             }
             pendingState = targetState
@@ -85,7 +84,7 @@ object TrackerStateManager {
                 pendingState = targetState
                 pendingStateStartTs = systemTimePulse
             } else if (pendingStateStartTs != 0L && (systemTimePulse - pendingStateStartTs >= requiredBuffer)) {
-                logStateChange(currentState, pendingState, speed, isTrajectoryPromoted)
+                logStateChange(currentState, pendingState, speed)
                 currentState = pendingState
                 pendingStateStartTs = 0L
             }
@@ -94,7 +93,7 @@ object TrackerStateManager {
         return currentState
     }
 
-    private fun logStateChange(old: TrackerState, new: TrackerState, speed: Double, promoted: Boolean) {
-        Log.d("GPS19", "Tracker behavior changed: $old -> $new (Speed: ${"%.1f".format(speed)}, Promoted: $promoted)")
+    private fun logStateChange(old: TrackerState, new: TrackerState, speed: Double) {
+        Log.d("GPS19", "Tracker behavior changed: $old -> $new (Speed: ${"%.1f".format(speed)})")
     }
 }

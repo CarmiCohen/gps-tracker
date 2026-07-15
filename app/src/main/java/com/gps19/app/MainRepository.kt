@@ -18,12 +18,11 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
- * v9.3.15:
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed isHindsightCorrected from trail saving and flows.
+ * July.1.12:
  * - Hardening: Removed redundant Float accessors in alignment with SettingsRepository 
  *   Double standardization.
- * v9.3.3:
- * - Issue #039 Identity Rejection Feedback: Updated saveSettingsBulk to throw 
- *   IllegalArgumentException on identity collision to prevent silent failures.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -118,10 +117,10 @@ class MainRepository @Inject constructor(
     val eventLogsFlow: Flow<List<LogEntry>> = logRepository.eventLogsFlow
 
     val trackerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(false).map { entities -> 
-        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected, it.accuracy, it.maxAccuracy) } 
+        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.accuracy, it.maxAccuracy) } 
     }
     val viewerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(true).map { entities -> 
-        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected, it.accuracy, it.maxAccuracy) } 
+        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.accuracy, it.maxAccuracy) } 
     }
     val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> 
         entities.map { ViolationPoint(point = GeoPoint(it.lat, it.lng), type = it.type, ts = it.ts, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy) } 
@@ -254,7 +253,7 @@ class MainRepository @Inject constructor(
     fun clearLogs() { logRepository.clearLogs() }
     suspend fun loadAllLogsStatic(): List<LogEntry> = logRepository.loadAllLogsStatic()
 
-    fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, isJump: Boolean = false, timestamp: Long? = null, force: Boolean = false, isHindsightCorrected: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
+    fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, isJump: Boolean = false, timestamp: Long? = null, force: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
         if (lat == 0.0 || lng == 0.0) return
         
         val integrity = telemetry.integrityState.value
@@ -270,7 +269,6 @@ class MainRepository @Inject constructor(
             trailDao.insert(TrailEntity(
                 lat = lat, lng = lng, timestamp = wallTs, 
                 isViewerTrail = isViewer, isJump = isJump, 
-                isHindsightCorrected = isHindsightCorrected,
                 accuracy = accuracy,
                 maxAccuracy = maxAccuracy
             ))
@@ -290,7 +288,7 @@ class MainRepository @Inject constructor(
     }
 
     suspend fun loadTrailStatic(isViewer: Boolean): List<TrailPoint> = trailDao.getTrailStatic(isViewer).map { 
-        TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected, it.accuracy, it.maxAccuracy) 
+        TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.accuracy, it.maxAccuracy)
     }
 
     suspend fun resetStats() = withContext(Dispatchers.IO) {

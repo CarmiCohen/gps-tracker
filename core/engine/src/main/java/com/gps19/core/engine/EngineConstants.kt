@@ -1,14 +1,12 @@
-
 package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * v9.4.0:
- * - R406a: Unified Heartbeat (Issue #501). Standardized TICK_INTERVAL_MS to 2000ms.
- *   Removed all variable GPS polling constants (MOVING, STATIONARY, etc.).
- * v9.3.20:
- * - R405: Heartbeat Unification. Standardized TICK_INTERVAL_MS to 2000ms (2s) 
- *   to simplify logic and improve power resilience across all devices (including A15).
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed trajectory promotion and hindsight constants.
+ * July.1.12:
+ * - Issue #504: Kalman Filter Removal. Replaced IMM constants with Position EMA parameters.
+ * - Issue #502: Device Independency. Genericized hardware-specific constants.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -29,7 +27,6 @@ const val MAX_TRACTOR_ACCEL = 2.0
 const val PARKING_ACCEL_LIMIT = 1.0
 const val ALTITUDE_VELOCITY_CAP = 10.0 
 const val VERTICAL_VELOCITY_MAX_MPS = 5.0
-const val PROMOTION_ANGLE_TOLERANCE = 30.0 
 const val PATH_EFFICIENCY_THRESHOLD = 0.1 
 const val COMPASS_STABILITY_THRESHOLD = 20.0 
 const val WILD_JUMP_THRESHOLD_METERS = 500000.0
@@ -56,24 +53,19 @@ const val JUMP_GATE_VISUAL_JITTER_A15_METERS = 25.0 // Issue #036: Hardened for 
 const val ADAPTIVE_JUMP_SNR_THRESHOLD = 35.0
 const val ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0
 
-// Hindsight Correction (v8.9.18 - Issue #334 / R334)
-const val HINDSIGHT_BUFFER_SIZE = 10 // Issue #461: Forensic Parity
-const val HINDSIGHT_MAX_AGE_MS = 30000L
-
 // Bayesian Uncertainty Growth (R460 / Issue #460)
 const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0 // 54 km/h conservative drift
 const val PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS = 1.5 // Minimal drift when stationary
 const val PENDING_UNCERTAINTY_SPEED_CAP_MPS = 33.3 // 120 km/h cap
 
-// ImmFilter Parameters
-const val IMM_STATIONARY_PROBABILITY = 0.8
-const val IMM_KINEMATIC_PROBABILITY = 0.2
-const val IMM_MIN_MEASUREMENT_NOISE_METERS = 5.0
-const val IMM_STATIONARY_Q_POS = 0.01
-const val IMM_STATIONARY_Q_VEL = 0.001
-const val IMM_KINEMATIC_Q_POS = 0.5
-const val IMM_KINEMATIC_Q_VEL = 0.2
-const val IMM_STALL_RECOVERY_DT_SEC = 60.0
+// Position EMA Parameters (Issue #504 Replacement for IMM)
+const val POSITION_EMA_ALPHA_DEFAULT = 0.3
+const val POSITION_EMA_ALPHA_STATIONARY = 0.1
+const val POSITION_EMA_ALPHA_SUSPICIOUS = 0.05
+const val SPEED_EMA_ALPHA = 0.2
+const val BEARING_EMA_ALPHA = 0.1
+const val STATIONARY_SPEED_THRESHOLD_MPS = 0.5
+const val POSITION_STALL_RECOVERY_DT_SEC = 60.0
 
 // Behavioral Sentinel Checks
 const val JUMP_CHECK_MIN_DIST = 5.0
@@ -130,7 +122,6 @@ const val SIT_DUPLICATE_GUARD_MS = 15000L
 
 // Filtering Thresholds (R810-P Zero-Lag)
 const val SUSPICIOUS_Q_SCALE = 1000.0
-const val TRAJECTORY_PROMOTION_WINDOW_MS = 30000L 
 const val HIGH_ACCURACY_THRESHOLD_METERS = 35.0
 
 /**
@@ -168,11 +159,6 @@ const val VIBRATION_EMA_UP_SLOW = 0.001
 const val VIBRATION_EMA_UP_FAST = 0.01
 const val BARO_EMA_SLOW = 0.001 
 
-// GtoEngine Optimization Constants (Issue #264)
-const val GTO_TOW_SPEED_THRESHOLD = 10.0
-const val GTO_KINEMATIC_SPEED_DELTA = 10.0
-const val GTO_WORK_SPEED_THRESHOLD = 5.0
-
 // Engine Execution Parameters
 const val BOOTSTRAP_PHASE_MS = 60000L
 const val DISCOVERY_PHASE_MS = 60000L
@@ -196,12 +182,12 @@ const val MUZZLE_HYSTERESIS_A15_MS = 500L
 const val ADAPTATION_SETTLING_MS = 5000L // Issue #038: Settle duration after polling change
 const val GPS_REVIVAL_RETRY_INTERVAL_MS = 120000L
 const val MAX_REVIVAL_ATTEMPTS = 3
-const val XIAOMI_BOOT_GRACE_MS = 30000L
+const val HARDWARE_BOOT_GRACE_MS = 30000L
 const val LANDING_PAGE_PAUSE_MS = 2000L
 
-// Xiaomi Heuristic Recovery (Issue #190)
-const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 15000L
-const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
+// Hardware Heuristic Recovery (Issue #502)
+const val HARDWARE_SUPPRESSION_THRESHOLD_MS = 15000L
+const val HARDWARE_RECOVERY_COOLDOWN_MS = 60000L
 
 const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 20000L // Issue #436: Aligned with TICK_INTERVAL_MS x 10
@@ -325,7 +311,7 @@ const val ALERT_ID_TRACKER_CHAIR = "CHAIR_OCCUPIED"
 const val ALERT_ID_SYSTEM_STORAGE_LOW = "SYSTEM_STORAGE_LOW"
 const val ALERT_ID_SYSTEM_STORAGE_CRITICAL = "SYSTEM_STORAGE_CRITICAL"
 const val ALERT_ID_BATTERY_STEEP_DISCHARGE = "BATTERY_HEALTH"
-const val ALERT_ID_XIAOMI_SYSTEM_MISSING = "XIAOMI_SYSTEM_MISSING"
+const val ALERT_ID_HARDWARE_CONFIGURATION = "HARDWARE_CONFIG_MISSING"
 
 // Alert Titles (R747 Standardized)
 const val ALERT_TITLE_LOCAL_INTERNET = "This device: Internet Lost"
@@ -351,13 +337,13 @@ const val ALERT_TITLE_TRACKER_CHAIR = "Chair Occupied"
 const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "System Storage Low"
 const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "System Storage Critical"
 const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "Critical Battery Health"
-const val ALERT_TITLE_XIAOMI_SYSTEM_MISSING = "Xiaomi System Not Ready"
+const val ALERT_TITLE_HARDWARE_CONFIGURATION = "Hardware Config Incomplete"
 
 // System Watchdog & Grace Periods
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L
-const val SYSTEM_WATCHDOG_INTERVAL_MS = 90000L
-const val SYSTEM_WATCHDOG_THROTTLE_MS = 60000L
-const val WATCHDOG_DANGER_WINDOW_MS = 20000L
+const val SYSTEM_WATCH_DOG_INTERVAL_MS = 90000L
+const val SYSTEM_WATCH_DOG_THROTTLE_MS = 60000L
+const val WATCH_DOG_DANGER_WINDOW_MS = 20000L
 const val COMMUNICATION_ALARM_GRACE_PERIOD_MS = 60000L
 const val LOCATION_ALARM_GRACE_PERIOD_MS = 30000L
 const val POWER_DISCONNECT_DEBOUNCE_MS = 3000L

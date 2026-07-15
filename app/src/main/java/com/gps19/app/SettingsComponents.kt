@@ -26,11 +26,8 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
- * v9.3.11:
- * - Issue #059: Added onNavigateToDiagnostics to PhoneSetupOverlay to allow 
- *   navigation to the new Diagnostics screen. Added Diagnostics button to SettingsOverlay.
- * v9.2.6:
- * - Forensic Stress Test: Added onTriggerForensicTest button to PhoneSetupOverlay.
+ * v9.4.0:
+ * - Issue #502: Device Independency. Genericized PhoneSetupOverlay and hardware-specific instructions.
  */
 
 @Composable
@@ -210,57 +207,54 @@ fun AlarmSoundOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSetting
 @Composable
 fun PhoneSetupOverlay(
     onClose: () -> Unit, onWhitelist: () -> Unit, onOverlay: () -> Unit, onAppInfo: () -> Unit, 
-    onExactAlarm: () -> Unit, onXiaomi: () -> Unit, onRefresh: () -> Unit, 
-    onToggleXiaomiOverride: () -> Unit = {},
+    onExactAlarm: () -> Unit, onHardwarePermission: () -> Unit, onRefresh: () -> Unit, 
+    onToggleManualOverride: () -> Unit = {},
     onTestAlarm: () -> Unit,
     onTriggerForensicTest: () -> Unit = {},
     onNavigateToDiagnostics: () -> Unit = {},
-    isBatteryWhitelisted: Boolean, isOverlayGranted: Boolean,
-    isMicrophoneGranted: Boolean, isExactAlarmGranted: Boolean, isPostNotificationsGranted: Boolean, 
-    isBackgroundLocationGranted: Boolean, xiaomiStatus: XiaomiPermissionStatus, 
-    isXiaomiManualOverride: Boolean,
+    permissions: PermissionState,
     homePointsCount: Int, isTrackerMode: Boolean, onGoToMap: () -> Unit = {}
 ) {
     val manufacturer = Build.MANUFACTURER.uppercase(); val model = Build.MODEL.uppercase()
     Card(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().navigationBarsPadding(), colors = CardDefaults.cardColors(containerColor = Slate950)) {
         Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column { Text("Phone Setup", color = BrandJd, fontSize = 24.sp, fontWeight = FontWeight.Bold); Text(stringResource(R.string.setup_detected_device, manufacturer, model), color = Slate500, fontSize = 10.sp) } }
-            Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step1_title), getRecentsLockDescription(), {}, stringResource(R.string.setup_info_only), if (isS21FEDevice()) true else null, Icons.Default.Lock)
-            Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), getBatteryOptimizationDescription(), onWhitelist, stringResource(R.string.btn_open_settings), isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!isBatteryWhitelisted) "Battery Optimization: Unrestricted mode NOT active" else null)
-            Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step3_title), stringResource(R.string.setup_step3_desc), onOverlay, stringResource(R.string.btn_authorize), isOverlayGranted, Icons.Default.Layers, reason = if (!isOverlayGranted) "Appear on Top: Permission NOT granted" else null)
-            Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step4_title), stringResource(R.string.setup_step4_desc), onAppInfo, stringResource(R.string.btn_app_info), isMicrophoneGranted, Icons.Default.Mic, reason = if (!isMicrophoneGranted) "Microphone: Permission NOT granted" else null)
-            Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step5_title), description = getAutoStartDescription(), onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = isBatteryWhitelisted, icon = Icons.Default.PlayCircle, reason = if (!isBatteryWhitelisted) "Manual verification required: Ensure 'Unrestricted' battery mode and 'Background activity' are allowed in system settings." else null)
+            Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step1_title), getRecentsLockDescription(), {}, stringResource(R.string.setup_info_only), if (permissions.requiresWakeLockRenewal) true else null, Icons.Default.Lock)
+            Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), getBatteryOptimizationDescription(), onWhitelist, stringResource(R.string.btn_open_settings), permissions.isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!permissions.isBatteryWhitelisted) "Battery Optimization: Unrestricted mode NOT active" else null)
+            Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step3_title), stringResource(R.string.setup_step3_desc), onOverlay, stringResource(R.string.btn_authorize), permissions.isOverlayGranted, Icons.Default.Layers, reason = if (!permissions.isOverlayGranted) "Appear on Top: Permission NOT granted" else null)
+            Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step4_title), stringResource(R.string.setup_step4_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isMicrophoneGranted, Icons.Default.Mic, reason = if (!permissions.isMicrophoneGranted) "Microphone: Permission NOT granted" else null)
+            Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step5_title), description = getAutoStartDescription(), onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBatteryWhitelisted, icon = Icons.Default.PlayCircle, reason = if (!permissions.isBatteryWhitelisted) "Manual verification required: Ensure 'Unrestricted' battery mode and 'Background activity' are allowed in system settings." else null)
             Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step6_title), stringResource(R.string.setup_step6_desc), {}, stringResource(R.string.setup_info_only), null, Icons.Default.Wifi)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step7_title), stringResource(R.string.setup_step7_desc), onExactAlarm, stringResource(R.string.btn_authorize), isExactAlarmGranted, Icons.Default.Alarm, reason = if (!isExactAlarmGranted) "Exact Alarms: Permission NOT granted" else null) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step7_title), stringResource(R.string.setup_step7_desc), onExactAlarm, stringResource(R.string.btn_authorize), permissions.isExactAlarmGranted, Icons.Default.Alarm, reason = if (!permissions.isExactAlarmGranted) "Exact Alarms: Permission NOT granted" else null) }
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                Spacer(Modifier.height(16.dp)); GuideSection(title = "Notification Alerts", description = "Required to show status and critical alerts in the notification shade.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = isPostNotificationsGranted, icon = Icons.Default.Notifications, reason = if (!isPostNotificationsGranted) "Notifications: Permission NOT granted" else null)
+                Spacer(Modifier.height(16.dp)); GuideSection(title = "Notification Alerts", description = "Required to show status and critical alerts in the notification shade.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isPostNotificationsGranted, icon = Icons.Default.Notifications, reason = if (!permissions.isPostNotificationsGranted) "Notifications: Permission NOT granted" else null)
             }
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                Spacer(Modifier.height(16.dp)); GuideSection(title = "Background Location", description = "Allows tracking and geofencing to work while the screen is off or app is in background.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = isBackgroundLocationGranted, icon = Icons.Default.LocationOn, reason = if (!isBackgroundLocationGranted) "Background Location: Set to 'Allow all the time' in system settings" else null)
+                Spacer(Modifier.height(16.dp)); GuideSection(title = "Background Location", description = "Allows tracking and geofencing to work while the screen is off or app is in background.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, reason = if (!permissions.isBackgroundLocationGranted) "Background Location: Set to 'Allow all the time' in system settings" else null)
             }
 
-            if (isXiaomiDevice()) { 
+            if (permissions.hasBackgroundRestriction) { 
                 Spacer(Modifier.height(16.dp))
-                val isCompleted = when(xiaomiStatus) {
-                    XiaomiPermissionStatus.GRANTED -> true
-                    XiaomiPermissionStatus.DENIED -> false
-                    XiaomiPermissionStatus.UNKNOWN -> isXiaomiManualOverride
+                val isCompleted = when(permissions.backgroundStatus) {
+                    CapabilityStatus.GRANTED -> true
+                    CapabilityStatus.DENIED -> false
+                    CapabilityStatus.UNKNOWN -> permissions.isManualOverride
                 }
                 GuideSection(
-                    title = stringResource(R.string.setup_step8_title), 
-                    description = stringResource(R.string.setup_step8_desc), 
-                    onClick = onXiaomi, 
+                    title = "Background Service Lock", 
+                    description = "Required to ensure the tracking service remains active on this hardware.", 
+                    onClick = onHardwarePermission, 
                     buttonText = stringResource(R.string.btn_miui_permissions), 
                     isCompleted = isCompleted, 
                     icon = Icons.Default.Security, 
-                    reason = if (xiaomiStatus == XiaomiPermissionStatus.DENIED) "Xiaomi: Required for Lock Screen alerts" else if (xiaomiStatus == XiaomiPermissionStatus.UNKNOWN && !isXiaomiManualOverride) "Xiaomi: Automatic verification failed. Please check manually." else null
+                    reason = if (permissions.backgroundStatus == CapabilityStatus.DENIED) "Hardware Policy: Required for Lock Screen alerts" else if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && !permissions.isManualOverride) "Hardware Policy: Automatic verification failed. Please check manually." else null
                 )
-                if (xiaomiStatus == XiaomiPermissionStatus.UNKNOWN) {
+                if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN) {
                     Spacer(Modifier.height(4.dp))
                     Row(modifier = Modifier.padding(start = 28.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = isXiaomiManualOverride, onCheckedChange = { onToggleXiaomiOverride() })
+                        Checkbox(checked = permissions.isManualOverride, onCheckedChange = { onToggleManualOverride() })
                         Text("Manually verified (Status detection failed)", color = Color.White, fontSize = 11.sp)
                     }
                 }

@@ -47,12 +47,12 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * v9.3.16:
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed hindsight-corrected trail rendering logic.
+ * July.1.12:
  * - Issue #078: Implemented MapFollowMode awareness in centering lock logic.
- * v9.3.8:
  * - Issue #072 Clock Skew Hardening: Transitioned map freshness calculations 
- *   to a Receipt-Time Authority model to prevent markers from turning gray due 
- *   to device clock drift. markers now use totalGpsAge (local delay + source delay).
+ *   to a Receipt-Time Authority model.
  */
 
 @Composable
@@ -344,8 +344,8 @@ fun OsmMap(
         }
 
         if (lastTrailRendered.value != trail || lastViewerTrailRendered.value != viewerTrail) {
-            trailFolderRef.value?.items?.clear(); val trSegs = drawTrailToFolder(view, trailFolderRef.value!!, trail, BrandJd.toArgb(), Slate500.toArgb(), trackerPolylinePool)
-            viewerTrailFolderRef.value?.items?.clear(); val viSegs = drawTrailToFolder(view, viewerTrailFolderRef.value!!, viewerTrail, ViewerCyan.toArgb(), Slate500.toArgb(), viewerPolylinePool)
+            trailFolderRef.value?.items?.clear(); val trSegs = drawTrailToFolder(view, trailFolderRef.value!!, trail, BrandJd.toArgb(), trackerPolylinePool)
+            viewerTrailFolderRef.value?.items?.clear(); val viSegs = drawTrailToFolder(view, viewerTrailFolderRef.value!!, viewerTrail, ViewerCyan.toArgb(), viewerPolylinePool)
             lastTrailRendered.value = trail.toList(); lastViewerTrailRendered.value = viewerTrail.toList()
             while(trackerPolylinePool.size > maxOf(trSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)) trackerPolylinePool.removeAt(trackerPolylinePool.size - 1)
             while(viewerPolylinePool.size > maxOf(viSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)) viewerPolylinePool.removeAt(viewerPolylinePool.size - 1)
@@ -401,19 +401,19 @@ fun OsmMap(
     }, onRelease = { view -> view.onDetach(); view.tileProvider.tileCache.clear(); view.tileProvider.detach() }, modifier = Modifier.fillMaxSize())
 }
 
-private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, colorNormal: Int, colorHindsight: Int, pool: MutableList<Polyline>): Int {
+private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, color: Int, pool: MutableList<Polyline>): Int {
     if (trailPoints.isEmpty()) return 0
     var poolIdx = 0; var startIdx = 0
     while (startIdx < trailPoints.size) {
-        val segmentPoints = mutableListOf<GeoPoint>(); val isHindsight = trailPoints[startIdx].isHindsightCorrected; var currentIdx = startIdx
+        val segmentPoints = mutableListOf<GeoPoint>(); var currentIdx = startIdx
         while (currentIdx < trailPoints.size) {
-            val pt = trailPoints[currentIdx]; if ((pt.isJump || pt.isHindsightCorrected != isHindsight) && currentIdx > startIdx) break
+            val pt = trailPoints[currentIdx]; if (pt.isJump && currentIdx > startIdx) break
             segmentPoints.add(pt.toGeoPoint()); currentIdx++
             if (pt.isJump) { startIdx = currentIdx; break }
         }
         if (segmentPoints.size > 1) {
             val line = if (poolIdx < pool.size) pool[poolIdx] else Polyline(view).also { l -> l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); pool.add(l) }
-            line.setPoints(segmentPoints); line.outlinePaint.color = if (isHindsight) colorHindsight else colorNormal; folder.add(line); poolIdx++
+            line.setPoints(segmentPoints); line.outlinePaint.color = color; folder.add(line); poolIdx++
         }
         if (currentIdx == trailPoints.size) break
         startIdx = if (startIdx < currentIdx) (if (!trailPoints[currentIdx - 1].isJump) currentIdx - 1 else currentIdx) else startIdx + 1

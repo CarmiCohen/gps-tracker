@@ -44,6 +44,8 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * v9.4.0:
+ * - Issue #502: Device Independency. Plumbed requiresExtraTopPadding through to HeaderBar.
  * v9.3.15:
  * - Hardening: Finalized Double standardization. Streamlined UI-layer Float 
  *   conversions for Compose rendering compatibility. Fixed satsUsed parameter mismatch.
@@ -700,7 +702,7 @@ fun HeaderBar(
     val nav = uiState.navigation
     val isAnyOverlayOpen = nav.isLogVisible || nav.isSettingsOpen || nav.isRibbonsVisible
     val isDashboardActive = !nav.isMapVisible && !isAnyOverlayOpen
-    val topPadding = if (isXiaomiDevice()) 8.dp else 2.dp
+    val topPadding = if (uiState.permissions.requiresExtraTopPadding) 8.dp else 2.dp
     
     val commitAnd = { action: () -> Unit ->
         if (uiState.navigation.isSettingsOpen) {

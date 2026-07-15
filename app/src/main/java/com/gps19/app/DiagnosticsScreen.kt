@@ -18,11 +18,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gps19.core.engine.CapabilityStatus
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
- * v9.3.20:
- * - R405: Samsung Hardening. Unified engine status display and removed A15-specific jitter notes.
+ * v9.4.0:
+ * - Issue #502: Device Independency. Replaced vendor-specific checks with capability logic.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,7 +34,7 @@ fun DiagnosticsScreen(
     onRequestOverlayPermission: () -> Unit,
     onRequestAppInfo: () -> Unit,
     onRequestExactAlarm: () -> Unit,
-    onRequestXiaomiPermission: () -> Unit
+    onRequestHardwarePermission: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val permissions = uiState.permissions
@@ -94,23 +95,23 @@ fun DiagnosticsScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Device-Specific Adaptations",
+                text = "Hardware Capabilities",
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.Gray,
                 fontWeight = FontWeight.Bold
             )
 
-            if (isXiaomiDevice()) {
+            if (permissions.hasBackgroundRestriction) {
                 DiagnosticItem(
-                    title = "Xiaomi Special Status",
-                    status = permissions.xiaomiStatus.name,
-                    isOk = permissions.xiaomiStatus == XiaomiPermissionStatus.GRANTED || 
-                           (permissions.xiaomiStatus == XiaomiPermissionStatus.UNKNOWN && permissions.isXiaomiManualOverride),
+                    title = "Background Service Lock",
+                    status = permissions.backgroundStatus.name,
+                    isOk = permissions.backgroundStatus == CapabilityStatus.GRANTED || 
+                           (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride),
                     icon = Icons.Default.SettingsSuggest,
-                    onClick = onRequestXiaomiPermission
+                    onClick = onRequestHardwarePermission
                 )
                 
-                if (permissions.xiaomiStatus == XiaomiPermissionStatus.UNKNOWN) {
+                if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -118,17 +119,22 @@ fun DiagnosticsScreen(
                     ) {
                         Text("Manual Override", color = Color.LightGray)
                         Switch(
-                            checked = permissions.isXiaomiManualOverride,
+                            checked = permissions.isManualOverride,
                             onCheckedChange = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) }
                         )
                     }
                 }
+            } else {
+                Text(
+                    text = "Standard background policy detected.",
+                    color = Color.Gray,
+                    fontSize = 12.sp
+                )
             }
 
-            if (isSamsungDevice()) {
-                val samsungNote = if (isS21FEDevice()) " (S21 FE Optimized)" else " (Standard Hardening)"
+            if (permissions.requiresWakeLockRenewal) {
                 Text(
-                    text = "Samsung Engine Tuning: ACTIVE$samsungNote",
+                    text = "Hardware Tuning: WAKELOCK_RENEWAL active",
                     color = Color.Cyan,
                     fontSize = 12.sp
                 )

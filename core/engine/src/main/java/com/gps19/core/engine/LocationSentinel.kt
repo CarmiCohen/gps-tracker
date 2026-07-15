@@ -5,13 +5,17 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * v9.3.20:
- * - R405: Samsung A15 Hardening. Removed device-specific isA15 branching and simplified thresholds.
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed trajectory promotion and hindsight buffering.
+ * July.1.12:
+ * - Issue #504: Kalman Filter Removal. Replaced ImmFilter with EMA smoothing.
  */
 class LocationSentinel {
 
-    private val immFilter = ImmFilter()
-    private val gtoEngine = GtoEngine()
+    private var smoothedLat: Double = 0.0
+    private var smoothedLng: Double = 0.0
+    private var smoothedSpeedMps: Double = 0.0
+    private var smoothedBearing: Double = 0.0
 
     private var prevValidLat: Double = 0.0
     private var prevValidLng: Double = 0.0
@@ -81,7 +85,7 @@ class LocationSentinel {
 
     fun setSpatialAnchor(lat: Double, lng: Double, alt: Double, timestamp: Long) {
         lastValidLat = lat; lastValidLng = lng; lastValidAlt = alt; lastValidTs = timestamp
-        immFilter.update(lat, lng, 10.0, timestamp) 
+        smoothedLat = lat; smoothedLng = lng
     }
 
     fun updateSensorState(
@@ -238,13 +242,9 @@ class LocationSentinel {
         baselineSitTilt = -1.0
     }
 
-    fun getEstimatedSpeedMps(): Double = immFilter.getEstimatedSpeedMps()
-    fun getEstimatedBearing(): Double = immFilter.getEstimatedBearing()
-    fun getStationaryProbability(): Double = immFilter.getStationaryProbability()
-
-    fun getHindsightBuffer(): List<RejectedPoint> = gtoEngine.getWindow().map {
-        RejectedPoint(it.lat, it.lng, it.alt, it.accuracy, it.bearing, it.speedMps, it.ts)
-    }
+    fun getEstimatedSpeedMps(): Double = smoothedSpeedMps
+    fun getEstimatedBearing(): Double = smoothedBearing
+    fun getStationaryProbability(): Double = if (isStationary()) 1.0 else 0.0
 
     fun processLocation(
         lat: Double, lng: Double, alt: Double, accuracy: Double, 
@@ -267,16 +267,15 @@ class LocationSentinel {
         
         if (lastValidTs == 0L) {
             updateLastValid(lat, lng, alt, timestamp, 0.0, bearing)
-            val optimized = immFilter.update(lat, lng, accuracy, timestamp, 1.0)
-            return SentinelResult(SentinelStatus.VALID, optimizedPoint = optimized.copy(accuracy = accuracy, maxAccuracy = maxAccuracy))
+            updateSmoothedPosition(lat, lng, 1.0, timestamp)
+            return SentinelResult(SentinelStatus.VALID, optimizedPoint = EngineGeoPoint(lat, lng, ts = timestamp, accuracy = accuracy, maxAccuracy = maxAccuracy))
         }
 
         val timeDeltaMs = timestamp - lastValidTs
         if (timeDeltaMs <= 0) return SentinelResult(SentinelStatus.VALID) 
         
         val altitudeDelta = if (lastValidAlt != 0.0) alt - lastValidAlt else 0.0
-        val stationaryProb = getStationaryProbability()
-        val isParking = stationaryProb > 0.8
+        val isParking = isStationary()
         
         val dist = PhysicsUtils.calculateDistance(lastValidLat, lastValidLng, lat, lng)
         val impliesMotion = dist > ACTIVE_MOVE_THRESHOLD
@@ -356,21 +355,7 @@ class LocationSentinel {
         }
 
         if (!bypassBehavioral) {
-            if (gtoEngine.evaluateTrajectory(lat, lng, bearing, currentSpeedMps, timestamp)) {
-                val promoted = mutableListOf<EngineGeoPoint>()
-                gtoEngine.getWindow().forEach { p ->
-                    val opt = immFilter.update(p.lat, p.lng, p.accuracy, p.ts, SUSPICIOUS_Q_SCALE)
-                    promoted.add(opt.copy(accuracy = p.accuracy, maxAccuracy = p.maxAccuracy))
-                    updateLastValid(p.lat, p.lng, p.alt, p.ts, p.speedMps, p.bearing)
-                }
-                gtoEngine.clear()
-                val optimized = immFilter.update(lat, lng, accuracy, timestamp, SUSPICIOUS_Q_SCALE)
-                updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
-                return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted (GTO)", optimized.copy(accuracy = accuracy, maxAccuracy = maxAccuracy), finalJumpConfidence, promotedPoints = promoted)
-            }
-
             if (behavioralStatus == SentinelStatus.JUMP || behavioralStatus == SentinelStatus.JITTER) {
-                gtoEngine.addPoint(lat, lng, alt, accuracy, maxAccuracy, bearing, currentSpeedMps, timestamp, currentVibrationIndex)
                 return SentinelResult(behavioralStatus, finalJumpConfidence.reason, jumpConfidence = finalJumpConfidence)
             }
 
@@ -381,23 +366,45 @@ class LocationSentinel {
             }
             
             if (sensorSentinel.status == SentinelStatus.VALID && sensorSentinel.suppressionNote != null) {
-                val effectiveQScale = if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0
-                val optimizedPoint = immFilter.update(lat, lng, accuracy, timestamp, effectiveQScale)
+                val alpha = if (isSuspicious) POSITION_EMA_ALPHA_SUSPICIOUS else if (isParking) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+                val optimizedPoint = updateSmoothedPosition(lat, lng, alpha, timestamp)
+                updateSmoothedMetrics(currentSpeedMps, bearing)
                 updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
-                gtoEngine.clear()
                 return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = optimizedPoint.copy(accuracy = accuracy, maxAccuracy = maxAccuracy), jumpConfidence = finalJumpConfidence, suppressionNote = sensorSentinel.suppressionNote)
             }
         }
 
-        val effectiveQScale = if (isSuspicious || 
+        val alpha = if (isSuspicious || 
                                  behavioralStatus == SentinelStatus.TAMPER_ALERT || 
                                  behavioralStatus == SentinelStatus.ACOUSTIC_WARNING || 
-                                 behavioralStatus == SentinelStatus.SENSOR_SUSPICIOUS) SUSPICIOUS_Q_SCALE else 1.0
+                                 behavioralStatus == SentinelStatus.SENSOR_SUSPICIOUS) POSITION_EMA_ALPHA_SUSPICIOUS else if (isParking) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
 
-        val optimizedPoint = immFilter.update(lat, lng, accuracy, timestamp, effectiveQScale)
+        val optimizedPoint = updateSmoothedPosition(lat, lng, alpha, timestamp)
+        updateSmoothedMetrics(currentSpeedMps, bearing)
         updateLastValid(lat, lng, alt, timestamp, currentSpeedMps, bearing)
-        gtoEngine.clear()
         return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = optimizedPoint.copy(accuracy = accuracy, maxAccuracy = maxAccuracy), jumpConfidence = finalJumpConfidence)
+    }
+
+    private fun updateSmoothedPosition(lat: Double, lng: Double, alpha: Double, ts: Long): EngineGeoPoint {
+        if (smoothedLat == 0.0) {
+            smoothedLat = lat
+            smoothedLng = lng
+        } else {
+            val dt = (ts - lastValidTs) / 1000.0
+            if (dt > POSITION_STALL_RECOVERY_DT_SEC) {
+                smoothedLat = lat
+                smoothedLng = lng
+            } else {
+                smoothedLat = PhysicsUtils.smoothCoordinate(smoothedLat, lat, alpha)
+                smoothedLng = PhysicsUtils.smoothCoordinate(smoothedLng, lng, alpha)
+            }
+        }
+        return EngineGeoPoint(smoothedLat, smoothedLng, ts = ts)
+    }
+
+    private fun updateSmoothedMetrics(speedMps: Double, bearing: Double) {
+        smoothedSpeedMps = if (smoothedSpeedMps == 0.0) speedMps else (smoothedSpeedMps * (1.0 - SPEED_EMA_ALPHA)) + (speedMps * SPEED_EMA_ALPHA)
+        smoothedBearing = if (smoothedBearing == 0.0) bearing else PhysicsUtils.smoothBearing(smoothedBearing, bearing, BEARING_EMA_ALPHA)
     }
 
     private fun runSensorSentinel(
@@ -469,7 +476,6 @@ class LocationSentinel {
         lastSitVz = 0.0; lastSitVzTs = 0L; lastSitDz = 0.0; lastSitBaro = 0.0; lastSitTilt = 0.0; lastSitShock = 0.0
         gpsMotionStartTs = 0L
         lastFastPathAcousticSpikeTs = 0L
-        gtoEngine.clear()
-        immFilter.reset()
+        smoothedLat = 0.0; smoothedLng = 0.0; smoothedSpeedMps = 0.0; smoothedBearing = 0.0
     }
 }

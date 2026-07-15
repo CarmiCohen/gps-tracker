@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
+import com.gps19.core.engine.CapabilityStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
 import javax.inject.Inject
@@ -17,14 +18,14 @@ import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
- * v9.3.11:
- * - Issue #068 Hardening: Enforced use of cachedPkgName in Xiaomi permission 
- *   check to eliminate logcat spillage during alarm overlay triggers.
- * v9.3.3:
- * - Issue #058: Hilt Migration. Added @Inject constructor for DI compatibility.
+ * July.1.12:
+ * - Issue #502: Device Independency. Genericized overlay blocking logic using PermissionState.
  */
 @Singleton
-class AppNotificationManager @Inject constructor(@ApplicationContext private val context: Context) {
+class AppNotificationManager @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val statusProvider: SystemStatusProvider
+) {
 
     private val channelId = "location_service_channel"
     private val alarmChannelId = "alarm_service_channel"
@@ -104,7 +105,7 @@ class AppNotificationManager @Inject constructor(@ApplicationContext private val
             .setOnlyAlertOnce(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
-        if (showPermissionAction && isXiaomiDevice()) {
+        if (showPermissionAction) {
             val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = Uri.fromParts("package", cachedPkgName, null)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -113,7 +114,7 @@ class AppNotificationManager @Inject constructor(@ApplicationContext private val
                 context, 1, settingsIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            builder.addAction(0, "GRANT OVERLAY PERMISSION", settingsPendingIntent)
+            builder.addAction(0, "FIX BACKGROUND RESTRICTION", settingsPendingIntent)
             builder.setContentText("$causes (Overlay Hidden - Tap to fix)")
         }
 
@@ -121,11 +122,14 @@ class AppNotificationManager @Inject constructor(@ApplicationContext private val
         notificationManager.notify(alarmNotificationId, builder.build())
     }
 
-    fun showAlarmOverlay(causes: String) {
-        val canDraw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
-        val xiaomiStatus = isXiaomiSpecialPermissionGranted(context, cachedPkgName)
+    suspend fun showAlarmOverlay(causes: String) {
+        val perms = statusProvider.getPermissionState()
+        val canDraw = perms.isOverlayGranted
         
-        val effectivelyBlocked = !canDraw || (isXiaomiDevice() && xiaomiStatus != XiaomiPermissionStatus.GRANTED)
+        // v9.4.0: Abstracting hardware-specific restriction detection.
+        val isHardwareBlocked = perms.hasBackgroundRestriction && perms.backgroundStatus != CapabilityStatus.GRANTED
+        
+        val effectivelyBlocked = !canDraw || isHardwareBlocked
 
         updateAlarmNotification(causes, showPermissionAction = effectivelyBlocked)
 

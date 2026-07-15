@@ -27,14 +27,8 @@ import com.gps19.core.engine.*
 
 /**
  * AlarmComponents: Overlay for active alarm states and sirens.
- * v9.1.0:
- * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
- * v9.0.4:
- * - R799d: Changed Viewer color to ViewerCyan.
- * v8.9.48:
- * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
- *   BrandJd (#367C2B) in resolved alarm status and secure state indicators.
- * Extracted from OverlayComponents for Issue 115 modularization.
+ * v9.4.0:
+ * - Issue #502: Device Independency. Genericized hardware configuration alerts.
  */
 
 @Composable
@@ -45,8 +39,9 @@ fun AlarmOverlay(
     onClose: () -> Unit, 
     onGoToMap: () -> Unit = onClose, 
     isLocationPending: Boolean = false,
-    xiaomiStatus: XiaomiPermissionStatus = XiaomiPermissionStatus.UNKNOWN,
-    onXiaomiPermissionClick: () -> Unit = {}
+    backgroundStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
+    hasBackgroundRestriction: Boolean = false,
+    onHardwarePermissionClick: () -> Unit = {}
 ) {
     val unresolvedAlarms = alarms.filter { !it.isResolved }
     val hasUnresolved = unresolvedAlarms.isNotEmpty()
@@ -59,7 +54,8 @@ fun AlarmOverlay(
         ALERT_TITLE_BATTERY_STEEP_DISCHARGE,
         ALERT_TITLE_TRACKER_TEMP, ALERT_TITLE_TRACKER_GAP, ALERT_TITLE_TRACKER_TAMPER,
         ALERT_TITLE_TRACKER_TILT, ALERT_TITLE_TRACKER_ACOUSTIC, ALERT_TITLE_TRACKER_LIFT,
-        ALERT_TITLE_TRACKER_CHAIR, ALERT_TITLE_SYSTEM_STORAGE_LOW, ALERT_TITLE_SYSTEM_STORAGE_CRITICAL
+        ALERT_TITLE_TRACKER_CHAIR, ALERT_TITLE_SYSTEM_STORAGE_LOW, ALERT_TITLE_SYSTEM_STORAGE_CRITICAL,
+        ALERT_TITLE_HARDWARE_CONFIGURATION
     )
 
     val activeDisplayList = alarmCategories.mapNotNull { cat -> alarms.find { it.type == cat || it.title == cat } }
@@ -80,10 +76,10 @@ fun AlarmOverlay(
             Text(if (isMuted) stringResource(R.string.alarm_title_muted) else if (hasUnresolved) stringResource(R.string.alarm_title_active) else stringResource(R.string.alarm_title_secure), color = if (isMuted) Slate500 else Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             
             if (hasUnresolved) {
-                if (xiaomiStatus == XiaomiPermissionStatus.DENIED) {
+                if (hasBackgroundRestriction && backgroundStatus == CapabilityStatus.DENIED) {
                     Spacer(Modifier.height(8.dp))
                     Card(
-                        modifier = Modifier.fillMaxWidth().clickable { onXiaomiPermissionClick() },
+                        modifier = Modifier.fillMaxWidth().clickable { onHardwarePermissionClick() },
                         colors = CardDefaults.cardColors(containerColor = Amber500),
                         shape = RoundedCornerShape(8.dp)
                     ) {
@@ -91,10 +87,10 @@ fun AlarmOverlay(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Security, null, tint = Color.Black, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.alarm_xiaomi_permission_required), color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                                Text("HARDWARE POLICY RESTRICTION", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Black)
                             }
                             Spacer(Modifier.height(4.dp))
-                            Text(stringResource(R.string.alarm_xiaomi_permission_desc), color = Color.Black.copy(alpha = 0.8f), fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                            Text("Background tracking is blocked by system policy. Tap to fix.", color = Color.Black.copy(alpha = 0.8f), fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                         }
                     }
                 } else if (isLocationPending) {

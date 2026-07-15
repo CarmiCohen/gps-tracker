@@ -10,9 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * v9.3.39:
- * - Issue #092: Added SetPendingMode to UiEvent for reactive navigation.
- * v9.3.25:
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted, hindsight flags, and corrected TrailPoint.
+ * July.1.12:
  * - Protocol Optimization: Migrated to Enum-based binary serialization for 
  *   tracker state and pending reasons to further reduce heartbeat footprint.
  */
@@ -30,7 +30,6 @@ data class TrailPoint(
     val lng: Double,
     val timestamp: Long = 0L,
     val isJump: Boolean = false,
-    val isHindsightCorrected: Boolean = false,
     val accuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0
 ) {
@@ -248,7 +247,6 @@ data class TrackerStatus(
     val isStalled: Boolean = false,
     val isJammer: Boolean = false,
     val isJump: Boolean = false,
-    val isTrajectoryPromoted: Boolean = false,
     val jumpTier: Int = 0,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
@@ -331,7 +329,6 @@ data class TrackerStatus(
             put("is_stalled", isStalled)
             put("is_jammer", isJammer)
             put("is_jump", isJump)
-            put("is_trajectory_promoted", isTrajectoryPromoted)
             put("jump_tier", jumpTier)
             put("is_location_pending", isLocationPending)
             put("location_pending_reason", locationPendingReason.name)
@@ -444,7 +441,6 @@ data class LocationState(
     val timestamp: Long = 0L,
     val telemetryTs: Long = 0L, 
     val isVisualJump: Boolean = false,
-    val isTrajectoryPromoted: Boolean = false,
     val jumpTier: Int = 0,
     val isJammer: Boolean = false,
     val isStalled: Boolean = false,

@@ -1,6 +1,7 @@
 package com.gps19.core.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 class ForensicIdentityTest {
@@ -11,14 +12,20 @@ class ForensicIdentityTest {
     }
 
     private val listener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean, accuracy: Double, maxAccuracy: Double) {}
+        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, accuracy: Double, maxAccuracy: Double) {}
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Double, snr: Double?, vibe: Double?) {}
         override fun onMaxAccuracyChanged(accuracy: Double) {}
         override fun onChairBaselineChanged(baseline: Double) {}
         override fun onGpsStallDetected(ts: Long) { }
     }
 
-    private val processor = LocationProcessor(listener, timeProvider)
+    private lateinit var processor: LocationProcessor
+
+    @Before
+    fun setup() {
+        processor = LocationProcessor(timeProvider)
+        processor.setListener(listener)
+    }
 
     @Test
     fun `processGpsPoint handles valid point`() {

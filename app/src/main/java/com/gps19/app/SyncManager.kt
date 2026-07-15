@@ -12,7 +12,9 @@ import javax.inject.Singleton
 
 /**
  * SyncManager: Handles the telemetry synchronization loop.
- * v9.3.3:
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted.
+ * July.1.12:
  * - Issue #058: Hilt Migration. Added @Inject constructor and start/stop lifecycle management.
  */
 @Singleton
@@ -80,7 +82,7 @@ class SyncManager @Inject constructor(
         deviceId: String, viewerId: String, isTrackerMode: Boolean, loc: android.location.Location?, filtered: EngineGeoPoint?,
         distToTracker: Double?, distToHome: Double?, maxAccuracy: Double, filteredSpeed: Double,
         vibration: Double, heading: Double, baroAlt: Double, lux: Double, isNear: Boolean, isSuspicious: Boolean,
-        tiltDegrees: Double, acousticDb: Double, isJump: Boolean, isTrajectoryPromoted: Boolean, jumpTier: Int,
+        tiltDegrees: Double, acousticDb: Double, isJump: Boolean, jumpTier: Int,
         isJammer: Boolean, isStalledRaw: Boolean, isStalledActive: Boolean, peakShock: Double, peakShockTs: Long,
         luxBaseline: Double, acousticFloorDb: Double, adaptiveVibrationFloor: Double, proxIdx: Double, proximityCm: Double,
         proximityDebounceMs: Long, vibrationRollingSum: Double,
@@ -114,7 +116,6 @@ class SyncManager @Inject constructor(
             tiltDegrees = tiltDegrees,
             acousticDb = acousticDb,
             isJump = isJump,
-            isTrajectoryPromoted = isTrajectoryPromoted,
             jumpTier = jumpTier,
             isJammer = isJammer,
             isStalled = isStalledActive,
@@ -231,7 +232,6 @@ class SyncManager @Inject constructor(
                 tiltDegrees = 0.0,
                 acousticDb = 0.0,
                 isJump = false,
-                isTrajectoryPromoted = false,
                 jumpTier = 0,
                 isJammer = false,
                 isStalled = false,

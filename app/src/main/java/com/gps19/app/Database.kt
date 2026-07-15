@@ -7,12 +7,10 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
- * v9.1.8:
- * - Issue #046: Shared Behavioral State. Added trackerState to PendingStatusEntity 
- *   to preserve authoritative state during offline periods. Bumped version to 54.
- * v9.1.6:
- * - Issue #043: Room Migration Hardening. Corrected MIGRATION_52_53 and added 
- *   explicit @ColumnInfo(defaultValue) to prevent schema drift.
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed isHindsightCorrected from TrailEntity.
+ * July.1.12:
+ * - Issue #046: Shared Behavioral State. Added trackerState to PendingStatusEntity.
  */
 @Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
 data class LogEntity(
@@ -48,7 +46,6 @@ data class TrailEntity(
     val timestamp: Long,
     val isViewerTrail: Boolean,
     val isJump: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isHindsightCorrected: Boolean = false,
     @ColumnInfo(defaultValue = "0") val accuracy: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0
 )
@@ -425,7 +422,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_trail_points_timestamp ON trail_points (timestamp)")
 
                 db.execSQL("CREATE TABLE connection_history_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, ts INTEGER NOT NULL, rtt INTEGER NOT NULL, isConnected INTEGER NOT NULL, isGap INTEGER NOT NULL, hasGps INTEGER NOT NULL, isTick INTEGER NOT NULL, ribbonKey TEXT NOT NULL, gpsIndex REAL NOT NULL DEFAULT 0, noiseIdx REAL NOT NULL DEFAULT 0, luxIdx REAL NOT NULL DEFAULT 0, vibeIdx REAL NOT NULL DEFAULT 0, proxIdx REAL NOT NULL DEFAULT 0, liftIdx REAL NOT NULL DEFAULT 0, snrIdx REAL NOT NULL DEFAULT 0, verticalVelocity REAL NOT NULL DEFAULT 0, sitVz REAL NOT NULL DEFAULT 0, sitDz REAL NOT NULL DEFAULT 0, isBatterySteepDischarge INTEGER NOT NULL DEFAULT 0, remoteSig INTEGER NOT NULL DEFAULT 10, isCoolingModeActive INTEGER NOT NULL DEFAULT 0, speed REAL NOT NULL DEFAULT 0, bearing REAL NOT NULL DEFAULT 0, isSitDetected INTEGER NOT NULL DEFAULT 0, isSitActive INTEGER NOT NULL DEFAULT 0, sitBaro REAL NOT NULL DEFAULT 0, sitTilt REAL NOT NULL DEFAULT 0, sitShock REAL NOT NULL DEFAULT 0)")
-                db.execSQL("INSERT INTO connection_history_new (id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, verticalVelocity, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock) SELECT id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, 0, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock FROM connection_history")
+                db.execSQL("INSERT INTO connection_history_new (id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, 0, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock) SELECT id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, 0, sitVz, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock FROM connection_history")
                 db.execSQL("DROP TABLE connection_history"); db.execSQL("ALTER TABLE connection_history_new RENAME TO connection_history")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_connection_history_ts ON connection_history (ts)")
 

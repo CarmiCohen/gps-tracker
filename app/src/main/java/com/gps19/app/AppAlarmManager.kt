@@ -13,10 +13,10 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * v9.3.16:
- * - Requirement R999b: Propagated trackerBaroAltEma to AlarmEvaluationState.
- * v9.3.3:
- * - Issue #058: Hilt Migration. Added @Inject constructor and listener interface.
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted logic.
+ * July.1.12:
+ * - Issue #502: Device Independency. Genericized hardware capabilities.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -106,7 +106,6 @@ class AppAlarmManager @Inject constructor(
         isRelayConnected: Boolean,
         isTrackerConnected: Boolean,
         isTrackerVisualJump: Boolean,
-        isTrajectoryPromoted: Boolean,
         jumpTier: Int = 0,
         isAdaptiveJump: Boolean = false,
         trackerLat: Double,
@@ -149,10 +148,7 @@ class AppAlarmManager @Inject constructor(
         isBatterySteepDischarge: Boolean = false,
         isCoolingModeActive: Boolean = false,
         discoveryPhase: DiscoveryPhase? = null,
-        isXiaomiDevice: Boolean = false,
-        xiaomiStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
-        xiaomiAutostartStatus: EngineXiaomiStatus = EngineXiaomiStatus.UNKNOWN,
-        isXiaomiManualOverride: Boolean = false,
+        capabilities: HardwareCapabilities = HardwareCapabilities(),
         isSitActive: Boolean = false,
         isLocationPending: Boolean = false,
         locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
@@ -191,7 +187,6 @@ class AppAlarmManager @Inject constructor(
             trackerLastValidFixTs = trackerLastValidFixTs,
             trackerSpeed = trackerSpeed,
             isTrackerVisualJump = isTrackerVisualJump,
-            isTrajectoryPromoted = isTrajectoryPromoted,
             jumpTier = jumpTier,
             isAdaptiveJump = isAdaptiveJump,
             trackerBattery = trackerBattery,
@@ -227,10 +222,7 @@ class AppAlarmManager @Inject constructor(
             isTrackerMode = isTrackerMode,
             isBatterySteepDischarge = isBatterySteepDischarge,
             isCoolingModeActive = isCoolingModeActive,
-            isXiaomiDevice = isXiaomiDevice,
-            xiaomiStatus = xiaomiStatus,
-            xiaomiAutostartStatus = xiaomiAutostartStatus,
-            isXiaomiManualOverride = isXiaomiManualOverride,
+            capabilities = capabilities,
             isAnchorLocked = isAnchorLocked
         )
 
@@ -342,7 +334,7 @@ class AppAlarmManager @Inject constructor(
             ALERT_ID_TRACKER_LIFT -> currentSettings.liftAlert
             ALERT_ID_SYSTEM_STORAGE_LOW -> currentSettings.systemStorageLow
             ALERT_ID_SYSTEM_STORAGE_CRITICAL -> true
-            ALERT_ID_XIAOMI_SYSTEM_MISSING -> true
+            ALERT_ID_HARDWARE_CONFIGURATION -> true
             else -> true
         }
     }
@@ -354,7 +346,7 @@ class AppAlarmManager @Inject constructor(
             ALERT_ID_TRACKER_GEOFENCE, ALERT_ID_TRACKER_LIFT, ALERT_ID_SYSTEM_STORAGE_LOW,
             ALERT_ID_SYSTEM_STORAGE_CRITICAL,
             ALERT_ID_SIGNAL_LOSS, ALERT_ID_GPS_STALL, ALERT_ID_TRACKER_TEMP,
-            ALERT_ID_BATTERY_STEEP_DISCHARGE, ALERT_ID_XIAOMI_SYSTEM_MISSING -> true
+            ALERT_ID_BATTERY_STEEP_DISCHARGE, ALERT_ID_HARDWARE_CONFIGURATION -> true
             else -> false
         }
     }

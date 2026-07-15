@@ -37,14 +37,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.gps19.core.engine.LANDING_PAGE_PAUSE_MS
+import com.gps19.core.engine.CapabilityStatus
 import kotlinx.coroutines.delay
 import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * v9.3.39:
- * - Issue #092: Migrated to reactive pendingMode for reliable auto-transitions.
- * - Issue #092: Fixed race condition in isManualSelectionInProgress flag reset.
+ * v9.4.0:
+ * - Issue #502: Device Independency. Genericized hardware permission handling.
  */
 @Composable
 fun MainAppContent(
@@ -56,7 +56,7 @@ fun MainAppContent(
     onRequestOverlayPermission: () -> Unit,
     onRequestAppInfo: () -> Unit,
     onRequestExactAlarm: () -> Unit,
-    onRequestXiaomiPermission: () -> Unit,
+    onRequestHardwarePermission: () -> Unit,
     checkAndRequestPermissions: (String) -> Unit,
     onStopTracking: () -> Unit
 ) {
@@ -314,7 +314,6 @@ fun MainAppContent(
                             uiState = uiState, viewModel = viewModel, logs = eventLogs, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
                             systemPulse = systemPulse, systemPulseRealtime = systemPulseRealtime,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
-                            // Corrected onToggleLog to prevent infinite loop or wrong state
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
                             onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
                             onExit = onCleanupAndExit,
@@ -334,7 +333,7 @@ fun MainAppContent(
                             onRequestOverlayPermission = onRequestOverlayPermission,
                             onRequestAppInfo = onRequestAppInfo,
                             onRequestExactAlarm = onRequestExactAlarm,
-                            onRequestXiaomiPermission = onRequestXiaomiPermission
+                            onRequestHardwarePermission = onRequestHardwarePermission
                         )
                     }
                 }
@@ -346,19 +345,12 @@ fun MainAppContent(
                         onOverlay = { onRequestOverlayPermission() }, 
                         onAppInfo = { onRequestAppInfo() },
                         onExactAlarm = { onRequestExactAlarm() },
-                        onXiaomi = { onRequestXiaomiPermission() },
+                        onHardwarePermission = { onRequestHardwarePermission() },
                         onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, 
-                        onToggleXiaomiOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
+                        onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onTestAlarm = { viewModel.onEvent(UiEvent.TriggerTestAlarm) },
                         onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
-                        isBatteryWhitelisted = uiState.permissions.isBatteryWhitelisted, 
-                        isOverlayGranted = uiState.permissions.isOverlayGranted,
-                        isMicrophoneGranted = uiState.permissions.isMicrophoneGranted,
-                        isExactAlarmGranted = uiState.permissions.isExactAlarmGranted,
-                        isPostNotificationsGranted = uiState.permissions.isPostNotificationsGranted,
-                        isBackgroundLocationGranted = uiState.permissions.isBackgroundLocationGranted,
-                        xiaomiStatus = uiState.permissions.xiaomiStatus,
-                        isXiaomiManualOverride = uiState.permissions.isXiaomiManualOverride,
+                        permissions = uiState.permissions,
                         homePointsCount = uiState.homePoints.size,
                         isTrackerMode = uiState.appMode == "tracker",
                         onGoToMap = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.ToggleMap(true)) }
@@ -369,8 +361,9 @@ fun MainAppContent(
                     AlarmOverlay(
                         alarms = uiState.activeAlarms, isMuted = uiState.isAlarmSilenced,
                         isLocationPending = uiState.integrity.isLocationPending,
-                        xiaomiStatus = uiState.permissions.xiaomiStatus,
-                        onXiaomiPermissionClick = { onRequestXiaomiPermission() },
+                        backgroundStatus = uiState.permissions.backgroundStatus,
+                        hasBackgroundRestriction = uiState.permissions.hasBackgroundRestriction,
+                        onHardwarePermissionClick = { onRequestHardwarePermission() },
                         onMute = { 
                             val currentCauses = uiState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { context.getString(R.string.status_muted) }
                             viewModel.onEvent(UiEvent.StopSiren(currentCauses))

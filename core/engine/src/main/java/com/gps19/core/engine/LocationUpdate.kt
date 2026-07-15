@@ -4,12 +4,11 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
- * v9.3.15:
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted.
+ * July.1.12:
  * - Hardening: Finalized Double standardization. Eliminated redundant 
  *   conversions across module boundaries.
- * v9.1.8:
- * - Issue #046: Shared Behavioral State. Added trackerState for authoritative 
- *   broadcast from Tracker to Viewer HUD.
  */
 @Serializable
 data class LocationUpdate(
@@ -18,7 +17,7 @@ data class LocationUpdate(
     val battery: Int = -1, val temp: Double = 0.0, val maxTemp: Double = 0.0,
     val isCharging: Boolean = false, val gpsTs: Long = 0L, val isMe: Boolean = true,
     val ts: Long = 0L,
-    val isJump: Boolean = false, val isTrajectoryPromoted: Boolean = false,
+    val isJump: Boolean = false,
     val jumpTier: Int = 0,
     val isAdaptiveJump: Boolean = false,
     val isJammer: Boolean = false, val isStalled: Boolean = false,

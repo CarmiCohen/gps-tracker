@@ -17,19 +17,21 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * v9.4.0:
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed trajectory promotion and hindsight logic.
+ * July.1.12:
+ * - Issue #502: Device Independency. Genericized hardware workarounds using HardwareCapabilities.
  * - R406a: Unified Heartbeat (Issue #501). Standardized loop and polling to 2s.
- *   Removed variable interval logic and device-specific polling adaptations.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
+
+    @Inject lateinit var statusProvider: SystemStatusProvider
 
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
-    
-    private var isXiaomiManualOverride = false
     
     private var lastKnownLocation: Location? = null
     private var lastProcessedLocation: LocationProcessor.ProcessedLocation? = null
@@ -41,9 +43,11 @@ class ViewerService : BaseMonitorService() {
     private var stabilityAuditViolationCount = 0
     private var lastStabilityAuditTs = 0L
 
+    private var capabilities = HardwareCapabilities()
+
     private val localProcessorListener = object : LocationProcessorListener {
         override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean, accuracy: Double, maxAccuracy: Double) {
-            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp, isHindsightCorrected = isHindsightCorrected, accuracy = accuracy, maxAccuracy = maxAccuracy)
+            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp, accuracy = accuracy, maxAccuracy = maxAccuracy)
         }
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Double, snr: Double?, vibe: Double?) {
             val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
@@ -71,6 +75,17 @@ class ViewerService : BaseMonitorService() {
             configManager.viewerId = viewerId
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
             configManager.isTrackerMode = false
+
+            // Issue #502: Initialize generic capabilities
+            val perms = statusProvider.getPermissionState()
+            capabilities = HardwareCapabilities(
+                hasBackgroundRestriction = perms.hasBackgroundRestriction,
+                backgroundStatus = perms.backgroundStatus,
+                autostartStatus = perms.autostartStatus,
+                requiresWakeLockRenewal = perms.requiresWakeLockRenewal,
+                requiresAdaptationMuzzle = perms.requiresAdaptationMuzzle,
+                isManualOverrideActive = perms.isManualOverride
+            )
 
             alarmManager.setListener(object : AppAlarmManager.Listener {
                 override fun onLogEvent(type: String, message: String, important: Boolean, extremeValue: Double?, logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, snr: Double?, vibe: Double?) {
@@ -154,11 +169,6 @@ class ViewerService : BaseMonitorService() {
                 launch {
                     repository.maxDistanceFlow.collect { dist ->
                         locationProcessor.setMaxDistanceAuthority(dist)
-                    }
-                }
-                launch {
-                    repository.isXiaomiManualOverrideFlow.collect { override ->
-                        isXiaomiManualOverride = override
                     }
                 }
             }
@@ -323,7 +333,7 @@ class ViewerService : BaseMonitorService() {
         }
     }
     
-    override fun getRequiredTickInterval(): Long {
+    override fun getRequired tickInterval(): Long {
         return TICK_INTERVAL_MS
     }
 
@@ -331,7 +341,7 @@ class ViewerService : BaseMonitorService() {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
 
         // R405: Samsung Stability Hardening. Renew WakeLock every tick.
-        if (isSamsungDevice()) systemMonitor.renewWakeLock()
+        if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
         if (nowRealtime - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
             if (stabilityAuditFixCount > 0) {
@@ -391,7 +401,7 @@ class ViewerService : BaseMonitorService() {
             maxAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), 
             filteredSpeed = proc?.filteredSpeed ?: 0.0,
             vibration = 0.0, heading = 0.0, baroAlt = 0.0,
-            lux = 0.0, isNear = true, isSuspicious = false, tiltDegrees = 0.0, acousticDb = 0.0, isJump = false, isTrajectoryPromoted = false,
+            lux = 0.0, isNear = true, isSuspicious = false, tiltDegrees = 0.0, acousticDb = 0.0, isJump = false,
             jumpTier = 0, isJammer = false, isStalledRaw = false, isStalledActive = false,
             peakShock = 0.0, peakShockTs = 0L, luxBaseline = 0.0, acousticFloorDb = 0.0, adaptiveVibrationFloor = 0.12,
             proxIdx = 1.0, proximityCm = -1.0, 
@@ -468,7 +478,7 @@ class ViewerService : BaseMonitorService() {
                 now = nowRealtime, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = false,
                 isRelayConnected = isSocketConnected, isTrackerConnected = isTrackerConnected,
                 isTrackerVisualJump = remoteHandler.isTrackerVisualJump, 
-                isTrajectoryPromoted = remoteHandler.isTrackerTrajectoryPromoted, jumpTier = remoteHandler.trackerJumpTier,
+                jumpTier = remoteHandler.trackerJumpTier,
                 trackerLat = remoteHandler.trackerLat, trackerLng = remoteHandler.trackerLng, trackerAccuracy = remoteHandler.trackerAccuracy,
                 maxTrackerAccuracy = remoteHandler.trackerMaxAccuracy, trackerLastGpsTs = remoteHandler.trackerLastGpsTs,
                 trackerLastValidFixTs = remoteHandler.trackerLastValidFixRealtime,
@@ -488,7 +498,7 @@ class ViewerService : BaseMonitorService() {
                 isStorageCritical = remoteHandler.isTrackerStorageCritical, 
                 isBatterySteepDischarge = remoteHandler.isTrackerBatterySteepDischarge,
                 isCoolingModeActive = remoteHandler.isTrackerCoolingModeActive,
-                discoveryPhase = null, isXiaomiDevice = false, xiaomiStatus = EngineXiaomiStatus.UNKNOWN, xiaomiAutostartStatus = EngineXiaomiStatus.UNKNOWN, isXiaomiManualOverride = false,
+                discoveryPhase = null, capabilities = capabilities,
                 snrSnapshot = gpsManager.averageSnr, vibeSnapshot = 0.0
             )
         }

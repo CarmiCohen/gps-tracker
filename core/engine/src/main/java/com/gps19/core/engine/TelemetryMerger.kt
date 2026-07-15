@@ -2,10 +2,8 @@ package com.gps19.core.engine
 
 /**
  * TelemetryMerger: Pure logic for aggregating and merging telemetry updates.
- * v8.9.21:
- * - Issue #224: Added tiltIdx and baroIdx to the merge copy list for forensic parity.
- * v8.9.5:
- * - Issue #337: Added currentMa to the merge copy list to ensure power forensic parity.
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted from merge logic.
  */
 object TelemetryMerger {
 
@@ -36,7 +34,6 @@ object TelemetryMerger {
                 maxAccuracy = if (incoming.maxAccuracy > 0) incoming.maxAccuracy else current.maxAccuracy,
                 isStalled = current.isStalled,
                 isJump = current.isJump,
-                isTrajectoryPromoted = current.isTrajectoryPromoted,
                 jumpTier = current.jumpTier,
                 isJammer = current.isJammer,
                 distToHome = current.distToHome,

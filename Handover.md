@@ -1,31 +1,28 @@
-# Project Handover: GPS Tracker Forensic Status
+# Project Handover: Issue #502 (Device Independency) Forensic Status
 
-## Current Status (v9.4.0)
-The application has undergone structural simplification as part of the R406 plan. Issue #501 (Unified Heartbeat) has been fully implemented, standardizing the system timing to a 2s cycle.
+## Current Status: COMPLETED
+Issue #502 has been fully implemented and refined. The core engine and application layer are now brand-agnostic, relying on abstract hardware capability flags.
 
-## Critical Fixes & Simplifications Applied
+## Forensic Implementation Details
 
-### 1. Unified Heartbeat (Issue #501 / R406a)
-- **Problem:** Fragmented timing model with multiple GPS polling intervals (200ms to 20s) and varying heartbeat rates created complexity and OS suppression risks.
-- **Solution:** 
-    - Standardized all periodic tasks, hardware polling, and logic cycles to a unified **2000ms (2s)** heartbeat (`TICK_INTERVAL_MS`).
-    - **EngineConstants.kt:** Removed all redundant polling constants (`MOVING_GPS_POLLING_MS`, `STATIONARY_GPS_POLLING_MS`, etc.).
-    - **ServiceBehaviorUseCase.kt:** Eliminated dynamic interval calculation logic.
-    - **GpsManager.kt:** Hardcoded the Fused Location Provider to a 2s interval and removed dynamic polling flows.
-    - **Tracker/Viewer Services:** Standardized loops and `getRequiredTickInterval()` to the 2s standard.
+### 1. Core Engine Abstraction (`:core:engine`)
+- **`EngineModels.kt`**: Introduced `HardwareCapabilities` data class and `CapabilityStatus` enum.
+- **`MainAlarmLogic.kt`**: Evaluates "Hardware Configuration Gating" based on abstract capabilities rather than hardcoded brand logic.
 
-### 2. Landing Page Responsiveness (Issue #092)
-- Refactored `MainAppContent.kt` for immediate manual selection while maintaining a 2s delay for automatic restoration.
+### 2. Application Mapping Layer (`:app`)
+- **`SystemStatusProvider.kt`**: Primary mapper for hardware quirks. Detects manufacturer and populates generic `PermissionState` fields (`requiresWakeLockRenewal`, `requiresExtraTopPadding`, `requiresAdaptationMuzzle`).
+- **`TrackerService.kt` / `ViewerService.kt`**: Services initialize `capabilities` via `SystemStatusProvider`. Workarounds (Samsung WakeLock, S21FE Muzzle) trigger based on these flags.
+- **`Utils.kt`**: Added `openHardwareSettings(context, pkg)` to encapsulate vendor-specific intents (e.g., MIUI PermCenter).
+
+### 3. UI Implementation
+- **`SharedUiComponents.kt`**: `HeaderBar` now uses `uiState.permissions.requiresExtraTopPadding` for status bar offsets.
+- **`DiagnosticsScreen.kt`**: Hardware-specific terminology genericized.
+- **`MainActivity.kt`**: Uses brand-agnostic hardware permission handlers.
+
+## All "Leftovers" Resolved
+- **`SharedUiComponents.kt`**: Legacy `isXiaomiDevice()` check in `HeaderBar` removed and replaced with capability plumbing.
+- **`AppNotificationManager.kt`**: Overlay blocking logic genericized.
 
 ## Environment Info
 - **Project Root:** `C:/CCwork/Android Projects/gps-tracker`
-- **Modules:** `:app` (Android), `:core:engine` (Kotlin)
-- **Primary Device:** Samsung A15 (R58X40GV2AR)
-
-## Newly Identified Risks
-- **Reduced Telemetry Density:** Standardizing to 2s removes the 200ms high-frequency mode. High-speed trail granularity may be slightly reduced, but stability and battery life are significantly improved.
-
-## Next Steps
-1. **Validation:** Verify location update stability on 2s interval across different motion states.
-2. **Issue #502 (Device Independency):** Proceed with removing vendor-specific logic from the engine.
-3. **Issue #504 (Kalman Filter Removal):** Plan for replacing `ImmFilter` with simpler EMA smoothing as per the simplification roadmap.
+- **Requirement Authority:** **R406b** (Formalized in `STATUS/SOT_MASTER_REQUIREMENTS.md`).

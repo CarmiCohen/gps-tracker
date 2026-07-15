@@ -6,11 +6,11 @@ import javax.inject.Singleton
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
- * v9.3.8:
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted mapping.
+ * July.1.12:
  * - Clock Skew Hardening: Forced remote updates to use local receipt time (nowMs) 
  *   for telemetryTs to ensure HUD freshness (Green vs Gray) is immune to device clock drift.
- * v9.1.8:
- * - Issue #046: Shared Behavioral State. Mapped trackerState from incoming telemetry.
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(
@@ -39,7 +39,6 @@ class TelemetryUseCase @Inject constructor(
             timestamp = if (newTimestamp > 0) newTimestamp else currentLoc.timestamp,
             telemetryTs = effectiveTelemetryTs,
             isVisualJump = update.isJump,
-            isTrajectoryPromoted = update.isTrajectoryPromoted,
             isJammer = update.isJammer, isStalled = update.isStalled,
             vibration = update.vibration ?: currentLoc.vibration,
             heading = update.heading ?: currentLoc.heading,
@@ -94,7 +93,7 @@ class TelemetryUseCase @Inject constructor(
             maxAccuracy = status.maxAccuracy,
             timestamp = status.gpsTs, 
             telemetryTs = status.ts, 
-            isVisualJump = status.isJump, isTrajectoryPromoted = status.isTrajectoryPromoted,
+            isVisualJump = status.isJump,
             vibration = status.vibration, heading = status.heading, tiltDegrees = status.tiltDegrees,
             acousticDb = status.acousticDb, baroAlt = status.baroAlt, lux = status.lux, isNear = status.isNear,
             isSuspicious = status.isSuspicious, isTamperDetected = status.isTamperDetected, isPowerTamper = status.isPowerTamper,
@@ -138,7 +137,6 @@ class TelemetryUseCase @Inject constructor(
             timestamp = if (newTimestamp > 0) newTimestamp else currentLoc.timestamp,
             telemetryTs = if (update.ts > 0) update.ts else nowMs,
             isVisualJump = update.isJump,
-            isTrajectoryPromoted = update.isTrajectoryPromoted,
             isJammer = update.isJammer, isStalled = update.isStalled,
             vibration = update.vibration ?: currentLoc.vibration,
             heading = update.heading ?: currentLoc.heading,
@@ -195,19 +193,6 @@ class TelemetryUseCase @Inject constructor(
             totalDropMs = update.totalDropMs ?: currentStats.totalDropMs, 
             maxDropMs = update.maxDropMs ?: currentStats.maxDropMs,
             maxDropTs = update.maxDropTs ?: currentStats.maxDropTs
-        )
-    }
-
-    fun mapStatsFromStatus(status: TrackerStatus, currentStats: StatsState): StatsState {
-        return currentStats.copy(
-            lastConnTs = status.lastDiscTs, 
-            lastDiscTs = status.lastDiscTs, 
-            totalConnectedMs = status.totalConnectedMs, 
-            sessionConnectedMs = status.sessionConnectedMs, 
-            maxDropMs = status.maxDropMs, 
-            maxDropTs = status.maxDropTs, 
-            totalDropMs = status.totalDropMs, 
-            uptimeMs = status.uptimeMs
         )
     }
 

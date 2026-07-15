@@ -20,15 +20,18 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.4.0:
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed trajectory promotion and hindsight logic.
+ * July.1.12:
+ * - Issue #502: Device Independency. Genericized hardware workarounds using HardwareCapabilities.
  * - R406a: Unified Heartbeat (Issue #501). Standardized loop and polling to 2s.
- *   Removed variable interval logic and device-specific polling adaptations.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
 
     @Inject lateinit var sensorManager: AppSensorManager
     @Inject lateinit var behaviorUseCase: ServiceBehaviorUseCase
+    @Inject lateinit var statusProvider: SystemStatusProvider
     
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
@@ -45,17 +48,16 @@ class TrackerService : BaseMonitorService() {
     private var isAdaptationMuzzled = false
     private var adaptationMuzzleJob: Job? = null
     
-    private var lastXiaomiRecoveryTs = 0L
+    private var lastHardwareRecoveryTs = 0L
     
-    private var isS21FE = false
-    private var isXiaomi = false
+    private var capabilities = HardwareCapabilities()
 
     private var lastGpsFixRealtime = 0L
     private var lastStabilityAuditTs = 0L
 
     private val localProcessorListener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean, accuracy: Double, maxAccuracy: Double) {
-            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp, isHindsightCorrected = isHindsightCorrected, accuracy = accuracy, maxAccuracy = maxAccuracy)
+        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, accuracy: Double, maxAccuracy: Double) {
+            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp, accuracy = accuracy, maxAccuracy = maxAccuracy)
         }
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Double, snr: Double?, vibe: Double?) {
             val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
@@ -84,8 +86,16 @@ class TrackerService : BaseMonitorService() {
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
             configManager.isTrackerMode = true
             
-            isS21FE = isS21FEDevice()
-            isXiaomi = isXiaomiDevice()
+            // Issue #502: Initialize generic capabilities
+            val perms = statusProvider.getPermissionState()
+            capabilities = HardwareCapabilities(
+                hasBackgroundRestriction = perms.hasBackgroundRestriction,
+                backgroundStatus = perms.backgroundStatus,
+                autostartStatus = perms.autostartStatus,
+                requiresWakeLockRenewal = perms.requiresWakeLockRenewal,
+                requiresAdaptationMuzzle = perms.requiresAdaptationMuzzle,
+                isManualOverrideActive = perms.isManualOverride
+            )
 
             alarmManager.setListener(object : AppAlarmManager.Listener {
                 override fun onLogEvent(type: String, message: String, important: Boolean, extremeValue: Double?, logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, snr: Double?, vibe: Double?) {
@@ -241,7 +251,7 @@ class TrackerService : BaseMonitorService() {
         if (!SignalingConstants.isValidViewerId(id)) return
         repository.updateRemoteActivity(timeProvider.currentTimeMillis())
 
-        if ((configManager.viewerId == MainRepository.DEFAULT_VIEWER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
+        if ((configManager.viewerId == MainRepository.DEFAULT_TRACKER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
             configManager.viewerId = id
             networkManager.updateIdentity(configManager.deviceId, id, true)
             lifecycleScope.launch { repository.saveString(MainRepository.VIEWER_ID_KEY, id) } 
@@ -259,7 +269,7 @@ class TrackerService : BaseMonitorService() {
         sessionManager.reset()
         integrityMonitor.resetStats()
         forensicUseCase.resetLatches()
-        lastXiaomiRecoveryTs = 0L
+        lastHardwareRecoveryTs = 0L
         logManager.logServiceEvent("Session Terminated", false)
     }
 
@@ -306,14 +316,14 @@ class TrackerService : BaseMonitorService() {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
         sensorManager.setHighLoad(integrityMonitor.isCoolingModeActive)
 
-        if (isSamsungDevice()) systemMonitor.renewWakeLock()
+        if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
-        if (isXiaomi && lastServiceTickRealtime > 0) {
+        if (capabilities.hasBackgroundRestriction && lastServiceTickRealtime > 0) {
             val tickGap = nowRealtime - lastServiceTickRealtime
-            if (tickGap > XIAOMI_SUPPRESSION_THRESHOLD_MS && nowRealtime - lastXiaomiRecoveryTs > XIAOMI_RECOVERY_COOLDOWN_MS) {
-                lastXiaomiRecoveryTs = nowRealtime
+            if (tickGap > HARDWARE_SUPPRESSION_THRESHOLD_MS && nowRealtime - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
+                lastHardwareRecoveryTs = nowRealtime
                 val proc = lastProcessedLocation
-                logManager.logServiceEvent("HEURISTIC RECOVERY: Xiaomi suppression detected.", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                logManager.logServiceEvent("HEURISTIC RECOVERY: Hardware suppression detected.", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
                     lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                 networkManager.connect(configManager.relayUrl)
             }
@@ -349,7 +359,7 @@ class TrackerService : BaseMonitorService() {
                 now = now, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime,
                 isTrackerMode = true, isRelayConnected = networkManager.isConnected(), isTrackerConnected = true,
                 isTrackerVisualJump = processed.status == SentinelStatus.JUMP,
-                isTrajectoryPromoted = processed.isTrajectoryPromoted, jumpTier = processed.jumpTier,
+                jumpTier = processed.jumpTier,
                 isAdaptiveJump = processed.isAdaptiveJump, trackerLat = processed.optimizedPoint.lat,
                 trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy,
                 maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = location.time,
@@ -366,7 +376,8 @@ class TrackerService : BaseMonitorService() {
                 trackerLux = sensorManager.currentLux, isNear = sensorManager.isProximityNear,
                 luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
                 adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = locationProcessor.getPeakVibrationShock(),
-                trackerCurrentMa = integrityMonitor.getBatteryCurrent(), isAnchorLocked = processed.isAnchorLocked
+                trackerCurrentMa = integrityMonitor.getBatteryCurrent(), isAnchorLocked = processed.isAnchorLocked,
+                capabilities = capabilities
             )
             
             val isUrgent = alarmManager.hasUnresolvedAlarms() || processed.status == SentinelStatus.JUMP
@@ -378,7 +389,7 @@ class TrackerService : BaseMonitorService() {
                 heading = sensorManager.currentCompassHeading, baroAlt = sensorManager.absoluteAltitude, lux = sensorManager.currentLux,
                 isNear = sensorManager.isProximityNear, isSuspicious = processed.status == SentinelStatus.SENSOR_SUSPICIOUS,
                 tiltDegrees = sensorManager.currentTiltDegrees, acousticDb = sensorManager.currentAcousticDb,
-                isJump = processed.status == SentinelStatus.JUMP, isTrajectoryPromoted = processed.isTrajectoryPromoted,
+                isJump = processed.status == SentinelStatus.JUMP,
                 jumpTier = processed.jumpTier, isJammer = processed.jammerDetected, isStalledRaw = false,
                 isStalledActive = processed.isStalled, peakShock = sensorManager.consumePeakVibration(),
                 peakShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
@@ -435,7 +446,7 @@ class TrackerService : BaseMonitorService() {
                 isAnchorLocked = processed.isAnchorLocked
             )
 
-            if (isUrgent && isS21FE) {
+            if (isUrgent && capabilities.requiresAdaptationMuzzle) {
                 isAdaptationMuzzled = true
                 adaptationMuzzleJob?.cancel()
                 adaptationMuzzleJob = lifecycleScope.launch { delay(3000L); isAdaptationMuzzled = false }
@@ -487,7 +498,7 @@ class TrackerService : BaseMonitorService() {
 
     companion object {
         private const val MUZZLE_HYSTERESIS_MS = 2000L
-        private const val XIAOMI_SUPPRESSION_THRESHOLD_MS = 45000L
-        private const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
+        private const val HARDWARE_SUPPRESSION_THRESHOLD_MS = 45000L
+        private const val HARDWARE_RECOVERY_COOLDOWN_MS = 60000L
     }
 }

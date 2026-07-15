@@ -6,11 +6,11 @@ import javax.inject.Singleton
 
 /**
  * BehaviorUseCase: Logic for determining high-level behavioral states and UI visibility gates.
- * v9.1.8:
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted from state computation.
+ * July.1.12:
  * - Issue #046: Shared Behavioral State. Updated computeTrackerState to adopt 
  *   authoritative remote state when in Viewer mode, preventing HUD desync.
- * v8.8.30:
- * - R872: Suppressed redScreenVisible (Alarm Overlay) in Tracker mode.
  */
 @Singleton
 class BehaviorUseCase @Inject constructor() {
@@ -40,7 +40,6 @@ class BehaviorUseCase @Inject constructor() {
 
         return TrackerStateManager.updateState(
             isVisualJump = effectiveLocation.isVisualJump,
-            isTrajectoryPromoted = effectiveLocation.isTrajectoryPromoted,
             speed = effectiveLocation.speed,
             vibration = effectiveLocation.vibration,
             vibrationFloor = effectiveLocation.adaptiveVibrationFloor,

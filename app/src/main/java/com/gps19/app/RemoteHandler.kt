@@ -19,7 +19,9 @@ import javax.inject.Singleton
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
- * v9.3.23:
+ * July.1.13:
+ * - Issue #509: Abandon GtoEngine. Removed trajectory promotion flags.
+ * July.1.12:
  * - Robust Aliasing: Fixed peer ID extraction. Trackers now correctly pass 
  *   'viewer_id' to the pulse listener instead of their own 'id'.
  */
@@ -64,7 +66,6 @@ class RemoteHandler @Inject constructor(
     var isTrackerCharging = false
     var isTrackerJammerSuspicion = false
     var isTrackerVisualJump = false
-    var isTrackerTrajectoryPromoted = false
     var trackerJumpTier = 0
     var isTrackerSuspicious = false
     var isTrackerTamperDetected = false
@@ -145,7 +146,7 @@ class RemoteHandler @Inject constructor(
                     trackerAccuracy = s.accuracy; trackerMaxAccuracy = s.maxAccuracy; trackerLastGpsTs = s.gpsTs; trackerBattery = s.battery
                     trackerTemp = s.temp; trackerMaxTemp = s.maxTemp; trackerCurrentMa = s.currentMa
                     isTrackerCharging = s.isCharging; trackerSatsView = s.satsView; trackerSatsUsed = s.satsUsed
-                    isTrackerJammerSuspicion = false; isTrackerVisualJump = false; isTrackerTrajectoryPromoted = false
+                    isTrackerJammerSuspicion = false; isTrackerVisualJump = false
                     trackerJumpTier = 0
                     isTrackerSuspicious = s.isSuspicious; isTrackerTamperDetected = s.isTamperDetected
                     isTrackerPowerTamper = s.isPowerTamper; isTrackerSitDetected = s.isSitDetected
@@ -247,7 +248,7 @@ class RemoteHandler @Inject constructor(
         trackerMaxAccuracy = 0.0; trackerLastGpsTs = 0L; trackerBattery = 0; trackerTemp = 0.0
         trackerMaxTemp = 0.0; trackerCurrentMa = 0; trackerSatsView = 0; trackerSatsUsed = 0
         isTrackerCharging = false; isTrackerJammerSuspicion = false; isTrackerVisualJump = false
-        isTrackerTrajectoryPromoted = false; trackerJumpTier = 0; isTrackerSuspicious = false
+        trackerJumpTier = 0; isTrackerSuspicious = false
         isTrackerTamperDetected = false; isTrackerPowerTamper = false
         isTrackerSitDetected = false; isTrackerSitActive = false; trackerLastSitTs = 0L; trackerVerticalVelocity = 0.0
         trackerSitVz = 0.0; trackerSitDz = 0.0; trackerSitBaro = 0.0; trackerSitTilt = 0.0; trackerSitShock = 0.0
@@ -468,7 +469,6 @@ class RemoteHandler @Inject constructor(
                 val isStalledPacket = data.optBoolean("is_stalled", false)
                 val isJumpPacket = data.optBoolean("is_jump", false)
                 val isJammerPacket = data.optBoolean("is_jammer", false)
-                val isTrajectoryPacket = data.optBoolean("is_trajectory_promoted", false)
                 val jumpTierPacket = data.optInt("jump_tier", 0)
 
                 val processed = locationProcessor.processGpsPoint(
@@ -485,7 +485,6 @@ class RemoteHandler @Inject constructor(
                     lastGpsTs = prevGpsTs,
                     providedMaxAccuracy = rawMaxAcc,
                     providedIsJump = isJumpPacket,
-                    providedIsTrajectoryPromoted = isTrajectoryPacket,
                     providedJumpTier = jumpTierPacket,
                     providedIsAdaptiveJump = data.optBoolean("is_adaptive_jump", false),
                     providedIsJammer = isJammerPacket,
@@ -516,7 +515,6 @@ class RemoteHandler @Inject constructor(
                 trackerSatsUsed = data.optInt("sats_used", trackerSatsUsed)
                 isTrackerJammerSuspicion = isJammerPacket
                 isTrackerVisualJump = isJumpPacket
-                isTrackerTrajectoryPromoted = isTrajectoryPacket
                 trackerJumpTier = jumpTierPacket
             }
             
@@ -603,7 +601,7 @@ class RemoteHandler @Inject constructor(
                         lat = trackerLat, lng = trackerLng, speed = trackerSpeed, accuracy = trackerAccuracy, bearing = trackerBearing,
                         battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp, isCharging = isTrackerCharging, currentMa = trackerCurrentMa,
                         gpsTs = trackerLastGpsTs, isMe = false, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
-                        isJump = isTrackerVisualJump, isTrajectoryPromoted = isTrackerTrajectoryPromoted, jumpTier = trackerJumpTier, 
+                        isJump = isTrackerVisualJump, jumpTier = trackerJumpTier, 
                         isJammer = isTrackerJammerSuspicion, isStalled = isStalled,
                         maxAccuracy = trackerMaxAccuracy, signal = peerSignal,
                         vibration = trackerVibration, heading = trackerBearing, baroAlt = trackerBaroAlt,
@@ -671,7 +669,7 @@ class RemoteHandler @Inject constructor(
                         proxIdx = trackerProxIdx, proximityCm = trackerProximityCm,
                         proximityDebounceMs = trackerProximityDebounceMs, vibrationRollingSum = trackerVibrationRollingSum,
                         isSuspicious = isTrackerSuspicious, isTamperDetected = isTrackerTamperDetected,
-                        isTrajectoryPromoted = isTrackerTrajectoryPromoted, jumpTier = trackerJumpTier,
+                        jumpTier = trackerJumpTier,
                         isLocationPending = isTrackerLocationPending,
                         locationPendingReason = trackerLocationPendingReason,
                         lastValidFixRealtime = trackerLastValidFixRealtime,

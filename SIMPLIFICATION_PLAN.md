@@ -9,11 +9,12 @@ Standardized all periodic tasks and hardware polling to a 2s cycle to reduce com
 *   **Implementation**: Used `TICK_INTERVAL_MS` (2000L) globally.
 *   **Status**: Fixed in July.11.01.
 
-## R406b: Device Independency - Issue #502
+## R406b: Device Independency - Issue #502 [COMPLETED]
 The codebase is currently littered with `isXiaomiDevice()`, `isSamsungDevice()`, and `isS21FEDevice()` checks.
 *   **Action**: Remove vendor-specific logic from the `core:engine`.
-*   **Abstraction**: If hardware-specific workarounds are needed (like Xiaomi's background restrictions), move them into a `HardwareCompatibility` layer that provides generic "Capabilities" (e.g., `requiresWakeLockRenewal`, `supportsHighFreqGps`).
-*   **Logic**: The engine should operate on "State" (Moving, Stationary, Suspicious) rather than "Device + State".
+*   **Abstraction**: Hardware-specific workarounds moved into `HardwareCapabilities` abstraction.
+*   **Logic**: Engine now operates on abstract capabilities (e.g., `requiresWakeLockRenewal`).
+*   **Status**: Fixed in July.1.12 (Issue #502).
 
 ## R406c: Hilt Removal (Simplification) - Issue #503
 Hilt/Dagger adds significant boilerplate and increases build times.
@@ -24,11 +25,12 @@ Hilt/Dagger adds significant boilerplate and increases build times.
     3.  Pass dependencies through constructors manually.
 *   **Benefit**: Easier debugging, no generated code obfuscating the call stack, and faster compilation.
 
-## R406d: Kalman Filter Removal - Issue #504
+## R406d: Kalman Filter Removal - Issue #504 [COMPLETED]
 The `ImmFilter` (Interacting Multiple Model) adds significant mathematical overhead and is a common source of "stuck" positions or "ghosting".
 *   **Action**: Delete `ImmFilter.kt` and `KalmanModel`.
-*   **Replacement**: Use a Simple Moving Average (SMA) or an Exponential Moving Average (EMA) for position smoothing, combined with a basic distance-based outlier rejector.
+*   **Replacement**: Used Exponential Moving Average (EMA) for position, speed, and bearing smoothing.
 *   **Benefit**: Predictable behavior and easier tuning of tracking logic.
+*   **Status**: Fixed in July.1.12 (Issue #504).
 
 ## R406e: Logic Refactoring (Additional Ideas)
 *   **State Machine Consolidation - Issue #505**: The `TrackerService` and `LocationProcessor` have overlapping responsibilities. Merge them into a single `TrackingEngine` that manages both data acquisition and processing.
@@ -62,12 +64,12 @@ Several "Zero-Lag" and "Hindsight Correction" optimizations add complexity that 
 We recommend implementing the following issues first to establish a stable and simplified foundation:
 
 1.  **Issue #501 (R406a: Unified Heartbeat)**: [DONE] Standardizing the timing loop to 2s simplified all downstream logic.
-2.  **Issue #504 (R406d: Kalman Filter Removal)**: Removing the `ImmFilter` in favor of simple EMA smoothing will eliminate the most mathematically complex and bug-prone part of the positioning logic.
+2.  **Issue #504 (R406d: Kalman Filter Removal)**: [DONE] Removing the `ImmFilter` in favor of simple EMA smoothing will eliminate the most mathematically complex and bug-prone part of the positioning logic.
 3.  **Issue #509 (R406h: GtoEngine / Hindsight Removal)**: This will strip out a large amount of complex buffer management and "time-travel" logic that often causes synchronization issues.
 
 ## Proposed Execution Order
-1.  **Phase 1**: Remove Kalman Filter and replace with EMA smoothing (Issue #504).
-2.  **Phase 2**: Standardize all timers to 2s and remove device-specific switches (Issue #501 [DONE], Issue #502).
-3.  **Phase 3**: Strip out GtoEngine and Hindsight logic (Issue #508, Issue #509).
-4.  **Phase 4**: Remove Hilt and implement manual DI (Issue #503).
+1.  **Phase 1**: Remove Kalman Filter and replace with EMA smoothing (Issue #504). [COMPLETED]
+2.  **Phase 2**: Standardize all timers to 2s and remove device-specific switches (Issue #501 [DONE], Issue #502 [DONE]).
+3.  **Phase 4**: Remove Hilt and implement manual DI (Issue #503).
+4.  **Phase 3**: Strip out GtoEngine and Hindsight logic (Issue #508, Issue #509).
 5.  **Phase 5**: Consolidate Sentinel statuses and flatten Service architecture (Issue #512, Issue #513).

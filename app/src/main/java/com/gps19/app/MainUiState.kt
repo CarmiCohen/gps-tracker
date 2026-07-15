@@ -1,9 +1,12 @@
 package com.gps19.app
 
+import com.gps19.core.engine.CapabilityStatus
 import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Unified immutable state for the entire UI structure.
+ * v9.4.0:
+ * - Issue #502: Device Independency. Genericized PermissionState and readiness logic.
  * v9.3.39:
  * - Issue #092: Added pendingMode to NavigationState to facilitate reactive 
  *   auto-transitions after permission grants.
@@ -69,8 +72,9 @@ data class MainUiState(
                 (appMode != null) &&
                 (appMode != "tracker" || permissions.isMicrophoneGranted) &&
                 (appMode == "tracker" || homePoints.isNotEmpty()) &&
-                (!isXiaomiDevice() || permissions.xiaomiStatus == XiaomiPermissionStatus.GRANTED || 
-                 (permissions.xiaomiStatus == XiaomiPermissionStatus.UNKNOWN && permissions.isXiaomiManualOverride))
+                (!permissions.hasBackgroundRestriction || 
+                 (permissions.backgroundStatus == CapabilityStatus.GRANTED && permissions.autostartStatus == CapabilityStatus.GRANTED) || 
+                 (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride))
 
     val systemIssuesCount: Int
         get() {
@@ -84,10 +88,11 @@ data class MainUiState(
             if (appMode == "tracker" && !permissions.isMicrophoneGranted) count++
             if (appMode != "tracker" && homePoints.isEmpty()) count++
             
-            val xiaomiIssue = isXiaomiDevice() && 
-                             permissions.xiaomiStatus != XiaomiPermissionStatus.GRANTED && 
-                             !(permissions.xiaomiStatus == XiaomiPermissionStatus.UNKNOWN && permissions.isXiaomiManualOverride)
-            if (xiaomiIssue) count++
+            val configIssue = permissions.hasBackgroundRestriction && 
+                             (permissions.backgroundStatus != CapabilityStatus.GRANTED || 
+                              permissions.autostartStatus != CapabilityStatus.GRANTED) && 
+                             !(permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)
+            if (configIssue) count++
             
             return count
         }
@@ -111,9 +116,13 @@ data class PermissionState(
     val isExactAlarmGranted: Boolean = false,
     val isPostNotificationsGranted: Boolean = true,
     val isBackgroundLocationGranted: Boolean = true,
-    val xiaomiStatus: XiaomiPermissionStatus = XiaomiPermissionStatus.UNKNOWN,
-    val xiaomiAutostartStatus: XiaomiPermissionStatus = XiaomiPermissionStatus.UNKNOWN,
-    val isXiaomiManualOverride: Boolean = false
+    val hasBackgroundRestriction: Boolean = false,
+    val backgroundStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
+    val autostartStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
+    val isManualOverride: Boolean = false,
+    val requiresWakeLockRenewal: Boolean = false,
+    val requiresExtraTopPadding: Boolean = false,
+    val requiresAdaptationMuzzle: Boolean = false
 )
 
 data class NavigationState(
