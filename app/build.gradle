@@ -28,7 +28,7 @@ def getGitVersionName = { ->
         }
         return stdout.toString().trim().replaceFirst("^v", "")
     } catch (Exception ignored) {
-        return "July.16.17"
+        return "July.16.23"
     }
 }
 
@@ -42,7 +42,7 @@ android {
         targetSdk = 35
         
         versionCode = getGitVersionCode()
-        versionName = "July.16.17"
+        versionName = "July.16.23"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

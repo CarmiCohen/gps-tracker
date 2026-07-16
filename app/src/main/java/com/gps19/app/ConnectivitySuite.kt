@@ -19,6 +19,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * ConnectivitySuite: Unified connectivity, telemetry sync, and remote peer handling.
+ * July.16.22:
+ * - Issue #526: A15 Landing Page Hang. Offloaded initialization and loops to background dispatchers
+ *   to prevent Main thread contention during cold start.
  * July.16.18:
  * - Issue #516: De-duplicate "Status" Logic. Updated pushCurrentStatus to include all health fields.
  */
@@ -61,7 +64,8 @@ class ConnectivitySuite(
         restartLoops()
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + suiteExceptionHandler)
+    // Issue #526: Moved internal scope to Dispatchers.Default to prevent UI hangs on cold start
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + suiteExceptionHandler)
     private var keepAliveJob: Job? = null
     private var syncJob: Job? = null
 
@@ -141,9 +145,12 @@ class ConnectivitySuite(
             }
         }
 
-        if (relayUrl.isNotEmpty() && SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
-            signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
-            wakeUpRelay()
+        // Issue #526: Offload initial connection to background to prevent cold start hang
+        scope.launch {
+            if (relayUrl.isNotEmpty() && SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
+                signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+                wakeUpRelay()
+            }
         }
 
         startKeepAliveLoop()
@@ -179,7 +186,7 @@ class ConnectivitySuite(
         if (latestDeviceId != deviceId || latestViewerId != viewerId || latestRelayUrl != relayUrl || latestIsTracker != isTrackerMode) {
             if (SignalingConstants.isValidTrackerId(latestDeviceId) && SignalingConstants.isValidViewerId(latestViewerId)) {
                 deviceId = latestDeviceId; viewerId = latestViewerId; relayUrl = latestRelayUrl; isTrackerMode = latestIsTracker
-                withContext(Dispatchers.Main) {
+                withContext(Dispatchers.Default) {
                     lastReconnectTs = timeProvider.elapsedRealtime()
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                     wakeUpRelay()
@@ -200,13 +207,13 @@ class ConnectivitySuite(
             val now = timeProvider.elapsedRealtime()
             if (signalingProvider.isConnected()) {
                 if (now - signalingProvider.getLastRelayTrafficTs() > NET_REJOIN_THRESHOLD_MS) {
-                    withContext(Dispatchers.Main) {
+                    withContext(Dispatchers.Default) {
                         signalingProvider.updateIdentity(deviceId, viewerId, isTrackerMode, force = true)
                         wakeUpRelay()
                     }
                 }
             } else if (now - lastReconnectTs > NET_REJOIN_THRESHOLD_MS) {
-                withContext(Dispatchers.Main) {
+                withContext(Dispatchers.Default) {
                     lastReconnectTs = now
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                     wakeUpRelay()
@@ -354,9 +361,19 @@ class ConnectivitySuite(
     private fun initializePeerState() {
         scope.launch {
             try {
-                trackerLuxBaseline = mainRepository.getDouble(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0)
-                trackerAcousticFloorDb = mainRepository.getDouble(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
-                mainRepository.loadTrackerState()?.let { s ->
+                // Issue #526: Use IO dispatcher for multiple repository fetches during cold start
+                val (luxBaseline, acousticFloor, trackerState) = withContext(Dispatchers.IO) {
+                    Triple(
+                        mainRepository.getDouble(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0),
+                        mainRepository.getDouble(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0),
+                        mainRepository.loadTrackerState()
+                    )
+                }
+                
+                trackerLuxBaseline = luxBaseline
+                trackerAcousticFloorDb = acousticFloor
+                
+                trackerState?.let { s ->
                     applyPeerStatus(s)
                     mainRepository.updateLocation(LocationUpdate(
                         lat = s.lat, lng = s.lng, speed = s.speed, accuracy = s.accuracy, bearing = s.bearing,

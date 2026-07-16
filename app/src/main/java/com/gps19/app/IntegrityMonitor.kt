@@ -16,8 +16,10 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * July.16.18:
+ * July.16.22:
  * - Issue #516: De-duplicate "Status" Logic. Refactored to use SystemHealthState.
+ * - Issue #523: Thread Safety. Synchronized access to currentHealth.
+ * - Issue #524: Power Reset. Added onViolationResolved to clear pending power alarms.
  */
 class IntegrityMonitor(
     private val context: Context,
@@ -26,10 +28,12 @@ class IntegrityMonitor(
 ) {
     interface Listener {
         fun onViolationSustained(type: String)
+        fun onViolationResolved(type: String)
         fun onLogEvent(message: String, important: Boolean)
     }
 
     private var listener: Listener? = null
+    private val healthLock = Any()
 
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -51,9 +55,12 @@ class IntegrityMonitor(
     private var lastPowerDisconnectTs = 0L
     private var _batteryLevel = -1
 
-    // The single source of truth for health data
-    var currentHealth = SystemHealthState()
-        private set
+    private var _currentHealth = SystemHealthState()
+    
+    // The single source of truth for health data - thread safe access
+    var currentHealth: SystemHealthState
+        get() = synchronized(healthLock) { _currentHealth }
+        private set(value) = synchronized(healthLock) { _currentHealth = value }
 
     fun getBatteryLevel(): Int {
         if (_batteryLevel == -1) {
@@ -73,17 +80,17 @@ class IntegrityMonitor(
         lastFullPollTs = nowRealtime
 
         val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        var newHealth = currentHealth
+        var workingHealth = currentHealth
 
         if (intent != null) {
             val batteryTemp = (intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)) / 10.0
-            var maxTemp = newHealth.maxTemp
+            var maxTemp = workingHealth.maxTemp
             if (batteryTemp > maxTemp) {
                 maxTemp = batteryTemp
                 repository.saveDoubleSync(MainRepository.MAX_TEMP_KEY, maxTemp)
             }
 
-            var isCooling = newHealth.isCoolingModeActive
+            var isCooling = workingHealth.isCoolingModeActive
             if (!isCooling && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
                 isCooling = true
                 listener?.onLogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true)
@@ -99,7 +106,7 @@ class IntegrityMonitor(
 
             if (isCharging) onPowerConnected() else onPowerDisconnected()
 
-            var isSteepDischarge = newHealth.isBatterySteepDischarge
+            var isSteepDischarge = workingHealth.isBatterySteepDischarge
             if (_batteryLevel != -1 && !isCharging) {
                 if (nowRealtime - lastBatteryCheckTs > 60000L) {
                     batterySamples.add(nowRealtime to _batteryLevel)
@@ -111,7 +118,7 @@ class IntegrityMonitor(
                 isSteepDischarge = false
             }
 
-            newHealth = newHealth.copy(
+            workingHealth = workingHealth.copy(
                 batteryLevel = _batteryLevel,
                 batteryTemp = batteryTemp,
                 maxTemp = maxTemp,
@@ -123,7 +130,7 @@ class IntegrityMonitor(
         }
 
         val powerSave = powerManager.isPowerSaveMode
-        if (powerSave != newHealth.isPowerSaveMode) {
+        if (powerSave != workingHealth.isPowerSaveMode) {
             if (powerSave) {
                 listener?.onLogEvent("SYSTEM WARNING: Power Save Mode active. Sensors and GPS may be throttled by OS.", true)
             } else {
@@ -131,7 +138,7 @@ class IntegrityMonitor(
             }
         }
         
-        var standbyBucket = newHealth.standbyBucket
+        var standbyBucket = workingHealth.standbyBucket
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && usageStatsManager != null) {
             val bucket = usageStatsManager.appStandbyBucket
             if (bucket != standbyBucket) {
@@ -153,13 +160,13 @@ class IntegrityMonitor(
         }
 
         val newNet = getActiveNetworkInterface()
-        if (newNet != newHealth.netInterface) {
+        if (newNet != workingHealth.netInterface) {
             listener?.onLogEvent("Network switched to $newNet", false)
         }
 
         val storage = checkStorageIntegrity()
 
-        var isPowerTamper = newHealth.isPowerTamper
+        var isPowerTamper = workingHealth.isPowerTamper
         if (lastPowerDisconnectTs > 0 && !isPowerTamper) {
             if (checkViolationSustained(ALERT_ID_TRACKER_POWER, lastPowerDisconnectTs, POWER_DISCONNECT_DEBOUNCE_MS)) {
                 isPowerTamper = true
@@ -167,7 +174,7 @@ class IntegrityMonitor(
             }
         }
 
-        currentHealth = newHealth.copy(
+        currentHealth = workingHealth.copy(
             isPowerSaveMode = powerSave,
             standbyBucket = standbyBucket,
             netInterface = newNet,
@@ -199,8 +206,9 @@ class IntegrityMonitor(
     }
 
     private fun checkStorageIntegrity(): Pair<Boolean, Boolean> {
-        var low = currentHealth.isStorageLow
-        var critical = currentHealth.isStorageCritical
+        val workingHealth = currentHealth
+        var low = workingHealth.isStorageLow
+        var critical = workingHealth.isStorageCritical
         try {
             val stat = StatFs(context.filesDir.path)
             val bytesAvailable = stat.availableBlocksLong * stat.blockSizeLong
@@ -209,14 +217,14 @@ class IntegrityMonitor(
             critical = megabytesAvailable < SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB
             low = megabytesAvailable < SYSTEM_STORAGE_LOW_THRESHOLD_MB
             
-            if (critical != currentHealth.isStorageCritical) {
+            if (critical != workingHealth.isStorageCritical) {
                 if (critical) {
                     listener?.onLogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB). ALL non-essential logging HALTED to prevent corruption.", true)
                     listener?.onViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL)
                 }
             }
 
-            if (low != currentHealth.isStorageLow) {
+            if (low != workingHealth.isStorageLow) {
                 if (low && !critical) {
                     listener?.onLogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB). Throttling logs.", true)
                     listener?.onViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW)
@@ -298,12 +306,14 @@ class IntegrityMonitor(
         lastPowerDisconnectTs = 0L
         if (currentHealth.isPowerTamper) {
             currentHealth = currentHealth.copy(isPowerTamper = false)
+            listener?.onViolationResolved(ALERT_ID_TRACKER_POWER)
             listener?.onLogEvent("Tracker power restored", false)
         }
     }
 
     fun clearPowerTamper() {
         currentHealth = currentHealth.copy(isPowerTamper = false)
+        listener?.onViolationResolved(ALERT_ID_TRACKER_POWER)
         lastPowerDisconnectTs = 0L
     }
 
