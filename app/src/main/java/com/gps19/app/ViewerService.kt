@@ -15,8 +15,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * July.16.18:
+ * July.16.20:
  * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
+ * - Issue #518: Fix Tracker ID persistence key in handleTrackerPulse.
+ * - Issue #519: Correct mapping of remote tracker health flags to engine.
+ * - Issue #520: Correct local infrastructure health mapping for relay offline detection.
  */
 class ViewerService : BaseMonitorService() {
 
@@ -88,6 +91,7 @@ class ViewerService : BaseMonitorService() {
 
             integrityMonitor.setListener(object : IntegrityMonitor.Listener {
                 override fun onViolationSustained(type: String) {}
+                override fun onViolationResolved(type: String) {}
                 override fun onLogEvent(message: String, important: Boolean) {
                     logManager.logServiceEvent(message, important)
                 }
@@ -260,7 +264,7 @@ class ViewerService : BaseMonitorService() {
         if ((configManager.deviceId == MainRepository.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
             configManager.deviceId = id
             connectivitySuite.updateIdentity(id, configManager.viewerId, false)
-            lifecycleScope.launch { repository.saveString(MainRepository.VIEWER_ID_KEY, id) }
+            lifecycleScope.launch { repository.saveString(MainRepository.TRACKER_ID_KEY, id) }
         }
         if (sessionManager.onTrackerPulse(id, timeProvider.currentTimeMillis(), false)) {
             val proc = lastProcessedLocation
@@ -448,7 +452,7 @@ class ViewerService : BaseMonitorService() {
         isTrackerConnected: Boolean
     ) {
         val isSocketConnected = connectivitySuite.isConnected()
-        val health = integrityMonitor.currentHealth
+        val localHealth = integrityMonitor.currentHealth
         
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
@@ -462,7 +466,8 @@ class ViewerService : BaseMonitorService() {
                 maxTrackerAccuracy = connectivitySuite.trackerMaxAccuracy, trackerLastGpsTs = connectivitySuite.trackerLastGpsTs,
                 trackerLastValidFixTs = connectivitySuite.trackerLastValidFixRealtime,
                 trackerSpeed = connectivitySuite.trackerSpeed, trackerBattery = connectivitySuite.trackerBattery, trackerTemp = connectivitySuite.trackerTemp,
-                isHardwareOnline = connectivitySuite.isTrackerConnected, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
+                isHardwareOnline = localHealth.isHardwareOnline, 
+                isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
                 isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(),
                 distToHomeAuthority = connectivitySuite.trackerDistToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(),
                 isGpsGap = isTrackerGap, isTamperDetected = connectivitySuite.isTrackerTamperDetected,
@@ -471,12 +476,14 @@ class ViewerService : BaseMonitorService() {
                 isNear = connectivitySuite.isTrackerNear, luxBaseline = connectivitySuite.trackerLuxBaseline, acousticFloorDb = connectivitySuite.trackerAcousticFloorDb,
                 adaptiveVibrationFloor = connectivitySuite.trackerAdaptiveVibrationFloor, peakVibrationShock = connectivitySuite.trackerPeakVibrationShock,
                 trackerCurrentMa = connectivitySuite.trackerCurrentMa, isLocationPending = connectivitySuite.isTrackerLocationPending,
-                locationPendingReason = connectivitySuite.trackerLocationPendingReason, isPowerSaveMode = health.isPowerSaveMode,
-                standbyBucket = health.standbyBucket, netInterface = health.netInterface, 
-                isStorageLow = health.isStorageLow,
-                isStorageCritical = health.isStorageCritical, 
-                isBatterySteepDischarge = health.isBatterySteepDischarge,
-                isCoolingModeActive = health.isCoolingModeActive,
+                locationPendingReason = connectivitySuite.trackerLocationPendingReason, 
+                isPowerSaveMode = connectivitySuite.isTrackerPowerSaveMode,
+                standbyBucket = connectivitySuite.trackerStandbyBucket, 
+                netInterface = connectivitySuite.trackerNetInterface, 
+                isStorageLow = connectivitySuite.isTrackerStorageLow,
+                isStorageCritical = connectivitySuite.isTrackerStorageCritical, 
+                isBatterySteepDischarge = connectivitySuite.isTrackerBatterySteepDischarge,
+                isCoolingModeActive = connectivitySuite.isTrackerCoolingModeActive,
                 discoveryPhase = null, capabilities = capabilities,
                 snrSnapshot = gpsManager.averageSnr, vibeSnapshot = 0.0
             )

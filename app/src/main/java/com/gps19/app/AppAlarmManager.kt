@@ -9,7 +9,7 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * July.16.19:
+ * July.16.22:
  * - Issue #517: Refactor AppAlarmManager. Consolidated local flags into AlarmHistory.
  */
 class AppAlarmManager(

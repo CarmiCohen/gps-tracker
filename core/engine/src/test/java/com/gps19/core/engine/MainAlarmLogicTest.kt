@@ -7,7 +7,7 @@ import org.junit.Test
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
- * July.16.19:
+ * July.16.22:
  * - Issue #517: Refactor AppAlarmManager. Updated to use AlarmHistory.
  */
 class MainAlarmLogicTest {

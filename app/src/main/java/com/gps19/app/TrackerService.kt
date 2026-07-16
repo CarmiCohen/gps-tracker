@@ -18,8 +18,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * July.16.18:
+ * July.16.23:
+ * - Version Alignment.
+ * July.16.22:
  * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
+ * - Issue #524: Handle power violation resolution.
+ * - Issue #525: Propagate acoustic lockout to engine.
+ * - Fix: Added checkInternetIntegrity call to monitor local internet.
  */
 class TrackerService : BaseMonitorService() {
 
@@ -41,6 +46,8 @@ class TrackerService : BaseMonitorService() {
 
     private var lastGpsFixRealtime = 0L
     private var lastStabilityAuditTs = 0L
+
+    private var lastFastPathAcousticSpikeTs = 0L
 
     private val localProcessorListener = object : LocationProcessorListener {
         override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, status: SentinelStatus, timestamp: Long, accuracy: Double, maxAccuracy: Double) {
@@ -94,6 +101,11 @@ class TrackerService : BaseMonitorService() {
                 override fun onViolationSustained(type: String) {
                     if (type == ALERT_ID_TRACKER_POWER) {
                         alarmManager.setPowerAlarmPending(true)
+                    }
+                }
+                override fun onViolationResolved(type: String) {
+                    if (type == ALERT_ID_TRACKER_POWER) {
+                        alarmManager.setPowerAlarmPending(false)
                     }
                 }
                 override fun onLogEvent(message: String, important: Boolean) {
@@ -208,6 +220,7 @@ class TrackerService : BaseMonitorService() {
             minDb = 40.0,
             onSpike = {
                 logManager.logServiceEvent("Acoustic Spike Detected (FastPath)", false)
+                lastFastPathAcousticSpikeTs = timeProvider.elapsedRealtime()
             }
         )
     }
@@ -279,6 +292,7 @@ class TrackerService : BaseMonitorService() {
 
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
+        integrityMonitor.checkInternetIntegrity(nowRealtime)
         val health = integrityMonitor.currentHealth
         repository.updateHealth(health)
 
@@ -286,14 +300,17 @@ class TrackerService : BaseMonitorService() {
 
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
-        if (capabilities.hasBackgroundRestriction && lastServiceTickRealtime > 0) {
+        // Issue #502: Device Independent Heuristic Recovery
+        if (lastServiceTickRealtime > 0) {
             val tickGap = nowRealtime - lastServiceTickRealtime
             if (tickGap > HARDWARE_SUPPRESSION_THRESHOLD_MS && nowRealtime - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
                 lastHardwareRecoveryTs = nowRealtime
                 val proc = lastProcessedLocation
-                logManager.logServiceEvent("HEURISTIC RECOVERY: Hardware suppression detected.", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                logManager.logServiceEvent("HEURISTIC RECOVERY: Heartbeat gap detected (${tickGap}ms). Reviving connection.", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
                     lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                connectivitySuite.connect(configManager.relayUrl)
+                
+                systemMonitor.acquireWakeLock() // Force hardware active
+                connectivitySuite.connect(configManager.relayUrl) // Re-establish signaling
             }
         }
         
@@ -316,6 +333,7 @@ class TrackerService : BaseMonitorService() {
                 snr = latestGnssDetail?.satellites?.map { it.cn0 }?.average() ?: 0.0,
                 satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0,
                 isViewerTrail = false, lastGpsTs = lastGpsFixRealtime, isLocal = true,
+                providedAcousticLockoutTs = lastFastPathAcousticSpikeTs,
                 nowWall = now, nowRealtime = nowRealtime
             )
             lastProcessedLocation = processed
@@ -427,10 +445,5 @@ class TrackerService : BaseMonitorService() {
         sensorManager.stop()
         connectivitySuite.stop()
         super.onDestroy()
-    }
-
-    companion object {
-        private const val HARDWARE_SUPPRESSION_THRESHOLD_MS = 45000L
-        private const val HARDWARE_RECOVERY_COOLDOWN_MS = 60000L
     }
 }

@@ -1,6 +1,10 @@
-# Project History & Versioning (v9.3.19)
+# Project History & Versioning (v9.3.20)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## v9.3.19
+- **Version Alignment**: Updated system-wide versioning to July.16.22.
+- **Subversion Increment**: Automatically incremented subversion to v9.3.20 as per project rules.
 
 ## v9.3.18
 - **Startup ANR Remediation (R403)**: Implemented dynamic heartbeat recovery logic. The system now uses a 2s heartbeat (`STARTUP_TICK_INTERVAL_MS`) during the first 60 seconds of operation to reduce CPU pressure and skip frames, automatically reverting to 1s for high-fidelity tracking.

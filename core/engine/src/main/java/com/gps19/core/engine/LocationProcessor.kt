@@ -5,9 +5,10 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
- * v9.4.1:
- * - Issue #510 & #515: Simplified logic, removed redundant smoothing and sit-detection.
+ * July.16.22:
+ * - Issue #510 & #515: Simplified logic, removed redundant smoothing.
  * - Issue #512: Aligned with consolidated SentinelStatus.
+ * - Issue #522: Stationary Jitter. Re-introduced stable spatial anchor for coordinate clamping.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -41,6 +42,10 @@ class LocationProcessor(
     private var lastHighAccLng = 0.0
     private var lastHighAccTs = 0L
 
+    private var spatialAnchorLat = 0.0
+    private var spatialAnchorLng = 0.0
+    private var isAnchorLocked = false
+
     private var cachedHomePoints: List<EngineGeoPoint>? = null
     private var maxDistanceAuthority: Double = 60.0
 
@@ -59,6 +64,9 @@ class LocationProcessor(
             lastLat = spatialAnchor.lat
             lastLng = spatialAnchor.lng
             lastTs = spatialAnchor.gpsTs
+            spatialAnchorLat = spatialAnchor.lat
+            spatialAnchorLng = spatialAnchor.lng
+            isAnchorLocked = true
             sentinel.setSpatialAnchor(spatialAnchor.lat, spatialAnchor.lng, spatialAnchor.alt, spatialAnchor.gpsTs)
         }
 
@@ -212,6 +220,17 @@ class LocationProcessor(
         val estimatedSpeed = sentinel.getEstimatedSpeedMps()
         val isStationary = estimatedSpeed < STATIONARY_SPEED_THRESHOLD_MPS
 
+        // Issue #522: Manage spatial anchor for stable stationary clamping
+        if (isStationary && !isViewerTrail && finalStatus == SentinelStatus.VALID) {
+            if (!isAnchorLocked) {
+                spatialAnchorLat = optimizedPoint.lat
+                spatialAnchorLng = optimizedPoint.lng
+                isAnchorLocked = true
+            }
+        } else if (!isStationary) {
+            isAnchorLocked = false
+        }
+
         val persistencePoint = if (isLocal) optimizedPoint else EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy)
         val timeSinceLastGpsSave = if (gpsTs > 0 && lastSavedGpsTs > 0) gpsTs - lastSavedGpsTs else 0L
         if (shouldSavePoint(finalStatus, isThrottled, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSave, maxAccuracy)) {
@@ -221,8 +240,8 @@ class LocationProcessor(
         
         lastProcessedAccuracy = accuracy
         
-        val finalOptimized = if (isStationary && !isViewerTrail && lastLat != 0.0) {
-            optimizedPoint.copy(lat = lastLat, lng = lastLng)
+        val finalOptimized = if (isAnchorLocked && !isViewerTrail && spatialAnchorLat != 0.0) {
+            optimizedPoint.copy(lat = spatialAnchorLat, lng = spatialAnchorLng)
         } else {
             optimizedPoint
         }
@@ -256,7 +275,7 @@ class LocationProcessor(
     }
     
     fun getEstimatedBearing(): Double = sentinel.getEstimatedBearing()
-    fun resetFilter() { sentinel.reset() }
+    fun resetFilter() { sentinel.reset(); isAnchorLocked = false }
     fun invalidateHomePointsCache() { cachedHomePoints = null }
     fun resetStats() {
         lastProcessedAccuracy = 0.0; maxAccuracy = 0.0; accuracyWindow.clear(); lastWindowUpdateRealtime = 0L
@@ -264,6 +283,7 @@ class LocationProcessor(
         lastLat = 0.0; lastLng = 0.0; lastTs = 0L; lastAcc = 0.0; lastMaxAcc = 0.0
         lastSavedLat = 0.0; lastSavedLng = 0.0; lastSavedTs = 0L; lastSavedGpsTs = 0L
         lastHighAccLat = 0.0; lastHighAccLng = 0.0; lastHighAccTs = 0L; lastValidFixTs = 0L
+        spatialAnchorLat = 0.0; spatialAnchorLng = 0.0; isAnchorLocked = false
         invalidateHomePointsCache(); sentinel.reset(); 
         listener?.onMaxAccuracyChanged(0.0)
     }

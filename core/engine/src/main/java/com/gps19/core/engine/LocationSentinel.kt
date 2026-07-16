@@ -5,10 +5,11 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * July.1.16:
+ * July.16.22:
  * - Issue #510: Abandon Chair Sit Detection. Removed all sit-related logic and state.
  * - Issue #508: Optimization Removal. Removed isMuzzled parameter and logic.
  * - Issue #512: Consolidate Sentinel Statuses. Simplified result mapping to VALID, JUMP, TAMPER.
+ * - Issue #521: Passive Zeroing. Implemented tiltBaseline capture for relative tilt detection.
  */
 class LocationSentinel {
 
@@ -39,8 +40,12 @@ class LocationSentinel {
     internal var currentLux: Double = 0.0
     internal var isNear: Boolean = true
     internal var isPowerTamper: Boolean = false
+    
     var currentTiltDegrees: Double = 0.0
         private set
+    var tiltBaseline: Double = 0.0
+        private set
+
     var currentAcousticDb: Double = 0.0
         private set
     internal var lastFastPathAcousticSpikeTs: Long = 0L
@@ -105,12 +110,13 @@ class LocationSentinel {
             this.peakVibrationShockTs = nowWall
         }
 
-        // Issue #515: Passive Zeroing for tilt baseline
+        // Issue #521: Passive Zeroing for tilt baseline
         if (isStationary()) {
-            if (stationaryStartTs == 0L) stationaryStartTs = nowRealtime
-            else if (nowRealtime - stationaryStartTs > PASSIVE_ZEROING_STATIONARY_MS) {
-                // If we've been stationary for a while, we adopt the current tilt as baseline
-                stationaryStartTs = 0L
+            if (stationaryStartTs == 0L) {
+                stationaryStartTs = nowRealtime
+            } else if (nowRealtime - stationaryStartTs > PASSIVE_ZEROING_STATIONARY_MS) {
+                this.tiltBaseline = safeD(tiltDegrees)
+                stationaryStartTs = nowRealtime // Allow periodic updates if it stays parked
             }
         } else {
             stationaryStartTs = 0L
@@ -121,7 +127,7 @@ class LocationSentinel {
         this.currentLux = safeD(lux)
         this.isNear = isNear
         this.isPowerTamper = powerTamper
-        this.currentTiltDegrees = safeD(tiltDegrees)
+        this.currentTiltDegrees = abs(safeD(tiltDegrees) - tiltBaseline)
         this.currentAcousticDb = safeD(acousticDb)
 
         if (luxBaseline < 0) {
@@ -404,6 +410,7 @@ class LocationSentinel {
     fun reset() {
         lastValidTs = 0L; currentVibrationIndex = 0.0; currentBaroAlt = 0.0; prevValidLat = 0.0; prevValidLng = 0.0
         currentLux = 0.0; isNear = true; isPowerTamper = false; currentTiltDegrees = 0.0
+        tiltBaseline = 0.0
         currentAcousticDb = 0.0; luxBaseline = -1.0; baroBaseline = -1000.0; acousticFloorDb = -1.0
         adaptiveVibrationFloor = INITIAL_VIBRATION_FLOOR; peakVibrationShock = 0.0; peakVibrationShockTs = 0L
         lastAcousticContractionRealtime = 0L

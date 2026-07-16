@@ -31,7 +31,9 @@ Removed `HindsightBuffer`, "Muzzle" logic, and `AdaptiveJumpConfidence` multipli
 *   **Simplify GpsManager - Issue #514 [COMPLETED]**: Streamlined to rely on `FusedLocationProviderClient` and immediate GNSS metadata.
 *   **Remove "Stationary Anchor" Logic - Issue #515 [COMPLETED]**: Replaced with a simple 0.5m/s speed gate.
 *   **De-duplicate "Status" Logic - Issue #516 [COMPLETED]**: Unified device metadata into `SystemHealthState`.
+    *   **Status**: Fixed in July.16.22.
 *   **Refactor AppAlarmManager - Issue #517 [COMPLETED]**: Eliminated local state flags in favor of `AlarmHistory` in `core:engine`.
+    *   **Status**: Fixed in July.16.22.
 
 ## Proposed Execution Order
 1.  **Phase 1-3**: Completed.
