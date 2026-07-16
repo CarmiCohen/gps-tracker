@@ -9,32 +9,21 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.abs
+import com.gps19.core.engine.TimeProvider
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Ensured maxAccuracy 
- *   parity in local database persistence and retrieval for forensic logs.
- * v8.9.37:
- * - Issue #241: Ensured snrSnapshot and vibeSnapshot parity in local database persistence and retrieval.
- * v8.9.11:
- * - Issue #212: Added accuracy mapping for forensic parity in historical recovery.
- * v8.9.10:
- * - Issue 209: Added lat/lng mapping for historical forensic marker reconstruction.
- * v8.9.7:
- * - Issue 194: Updated addLog to accept an initial 'synced' state to prevent duplicate emissions.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual dependency injection.
  */
-@Singleton
-class LogRepository @Inject constructor(
+class LogRepository(
     private val logDao: LogDao,
-    private val telemetry: TelemetryRepository
+    private val scope: CoroutineScope,
+    private val timeProvider: TimeProvider
 ) {
     private val logMutex = Mutex()
     private var logWriteCount = 0
-    private val scope = CoroutineScope(Dispatchers.IO)
 
     companion object {
         private const val DB_PRUNE_THRESHOLD = 50
@@ -68,12 +57,10 @@ class LogRepository @Inject constructor(
     }
 
     fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
-        val integrity = telemetry.integrityState.value
-        if (integrity.isStorageCritical && !entry.isSpecial) {
-            return
-        }
-
-        scope.launch {
+        // Issue #503: Storage-critical suppression logic moved to LogManager or 
+        // delegated back if needed. For now, maintaining core persistence logic.
+        
+        scope.launch(Dispatchers.IO) {
             logMutex.withLock {
                 try {
                     val existing = if (entry.localId.isNotBlank()) logDao.getLogByLocalId(entry.localId) else null
@@ -194,7 +181,7 @@ class LogRepository @Inject constructor(
     }
 
     fun clearLogs() { 
-        scope.launch { 
+        scope.launch(Dispatchers.IO) {
             try {
                 logDao.clearAll() 
             } catch (e: Exception) {

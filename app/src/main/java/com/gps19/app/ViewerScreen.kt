@@ -30,12 +30,8 @@ import com.gps19.core.engine.*
 
 /**
  * ViewerScreen: Pocket-mode UI.
- * v8.9.63:
- * - Issue #461: Fixed compilation error in GlobalStatusBar call.
- * v8.9.42:
- * - Issue #338: Ghost Mode UX. Propagated isTelemetryFresh to LogOverlay for unified staleness.
- * v8.9.18:
- * - Issue #221: Propagating systemPulseRealtime for Bayesian uncertainty scaling.
+ * v9.4.1:
+ * - Issue #510: Removed Chair Sit Detection UI references.
  */
 
 @Composable
@@ -231,8 +227,7 @@ fun ViewerScreen(
                     }
                 },
                 onShowPhoneSetup = { viewModel.onEvent(UiEvent.TogglePhoneSetup(true)) },
-                viewModel = viewModel,
-                onCalibrateChair = { viewModel.onEvent(UiEvent.CalibrateChair) }
+                viewModel = viewModel
             )
         } else if (isLogVisible) {
             val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()
@@ -272,7 +267,6 @@ fun ViewerDashboard(uiState: MainUiState, dashboardState: DashboardState, system
                         systemPulse = systemPulse, 
                         gpsIndexDataFlow = viewModel.gpsIndexData, 
                         rttFlow = viewModel.rtt,
-                        onCalibrateChair = { onEvent(UiEvent.CalibrateChair) },
                         onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                     )
                     DebugTable(

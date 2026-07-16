@@ -8,19 +8,13 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.osmdroid.util.GeoPoint
 import timber.log.Timber
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
- * v9.3.37:
- * - Issue #092: Added appMode to observeRepositorySettings for reactive UI synchronization.
- * v8.9.79: Issue #014 - Type Migration: Standardized temperature fields to Double.
- * v8.9.5:
- * - Issue #337: Propagated currentMa in observeIntegrityUpdates for power forensic parity.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal.
  */
-@Singleton
-class StateSubscriptionUseCase @Inject constructor(
+class StateSubscriptionUseCase(
     private val repository: MainRepository,
     private val gpsStatusManager: GpsStatusManager,
     private val systemStatusProvider: SystemStatusProvider,
@@ -145,14 +139,11 @@ class StateSubscriptionUseCase @Inject constructor(
             integrityUi = IntegrityStateUi(
                 signalLoss = info.signalLoss,
                 gpsStalled = info.gpsStalled,
-                jammerSuspicion = info.jammerSuspicion,
                 localInternetLoss = info.localInternetLoss,
                 isHardwareOnline = info.isHardwareOnline,
-                isSuspicious = info.isSuspicious,
+                status = info.status,
                 isTamperDetected = info.isTamperDetected,
                 isPowerTamper = info.isPowerTamper,
-                isSitDetected = info.isSitDetected,
-                lastSitTs = info.lastSitTs,
                 micPending = info.micPending,
                 isLocationPending = info.isLocationPending,
                 isPowerSaveMode = info.isPowerSaveMode,
@@ -162,7 +153,10 @@ class StateSubscriptionUseCase @Inject constructor(
                 isStorageCritical = info.isStorageCritical,
                 isCoolingModeActive = info.isCoolingModeActive,
                 currentMa = info.currentMa,
-                isAnchorLocked = info.isAnchorLocked
+                isBatterySteepDischarge = info.isBatterySteepDischarge,
+                lastValidFixRealtime = info.lastValidFixRealtime,
+                locationPendingReason = info.locationPendingReason,
+                isClockRegression = info.isClockRegression
             ),
             isLocalOnline = info.isHardwareOnline,
             batteryLevel = info.batteryLevel,

@@ -1,14 +1,10 @@
 package com.gps19.app
 
-import javax.inject.Inject
-import javax.inject.Singleton
-
 /**
  * OfflineRepository: Manages persistent buffering of status updates during network loss.
- * v8.8.10: Extracted from MainRepository to isolate networking persistence.
+ * v9.5.0: Hilt removed. Manual DI.
  */
-@Singleton
-class OfflineRepository @Inject constructor(
+class OfflineRepository(
     private val pendingStatusDao: PendingStatusDao,
     private val telemetry: TelemetryRepository
 ) {

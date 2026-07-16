@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,13 +25,10 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
- * v9.0.4:
- * - R799d: Changed Viewer color to ViewerCyan.
- * v8.9.78:
- * - Issue #018: Stationary Anchor Hard-Lock. Added visual indicator to LegacyDashboardGrid.
- * v8.9.55:
- * - Issue #013: Forensic UI Expansion. Added proximityDebounce and 
- *   rollingVibration fields to LegacyDashboardGrid for stationary scaling verification.
+ * July.1.16:
+ * - Issue #510: Abandoned Chair Sit Detection. Removed sitting badges and forensics.
+ * - Issue #515: Stationary Anchor Removal. Removed anchor locked indicator.
+ * - Issue #512: Status Consolidation.
  */
 
 @Composable
@@ -42,7 +38,6 @@ fun LegacyDashboardGrid(
     systemPulse: Long, 
     gpsIndexDataFlow: StateFlow<GpsIndexData>,
     rttFlow: StateFlow<Int>,
-    onCalibrateChair: () -> Unit = {},
     onShowGnssDetail: () -> Unit = {}
 ) {
     val d = dashboard
@@ -51,7 +46,6 @@ fun LegacyDashboardGrid(
     val now = systemPulse
 
     val gpsColor = if (d.isGpsFresh) Color.White else Slate500
-    val linkColor = if (d.isLinkFresh) Color.White else Slate500
     val telemetryColor = if (d.isTelemetryFresh) Color.White else Slate500
     val masterColor = if (d.isLinkFresh) Color.White else Slate500
 
@@ -93,21 +87,6 @@ fun LegacyDashboardGrid(
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
-                    
-                    if (d.isAnchorLocked) {
-                        Spacer(Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .background(BrandJd, RoundedCornerShape(4.dp))
-                                .padding(horizontal = 4.dp, vertical = 1.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Lock, null, tint = Color.White, modifier = Modifier.size(10.dp))
-                                Spacer(Modifier.width(2.dp))
-                                Text("LOCKED", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black)
-                            }
-                        }
-                    }
                 }
                 
                 if (d.isLocationPending && d.locationPendingReason != LocationPendingReason.NONE) {
@@ -121,14 +100,11 @@ fun LegacyDashboardGrid(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (d.isSuspicious) {
-                        Text(text = "[SUSPICIOUS]", color = if (d.isTelemetryFresh) Amber500 else Slate500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                    }
-                    if (d.isTamperDetected) {
+                    if (d.status == SentinelStatus.TAMPER) {
                         Text(text = "[TAMPER]", color = if (d.isTelemetryFresh) Rose500 else Slate500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     }
-                    if (d.isSitDetected) {
-                        Text(text = "[SITTING]", color = if (d.isTelemetryFresh) Color(FORENSIC_PINK_COLOR) else Slate500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    if (d.isTamperDetected) {
+                        Text(text = "[HW TAMPER]", color = if (d.isTelemetryFresh) Rose500 else Slate500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     }
                     if (d.isBatterySteepDischarge) {
                         Text(text = "[BATT HEALTH]", color = if (d.isTelemetryFresh) Rose500 else Slate500, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
@@ -174,11 +150,9 @@ fun LegacyDashboardGrid(
             InfoRow(leftVal = d.engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = d.sinceConn, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else BrandJd)
             
             InfoRow(
-                leftVal = d.lastChairSit, leftLabel = "Last Sit", leftColor = if(!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR), 
-                rightVal = d.sinceDisco, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else BrandJd
+                leftVal = d.sinceDisco, leftLabel = "Disconnected", leftColor = if(isConnStale) Slate500 else BrandJd,
+                rightVal = d.violationUptime, rightLabel = "Violation", rightColor = if (!d.isTelemetryFresh) Slate500 else Rose500
             )
-            
-            InfoRow(leftVal = d.violationUptime, leftLabel = "Violation", leftColor = if (!d.isTelemetryFresh) Slate500 else Rose500, rightVal = d.violationPercentage, rightLabel = "Stress Idx", rightColor = if (!d.isTelemetryFresh) Slate500 else Rose500)
             
             InfoRow(
                 leftVal = d.distToHome, leftLabel = "Dist Home", leftColor = gpsColor,
@@ -208,27 +182,11 @@ fun LegacyDashboardGrid(
             
             InfoRow(leftVal = d.proximity, leftLabel = "Proximity", leftColor = if (!d.isTelemetryFresh) Slate500 else BrandJd, rightVal = d.proximityCm, rightLabel = "Raw Prox", rightColor = if (!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR))
             
-            // Issue #013: Forensic UI Expansion - Stationary Scaling Metrics
             InfoRow(
                 leftVal = d.proximityDebounce, leftLabel = "Prox Debounce", leftColor = if (!d.isTelemetryFresh) Slate500 else BrandJd,
                 rightVal = d.rollingVibration, rightLabel = "Rolling Vibe", rightColor = if (!d.isTelemetryFresh) Slate500 else Color(FORENSIC_PINK_COLOR)
             )
 
-            if (d.chairForensics != "--") {
-                Spacer(Modifier.height(2.dp))
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Forensics:", color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(55.dp))
-                    Text(
-                        text = d.chairForensics, 
-                        color = if (d.isTelemetryFresh) Color(FORENSIC_PINK_COLOR) else Slate500, 
-                        fontSize = 10.sp, 
-                        fontFamily = FontFamily.Monospace, 
-                        fontWeight = FontWeight.Bold,
-                        softWrap = true
-                    )
-                }
-            }
-            
             InfoRow(leftVal = d.trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!d.isTelemetryFresh) Slate500 else BrandJd, rightVal = if (isViewer) d.viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !uiState.connectivity.isLocalOnline) Slate500 else ViewerCyan)
 
             Spacer(Modifier.height(6.dp)); HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp); Spacer(Modifier.height(6.dp))
@@ -280,9 +238,8 @@ fun TelemetryBox(
     systemPulse: Long, 
     gpsIndexDataFlow: StateFlow<GpsIndexData>,
     rttFlow: StateFlow<Int>,
-    onCalibrateChair: () -> Unit = {},
     onShowGnssDetail: () -> Unit = {}
-) { LegacyDashboardGrid(uiState, dashboard, systemPulse, gpsIndexDataFlow, rttFlow, onCalibrateChair, onShowGnssDetail) }
+) { LegacyDashboardGrid(uiState, dashboard, systemPulse, gpsIndexDataFlow, rttFlow, onShowGnssDetail) }
 
 @Composable
 fun DebugTable(

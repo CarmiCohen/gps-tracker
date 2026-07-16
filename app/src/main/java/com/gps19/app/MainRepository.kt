@@ -3,30 +3,20 @@ package com.gps19.app
 import android.content.Context
 import androidx.room.withTransaction
 import com.gps19.core.engine.*
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import org.osmdroid.util.GeoPoint
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
-import javax.inject.Inject
-import javax.inject.Singleton
 import java.util.UUID
-import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed isHindsightCorrected from trail saving and flows.
- * July.1.12:
- * - Hardening: Removed redundant Float accessors in alignment with SettingsRepository 
- *   Double standardization.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal.
  */
-@Singleton
-class MainRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+class MainRepository(
+    private val context: Context,
     private val trailDao: TrailDao,
     private val historyDao: HistoryDao,
     private val violationDao: ViolationDao,
@@ -82,9 +72,6 @@ class MainRepository @Inject constructor(
 
         const val TRACKER_LUX_BASELINE_KEY = SettingsRepository.TRACKER_LUX_BASELINE_KEY
         const val TRACKER_ACOUSTIC_FLOOR_KEY = SettingsRepository.TRACKER_ACOUSTIC_FLOOR_KEY
-
-        const val LAST_SIT_TS_KEY = SettingsRepository.LAST_SIT_TS_KEY
-        const val CHAIR_BASELINE_TILT_KEY = SettingsRepository.CHAIR_BASELINE_TILT_KEY
         
         const val SELECTED_SIREN_KEY = SettingsRepository.SELECTED_SIREN_KEY
         const val LAST_SERVICE_TICK_TS_KEY = SettingsRepository.LAST_SERVICE_TICK_TS_KEY
@@ -100,7 +87,6 @@ class MainRepository @Inject constructor(
         const val DRAFT_MAX_DISTANCE = SettingsRepository.DRAFT_MAX_DISTANCE
 
         const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = SettingsRepository.IS_XIAOMI_MANUAL_OVERRIDE_KEY
-        const val LAST_HISTORY_SIT_TS_KEY = SettingsRepository.LAST_HISTORY_SIT_TS_KEY
         
         const val IDENTITY_SANITIZED_KEY = SettingsRepository.IDENTITY_SANITIZED_KEY
     }
@@ -117,10 +103,10 @@ class MainRepository @Inject constructor(
     val eventLogsFlow: Flow<List<LogEntry>> = logRepository.eventLogsFlow
 
     val trackerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(false).map { entities -> 
-        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.accuracy, it.maxAccuracy) } 
+        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, SentinelStatus.valueOf(it.status), it.accuracy, it.maxAccuracy) } 
     }
     val viewerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(true).map { entities -> 
-        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.accuracy, it.maxAccuracy) } 
+        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, SentinelStatus.valueOf(it.status), it.accuracy, it.maxAccuracy) } 
     }
     val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> 
         entities.map { ViolationPoint(point = GeoPoint(it.lat, it.lng), type = it.type, ts = it.ts, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy) } 
@@ -147,7 +133,6 @@ class MainRepository @Inject constructor(
     val relayUrlFlow = settings.relayUrlFlow
     val isManualExitFlow = settings.isManualExitFlow
     val lastAlarmAckTsFlow = settings.lastAlarmAckTsFlow
-    val lastSitTsFlow = settings.lastSitTsFlow
     val homePointsFlow = settings.homePointsFlow
     val maxDistanceFlow = settings.maxDistanceFlow
     val alertSettingsFlow = settings.alertSettingsFlow
@@ -253,22 +238,21 @@ class MainRepository @Inject constructor(
     fun clearLogs() { logRepository.clearLogs() }
     suspend fun loadAllLogsStatic(): List<LogEntry> = logRepository.loadAllLogsStatic()
 
-    fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, isJump: Boolean = false, timestamp: Long? = null, force: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
+    fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, status: SentinelStatus = SentinelStatus.VALID, timestamp: Long? = null, force: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
         if (lat == 0.0 || lng == 0.0) return
         
         val integrity = telemetry.integrityState.value
         if (!PersistencePolicy.shouldSaveTrailPoint(
             isStorageCritical = integrity.isStorageCritical,
             isStorageLow = integrity.isStorageLow,
-            isJump = isJump,
-            isSuspicious = integrity.isSuspicious
+            status = status
         )) return
 
         scope.launch {
             val wallTs = timestamp ?: timeProvider.currentTimeMillis()
             trailDao.insert(TrailEntity(
                 lat = lat, lng = lng, timestamp = wallTs, 
-                isViewerTrail = isViewer, isJump = isJump, 
+                isViewerTrail = isViewer, status = status.name, 
                 accuracy = accuracy,
                 maxAccuracy = maxAccuracy
             ))
@@ -288,7 +272,7 @@ class MainRepository @Inject constructor(
     }
 
     suspend fun loadTrailStatic(isViewer: Boolean): List<TrailPoint> = trailDao.getTrailStatic(isViewer).map { 
-        TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.accuracy, it.maxAccuracy)
+        TrailPoint(it.lat, it.lng, it.timestamp, SentinelStatus.valueOf(it.status), it.accuracy, it.maxAccuracy)
     }
 
     suspend fun resetStats() = withContext(Dispatchers.IO) {
@@ -319,19 +303,10 @@ class MainRepository @Inject constructor(
             ConnectionPoint(
                 localId = UUID.randomUUID().toString(), ts = entity.ts, rtt = entity.rtt, localSig = 10, remoteSig = entity.remoteSig,
                 isConnected = entity.isConnected, isGap = entity.isGap, gpsAccuracy = entity.accuracy, maxAccuracy = entity.maxAccuracy, isTick = entity.isTick, 
-                hasGps = entity.hasGps, gpsIndex = entity.gpsIndex,
-                noiseIdx = entity.noiseIdx, luxIdx = entity.luxIdx, vibeIdx = entity.vibeIdx, proxIdx = entity.proxIdx,
-                liftIdx = entity.liftIdx, snrIdx = entity.snrIdx,
-                verticalVelocity = entity.verticalVelocity,
-                sitVz = entity.sitVz, sitDz = entity.sitDz,
+                hasGps = entity.hasGps,
                 isBatterySteepDischarge = entity.isBatterySteepDischarge,
                 isCoolingModeActive = entity.isCoolingModeActive,
                 speed = entity.speed, bearing = entity.bearing,
-                isSitDetected = entity.isSitDetected,
-                isSitActive = entity.isSitActive,
-                sitBaro = entity.sitBaro,
-                sitTilt = entity.sitTilt,
-                sitShock = entity.sitShock,
                 currentMa = entity.currentMa,
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
             ) 
@@ -357,20 +332,11 @@ class MainRepository @Inject constructor(
         points.forEach { point ->
             historyBuffer.add(HistoryEntity(
                 ts = point.ts, rtt = point.rtt, isConnected = point.isConnected, isGap = point.isGap, 
-                hasGps = point.hasGps, isTick = point.isTick, ribbonKey = ribbonKey, gpsIndex = point.gpsIndex,
-                noiseIdx = point.noiseIdx, luxIdx = point.luxIdx, vibeIdx = point.vibeIdx, proxIdx = point.proxIdx,
-                liftIdx = point.liftIdx, snrIdx = point.snrIdx,
-                verticalVelocity = point.verticalVelocity,
-                sitVz = point.sitVz, sitDz = point.sitDz,
+                hasGps = point.hasGps, isTick = point.isTick, ribbonKey = ribbonKey,
                 isBatterySteepDischarge = point.isBatterySteepDischarge,
                 remoteSig = point.remoteSig,
                 isCoolingModeActive = point.isCoolingModeActive,
                 speed = point.speed, bearing = point.bearing,
-                isSitDetected = point.isSitDetected,
-                isSitActive = point.isSitActive,
-                sitBaro = point.sitBaro,
-                sitTilt = point.sitTilt,
-                sitShock = point.sitShock,
                 currentMa = point.currentMa,
                 locationPendingReason = point.locationPendingReason.name,
                 accuracy = point.gpsAccuracy,

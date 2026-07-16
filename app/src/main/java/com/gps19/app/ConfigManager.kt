@@ -1,20 +1,18 @@
 package com.gps19.app
 
 import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * ConfigManager: Manages identity and core configuration settings.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal.
  */
-@Singleton
-class ConfigManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+class ConfigManager(
+    private val context: Context,
     private val repository: MainRepository
 ) {
     var isTrackerMode: Boolean = true
@@ -49,5 +47,9 @@ class ConfigManager @Inject constructor(
                 if (id.isNotEmpty()) viewerId = id
             }
         }
+    }
+
+    companion object {
+        const val DEFAULT_RELAY_URL = SettingsRepository.DEFAULT_RELAY_URL
     }
 }

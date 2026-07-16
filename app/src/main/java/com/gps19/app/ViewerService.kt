@@ -7,26 +7,20 @@ import android.location.Location
 import android.os.Build
 import androidx.lifecycle.lifecycleScope
 import com.gps19.core.engine.*
-import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
 import java.util.*
-import javax.inject.Inject
 import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed trajectory promotion and hindsight logic.
- * July.1.12:
- * - Issue #502: Device Independency. Genericized hardware workarounds using HardwareCapabilities.
- * - R406a: Unified Heartbeat (Issue #501). Standardized loop and polling to 2s.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual dependency injection.
  */
-@AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
 
-    @Inject lateinit var statusProvider: SystemStatusProvider
+    lateinit var statusProvider: SystemStatusProvider
 
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
@@ -46,8 +40,8 @@ class ViewerService : BaseMonitorService() {
     private var capabilities = HardwareCapabilities()
 
     private val localProcessorListener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean, accuracy: Double, maxAccuracy: Double) {
-            repository.saveTrailPoint(lat, lng, isViewerTrail, isJump, timestamp, accuracy = accuracy, maxAccuracy = maxAccuracy)
+        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, status: SentinelStatus, timestamp: Long, accuracy: Double, maxAccuracy: Double) {
+            repository.saveTrailPoint(lat, lng, isViewerTrail, status, timestamp, accuracy = accuracy, maxAccuracy = maxAccuracy)
         }
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Double, snr: Double?, vibe: Double?) {
             val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
@@ -56,12 +50,13 @@ class ViewerService : BaseMonitorService() {
         override fun onMaxAccuracyChanged(accuracy: Double) {
             repository.saveDoubleSync(MainRepository.MAX_ACCURACY_KEY, accuracy)
         }
-        override fun onChairBaselineChanged(baseline: Double) {
-            val proc = lastProcessedLocation
-            logManager.logServiceEvent("Tracker: Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°",
-                lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-        }
         override fun onGpsStallDetected(ts: Long) {}
+    }
+
+    override fun injectDependencies() {
+        super.injectDependencies()
+        val container = (application as GpsApplication).container
+        statusProvider = container.systemStatusProvider
     }
 
     override fun onCreate() {
@@ -76,14 +71,12 @@ class ViewerService : BaseMonitorService() {
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
             configManager.isTrackerMode = false
 
-            // Issue #502: Initialize generic capabilities
             val perms = statusProvider.getPermissionState()
             capabilities = HardwareCapabilities(
                 hasBackgroundRestriction = perms.hasBackgroundRestriction,
                 backgroundStatus = perms.backgroundStatus,
                 autostartStatus = perms.autostartStatus,
                 requiresWakeLockRenewal = perms.requiresWakeLockRenewal,
-                requiresAdaptationMuzzle = perms.requiresAdaptationMuzzle,
                 isManualOverrideActive = perms.isManualOverride
             )
 
@@ -105,12 +98,10 @@ class ViewerService : BaseMonitorService() {
             delay(1000)
             
             val savedMaxAcc = repository.getDouble(MainRepository.MAX_ACCURACY_KEY, 0.0)
-            val savedLastSit = repository.getLong(MainRepository.LAST_SIT_TS_KEY, 0L)
-            val savedBaseline = repository.getDouble(MainRepository.CHAIR_BASELINE_TILT_KEY, -1000.0)
             val trackerState = repository.loadTrackerState()
             val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
             val maxDist = repository.getDouble(MainRepository.MAX_DISTANCE_STORAGE_KEY, 60.0)
-            locationProcessor.loadState(savedMaxAcc, savedLastSit, savedBaseline, trackerState, homePoints, maxDist)
+            locationProcessor.loadState(savedMaxAcc, trackerState, homePoints, maxDist)
 
             delay(1000)
             networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, false)
@@ -256,7 +247,7 @@ class ViewerService : BaseMonitorService() {
             maxAccuracy = processed.maxAccuracy,
             currentMa = integrityMonitor.getBatteryCurrent(),
             lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
-            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
+            status = processed.status
         ))
 
         val trackerAnchor = object : SpatialAnchor {
@@ -279,7 +270,7 @@ class ViewerService : BaseMonitorService() {
         if ((configManager.deviceId == MainRepository.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
             configManager.deviceId = id
             networkManager.updateIdentity(id, configManager.viewerId, false)
-            lifecycleScope.launch { repository.saveString(MainRepository.TRACKER_ID_KEY, id) }
+            lifecycleScope.launch { repository.saveString(MainRepository.VIEWER_ID_KEY, id) }
         }
         if (sessionManager.onTrackerPulse(id, timeProvider.currentTimeMillis(), false)) {
             val proc = lastProcessedLocation
@@ -333,14 +324,13 @@ class ViewerService : BaseMonitorService() {
         }
     }
     
-    override fun getRequired tickInterval(): Long {
+    override fun getRequiredTickInterval(): Long {
         return TICK_INTERVAL_MS
     }
 
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
 
-        // R405: Samsung Stability Hardening. Renew WakeLock every tick.
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
         if (nowRealtime - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
@@ -377,7 +367,6 @@ class ViewerService : BaseMonitorService() {
             if (isTrackerStalled) activeViolations.add(ALERT_ID_GPS_STALL)
             if (isTrackerGap) activeViolations.add(ALERT_ID_TRACKER_GAP)
             if (remoteHandler.isTrackerVisualJump) activeViolations.add(ALERT_ID_VISUAL_JUMP)
-            if (remoteHandler.isTrackerSitDetected) activeViolations.add(ALERT_ID_TRACKER_CHAIR)
 
             forensicUseCase.recordViolationMarkers(
                 now = now,
@@ -401,24 +390,23 @@ class ViewerService : BaseMonitorService() {
             maxAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), 
             filteredSpeed = proc?.filteredSpeed ?: 0.0,
             vibration = 0.0, heading = 0.0, baroAlt = 0.0,
-            lux = 0.0, isNear = true, isSuspicious = false, tiltDegrees = 0.0, acousticDb = 0.0, isJump = false,
-            jumpTier = 0, isJammer = false, isStalledRaw = false, isStalledActive = false,
+            lux = 0.0, isNear = true, tiltDegrees = 0.0, acousticDb = 0.0,
+            jumpTier = 0, isJammer = false, isStalled = false,
             peakShock = 0.0, peakShockTs = 0L, luxBaseline = 0.0, acousticFloorDb = 0.0, adaptiveVibrationFloor = 0.12,
             proxIdx = 1.0, proximityCm = -1.0, 
             proximityDebounceMs = 0L, vibrationRollingSum = 0.0,
-            micPending = false, isTamperDetected = false, isPowerTamper = false,
-            isSitDetected = false, isSitActive = false, lastSitTs = 0L, receiptRealtime = proc?.receiptRealtime ?: 0L,
-            violationUptimeMs = 0L, violationPercentage = 0.0, verticalVelocity = 0.0, sitVz = 0.0, sitDz = 0.0,
-            sitBaro = 0.0, sitTilt = 0.0, sitShock = 0.0, isClockRegression = proc?.isClockRegression ?: false,
+            isTamperDetected = false, isPowerTamper = false,
+            receiptRealtime = proc?.receiptRealtime ?: 0L,
+            violationUptimeMs = 0L, violationPercentage = 0.0,
+            isClockRegression = proc?.isClockRegression ?: false,
             isLocationPending = false, locationPendingReason = LocationPendingReason.NONE, lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
             gnssDetail = latestGnssDetail,
-            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0),
-            tiltIdx = 0.0, baroIdx = 0.0, isBatterySteepDischarge = false, isCoolingModeActive = false,
-            batteryLevel = integrityMonitor.getBatteryLevel(), batteryTemp = integrityMonitor.batteryTemp, isCharging = integrityMonitor.isCharging
+            isBatterySteepDischarge = false, isCoolingModeActive = false,
+            batteryLevel = integrityMonitor.getBatteryLevel(), batteryTemp = integrityMonitor.batteryTemp, isCharging = integrityMonitor.isCharging,
+            status = proc?.status ?: SentinelStatus.VALID
         )
 
         val gpsTs = proc?.timestamp ?: 0L
-        val gpsAge = if (gpsTs > 0) (now - gpsTs) else 3600000L
         historyManager.updateRibbons(
             now = now,
             lastTickTs = lastServiceTickTs,
@@ -428,17 +416,12 @@ class ViewerService : BaseMonitorService() {
             peerAvail = isSocketConnected && isTrackerActive,
             hasGps = gpsTs > 0,
             isTrackerMode = false,
-            gpsIndex = TelemetryUtils.calculateGpsIndex(gpsAge, proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), lastKnownLocation?.extras?.getInt("satellites") ?: gpsManager.satellitesUsed).totalIndex,
             accuracy = proc?.currentAccuracy ?: locationProcessor.getLastProcessedAccuracy(),
             maxAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(),
-            noiseIdx = 0.0, luxIdx = 0.0, vibeIdx = 0.0, proxIdx = 1.0, liftIdx = 0.0,
-            snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0),
-            tiltIdx = 0.0, baroIdx = 0.0,
-            verticalVelocity = 0.0, sitVz = 0.0, sitDz = 0.0, sitBaro = 0.0, sitTilt = 0.0, sitShock = 0.0,
             isBatterySteepDischarge = false, isCoolingModeActive = false,
             speed = proc?.filteredSpeed ?: 0.0,
             bearing = (lastKnownLocation?.bearing?.toDouble() ?: 0.0),
-            isSitDetected = false, isSitActive = false, currentMa = integrityMonitor.getBatteryCurrent(),
+            currentMa = integrityMonitor.getBatteryCurrent(),
             locationPendingReason = LocationPendingReason.NONE
         )
 
@@ -477,21 +460,22 @@ class ViewerService : BaseMonitorService() {
             alarmManager.evaluateAlarms(
                 now = nowRealtime, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = false,
                 isRelayConnected = isSocketConnected, isTrackerConnected = isTrackerConnected,
-                isTrackerVisualJump = remoteHandler.isTrackerVisualJump, 
+                status = remoteHandler.trackerStatus,
+                isJammer = isTrackerJammerSuspicion,
                 jumpTier = remoteHandler.trackerJumpTier,
                 trackerLat = remoteHandler.trackerLat, trackerLng = remoteHandler.trackerLng, trackerAccuracy = remoteHandler.trackerAccuracy,
                 maxTrackerAccuracy = remoteHandler.trackerMaxAccuracy, trackerLastGpsTs = remoteHandler.trackerLastGpsTs,
                 trackerLastValidFixTs = remoteHandler.trackerLastValidFixRealtime,
                 trackerSpeed = remoteHandler.trackerSpeed, trackerBattery = remoteHandler.trackerBattery, trackerTemp = remoteHandler.trackerTemp,
                 isHardwareOnline = remoteHandler.isTrackerConnected, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
-                isJammerSuspicion = isTrackerJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(),
+                isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(),
                 distToHomeAuthority = remoteHandler.trackerDistToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(),
-                isGpsGap = isTrackerGap, isSuspicious = remoteHandler.isTrackerSuspicious, isTamperDetected = remoteHandler.isTrackerTamperDetected,
+                isGpsGap = isTrackerGap, isTamperDetected = remoteHandler.isTrackerTamperDetected,
                 isPowerTamper = remoteHandler.isTrackerPowerTamper, trackerTiltDegrees = remoteHandler.trackerTiltDegrees, 
                 trackerAcousticDb = remoteHandler.trackerAcousticDb, trackerBaroAlt = remoteHandler.trackerBaroAlt, trackerLux = remoteHandler.trackerLux,
                 isNear = remoteHandler.isTrackerNear, luxBaseline = remoteHandler.trackerLuxBaseline, acousticFloorDb = remoteHandler.trackerAcousticFloorDb,
                 adaptiveVibrationFloor = remoteHandler.trackerAdaptiveVibrationFloor, peakVibrationShock = remoteHandler.trackerPeakVibrationShock,
-                trackerCurrentMa = remoteHandler.trackerCurrentMa, isSitActive = remoteHandler.isTrackerSitActive, isLocationPending = remoteHandler.isTrackerLocationPending,
+                trackerCurrentMa = remoteHandler.trackerCurrentMa, isLocationPending = remoteHandler.isTrackerLocationPending,
                 locationPendingReason = remoteHandler.trackerLocationPendingReason, isPowerSaveMode = remoteHandler.isTrackerPowerSaveMode,
                 standbyBucket = remoteHandler.trackerStandbyBucket, netInterface = remoteHandler.trackerNetInterface, 
                 isStorageLow = remoteHandler.isTrackerStorageLow,

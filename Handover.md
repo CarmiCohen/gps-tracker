@@ -1,28 +1,27 @@
-# Project Handover: Issue #502 (Device Independency) Forensic Status
+# Project Handover: Issue #512 (Status Consolidation) - Core Logic Complete
 
-## Current Status: COMPLETED
-Issue #502 has been fully implemented and refined. The core engine and application layer are now brand-agnostic, relying on abstract hardware capability flags.
+## Current Status: IN PROGRESS (UI & Cleanup Phase)
+The core logic for `SentinelStatus` consolidation (VALID, JUMP, TAMPER) is complete. The engine, services, and persistence layers are aligned. UI components are being updated to use the new status field.
 
-## Forensic Implementation Details
+## Completed Actions
+- **Engine & Logic Layer**:
+    - **`EngineModels.kt`**: `AlarmEvaluationState` now uses `SentinelStatus` and `isJammer`.
+    - **`MainAlarmLogic.kt`**: Violation detection now branches based on consolidated status.
+    - **`LocationProcessor.kt`**: Aligned `ProcessedLocation` with the new status model.
+- **Service Layer**:
+    - **`TrackerService.kt` & `ViewerService.kt`**: Updated to pass and process consolidated statuses.
+    - **`RemoteHandler.kt`**: Introduced `trackerStatus` for remote state tracking.
+    - **`SyncManager.kt`**: Aligned telemetry sync with the new schema.
+- **Persistence Layer**:
+    - **`Database.kt`**: Version 56. Added `status` to `PendingStatusEntity`. `MIGRATION_55_56` implemented.
+- **Persistence Layer**:
+    - **`Models.kt`**: Added `status` to `TrackerStatus`, `LocationState`, and `IntegrityState`.
 
-### 1. Core Engine Abstraction (`:core:engine`)
-- **`EngineModels.kt`**: Introduced `HardwareCapabilities` data class and `CapabilityStatus` enum.
-- **`MainAlarmLogic.kt`**: Evaluates "Hardware Configuration Gating" based on abstract capabilities rather than hardcoded brand logic.
-
-### 2. Application Mapping Layer (`:app`)
-- **`SystemStatusProvider.kt`**: Primary mapper for hardware quirks. Detects manufacturer and populates generic `PermissionState` fields (`requiresWakeLockRenewal`, `requiresExtraTopPadding`, `requiresAdaptationMuzzle`).
-- **`TrackerService.kt` / `ViewerService.kt`**: Services initialize `capabilities` via `SystemStatusProvider`. Workarounds (Samsung WakeLock, S21FE Muzzle) trigger based on these flags.
-- **`Utils.kt`**: Added `openHardwareSettings(context, pkg)` to encapsulate vendor-specific intents (e.g., MIUI PermCenter).
-
-### 3. UI Implementation
-- **`SharedUiComponents.kt`**: `HeaderBar` now uses `uiState.permissions.requiresExtraTopPadding` for status bar offsets.
-- **`DiagnosticsScreen.kt`**: Hardware-specific terminology genericized.
-- **`MainActivity.kt`**: Uses brand-agnostic hardware permission handlers.
-
-## All "Leftovers" Resolved
-- **`SharedUiComponents.kt`**: Legacy `isXiaomiDevice()` check in `HeaderBar` removed and replaced with capability plumbing.
-- **`AppNotificationManager.kt`**: Overlay blocking logic genericized.
+## Remaining Tasks
+1.  **Refactor `DashboardUseCase.kt`**: Switch from `isSuspicious` and `isTrackerVisualJump` flags to the `status` enum for badge and state rendering.
+2.  **Redundant Flag Removal**: Remove legacy boolean flags from `Models.kt` (e.g., `isSuspicious`, `isJump`) once UI migration is confirmed.
+3.  **UI Verification**: Ensure `SharedUiComponents.kt` correctly interprets `JUMP` and `TAMPER` for color-coding.
 
 ## Environment Info
-- **Project Root:** `C:/CCwork/Android Projects/gps-tracker`
-- **Requirement Authority:** **R406b** (Formalized in `STATUS/SOT_MASTER_REQUIREMENTS.md`).
+- **Database Version**: 56
+- **Critical File**: `MainAlarmLogic.kt` (Source of truth for violation mapping)

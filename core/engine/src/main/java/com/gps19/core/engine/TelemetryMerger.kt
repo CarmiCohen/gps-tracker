@@ -2,8 +2,9 @@ package com.gps19.core.engine
 
 /**
  * TelemetryMerger: Pure logic for aggregating and merging telemetry updates.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted from merge logic.
+ * July.1.16:
+ * - Issue #512: Consolidate Sentinel Statuses. Removed legacy flags (isJump, isJammer).
+ * - Issue #511: Simplified telemetry mapping.
  */
 object TelemetryMerger {
 
@@ -32,15 +33,10 @@ object TelemetryMerger {
                 gpsTs = current.gpsTs,
                 ts = if (incoming.ts > 0) incoming.ts else current.ts,
                 maxAccuracy = if (incoming.maxAccuracy > 0) incoming.maxAccuracy else current.maxAccuracy,
-                isStalled = current.isStalled,
-                isJump = current.isJump,
+                status = current.status,
                 jumpTier = current.jumpTier,
-                isJammer = current.isJammer,
                 distToHome = current.distToHome,
                 distToTracker = current.distToTracker,
-                snrIdx = current.snrIdx,
-                tiltIdx = current.tiltIdx,
-                baroIdx = current.baroIdx,
                 gnssDetail = incoming.gnssDetail ?: current.gnssDetail,
                 currentMa = current.currentMa
             )

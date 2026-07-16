@@ -4,12 +4,10 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed RejectedPoint and trajectory-specific result fields.
- * July.1.12:
- * - Issue #504: Kalman Filter Removal. Relies on EMA smoothing.
- * July.1.11:
- * - Issue #502: Device Independency. Replaced vendor-specific flags with HardwareCapabilities abstraction.
+ * July.1.16:
+ * - Issue #510: Abandon Chair Sit Detection. Removed sit-related fields.
+ * - Issue #508 & #515: Optimization & Anchor Removal. Removed isAdaptiveJump and isAnchorLocked.
+ * - Issue #512: Consolidate Sentinel Statuses. Reduced to VALID, JUMP, TAMPER.
  */
 
 @Serializable
@@ -30,14 +28,9 @@ enum class DiscoveryPhase {
 }
 
 enum class SentinelStatus {
-    VALID,
-    JUMP,
-    OUTLIER,
-    JITTER,
-    JAMMER_SUSPICION,
-    TAMPER_ALERT,
-    ACOUSTIC_WARNING,
-    SENSOR_SUSPICIOUS
+    VALID, // Point is usable
+    JUMP,  // Point rejected due to physical impossibility or jitter
+    TAMPER // Point accompanied by hardware violation (Tilt, Shock, etc.)
 }
 
 /**
@@ -56,7 +49,6 @@ data class HardwareCapabilities(
     val backgroundStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
     val autostartStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
     val requiresWakeLockRenewal: Boolean = false,
-    val requiresAdaptationMuzzle: Boolean = false,
     val requiresExtraTopPadding: Boolean = false,
     val isManualOverrideActive: Boolean = false
 )
@@ -84,34 +76,15 @@ data class EngineConnectionPoint(
     val isConnected: Boolean,
     val isGap: Boolean = false,
     val hasGps: Boolean = false,
-    val gpsIndex: Double = 0.0,
     val accuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0,
-    val noiseIdx: Double = 0.0,
-    val luxIdx: Double = 0.0,
-    val vibeIdx: Double = 0.0,
-    val proxIdx: Double = 1.0,
-    val liftIdx: Double = 0.0,
-    val snrIdx: Double = 0.0,
-    val tiltIdx: Double = 0.0,
-    val baroIdx: Double = 0.0,
-    val verticalVelocity: Double = 0.0,
-    val sitVz: Double = 0.0,
-    val sitVzTs: Long = 0L,
-    val sitDz: Double = 0.0,
-    val sitBaro: Double = 0.0,
-    val sitTilt: Double = 0.0,
-    val sitShock: Double = 0.0,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
     val speed: Double = 0.0,
     val bearing: Double = 0.0,
-    val isSitDetected: Boolean = false,
-    val isSitActive: Boolean = false,
     val isTick: Boolean = false,
     val currentMa: Int = 0,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val isAnchorLocked: Boolean = false
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
 )
 
 enum class RibbonScale(val key: String, val intervalSeconds: Int) {
@@ -131,11 +104,7 @@ data class EngineSensorSnapshot(
     val ts: Long,
     val acoustic: Double,
     val lux: Double,
-    val vibe: Double,
-    val proxIdx: Double,
-    val lift: Double,
-    val tilt: Double,
-    val isSitDetected: Boolean
+    val vibe: Double
 )
 
 @Serializable
@@ -152,7 +121,6 @@ data class JumpConfidence(
     val score: Int = 0, 
     val isJump: Boolean = false,
     val isOutlier: Boolean = false,
-    val isAdaptiveJump: Boolean = false,
     val tier: Int = 0, 
     val reason: String = ""
 )
@@ -204,7 +172,6 @@ data class AlarmEvaluationState(
     val discoveryPhase: DiscoveryPhase?,
     val isHardwareOnline: Boolean, 
     val isLocalInternetLoss: Boolean, 
-    val isJammerSuspicion: Boolean,
     val isSignalLoss: Boolean, 
     val isGpsStalling: Boolean, 
     var powerAlarmPending: Boolean,
@@ -215,9 +182,9 @@ data class AlarmEvaluationState(
     val lastGpsPacketTs: Long,
     val trackerLastValidFixTs: Long = 0L, 
     val trackerSpeed: Double = 0.0,
-    val isTrackerVisualJump: Boolean = false,
+    val status: SentinelStatus = SentinelStatus.VALID,
+    val isJammer: Boolean = false,
     val jumpTier: Int = 0,
-    val isAdaptiveJump: Boolean = false,
     val trackerBattery: Int, 
     val trackerTemp: Double,
     var wasDistanceViolated: Boolean, 
@@ -228,7 +195,6 @@ data class AlarmEvaluationState(
     val maxDistance: Double = 60.0,
     val distToHomeAuthority: Double? = null,
     val isGpsGap: Boolean = false,
-    val isSuspicious: Boolean = false,
     val isTamperDetected: Boolean = false,
     val trackerTiltDegrees: Double = 0.0,
     val trackerAcousticDb: Double = 0.0,
@@ -242,10 +208,6 @@ data class AlarmEvaluationState(
     val peakVibrationShock: Double = 0.0,
     val trackerCurrentMa: Int = 0,
     val isPowerTamper: Boolean = false,
-    val isSitActive: Boolean = false,
-    val lastSitTs: Long = 0L,
-    val verticalVelocity: Double = 0.0,
-    val sitVzTs: Long = 0L,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isPowerSaveMode: Boolean = false, 
@@ -256,6 +218,5 @@ data class AlarmEvaluationState(
     val isTrackerMode: Boolean = true,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val capabilities: HardwareCapabilities = HardwareCapabilities(),
-    val isAnchorLocked: Boolean = false
+    val capabilities: HardwareCapabilities = HardwareCapabilities()
 )

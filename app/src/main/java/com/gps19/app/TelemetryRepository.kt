@@ -5,17 +5,12 @@ import com.gps19.core.engine.LocationUpdate
 import com.gps19.core.engine.TelemetryMerger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * TelemetryRepository: In-memory store for live system status.
- * v8.8.21:
- * - Logic Decoupling: Delegated full telemetry merging logic to TelemetryMerger (engine).
- * - Boundary Cleanup: LocationUpdate model now resides in :core:engine.
+ * v9.5.0: Hilt removed. Manual DI.
  */
-@Singleton
-class TelemetryRepository @Inject constructor() {
+class TelemetryRepository() {
     private val _isRelayConnected = MutableStateFlow(false)
     val isRelayConnected = _isRelayConnected.asStateFlow()
 

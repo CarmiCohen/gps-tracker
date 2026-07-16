@@ -5,8 +5,6 @@ import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gps19.core.engine.*
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -15,16 +13,14 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import javax.inject.Inject
 import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * vJuly.11.01:
- * - R406a: Unified Heartbeat (Issue #501). Standardized global timer to TICK_INTERVAL_MS (2s).
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual dependency injection.
  */
-@HiltViewModel
-class MainViewModel @Inject constructor(
+class MainViewModel(
     val repository: MainRepository,
     private val logManager: LogManager,
     private val systemStatusProvider: SystemStatusProvider,
@@ -39,7 +35,7 @@ class MainViewModel @Inject constructor(
     private val alertUseCase: AlertUseCase,
     private val mapUseCase: MapUseCase,
     val timeProvider: TimeProvider,
-    @ApplicationContext private val context: Context
+    private val context: Context
 ) : ViewModel() {
 
     private val uiExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -139,7 +135,7 @@ class MainViewModel @Inject constructor(
                     deviceId = update.trackerId, viewerId = update.viewerId, relayUrl = update.relayUrl,
                     maxDistance = update.maxDistance, homePoints = update.homePoints, lastAlarmAckTs = update.lastAlarmAckTs,
                     appMode = update.appMode,
-                    permissions = it.permissions.copy(isXiaomiManualOverride = update.isXiaomiManualOverride)
+                    permissions = it.permissions.copy(isManualOverride = update.isXiaomiManualOverride)
                 )}
             }.launchIn(viewModelScope)
 
@@ -182,7 +178,6 @@ class MainViewModel @Inject constructor(
         stateSubscriptionUseCase.observeGnssDetail().distinctUntilChanged().onEach { _gnssDetail.value = it }.launchIn(viewModelScope)
         stateSubscriptionUseCase.observeGpsIndex().distinctUntilChanged().onEach { _gpsIndexData.value = it }.launchIn(viewModelScope)
 
-        // Note: StateFlow sources from repository already imply distinctUntilChanged behavior.
         viewModelScope.launch { repository.localLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
         viewModelScope.launch { repository.trackerLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
         viewModelScope.launch { repository.connectedViewers.collect { viewers -> updateState { it.copy(connectivity = it.connectivity.copy(connectedViewers = viewers)) } } }
@@ -238,8 +233,10 @@ class MainViewModel @Inject constructor(
             is UiEvent.ClearHomePoints, is UiEvent.AddHomePoint, is UiEvent.RemoveHomePoint,
             is UiEvent.SetGeofenceMode, is UiEvent.SetMaxDistance, is UiEvent.SetHomePoints,
             is UiEvent.SaveHomePoints, is UiEvent.MapTap -> handleHomePointEvent(event)
-            is UiEvent.SetJammerSuspicion -> updateState { it.copy(integrity = it.integrity.copy(jammerSuspicion = event.isJammer)) }
+            
+            is UiEvent.SetJammerSuspicion -> updateState { it.copy(integrity = it.integrity.copy(isJammer = event.isJammer)) }
             is UiEvent.SetSignalLoss -> updateState { it.copy(integrity = it.integrity.copy(signalLoss = event.isSignalLoss)) }
+
             is UiEvent.SetAlertSettings -> { 
                 viewModelScope.launch(uiExceptionHandler) {
                     settingsUseCase.handleImmediateAlertUpdate(event.settings)
@@ -254,10 +251,6 @@ class MainViewModel @Inject constructor(
             is UiEvent.UpdateDraftDeviceId, is UiEvent.UpdateDraftViewerId, is UiEvent.UpdateDraftRelayUrl, 
             is UiEvent.UpdateDraftMaxDistance, is UiEvent.UpdateDraftAlertSettings, is UiEvent.UpdateDraftAlarmVolume, 
             is UiEvent.CommitSettings -> handleDraftEvent(event)
-            is UiEvent.CalibrateChair -> {
-                addPersistentLog("user", "USER ACTION: Chair calibration requested", true)
-                repository.sendCommand(UiCommand.CalibrateChair); Toast.makeText(context, "Chair calibration requested", Toast.LENGTH_SHORT).show()
-            }
             is UiEvent.SetLogFilterShowDetails -> viewModelScope.launch { repository.updateLogFilters(details = event.show) }
             is UiEvent.SetLogFilterShowRecovered -> viewModelScope.launch { repository.updateLogFilters(recovered = event.show) }
             is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
@@ -267,8 +260,8 @@ class MainViewModel @Inject constructor(
             is UiEvent.TriggerTestAlarm -> { addPersistentLog("user", "USER ACTION: Test alarm triggered", true); repository.sendCommand(UiCommand.TriggerTestAlarm) }
             is UiEvent.TriggerForensicTest -> { addPersistentLog("user", "USER ACTION: Forensic stress test triggered", true); repository.sendCommand(UiCommand.TriggerForensicTest) }
             is UiEvent.ToggleXiaomiManualOverride -> {
-                val nextValue = !_uiState.value.permissions.isXiaomiManualOverride
-                updateState { it.copy(permissions = it.permissions.copy(isXiaomiManualOverride = nextValue)) }
+                val nextValue = !_uiState.value.permissions.isManualOverride
+                updateState { it.copy(permissions = it.permissions.copy(isManualOverride = nextValue)) }
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { repository.saveBoolean(MainRepository.IS_XIAOMI_MANUAL_OVERRIDE_KEY, nextValue); addPersistentLog("user", "USER ACTION: Xiaomi manual override set to $nextValue", true) }
             }
             is UiEvent.DismissIdentitySanitization -> {
@@ -497,7 +490,6 @@ class MainViewModel @Inject constructor(
             val home = current.homePoints.firstOrNull()
             val distToHome = if (home != null) PhysicsUtils.calculateDistance(update.lat, update.lng, home.latitude, home.longitude) else null
             if (!update.isMe) {
-                _remoteSignal.value = update.signal ?: _remoteSignal.value
                 _trackerCurrentMa.value = update.currentMa
                 current.copy(
                     trackerLocation = telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime),

@@ -1,15 +1,13 @@
 package com.gps19.app
 
 import com.gps19.core.engine.TimeProvider
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * AlertUseCase: Handles logic for alarm dismissal and siren control.
- * Extracted from MainViewModel to resolve Issue 115 (Architectural Bloat).
+ * v9.5.0:
+ * - Issue #503: Hilt Removal.
  */
-@Singleton
-class AlertUseCase @Inject constructor(
+class AlertUseCase(
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
     private val logManager: LogManager

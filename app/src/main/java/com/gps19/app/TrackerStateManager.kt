@@ -5,7 +5,8 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerStateManager: Logic for mapping raw telemetry to high-level behavioral states.
- * July.1.13:
+ * July.1.16:
+ * - Issue #512: Consolidate Sentinel Statuses. Replaced isVisualJump with SentinelStatus.
  * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted from state logic.
  */
 object TrackerStateManager {
@@ -17,7 +18,7 @@ object TrackerStateManager {
     private var sustainedSpeedCount = 0
 
     fun updateState(
-        isVisualJump: Boolean,
+        status: SentinelStatus,
         speed: Double,
         vibration: Double,
         vibrationFloor: Double,
@@ -63,7 +64,7 @@ object TrackerStateManager {
         val inMovingHold = lastMovingTs > 0L && (systemTimePulse - lastMovingTs < MOVING_HOLD_DURATION_MS)
         
         val targetState = when {
-            isVisualJump -> TrackerState.JUMPING
+            status == SentinelStatus.JUMP -> TrackerState.JUMPING
             isMovingNow || inMovingHold -> TrackerState.MOVING
             else -> TrackerState.PARKING
         }

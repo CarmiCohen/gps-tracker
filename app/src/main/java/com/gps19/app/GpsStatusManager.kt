@@ -7,20 +7,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.scan
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class GpsStatusManager @Inject constructor(
+/**
+ * GpsStatusManager: Centralized reactive Flow for the GPS-Index.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual dependency injection.
+ */
+class GpsStatusManager(
     private val telemetryRepository: TelemetryRepository,
     private val settingsRepository: SettingsRepository
 ) {
-    /**
-     * GpsStatusManager: Centralized reactive Flow for the GPS-Index.
-     * v8.9.79: Issue #014 - Type Migration: Standardized accuracy to Double.
-     * v8.8.21:
-     * - Modularization: Direct integration with TelemetryUtils for signal scoring.
-     */
     fun observeGpsIndex(nowFlow: Flow<Long>): Flow<GpsIndexData> {
         data class IndexParams(val gpsTs: Long, val maxAccuracy: Double, val satsUsed: Int)
 
@@ -44,11 +40,10 @@ class GpsStatusManager @Inject constructor(
         }.scan(GpsIndexData(0.0, 0.0, 0.0, 0.0) to (null as IndexParams?)) { state, (params, now) ->
             val lastParams = state.second
             
-            // v5.941 Monotonicity & Heartbeat Firewall
             val activeParams = if (params != null && (lastParams == null || params.gpsTs >= lastParams.gpsTs)) {
                 params
             } else {
-                lastParams // Bridging heartbeats
+                lastParams
             }
             
             if (activeParams != null) {

@@ -18,7 +18,6 @@ import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.gps19.core.engine.CapabilityStatus
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -28,8 +27,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
 interface SystemStatusProvider {
     fun isBatteryWhitelisted(): Boolean
@@ -42,7 +39,8 @@ interface SystemStatusProvider {
     fun isLocalOnline(): Boolean
     
     /**
-     * v9.4.0: Genericized permission state for Issue #502.
+     * v9.5.0:
+     * - Issue #503: Hilt Removal. Manual dependency injection.
      */
     suspend fun getPermissionState(forceRefresh: Boolean = false): PermissionState
     
@@ -50,9 +48,8 @@ interface SystemStatusProvider {
     fun observeBatteryStatus(): Flow<BatteryStatus>
 }
 
-@Singleton
-class SystemStatusProviderImpl @Inject constructor(
-    @ApplicationContext private val context: Context
+class SystemStatusProviderImpl(
+    private val context: Context
 ) : SystemStatusProvider {
 
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -109,7 +106,7 @@ class SystemStatusProviderImpl @Inject constructor(
                 hasBackgroundRestriction = isXiaomi,
                 backgroundStatus = toCapabilityStatus(xiaomiStatus),
                 autostartStatus = toCapabilityStatus(xiaomiAutostart),
-                isManualOverride = false, // Will be updated by UI/Settings if needed
+                isManualOverride = false,
                 requiresWakeLockRenewal = isSamsung,
                 requiresExtraTopPadding = isXiaomi,
                 requiresAdaptationMuzzle = isS21FE

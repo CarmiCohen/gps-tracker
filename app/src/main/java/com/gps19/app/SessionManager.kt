@@ -1,23 +1,13 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
-import kotlinx.coroutines.CoroutineScope
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * SessionManager: Tracks session-level state and uptime metrics.
- * v9.3.18:
- * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
- * v9.3.17:
- * - R403: Heartbeat Alignment. Replaced hardcoded 1000L increment with 
- *   TICK_INTERVAL_MS to ensure consistent uptime accounting.
+ * v9.5.0: Hilt removed. Manual DI. Cleaned up unused parameters.
  */
-@Singleton
-class SessionManager @Inject constructor(
+class SessionManager(
     private val repository: MainRepository,
-    @ApplicationScope private val scope: CoroutineScope,
-    private val logManager: LogManager,
     private val timeProvider: TimeProvider
 ) {
     var appStartTime: Long = timeProvider.currentTimeMillis()

@@ -3,24 +3,21 @@ package com.gps19.app
 import android.content.Context
 import com.gps19.core.engine.*
 import com.gps19.core.engine.LocationProcessor
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * v9.3.5:
- * - Issue #058: Hilt Migration. Refactored to use Listener interface and separate initialization.
+ * July.1.16:
+ * - Issue #510: Abandoned Chair Sit Detection. Removed sit-related fields.
+ * - Issue #515: Stationary Anchor Removal. Removed isAnchorLocked.
  */
-@Singleton
-class HistoryManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+class HistoryManager(
+    private val context: Context,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
     private val gpsManager: GpsManager,
@@ -46,18 +43,12 @@ class HistoryManager @Inject constructor(
     private var lastAuditTs = 0L
     private var lastTimeTriggerTs = 0L
 
-    private var lastSitDetectedTs = 0L
-
     fun setListener(listener: Listener) {
         this.listener = listener
     }
 
     fun initialize(scope: CoroutineScope) {
         this.scope = scope
-        
-        scope.launch {
-            lastSitDetectedTs = repository.getLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, 0L)
-        }
     }
 
     suspend fun updateRibbons(
@@ -69,32 +60,14 @@ class HistoryManager @Inject constructor(
         peerAvail: Boolean,
         hasGps: Boolean,
         isTrackerMode: Boolean,
-        gpsIndex: Double = 0.0,
         accuracy: Double = 0.0,
         maxAccuracy: Double = 0.0,
-        noiseIdx: Double = 0.0,
-        luxIdx: Double = 0.0,
-        vibeIdx: Double = 0.0,
-        proxIdx: Double = 1.0,
-        liftIdx: Double = 0.0,
-        snrIdx: Double = 0.0,
-        tiltIdx: Double = 0.0,
-        baroIdx: Double = 0.0,
-        verticalVelocity: Double = 0.0,
-        sitVz: Double = 0.0,
-        sitDz: Double = 0.0,
-        sitBaro: Double = 0.0,
-        sitTilt: Double = 0.0,
-        sitShock: Double = 0.0,
         isBatterySteepDischarge: Boolean = false,
         isCoolingModeActive: Boolean = false,
         speed: Double = 0.0,
         bearing: Double = 0.0,
-        isSitDetected: Boolean = false,
-        isSitActive: Boolean = false,
         currentMa: Int = 0,
-        locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-        isAnchorLocked: Boolean = false
+        locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
     ) {
         detectClockTampering(now)
 
@@ -119,32 +92,14 @@ class HistoryManager @Inject constructor(
                 peerAvail = peerAvail,
                 hasGps = hasGps,
                 isTrackerMode = isTrackerMode,
-                gpsIndex = gpsIndex,
                 accuracy = accuracy,
                 maxAccuracy = maxAccuracy,
-                noiseIdx = noiseIdx,
-                luxIdx = luxIdx,
-                vibeIdx = vibeIdx,
-                proxIdx = proxIdx,
-                liftIdx = liftIdx,
-                snrIdx = snrIdx,
-                tiltIdx = tiltIdx,
-                baroIdx = baroIdx,
-                verticalVelocity = verticalVelocity,
-                sitVz = sitVz,
-                sitDz = sitDz,
-                sitBaro = sitBaro,
-                sitTilt = sitTilt,
-                sitShock = sitShock,
                 isBatterySteepDischarge = isBatterySteepDischarge,
                 isCoolingModeActive = isCoolingModeActive,
                 speed = speed,
                 bearing = bearing,
-                isSitDetected = isSitDetected,
-                isSitActive = isSitActive,
                 currentMa = currentMa,
-                locationPendingReason = locationPendingReason,
-                isAnchorLocked = isAnchorLocked
+                locationPendingReason = locationPendingReason
             )
         }
 
@@ -155,33 +110,15 @@ class HistoryManager @Inject constructor(
             isConnected = peerAvail,
             isGap = false,
             hasGps = hasGps,
-            gpsIndex = gpsIndex,
             accuracy = accuracy,
             maxAccuracy = maxAccuracy,
-            noiseIdx = noiseIdx,
-            luxIdx = luxIdx,
-            vibeIdx = vibeIdx,
-            proxIdx = proxIdx,
-            liftIdx = liftIdx,
-            snrIdx = snrIdx,
-            tiltIdx = tiltIdx,
-            baroIdx = baroIdx,
-            verticalVelocity = verticalVelocity,
-            sitVz = sitVz,
-            sitDz = sitDz,
-            sitBaro = sitBaro,
-            sitTilt = sitTilt,
-            sitShock = sitShock,
             isBatterySteepDischarge = isBatterySteepDischarge,
             isCoolingModeActive = isCoolingModeActive,
             speed = speed,
             bearing = bearing,
-            isSitDetected = applySitDuplicateGuard(isSitDetected, now),
-            isSitActive = isSitActive,
             isTick = false,
             currentMa = currentMa,
-            locationPendingReason = locationPendingReason,
-            isAnchorLocked = isAnchorLocked
+            locationPendingReason = locationPendingReason
         )
 
         processResults(aggregator.processPoint(currentPoint))
@@ -212,32 +149,14 @@ class HistoryManager @Inject constructor(
         peerAvail: Boolean,
         hasGps: Boolean,
         isTrackerMode: Boolean,
-        gpsIndex: Double,
         accuracy: Double,
         maxAccuracy: Double,
-        noiseIdx: Double,
-        luxIdx: Double,
-        vibeIdx: Double,
-        proxIdx: Double,
-        liftIdx: Double,
-        snrIdx: Double,
-        tiltIdx: Double,
-        baroIdx: Double,
-        verticalVelocity: Double,
-        sitVz: Double,
-        sitDz: Double,
-        sitBaro: Double,
-        sitTilt: Double,
-        sitShock: Double,
         isBatterySteepDischarge: Boolean,
         isCoolingModeActive: Boolean,
         speed: Double,
         bearing: Double,
-        isSitDetected: Boolean,
-        isSitActive: Boolean,
         currentMa: Int,
-        locationPendingReason: LocationPendingReason,
-        isAnchorLocked: Boolean
+        locationPendingReason: LocationPendingReason
     ) {
         val snrSamples = if (isTrackerMode) {
             gpsManager.getSnrSamples(lastTickTs + 1, now).map { EngineSnrSample(it.first, it.second) }
@@ -245,11 +164,9 @@ class HistoryManager @Inject constructor(
 
         val sensorSamples = if (isTrackerMode) {
             sensorManager.getSensorSamples(lastTickTs + 1, now).map { 
-                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
+                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe) 
             }
         } else emptyList()
-
-        val acousticFloor = if (isTrackerMode) locationProcessor.getAcousticFloorDb() else 0.0
 
         val baseTemplate = EngineConnectionPoint(
             ts = 0L,
@@ -257,35 +174,17 @@ class HistoryManager @Inject constructor(
             remoteSig = peerSignal,
             isConnected = peerAvail,
             hasGps = hasGps,
-            gpsIndex = gpsIndex,
             accuracy = accuracy,
             maxAccuracy = maxAccuracy,
-            noiseIdx = noiseIdx,
-            luxIdx = luxIdx,
-            vibeIdx = vibeIdx,
-            proxIdx = proxIdx,
-            liftIdx = liftIdx,
-            snrIdx = snrIdx,
-            tiltIdx = tiltIdx,
-            baroIdx = baroIdx,
-            verticalVelocity = verticalVelocity,
-            sitVz = sitVz,
-            sitDz = sitDz,
-            sitBaro = sitBaro,
-            sitTilt = sitTilt,
-            sitShock = sitShock,
             isBatterySteepDischarge = isBatterySteepDischarge,
             isCoolingModeActive = isCoolingModeActive,
             speed = speed,
             bearing = bearing,
-            isSitDetected = applySitDuplicateGuard(isSitDetected, now),
-            isSitActive = isSitActive,
             currentMa = currentMa,
-            locationPendingReason = locationPendingReason,
-            isAnchorLocked = isAnchorLocked
+            locationPendingReason = locationPendingReason
         )
 
-        val results = aggregator.backfillGaps(lastTickTs, now, snrSamples, sensorSamples, acousticFloor, baseTemplate)
+        val results = aggregator.backfillGaps(lastTickTs, now, snrSamples, sensorSamples, baseTemplate)
         
         val fourMPoints = results.filter { it.first == RibbonScale.FOUR_MIN }.map { mapToAppPoint(it.second) }
         if (fourMPoints.isNotEmpty()) {
@@ -300,20 +199,14 @@ class HistoryManager @Inject constructor(
     }
 
     private fun fillRealGap(lastTickTs: Long, now: Long, isTrackerMode: Boolean) {
-        val snrSamples = if (isTrackerMode) {
-            gpsManager.getSnrSamples(lastTickTs, now).map { EngineSnrSample(it.first, it.second) }
-        } else emptyList()
-
         val sensorSamples = if (isTrackerMode) {
             sensorManager.getSensorSamples(lastTickTs, now).map { 
-                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
+                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe) 
             }
         } else emptyList()
 
-        val acousticFloor = if (isTrackerMode) locationProcessor.getAcousticFloorDb() else 0.0
-
         RibbonScale.entries.forEach { scale ->
-            val gapPoints = aggregator.fillRealGap(scale.key, scale.intervalSeconds, lastTickTs, now, snrSamples, sensorSamples, acousticFloor)
+            val gapPoints = aggregator.fillRealGap(scale.key, scale.intervalSeconds, lastTickTs, now, sensorSamples)
             if (gapPoints.isNotEmpty()) {
                 repository.addHistoryPoints(scale.key, gapPoints.map { mapToAppPoint(it) })
             }
@@ -338,18 +231,6 @@ class HistoryManager @Inject constructor(
         }
     }
 
-    private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long): Boolean {
-        if (!isDetected) return false
-        if (abs(ts - lastSitDetectedTs) < SIT_DUPLICATE_GUARD_MS) {
-            return false
-        }
-        lastSitDetectedTs = ts
-        scope?.launch {
-            repository.saveLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, ts)
-        }
-        return true
-    }
-
     private fun mapToAppPoint(p: EngineConnectionPoint): ConnectionPoint {
         return ConnectionPoint(
             ts = p.ts,
@@ -360,32 +241,14 @@ class HistoryManager @Inject constructor(
             isGap = p.isGap,
             hasGps = p.hasGps,
             isTick = p.isTick,
-            gpsIndex = p.gpsIndex,
             gpsAccuracy = p.accuracy,
             maxAccuracy = p.maxAccuracy,
-            noiseIdx = p.noiseIdx,
-            luxIdx = p.luxIdx,
-            vibeIdx = p.vibeIdx,
-            proxIdx = p.proxIdx,
-            liftIdx = p.liftIdx,
-            snrIdx = p.snrIdx,
-            tiltIdx = p.tiltIdx,
-            baroIdx = p.baroIdx,
-            verticalVelocity = p.verticalVelocity,
-            sitVz = p.sitVz,
-            sitDz = p.sitDz,
-            sitBaro = p.sitBaro,
-            sitTilt = p.sitTilt,
-            sitShock = p.sitShock,
             isBatterySteepDischarge = p.isBatterySteepDischarge,
             isCoolingModeActive = p.isCoolingModeActive,
             speed = p.speed,
             bearing = p.bearing,
-            isSitDetected = p.isSitDetected,
-            isSitActive = p.isSitActive,
             currentMa = p.currentMa,
-            locationPendingReason = p.locationPendingReason,
-            isAnchorLocked = p.isAnchorLocked
+            locationPendingReason = p.locationPendingReason
         )
     }
 

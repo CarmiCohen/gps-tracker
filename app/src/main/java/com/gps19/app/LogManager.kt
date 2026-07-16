@@ -1,22 +1,16 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
-import dagger.Lazy
-import javax.inject.Inject
-import javax.inject.Singleton
 import java.util.UUID
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
- * v9.3.15:
- * - Hardening: Finalized Double standardization. Eliminated redundant boundary 
- *   conversions in telemetry logging paths.
+ * v9.5.0: Hilt removed. Manual DI. Replaced Lazy with lambda.
  */
-@Singleton
-class LogManager @Inject constructor(
+class LogManager(
     private val logRepository: LogRepository,
     private val telemetry: TelemetryRepository,
-    private val networkManager: Lazy<AppNetworkManager>,
+    private val networkManager: () -> AppNetworkManager,
     private val configManager: ConfigManager,
     private val timeProvider: TimeProvider
 ) {
@@ -88,9 +82,6 @@ class LogManager @Inject constructor(
             }
         }
 
-        if (finalSnr == null && fallbackTelem.snrIdx > 0.0) {
-            finalSnr = fallbackTelem.snrIdx * RIBBON_SNR_SCALE_DB
-        }
         if (finalVibe == null && (fallbackTelem.vibration ?: 0.0) > 0.0) {
             finalVibe = fallbackTelem.vibration
         }
@@ -116,7 +107,7 @@ class LogManager @Inject constructor(
             vibeSnapshot = finalVibe
         )
         
-        val net = networkManager.get()
+        val net = networkManager()
         val isConnected = net.isConnected()
         
         val data = log.toJSONObject().apply {

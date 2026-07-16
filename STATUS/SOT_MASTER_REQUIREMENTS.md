@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - v9.4.0 (Development)
+# System Source of Truth (SoT) - July.16.17 (Development)
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Manual Dependency Injection Authority (R406c / Issue #503)**: The system MUST use a manual Dependency Injection pattern centered around a singleton `AppContainer` hosted in the `GpsApplication` class. Dagger, Hilt, and other reflective or bytecode-generating DI frameworks are strictly FORBIDDEN. All global singletons and repositories MUST be instantiated and managed within `AppContainer`. (v9.5.0)
 *   **Unified System Heartbeat (R406a / Issue #501)**: The system MUST use a standardized 2000ms heartbeat (`TICK_INTERVAL_MS`) globally for all hardware polling, logic cycles, and telemetry submissions. ALL variable polling intervals (Moving, Stationary, Suspicious, High-Frequency) are DEPRECATED and REMOVED. This simplifies the state machine and ensures predictable data density. (v9.4.0)
 *   **Device Independency / Hardware Abstraction (R406b / Issue #502)**: The core tracking engine MUST be brand-agnostic. All hardware-specific workarounds (e.g., Xiaomi background restrictions, Samsung wake-lock renewal) MUST be abstracted into a generic `HardwareCapabilities` model. The engine MUST operate on abstract capability flags rather than hardcoded manufacturer names. (v9.4.0)
 *   **Binary Telemetry Authority (R988)**: The system MUST prioritize binary Protobuf-based telemetry (`location_update_bin`) for high-frequency tracker updates to minimize relay bandwidth and improve device performance. The schema MUST use optimized Enums for states and reasons. (v9.3.25)

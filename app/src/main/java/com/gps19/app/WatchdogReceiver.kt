@@ -4,24 +4,19 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
-import com.gps19.core.engine.TimeProvider
-import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.runBlocking
 import timber.log.Timber
-import javax.inject.Inject
 
 /**
  * WatchdogReceiver: Responds to watchdog alarms to ensure the service stays active.
- * v9.3.6: Migrated to Hilt @AndroidEntryPoint.
+ * v9.5.0: Hilt removed. Manual dependency injection via AppContainer.
  */
-@AndroidEntryPoint
 class WatchdogReceiver : BroadcastReceiver() {
 
-    @Inject lateinit var repository: MainRepository
-    @Inject lateinit var timeProvider: TimeProvider
-
     override fun onReceive(context: Context, intent: Intent?) {
-        // Removed super.onReceive as it is an abstract method in BroadcastReceiver
+        val app = context.applicationContext as GpsApplication
+        val repository = app.container.mainRepository
+        val timeProvider = app.container.timeProvider
         
         val action = intent?.action
         Timber.d("Watchdog Receiver: Action $action received")

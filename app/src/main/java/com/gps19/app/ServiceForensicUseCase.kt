@@ -1,18 +1,13 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * ServiceForensicUseCase: Manages state-latched violation recording for background services.
- * v8.9.79: Issue #014 - Type Migration: Standardized accuracy to Double.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Refactored recordViolationMarkers 
- *   to propagate both raw accuracy and authoritative maxAccuracy for forensic parity.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual DI transition.
  */
-@Singleton
-class ServiceForensicUseCase @Inject constructor(
+class ServiceForensicUseCase(
     private val repository: MainRepository
 ) {
     private val latches = mutableMapOf<String, Boolean>()
@@ -34,7 +29,6 @@ class ServiceForensicUseCase @Inject constructor(
         handleLatch(ALERT_ID_VISUAL_JUMP, ALERT_ID_VISUAL_JUMP in activeViolations, lat, lng, accuracy, maxAccuracy, now)
         handleLatch(ALERT_ID_GPS_STALL, ALERT_ID_GPS_STALL in activeViolations, lat, lng, accuracy, maxAccuracy, now)
         handleLatch(ALERT_ID_TRACKER_GAP, ALERT_ID_TRACKER_GAP in activeViolations, lat, lng, accuracy, maxAccuracy, now)
-        handleLatch(ALERT_ID_TRACKER_CHAIR, ALERT_ID_TRACKER_CHAIR in activeViolations, lat, lng, accuracy, maxAccuracy, now)
 
         // 2. Alarm-based violations (passed in via unresolvedAlarms)
         handleLatch(ALERT_ID_TRACKER_TAMPER, ALERT_ID_TRACKER_TAMPER in unresolvedAlarms, lat, lng, accuracy, maxAccuracy, now)

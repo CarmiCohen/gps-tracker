@@ -6,7 +6,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.dataStoreFile
 import com.gps19.core.engine.*
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -14,8 +13,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * CommitResult: Result of an atomic draft commit to primary settings.
@@ -32,14 +29,11 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
- * v9.3.28:
- * - ANR Hardening (#092): Finalized single-cycle I/O with getSettingsSnapshot() 
- *   and corrected default value logic to prevent infinite telemetry loops.
- * - Architecture: Consolidated conversion logic into SettingsMapper.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal.
  */
-@Singleton
-class SettingsRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+class SettingsRepository(
+    private val context: Context,
     private val timeProvider: TimeProvider
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
@@ -140,8 +134,6 @@ class SettingsRepository @Inject constructor(
         const val TRACKER_ACOUSTIC_FLOOR_KEY = "tracker_acoustic_floor"
         
         const val IS_MIC_TYPE_STARTED_KEY = "is_mic_type_started"
-        const val LAST_SIT_TS_KEY = "last_sit_ts"
-        const val CHAIR_BASELINE_TILT_KEY = "chair_baseline_tilt"
 
         const val SELECTED_SIREN_KEY = "selected_siren"
         const val LAST_SERVICE_TICK_TS_KEY = "last_service_tick_ts"
@@ -157,7 +149,6 @@ class SettingsRepository @Inject constructor(
         const val DRAFT_MAX_DISTANCE = "draft_max_distance"
 
         const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = "is_xiaomi_manual_override"
-        const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
         
         const val IDENTITY_SANITIZED_KEY = "identity_sanitized"
     }
@@ -168,7 +159,6 @@ class SettingsRepository @Inject constructor(
     val relayUrlFlow: Flow<String> = dataStore.data.map { it.relayUrl.ifEmpty { DEFAULT_RELAY_URL } }
     val isManualExitFlow: Flow<Boolean> = dataStore.data.map { it.isManualExit }
     val lastAlarmAckTsFlow: Flow<Long> = dataStore.data.map { it.lastAlarmAckTs }
-    val lastSitTsFlow: Flow<Long> = dataStore.data.map { it.lastSitTs }
     val homePointsFlow: Flow<List<GeoPoint>> = dataStore.data.map { it.homePointsList.map { p -> GeoPoint(p.lat, p.lng) } }
     val maxDistanceFlow: Flow<Double> = dataStore.data.map { if (it.maxDistance > 0.0) it.maxDistance else DEFAULT_MAX_DISTANCE }
     val alertSettingsFlow: Flow<AlertSettings> = dataStore.data.map { SettingsMapper.protoToAlertSettings(it.alertSettings) }
@@ -212,10 +202,8 @@ class SettingsRepository @Inject constructor(
                 MAX_DROP_KEY -> builder.setMaxDrop(value)
                 MAX_DROP_TS_KEY -> builder.setMaxDropTs(value)
                 LAST_GPS_TS_KEY -> builder.setLastGpsTs(value)
-                LAST_SIT_TS_KEY -> builder.setLastSitTs(value)
                 VIOLATION_UPTIME_MS_KEY -> builder.setViolationUptimeMs(value)
                 LAST_SERVICE_TICK_REALTIME_KEY -> builder.setLastServiceTickRealtime(value)
-                LAST_HISTORY_SIT_TS_KEY -> builder.setLastHistorySitTs(value)
             }
             builder.build()
         }
@@ -231,7 +219,6 @@ class SettingsRepository @Inject constructor(
                 TRACKER_LUX_BASELINE_KEY -> builder.setTrackerLuxBaseline(value)
                 TRACKER_ACOUSTIC_FLOOR_KEY -> builder.setTrackerAcousticFloor(value)
                 DRAFT_MAX_DISTANCE -> builder.setDraftMaxDistance(value)
-                CHAIR_BASELINE_TILT_KEY -> builder.setChairBaselineTilt(value)
             }
             builder.build()
         }
@@ -293,10 +280,8 @@ class SettingsRepository @Inject constructor(
             MAX_DROP_KEY -> settings.maxDrop
             MAX_DROP_TS_KEY -> settings.maxDropTs
             LAST_GPS_TS_KEY -> settings.lastGpsTs
-            LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else 0L
             VIOLATION_UPTIME_MS_KEY -> settings.violationUptimeMs
             LAST_SERVICE_TICK_REALTIME_KEY -> settings.lastServiceTickRealtime
-            LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else 0L
             else -> 0L
         }
         return if (value == 0L) default else value
@@ -311,10 +296,9 @@ class SettingsRepository @Inject constructor(
             TRACKER_LUX_BASELINE_KEY -> settings.trackerLuxBaseline
             TRACKER_ACOUSTIC_FLOOR_KEY -> settings.trackerAcousticFloor
             DRAFT_MAX_DISTANCE -> settings.draftMaxDistance
-            CHAIR_BASELINE_TILT_KEY -> if (settings.hasChairBaselineTilt()) settings.chairBaselineTilt else -1000.0
             else -> 0.0
         }
-        return if (value == 0.0 || value == -1000.0) default else value
+        return if (value == 0.0) default else value
     }
 
     suspend fun getBoolean(keyName: String, default: Boolean): Boolean {

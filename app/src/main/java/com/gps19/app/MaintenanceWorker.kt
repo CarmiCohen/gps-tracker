@@ -7,29 +7,22 @@ import android.net.NetworkCapabilities
 import android.os.StatFs
 import android.util.Log
 import androidx.core.content.ContextCompat
-import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.gps19.core.engine.*
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
- * v8.9.87:
- * - Issue #005 Hardening: Cached packageName to prevent repetitive getPackageName() 
- *   system log spam on Samsung devices.
- * v8.8.21: Migrated to TimeProvider for all timing logic.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Converted to standard CoroutineWorker.
  */
-@HiltWorker
-class MaintenanceWorker @AssistedInject constructor(
-    @Assisted context: Context,
-    @Assisted params: WorkerParameters,
+class MaintenanceWorker(
+    context: Context,
+    params: WorkerParameters,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider
 ) : CoroutineWorker(context, params) {
     
-    // Rationale: Cache packageName to prevent repetitive getPackageName() log spam.
     private val cachedPkgName = applicationContext.packageName
 
     override suspend fun doWork(): Result {

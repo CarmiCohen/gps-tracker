@@ -26,7 +26,8 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
- * v9.4.0:
+ * v9.4.1:
+ * - Issue #510: Removed Chair Sit Detection UI and settings.
  * - Issue #502: Device Independency. Genericized PhoneSetupOverlay and hardware-specific instructions.
  */
 
@@ -36,8 +37,7 @@ fun SettingsOverlay(
     onClear: (() -> Unit)?=null, onImportConfig: () -> Unit, onFullInitialization: () -> Unit,
     onUpdateDeviceId: (String) -> Unit, onUpdateViewerId: (String) -> Unit, onUpdateRelayUrl: (String) -> Unit,
     onUpdateMaxDistance: (String) -> Unit, onUpdateAlertSettings: (AlertSettings) -> Unit, onUpdateSirenType: (String) -> Unit,
-    onUpdateAlarmVolume: (Float) -> Unit, onTestSiren: () -> Unit, onShowPhoneSetup: () -> Unit = {}, viewModel: MainViewModel? = null,
-    onCalibrateChair: () -> Unit = {}
+    onUpdateAlarmVolume: (Float) -> Unit, onTestSiren: () -> Unit, onShowPhoneSetup: () -> Unit = {}, viewModel: MainViewModel? = null
 ) { 
     val activeSub = uiState.navigation.activeSubSettings
 
@@ -110,7 +110,7 @@ fun SettingsOverlay(
         }
         when (activeSub) {
             SubSettings.CLEAN -> CleanSetupOverlay(uiState = uiState, onClear = onClear, onReset = onReset, onFullInitialization = onFullInitialization, onClose = { viewModel?.onEvent(UiEvent.SetSubSettings(null)) })
-            SubSettings.ALERTS -> AlertManagementOverlay(uiState = uiState, onUpdateAlertSettings = onUpdateAlertSettings, onCalibrateChair = onCalibrateChair, onClose = { viewModel?.onEvent(UiEvent.SetSubSettings(null)) })
+            SubSettings.ALERTS -> AlertManagementOverlay(uiState = uiState, onUpdateAlertSettings = onUpdateAlertSettings, onClose = { viewModel?.onEvent(UiEvent.SetSubSettings(null)) })
             SubSettings.SOUND -> AlarmSoundOverlay(uiState = uiState, onUpdateAlertSettings = onUpdateAlertSettings, onUpdateSirenType = onUpdateSirenType, onUpdateAlarmVolume = onUpdateAlarmVolume, onTestSiren = onTestSiren, onClose = { viewModel?.onEvent(UiEvent.SetSubSettings(null)) })
             else -> {}
         }
@@ -131,11 +131,11 @@ fun CleanSetupOverlay(uiState: MainUiState, onClear: (() -> Unit)?, onReset: (()
 }
 
 @Composable
-fun AlertManagementOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSettings) -> Unit, onCalibrateChair: () -> Unit = {}, onClose: () -> Unit) {
+fun AlertManagementOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSettings) -> Unit, onClose: () -> Unit) {
     Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate900) {
         Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.alert_mgmt_title), color = ViewerCyan, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
-            Spacer(Modifier.height(16.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.alert_group_toggles), color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp); Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) { TextButton(onClick = { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(localInternet = true, serverConnection = true, relayConnection = true, jammerDetection = true, signalLoss = true, gpsStalling = true, distance = true, power = true, lowBattery = true, batteryHealth = true, highTemperature = true, longTimeGap = true, tamperAlert = true, tiltAlert = true, acousticAlert = true, liftAlert = true, chairOccupied = true, systemStorageLow = true)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_all_on), fontSize = 7.5.sp, color = BrandJd) }; TextButton(onClick = { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(localInternet = false, serverConnection = false, relayConnection = false, jammerDetection = false, signalLoss = false, gpsStalling = false, distance = false, power = false, lowBattery = false, batteryHealth = false, highTemperature = false, longTimeGap = false, tamperAlert = false, tiltAlert = false, acousticAlert = false, liftAlert = false, chairOccupied = false, systemStorageLow = false)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_reset), fontSize = 7.5.sp, color = Rose500) } } }
+            Spacer(Modifier.height(16.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.alert_group_toggles), color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp); Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) { TextButton(onClick = { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(localInternet = true, serverConnection = true, relayConnection = true, jammerDetection = true, signalLoss = true, gpsStalling = true, distance = true, power = true, lowBattery = true, batteryHealth = true, highTemperature = true, longTimeGap = true, tamperAlert = true, tiltAlert = true, acousticAlert = true, liftAlert = true, systemStorageLow = true)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_all_on), fontSize = 7.5.sp, color = BrandJd) }; TextButton(onClick = { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(localInternet = false, serverConnection = false, relayConnection = false, jammerDetection = false, signalLoss = false, gpsStalling = false, distance = false, power = false, lowBattery = false, batteryHealth = false, highTemperature = false, longTimeGap = false, tamperAlert = false, tiltAlert = false, acousticAlert = false, liftAlert = false, systemStorageLow = false)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_reset), fontSize = 7.5.sp, color = Rose500) } } }
             
             Spacer(Modifier.height(8.dp)); SettingsGroupHeader(stringResource(R.string.alert_group_master), BrandJd)
             AlarmToggle(stringResource(R.string.alert_label_global_mute), uiState.draftSettings.alertSettings.globalMute) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(globalMute = it)) }
@@ -172,14 +172,7 @@ fun AlertManagementOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSe
             }
 
             AlarmToggle(ALERT_TITLE_TRACKER_LIFT, uiState.draftSettings.alertSettings.liftAlert) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(liftAlert = it)) }
-            AlarmToggle(ALERT_TITLE_TRACKER_CHAIR, uiState.draftSettings.alertSettings.chairOccupied) { onUpdateAlertSettings(uiState.draftSettings.alertSettings.copy(chairOccupied = it)) }
             
-            if (uiState.draftSettings.alertSettings.chairOccupied) {
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = onCalibrateChair, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(FORENSIC_PINK_COLOR))) {
-                    Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_calibrate_chair))
-                }
-            }
             Spacer(Modifier.height(32.dp))
         }
     }

@@ -1,33 +1,19 @@
 package com.gps19.app
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
-import android.widget.Toast
 import com.gps19.core.engine.*
-import com.gps19.core.engine.LocationProcessor
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
-import org.osmdroid.util.GeoPoint
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed trajectory promotion flags.
- * July.1.12:
- * - Robust Aliasing: Fixed peer ID extraction. Trackers now correctly pass 
- *   'viewer_id' to the pulse listener instead of their own 'id'.
+ * v9.5.0: Hilt removed. Manual DI.
  */
-@Singleton
-class RemoteHandler @Inject constructor(
-    @ApplicationContext private val context: Context,
+class RemoteHandler(
+    private val context: Context,
     private val repository: MainRepository,
     private val locationProcessor: LocationProcessor,
     private val alarmManager: AppAlarmManager,
@@ -67,20 +53,13 @@ class RemoteHandler @Inject constructor(
     var isTrackerJammerSuspicion = false
     var isTrackerVisualJump = false
     var trackerJumpTier = 0
-    var isTrackerSuspicious = false
+    var trackerStatus = SentinelStatus.VALID
     var isTrackerTamperDetected = false
     var isTrackerPowerTamper = false
-    var isTrackerSitDetected = false
-    var isTrackerSitActive = false
-    var trackerLastSitTs = 0L
-    var trackerVerticalVelocity = 0.0
     var isTrackerClockRegression = false
     var isTrackerLocationPending = false
     var trackerLocationPendingReason = LocationPendingReason.NONE
     var trackerLocationDetail: GnssDetail? = null
-    var trackerSnrIdx = 0.0
-    var trackerTiltIdx = 0.0
-    var trackerBaroIdx = 0.0
     var isTrackerBatterySteepDischarge = false 
     var isTrackerCoolingModeActive = false 
     
@@ -89,14 +68,7 @@ class RemoteHandler @Inject constructor(
     var trackerNetInterface = "UNKNOWN"
     var isTrackerStorageLow = false
     var isTrackerStorageCritical = false
-    var isTrackerAnchorLocked = false
     var trackerState = TrackerState.UNKNOWN
-
-    var trackerSitVz = 0.0 
-    var trackerSitDz = 0.0 
-    var trackerSitBaro = 0.0 
-    var trackerSitTilt = 0.0 
-    var trackerSitShock = 0.0
 
     var trackerDistToHome: Double? = null
     var trackerDistToViewer: Double? = null
@@ -146,14 +118,11 @@ class RemoteHandler @Inject constructor(
                     trackerAccuracy = s.accuracy; trackerMaxAccuracy = s.maxAccuracy; trackerLastGpsTs = s.gpsTs; trackerBattery = s.battery
                     trackerTemp = s.temp; trackerMaxTemp = s.maxTemp; trackerCurrentMa = s.currentMa
                     isTrackerCharging = s.isCharging; trackerSatsView = s.satsView; trackerSatsUsed = s.satsUsed
-                    isTrackerJammerSuspicion = false; isTrackerVisualJump = false
-                    trackerJumpTier = 0
-                    isTrackerSuspicious = s.isSuspicious; isTrackerTamperDetected = s.isTamperDetected
-                    isTrackerPowerTamper = s.isPowerTamper; isTrackerSitDetected = s.isSitDetected
-                    isTrackerSitActive = s.isSitActive
-                    trackerLastSitTs = s.lastSitTs; trackerVerticalVelocity = s.verticalVelocity
-                    trackerSitVz = s.sitVz; trackerSitDz = s.sitDz; trackerSitBaro = s.sitBaro
-                    trackerSitTilt = s.sitTilt; trackerSitShock = s.sitShock
+                    isTrackerJammerSuspicion = s.isJammer; isTrackerVisualJump = false
+                    trackerJumpTier = s.jumpTier
+                    trackerStatus = s.status
+                    isTrackerTamperDetected = s.isTamperDetected
+                    isTrackerPowerTamper = s.isPowerTamper
                     trackerVibration = s.vibration; trackerHeading = s.heading; trackerBaroAlt = s.baroAlt
                     trackerLux = s.lux; isTrackerNear = s.isNear; trackerTiltDegrees = s.tiltDegrees
                     trackerAcousticDb = s.acousticDb; trackerPeakVibrationShock = s.peakVibrationShock
@@ -169,9 +138,6 @@ class RemoteHandler @Inject constructor(
                     isTrackerLocationPending = s.isLocationPending
                     trackerLocationPendingReason = s.locationPendingReason
                     trackerLocationDetail = s.gnssDetail
-                    trackerSnrIdx = s.snrIdx
-                    trackerTiltIdx = s.tiltIdx
-                    trackerBaroIdx = s.baroIdx
                     isTrackerBatterySteepDischarge = s.isBatterySteepDischarge
                     isTrackerCoolingModeActive = s.isCoolingModeActive
                     
@@ -180,7 +146,6 @@ class RemoteHandler @Inject constructor(
                     trackerNetInterface = s.netInterface
                     isTrackerStorageLow = s.isStorageLow
                     isTrackerStorageCritical = s.isStorageCritical
-                    isTrackerAnchorLocked = s.isAnchorLocked
                     trackerState = s.trackerState
                     
                     trackerLastValidFixRealtime = s.lastValidFixRealtime
@@ -189,17 +154,14 @@ class RemoteHandler @Inject constructor(
                         lat = trackerLat, lng = trackerLng, speed = trackerSpeed, accuracy = trackerAccuracy, bearing = trackerBearing,
                         battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp, isCharging = isTrackerCharging, currentMa = trackerCurrentMa,
                         gpsTs = trackerLastGpsTs, isMe = false, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
-                        isJump = false, isJammer = false, isStalled = false,
                         maxAccuracy = trackerMaxAccuracy, signal = 0,
                         vibration = trackerVibration, heading = trackerBearing, baroAlt = trackerBaroAlt,
                         lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb,
                         peakVibrationShock = trackerPeakVibrationShock, peakVibrationShockTs = trackerPeakVibrationShockTs,
                         luxBaseline = trackerLuxBaseline, acousticFloorDb = trackerAcousticFloorDb,
-                        adaptiveVibrationFloor = trackerAdaptiveVibrationFloor, isSuspicious = isTrackerSuspicious,
+                        adaptiveVibrationFloor = trackerAdaptiveVibrationFloor, 
+                        status = trackerStatus,
                         isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
-                        isSitDetected = trackerLastSitTs > 0, isSitActive = isTrackerSitActive, lastSitTs = trackerLastSitTs,
-                        verticalVelocity = trackerVerticalVelocity, sitVz = trackerSitVz, sitDz = trackerSitDz,
-                        sitBaro = trackerSitBaro, sitTilt = trackerSitTilt, sitShock = trackerSitShock,
                         proxIdx = trackerProxIdx, proximityCm = trackerProximityCm,
                         proximityDebounceMs = trackerProximityDebounceMs, vibrationRollingSum = trackerVibrationRollingSum,
                         uptimeMs = trackerUptimeMs, totalDropMs = trackerTotalDropMs,
@@ -217,14 +179,10 @@ class RemoteHandler @Inject constructor(
                         isStorageLow = isTrackerStorageLow,
                         isStorageCritical = isTrackerStorageCritical,
                         gnssDetail = trackerLocationDetail,
-                        snrIdx = trackerSnrIdx,
-                        tiltIdx = trackerTiltIdx,
-                        baroIdx = trackerBaroIdx,
                         isBatterySteepDischarge = isTrackerBatterySteepDischarge,
                         isCoolingModeActive = isTrackerCoolingModeActive,
-                        isAnchorLocked = isTrackerAnchorLocked,
                         trackerState = trackerState,
-                        ts = s.ts // Initial load from stored status
+                        ts = s.ts 
                     ))
                 }
             } catch (e: Exception) {
@@ -248,10 +206,8 @@ class RemoteHandler @Inject constructor(
         trackerMaxAccuracy = 0.0; trackerLastGpsTs = 0L; trackerBattery = 0; trackerTemp = 0.0
         trackerMaxTemp = 0.0; trackerCurrentMa = 0; trackerSatsView = 0; trackerSatsUsed = 0
         isTrackerCharging = false; isTrackerJammerSuspicion = false; isTrackerVisualJump = false
-        trackerJumpTier = 0; isTrackerSuspicious = false
+        trackerJumpTier = 0; trackerStatus = SentinelStatus.VALID
         isTrackerTamperDetected = false; isTrackerPowerTamper = false
-        isTrackerSitDetected = false; isTrackerSitActive = false; trackerLastSitTs = 0L; trackerVerticalVelocity = 0.0
-        trackerSitVz = 0.0; trackerSitDz = 0.0; trackerSitBaro = 0.0; trackerSitTilt = 0.0; trackerSitShock = 0.0
         trackerDistToHome = null; trackerDistToViewer = null
         trackerVibration = 0.0; trackerHeading = 0.0; trackerBaroAlt = 0.0; trackerLux = 0.0
         isTrackerNear = true; trackerTiltDegrees = 0.0; trackerAcousticDb = 0.0
@@ -269,9 +225,6 @@ class RemoteHandler @Inject constructor(
         isTrackerLocationPending = false
         trackerLocationPendingReason = LocationPendingReason.NONE
         trackerLocationDetail = null
-        trackerSnrIdx = 0.0
-        trackerTiltIdx = 0.0
-        trackerBaroIdx = 0.0
         isTrackerBatterySteepDischarge = false
         isTrackerCoolingModeActive = false
         
@@ -280,7 +233,6 @@ class RemoteHandler @Inject constructor(
         trackerNetInterface = "UNKNOWN"
         isTrackerStorageLow = false
         isTrackerStorageCritical = false
-        isTrackerAnchorLocked = false
         trackerState = TrackerState.UNKNOWN
         
         repository.saveDoubleSync(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0)
@@ -293,56 +245,30 @@ class RemoteHandler @Inject constructor(
         
         lastPeerActivityTs = nowRealtime
         repository.updateRemoteActivity(now)
-
-        if (entry.message.contains("Sit Detected", ignoreCase = true)) {
-            if (!isTrackerSitDetected) {
-                isTrackerSitDetected = true
-            }
-        }
     }
 
     fun handleRemoteUpdate(data: JSONObject, isTrackerMode: Boolean) {
         val fromId = data.optString("id")
-        val fromViewerId = data.optString("viewer_id") // R182: Explicitly extract viewer ID
+        val fromViewerId = data.optString("viewer_id") 
         val fromViewer = data.optBoolean("from_viewer", false) 
         val type = data.optString("type", "")
         val now = timeProvider.currentTimeMillis()
         val nowRealtime = timeProvider.elapsedRealtime()
 
-        // R182: Correct peer ID determination based on mode.
         val peerId = if (isTrackerMode) {
             if (fromViewerId.isNotEmpty()) fromViewerId else fromId
         } else {
             fromId
         }
 
-        if (isTrackerMode && fromViewer && type == "calibrate_chair") {
-            locationProcessor.resetChairBaseline()
-            repository.addLog(LogEntry(
-                timestamp = now,
-                message = "REMOTE CALIBRATION: Chair baseline zeroed via viewer command",
-                type = "event",
-                isImportant = true
-            ))
-            
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show()
-            }
-
-            listener?.onPeerPulse(peerId)
-            lastPeerActivityTs = nowRealtime
-            repository.updateRemoteActivity(now)
-            return
-        }
-
         if (isTrackerMode && fromViewer && data.has("home_points")) {
             scope?.launch {
                 try {
                     val array = data.getJSONArray("home_points")
-                    val newList = mutableListOf<GeoPoint>()
+                    val newList = mutableListOf<org.osmdroid.util.GeoPoint>()
                     for (i in 0 until array.length()) {
                         val obj = array.getJSONObject(i)
-                        newList.add(GeoPoint(obj.getDouble("lat"), obj.getDouble("lng")))
+                        newList.add(org.osmdroid.util.GeoPoint(obj.getDouble("lat"), obj.getDouble("lng")))
                     }
                     val maxDist = data.optDouble("max_dist", -1.0)
                     val ts = data.optLong("settings_ts", 0L)
@@ -397,34 +323,26 @@ class RemoteHandler @Inject constructor(
             val hasIncomingGps = data.has("lat") || data.has("gps_ts") || data.has("gps_age_ms")
             val prevGpsTs = trackerLastGpsTs
             
-            isTrackerSuspicious = data.optBoolean("is_suspicious", isTrackerSuspicious)
+            val statusStr = data.optString("status", SentinelStatus.VALID.name)
+            trackerStatus = try { SentinelStatus.valueOf(statusStr) } catch(e: Exception) { SentinelStatus.VALID }
+
             isTrackerTamperDetected = data.optBoolean("is_tamper_detected", isTrackerTamperDetected)
             isTrackerPowerTamper = data.optBoolean("is_power_tamper", isTrackerPowerTamper)
             
-            val incomingSitDetected = data.optBoolean("is_sit_detected", false)
-            isTrackerSitDetected = incomingSitDetected
-
-            isTrackerSitActive = data.optBoolean("is_sit_active", isTrackerSitActive)
-            trackerLastSitTs = data.optLong("last_sit_ts", trackerLastSitTs)
-            trackerVerticalVelocity = data.optDouble("vertical_velocity", trackerVerticalVelocity)
             isTrackerLocationPending = data.optBoolean("is_location_pending", false)
             
             val reasonStr = data.optString("location_pending_reason", "NONE")
             trackerLocationPendingReason = try { LocationPendingReason.valueOf(reasonStr) } catch(e: Exception) { LocationPendingReason.NONE }
 
             trackerLastValidFixRealtime = data.optLong("last_valid_fix_realtime", trackerLastValidFixRealtime)
-            trackerSnrIdx = data.optDouble("snr_idx", trackerSnrIdx)
-            trackerTiltIdx = data.optDouble("tilt_idx", trackerTiltIdx)
-            trackerBaroIdx = data.optDouble("baro_idx", trackerBaroIdx)
             isTrackerBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false)
             isTrackerCoolingModeActive = data.optBoolean("is_cooling_mode_active", false)
             
             isTrackerPowerSaveMode = data.optBoolean("is_power_save_mode", isTrackerPowerSaveMode)
-            trackerStandbyBucket = data.optInt("standby_bucket", trackerStandbyBucket)
+            trackerStandbyBucket = data.optInt("standard_bucket", trackerStandbyBucket)
             trackerNetInterface = data.optString("net_interface", trackerNetInterface)
             isTrackerStorageLow = data.optBoolean("is_storage_low", isTrackerStorageLow)
             isTrackerStorageCritical = data.optBoolean("is_storage_critical", isTrackerStorageCritical)
-            isTrackerAnchorLocked = data.optBoolean("is_anchor_locked", false)
 
             val stateStr = data.optString("tracker_state", "UNKNOWN")
             trackerState = try { TrackerState.valueOf(stateStr) } catch(e: Exception) { TrackerState.UNKNOWN }
@@ -467,7 +385,6 @@ class RemoteHandler @Inject constructor(
                 val rawMaxAcc = data.optDouble("max_accuracy", 0.0)
                 
                 val isStalledPacket = data.optBoolean("is_stalled", false)
-                val isJumpPacket = data.optBoolean("is_jump", false)
                 val isJammerPacket = data.optBoolean("is_jammer", false)
                 val jumpTierPacket = data.optInt("jump_tier", 0)
 
@@ -484,13 +401,10 @@ class RemoteHandler @Inject constructor(
                     isViewerTrail = false,
                     lastGpsTs = prevGpsTs,
                     providedMaxAccuracy = rawMaxAcc,
-                    providedIsJump = isJumpPacket,
                     providedJumpTier = jumpTierPacket,
-                    providedIsAdaptiveJump = data.optBoolean("is_adaptive_jump", false),
                     providedIsJammer = isJammerPacket,
                     providedIsStalled = isStalledPacket,
-                    providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending,
-                    isSuspicious = isTrackerSuspicious,
+                    providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending || trackerStatus == SentinelStatus.TAMPER,
                     nowWall = now,
                     nowRealtime = nowRealtime
                 )
@@ -514,7 +428,7 @@ class RemoteHandler @Inject constructor(
                 trackerSatsView = data.optInt("sats_view", trackerSatsView)
                 trackerSatsUsed = data.optInt("sats_used", trackerSatsUsed)
                 isTrackerJammerSuspicion = isJammerPacket
-                isTrackerVisualJump = isJumpPacket
+                isTrackerVisualJump = processed.status == SentinelStatus.JUMP
                 trackerJumpTier = jumpTierPacket
             }
             
@@ -523,12 +437,6 @@ class RemoteHandler @Inject constructor(
             trackerMaxTemp = data.optDouble("max_temp", trackerMaxTemp)
             trackerCurrentMa = data.optInt("current_ma", trackerCurrentMa)
             isTrackerCharging = data.optBoolean("is_charging", isTrackerCharging)
-            
-            trackerSitVz = data.optDouble("sit_vz", trackerSitVz)
-            trackerSitDz = data.optDouble("sit_dz", trackerSitDz)
-            trackerSitBaro = data.optDouble("sit_baro", trackerSitBaro)
-            trackerSitTilt = data.optDouble("sit_tilt", trackerSitTilt)
-            trackerSitShock = data.optDouble("sit_shock", trackerSitShock)
             
             trackerVibration = data.optDouble("vibration", trackerVibration)
             trackerHeading = data.optDouble("heading", trackerHeading)
@@ -558,7 +466,7 @@ class RemoteHandler @Inject constructor(
 
             trackerAdaptiveVibrationFloor = data.optDouble("adaptive_vibration_floor", trackerAdaptiveVibrationFloor)
             
-            locationProcessor.updateSensorData(
+            locationProcessor.sentinel.updateSensorState(
                 vibration = trackerVibration,
                 heading = trackerHeading,
                 baroAlt = trackerBaroAlt,
@@ -569,12 +477,6 @@ class RemoteHandler @Inject constructor(
                 acousticDb = trackerAcousticDb,
                 peakShock = trackerPeakVibrationShock,
                 acousticMinDb = -1.0,
-                peakVerticalVelocity = trackerVerticalVelocity,
-                plungeMatched = false, 
-                peakVerticalVelocityTs = 0L,
-                isSirenActive = false,
-                isWarming = false,
-                manualAdaptiveFloor = trackerAdaptiveVibrationFloor,
                 nowRealtime = nowRealtime,
                 nowWall = now
             )
@@ -601,33 +503,10 @@ class RemoteHandler @Inject constructor(
                         lat = trackerLat, lng = trackerLng, speed = trackerSpeed, accuracy = trackerAccuracy, bearing = trackerBearing,
                         battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp, isCharging = isTrackerCharging, currentMa = trackerCurrentMa,
                         gpsTs = trackerLastGpsTs, isMe = false, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
-                        isJump = isTrackerVisualJump, jumpTier = trackerJumpTier, 
-                        isJammer = isTrackerJammerSuspicion, isStalled = isStalled,
-                        maxAccuracy = trackerMaxAccuracy, signal = peerSignal,
-                        vibration = trackerVibration, heading = trackerBearing, baroAlt = trackerBaroAlt,
-                        lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb,
-                        peakVibrationShock = trackerPeakVibrationShock, peakVibrationShockTs = trackerPeakVibrationShockTs,
-                        luxBaseline = trackerLuxBaseline, acousticFloorDb = trackerAcousticFloorDb,
-                        adaptiveVibrationFloor = trackerAdaptiveVibrationFloor, isSuspicious = isTrackerSuspicious,
+                        jumpTier = trackerJumpTier, 
+                        status = trackerStatus,
                         isTamperDetected = isTrackerTamperDetected,
                         isPowerTamper = isTrackerPowerTamper,
-                        isSitDetected = incomingSitDetected,
-                        isSitActive = isTrackerSitActive,
-                        lastSitTs = trackerLastSitTs,
-                        verticalVelocity = trackerVerticalVelocity,
-                        sitVz = trackerSitVz,
-                        sitDz = trackerSitDz,
-                        sitBaro = trackerSitBaro,
-                        sitTilt = trackerSitTilt,
-                        sitShock = trackerSitShock,
-                        proxIdx = trackerProxIdx,
-                        proximityCm = trackerProximityCm,
-                        proximityDebounceMs = trackerProximityDebounceMs,
-                        vibrationRollingSum = trackerVibrationRollingSum,
-                        uptimeMs = trackerUptimeMs, totalDropMs = trackerTotalDropMs, maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
-                        totalConnectedMs = trackerTotalConnectedMs,
-                        sessionConnectedMs = trackerSessionConnectedMs,
-                        lastConnTs = trackerLastConnTs, lastDiscTs = trackerLastDiscTs,
                         violationUptimeMs = violationUptimeMs,
                         violationPercentage = violationPercentage,
                         isClockRegression = isTrackerClockRegression,
@@ -640,12 +519,8 @@ class RemoteHandler @Inject constructor(
                         isStorageLow = isTrackerStorageLow,
                         isStorageCritical = isTrackerStorageCritical,
                         gnssDetail = trackerLocationDetail,
-                        snrIdx = trackerSnrIdx,
-                        tiltIdx = trackerTiltIdx,
-                        baroIdx = trackerBaroIdx,
                         isBatterySteepDischarge = isTrackerBatterySteepDischarge,
                         isCoolingModeActive = isTrackerCoolingModeActive,
-                        isAnchorLocked = isTrackerAnchorLocked,
                         trackerState = trackerState,
                         ts = now
                     ))
@@ -659,8 +534,6 @@ class RemoteHandler @Inject constructor(
                         sessionConnectedMs = trackerSessionConnectedMs, totalDropMs = trackerTotalDropMs,
                         maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
                         violationUptimeMs = violationUptimeMs, violationPercentage = violationPercentage,
-                        isSitDetected = incomingSitDetected, isSitActive = isTrackerSitActive, lastSitTs = trackerLastSitTs, verticalVelocity = trackerVerticalVelocity,
-                        sitVz = trackerSitVz, sitDz = trackerSitDz, sitBaro = trackerSitBaro, sitTilt = trackerSitTilt, sitShock = trackerSitShock,
                         isPowerTamper = isTrackerPowerTamper, vibration = trackerVibration, heading = trackerHeading,
                         baroAlt = trackerBaroAlt, lux = trackerLux, isNear = isTrackerNear, tiltDegrees = trackerTiltDegrees,
                         acousticDb = trackerAcousticDb, peakVibrationShock = trackerPeakVibrationShock,
@@ -668,7 +541,7 @@ class RemoteHandler @Inject constructor(
                         acousticFloorDb = trackerAcousticFloorDb, adaptiveVibrationFloor = trackerAdaptiveVibrationFloor,
                         proxIdx = trackerProxIdx, proximityCm = trackerProximityCm,
                         proximityDebounceMs = trackerProximityDebounceMs, vibrationRollingSum = trackerVibrationRollingSum,
-                        isSuspicious = isTrackerSuspicious, isTamperDetected = isTrackerTamperDetected,
+                        status = trackerStatus, isTamperDetected = isTrackerTamperDetected,
                         jumpTier = trackerJumpTier,
                         isLocationPending = isTrackerLocationPending,
                         locationPendingReason = trackerLocationPendingReason,
@@ -679,12 +552,8 @@ class RemoteHandler @Inject constructor(
                         isStorageLow = isTrackerStorageLow,
                         isStorageCritical = isTrackerStorageCritical,
                         gnssDetail = trackerLocationDetail,
-                        snrIdx = trackerSnrIdx,
-                        tiltIdx = trackerTiltIdx,
-                        baroIdx = trackerBaroIdx,
                         isBatterySteepDischarge = isTrackerBatterySteepDischarge,
                         isCoolingModeActive = isTrackerCoolingModeActive,
-                        isAnchorLocked = isTrackerAnchorLocked,
                         trackerState = trackerState
                     ))
                 } catch (e: Exception) {

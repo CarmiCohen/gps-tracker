@@ -7,16 +7,13 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import android.content.BroadcastReceiver
-import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.firstOrNull
 import timber.log.Timber
 
 /**
  * BootReceiver: Triggered when the device restarts.
- * v8.6.2: Updated to restart specialized TrackerService or ViewerService.
+ * v9.5.0: Hilt removed. Manual DI.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -34,10 +31,9 @@ class BootReceiver : BroadcastReceiver() {
 /**
  * Worker that bridges the boot broadcast to the Foreground Service.
  */
-@HiltWorker
-class BootServiceStartWorker @AssistedInject constructor(
-    @Assisted val context: Context,
-    @Assisted params: WorkerParameters,
+class BootServiceStartWorker(
+    val context: Context,
+    params: WorkerParameters,
     private val repository: MainRepository
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {

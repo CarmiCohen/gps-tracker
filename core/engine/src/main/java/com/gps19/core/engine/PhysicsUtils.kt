@@ -4,8 +4,8 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: High-performance geospatial and kinematic calculations.
- * v9.3.20:
- * - R405: Samsung A15 Hardening. Unified jump gates and removed isA15 branching.
+ * July.1.16:
+ * - Issue #508: Optimization Removal. Removed Adaptive Jump and SNR-based scaling.
  */
 object PhysicsUtils {
 
@@ -71,7 +71,6 @@ object PhysicsUtils {
 
     /**
      * Multi-Factor Jump Engine logic. Standardized to Double.
-     * R405: Removed device-specific (A15) threshold branching.
      */
     fun isVisualJump(
         lastLat: Double, lastLng: Double, 
@@ -95,17 +94,11 @@ object PhysicsUtils {
         }
         
         var score = 0
-        var isAdaptiveJump = false
         
         // Sensor Fusion check
         val mismatchGate = JUMP_GATE_SENSOR_MISMATCH_MPS
         if (!hasPhysicalMotion && speedMps > mismatchGate) { 
             score += JUMP_WEIGHT_SENSOR_MISMATCH
-            
-            if (snr >= ADAPTIVE_JUMP_SNR_THRESHOLD) {
-                isAdaptiveJump = true
-                score += 20
-            }
         }
         
         // Velocity Inertia
@@ -132,7 +125,6 @@ object PhysicsUtils {
         val isJump = isTier2 || isTier3 || score >= 50
         
         val reason = when {
-            isAdaptiveJump -> "Signal Reflection Suspicion (High SNR)"
             !hasPhysicalMotion && speedMps > mismatchGate -> "Sensor Mismatch Jump (Urban Canyon)"
             isTier2 -> "Security Jump"
             isTier3 -> "Visual Jitter"
@@ -143,7 +135,6 @@ object PhysicsUtils {
         return JumpConfidence(
             score = score.coerceIn(0, 100),
             isJump = isJump,
-            isAdaptiveJump = isAdaptiveJump,
             tier = if (isTier2) 2 else if (isTier3) 3 else 0,
             reason = reason
         )

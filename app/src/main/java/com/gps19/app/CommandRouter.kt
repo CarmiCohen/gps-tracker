@@ -7,7 +7,6 @@ import android.content.IntentFilter
 import android.os.Build
 import com.gps19.core.engine.*
 import com.gps19.core.engine.LocationProcessor
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -17,17 +16,13 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import timber.log.Timber
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
- * v9.3.3:
- * - Issue #058: Hilt Migration. Added @Inject constructor and listener interface.
+ * v9.5.0: Hilt removed. Manual DI.
  */
-@Singleton
-class CommandRouter @Inject constructor(
-    @ApplicationContext private val context: Context,
+class CommandRouter(
+    private val context: Context,
     private val configManager: ConfigManager,
     private val logManager: LogManager,
     private val networkManager: AppNetworkManager,
@@ -139,20 +134,6 @@ class CommandRouter @Inject constructor(
                             locationProcessor.resetStats()
                             remoteHandler.resetStats()
                             listener?.onSyncSensors()
-                        }
-                        is UiCommand.CalibrateChair -> {
-                            if (configManager.isTrackerMode) {
-                                locationProcessor.sentinel.resetChairBaseline()
-                                logManager.logServiceEvent("MANUAL CALIBRATION: Chair baseline zeroed", true)
-                            } else {
-                                val cmd = JSONObject().apply {
-                                    put("id", configManager.deviceId)
-                                    put("viewer_id", configManager.viewerId)
-                                    put("from_viewer", true)
-                                    put("type", "calibrate_chair")
-                                }
-                                networkManager.emit("location_update", cmd)
-                            }
                         }
                         is UiCommand.TriggerTestAlarm -> {
                             scope.launch {

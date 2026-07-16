@@ -1,19 +1,13 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted mapping.
- * July.1.12:
- * - Clock Skew Hardening: Forced remote updates to use local receipt time (nowMs) 
- *   for telemetryTs to ensure HUD freshness (Green vs Gray) is immune to device clock drift.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal.
  */
-@Singleton
-class TelemetryUseCase @Inject constructor(
+class TelemetryUseCase(
     private val timeProvider: TimeProvider
 ) {
     fun mapTrackerLocation(
@@ -38,8 +32,7 @@ class TelemetryUseCase @Inject constructor(
             bearing = if (isLocationValid) update.bearing else currentLoc.bearing, 
             timestamp = if (newTimestamp > 0) newTimestamp else currentLoc.timestamp,
             telemetryTs = effectiveTelemetryTs,
-            isVisualJump = update.isJump,
-            isJammer = update.isJammer, isStalled = update.isStalled,
+            status = update.status,
             vibration = update.vibration ?: currentLoc.vibration,
             heading = update.heading ?: currentLoc.heading,
             tiltDegrees = update.tiltDegrees ?: currentLoc.tiltDegrees,
@@ -47,17 +40,8 @@ class TelemetryUseCase @Inject constructor(
             baroAlt = update.baroAlt ?: currentLoc.baroAlt,
             lux = update.lux ?: currentLoc.lux,
             isNear = update.isNear ?: currentLoc.isNear,
-            isSuspicious = update.isSuspicious,
             isTamperDetected = update.isTamperDetected,
             isPowerTamper = update.isPowerTamper,
-            isSitDetected = update.isSitDetected,
-            lastSitTs = update.lastSitTs,
-            verticalVelocity = update.verticalVelocity ?: currentLoc.verticalVelocity,
-            sitVz = update.sitVz ?: currentLoc.sitVz,
-            sitDz = update.sitDz ?: currentLoc.sitDz,
-            sitBaro = update.sitBaro ?: currentLoc.sitBaro,
-            sitTilt = update.sitTilt ?: currentLoc.sitTilt,
-            sitShock = update.sitShock ?: currentLoc.sitShock,
             micPending = update.micPending,
             peakVibrationShock = update.peakVibrationShock ?: currentLoc.peakVibrationShock,
             peakVibrationShockTs = update.peakVibrationShockTs ?: currentLoc.peakVibrationShockTs,
@@ -79,10 +63,9 @@ class TelemetryUseCase @Inject constructor(
             isStorageLow = update.isStorageLow,
             isStorageCritical = update.isStorageCritical,
             gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail,
-            snrIdx = update.snrIdx,
+            isBatterySteepDischarge = update.isBatterySteepDischarge,
             isCoolingModeActive = update.isCoolingModeActive,
             currentMa = update.currentMa,
-            isAnchorLocked = update.isAnchorLocked,
             trackerState = update.trackerState
         )
     }
@@ -93,12 +76,10 @@ class TelemetryUseCase @Inject constructor(
             maxAccuracy = status.maxAccuracy,
             timestamp = status.gpsTs, 
             telemetryTs = status.ts, 
-            isVisualJump = status.isJump,
+            status = status.status,
             vibration = status.vibration, heading = status.heading, tiltDegrees = status.tiltDegrees,
             acousticDb = status.acousticDb, baroAlt = status.baroAlt, lux = status.lux, isNear = status.isNear,
-            isSuspicious = status.isSuspicious, isTamperDetected = status.isTamperDetected, isPowerTamper = status.isPowerTamper,
-            isSitDetected = status.isSitDetected, isSitActive = status.isSitActive, lastSitTs = status.lastSitTs, verticalVelocity = status.verticalVelocity,
-            sitVz = status.sitVz, sitDz = status.sitDz, sitBaro = status.sitBaro, sitTilt = status.sitTilt, sitShock = status.sitShock,
+            isTamperDetected = status.isTamperDetected, isPowerTamper = status.isPowerTamper,
             peakVibrationShock = status.peakVibrationShock, peakVibrationShockTs = status.peakVibrationShockTs,
             luxBaseline = status.luxBaseline, acousticFloorDb = status.acousticFloorDb, adaptiveVibrationFloor = status.adaptiveVibrationFloor,
             proxIdx = status.proxIdx, proximityCm = status.proximityCm, 
@@ -110,10 +91,10 @@ class TelemetryUseCase @Inject constructor(
             isPowerSaveMode = status.isPowerSaveMode,
             standbyBucket = status.standbyBucket, netInterface = status.netInterface,
             isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical,
-            gnssDetail = status.gnssDetail, snrIdx = status.snrIdx,
+            gnssDetail = status.gnssDetail,
+            isBatterySteepDischarge = status.isBatterySteepDischarge,
             isCoolingModeActive = status.isCoolingModeActive,
             currentMa = status.currentMa,
-            isAnchorLocked = status.isAnchorLocked,
             trackerState = status.trackerState
         )
     }
@@ -136,8 +117,7 @@ class TelemetryUseCase @Inject constructor(
             bearing = if (isLocationValid) update.bearing else currentLoc.bearing, 
             timestamp = if (newTimestamp > 0) newTimestamp else currentLoc.timestamp,
             telemetryTs = if (update.ts > 0) update.ts else nowMs,
-            isVisualJump = update.isJump,
-            isJammer = update.isJammer, isStalled = update.isStalled,
+            status = update.status,
             vibration = update.vibration ?: currentLoc.vibration,
             heading = update.heading ?: currentLoc.heading,
             tiltDegrees = update.tiltDegrees ?: currentLoc.tiltDegrees,
@@ -145,17 +125,8 @@ class TelemetryUseCase @Inject constructor(
             baroAlt = update.baroAlt ?: currentLoc.baroAlt,
             lux = update.lux ?: currentLoc.lux,
             isNear = update.isNear ?: currentLoc.isNear,
-            isSuspicious = update.isSuspicious,
             isTamperDetected = update.isTamperDetected,
             isPowerTamper = update.isPowerTamper,
-            isSitDetected = update.isSitDetected,
-            lastSitTs = update.lastSitTs,
-            verticalVelocity = update.verticalVelocity ?: currentLoc.verticalVelocity,
-            sitVz = update.sitVz ?: currentLoc.sitVz,
-            sitDz = update.sitDz ?: currentLoc.sitDz,
-            sitBaro = update.sitBaro ?: currentLoc.sitBaro,
-            sitTilt = update.sitTilt ?: currentLoc.sitTilt,
-            sitShock = update.sitShock ?: currentLoc.sitShock,
             micPending = update.micPending,
             peakVibrationShock = update.peakVibrationShock ?: currentLoc.peakVibrationShock,
             peakVibrationShockTs = update.peakVibrationShockTs ?: currentLoc.peakVibrationShockTs,
@@ -175,10 +146,9 @@ class TelemetryUseCase @Inject constructor(
             standbyBucket = update.standbyBucket, netInterface = update.netInterface,
             isStorageLow = update.isStorageLow, isStorageCritical = update.isStorageCritical,
             gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail,
-            snrIdx = update.snrIdx,
+            isBatterySteepDischarge = update.isBatterySteepDischarge,
             isCoolingModeActive = update.isCoolingModeActive,
             currentMa = update.currentMa,
-            isAnchorLocked = update.isAnchorLocked,
             trackerState = update.trackerState
         )
     }
@@ -193,6 +163,21 @@ class TelemetryUseCase @Inject constructor(
             totalDropMs = update.totalDropMs ?: currentStats.totalDropMs, 
             maxDropMs = update.maxDropMs ?: currentStats.maxDropMs,
             maxDropTs = update.maxDropTs ?: currentStats.maxDropTs
+        )
+    }
+
+    fun mapStatsFromStatus(status: TrackerStatus, currentStats: StatsState): StatsState {
+        return currentStats.copy(
+            totalConnectedMs = status.totalConnectedMs,
+            sessionConnectedMs = status.sessionConnectedMs,
+            lastConnTs = status.lastConnTs,
+            lastDiscTs = status.lastDiscTs,
+            uptimeMs = status.uptimeMs,
+            totalDropMs = status.totalDropMs,
+            maxDropMs = status.maxDropMs,
+            maxDropTs = status.maxDropTs,
+            violationUptimeMs = status.violationUptimeMs,
+            violationPercentage = status.violationPercentage
         )
     }
 

@@ -10,11 +10,11 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted, hindsight flags, and corrected TrailPoint.
- * July.1.12:
- * - Protocol Optimization: Migrated to Enum-based binary serialization for 
- *   tracker state and pending reasons to further reduce heartbeat footprint.
+ * July.1.16:
+ * - Issue #512: Consolidate Sentinel Statuses. Removed isSuspicious and isJump (derived from status).
+ * - Issue #510: Abandoned Chair Sit Detection. Removed all sit-related fields.
+ * - Issue #515: Stationary Anchor Removal. Removed isAnchorLocked.
+ * - Issue #508: Optimization Removal. Removed Adaptation Muzzle flags.
  */
 
 @Serializable
@@ -29,7 +29,7 @@ data class TrailPoint(
     val lat: Double,
     val lng: Double,
     val timestamp: Long = 0L,
-    val isJump: Boolean = false,
+    val status: SentinelStatus = SentinelStatus.VALID,
     val accuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0
 ) {
@@ -70,7 +70,6 @@ data class AlertSettings(
     val acousticAlert: Boolean = true,
     val liftAlert: Boolean = true,
     val tamperAlert: Boolean = true,
-    val chairOccupied: Boolean = true,
     val globalMute: Boolean = false,
     val systemStorageLow: Boolean = true
 )
@@ -81,23 +80,13 @@ data class ConnectionPoint(
     val isConnected: Boolean, val isGap: Boolean = false, 
     val gpsAccuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0,
-    val isTick: Boolean = false, val hasGps: Boolean = false, val gpsIndex: Double = 0.0,
-    val noiseIdx: Double = 0.0, val luxIdx: Double = 0.0, val vibeIdx: Double = 0.0, val proxIdx: Double = 1.0,
-    val liftIdx: Double = 0.0, val snrIdx: Double = 0.0,
-    val tiltIdx: Double = 0.0, val baroIdx: Double = 0.0,
-    val verticalVelocity: Double = 0.0,
-    val sitVz: Double = 0.0, val sitVzTs: Long = 0L, val sitDz: Double = 0.0,
+    val isTick: Boolean = false, val hasGps: Boolean = false,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
     val speed: Double = 0.0, val bearing: Double = 0.0,
-    val isSitDetected: Boolean = false,
-    val isSitActive: Boolean = false,
-    val sitBaro: Double = 0.0,
-    val sitTilt: Double = 0.0,
-    val sitShock: Double = 0.0,
     val currentMa: Int = 0,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val isAnchorLocked: Boolean = false
+    val status: SentinelStatus = SentinelStatus.VALID,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
 )
 
 data class ViolationPoint(
@@ -217,17 +206,9 @@ data class TrackerStatus(
     val isPowerTamper: Boolean = false,
     val violationUptimeMs: Long = 0L,
     val violationPercentage: Double = 0.0,
-    val isSitDetected: Boolean = false,
-    val isSitActive: Boolean = false,
-    val lastSitTs: Long = 0L,
-    val verticalVelocity: Double = 0.0,
-    val sitVz: Double = 0.0,
-    val sitVzTs: Long = 0L,
-    val sitDz: Double = 0.0,
-    val sitBaro: Double = 0.0,
-    val sitTilt: Double = 0.0,
-    val sitShock: Double = 0.0,
-    val isSuspicious: Boolean = false,
+    val status: SentinelStatus = SentinelStatus.VALID,
+    val isJammer: Boolean = false,
+    val isStalled: Boolean = false,
     val isTamperDetected: Boolean = false,
     val vibration: Double = 0.0,
     val heading: Double = 0.0,
@@ -244,9 +225,6 @@ data class TrackerStatus(
     val proximityDebounceMs: Long = 0L,
     val vibrationRollingSum: Double = 0.0,
     val isClockRegression: Boolean = false,
-    val isStalled: Boolean = false,
-    val isJammer: Boolean = false,
-    val isJump: Boolean = false,
     val jumpTier: Int = 0,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
@@ -257,12 +235,8 @@ data class TrackerStatus(
     val isStorageLow: Boolean = false,
     val isStorageCritical: Boolean = false,
     val gnssDetail: GnssDetail? = null,
-    val snrIdx: Double = 0.0,
-    val tiltIdx: Double = 0.0,
-    val baroIdx: Double = 0.0,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val isAnchorLocked: Boolean = false,
     val trackerState: TrackerState = TrackerState.UNKNOWN
 ) : SpatialAnchor {
     fun toJSONObject(fromViewer: Boolean): JSONObject {
@@ -299,17 +273,9 @@ data class TrackerStatus(
             put("is_power_tamper", isPowerTamper)
             put("violation_uptime_ms", violationUptimeMs)
             put("violation_percentage", violationPercentage)
-            put("is_sit_detected", isSitDetected)
-            put("is_sit_active", isSitActive)
-            put("last_sit_ts", lastSitTs)
-            put("vertical_velocity", verticalVelocity)
-            put("sit_vz", sitVz)
-            put("sit_vz_ts", sitVzTs)
-            put("sit_dz", sitDz)
-            put("sit_baro", sitBaro)
-            put("sit_tilt", sitTilt)
-            put("sit_shock", sitShock)
-            put("is_suspicious", isSuspicious)
+            put("status", status.name)
+            put("is_jammer", isJammer)
+            put("is_stalled", isStalled)
             put("is_tamper_detected", isTamperDetected)
             put("vibration", vibration)
             put("heading", heading)
@@ -320,15 +286,12 @@ data class TrackerStatus(
             put("is_near", isNear)
             put("lux_baseline", luxBaseline)
             put("acoustic_floor_db", acousticFloorDb)
-            put("adaptive_vibration_floor", adaptiveVibrationFloor)
+            put("adaptiveVibrationFloor", adaptiveVibrationFloor)
             put("prox_idx", proxIdx)
             put("proximity_cm", proximityCm)
             put("proximity_debounce_ms", proximityDebounceMs)
             put("vibration_rolling_sum", vibrationRollingSum)
             put("is_clock_regression", isClockRegression)
-            put("is_stalled", isStalled)
-            put("is_jammer", isJammer)
-            put("is_jump", isJump)
             put("jump_tier", jumpTier)
             put("is_location_pending", isLocationPending)
             put("location_pending_reason", locationPendingReason.name)
@@ -338,12 +301,8 @@ data class TrackerStatus(
             put("net_interface", netInterface)
             put("is_storage_low", isStorageLow)
             put("is_storage_critical", isStorageCritical)
-            put("snr_idx", snrIdx)
-            put("tilt_idx", tiltIdx)
-            put("baro_idx", baroIdx)
             put("is_battery_steep_discharge", isBatterySteepDischarge)
-            put("is_cooling_mode_active", isCoolingModeActive)
-            put("is_anchor_locked", isAnchorLocked)
+            put("is_cooling_modeActive", isCoolingModeActive)
             put("tracker_state", trackerState.name)
         }
     }
@@ -375,7 +334,6 @@ data class TrackerStatus(
             .setLastConnTs(lastConnTs)
             .setLastDiscTs(lastDiscTs)
             .setState(mapTrackerStateToProto(trackerState))
-            .setIsAnchorLocked(isAnchorLocked)
             .setIsLocationPending(isLocationPending)
             .setPendingReason(mapPendingReasonToProto(locationPendingReason))
             .setLastValidFixRealtime(lastValidFixRealtime)
@@ -440,8 +398,7 @@ data class LocationState(
     val bearing: Double = 0.0,
     val timestamp: Long = 0L,
     val telemetryTs: Long = 0L, 
-    val isVisualJump: Boolean = false,
-    val jumpTier: Int = 0,
+    val status: SentinelStatus = SentinelStatus.VALID,
     val isJammer: Boolean = false,
     val isStalled: Boolean = false,
     val vibration: Double = 0.0,
@@ -451,7 +408,6 @@ data class LocationState(
     val baroAlt: Double = 0.0,
     val lux: Double = 0.0,
     val isNear: Boolean = true,
-    val isSuspicious: Boolean = false,
     val isTamperDetected: Boolean = false,
     val peakVibrationShock: Double = 0.0,
     val peakVibrationShockTs: Long = 0L,
@@ -466,14 +422,6 @@ data class LocationState(
     val isPowerTamper: Boolean = false,
     val violationUptimeMs: Long = 0L,
     val violationPercentage: Double = 0.0,
-    val isSitDetected: Boolean = false,
-    val isSitActive: Boolean = false,
-    val lastSitTs: Long = 0L,
-    val verticalVelocity: Double = 0.0,
-    val sitVz: Double = 0.0, val sitVzTs: Long = 0L, val sitDz: Double = 0.0,
-    val sitBaro: Double = 0.0,
-    val sitTilt: Double = 0.0,
-    val sitShock: Double = 0.0,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
@@ -484,13 +432,9 @@ data class LocationState(
     val isStorageLow: Boolean = false,
     val isStorageCritical: Boolean = false,
     val gnssDetail: GnssDetail? = null,
-    val snrIdx: Double = 0.0,
-    val tiltIdx: Double = 0.0,
-    val baroIdx: Double = 0.0,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
     val currentMa: Int = 0,
-    val isAnchorLocked: Boolean = false,
     val trackerState: TrackerState = TrackerState.UNKNOWN
 )
 
@@ -520,6 +464,7 @@ data class DashboardState(
     val viewerTemp: String = "--",
     val viewerMaxTemp: String = "--",
     val trackerState: TrackerState = TrackerState.UNKNOWN,
+    val status: SentinelStatus = SentinelStatus.VALID,
     val vibration: String = "--",
     val heading: String = "--",
     val lat: String = "--",
@@ -533,10 +478,7 @@ data class DashboardState(
     val proximityDebounce: String = "--",
     val rollingVibration: String = "--",
     val gpsSpeed: String = "--",     
-    val isSuspicious: Boolean = false,
     val isTamperDetected: Boolean = false,
-    val isSitDetected: Boolean = false,
-    val lastSitTs: Long = 0L,
     val peakShock: String = "--",
     val luxBaseline: String = "--",
     val acousticFloor: String = "--",
@@ -545,10 +487,7 @@ data class DashboardState(
     val isPowerTamper: Boolean = false,
     val violationUptime: String = "00:00:00",
     val violationPercentage: String = "0.0%",
-    val lastChairSit: String = "--",
     val engineVersion: String = "--",
-    val plungeSpeed: String = "--",
-    val chairForensics: String = "--",
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isPowerSaveMode: Boolean = false,
@@ -566,8 +505,7 @@ data class DashboardState(
     val isLinkVisible: Boolean = true,   
     val isBatterySteepDischarge: Boolean = false, 
     val isCoolingModeActive: Boolean = false,
-    val currentMa: String = "--",
-    val isAnchorLocked: Boolean = false
+    val currentMa: String = "--"
 )
 
 sealed class UiEvent {
@@ -611,8 +549,6 @@ sealed class UiEvent {
     data class SetDeviceId(val id: String) : UiEvent()
     data class SetViewerId(val id: String) : UiEvent()
     data class SetRelayUrl(val url: String) : UiEvent()
-    data class SetJammerSuspicion(val isJammer: Boolean) : UiEvent()
-    data class SetSignalLoss(val isSignalLoss: Boolean) : UiEvent()
     data class UpdateDraftDeviceId(val id: String) : UiEvent()
     data class UpdateDraftViewerId(val id: String) : UiEvent()
     data class UpdateDraftRelayUrl(val url: String) : UiEvent()
@@ -626,7 +562,8 @@ sealed class UiEvent {
     data class ToggleAlertsSetup(val visible: Boolean) : UiEvent()
     data class ToggleAlarmSoundSetup(val visible: Boolean) : UiEvent()
     object ToggleTestSiren : UiEvent()
-    object CalibrateChair : UiEvent()
+    data class SetJammerSuspicion(val isJammer: Boolean) : UiEvent()
+    data class SetSignalLoss(val isSignalLoss: Boolean) : UiEvent()
     data class BulkUpdateSettings(
         val deviceId: String? = null,
         val viewerId: String? = null,
@@ -658,7 +595,6 @@ sealed class UiCommand {
     object ZoomIn : UiCommand()
     object ZoomOut : UiCommand()
     object FullInitializationReset : UiCommand()
-    object CalibrateChair : UiCommand()
     object TriggerTestAlarm : UiCommand()
     object TriggerForensicTest : UiCommand()
     object MapZoomIn : UiCommand()
@@ -666,23 +602,16 @@ sealed class UiCommand {
 }
 
 data class IntegrityState(
-    val signalLoss: Boolean = false, val gpsStalled: Boolean = false, val jammerSuspicion: Boolean = false,
+    val signalLoss: Boolean = false, val gpsStalled: Boolean = false,
     val localInternetLoss: Boolean = false, val isHardwareOnline: Boolean = true, val batteryLevel: Int = 100,
     val batteryTemp: Double = 0.0, val maxTemp: Double = 0.0, val isCharging: Boolean = false, val currentMa: Int = 0,
     val activeAlarmsJson: String? = null,
-    val isSuspicious: Boolean = false,
+    val status: SentinelStatus = SentinelStatus.VALID,
+    val isJammer: Boolean = false,
+    val isStalled: Boolean = false,
     val isTamperDetected: Boolean = false,
     val micPending: Boolean = false,
     val isPowerTamper: Boolean = false,
-    val isSitDetected: Boolean = false,
-    val isSitActive: Boolean = false,
-    val lastSitTs: Long = 0L,
-    val sitVz: Double = 0.0,
-    val sitVzTs: Long = 0L,
-    val sitDz: Double = 0.0,
-    val sitBaro: Double = 0.0,
-    val sitTilt: Double = 0.0,
-    val sitShock: Double = 0.0,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
@@ -693,10 +622,7 @@ data class IntegrityState(
     val isStorageLow: Boolean = false,
     val isStorageCritical: Boolean = false,
     val isBatterySteepDischarge: Boolean = false, 
-    val isCoolingModeActive: Boolean = false,
-    val tiltIdx: Double = 0.0,
-    val baroIdx: Double = 0.0,
-    val isAnchorLocked: Boolean = false
+    val isCoolingModeActive: Boolean = false
 )
 
 data class StatsState(
@@ -719,16 +645,14 @@ data class ConnectivityState(
 data class IntegrityStateUi(
     val signalLoss: Boolean = false,
     val gpsStalled: Boolean = false,
-    val jammerSuspicion: Boolean = false,
     val localInternetLoss: Boolean = false,
     val isHardwareOnline: Boolean = true,
-    val isSuspicious: Boolean = false,
+    val status: SentinelStatus = SentinelStatus.VALID,
+    val isJammer: Boolean = false,
+    val isStalled: Boolean = false,
     val isTamperDetected: Boolean = false,
     val micPending: Boolean = false,
     val isPowerTamper: Boolean = false,
-    val isSitDetected: Boolean = false,
-    val isSitActive: Boolean = false,
-    val lastSitTs: Long = 0L,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
@@ -740,8 +664,5 @@ data class IntegrityStateUi(
     val isStorageCritical: Boolean = false,
     val isBatterySteepDischarge: Boolean = false, 
     val isCoolingModeActive: Boolean = false,
-    val currentMa: Int = 0,
-    val tiltIdx: Double = 0.0,
-    val baroIdx: Double = 0.0,
-    val isAnchorLocked: Boolean = false
+    val currentMa: Int = 0
 )

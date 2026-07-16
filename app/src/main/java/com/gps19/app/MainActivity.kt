@@ -13,18 +13,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
- * v9.4.0:
- * - Issue #502: Device Independency. Genericized hardware permission handling.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual DI transition.
  */
-@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels()
+    private val viewModel: MainViewModel by viewModels {
+        MainViewModelFactory(this, (application as GpsApplication).container)
+    }
+
     private val cachedPkgName by lazy { packageName }
 
     private val requestPermissionLauncher = registerForActivityResult(

@@ -4,11 +4,9 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
- * v9.3.26:
- * - ANR Hardening (#092): Added MAX_BACKFILL_POINTS (1000) cap to loops to 
- *   prevent main thread hangs during cold-starts with stale timestamps.
- * v9.3.18:
- * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
+ * July.1.16:
+ * - Issue #510: Abandoned Chair Sit Detection. Removed sit-related fields.
+ * - Issue #511: Simplify Ribbon Telemetry.
  */
 class TelemetryAggregator {
 
@@ -27,28 +25,12 @@ class TelemetryAggregator {
             remoteSig = min(acc.remoteSig, cur.remoteSig),
             isConnected = acc.isConnected && cur.isConnected,
             hasGps = acc.hasGps && cur.hasGps,
-            gpsIndex = min(acc.gpsIndex, cur.gpsIndex),
             accuracy = max(acc.accuracy, cur.accuracy),
             maxAccuracy = max(acc.maxAccuracy, cur.maxAccuracy),
-            noiseIdx = max(acc.noiseIdx, cur.noiseIdx),
-            luxIdx = max(acc.luxIdx, cur.luxIdx),
-            vibeIdx = max(acc.vibeIdx, cur.vibeIdx),
-            proxIdx = min(acc.proxIdx, cur.proxIdx),
-            liftIdx = max(acc.liftIdx, cur.liftIdx),
-            snrIdx = min(acc.snrIdx, cur.snrIdx),
-            tiltIdx = max(acc.tiltIdx, cur.tiltIdx),
-            baroIdx = max(acc.baroIdx, cur.baroIdx),
-            sitVz = if (abs(cur.sitVz) > abs(acc.sitVz)) cur.sitVz else acc.sitVz,
-            sitDz = if (abs(cur.sitDz) > abs(acc.sitDz)) cur.sitDz else acc.sitDz,
-            sitBaro = if (abs(cur.sitBaro) > abs(acc.sitBaro)) cur.sitBaro else acc.sitBaro,
-            sitTilt = if (abs(cur.sitTilt) > abs(acc.sitTilt)) cur.sitTilt else acc.sitTilt,
-            sitShock = max(acc.sitShock, cur.sitShock),
             isBatterySteepDischarge = acc.isBatterySteepDischarge || cur.isBatterySteepDischarge,
             isCoolingModeActive = acc.isCoolingModeActive || cur.isCoolingModeActive,
             speed = max(acc.speed, cur.speed),
             bearing = if (cur.hasGps) cur.bearing else acc.bearing,
-            isSitDetected = acc.isSitDetected || cur.isSitDetected,
-            isSitActive = acc.isSitActive || cur.isSitActive,
             currentMa = min(acc.currentMa, cur.currentMa),
             locationPendingReason = getHigherPriorityReason(acc.locationPendingReason, cur.locationPendingReason)
         )
@@ -107,7 +89,6 @@ class TelemetryAggregator {
         now: Long,
         snrSamples: List<EngineSnrSample>,
         sensorSamples: List<EngineSensorSnapshot>,
-        acousticFloor: Double,
         baseTemplate: EngineConnectionPoint
     ): List<Pair<RibbonScale, EngineConnectionPoint>> {
         val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
@@ -117,31 +98,9 @@ class TelemetryAggregator {
         while (fillTs < now && pointsGenerated < MAX_BACKFILL_POINTS) {
             val totalSeconds = (fillTs / TICK_INTERVAL_MS).toInt()
             
-            val resolvedSnr = snrSamples.find { it.ts in fillTs..(fillTs + TICK_INTERVAL_MS - 1) }?.snr?.let { (it / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) } ?: baseTemplate.snrIdx
-            val snapshot = sensorSamples.find { it.ts in fillTs..(fillTs + TICK_INTERVAL_MS - 1) }
-            
-            val resolvedNoise = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: baseTemplate.noiseIdx
-            val resolvedLux = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: baseTemplate.luxIdx
-            val resolvedVibe = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: baseTemplate.vibeIdx
-            val resolvedProx = snapshot?.proxIdx ?: baseTemplate.proxIdx
-            val resolvedLift = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.liftIdx
-            val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: baseTemplate.tiltIdx
-            val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.baroIdx
-            
-            val resolvedSit = snapshot?.isSitDetected ?: false
-
             val fillPoint = baseTemplate.copy(
                 ts = fillTs,
                 isGap = false,
-                noiseIdx = resolvedNoise,
-                luxIdx = resolvedLux,
-                vibeIdx = resolvedVibe,
-                proxIdx = resolvedProx,
-                liftIdx = resolvedLift,
-                snrIdx = resolvedSnr,
-                tiltIdx = resolvedTilt,
-                baroIdx = resolvedBaro,
-                isSitDetected = resolvedSit,
                 currentMa = baseTemplate.currentMa,
                 locationPendingReason = baseTemplate.locationPendingReason
             )
@@ -161,9 +120,7 @@ class TelemetryAggregator {
         intervalSeconds: Int,
         lastTickTs: Long,
         now: Long,
-        snrSamples: List<EngineSnrSample>,
-        sensorSamples: List<EngineSensorSnapshot>,
-        acousticFloor: Double
+        sensorSamples: List<EngineSensorSnapshot>
     ): List<EngineConnectionPoint> {
         val intervalMs = intervalSeconds * TICK_INTERVAL_MS
         val maxGapMs = intervalMs * 240
@@ -178,33 +135,6 @@ class TelemetryAggregator {
         while (currentTs < now && pointsGenerated < MAX_BACKFILL_POINTS) {
             val totalSeconds = (currentTs / TICK_INTERVAL_MS).toInt()
             
-            val samplesInInterval = snrSamples.filter { it.ts in currentTs..(currentTs + intervalMs - 1) }
-            val resolvedSnr = if (samplesInInterval.isNotEmpty()) {
-                samplesInInterval.minOf { it.snr }.let { (it / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) }
-            } else 0.0
-            
-            val snapshotsInInterval = sensorSamples.filter { it.ts in currentTs..(currentTs + intervalMs - 1) }
-            val resolvedNoise = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.acoustic }.let { ((it - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) }
-            } else 0.0
-            val resolvedLux = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.lux }.let { (log10(it + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) }
-            } else 0.0
-            val resolvedVibe = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.vibe }.let { (it / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) }
-            } else 0.0
-            val resolvedProx = if (snapshotsInInterval.isNotEmpty()) snapshotsInInterval.minOf { it.proxIdx } else 1.0
-            val resolvedLift = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.lift }.let { (it / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) }
-            } else 0.0
-            val resolvedTilt = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.tilt }.let { (it / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) }
-            } else 0.0
-            val resolvedBaro = if (snapshotsInInterval.isNotEmpty()) {
-                snapshotsInInterval.maxOf { it.lift }.let { (it / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) }
-            } else 0.0
-            val resolvedSit = snapshotsInInterval.any { it.isSitDetected }
-
             gapPoints.add(EngineConnectionPoint(
                 ts = currentTs,
                 rtt = 0,
@@ -212,16 +142,6 @@ class TelemetryAggregator {
                 isConnected = false,
                 isGap = true,
                 isTick = isScaleTick(getScaleByKey(ribbonKey), totalSeconds),
-                noiseIdx = resolvedNoise,
-                luxIdx = resolvedLux,
-                vibeIdx = resolvedVibe,
-                proxIdx = resolvedProx,
-                liftIdx = resolvedLift,
-                snrIdx = resolvedSnr,
-                tiltIdx = resolvedTilt,
-                baroIdx = resolvedBaro,
-                isSitDetected = resolvedSit,
-                isSitActive = false,
                 currentMa = 0,
                 locationPendingReason = LocationPendingReason.NONE
             ))

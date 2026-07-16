@@ -7,22 +7,16 @@ import android.content.Intent
 import android.os.Build
 import android.os.PowerManager
 import com.gps19.core.engine.*
-import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
- * v9.3.25:
- * - R996: Logcat Forensic Integrity. Throttled WakeLock renewal to 5 minutes 
- *   to eliminate repetitive getPackageName() system logs on Samsung devices.
- * - Issue #058: Hilt Migration. Added @Inject constructor.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual dependency injection.
  */
-@Singleton
-class SystemMonitor @Inject constructor(
-    @ApplicationContext private val context: Context, 
+class SystemMonitor(
+    private val context: Context,
     private val timeProvider: TimeProvider
 ) {
     private var onLogWatchdog: ((Boolean, Int) -> Unit)? = null

@@ -47,12 +47,8 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed hindsight-corrected trail rendering logic.
- * July.1.12:
- * - Issue #078: Implemented MapFollowMode awareness in centering lock logic.
- * - Issue #072 Clock Skew Hardening: Transitioned map freshness calculations 
- *   to a Receipt-Time Authority model.
+ * July.1.16:
+ * - Issue #515: Stationary Anchor Removal.
  */
 
 @Composable
@@ -96,7 +92,6 @@ fun AppMapContainer(
     val trackerLastValidFixRealtime = trackerLoc.lastValidFixRealtime
     val trackerLocationPending = trackerLoc.isLocationPending
     val trackerLocationPendingReason = trackerLoc.locationPendingReason
-    val trackerIsAnchorLocked = trackerLoc.isAnchorLocked
 
     val viewerLat = viewerLoc.lat; val viewerLng = viewerLoc.lng
     val viewerBearing = viewerLoc.bearing; val viewerAccuracy = viewerLoc.accuracy
@@ -124,19 +119,10 @@ fun AppMapContainer(
             accuracy = trackerAccuracy, maxAcc = trackerMaxAcc, speed = trackerSpeed, myAccuracy = viewerAccuracy, myMaxAcc = viewerMaxAcc, mySpeed = viewerSpeed,
             initialCenter = initialCenter, centeringTrackerTrigger = uiState.centeringTrackerTrigger, centeringViewerTrigger = uiState.centeringViewerTrigger,
             zoomInTrigger = uiState.zoomInTrigger, zoomOutTrigger = uiState.zoomOutTrigger, lastGpsTs = trackerLoc.timestamp, isTrackerMode = isTrackerMode,
-            isLocked = uiState.isMapLocked, mapFollowMode = uiState.mapFollowMode, onLockChange = { onEvent(UiEvent.SetMapLocked(it)) }, mapViewRef = mapViewRef, geofenceMode = uiState.geofenceMode,
+            isLocked = uiState.isMapLocked, mapFollowMode = uiState.mapFollowMode, onLockChange = { onLockChangeInternal(it, onEvent) }, mapViewRef = mapViewRef, geofenceMode = uiState.geofenceMode,
             systemPulse = now, systemPulseRealtime = systemPulseRealtime, isLocationPending = trackerLocationPending, locationPendingReason = trackerLocationPendingReason,
             lastValidFixRealtime = trackerLastValidFixRealtime, isMeLocationPending = viewerLocationPending, meLocationPendingReason = viewerLocationPendingReason, meLastValidFixRealtime = viewerLastValidFixRealtime
         )
-
-        if (trackerIsAnchorLocked) {
-            Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp).background(BrandJd, RoundedCornerShape(4.dp)).border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Lock, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp)); Text("ANCHOR LOCKED", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black)
-                }
-            }
-        }
 
         Text(text = BuildConfig.VERSION_NAME, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 4.dp, bottom = 2.dp).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(2.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
 
@@ -164,6 +150,10 @@ fun AppMapContainer(
             }
         }
     }
+}
+
+private fun onLockChangeInternal(locked: Boolean, onEvent: (UiEvent) -> Unit) {
+    onEvent(UiEvent.SetMapLocked(locked))
 }
 
 @Composable
@@ -407,16 +397,16 @@ private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints:
     while (startIdx < trailPoints.size) {
         val segmentPoints = mutableListOf<GeoPoint>(); var currentIdx = startIdx
         while (currentIdx < trailPoints.size) {
-            val pt = trailPoints[currentIdx]; if (pt.isJump && currentIdx > startIdx) break
+            val pt = trailPoints[currentIdx]; if (pt.status != SentinelStatus.VALID && currentIdx > startIdx) break
             segmentPoints.add(pt.toGeoPoint()); currentIdx++
-            if (pt.isJump) { startIdx = currentIdx; break }
+            if (pt.status != SentinelStatus.VALID) { startIdx = currentIdx; break }
         }
         if (segmentPoints.size > 1) {
             val line = if (poolIdx < pool.size) pool[poolIdx] else Polyline(view).also { l -> l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); pool.add(l) }
             line.setPoints(segmentPoints); line.outlinePaint.color = color; folder.add(line); poolIdx++
         }
         if (currentIdx == trailPoints.size) break
-        startIdx = if (startIdx < currentIdx) (if (!trailPoints[currentIdx - 1].isJump) currentIdx - 1 else currentIdx) else startIdx + 1
+        startIdx = if (startIdx < currentIdx) (if (trailPoints[currentIdx - 1].status == SentinelStatus.VALID) currentIdx - 1 else currentIdx) else startIdx + 1
     }
     return poolIdx
 }

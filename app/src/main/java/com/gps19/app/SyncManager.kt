@@ -2,24 +2,17 @@ package com.gps19.app
 
 import android.content.Context
 import com.gps19.core.engine.*
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * SyncManager: Handles the telemetry synchronization loop.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted.
- * July.1.12:
- * - Issue #058: Hilt Migration. Added @Inject constructor and start/stop lifecycle management.
+ * v9.5.0: Hilt removed. Manual DI transition.
  */
-@Singleton
-class SyncManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+class SyncManager(
+    private val context: Context,
     private val networkManager: AppNetworkManager,
     private val sessionManager: SessionManager,
     private val gpsManager: GpsManager,
@@ -81,22 +74,21 @@ class SyncManager @Inject constructor(
     suspend fun pushCurrentStatus(
         deviceId: String, viewerId: String, isTrackerMode: Boolean, loc: android.location.Location?, filtered: EngineGeoPoint?,
         distToTracker: Double?, distToHome: Double?, maxAccuracy: Double, filteredSpeed: Double,
-        vibration: Double, heading: Double, baroAlt: Double, lux: Double, isNear: Boolean, isSuspicious: Boolean,
-        tiltDegrees: Double, acousticDb: Double, isJump: Boolean, jumpTier: Int,
-        isJammer: Boolean, isStalledRaw: Boolean, isStalledActive: Boolean, peakShock: Double, peakShockTs: Long,
+        vibration: Double, heading: Double, baroAlt: Double, lux: Double, isNear: Boolean,
+        tiltDegrees: Double, acousticDb: Double, jumpTier: Int,
+        isJammer: Boolean, isStalled: Boolean, peakShock: Double, peakShockTs: Long,
         luxBaseline: Double, acousticFloorDb: Double, adaptiveVibrationFloor: Double, proxIdx: Double, proximityCm: Double,
         proximityDebounceMs: Long, vibrationRollingSum: Double,
-        micPending: Boolean, isTamperDetected: Boolean, isPowerTamper: Boolean, isSitDetected: Boolean, isSitActive: Boolean,
-        lastSitTs: Long, receiptRealtime: Long, violationUptimeMs: Long, violationPercentage: Double,
-        verticalVelocity: Double, sitVz: Double, sitDz: Double, sitBaro: Double, sitTilt: Double, sitShock: Double,
+        isTamperDetected: Boolean, isPowerTamper: Boolean,
+        receiptRealtime: Long, violationUptimeMs: Long, violationPercentage: Double,
         isClockRegression: Boolean, isLocationPending: Boolean, locationPendingReason: LocationPendingReason,
-        lastValidFixRealtime: Long, gnssDetail: GnssDetail?, snrIdx: Double, tiltIdx: Double, baroIdx: Double,
+        lastValidFixRealtime: Long, gnssDetail: GnssDetail?,
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
         batteryLevel: Int, batteryTemp: Double, isCharging: Boolean,
-        isAnchorLocked: Boolean = false,
-        trackerState: TrackerState = TrackerState.UNKNOWN
+        trackerState: TrackerState = TrackerState.UNKNOWN,
+        status: SentinelStatus = SentinelStatus.VALID
     ) {
-        val status = TrackerStatus(
+        val trackerStatus = TrackerStatus(
             deviceId = deviceId,
             viewerId = viewerId,
             ts = timeProvider.currentTimeMillis(),
@@ -112,13 +104,11 @@ class SyncManager @Inject constructor(
             baroAlt = baroAlt,
             lux = lux,
             isNear = isNear,
-            isSuspicious = isSuspicious,
             tiltDegrees = tiltDegrees,
             acousticDb = acousticDb,
-            isJump = isJump,
             jumpTier = jumpTier,
             isJammer = isJammer,
-            isStalled = isStalledActive,
+            isStalled = isStalled,
             peakVibrationShock = peakShock,
             peakVibrationShockTs = peakShockTs,
             luxBaseline = luxBaseline,
@@ -130,78 +120,55 @@ class SyncManager @Inject constructor(
             vibrationRollingSum = vibrationRollingSum,
             isTamperDetected = isTamperDetected,
             isPowerTamper = isPowerTamper,
-            isSitDetected = isSitDetected,
-            isSitActive = isSitActive,
-            lastSitTs = lastSitTs,
             violationUptimeMs = violationUptimeMs,
             violationPercentage = violationPercentage,
-            verticalVelocity = verticalVelocity,
-            sitVz = sitVz,
-            sitDz = sitDz,
-            sitBaro = sitBaro,
-            sitTilt = sitTilt,
-            sitShock = sitShock,
+            status = status,
             isClockRegression = isClockRegression,
             isLocationPending = isLocationPending,
             locationPendingReason = locationPendingReason,
             lastValidFixRealtime = lastValidFixRealtime,
-            snrIdx = snrIdx,
-            tiltIdx = tiltIdx,
-            baroIdx = baroIdx,
             isBatterySteepDischarge = isBatterySteepDischarge,
             isCoolingModeActive = isCoolingModeActive,
             gnssDetail = gnssDetail,
             battery = batteryLevel,
             temp = batteryTemp,
             isCharging = isCharging,
-            isAnchorLocked = isAnchorLocked,
             trackerState = trackerState
         )
 
-        val success = networkManager.sendTelemetry(status)
+        val success = networkManager.sendTelemetry(trackerStatus)
         
         if (isTrackerMode) {
-            repository.saveTrackerState(status)
+            repository.saveTrackerState(trackerStatus)
             
             if (!success) {
                 offlineRepository.addPendingStatusUpdate(PendingStatusEntity(
-                    lat = status.lat,
-                    lng = status.lng,
-                    speed = status.speed,
-                    accuracy = status.accuracy,
-                    bearing = status.bearing,
-                    battery = status.battery,
-                    temp = status.temp,
-                    isCharging = status.isCharging,
-                    timestamp = status.ts,
+                    lat = trackerStatus.lat,
+                    lng = trackerStatus.lng,
+                    speed = trackerStatus.speed,
+                    accuracy = trackerStatus.accuracy,
+                    bearing = trackerStatus.bearing,
+                    battery = trackerStatus.battery,
+                    temp = trackerStatus.temp,
+                    isCharging = trackerStatus.isCharging,
+                    timestamp = trackerStatus.ts,
                     gpsTs = loc?.time ?: 0L,
-                    satsView = status.gnssDetail?.satellites?.size ?: 0,
-                    satsUsed = status.gnssDetail?.satellites?.count { it.usedInFix } ?: 0,
-                    maxAccuracy = status.maxAccuracy,
+                    satsView = trackerStatus.gnssDetail?.satellites?.size ?: 0,
+                    satsUsed = trackerStatus.gnssDetail?.satellites?.count { it.usedInFix } ?: 0,
+                    maxAccuracy = trackerStatus.maxAccuracy,
                     distToTracker = distToTracker,
                     distToHome = distToHome,
-                    snrIdx = status.snrIdx,
-                    tiltIdx = status.tiltIdx,
-                    baroIdx = status.baroIdx,
-                    isBatterySteepDischarge = status.isBatterySteepDischarge,
-                    isCoolingModeActive = status.isCoolingModeActive,
-                    isSitDetected = status.isSitDetected,
-                    isSitActive = status.isSitActive,
-                    sitVz = status.sitVz,
-                    sitDz = status.sitDz,
-                    verticalVelocity = status.verticalVelocity,
-                    sitBaro = status.sitBaro,
-                    sitTilt = status.sitTilt,
-                    sitShock = status.sitShock,
+                    isBatterySteepDischarge = trackerStatus.isBatterySteepDischarge,
+                    isCoolingModeActive = trackerStatus.isCoolingModeActive,
                     isStorageLow = telemetryRepository.integrityState.value.isStorageLow,
                     isStorageCritical = telemetryRepository.integrityState.value.isStorageCritical,
                     isPowerSaveMode = telemetryRepository.integrityState.value.isPowerSaveMode,
-                    standbyBucket = status.standbyBucket,
-                    netInterface = status.netInterface,
-                    lastValidFixRealtime = status.lastValidFixRealtime,
-                    locationPendingReason = status.locationPendingReason.name,
-                    isAnchorLocked = status.isAnchorLocked,
-                    trackerState = status.trackerState.name
+                    standbyBucket = trackerStatus.standbyBucket,
+                    netInterface = trackerStatus.netInterface,
+                    lastValidFixRealtime = trackerStatus.lastValidFixRealtime,
+                    locationPendingReason = trackerStatus.locationPendingReason.name,
+                    trackerState = trackerStatus.trackerState.name,
+                    status = trackerStatus.status.name
                 ))
             }
         }
@@ -228,10 +195,8 @@ class SyncManager @Inject constructor(
                 baroAlt = 0.0,
                 lux = 0.0,
                 isNear = true,
-                isSuspicious = false,
                 tiltDegrees = 0.0,
                 acousticDb = 0.0,
-                isJump = false,
                 jumpTier = 0,
                 isJammer = false,
                 isStalled = false,
@@ -239,27 +204,15 @@ class SyncManager @Inject constructor(
                 peakVibrationShockTs = 0L,
                 isTamperDetected = false,
                 isPowerTamper = false,
-                isSitDetected = entity.isSitDetected,
-                isSitActive = entity.isSitActive,
-                lastSitTs = 0L,
-                verticalVelocity = entity.verticalVelocity,
-                sitVz = entity.sitVz,
-                sitDz = entity.sitDz,
-                sitBaro = entity.sitBaro,
-                sitTilt = entity.sitTilt,
-                sitShock = entity.sitShock,
+                status = try { SentinelStatus.valueOf(entity.status) } catch(e: Exception) { SentinelStatus.VALID },
                 isLocationPending = false,
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE },
                 lastValidFixRealtime = entity.lastValidFixRealtime,
-                snrIdx = entity.snrIdx,
-                tiltIdx = entity.tiltIdx,
-                baroIdx = entity.baroIdx,
                 isBatterySteepDischarge = entity.isBatterySteepDischarge,
                 isCoolingModeActive = entity.isCoolingModeActive,
                 battery = entity.battery,
                 temp = entity.temp,
                 isCharging = entity.isCharging,
-                isAnchorLocked = entity.isAnchorLocked,
                 trackerState = try { TrackerState.valueOf(entity.trackerState) } catch(e: Exception) { TrackerState.UNKNOWN }
             )
 

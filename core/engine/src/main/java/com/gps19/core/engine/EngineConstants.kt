@@ -2,11 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed trajectory promotion and hindsight constants.
- * July.1.12:
- * - Issue #504: Kalman Filter Removal. Replaced IMM constants with Position EMA parameters.
- * - Issue #502: Device Independency. Genericized hardware-specific constants.
+ * July.1.16:
+ * - Issue #510: Abandoned Chair Sit Detection. Removed all sit-related thresholds and constants.
+ * July.1.15:
+ * - Issue #508: Optimization Removal. Removed Muzzle and Adaptive Jump constants.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -41,17 +40,11 @@ const val JUMP_WEIGHT_ACCURACY_LOW = 30
 const val JUMP_WEIGHT_ACCURACY_HIGH = 20
 
 const val JUMP_GATE_SENSOR_MISMATCH_MPS = 2.0
-const val JUMP_GATE_SENSOR_MISMATCH_A15_MPS = 5.0 // Issue #036: Hardened for A15 jitter
 const val JUMP_GATE_SPEED_ACCURACY_LOW_MPS = 22.2
 const val JUMP_GATE_SPEED_ACCURACY_HIGH_MPS = 8.3
 const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0
 const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0
 const val JUMP_GATE_VISUAL_JITTER_METERS = 10.0
-const val JUMP_GATE_VISUAL_JITTER_A15_METERS = 25.0 // Issue #036: Hardened for A15 jitter
-
-// Adaptive Jump Confidence (v8.9.18 - Issue #332 / R332)
-const val ADAPTIVE_JUMP_SNR_THRESHOLD = 35.0
-const val ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0
 
 // Bayesian Uncertainty Growth (R460 / Issue #460)
 const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0 // 54 km/h conservative drift
@@ -77,9 +70,7 @@ const val SCATTER_ANGLE_THRESHOLD = 120.0
 
 // Acoustic Monitoring (R810-L)
 const val BREACH_THRESHOLD_DB_JUMP = 40.0 
-const val BREACH_THRESHOLD_DB_JUMP_A15 = 55.0 
 const val ACOUSTIC_THRESHOLD_DB_JUMP = 40.0 
-const val ACOUSTIC_THRESHOLD_DB_JUMP_A15 = 55.0 
 const val ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP = 20.0
 const val ACOUSTIC_MIN_THRESHOLD_DB = 50.0
 const val ACOUSTIC_FLOOR_MIN_DB = 50.0 
@@ -108,30 +99,11 @@ const val ROTATION_INIT_STATIONARY_MS = 3000L
 const val BARO_ZEROING_INTERVAL_MS = 300000L 
 const val SPIKE_DEBOUNCE_MS = 5000L
 
-// Chair Sit Detection (R832 - Issue #459)
-const val CHAIR_SIT_TILT_THRESHOLD = 7.0 
-const val CHAIR_SIT_VIBRATION_THRESHOLD = 0.35 
-const val CHAIR_SIT_BARO_THRESHOLD = 0.08 
-const val CHAIR_PLUNGE_VELOCITY_THRESHOLD = 0.18 
-const val CHAIR_PLUNGE_DISTANCE_THRESHOLD = 0.05 
-const val CHAIR_PLUNGE_WINDOW_MS = 800L
-const val CHAIR_PLUNGE_PHASE_TIMEOUT_MS = 1500L
-const val CHAIR_SIT_COOLDOWN_MS = 5000L
-const val SIT_TRANSMISSION_LATCH_MS = 10000L
-const val SIT_DUPLICATE_GUARD_MS = 15000L
-
 // Filtering Thresholds (R810-P Zero-Lag)
 const val SUSPICIOUS_Q_SCALE = 1000.0
 const val HIGH_ACCURACY_THRESHOLD_METERS = 35.0
-
-/**
- * Multiplier applied to [HIGH_ACCURACY_THRESHOLD_METERS] to determine the floor 
- * for trajectory-based outlier rejection.
- * Used in [LocationProcessor] to reject low-accuracy points following high-accuracy fixes.
- */
 const val TRAJECTORY_REJECTION_ACCURACY_MULT = 3.0
 
-// Issue #024: Increased to 120s to ensure buckets (30s) exceed stationary polling (20s)
 const val ACCURACY_WINDOW_BUCKET_MS = 120000L
 const val ACCURACY_WINDOW_MAX_SIZE = 4
 const val GEOFENCE_ACCURACY_HYSTERESIS_MULT = 1.10
@@ -146,7 +118,6 @@ const val LUX_EMA_SLOW = 0.01
 const val LUX_EMA_FAST = 0.1
 const val LUX_EMA_UP_SLOW = 0.001
 const val LUX_EMA_UP_FAST = 0.01
-const val LUX_EMA_UP_FAST_A15 = 0.05 // Optimized for A15 LED flutter
 const val LUX_EMA_DOWN_SLOW = 0.001
 const val LUX_EMA_DOWN_FAST = 0.02
 const val ACOUSTIC_EMA_DOWN_SLOW = 0.001
@@ -170,16 +141,13 @@ const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
 
 // R406a: Unified 2s heartbeat for all tasks and devices.
 const val TICK_INTERVAL_MS = 2000L
-const val UI_PULSE_TIMEOUT_MS = 45000L // Issue #025: Relaxed to 45s to harden FGS transitions
+const val UI_PULSE_TIMEOUT_MS = 45000L 
 const val FGS_STICKY_DELAY_MS = 45000L
-const val WATCH_TIMEOUT_MS = 15000L // Issue #427/428: Relaxed to 15s to handle network jitter
+const val WATCH_TIMEOUT_MS = 15000L 
 const val CLOCK_REGRESSION_GATE_MS = 100L
 const val SENSOR_WARMING_MS = 5000L
 const val SUSPICIOUS_STATE_COOLDOWN_MS = 60000L
-const val MUZZLE_WINDOW_DURATION_MS = 2000L
-const val MUZZLE_HYSTERESIS_MS = 200L
-const val MUZZLE_HYSTERESIS_A15_MS = 500L
-const val ADAPTATION_SETTLING_MS = 5000L // Issue #038: Settle duration after polling change
+const val ADAPTATION_SETTLING_MS = 5000L 
 const val GPS_REVIVAL_RETRY_INTERVAL_MS = 120000L
 const val MAX_REVIVAL_ATTEMPTS = 3
 const val HARDWARE_BOOT_GRACE_MS = 30000L
@@ -190,17 +158,9 @@ const val HARDWARE_SUPPRESSION_THRESHOLD_MS = 15000L
 const val HARDWARE_RECOVERY_COOLDOWN_MS = 60000L
 
 const val ACTIVE_MOVE_THRESHOLD = 2.0
-const val GPS_SAVE_INTERVAL_MS = 20000L // Issue #436: Aligned with TICK_INTERVAL_MS x 10
+const val GPS_SAVE_INTERVAL_MS = 20000L 
 
-// Stationary Anchor Monitor (Issue #062)
-const val PARKING_ANCHOR_MIN_DIST = 20.0
-const val PARKING_ANCHOR_FACTOR = 0.8
-const val ANCHOR_ESCAPE_SCORE_THRESHOLD = 100.0
-const val ANCHOR_TREND_WINDOW_SIZE = 3
-const val ANCHOR_TRANSITION_ZONE_START = 0.7 // Start accumulating score at 70% of threshold
-const val ANCHOR_VELOCITY_WEIGHT_MPS = 15.0 // Score points per m/s of estimated speed
-
-const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 // Issue #450: Authoritative multiplier
+const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 
 
 // Behavioral State Thresholds (Issue #302)
 const val SUSTAINED_SPEED_THRESHOLD = 2 
@@ -253,20 +213,16 @@ const val RIBBON_VIBRATION_SCALE_G = 2.0
 const val RIBBON_LIFT_SCALE_METERS = 5.0
 const val RIBBON_SNR_SCALE_DB = 45.0
 const val RIBBON_CURRENT_SCALE_MA = 1000.0
-const val RIBBON_SIT_TILT_SCALE_DEG = 15.0
-const val RIBBON_SIT_BARO_SCALE_METERS = 0.5
 
 const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 
 // Network Communication (v8.8.21)
-// Issue #315: Maximum healthy RTT for sync loop scaling.
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0
 const val NETWORK_TIMEOUT_MS = 10000
 const val NET_REJOIN_THRESHOLD_MS = 15000L
 const val NET_HEAL_THRESHOLD_MS = 45000L
-// Issue #315: Baseline sync interval.
 const val PING_INTERVAL_MS = 10000L
 const val SOCKET_TIMEOUT_MS = 60000
 const val RTT_WINDOW_SIZE = 5
@@ -275,15 +231,12 @@ const val RTT_WINDOW_SIZE = 5
 const val HOME_POINT_REFRESH_INTERVAL_MS = 30000L
 
 // Logging & UI (v8.9.2)
-const val LOG_MUZZLE_STARTUP_MS = 10000L
-const val GPS_TRANSITION_LOG_MUZZLE_MS = 30000L
 const val MAX_HISTORY_POINTS_PER_RIBBONS = 240
 const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
 
-// R338: Unified UI Staleness Threshold (15s) - Relaxed to accommodate jitter
-// Issue #002: Increased to 35s to cover unified heartbeat logic
+// Unified UI Staleness Threshold
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 35000L
 const val GPS_UI_FAIL_THRESHOLD_MS = 35000L
 
@@ -307,7 +260,6 @@ const val ALERT_ID_TRACKER_TAMPER = "TRACKER_TAMPER"
 const val ALERT_ID_TRACKER_TILT = "TILT_ALERT"
 const val ALERT_ID_TRACKER_ACOUSTIC = "ACOUSTIC_ALERT"
 const val ALERT_ID_TRACKER_LIFT = "LIFT_ALERT"
-const val ALERT_ID_TRACKER_CHAIR = "CHAIR_OCCUPIED"
 const val ALERT_ID_SYSTEM_STORAGE_LOW = "SYSTEM_STORAGE_LOW"
 const val ALERT_ID_SYSTEM_STORAGE_CRITICAL = "SYSTEM_STORAGE_CRITICAL"
 const val ALERT_ID_BATTERY_STEEP_DISCHARGE = "BATTERY_HEALTH"
@@ -333,7 +285,6 @@ const val ALERT_TITLE_TRACKER_TAMPER = "Tamper Detected"
 const val ALERT_TITLE_TRACKER_TILT = "Tilt Alert"
 const val ALERT_TITLE_TRACKER_ACOUSTIC = "Acoustic Alert"
 const val ALERT_TITLE_TRACKER_LIFT = "Lift"
-const val ALERT_TITLE_TRACKER_CHAIR = "Chair Occupied"
 const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "System Storage Low"
 const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "System Storage Critical"
 const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "Critical Battery Health"
@@ -341,9 +292,9 @@ const val ALERT_TITLE_HARDWARE_CONFIGURATION = "Hardware Config Incomplete"
 
 // System Watchdog & Grace Periods
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L
-const val SYSTEM_WATCH_DOG_INTERVAL_MS = 90000L
-const val SYSTEM_WATCH_DOG_THROTTLE_MS = 60000L
-const val WATCH_DOG_DANGER_WINDOW_MS = 20000L
+const val SYSTEM_WATCHDOG_INTERVAL_MS = 90000L
+const val SYSTEM_WATCHDOG_THROTTLE_MS = 60000L
+const val WATCHDOG_DANGER_WINDOW_MS = 20000L
 const val COMMUNICATION_ALARM_GRACE_PERIOD_MS = 60000L
 const val LOCATION_ALARM_GRACE_PERIOD_MS = 30000L
 const val POWER_DISCONNECT_DEBOUNCE_MS = 3000L
@@ -353,12 +304,11 @@ const val ALARM_OVERLAY_THROTTLE_MS = 30000L
 const val HEARTBEAT_INTERVAL_MS = 3600000L
 
 // UI Health & Visibility
-const val WATCH_DOG_UI_GRACE_MS = 15000L // Issue #427/428: Relaxed to 15s
+const val WATCH_DOG_UI_GRACE_MS = 15000L 
 const val SENSOR_GRACE_PERIOD_MS = 600000L
 const val TEST_ALARM_DURATION_MS = 3000L
 
-// R729: Behavioral Debouncing & Muzzle Hardening (Issue #191)
-const val PROXIMITY_DEBOUNCE_STATIONARY_A15_MS = 5000L
+// R729: Behavioral Debouncing
 const val PROXIMITY_DEBOUNCE_STATIONARY_MS = 3000L
 const val PROXIMITY_DEBOUNCE_MOVING_MS = 1000L
 
@@ -380,3 +330,4 @@ const val DB_PRUNE_THRESHOLD = 50
 
 // UI Performance
 const val MARKER_POOL_PRUNE_THRESHOLD = 50
+const val LOG_MUZZLE_STARTUP_MS = 60000L

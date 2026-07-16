@@ -44,14 +44,11 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * v9.4.0:
+ * July.1.16:
+ * - Issue #510 & #511: Removed Sit Detection and detailed sensor ribbons.
+ * July.1.13:
+ * - Issue #511: Simplify Ribbon Telemetry. Removed obsolete sensor ribbons; added core SPD/ACC ribbons.
  * - Issue #502: Device Independency. Plumbed requiresExtraTopPadding through to HeaderBar.
- * v9.3.15:
- * - Hardening: Finalized Double standardization. Streamlined UI-layer Float 
- *   conversions for Compose rendering compatibility. Fixed satsUsed parameter mismatch.
- * v9.3.8:
- * - Clock Skew Hardening: Replaced all manual HUD age calculations with authoritative 
- *   DashboardState flags.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -114,29 +111,21 @@ fun AnalyticalRibbons(viewModel: MainViewModel) {
             }
         }
         
-        StatefulSensorRibbon(sensorFlow, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), valueSelector = { it.snrIdx.toFloat() })
-        StatefulSensorRibbon(sensorFlow, "NOI", selectedScale, lineColor = Amber500, valueSelector = { it.noiseIdx.toFloat() })
-        StatefulSensorRibbon(sensorFlow, "LUX", selectedScale, lineColor = Color.White, valueSelector = { it.luxIdx.toFloat() })
-        StatefulSensorRibbon(sensorFlow, "VIB", selectedScale, lineColor = Color.Magenta, valueSelector = { it.vibeIdx.toFloat() })
-        StatefulSensorRibbon(sensorFlow, "PRX", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { it.proxIdx.toFloat() })
-        StatefulSensorRibbon(sensorFlow, "LIF", selectedScale, lineColor = Color(0xFFFACC15), valueSelector = { it.liftIdx.toFloat() })
+        // Core Metrics
+        StatefulSensorRibbon(sensorFlow, "SPD", selectedScale, lineColor = Color(0xFF4ADE80), valueSelector = { (it.speed.toFloat() / MAX_PHYSICAL_SPEED_MPS.toFloat()).coerceIn(0f, 1f) })
+        StatefulSensorRibbon(sensorFlow, "ACC", selectedScale, lineColor = Color(0xFFF87171), valueSelector = { (1.0f - (it.gpsAccuracy.toFloat() / 100f)).coerceIn(0f, 1f) })
         StatefulSensorRibbon(sensorFlow, "BAT", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isBatterySteepDischarge) 1f else 0f })
         StatefulSensorRibbon(sensorFlow, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isCoolingModeActive) 1f else 0f })
         StatefulSensorRibbon(sensorFlow, "CUR", selectedScale, lineColor = Color(0xFFFB923C), valueSelector = { (kotlin.math.abs(it.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) })
-        StatefulSensorRibbon(sensorFlow, "SIT", selectedScale, lineColor = BrandJd, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isSitActive) 1f else 0f })
-        StatefulSensorRibbon(sensorFlow, "TLT", selectedScale, lineColor = Color(0xFF818CF8), valueSelector = { it.tiltIdx.toFloat() })
-        StatefulSensorRibbon(sensorFlow, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), valueSelector = { it.baroIdx.toFloat() })
-        StatefulSensorRibbon(sensorFlow, "SVZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f) })
-        StatefulSensorRibbon(sensorFlow, "SDZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f) })
         
         HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
 
-        StatefulConnectionRibbon(viewModel.history4MFlow, "4M")
-        StatefulConnectionRibbon(viewModel.history16MFlow, "16M")
-        StatefulConnectionRibbon(viewModel.history1HFlow, "1H")
-        StatefulConnectionRibbon(viewModel.history4HFlow, "4H")
-        StatefulConnectionRibbon(viewModel.history24HFlow, "24H")
-        StatefulConnectionRibbon(viewModel.history7DFlow, "7D")
+        StatefulConnectionQualityRibbon(viewModel.history4MFlow, "4M")
+        StatefulConnectionQualityRibbon(viewModel.history16MFlow, "16M")
+        StatefulConnectionQualityRibbon(viewModel.history1HFlow, "1H")
+        StatefulConnectionQualityRibbon(viewModel.history4HFlow, "4H")
+        StatefulConnectionQualityRibbon(viewModel.history24HFlow, "24H")
+        StatefulConnectionQualityRibbon(viewModel.history7DFlow, "7D")
     }
 }
 
@@ -154,7 +143,7 @@ fun StatefulSensorRibbon(
 }
 
 @Composable
-fun StatefulConnectionRibbon(
+fun StatefulConnectionQualityRibbon(
     flow: StateFlow<List<ConnectionPoint>>,
     title: String
 ) {
@@ -275,9 +264,6 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, title: String) {
                         strokeWidth = 0.5.dp.toPx()
                     )
 
-                    var lastGpsPos: Offset? = null
-                    val cyanColor = Color(0xFF00FFFF)
-
                     val textPaint = android.graphics.Paint().apply {
                         color = android.graphics.Color.WHITE
                         textSize = (if (isLandscape) { 10.sp.toPx() } else { 6.sp.toPx() })
@@ -308,21 +294,6 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, title: String) {
                         
                         drawRect(pColor, Offset(xPos, baseLineY - (ribbonMaxHeight * hFactor)), Size(maxOf(1f, pointWidth), ribbonMaxHeight * hFactor))
                         
-                        if (p.hasGps && p.gpsIndex > 0.0) {
-                            val dotRadius = (if (isLandscape) 1.dp.toPx() else 0.5.dp.toPx())
-                            val baseHeight = if (isLandscape) 20.dp.toPx() else 10.dp.toPx()
-                            val normalizedHeight = (p.gpsIndex.toFloat().coerceIn(0f, 1f) * baseHeight)
-                            val yPos = baseLineY - ribbonMaxHeight - (if (isLandscape) { 3.dp.toPx() } else { 1.5.dp.toPx() }) - normalizedHeight
-                            val currentPos = Offset(xPos + (maxOf(1f, pointWidth) / 2f), yPos)
-                            lastGpsPos?.let { lastPos ->
-                                if (currentPos.x - lastPos.x < pointWidth * 10) {
-                                    drawLine(color = cyanColor, start = lastPos, end = currentPos, strokeWidth = (if (isLandscape) { 1.dp.toPx() } else { 0.5.dp.toPx() }))
-                                }
-                            }
-                            drawCircle(color = cyanColor, radius = dotRadius, center = currentPos)
-                            lastGpsPos = currentPos
-                        }
-
                         if (intervalMs > 0 && history.isNotEmpty() && p.ts >= baseTickTs) {
                             val tickCount = (p.ts - baseTickTs) / intervalMs
                             val prevTickCount = if (index > 0) {

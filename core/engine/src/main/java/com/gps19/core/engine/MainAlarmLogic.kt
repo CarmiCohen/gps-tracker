@@ -5,10 +5,11 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted logic from geofence evaluation.
- * July.1.12:
- * - Issue #502: Device Independency. Genericized hardware gating using HardwareCapabilities.
+ * July.1.16:
+ * - Issue #510: Abandoned Chair Sit Detection. Removed sit violation logic.
+ * - Issue #508: Optimization Removal. Removed isAdaptiveJump logic.
+ * July.1.15:
+ * - Issue #512: Consolidate Sentinel Statuses. Aligned with VALID, JUMP, TAMPER.
  */
 object MainAlarmLogic {
 
@@ -66,7 +67,7 @@ object MainAlarmLogic {
                 type = ALERT_ID_JUMP_ALERT,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_JUMP_ALERT),
                 subtitle = "Device data is erratic or jumping",
-                conditionMet = canCheckPeerErrors && state.isJammerSuspicion && !shouldSuppressPeerErrors
+                conditionMet = canCheckPeerErrors && state.isJammer && !shouldSuppressPeerErrors
             )
         )
 
@@ -75,8 +76,8 @@ object MainAlarmLogic {
                 type = ALERT_ID_VISUAL_JUMP,
                 title = getTrackerTitle(isTracker, ALERT_TITLE_VISUAL_JUMP),
                 subtitle = "Trajectory-based jump detected",
-                conditionMet = canCheckPeerErrors && state.isTrackerVisualJump && !shouldSuppressPeerErrors,
-                technicalDetails = "Tier: ${state.jumpTier}${if (state.isAdaptiveJump) " (Adaptive)" else ""}"
+                conditionMet = canCheckPeerErrors && state.status == SentinelStatus.JUMP && !state.isJammer && !shouldSuppressPeerErrors,
+                technicalDetails = "Tier: ${state.jumpTier}"
             )
         )
         
@@ -129,12 +130,14 @@ object MainAlarmLogic {
         
         val isLightMet = SentinelValidator.isLightViolated(state.trackerLux, state.luxBaseline)
 
-        val isTamperCondition = state.isTamperDetected || 
+        val isTamperCondition = state.status == SentinelStatus.TAMPER ||
+                                state.isTamperDetected || 
                                 (!state.isNear) || 
                                 isLightMet || 
                                 isShock || isTilt || isAcousticMet || isLift || state.isPowerTamper
 
         val tamperReason = when {
+            state.status == SentinelStatus.TAMPER -> "Hardware sentinel violation"
             isShock -> "Shock: ${String.format(Locale.getDefault(), "%.1f", state.peakVibrationShock)}G"
             isLightMet -> "Light: ${state.trackerLux.roundToInt()} lux"
             !state.isNear -> "Proximity sensor cleared"
@@ -232,11 +235,11 @@ object MainAlarmLogic {
         val threshold = maxD + accuracyBuffer
         val predictiveThreshold = threshold - predictiveBuffer
 
-        val isGeofenceSuppressed = state.isJammerSuspicion || shouldSuppressPeerErrors
+        val isGeofenceSuppressed = state.isJammer || shouldSuppressPeerErrors
 
         if (distVal != null && !isGeofenceSuppressed && state.lastGpsPacketTs > 0) {
             val dValue = distVal
-            val isJump = state.isTrackerVisualJump
+            val isJump = state.status == SentinelStatus.JUMP
             val jumpTier = state.jumpTier
             val isPredictedExit = dValue > predictiveThreshold && state.trackerSpeed > GEOFENCE_PREDICTIVE_MIN_SPEED_MPS
 
@@ -256,7 +259,7 @@ object MainAlarmLogic {
                 }
 
                 val timeSinceFirst = now - state.firstViolationTs
-                val effectiveHoldMs = if (state.isAdaptiveJump) (JUMP_HOLD_DURATION_MS * ADAPTIVE_JUMP_HOLD_MULTIPLIER).toLong() else JUMP_HOLD_DURATION_MS
+                val effectiveHoldMs = JUMP_HOLD_DURATION_MS
                 
                 val isSustained = if (state.firstViolationWasJump) {
                     timeSinceFirst >= effectiveHoldMs
@@ -273,7 +276,7 @@ object MainAlarmLogic {
                 val debounceStr = when {
                     isPredictedExit -> "PREDICTIVE EXIT (${String.format(Locale.getDefault(), "%.1f", state.trackerSpeed * 3.6)} km/h)"
                     isSustained -> "ALARM ACTIVE"
-                    state.firstViolationWasJump -> "Jump Hold: ${durationSec}s/${effectiveHoldMs/1000}s${if (state.isAdaptiveJump) " (Adaptive)" else ""}"
+                    state.firstViolationWasJump -> "Jump Hold: ${durationSec}s/${effectiveHoldMs/1000}s"
                     else -> "Wait: ${state.distanceViolationCounter}/$DISTANCE_ALARM_SAMPLES_REQUIRED"
                 }
 
@@ -359,16 +362,6 @@ object MainAlarmLogic {
             )
         )
         
-        reports.add(
-            ViolationReport(
-                type = ALERT_ID_TRACKER_CHAIR,
-                title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_CHAIR),
-                subtitle = "Chair occupancy detected",
-                conditionMet = state.isSitActive,
-                technicalDetails = "Vz: ${String.format(Locale.getDefault(), "%.2f", state.verticalVelocity)} m/s"
-            )
-        )
-
         reports.add(
             ViolationReport(
                 type = ALERT_ID_SYSTEM_STORAGE_LOW,

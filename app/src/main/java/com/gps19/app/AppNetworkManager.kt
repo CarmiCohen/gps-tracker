@@ -6,28 +6,19 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
 import com.gps19.core.engine.*
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.atomic.AtomicInteger
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * High-level Network Manager for the Service.
  * Orchestrates the SignalingProvider (Socket.io) and the HTTP Keep-alive logic.
- * v9.3.25:
- * - R988: Activated binary telemetry channel for trackers to reduce relay overhead.
- * - R988: Implemented routingId-aware emitBinary calls.
- * v8.9.99:
- * - Issue #041: Identity Sanitization. Added strict ID validation before 
- *   initiating relay connections to prevent using corrupted identities.
+ * v9.5.0: Hilt removed. Manual DI.
  */
-@Singleton
-class AppNetworkManager @Inject constructor(
-    @ApplicationContext private val context: android.content.Context,
+class AppNetworkManager(
+    private val context: android.content.Context,
     private val settingsRepository: SettingsRepository,
     private val telemetryRepository: TelemetryRepository,
     private val logManager: LogManager,

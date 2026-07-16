@@ -6,8 +6,8 @@ import androidx.datastore.migrations.SharedPreferencesView
 
 /**
  * AppSettingsMigration: Migrates data from legacy SharedPreferences to DataStore.
- * v8.9.80:
- * - Issue #014: Type Migration. Standardized all telemetry fields to Double for consistency.
+ * v9.4.1:
+ * - Issue #510: Removed Chair Sit Detection legacy fields.
  */
 fun AppSettingsMigration(context: Context) = SharedPreferencesMigration<AppSettings>(
     context = context,
@@ -46,7 +46,6 @@ fun AppSettingsMigration(context: Context) = SharedPreferencesMigration<AppSetti
         sharedPrefs.getFloat("tracker_lux_baseline", 0f).let { if (it > 0f) builder.setTrackerLuxBaseline(it.toDouble()) }
         
         sharedPrefs.getBoolean("is_mic_type_started", false).let { if (it) builder.setIsMicTypeStarted(true) }
-        sharedPrefs.getLong("last_sit_ts", 0L).let { if (it > 0) builder.setLastSitTs(it) }
 
         val alertBuilder = AlertSettingsProto.newBuilder()
         sharedPrefs.getBoolean("alert_local_internet", true).let { alertBuilder.setLocalInternet(it) }
@@ -69,7 +68,6 @@ fun AppSettingsMigration(context: Context) = SharedPreferencesMigration<AppSetti
         sharedPrefs.getBoolean("alert_acoustic", true).let { alertBuilder.setAcousticAlert(it) }
         sharedPrefs.getBoolean("alert_lift", true).let { alertBuilder.setLiftAlert(it) }
         sharedPrefs.getBoolean("alert_tamper", true).let { alertBuilder.setTamperAlert(it) }
-        sharedPrefs.getBoolean("alert_chair", true).let { alertBuilder.setChairOccupied(it) }
         sharedPrefs.getBoolean("alert_global_mute", false).let { alertBuilder.setGlobalMute(it) }
         builder.setAlertSettings(alertBuilder.build())
 

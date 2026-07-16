@@ -15,28 +15,20 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
 /**
  * AlarmActivity: Full-screen alarm overlay that bypasses the lock screen.
- * v8.8.4:
- * - Issue 38: Implemented UiCommand.StopSiren observer to auto-dismiss activity when silenced.
- * v8.8.28:
- * - Issue 288: Wired Xiaomi manual override status and callback to AlarmOverlay.
- * v6.199:
- * - Lifecycle: Updated to use collectAsStateWithLifecycle() for UI state collection.
- * v5.607:
- * - R800: Unified Back Navigation. Added BackHandler to dismiss alarms and finish activity.
- * - R799: Pass appMode to GpsTrackerTheme for role-consistent coloring even on alarm screen.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual DI transition.
  */
-@AndroidEntryPoint
 class AlarmActivity : ComponentActivity() {
-    private val viewModel: MainViewModel by viewModels()
+    private val viewModel: MainViewModel by viewModels {
+        MainViewModelFactory(this, (application as GpsApplication).container)
+    }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -85,8 +77,9 @@ class AlarmActivity : ComponentActivity() {
                         alarms = uiState.activeAlarms,
                         isMuted = uiState.isAlarmSilenced,
                         isLocationPending = uiState.integrity.isLocationPending,
-                        xiaomiStatus = uiState.permissions.xiaomiStatus,
-                        onXiaomiPermissionClick = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
+                        backgroundStatus = uiState.permissions.backgroundStatus,
+                        hasBackgroundRestriction = uiState.permissions.hasBackgroundRestriction,
+                        onHardwarePermissionClick = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onMute = {
                             val currentCauses = uiState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
                             viewModel.onEvent(UiEvent.StopSiren(currentCauses))

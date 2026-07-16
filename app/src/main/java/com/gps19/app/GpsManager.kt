@@ -4,29 +4,23 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.location.GnssStatus
 import android.location.Location
-import android.location.LocationListener
 import android.location.LocationManager
 import android.os.*
 import com.google.android.gms.location.*
 import com.gps19.core.engine.*
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * GpsManager: Manages hardware GPS and GNSS status.
- * v9.4.0:
- * - R406a: Unified Heartbeat (Issue #501). Standardized GPS polling to 2s.
- *   Removed pollIntervalFlow and setPollingInterval to simplify logic.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal.
  */
-@Singleton
-class GpsManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+class GpsManager(
+    private val context: Context,
     private val timeProvider: TimeProvider
 ) {
 
@@ -134,7 +128,6 @@ class GpsManager @Inject constructor(
             Timber.e(e, "GPS: Failed to register GNSS callback")
         }
 
-        // Try to send last known location immediately
         fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
             if (loc != null) {
                 Timber.d("GPS: Delivered initial lastLocation (Acc: ${loc.accuracy})")

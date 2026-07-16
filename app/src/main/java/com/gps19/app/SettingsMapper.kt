@@ -4,6 +4,9 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsMapper: Conversion logic between DataStore Protos and Domain Models.
+ * July.1.16:
+ * - Issue #510: Abandoned Chair Sit Detection. Removed sit-related fields from mapping.
+ * - Issue #512 & #515: Removed legacy flags (isSuspicious, isJammer, isAnchorLocked) from TrackerStatus mapping.
  */
 object SettingsMapper {
 
@@ -30,7 +33,6 @@ object SettingsMapper {
             acousticAlert = s.acousticAlert,
             liftAlert = s.liftAlert,
             tamperAlert = s.tamperAlert,
-            chairOccupied = s.chairOccupied,
             globalMute = s.globalMute,
             systemStorageLow = s.systemStorageLow
         )
@@ -59,7 +61,6 @@ object SettingsMapper {
             .setAcousticAlert(s.acousticAlert)
             .setLiftAlert(s.liftAlert)
             .setTamperAlert(s.tamperAlert)
-            .setChairOccupied(s.chairOccupied)
             .setGlobalMute(s.globalMute)
             .setSystemStorageLow(s.systemStorageLow)
             .build()
@@ -76,8 +77,6 @@ object SettingsMapper {
             totalConnectedMs = s.totalConnectedMs, sessionConnectedMs = s.sessionConnectedMs,
             totalDropMs = s.totalDropMs, maxDropMs = s.maxDropMs,
             maxDropTs = s.maxDropTs, violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage,
-            isSitDetected = s.isSitDetected, lastSitTs = s.lastSitTs, verticalVelocity = s.verticalVelocity,
-            sitVz = s.sitVz, sitDz = s.sitDz, sitBaro = s.sitBaro, sitTilt = s.sitTilt, sitShock = s.sitShock,
             isPowerTamper = s.isPowerTamper,
             vibration = s.vibration,
             heading = s.heading,
@@ -92,7 +91,6 @@ object SettingsMapper {
             acousticFloorDb = s.acousticFloor,
             adaptiveVibrationFloor = s.adaptiveVibrationFloor,
             proxIdx = s.proxIdx,
-            isSuspicious = s.isSuspicious,
             isTamperDetected = s.isTamperDetected,
             isPowerSaveMode = s.isPowerSaveMode,
             standbyBucket = s.standbyBucket,
@@ -100,11 +98,10 @@ object SettingsMapper {
             isStorageLow = s.isStorageLow,
             isStorageCritical = s.isStorageCritical,
             isBatterySteepDischarge = s.isBatterySteepDischarge,
-            isJammer = s.isJammer,
             isCoolingModeActive = s.isCoolingModeActive,
             currentMa = s.currentMa,
-            isAnchorLocked = s.isAnchorLocked,
-            trackerState = try { TrackerState.valueOf(s.trackerState) } catch (e: Exception) { TrackerState.UNKNOWN }
+            trackerState = try { if (s.trackerState.isNullOrBlank()) TrackerState.UNKNOWN else TrackerState.valueOf(s.trackerState) } catch (e: Exception) { TrackerState.UNKNOWN },
+            status = try { if (s.status.isNullOrBlank()) SentinelStatus.VALID else SentinelStatus.valueOf(s.status) } catch (e: Exception) { SentinelStatus.VALID }
         )
     }
 
@@ -135,14 +132,6 @@ object SettingsMapper {
             .setMaxDropTs(status.maxDropTs)
             .setViolationUptimeMs(status.violationUptimeMs)
             .setViolationPercentage(status.violationPercentage)
-            .setIsSitDetected(status.isSitDetected)
-            .setLastSitTs(status.lastSitTs)
-            .setVerticalVelocity(status.verticalVelocity)
-            .setSitVz(status.sitVz)
-            .setSitDz(status.sitDz)
-            .setSitBaro(status.sitBaro)
-            .setSitTilt(status.sitTilt)
-            .setSitShock(status.sitShock)
             .setIsPowerTamper(status.isPowerTamper)
             .setVibration(status.vibration)
             .setHeading(status.heading)
@@ -157,19 +146,17 @@ object SettingsMapper {
             .setAcousticFloor(status.acousticFloorDb)
             .setAdaptiveVibrationFloor(status.adaptiveVibrationFloor)
             .setProxIdx(status.proxIdx)
-            .setIsSuspicious(status.isSuspicious)
             .setIsTamperDetected(status.isTamperDetected)
             .setIsPowerSaveMode(status.isPowerSaveMode)
             .setStandbyBucket(status.standbyBucket)
             .setNetInterface(status.netInterface)
             .setIsStorageLow(status.isStorageLow)
             .setIsBatterySteepDischarge(status.isBatterySteepDischarge)
-            .setIsJammer(status.isJammer)
             .setIsCoolingModeActive(status.isCoolingModeActive)
             .setIsStorageCritical(status.isStorageCritical)
             .setCurrentMa(status.currentMa)
-            .setIsAnchorLocked(status.isAnchorLocked)
             .setTrackerState(status.trackerState.name)
+            .setStatus(status.status.name)
             .build()
     }
 }

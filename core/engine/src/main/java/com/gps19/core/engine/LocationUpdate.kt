@@ -4,11 +4,10 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted.
- * July.1.12:
- * - Hardening: Finalized Double standardization. Eliminated redundant 
- *   conversions across module boundaries.
+ * July.1.16:
+ * - Issue #510: Abandoned Chair Sit Detection. Removed sit-related fields.
+ * - Issue #508 & #515: Optimization Removal. Removed isAdaptiveJump and isAnchorLocked.
+ * - Issue #512: Consolidate Sentinel Statuses. Removed legacy boolean flags (isJump, isJammer, etc.).
  */
 @Serializable
 data class LocationUpdate(
@@ -17,10 +16,8 @@ data class LocationUpdate(
     val battery: Int = -1, val temp: Double = 0.0, val maxTemp: Double = 0.0,
     val isCharging: Boolean = false, val gpsTs: Long = 0L, val isMe: Boolean = true,
     val ts: Long = 0L,
-    val isJump: Boolean = false,
+    val status: SentinelStatus = SentinelStatus.VALID,
     val jumpTier: Int = 0,
-    val isAdaptiveJump: Boolean = false,
-    val isJammer: Boolean = false, val isStalled: Boolean = false,
     val distToTracker: Double? = null, val distToHome: Double? = null,
     val totalConnectedMs: Long? = null, val sessionConnectedMs: Long? = null,
     val lastConnTs: Long? = null, val lastDiscTs: Long? = null,
@@ -35,7 +32,6 @@ data class LocationUpdate(
     val peakVibrationShock: Double? = null,
     val peakVibrationShockTs: Long? = null,
     val adaptiveVibrationFloor: Double? = null,
-    val isSuspicious: Boolean = false,
     val isTamperDetected: Boolean = false,
     val proxIdx: Double? = null,
     val proximityCm: Double? = null,
@@ -47,16 +43,6 @@ data class LocationUpdate(
     val isPowerTamper: Boolean = false,
     val violationUptimeMs: Long? = null,
     val violationPercentage: Double? = null,
-    val isSitDetected: Boolean = false,
-    val isSitActive: Boolean = false,
-    val lastSitTs: Long = 0L,
-    val verticalVelocity: Double? = null,
-    val sitVz: Double? = null,
-    val sitVzTs: Long = 0L,
-    val sitDz: Double? = null,
-    val sitBaro: Double? = null,
-    val sitTilt: Double? = null,
-    val sitShock: Double? = null,
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
@@ -67,11 +53,7 @@ data class LocationUpdate(
     val isStorageLow: Boolean = false,
     val isStorageCritical: Boolean = false,
     val gnssDetail: GnssDetail? = null,
-    val snrIdx: Double = 0.0,
-    val tiltIdx: Double = 0.0,
-    val baroIdx: Double = 0.0,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val isAnchorLocked: Boolean = false,
     val trackerState: TrackerState = TrackerState.UNKNOWN
 )

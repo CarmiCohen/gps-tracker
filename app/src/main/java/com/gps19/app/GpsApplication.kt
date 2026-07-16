@@ -2,18 +2,15 @@ package com.gps19.app
 
 import android.app.Application
 import android.util.Log
-import androidx.hilt.work.HiltWorkerFactory
 import androidx.preference.PreferenceManager
 import androidx.work.Configuration
+import androidx.work.ListenableWorker
+import androidx.work.WorkerFactory
+import androidx.work.WorkerParameters
+import android.content.Context
 import com.gps19.core.engine.TimeProvider
-import dagger.hilt.android.HiltAndroidApp
 import org.osmdroid.config.Configuration as OsmConfig
 import timber.log.Timber
-import javax.inject.Inject
-import dagger.hilt.android.EntryPointAccessors
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -21,31 +18,43 @@ import java.io.File
 
 /**
  * GpsApplication: Application entry point and global dependency management.
- * v9.3.6:
- * - Issue #058: Hilt Migration. Injected LogManager directly to remove 
- *   EntryPointAccessors from Timber tree.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Reverted to manual Dependency Injection via AppContainer.
  */
-@HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
 
-    @Inject lateinit var workerFactory: HiltWorkerFactory
-    @Inject lateinit var logManager: LogManager
+    lateinit var container: AppContainer
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
-            .setWorkerFactory(workerFactory)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: Context,
+                    workerClassName: String,
+                    workerParameters: WorkerParameters
+                ): ListenableWorker? {
+                    return when (workerClassName) {
+                        MaintenanceWorker::class.java.name -> MaintenanceWorker(
+                            appContext,
+                            workerParameters,
+                            container.mainRepository,
+                            container.timeProvider
+                        )
+                        BootServiceStartWorker::class.java.name -> BootServiceStartWorker(
+                            appContext,
+                            workerParameters,
+                            container.mainRepository
+                        )
+                        else -> null
+                    }
+                }
+            })
             .build()
-
-    @EntryPoint
-    @InstallIn(SingletonComponent::class)
-    interface GpsApplicationEntryPoint {
-        fun logManager(): LogManager
-        fun repository(): MainRepository
-        fun timeProvider(): TimeProvider
-    }
 
     override fun onCreate() {
         super.onCreate()
+        
+        container = AppContainer(this)
         
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
@@ -72,14 +81,13 @@ class GpsApplication : Application(), Configuration.Provider {
             osmConfig.isDebugTileProviders = false
         }
 
-        // Issue #058: Eliminated EntryPointAccessors by using injected logManager
         Timber.plant(object : Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
                 if (priority >= Log.ERROR) {
                     try {
                         val fullMessage = if (tag != null) "[$tag] $message" else message
                         val suffix = t?.let { ": ${it.stackTraceToString().take(500)}" } ?: ""
-                        logManager.logServiceEvent("CRITICAL ERROR: $fullMessage$suffix", true)
+                        container.logManager.logServiceEvent("CRITICAL ERROR: $fullMessage$suffix", true)
                     } catch (e: Exception) {
                     }
                 }

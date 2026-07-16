@@ -2,25 +2,18 @@ package com.gps19.app
 
 import android.content.Context
 import com.gps19.core.engine.*
-import dagger.hilt.android.qualifiers.ApplicationContext
 import org.json.JSONArray
 import org.json.JSONObject
-import timber.log.Timber
 import java.util.*
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted logic.
- * July.1.12:
- * - Issue #502: Device Independency. Genericized hardware capabilities.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual dependency injection.
  */
-@Singleton
-class AppAlarmManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+class AppAlarmManager(
+    private val context: Context,
     private val repository: MainRepository,
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
@@ -105,9 +98,9 @@ class AppAlarmManager @Inject constructor(
         isTrackerMode: Boolean,
         isRelayConnected: Boolean,
         isTrackerConnected: Boolean,
-        isTrackerVisualJump: Boolean,
+        status: SentinelStatus,
+        isJammer: Boolean = false,
         jumpTier: Int = 0,
-        isAdaptiveJump: Boolean = false,
         trackerLat: Double,
         trackerLng: Double,
         trackerAccuracy: Double,
@@ -119,14 +112,12 @@ class AppAlarmManager @Inject constructor(
         trackerTemp: Double,
         isHardwareOnline: Boolean,
         isLocalInternetLoss: Boolean,
-        isJammerSuspicion: Boolean,
         isSignalLoss: Boolean,
         isGpsStalling: Boolean,
         isUiVisible: Boolean,
         distToHomeAuthority: Double?,
         maxDistanceAuthority: Double,
         isGpsGap: Boolean,
-        isSuspicious: Boolean,
         isTamperDetected: Boolean,
         isPowerTamper: Boolean,
         trackerTiltDegrees: Double,
@@ -149,12 +140,10 @@ class AppAlarmManager @Inject constructor(
         isCoolingModeActive: Boolean = false,
         discoveryPhase: DiscoveryPhase? = null,
         capabilities: HardwareCapabilities = HardwareCapabilities(),
-        isSitActive: Boolean = false,
         isLocationPending: Boolean = false,
         locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
         snrSnapshot: Double? = null,
-        vibeSnapshot: Double? = null,
-        isAnchorLocked: Boolean = false
+        vibeSnapshot: Double? = null
     ) {
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
         
@@ -173,7 +162,6 @@ class AppAlarmManager @Inject constructor(
             },
             isHardwareOnline = isHardwareOnline,
             isLocalInternetLoss = isLocalInternetLoss,
-            isJammerSuspicion = isJammerSuspicion,
             isSignalLoss = isSignalLoss,
             isGpsStalling = isGpsStalling,
             powerAlarmPending = powerAlarmPending,
@@ -186,9 +174,9 @@ class AppAlarmManager @Inject constructor(
             lastGpsPacketTs = trackerLastGpsTs,
             trackerLastValidFixTs = trackerLastValidFixTs,
             trackerSpeed = trackerSpeed,
-            isTrackerVisualJump = isTrackerVisualJump,
+            status = status,
+            isJammer = isJammer,
             jumpTier = jumpTier,
-            isAdaptiveJump = isAdaptiveJump,
             trackerBattery = trackerBattery,
             trackerTemp = trackerTemp,
             wasDistanceViolated = wasDistanceViolated,
@@ -197,7 +185,6 @@ class AppAlarmManager @Inject constructor(
             firstViolationWasJump = firstViolationWasJump,
             distToHomeAuthority = distToHomeAuthority,
             isGpsGap = isGpsGap,
-            isSuspicious = isSuspicious,
             isTamperDetected = isTamperDetected,
             trackerTiltDegrees = trackerTiltDegrees,
             trackerAcousticDb = trackerAcousticDb,
@@ -211,7 +198,6 @@ class AppAlarmManager @Inject constructor(
             peakVibrationShock = peakVibrationShock,
             trackerCurrentMa = trackerCurrentMa,
             isPowerTamper = isPowerTamper,
-            isSitActive = isSitActive,
             isLocationPending = isLocationPending,
             locationPendingReason = locationPendingReason,
             isPowerSaveMode = isPowerSaveMode,
@@ -222,8 +208,7 @@ class AppAlarmManager @Inject constructor(
             isTrackerMode = isTrackerMode,
             isBatterySteepDischarge = isBatterySteepDischarge,
             isCoolingModeActive = isCoolingModeActive,
-            capabilities = capabilities,
-            isAnchorLocked = isAnchorLocked
+            capabilities = capabilities
         )
 
         val report = MainAlarmLogic.detectViolations(evaluationState)
@@ -330,7 +315,6 @@ class AppAlarmManager @Inject constructor(
             ALERT_ID_TRACKER_TAMPER -> currentSettings.tamperAlert
             ALERT_ID_TRACKER_TILT -> currentSettings.tiltAlert
             ALERT_ID_TRACKER_ACOUSTIC -> currentSettings.acousticAlert
-            ALERT_ID_TRACKER_CHAIR -> currentSettings.chairOccupied
             ALERT_ID_TRACKER_LIFT -> currentSettings.liftAlert
             ALERT_ID_SYSTEM_STORAGE_LOW -> currentSettings.systemStorageLow
             ALERT_ID_SYSTEM_STORAGE_CRITICAL -> true
@@ -342,7 +326,7 @@ class AppAlarmManager @Inject constructor(
     private fun isSpecialType(type: String): Boolean {
         return when (type) {
             ALERT_ID_JUMP_ALERT, ALERT_ID_TRACKER_TAMPER, ALERT_ID_TRACKER_POWER,
-            ALERT_ID_TRACKER_TILT, ALERT_ID_TRACKER_ACOUSTIC, ALERT_ID_TRACKER_CHAIR, 
+            ALERT_ID_TRACKER_TILT, ALERT_ID_TRACKER_ACOUSTIC,
             ALERT_ID_TRACKER_GEOFENCE, ALERT_ID_TRACKER_LIFT, ALERT_ID_SYSTEM_STORAGE_LOW,
             ALERT_ID_SYSTEM_STORAGE_CRITICAL,
             ALERT_ID_SIGNAL_LOSS, ALERT_ID_GPS_STALL, ALERT_ID_TRACKER_TEMP,

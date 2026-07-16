@@ -8,46 +8,42 @@ import android.os.IBinder
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.gps19.core.engine.*
-import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.inject.Inject
 import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * v9.3.6:
- * - Issue #058: Hilt Migration. Consolidated common service dependencies and 
- *   added RemoteUpdateWrapper for direct injection. Standardized onDestroy for shared components.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual dependency injection via AppContainer.
  */
-@AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
 
-    @Inject lateinit var configManager: ConfigManager
-    @Inject lateinit var logManager: LogManager
-    @Inject lateinit var networkManager: AppNetworkManager
-    @Inject lateinit var networkManagerWrapper: RemoteUpdateWrapper
-    @Inject lateinit var repository: MainRepository
-    @Inject lateinit var telemetryRepository: TelemetryRepository
-    @Inject lateinit var offlineRepository: OfflineRepository
-    @Inject lateinit var timeProvider: TimeProvider
+    lateinit var configManager: ConfigManager
+    lateinit var logManager: LogManager
+    lateinit var networkManager: AppNetworkManager
+    lateinit var networkManagerWrapper: RemoteUpdateWrapper
+    lateinit var repository: MainRepository
+    lateinit var telemetryRepository: TelemetryRepository
+    lateinit var offlineRepository: OfflineRepository
+    lateinit var timeProvider: TimeProvider
     
-    @Inject lateinit var systemMonitor: SystemMonitor
-    @Inject lateinit var notificationManager: AppNotificationManager
+    lateinit var systemMonitor: SystemMonitor
+    lateinit var notificationManager: AppNotificationManager
 
     // Common Core Components
-    @Inject lateinit var gpsManager: GpsManager
-    @Inject lateinit var sessionManager: SessionManager
-    @Inject lateinit var systemStatusProvider: SystemStatusProvider
-    @Inject lateinit var forensicUseCase: ServiceForensicUseCase
-    @Inject lateinit var integrityMonitor: IntegrityMonitor
-    @Inject lateinit var alarmManager: AppAlarmManager
-    @Inject lateinit var historyManager: HistoryManager
-    @Inject lateinit var locationProcessor: LocationProcessor
-    @Inject lateinit var syncManager: SyncManager
-    @Inject lateinit var commandRouter: CommandRouter
-    @Inject lateinit var remoteHandler: RemoteHandler
+    lateinit var gpsManager: GpsManager
+    lateinit var sessionManager: SessionManager
+    lateinit var systemStatusProvider: SystemStatusProvider
+    lateinit var forensicUseCase: ServiceForensicUseCase
+    lateinit var integrityMonitor: IntegrityMonitor
+    lateinit var alarmManager: AppAlarmManager
+    lateinit var historyManager: HistoryManager
+    lateinit var locationProcessor: LocationProcessor
+    lateinit var syncManager: SyncManager
+    lateinit var commandRouter: CommandRouter
+    lateinit var remoteHandler: RemoteHandler
     
     protected val cachedPkgName by lazy { packageName }
 
@@ -73,6 +69,8 @@ abstract class BaseMonitorService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
+        injectDependencies()
+        
         serviceStartRealtime = timeProvider.elapsedRealtime()
         
         systemMonitor.setWatchdogListener { set, skipped ->
@@ -84,6 +82,31 @@ abstract class BaseMonitorService : LifecycleService() {
         systemMonitor.acquireWakeLock()
         
         startServiceForeground()
+    }
+
+    protected open fun injectDependencies() {
+        val container = (application as GpsApplication).container
+        configManager = container.configManager
+        logManager = container.logManager
+        networkManager = container.appNetworkManager
+        networkManagerWrapper = container.remoteUpdateWrapper
+        repository = container.mainRepository
+        telemetryRepository = container.telemetryRepository
+        offlineRepository = container.offlineRepository
+        timeProvider = container.timeProvider
+        systemMonitor = container.systemMonitor
+        notificationManager = container.appNotificationManager
+        gpsManager = container.gpsManager
+        sessionManager = container.sessionManager
+        systemStatusProvider = container.systemStatusProvider
+        forensicUseCase = container.serviceForensicUseCase
+        integrityMonitor = container.integrityMonitor
+        alarmManager = container.appAlarmManager
+        historyManager = container.historyManager
+        locationProcessor = container.locationProcessor
+        syncManager = container.syncManager
+        commandRouter = container.commandRouter
+        remoteHandler = container.remoteHandler
     }
 
     abstract fun startServiceForeground()

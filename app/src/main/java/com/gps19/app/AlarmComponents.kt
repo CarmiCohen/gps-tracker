@@ -29,6 +29,8 @@ import com.gps19.core.engine.*
  * AlarmComponents: Overlay for active alarm states and sirens.
  * v9.4.0:
  * - Issue #502: Device Independency. Genericized hardware configuration alerts.
+ * v9.4.1:
+ * - Issue #510: Removed Chair Sit Detection.
  */
 
 @Composable
@@ -54,7 +56,7 @@ fun AlarmOverlay(
         ALERT_TITLE_BATTERY_STEEP_DISCHARGE,
         ALERT_TITLE_TRACKER_TEMP, ALERT_TITLE_TRACKER_GAP, ALERT_TITLE_TRACKER_TAMPER,
         ALERT_TITLE_TRACKER_TILT, ALERT_TITLE_TRACKER_ACOUSTIC, ALERT_TITLE_TRACKER_LIFT,
-        ALERT_TITLE_TRACKER_CHAIR, ALERT_TITLE_SYSTEM_STORAGE_LOW, ALERT_TITLE_SYSTEM_STORAGE_CRITICAL,
+        ALERT_TITLE_SYSTEM_STORAGE_LOW, ALERT_TITLE_SYSTEM_STORAGE_CRITICAL,
         ALERT_TITLE_HARDWARE_CONFIGURATION
     )
 

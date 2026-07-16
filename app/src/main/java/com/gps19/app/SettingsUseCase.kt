@@ -5,20 +5,13 @@ import android.widget.Toast
 import com.gps19.core.engine.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
- * Handles draft lifecycle, atomic commits, and full system resets.
- * v9.3.27:
- * - Performance (#092): Refactored loadAllSettings to use getSettingsSnapshot() 
- *   and SettingsMapper, reducing startup I/O from ~15 reads to 1.
- * v9.3.3:
- * - Issue #039 Identity Rejection Feedback: Added bulkUpdateSettings.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal.
  */
-@Singleton
-class SettingsUseCase @Inject constructor(
+class SettingsUseCase(
     private val repository: MainRepository,
     private val settingsRepository: SettingsRepository,
     private val timeProvider: TimeProvider,

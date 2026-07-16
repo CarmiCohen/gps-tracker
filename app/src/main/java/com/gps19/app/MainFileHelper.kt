@@ -20,9 +20,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
- * v9.3.15:
- * - Hardening: Finalized Double standardization. Eliminated redundant boundary 
- *   conversions in export/import paths.
+ * v9.4.1:
+ * - Issue #510: Removed Chair Sit Detection from import/export.
  */
 object MainFileHelper {
 
@@ -99,8 +98,7 @@ object MainFileHelper {
                     tiltAlert = s.optBoolean("tiltAlert", true),
                     acousticAlert = s.optBoolean("acousticAlert", true),
                     liftAlert = s.optBoolean("liftAlert", true),
-                    tamperAlert = s.optBoolean("tamperAlert", true),
-                    chairOccupied = s.optBoolean("chairOccupied", true)
+                    tamperAlert = s.optBoolean("tamperAlert", true)
                 )
             }
             
@@ -277,7 +275,6 @@ object MainFileHelper {
                         put("acousticAlert", alertSettings.acousticAlert)
                         put("liftAlert", alertSettings.liftAlert)
                         put("tamperAlert", alertSettings.tamperAlert)
-                        put("chairOccupied", alertSettings.chairOccupied)
                     })
                 }
 
@@ -296,7 +293,7 @@ object MainFileHelper {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Config save failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Log.e("GPS19", "Config save failed: ${e.message}")
                 }
             }
         }

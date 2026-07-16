@@ -11,21 +11,16 @@ import android.os.Build
 import android.os.PowerManager
 import android.os.StatFs
 import com.gps19.core.engine.*
-import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * v9.3.25:
- * - R996: Logcat Forensic Integrity. Cached system services and implemented 
- *   a 10s TTL for system status polling to eliminate Samsung getPackageName noise.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual dependency injection.
  */
-@Singleton
-class IntegrityMonitor @Inject constructor(
-    @ApplicationContext private val context: Context,
+class IntegrityMonitor(
+    private val context: Context,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider
 ) {

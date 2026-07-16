@@ -2,7 +2,8 @@ package com.gps19.core.engine
 
 /**
  * PersistencePolicy: Rules for determining if data should be written to disk.
- * v8.8.21: Extracted from MainRepository to decouple storage logic from the persistence layer.
+ * July.1.15:
+ * - Issue #512: Consolidate Sentinel Statuses. Aligned storage gating with SentinelStatus.
  */
 object PersistencePolicy {
 
@@ -12,13 +13,12 @@ object PersistencePolicy {
     fun shouldSaveTrailPoint(
         isStorageCritical: Boolean,
         isStorageLow: Boolean,
-        isJump: Boolean,
-        isSuspicious: Boolean
+        status: SentinelStatus
     ): Boolean {
         if (isStorageCritical) return false
         
-        // On low storage, we only save high-priority forensic points (jumps or suspicious activity).
-        if (isStorageLow && !isJump && !isSuspicious) return false
+        // On low storage, we only save high-priority forensic points (JUMP or TAMPER).
+        if (isStorageLow && status == SentinelStatus.VALID) return false
         
         return true
     }

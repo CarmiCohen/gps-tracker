@@ -1,19 +1,13 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * BehaviorUseCase: Logic for determining high-level behavioral states and UI visibility gates.
- * July.1.13:
- * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted from state computation.
- * July.1.12:
- * - Issue #046: Shared Behavioral State. Updated computeTrackerState to adopt 
- *   authoritative remote state when in Viewer mode, preventing HUD desync.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal.
  */
-@Singleton
-class BehaviorUseCase @Inject constructor() {
+class BehaviorUseCase {
 
     fun computeTrackerState(
         currentState: MainUiState,
@@ -39,7 +33,7 @@ class BehaviorUseCase @Inject constructor() {
         }
 
         return TrackerStateManager.updateState(
-            isVisualJump = effectiveLocation.isVisualJump,
+            status = effectiveLocation.status,
             speed = effectiveLocation.speed,
             vibration = effectiveLocation.vibration,
             vibrationFloor = effectiveLocation.adaptiveVibrationFloor,

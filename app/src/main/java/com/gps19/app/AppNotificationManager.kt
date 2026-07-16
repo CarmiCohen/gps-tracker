@@ -11,20 +11,17 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import com.gps19.core.engine.CapabilityStatus
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
- * July.1.12:
- * - Issue #502: Device Independency. Genericized overlay blocking logic using PermissionState.
+ * v9.5.0:
+ * - Issue #503: Hilt Removal. Manual dependency injection.
  */
-@Singleton
-class AppNotificationManager @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val statusProvider: SystemStatusProvider
+class AppNotificationManager(
+    private val context: Context,
+    private val configManager: ConfigManager,
+    private val timeProvider: com.gps19.core.engine.TimeProvider
 ) {
 
     private val channelId = "location_service_channel"
@@ -120,29 +117,6 @@ class AppNotificationManager @Inject constructor(
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(alarmNotificationId, builder.build())
-    }
-
-    suspend fun showAlarmOverlay(causes: String) {
-        val perms = statusProvider.getPermissionState()
-        val canDraw = perms.isOverlayGranted
-        
-        // v9.4.0: Abstracting hardware-specific restriction detection.
-        val isHardwareBlocked = perms.hasBackgroundRestriction && perms.backgroundStatus != CapabilityStatus.GRANTED
-        
-        val effectivelyBlocked = !canDraw || isHardwareBlocked
-
-        updateAlarmNotification(causes, showPermissionAction = effectivelyBlocked)
-
-        if (!effectivelyBlocked) {
-            val intent = Intent(context, AlarmActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                putExtra("causes", causes)
-            }
-            try {
-                context.startActivity(intent)
-            } catch (e: Exception) {
-            }
-        }
     }
 
     fun cancelAlarm() {
