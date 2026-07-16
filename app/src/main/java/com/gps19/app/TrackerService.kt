@@ -18,8 +18,7 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Manual dependency injection.
+ * v9.5.0: Issue #513 - Flatten Service Architecture (ConnectivitySuite).
  */
 class TrackerService : BaseMonitorService() {
 
@@ -132,17 +131,13 @@ class TrackerService : BaseMonitorService() {
             sensorManager.start()
 
             delay(1000)
-            networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
+            connectivitySuite.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
             
-            delay(1000)
-            syncManager.startSyncLoop(lifecycleScope, configManager.deviceId, configManager.viewerId, true)
-
-            remoteHandler.setListener(object : RemoteHandler.Listener {
+            connectivitySuite.setPeerListener(object : ConnectivitySuite.PeerListener {
                 override fun onPeerPulse(id: String) {
                     handleViewerPulse(id)
                 }
             })
-            remoteHandler.initialize(lifecycleScope)
 
             commandRouter.setListener(object : CommandRouter.Listener {
                 override fun onViewerPulse(id: String) = handleViewerPulse(id)
@@ -164,10 +159,6 @@ class TrackerService : BaseMonitorService() {
             })
             commandRouter.register()
             commandRouter.startObservingCommands(lifecycleScope)
-
-            networkManagerWrapper.setCallback { data -> 
-                remoteHandler.handleRemoteUpdate(data, true)
-            }
 
             delay(2000)
             gpsCollectionJob = lifecycleScope.launch { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
@@ -226,7 +217,7 @@ class TrackerService : BaseMonitorService() {
 
         if ((configManager.viewerId == MainRepository.DEFAULT_TRACKER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
             configManager.viewerId = id
-            networkManager.updateIdentity(configManager.deviceId, id, true)
+            connectivitySuite.updateIdentity(configManager.deviceId, id, true)
             lifecycleScope.launch { repository.saveString(MainRepository.VIEWER_ID_KEY, id) } 
         }
         if (sessionManager.onViewerPulse(id, timeProvider.currentTimeMillis(), true)) { 
@@ -298,12 +289,12 @@ class TrackerService : BaseMonitorService() {
                 val proc = lastProcessedLocation
                 logManager.logServiceEvent("HEURISTIC RECOVERY: Hardware suppression detected.", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
                     lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                networkManager.connect(configManager.relayUrl)
+                connectivitySuite.connect(configManager.relayUrl)
             }
         }
         
-        val isSocketConnected = networkManager.isConnected() && !transientDropDetected.getAndSet(false)
-        networkManager.updateRelayStatus(isSocketConnected)
+        val isSocketConnected = connectivitySuite.isConnected() && !transientDropDetected.getAndSet(false)
+        connectivitySuite.updateRelayStatus(isSocketConnected)
         
         val isViewerActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
         sessionManager.updateTick(nowRealtime, lastServiceTickRealtime, isPeerAvailable = isSocketConnected && isViewerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
@@ -327,7 +318,7 @@ class TrackerService : BaseMonitorService() {
 
             alarmManager.evaluateAlarms(
                 now = now, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime,
-                isTrackerMode = true, isRelayConnected = networkManager.isConnected(), isTrackerConnected = true,
+                isTrackerMode = true, isRelayConnected = connectivitySuite.isConnected(), isTrackerConnected = true,
                 status = processed.status,
                 isJammer = processed.jammerDetected,
                 jumpTier = processed.jumpTier,
@@ -351,7 +342,7 @@ class TrackerService : BaseMonitorService() {
                 capabilities = capabilities
             )
             
-            syncManager.pushCurrentStatus(
+            connectivitySuite.pushCurrentStatus(
                 deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true,
                 loc = location, filtered = processed.optimizedPoint, distToTracker = null, distToHome = processed.distToHome,
                 maxAccuracy = processed.maxAccuracy, filteredSpeed = processed.filteredSpeed, vibration = sensorManager.currentVibrationIndex,
@@ -379,7 +370,7 @@ class TrackerService : BaseMonitorService() {
                 now = now,
                 lastTickTs = lastServiceTickTs,
                 serviceTickCounter = serviceTickCounter,
-                rtt = networkManager.getRtt(),
+                rtt = connectivitySuite.getRtt(),
                 peerSignal = 10,
                 peerAvail = isSocketConnected && isViewerActive,
                 hasGps = true,
@@ -399,7 +390,7 @@ class TrackerService : BaseMonitorService() {
                 now = now,
                 lastTickTs = lastServiceTickTs,
                 serviceTickCounter = serviceTickCounter,
-                rtt = networkManager.getRtt(),
+                rtt = connectivitySuite.getRtt(),
                 peerSignal = 0,
                 peerAvail = isSocketConnected && isViewerActive,
                 hasGps = false,
@@ -428,8 +419,7 @@ class TrackerService : BaseMonitorService() {
         settingsJob?.cancel()
         commandRouter.unregister()
         sensorManager.stop()
-        networkManager.stop()
-        syncManager.stopSyncLoop()
+        connectivitySuite.stop()
         super.onDestroy()
     }
 

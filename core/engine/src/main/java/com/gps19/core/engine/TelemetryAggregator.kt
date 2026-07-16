@@ -4,9 +4,8 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
- * July.1.16:
- * - Issue #510: Abandoned Chair Sit Detection. Removed sit-related fields.
- * - Issue #511: Simplify Ribbon Telemetry.
+ * July.16.18:
+ * - Issue #514: Simplified backfillGaps. Removed snrSamples parameter.
  */
 class TelemetryAggregator {
 
@@ -87,7 +86,6 @@ class TelemetryAggregator {
     fun backfillGaps(
         lastTickTs: Long,
         now: Long,
-        snrSamples: List<EngineSnrSample>,
         sensorSamples: List<EngineSensorSnapshot>,
         baseTemplate: EngineConnectionPoint
     ): List<Pair<RibbonScale, EngineConnectionPoint>> {

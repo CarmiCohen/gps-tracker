@@ -27,12 +27,13 @@ Removed `HindsightBuffer`, "Muzzle" logic, and `AdaptiveJumpConfidence` multipli
 *   **Abandon Chair Sit Detection - Issue #510 [COMPLETED]**: Removed IMU-based sit detection logic and associated sensor pipeline.
 *   **Simplify Ribbon Telemetry - Issue #511 [COMPLETED]**: Purged detailed sensor ribbons (SIT, TLT, BAR, SVZ, SDZ).
 *   **Consolidate Sentinel Statuses - Issue #512 [COMPLETED]**: Unified system states into `VALID`, `JUMP`, and `TAMPER`.
-*   **Flatten Service Dependencies - Issue #513 [PENDING]**: Plan to merge managers into `ConnectivitySuite`.
-*   **Simplify GpsManager - Issue #514 [PENDING]**: Plan to rely on `FusedLocationProviderClient`.
+*   **Flatten Service Dependencies - Issue #513 [COMPLETED]**: Merged `AppNetworkManager`, `SyncManager`, and `RemoteHandler` into `ConnectivitySuite`.
+*   **Simplify GpsManager - Issue #514 [COMPLETED]**: Streamlined to rely on `FusedLocationProviderClient` and immediate GNSS metadata.
 *   **Remove "Stationary Anchor" Logic - Issue #515 [COMPLETED]**: Replaced with a simple 0.5m/s speed gate.
 *   **De-duplicate "Status" Logic - Issue #516 [PENDING]**: Plan for `SystemHealthState` source of truth.
 
 ## Proposed Execution Order
-1.  **Phase 1-3**: Completed (Kalman, Timers, GtoEngine, Sit Detection, Status Consolidation).
+1.  **Phase 1-3**: Completed.
 2.  **Phase 4**: Remove Hilt and implement manual DI (Issue #503) - **COMPLETED**.
-3.  **Phase 5**: Flatten Service architecture (Issue #513).
+3.  **Phase 5**: Flatten Service architecture (Issue #513) - **COMPLETED**.
+4.  **Phase 6**: Simplify GpsManager (Issue #514) - **COMPLETED**.

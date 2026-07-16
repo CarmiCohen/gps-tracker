@@ -5,12 +5,12 @@ import java.util.UUID
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
- * v9.5.0: Hilt removed. Manual DI. Replaced Lazy with lambda.
+ * v9.5.0: Issue #513 - Flatten Service Architecture (ConnectivitySuite).
  */
 class LogManager(
     private val logRepository: LogRepository,
     private val telemetry: TelemetryRepository,
-    private val networkManager: () -> AppNetworkManager,
+    private val connectivitySuite: () -> ConnectivitySuite,
     private val configManager: ConfigManager,
     private val timeProvider: TimeProvider
 ) {
@@ -107,15 +107,15 @@ class LogManager(
             vibeSnapshot = finalVibe
         )
         
-        val net = networkManager()
-        val isConnected = net.isConnected()
+        val suite = connectivitySuite()
+        val isConnected = suite.isConnected()
         
         val data = log.toJSONObject().apply {
             put("ver", BuildConfig.VERSION_NAME)
         }
         
         if (isConnected) {
-            net.emit("log_update", data)
+            suite.emit("log_update", data)
         }
         
         logRepository.addLog(log, initiallySynced = isConnected)

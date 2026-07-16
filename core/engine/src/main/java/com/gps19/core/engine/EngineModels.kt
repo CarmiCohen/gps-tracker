@@ -4,10 +4,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * July.1.16:
- * - Issue #510: Abandon Chair Sit Detection. Removed sit-related fields.
- * - Issue #508 & #515: Optimization & Anchor Removal. Removed isAdaptiveJump and isAnchorLocked.
- * - Issue #512: Consolidate Sentinel Statuses. Reduced to VALID, JUMP, TAMPER.
+ * July.16.18:
+ * - Issue #514: Simplified GpsManager. Removed EngineSnrSample.
  */
 
 @Serializable
@@ -97,9 +95,8 @@ enum class RibbonScale(val key: String, val intervalSeconds: Int) {
 }
 
 /**
- * Sensor and SNR snapshots for gap filling.
+ * Sensor snapshots for gap filling.
  */
-data class EngineSnrSample(val ts: Long, val snr: Double)
 data class EngineSensorSnapshot(
     val ts: Long,
     val acoustic: Double,

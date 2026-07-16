@@ -1,27 +1,29 @@
-# Project Handover: Issue #512 (Status Consolidation) - Core Logic Complete
+# Project Handover: Service Simplification Phase (Issues #513, #514) - COMPLETED
 
-## Current Status: IN PROGRESS (UI & Cleanup Phase)
-The core logic for `SentinelStatus` consolidation (VALID, JUMP, TAMPER) is complete. The engine, services, and persistence layers are aligned. UI components are being updated to use the new status field.
+## Status: COMPLETED
+**Version Context**: `July.16.18`
 
-## Completed Actions
-- **Engine & Logic Layer**:
-    - **`EngineModels.kt`**: `AlarmEvaluationState` now uses `SentinelStatus` and `isJammer`.
-    - **`MainAlarmLogic.kt`**: Violation detection now branches based on consolidated status.
-    - **`LocationProcessor.kt`**: Aligned `ProcessedLocation` with the new status model.
-- **Service Layer**:
-    - **`TrackerService.kt` & `ViewerService.kt`**: Updated to pass and process consolidated statuses.
-    - **`RemoteHandler.kt`**: Introduced `trackerStatus` for remote state tracking.
-    - **`SyncManager.kt`**: Aligned telemetry sync with the new schema.
-- **Persistence Layer**:
-    - **`Database.kt`**: Version 56. Added `status` to `PendingStatusEntity`. `MIGRATION_55_56` implemented.
-- **Persistence Layer**:
-    - **`Models.kt`**: Added `status` to `TrackerStatus`, `LocationState`, and `IntegrityState`.
+This session focused on the core simplification of the service layer and hardware management, adhering to the R406 hardening plan.
 
-## Remaining Tasks
-1.  **Refactor `DashboardUseCase.kt`**: Switch from `isSuspicious` and `isTrackerVisualJump` flags to the `status` enum for badge and state rendering.
-2.  **Redundant Flag Removal**: Remove legacy boolean flags from `Models.kt` (e.g., `isSuspicious`, `isJump`) once UI migration is confirmed.
-3.  **UI Verification**: Ensure `SharedUiComponents.kt` correctly interprets `JUMP` and `TAMPER` for color-coding.
+## Key Changes
 
-## Environment Info
-- **Database Version**: 56
-- **Critical File**: `MainAlarmLogic.kt` (Source of truth for violation mapping)
+### 1. ConnectivitySuite Integration (Issue #513)
+- **Consolidation**: Merged `AppNetworkManager`, `SyncManager`, and `RemoteHandler` into a unified `ConnectivitySuite.kt`.
+- **Decoupling**: Removed `RemoteUpdateWrapper` and implemented a direct `PeerListener` interface.
+- **Dependency Graph**: Updated `AppContainer`, `TrackerService`, and `ViewerService` to use the new suite, significantly reducing constructor bloat.
+
+### 2. GpsManager Simplification (Issue #514)
+- **Streamlined Hardware Access**: Refactored `GpsManager.kt` to rely on `FusedLocationProviderClient` for location updates and immediate `GnssStatus` for metadata.
+- **Forensic Cleanup**: Removed legacy `kickGps`/`reviveGps` commands and the high-maintenance SNR sampling/buffering logic.
+- **Downstream Updates**: 
+    - Updated `TelemetryAggregator.kt` in `:core:engine` to remove SNR-based gap filling.
+    - Updated `HistoryManager.kt` to purge SNR sampling dependencies.
+    - Removed `EngineSnrSample` from `EngineModels.kt`.
+
+## Verification Results
+- **Build**: Successfully executed `:app:assembleDebug`.
+- **Authoritative Requirements**: Updated `STATUS/SOT_MASTER_REQUIREMENTS.md` with **R406h** (Connectivity) and **R406i** (GPS).
+- **Tracking**: `issues.md` and `SIMPLIFICATION_PLAN.md` updated.
+
+## Next Steps
+- **Issue #516**: De-duplicate "Status" logic by creating a unified `SystemHealthState`.

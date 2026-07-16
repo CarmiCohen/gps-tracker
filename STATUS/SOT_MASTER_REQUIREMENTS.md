@@ -1,8 +1,10 @@
-# System Source of Truth (SoT) - July.16.17 (Development)
+# System Source of Truth (SoT) - July.16.18 (Development)
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Streamlined GPS Architecture (R406i / Issue #514)**: The system MUST rely primarily on the `FusedLocationProviderClient` for location updates. Manual GNSS callback data is restricted to immediate metadata (SNR, satellites in view) only. Forensic SNR buffering and secondary analytical backfilling of signal density are DEPRECATED and REMOVED to minimize CPU overhead and maintain system simplicity. (v9.5.0)
+*   **Flattened Connectivity Architecture (R406h / Issue #513)**: The system MUST use a unified `ConnectivitySuite` to manage all external communications. This component consolidates the responsibilities of the previous Network Manager, Sync Manager, and Remote Peer Handler. It serves as the single point of entry for telemetry emission, heartbeat/keep-alive logic, and peer state synchronization. (v9.5.0)
 *   **Manual Dependency Injection Authority (R406c / Issue #503)**: The system MUST use a manual Dependency Injection pattern centered around a singleton `AppContainer` hosted in the `GpsApplication` class. Dagger, Hilt, and other reflective or bytecode-generating DI frameworks are strictly FORBIDDEN. All global singletons and repositories MUST be instantiated and managed within `AppContainer`. (v9.5.0)
 *   **Unified System Heartbeat (R406a / Issue #501)**: The system MUST use a standardized 2000ms heartbeat (`TICK_INTERVAL_MS`) globally for all hardware polling, logic cycles, and telemetry submissions. ALL variable polling intervals (Moving, Stationary, Suspicious, High-Frequency) are DEPRECATED and REMOVED. This simplifies the state machine and ensures predictable data density. (v9.4.0)
 *   **Device Independency / Hardware Abstraction (R406b / Issue #502)**: The core tracking engine MUST be brand-agnostic. All hardware-specific workarounds (e.g., Xiaomi background restrictions, Samsung wake-lock renewal) MUST be abstracted into a generic `HardwareCapabilities` model. The engine MUST operate on abstract capability flags rather than hardcoded manufacturer names. (v9.4.0)

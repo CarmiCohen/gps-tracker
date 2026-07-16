@@ -12,9 +12,8 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * July.1.16:
- * - Issue #510: Abandoned Chair Sit Detection. Removed sit-related fields.
- * - Issue #515: Stationary Anchor Removal. Removed isAnchorLocked.
+ * July.16.18:
+ * - Issue #514: Simplified GpsManager. Removed SNR sampling logic.
  */
 class HistoryManager(
     private val context: Context,
@@ -158,10 +157,6 @@ class HistoryManager(
         currentMa: Int,
         locationPendingReason: LocationPendingReason
     ) {
-        val snrSamples = if (isTrackerMode) {
-            gpsManager.getSnrSamples(lastTickTs + 1, now).map { EngineSnrSample(it.first, it.second) }
-        } else emptyList()
-
         val sensorSamples = if (isTrackerMode) {
             sensorManager.getSensorSamples(lastTickTs + 1, now).map { 
                 EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe) 
@@ -184,7 +179,7 @@ class HistoryManager(
             locationPendingReason = locationPendingReason
         )
 
-        val results = aggregator.backfillGaps(lastTickTs, now, snrSamples, sensorSamples, baseTemplate)
+        val results = aggregator.backfillGaps(lastTickTs, now, sensorSamples, baseTemplate)
         
         val fourMPoints = results.filter { it.first == RibbonScale.FOUR_MIN }.map { mapToAppPoint(it.second) }
         if (fourMPoints.isNotEmpty()) {

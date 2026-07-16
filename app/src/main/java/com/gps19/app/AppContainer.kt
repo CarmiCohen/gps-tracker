@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 /**
  * AppContainer: Manual Dependency Injection container.
  * Part of Issue #503: Hilt Removal.
+ * Updated for Issue #513: ConnectivitySuite integration.
  */
 class AppContainer(private val context: Context) {
 
@@ -73,28 +74,14 @@ class AppContainer(private val context: Context) {
         LogManager(
             logRepository = logRepository,
             telemetry = telemetryRepository,
-            networkManager = { appNetworkManager },
+            connectivitySuite = { connectivitySuite },
             configManager = configManager,
             timeProvider = timeProvider
         )
     }
 
-    val remoteUpdateWrapper = RemoteUpdateWrapper()
-
     val communicationManager: CommunicationManager by lazy {
         CommunicationManager(context, configManager, logManager, timeProvider)
-    }
-
-    val appNetworkManager: AppNetworkManager by lazy {
-        AppNetworkManager(
-            context = context,
-            settingsRepository = settingsRepository,
-            telemetryRepository = telemetryRepository,
-            logManager = logManager,
-            onRemoteUpdateWrapper = remoteUpdateWrapper,
-            timeProvider = timeProvider,
-            signalingProvider = communicationManager
-        )
     }
 
     val systemMonitor = SystemMonitor(context, timeProvider)
@@ -118,18 +105,23 @@ class AppContainer(private val context: Context) {
         locationProcessor = locationProcessor
     )
     
-    val syncManager = SyncManager(
-        context = context,
-        networkManager = appNetworkManager,
-        sessionManager = sessionManager,
-        gpsManager = gpsManager,
-        locationProcessor = locationProcessor,
-        telemetryRepository = telemetryRepository,
-        offlineRepository = offlineRepository,
-        logManager = logManager,
-        timeProvider = timeProvider,
-        repository = mainRepository
-    )
+    val connectivitySuite: ConnectivitySuite by lazy {
+        ConnectivitySuite(
+            context = context,
+            settingsRepository = settingsRepository,
+            telemetryRepository = telemetryRepository,
+            logManager = { logManager },
+            timeProvider = timeProvider,
+            signalingProvider = communicationManager,
+            sessionManager = sessionManager,
+            gpsManager = gpsManager,
+            locationProcessor = locationProcessor,
+            offlineRepository = offlineRepository,
+            mainRepository = mainRepository,
+            alarmManager = appAlarmManager,
+            forensicUseCase = serviceForensicUseCase
+        )
+    }
 
     val serviceBehaviorUseCase = ServiceBehaviorUseCase(timeProvider)
 
@@ -142,29 +134,19 @@ class AppContainer(private val context: Context) {
         timeProvider
     )
 
-    val remoteHandler = RemoteHandler(
-        context = context,
-        repository = mainRepository,
-        locationProcessor = locationProcessor,
-        alarmManager = appAlarmManager,
-        sessionManager = sessionManager,
-        forensicUseCase = serviceForensicUseCase,
-        timeProvider = timeProvider
-    )
-
-    val commandRouter = CommandRouter(
-        context = context,
-        configManager = configManager,
-        logManager = logManager,
-        networkManager = appNetworkManager,
-        alarmManager = appAlarmManager,
-        notificationManager = appNotificationManager,
-        sessionManager = sessionManager,
-        locationProcessor = locationProcessor,
-        remoteHandler = remoteHandler,
-        repository = mainRepository,
-        syncManager = syncManager,
-        integrityMonitor = integrityMonitor,
-        timeProvider = timeProvider
-    )
+    val commandRouter: CommandRouter by lazy {
+        CommandRouter(
+            context = context,
+            configManager = configManager,
+            logManager = logManager,
+            connectivitySuite = connectivitySuite,
+            alarmManager = appAlarmManager,
+            notificationManager = appNotificationManager,
+            sessionManager = sessionManager,
+            locationProcessor = locationProcessor,
+            repository = mainRepository,
+            integrityMonitor = integrityMonitor,
+            timeProvider = timeProvider
+        )
+    }
 }

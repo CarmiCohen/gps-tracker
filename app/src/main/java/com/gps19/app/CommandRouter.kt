@@ -19,20 +19,18 @@ import timber.log.Timber
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
- * v9.5.0: Hilt removed. Manual DI.
+ * v9.5.0: Issue #513 - Flatten Service Architecture (ConnectivitySuite).
  */
 class CommandRouter(
     private val context: Context,
     private val configManager: ConfigManager,
     private val logManager: LogManager,
-    private val networkManager: AppNetworkManager,
+    private val connectivitySuite: ConnectivitySuite,
     private val alarmManager: AppAlarmManager,
     private val notificationManager: AppNotificationManager,
     private val sessionManager: SessionManager,
     private val locationProcessor: LocationProcessor,
-    private val remoteHandler: RemoteHandler,
     private val repository: MainRepository,
-    private val syncManager: SyncManager,
     private val integrityMonitor: IntegrityMonitor,
     private val timeProvider: TimeProvider
 ) {
@@ -106,33 +104,32 @@ class CommandRouter(
                             listener?.onResetTimers()
                             sessionManager.reset()
                             locationProcessor.resetStats()
-                            remoteHandler.resetStats()
+                            connectivitySuite.resetPeerStats()
                         }
                         is UiCommand.SendSettingsCmd -> {
                             try {
                                 val data = JSONObject(command.data)
                                 data.put("viewer_id", configManager.viewerId)
                                 data.put("from_viewer", true)
-                                networkManager.emit("settings_update", data)
+                                connectivitySuite.emit("settings_update", data)
                             } catch (e: Exception) {
                                 Timber.e(e, "Error parsing settings command data")
                             }
                         }
                         is UiCommand.SettingsUpdated -> {
                             listener?.onSyncSensors()
-                            networkManager.connect(configManager.relayUrl)
-                            networkManager.updateIdentity(configManager.deviceId, configManager.viewerId, configManager.isTrackerMode)
-                            syncManager.startSyncLoop(scope, configManager.deviceId, configManager.viewerId, configManager.isTrackerMode)
+                            connectivitySuite.connect(configManager.relayUrl)
+                            connectivitySuite.updateIdentity(configManager.deviceId, configManager.viewerId, configManager.isTrackerMode)
                         }
                         is UiCommand.PushSettings -> {
-                            networkManager.pushSettings()
+                            connectivitySuite.pushSettings()
                         }
                         is UiCommand.ZoomIn, is UiCommand.ZoomOut, is UiCommand.MapZoomIn, is UiCommand.MapZoomOut -> {}
                         is UiCommand.FullInitializationReset -> {
                             listener?.onResetTimers()
                             sessionManager.reset()
                             locationProcessor.resetStats()
-                            remoteHandler.resetStats()
+                            connectivitySuite.resetPeerStats()
                             listener?.onSyncSensors()
                         }
                         is UiCommand.TriggerTestAlarm -> {

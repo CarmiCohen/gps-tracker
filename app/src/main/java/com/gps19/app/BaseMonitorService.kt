@@ -15,15 +15,13 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Manual dependency injection via AppContainer.
+ * v9.5.0: Issue #513 - Flatten Service Architecture (ConnectivitySuite).
  */
 abstract class BaseMonitorService : LifecycleService() {
 
     lateinit var configManager: ConfigManager
     lateinit var logManager: LogManager
-    lateinit var networkManager: AppNetworkManager
-    lateinit var networkManagerWrapper: RemoteUpdateWrapper
+    lateinit var connectivitySuite: ConnectivitySuite
     lateinit var repository: MainRepository
     lateinit var telemetryRepository: TelemetryRepository
     lateinit var offlineRepository: OfflineRepository
@@ -41,9 +39,7 @@ abstract class BaseMonitorService : LifecycleService() {
     lateinit var alarmManager: AppAlarmManager
     lateinit var historyManager: HistoryManager
     lateinit var locationProcessor: LocationProcessor
-    lateinit var syncManager: SyncManager
     lateinit var commandRouter: CommandRouter
-    lateinit var remoteHandler: RemoteHandler
     
     protected val cachedPkgName by lazy { packageName }
 
@@ -88,8 +84,7 @@ abstract class BaseMonitorService : LifecycleService() {
         val container = (application as GpsApplication).container
         configManager = container.configManager
         logManager = container.logManager
-        networkManager = container.appNetworkManager
-        networkManagerWrapper = container.remoteUpdateWrapper
+        connectivitySuite = container.connectivitySuite
         repository = container.mainRepository
         telemetryRepository = container.telemetryRepository
         offlineRepository = container.offlineRepository
@@ -104,9 +99,7 @@ abstract class BaseMonitorService : LifecycleService() {
         alarmManager = container.appAlarmManager
         historyManager = container.historyManager
         locationProcessor = container.locationProcessor
-        syncManager = container.syncManager
         commandRouter = container.commandRouter
-        remoteHandler = container.remoteHandler
     }
 
     abstract fun startServiceForeground()
@@ -190,7 +183,7 @@ abstract class BaseMonitorService : LifecycleService() {
             systemMonitor.cancelWatchdogAlarm()
             systemMonitor.releaseWakeLock()
         }
-        if (this::networkManager.isInitialized) networkManager.stop()
+        if (this::connectivitySuite.isInitialized) connectivitySuite.stop()
         if (this::commandRouter.isInitialized) commandRouter.unregister()
 
         super.onDestroy()
