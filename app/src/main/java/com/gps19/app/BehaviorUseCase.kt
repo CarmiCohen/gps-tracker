@@ -32,11 +32,17 @@ class BehaviorUseCase {
             currentState.trackerLocation
         }
 
+        val effectiveHealth = if (appMode == "tracker") {
+            currentState.localHealth
+        } else {
+            currentState.trackerHealth
+        }
+
         return TrackerStateManager.updateState(
             status = effectiveLocation.status,
             speed = effectiveLocation.speed,
-            vibration = effectiveLocation.vibration,
-            vibrationFloor = effectiveLocation.adaptiveVibrationFloor,
+            vibration = effectiveHealth.vibration,
+            vibrationFloor = effectiveHealth.adaptiveVibrationFloor,
             isTrackerConnected = isConnected,
             systemTimePulse = systemTimePulse
         )

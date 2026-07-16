@@ -9,8 +9,8 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Manual dependency injection.
+ * July.16.19:
+ * - Issue #517: Refactor AppAlarmManager. Consolidated local flags into AlarmHistory.
  */
 class AppAlarmManager(
     private val context: Context,
@@ -36,13 +36,8 @@ class AppAlarmManager(
 
     private val activeAlarms = mutableMapOf<String, AlarmEvaluation>()
     private var lastAlarmsJson = "[]"
-    private var powerAlarmPending = false
     private var currentSettings = AlertSettings()
-
-    private var firstViolationTs: Long = 0L
-    private var firstViolationWasJump: Boolean = false
-    private var distanceViolationCounter: Int = 0
-    private var wasDistanceViolated: Boolean = false
+    private var history = AlarmHistory()
     
     private var lastSirenStopTs: Long = 0L
     private var lastGlobalTriggerTs: Long = 0L
@@ -54,7 +49,7 @@ class AppAlarmManager(
     fun getSettings(): AlertSettings = currentSettings
 
     fun setPowerAlarmPending(pending: Boolean) {
-        powerAlarmPending = pending
+        history.powerAlarmPending = pending
     }
 
     fun hasUnresolvedAlarms(): Boolean {
@@ -160,11 +155,6 @@ class AppAlarmManager(
                 now - serviceStartTs < BOOTSTRAP_PHASE_MS + DISCOVERY_PHASE_MS -> DiscoveryPhase.DISCOVERING
                 else -> DiscoveryPhase.MONITORING
             },
-            isHardwareOnline = isHardwareOnline,
-            isLocalInternetLoss = isLocalInternetLoss,
-            isSignalLoss = isSignalLoss,
-            isGpsStalling = isGpsStalling,
-            powerAlarmPending = powerAlarmPending,
             trackerLat = trackerLat,
             trackerLng = trackerLng,
             homePoints = repository.getCachedHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) },
@@ -174,49 +164,49 @@ class AppAlarmManager(
             lastGpsPacketTs = trackerLastGpsTs,
             trackerLastValidFixTs = trackerLastValidFixTs,
             trackerSpeed = trackerSpeed,
-            status = status,
-            isJammer = isJammer,
             jumpTier = jumpTier,
-            trackerBattery = trackerBattery,
-            trackerTemp = trackerTemp,
-            wasDistanceViolated = wasDistanceViolated,
-            distanceViolationCounter = distanceViolationCounter,
-            firstViolationTs = firstViolationTs,
-            firstViolationWasJump = firstViolationWasJump,
+            history = history,
             distToHomeAuthority = distToHomeAuthority,
             isGpsGap = isGpsGap,
-            isTamperDetected = isTamperDetected,
-            trackerTiltDegrees = trackerTiltDegrees,
-            trackerAcousticDb = trackerAcousticDb,
-            trackerBaroAlt = trackerBaroAlt,
             trackerBaroAltEma = trackerBaroAltEma,
-            trackerLux = trackerLux,
-            isNear = isNear,
-            luxBaseline = luxBaseline,
-            acousticFloorDb = acousticFloorDb,
-            adaptiveVibrationFloor = adaptiveVibrationFloor,
-            peakVibrationShock = peakVibrationShock,
-            trackerCurrentMa = trackerCurrentMa,
-            isPowerTamper = isPowerTamper,
-            isLocationPending = isLocationPending,
-            locationPendingReason = locationPendingReason,
-            isPowerSaveMode = isPowerSaveMode,
-            standbyBucket = standbyBucket,
-            netInterface = netInterface,
-            isStorageLow = isStorageLow,
-            isStorageCritical = isStorageCritical,
             isTrackerMode = isTrackerMode,
-            isBatterySteepDischarge = isBatterySteepDischarge,
-            isCoolingModeActive = isCoolingModeActive,
+            health = SystemHealthState(
+                isHardwareOnline = isHardwareOnline,
+                localInternetLoss = isLocalInternetLoss,
+                signalLoss = isSignalLoss,
+                gpsStalled = isGpsStalling,
+                status = status,
+                isJammer = isJammer,
+                batteryLevel = trackerBattery,
+                batteryTemp = trackerTemp,
+                isTamperDetected = isTamperDetected,
+                tiltDegrees = trackerTiltDegrees,
+                acousticDb = trackerAcousticDb,
+                baroAlt = trackerBaroAlt,
+                lux = trackerLux,
+                isNear = isNear,
+                luxBaseline = luxBaseline,
+                acousticFloorDb = acousticFloorDb,
+                adaptiveVibrationFloor = adaptiveVibrationFloor,
+                peakVibrationShock = peakVibrationShock,
+                currentMa = trackerCurrentMa,
+                isPowerTamper = isPowerTamper,
+                isLocationPending = isLocationPending,
+                locationPendingReason = locationPendingReason,
+                isPowerSaveMode = isPowerSaveMode,
+                standbyBucket = standbyBucket,
+                netInterface = netInterface,
+                isStorageLow = isStorageLow,
+                isStorageCritical = isStorageCritical,
+                isBatterySteepDischarge = isBatterySteepDischarge,
+                isCoolingModeActive = isCoolingModeActive
+            ),
             capabilities = capabilities
         )
 
         val report = MainAlarmLogic.detectViolations(evaluationState)
         
-        wasDistanceViolated = evaluationState.wasDistanceViolated
-        distanceViolationCounter = evaluationState.distanceViolationCounter
-        firstViolationTs = evaluationState.firstViolationTs
-        firstViolationWasJump = evaluationState.firstViolationWasJump
+        // history is modified in-place by detectViolations
 
         val newAlarms = mutableMapOf<String, AlarmEvaluation>()
         var triggerOccurredInThisCycle = false
@@ -341,9 +331,7 @@ class AppAlarmManager(
             activeAlarms.clear()
         }
         lastAlarmsJson = "[]"
-        wasDistanceViolated = false
-        distanceViolationCounter = 0
-        firstViolationTs = 0L
+        history = AlarmHistory()
         lastSirenStopTs = 0L
         lastGlobalTriggerTs = 0L
     }

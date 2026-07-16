@@ -74,6 +74,9 @@ fun AppMapContainer(
     
     val trackerLoc = if (isTrackerMode) uiState.localLocation else uiState.trackerLocation
     val viewerLoc = if (isTrackerMode) uiState.trackerLocation else uiState.localLocation
+    
+    val trackerHealth = if (isTrackerMode) uiState.localHealth else uiState.trackerHealth
+    val viewerHealth = if (isTrackerMode) uiState.trackerHealth else uiState.localHealth
 
     // Skew-Immune Freshness Logic for Map
     fun calculateFreshness(loc: LocationState): Boolean {
@@ -89,16 +92,16 @@ fun AppMapContainer(
     val trackerLat = trackerLoc.lat; val trackerLng = trackerLoc.lng
     val trackerBearing = trackerLoc.bearing; val trackerAccuracy = trackerLoc.accuracy
     val trackerMaxAcc = trackerLoc.maxAccuracy; val trackerSpeed = trackerLoc.speed
-    val trackerLastValidFixRealtime = trackerLoc.lastValidFixRealtime
-    val trackerLocationPending = trackerLoc.isLocationPending
-    val trackerLocationPendingReason = trackerLoc.locationPendingReason
+    val trackerLastValidFixRealtime = trackerHealth.lastValidFixRealtime
+    val trackerLocationPending = trackerHealth.isLocationPending
+    val trackerLocationPendingReason = trackerHealth.locationPendingReason
 
     val viewerLat = viewerLoc.lat; val viewerLng = viewerLoc.lng
     val viewerBearing = viewerLoc.bearing; val viewerAccuracy = viewerLoc.accuracy
     val viewerMaxAcc = viewerLoc.maxAccuracy; val viewerSpeed = viewerLoc.speed
-    val viewerLastValidFixRealtime = viewerLoc.lastValidFixRealtime
-    val viewerLocationPending = viewerLoc.isLocationPending
-    val viewerLocationPendingReason = viewerLoc.locationPendingReason
+    val viewerLastValidFixRealtime = viewerHealth.lastValidFixRealtime
+    val viewerLocationPending = viewerHealth.isLocationPending
+    val viewerLocationPendingReason = viewerHealth.locationPendingReason
 
     val initialCenter = remember(uiState.trackerLocation.lat, uiState.localLocation.lat) {
         when {
@@ -225,8 +228,8 @@ fun OsmMap(
     LaunchedEffect(isLocked) { localLockStatus.value = isLocked }
 
     val lastTrailRendered = remember { mutableStateOf<List<TrailPoint>?>(null) }; val lastViewerTrailRendered = remember { mutableStateOf<List<TrailPoint>?>(null) }
-    val lastHomeRendered = remember { mutableStateOf<List<GeoPoint>?>(null) }; val lastViolationsRendered = remember { mutableStateOf<List<ViolationPoint>?>(null) }
-    val lastFenceState = remember { mutableStateOf<Boolean?>(null) }; val lastViolationVisibility = remember { mutableStateOf<Pair<Boolean, Boolean>?>(null) }
+    val lastHomeRendered = remember { mutableStateOf<List<GeoPoint>?>(null) }; val lastFenceState = remember { mutableStateOf<Boolean?>(null) }
+    val lastViolationsRendered = remember { mutableStateOf<List<ViolationPoint>?>(null) }; val lastViolationVisibility = remember { mutableStateOf<Pair<Boolean, Boolean>?>(null) }
 
     LaunchedEffect(localLockStatus.value, lat, lng, myLat, myLng, isFresh, isMeFresh, mapFollowMode) {
         if (localLockStatus.value) {

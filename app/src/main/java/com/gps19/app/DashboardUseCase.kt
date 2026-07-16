@@ -5,9 +5,8 @@ import java.util.Locale
 
 /**
  * DashboardUseCase: Logic for computing the analytical dashboard state.
- * v9.5.0:
- * - Issue #503: Hilt Removal.
- * - Issue #512: Aligned with consolidated SentinelStatus.
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Use localHealth and trackerHealth.
  */
 class DashboardUseCase {
 
@@ -45,6 +44,7 @@ class DashboardUseCase {
         } else 0L
 
         val loc = if (isViewer) state.trackerLocation else state.localLocation
+        val health = if (isViewer) state.trackerHealth else state.localHealth
         
         // Receipt-based freshness calculation
         val telemetryAge = if (loc.telemetryTs > 0) now - loc.telemetryTs else Long.MAX_VALUE
@@ -56,7 +56,7 @@ class DashboardUseCase {
         val isTelemetryVisible = telemetryAge < SENSOR_GRACE_PERIOD_MS
         val isForensicFresh = telemetryAge < WATCH_DOG_UI_GRACE_MS
 
-        val bucket = if (isViewer) state.trackerLocation.standbyBucket else state.integrity.standbyBucket
+        val bucket = health.standbyBucket
         val snrValue = if (loc.gnssDetail != null && isTelemetryVisible) {
             val avgCn0 = loc.gnssDetail?.satellites?.map { it.cn0 }?.average() ?: 0.0
             "${avgCn0.toInt()}dB"
@@ -72,7 +72,7 @@ class DashboardUseCase {
         return DashboardState(
             trackerState = trackerState,
             status = loc.status,
-            isTamperDetected = loc.isTamperDetected,
+            isTamperDetected = health.isTamperDetected,
             maxDrop = maxDrop,
             lastSeen = lastSeen,
             totalDrop = totalDrop,
@@ -83,8 +83,8 @@ class DashboardUseCase {
             engineVersion = BuildConfig.VERSION_NAME,
             sinceConn = sinceConn,
             sinceDisco = sinceDisco,
-            violationUptime = formatDuration(loc.violationUptimeMs),
-            violationPercentage = "%.1f%%".format(Locale.getDefault(), loc.violationPercentage * 100.0),
+            violationUptime = formatDuration(health.violationUptimeMs),
+            violationPercentage = "%.1f%%".format(Locale.getDefault(), health.violationPercentage * 100.0),
             lat = gpsVal("%.6f".format(Locale.getDefault(), loc.lat)),
             lng = gpsVal("%.6f".format(Locale.getDefault(), loc.lng)),
             trackerAccuracy = gpsVal("±%.1fm".format(Locale.getDefault(), rawAcc)),
@@ -93,30 +93,30 @@ class DashboardUseCase {
             isSatsIndexWarning = (state.trackerSatsUsed < 4 && state.trackerSatsView > 0),
             viewerAccuracy = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), state.localLocation.accuracy),
             viewerMaxAcc = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), if(state.localLocation.maxAccuracy > 0) state.localLocation.maxAccuracy else state.localLocation.accuracy),
-            vibration = sensorVal("%.2fG".format(Locale.getDefault(), loc.vibration)),
-            heading = sensorVal("%.0f°".format(Locale.getDefault(), loc.heading)),
-            tilt = sensorVal("%.1f°".format(Locale.getDefault(), loc.tiltDegrees)),
-            acoustic = sensorVal("%.0fdB".format(Locale.getDefault(), loc.acousticDb)),
-            lift = sensorVal("%.1fm".format(Locale.getDefault(), loc.baroAlt)),
-            lux = sensorVal("%.0flx".format(Locale.getDefault(), loc.lux)),
-            proximity = sensorVal(if (loc.isNear) "NEAR" else "FAR"),
-            proximityCm = sensorVal(if (loc.proximityCm >= 0) "${loc.proximityCm.toInt()}cm" else "--"),
-            proximityDebounce = forensicVal("${loc.proximityDebounceMs}ms"),
-            rollingVibration = forensicVal("%.3fG".format(Locale.getDefault(), loc.vibrationRollingSum)),
+            vibration = sensorVal("%.2fG".format(Locale.getDefault(), health.vibration)),
+            heading = sensorVal("%.0f°".format(Locale.getDefault(), health.heading)),
+            tilt = sensorVal("%.1f°".format(Locale.getDefault(), health.tiltDegrees)),
+            acoustic = sensorVal("%.0fdB".format(Locale.getDefault(), health.acousticDb)),
+            lift = sensorVal("%.1fm".format(Locale.getDefault(), health.baroAlt)),
+            lux = sensorVal("%.0flx".format(Locale.getDefault(), health.lux)),
+            proximity = sensorVal(if (health.isNear) "NEAR" else "FAR"),
+            proximityCm = sensorVal(if (health.proximityCm >= 0) "${health.proximityCm.toInt()}cm" else "--"),
+            proximityDebounce = forensicVal("${health.proximityDebounceMs}ms"),
+            rollingVibration = forensicVal("%.3fG".format(Locale.getDefault(), health.vibrationRollingSum)),
             gpsSpeed = gpsVal("%.1fkm/h".format(Locale.getDefault(), loc.speed * 3.6)),
             trackerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), trackerMaxTemp)),
             viewerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), localMaxTemp)),
-            peakShock = sensorVal("%.2fG".format(Locale.getDefault(), loc.peakVibrationShock)),
-            vibrationFloor = sensorVal("%.2fG".format(Locale.getDefault(), loc.adaptiveVibrationFloor)),
-            luxBaseline = sensorVal("%.0flx".format(Locale.getDefault(), loc.luxBaseline)),
-            acousticFloor = sensorVal("%.0fdB".format(Locale.getDefault(), loc.acousticFloorDb)),
-            isMicPending = loc.micPending,
-            isPowerTamper = loc.isPowerTamper,
-            isPowerSaveMode = if (isViewer) state.trackerLocation.isPowerSaveMode else state.integrity.isPowerSaveMode,
+            peakShock = sensorVal("%.2fG".format(Locale.getDefault(), health.peakVibrationShock)),
+            vibrationFloor = sensorVal("%.2fG".format(Locale.getDefault(), health.adaptiveVibrationFloor)),
+            luxBaseline = sensorVal("%.0flx".format(Locale.getDefault(), health.luxBaseline)),
+            acousticFloor = sensorVal("%.0fdB".format(Locale.getDefault(), health.acousticFloorDb)),
+            isMicPending = health.micPending,
+            isPowerTamper = health.isPowerTamper,
+            isPowerSaveMode = health.isPowerSaveMode,
             standbyBucket = bucket,
-            netInterface = if (isViewer) state.trackerLocation.netInterface else state.integrity.netInterface,
-            isStorageLow = if (isViewer) state.trackerLocation.isStorageLow else state.integrity.isStorageLow,
-            isStorageCritical = if (isViewer) state.trackerLocation.isStorageCritical else state.integrity.isStorageCritical,
+            netInterface = health.netInterface,
+            isStorageLow = health.isStorageLow,
+            isStorageCritical = health.isStorageCritical,
             snr = snrValue,
             distToHome = formatDist(state.distanceTrackerToHome),
             distToViewer = formatDist(state.distanceTrackerToViewer),
@@ -125,11 +125,11 @@ class DashboardUseCase {
             isTelemetryFresh = isTelemetryFresh,
             isGpsVisible = isTelemetryVisible,
             isLinkVisible = isTelemetryVisible,
-            isBatterySteepDischarge = loc.isBatterySteepDischarge,
-            isCoolingModeActive = loc.isCoolingModeActive,
-            currentMa = sensorVal("${loc.currentMa}mA"),
-            isLocationPending = loc.isLocationPending,
-            locationPendingReason = loc.locationPendingReason
+            isBatterySteepDischarge = health.isBatterySteepDischarge,
+            isCoolingModeActive = health.isCoolingModeActive,
+            currentMa = sensorVal("${health.currentMa}mA"),
+            isLocationPending = health.isLocationPending,
+            locationPendingReason = health.locationPendingReason
         )
     }
 

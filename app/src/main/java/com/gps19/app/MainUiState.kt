@@ -1,15 +1,13 @@
 package com.gps19.app
 
 import com.gps19.core.engine.CapabilityStatus
+import com.gps19.core.engine.SystemHealthState
 import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Unified immutable state for the entire UI structure.
- * v9.4.0:
- * - Issue #502: Device Independency. Genericized PermissionState and readiness logic.
- * v9.3.39:
- * - Issue #092: Added pendingMode to NavigationState to facilitate reactive 
- *   auto-transitions after permission grants.
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Use localHealth and trackerHealth.
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -29,7 +27,8 @@ data class MainUiState(
     val trackerSatsView: Int = 0,
     val trackerSatsUsed: Int = 0,
     val connectivity: ConnectivityState = ConnectivityState(),
-    val integrity: IntegrityStateUi = IntegrityStateUi(),
+    val localHealth: SystemHealthState = SystemHealthState(),
+    val trackerHealth: SystemHealthState = SystemHealthState(),
     val alertSettings: AlertSettings = AlertSettings(),
     val isAlarmSilenced: Boolean = false,
     val isSirenPlaying: Boolean = false,

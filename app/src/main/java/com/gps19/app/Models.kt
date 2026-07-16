@@ -10,11 +10,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * July.1.16:
- * - Issue #512: Consolidate Sentinel Statuses. Removed isSuspicious and isJump (derived from status).
- * - Issue #510: Abandoned Chair Sit Detection. Removed all sit-related fields.
- * - Issue #515: Stationary Anchor Removal. Removed isAnchorLocked.
- * - Issue #508: Optimization Removal. Removed Adaptation Muzzle flags.
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Purged IntegrityState, simplified LocationState.
  */
 
 @Serializable
@@ -389,6 +386,9 @@ data class TrackerStatus(
 
 data class AlarmInfo(val title: String, val subtitle: String, val type: String = "", val isResolved: Boolean = false, val isSirenDisabled: Boolean = false)
 
+/**
+ * LocationState: Pure position data. Hardware/Health metadata moved to SystemHealthState.
+ */
 data class LocationState(
     val lat: Double = 0.0,
     val lng: Double = 0.0,
@@ -399,43 +399,8 @@ data class LocationState(
     val timestamp: Long = 0L,
     val telemetryTs: Long = 0L, 
     val status: SentinelStatus = SentinelStatus.VALID,
-    val isJammer: Boolean = false,
-    val isStalled: Boolean = false,
-    val vibration: Double = 0.0,
-    val heading: Double = 0.0,
-    val tiltDegrees: Double = 0.0,
-    val acousticDb: Double = 0.0,
-    val baroAlt: Double = 0.0,
-    val lux: Double = 0.0,
-    val isNear: Boolean = true,
-    val isTamperDetected: Boolean = false,
-    val peakVibrationShock: Double = 0.0,
-    val peakVibrationShockTs: Long = 0L,
-    val luxBaseline: Double = 0.0,
-    val acousticFloorDb: Double = 0.0,
-    val adaptiveVibrationFloor: Double = 0.12,
-    val proxIdx: Double = 1.0,
-    val proximityCm: Double = -1.0,
-    val proximityDebounceMs: Long = 0L,
-    val vibrationRollingSum: Double = 0.0,
-    val micPending: Boolean = false,
-    val isPowerTamper: Boolean = false,
-    val violationUptimeMs: Long = 0L,
-    val violationPercentage: Double = 0.0,
-    val isClockRegression: Boolean = false,
-    val isLocationPending: Boolean = false,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRealtime: Long = 0L,
-    val isPowerSaveMode: Boolean = false,
-    val standbyBucket: Int = -1,
-    val netInterface: String = "UNKNOWN",
-    val isStorageLow: Boolean = false,
-    val isStorageCritical: Boolean = false,
-    val gnssDetail: GnssDetail? = null,
-    val isBatterySteepDischarge: Boolean = false,
-    val isCoolingModeActive: Boolean = false,
-    val currentMa: Int = 0,
-    val trackerState: TrackerState = TrackerState.UNKNOWN
+    val trackerState: TrackerState = TrackerState.UNKNOWN,
+    val gnssDetail: GnssDetail? = null
 )
 
 data class DashboardState(
@@ -601,30 +566,6 @@ sealed class UiCommand {
     object MapZoomOut : UiCommand()
 }
 
-data class IntegrityState(
-    val signalLoss: Boolean = false, val gpsStalled: Boolean = false,
-    val localInternetLoss: Boolean = false, val isHardwareOnline: Boolean = true, val batteryLevel: Int = 100,
-    val batteryTemp: Double = 0.0, val maxTemp: Double = 0.0, val isCharging: Boolean = false, val currentMa: Int = 0,
-    val activeAlarmsJson: String? = null,
-    val status: SentinelStatus = SentinelStatus.VALID,
-    val isJammer: Boolean = false,
-    val isStalled: Boolean = false,
-    val isTamperDetected: Boolean = false,
-    val micPending: Boolean = false,
-    val isPowerTamper: Boolean = false,
-    val isClockRegression: Boolean = false,
-    val isLocationPending: Boolean = false,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRealtime: Long = 0L,
-    val isPowerSaveMode: Boolean = false,
-    val standbyBucket: Int = -1,
-    val netInterface: String = "UNKNOWN",
-    val isStorageLow: Boolean = false,
-    val isStorageCritical: Boolean = false,
-    val isBatterySteepDischarge: Boolean = false, 
-    val isCoolingModeActive: Boolean = false
-)
-
 data class StatsState(
     val totalConnectedMs: Long = 0L, val sessionConnectedMs: Long = 0L,
     val maxDropMs: Long = 0L, val maxDropTs: Long = 0L, val totalDropMs: Long = 0L,
@@ -640,29 +581,4 @@ data class ConnectivityState(
     val isLocalOnline: Boolean = true, val isRelayConnected: Boolean = false, val isTrackerConnected: Boolean = false,
     val lastUpdateTs: Long = 0L,
     val lastRemoteActivityTs: Long = 0L, val connectedViewers: List<String> = emptyList()
-)
-
-data class IntegrityStateUi(
-    val signalLoss: Boolean = false,
-    val gpsStalled: Boolean = false,
-    val localInternetLoss: Boolean = false,
-    val isHardwareOnline: Boolean = true,
-    val status: SentinelStatus = SentinelStatus.VALID,
-    val isJammer: Boolean = false,
-    val isStalled: Boolean = false,
-    val isTamperDetected: Boolean = false,
-    val micPending: Boolean = false,
-    val isPowerTamper: Boolean = false,
-    val isClockRegression: Boolean = false,
-    val isLocationPending: Boolean = false,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRealtime: Long = 0L,
-    val isPowerSaveMode: Boolean = false,
-    val standbyBucket: Int = -1,
-    val netInterface: String = "UNKNOWN",
-    val isStorageLow: Boolean = false,
-    val isStorageCritical: Boolean = false,
-    val isBatterySteepDischarge: Boolean = false, 
-    val isCoolingModeActive: Boolean = false,
-    val currentMa: Int = 0
 )

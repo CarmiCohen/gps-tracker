@@ -16,8 +16,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Manual dependency injection.
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Refactored to use SystemHealthState.
  */
 class IntegrityMonitor(
     private val context: Context,
@@ -45,40 +45,14 @@ class IntegrityMonitor(
         this.listener = listener
     }
 
-    var maxTemperature = 0.0
-        private set
-
     private val sustainedViolations = mutableMapOf<String, Long>()
-    
-    var batteryTemp = 0.0
-    private var _batteryLevel = -1
-    var isPowerTamperDetected = false
-    private var lastPowerDisconnectTs = 0L
-
-    var isPowerSaveModeActive = false
-        private set
-        
-    var currentStandbyBucket: Int = -1
-        private set
-
-    var isStorageLow = false
-        private set
-
-    var isStorageCritical = false
-        private set
-
-    var currentNetInterface: String = "UNKNOWN"
-        private set
-
-    var isCharging = false
-        private set
-
     private val batterySamples = ConcurrentLinkedQueue<Pair<Long, Int>>()
     private var lastBatteryCheckTs = 0L
-    var isBatterySteepDischarge = false
-        private set
+    private var lastPowerDisconnectTs = 0L
+    private var _batteryLevel = -1
 
-    var isCoolingModeActive = false
+    // The single source of truth for health data
+    var currentHealth = SystemHealthState()
         private set
 
     fun getBatteryLevel(): Int {
@@ -99,54 +73,68 @@ class IntegrityMonitor(
         lastFullPollTs = nowRealtime
 
         val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        
+        var newHealth = currentHealth
+
         if (intent != null) {
-            batteryTemp = (intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)) / 10.0
-            if (batteryTemp > maxTemperature) {
-                maxTemperature = batteryTemp
-                repository.saveDoubleSync(MainRepository.MAX_TEMP_KEY, maxTemperature)
+            val batteryTemp = (intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)) / 10.0
+            var maxTemp = newHealth.maxTemp
+            if (batteryTemp > maxTemp) {
+                maxTemp = batteryTemp
+                repository.saveDoubleSync(MainRepository.MAX_TEMP_KEY, maxTemp)
             }
 
-            if (!isCoolingModeActive && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
-                isCoolingModeActive = true
+            var isCooling = newHealth.isCoolingModeActive
+            if (!isCooling && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
+                isCooling = true
                 listener?.onLogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true)
                 listener?.onViolationSustained(ALERT_ID_TRACKER_TEMP)
-            } else if (isCoolingModeActive && batteryTemp < MAX_SAFE_TEMPERATURE_RECOVERY) {
-                isCoolingModeActive = false
+            } else if (isCooling && batteryTemp < MAX_SAFE_TEMPERATURE_RECOVERY) {
+                isCooling = false
                 listener?.onLogEvent("System Info: Thermal limit recovered (${batteryTemp}°C). Normal tracking resumed.", false)
             }
 
             _batteryLevel = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
             val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
-            isCharging = plugged > 0
+            val isCharging = plugged > 0
 
             if (isCharging) onPowerConnected() else onPowerDisconnected()
 
+            var isSteepDischarge = newHealth.isBatterySteepDischarge
             if (_batteryLevel != -1 && !isCharging) {
                 if (nowRealtime - lastBatteryCheckTs > 60000L) {
                     batterySamples.add(nowRealtime to _batteryLevel)
                     lastBatteryCheckTs = nowRealtime
-                    checkBatteryDischarge(nowRealtime)
+                    isSteepDischarge = checkBatteryDischarge(nowRealtime)
                 }
             } else if (isCharging) {
                 batterySamples.clear()
-                isBatterySteepDischarge = false
+                isSteepDischarge = false
             }
+
+            newHealth = newHealth.copy(
+                batteryLevel = _batteryLevel,
+                batteryTemp = batteryTemp,
+                maxTemp = maxTemp,
+                isCharging = isCharging,
+                isCoolingModeActive = isCooling,
+                isBatterySteepDischarge = isSteepDischarge,
+                currentMa = getBatteryCurrent()
+            )
         }
 
-        val currentPowerSave = powerManager.isPowerSaveMode
-        if (currentPowerSave != isPowerSaveModeActive) {
-            isPowerSaveModeActive = currentPowerSave
-            if (isPowerSaveModeActive) {
+        val powerSave = powerManager.isPowerSaveMode
+        if (powerSave != newHealth.isPowerSaveMode) {
+            if (powerSave) {
                 listener?.onLogEvent("SYSTEM WARNING: Power Save Mode active. Sensors and GPS may be throttled by OS.", true)
             } else {
                 listener?.onLogEvent("System Info: Power Save Mode deactivated. Normal tracking resumed.", false)
             }
         }
         
+        var standbyBucket = newHealth.standbyBucket
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && usageStatsManager != null) {
             val bucket = usageStatsManager.appStandbyBucket
-            if (bucket != currentStandbyBucket) {
+            if (bucket != standbyBucket) {
                 val bucketName = when (bucket) {
                     UsageStatsManager.STANDBY_BUCKET_ACTIVE -> "ACTIVE"
                     UsageStatsManager.STANDBY_BUCKET_WORKING_SET -> "WORKING_SET"
@@ -156,83 +144,96 @@ class IntegrityMonitor(
                     else -> "UNKNOWN ($bucket)"
                 }
                 
-                if (currentStandbyBucket != -1) {
+                if (standbyBucket != -1) {
                     val isCritical = bucket >= UsageStatsManager.STANDBY_BUCKET_RARE
                     listener?.onLogEvent("SYSTEM PRIORITY: Standby bucket changed to $bucketName. ${if(isCritical) "Background tracking may be severely limited." else ""}", isCritical)
                 }
-                currentStandbyBucket = bucket
+                standbyBucket = bucket
             }
         }
 
         val newNet = getActiveNetworkInterface()
-        if (newNet != currentNetInterface) {
+        if (newNet != newHealth.netInterface) {
             listener?.onLogEvent("Network switched to $newNet", false)
-            currentNetInterface = newNet
         }
 
-        checkStorageIntegrity()
+        val storage = checkStorageIntegrity()
 
-        if (lastPowerDisconnectTs > 0 && !isPowerTamperDetected) {
+        var isPowerTamper = newHealth.isPowerTamper
+        if (lastPowerDisconnectTs > 0 && !isPowerTamper) {
             if (checkViolationSustained(ALERT_ID_TRACKER_POWER, lastPowerDisconnectTs, POWER_DISCONNECT_DEBOUNCE_MS)) {
-                isPowerTamperDetected = true
+                isPowerTamper = true
                 listener?.onLogEvent("Tracker power tamper confirmed (debounce met)", true)
             }
         }
+
+        currentHealth = newHealth.copy(
+            isPowerSaveMode = powerSave,
+            standbyBucket = standbyBucket,
+            netInterface = newNet,
+            isStorageLow = storage.first,
+            isStorageCritical = storage.second,
+            isPowerTamper = isPowerTamper,
+            isHardwareOnline = isInternetHardwarePresent()
+        )
     }
 
-    private fun checkBatteryDischarge(nowRealtime: Long) {
+    private fun checkBatteryDischarge(nowRealtime: Long): Boolean {
         while (batterySamples.isNotEmpty() && (nowRealtime - batterySamples.peek()!!.first) > BATTERY_STEEP_DISCHARGE_WINDOW_MS) {
             batterySamples.poll()
         }
 
-        if (batterySamples.size < 2) return
+        if (batterySamples.size < 2) return currentHealth.isBatterySteepDischarge
 
         val earliest = batterySamples.peek()!!
         val latest = batterySamples.last()
         
         val drop = earliest.second - latest.second
-        val wasSteep = isBatterySteepDischarge
-        isBatterySteepDischarge = drop >= BATTERY_STEEP_DISCHARGE_THRESHOLD
+        val isSteep = drop >= BATTERY_STEEP_DISCHARGE_THRESHOLD
         
-        if (isBatterySteepDischarge && !wasSteep) {
+        if (isSteep && !currentHealth.isBatterySteepDischarge) {
             listener?.onLogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected ($drop% in ${(nowRealtime - earliest.first) / 60000}m). System shutdown likely imminent.", true)
             listener?.onViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE)
         }
+        return isSteep
     }
 
-    private fun checkStorageIntegrity() {
+    private fun checkStorageIntegrity(): Pair<Boolean, Boolean> {
+        var low = currentHealth.isStorageLow
+        var critical = currentHealth.isStorageCritical
         try {
             val stat = StatFs(context.filesDir.path)
             val bytesAvailable = stat.availableBlocksLong * stat.blockSizeLong
             val megabytesAvailable = bytesAvailable / (1024 * 1024)
             
-            val currentCritical = megabytesAvailable < SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB
-            val currentLow = megabytesAvailable < SYSTEM_STORAGE_LOW_THRESHOLD_MB
+            critical = megabytesAvailable < SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB
+            low = megabytesAvailable < SYSTEM_STORAGE_LOW_THRESHOLD_MB
             
-            if (currentCritical != isStorageCritical) {
-                isStorageCritical = currentCritical
-                if (isStorageCritical) {
+            if (critical != currentHealth.isStorageCritical) {
+                if (critical) {
                     listener?.onLogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB). ALL non-essential logging HALTED to prevent corruption.", true)
                     listener?.onViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL)
                 }
             }
 
-            if (currentLow != isStorageLow) {
-                isStorageLow = currentLow
-                if (isStorageLow && !isStorageCritical) {
+            if (low != currentHealth.isStorageLow) {
+                if (low && !critical) {
                     listener?.onLogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB). Throttling logs.", true)
                     listener?.onViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW)
-                } else if (!isStorageLow) {
-                    isStorageCritical = false
+                } else if (!low) {
+                    critical = false
                     listener?.onLogEvent("System Info: Storage space restored (${megabytesAvailable}MB).", false)
                 }
             }
         } catch (e: Exception) {
             Timber.e(e, "Failed to check storage integrity")
         }
+        return low to critical
     }
 
-    fun setMaxTemperature(temp: Double) { maxTemperature = temp }
+    fun setMaxTemperature(temp: Double) {
+        currentHealth = currentHealth.copy(maxTemp = temp)
+    }
 
     fun getActiveNetworkInterface(): String {
         val activeNetwork = connectivityManager.activeNetwork ?: return "OFFLINE"
@@ -251,18 +252,18 @@ class IntegrityMonitor(
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
-    fun isHardwareOnline(): Boolean = isInternetHardwarePresent()
-
     fun checkInternetIntegrity(now: Long): Boolean {
         val online = isInternetHardwarePresent()
         if (!online) {
             val firstDetected = sustainedViolations.getOrPut(ALERT_ID_LOCAL_INTERNET) { now }
             if (now - firstDetected > INTERNET_LOSS_THRESHOLD_MS) {
                 listener?.onViolationSustained(ALERT_ID_LOCAL_INTERNET)
+                currentHealth = currentHealth.copy(localInternetLoss = true)
                 return false
             }
         } else {
             sustainedViolations.remove(ALERT_ID_LOCAL_INTERNET)
+            currentHealth = currentHealth.copy(localInternetLoss = false)
         }
         return true
     }
@@ -273,7 +274,9 @@ class IntegrityMonitor(
         } else {
             TRACKER_SIGNAL_LOSS_THRESHOLD_MS
         }
-        return silenceDelta > threshold
+        val loss = silenceDelta > threshold
+        currentHealth = currentHealth.copy(signalLoss = loss)
+        return !loss
     }
 
     fun checkViolationSustained(type: String, startTs: Long, threshold: Long): Boolean {
@@ -285,7 +288,7 @@ class IntegrityMonitor(
     }
 
     fun onPowerDisconnected() {
-        if (!isPowerTamperDetected && lastPowerDisconnectTs == 0L) {
+        if (!currentHealth.isPowerTamper && lastPowerDisconnectTs == 0L) {
             lastPowerDisconnectTs = timeProvider.elapsedRealtime()
             listener?.onLogEvent("Tracker power unplugged, starting debounce...", false)
         }
@@ -293,30 +296,22 @@ class IntegrityMonitor(
 
     fun onPowerConnected() {
         lastPowerDisconnectTs = 0L
-        if (isPowerTamperDetected) {
-            isPowerTamperDetected = false
+        if (currentHealth.isPowerTamper) {
+            currentHealth = currentHealth.copy(isPowerTamper = false)
             listener?.onLogEvent("Tracker power restored", false)
         }
     }
 
     fun clearPowerTamper() {
-        isPowerTamperDetected = false
+        currentHealth = currentHealth.copy(isPowerTamper = false)
         lastPowerDisconnectTs = 0L
     }
 
     fun resetStats() {
         sustainedViolations.clear()
-        maxTemperature = 0.0
-        isPowerTamperDetected = false
+        currentHealth = SystemHealthState()
         lastPowerDisconnectTs = 0L
-        isPowerSaveModeActive = false
-        currentStandbyBucket = -1
-        isStorageLow = false
-        isStorageCritical = false
-        currentNetInterface = "UNKNOWN"
         batterySamples.clear()
-        isBatterySteepDischarge = false
-        isCoolingModeActive = false
         lastFullPollTs = 0L
         _batteryLevel = -1
     }

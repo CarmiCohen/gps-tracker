@@ -12,8 +12,8 @@ import java.util.UUID
 
 /**
  * MainRepository: Centralized data hub for the application.
- * v9.5.0:
- * - Issue #503: Hilt Removal.
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
  */
 class MainRepository(
     private val context: Context,
@@ -93,7 +93,7 @@ class MainRepository(
 
     val isRelayConnected = telemetry.isRelayConnected
     val lastRtt = telemetry.lastRtt
-    val integrityState = telemetry.integrityState
+    val systemHealth = telemetry.systemHealth
     val localLocation = telemetry.localLocation
     val trackerLocation = telemetry.trackerLocation
     val connectedViewers = telemetry.connectedViewers
@@ -119,7 +119,7 @@ class MainRepository(
 
     fun updateRelayStatus(connected: Boolean) { telemetry.updateRelayStatus(connected) }
     fun updateLastRtt(rtt: Int) { telemetry.updateLastRtt(rtt) }
-    fun updateIntegrity(state: IntegrityState) { telemetry.updateIntegrity(state) }
+    fun updateHealth(state: SystemHealthState) { telemetry.updateHealth(state) }
     fun updateLocation(update: LocationUpdate) { telemetry.updateLocation(update) }
     fun updateConnectedViewers(viewers: List<String>) { telemetry.updateConnectedViewers(viewers) }
     fun updateRemoteActivity(ts: Long) { telemetry.updateRemoteActivity(ts) }
@@ -241,10 +241,9 @@ class MainRepository(
     fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, status: SentinelStatus = SentinelStatus.VALID, timestamp: Long? = null, force: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
         if (lat == 0.0 || lng == 0.0) return
         
-        val integrity = telemetry.integrityState.value
+        val health = telemetry.systemHealth.value
         if (!PersistencePolicy.shouldSaveTrailPoint(
-            isStorageCritical = integrity.isStorageCritical,
-            isStorageLow = integrity.isStorageLow,
+            health = health,
             status = status
         )) return
 
@@ -326,8 +325,8 @@ class MainRepository(
     fun addHistoryPoints(ribbonKey: String, points: List<ConnectionPoint>) {
         scope.launch { _liveHistoryFlow.emit(ribbonKey to points) }
         
-        val integrity = telemetry.integrityState.value
-        if (!PersistencePolicy.shouldSaveHistoryPoint(integrity.isStorageCritical)) return
+        val health = telemetry.systemHealth.value
+        if (!PersistencePolicy.shouldSaveHistoryPoint(health)) return
 
         points.forEach { point ->
             historyBuffer.add(HistoryEntity(

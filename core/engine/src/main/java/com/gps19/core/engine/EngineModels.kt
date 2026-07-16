@@ -4,8 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * July.16.18:
- * - Issue #514: Simplified GpsManager. Removed EngineSnrSample.
+ * July.16.19:
+ * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState in AlarmEvaluationState.
+ * - Issue #517: Refactor AppAlarmManager. Added AlarmHistory to AlarmEvaluationState.
  */
 
 @Serializable
@@ -159,6 +160,15 @@ data class ViolationReport(
 @Serializable
 data class SystemHealthReport(val reports: List<ViolationReport>)
 
+@Serializable
+data class AlarmHistory(
+    var powerAlarmPending: Boolean = false,
+    var wasDistanceViolated: Boolean = false,
+    var distanceViolationCounter: Int = 0,
+    var firstViolationTs: Long = 0L,
+    var firstViolationWasJump: Boolean = false
+)
+
 data class AlarmEvaluationState(
     val now: Long, 
     val serviceStartTime: Long, 
@@ -167,11 +177,6 @@ data class AlarmEvaluationState(
     val isRelayConnected: Boolean, 
     val isTrackerConnected: Boolean, 
     val discoveryPhase: DiscoveryPhase?,
-    val isHardwareOnline: Boolean, 
-    val isLocalInternetLoss: Boolean, 
-    val isSignalLoss: Boolean, 
-    val isGpsStalling: Boolean, 
-    var powerAlarmPending: Boolean,
     val trackerLat: Double, 
     val trackerLng: Double, 
     val trackerGpsAccuracy: Double,
@@ -179,41 +184,14 @@ data class AlarmEvaluationState(
     val lastGpsPacketTs: Long,
     val trackerLastValidFixTs: Long = 0L, 
     val trackerSpeed: Double = 0.0,
-    val status: SentinelStatus = SentinelStatus.VALID,
-    val isJammer: Boolean = false,
     val jumpTier: Int = 0,
-    val trackerBattery: Int, 
-    val trackerTemp: Double,
-    var wasDistanceViolated: Boolean, 
-    var distanceViolationCounter: Int, 
-    var firstViolationTs: Long, 
-    var firstViolationWasJump: Boolean,
+    val history: AlarmHistory = AlarmHistory(),
     val homePoints: List<EngineGeoPoint> = emptyList(),
     val maxDistance: Double = 60.0,
     val distToHomeAuthority: Double? = null,
     val isGpsGap: Boolean = false,
-    val isTamperDetected: Boolean = false,
-    val trackerTiltDegrees: Double = 0.0,
-    val trackerAcousticDb: Double = 0.0,
-    val trackerBaroAlt: Double = 0.0,
     val trackerBaroAltEma: Double = 0.0,
-    val trackerLux: Double = 0.0,
-    val isNear: Boolean = true,
-    val luxBaseline: Double = 0.0,
-    val acousticFloorDb: Double = 0.0,
-    val adaptiveVibrationFloor: Double = 0.12,
-    val peakVibrationShock: Double = 0.0,
-    val trackerCurrentMa: Int = 0,
-    val isPowerTamper: Boolean = false,
-    val isLocationPending: Boolean = false,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val isPowerSaveMode: Boolean = false, 
-    val standbyBucket: Int = -1,
-    val netInterface: String = "UNKNOWN",
-    val isStorageLow: Boolean = false,
-    val isStorageCritical: Boolean = false,
     val isTrackerMode: Boolean = true,
-    val isBatterySteepDischarge: Boolean = false,
-    val isCoolingModeActive: Boolean = false,
+    val health: SystemHealthState = SystemHealthState(),
     val capabilities: HardwareCapabilities = HardwareCapabilities()
 )

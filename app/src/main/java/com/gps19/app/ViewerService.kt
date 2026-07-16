@@ -15,7 +15,8 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * v9.5.0: Issue #513 - Flatten Service Architecture (ConnectivitySuite).
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
  */
 class ViewerService : BaseMonitorService() {
 
@@ -217,6 +218,7 @@ class ViewerService : BaseMonitorService() {
         lastKnownLocation = location
         lastProcessedLocation = processed
 
+        val health = integrityMonitor.currentHealth
         repository.updateLocation(LocationUpdate(
             lat = lat,
             lng = lng,
@@ -224,16 +226,16 @@ class ViewerService : BaseMonitorService() {
             speed = speed,
             accuracy = acc,
             bearing = bearing,
-            battery = integrityMonitor.getBatteryLevel(),
-            temp = integrityMonitor.batteryTemp,
-            isCharging = integrityMonitor.isCharging,
+            battery = health.batteryLevel,
+            temp = health.batteryTemp,
+            isCharging = health.isCharging,
             gpsTs = location.time,
             ts = nowWall,
             isMe = true,
             satsView = gpsManager.satellitesInView,
             satsUsed = location.extras?.getInt("satellites") ?: gpsManager.satellitesUsed,
             maxAccuracy = processed.maxAccuracy,
-            currentMa = integrityMonitor.getBatteryCurrent(),
+            currentMa = health.currentMa,
             lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
             status = processed.status
         ))
@@ -318,6 +320,8 @@ class ViewerService : BaseMonitorService() {
 
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
+        val health = integrityMonitor.currentHealth
+        repository.updateHealth(health)
 
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
@@ -342,7 +346,7 @@ class ViewerService : BaseMonitorService() {
         sessionManager.updateTick(nowRealtime, lastServiceTickRealtime, isPeerAvailable = isSocketConnected && isTrackerActive, isInViolation = false)
 
         val silenceDelta = if (connectivitySuite.lastPeerActivityTs > 0) nowRealtime - connectivitySuite.lastPeerActivityTs else 0L
-        val isSignalLoss = integrityMonitor.checkSignalIntegrity(nowRealtime, silenceDelta, false)
+        val isSignalLoss = !integrityMonitor.checkSignalIntegrity(nowRealtime, silenceDelta, false)
         val isTrackerJammerSuspicion = connectivitySuite.isTrackerJammerSuspicion
         val isTrackerStalled = connectivitySuite.trackerGpsStallStartTs > 0L && (nowRealtime - connectivitySuite.trackerGpsStallStartTs > GPS_STALL_THRESHOLD_MS)
         val isTrackerGap = connectivitySuite.trackerLastValidFixRealtime > 0L && (nowRealtime - connectivitySuite.trackerLastValidFixRealtime > GPS_GAP_THRESHOLD_MS)
@@ -389,9 +393,11 @@ class ViewerService : BaseMonitorService() {
             isClockRegression = proc?.isClockRegression ?: false,
             isLocationPending = false, locationPendingReason = LocationPendingReason.NONE, lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
             gnssDetail = latestGnssDetail,
-            isBatterySteepDischarge = false, isCoolingModeActive = false,
-            batteryLevel = integrityMonitor.getBatteryLevel(), batteryTemp = integrityMonitor.batteryTemp, isCharging = integrityMonitor.isCharging,
-            status = proc?.status ?: SentinelStatus.VALID
+            isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive,
+            batteryLevel = health.batteryLevel, batteryTemp = health.batteryTemp, isCharging = health.isCharging,
+            status = proc?.status ?: SentinelStatus.VALID,
+            isStorageLow = health.isStorageLow, isStorageCritical = health.isStorageCritical,
+            isPowerSaveMode = health.isPowerSaveMode, standbyBucket = health.standbyBucket, netInterface = health.netInterface
         )
 
         val gpsTs = proc?.timestamp ?: 0L
@@ -406,10 +412,10 @@ class ViewerService : BaseMonitorService() {
             isTrackerMode = false,
             accuracy = proc?.currentAccuracy ?: locationProcessor.getLastProcessedAccuracy(),
             maxAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(),
-            isBatterySteepDischarge = false, isCoolingModeActive = false,
+            isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive,
             speed = proc?.filteredSpeed ?: 0.0,
             bearing = (lastKnownLocation?.bearing?.toDouble() ?: 0.0),
-            currentMa = integrityMonitor.getBatteryCurrent(),
+            currentMa = health.currentMa,
             locationPendingReason = LocationPendingReason.NONE
         )
 
@@ -420,9 +426,9 @@ class ViewerService : BaseMonitorService() {
             lastNotificationUpdateTs = now
             notificationManager.updatePulse(
                 sats = gpsManager.satellitesUsed,
-                battery = integrityMonitor.getBatteryLevel(),
+                battery = health.batteryLevel,
                 isSecure = !alarmManager.hasUnresolvedAlarms(),
-                isPowerSave = integrityMonitor.isPowerSaveModeActive
+                isPowerSave = health.isPowerSaveMode
             )
         }
 
@@ -442,6 +448,7 @@ class ViewerService : BaseMonitorService() {
         isTrackerConnected: Boolean
     ) {
         val isSocketConnected = connectivitySuite.isConnected()
+        val health = integrityMonitor.currentHealth
         
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
@@ -464,12 +471,12 @@ class ViewerService : BaseMonitorService() {
                 isNear = connectivitySuite.isTrackerNear, luxBaseline = connectivitySuite.trackerLuxBaseline, acousticFloorDb = connectivitySuite.trackerAcousticFloorDb,
                 adaptiveVibrationFloor = connectivitySuite.trackerAdaptiveVibrationFloor, peakVibrationShock = connectivitySuite.trackerPeakVibrationShock,
                 trackerCurrentMa = connectivitySuite.trackerCurrentMa, isLocationPending = connectivitySuite.isTrackerLocationPending,
-                locationPendingReason = connectivitySuite.trackerLocationPendingReason, isPowerSaveMode = connectivitySuite.isTrackerPowerSaveMode,
-                standbyBucket = connectivitySuite.trackerStandbyBucket, netInterface = connectivitySuite.trackerNetInterface, 
-                isStorageLow = connectivitySuite.isTrackerStorageLow,
-                isStorageCritical = connectivitySuite.isTrackerStorageCritical, 
-                isBatterySteepDischarge = connectivitySuite.isTrackerBatterySteepDischarge,
-                isCoolingModeActive = connectivitySuite.isTrackerCoolingModeActive,
+                locationPendingReason = connectivitySuite.trackerLocationPendingReason, isPowerSaveMode = health.isPowerSaveMode,
+                standbyBucket = health.standbyBucket, netInterface = health.netInterface, 
+                isStorageLow = health.isStorageLow,
+                isStorageCritical = health.isStorageCritical, 
+                isBatterySteepDischarge = health.isBatterySteepDischarge,
+                isCoolingModeActive = health.isCoolingModeActive,
                 discoveryPhase = null, capabilities = capabilities,
                 snrSnapshot = gpsManager.averageSnr, vibeSnapshot = 0.0
             )

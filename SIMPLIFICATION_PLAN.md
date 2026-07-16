@@ -30,10 +30,13 @@ Removed `HindsightBuffer`, "Muzzle" logic, and `AdaptiveJumpConfidence` multipli
 *   **Flatten Service Dependencies - Issue #513 [COMPLETED]**: Merged `AppNetworkManager`, `SyncManager`, and `RemoteHandler` into `ConnectivitySuite`.
 *   **Simplify GpsManager - Issue #514 [COMPLETED]**: Streamlined to rely on `FusedLocationProviderClient` and immediate GNSS metadata.
 *   **Remove "Stationary Anchor" Logic - Issue #515 [COMPLETED]**: Replaced with a simple 0.5m/s speed gate.
-*   **De-duplicate "Status" Logic - Issue #516 [PENDING]**: Plan for `SystemHealthState` source of truth.
+*   **De-duplicate "Status" Logic - Issue #516 [COMPLETED]**: Unified device metadata into `SystemHealthState`.
+*   **Refactor AppAlarmManager - Issue #517 [COMPLETED]**: Eliminated local state flags in favor of `AlarmHistory` in `core:engine`.
 
 ## Proposed Execution Order
 1.  **Phase 1-3**: Completed.
 2.  **Phase 4**: Remove Hilt and implement manual DI (Issue #503) - **COMPLETED**.
 3.  **Phase 5**: Flatten Service architecture (Issue #513) - **COMPLETED**.
 4.  **Phase 6**: Simplify GpsManager (Issue #514) - **COMPLETED**.
+5.  **Phase 7**: De-duplicate Status Logic (Issue #516) - **COMPLETED**.
+6.  **Phase 8**: Refactor AppAlarmManager (Issue #517) - **COMPLETED**.

@@ -360,7 +360,7 @@ fun MainAppContent(
                 if (redScreenVisible && uiState.appMode != null) {
                     AlarmOverlay(
                         alarms = uiState.activeAlarms, isMuted = uiState.isAlarmSilenced,
-                        isLocationPending = uiState.integrity.isLocationPending,
+                        isLocationPending = uiState.trackerHealth.isLocationPending,
                         backgroundStatus = uiState.permissions.backgroundStatus,
                         hasBackgroundRestriction = uiState.permissions.hasBackgroundRestriction,
                         onHardwarePermissionClick = { onRequestHardwarePermission() },

@@ -1,29 +1,40 @@
-# Project Handover: Service Simplification Phase (Issues #513, #514) - COMPLETED
+# Project Handover: Issue #517 (Refactor AppAlarmManager) - COMPLETED
 
 ## Status: COMPLETED
-**Version Context**: `July.16.18`
+**Version Context**: `July.16.19`
+**Authoritative model**: `AlarmHistory` in `:core:engine`.
 
-This session focused on the core simplification of the service layer and hardware management, adhering to the R406 hardening plan.
+## Context & Progress
+This issue successfully refactored `AppAlarmManager` to be stateless regarding violation logic, centralizing persistent evaluation metadata into the core engine.
 
-## Key Changes
+### 1. Alarm History Consolidation (Issue #517)
+- **Centralized Model**: Created `AlarmHistory` in `EngineModels.kt` to house flags previously scattered in `AppAlarmManager`:
+    - `powerAlarmPending`
+    - `wasDistanceViolated`
+    - `distanceViolationCounter`
+    - `firstViolationTs`
+    - `firstViolationWasJump`
+- **Logic Decoupling**: Refactored `MainAlarmLogic.detectViolations` to consume and update `AlarmHistory` directly.
+- **Service Layer Simplification**: `AppAlarmManager` now maintains a single `history` instance and passes it to the engine, removing the need for internal state management of geofence debouncing and power triggers.
 
-### 1. ConnectivitySuite Integration (Issue #513)
-- **Consolidation**: Merged `AppNetworkManager`, `SyncManager`, and `RemoteHandler` into a unified `ConnectivitySuite.kt`.
-- **Decoupling**: Removed `RemoteUpdateWrapper` and implemented a direct `PeerListener` interface.
-- **Dependency Graph**: Updated `AppContainer`, `TrackerService`, and `ViewerService` to use the new suite, significantly reducing constructor bloat.
+### 2. Architectural Hardening
+- **Requirement R406k**: Added to `SOT_MASTER_REQUIREMENTS.md` to enforce the use of `AlarmHistory` for all persistent evaluation states.
+- **Cleanup**: Purged redundant field declarations and simplified the `resetEvaluation` path.
+- **Consistency**: Verified that both `TrackerService` and `ViewerService` correctly utilize the refactored `evaluateAlarms` signature.
 
-### 2. GpsManager Simplification (Issue #514)
-- **Streamlined Hardware Access**: Refactored `GpsManager.kt` to rely on `FusedLocationProviderClient` for location updates and immediate `GnssStatus` for metadata.
-- **Forensic Cleanup**: Removed legacy `kickGps`/`reviveGps` commands and the high-maintenance SNR sampling/buffering logic.
-- **Downstream Updates**: 
-    - Updated `TelemetryAggregator.kt` in `:core:engine` to remove SNR-based gap filling.
-    - Updated `HistoryManager.kt` to purge SNR sampling dependencies.
-    - Removed `EngineSnrSample` from `EngineModels.kt`.
+## Project State Snapshot
+- **Core Engine**: Fully authoritative over violation detection and state progression.
+- **App Layer**: Acting as a thin coordinator between the `SystemHealthState` producer and the `MainAlarmLogic` evaluator.
+- **Documentation**: All progress tracked in `SIMPLIFICATION_PLAN.md` and `issues.md`.
 
-## Verification Results
-- **Build**: Successfully executed `:app:assembleDebug`.
-- **Authoritative Requirements**: Updated `STATUS/SOT_MASTER_REQUIREMENTS.md` with **R406h** (Connectivity) and **R406i** (GPS).
-- **Tracking**: `issues.md` and `SIMPLIFICATION_PLAN.md` updated.
+## Git Release Commands
+```bash
+git add .
+git commit -m "Hardening July.16.19: Issue #517 - Refactor AppAlarmManager & Consolidate Alarm History"
+git tag -a July.16.19 -m "Refactor AppAlarmManager and alarm history consolidation"
+git push origin main --tags
+```
 
 ## Next Steps
-- **Issue #516**: De-duplicate "Status" logic by creating a unified `SystemHealthState`.
+- The system is now fully aligned with the R406 simplification series.
+- Monitor the `ConnectivitySuite` as it now handles the bulk of telemetry propagation.

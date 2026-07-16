@@ -2,8 +2,8 @@ package com.gps19.core.engine
 
 /**
  * PersistencePolicy: Rules for determining if data should be written to disk.
- * July.1.15:
- * - Issue #512: Consolidate Sentinel Statuses. Aligned storage gating with SentinelStatus.
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
  */
 object PersistencePolicy {
 
@@ -11,14 +11,13 @@ object PersistencePolicy {
      * Determines if a trail point should be saved based on storage state and point priority.
      */
     fun shouldSaveTrailPoint(
-        isStorageCritical: Boolean,
-        isStorageLow: Boolean,
+        health: SystemHealthState,
         status: SentinelStatus
     ): Boolean {
-        if (isStorageCritical) return false
+        if (health.isStorageCritical) return false
         
         // On low storage, we only save high-priority forensic points (JUMP or TAMPER).
-        if (isStorageLow && status == SentinelStatus.VALID) return false
+        if (health.isStorageLow && status == SentinelStatus.VALID) return false
         
         return true
     }
@@ -26,7 +25,7 @@ object PersistencePolicy {
     /**
      * Determines if history/telemetry points should be saved.
      */
-    fun shouldSaveHistoryPoint(isStorageCritical: Boolean): Boolean {
-        return !isStorageCritical
+    fun shouldSaveHistoryPoint(health: SystemHealthState): Boolean {
+        return !health.isStorageCritical
     }
 }

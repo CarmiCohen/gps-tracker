@@ -2,14 +2,15 @@ package com.gps19.app
 
 /**
  * OfflineRepository: Manages persistent buffering of status updates during network loss.
- * v9.5.0: Hilt removed. Manual DI.
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Use systemHealth.
  */
 class OfflineRepository(
     private val pendingStatusDao: PendingStatusDao,
     private val telemetry: TelemetryRepository
 ) {
     suspend fun addPendingStatusUpdate(update: PendingStatusEntity) {
-        if (telemetry.integrityState.value.isStorageCritical) return
+        if (telemetry.systemHealth.value.isStorageCritical) return
 
         pendingStatusDao.insert(update)
         pendingStatusDao.prune()

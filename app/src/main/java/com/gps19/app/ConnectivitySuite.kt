@@ -19,8 +19,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * ConnectivitySuite: Unified connectivity, telemetry sync, and remote peer handling.
- * Merges AppNetworkManager, SyncManager, and RemoteHandler.
- * v9.5.0: Issue #513 - Flatten Service Architecture.
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Updated pushCurrentStatus to include all health fields.
  */
 class ConnectivitySuite(
     private val context: Context,
@@ -266,7 +266,9 @@ class ConnectivitySuite(
                 isLocationPending = false, locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE },
                 lastValidFixRealtime = entity.lastValidFixRealtime, isBatterySteepDischarge = entity.isBatterySteepDischarge,
                 isCoolingModeActive = entity.isCoolingModeActive, battery = entity.battery, temp = entity.temp, isCharging = entity.isCharging,
-                trackerState = try { TrackerState.valueOf(entity.trackerState) } catch(e: Exception) { TrackerState.UNKNOWN }
+                trackerState = try { TrackerState.valueOf(entity.trackerState) } catch(e: Exception) { TrackerState.UNKNOWN },
+                isStorageLow = entity.isStorageLow, isStorageCritical = entity.isStorageCritical,
+                isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface
             )
             if (sendTelemetryInternal(status)) offlineRepository.deletePendingStatusUpdate(entity.id)
         }
@@ -284,8 +286,8 @@ class ConnectivitySuite(
                     satsUsed = status.gnssDetail?.satellites?.count { it.usedInFix } ?: 0,
                     maxAccuracy = status.maxAccuracy, distToTracker = null, distToHome = null,
                     isBatterySteepDischarge = status.isBatterySteepDischarge, isCoolingModeActive = status.isCoolingModeActive,
-                    isStorageLow = telemetryRepository.integrityState.value.isStorageLow, isStorageCritical = telemetryRepository.integrityState.value.isStorageCritical,
-                    isPowerSaveMode = telemetryRepository.integrityState.value.isPowerSaveMode, standbyBucket = status.standbyBucket,
+                    isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical,
+                    isPowerSaveMode = status.isPowerSaveMode, standbyBucket = status.standbyBucket,
                     netInterface = status.netInterface, lastValidFixRealtime = status.lastValidFixRealtime,
                     locationPendingReason = status.locationPendingReason.name, trackerState = status.trackerState.name, status = status.status.name
                 ))
@@ -319,7 +321,12 @@ class ConnectivitySuite(
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
         batteryLevel: Int, batteryTemp: Double, isCharging: Boolean,
         trackerState: TrackerState = TrackerState.UNKNOWN,
-        status: SentinelStatus = SentinelStatus.VALID
+        status: SentinelStatus = SentinelStatus.VALID,
+        isStorageLow: Boolean = false,
+        isStorageCritical: Boolean = false,
+        isPowerSaveMode: Boolean = false,
+        standbyBucket: Int = -1,
+        netInterface: String = "UNKNOWN"
     ) {
         val trackerStatus = TrackerStatus(
             deviceId = deviceId, viewerId = viewerId, ts = timeProvider.currentTimeMillis(),
@@ -337,7 +344,9 @@ class ConnectivitySuite(
             locationPendingReason = locationPendingReason, lastValidFixRealtime = lastValidFixRealtime,
             isBatterySteepDischarge = isBatterySteepDischarge, isCoolingModeActive = isCoolingModeActive,
             gnssDetail = gnssDetail, battery = batteryLevel, temp = batteryTemp, isCharging = isCharging,
-            trackerState = trackerState
+            trackerState = trackerState,
+            isStorageLow = isStorageLow, isStorageCritical = isStorageCritical,
+            isPowerSaveMode = isPowerSaveMode, standbyBucket = standbyBucket, netInterface = netInterface
         )
         sendTelemetry(trackerStatus)
     }

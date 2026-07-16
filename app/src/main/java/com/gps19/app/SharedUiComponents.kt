@@ -347,6 +347,7 @@ fun GlobalStatusBar(
     } else 0
 
     val loc = if (mode == "viewer") uiState.trackerLocation else uiState.localLocation
+    val health = if (mode == "viewer") uiState.trackerHealth else uiState.localHealth
     val lastGpsTs = loc.timestamp
     
     // Issue #044: Differentiate Local vs Tracker GPS Health for HUD top-level badges.
@@ -379,10 +380,10 @@ fun GlobalStatusBar(
         viewerGpsTs = uiState.localLocation.timestamp, trackerId = uiState.deviceId, viewerId = uiState.viewerId, watchdogOk = dashboardState.watchdogOk,
         trackerState = dashboardState.trackerState, hasActiveAlarms = hasUnresolved, isRedScreenSuppressed = (hasUnresolved && !redScreenVisible),
         isSirenPlaying = uiState.isSirenPlaying,
-        isTrackerLocPending = loc.isLocationPending, 
-        trackerLocPendingReason = loc.locationPendingReason,
-        isViewerLocPending = uiState.localLocation.isLocationPending,
-        viewerLocPendingReason = uiState.localLocation.locationPendingReason,
+        isTrackerLocPending = health.isLocationPending, 
+        trackerLocPendingReason = health.locationPendingReason,
+        isViewerLocPending = uiState.localHealth.isLocationPending,
+        viewerLocPendingReason = uiState.localHealth.locationPendingReason,
         lastGpsTs = lastGpsTs,
         isTelemetryFresh = dashboardState.isTelemetryFresh,
         isGpsFresh = dashboardState.isGpsFresh

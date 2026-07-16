@@ -18,7 +18,8 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.5.0: Issue #513 - Flatten Service Architecture (ConnectivitySuite).
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
  */
 class TrackerService : BaseMonitorService() {
 
@@ -278,7 +279,10 @@ class TrackerService : BaseMonitorService() {
 
     override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRealtime)
-        sensorManager.setHighLoad(integrityMonitor.isCoolingModeActive)
+        val health = integrityMonitor.currentHealth
+        repository.updateHealth(health)
+
+        sensorManager.setHighLoad(health.isCoolingModeActive)
 
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
@@ -326,19 +330,19 @@ class TrackerService : BaseMonitorService() {
                 trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy,
                 maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = location.time,
                 trackerLastValidFixTs = locationProcessor.getLastValidFixTs(), trackerSpeed = processed.filteredSpeed,
-                trackerBattery = integrityMonitor.getBatteryLevel(), trackerTemp = integrityMonitor.batteryTemp,
-                isHardwareOnline = integrityMonitor.isHardwareOnline(), isLocalInternetLoss = false,
-                isSignalLoss = false, isGpsStalling = processed.isStalled,
+                trackerBattery = health.batteryLevel, trackerTemp = health.batteryTemp,
+                isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss,
+                isSignalLoss = health.signalLoss, isGpsStalling = processed.isStalled,
                 isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome,
                 maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = false,
                 isTamperDetected = processed.tamperDetected,
-                isPowerTamper = integrityMonitor.isPowerTamperDetected, trackerTiltDegrees = sensorManager.currentTiltDegrees,
+                isPowerTamper = health.isPowerTamper, trackerTiltDegrees = sensorManager.currentTiltDegrees,
                 trackerAcousticDb = sensorManager.currentAcousticDb, trackerBaroAlt = sensorManager.absoluteAltitude,
                 trackerBaroAltEma = 0.0,
                 trackerLux = sensorManager.currentLux, isNear = sensorManager.isProximityNear,
                 luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
                 adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = sensorManager.consumePeakVibration(),
-                trackerCurrentMa = integrityMonitor.getBatteryCurrent(),
+                trackerCurrentMa = health.currentMa,
                 capabilities = capabilities
             )
             
@@ -355,15 +359,17 @@ class TrackerService : BaseMonitorService() {
                 adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = sensorManager.proximityIdx,
                 proximityCm = sensorManager.currentProximityCm, proximityDebounceMs = sensorManager.proximityDebounceMs,
                 vibrationRollingSum = sensorManager.vibrationRollingSum,
-                isTamperDetected = processed.tamperDetected, isPowerTamper = integrityMonitor.isPowerTamperDetected,
+                isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper,
                 receiptRealtime = nowRealtime, violationUptimeMs = sessionManager.violationUptimeMs,
                 violationPercentage = sessionManager.getViolationPercentage(),
                 isClockRegression = processed.isClockRegression, isLocationPending = false, locationPendingReason = LocationPendingReason.NONE,
                 lastValidFixRealtime = locationProcessor.getLastValidFixTs(), gnssDetail = latestGnssDetail,
-                isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge, isCoolingModeActive = integrityMonitor.isCoolingModeActive,
-                batteryLevel = integrityMonitor.getBatteryLevel(), batteryTemp = integrityMonitor.batteryTemp, isCharging = integrityMonitor.isCharging,
+                isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive,
+                batteryLevel = health.batteryLevel, batteryTemp = health.batteryTemp, isCharging = health.isCharging,
                 trackerState = if (processed.filteredSpeed > 0.5) TrackerState.MOVING else TrackerState.PARKING,
-                status = processed.status
+                status = processed.status,
+                isStorageLow = health.isStorageLow, isStorageCritical = health.isStorageCritical,
+                isPowerSaveMode = health.isPowerSaveMode, standbyBucket = health.standbyBucket, netInterface = health.netInterface
             )
             
             historyManager.updateRibbons(
@@ -377,11 +383,11 @@ class TrackerService : BaseMonitorService() {
                 isTrackerMode = true,
                 accuracy = processed.currentAccuracy,
                 maxAccuracy = processed.maxAccuracy,
-                isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge,
-                isCoolingModeActive = integrityMonitor.isCoolingModeActive,
+                isBatterySteepDischarge = health.isBatterySteepDischarge,
+                isCoolingModeActive = health.isCoolingModeActive,
                 speed = processed.filteredSpeed,
                 bearing = location.bearing.toDouble(),
-                currentMa = integrityMonitor.getBatteryCurrent(),
+                currentMa = health.currentMa,
                 locationPendingReason = LocationPendingReason.NONE
             )
         } else {
@@ -395,7 +401,7 @@ class TrackerService : BaseMonitorService() {
                 peerAvail = isSocketConnected && isViewerActive,
                 hasGps = false,
                 isTrackerMode = true,
-                currentMa = integrityMonitor.getBatteryCurrent()
+                currentMa = health.currentMa
             )
         }
 

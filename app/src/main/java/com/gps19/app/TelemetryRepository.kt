@@ -1,14 +1,13 @@
 package com.gps19.app
 
-import com.gps19.core.engine.GnssDetail
-import com.gps19.core.engine.LocationUpdate
-import com.gps19.core.engine.TelemetryMerger
+import com.gps19.core.engine.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * TelemetryRepository: In-memory store for live system status.
- * v9.5.0: Hilt removed. Manual DI.
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Replaced IntegrityState with SystemHealthState.
  */
 class TelemetryRepository() {
     private val _isRelayConnected = MutableStateFlow(false)
@@ -17,8 +16,8 @@ class TelemetryRepository() {
     private val _lastRtt = MutableStateFlow(0)
     val lastRtt = _lastRtt.asStateFlow()
 
-    private val _integrityState = MutableStateFlow(IntegrityState())
-    val integrityState = _integrityState.asStateFlow()
+    private val _systemHealth = MutableStateFlow(SystemHealthState())
+    val systemHealth = _systemHealth.asStateFlow()
 
     private val _localLocation = MutableStateFlow(LocationUpdate())
     val localLocation = _localLocation.asStateFlow()
@@ -37,7 +36,7 @@ class TelemetryRepository() {
 
     fun updateRelayStatus(connected: Boolean) { _isRelayConnected.value = connected }
     fun updateLastRtt(rtt: Int) { _lastRtt.value = rtt }
-    fun updateIntegrity(state: IntegrityState) { _integrityState.value = state }
+    fun updateHealth(state: SystemHealthState) { _systemHealth.value = state }
     fun updateGnssDetail(detail: GnssDetail?) { _gnssDetail.value = detail }
 
     fun updateLocation(update: LocationUpdate) {
@@ -59,7 +58,7 @@ class TelemetryRepository() {
     fun clear() {
         _localLocation.value = LocationUpdate()
         _trackerLocation.value = LocationUpdate()
-        _integrityState.value = IntegrityState()
+        _systemHealth.value = SystemHealthState()
         _connectedViewers.value = emptyList()
         _lastRemoteActivityTs.value = 0L
         _gnssDetail.value = null

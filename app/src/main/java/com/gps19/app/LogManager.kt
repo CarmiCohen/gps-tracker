@@ -5,7 +5,8 @@ import java.util.UUID
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
- * v9.5.0: Issue #513 - Flatten Service Architecture (ConnectivitySuite).
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Use systemHealth.
  */
 class LogManager(
     private val logRepository: LogRepository,
@@ -37,14 +38,14 @@ class LogManager(
         vibe: Double? = null
     ) {
         val now = timeProvider.currentTimeMillis()
-        val integrity = telemetry.integrityState.value
+        val health = telemetry.systemHealth.value
         
         if (type == "hidden") return
 
-        val isSuppressedByStorage = integrity.isStorageCritical && !isSpecial
+        val isSuppressedByStorage = health.isStorageCritical && !isSpecial
         if (isSuppressedByStorage) return
 
-        if (integrity.isStorageLow && !important && !isSpecial) return
+        if (health.isStorageLow && !important && !isSpecial) return
 
         if (type == "system" && !important && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
             return

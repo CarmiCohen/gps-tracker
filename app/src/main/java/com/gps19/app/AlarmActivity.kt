@@ -76,7 +76,7 @@ class AlarmActivity : ComponentActivity() {
                     AlarmOverlay(
                         alarms = uiState.activeAlarms,
                         isMuted = uiState.isAlarmSilenced,
-                        isLocationPending = uiState.integrity.isLocationPending,
+                        isLocationPending = uiState.trackerHealth.isLocationPending,
                         backgroundStatus = uiState.permissions.backgroundStatus,
                         hasBackgroundRestriction = uiState.permissions.hasBackgroundRestriction,
                         onHardwarePermissionClick = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },

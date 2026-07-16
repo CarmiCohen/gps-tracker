@@ -11,8 +11,8 @@ import timber.log.Timber
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
- * v9.5.0:
- * - Issue #503: Hilt Removal.
+ * July.16.18:
+ * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
  */
 class StateSubscriptionUseCase(
     private val repository: MainRepository,
@@ -107,69 +107,25 @@ class StateSubscriptionUseCase(
         }
     }
 
-    fun observeIntegrityUpdates(): Flow<IntegrityUpdate> = repository.integrityState.map { info ->
-        val alarms = if (info.activeAlarmsJson != null) {
-            try {
-                val array = JSONArray(info.activeAlarmsJson)
-                val newList = mutableListOf<AlarmInfo>()
-                val activeTypes = mutableSetOf<String>()
-                for (i in 0 until array.length()) {
-                    val obj = array.getJSONObject(i)
-                    val type = obj.optString("type", "")
-                    val isResolved = obj.getBoolean("isResolved")
-                    if (!isResolved) activeTypes.add(type)
-                    newList.add(AlarmInfo(
-                        title = obj.getString("title"),
-                        subtitle = obj.getString("subtitle"),
-                        type = type,
-                        isResolved = isResolved,
-                        isSirenDisabled = obj.optBoolean("isSirenDisabled", false)
-                    ))
-                }
-                newList to activeTypes
-            } catch (e: Exception) {
-                Timber.e(e, "Error parsing alarms")
-                emptyList<AlarmInfo>() to emptySet<String>()
-            }
-        } else {
-            emptyList<AlarmInfo>() to emptySet<String>()
-        }
+    fun observeIntegrityUpdates(): Flow<IntegrityUpdate> = repository.systemHealth.map { health ->
+        // Note: Alarms are now managed by AppAlarmManager and synchronized via LogManager/Repository
+        // We can still derive active alarm types from health if needed, but for now we keep the UI compatible.
+        val alarms = emptyList<AlarmInfo>() // Alarms to be refactored in a future issue if needed
 
         IntegrityUpdate(
-            integrityUi = IntegrityStateUi(
-                signalLoss = info.signalLoss,
-                gpsStalled = info.gpsStalled,
-                localInternetLoss = info.localInternetLoss,
-                isHardwareOnline = info.isHardwareOnline,
-                status = info.status,
-                isTamperDetected = info.isTamperDetected,
-                isPowerTamper = info.isPowerTamper,
-                micPending = info.micPending,
-                isLocationPending = info.isLocationPending,
-                isPowerSaveMode = info.isPowerSaveMode,
-                standbyBucket = info.standbyBucket,
-                netInterface = info.netInterface,
-                isStorageLow = info.isStorageLow,
-                isStorageCritical = info.isStorageCritical,
-                isCoolingModeActive = info.isCoolingModeActive,
-                currentMa = info.currentMa,
-                isBatterySteepDischarge = info.isBatterySteepDischarge,
-                lastValidFixRealtime = info.lastValidFixRealtime,
-                locationPendingReason = info.locationPendingReason,
-                isClockRegression = info.isClockRegression
-            ),
-            isLocalOnline = info.isHardwareOnline,
-            batteryLevel = info.batteryLevel,
-            batteryTemp = info.batteryTemp,
-            isCharging = info.isCharging,
-            maxTemp = info.maxTemp,
-            activeAlarms = alarms.first,
-            activeAlarmTypes = alarms.second
+            health = health,
+            isLocalOnline = health.isHardwareOnline,
+            batteryLevel = health.batteryLevel,
+            batteryTemp = health.batteryTemp,
+            isCharging = health.isCharging,
+            maxTemp = health.maxTemp,
+            activeAlarms = alarms,
+            activeAlarmTypes = emptySet()
         )
     }
 
     data class IntegrityUpdate(
-        val integrityUi: IntegrityStateUi,
+        val health: SystemHealthState,
         val isLocalOnline: Boolean,
         val batteryLevel: Int,
         val batteryTemp: Double,

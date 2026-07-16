@@ -33,7 +33,6 @@
 -keep class com.gps19.app.DashboardState { *; }
 -keep class com.gps19.app.LocationState { *; }
 -keep class com.gps19.app.MainUiState { *; }
--keep class com.gps19.app.IntegrityState { *; }
 -keep class com.gps19.app.StatsState { *; }
 -keep class com.gps19.app.BatteryState { *; }
 -keep class com.gps19.app.ConnectivityState { *; }
