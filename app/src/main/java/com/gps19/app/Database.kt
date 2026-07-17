@@ -7,12 +7,12 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * v9.3.55:
+ * - Issue #096: Room Migration Hardening. Bumped version to 55.
+ *   Added MIGRATION_54_55 to harmonize 'logs' table schema to match LogEntity.
  * v9.1.8:
  * - Issue #046: Shared Behavioral State. Added trackerState to PendingStatusEntity 
  *   to preserve authoritative state during offline periods. Bumped version to 54.
- * v9.1.6:
- * - Issue #043: Room Migration Hardening. Corrected MIGRATION_52_53 and added 
- *   explicit @ColumnInfo(defaultValue) to prevent schema drift.
  */
 @Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
 data class LogEntity(
@@ -204,7 +204,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 54, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 55, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -213,6 +213,33 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_54_55 = object : Migration(54, 55) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #096: Harmonize logs table with explicit DEFAULTS and new columns
+                db.execSQL("CREATE TABLE logs_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, localId TEXT NOT NULL, timestamp INTEGER NOT NULL, message TEXT NOT NULL, type TEXT NOT NULL, isImportant INTEGER NOT NULL, deviceId TEXT NOT NULL, viewerId TEXT NOT NULL, count INTEGER NOT NULL, extremeValue REAL, durationMs INTEGER NOT NULL, isSpecial INTEGER NOT NULL, specialColor INTEGER, firstSeenTs INTEGER NOT NULL DEFAULT 0, role TEXT NOT NULL DEFAULT 'tracker', synced INTEGER NOT NULL DEFAULT 0, lat REAL NOT NULL DEFAULT 0.0, lng REAL NOT NULL DEFAULT 0.0, accuracy REAL NOT NULL DEFAULT 0.0, maxAccuracy REAL NOT NULL DEFAULT 0.0, snrSnapshot REAL, vibeSnapshot REAL)")
+                
+                val cursor = db.query("PRAGMA table_info(logs)")
+                val cols = mutableSetOf<String>(); while(cursor.moveToNext()) cols.add(cursor.getString(1)); cursor.close()
+                
+                val select = "id, localId, timestamp, message, type, isImportant, deviceId, viewerId, count, extremeValue, durationMs, isSpecial, specialColor, " +
+                    (if (cols.contains("firstSeenTs")) "firstSeenTs" else "0") + ", " +
+                    (if (cols.contains("role")) "role" else "'tracker'") + ", " +
+                    (if (cols.contains("synced")) "synced" else "0") + ", " +
+                    (if (cols.contains("lat")) "lat" else "0.0") + ", " +
+                    (if (cols.contains("lng")) "lng" else "0.0") + ", " +
+                    (if (cols.contains("accuracy")) "accuracy" else "0.0") + ", " +
+                    (if (cols.contains("maxAccuracy")) "maxAccuracy" else "0.0") + ", " +
+                    (if (cols.contains("snrSnapshot")) "snrSnapshot" else "NULL") + ", " +
+                    (if (cols.contains("vibeSnapshot")) "vibeSnapshot" else "NULL")
+
+                db.execSQL("INSERT INTO logs_new SELECT $select FROM logs")
+                db.execSQL("DROP TABLE logs")
+                db.execSQL("ALTER TABLE logs_new RENAME TO logs")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_timestamp ON logs (timestamp)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_localId ON logs (localId)")
+            }
+        }
+
         val MIGRATION_53_54 = object : Migration(53, 54) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN trackerState TEXT NOT NULL DEFAULT 'UNKNOWN'")

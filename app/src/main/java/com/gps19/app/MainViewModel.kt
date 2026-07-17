@@ -20,6 +20,9 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * v9.3.55:
+ * - ANR Hardening (#096): Offloaded loadInitialData to Dispatchers.IO to prevent 
+ *   Room migrations from blocking the Main thread on startup.
  * v9.3.47:
  * - ANR Hardening (#092): Deferred heavy data observations (logs, trails, history) 
  *   until appMode is active to ensure Landing Page responsiveness on A15.
@@ -541,18 +544,21 @@ class MainViewModel @Inject constructor(
     }
 
     private fun loadInitialData() {
-        viewModelScope.launch(uiExceptionHandler) {
+        // v9.3.55: Explicitly offload to IO as this triggers DB opening and heavy migrations.
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             val initial = settingsUseCase.loadAllSettings()
-            appStartTime = initial.appStartTime
-            updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings, isIdentitySanitized = initial.identitySanitized) }
-            _localMaxTemp.value = initial.maxTemp; if (initial.appMode == "tracker") _trackerMaxTemp.value = initial.maxTemp
-            initial.trackerStatus?.let { status -> 
-                updateState { it.copy(trackerLocation = telemetryUseCase.mapTrackerLocationFromStatus(status, it.trackerLocation), connectivity = it.connectivity.copy(lastUpdateTs = status.ts), trackerStats = telemetryUseCase.mapStatsFromStatus(status, it.trackerStats), trackerBattery = it.trackerBattery.copy(level = status.battery, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging), trackerSatsView = status.satsView, trackerSatsUsed = status.satsUsed, maxTrackerAccuracy = if (status.maxAccuracy > 0.0) status.maxAccuracy else it.maxTrackerAccuracy) }
-                _trackerMaxTemp.value = status.maxTemp
-                _trackerCurrentMa.value = status.currentMa
-                if (_uiState.value.appMode == "tracker") _localMaxTemp.value = status.maxTemp 
+            withContext(Dispatchers.Main) {
+                appStartTime = initial.appStartTime
+                updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings, isIdentitySanitized = initial.identitySanitized) }
+                _localMaxTemp.value = initial.maxTemp; if (initial.appMode == "tracker") _trackerMaxTemp.value = initial.maxTemp
+                initial.trackerStatus?.let { status -> 
+                    updateState { it.copy(trackerLocation = telemetryUseCase.mapTrackerLocationFromStatus(status, it.trackerLocation), connectivity = it.connectivity.copy(lastUpdateTs = status.ts), trackerStats = telemetryUseCase.mapStatsFromStatus(status, it.trackerStats), trackerBattery = it.trackerBattery.copy(level = status.battery, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging), trackerSatsView = status.satsView, trackerSatsUsed = status.satsUsed, maxTrackerAccuracy = if (status.maxAccuracy > 0.0) status.maxAccuracy else it.maxTrackerAccuracy) }
+                    _trackerMaxTemp.value = status.maxTemp
+                    _trackerCurrentMa.value = status.currentMa
+                    if (_uiState.value.appMode == "tracker") _localMaxTemp.value = status.maxTemp 
+                }
+                updateState { it.copy(isInitialized = true) }
             }
-            updateState { it.copy(isInitialized = true) }
         }
     }
 

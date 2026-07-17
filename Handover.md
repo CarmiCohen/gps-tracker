@@ -1,25 +1,26 @@
-# Handover: GPS Tracker Hardening (July17.06)
+# Handover: GPS Tracker Hardening (July17.07)
 
-## 🎯 Current Status: v9.3.52 (July17.06)
-The system has been hardened against Main-thread ANRs during startup and mode transitions. All heavy database-to-UI mapping operations are now offloaded to background dispatchers.
+## 🎯 Current Status: v9.3.55 (July17.07)
+The system has been hardened against startup crashes and Main-thread ANRs during database migrations. The `logs` table schema has been harmonized to resolve drift.
 
-## 🟢 Resolved Issues (July17.06)
-1. **Landing Page ANR Hardening (#092)**:
-    - **Problem**: Application Not Responding (ANR) occurrences on the Landing Page, especially during cold starts or role selection.
-    - **Root Cause**: Heavy mapping of database entities (`LogEntity`, `TrailEntity`, `HistoryEntity`) to UI models was performed on the Main thread within Repository and UseCase flows.
-    - **Resolution**: Implemented explicit offloading to `Dispatchers.Default` using `.flowOn()` in `LogRepository`, `MainRepository`, and `StateSubscriptionUseCase`.
-    - **History Processing**: Offloaded the complex list reconciliation and JSON parsing for integrity updates in `StateSubscriptionUseCase` to ensure the UI thread remains responsive for the Landing Page animation and transitions.
+## 🟢 Resolved Issues (July17.07)
+1.  **Room Database Migration Hardening (#096)**:
+    - **Problem**: `IllegalStateException` during cold start due to `logs` table schema mismatch.
+    - **Root Cause**: Schema drift where the persistent database lacked fields defined in the `LogEntity` class.
+    - **Resolution**: Bumped version to 55 and implemented a robust `MIGRATION_54_55` to recreate the `logs` table with correct defaults and columns.
+2.  **Startup ANR Hardening (#096b)**:
+    - **Problem**: UI stutter or ANR during cold start while Room validates/migrates the database.
+    - **Resolution**: Offloaded `loadInitialData` in `MainViewModel` to `Dispatchers.IO`. This ensures the database "open" call doesn't block the UI thread during the Landing Page animation.
 
-2. **Setup Flow Deadlock (#095)**:
-    - **Problem**: Unresponsive mode selection and hangs during permission polling.
-    - **Resolution**: Implemented Differential Polling and reactive auto-transitions (Resolved in July17.05).
+## 🟢 Previous Resolutions (July17.06)
+1. **Landing Page ANR Hardening (#092)**: Offloaded database-to-UI mapping in Repositories.
+2. **Setup Flow Deadlock (#095)**: Implemented Differential Polling for permissions.
 
 ## ⚠️ Known Risks & Residual Tasks
-- **Battery Exemption Persistence**: Samsung-specific behavior where exemptions may reset after reboot.
-- **Stray File**: `app/src/proto/app_settings.proto` should be removed if build issues occur.
+- **Migration Performance**: On devices with massive log histories, the recreation of the `logs` table may take several seconds. Pruning is implemented to keep the count at 1000.
 
 ## 🛠️ Verification Steps
-1. Perform a cold start with an existing app mode (Tracker or Viewer).
-2. Verify the Landing Page displays for the full 2 seconds without UI stutter.
-3. Verify the transition to the dashboard is smooth.
-4. Open Logs and Trails to ensure data is still correctly populated and rendered.
+1. Perform a cold start.
+2. Verify the Landing Page animation is fluid.
+3. Verify the app transitions to the dashboard without crashing.
+4. Check Logs to ensure historical data was preserved during the migration to version 55.
