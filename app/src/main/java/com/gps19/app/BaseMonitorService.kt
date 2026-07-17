@@ -17,9 +17,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * v9.3.6:
- * - Issue #058: Hilt Migration. Consolidated common service dependencies and 
- *   added RemoteUpdateWrapper for direct injection. Standardized onDestroy for shared components.
+ * v9.3.30:
+ * - ANR Hardening (#092): Bounded runBlocking in onDestroy with strict 1s timeout 
+ *   to prevent service termination from hanging the system.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -155,6 +155,7 @@ abstract class BaseMonitorService : LifecycleService() {
         tickJob?.cancel()
         fgsUpdateJob?.cancel()
         
+        // R406: Bounded cleanup to prevent termination ANR
         runBlocking {
             withTimeoutOrNull(1000) {
                 if (this@BaseMonitorService::repository.isInitialized) {

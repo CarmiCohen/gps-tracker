@@ -25,25 +25,26 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 interface SystemStatusProvider {
-    fun isBatteryWhitelisted(): Boolean
-    fun isAutoStartGranted(): Boolean
-    fun isOverlayGranted(): Boolean
-    fun isMicrophoneGranted(): Boolean
-    fun isExactAlarmGranted(): Boolean
-    fun isPostNotificationsGranted(): Boolean
-    fun isBackgroundLocationGranted(): Boolean
+    suspend fun isBatteryWhitelisted(): Boolean
+    suspend fun isAutoStartGranted(): Boolean
+    suspend fun isOverlayGranted(): Boolean
+    suspend fun isMicrophoneGranted(): Boolean
+    suspend fun isExactAlarmGranted(): Boolean
+    suspend fun isPostNotificationsGranted(): Boolean
+    suspend fun isBackgroundLocationGranted(): Boolean
     fun isLocalOnline(): Boolean
-    fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus
+    suspend fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus
     
     /**
-     * v9.3.14: Added forceRefresh to bypass TTL caching for user-initiated checks.
+     * v9.3.30: Fixed ANR by converting getPermissionState to suspend and removing runBlocking.
      */
-    fun getPermissionState(forceRefresh: Boolean = false): PermissionState
+    suspend fun getPermissionState(forceRefresh: Boolean = false): PermissionState
     
     // R945: Reactive Flows for system states
     fun observeInternetStatus(): Flow<Boolean>
@@ -68,35 +69,35 @@ class SystemStatusProviderImpl @Inject constructor(
     
     private val PERMISSION_TTL_MS = 10_000L
 
-    override fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
-    override fun isAutoStartGranted(): Boolean = getPermissionState().isAutoStartGranted
-    override fun isOverlayGranted(): Boolean = getPermissionState().isOverlayGranted
-    override fun isMicrophoneGranted(): Boolean = getPermissionState().isMicrophoneGranted
-    override fun isExactAlarmGranted(): Boolean = getPermissionState().isExactAlarmGranted
-    override fun isPostNotificationsGranted(): Boolean = getPermissionState().isPostNotificationsGranted
-    override fun isBackgroundLocationGranted(): Boolean = getPermissionState().isBackgroundLocationGranted
+    override suspend fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
+    override suspend fun isAutoStartGranted(): Boolean = getPermissionState().isAutoStartGranted
+    override suspend fun isOverlayGranted(): Boolean = getPermissionState().isOverlayGranted
+    override suspend fun isMicrophoneGranted(): Boolean = getPermissionState().isMicrophoneGranted
+    override suspend fun isExactAlarmGranted(): Boolean = getPermissionState().isExactAlarmGranted
+    override suspend fun isPostNotificationsGranted(): Boolean = getPermissionState().isPostNotificationsGranted
+    override suspend fun isBackgroundLocationGranted(): Boolean = getPermissionState().isBackgroundLocationGranted
 
     override fun isLocalOnline(): Boolean {
         val caps = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
         return caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
 
-    override fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus = getPermissionState().xiaomiStatus
+    override suspend fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus = getPermissionState().xiaomiStatus
 
     /**
-     * getPermissionState: Implements v9.3.29 Hardening (#092).
-     * Added Mutex to prevent IPC congestion during concurrent calls from multiple threads.
+     * getPermissionState: Implements v9.3.30 Hardening (#092).
+     * Switched to suspend to prevent Main thread blockage during IPC calls.
      */
-    override fun getPermissionState(forceRefresh: Boolean): PermissionState = runBlocking {
+    override suspend fun getPermissionState(forceRefresh: Boolean): PermissionState = withContext(Dispatchers.IO) {
         permissionMutex.withLock {
             val now = SystemClock.elapsedRealtime()
             val current = cachedState
             
             if (!forceRefresh && current != null && (now - lastFullRefreshTime < PERMISSION_TTL_MS)) {
-                return@runBlocking current
+                return@withLock current
             }
 
-            // Perform actual system calls
+            // Perform actual system calls on IO dispatcher
             val newState = PermissionState(
                 isBatteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName),
                 isAutoStartGranted = if (isXiaomiDevice()) isXiaomiAutostartGranted(context, cachedPackageName) else powerManager.isIgnoringBatteryOptimizations(cachedPackageName),

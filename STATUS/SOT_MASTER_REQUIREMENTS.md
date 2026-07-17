@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - v9.3.25 (Development)
+# System Source of Truth (SoT) - v9.3.30 (Development)
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Non-Blocking System API Authority (R406)**: The system MUST NOT execute system IPC calls (permissions, battery optimizations, overlays) using `runBlocking` or on the Main thread. All system status checks MUST be implemented as `suspend` functions and offloaded to `Dispatchers.IO` to prevent ANRs and Main thread starvation. (v9.3.30 / Issue #092)
 *   **Binary Telemetry Authority (R988)**: The system MUST prioritize binary Protobuf-based telemetry (`location_update_bin`) for high-frequency tracker updates to minimize relay bandwidth and improve device performance on battery-constrained devices like the Samsung A15. The schema MUST use optimized Enums for states and reasons to minimize binary footprint. (v9.3.25)
 *   **Alias-Aware Identity Uniqueness (R182b)**: The system MUST enforce identity uniqueness that accounts for reserved legacy aliases (`T`, `V`, `Trk`, `viewer`). Tracker and Viewer IDs MUST NOT conflict with these reserved sets to ensure bidirectional backward compatibility with legacy versions (v9.3.7). (v9.3.25)
 *   **Samsung A15 Hardening Authority (R405)**: The system MUST prioritize background persistence on Samsung A15 devices through four combined mechanisms: (1) Mandatory prompt for `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, (2) A unified 2000ms system heartbeat, (3) A continuous low-power hardware sensor subscription (`TYPE_STEP_DETECTOR`), and (4) An explicit **Accelerometer-based Stay-Alive fallback** if hardware step detection is unavailable. This authority replaces all previous device-specific `Build.MODEL` logic branching in the engine and service layers. (v9.3.25)
