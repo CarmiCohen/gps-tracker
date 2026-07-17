@@ -18,15 +18,14 @@ import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -42,11 +41,11 @@ interface SystemStatusProvider {
     suspend fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus
     
     /**
-     * v9.3.30: Fixed ANR by converting getPermissionState to suspend and removing runBlocking.
+     * v9.3.45: Hardened for ANR prevention. Implements non-blocking polling 
+     * to avoid IPC congestion on low-end hardware (Samsung A15).
      */
     suspend fun getPermissionState(forceRefresh: Boolean = false): PermissionState
     
-    // R945: Reactive Flows for system states
     fun observeInternetStatus(): Flow<Boolean>
     fun observeBatteryStatus(): Flow<BatteryStatus>
 }
@@ -62,12 +61,13 @@ class SystemStatusProviderImpl @Inject constructor(
     private val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
     
     private val cachedPackageName = context.packageName
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var lastFullRefreshTime: Long = 0
-    private var cachedState: PermissionState? = null
-    private val permissionMutex = Mutex()
+    private val cachedState = AtomicReference<PermissionState>(PermissionState())
+    private val isRefreshing = AtomicBoolean(false)
     
-    private val PERMISSION_TTL_MS = 10_000L
+    private val PERMISSION_TTL_MS = 15_000L
 
     override suspend fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
     override suspend fun isAutoStartGranted(): Boolean = getPermissionState().isAutoStartGranted
@@ -84,39 +84,43 @@ class SystemStatusProviderImpl @Inject constructor(
 
     override suspend fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus = getPermissionState().xiaomiStatus
 
-    /**
-     * getPermissionState: Implements v9.3.30 Hardening (#092).
-     * Switched to suspend to prevent Main thread blockage during IPC calls.
-     */
-    override suspend fun getPermissionState(forceRefresh: Boolean): PermissionState = withContext(Dispatchers.IO) {
-        permissionMutex.withLock {
-            val now = SystemClock.elapsedRealtime()
-            val current = cachedState
-            
-            if (!forceRefresh && current != null && (now - lastFullRefreshTime < PERMISSION_TTL_MS)) {
-                return@withLock current
-            }
+    override suspend fun getPermissionState(forceRefresh: Boolean): PermissionState {
+        val now = SystemClock.elapsedRealtime()
+        val current = cachedState.get()
+        
+        val isStale = now - lastFullRefreshTime > PERMISSION_TTL_MS
+        if ((isStale || forceRefresh) && isRefreshing.compareAndSet(false, true)) {
+            scope.launch {
+                try {
+                    val isXiaomi = isXiaomiDevice()
+                    val batteryWhitelisted = if (current.isBatteryWhitelisted && !forceRefresh) true 
+                                           else powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
+                    
+                    val overlayGranted = if (current.isOverlayGranted && !forceRefresh) true 
+                                         else Settings.canDrawOverlays(context)
 
-            // Perform actual system calls on IO dispatcher
-            val newState = PermissionState(
-                isBatteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName),
-                isAutoStartGranted = if (isXiaomiDevice()) isXiaomiAutostartGranted(context, cachedPackageName) else powerManager.isIgnoringBatteryOptimizations(cachedPackageName),
-                isOverlayGranted = Settings.canDrawOverlays(context),
-                isMicrophoneGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
-                isExactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true,
-                isPostNotificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true,
-                isBackgroundLocationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true,
-                xiaomiStatus = com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName),
-                xiaomiAutostartStatus = com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName)
-            )
-            
-            cachedState = newState
-            lastFullRefreshTime = now
-            newState
+                    val newState = PermissionState(
+                        isBatteryWhitelisted = batteryWhitelisted,
+                        isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, cachedPackageName) else batteryWhitelisted,
+                        isOverlayGranted = overlayGranted,
+                        isMicrophoneGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
+                        isExactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true,
+                        isPostNotificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true,
+                        isBackgroundLocationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true,
+                        xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN,
+                        xiaomiAutostartStatus = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
+                    )
+                    cachedState.set(newState)
+                    lastFullRefreshTime = now
+                } finally {
+                    isRefreshing.set(false)
+                }
+            }
         }
+        return cachedState.get()
     }
 
-    override fun observeInternetStatus(): Flow<Boolean> = callbackFlow {
+    override fun observeInternetStatus(): Flow<Boolean> = callbackFlow<Boolean> {
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) { trySend(true) }
             override fun onLost(network: Network) { trySend(false) }
@@ -124,17 +128,13 @@ class SystemStatusProviderImpl @Inject constructor(
                 trySend(caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
             }
         }
-        
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
-            
+        val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
         connectivityManager.registerNetworkCallback(request, callback)
         trySend(isLocalOnline())
         awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
     }.distinctUntilChanged().conflate()
 
-    override fun observeBatteryStatus(): Flow<BatteryStatus> = callbackFlow {
+    override fun observeBatteryStatus(): Flow<BatteryStatus> = callbackFlow<BatteryStatus> {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)

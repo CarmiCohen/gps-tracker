@@ -2,9 +2,11 @@ package com.gps19.app
 
 import com.gps19.core.engine.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.osmdroid.util.GeoPoint
 import timber.log.Timber
@@ -13,9 +15,9 @@ import javax.inject.Singleton
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
- * v8.9.79: Issue #014 - Type Migration: Standardized temperature fields to Double.
- * v8.9.5:
- * - Issue #337: Propagated currentMa in observeIntegrityUpdates for power forensic parity.
+ * v9.3.51:
+ * - ANR Hardening (#092): Offloaded history processing and integrity JSON parsing 
+ *   to Dispatchers.Default to ensure Landing Page responsiveness.
  */
 @Singleton
 class StateSubscriptionUseCase @Inject constructor(
@@ -39,7 +41,7 @@ class StateSubscriptionUseCase @Inject constructor(
 
     fun startHistoryObservations(scope: CoroutineScope) {
         _historyFlows.forEach { (key, stateFlow) ->
-            scope.launch {
+            scope.launch(Dispatchers.Default) {
                 repository.getHistoryFlow(key).collect { dbList ->
                     stateFlow.update { current ->
                         val lastDbTs = dbList.lastOrNull()?.ts ?: 0L
@@ -50,7 +52,7 @@ class StateSubscriptionUseCase @Inject constructor(
             }
         }
 
-        scope.launch {
+        scope.launch(Dispatchers.Default) {
             repository.liveHistoryFlow.collect { (key, points) ->
                 _historyFlows[key]?.update { (it + points).takeLast(240) }
             }
@@ -96,7 +98,7 @@ class StateSubscriptionUseCase @Inject constructor(
                 isXiaomiManualOverride = args[5] as Boolean,
                 lastAlarmAckTs = args[6] as Long
             )
-        }
+        }.flowOn(Dispatchers.Default)
     }
 
     fun observeConnectivityBasics(): Flow<ConnectivityUpdate> {
@@ -106,7 +108,7 @@ class StateSubscriptionUseCase @Inject constructor(
             repository.lastRemoteActivityTs
         ) { connected, rtt, remoteTs ->
             ConnectivityUpdate(connected, rtt, remoteTs)
-        }
+        }.flowOn(Dispatchers.Default)
     }
 
     fun observeIntegrityUpdates(): Flow<IntegrityUpdate> = repository.integrityState.map { info ->
@@ -168,7 +170,7 @@ class StateSubscriptionUseCase @Inject constructor(
             activeAlarms = alarms.first,
             activeAlarmTypes = alarms.second
         )
-    }
+    }.flowOn(Dispatchers.Default)
 
     data class IntegrityUpdate(
         val integrityUi: IntegrityStateUi,

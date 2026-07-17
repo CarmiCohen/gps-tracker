@@ -20,11 +20,9 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * v9.3.29:
- * - ANR Hardening (#092): Offloaded permission state polling to Dispatchers.IO 
- *   to prevent system IPC calls from blocking the Main thread.
- * v9.3.26:
- * - ANR Recovery: Guarded startGlobalTimer logic with initialization check.
+ * v9.3.47:
+ * - ANR Hardening (#092): Deferred heavy data observations (logs, trails, history) 
+ *   until appMode is active to ensure Landing Page responsiveness on A15.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -101,16 +99,21 @@ class MainViewModel @Inject constructor(
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), DashboardState())
 
-    val eventLogsFlow: StateFlow<List<LogEntry>> = repository.eventLogsFlow
+    // v9.3.47: Lazy Gated Flows to prevent Main-thread flooding on Landing Page
+    val eventLogsFlow: StateFlow<List<LogEntry>> = _uiState.map { it.appMode }.distinctUntilChanged()
+        .flatMapLatest { mode -> if (mode != null) repository.eventLogsFlow else flowOf(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), emptyList())
 
-    val trackerTrailFlow: StateFlow<List<TrailPoint>> = repository.trackerTrailFlow
+    val trackerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
+        .flatMapLatest { mode -> if (mode != null) repository.trackerTrailFlow else flowOf(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), emptyList())
 
-    val viewerTrailFlow: StateFlow<List<TrailPoint>> = repository.viewerTrailFlow
+    val viewerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
+        .flatMapLatest { mode -> if (mode != null) repository.viewerTrailFlow else flowOf(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), emptyList())
 
-    val violationPointsFlow: Flow<List<ViolationPoint>> = repository.violationsFlow
+    val violationPointsFlow: Flow<List<ViolationPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
+        .flatMapLatest { mode -> if (mode != null) repository.violationsFlow else flowOf(emptyList()) }
 
     val history4MFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("4M")
     val history16MFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("16M")
@@ -125,6 +128,7 @@ class MainViewModel @Inject constructor(
     private var lastKnownAlarmTypes: Set<String> = emptySet()
 
     private var lastAlarmAckRealtime: Long = 0L
+    private var isHeavyObservationStarted = false
 
     init {
         viewModelScope.launch(uiExceptionHandler) {
@@ -132,13 +136,15 @@ class MainViewModel @Inject constructor(
             delay(150)
             startGlobalTimer()
             delay(200)
-            startReactiveObservations()
-            delay(1000)
-            stateSubscriptionUseCase.startHistoryObservations(viewModelScope)
+            startBaseObservations()
+            
+            // Auto-trigger heavy observations if app starts already in a mode (cold-boot recovery)
+            _uiState.filter { it.isInitialized && it.appMode != null }.first()
+            startHeavyObservations()
         }
     }
 
-    private fun startReactiveObservations() {
+    private fun startBaseObservations() {
         stateSubscriptionUseCase.observeRepositorySettings()
             .onEach { update ->
                 updateState { it.copy(
@@ -148,6 +154,24 @@ class MainViewModel @Inject constructor(
                 )}
             }.launchIn(viewModelScope)
 
+        stateSubscriptionUseCase.observeInternetStatus().onEach { online -> updateState { it.copy(connectivity = it.connectivity.copy(isLocalOnline = online)) } }.launchIn(viewModelScope)
+        
+        viewModelScope.launch(Dispatchers.IO) { 
+            while(true) { 
+                val newState = systemStatusProvider.getPermissionState()
+                withContext(Dispatchers.Main) { updateState { it.copy(permissions = newState) } }
+                val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
+                delay(if (refreshFast) PERMISSION_REFRESH_INTERVAL_FAST_MS else PERMISSION_REFRESH_INTERVAL_SLOW_MS) 
+            } 
+        }
+
+        repository.identitySanitizedFlow.onEach { sanitized -> updateState { it.copy(isIdentitySanitized = sanitized) } }.launchIn(viewModelScope)
+    }
+
+    private fun startHeavyObservations() {
+        if (isHeavyObservationStarted) return
+        isHeavyObservationStarted = true
+        
         stateSubscriptionUseCase.observeConnectivityBasics()
             .onEach { update ->
                 _rtt.value = update.lastRtt
@@ -168,7 +192,6 @@ class MainViewModel @Inject constructor(
                 if (_uiState.value.appMode == "tracker") _trackerMaxTemp.value = update.maxTemp
             }.launchIn(viewModelScope)
 
-        stateSubscriptionUseCase.observeInternetStatus().onEach { online -> updateState { it.copy(connectivity = it.connectivity.copy(isLocalOnline = online)) } }.launchIn(viewModelScope)
         stateSubscriptionUseCase.observeBatteryStatus().onEach { status -> 
             updateState { current -> current.copy(
                 battery = current.battery.copy(level = status.level, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging),
@@ -184,20 +207,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { repository.trackerLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
         viewModelScope.launch { repository.connectedViewers.collect { viewers -> updateState { it.copy(connectivity = it.connectivity.copy(connectedViewers = viewers)) } } }
 
-        viewModelScope.launch(Dispatchers.IO) { 
-            while(true) { 
-                val newState = systemStatusProvider.getPermissionState()
-                withContext(Dispatchers.Main) {
-                    updateState { it.copy(permissions = newState) }
-                }
-                val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
-                delay(if (refreshFast) PERMISSION_REFRESH_INTERVAL_FAST_MS else PERMISSION_REFRESH_INTERVAL_SLOW_MS) 
-            } 
-        }
-
-        repository.identitySanitizedFlow.onEach { sanitized ->
-            updateState { it.copy(isIdentitySanitized = sanitized) }
-        }.launchIn(viewModelScope)
+        stateSubscriptionUseCase.startHistoryObservations(viewModelScope)
     }
 
     fun onEvent(event: UiEvent) {
@@ -390,6 +400,7 @@ class MainViewModel @Inject constructor(
         when (event) {
             is UiEvent.SetAppMode -> { 
                 addPersistentLog("user", "USER ACTION: App mode set to ${event.mode ?: "NONE"}", true)
+                if (event.mode != null) startHeavyObservations()
                 viewModelScope.launch(uiExceptionHandler) {
                     val newStartTime = sessionUseCase.setAppMode(event.mode)
                     updateState { it.copy(appMode = event.mode, appStartTime = newStartTime ?: it.appStartTime) }
@@ -479,7 +490,6 @@ class MainViewModel @Inject constructor(
                     updateState { state -> state.copy(isAlarmSilenced = behaviorUseCase.isAlarmSilenced(state.lastAlarmAckTs, now)) }
                 }
 
-                // R405: Unified 2s heartbeat for UI timer.
                 val currentInterval = getActiveHeartbeatInterval(0)
                 delay(currentInterval)
             }

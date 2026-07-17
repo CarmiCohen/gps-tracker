@@ -3,6 +3,7 @@ package com.gps19.app
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -15,17 +16,9 @@ import kotlin.math.abs
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring (Dual-Metric). Ensured maxAccuracy 
- *   parity in local database persistence and retrieval for forensic logs.
- * v8.9.37:
- * - Issue #241: Ensured snrSnapshot and vibeSnapshot parity in local database persistence and retrieval.
- * v8.9.11:
- * - Issue #212: Added accuracy mapping for forensic parity in historical recovery.
- * v8.9.10:
- * - Issue 209: Added lat/lng mapping for historical forensic marker reconstruction.
- * v8.9.7:
- * - Issue 194: Updated addLog to accept an initial 'synced' state to prevent duplicate emissions.
+ * v9.3.49:
+ * - ANR Hardening (#092): Corrected variable references in addLog and 
+ *   confirmed offloading of eventLogsFlow mapping.
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -65,7 +58,7 @@ class LogRepository @Inject constructor(
                 vibeSnapshot = it.vibeSnapshot
             ) 
         }
-    }
+    }.flowOn(Dispatchers.Default)
 
     fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
         val integrity = telemetry.integrityState.value
@@ -89,7 +82,7 @@ class LogRepository @Inject constructor(
                             isSpecial = entry.isSpecial,
                             specialColor = entry.specialColor,
                             role = entry.role,
-                            synced = initiallySynced, // Update sync status if requested
+                            synced = initiallySynced,
                             lat = entry.lat,
                             lng = entry.lng,
                             accuracy = entry.accuracy,
@@ -120,7 +113,7 @@ class LogRepository @Inject constructor(
                                 extremeValue = newExtreme,
                                 timestamp = entry.timestamp,
                                 message = entry.message,
-                                synced = initiallySynced, // Reset/update sync status on merge
+                                synced = initiallySynced,
                                 lat = entry.lat,
                                 lng = entry.lng,
                                 accuracy = entry.accuracy,

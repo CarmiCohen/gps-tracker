@@ -18,28 +18,15 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
- * v9.3.20:
- * - R405: Samsung A15 Power Hardening. Added proactive battery optimization check.
- * v9.1.3:
- * - Maintenance: Corrected versioning sequence and redeployed stable engine.
+ * v9.3.45:
+ * - Issue #095: Reactive Flow Hardening. Offloaded permission request logic 
+ *   to MainAppContent to ensure atomic mode transitions.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
     private val cachedPkgName by lazy { packageName }
-
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val allGranted = permissions.entries.all { it.value }
-        if (allGranted) {
-            Timber.d("All requested permissions granted.")
-        } else {
-            Timber.w("Some permissions were denied.")
-        }
-        viewModel.onEvent(UiEvent.RefreshPermissionStatus)
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -116,21 +103,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 },
-                checkAndRequestPermissions = { mode ->
-                    val permissions = mutableListOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
-                    
-                    if (mode == "tracker") {
-                        permissions.add(Manifest.permission.RECORD_AUDIO)
-                    }
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                    requestPermissionLauncher.launch(permissions.toTypedArray())
-                },
                 onStopTracking = {
                     stopService(Intent(this, TrackerService::class.java))
                     stopService(Intent(this, ViewerService::class.java))
@@ -175,8 +147,6 @@ class MainActivity : ComponentActivity() {
         // R405: Proactive check for Samsung A15 hardening
         if (isA15Device() && !viewModel.uiState.value.permissions.isBatteryWhitelisted) {
             Timber.i("R405: Samsung A15 detected without battery exemption. Prompting user.")
-            // We don't auto-launch every time, but ensure UI knows it's critical.
-            // In a real implementation, you might show a specific dialog here.
         }
     }
 }

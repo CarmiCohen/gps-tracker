@@ -4,11 +4,9 @@ import com.gps19.core.engine.*
 
 /**
  * Constants: Centralized configuration values and system thresholds.
- * v8.9.2:
- * - Issue 182: Synchronized version strings to v8.9.2 baseline.
- * - Forensic Simplification: Reflects removal of 'ver' and 'vid' tags from data stream.
- * - Issue 162: Removed duplicated scheduling and RTT constants; migrated to EngineConstants.kt.
- * - FIXED: Restored FLOW_SHARING_TIMEOUT_MS for ViewModel state stability.
+ * v9.3.40:
+ * - Issue #092 Hardening: Increased PERMISSION_REFRESH_INTERVAL_FAST_MS to 2000ms 
+ *   to prevent IPC-induced ANRs on low-end devices like Samsung A15.
  */
 
 // Global App Defaults
@@ -63,7 +61,7 @@ val DAILY_CLEANUP_DATE_KEY = "last_daily_cleanup_date"
 const val ALARM_ACK_RESET_MS = 2000L
 const val SILENCE_TIMEOUT_MS = 300000L
 const val WAKELOCK_TIMEOUT_MS = 600000L
-const val PERMISSION_REFRESH_INTERVAL_SLOW_MS = 5000L
-const val PERMISSION_REFRESH_INTERVAL_FAST_MS = 500L
+const val PERMISSION_REFRESH_INTERVAL_SLOW_MS = 10000L
+const val PERMISSION_REFRESH_INTERVAL_FAST_MS = 2000L
 const val SILENCE_AUTO_RECOVERY_MS = 300000L
 const val FLOW_SHARING_TIMEOUT_MS = 5000L

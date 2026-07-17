@@ -18,12 +18,9 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
- * v9.3.15:
- * - Hardening: Removed redundant Float accessors in alignment with SettingsRepository 
- *   Double standardization.
- * v9.3.3:
- * - Issue #039 Identity Rejection Feedback: Updated saveSettingsBulk to throw 
- *   IllegalArgumentException on identity collision to prevent silent failures.
+ * v9.3.50:
+ * - ANR Hardening (#092): Offloaded trail and violation flow mapping to 
+ *   Dispatchers.Default to ensure Landing Page responsiveness.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -119,13 +116,15 @@ class MainRepository @Inject constructor(
 
     val trackerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(false).map { entities -> 
         entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected, it.accuracy, it.maxAccuracy) } 
-    }
+    }.flowOn(Dispatchers.Default)
+
     val viewerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(true).map { entities -> 
         entities.map { TrailPoint(it.lat, it.lng, it.timestamp, it.isJump, it.isHindsightCorrected, it.accuracy, it.maxAccuracy) } 
-    }
+    }.flowOn(Dispatchers.Default)
+
     val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> 
         entities.map { ViolationPoint(point = GeoPoint(it.lat, it.lng), type = it.type, ts = it.ts, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy) } 
-    }
+    }.flowOn(Dispatchers.Default)
 
     private val _uiCommands = MutableSharedFlow<UiCommand>(extraBufferCapacity = 10)
     val uiCommands: SharedFlow<UiCommand> = _uiCommands.asSharedFlow()
@@ -338,7 +337,7 @@ class MainRepository @Inject constructor(
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
             ) 
         }
-    }
+    }.flowOn(Dispatchers.Default)
 
     private var lastBatchWriteRealtime = 0L
     private val historyBuffer = ConcurrentLinkedQueue<HistoryEntity>()
