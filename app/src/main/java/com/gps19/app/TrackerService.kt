@@ -18,13 +18,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * July.16.23:
- * - Version Alignment.
- * July.16.22:
- * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
- * - Issue #524: Handle power violation resolution.
- * - Issue #525: Propagate acoustic lockout to engine.
- * - Fix: Added checkInternetIntegrity call to monitor local internet.
+ * July.16.24:
+ * - Issue #526: Landing Page Hang. Root-cause remediation for budget devices.
+ * - Version: July.16.24 Hardened.
  */
 class TrackerService : BaseMonitorService() {
 
@@ -67,10 +63,10 @@ class TrackerService : BaseMonitorService() {
 
     override fun injectDependencies() {
         super.injectDependencies()
-        val container = (application as GpsApplication).container
-        sensorManager = container.appSensorManager
-        behaviorUseCase = container.serviceBehaviorUseCase
-        statusProvider = container.systemStatusProvider
+        // Dependencies are now lazy-loaded in BaseMonitorService to prevent Main thread hangs
+        sensorManager = (application as GpsApplication).container.appSensorManager
+        behaviorUseCase = (application as GpsApplication).container.serviceBehaviorUseCase
+        statusProvider = (application as GpsApplication).container.systemStatusProvider
     }
 
     override fun onCreate() {

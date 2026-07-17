@@ -1,26 +1,19 @@
-# System Source of Truth (SoT) - July.16.22 (Development)
+# System Source of Truth (SoT) - July.17.00 (Release)
 
-This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
+This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
-### 1. Core Architectural Baselines
-*   **Startup Responsiveness Authority (Issue #526)**: All service-level components (e.g., `ConnectivitySuite`) MUST offload I/O-heavy initialization and continuous logic loops to background dispatchers (`Dispatchers.Default` or `Dispatchers.IO`). Main thread contention during the app's cold start window MUST be eliminated to ensure landing page responsiveness on budget hardware (e.g., Samsung A15). (v9.5.2)
-*   **Stable Stationary Anchor Authority (R406m / Issue #522)**: When the system determines the device is stationary (speed < 0.5m/s), the `LocationProcessor` MUST lock a geographic spatial anchor. Subsequent location updates MUST be clamped to this anchor's coordinates until motion is re-detected. This eliminates coordinate wander and jitter during prolonged parking periods. (v9.5.1)
-*   **Passive Tilt Zeroing Authority (R406l / Issue #521)**: The system MUST support relative tilt monitoring. After 5 minutes of continuous stationary state, the `LocationSentinel` MUST adopt the current device orientation as the new `tiltBaseline`. All subsequent tilt alarms MUST be calculated as a delta from this baseline to account for the device's resting position. (v9.5.1)
-*   **Consolidated Alarm History Authority (R406k / Issue #517)**: The system MUST manage persistent alarm evaluation state (e.g., geofence violation counters, power alarm pending flags, first violation timestamps) within a unified `AlarmHistory` model in the `:core:engine`. `AppAlarmManager` MUST NOT maintain local primitive flags for these states. (v9.5.0)
-*   **Unified System Health Authority (R406j / Issue #516)**: All device-specific health metadata (Battery, Thermal, Storage, Signal, and Connectivity stats) MUST be managed via a unified `SystemHealthState` model within the `:core:engine`. `IntegrityMonitor` serves as the authoritative producer. (v9.5.0)
-*   **Streamlined GPS Architecture (R406i / Issue #514)**: The system MUST rely primarily on the `FusedLocationProviderClient` for location updates. Forensic SNR buffering and secondary analytical backfilling are DEPRECATED and REMOVED. (v9.5.0)
-*   **Flattened Connectivity Architecture (R406h / Issue #513)**: The system MUST use a unified `ConnectivitySuite` to manage all external communications, consolidating Network Manager, Sync Manager, and Remote Peer Handler. (v9.5.0)
-*   **Manual Dependency Injection Authority (R406c / Issue #503)**: The system MUST use a manual Dependency Injection pattern centered around a singleton `AppContainer` hosted in the `GpsApplication` class. Dagger, Hilt, and other reflective DI frameworks are strictly FORBIDDEN. (v9.5.0)
-*   **Unified System Heartbeat (R406a / Issue #501)**: The system MUST use a standardized 2000ms heartbeat (`TICK_INTERVAL_MS`) globally for all hardware polling, logic cycles, and telemetry submissions. (v9.4.0)
-*   **Device Independency / Hardware Abstraction (R406b / Issue #502)**: The core tracking engine MUST be brand-agnostic. All hardware-specific workarounds MUST be abstracted into a generic `HardwareCapabilities` model. (v9.4.0)
-*   **Binary Telemetry Authority (R988)**: The system MUST prioritize binary Protobuf-based telemetry (`location_update_bin`) for high-frequency tracker updates. (v9.3.25)
-*   **Alias-Aware Identity Uniqueness (R182b)**: The system MUST enforce identity uniqueness that accounts for reserved legacy aliases (`T`, `V`, `Trk`, `viewer`). (v9.3.25)
-*   **Samsung A15 Hardening Authority (R405)**: The system MUST prioritize background persistence on Samsung A15 devices through combined mechanisms: (1) `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, (2) Unified 2s heartbeat, (3) `TYPE_STEP_DETECTOR` stay-alive sensor, and (4) Accelerometer-based fallback. (v9.3.25)
-*   **Relay Configuration Authority (R404)**: The system MUST enforce a centralized relay configuration via `MainRepository.DEFAULT_RELAY_URL`. (v9.3.18)
-*   **Automatic Mode Transition Delay (R925)**: The app MUST pause for 2s (`LANDING_PAGE_PAUSE_MS`) on the landing page for automatic restoration. (Issue #092 / v9.3.36)
-*   **System API Synchronization Authority (R999b)**: The background service layer MUST maintain strict signature parity with the `:core:engine` telemetry pipeline. (v9.3.16)
-*   **Map Follow Mode Persistence (R981b)**: The map system MUST respect the user's manual focus intent (Tracker, Viewer, or Auto). (v9.3.16)
-*   **Type Safety Authority (R999)**: All internal telemetry, sensor data, and engine pipelines MUST use `Double` precision. (v9.3.15)
-*   **System API Throttling (R998)**: The system MUST enforce a minimum 10,000ms TTL cache for all system API checks to eliminate logcat jitter. (v9.3.14)
-*   **Dynamic Anchor Breakout (R990c)**: The engine MUST implement a displacement-weighted monitor to prevent "sticky anchors". (v9.3.13)
-*   **Forensic Visual Authority (R404b)**: The system MUST use a standardized `FORENSIC_PINK_COLOR` (#FF1493) for all forensic events. (v9.3.18)
+### 1. Performance & Startup Authority (Issue #526)
+*   **Main-Thread Purity**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start.
+*   **Lazy Safety**: All properties in `AppContainer` MUST use `LazyThreadSafetyMode.PUBLICATION` to prevent thread stalling during background warm-ups.
+*   **Non-Blocking Services**: `BaseMonitorService.onCreate` MUST be logic-free. All initialization, including `startForeground`, MUST occur within a background lifecycle scope to maintain UI responsiveness on budget hardware (Samsung A15).
+*   **Notification Decoupling**: `AppNotificationManager` MUST remain independent of the `MainRepository` and `Database` to allow instant foreground service binding.
+
+### 2. Architectural Baselines
+*   **Stable Stationary Anchor (R406m)**: `LocationProcessor` locks geographic anchors when speed < 0.5m/s.
+*   **Passive Tilt Zeroing (R406l)**: `LocationSentinel` adopts resting orientation as baseline after 5 mins of stability.
+*   **Manual Dependency Injection (R406c)**: manual DI via `AppContainer` is the sole injection pattern.
+*   **Unified System Heartbeat (R406a)**: Global 2000ms heartbeat standard.
+
+### 3. Version Authority
+*   **Current Baseline**: `July.17.00`.
+*   **Source of Truth**: `app/build.gradle` `versionName`.

@@ -27,8 +27,8 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Manual dependency injection.
+ * July.16.24:
+ * - Issue #526: Offloaded hardware lookups to lazy properties to prevent cold-start hangs.
  */
 class AppSensorManager(
     private val context: Context,
@@ -36,18 +36,18 @@ class AppSensorManager(
     private val timeProvider: TimeProvider
 ) : SensorEventListener {
 
-    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as AndroidSensorManager
-    private val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+    private val sensorManager by lazy { context.getSystemService(Context.SENSOR_SERVICE) as AndroidSensorManager }
+    private val displayManager by lazy { context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager }
     
-    private val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-    private val linearAccel = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
-    private val magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-    private val barometer = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
-    private val proximity = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY)
-    private val light = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
-    private val rotationVector = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+    private val accelerometer by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
+    private val linearAccel by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION) }
+    private val magnetometer by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) }
+    private val barometer by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE) }
+    private val proximity by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY) }
+    private val light by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT) }
+    private val rotationVector by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) }
     
-    private val stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+    private val stepDetector by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR) }
 
     private var sensorThread: HandlerThread? = null
     private var sensorHandler: Handler? = null

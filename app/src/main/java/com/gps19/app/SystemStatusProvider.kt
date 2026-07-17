@@ -39,8 +39,8 @@ interface SystemStatusProvider {
     fun isLocalOnline(): Boolean
     
     /**
-     * v9.5.0:
-     * - Issue #503: Hilt Removal. Manual dependency injection.
+     * July.16.24:
+     * - Issue #526: Performance hardening. Hardware lookups are now lazy.
      */
     suspend fun getPermissionState(forceRefresh: Boolean = false): PermissionState
     
@@ -52,10 +52,10 @@ class SystemStatusProviderImpl(
     private val context: Context
 ) : SystemStatusProvider {
 
-    private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-    private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-    private val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+    private val powerManager by lazy { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
+    private val connectivityManager by lazy { context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager }
+    private val alarmManager by lazy { context.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
+    private val batteryManager by lazy { context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager }
     
     private val cachedPackageName = context.packageName
 

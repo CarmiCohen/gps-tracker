@@ -10,18 +10,16 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
-import com.gps19.core.engine.CapabilityStatus
 import java.util.Locale
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Manual dependency injection.
+ * July.16.24:
+ * - Issue #526: Performance hardening. Removed ConfigManager dependency to prevent
+ *   Main-thread lazy-loading of the database during cold start.
  */
 class AppNotificationManager(
-    private val context: Context,
-    private val configManager: ConfigManager,
-    private val timeProvider: com.gps19.core.engine.TimeProvider
+    private val context: Context
 ) {
 
     private val channelId = "location_service_channel"

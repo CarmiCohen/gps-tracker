@@ -1,31 +1,36 @@
-# Project Handover: July.16.24 Baseline
+# Project Handover: July.17.00 - Performance Hardened Baseline
 
 ## 🔴 Status: HARDENED BASELINE ACHIEVED
-**Version Context**: `July.16.24`
-**Authoritative Specifications**: `STATUS/SOT_MASTER_REQUIREMENTS.md`
+**Version Context**: `July.17.00` (Authoritative)
+**Target Hardware**: Samsung A15 (Budget Benchmark)
+**Core Issue Resolved**: #526 (Startup Hang)
 
-This document provides the forensic state required to resume development. All performance hardening for budget devices is complete.
+This document provides the definitive forensic state required to resume development in a new session. The system has been hardened against startup frame-spikes that previously impacted low-end hardware.
 
-### 1. Authoritative Data Models
-- **`SystemHealthState`**: Sole source of truth for device metadata.
-- **`AlarmHistory`**: Stateless persistent metadata managed by `AppAlarmManager`.
-- **`HardwareCapabilities`**: Abstraction of device-specific restrictions.
+### 1. Forensic Status of Issue #526 (Resolved)
+The "Landing Page Hang" was a race condition between background initialization and Main-thread property access during the cold-start window.
+- **Root Cause**: `BaseMonitorService` and `MainViewModelFactory` triggered Room DB initialization on the Main thread via a "Lazy Cascade". Default Kotlin `lazy` synchronization caused kernel-level blocking.
+- **Remediation**: 
+    - **Lock-Free Lazy DI**: `AppContainer` properties now use `LazyThreadSafetyMode.PUBLICATION`. The Main thread will no longer block on background initializers.
+    - **AppNotificationManager**: Decoupled from the repository layer. It now builds foreground notifications instantly without touching the database.
+    - **Async Service Boot**: `BaseMonitorService.onCreate` is now logic-free. `startForeground` and hardware binding are deferred to a background scope.
+    - **Warm-up**: `GpsApplication` proactively primes the DB and Managers on `Dispatchers.IO` immediately after creation.
 
-### 2. Architectural Hardening
-- **Lazy Dependency Injection**: The `AppContainer` now uses full lazy initialization. This prevents Main thread contention during application startup by deferring the creation of heavy components (Database, GpsManager, SensorManager) until they are first accessed.
-- **Asynchronous Startup**: `GpsApplication` offloads osmdroid and WorkManager setup to `Dispatchers.IO`.
-- **ConnectivitySuite**: Unified communication component, fully asynchronous.
+### 2. Authoritative Data Models
+- **`SystemHealthState`**: Authority for device metadata (Battery, Thermal, Storage, Signal).
+- **`AlarmHistory`**: Authority for persistent violation counters (resident in-memory).
+- **`HardwareCapabilities`**: Brand-agnostic abstraction of device restrictions.
 
-### 3. Recent Hardening Remediation (July.16.24)
-- **Issue #526: A15 Landing Page Hang (Resolved)**: Fixed UI unresponsiveness on Samsung A15 by eliminating Main thread spikes during cold start via lazy DI and asynchronous app initialization.
-- **S21FE Performance**: Verified smooth execution on high-end hardware with the new lazy architecture.
+### 3. Architectural Baselines
+- **Manual Lazy DI**: Managed via `AppContainer.kt`. **STRICT RULE**: Never access a `container` property on the Main thread during the cold-start window (0-3s after launch).
+- **Unified Heartbeat**: Global 2000ms standard (`TICK_INTERVAL_MS`).
 
-### 4. Current File-System State
-- **`AppContainer.kt`**: Now the central point for lazy dependency management.
-- **`GpsApplication.kt`**: Cleaned of blocking startup tasks.
-- **`issues.md`**: Updated with budget device sensitivity concerns.
+### 4. Resumption Instructions
+1. **Sync**: Perform a Gradle Sync immediately to regenerate `BuildConfig`.
+2. **Build**: Run `:app:assembleDebug`.
+3. **Verification**: Confirm version `July.17.00` appears on the landing page.
+4. **Caution**: Any new global component added to `AppContainer` MUST be lazy and use `PUBLICATION` safety.
 
-### 5. Resumption Instructions
-1. **Build**: Run `:app:assembleDebug` to verify baseline integrity.
-2. **Context**: Budget device performance is now a core requirement. Any new global manager MUST be lazy-loaded.
-3. **Verification**: Confirm `SOT_MASTER_REQUIREMENTS.md` reflects the July.16.24 performance authority.
+### 5. Future Simplification Ideas
+- **Service Consolidation**: Merge `ViewerService` and `TrackerService` into a single role-configurable `MonitorService`.
+- **Repository Flattening**: Consolidate `OfflineRepository` and `TelemetryRepository` into `MainRepository`.

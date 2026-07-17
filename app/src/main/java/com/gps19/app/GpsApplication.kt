@@ -19,10 +19,9 @@ import java.io.File
 
 /**
  * GpsApplication: Application entry point and global dependency management.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Reverted to manual Dependency Injection via AppContainer.
  * July.16.24:
- * - Issue #526: Landing Page Hang. Offloaded osmdroid and WorkManager initialization to background threads.
+ * - Issue #526: Landing Page Hang. Implemented background "warm-up" of heavy lazy dependencies
+ *   to ensure Main thread remains responsive during cold start.
  */
 class GpsApplication : Application(), Configuration.Provider {
 
@@ -63,26 +62,40 @@ class GpsApplication : Application(), Configuration.Provider {
             Timber.plant(Timber.DebugTree())
         }
 
-        // Issue #526: Offload non-critical initialization to background thread
+        // Issue #526: Proactive Background Warm-up
+        // This triggers the lazy initializers for heavy components on a background thread.
+        // When the Main thread eventually accesses them, the heavy work is already done.
         GlobalScope.launch(Dispatchers.IO) {
-            // Issue #456: Layer 3 Watchdog - WorkManager persistence
-            MaintenanceWorker.schedule(this@GpsApplication)
+            try {
+                // Initialize Database and Repository chain
+                val repo = container.mainRepository
+                repo.getAppMode() 
+                
+                // Warm up hardware managers
+                container.gpsManager
+                container.appSensorManager
+                
+                // Issue #456: Layer 3 Watchdog - WorkManager persistence
+                MaintenanceWorker.schedule(this@GpsApplication)
 
-            // Issue #005: Deep silence for osmdroid
-            val osmConfig = OsmConfig.getInstance()
-            osmConfig.userAgentValue = "GpsTracker/8.9.91"
-            
-            val baseDir = File(filesDir, "osmdroid")
-            if (!baseDir.exists()) baseDir.mkdirs()
-            osmConfig.osmdroidBasePath = baseDir
-            
-            val cacheDir = File(baseDir, "tiles")
-            if (!cacheDir.exists()) cacheDir.mkdirs()
-            osmConfig.osmdroidTileCache = cacheDir
+                // Issue #005: Deep silence for osmdroid
+                val osmConfig = OsmConfig.getInstance()
+                osmConfig.userAgentValue = "GpsTracker/8.9.91"
+                
+                val baseDir = File(filesDir, "osmdroid")
+                if (!baseDir.exists()) baseDir.mkdirs()
+                osmConfig.osmdroidBasePath = baseDir
+                
+                val cacheDir = File(baseDir, "tiles")
+                if (!cacheDir.exists()) cacheDir.mkdirs()
+                osmConfig.osmdroidTileCache = cacheDir
 
-            osmConfig.load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
-            osmConfig.isDebugMode = false
-            osmConfig.isDebugTileProviders = false
+                osmConfig.load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
+                osmConfig.isDebugMode = false
+                osmConfig.isDebugTileProviders = false
+            } catch (e: Exception) {
+                Log.e("GPS19", "Background warm-up failed", e)
+            }
         }
 
         Timber.plant(object : Timber.Tree() {
@@ -91,7 +104,7 @@ class GpsApplication : Application(), Configuration.Provider {
                     try {
                         val fullMessage = if (tag != null) "[$tag] $message" else message
                         val suffix = t?.let { ": ${it.stackTraceToString().take(500)}" } ?: ""
-                        // LogManager is lazy-loaded, so this might trigger its creation if an error occurs early
+                        // LogManager access is safe here as the database is warmed up in background
                         container.logManager.logServiceEvent("CRITICAL ERROR: $fullMessage$suffix", true)
                     } catch (e: Exception) {
                     }

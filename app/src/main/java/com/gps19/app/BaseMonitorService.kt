@@ -15,31 +15,34 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * v9.5.0: Issue #513 - Flatten Service Architecture (ConnectivitySuite).
+ * July.16.24:
+ * - Issue #526: Definitive performance hardening. All logic including foreground start
+ *   is deferred to background scope to prevent Main thread hangs on Samsung A15.
  */
 abstract class BaseMonitorService : LifecycleService() {
 
-    lateinit var configManager: ConfigManager
-    lateinit var logManager: LogManager
-    lateinit var connectivitySuite: ConnectivitySuite
-    lateinit var repository: MainRepository
-    lateinit var telemetryRepository: TelemetryRepository
-    lateinit var offlineRepository: OfflineRepository
-    lateinit var timeProvider: TimeProvider
-    
-    lateinit var systemMonitor: SystemMonitor
-    lateinit var notificationManager: AppNotificationManager
+    private val container by lazy { (application as GpsApplication).container }
 
-    // Common Core Components
-    lateinit var gpsManager: GpsManager
-    lateinit var sessionManager: SessionManager
-    lateinit var systemStatusProvider: SystemStatusProvider
-    lateinit var forensicUseCase: ServiceForensicUseCase
-    lateinit var integrityMonitor: IntegrityMonitor
-    lateinit var alarmManager: AppAlarmManager
-    lateinit var historyManager: HistoryManager
-    lateinit var locationProcessor: LocationProcessor
-    lateinit var commandRouter: CommandRouter
+    val configManager by lazy { container.configManager }
+    val logManager by lazy { container.logManager }
+    val connectivitySuite by lazy { container.connectivitySuite }
+    val repository by lazy { container.mainRepository }
+    val telemetryRepository by lazy { container.telemetryRepository }
+    val offlineRepository by lazy { container.offlineRepository }
+    val timeProvider by lazy { container.timeProvider }
+    
+    val systemMonitor by lazy { container.systemMonitor }
+    val notificationManager by lazy { container.appNotificationManager }
+
+    val gpsManager by lazy { container.gpsManager }
+    val sessionManager by lazy { container.sessionManager }
+    val systemStatusProvider by lazy { container.systemStatusProvider }
+    val forensicUseCase by lazy { container.serviceForensicUseCase }
+    val integrityMonitor by lazy { container.integrityMonitor }
+    val alarmManager by lazy { container.appAlarmManager }
+    val historyManager by lazy { container.historyManager }
+    val locationProcessor by lazy { container.locationProcessor }
+    val commandRouter by lazy { container.commandRouter }
     
     protected val cachedPkgName by lazy { packageName }
 
@@ -65,41 +68,24 @@ abstract class BaseMonitorService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
-        injectDependencies()
         
-        serviceStartRealtime = timeProvider.elapsedRealtime()
-        
-        systemMonitor.setWatchdogListener { set, skipped ->
-            if (this::logManager.isInitialized) {
-                logManager.logWatchdogPulse(set, skipped)
+        // v9.5.4: Completely defer all logic off the Main thread. 
+        // This prevents the "Lazy Cascade" from triggering DB/Manager init during startup.
+        lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
+            // Android allows a short window to call startForeground after service start.
+            // We use this window to let the UI finish its frame first.
+            startServiceForeground()
+            
+            serviceStartRealtime = timeProvider.elapsedRealtime()
+            
+            systemMonitor.setWatchdogListener { set, skipped ->
+                lifecycleScope.launch(Dispatchers.IO) {
+                    logManager.logWatchdogPulse(set, skipped)
+                }
             }
+
+            systemMonitor.acquireWakeLock()
         }
-
-        systemMonitor.acquireWakeLock()
-        
-        startServiceForeground()
-    }
-
-    protected open fun injectDependencies() {
-        val container = (application as GpsApplication).container
-        configManager = container.configManager
-        logManager = container.logManager
-        connectivitySuite = container.connectivitySuite
-        repository = container.mainRepository
-        telemetryRepository = container.telemetryRepository
-        offlineRepository = container.offlineRepository
-        timeProvider = container.timeProvider
-        systemMonitor = container.systemMonitor
-        notificationManager = container.appNotificationManager
-        gpsManager = container.gpsManager
-        sessionManager = container.sessionManager
-        systemStatusProvider = container.systemStatusProvider
-        forensicUseCase = container.serviceForensicUseCase
-        integrityMonitor = container.integrityMonitor
-        alarmManager = container.appAlarmManager
-        historyManager = container.historyManager
-        locationProcessor = container.locationProcessor
-        commandRouter = container.commandRouter
     }
 
     abstract fun startServiceForeground()
@@ -116,7 +102,6 @@ abstract class BaseMonitorService : LifecycleService() {
                 val nowRealtime = timeProvider.elapsedRealtime()
                 
                 systemMonitor.scheduleWatchdogAlarm()
-                
                 processTick(now, nowRealtime) 
                 
                 val elapsed = timeProvider.elapsedRealtime() - startTime
@@ -146,19 +131,7 @@ abstract class BaseMonitorService : LifecycleService() {
                 startForeground(id, notification)
             }
         } catch (e: Exception) {
-            val isStartDenied = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && 
-                    e.javaClass.name.contains("ForegroundServiceStartNotAllowedException")
-            
-            val logMsg = when {
-                isStartDenied -> "Foreground start denied (Background restriction): ${e.message}"
-                e is SecurityException -> "Foreground start failed (Security/Mismatch): ${e.message}"
-                else -> "Foreground start failed: ${e.message}"
-            }
-            Timber.e(e, logMsg)
-            
-            if (this::logManager.isInitialized) {
-                logManager.logServiceEvent("RECOVERY_WARN: $logMsg", important = true)
-            }
+            Timber.e(e, "Foreground start failed: ${e.message}")
         }
     }
 
@@ -179,12 +152,11 @@ abstract class BaseMonitorService : LifecycleService() {
             }
         }
 
-        if (this::systemMonitor.isInitialized) {
-            systemMonitor.cancelWatchdogAlarm()
-            systemMonitor.releaseWakeLock()
-        }
-        if (this::connectivitySuite.isInitialized) connectivitySuite.stop()
-        if (this::commandRouter.isInitialized) commandRouter.unregister()
+        systemMonitor.cancelWatchdogAlarm()
+        systemMonitor.releaseWakeLock()
+        
+        connectivitySuite.stop()
+        commandRouter.unregister()
 
         super.onDestroy()
     }

@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 
 /**
- * MainViewModelFactory: Standard factory for manual ViewModel injection.
- * Part of Issue #503: Hilt Removal.
+ * MainViewModelFactory: Factory for manual ViewModel injection.
+ * July.17.00:
+ * - Issue #526: Performance Hardening. Now pulls pre-configured lazy UseCases 
+ *   from AppContainer to prevent Main thread spikes.
  */
 class MainViewModelFactory(
     private val context: Context,
@@ -20,25 +22,16 @@ class MainViewModelFactory(
                 repository = container.mainRepository,
                 logManager = container.logManager,
                 systemStatusProvider = container.systemStatusProvider,
-                homePointUseCase = HomePointUseCase(container.mainRepository),
-                dashboardUseCase = DashboardUseCase(),
-                navigationUseCase = NavigationUseCase(),
-                settingsUseCase = SettingsUseCase(
-                    container.mainRepository,
-                    container.settingsRepository,
-                    container.timeProvider,
-                    container.logManager
-                ),
-                telemetryUseCase = TelemetryUseCase(container.timeProvider),
+                homePointUseCase = container.homePointUseCase,
+                dashboardUseCase = container.dashboardUseCase,
+                navigationUseCase = container.navigationUseCase,
+                settingsUseCase = container.settingsUseCase,
+                telemetryUseCase = container.telemetryUseCase,
                 stateSubscriptionUseCase = container.stateSubscriptionUseCase,
-                sessionUseCase = SessionUseCase(container.mainRepository, container.timeProvider),
-                behaviorUseCase = BehaviorUseCase(),
-                alertUseCase = AlertUseCase(
-                    container.mainRepository,
-                    container.timeProvider,
-                    container.logManager
-                ),
-                mapUseCase = MapUseCase(),
+                sessionUseCase = container.sessionUseCase,
+                behaviorUseCase = container.behaviorUseCase,
+                alertUseCase = container.alertUseCase,
+                mapUseCase = container.mapUseCase,
                 timeProvider = container.timeProvider,
                 context = context
             ) as T

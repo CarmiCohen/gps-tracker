@@ -14,17 +14,17 @@ import kotlinx.coroutines.flow.*
 import timber.log.Timber
 
 /**
- * GpsManager: Streamlined hardware GPS and GNSS status provider.
- * v9.5.0: Issue #514 - Simplified to rely on FusedLocationProvider and immediate GNSS status.
- * Removed legacy kick/revive commands and complex SNR buffering.
+ * GpsManager: Hardware GPS and GNSS status provider.
+ * July.16.24: 
+ * - Issue #526: Offloaded hardware lookups to lazy properties to prevent cold-start hangs.
  */
 class GpsManager(
     private val context: Context,
     private val timeProvider: TimeProvider
 ) {
 
-    private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+    private val locationManager by lazy { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
+    private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
     
     var satellitesInView = 0
         private set
@@ -93,7 +93,6 @@ class GpsManager(
 
         try {
             fusedLocationClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper())
-            Timber.d("GPS: Location updates requested at ${TICK_INTERVAL_MS}ms interval")
         } catch (e: Exception) {
             Timber.e(e, "CRITICAL: GPS Request failed")
             close(e)
