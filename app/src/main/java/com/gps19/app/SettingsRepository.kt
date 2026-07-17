@@ -29,6 +29,8 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * July.17.02:
+ * - Added IS_SYSTEM_ACTIVE_KEY to prevent unintended engine starts on boot.
  * v9.5.0:
  * - Issue #503: Hilt Removal.
  */
@@ -149,6 +151,7 @@ class SettingsRepository(
         const val DRAFT_MAX_DISTANCE = "draft_max_distance"
 
         const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = "is_xiaomi_manual_override"
+        const val IS_SYSTEM_ACTIVE_KEY = "is_system_active"
         
         const val IDENTITY_SANITIZED_KEY = "identity_sanitized"
     }
@@ -164,6 +167,7 @@ class SettingsRepository(
     val alertSettingsFlow: Flow<AlertSettings> = dataStore.data.map { SettingsMapper.protoToAlertSettings(it.alertSettings) }
     val isXiaomiManualOverrideFlow: Flow<Boolean> = dataStore.data.map { it.isXiaomiManualOverride }
     val identitySanitizedFlow: Flow<Boolean> = dataStore.data.map { it.identitySanitized }
+    val isSystemActiveFlow: Flow<Boolean> = dataStore.data.map { it.isSystemActive }
 
     suspend fun getSettingsSnapshot(): AppSettings = dataStore.data.first()
 
@@ -232,6 +236,7 @@ class SettingsRepository(
                 IS_MIC_TYPE_STARTED_KEY -> builder.setIsMicTypeStarted(value)
                 IS_XIAOMI_MANUAL_OVERRIDE_KEY -> builder.setIsXiaomiManualOverride(value)
                 IDENTITY_SANITIZED_KEY -> builder.setIdentitySanitized(value)
+                IS_SYSTEM_ACTIVE_KEY -> builder.setIsSystemActive(value)
             }
             builder.build()
         }
@@ -308,6 +313,7 @@ class SettingsRepository(
             IS_MIC_TYPE_STARTED_KEY -> settings.isMicTypeStarted
             IS_XIAOMI_MANUAL_OVERRIDE_KEY -> settings.isXiaomiManualOverride
             IDENTITY_SANITIZED_KEY -> settings.identitySanitized
+            IS_SYSTEM_ACTIVE_KEY -> settings.isSystemActive
             else -> default
         }
     }

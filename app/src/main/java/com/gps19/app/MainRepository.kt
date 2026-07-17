@@ -12,6 +12,8 @@ import java.util.UUID
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * July.17.02:
+ * - Added IS_SYSTEM_ACTIVE_KEY for persistent arming state.
  * July.16.18:
  * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
  */
@@ -87,6 +89,7 @@ class MainRepository(
         const val DRAFT_MAX_DISTANCE = SettingsRepository.DRAFT_MAX_DISTANCE
 
         const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = SettingsRepository.IS_XIAOMI_MANUAL_OVERRIDE_KEY
+        const val IS_SYSTEM_ACTIVE_KEY = SettingsRepository.IS_SYSTEM_ACTIVE_KEY
         
         const val IDENTITY_SANITIZED_KEY = SettingsRepository.IDENTITY_SANITIZED_KEY
     }
@@ -138,6 +141,7 @@ class MainRepository(
     val alertSettingsFlow = settings.alertSettingsFlow
     val isXiaomiManualOverrideFlow = settings.isXiaomiManualOverrideFlow
     val identitySanitizedFlow = settings.identitySanitizedFlow
+    val isSystemActiveFlow = settings.isSystemActiveFlow
 
     init {
         scope.launch {

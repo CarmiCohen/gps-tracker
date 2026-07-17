@@ -18,6 +18,8 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.17.02:
+ * - Issue #R993: Throttled notification updates to 30s via NOTIFICATION_THROTTLE_MS.
  * July.17.00:
  * - Issue #526: Definitive performance hardening. All dependencies pulled via lazy 
  *   delegates from BaseMonitorService to prevent Main thread hangs on Samsung A15.
@@ -402,6 +404,16 @@ class TrackerService : BaseMonitorService() {
                 hasGps = false,
                 isTrackerMode = true,
                 currentMa = health.currentMa
+            )
+        }
+
+        if (now - lastNotificationUpdateTs >= NOTIFICATION_THROTTLE_MS) {
+            lastNotificationUpdateTs = now
+            notificationManager.updatePulse(
+                sats = gpsManager.satellitesUsed,
+                battery = health.batteryLevel,
+                isSecure = !alarmManager.hasUnresolvedAlarms(),
+                isPowerSave = health.isPowerSaveMode
             )
         }
 

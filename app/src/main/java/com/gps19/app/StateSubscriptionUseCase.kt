@@ -11,6 +11,8 @@ import timber.log.Timber
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * July.17.02:
+ * - Added isSystemActive to observeRepositorySettings.
  * July.16.18:
  * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
  */
@@ -82,7 +84,8 @@ class StateSubscriptionUseCase(
             repository.homePointsFlow,
             repository.isXiaomiManualOverrideFlow,
             repository.lastAlarmAckTsFlow,
-            repository.appModeFlow
+            repository.appModeFlow,
+            repository.isSystemActiveFlow
         ) { args: Array<Any?> ->
             SettingsUpdate(
                 trackerId = args[0] as String,
@@ -92,7 +95,8 @@ class StateSubscriptionUseCase(
                 homePoints = args[4] as List<GeoPoint>,
                 isXiaomiManualOverride = args[5] as Boolean,
                 lastAlarmAckTs = args[6] as Long,
-                appMode = args[7] as String?
+                appMode = args[7] as String?,
+                isSystemActive = args[8] as Boolean
             )
         }
     }
@@ -143,7 +147,8 @@ class StateSubscriptionUseCase(
         val homePoints: List<GeoPoint>,
         val isXiaomiManualOverride: Boolean,
         val lastAlarmAckTs: Long,
-        val appMode: String?
+        val appMode: String?,
+        val isSystemActive: Boolean
     )
 
     data class ConnectivityUpdate(

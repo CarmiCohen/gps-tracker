@@ -13,7 +13,10 @@ import timber.log.Timber
 
 /**
  * BootReceiver: Triggered when the device restarts.
- * v9.5.0: Hilt removed. Manual DI.
+ * July.17.02:
+ * - Added check for isSystemActive to prevent unintended engine starts on landing page.
+ * v9.5.0:
+ * - Hilt removed. Manual DI.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -38,9 +41,10 @@ class BootServiceStartWorker(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val appMode = repository.appModeFlow.firstOrNull() ?: repository.getAppMode()
+        val isSystemActive = repository.isSystemActiveFlow.firstOrNull() ?: repository.getBoolean(MainRepository.IS_SYSTEM_ACTIVE_KEY, false)
         
-        if (appMode != null) {
-            Timber.i("BootWorker: Restarting service in $appMode mode")
+        if (appMode != null && isSystemActive) {
+            Timber.i("BootWorker: Restarting service in $appMode mode (System Active)")
             val serviceClass = if (appMode == "tracker") TrackerService::class.java else ViewerService::class.java
             val serviceIntent = Intent(context, serviceClass)
             try {
@@ -55,7 +59,7 @@ class BootServiceStartWorker(
                 return Result.retry()
             }
         } else {
-            Timber.d("BootWorker: No active app mode found, skipping service start")
+            Timber.d("BootWorker: System inactive or no mode found, skipping service start. Mode: $appMode, Active: $isSystemActive")
         }
         return Result.success()
     }

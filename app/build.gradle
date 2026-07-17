@@ -15,9 +15,9 @@ android {
         minSdk = 24
         targetSdk = 35
         
-        // Forced Version Authority for Release July.17.00
-        versionCode 408
-        versionName "July.17.00"
+        // Forced Version Authority for Release July.17.02
+        versionCode 410
+        versionName "July.17.02"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

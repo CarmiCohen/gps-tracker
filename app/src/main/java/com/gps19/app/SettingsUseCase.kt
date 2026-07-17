@@ -8,6 +8,8 @@ import kotlinx.coroutines.withContext
 
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
+ * July.17.02:
+ * - Added isSystemActive to InitialSettings.
  * v9.5.0:
  * - Issue #503: Hilt Removal.
  */
@@ -75,6 +77,7 @@ class SettingsUseCase(
         val lAlarmAck = s.lastAlarmAckTs
         val lMaxTemp = s.maxTemp
         val sanitized = s.identitySanitized
+        val isActive = s.isSystemActive
         
         var appStartTime = s.appStartTime
         if (appStartTime == 0L) {
@@ -100,7 +103,8 @@ class SettingsUseCase(
             homePoints = hPoints, alertSettings = aSettings, appMode = mMode,
             selectedSirenType = sSiren, lastAlarmAckTs = lAlarmAck, maxTemp = lMaxTemp,
             appStartTime = appStartTime, draftSettings = draftSettings,
-            trackerStatus = trackerStatus, identitySanitized = sanitized
+            trackerStatus = trackerStatus, identitySanitized = sanitized,
+            isSystemActive = isActive
         )
     }
 
@@ -115,6 +119,7 @@ class SettingsUseCase(
             repository.saveString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
             repository.saveString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
             repository.saveBoolean(MainRepository.IDENTITY_SANITIZED_KEY, false)
+            repository.saveBoolean(MainRepository.IS_SYSTEM_ACTIVE_KEY, false)
             repository.clearDraftSettings()
             
             val appStartTime = timeProvider.currentTimeMillis()
@@ -166,5 +171,6 @@ data class InitialSettings(
     val homePoints: List<org.osmdroid.util.GeoPoint>, val alertSettings: AlertSettings,
     val appMode: String?, val selectedSirenType: String, val lastAlarmAckTs: Long,
     val maxTemp: Double, val appStartTime: Long, val draftSettings: DraftSettings?,
-    val trackerStatus: TrackerStatus?, val identitySanitized: Boolean = false
+    val trackerStatus: TrackerStatus?, val identitySanitized: Boolean = false,
+    val isSystemActive: Boolean = false
 )

@@ -2,10 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.17.02:
+ * - Issue #R993: Increased NOTIFICATION_THROTTLE_MS to 30s to prevent Logcat spam.
  * July.1.16:
  * - Issue #510: Abandoned Chair Sit Detection. Removed all sit-related thresholds and constants.
- * July.1.15:
- * - Issue #508: Optimization Removal. Removed Muzzle and Adaptive Jump constants.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -241,7 +241,7 @@ const val TELEMETRY_UI_STALE_THRESHOLD_MS = 35000L
 const val GPS_UI_FAIL_THRESHOLD_MS = 35000L
 
 // R993: Notification Throttling
-const val NOTIFICATION_THROTTLE_MS = 10000L
+const val NOTIFICATION_THROTTLE_MS = 30000L
 
 // Alert Internal IDs (Aligned with SoT)
 const val ALERT_ID_LOCAL_INTERNET = "LOCAL_INTERNET"

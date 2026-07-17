@@ -1,36 +1,31 @@
-# Project Handover: July.17.00 - Performance Hardened Baseline
+# Project Handover: July.17.02 - Silence & Persistence Hardened
 
-## 🔴 Status: HARDENED BASELINE ACHIEVED
-**Version Context**: `July.17.00` (Authoritative)
+## 🔴 Status: ENGINE SILENCE ACHIEVED
+**Version Context**: `July.17.02` (Authoritative)
 **Target Hardware**: Samsung A15 (Budget Benchmark)
-**Core Issue Resolved**: #526 (Startup Hang)
+**Core Issue Resolved**: #R993 (Notification Spam), #R994 (Unintended Activation)
 
-This document provides the definitive forensic state required to resume development in a new session. The system has been hardened against startup frame-spikes that previously impacted low-end hardware.
+This document provides the definitive forensic state required to resume development. The system has been hardened to prevent Logcat spam and unintended background execution when the user is on the landing page.
 
-### 1. Forensic Status of Issue #526 (Resolved)
-The "Landing Page Hang" was a race condition between background initialization and Main-thread property access during the cold-start window.
-- **Root Cause**: `BaseMonitorService` and `MainViewModelFactory` triggered Room DB initialization on the Main thread via a "Lazy Cascade". Default Kotlin `lazy` synchronization caused kernel-level blocking.
-- **Remediation**: 
-    - **Lock-Free Lazy DI**: `AppContainer` properties now use `LazyThreadSafetyMode.PUBLICATION`. The Main thread will no longer block on background initializers.
-    - **AppNotificationManager**: Decoupled from the repository layer. It now builds foreground notifications instantly without touching the database.
-    - **Async Service Boot**: `BaseMonitorService.onCreate` is now logic-free. `startForeground` and hardware binding are deferred to a background scope.
-    - **Warm-up**: `GpsApplication` proactively primes the DB and Managers on `Dispatchers.IO` immediately after creation.
+### 1. Forensic Status of Issue #R993 & #R994 (Resolved)
+- **Notification Throttling**: Foreground notification updates were decoupled from the 2s engine tick. 
+    - **Remediation**: Introduced `NOTIFICATION_THROTTLE_MS` (30,000ms) in `EngineConstants.kt`. Both `ViewerService` and `TrackerService` now respect this interval for UI updates.
+- **Unintended Service Start**: The engine previously auto-revived on boot/update if any mode was saved.
+    - **Remediation**: Introduced a persistent `isSystemActive` flag in `DataStore`. `BootReceiver` now strictly enforces that the service only restarts if it was manually armed by the user.
 
-### 2. Authoritative Data Models
-- **`SystemHealthState`**: Authority for device metadata (Battery, Thermal, Storage, Signal).
-- **`AlarmHistory`**: Authority for persistent violation counters (resident in-memory).
-- **`HardwareCapabilities`**: Brand-agnostic abstraction of device restrictions.
+### 2. Architectural Updates
+- **`isSystemActive`**: New persistent boolean in `AppSettings.proto`. It governs the lifecycle of background services across device restarts.
+- **Service Lifecycle**: Services now remain silent and dormant unless the "Armed" state is true.
 
-### 3. Architectural Baselines
-- **Manual Lazy DI**: Managed via `AppContainer.kt`. **STRICT RULE**: Never access a `container` property on the Main thread during the cold-start window (0-3s after launch).
-- **Unified Heartbeat**: Global 2000ms standard (`TICK_INTERVAL_MS`).
+### 3. Authorized State Management
+- **`SessionUseCase`**: Now the authority for toggling system activation state and cleaning up resources.
+- **`MainViewModel`**: Orchestrates the UI toggle for activation and ensures persistence through the UseCase.
 
-### 4. Resumption Instructions
-1. **Sync**: Perform a Gradle Sync immediately to regenerate `BuildConfig`.
-2. **Build**: Run `:app:assembleDebug`.
-3. **Verification**: Confirm version `July.17.00` appears on the landing page.
-4. **Caution**: Any new global component added to `AppContainer` MUST be lazy and use `PUBLICATION` safety.
+### 4. Verification Baseline
+1. Confirm `NOTIFICATION_THROTTLE_MS` is set to 30000L.
+2. Confirm `BootServiceStartWorker` checks both `appMode` and `isSystemActive`.
+3. Confirm Version `July.17.02` is displayed.
 
 ### 5. Future Simplification Ideas
-- **Service Consolidation**: Merge `ViewerService` and `TrackerService` into a single role-configurable `MonitorService`.
-- **Repository Flattening**: Consolidate `OfflineRepository` and `TelemetryRepository` into `MainRepository`.
+- **Unified Service**: Merge `TrackerService` and `ViewerService` into a single class using a role-based configuration strategy to reduce duplicate lifecycle logic.
+- **Requirement Centralization**: Move all engine-governing constants into a single `EnginePolicy` object.

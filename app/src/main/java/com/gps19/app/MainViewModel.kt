@@ -17,6 +17,8 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.17.02:
+ * - Persisting isSystemActive state to prevent unintended engine starts on landing page.
  * July.16.18:
  * - Issue #516: De-duplicate "Status" Logic. Use localHealth and trackerHealth.
  */
@@ -134,7 +136,7 @@ class MainViewModel(
                 updateState { it.copy(
                     deviceId = update.trackerId, viewerId = update.viewerId, relayUrl = update.relayUrl,
                     maxDistance = update.maxDistance, homePoints = update.homePoints, lastAlarmAckTs = update.lastAlarmAckTs,
-                    appMode = update.appMode,
+                    appMode = update.appMode, isSystemActive = update.isSystemActive,
                     permissions = it.permissions.copy(isManualOverride = update.isXiaomiManualOverride)
                 )}
             }.launchIn(viewModelScope)
@@ -221,6 +223,9 @@ class MainViewModel(
             is UiEvent.SetSystemActive -> { 
                 addPersistentLog("user", "USER ACTION: System ${if (event.active) "ACTIVATED" else "DEACTIVATED"}", true)
                 updateState { it.copy(isSystemActive = event.active) } 
+                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+                    sessionUseCase.setSystemActive(event.active)
+                }
             }
             is UiEvent.ManualExit -> addPersistentLog("user", "USER ACTION: Manual navigation to background requested", true)
             is UiEvent.SetDeviceId, is UiEvent.SetViewerId, is UiEvent.SetRelayUrl -> handleConfigEvent(event)
@@ -228,7 +233,7 @@ class MainViewModel(
             is UiEvent.LogAction -> addPersistentLog(event.type, event.message, event.isImportant, event.isSpecial, event.specialColor)
             is UiEvent.ClearTrails -> clearTrails(context)
             is UiEvent.SetFenceVisible, is UiEvent.SetViolationsVisible, is UiEvent.SetGeofenceViolationsVisible, 
-            is UiEvent.SetMapButtonsVisible, is UiEvent.SetMapLocked, is UiEvent.MapZoomIn, is UiEvent.MapZoomOut, 
+            is UiEvent.SetMapButtonsVisible, is UiEvent.SetMapLocked, is UiEvent.MapZoomIn, is UiEvent.MapZoomOut,
             is UiEvent.CenterTracker, is UiEvent.CenterViewer -> updateState { mapUseCase.handleMapEvent(event, it) }
             is UiEvent.ClearHomePoints, is UiEvent.AddHomePoint, is UiEvent.RemoveHomePoint,
             is UiEvent.SetGeofenceMode, is UiEvent.SetMaxDistance, is UiEvent.SetHomePoints,
@@ -398,7 +403,7 @@ class MainViewModel(
                 updateNavigation { it.copy(isStopTrackingConfirmationVisible = false) }
                 viewModelScope.launch(uiExceptionHandler) {
                     sessionUseCase.stopTrackingSession()
-                    updateState { it.copy(appMode = null, trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = ConnectivityState(isTrackerConnected = false, lastUpdateTs = 0L, lastRemoteActivityTs = 0L), distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, maxTrackerAccuracy = 0.0, maxViewerAccuracy = 0.0, localHealth = SystemHealthState(), trackerHealth = SystemHealthState()) }
+                    updateState { it.copy(appMode = null, isSystemActive = false, trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = ConnectivityState(isTrackerConnected = false, lastUpdateTs = 0L, lastRemoteActivityTs = 0L), distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, maxTrackerAccuracy = 0.0, maxViewerAccuracy = 0.0, localHealth = SystemHealthState(), trackerHealth = SystemHealthState()) }
                     _remoteSignal.value = 0; _trackerCurrentMa.value = 0; _gnssDetail.value = null; _trackerState.value = TrackerState.UNKNOWN; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _redScreenVisible.value = false; _rtt.value = 0; _gpsIndexData.value = GpsIndexData(0.0, 0.0, 0.0, 0.0); stateSubscriptionUseCase.clearHistory()
                 }
             }
@@ -532,7 +537,7 @@ class MainViewModel(
     private suspend fun loadInitialData() {
         val initial = settingsUseCase.loadAllSettings()
         appStartTime = initial.appStartTime
-        updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings, isIdentitySanitized = initial.identitySanitized) }
+        updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, isSystemActive = initial.isSystemActive, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings, isIdentitySanitized = initial.identitySanitized) }
         _localMaxTemp.value = initial.maxTemp; if (initial.appMode == "tracker") _trackerMaxTemp.value = initial.maxTemp
         initial.trackerStatus?.let { status -> 
             updateState { it.copy(

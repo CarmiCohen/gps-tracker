@@ -5,10 +5,10 @@ option java_multiple_files = true;
 
 /**
  * AppSettings: Persistence schema for DataStore.
+ * July.17.02:
+ * - Added is_system_active to track if the engine should run after boot/update.
  * July.1.16:
  * - Issue #510: Abandoned Chair Sit Detection. Removed sit-related fields.
- * - Issue #512: Consolidated SentinelStatus mapping.
- * - Issue #515: Removed Stationary Anchor flags.
  */
 message AppSettings {
     optional string app_mode = 1;
@@ -83,6 +83,8 @@ message AppSettings {
     optional double max_temp = 62;
 
     optional bool identity_sanitized = 63;
+
+    optional bool is_system_active = 64;
 }
 
 enum TrackerStateProto {

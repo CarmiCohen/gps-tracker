@@ -6,6 +6,8 @@ import kotlinx.coroutines.withContext
 
 /**
  * SessionUseCase: Logic for managing tracking sessions, mode transitions, and resource cleanup.
+ * July.17.02:
+ * - Added setSystemActive to persist arming state across reboots.
  * v9.5.0:
  * - Issue #503: Hilt Removal.
  */
@@ -24,9 +26,14 @@ class SessionUseCase(
         return null
     }
 
+    suspend fun setSystemActive(active: Boolean) {
+        repository.saveBoolean(MainRepository.IS_SYSTEM_ACTIVE_KEY, active)
+    }
+
     suspend fun stopTrackingSession() {
         withContext(Dispatchers.IO) {
             repository.setAppMode(null)
+            repository.saveBoolean(MainRepository.IS_SYSTEM_ACTIVE_KEY, false)
             repository.resetStats()
             repository.clear()
         }

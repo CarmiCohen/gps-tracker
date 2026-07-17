@@ -15,10 +15,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.17.02:
+ * - Issue #R993: Increased notification update interval to NOTIFICATION_THROTTLE_MS (30s).
  * July.17.00:
  * - Issue #526: Definitive performance hardening. All dependencies pulled via lazy 
  *   delegates from BaseMonitorService to prevent Main thread hangs on Samsung A15.
- * - Removed redundant lateinit assignments and dependency injection overrides.
  */
 class ViewerService : BaseMonitorService() {
 
@@ -418,8 +419,7 @@ class ViewerService : BaseMonitorService() {
 
         evaluateAlarmsInternal(nowRealtime, isSignalLoss, isTrackerJammerSuspicion, isTrackerStalled, isTrackerGap, isTrackerActive)
 
-        val notificationInterval = TICK_INTERVAL_MS
-        if (now - lastNotificationUpdateTs >= notificationInterval) {
+        if (now - lastNotificationUpdateTs >= NOTIFICATION_THROTTLE_MS) {
             lastNotificationUpdateTs = now
             notificationManager.updatePulse(
                 sats = gpsManager.satellitesUsed,
