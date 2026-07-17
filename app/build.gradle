@@ -20,19 +20,6 @@ def getGitVersionCode = { ->
     }
 }
 
-def getGitVersionName = { ->
-    try {
-        def stdout = new ByteArrayOutputStream()
-        project.exec {
-            commandLine 'git', 'describe', '--tags', '--always'
-            standardOutput = stdout
-        }
-        return stdout.toString().trim().replaceFirst("^v", "")
-    } catch (Exception ignored) {
-        return "9.1.4"
-    }
-}
-
 android {
     namespace = 'com.gps19.app'
     compileSdk = 35
@@ -43,7 +30,7 @@ android {
         targetSdk = 35
         
         versionCode = getGitVersionCode()
-        versionName = getGitVersionName()
+        versionName = "July17.01"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
