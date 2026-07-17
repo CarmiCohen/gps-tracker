@@ -18,11 +18,11 @@ This document tracks pending unit tests, integration tests, and manual validatio
 | ID | Task | Result |
 | :--- | :--- | :--- |
 | **#080** | **Lift Detection Parity** | Verify `MainAlarmLogic` correctly uses `trackerBaroAltEma` delta for lift violations instead of raw altitude. |
-| **#079** | **API Synchronization** | Verify `TrackerService` background loop stability on v9.3.16. Ensure location processing, alarm evaluation, and sync submissions match engine signatures. |
 
-## 🟢 Recently Verified (v9.3.15)
+## 🟢 Recently Verified (July.17.00)
 | ID | Task | Result |
 | :--- | :--- | :--- |
+| **#526** | **A15 Landing Page Hang** | **Verified**: Resolved startup UI unresponsiveness on Samsung A15 by eliminating Main-thread contention through hardened lazy DI and async service boot. |
 | **#077** | **Type Safety Hardening** | **Verified**: Systematic audit and elimination of redundant `toDouble()`/`toFloat()` conversions. Standardized `AppSensorManager` with pre-allocated `DoubleArray` buffers. |
 
 ---

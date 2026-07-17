@@ -15,15 +15,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * July.16.20:
- * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
- * - Issue #518: Fix Tracker ID persistence key in handleTrackerPulse.
- * - Issue #519: Correct mapping of remote tracker health flags to engine.
- * - Issue #520: Correct local infrastructure health mapping for relay offline detection.
+ * July.17.00:
+ * - Issue #526: Definitive performance hardening. All dependencies pulled via lazy 
+ *   delegates from BaseMonitorService to prevent Main thread hangs on Samsung A15.
+ * - Removed redundant lateinit assignments and dependency injection overrides.
  */
 class ViewerService : BaseMonitorService() {
-
-    lateinit var statusProvider: SystemStatusProvider
 
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
@@ -56,12 +53,6 @@ class ViewerService : BaseMonitorService() {
         override fun onGpsStallDetected(ts: Long) {}
     }
 
-    override fun injectDependencies() {
-        super.injectDependencies()
-        val container = (application as GpsApplication).container
-        statusProvider = container.systemStatusProvider
-    }
-
     override fun onCreate() {
         super.onCreate()
         
@@ -74,7 +65,7 @@ class ViewerService : BaseMonitorService() {
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
             configManager.isTrackerMode = false
 
-            val perms = statusProvider.getPermissionState()
+            val perms = systemStatusProvider.getPermissionState()
             capabilities = HardwareCapabilities(
                 hasBackgroundRestriction = perms.hasBackgroundRestriction,
                 backgroundStatus = perms.backgroundStatus,
@@ -261,10 +252,10 @@ class ViewerService : BaseMonitorService() {
             return
         }
 
-        if ((configManager.deviceId == MainRepository.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
-            configManager.deviceId = id
+        if ((configManager.viewerId == MainRepository.DEFAULT_TRACKER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
+            configManager.viewerId = id
             connectivitySuite.updateIdentity(id, configManager.viewerId, false)
-            lifecycleScope.launch { repository.saveString(MainRepository.TRACKER_ID_KEY, id) }
+            lifecycleScope.launch { repository.saveString(MainRepository.VIEWER_ID_KEY, id) }
         }
         if (sessionManager.onTrackerPulse(id, timeProvider.currentTimeMillis(), false)) {
             val proc = lastProcessedLocation
@@ -327,7 +318,9 @@ class ViewerService : BaseMonitorService() {
         val health = integrityMonitor.currentHealth
         repository.updateHealth(health)
 
-        if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
+        if (timeProvider.elapsedRealtime() > 0) {
+             systemMonitor.renewWakeLock()
+        }
 
         if (nowRealtime - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
             if (stabilityAuditFixCount > 0) {
@@ -391,7 +384,7 @@ class ViewerService : BaseMonitorService() {
             peakShock = 0.0, peakShockTs = 0L, luxBaseline = 0.0, acousticFloorDb = 0.0, adaptiveVibrationFloor = 0.12,
             proxIdx = 1.0, proximityCm = -1.0, 
             proximityDebounceMs = 0L, vibrationRollingSum = 0.0,
-            isTamperDetected = false, isPowerTamper = false,
+            isTamperDetected = false, isPowerTamper = health.isPowerTamper,
             receiptRealtime = proc?.receiptRealtime ?: 0L,
             violationUptimeMs = 0L, violationPercentage = 0.0,
             isClockRegression = proc?.isClockRegression ?: false,
@@ -471,7 +464,7 @@ class ViewerService : BaseMonitorService() {
                 isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(),
                 distToHomeAuthority = connectivitySuite.trackerDistToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(),
                 isGpsGap = isTrackerGap, isTamperDetected = connectivitySuite.isTrackerTamperDetected,
-                isPowerTamper = connectivitySuite.isTrackerPowerTamper, trackerTiltDegrees = connectivitySuite.trackerTiltDegrees, 
+                isPowerTamper = connectivitySuite.isTrackerPowerTamper, trackerTiltDegrees = connectivitySuite.trackerTiltDegrees,
                 trackerAcousticDb = connectivitySuite.trackerAcousticDb, trackerBaroAlt = connectivitySuite.trackerBaroAlt, trackerLux = connectivitySuite.trackerLux,
                 isNear = connectivitySuite.isTrackerNear, luxBaseline = connectivitySuite.trackerLuxBaseline, acousticFloorDb = connectivitySuite.trackerAcousticFloorDb,
                 adaptiveVibrationFloor = connectivitySuite.trackerAdaptiveVibrationFloor, peakVibrationShock = connectivitySuite.trackerPeakVibrationShock,

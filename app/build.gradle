@@ -16,7 +16,7 @@ android {
         targetSdk = 35
         
         // Forced Version Authority for Release July.17.00
-        versionCode 407
+        versionCode 408
         versionName "July.17.00"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

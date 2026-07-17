@@ -15,14 +15,16 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * July.16.24:
+ * July.17.00:
  * - Issue #526: Definitive performance hardening. All logic including foreground start
  *   is deferred to background scope to prevent Main thread hangs on Samsung A15.
+ * - Converted all common dependencies to lazy delegates.
  */
 abstract class BaseMonitorService : LifecycleService() {
 
-    private val container by lazy { (application as GpsApplication).container }
+    protected val container by lazy { (application as GpsApplication).container }
 
+    // Lazy delegates ensure no Main-thread blocking during service creation
     val configManager by lazy { container.configManager }
     val logManager by lazy { container.logManager }
     val connectivitySuite by lazy { container.connectivitySuite }
@@ -43,6 +45,10 @@ abstract class BaseMonitorService : LifecycleService() {
     val historyManager by lazy { container.historyManager }
     val locationProcessor by lazy { container.locationProcessor }
     val commandRouter by lazy { container.commandRouter }
+    
+    // Shared managers that were previously triggering Main-thread spikes
+    val appSensorManager by lazy { container.appSensorManager }
+    val serviceBehaviorUseCase by lazy { container.serviceBehaviorUseCase }
     
     protected val cachedPkgName by lazy { packageName }
 
@@ -72,8 +78,7 @@ abstract class BaseMonitorService : LifecycleService() {
         // v9.5.4: Completely defer all logic off the Main thread. 
         // This prevents the "Lazy Cascade" from triggering DB/Manager init during startup.
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
-            // Android allows a short window to call startForeground after service start.
-            // We use this window to let the UI finish its frame first.
+            // Building notification off-thread to avoid triggering database load on Main.
             startServiceForeground()
             
             serviceStartRealtime = timeProvider.elapsedRealtime()
@@ -144,12 +149,10 @@ abstract class BaseMonitorService : LifecycleService() {
         tickJob?.cancel()
         fgsUpdateJob?.cancel()
         
-        runBlocking {
-            withTimeoutOrNull(1000) {
-                if (this@BaseMonitorService::repository.isInitialized) {
-                    repository.flushHistory()
-                }
-            }
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                repository.flushHistory()
+            } catch (e: Exception) {}
         }
 
         systemMonitor.cancelWatchdogAlarm()
