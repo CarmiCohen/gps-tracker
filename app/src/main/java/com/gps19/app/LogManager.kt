@@ -2,9 +2,13 @@ package com.gps19.app
 
 import com.gps19.core.engine.*
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * July.17.03:
+ * - Fixed #R998: Added recursion guard to submitToLogSink to prevent infinite loops if
+ *   logging logic itself triggers an error (via Timber tree in GpsApplication).
  * July.16.18:
  * - Issue #516: De-duplicate "Status" Logic. Use systemHealth.
  */
@@ -16,6 +20,7 @@ class LogManager(
     private val timeProvider: TimeProvider
 ) {
     private var sessionStartTs = 0L
+    private val isLoggingInProgress = AtomicBoolean(false)
 
     fun startNewSession() {
         sessionStartTs = timeProvider.currentTimeMillis()
@@ -37,89 +42,96 @@ class LogManager(
         snr: Double? = null,
         vibe: Double? = null
     ) {
-        val now = timeProvider.currentTimeMillis()
-        val health = telemetry.systemHealth.value
+        // R998: Prevent recursion if Timber.e triggers another log during this execution
+        if (!isLoggingInProgress.compareAndSet(false, true)) return
         
-        if (type == "hidden") return
+        try {
+            val now = timeProvider.currentTimeMillis()
+            val health = telemetry.systemHealth.value
+            
+            if (type == "hidden") return
 
-        val isSuppressedByStorage = health.isStorageCritical && !isSpecial
-        if (isSuppressedByStorage) return
+            val isSuppressedByStorage = health.isStorageCritical && !isSpecial
+            if (isSuppressedByStorage) return
 
-        if (health.isStorageLow && !important && !isSpecial) return
+            if (health.isStorageLow && !important && !isSpecial) return
 
-        if (type == "system" && !important && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
-            return
-        }
-
-        var finalLat = lat
-        var finalLng = lng
-        var finalAccuracy = accuracy
-        var finalMaxAccuracy = maxAccuracy
-        var finalSnr = snr
-        var finalVibe = vibe
-        
-        val local = telemetry.localLocation.value
-        val tracker = telemetry.trackerLocation.value
-        
-        val fallbackTelem = if (configManager.isTrackerMode) {
-            if (local.lat != 0.0) local else tracker
-        } else {
-            if (tracker.lat != 0.0) tracker else local
-        }
-
-        if (finalLat == 0.0 && finalLng == 0.0) {
-            if (fallbackTelem.lat != 0.0 && fallbackTelem.lng != 0.0) {
-                finalLat = fallbackTelem.lat
-                finalLng = fallbackTelem.lng
-                finalAccuracy = fallbackTelem.accuracy
-                finalMaxAccuracy = fallbackTelem.maxAccuracy
+            if (type == "system" && !important && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
+                return
             }
-        } else {
-            if (finalAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
-                finalAccuracy = fallbackTelem.accuracy
-            }
-            if (finalMaxAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
-                finalMaxAccuracy = fallbackTelem.maxAccuracy
-            }
-        }
 
-        if (finalVibe == null && (fallbackTelem.vibration ?: 0.0) > 0.0) {
-            finalVibe = fallbackTelem.vibration
-        }
+            var finalLat = lat
+            var finalLng = lng
+            var finalAccuracy = accuracy
+            var finalMaxAccuracy = maxAccuracy
+            var finalSnr = snr
+            var finalVibe = vibe
+            
+            val local = telemetry.localLocation.value
+            val tracker = telemetry.trackerLocation.value
+            
+            val fallbackTelem = if (configManager.isTrackerMode) {
+                if (local.lat != 0.0) local else tracker
+            } else {
+                if (tracker.lat != 0.0) tracker else local
+            }
 
-        val log = LogEntry(
-            localId = localId ?: UUID.randomUUID().toString(),
-            timestamp = now,
-            message = message,
-            type = type,
-            isImportant = important,
-            id = configManager.deviceId,
-            viewerId = configManager.viewerId,
-            extremeValue = extremeValue,
-            durationMs = durationMs,
-            isSpecial = isSpecial,
-            specialColor = specialColor,
-            role = if (configManager.isTrackerMode) "tracker" else "viewer",
-            lat = finalLat,
-            lng = finalLng,
-            accuracy = finalAccuracy,
-            maxAccuracy = finalMaxAccuracy,
-            snrSnapshot = finalSnr,
-            vibeSnapshot = finalVibe
-        )
-        
-        val suite = connectivitySuite()
-        val isConnected = suite.isConnected()
-        
-        val data = log.toJSONObject().apply {
-            put("ver", BuildConfig.VERSION_NAME)
+            if (finalLat == 0.0 && finalLng == 0.0) {
+                if (fallbackTelem.lat != 0.0 && fallbackTelem.lng != 0.0) {
+                    finalLat = fallbackTelem.lat
+                    finalLng = fallbackTelem.lng
+                    finalAccuracy = fallbackTelem.accuracy
+                    finalMaxAccuracy = fallbackTelem.maxAccuracy
+                }
+            } else {
+                if (finalAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
+                    finalAccuracy = fallbackTelem.accuracy
+                }
+                if (finalMaxAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
+                    finalMaxAccuracy = fallbackTelem.maxAccuracy
+                }
+            }
+
+            if (finalVibe == null && (fallbackTelem.vibration ?: 0.0) > 0.0) {
+                finalVibe = fallbackTelem.vibration
+            }
+
+            val log = LogEntry(
+                localId = localId ?: UUID.randomUUID().toString(),
+                timestamp = now,
+                message = message,
+                type = type,
+                isImportant = important,
+                id = configManager.deviceId,
+                viewerId = configManager.viewerId,
+                extremeValue = extremeValue,
+                durationMs = durationMs,
+                isSpecial = isSpecial,
+                specialColor = specialColor,
+                role = if (configManager.isTrackerMode) "tracker" else "viewer",
+                lat = finalLat,
+                lng = finalLng,
+                accuracy = finalAccuracy,
+                maxAccuracy = finalMaxAccuracy,
+                snrSnapshot = finalSnr,
+                vibeSnapshot = finalVibe
+            )
+            
+            val suite = connectivitySuite()
+            val isConnected = suite.isConnected()
+            
+            val data = log.toJSONObject().apply {
+                put("ver", BuildConfig.VERSION_NAME)
+            }
+            
+            if (isConnected) {
+                suite.emit("log_update", data)
+            }
+            
+            logRepository.addLog(log, initiallySynced = isConnected)
+        } finally {
+            isLoggingInProgress.set(false)
         }
-        
-        if (isConnected) {
-            suite.emit("log_update", data)
-        }
-        
-        logRepository.addLog(log, initiallySynced = isConnected)
     }
 
     fun logServiceEvent(

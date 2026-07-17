@@ -13,6 +13,9 @@ import java.util.*
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * July.17.03:
+ * - Fixed #R997: markTraffic() now called on emit/emitBinary to prevent keep-alive logic
+ *   from falsely detecting silence during active outgoing traffic.
  * v9.5.0:
  * - Issue #503: Hilt Removal. Manual dependency injection.
  */
@@ -97,8 +100,10 @@ class CommunicationManager(
             }
             if (this.deviceId.isNotEmpty()) {
                 val transNew = SignalingConstants.getTransmissionId(this.deviceId)
-                logToApp("Joining room: $transNew (Force: $force)", force)
+                // R997: Log join as non-important to prevent recursive emission loop if keep-alive triggered it
+                logToApp("Joining room: $transNew (Force: $force)", false)
                 socket?.emit("join", createJoinPayload())
+                markTraffic()
             }
         }
     }
@@ -159,7 +164,6 @@ class CommunicationManager(
                 s.emit("join", createJoinPayload())
             }
             pushSettings()
-            // Telemetry update delegated via ConfigManager/Repository later
         }
 
         s.on(Socket.EVENT_CONNECT) { onConnectAction() }
@@ -204,11 +208,13 @@ class CommunicationManager(
 
     override fun emit(event: String, data: JSONObject) {
         if (isStopped) return
+        markTraffic()
         if (event == "location_update") { emitLocationConflated(data) } else { socket?.emit(event, data) }
     }
 
     override fun emitBinary(event: String, routingId: String, data: ByteArray) {
         if (isStopped) return
+        markTraffic()
         Log.d("GPS19_COMM", "EMIT BINARY: $event for $routingId (${data.size} bytes)")
         socket?.emit(event, routingId, data) 
     }
@@ -246,7 +252,6 @@ class CommunicationManager(
 
     override fun pushSettings() {
         if (isTrackerMode || deviceId.isEmpty() || isStopped) return
-        // Settings push logic delegated to ViewerService/TrackerService
     }
 
     override fun disconnect() { 
