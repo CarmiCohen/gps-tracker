@@ -1,10 +1,11 @@
-# System Source of Truth (SoT) - July.18.00
+# System Source of Truth (SoT) - July.18.01
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Database Migration Integrity (R956b)**: Any change to an `@Entity` class MUST be accompanied by a version bump and an explicit `Migration` object. To resolve `IllegalStateException` integrity errors (Identity Hash mismatch), the physical schema MUST strictly align with Room's generated SQL, including precise default value formatting. Re-harmonization via table recreation is the authoritative remediation for schema drift. (July.18.01 / Issue #097)
 *   **Dynamic Anchor Breakout Authority (R990)**: To prevent "sticky anchors" during physical movement, the system MUST employ a displacement-weighted monitor. This monitor (`anchorEscapeScore`) MUST evaluate: (a) Physical motion detection via sensors, (b) Positional trend analysis over a window of points, and (c) Progress through a distance-based transition zone relative to accuracy-weighted thresholds. (v9.3.56 / Issue #062)
-*   **Database Migration Integrity (R956)**: Any change to an `@Entity` class MUST be accompanied by a version bump and an explicit `Migration` object. For tables with many columns (e.g., `logs`), a "Recreate-Copy-Rename" strategy is preferred over multiple `ALTER TABLE` calls to prevent schema drift. ALL `Double` (REAL) column defaults MUST use integer string representation `"0"` to ensure cross-platform SQLite normalization consistency. (July.18.00 / Issue #096)
+*   **Database Default Normalization (R956)**: ALL `Double` (REAL) column defaults MUST use integer string representation `"0"` to ensure cross-platform SQLite normalization consistency and prevent Room Identity Hash mismatches. (July.18.00 / Issue #096)
 *   **Startup IO Offloading Authority (R955)**: All operations that trigger database opening or initial persistence loading (e.g., `loadInitialData`) MUST be executed on `Dispatchers.IO`. This prevents Room migrations or heavy disk reads from starving the Main thread during the cold start landing page sequence. (v9.3.55 / Issue #096)
 *   **Landing Page Event Suppression (R954)**: To ensure state purity and minimize startup contention, the system MUST reject all frame notices and telemetry events while the Landing Page is active. (v9.3.52)
 *   **Data Flow Offloading Authority (R953)**: To ensure UI responsiveness and prevent ANRs, all mapping operations from database entities to UI models MUST be offloaded to `Dispatchers.Default` using `.flowOn()` at the Repository level. (v9.3.52 / Issue #092)

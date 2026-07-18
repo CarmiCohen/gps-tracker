@@ -18,6 +18,8 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * July.18.01:
+ * - Issue #097: Room Identity Hash stabilization. Database version 57.
  * July.18.00:
  * - Issue #096 Hardening: Finalized Room migration stabilization and version baseline.
  * v9.3.45:

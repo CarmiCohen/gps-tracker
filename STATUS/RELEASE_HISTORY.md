@@ -1,17 +1,15 @@
-# Project History & Versioning (v9.3.55)
+# Project History & Versioning (July.18.01)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
 
-## v9.3.55 (July17.07)
-- **Room Database Migration Hardening (#096)**: Resolved `IllegalStateException` on startup by harmonizing the `logs` table schema via `MIGRATION_54_55`.
-- **Startup ANR Hardening (#096b)**: Offloaded database initialization and migrations to `Dispatchers.IO` in `MainViewModel`, ensuring the UI thread remains responsive during cold starts on devices like Samsung A15.
+## July.18.01 (v9.3.57)
+- **Room Identity Hash Stabilization (#097)**: Resolved `IllegalStateException` integrity error on version 56 by adding `MIGRATION_56_57`. This migration re-harmonizes all table schemas to match Entity definitions exactly.
+- **Version Baseline**: Updated versioning to July.18.01 across `build.gradle` and documentation.
 
-## v9.3.52 (July17.06)
-- **Landing Page ANR Hardening (#092)**: Implemented explicit offloading of database-to-UI mapping operations (Logs, Trails, History) to `Dispatchers.Default`.
-- **Setup Flow Deadlock (#095)**: Implemented Differential Polling and reactive auto-transitions for permission states.
+## v9.3.56 (July.18.00)
+- **Room Database Migration Hardening (#096)**: Harmonized all `Double` column default values to `"0"` (integer string) to resolve `IllegalStateException` on startup.
 
-## v9.3.18
-- **Startup ANR Remediation (R403)**: Implemented dynamic heartbeat recovery logic (2s startup tick).
-- **Relay Configuration Authority (R404)**: Standardized fallback to authoritative relay Render URL.
+## v9.3.55
+- **Startup ANR Hardening (#096b)**: Offloaded database initialization and migrations to `Dispatchers.IO` in `MainViewModel`.
 
 ... [Rest of document remains unchanged]
