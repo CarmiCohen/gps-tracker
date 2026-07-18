@@ -224,13 +224,15 @@ const val XIAOMI_RECOVERY_COOLDOWN_MS = 60000L
 const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 20000L // Issue #436: Aligned with STATIONARY_GPS_POLLING_MS
 
-// Stationary Anchor Monitor (Issue #062)
+// Stationary Anchor Monitor (Issue #062 - R990)
 const val PARKING_ANCHOR_MIN_DIST = 20.0
 const val PARKING_ANCHOR_FACTOR = 0.8
+const val ANCHOR_ENGAGEMENT_PROBABILITY = 0.9
 const val ANCHOR_ESCAPE_SCORE_THRESHOLD = 100.0
 const val ANCHOR_TREND_WINDOW_SIZE = 3
 const val ANCHOR_TRANSITION_ZONE_START = 0.7 // Start accumulating score at 70% of threshold
 const val ANCHOR_VELOCITY_WEIGHT_MPS = 15.0 // Score points per m/s of estimated speed
+const val ANCHOR_DISPLACEMENT_WEIGHT = 2.0 // Score points per meter of net displacement in transition zone
 
 const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 // Issue #450: Authoritative multiplier
 

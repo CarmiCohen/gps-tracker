@@ -5,10 +5,11 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * v9.3.22:
+ * - Issue #062 (R990): Dynamic Anchor Breakout. Implemented displacement-weighted monitor 
+ *   to prevent "sticky anchors" by accumulating displacement score in the transition zone.
  * v9.3.20:
  * - R405 Hardening: Removed redundant isA15 parameters and simplified engine logic.
- * v9.3.16:
- * - Hardening: Added getBaroBaseline() to satisfy R999b synchronization.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -306,7 +307,8 @@ class LocationProcessor(
         val isPhysicallyStationary = sentinel.isStationary()
         val estimatedSpeed = sentinel.getEstimatedSpeedMps()
         
-        if (!isSuspicious && !isAdaptationMuzzled && stationaryProb > 0.9) {
+        // Issue #062 - Dynamic Anchor Breakout Logic (R990)
+        if (!isSuspicious && !isAdaptationMuzzled && stationaryProb > ANCHOR_ENGAGEMENT_PROBABILITY) {
             if (parkingAnchorPoint == null && isPhysicallyStationary) {
                 parkingAnchorPoint = persistencePoint
                 anchorEscapeScore = 0.0
@@ -319,16 +321,24 @@ class LocationProcessor(
                 val distFromAnchor = PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, persistencePoint.lat, persistencePoint.lng)
                 
                 if (!isPhysicallyStationary) {
+                    // Force breakout on physical motion detected by sensors
                     anchorEscapeScore = ANCHOR_ESCAPE_SCORE_THRESHOLD
                 } else {
                     val transitionZoneStart = breakoutThreshold * ANCHOR_TRANSITION_ZONE_START
                     if (distFromAnchor > transitionZoneStart) {
+                        // Weighted accumulation of displacement in the transition zone
                         val zoneProgress = (distFromAnchor - transitionZoneStart) / (breakoutThreshold - transitionZoneStart)
                         anchorEscapeScore += (zoneProgress * 25.0).coerceIn(0.0, 50.0)
+                        anchorEscapeScore += (distFromAnchor - transitionZoneStart) * ANCHOR_DISPLACEMENT_WEIGHT
                     } else {
+                        // Gradual recovery if coordinate pulls back towards anchor
                         anchorEscapeScore = (anchorEscapeScore * 0.8).coerceAtLeast(0.0)
                     }
+                    
+                    // Velocity weighting to sensitive breakout during movement
                     anchorEscapeScore += estimatedSpeed * ANCHOR_VELOCITY_WEIGHT_MPS
+                    
+                    // Trend analysis: sustained outward movement triggers breakout faster
                     anchorTrendPoints.add(persistencePoint)
                     if (anchorTrendPoints.size > ANCHOR_TREND_WINDOW_SIZE) anchorTrendPoints.removeAt(0)
                     if (anchorTrendPoints.size >= ANCHOR_TREND_WINDOW_SIZE) {
