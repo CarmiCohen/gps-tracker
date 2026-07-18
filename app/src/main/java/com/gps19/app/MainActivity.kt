@@ -18,6 +18,8 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * July.18.00:
+ * - Issue #096 Hardening: Finalized Room migration stabilization and version baseline.
  * v9.3.45:
  * - Issue #095: Reactive Flow Hardening. Offloaded permission request logic 
  *   to MainAppContent to ensure atomic mode transitions.

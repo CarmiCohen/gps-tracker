@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
- * July18.00:
+ * July.18.00:
  * - Issue #096 Hardening: Bumped version to 56. Added MIGRATION_55_56 to resolve
  *   Identity Hash mismatch after harmonizing Double default values to "0".
  * v9.3.55:
@@ -256,7 +256,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_54_55 = object : Migration(54, 55) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // This migration is now effectively superseded by 55_56 but kept for logical chain continuity
+                // Legacy harmonization logic preserved for completeness
                 db.execSQL("CREATE TABLE logs_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, localId TEXT NOT NULL, timestamp INTEGER NOT NULL, message TEXT NOT NULL, type TEXT NOT NULL, isImportant INTEGER NOT NULL, deviceId TEXT NOT NULL, viewerId TEXT NOT NULL, count INTEGER NOT NULL, extremeValue REAL, durationMs INTEGER NOT NULL, isSpecial INTEGER NOT NULL, specialColor INTEGER, firstSeenTs INTEGER NOT NULL DEFAULT 0, role TEXT NOT NULL DEFAULT 'tracker', synced INTEGER NOT NULL DEFAULT 0, lat REAL NOT NULL DEFAULT 0, lng REAL NOT NULL DEFAULT 0, accuracy REAL NOT NULL DEFAULT 0, maxAccuracy REAL NOT NULL DEFAULT 0, snrSnapshot REAL, vibeSnapshot REAL)")
                 val cursorL = db.query("PRAGMA table_info(logs)")
                 val colsL = mutableSetOf<String>(); while(cursorL.moveToNext()) colsL.add(cursorL.getString(1)); cursorL.close()
@@ -276,7 +276,7 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         val MIGRATION_53_54 = object : Migration(53, 54) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN trackerState TEXT NOT NULL DEFAULT 'UNKNOWN'") } }
-        val MIGRATION_52_53 = object : Migration(52, 53) { override fun migrate(db: SupportSQLiteDatabase) { /* Legacy harmonization */ } }
+        val MIGRATION_52_53 = object : Migration(52, 53) { override fun migrate(db: SupportSQLiteDatabase) {} }
         val MIGRATION_51_52 = object : Migration(51, 52) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE connection_history ADD COLUMN isAnchorLocked INTEGER NOT NULL DEFAULT 0"); db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isAnchorLocked INTEGER NOT NULL DEFAULT 0") } }
         val MIGRATION_50_51 = object : Migration(50, 51) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN name TEXT") } }
         val MIGRATION_49_50 = object : Migration(49, 50) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE trail_points ADD COLUMN accuracy REAL NOT NULL DEFAULT 0.0"); db.execSQL("ALTER TABLE trail_points ADD COLUMN maxAccuracy REAL NOT NULL DEFAULT 0.0") } }
@@ -309,10 +309,10 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_29_30 = object : Migration(29, 30) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE connection_history ADD COLUMN vid TEXT"); db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN vid TEXT"); db.execSQL("ALTER TABLE logs ADD COLUMN vid TEXT") } }
         val MIGRATION_30_31 = object : Migration(30, 31) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE connection_history ADD COLUMN sitBaro REAL NOT NULL DEFAULT 0.0"); db.execSQL("ALTER TABLE connection_history ADD COLUMN sitTilt REAL NOT NULL DEFAULT 0.0"); db.execSQL("ALTER TABLE connection_history ADD COLUMN sitShock REAL NOT NULL DEFAULT 0.0"); db.execSQL("ALTER TABLE connection_history ADD COLUMN ver TEXT"); db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN sitBaro REAL NOT NULL DEFAULT 0.0"); db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN sitTilt REAL NOT NULL DEFAULT 0.0"); db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN sitShock REAL NOT NULL DEFAULT 0.0"); db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isStorageLow INTEGER NOT NULL DEFAULT 0"); db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isStorageCritical INTEGER NOT NULL DEFAULT 0"); db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isPowerSaveMode INTEGER NOT NULL DEFAULT 0"); db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN standbyBucket INTEGER NOT NULL DEFAULT -1"); db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN netInterface TEXT NOT NULL DEFAULT 'UNKNOWN'"); db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN ver TEXT") } }
         val MIGRATION_31_32 = object : Migration(31, 32) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE trail_points ADD COLUMN ver TEXT"); db.execSQL("ALTER TABLE violations ADD COLUMN ver TEXT") } }
-        val MIGRATION_32_33 = object : Migration(32, 33) { override fun migrate(db: SupportSQLiteDatabase) { /* Recreate with indices */ } }
+        val MIGRATION_32_33 = object : Migration(32, 33) { override fun migrate(db: SupportSQLiteDatabase) {} }
         val MIGRATION_33_34 = object : Migration(33, 34) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN gpsTs INTEGER NOT NULL DEFAULT 0") } }
         val MIGRATION_34_35 = object : Migration(34, 35) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN currentMa INTEGER NOT NULL DEFAULT 0"); db.execSQL("ALTER TABLE connection_history ADD COLUMN currentMa INTEGER NOT NULL DEFAULT 0") } }
-        val MIGRATION_35_36 = object : Migration(35, 36) { override fun migrate(db: SupportSQLiteDatabase) { /* Recreate to v36 */ } }
+        val MIGRATION_35_36 = object : Migration(35, 36) { override fun migrate(db: SupportSQLiteDatabase) {} }
         val MIGRATION_36_37 = object : Migration(36, 37) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE logs ADD COLUMN synced INTEGER NOT NULL DEFAULT 0") } }
     }
 }

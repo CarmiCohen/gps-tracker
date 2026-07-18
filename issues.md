@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July18.00)
+# Project Issues & Hardening Tracking (July.18.00)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Resolution Archive](STATUS/RESOLUTION_ARCHIVE.md), and validation tasks are in [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md).
 
@@ -22,10 +22,10 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (July18.00)
+## 🟢 Recently Resolved Issues (July.18.00)
 *   **Issue #096 Hardening: Room Database Migration Crash (IllegalStateException)**.
     *   **Root Cause**: Inconsistent floating-point default value representation between Room's expected schema ("0.0") and SQLite's normalized format ("0").
-    *   **Resolution**: Harmonized all `Double` column default values to `"0"` (integer string) across all `@Entity` definitions and within the `MIGRATION_54_55` SQL recreation script in `Database.kt`.
+    *   **Resolution**: Harmonized all `Double` column default values to `"0"` (integer string) across all `@Entity` definitions and within the `MIGRATION_54_55` and `MIGRATION_55_56` SQL recreation scripts in `Database.kt`.
     *   **Verification**: App successfully performs migration and starts without verification errors.
 
 *   **Issue #062: Dynamic Anchor Breakout (R990)**. (v9.3.56 / July17.08)
