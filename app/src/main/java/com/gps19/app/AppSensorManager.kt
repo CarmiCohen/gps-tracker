@@ -31,6 +31,9 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.19.00:
+ * - Issue #098: Samsung A15 Hardening. Implemented registration failure detection 
+ *   for Step Detector to trigger Accelerometer-based fallback stay-alive.
  * v9.3.25:
  * - R405: Samsung Stay-Alive Fallback. Implemented passive pulse from 
  *   accelerometer when TYPE_STEP_DETECTOR is unavailable to maintain OOM priority.
@@ -56,6 +59,7 @@ class AppSensorManager @Inject constructor(
     private val rotationVector = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
     
     private val stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+    private var isStepDetectorRegistered = false
 
     private var sensorThread: HandlerThread? = null
     private var sensorHandler: Handler? = null
@@ -267,7 +271,13 @@ class AppSensorManager @Inject constructor(
         light?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         rotationVector?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         
-        stepDetector?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
+        isStepDetectorRegistered = stepDetector?.let { 
+            val registered = sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) 
+            if (!registered) {
+                Timber.e("Issue #098: Step Detector exists but registerListener failed. Engaging fallback.")
+            }
+            registered
+        } ?: false
 
         displayManager.registerDisplayListener(displayListener, sensorHandler)
         val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
@@ -284,6 +294,7 @@ class AppSensorManager @Inject constructor(
         sensorThread?.quitSafely()
         sensorThread = null
         sensorHandler = null
+        isStepDetectorRegistered = false
     }
 
     fun setHardwareFailureCallback(callback: (String) -> Unit) {
@@ -342,9 +353,9 @@ class AppSensorManager @Inject constructor(
                 processVibration(v0, v1, v2)
                 updateOrientation()
                 
-                // R405 Fallback: If hardware Step Detector is missing, use Accelerometer pulses 
-                // to maintain process priority on Samsung devices.
-                if (stepDetector == null && now - lastStayAliveTs > 10000L) {
+                // R405 Fallback: If hardware Step Detector is missing OR registration failed (Issue #098),
+                // use Accelerometer pulses to maintain process priority on Samsung devices.
+                if (!isStepDetectorRegistered && now - lastStayAliveTs > 10000L) {
                     lastStayAliveTs = now
                     Timber.v("Stay-Alive Pulse (Accel Fallback)")
                 }

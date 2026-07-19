@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - July.18.03
+# System Source of Truth (SoT) - July.19.00
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Samsung Stay-Alive Hardware Fallback (R405c)**: The system MUST detect hardware sensor registration failures (e.g., Step Detector returning `false` on `registerListener`) and immediately engage the Accelerometer-based stay-alive pulse to maintain process priority. (July.19.00 / Issue #098)
 *   **Samsung A15 Battery Prompt Authority (R405b)**: The system MUST proactively trigger the configuration overlay if battery exemption is missing on Samsung A15 hardware, ensuring user awareness of critical background requirements. (July.18.03 / Issue #101)
 *   **Database Migration Integrity (R956b)**: Any change to an `@Entity` class MUST be accompanied by a version bump and an explicit `Migration` object. To resolve `IllegalStateException` integrity errors (Identity Hash mismatch), the physical schema MUST strictly align with Room's generated SQL, including precise default value formatting. Re-harmonization via table recreation is the authoritative remediation for schema drift. (July.18.01 / Issue #097)
 *   **Dynamic Anchor Breakout Authority (R990)**: To prevent "sticky anchors" during physical movement, the system MUST employ a displacement-weighted monitor. This monitor (`anchorEscapeScore`) MUST evaluate: (a) Physical motion detection via sensors, (b) Positional trend analysis over a window of points, and (c) Progress through a distance-based transition zone relative to accuracy-weighted thresholds. (v9.3.56 / Issue #062)
