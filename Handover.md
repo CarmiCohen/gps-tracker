@@ -1,28 +1,29 @@
-# Handover: GPS Tracker Hardening (July.18.01)
+# Handover: GPS Tracker Hardening (July.18.03)
 
-## 🎯 Current Status: July.18.01
-The database has been further stabilized by resolving a schema identity mismatch that occurred in version 56. The system now strictly aligns physical table structures with Entity definitions.
+## 🎯 Current Status: July.18.03
+Implemented proactive battery exemption prompting for Samsung A15 devices to prevent silent background termination. Database and reactive flows remain stable.
+
+## 🟢 Resolved Issues (July.18.03)
+1.  **Silent Battery Exemption Requirement (#101)**:
+    - **Problem**: On Samsung A15, the app would log the need for battery exemption but remain on the Landing Page without prompting the user.
+    - **Root Cause**: Lack of UI trigger in `MainActivity` despite background detection.
+    - **Resolution**: Updated `MainActivity.onResume` to explicitly fire `UiEvent.TogglePhoneSetup(true)` if a Samsung A15 is detected without `isBatteryWhitelisted`.
+    - **Requirement Alignment**: Directly satisfies R405 (Samsung Hardening Authority).
 
 ## 🟢 Resolved Issues (July.18.01)
 1.  **Room Identity Hash Mismatch (#097)**:
     - **Problem**: `IllegalStateException: Room cannot verify the data integrity` prevented the database from initializing.
-    - **Root Cause**: Discrepancy in schema representation (likely default value formatting) between version 56's manual migration and Room's expectation.
-    - **Resolution**: Bumped version to 57. Added `MIGRATION_56_57` which recreates all tables (`logs`, `trail_points`, `violations`, `connection_history`, `pending_status_updates`) using a strict "create-new-copy-old-rename" sequence.
-    - **Cleanup**: Verified the new migration is registered in `AppModule.kt`.
+    - **Resolution**: Re-harmonized schema via `MIGRATION_56_57` with strict table recreation.
 
 ## 🟢 Resolved Issues (July.18.00)
 1.  **Room Migration Crash (#096 Hardening)**:
-    - **Problem**: `IllegalStateException` during migration from older versions to 56.
-    - **Resolution**: Harmonized all `Double` column default values to `"0"` across all entities.
-
-## 🟢 Resolved Issues (July.17.08)
-1.  **Dynamic Anchor Breakout (#062 / R990)**:
-    - **Resolution**: Implemented a displacement-weighted score monitor in `LocationProcessor`.
+    - **Resolution**: Harmonized `Double` column defaults to `"0"`.
 
 ## ⚠️ Known Risks & Residual Tasks
-- **Migration Performance**: On low-end devices (e.g., A15), recreating large tables during migration might cause a long first startup. Pruning logic is in place to keep table sizes manageable.
+- **Migration Performance**: Large log tables may cause slow first-start during table recreation on low-end hardware.
 
 ## 🛠️ Verification Steps
-1. Re-deploy the app to a device with version 56 or older.
-2. Verify the app starts and `logcat` shows successful database initialization without `IllegalStateException`.
-3. Check that the "Viewer" or "Tracker" screens load correctly, indicating valid DAO operations.
+1. Deploy to a Samsung A15.
+2. Ensure battery optimization is ON for the app.
+3. Launch app; verify the `PhoneSetupOverlay` appears automatically on the Landing Page.
+4. Grant exemption and verify the overlay can be dismissed or proceeds correctly.

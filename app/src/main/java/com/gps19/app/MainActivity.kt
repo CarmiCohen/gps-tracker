@@ -18,13 +18,13 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * July.18.03:
+ * - Issue #101: Samsung A15 Battery Hardening. Proactively triggers PhoneSetupOverlay
+ *   in onResume to satisfy R405 and prevent silent background termination.
  * July.18.01:
  * - Issue #097: Room Identity Hash stabilization. Database version 57.
  * July.18.00:
  * - Issue #096 Hardening: Finalized Room migration stabilization and version baseline.
- * v9.3.45:
- * - Issue #095: Reactive Flow Hardening. Offloaded permission request logic 
- *   to MainAppContent to ensure atomic mode transitions.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -149,8 +149,11 @@ class MainActivity : ComponentActivity() {
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
         
         // R405: Proactive check for Samsung A15 hardening
-        if (isA15Device() && !viewModel.uiState.value.permissions.isBatteryWhitelisted) {
+        // July.18.03: Actually trigger the UI prompt instead of just logging.
+        val state = viewModel.uiState.value
+        if (isA15Device() && !state.permissions.isBatteryWhitelisted && !state.navigation.isPhoneSetupVisible) {
             Timber.i("R405: Samsung A15 detected without battery exemption. Prompting user.")
+            viewModel.onEvent(UiEvent.TogglePhoneSetup(true))
         }
     }
 }
