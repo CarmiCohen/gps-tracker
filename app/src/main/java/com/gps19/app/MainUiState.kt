@@ -4,6 +4,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Unified immutable state for the entire UI structure.
+ * July.19.01:
+ * - Issue #099: Added isA15Device to PermissionState to prevent repeated SysProp access.
  * v9.3.16:
  * - Issue #078: Introduced MapFollowMode to prevent map centering conflicts.
  * v9.3.14:
@@ -61,6 +63,7 @@ data class MainUiState(
     val distanceTrackerToHome: Double? = null,
     val distanceTrackerToViewer: Double? = null,
     val distanceViewerToHome: Double? = null,
+    val distanceViewerToTracker: Double? = null, // Added for completeness in v9.3.16 trails
     val draftSettings: DraftSettings = DraftSettings(),
     val isIdentitySanitized: Boolean = false
 ) {
@@ -118,7 +121,8 @@ data class PermissionState(
     val isBackgroundLocationGranted: Boolean = true,
     val xiaomiStatus: XiaomiPermissionStatus = XiaomiPermissionStatus.UNKNOWN,
     val xiaomiAutostartStatus: XiaomiPermissionStatus = XiaomiPermissionStatus.UNKNOWN,
-    val isXiaomiManualOverride: Boolean = false
+    val isXiaomiManualOverride: Boolean = false,
+    val isA15Device: Boolean = false
 )
 
 data class NavigationState(

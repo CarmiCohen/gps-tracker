@@ -297,7 +297,7 @@ const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0
-const val NETWORK_TIMEOUT_MS = 10000
+const val NETWORK_TIMEOUT_MS = 60000 // Issue #100: Increased to 60s to handle relay cold-start
 const val NET_REJOIN_THRESHOLD_MS = 15000L
 const val NET_HEAL_THRESHOLD_MS = 45000L
 // Issue #315: Baseline sync interval.

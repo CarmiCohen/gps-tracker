@@ -20,12 +20,12 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.19.01:
+ * - Issue #099: ANR Hardening. Staggered initialization and lazy permission 
+ *   checks to prevent cold-start frame skipping on Samsung A15.
  * v9.3.55:
  * - ANR Hardening (#096): Offloaded loadInitialData to Dispatchers.IO to prevent 
  *   Room migrations from blocking the Main thread on startup.
- * v9.3.47:
- * - ANR Hardening (#092): Deferred heavy data observations (logs, trails, history) 
- *   until appMode is active to ensure Landing Page responsiveness on A15.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -102,7 +102,6 @@ class MainViewModel @Inject constructor(
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), DashboardState())
 
-    // v9.3.47: Lazy Gated Flows to prevent Main-thread flooding on Landing Page
     val eventLogsFlow: StateFlow<List<LogEntry>> = _uiState.map { it.appMode }.distinctUntilChanged()
         .flatMapLatest { mode -> if (mode != null) repository.eventLogsFlow else flowOf(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), emptyList())
@@ -133,15 +132,14 @@ class MainViewModel @Inject constructor(
     private var lastAlarmAckRealtime: Long = 0L
     private var isHeavyObservationStarted = false
 
+    private val INITIAL_RENDER_DELAY_MS = 500L
+
     init {
         viewModelScope.launch(uiExceptionHandler) {
             loadInitialData()
-            delay(150)
-            startGlobalTimer()
-            delay(200)
+            delay(INITIAL_RENDER_DELAY_MS)
             startBaseObservations()
-            
-            // Auto-trigger heavy observations if app starts already in a mode (cold-boot recovery)
+            startGlobalTimer()
             _uiState.filter { it.isInitialized && it.appMode != null }.first()
             startHeavyObservations()
         }
@@ -162,7 +160,9 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) { 
             while(true) { 
                 val newState = systemStatusProvider.getPermissionState()
-                withContext(Dispatchers.Main) { updateState { it.copy(permissions = newState) } }
+                withContext(Dispatchers.Main) { 
+                    updateState { it.copy(permissions = newState.copy(isA15Device = systemStatusProvider.isA15Hardware())) } 
+                }
                 val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
                 delay(if (refreshFast) PERMISSION_REFRESH_INTERVAL_FAST_MS else PERMISSION_REFRESH_INTERVAL_SLOW_MS) 
             } 
@@ -271,7 +271,9 @@ class MainViewModel @Inject constructor(
             is UiEvent.SetLogFilterShowRecovered -> viewModelScope.launch { repository.updateLogFilters(recovered = event.show) }
             is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
                 val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
-                withContext(Dispatchers.Main) { updateState { it.copy(permissions = newState) } }
+                withContext(Dispatchers.Main) { 
+                    updateState { it.copy(permissions = newState.copy(isA15Device = systemStatusProvider.isA15Hardware())) } 
+                }
             }
             is UiEvent.TriggerTestAlarm -> { addPersistentLog("user", "USER ACTION: Test alarm triggered", true); repository.sendCommand(UiCommand.TriggerTestAlarm) }
             is UiEvent.TriggerForensicTest -> { addPersistentLog("user", "USER ACTION: Forensic stress test triggered", true); repository.sendCommand(UiCommand.TriggerForensicTest) }

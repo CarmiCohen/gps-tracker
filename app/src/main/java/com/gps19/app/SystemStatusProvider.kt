@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
+import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
@@ -39,10 +40,11 @@ interface SystemStatusProvider {
     suspend fun isBackgroundLocationGranted(): Boolean
     fun isLocalOnline(): Boolean
     suspend fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus
+    fun isA15Hardware(): Boolean
     
     /**
-     * v9.3.45: Hardened for ANR prevention. Implements non-blocking polling 
-     * to avoid IPC congestion on low-end hardware (Samsung A15).
+     * July.19.01: Hardened for ANR prevention (#099). 
+     * Uses lazy device caching and synchronized refresh to prevent cold-start frame skips.
      */
     suspend fun getPermissionState(forceRefresh: Boolean = false): PermissionState
     
@@ -67,6 +69,10 @@ class SystemStatusProviderImpl @Inject constructor(
     private val cachedState = AtomicReference<PermissionState>(PermissionState())
     private val isRefreshing = AtomicBoolean(false)
     
+    // July.19.01: Cached hardware flags to prevent repeated IPC/SysProp access during startup
+    private val isXiaomi by lazy { isXiaomiDevice() }
+    private val isA15 by lazy { isA15Device() }
+    
     private val PERMISSION_TTL_MS = 15_000L
 
     override suspend fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
@@ -76,9 +82,12 @@ class SystemStatusProviderImpl @Inject constructor(
     override suspend fun isExactAlarmGranted(): Boolean = getPermissionState().isExactAlarmGranted
     override suspend fun isPostNotificationsGranted(): Boolean = getPermissionState().isPostNotificationsGranted
     override suspend fun isBackgroundLocationGranted(): Boolean = getPermissionState().isBackgroundLocationGranted
+    override fun isA15Hardware(): Boolean = isA15
 
     override fun isLocalOnline(): Boolean {
-        val caps = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+        val caps = try {
+            connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+        } catch (e: Exception) { null }
         return caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
 
@@ -90,9 +99,9 @@ class SystemStatusProviderImpl @Inject constructor(
         
         val isStale = now - lastFullRefreshTime > PERMISSION_TTL_MS
         if ((isStale || forceRefresh) && isRefreshing.compareAndSet(false, true)) {
+            // v9.3.45: Offload to background scope but allow local return of cached data if needed
             scope.launch {
                 try {
-                    val isXiaomi = isXiaomiDevice()
                     val batteryWhitelisted = if (current.isBatteryWhitelisted && !forceRefresh) true 
                                            else powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
                     
@@ -112,6 +121,8 @@ class SystemStatusProviderImpl @Inject constructor(
                     )
                     cachedState.set(newState)
                     lastFullRefreshTime = now
+                } catch (e: Exception) {
+                    Timber.e(e, "Issue #099: Permission check failed during refresh")
                 } finally {
                     isRefreshing.set(false)
                 }
@@ -129,9 +140,14 @@ class SystemStatusProviderImpl @Inject constructor(
             }
         }
         val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
-        connectivityManager.registerNetworkCallback(request, callback)
-        trySend(isLocalOnline())
-        awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
+        try {
+            connectivityManager.registerNetworkCallback(request, callback)
+            trySend(isLocalOnline())
+        } catch (e: Exception) {
+            Timber.e(e, "Connectivity callback registration failed")
+            trySend(false)
+        }
+        awaitClose { try { connectivityManager.unregisterNetworkCallback(callback) } catch(e: Exception) {} }
     }.distinctUntilChanged().conflate()
 
     override fun observeBatteryStatus(): Flow<BatteryStatus> = callbackFlow<BatteryStatus> {
@@ -143,12 +159,16 @@ class SystemStatusProviderImpl @Inject constructor(
                 val temp = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10.0
                 val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
                 val isCharging = plugged > 0
-                val currentMa = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) / 1000
+                val currentMa = try { batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) / 1000 } catch(e: Exception) { 0 }
                 trySend(BatteryStatus(pct, temp, isCharging, currentMa))
             }
         }
-        context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        awaitClose { context.unregisterReceiver(receiver) }
+        try {
+            context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        } catch (e: Exception) {
+            Timber.e(e, "Battery receiver registration failed")
+        }
+        awaitClose { try { context.unregisterReceiver(receiver) } catch(e: Exception) {} }
     }.distinctUntilChanged().conflate()
 }
 

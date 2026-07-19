@@ -18,12 +18,12 @@ import javax.inject.Singleton
 /**
  * High-level Network Manager for the Service.
  * Orchestrates the SignalingProvider (Socket.io) and the HTTP Keep-alive logic.
+ * v9.3.26:
+ * - Issue #100: Hardened Relay Wake-up. Increased timeouts to NETWORK_TIMEOUT_MS (60s)
+ *   to handle cold-starts of relay infrastructure.
  * v9.3.25:
  * - R988: Activated binary telemetry channel for trackers to reduce relay overhead.
  * - R988: Implemented routingId-aware emitBinary calls.
- * v8.9.99:
- * - Issue #041: Identity Sanitization. Added strict ID validation before 
- *   initiating relay connections to prevent using corrupted identities.
  */
 @Singleton
 class AppNetworkManager @Inject constructor(
@@ -132,7 +132,9 @@ class AppNetworkManager @Inject constructor(
                 }
 
                 val urlConnection = (URL(relayUrl).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 30000; readTimeout = 30000
+                    // Issue #100: Use unified timeout constant
+                    connectTimeout = NETWORK_TIMEOUT_MS.toInt()
+                    readTimeout = NETWORK_TIMEOUT_MS.toInt()
                     setRequestProperty("User-Agent", "GPS19-Monitor")
                 }
                 val code = urlConnection.responseCode
@@ -180,7 +182,9 @@ class AppNetworkManager @Inject constructor(
                 try {
                     Log.d("GPS19_NET", "Wake-up (Attempt ${attempt+1}): GET $relayUrl")
                     val conn = URL(relayUrl).openConnection() as HttpURLConnection
-                    conn.connectTimeout = 30000; conn.readTimeout = 30000
+                    // Issue #100: Use unified timeout constant
+                    conn.connectTimeout = NETWORK_TIMEOUT_MS.toInt()
+                    conn.readTimeout = NETWORK_TIMEOUT_MS.toInt()
                     conn.requestMethod = "GET"
                     conn.setRequestProperty("User-Agent", "Mozilla/5.0 (GPS19-Wakeup)")
                     val code = conn.responseCode

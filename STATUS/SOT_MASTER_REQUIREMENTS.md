@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - July.19.00
+# System Source of Truth (SoT) - July.19.01
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Cold-Start Hardening Authority (R955b)**: To prevent Main-thread frame skipping and ANRs on low-end hardware, the system MUST: (a) Implement a mandatory 500ms staggered delay before starting base observations, (b) Cache all hardware property checks (e.g., `Build.MODEL` checks for A15) at the service/provider level, and (c) Defer all non-critical IPC permission status checks until after the initial UI composition is stable. (July.19.01 / Issue #099)
 *   **Samsung Stay-Alive Hardware Fallback (R405c)**: The system MUST detect hardware sensor registration failures (e.g., Step Detector returning `false` on `registerListener`) and immediately engage the Accelerometer-based stay-alive pulse to maintain process priority. (July.19.00 / Issue #098)
 *   **Samsung A15 Battery Prompt Authority (R405b)**: The system MUST proactively trigger the configuration overlay if battery exemption is missing on Samsung A15 hardware, ensuring user awareness of critical background requirements. (July.18.03 / Issue #101)
 *   **Database Migration Integrity (R956b)**: Any change to an `@Entity` class MUST be accompanied by a version bump and an explicit `Migration` object. To resolve `IllegalStateException` integrity errors (Identity Hash mismatch), the physical schema MUST strictly align with Room's generated SQL, including precise default value formatting. Re-harmonization via table recreation is the authoritative remediation for schema drift. (July.18.01 / Issue #097)
