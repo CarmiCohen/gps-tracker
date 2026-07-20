@@ -17,11 +17,10 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.20.07:
+ * - Issue #117 Fix: Corrected property names in evaluateAlarmsInternal (trackerLuxBaseline, trackerAcousticFloorDb).
  * v9.4.08:
  * - Issue #077 Fix: Corrected unresolved reference 'isGpsGap' in processTick.
- * v9.4.07:
- * - Issue #077 Hardening: Cached GPS primitives as Double to eliminate 
- *   redundant toDouble() conversions in the tick loop.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -514,7 +513,7 @@ class ViewerService : BaseMonitorService() {
                 isSuspicious = remoteHandler.isTrackerSuspicious, isTamperDetected = remoteHandler.isTrackerTamperDetected,
                 isPowerTamper = remoteHandler.isTrackerPowerTamper, trackerTiltDegrees = remoteHandler.trackerTiltDegrees, 
                 trackerAcousticDb = remoteHandler.trackerAcousticDb, trackerBaroAlt = remoteHandler.trackerBaroAlt, trackerLux = remoteHandler.trackerLux,
-                isNear = remoteHandler.isTrackerNear, luxBaseline = remoteHandler.trackerValueLuxBaseline, acousticFloorDb = remoteHandler.trackerValueAcousticFloorDb,
+                isNear = remoteHandler.isTrackerNear, luxBaseline = remoteHandler.trackerLuxBaseline, acousticFloorDb = remoteHandler.trackerAcousticFloorDb,
                 adaptiveVibrationFloor = remoteHandler.trackerAdaptiveVibrationFloor, peakVibrationShock = remoteHandler.trackerPeakVibrationShock,
                 trackerCurrentMa = remoteHandler.trackerCurrentMa, isSitActive = remoteHandler.isTrackerSitActive, isLocationPending = remoteHandler.isTrackerLocationPending,
                 locationPendingReason = remoteHandler.trackerLocationPendingReason, isPowerSaveMode = remoteHandler.isTrackerPowerSaveMode,

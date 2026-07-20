@@ -41,6 +41,9 @@ import kotlinx.coroutines.delay
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * July.20.07:
+ * - Issue #117: Fixed typo in AlarmOverlay onGoToMap callback.
+ * - Issue #107: Added ACTIVITY_RECOGNITION to core permission flow for Tracker mode (API 29+).
  * v9.3.40:
  * - Issue #095 Hardening: Implemented reactive permission flow. Role selection 
  *   now proceeds automatically upon permission grant, eliminating "no response" taps.
@@ -133,7 +136,12 @@ fun MainAppContent(
 
     fun checkAndRequestPermissionsLocal(mode: String) {
         val permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-        if (mode == "tracker") permissions.add(Manifest.permission.RECORD_AUDIO)
+        if (mode == "tracker") {
+            permissions.add(Manifest.permission.RECORD_AUDIO)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                permissions.add(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         
         viewModel.pendingMode = mode
@@ -144,7 +152,10 @@ fun MainAppContent(
         val fineLocation = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val audio = if (mode == "tracker") ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED else true
         val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true
-        return fineLocation && audio && notification
+        val activityRec = if (mode == "tracker" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(activity, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+        } else true
+        return fineLocation && audio && notification && activityRec
     }
 
     // Navigation logic based on app mode and diagnostics visibility
