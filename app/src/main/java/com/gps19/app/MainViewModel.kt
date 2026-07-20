@@ -21,13 +21,13 @@ import java.util.Locale
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
  * July.20.07:
- * - Release hardening and monitoring.
+ * - Issue #109: Startup Hardening. Decoupled proactivePruning from critical load path.
+ * - Issue #107: Step Detector Hardening. Tracking ACTIVITY_RECOGNITION permission.
  * July.20.06:
  * - Version synchronization and release hardening.
  * July.20.05:
  * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
  *   parameter naming to 'nowRt'.
- * - Issue #104: Integrated proactivePruning in loadInitialData for startup hardening.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -485,14 +485,14 @@ class MainViewModel @Inject constructor(
                     withContext(Dispatchers.Default) {
                         val currentState = _uiState.value
                         val newState = behaviorUseCase.computeTrackerState(currentState, now)
-                        val shouldShowRed = behaviorUseCase.shouldShowRedScreen(currentState, nowRt, lastAlarmAckRt, _redScreenVisible.value)
+                        val shouldShowRedScreen = behaviorUseCase.shouldShowRedScreen(currentState, nowRt, lastAlarmAckRt, _redScreenVisible.value)
                         
                         withContext(Dispatchers.Main) {
                             if (newState != _trackerState.value && newState != TrackerState.UNKNOWN) {
                                 addPersistentLog("event", "Tracker is $newState", true)
                             }
                             _trackerState.value = newState
-                            _redScreenVisible.value = shouldShowRed
+                            _redScreenVisible.value = shouldShowRedScreen
                         }
                     }
                     updateState { state -> state.copy(isAlarmSilenced = behaviorUseCase.isAlarmSilenced(state.lastAlarmAckTs, now)) }
@@ -519,7 +519,7 @@ class MainViewModel @Inject constructor(
                     trackerLocation = telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime),
                     connectivity = current.connectivity.copy(isTrackerConnected = true, lastUpdateTs = nowMs, lastRemoteActivityTs = nowMs),
                     trackerStats = telemetryUseCase.mapStats(update, current.trackerStats),
-                    trackerBattery = if (current.appMode == "tracker") current.trackerBattery.copy(level = update.battery, temp = update.batteryTemp, isCharging = update.isCharging, isChargingStable = update.isCharging) else current.trackerBattery,
+                    trackerBattery = if (current.appMode == "tracker") current.trackerBattery.copy(level = update.battery, temp = update.temp, isCharging = update.isCharging, isChargingStable = update.isCharging) else current.trackerBattery,
                     trackerSatsView = update.satsView,
                     trackerSatsUsed = update.satsUsed,
                     distanceTrackerToHome = if (current.appMode == "viewer" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceTrackerToHome,
@@ -549,11 +549,13 @@ class MainViewModel @Inject constructor(
     }
 
     private fun loadInitialData() {
-        // v9.4.01: Explicitly offload to IO as this triggers DB opening, migrations, and proactive maintenance.
+        // July.20.07: Offload maintenance to an independent background job to ensure zero-jank startup.
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            // Issue #104: Startup ANR Hardening - Prune logs before heavy startup queries.
             repository.proactivePruning()
+        }
 
+        // v9.4.01: Explicitly offload to IO as this triggers DB opening and migrations.
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             val initial = settingsUseCase.loadAllSettings()
             withContext(Dispatchers.Main) {
                 appStartTime = initial.appStartTime

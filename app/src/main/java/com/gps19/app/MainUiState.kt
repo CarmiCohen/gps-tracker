@@ -4,6 +4,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Unified immutable state for the entire UI structure.
+ * July.20.07:
+ * - Issue #107: Added isActivityRecognitionGranted to PermissionState.
  * July.19.01:
  * - Issue #099: Added isA15Device to PermissionState to prevent repeated SysProp access.
  * v9.3.16:
@@ -74,6 +76,7 @@ data class MainUiState(
                 permissions.isOverlayGranted &&
                 permissions.isPostNotificationsGranted &&
                 permissions.isBackgroundLocationGranted &&
+                permissions.isActivityRecognitionGranted &&
                 (appMode != null) &&
                 (appMode != "tracker" || permissions.isMicrophoneGranted) &&
                 (appMode == "tracker" || homePoints.isNotEmpty()) &&
@@ -89,6 +92,7 @@ data class MainUiState(
             if (!permissions.isOverlayGranted) count++
             if (!permissions.isPostNotificationsGranted) count++
             if (!permissions.isBackgroundLocationGranted) count++
+            if (!permissions.isActivityRecognitionGranted) count++
             if (appMode == "tracker" && !permissions.isMicrophoneGranted) count++
             if (appMode != "tracker" && homePoints.isEmpty()) count++
             
@@ -119,6 +123,7 @@ data class PermissionState(
     val isExactAlarmGranted: Boolean = false,
     val isPostNotificationsGranted: Boolean = true,
     val isBackgroundLocationGranted: Boolean = true,
+    val isActivityRecognitionGranted: Boolean = true,
     val xiaomiStatus: XiaomiPermissionStatus = XiaomiPermissionStatus.UNKNOWN,
     val xiaomiAutostartStatus: XiaomiPermissionStatus = XiaomiPermissionStatus.UNKNOWN,
     val isXiaomiManualOverride: Boolean = false,

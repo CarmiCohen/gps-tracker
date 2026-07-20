@@ -31,6 +31,9 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * v9.4.05:
+ * - Issue #077 Hardening: Eliminated redundant toDouble() conversions and 
+ *   DoubleArray buffers. Optimized sensor pipeline for Float-first processing.
  * v9.4.00:
  * - Issue #102: Temporal Forensic Integrity. Renamed monotonic timing variables 
  *   to use 'Rt' suffix and ensured wall-clock separation in sensor snapshots.
@@ -101,8 +104,6 @@ class AppSensorManager @Inject constructor(
 
     private val gravityBuffer = FloatArray(3)
     private val geomagneticBuffer = FloatArray(3)
-    private val gravityBufferDouble = DoubleArray(3)
-    private val geomagneticBufferDouble = DoubleArray(3)
 
     private val rotationMatrixBuffer = FloatArray(9)
     private val inclinationMatrixBuffer = FloatArray(9)
@@ -111,9 +112,9 @@ class AppSensorManager @Inject constructor(
     private var hasGravity = false
     private var hasGeomagnetic = false
 
-    private var lastAccelX = 0.0
-    private var lastAccelY = 0.0
-    private var lastAccelZ = 0.0
+    private var lastAccelX = 0f
+    private var lastAccelY = 0f
+    private var lastAccelZ = 0f
     
     private val vibrationCircularBuffer = DoubleArray(VIBRATION_WINDOW_SIZE)
     private var vibrationCircularIdx = 0
@@ -204,7 +205,7 @@ class AppSensorManager @Inject constructor(
 
     private var proximityJob: Job? = null
     private var rawProximityNear: Boolean = true
-    private var proximityMaxRange = 5.0
+    private var proximityMaxRange = 5f
 
     var isProximityNear: Boolean = true
         private set
@@ -253,7 +254,7 @@ class AppSensorManager @Inject constructor(
         sessionStartRt = timeProvider.elapsedRealtime()
         lastBaroZeroingRt = sessionStartRt
         hasLoggedThreadInfo.set(false)
-        proximityMaxRange = proximity?.maximumRange?.toDouble() ?: 5.0
+        proximityMaxRange = proximity?.maximumRange ?: 5f
 
         if (sensorThread == null) {
             sensorThread = HandlerThread("AppSensorThread").apply { start() }
@@ -335,19 +336,12 @@ class AppSensorManager @Inject constructor(
                 lastStayAliveRt = nowRt
             }
             Sensor.TYPE_ACCELEROMETER -> {
-                val v0 = values[0].toDouble()
-                val v1 = values[1].toDouble()
-                val v2 = values[2].toDouble()
-                
                 gravityBuffer[0] = values[0]
                 gravityBuffer[1] = values[1]
                 gravityBuffer[2] = values[2]
-                gravityBufferDouble[0] = v0
-                gravityBufferDouble[1] = v1
-                gravityBufferDouble[2] = v2
                 
                 hasGravity = true
-                processVibration(v0, v1, v2)
+                processVibration(values[0], values[1], values[2])
                 updateOrientation()
                 
                 // R405 Fallback: If hardware Step Detector is missing OR registration failed (Issue #098),
@@ -358,20 +352,19 @@ class AppSensorManager @Inject constructor(
                 }
             }
             Sensor.TYPE_LINEAR_ACCELERATION -> {
-                processLinearAcceleration(values[0].toDouble(), values[1].toDouble(), values[2].toDouble(), event.timestamp)
+                processLinearAcceleration(values[0], values[1], values[2], event.timestamp)
             }
             Sensor.TYPE_MAGNETIC_FIELD -> {
                 geomagneticBuffer[0] = values[0]; geomagneticBuffer[1] = values[1]; geomagneticBuffer[2] = values[2]
-                geomagneticBufferDouble[0] = values[0].toDouble(); geomagneticBufferDouble[1] = values[1].toDouble(); geomagneticBufferDouble[2] = values[2].toDouble()
                 hasGeomagnetic = true; updateOrientation()
             }
-            Sensor.TYPE_PRESSURE -> processPressure(values[0].toDouble())
+            Sensor.TYPE_PRESSURE -> processPressure(values[0])
             Sensor.TYPE_PROXIMITY -> {
-                val value = values[0].toDouble()
+                val value = values[0]
                 val newValue = value < proximityMaxRange
-                currentProximityCm = value
-                if (debouncedProximityCm == -1.0) debouncedProximityCm = value
-                proximityIdx = (1.0 - (value / proximityMaxRange)).coerceIn(0.0, 1.0)
+                currentProximityCm = value.toDouble()
+                if (debouncedProximityCm == -1.0) debouncedProximityCm = value.toDouble()
+                proximityIdx = (1.0 - (value / proximityMaxRange)).toDouble().coerceIn(0.0, 1.0)
                 if (proximityIdx < secMinProxIdx) secMinProxIdx = proximityIdx
                 if (newValue != rawProximityNear) {
                     if (!newValue && isDisplayFlickering.get() && isStationary()) return
@@ -388,7 +381,7 @@ class AppSensorManager @Inject constructor(
                     proximityJob = scope.launch {
                         delay(calcDebounceMs)
                         if (isActive && isProximityNear != rawProximityNear) {
-                            isProximityNear = rawProximityNear; debouncedProximityCm = value
+                            isProximityNear = rawProximityNear; debouncedProximityCm = value.toDouble()
                         }
                     }
                 }
@@ -504,28 +497,28 @@ class AppSensorManager @Inject constructor(
     fun consumePeakVerticalDisplacement(): Double { synchronized(this) { val p = internalPeakVerticalDisplacement; internalPeakVerticalDisplacement = 0.0; return p } }
     fun consumePlungeMatched(): Boolean { synchronized(this) { val m = !isWarming && plungeMatched; plungeMatched = false; return m } }
 
-    private fun processVibration(x: Double, y: Double, z: Double) {
+    private fun processVibration(x: Float, y: Float, z: Float) {
         val dx = x - lastAccelX; val dy = y - lastAccelY; val dz = z - lastAccelZ
-        val delta = (sqrt(dx * dx + dy * dy + dz * dz)) / 9.80665
-        synchronized(this) { if (delta > internalPeakVibration) internalPeakVibration = delta; adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta, isWarming) }
+        val delta = (sqrt(dx * dx + dy * dy + dz * dz)) / 9.80665f
+        synchronized(this) { if (delta.toDouble() > internalPeakVibration) internalPeakVibration = delta.toDouble(); adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta.toDouble(), isWarming) }
         lastAccelX = x; lastAccelY = y; lastAccelZ = z
-        val oldVal = vibrationCircularBuffer[vibrationCircularIdx]; vibrationCircularBuffer[vibrationCircularIdx] = delta; vibrationRollingSum = vibrationRollingSum - oldVal + delta; vibrationCircularIdx = (vibrationCircularIdx + 1) % VIBRATION_WINDOW_SIZE; if (vibrationBufferCount < VIBRATION_WINDOW_SIZE) vibrationBufferCount++
+        val oldVal = vibrationCircularBuffer[vibrationCircularIdx]; vibrationCircularBuffer[vibrationCircularIdx] = delta.toDouble(); vibrationRollingSum = vibrationRollingSum - oldVal + delta.toDouble(); vibrationCircularIdx = (vibrationCircularIdx + 1) % VIBRATION_WINDOW_SIZE; if (vibrationBufferCount < VIBRATION_WINDOW_SIZE) vibrationBufferCount++
         currentVibrationIndex = if (vibrationBufferCount > 0) vibrationRollingSum / vibrationBufferCount else 0.0; if (currentVibrationIndex > secPeakVibe) secPeakVibe = currentVibrationIndex
         val nowRt = timeProvider.elapsedRealtime()
         if (plungePhase == 2) { if (isStationary()) { synchronized(this) { plungeMatched = true; secSitDetected = true }; plungePhase = 0 } else if (nowRt - lastPlungePhaseRt > CHAIR_PLUNGE_PHASE_TIMEOUT_MS) { plungePhase = 0 } }
         if (isStationary()) { if (stationaryStartRt == 0L) stationaryStartRt = nowRt else if (nowRt - stationaryStartRt > MUZZLE_HYSTERESIS_MS) { currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; if (plungePhase != 2) plungePhase = 0 } } else { stationaryStartRt = 0L }
     }
 
-    private fun processLinearAcceleration(val0: Double, val1: Double, val2: Double, timestampNs: Long) {
+    private fun processLinearAcceleration(val0: Float, val1: Float, val2: Float, timestampNs: Long) {
         if (!hasGravity) return
         if (lastLinearAccelTs == 0L) { lastLinearAccelTs = timestampNs; return }
         val dt = (timestampNs - lastLinearAccelTs).toDouble() / 1_000_000_000.0
         lastLinearAccelTs = timestampNs
         if (dt > 0.0 && dt < 0.2) {
-            val dot = val0 * gravityBufferDouble[0] + val1 * gravityBufferDouble[1] + val2 * gravityBufferDouble[2]
-            val gravMag = sqrt(gravityBufferDouble[0] * gravityBufferDouble[0] + gravityBufferDouble[1] * gravityBufferDouble[1] + gravityBufferDouble[2] * gravityBufferDouble[2])
-            val vz_accel = if (gravMag > 0.1) dot / gravMag else 0.0
-            currentVerticalVelocity += vz_accel * dt; currentVerticalDisplacement += currentVerticalVelocity * dt 
+            val dot = val0 * gravityBuffer[0] + val1 * gravityBuffer[1] + val2 * gravityBuffer[2]
+            val gravMag = sqrt(gravityBuffer[0] * gravityBuffer[0] + gravityBuffer[1] * gravityBuffer[1] + gravityBuffer[2] * gravityBuffer[2])
+            val vz_accel = if (gravMag > 0.1f) dot / gravMag else 0.0f
+            currentVerticalVelocity += vz_accel.toDouble() * dt; currentVerticalDisplacement += currentVerticalVelocity * dt 
             if (abs(currentVerticalVelocity) > VERTICAL_VELOCITY_MAX_MPS) currentVerticalVelocity = if (currentVerticalVelocity > 0) VERTICAL_VELOCITY_MAX_MPS else -VERTICAL_VELOCITY_MAX_MPS
             val nowRt = timeProvider.elapsedRealtime(); val wallNow = timeProvider.currentTimeMillis()
             if (plungePhase > 0 && nowRt - lastPlungePhaseRt > CHAIR_PLUNGE_PHASE_TIMEOUT_MS) plungePhase = 0
@@ -537,14 +530,15 @@ class AppSensorManager @Inject constructor(
         }
     }
 
-    private fun processPressure(pressure: Double) {
-        if (emaPressure == 0.0) emaPressure = pressure
-        currentPressure = pressure
+    private fun processPressure(pressure: Float) {
+        val pressureDouble = pressure.toDouble()
+        if (emaPressure == 0.0) emaPressure = pressureDouble
+        currentPressure = pressureDouble
         val alpha = SentinelValidator.accelerateAlpha(1.0 - BARO_EMA_SLOW, isWarming)
-        emaPressure = (emaPressure * (1.0 - alpha)) + (pressure * alpha)
+        emaPressure = (emaPressure * (1.0 - alpha)) + (pressureDouble * alpha)
         val nowRt = timeProvider.elapsedRealtime(); val stationaryDuration = if (stationaryStartRt > 0L) nowRt - stationaryStartRt else 0L
-        if (nowRt - lastBaroZeroingRt > BARO_ZEROING_INTERVAL_MS && stationaryDuration >= PASSIVE_ZEROING_STATIONARY_MS) { emaPressure = pressure; lastBaroZeroingRt = nowRt }
-        val currentAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure.toFloat()).toDouble()
+        if (nowRt - lastBaroZeroingRt > BARO_ZEROING_INTERVAL_MS && stationaryDuration >= PASSIVE_ZEROING_STATIONARY_MS) { emaPressure = pressureDouble; lastBaroZeroingRt = nowRt }
+        val currentAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure).toDouble()
         val baselineAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure.toFloat()).toDouble()
         absoluteAltitude = currentAlt; relativeAltitude = if (isWarming) 0.0 else currentAlt - baselineAlt
         if (abs(relativeAltitude) > secPeakLift) secPeakLift = abs(relativeAltitude)

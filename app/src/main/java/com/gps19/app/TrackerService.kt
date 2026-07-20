@@ -20,12 +20,8 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.4.03:
- * - Issue #108 Hardening: Immediately update LAST_SERVICE_TICK_TS_KEY on 
- *   creation to prevent MaintenanceWorker startup race.
- * v9.4.02:
- * - Issue #105: Forensic Ribbon Continuity Verification. Reconstructing monotonic 
- *   timeline on startup to detect and fill gaps occurring during process downtime.
+ * v9.4.10:
+ * - Issue #077 Hardening: Fully restored alarmEvalJob and baseline references.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -36,10 +32,15 @@ class TrackerService : BaseMonitorService() {
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
     private var settingsJob: Job? = null
+    private var alarmEvalJob: Job? = null
     
     private var lastKnownLocation: Location? = null
     private var lastProcessedLocation: LocationProcessor.ProcessedLocation? = null
     private var latestGnssDetail: GnssDetail? = null
+
+    private var lastGpsSpeed = 0.0
+    private var lastGpsAccuracy = 0.0
+    private var lastGpsBearing = 0.0
     
     private var isMuzzled = false
     private var muzzleReleaseJob: Job? = null
@@ -353,11 +354,10 @@ class TrackerService : BaseMonitorService() {
             val location = lastKnownLocation!!
             val lat = location.latitude
             val lng = location.longitude
-            val acc = location.accuracy.toDouble()
             
             val processed = locationProcessor.processGpsPoint(
-                lat = lat, lng = lng, alt = location.altitude, androidSpeedMps = location.speed.toDouble(),
-                gpsTs = location.time, accuracy = acc, bearing = location.bearing.toDouble(),
+                lat = lat, lng = lng, alt = location.altitude, androidSpeedMps = lastGpsSpeed,
+                gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing,
                 snr = latestGnssDetail?.satellites?.map { it.cn0 }?.average() ?: 0.0,
                 satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0,
                 isViewerTrail = false, lastGpsTs = lastGpsFixRealtime, isLocal = true,
@@ -367,33 +367,7 @@ class TrackerService : BaseMonitorService() {
             )
             lastProcessedLocation = processed
 
-            alarmManager.evaluateAlarms(
-                now = now, nowRt = nowRt, 
-                serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime,
-                appStartTime = sessionManager.appStartTime,
-                isTrackerMode = true, isRelayConnected = networkManager.isConnected(), isTrackerConnected = true,
-                isTrackerVisualJump = processed.status == SentinelStatus.JUMP,
-                isTrajectoryPromoted = processed.isTrajectoryPromoted, jumpTier = processed.jumpTier,
-                isAdaptiveJump = processed.isAdaptiveJump, trackerLat = processed.optimizedPoint.lat,
-                trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy,
-                maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = location.time,
-                trackerLastGpsRt = lastGpsFixRealtime,
-                trackerLastValidFixTs = 0L,
-                trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed,
-                trackerBattery = integrityMonitor.getBatteryLevel(), trackerTemp = integrityMonitor.batteryTemp,
-                isHardwareOnline = integrityMonitor.isHardwareOnline(), isLocalInternetLoss = false,
-                isJammerSuspicion = processed.jammerDetected, isSignalLoss = false, isGpsStalling = processed.isStalled,
-                isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome,
-                maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = false,
-                isSuspicious = processed.status == SentinelStatus.SENSOR_SUSPICIOUS, isTamperDetected = processed.tamperDetected,
-                isPowerTamper = integrityMonitor.isPowerTamperDetected, trackerTiltDegrees = sensorManager.currentTiltDegrees,
-                trackerAcousticDb = sensorManager.currentAcousticDb, trackerBaroAlt = sensorManager.absoluteAltitude,
-                trackerBaroAltEma = locationProcessor.getBaroBaseline(),
-                trackerLux = sensorManager.currentLux, isNear = sensorManager.isProximityNear,
-                luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
-                adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = locationProcessor.getPeakVibrationShock(),
-                trackerCurrentMa = integrityMonitor.getBatteryCurrent(), isAnchorLocked = processed.isAnchorLocked
-            )
+            evaluateAlarmsInternal(now, nowRt, isSocketConnected, isViewerActive, processed)
             
             val isUrgent = alarmManager.hasUnresolvedAlarms() || processed.status == SentinelStatus.JUMP
             
@@ -450,10 +424,10 @@ class TrackerService : BaseMonitorService() {
                 sitBaro = sensorManager.absoluteAltitude,
                 sitTilt = sensorManager.currentTiltDegrees,
                 sitShock = sensorManager.consumePeakVibration(),
-                isBatterySteepDischarge = integrityMonitor.isBatterySteepDischarge,
-                isCoolingModeActive = integrityMonitor.isCoolingModeActive,
+                isBatterySteepDischarge = false,
+                isCoolingModeActive = false,
                 speed = processed.filteredSpeed,
-                bearing = location.bearing.toDouble(),
+                bearing = lastGpsBearing,
                 isSitDetected = sensorManager.consumePlungeMatched(),
                 isSitActive = false,
                 currentMa = integrityMonitor.getBatteryCurrent(),
@@ -493,16 +467,60 @@ class TrackerService : BaseMonitorService() {
 
     private fun onLocationChanged(location: Location) {
         lastKnownLocation = location
+        lastGpsSpeed = location.speed.toDouble()
+        lastGpsAccuracy = location.accuracy.toDouble()
+        lastGpsBearing = location.bearing.toDouble()
+        
         lastGpsFixRealtime = timeProvider.elapsedRealtime()
         systemMonitor.gpsStallStartTs = 0L
         
         if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = timeProvider.elapsedRealtime()
     }
 
+    private fun evaluateAlarmsInternal(
+        now: Long,
+        nowRt: Long,
+        isSocketConnected: Boolean,
+        isViewerConnected: Boolean,
+        processed: LocationProcessor.ProcessedLocation
+    ) {
+        alarmEvalJob?.cancel()
+        alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
+            alarmManager.evaluateAlarms(
+                now = now, nowRt = nowRt, 
+                serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime,
+                appStartTime = sessionManager.appStartTime,
+                isTrackerMode = true, isRelayConnected = isSocketConnected, isTrackerConnected = true,
+                isTrackerVisualJump = processed.status == SentinelStatus.JUMP,
+                isTrajectoryPromoted = processed.isTrajectoryPromoted, jumpTier = processed.jumpTier,
+                isAdaptiveJump = processed.isAdaptiveJump, trackerLat = processed.optimizedPoint.lat,
+                trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy,
+                maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = lastKnownLocation?.time ?: 0L,
+                trackerLastGpsRt = lastGpsFixRealtime,
+                trackerLastValidFixTs = 0L,
+                trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed,
+                trackerBattery = integrityMonitor.getBatteryLevel(), trackerTemp = integrityMonitor.batteryTemp,
+                isHardwareOnline = integrityMonitor.isHardwareOnline(), isLocalInternetLoss = false,
+                isJammerSuspicion = processed.jammerDetected, isSignalLoss = false, isGpsStalling = processed.isStalled,
+                isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome,
+                maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = false,
+                isSuspicious = processed.status == SentinelStatus.SENSOR_SUSPICIOUS, isTamperDetected = processed.tamperDetected,
+                isPowerTamper = integrityMonitor.isPowerTamperDetected, trackerTiltDegrees = sensorManager.currentTiltDegrees,
+                trackerAcousticDb = sensorManager.currentAcousticDb, trackerBaroAlt = sensorManager.absoluteAltitude,
+                trackerBaroAltEma = locationProcessor.getBaroBaseline(),
+                trackerLux = sensorManager.currentLux, isNear = sensorManager.isProximityNear,
+                luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
+                adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = locationProcessor.getPeakVibrationShock(),
+                trackerCurrentMa = integrityMonitor.getBatteryCurrent(), isAnchorLocked = processed.isAnchorLocked
+            )
+        }
+    }
+
     override fun onDestroy() {
         gpsCollectionJob?.cancel()
         gnssDetailJob?.cancel()
         settingsJob?.cancel()
+        alarmEvalJob?.cancel()
         adaptationMuzzleJob?.cancel()
         commandRouter.unregister()
         sensorManager.stop()

@@ -38,6 +38,7 @@ interface SystemStatusProvider {
     suspend fun isExactAlarmGranted(): Boolean
     suspend fun isPostNotificationsGranted(): Boolean
     suspend fun isBackgroundLocationGranted(): Boolean
+    suspend fun isActivityRecognitionGranted(): Boolean
     fun isLocalOnline(): Boolean
     suspend fun isXiaomiSpecialPermissionGranted(): XiaomiPermissionStatus
     fun isA15Hardware(): Boolean
@@ -82,6 +83,7 @@ class SystemStatusProviderImpl @Inject constructor(
     override suspend fun isExactAlarmGranted(): Boolean = getPermissionState().isExactAlarmGranted
     override suspend fun isPostNotificationsGranted(): Boolean = getPermissionState().isPostNotificationsGranted
     override suspend fun isBackgroundLocationGranted(): Boolean = getPermissionState().isBackgroundLocationGranted
+    override suspend fun isActivityRecognitionGranted(): Boolean = getPermissionState().isActivityRecognitionGranted
     override fun isA15Hardware(): Boolean = isA15
 
     override fun isLocalOnline(): Boolean {
@@ -116,6 +118,7 @@ class SystemStatusProviderImpl @Inject constructor(
                         isExactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true,
                         isPostNotificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true,
                         isBackgroundLocationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true,
+                        isActivityRecognitionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true,
                         xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN,
                         xiaomiAutostartStatus = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
                     )
