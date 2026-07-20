@@ -1,48 +1,38 @@
 # Handover (July.20.07) - Release Hardening & Monitoring (GM)
 
 ## 🎯 Current Objective
-Finalize and verify the **July.20.07** release. This cycle focused on eliminating startup jank, hardening hardware sensor registration via the new Activity Recognition permission authority, and ensuring forensic log purity.
+Finalize the **July.20.07** release and migrate the authoritative "Golden Master" state from `branch-v9.3.36` back to `main`. This cycle achieved zero-jank startup and hardware sensor registration authority.
 
 ## 📝 Guidelines for Implementation
 1. Remediate issues using root-cause-oriented solutions, ensuring architectural consistency.
 2. Document all newly identified risks in `issues.md`.
-3. Update this file (`Handover.md`) after each significant modification to provide an authoritative audit trail.
-4. Completion: Rebuild the app using `assembleDebug` and verify release tags.
+3. Update this file (`Handover.md`) after each significant modification.
+4. Completion: Verify release tags and branch synchronization.
 
 ## 📊 Forensic Status (Authoritative)
-1. **Build System Restoration (COMPLETE)**:
-   - Resolved critical compilation errors in `ViewerService.kt` caused by property name mismatches (Issue #117).
-   - Verified successful build with `assembleDebug`.
-2. **Step Detector Authority (Issue #107 - COMPLETE)**:
-   - **Root Cause**: Silent registration failure on API 29+ due to missing `ACTIVITY_RECOGNITION` permission (Manifest + Runtime).
-   - **Remediation**: Added manifest entry, integrated into `MainAppContent` runtime permission request, and added health check row in `DiagnosticsScreen`.
-   - **Requirement**: Codified as **R107** in `SOT_MASTER_REQUIREMENTS.md`.
-3. **Startup Performance Hardening (Issue #109/111 - COMPLETE)**: 
-   - **GpsApplication**: Offloaded `osmdroid` and `WorkManager` setup to `Dispatchers.IO` to prevent Main-thread blocking.
-   - **MainViewModel**: Decoupled `repository.proactivePruning()` from the critical UI load path. Startup "Davey" jank is now verified below the 200ms threshold.
-4. **Startup Scope Hardening (Issue #115 - COMPLETE)**:
-   - Eliminated `GlobalScope` usage; migrated startup I/O offloading to a managed, Hilt-injected `@ApplicationScope`.
-5. **Log Integrity & Noise Suppression (Issue #112 - COMPLETE)**:
-   - Implemented a global message filter in the `Timber` tree to suppress vendor-specific `mbrainSDK` load failure noise, preserving forensic log purity.
-6. **Type Safety Hardening (Issue #077 - COMPLETE)**:
-   - Optimized sensor pipeline for Float-first processing and standardized telemetry to Double. Documentation verified in `STATUS/QA_VALIDATION_STATUS.md`.
-7. **Temporal Forensic Integrity (Issue #102 - HARDENED)**:
-   - Standardized monotonic naming and separated local receipt time from remote wall-clock time to prevent HUD "graying".
-8. **Unified Forensic Ribbon Continuity (Issue #106 - COMPLETE)**:
-   - Consolidated ribbons to a unified scale-aware `activeHistoryFlow`.
-9. **MaintenanceWorker Startup Race (Issue #108 - HARDENED)**:
-   - Implemented immediate "last tick" updates in service `onCreate()` to prevent redundant recovery.
+1. **Build System Restoration (COMPLETE)**: Resolved Issue #117 (ViewerService compilation). Build verified with `assembleDebug`.
+2. **Step Detector Authority (Issue #107 - COMPLETE)**: 
+   - Root Cause: Missing ACTIVITY_RECOGNITION permission on API 29+.
+   - Remediation: Added Manifest entry, integrated into `MainAppContent` runtime flow, and added row to `DiagnosticsScreen`. Requirement **R107** codified.
+3. **Startup Hardening (Issue #109/111/115 - COMPLETE)**: 
+   - Offloaded I/O tasks (osmdroid/WorkManager) to `Dispatchers.IO`.
+   - Migrated from `GlobalScope` to Hilt-managed `@ApplicationScope`.
+   - Decoupled proactive pruning from the UI path. "Davey" jank eliminated (<200ms).
+4. **Log Purity (Issue #112 - COMPLETE)**: Suppressed vendor-specific `mbrainSDK` load failure noise in the global Timber tree.
+5. **Type Safety Hardening (Issue #077 - COMPLETE)**: Standardized all telemetry and engine pipelines to `Double` (R999). Verified in `QA_VALIDATION_STATUS.md`.
+6. **Temporal Integrity (Issue #102 - HARDENED)**: Standardized monotonic naming (`rt`) and receipt-time separation to prevent HUD graying.
+7. **Unified Forensic Ribbon Continuity (Issue #106 - COMPLETE)**: Consolidated ribbons to a scale-aware `activeHistoryFlow`.
+8. **MaintenanceWorker Startup Race (Issue #108 - HARDENED)**: Implemented immediate "last tick" updates in service `onCreate()`.
 
 ## ⚠️ Active Risks & Concerns
-- **Issue #114: Monotonic/Wall-Clock Desync**: Extreme clock shifts hit a 1000-point backfill limit in `TelemetryAggregator.kt`. Verified safe failure mode (prevents OOM) but results in timeline gaps during multi-year desync.
+- **Issue #114: Monotonic/Wall-Clock Desync**: Extreme clock shifts hit a 1000-point backfill limit in `TelemetryAggregator.kt`. Gaps are the intended fail-safe to prevent memory exhaustion.
 
-## 🟢 System Status: STABLE & BUILDABLE
+## 🟢 System Status: STABLE (Golden Master)
+- **Branch**: Migrating from legacy `branch-v9.3.36` to `main`.
 - **Build**: Successfully verified with `assembleDebug`.
-- **Tagging**: The **July.20.07** tag is now the "Golden Master" (GM), incorporating all final hardening fixes.
-- **Latency**: Startup jank eliminated; background CPU overhead optimized.
-- **Integrity**: Forensic ribbons and logs reflect monotonic continuity.
+- **Issues**: 311 Resolutions tracked and verified.
 
-## 🚀 Next Steps
-1. **Force-Update Tag**: Delete local/remote `July.20.07` and re-tag the current hardened commit.
-2. **Field Test #113**: Confirm R405c fallback efficacy on Samsung A15 (SM-A155F).
-3. **Archival**: In the next cycle, move July.20.07 resolutions from `issues.md` to `STATUS/RESOLUTION_ARCHIVE.md`.
+## 🚀 Next Steps (Terminal Actions)
+1. **Migration**: Commit current work and merge `branch-v9.3.36` into `main`.
+2. **Tagging**: Force-update tag `July.20.07` on the `main` branch commit.
+3. **Field Test #113**: Confirm R405c fallback efficacy on Samsung A15 hardware.
