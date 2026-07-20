@@ -19,9 +19,9 @@ import javax.inject.Singleton
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
- * v9.3.23:
- * - Robust Aliasing: Fixed peer ID extraction. Trackers now correctly pass 
- *   'viewer_id' to the pulse listener instead of their own 'id'.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized all monotonic 
+ *   timestamps to use 'Rt' suffix (e.g., 'nowRt', 'trackerLastValidFixRt').
  */
 @Singleton
 class RemoteHandler @Inject constructor(
@@ -54,7 +54,7 @@ class RemoteHandler @Inject constructor(
     var trackerAccuracy = 0.0
     var trackerMaxAccuracy = 0.0
     var trackerLastGpsTs = 0L
-    var trackerLastValidFixRealtime = 0L 
+    var trackerLastValidFixRt = 0L 
     var trackerBattery = 0
     var trackerTemp = 0.0
     var trackerMaxTemp = 0.0
@@ -182,7 +182,7 @@ class RemoteHandler @Inject constructor(
                     isTrackerAnchorLocked = s.isAnchorLocked
                     trackerState = s.trackerState
                     
-                    trackerLastValidFixRealtime = s.lastValidFixRealtime
+                    trackerLastValidFixRt = s.lastValidFixRt
 
                     repository.updateLocation(LocationUpdate(
                         lat = trackerLat, lng = trackerLng, speed = trackerSpeed, accuracy = trackerAccuracy, bearing = trackerBearing,
@@ -209,7 +209,7 @@ class RemoteHandler @Inject constructor(
                         violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage,
                         isLocationPending = isTrackerLocationPending,
                         locationPendingReason = trackerLocationPendingReason,
-                        lastValidFixRealtime = trackerLastValidFixRealtime,
+                        lastValidFixRt = trackerLastValidFixRt,
                         isPowerSaveMode = isTrackerPowerSaveMode,
                         standbyBucket = trackerStandbyBucket,
                         netInterface = trackerNetInterface,
@@ -263,7 +263,7 @@ class RemoteHandler @Inject constructor(
         trackerTotalConnectedMs = 0L; trackerSessionConnectedMs = 0L
         trackerLastConnTs = 0L; trackerLastDiscTs = 0L
         trackerGpsStallStartTs = 0L
-        trackerLastValidFixRealtime = 0L
+        trackerLastValidFixRt = 0L
         isTrackerClockRegression = false
         isTrackerLocationPending = false
         trackerLocationPendingReason = LocationPendingReason.NONE
@@ -288,9 +288,9 @@ class RemoteHandler @Inject constructor(
 
     fun handleRemoteLog(entry: LogEntry) {
         val now = timeProvider.currentTimeMillis()
-        val nowRealtime = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime()
         
-        lastPeerActivityTs = nowRealtime
+        lastPeerActivityTs = nowRt
         repository.updateRemoteActivity(now)
 
         if (entry.message.contains("Sit Detected", ignoreCase = true)) {
@@ -306,7 +306,7 @@ class RemoteHandler @Inject constructor(
         val fromViewer = data.optBoolean("from_viewer", false) 
         val type = data.optString("type", "")
         val now = timeProvider.currentTimeMillis()
-        val nowRealtime = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime()
 
         // R182: Correct peer ID determination based on mode.
         val peerId = if (isTrackerMode) {
@@ -329,7 +329,7 @@ class RemoteHandler @Inject constructor(
             }
 
             listener?.onPeerPulse(peerId)
-            lastPeerActivityTs = nowRealtime
+            lastPeerActivityTs = nowRt
             repository.updateRemoteActivity(now)
             return
         }
@@ -348,7 +348,7 @@ class RemoteHandler @Inject constructor(
                     
                     repository.saveHomePoints(newList, if (maxDist > 0) maxDist else null, if (ts > 0) ts else null)
                     listener?.onPeerPulse(peerId)
-                    lastPeerActivityTs = nowRealtime
+                    lastPeerActivityTs = nowRt
                     repository.updateRemoteActivity(now)
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
@@ -361,11 +361,11 @@ class RemoteHandler @Inject constructor(
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
             if (isTrackerMode && fromViewer) {
                 listener?.onPeerPulse(peerId)
-                lastPeerActivityTs = nowRealtime
+                lastPeerActivityTs = nowRt
                 repository.updateRemoteActivity(now)
             } else if (!isTrackerMode && !fromViewer) {
                 listener?.onPeerPulse(peerId)
-                lastPeerActivityTs = nowRealtime
+                lastPeerActivityTs = nowRt
                 isTrackerConnected = true
                 repository.updateRemoteActivity(now)
             }
@@ -374,7 +374,7 @@ class RemoteHandler @Inject constructor(
 
         if (isTrackerMode && fromViewer) {
             listener?.onPeerPulse(peerId)
-            lastPeerActivityTs = nowRealtime
+            lastPeerActivityTs = nowRt
             repository.updateRemoteActivity(now)
             return
         }
@@ -387,7 +387,7 @@ class RemoteHandler @Inject constructor(
             if (remoteTs > 0) lastRemotePacketTs = remoteTs
 
             listener?.onPeerPulse(peerId)
-            lastPeerActivityTs = nowRealtime
+            lastPeerActivityTs = nowRt
             isTrackerConnected = true
             repository.updateRemoteActivity(now)
             
@@ -411,7 +411,7 @@ class RemoteHandler @Inject constructor(
             val reasonStr = data.optString("location_pending_reason", "NONE")
             trackerLocationPendingReason = try { LocationPendingReason.valueOf(reasonStr) } catch(e: Exception) { LocationPendingReason.NONE }
 
-            trackerLastValidFixRealtime = data.optLong("last_valid_fix_realtime", trackerLastValidFixRealtime)
+            trackerLastValidFixRt = data.optLong("last_valid_fix_rt", trackerLastValidFixRt)
             trackerSnrIdx = data.optDouble("snr_idx", trackerSnrIdx)
             trackerTiltIdx = data.optDouble("tilt_idx", trackerTiltIdx)
             trackerBaroIdx = data.optDouble("baro_idx", trackerBaroIdx)
@@ -493,7 +493,7 @@ class RemoteHandler @Inject constructor(
                     providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending,
                     isSuspicious = isTrackerSuspicious,
                     nowWall = now,
-                    nowRealtime = nowRealtime
+                    nowRt = nowRt
                 )
 
                 isTrackerClockRegression = processed.isClockRegression
@@ -503,7 +503,7 @@ class RemoteHandler @Inject constructor(
                     trackerLng = processed.optimizedPoint.lng
                     trackerLastGpsTs = processed.optimizedPoint.ts
                     lastPeerGpsTs = trackerLastGpsTs
-                    if (!processed.isStalled) trackerLastValidFixRealtime = nowRealtime
+                    if (!processed.isStalled) trackerLastValidFixRt = nowRt
                 }
                 
                 trackerSpeed = processed.filteredSpeed
@@ -577,7 +577,7 @@ class RemoteHandler @Inject constructor(
                 isSirenActive = false,
                 isWarming = false,
                 manualAdaptiveFloor = trackerAdaptiveVibrationFloor,
-                nowRealtime = nowRealtime,
+                nowRt = nowRt,
                 nowWall = now
             )
 
@@ -594,7 +594,7 @@ class RemoteHandler @Inject constructor(
             val violationPercentage = data.optDouble("violation_percentage", 0.0)
 
             val isStalled = data.optBoolean("is_stalled", false)
-            if (isStalled && trackerGpsStallStartTs == 0L) trackerGpsStallStartTs = nowRealtime
+            if (isStalled && trackerGpsStallStartTs == 0L) trackerGpsStallStartTs = nowRt
             else if (!isStalled) trackerGpsStallStartTs = 0L
 
             scope?.launch {
@@ -635,7 +635,7 @@ class RemoteHandler @Inject constructor(
                         isClockRegression = isTrackerClockRegression,
                         isLocationPending = isTrackerLocationPending,
                         locationPendingReason = trackerLocationPendingReason,
-                        lastValidFixRealtime = trackerLastValidFixRealtime,
+                        lastValidFixRt = trackerLastValidFixRt,
                         isPowerSaveMode = isTrackerPowerSaveMode,
                         standbyBucket = trackerStandbyBucket,
                         netInterface = trackerNetInterface,
@@ -654,7 +654,7 @@ class RemoteHandler @Inject constructor(
                     
                     repository.saveTrackerState(TrackerStatus(
                         lat = trackerLat, lng = trackerLng, speed = trackerSpeed, bearing = trackerBearing, accuracy = trackerAccuracy,
-                        gpsTs = trackerLastGpsTs, ts = now, battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp,
+                        gpsTs = trackerLastGpsTs, ts = now, rt = nowRt, battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp,
                         isCharging = isTrackerCharging, currentMa = trackerCurrentMa, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
                         lastConnTs = trackerLastConnTs, lastDiscTs = trackerLastDiscTs, uptimeMs = trackerUptimeMs,
                         totalConnectedMs = trackerTotalConnectedMs,
@@ -674,7 +674,7 @@ class RemoteHandler @Inject constructor(
                         isTrajectoryPromoted = isTrackerTrajectoryPromoted, jumpTier = trackerJumpTier,
                         isLocationPending = isTrackerLocationPending,
                         locationPendingReason = trackerLocationPendingReason,
-                        lastValidFixRealtime = trackerLastValidFixRealtime,
+                        lastValidFixRt = trackerLastValidFixRt,
                         isPowerSaveMode = isTrackerPowerSaveMode,
                         standbyBucket = trackerStandbyBucket,
                         netInterface = trackerNetInterface,

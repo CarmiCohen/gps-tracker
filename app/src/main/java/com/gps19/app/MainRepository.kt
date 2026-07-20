@@ -18,9 +18,8 @@ import kotlin.math.abs
 
 /**
  * MainRepository: Centralized data hub for the application.
- * v9.3.50:
- * - ANR Hardening (#092): Offloaded trail and violation flow mapping to 
- *   Dispatchers.Default to ensure Landing Page responsiveness.
+ * v9.4.01:
+ * - Issue #103: Added CLOCK_DRIFT_REF_KEY for forensic integrity.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -101,6 +100,7 @@ class MainRepository @Inject constructor(
         const val LAST_HISTORY_SIT_TS_KEY = SettingsRepository.LAST_HISTORY_SIT_TS_KEY
         
         const val IDENTITY_SANITIZED_KEY = SettingsRepository.IDENTITY_SANITIZED_KEY
+        const val CLOCK_DRIFT_REF_KEY = SettingsRepository.CLOCK_DRIFT_REF_KEY
     }
 
     val isRelayConnected = telemetry.isRelayConnected
@@ -209,7 +209,7 @@ class MainRepository @Inject constructor(
 
     suspend fun loadAlertSettings() = settings.loadAlertSettings()
     suspend fun saveAlertSettings(s: AlertSettings) = settings.saveAlertSettings(s)
-    suspend fun saveDraftAlertSettings(s: AlertSettings) = settings.saveDraftAlertSettings(s)
+    suspend fun saveDraftAlertSettings(s: AlertSettings) = settings.saveAlertSettings(s)
     suspend fun loadDraftAlertSettings() = settings.loadDraftAlertSettings()
     fun clearDraftSettings() { scope.launch { settings.clearDraftSettings() } }
     

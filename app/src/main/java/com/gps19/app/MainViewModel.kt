@@ -20,12 +20,9 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * July.19.01:
- * - Issue #099: ANR Hardening. Staggered initialization and lazy permission 
- *   checks to prevent cold-start frame skipping on Samsung A15.
- * v9.3.55:
- * - ANR Hardening (#096): Offloaded loadInitialData to Dispatchers.IO to prevent 
- *   Room migrations from blocking the Main thread on startup.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
+ *   parameter naming to 'nowRt'.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -57,8 +54,8 @@ class MainViewModel @Inject constructor(
     private val _systemPulse = MutableStateFlow(timeProvider.currentTimeMillis())
     val systemPulse: StateFlow<Long> = _systemPulse.asStateFlow()
 
-    private val _systemPulseRealtime = MutableStateFlow(timeProvider.elapsedRealtime())
-    val systemPulseRealtime: StateFlow<Long> = _systemPulseRealtime.asStateFlow()
+    private val _systemPulseRt = MutableStateFlow(timeProvider.elapsedRealtime())
+    val systemPulseRt: StateFlow<Long> = _systemPulseRt.asStateFlow()
 
     private val _rtt = MutableStateFlow(0)
     val rtt: StateFlow<Int> = _rtt.asStateFlow()
@@ -129,7 +126,7 @@ class MainViewModel @Inject constructor(
     private var autoSaveJob: Job? = null
     private var lastKnownAlarmTypes: Set<String> = emptySet()
 
-    private var lastAlarmAckRealtime: Long = 0L
+    private var lastAlarmAckRt: Long = 0L
     private var isHeavyObservationStarted = false
 
     private val INITIAL_RENDER_DELAY_MS = 500L
@@ -367,6 +364,7 @@ class MainViewModel @Inject constructor(
                 if (result.trackerIdChanged) addPersistentLog("user", "USER ACTION: Tracker ID changed", true)
                 if (result.viewerIdChanged) addPersistentLog("user", "USER ACTION: Viewer ID changed", true)
                 if (result.relayUrlChanged) addPersistentLog("user", "USER ACTION: Relay URL changed", true)
+                if (result.relayUrlChanged) addPersistentLog("user", "USER ACTION: Relay URL changed", true)
                 if (result.maxDistanceChanged) addPersistentLog("user", "USER ACTION: Geofence distance updated", true)
                 if (result.trackerIdChanged || result.viewerIdChanged) {
                     repository.resetStats(); repository.sendCommand(UiCommand.StatsReset)
@@ -387,14 +385,14 @@ class MainViewModel @Inject constructor(
 
     private fun handleAlarmEvent(event: UiEvent) {
         viewModelScope.launch(uiExceptionHandler) {
-            val nowRealtime = timeProvider.elapsedRealtime()
+            val nowRt = timeProvider.elapsedRealtime()
             val nowWall = when (event) {
                 is UiEvent.DismissAlarms -> alertUseCase.dismissAlarms()
                 is UiEvent.StopSiren -> alertUseCase.stopSiren(event.causes)
                 else -> 0L
             }
             if (nowWall > 0) {
-                lastAlarmAckRealtime = nowRealtime
+                lastAlarmAckRt = nowRt
                 updateState { it.copy(isAlarmSilenced = true, lastAlarmAckTs = nowWall) }
                 _redScreenVisible.value = false
             }
@@ -473,16 +471,16 @@ class MainViewModel @Inject constructor(
                 val stateSnapshot = _uiState.value
                 if (stateSnapshot.isInitialized && stateSnapshot.appMode != null) {
                     val now = timeProvider.currentTimeMillis()
-                    val nowRealtime = timeProvider.elapsedRealtime()
+                    val nowRt = timeProvider.elapsedRealtime()
                     _systemPulse.value = now
-                    _systemPulseRealtime.value = nowRealtime
+                    _systemPulseRt.value = nowRt
                     updateState { state -> state.copy(isSirenPlaying = AudioSynthesizer.isPlaying()) }
                     
                     repository.sendCommand(UiCommand.SyncRequest)
                     withContext(Dispatchers.Default) {
                         val currentState = _uiState.value
                         val newState = behaviorUseCase.computeTrackerState(currentState, now)
-                        val shouldShowRed = behaviorUseCase.shouldShowRedScreen(currentState, nowRealtime, lastAlarmAckRealtime, _redScreenVisible.value)
+                        val shouldShowRed = behaviorUseCase.shouldShowRedScreen(currentState, nowRt, lastAlarmAckRt, _redScreenVisible.value)
                         
                         withContext(Dispatchers.Main) {
                             if (newState != _trackerState.value && newState != TrackerState.UNKNOWN) {

@@ -4,14 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Added monotonic 'rt' (realtime) 
+ *   timestamps to Geo and Connection points to ensure logic immunity to clock drifts.
  * v9.3.16:
  * - Requirement R999b: Added trackerBaroAltEma to AlarmEvaluationState to support 
  *   synchronized barometer violation detection.
- * v9.2.2:
- * - Issue #326: Added GPS_GAP to LocationPendingReason for environmental signal loss.
- * v9.2.1:
- * - Issue #018: Added alt to EngineGeoPoint to support altitude preservation 
- *   during anchor clamping.
  */
 
 @Serializable
@@ -19,7 +17,8 @@ data class EngineGeoPoint(
     val lat: Double, 
     val lng: Double, 
     val alt: Double = 0.0,
-    val ts: Long = 0L,
+    val ts: Long = 0L, // Wall-clock for forensics
+    val rt: Long = 0L, // Monotonic for engine logic
     val accuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0
 )
@@ -65,7 +64,8 @@ enum class LocationPendingReason {
  */
 @Serializable
 data class EngineConnectionPoint(
-    val ts: Long,
+    val ts: Long, // Wall-clock
+    val rt: Long = 0L, // Monotonic (Issue #102)
     val rtt: Int,
     val remoteSig: Int,
     val isConnected: Boolean,
@@ -113,9 +113,10 @@ enum class RibbonScale(val key: String, val intervalSeconds: Int) {
 /**
  * Sensor and SNR snapshots for gap filling.
  */
-data class EngineSnrSample(val ts: Long, val snr: Double)
+data class EngineSnrSample(val ts: Long, val rt: Long = 0L, val snr: Double)
 data class EngineSensorSnapshot(
     val ts: Long,
+    val rt: Long = 0L,
     val acoustic: Double,
     val lux: Double,
     val vibe: Double,
@@ -168,7 +169,8 @@ data class RejectedPoint(
     val accuracy: Double,
     val bearing: Double,
     val speedMps: Double,
-    val ts: Long
+    val ts: Long,
+    val rt: Long = 0L
 )
 
 /**
@@ -179,7 +181,8 @@ interface SpatialAnchor {
     val lng: Double
     val alt: Double
     val gpsTs: Long
-    val ts: Long
+    val ts: Long // Wall-clock
+    val rt: Long // Monotonic
 }
 
 @Serializable
@@ -196,8 +199,10 @@ data class ViolationReport(
 data class SystemHealthReport(val reports: List<ViolationReport>)
 
 data class AlarmEvaluationState(
-    val now: Long, 
+    val now: Long, // Wall-clock for server sync
+    val nowRt: Long, // Monotonic for alarm logic (Issue #102)
     val serviceStartTime: Long, 
+    val serviceStartRt: Long, // Monotonic
     val lastAlarmAckTs: Long, 
     val appStartTime: Long,
     val isRelayConnected: Boolean, 
@@ -214,7 +219,9 @@ data class AlarmEvaluationState(
     val trackerGpsAccuracy: Double,
     val maxTrackerAccuracy: Double,
     val lastGpsPacketTs: Long,
+    val lastGpsPacketRt: Long = 0L,
     val trackerLastValidFixTs: Long = 0L, 
+    val trackerLastValidFixRt: Long = 0L,
     val trackerSpeed: Double = 0.0,
     val isTrackerVisualJump: Boolean = false,
     val isTrajectoryPromoted: Boolean = false,
@@ -225,6 +232,7 @@ data class AlarmEvaluationState(
     var wasDistanceViolated: Boolean, 
     var distanceViolationCounter: Int, 
     var firstViolationTs: Long, 
+    var firstViolationRt: Long = 0L,
     var firstViolationWasJump: Boolean,
     val homePoints: List<EngineGeoPoint> = emptyList(),
     val maxDistance: Double = 60.0,

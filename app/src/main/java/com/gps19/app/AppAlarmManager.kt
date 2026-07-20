@@ -13,10 +13,9 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * v9.3.16:
- * - Requirement R999b: Propagated trackerBaroAltEma to AlarmEvaluationState.
- * v9.3.3:
- * - Issue #058: Hilt Migration. Added @Inject constructor and listener interface.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Propagated monotonic 'rt' timestamps 
+ *   to AlarmEvaluationState for skew-immune alarm evaluation.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -47,6 +46,7 @@ class AppAlarmManager @Inject constructor(
     private var currentSettings = AlertSettings()
 
     private var firstViolationTs: Long = 0L
+    private var firstViolationRt: Long = 0L // Monotonic
     private var firstViolationWasJump: Boolean = false
     private var distanceViolationCounter: Int = 0
     private var wasDistanceViolated: Boolean = false
@@ -100,7 +100,9 @@ class AppAlarmManager @Inject constructor(
 
     fun evaluateAlarms(
         now: Long,
+        nowRt: Long, // Monotonic
         serviceStartTs: Long,
+        serviceStartRt: Long, // Monotonic
         appStartTime: Long,
         isTrackerMode: Boolean,
         isRelayConnected: Boolean,
@@ -114,7 +116,9 @@ class AppAlarmManager @Inject constructor(
         trackerAccuracy: Double,
         maxTrackerAccuracy: Double,
         trackerLastGpsTs: Long,
+        trackerLastGpsRt: Long = 0L,
         trackerLastValidFixTs: Long = 0L,
+        trackerLastValidFixRt: Long = 0L,
         trackerSpeed: Double,
         trackerBattery: Int,
         trackerTemp: Double,
@@ -165,14 +169,16 @@ class AppAlarmManager @Inject constructor(
         val lastAlarmAckTs = repository.getLastAlarmAckTsSync()
         val evaluationState = AlarmEvaluationState(
             now = now,
+            nowRt = nowRt,
             serviceStartTime = serviceStartTs,
+            serviceStartRt = serviceStartRt,
             lastAlarmAckTs = lastAlarmAckTs,
             appStartTime = appStartTime,
             isRelayConnected = isRelayConnected,
             isTrackerConnected = isTrackerConnected,
             discoveryPhase = discoveryPhase ?: when {
-                now - serviceStartTs < BOOTSTRAP_PHASE_MS -> DiscoveryPhase.BOOTSTRAP
-                now - serviceStartTs < BOOTSTRAP_PHASE_MS + DISCOVERY_PHASE_MS -> DiscoveryPhase.DISCOVERING
+                nowRt - serviceStartRt < BOOTSTRAP_PHASE_MS -> DiscoveryPhase.BOOTSTRAP
+                nowRt - serviceStartRt < BOOTSTRAP_PHASE_MS + DISCOVERY_PHASE_MS -> DiscoveryPhase.DISCOVERING
                 else -> DiscoveryPhase.MONITORING
             },
             isHardwareOnline = isHardwareOnline,
@@ -188,7 +194,9 @@ class AppAlarmManager @Inject constructor(
             trackerGpsAccuracy = trackerAccuracy,
             maxTrackerAccuracy = maxTrackerAccuracy,
             lastGpsPacketTs = trackerLastGpsTs,
+            lastGpsPacketRt = trackerLastGpsRt,
             trackerLastValidFixTs = trackerLastValidFixTs,
+            trackerLastValidFixRt = trackerLastValidFixRt,
             trackerSpeed = trackerSpeed,
             isTrackerVisualJump = isTrackerVisualJump,
             isTrajectoryPromoted = isTrajectoryPromoted,
@@ -199,6 +207,7 @@ class AppAlarmManager @Inject constructor(
             wasDistanceViolated = wasDistanceViolated,
             distanceViolationCounter = distanceViolationCounter,
             firstViolationTs = firstViolationTs,
+            firstViolationRt = firstViolationRt,
             firstViolationWasJump = firstViolationWasJump,
             distToHomeAuthority = distToHomeAuthority,
             isGpsGap = isGpsGap,
@@ -239,6 +248,7 @@ class AppAlarmManager @Inject constructor(
         wasDistanceViolated = evaluationState.wasDistanceViolated
         distanceViolationCounter = evaluationState.distanceViolationCounter
         firstViolationTs = evaluationState.firstViolationTs
+        firstViolationRt = evaluationState.firstViolationRt
         firstViolationWasJump = evaluationState.firstViolationWasJump
 
         val newAlarms = mutableMapOf<String, AlarmEvaluation>()
@@ -254,34 +264,37 @@ class AppAlarmManager @Inject constructor(
             
             if (violation.conditionMet && enabled) {
                 if (!eval.isTriggered || eval.isResolved) {
-                    val canTrigger = (now - lastGlobalTriggerTs) >= ALERT_TRIGGER_GRACE_PERIOD_MS
+                    val canTrigger = (nowRt - lastGlobalTriggerTs) >= ALERT_TRIGGER_GRACE_PERIOD_MS
                     if (canTrigger) {
                         eval.isTriggered = true
                         eval.firstTriggerTs = now
+                        eval.firstTriggerRt = nowRt
                         eval.isResolved = false
                         triggerOccurredInThisCycle = true
                         listener?.onLogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
                         
-                        if (now - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) {
+                        if (nowRt - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) {
                             lastSirenStopTs = 0L 
                         }
                     }
                 }
                 eval.lastLogTs = now
+                eval.lastLogRt = nowRt
                 eval.title = violation.title
                 eval.subtitle = violation.subtitle
                 newAlarms[type] = eval
             } else if (eval.isTriggered) {
                 if (!eval.isResolved) {
                     eval.isResolved = true
-                    listener?.onLogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, now - eval.firstTriggerTs, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
+                    val durationMs = if (eval.firstTriggerRt > 0) nowRt - eval.firstTriggerRt else now - eval.firstTriggerTs
+                    listener?.onLogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, durationMs, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
                 }
                 newAlarms[type] = eval
             }
         }
 
         if (triggerOccurredInThisCycle) {
-            lastGlobalTriggerTs = now
+            lastGlobalTriggerTs = nowRt
         }
 
         synchronized(activeAlarms) {
@@ -368,6 +381,7 @@ class AppAlarmManager @Inject constructor(
         wasDistanceViolated = false
         distanceViolationCounter = 0
         firstViolationTs = 0L
+        firstViolationRt = 0L
         lastSirenStopTs = 0L
         lastGlobalTriggerTs = 0L
     }
@@ -378,7 +392,9 @@ class AppAlarmManager @Inject constructor(
         var subtitle: String = "",
         var isTriggered: Boolean = false,
         var firstTriggerTs: Long = 0L,
+        var firstTriggerRt: Long = 0L,
         var lastLogTs: Long = 0L,
+        var lastLogRt: Long = 0L,
         var isResolved: Boolean = true
     )
 }

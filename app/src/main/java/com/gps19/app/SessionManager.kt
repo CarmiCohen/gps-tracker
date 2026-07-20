@@ -7,11 +7,9 @@ import javax.inject.Singleton
 
 /**
  * SessionManager: Tracks session-level state and uptime metrics.
- * v9.3.18:
- * - R404: Legacy Relay URL Fallback Remediation. Centralized config authority.
- * v9.3.17:
- * - R403: Heartbeat Alignment. Replaced hardcoded 1000L increment with 
- *   TICK_INTERVAL_MS to ensure consistent uptime accounting.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
+ *   parameter naming to 'nowRt'.
  */
 @Singleton
 class SessionManager @Inject constructor(
@@ -32,8 +30,8 @@ class SessionManager @Inject constructor(
     private val viewerPulseMap = mutableMapOf<String, Long>()
     private val trackerPulseMap = mutableMapOf<String, Long>()
 
-    fun updateTick(nowRealtime: Long, lastTickTs: Long, isPeerAvailable: Boolean, isInViolation: Boolean) {
-        val delta = nowRealtime - lastTickTs
+    fun updateTick(nowRt: Long, lastTickTs: Long, isPeerAvailable: Boolean, isInViolation: Boolean) {
+        val delta = nowRt - lastTickTs
         // R403: Use dynamic delta but fallback to standardized heartbeat constant
         val increment = if (lastTickTs > 0 && delta in 0L..3600000L) delta else TICK_INTERVAL_MS
         
@@ -43,12 +41,12 @@ class SessionManager @Inject constructor(
         }
 
         if (!isPeerAvailable && currentDropStartTs == 0L) {
-            currentDropStartTs = nowRealtime
+            currentDropStartTs = nowRt
         } else if (isPeerAvailable && currentDropStartTs > 0L) {
             currentDropStartTs = 0L
         }
         
-        cleanupOldPulses(nowRealtime)
+        cleanupOldPulses(nowRt)
     }
 
     fun notifyTamperCleared() {
@@ -75,14 +73,14 @@ class SessionManager @Inject constructor(
         return (violationUptimeMs.toDouble() / totalUptimeMs.toDouble()) * 100.0
     }
 
-    private fun cleanupOldPulses(nowRealtime: Long) {
+    private fun cleanupOldPulses(nowRt: Long) {
         val itV = viewerPulseMap.entries.iterator()
         while (itV.hasNext()) {
-            if (nowRealtime - itV.next().value > WATCH_TIMEOUT_MS) itV.remove()
+            if (nowRt - itV.next().value > WATCH_TIMEOUT_MS) itV.remove()
         }
         val itT = trackerPulseMap.entries.iterator()
         while (itT.hasNext()) {
-            if (nowRealtime - itT.next().value > WATCH_TIMEOUT_MS) itT.remove()
+            if (nowRt - itT.next().value > WATCH_TIMEOUT_MS) itT.remove()
         }
     }
 

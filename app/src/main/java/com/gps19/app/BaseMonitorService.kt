@@ -17,9 +17,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * v9.3.30:
- * - ANR Hardening (#092): Bounded runBlocking in onDestroy with strict 1s timeout 
- *   to prevent service termination from hanging the system.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Added serviceStartWall to provide 
+ *   a stable wall-clock reference alongside monotonic serviceStartRealtime.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -51,9 +51,10 @@ abstract class BaseMonitorService : LifecycleService() {
     
     protected val cachedPkgName by lazy { packageName }
 
-    protected var serviceStartRealtime = 0L
-    protected var lastServiceTickTs = 0L
-    protected var lastServiceTickRealtime = 0L
+    protected var serviceStartRealtime = 0L // Monotonic
+    protected var serviceStartWall = 0L // Wall-clock (Issue #102)
+    protected var lastServiceTickTs = 0L // Wall-clock
+    protected var lastServiceTickRealtime = 0L // Monotonic
     protected var serviceTickCounter = 0
     protected var lastNotificationUpdateTs = 0L
     
@@ -74,6 +75,7 @@ abstract class BaseMonitorService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         serviceStartRealtime = timeProvider.elapsedRealtime()
+        serviceStartWall = timeProvider.currentTimeMillis()
         
         systemMonitor.setWatchdogListener { set, skipped ->
             if (this::logManager.isInitialized) {
@@ -88,7 +90,7 @@ abstract class BaseMonitorService : LifecycleService() {
 
     abstract fun startServiceForeground()
     abstract fun updateForegroundServiceType()
-    abstract suspend fun processTick(now: Long, nowRealtime: Long)
+    abstract suspend fun processTick(now: Long, nowRt: Long)
     abstract fun getRequiredTickInterval(): Long
 
     protected fun startTickLoop() {
@@ -97,11 +99,11 @@ abstract class BaseMonitorService : LifecycleService() {
             while (isActive) { 
                 val startTime = timeProvider.elapsedRealtime()
                 val now = timeProvider.currentTimeMillis()
-                val nowRealtime = timeProvider.elapsedRealtime()
+                val nowRt = timeProvider.elapsedRealtime()
                 
                 systemMonitor.scheduleWatchdogAlarm()
                 
-                processTick(now, nowRealtime) 
+                processTick(now, nowRt) 
                 
                 val elapsed = timeProvider.elapsedRealtime() - startTime
                 val interval = getRequiredTickInterval()
@@ -155,6 +157,7 @@ abstract class BaseMonitorService : LifecycleService() {
         tickJob?.cancel()
         fgsUpdateJob?.cancel()
         
+        // runBlocking is generally discouraged in main thread, but here we are in a service being destroyed.
         // R406: Bounded cleanup to prevent termination ANR
         runBlocking {
             withTimeoutOrNull(1000) {

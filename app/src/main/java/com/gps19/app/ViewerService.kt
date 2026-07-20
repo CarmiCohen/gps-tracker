@@ -17,11 +17,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * v9.3.25:
- * - R405: Samsung A15 Stability Hardening. Integrated wake-lock renewal 
- *   into processTick to prevent background suppression on Samsung devices.
- * v9.3.18:
- * - R404: Legacy Relay URL Fallback Remediation. Synchronized with MainRepository.DEFAULT_RELAY_URL.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Propagating monotonic 'nowRt' 
+ *   to engine components to ensure logic immunity to system clock drifts.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -59,7 +57,7 @@ class ViewerService : BaseMonitorService() {
             logManager.logServiceEvent("Tracker: Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°",
                 lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
         }
-        override fun onGpsStallDetected(ts: Long) {}
+        override fun onGpsStallDetected(rt: Long) {}
     }
 
     override fun onCreate() {
@@ -169,9 +167,10 @@ class ViewerService : BaseMonitorService() {
             val recoveredTs = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
             lastServiceTickTs = recoveredTs
             lastServiceTickRealtime = timeProvider.elapsedRealtime()
-            locationProcessor.setLastValidFixTs(timeProvider.elapsedRealtime())
+            locationProcessor.setLastValidFixRt(timeProvider.elapsedRealtime())
             
             serviceStartRealtime = timeProvider.elapsedRealtime()
+            serviceStartWall = timeProvider.currentTimeMillis()
 
             startTickLoop()
             
@@ -184,7 +183,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     private fun onLocationChanged(location: Location) {
-        val nowRealtime = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime()
         val nowWall = timeProvider.currentTimeMillis()
 
         val lat = location.latitude
@@ -196,7 +195,7 @@ class ViewerService : BaseMonitorService() {
 
         val currentHeartbeat = getRequiredTickInterval()
         if (VIEWER_GPS_POLLING_MS == TICK_INTERVAL_MS && lastGpsFixRealtime > 0) {
-            val gap = nowRealtime - lastGpsFixRealtime
+            val gap = nowRt - lastGpsFixRealtime
             stabilityAuditFixCount++
             if (gap > currentHeartbeat + GPS_STABILITY_GAP_THRESHOLD_MS) {
                 stabilityAuditViolationCount++
@@ -205,7 +204,7 @@ class ViewerService : BaseMonitorService() {
                     lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = acc)
             }
         }
-        lastGpsFixRealtime = nowRealtime
+        lastGpsFixRealtime = nowRt
 
         val processed = locationProcessor.processGpsPoint(
             lat = lat,
@@ -220,7 +219,7 @@ class ViewerService : BaseMonitorService() {
             isViewerTrail = true,
             lastGpsTs = sessionManager.lastGpsTs,
             isLocal = true,
-            nowRealtime = nowRealtime,
+            nowRt = nowRt,
             nowWall = nowWall
         )
 
@@ -248,7 +247,7 @@ class ViewerService : BaseMonitorService() {
             satsUsed = location.extras?.getInt("satellites") ?: gpsManager.satellitesUsed,
             maxAccuracy = processed.maxAccuracy,
             currentMa = integrityMonitor.getBatteryCurrent(),
-            lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
+            lastValidFixRt = locationProcessor.getLastValidFixRt(),
             snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
         ))
 
@@ -258,6 +257,7 @@ class ViewerService : BaseMonitorService() {
             override val alt = remoteHandler.trackerBaroAlt
             override val gpsTs = remoteHandler.trackerLastGpsTs
             override val ts = 0L 
+            override val rt = remoteHandler.trackerLastValidFixRt
         }
         
         locationProcessor.updateCalculatedDistances(lat, lng, true, trackerAnchor)
@@ -272,7 +272,7 @@ class ViewerService : BaseMonitorService() {
         if ((configManager.deviceId == MainRepository.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
             configManager.deviceId = id
             networkManager.updateIdentity(id, configManager.viewerId, false)
-            lifecycleScope.launch { repository.saveString(MainRepository.TRACKER_ID_KEY, id) }
+            lifecycleScope.launch { repository.saveString(MainRepository.VIEWER_ID_KEY, id) }
         }
         if (sessionManager.onTrackerPulse(id, timeProvider.currentTimeMillis(), false)) {
             val proc = lastProcessedLocation
@@ -285,6 +285,7 @@ class ViewerService : BaseMonitorService() {
     private fun resetServiceTimers() {
         val proc = lastProcessedLocation
         serviceStartRealtime = timeProvider.elapsedRealtime()
+        serviceStartWall = timeProvider.currentTimeMillis()
         alarmManager.resetEvaluation()
         sessionManager.reset()
         integrityMonitor.resetStats()
@@ -332,13 +333,13 @@ class ViewerService : BaseMonitorService() {
         return if (isUiVisible()) TICK_INTERVAL_MS else TICK_INTERVAL_SLOW_MS
     }
 
-    override suspend fun processTick(now: Long, nowRealtime: Long): Unit = withContext(Dispatchers.Default) {
-        integrityMonitor.pollSystemStatus(now, nowRealtime)
+    override suspend fun processTick(now: Long, nowRt: Long): Unit = withContext(Dispatchers.Default) {
+        integrityMonitor.pollSystemStatus(now, nowRt)
 
         // R405: Samsung Stability Hardening. Renew WakeLock every tick.
         if (isSamsungDevice()) systemMonitor.renewWakeLock()
 
-        if (nowRealtime - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
+        if (nowRt - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
             if (stabilityAuditFixCount > 0) {
                 val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
                 if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
@@ -349,20 +350,20 @@ class ViewerService : BaseMonitorService() {
                 stabilityAuditFixCount = 0
                 stabilityAuditViolationCount = 0
             }
-            lastStabilityAuditTs = nowRealtime
+            lastStabilityAuditTs = nowRt
         }
 
         val isSocketConnected = networkManager.isConnected() && !transientDropDetected.getAndSet(false)
         networkManager.updateRelayStatus(isSocketConnected)
         
-        val isTrackerActive = remoteHandler.lastPeerActivityTs > 0 && (nowRealtime - remoteHandler.lastPeerActivityTs < WATCH_TIMEOUT_MS)
-        sessionManager.updateTick(nowRealtime, lastServiceTickRealtime, isPeerAvailable = isSocketConnected && isTrackerActive, isInViolation = false)
+        val isTrackerActive = remoteHandler.lastPeerActivityTs > 0 && (nowRt - remoteHandler.lastPeerActivityTs < WATCH_TIMEOUT_MS)
+        sessionManager.updateTick(nowRt, lastServiceTickRealtime, isPeerAvailable = isSocketConnected && isTrackerActive, isInViolation = false)
 
-        val silenceDelta = if (remoteHandler.lastPeerActivityTs > 0) nowRealtime - remoteHandler.lastPeerActivityTs else 0L
-        val isSignalLoss = integrityMonitor.checkSignalIntegrity(nowRealtime, silenceDelta, false)
+        val silenceDelta = if (remoteHandler.lastPeerActivityTs > 0) nowRt - remoteHandler.lastPeerActivityTs else 0L
+        val isSignalLoss = integrityMonitor.checkSignalIntegrity(nowRt, silenceDelta, false)
         val isTrackerJammerSuspicion = remoteHandler.isTrackerJammerSuspicion
-        val isTrackerStalled = remoteHandler.trackerGpsStallStartTs > 0L && (nowRealtime - remoteHandler.trackerGpsStallStartTs > GPS_STALL_THRESHOLD_MS)
-        val isTrackerGap = remoteHandler.trackerLastValidFixRealtime > 0L && (nowRealtime - remoteHandler.trackerLastValidFixRealtime > GPS_GAP_THRESHOLD_MS)
+        val isTrackerStalled = remoteHandler.trackerGpsStallStartTs > 0L && (nowRt - remoteHandler.trackerGpsStallStartTs > GPS_STALL_THRESHOLD_MS)
+        val isTrackerGap = remoteHandler.trackerLastValidFixRt > 0L && (nowRt - remoteHandler.trackerLastValidFixRt > GPS_GAP_THRESHOLD_MS)
 
         if (remoteHandler.trackerLat != 0.0 && remoteHandler.trackerLng != 0.0) {
             val unresolvedAlarms = alarmManager.getUnresolvedAlarmTypes()
@@ -379,7 +380,7 @@ class ViewerService : BaseMonitorService() {
                 lat = remoteHandler.trackerLat,
                 lng = remoteHandler.trackerLng,
                 accuracy = remoteHandler.trackerAccuracy,
-                maxAccuracy = remoteHandler.trackerMaxAccuracy,
+                maxTrackerAccuracy = remoteHandler.trackerMaxAccuracy,
                 activeViolations = activeViolations,
                 unresolvedAlarms = unresolvedAlarms
             )
@@ -402,10 +403,10 @@ class ViewerService : BaseMonitorService() {
             proxIdx = 1.0, proximityCm = -1.0, 
             proximityDebounceMs = 0L, vibrationRollingSum = 0.0,
             micPending = false, isTamperDetected = false, isPowerTamper = false,
-            isSitDetected = false, isSitActive = false, lastSitTs = 0L, receiptRealtime = proc?.receiptRealtime ?: 0L,
+            isSitDetected = false, isSitActive = false, lastSitTs = 0L, receiptRt = proc?.rt ?: 0L,
             violationUptimeMs = 0L, violationPercentage = 0.0, verticalVelocity = 0.0, sitVz = 0.0, sitDz = 0.0,
             sitBaro = 0.0, sitTilt = 0.0, sitShock = 0.0, isClockRegression = proc?.isClockRegression ?: false,
-            isLocationPending = false, locationPendingReason = LocationPendingReason.NONE, lastValidFixRealtime = locationProcessor.getLastValidFixTs(),
+            isLocationPending = false, locationPendingReason = LocationPendingReason.NONE, lastValidFixRt = locationProcessor.getLastValidFixRt(),
             gnssDetail = latestGnssDetail,
             snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0),
             tiltIdx = 0.0, baroIdx = 0.0, isBatterySteepDischarge = false, isCoolingModeActive = false,
@@ -415,8 +416,8 @@ class ViewerService : BaseMonitorService() {
         val gpsTs = proc?.timestamp ?: 0L
         val gpsAge = if (gpsTs > 0) (now - gpsTs) else 3600000L
         historyManager.updateRibbons(
-            now = now,
-            lastTickTs = lastServiceTickTs,
+            now = now, nowRt = nowRt,
+            lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime,
             serviceTickCounter = serviceTickCounter,
             rtt = networkManager.getRtt(),
             peerSignal = remoteHandler.peerSignal,
@@ -437,7 +438,7 @@ class ViewerService : BaseMonitorService() {
             locationPendingReason = LocationPendingReason.NONE
         )
 
-        evaluateAlarmsInternal(nowRealtime, isSignalLoss, isTrackerJammerSuspicion, isTrackerStalled, isTrackerGap, isTrackerActive)
+        evaluateAlarmsInternal(now, nowRt, isSignalLoss, isTrackerJammerSuspicion, isTrackerStalled, isTrackerGap, isTrackerActive)
 
         val notificationInterval = if (isUiVisible()) TICK_INTERVAL_MS else NOTIFICATION_THROTTLE_MS
         if (now - lastNotificationUpdateTs >= notificationInterval) {
@@ -451,14 +452,15 @@ class ViewerService : BaseMonitorService() {
         }
 
         repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, now)
-        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_REALTIME_KEY, nowRealtime)
+        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
         lastServiceTickTs = now
-        lastServiceTickRealtime = nowRealtime
+        lastServiceTickRealtime = nowRt
         serviceTickCounter++
     }
 
     private fun evaluateAlarmsInternal(
-        nowRealtime: Long,
+        now: Long,
+        nowRt: Long,
         isSignalLoss: Boolean,
         isTrackerJammerSuspicion: Boolean,
         isTrackerStalled: Boolean,
@@ -470,13 +472,17 @@ class ViewerService : BaseMonitorService() {
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
             alarmManager.evaluateAlarms(
-                now = nowRealtime, serviceStartTs = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = false,
+                now = now, nowRt = nowRt, 
+                serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime,
+                appStartTime = sessionManager.appStartTime, isTrackerMode = false,
                 isRelayConnected = isSocketConnected, isTrackerConnected = isTrackerConnected,
                 isTrackerVisualJump = remoteHandler.isTrackerVisualJump, 
                 isTrajectoryPromoted = remoteHandler.isTrackerTrajectoryPromoted, jumpTier = remoteHandler.trackerJumpTier,
                 trackerLat = remoteHandler.trackerLat, trackerLng = remoteHandler.trackerLng, trackerAccuracy = remoteHandler.trackerAccuracy,
                 maxTrackerAccuracy = remoteHandler.trackerMaxAccuracy, trackerLastGpsTs = remoteHandler.trackerLastGpsTs,
-                trackerLastValidFixTs = remoteHandler.trackerLastValidFixRealtime,
+                trackerLastGpsRt = remoteHandler.trackerLastValidFixRt,
+                trackerLastValidFixTs = 0L,
+                trackerLastValidFixRt = remoteHandler.trackerLastValidFixRt,
                 trackerSpeed = remoteHandler.trackerSpeed, trackerBattery = remoteHandler.trackerBattery, trackerTemp = remoteHandler.trackerTemp,
                 isHardwareOnline = remoteHandler.isTrackerConnected, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
                 isJammerSuspicion = isTrackerJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(),

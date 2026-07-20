@@ -5,9 +5,8 @@ option java_multiple_files = true;
 
 /**
  * AppSettings: Persistence schema for DataStore.
- * v9.4.01:
- * - Issue #103: Drift Reference Persistence. Added clock_drift_ref to maintain
- *   forensic integrity across process restarts.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Renamed realtime fields to use 'rt' suffix.
  */
 message AppSettings {
     optional string app_mode = 1;
@@ -31,7 +30,8 @@ message AppSettings {
     optional int64 total_drop = 15;
     optional int64 uptime = 16;
     optional int64 last_connection_ts = 17;
-    optional int64 last_disconnection_ts = 18;    reserved 19;
+    optional int64 last_disconnection_ts = 18;
+    reserved 19;
     optional int64 last_gps_ts = 20;
 
     optional string selected_siren = 21;
@@ -69,15 +69,13 @@ message AppSettings {
     optional double chair_baseline_tilt = 43;
 
     optional int64 violation_uptime_ms = 44;
-    optional int64 last_service_tick_rt = 45; // Renamed
+    optional int64 last_service_tick_rt = 45;
     optional string last_daily_archive_date = 46;
 
     optional bool is_xiaomi_manual_override = 47;
 
     optional int64 last_history_sit_ts = 48;
     optional bool is_anchor_locked = 49;
-
-    optional int64 clock_drift_ref = 50;
 
     // New high-precision fields (Issue #023)
     optional double max_distance = 60;
@@ -137,7 +135,7 @@ message RealtimeStatus {
     bool is_location_pending = 30;
     LocationPendingReasonProto pending_reason = 31;
 
-    int64 last_valid_fix_rt = 32; // Renamed
+    int64 last_valid_fix_rt = 32;
     bool is_battery_steep_discharge = 33;
     bool is_cooling_mode_active = 34;
 }
@@ -224,7 +222,7 @@ message TrackerStatusProto {
     double lux_baseline = 46;
     double acoustic_floor = 47;
     double adaptive_vibration_floor = 48;
-    double prox_idx = 49;
+    double proxIdx = 49;
     bool is_suspicious = 50;
     bool is_tamper_detected = 51;
     string ver = 52;

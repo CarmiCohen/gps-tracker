@@ -36,7 +36,7 @@ import com.gps19.core.engine.*
  * v8.9.42:
  * - Issue #338: Ghost Mode UX. Propagated isTelemetryFresh to LogOverlay for unified staleness.
  * v8.9.18:
- * - Issue #221: Propagating systemPulseRealtime for Bayesian uncertainty scaling.
+ * - Issue #221: Propagating systemPulseRt for Bayesian uncertainty scaling.
  */
 
 @Composable
@@ -48,7 +48,7 @@ fun TrackerScreen(
     viewerTrail: List<TrailPoint>,
     violations: List<ViolationPoint>,
     systemPulse: Long,
-    systemPulseRealtime: Long,
+    systemPulseRt: Long,
     onToggleMap: () -> Unit,
     onToggleLog: () -> Unit,
     onToggleSettings: () -> Unit,
@@ -119,7 +119,7 @@ fun TrackerScreen(
                             AppMapContainer(
                                 uiState = uiState,
                                 systemPulse = systemPulse,
-                                systemPulseRealtime = systemPulseRealtime,
+                                systemPulseRt = systemPulseRt,
                                 onEvent = { viewModel.onEvent(it) },
                                 onClearTrails = { viewModel.clearTrails(context) },
                                 trail = trail, viewerTrail = viewerTrail, 
@@ -139,7 +139,7 @@ fun TrackerScreen(
                 AppMapContainer(
                     uiState = uiState,
                     systemPulse = systemPulse,
-                    systemPulseRealtime = systemPulseRealtime,
+                    systemPulseRt = systemPulseRt,
                     onEvent = { viewModel.onEvent(it) },
                     onClearTrails = { viewModel.clearTrails(context) },
                     trail = trail, viewerTrail = viewerTrail, 

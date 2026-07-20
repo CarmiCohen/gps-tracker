@@ -6,11 +6,9 @@ import javax.inject.Singleton
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
- * v9.3.8:
- * - Clock Skew Hardening: Forced remote updates to use local receipt time (nowMs) 
- *   for telemetryTs to ensure HUD freshness (Green vs Gray) is immune to device clock drift.
- * v9.1.8:
- * - Issue #046: Shared Behavioral State. Mapped trackerState from incoming telemetry.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized all monotonic 
+ *   timestamps to use 'Rt' suffix (e.g., 'lastValidFixRt').
  */
 @Singleton
 class TelemetryUseCase @Inject constructor(
@@ -73,7 +71,7 @@ class TelemetryUseCase @Inject constructor(
             violationPercentage = update.violationPercentage ?: calculateViolationPercentage(update.violationUptimeMs, nowMs - appStartTime),
             isLocationPending = update.isLocationPending,
             locationPendingReason = update.locationPendingReason,
-            lastValidFixRealtime = if (update.lastValidFixRealtime > 0L) update.lastValidFixRealtime else currentLoc.lastValidFixRealtime,
+            lastValidFixRt = if (update.lastValidFixRt > 0L) update.lastValidFixRt else currentLoc.lastValidFixRt,
             isPowerSaveMode = update.isPowerSaveMode,
             standbyBucket = update.standbyBucket,
             netInterface = update.netInterface,
@@ -107,7 +105,7 @@ class TelemetryUseCase @Inject constructor(
             violationUptimeMs = status.violationUptimeMs, violationPercentage = status.violationPercentage,
             isLocationPending = status.isLocationPending, 
             locationPendingReason = status.locationPendingReason,
-            lastValidFixRealtime = status.lastValidFixRealtime,
+            lastValidFixRt = status.lastValidFixRt,
             isPowerSaveMode = status.isPowerSaveMode,
             standbyBucket = status.standbyBucket, netInterface = status.netInterface,
             isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical,
@@ -172,7 +170,7 @@ class TelemetryUseCase @Inject constructor(
             violationPercentage = update.violationPercentage ?: calculateViolationPercentage(update.violationUptimeMs, nowMs - appStartTime),
             isLocationPending = update.isLocationPending,
             locationPendingReason = update.locationPendingReason,
-            lastValidFixRealtime = if (update.lastValidFixRealtime > 0L) update.lastValidFixRealtime else currentLoc.lastValidFixRealtime,
+            lastValidFixRt = if (update.lastValidFixRt > 0L) update.lastValidFixRt else currentLoc.lastValidFixRt,
             isPowerSaveMode = update.isPowerSaveMode,
             standbyBucket = update.standbyBucket, netInterface = update.netInterface,
             isStorageLow = update.isStorageLow, isStorageCritical = update.isStorageCritical,

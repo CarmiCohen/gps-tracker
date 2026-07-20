@@ -55,20 +55,7 @@ abstract class AppModule {
             )
             .setJournalMode(androidx.room.RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
             .addMigrations(
-                AppDatabase.MIGRATION_16_17, AppDatabase.MIGRATION_17_18, AppDatabase.MIGRATION_18_19,
-                AppDatabase.MIGRATION_19_20, AppDatabase.MIGRATION_20_21, AppDatabase.MIGRATION_21_22,
-                AppDatabase.MIGRATION_22_23, AppDatabase.MIGRATION_23_24, AppDatabase.MIGRATION_24_25,
-                AppDatabase.MIGRATION_25_26, AppDatabase.MIGRATION_26_27, AppDatabase.MIGRATION_27_28,
-                AppDatabase.MIGRATION_28_29, AppDatabase.MIGRATION_29_30, AppDatabase.MIGRATION_30_31,
-                AppDatabase.MIGRATION_31_32, AppDatabase.MIGRATION_32_33, AppDatabase.MIGRATION_33_34,
-                AppDatabase.MIGRATION_34_35, AppDatabase.MIGRATION_35_36, AppDatabase.MIGRATION_36_37,
-                AppDatabase.MIGRATION_37_38, AppDatabase.MIGRATION_38_39, AppDatabase.MIGRATION_39_40,
-                AppDatabase.MIGRATION_40_41, AppDatabase.MIGRATION_41_42, AppDatabase.MIGRATION_42_43,
-                AppDatabase.MIGRATION_43_44, AppDatabase.MIGRATION_44_45, AppDatabase.MIGRATION_45_46,
-                AppDatabase.MIGRATION_46_47, AppDatabase.MIGRATION_47_48, AppDatabase.MIGRATION_48_49,
-                AppDatabase.MIGRATION_49_50, AppDatabase.MIGRATION_50_51, AppDatabase.MIGRATION_51_52,
-                AppDatabase.MIGRATION_52_53, AppDatabase.MIGRATION_53_54, AppDatabase.MIGRATION_54_55,
-                AppDatabase.MIGRATION_55_56, AppDatabase.MIGRATION_56_57
+                AppDatabase.MIGRATION_56_57
             )
             .fallbackToDestructiveMigration()
             .build()

@@ -1,8 +1,10 @@
-# System Source of Truth (SoT) - July.19.01
+# System Source of Truth (SoT) - July.19.04
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Drift Reference Persistence (R103)**: To maintain forensic continuity across process restarts, the system MUST persist the monotonic-to-wall-clock drift reference (`clock_drift_ref`). This ensures that gap-filling logic in `HistoryManager` can correctly identify system clock adjustments made while the application was inactive, preserving the 1Hz ribbon fidelity even after cold starts. (July.19.04 / Issue #103)
+*   **Temporal Forensic Integrity (R102)**: To ensure logic stability against system clock drifts or manual adjustments, the engine MUST employ a dual-time strategy. (a) **Monotonic Time (`rt`)**: All internal state transitions, debouncing, hindsight buffer aging, and duration-based logic MUST use `SystemClock.elapsedRealtime()`. (b) **Forensic Time (`ts`)**: Wall-clock (UTC) timestamps MUST be preserved strictly for human-readable logging and external reporting. All engine models (Geo/Connection points) MUST explicitly carry both time-streams. (July.19.01 / Issue #102)
 *   **Cold-Start Hardening Authority (R955b)**: To prevent Main-thread frame skipping and ANRs on low-end hardware, the system MUST: (a) Implement a mandatory 500ms staggered delay before starting base observations, (b) Cache all hardware property checks (e.g., `Build.MODEL` checks for A15) at the service/provider level, and (c) Defer all non-critical IPC permission status checks until after the initial UI composition is stable. (July.19.01 / Issue #099)
 *   **Samsung Stay-Alive Hardware Fallback (R405c)**: The system MUST detect hardware sensor registration failures (e.g., Step Detector returning `false` on `registerListener`) and immediately engage the Accelerometer-based stay-alive pulse to maintain process priority. (July.19.00 / Issue #098)
 *   **Samsung A15 Battery Prompt Authority (R405b)**: The system MUST proactively trigger the configuration overlay if battery exemption is missing on Samsung A15 hardware, ensuring user awareness of critical background requirements. (July.18.03 / Issue #101)
@@ -58,7 +60,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Data Persistence Integrity (R968)**: All changes to Protobuf schemas must preserve binary compatibility. (Issue #076 / v9.3.12)
 *   **Database Schema Hardening (R985)**: Room Entity fields MUST be decorated with explicit `@ColumnInfo(defaultValue)`.
 *   **Authoritative State Model (R986)**: The `TrackerState` MUST be computed exclusively by the Tracker.
-*   **Binary Forensic Parity (R988)**: The binary telemetry contract MUST maintain field parity with authoritative state flow.
+*   **Binary Telemetry Authority (R988)**: The binary telemetry contract MUST maintain field parity with authoritative state flow.
 *   **Speed Unit Standardization (R987)**: All internal telemetry and engine pipelines MUST use raw meters per second (m/s).
 *   **HUD Freshness Duality (R989)**: The HUD MUST differentiate between Telemetry Freshness and GPS Freshness. (Issue R989 / v9.2.0)
 *   **Telemetry Freshness Authority (Issue #029)**: Data health (`DAT` badge) is determined by arrival of any packet.

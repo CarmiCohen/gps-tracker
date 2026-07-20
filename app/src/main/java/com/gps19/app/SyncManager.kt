@@ -12,8 +12,9 @@ import javax.inject.Singleton
 
 /**
  * SyncManager: Handles the telemetry synchronization loop.
- * v9.3.3:
- * - Issue #058: Hilt Migration. Added @Inject constructor and start/stop lifecycle management.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
+ *   parameter naming to 'rt'.
  */
 @Singleton
 class SyncManager @Inject constructor(
@@ -85,10 +86,10 @@ class SyncManager @Inject constructor(
         luxBaseline: Double, acousticFloorDb: Double, adaptiveVibrationFloor: Double, proxIdx: Double, proximityCm: Double,
         proximityDebounceMs: Long, vibrationRollingSum: Double,
         micPending: Boolean, isTamperDetected: Boolean, isPowerTamper: Boolean, isSitDetected: Boolean, isSitActive: Boolean,
-        lastSitTs: Long, receiptRealtime: Long, violationUptimeMs: Long, violationPercentage: Double,
+        lastSitTs: Long, receiptRt: Long, violationUptimeMs: Long, violationPercentage: Double,
         verticalVelocity: Double, sitVz: Double, sitDz: Double, sitBaro: Double, sitTilt: Double, sitShock: Double,
         isClockRegression: Boolean, isLocationPending: Boolean, locationPendingReason: LocationPendingReason,
-        lastValidFixRealtime: Long, gnssDetail: GnssDetail?, snrIdx: Double, tiltIdx: Double, baroIdx: Double,
+        lastValidFixRt: Long, gnssDetail: GnssDetail?, snrIdx: Double, tiltIdx: Double, baroIdx: Double,
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
         batteryLevel: Int, batteryTemp: Double, isCharging: Boolean,
         isAnchorLocked: Boolean = false,
@@ -98,6 +99,7 @@ class SyncManager @Inject constructor(
             deviceId = deviceId,
             viewerId = viewerId,
             ts = timeProvider.currentTimeMillis(),
+            rt = receiptRt,
             lat = filtered?.lat ?: loc?.latitude ?: 0.0,
             lng = filtered?.lng ?: loc?.longitude ?: 0.0,
             alt = loc?.altitude ?: 0.0,
@@ -143,7 +145,7 @@ class SyncManager @Inject constructor(
             isClockRegression = isClockRegression,
             isLocationPending = isLocationPending,
             locationPendingReason = locationPendingReason,
-            lastValidFixRealtime = lastValidFixRealtime,
+            lastValidFixRt = lastValidFixRt,
             snrIdx = snrIdx,
             tiltIdx = tiltIdx,
             baroIdx = baroIdx,
@@ -197,7 +199,7 @@ class SyncManager @Inject constructor(
                     isPowerSaveMode = telemetryRepository.integrityState.value.isPowerSaveMode,
                     standbyBucket = status.standbyBucket,
                     netInterface = status.netInterface,
-                    lastValidFixRealtime = status.lastValidFixRealtime,
+                    lastValidFixRt = status.lastValidFixRt,
                     locationPendingReason = status.locationPendingReason.name,
                     isAnchorLocked = status.isAnchorLocked,
                     trackerState = status.trackerState.name
@@ -215,6 +217,7 @@ class SyncManager @Inject constructor(
                 deviceId = deviceId,
                 viewerId = viewerId,
                 ts = entity.timestamp,
+                rt = entity.lastValidFixRt, // Monotonic approximation
                 lat = entity.lat,
                 lng = entity.lng,
                 alt = 0.0, 
@@ -250,7 +253,7 @@ class SyncManager @Inject constructor(
                 sitShock = entity.sitShock,
                 isLocationPending = false,
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE },
-                lastValidFixRealtime = entity.lastValidFixRealtime,
+                lastValidFixRt = entity.lastValidFixRt,
                 snrIdx = entity.snrIdx,
                 tiltIdx = entity.tiltIdx,
                 baroIdx = entity.baroIdx,

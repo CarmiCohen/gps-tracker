@@ -10,10 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * v9.3.25:
- * - Protocol Optimization: Migrated to Enum-based binary serialization for 
- *   tracker state and pending reasons to further reduce heartbeat footprint.
- * - Bugfix: Corrected isBatterySteepDischarge naming in ConnectionPoint.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized all monotonic 
+ *   timestamps to use 'Rt' suffix (e.g., 'rt', 'lastValidFixRt').
  */
 
 @Serializable
@@ -197,6 +196,7 @@ data class TrackerStatus(
     val maxAccuracy: Double = 0.0,
     override val gpsTs: Long = 0L,
     override val ts: Long = 0L,
+    override val rt: Long = 0L, // Monotonic (Issue #102)
     val uptimeMs: Long = 0L,
     val lastConnTs: Long = 0L,
     val lastDiscTs: Long = 0L,
@@ -251,7 +251,7 @@ data class TrackerStatus(
     val jumpTier: Int = 0,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRealtime: Long = 0L,
+    val lastValidFixRt: Long = 0L,
     val isPowerSaveMode: Boolean = false, 
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",
@@ -280,6 +280,7 @@ data class TrackerStatus(
             put("max_accuracy", maxAccuracy)
             put("gps_ts", gpsTs)
             put("ts", ts)
+            put("rt", rt)
             put("uptime_ms", uptimeMs)
             put("last_conn_ts", lastConnTs)
             put("last_disc_ts", lastDiscTs)
@@ -321,7 +322,7 @@ data class TrackerStatus(
             put("is_near", isNear)
             put("lux_baseline", luxBaseline)
             put("acoustic_floor_db", acousticFloorDb)
-            put("adaptive_vibration_floor", adaptiveVibrationFloor)
+            put("adaptiveVibrationFloor", adaptiveVibrationFloor)
             put("prox_idx", proxIdx)
             put("proximity_cm", proximityCm)
             put("proximity_debounce_ms", proximityDebounceMs)
@@ -334,7 +335,7 @@ data class TrackerStatus(
             put("jump_tier", jumpTier)
             put("is_location_pending", isLocationPending)
             put("location_pending_reason", locationPendingReason.name)
-            put("last_valid_fixRealtime", lastValidFixRealtime)
+            put("last_valid_fix_rt", lastValidFixRt)
             put("is_power_save_mode", isPowerSaveMode)
             put("standby_bucket", standbyBucket)
             put("net_interface", netInterface)
@@ -380,7 +381,6 @@ data class TrackerStatus(
             .setIsAnchorLocked(isAnchorLocked)
             .setIsLocationPending(isLocationPending)
             .setPendingReason(mapPendingReasonToProto(locationPendingReason))
-            .setLastValidFixRealtime(lastValidFixRealtime)
             .setIsBatterySteepDischarge(isBatterySteepDischarge)
             .setIsCoolingModeActive(isCoolingModeActive)
             .build()
@@ -480,7 +480,7 @@ data class LocationState(
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRealtime: Long = 0L,
+    val lastValidFixRt: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",
@@ -585,6 +585,7 @@ sealed class UiEvent {
     object DismissAlarms : UiEvent()
     data class SetAppMode(val mode: String?) : UiEvent()
     data class SetSystemActive(val active: Boolean) : UiEvent()
+    data class SetSystemMode(val mode: String) : UiEvent()
     data class StopSiren(val causes: String? = null) : UiEvent()
     object ResetStats : UiEvent()
     object ClearLogs : UiEvent()
@@ -688,7 +689,7 @@ data class IntegrityState(
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRealtime: Long = 0L,
+    val lastValidFixRt: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",
@@ -734,7 +735,7 @@ data class IntegrityStateUi(
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRealtime: Long = 0L,
+    val lastValidFixRt: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",

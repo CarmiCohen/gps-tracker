@@ -19,9 +19,9 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * v9.3.25:
- * - R996: Logcat Forensic Integrity. Cached system services and implemented 
- *   a 10s TTL for system status polling to eliminate Samsung getPackageName noise.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
+ *   parameter naming to 'nowRt'.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -98,10 +98,10 @@ class IntegrityMonitor @Inject constructor(
         return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) / 1000
     }
 
-    fun pollSystemStatus(nowWall: Long, nowRealtime: Long) {
-        val delta = nowRealtime - lastFullPollTs
+    fun pollSystemStatus(nowWall: Long, nowRt: Long) {
+        val delta = nowRt - lastFullPollTs
         if (delta < POLL_TTL_MS && lastFullPollTs != 0L) return
-        lastFullPollTs = nowRealtime
+        lastFullPollTs = nowRt
 
         val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         
@@ -128,10 +128,10 @@ class IntegrityMonitor @Inject constructor(
             if (isCharging) onPowerConnected() else onPowerDisconnected()
 
             if (_batteryLevel != -1 && !isCharging) {
-                if (nowRealtime - lastBatteryCheckTs > 60000L) {
-                    batterySamples.add(nowRealtime to _batteryLevel)
-                    lastBatteryCheckTs = nowRealtime
-                    checkBatteryDischarge(nowRealtime)
+                if (nowRt - lastBatteryCheckTs > 60000L) {
+                    batterySamples.add(nowRt to _batteryLevel)
+                    lastBatteryCheckTs = nowRt
+                    checkBatteryDischarge(nowRt)
                 }
             } else if (isCharging) {
                 batterySamples.clear()
@@ -185,8 +185,8 @@ class IntegrityMonitor @Inject constructor(
         }
     }
 
-    private fun checkBatteryDischarge(nowRealtime: Long) {
-        while (batterySamples.isNotEmpty() && (nowRealtime - batterySamples.peek()!!.first) > BATTERY_STEEP_DISCHARGE_WINDOW_MS) {
+    private fun checkBatteryDischarge(nowRt: Long) {
+        while (batterySamples.isNotEmpty() && (nowRt - batterySamples.peek()!!.first) > BATTERY_STEEP_DISCHARGE_WINDOW_MS) {
             batterySamples.poll()
         }
 
@@ -200,7 +200,7 @@ class IntegrityMonitor @Inject constructor(
         isBatterySteepDischarge = drop >= BATTERY_STEEP_DISCHARGE_THRESHOLD
         
         if (isBatterySteepDischarge && !wasSteep) {
-            listener?.onLogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected ($drop% in ${(nowRealtime - earliest.first) / 60000}m). System shutdown likely imminent.", true)
+            listener?.onLogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected ($drop% in ${(nowRt - earliest.first) / 60000}m). System shutdown likely imminent.", true)
             listener?.onViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE)
         }
     }
@@ -272,7 +272,7 @@ class IntegrityMonitor @Inject constructor(
         return true
     }
 
-    fun checkSignalIntegrity(now: Long, silenceDelta: Long, isTracker: Boolean): Boolean {
+    fun checkSignalIntegrity(nowRt: Long, silenceDelta: Long, isTracker: Boolean): Boolean {
         val threshold = if (isTracker) {
             VIEWER_SIGNAL_LOSS_THRESHOLD_MS
         } else {

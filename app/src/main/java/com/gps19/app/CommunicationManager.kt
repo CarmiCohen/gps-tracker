@@ -261,7 +261,7 @@ class CommunicationManager @Inject constructor(
                 put("is_location_pending", status.isLocationPending)
                 put("location_pending_reason", TrackerStatus.mapProtoToPendingReason(status.pendingReason).name)
                 
-                put("last_valid_fixRealtime", status.lastValidFixRealtime)
+                put("last_valid_fix_rt", status.lastValidFixRt)
                 put("is_battery_steep_discharge", status.isBatterySteepDischarge)
                 put("is_cooling_mode_active", status.isCoolingModeActive)
             }

@@ -2,7 +2,6 @@ package com.gps19.app
 
 import android.content.Context
 import com.gps19.core.engine.*
-import com.gps19.core.engine.LocationProcessor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,8 +14,9 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * v9.3.5:
- * - Issue #058: Hilt Migration. Refactored to use Listener interface and separate initialization.
+ * v9.4.01:
+ * - Issue #103: Drift Reference Persistence. Persisting clockDriftRef to 
+ *   ensure forensic continuity across process restarts.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -46,7 +46,7 @@ class HistoryManager @Inject constructor(
     private var lastAuditTs = 0L
     private var lastTimeTriggerTs = 0L
 
-    private var lastSitDetectedTs = 0L
+    private var lastSitDetectedRt = 0L
 
     fun setListener(listener: Listener) {
         this.listener = listener
@@ -56,13 +56,22 @@ class HistoryManager @Inject constructor(
         this.scope = scope
         
         scope.launch {
-            lastSitDetectedTs = repository.getLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, 0L)
+            // v9.4.00: We prioritize monotonic reference for sit duplicate guard if possible
+            val lastSitTs = repository.getLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, 0L)
+            if (lastSitTs > 0) {
+                 lastSitDetectedRt = timeProvider.elapsedRealtime() - (timeProvider.currentTimeMillis() - lastSitTs)
+            }
+            
+            // v9.4.01: Restore persisted clock drift reference (Issue #103)
+            clockDriftRef = repository.getLong(MainRepository.CLOCK_DRIFT_REF_KEY, 0L)
         }
     }
 
     suspend fun updateRibbons(
         now: Long,
+        nowRt: Long,
         lastTickTs: Long,
+        lastTickRt: Long,
         serviceTickCounter: Int,
         rtt: Int,
         peerSignal: Int,
@@ -98,7 +107,7 @@ class HistoryManager @Inject constructor(
     ) {
         detectClockTampering(now)
 
-        val deltaMs = now - lastTickTs
+        val deltaRt = if (lastTickRt > 0) nowRt - lastTickRt else 0L
         
         if (now - lastAuditTs > 60000L) {
             if (backfillAuditCount > 0) {
@@ -108,12 +117,15 @@ class HistoryManager @Inject constructor(
             lastAuditTs = now
         }
 
-        if (lastTickTs > 0 && deltaMs > REAL_TIME_GAP_LIMIT_MS) {
-            fillRealGap(lastTickTs, now, isTrackerMode)
-        } else if (lastTickTs > 0 && deltaMs > 1500L) {
+        // v9.4.00: Use monotonic delta for gap detection (Issue #102)
+        if (lastTickRt > 0 && deltaRt > REAL_TIME_GAP_LIMIT_MS) {
+            fillRealGap(lastTickTs, lastTickRt, now, nowRt, isTrackerMode)
+        } else if (lastTickRt > 0 && deltaRt > 1500L) {
             backfillAnalyticalGaps(
                 lastTickTs = lastTickTs,
+                lastTickRt = lastTickRt,
                 now = now,
+                nowRt = nowRt,
                 rtt = rtt,
                 peerSignal = peerSignal,
                 peerAvail = peerAvail,
@@ -150,6 +162,7 @@ class HistoryManager @Inject constructor(
 
         val currentPoint = EngineConnectionPoint(
             ts = now,
+            rt = nowRt,
             rtt = rtt,
             remoteSig = peerSignal,
             isConnected = peerAvail,
@@ -176,7 +189,7 @@ class HistoryManager @Inject constructor(
             isCoolingModeActive = isCoolingModeActive,
             speed = speed,
             bearing = bearing,
-            isSitDetected = applySitDuplicateGuard(isSitDetected, now),
+            isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt),
             isSitActive = isSitActive,
             isTick = false,
             currentMa = currentMa,
@@ -206,7 +219,9 @@ class HistoryManager @Inject constructor(
 
     private fun backfillAnalyticalGaps(
         lastTickTs: Long,
+        lastTickRt: Long,
         now: Long,
+        nowRt: Long,
         rtt: Int,
         peerSignal: Int,
         peerAvail: Boolean,
@@ -240,12 +255,12 @@ class HistoryManager @Inject constructor(
         isAnchorLocked: Boolean
     ) {
         val snrSamples = if (isTrackerMode) {
-            gpsManager.getSnrSamples(lastTickTs + 1, now).map { EngineSnrSample(it.first, it.second) }
+            gpsManager.getSnrSamples(lastTickTs + 1, now).map { EngineSnrSample(it.first, it.first - (now - nowRt), it.second) }
         } else emptyList()
 
         val sensorSamples = if (isTrackerMode) {
             sensorManager.getSensorSamples(lastTickTs + 1, now).map { 
-                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
+                EngineSensorSnapshot(it.ts, it.ts - (now - nowRt), it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
             }
         } else emptyList()
 
@@ -253,6 +268,7 @@ class HistoryManager @Inject constructor(
 
         val baseTemplate = EngineConnectionPoint(
             ts = 0L,
+            rt = 0L,
             rtt = rtt,
             remoteSig = peerSignal,
             isConnected = peerAvail,
@@ -278,14 +294,14 @@ class HistoryManager @Inject constructor(
             isCoolingModeActive = isCoolingModeActive,
             speed = speed,
             bearing = bearing,
-            isSitDetected = applySitDuplicateGuard(isSitDetected, now),
+            isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt),
             isSitActive = isSitActive,
             currentMa = currentMa,
             locationPendingReason = locationPendingReason,
             isAnchorLocked = isAnchorLocked
         )
 
-        val results = aggregator.backfillGaps(lastTickTs, now, snrSamples, sensorSamples, acousticFloor, baseTemplate)
+        val results = aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, acousticFloor, baseTemplate)
         
         val fourMPoints = results.filter { it.first == RibbonScale.FOUR_MIN }.map { mapToAppPoint(it.second) }
         if (fourMPoints.isNotEmpty()) {
@@ -299,21 +315,21 @@ class HistoryManager @Inject constructor(
         }
     }
 
-    private fun fillRealGap(lastTickTs: Long, now: Long, isTrackerMode: Boolean) {
+    private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
         val snrSamples = if (isTrackerMode) {
-            gpsManager.getSnrSamples(lastTickTs, now).map { EngineSnrSample(it.first, it.second) }
+            gpsManager.getSnrSamples(lastTickTs, now).map { EngineSnrSample(it.first, it.first - (now - nowRt), it.second) }
         } else emptyList()
 
         val sensorSamples = if (isTrackerMode) {
             sensorManager.getSensorSamples(lastTickTs, now).map { 
-                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
+                EngineSensorSnapshot(it.ts, it.ts - (now - nowRt), it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
             }
         } else emptyList()
 
         val acousticFloor = if (isTrackerMode) locationProcessor.getAcousticFloorDb() else 0.0
 
         RibbonScale.entries.forEach { scale ->
-            val gapPoints = aggregator.fillRealGap(scale.key, scale.intervalSeconds, lastTickTs, now, snrSamples, sensorSamples, acousticFloor)
+            val gapPoints = aggregator.fillRealGap(scale.key, scale.intervalSeconds, lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, acousticFloor)
             if (gapPoints.isNotEmpty()) {
                 repository.addHistoryPoints(scale.key, gapPoints.map { mapToAppPoint(it) })
             }
@@ -326,6 +342,8 @@ class HistoryManager @Inject constructor(
         
         if (clockDriftRef == 0L) {
             clockDriftRef = currentDrift
+            // v9.4.01: Persist initial drift reference (Issue #103)
+            scope?.launch { repository.saveLong(MainRepository.CLOCK_DRIFT_REF_KEY, currentDrift) }
             return
         }
         
@@ -335,15 +353,17 @@ class HistoryManager @Inject constructor(
             val direction = if (currentDrift > clockDriftRef) "forward" else "backward"
             listener?.onLogEvent("FORENSIC ALERT: System clock jump detected ($direction ${jumpSec}s). Monotonic uptime preserved.", true)
             clockDriftRef = currentDrift
+            // v9.4.01: Persist updated drift reference (Issue #103)
+            scope?.launch { repository.saveLong(MainRepository.CLOCK_DRIFT_REF_KEY, currentDrift) }
         }
     }
 
-    private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long): Boolean {
+    private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long, rt: Long): Boolean {
         if (!isDetected) return false
-        if (abs(ts - lastSitDetectedTs) < SIT_DUPLICATE_GUARD_MS) {
+        if (abs(rt - lastSitDetectedRt) < SIT_DUPLICATE_GUARD_MS) {
             return false
         }
-        lastSitDetectedTs = ts
+        lastSitDetectedRt = rt
         scope?.launch {
             repository.saveLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, ts)
         }

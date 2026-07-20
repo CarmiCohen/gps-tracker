@@ -6,11 +6,9 @@ import javax.inject.Singleton
 
 /**
  * BehaviorUseCase: Logic for determining high-level behavioral states and UI visibility gates.
- * v9.1.8:
- * - Issue #046: Shared Behavioral State. Updated computeTrackerState to adopt 
- *   authoritative remote state when in Viewer mode, preventing HUD desync.
- * v8.8.30:
- * - R872: Suppressed redScreenVisible (Alarm Overlay) in Tracker mode.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
+ *   parameter naming to 'nowRt'.
  */
 @Singleton
 class BehaviorUseCase @Inject constructor() {
@@ -51,8 +49,8 @@ class BehaviorUseCase @Inject constructor() {
 
     fun shouldShowRedScreen(
         currentState: MainUiState,
-        nowRealtime: Long,
-        lastAckRealtime: Long,
+        nowRt: Long,
+        lastAckRt: Long,
         currentVisible: Boolean
     ): Boolean {
         // R872: No visual alerts (red screen) in tracker mode.
@@ -62,7 +60,7 @@ class BehaviorUseCase @Inject constructor() {
         if (!hasAlertToDisplay) return false
 
         // Use monotonic time for lockout to survive system clock jumps
-        val lockoutActive = (nowRealtime - lastAckRealtime < ALARM_OVERLAY_THROTTLE_MS)
+        val lockoutActive = (nowRt - lastAckRt < ALARM_OVERLAY_THROTTLE_MS)
         
         return if (!lockoutActive || currentState.isNewViolationDetected) {
             true

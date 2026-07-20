@@ -32,10 +32,8 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
- * v9.3.28:
- * - ANR Hardening (#092): Finalized single-cycle I/O with getSettingsSnapshot() 
- *   and corrected default value logic to prevent infinite telemetry loops.
- * - Architecture: Consolidated conversion logic into SettingsMapper.
+ * v9.4.01:
+ * - Issue #103: Added CLOCK_DRIFT_REF_KEY for forensic integrity.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -160,6 +158,7 @@ class SettingsRepository @Inject constructor(
         const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
         
         const val IDENTITY_SANITIZED_KEY = "identity_sanitized"
+        const val CLOCK_DRIFT_REF_KEY = "clock_drift_ref"
     }
 
     val appModeFlow: Flow<String?> = dataStore.data.map { it.appMode.ifEmpty { null } }
@@ -214,8 +213,9 @@ class SettingsRepository @Inject constructor(
                 LAST_GPS_TS_KEY -> builder.setLastGpsTs(value)
                 LAST_SIT_TS_KEY -> builder.setLastSitTs(value)
                 VIOLATION_UPTIME_MS_KEY -> builder.setViolationUptimeMs(value)
-                LAST_SERVICE_TICK_REALTIME_KEY -> builder.setLastServiceTickRealtime(value)
+                LAST_SERVICE_TICK_REALTIME_KEY -> builder.setLastServiceTickRt(value)
                 LAST_HISTORY_SIT_TS_KEY -> builder.setLastHistorySitTs(value)
+                CLOCK_DRIFT_REF_KEY -> builder.setClockDriftRef(value)
             }
             builder.build()
         }
@@ -295,8 +295,9 @@ class SettingsRepository @Inject constructor(
             LAST_GPS_TS_KEY -> settings.lastGpsTs
             LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else 0L
             VIOLATION_UPTIME_MS_KEY -> settings.violationUptimeMs
-            LAST_SERVICE_TICK_REALTIME_KEY -> settings.lastServiceTickRealtime
+            LAST_SERVICE_TICK_REALTIME_KEY -> settings.lastServiceTickRt
             LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else 0L
+            CLOCK_DRIFT_REF_KEY -> if (settings.hasClockDriftRef()) settings.clockDriftRef else 0L
             else -> 0L
         }
         return if (value == 0L) default else value

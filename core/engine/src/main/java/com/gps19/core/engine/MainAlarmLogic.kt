@@ -5,12 +5,12 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Refactored all timing, duration, 
+ *   and debounce logic to use monotonic 'rt' timestamps from AlarmEvaluationState.
  * v9.3.16:
  * - Requirement R999b: Standardized lift detection to use barometer delta 
  *   (Absolute - EMA) instead of raw absolute altitude.
- * v9.2.2:
- * - Issue #326 Fix: Intelligent Uncertainty UX. Included specific locationPendingReason 
- *   in forensic technical details.
  */
 object MainAlarmLogic {
 
@@ -18,7 +18,7 @@ object MainAlarmLogic {
         state: AlarmEvaluationState,
         isWarmup: Boolean = false
     ): SystemHealthReport {
-        val now = state.now
+        val nowRt = state.nowRt
         val reports = mutableListOf<ViolationReport>()
         
         val phase = state.discoveryPhase
@@ -51,7 +51,7 @@ object MainAlarmLogic {
             )
         )
 
-        // 3. PEER-DEPENDENT ALERTS (R747: Simplified "Tracker" to "Device")
+        // 3. PEER-DEPENDENT ALERTS
         val shouldSuppressPeerErrors = !isInternetHardwareOk || !isRelayConnected
         
         reports.add(
@@ -125,7 +125,6 @@ object MainAlarmLogic {
         val isTilt = SentinelValidator.isTiltViolated(state.trackerTiltDegrees)
         val isAcousticMet = SentinelValidator.isAcousticViolated(state.trackerAcousticDb, state.acousticFloorDb)
         
-        // Requirement R999b: Calculate delta relative to baseline for lift detection
         val liftDelta = if (state.trackerBaroAltEma > -999.0) state.trackerBaroAlt - state.trackerBaroAltEma else 0.0
         val isLift = SentinelValidator.isLiftViolated(liftDelta)
         
@@ -196,12 +195,11 @@ object MainAlarmLogic {
         val home = state.homePoints
         val maxD = state.maxDistance
         
-        // Bayesian Uncertainty Expansion (Issue #460)
+        // Bayesian Uncertainty Expansion (Issue #460) using monotonic time (Issue #102)
         var acc = state.maxTrackerAccuracy
-        if (state.isLocationPending && state.trackerLastValidFixTs > 0) {
-            val elapsedSec = (now - state.trackerLastValidFixTs) / 1000.0
+        if (state.isLocationPending && state.trackerLastValidFixRt > 0) {
+            val elapsedSec = (nowRt - state.trackerLastValidFixRt) / 1000.0
             if (elapsedSec > 0) {
-                // Moving: Grows at speed or conservative constant, capped at 33.3m/s (Issue #383)
                 val driftRate = if (state.trackerSpeed > 1.0) {
                     state.trackerSpeed.coerceIn(PENDING_UNCERTAINTY_GROWTH_RATE_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS)
                 } else {
@@ -236,7 +234,7 @@ object MainAlarmLogic {
 
         val isGeofenceSuppressed = state.isJammerSuspicion || shouldSuppressPeerErrors
 
-        if (distVal != null && !isGeofenceSuppressed && state.lastGpsPacketTs > 0) {
+        if (distVal != null && !isGeofenceSuppressed && state.lastGpsPacketRt > 0) {
             val dValue = distVal
             val isJump = state.isTrackerVisualJump
             val jumpTier = state.jumpTier
@@ -244,8 +242,9 @@ object MainAlarmLogic {
             val isPredictedExit = dValue > predictiveThreshold && state.trackerSpeed > GEOFENCE_PREDICTIVE_MIN_SPEED_MPS
 
             if (dValue > threshold || (isPredictedExit && !isJump)) {
-                if (state.firstViolationTs == 0L) {
-                    state.firstViolationTs = now
+                if (state.firstViolationRt == 0L) {
+                    state.firstViolationTs = state.now
+                    state.firstViolationRt = nowRt
                     state.firstViolationWasJump = isJump && (jumpTier == 1 || jumpTier == 2)
                 }
                 
@@ -258,11 +257,11 @@ object MainAlarmLogic {
                     if (!isPredictedExit) state.distanceViolationCounter++
                 }
 
-                val timeSinceFirst = now - state.firstViolationTs
+                val timeSinceFirstRt = nowRt - state.firstViolationRt
                 val effectiveHoldMs = if (state.isAdaptiveJump) (JUMP_HOLD_DURATION_MS * ADAPTIVE_JUMP_HOLD_MULTIPLIER).toLong() else JUMP_HOLD_DURATION_MS
                 
                 val isSustained = if (state.firstViolationWasJump) {
-                    timeSinceFirst >= effectiveHoldMs
+                    timeSinceFirstRt >= effectiveHoldMs
                 } else {
                     state.distanceViolationCounter >= DISTANCE_ALARM_SAMPLES_REQUIRED
                 }
@@ -272,7 +271,7 @@ object MainAlarmLogic {
                 }
                 
                 val deviation = dValue - threshold
-                val durationSec = timeSinceFirst / 1000
+                val durationSec = timeSinceFirstRt / 1000
                 val debounceStr = when {
                     isPredictedExit -> "PREDICTIVE EXIT (${String.format(Locale.getDefault(), "%.1f", state.trackerSpeed * 3.6)} km/h)"
                     isPromoted -> "TRAJECTORY PROMOTED"
@@ -309,6 +308,7 @@ object MainAlarmLogic {
                 }
                 state.distanceViolationCounter = 0
                 state.firstViolationTs = 0L
+                state.firstViolationRt = 0L
                 state.firstViolationWasJump = false
                 if (reports.none { it.type == ALERT_ID_TRACKER_GEOFENCE }) {
                     reports.add(ViolationReport(type = ALERT_ID_TRACKER_GEOFENCE, title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_GEOFENCE), subtitle = "Inside safe range", conditionMet = false))
@@ -319,6 +319,7 @@ object MainAlarmLogic {
         } else {
             state.distanceViolationCounter = 0
             state.firstViolationTs = 0L
+            state.firstViolationRt = 0L
             state.firstViolationWasJump = false
             reports.add(ViolationReport(type = ALERT_ID_TRACKER_GEOFENCE, title = getTrackerTitle(isTracker, ALERT_TITLE_TRACKER_GEOFENCE), subtitle = "Geofence suppressed or missing data", conditionMet = false))
         }
@@ -392,8 +393,8 @@ object MainAlarmLogic {
         )
 
         // 7. DEVICE SPECIFIC GATING
-        val uptimeMs = now - state.serviceStartTime
-        val isXiaomiBootGraceActive = uptimeMs < XIAOMI_BOOT_GRACE_MS
+        val uptimeRt = nowRt - state.serviceStartRt
+        val isXiaomiBootGraceActive = uptimeRt < XIAOMI_BOOT_GRACE_MS
         val isAutostartExplicitlyDenied = state.xiaomiAutostartStatus == EngineXiaomiStatus.DENIED
         val isSpecialExplicitlyDenied = state.xiaomiStatus == EngineXiaomiStatus.DENIED
         val isAutostartIndeterminate = state.xiaomiAutostartStatus == EngineXiaomiStatus.UNKNOWN

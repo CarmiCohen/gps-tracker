@@ -4,9 +4,9 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
- * v9.3.46:
- * - ANR Optimization (#092): Replaced O(N*M) backfill loops with linear O(N+M) 
- *   sliding window to prevent CPU saturation on Samsung A15 during cold-starts.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Switched internal aggregation and 
+ *   gap detection logic to use monotonic 'rt' timestamps.
  */
 class TelemetryAggregator {
 
@@ -69,7 +69,9 @@ class TelemetryAggregator {
 
     fun processPoint(point: EngineConnectionPoint): List<Pair<RibbonScale, EngineConnectionPoint>> {
         val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
-        val totalSeconds = (point.ts / TICK_INTERVAL_MS).toInt()
+        // v9.4.00: Use monotonic 'rt' for bucket calculations (Issue #102)
+        val timeRef = if (point.rt > 0) point.rt else point.ts
+        val totalSeconds = (timeRef / TICK_INTERVAL_MS).toInt()
 
         RibbonScale.entries.forEach { scale ->
             if (scale == RibbonScale.FOUR_MIN) {
@@ -92,34 +94,36 @@ class TelemetryAggregator {
     }
 
     fun backfillGaps(
+        lastTickRt: Long,
+        nowRt: Long,
         lastTickTs: Long,
-        now: Long,
+        nowTs: Long,
         snrSamples: List<EngineSnrSample>,
         sensorSamples: List<EngineSensorSnapshot>,
         acousticFloor: Double,
         baseTemplate: EngineConnectionPoint
     ): List<Pair<RibbonScale, EngineConnectionPoint>> {
         val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
+        var fillRt = lastTickRt + TICK_INTERVAL_MS
         var fillTs = lastTickTs + TICK_INTERVAL_MS
         var pointsGenerated = 0
         
-        // v9.3.46: Linear scan optimization
         var snrIdx = 0
         var sensorIdx = 0
 
-        while (fillTs < now && pointsGenerated < MAX_BACKFILL_POINTS) {
-            val totalSeconds = (fillTs / TICK_INTERVAL_MS).toInt()
-            val windowEnd = fillTs + TICK_INTERVAL_MS - 1
+        while (fillRt < nowRt && pointsGenerated < MAX_BACKFILL_POINTS) {
+            val totalSeconds = (fillRt / TICK_INTERVAL_MS).toInt()
+            val windowEndRt = fillRt + TICK_INTERVAL_MS - 1
             
-            // Fast-forward indices to current window
-            while (snrIdx < snrSamples.size && snrSamples[snrIdx].ts < fillTs) snrIdx++
-            while (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].ts < fillTs) sensorIdx++
+            // v9.4.00: Use monotonic 'rt' for window matching (Issue #102)
+            while (snrIdx < snrSamples.size && snrSamples[snrIdx].rt < fillRt) snrIdx++
+            while (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].rt < fillRt) sensorIdx++
 
-            val resolvedSnr = if (snrIdx < snrSamples.size && snrSamples[snrIdx].ts <= windowEnd) {
+            val resolvedSnr = if (snrIdx < snrSamples.size && snrSamples[snrIdx].rt <= windowEndRt) {
                 (snrSamples[snrIdx].snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
             } else baseTemplate.snrIdx
             
-            val snapshot = if (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].ts <= windowEnd) sensorSamples[sensorIdx] else null
+            val snapshot = if (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].rt <= windowEndRt) sensorSamples[sensorIdx] else null
             
             val resolvedNoise = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: baseTemplate.noiseIdx
             val resolvedLux = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: baseTemplate.luxIdx
@@ -132,6 +136,7 @@ class TelemetryAggregator {
 
             val fillPoint = baseTemplate.copy(
                 ts = fillTs,
+                rt = fillRt,
                 isGap = false,
                 noiseIdx = resolvedNoise,
                 luxIdx = resolvedLux,
@@ -147,6 +152,7 @@ class TelemetryAggregator {
             )
 
             results.addAll(processPoint(fillPoint))
+            fillRt += TICK_INTERVAL_MS
             fillTs += TICK_INTERVAL_MS
             pointsGenerated++
         }
@@ -156,38 +162,40 @@ class TelemetryAggregator {
     fun fillRealGap(
         ribbonKey: String,
         intervalSeconds: Int,
+        lastTickRt: Long,
+        nowRt: Long,
         lastTickTs: Long,
-        now: Long,
+        nowTs: Long,
         snrSamples: List<EngineSnrSample>,
         sensorSamples: List<EngineSensorSnapshot>,
         acousticFloor: Double
     ): List<EngineConnectionPoint> {
         val intervalMs = intervalSeconds * TICK_INTERVAL_MS
         val maxGapMs = intervalMs * 240
-        val effectiveStartTs = maxOf(lastTickTs, now - maxGapMs)
+        val effectiveStartRt = maxOf(lastTickRt, nowRt - maxGapMs)
+        val rtToTsOffset = lastTickTs - lastTickRt
 
-        var currentTs = alignToInterval(effectiveStartTs, intervalSeconds)
-        if (currentTs <= lastTickTs) currentTs += intervalMs
+        var currentRt = alignToInterval(effectiveStartRt, intervalSeconds)
+        if (currentRt <= lastTickRt) currentRt += intervalMs
 
         val gapPoints = mutableListOf<EngineConnectionPoint>()
         var pointsGenerated = 0
         
-        // v9.3.46: Linear scan optimization
         var snrIdx = 0
         var sensorIdx = 0
         
-        while (currentTs < now && pointsGenerated < MAX_BACKFILL_POINTS) {
-            val totalSeconds = (currentTs / TICK_INTERVAL_MS).toInt()
-            val windowEnd = currentTs + intervalMs - 1
+        while (currentRt < nowRt && pointsGenerated < MAX_BACKFILL_POINTS) {
+            val totalSeconds = (currentRt / TICK_INTERVAL_MS).toInt()
+            val windowEndRt = currentRt + intervalMs - 1
             
-            while (snrIdx < snrSamples.size && snrSamples[snrIdx].ts < currentTs) snrIdx++
-            while (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].ts < currentTs) sensorIdx++
+            while (snrIdx < snrSamples.size && snrSamples[snrIdx].rt < currentRt) snrIdx++
+            while (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].rt < currentRt) sensorIdx++
 
-            val resolvedSnr = if (snrIdx < snrSamples.size && snrSamples[snrIdx].ts <= windowEnd) {
+            val resolvedSnr = if (snrIdx < snrSamples.size && snrSamples[snrIdx].rt <= windowEndRt) {
                 (snrSamples[snrIdx].snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
             } else 0.0
             
-            val snapshot = if (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].ts <= windowEnd) sensorSamples[sensorIdx] else null
+            val snapshot = if (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].rt <= windowEndRt) sensorSamples[sensorIdx] else null
             
             val resolvedNoise = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: 0.0
             val resolvedLux = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: 0.0
@@ -199,7 +207,8 @@ class TelemetryAggregator {
             val resolvedSit = snapshot?.isSitDetected ?: false
 
             gapPoints.add(EngineConnectionPoint(
-                ts = currentTs,
+                ts = currentRt + rtToTsOffset,
+                rt = currentRt,
                 rtt = 0,
                 remoteSig = 0,
                 isConnected = false,
@@ -218,7 +227,7 @@ class TelemetryAggregator {
                 currentMa = 0,
                 locationPendingReason = LocationPendingReason.NONE
             ))
-            currentTs += intervalMs
+            currentRt += intervalMs
             pointsGenerated++
         }
         return gapPoints

@@ -4,9 +4,9 @@ import kotlin.math.*
 
 /**
  * GtoEngine: Graph Trajectory Optimization.
- * v9.3.15:
- * - Hardening: Finalized Double standardization. Eliminated redundant 
- *   conversions in trajectory evaluation.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized internal buffer aging 
+ *   to use monotonic 'rt' timestamps instead of wall-clock.
  */
 class GtoEngine {
 
@@ -21,32 +21,36 @@ class GtoEngine {
         val maxAccuracy: Double, 
         val bearing: Double,
         val speedMps: Double,
-        val ts: Long,
+        val ts: Long, // Wall-clock
+        val rt: Long, // Monotonic (Issue #102)
         val vibrationIndex: Double
     )
 
     fun addPoint(
         lat: Double, lng: Double, alt: Double, accuracy: Double, maxAccuracy: Double,
-        bearing: Double, speedMps: Double, ts: Long, vibrationIndex: Double
+        bearing: Double, speedMps: Double, ts: Long, rt: Long, vibrationIndex: Double
     ) {
-        window.removeAll { (ts - it.ts) > HINDSIGHT_MAX_AGE_MS }
+        // v9.4.00: Use monotonic 'rt' for aging (Issue #102)
+        window.removeAll { (rt - it.rt) > HINDSIGHT_MAX_AGE_MS }
         if (window.size >= maxWindowSize) {
             window.removeAt(0)
         }
-        window.add(GtoNode(lat, lng, alt, accuracy, maxAccuracy, bearing, speedMps, ts, vibrationIndex))
+        window.add(GtoNode(lat, lng, alt, accuracy, maxAccuracy, bearing, speedMps, ts, rt, vibrationIndex))
     }
 
-    fun evaluateTrajectory(newLat: Double, newLng: Double, newBearing: Double, newSpeedMps: Double, timestamp: Long): Boolean {
+    fun evaluateTrajectory(newLat: Double, newLng: Double, newBearing: Double, newSpeedMps: Double, timestamp: Long, rt: Long): Boolean {
         if (window.isEmpty()) return false
 
         val last = window.last()
         
         val angleDiff = abs(newBearing - last.bearing).let { if (it > 180) 360 - it else it }
         val distFromLast = PhysicsUtils.calculateDistance(last.lat, last.lng, newLat, newLng)
-        val timeFromLast = (timestamp - last.ts) / 1000.0
+        
+        // v9.4.00: Use monotonic 'rt' for kinematic calculations (Issue #102)
+        val timeFromLast = (rt - last.rt) / 1000.0
         val impliedSpeed = distFromLast / max(0.1, timeFromLast)
         
-        if (timestamp <= last.ts || (timestamp - last.ts) > HINDSIGHT_MAX_AGE_MS) return false
+        if (rt <= last.rt || (rt - last.rt) > HINDSIGHT_MAX_AGE_MS) return false
         
         val avgVibration = window.map { it.vibrationIndex }.average()
         val isTowSignature = avgVibration < VIBRATION_STATIONARY_THRESHOLD && newSpeedMps > GTO_TOW_SPEED_THRESHOLD

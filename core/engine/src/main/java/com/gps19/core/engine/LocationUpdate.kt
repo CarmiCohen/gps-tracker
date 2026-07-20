@@ -4,12 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
- * v9.3.15:
- * - Hardening: Finalized Double standardization. Eliminated redundant 
- *   conversions across module boundaries.
- * v9.1.8:
- * - Issue #046: Shared Behavioral State. Added trackerState for authoritative 
- *   broadcast from Tracker to Viewer HUD.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Added monotonic 'rt' timestamp 
+ *   to ensure end-to-end temporal purity in the telemetry pipeline.
  */
 @Serializable
 data class LocationUpdate(
@@ -17,7 +14,8 @@ data class LocationUpdate(
     val speed: Double = 0.0, val accuracy: Double = 0.0, val bearing: Double = 0.0,
     val battery: Int = -1, val temp: Double = 0.0, val maxTemp: Double = 0.0,
     val isCharging: Boolean = false, val gpsTs: Long = 0L, val isMe: Boolean = true,
-    val ts: Long = 0L,
+    val ts: Long = 0L, // Wall-clock
+    val rt: Long = 0L, // Monotonic (Issue #102)
     val isJump: Boolean = false, val isTrajectoryPromoted: Boolean = false,
     val jumpTier: Int = 0,
     val isAdaptiveJump: Boolean = false,
@@ -61,7 +59,7 @@ data class LocationUpdate(
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRealtime: Long = 0L,
+    val lastValidFixRt: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",

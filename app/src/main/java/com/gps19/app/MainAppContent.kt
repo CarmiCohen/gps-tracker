@@ -61,7 +61,7 @@ fun MainAppContent(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val systemPulse by viewModel.systemPulse.collectAsStateWithLifecycle()
-    val systemPulseRealtime by viewModel.systemPulseRealtime.collectAsStateWithLifecycle()
+    val systemPulseRt by viewModel.systemPulseRt.collectAsStateWithLifecycle()
     val redScreenVisible by viewModel.redScreenVisible.collectAsStateWithLifecycle()
     
     val navController = rememberNavController()
@@ -295,7 +295,7 @@ fun MainAppContent(
                         }
                         TrackerScreen(
                             uiState = uiState, viewModel = viewModel, logs = eventLogs, trail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
-                            systemPulse = systemPulse, systemPulseRealtime = systemPulseRealtime,
+                            systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
                             onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
@@ -321,7 +321,7 @@ fun MainAppContent(
                         }
                         ViewerScreen(
                             uiState = uiState, viewModel = viewModel, logs = eventLogs, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
-                            systemPulse = systemPulse, systemPulseRealtime = systemPulseRealtime,
+                            systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
                             onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },

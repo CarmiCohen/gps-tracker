@@ -31,14 +31,9 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * July.19.00:
- * - Issue #098: Samsung A15 Hardening. Implemented registration failure detection 
- *   for Step Detector to trigger Accelerometer-based fallback stay-alive.
- * v9.3.25:
- * - R405: Samsung Stay-Alive Fallback. Implemented passive pulse from 
- *   accelerometer when TYPE_STEP_DETECTOR is unavailable to maintain OOM priority.
- * v9.3.20:
- * - R405: Samsung A15 Hardening. Implemented "Stay-Alive" low-power sensor subscription.
+ * v9.4.00:
+ * - Issue #102: Temporal Forensic Integrity. Renamed monotonic timing variables 
+ *   to use 'Rt' suffix and ensured wall-clock separation in sensor snapshots.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -66,10 +61,10 @@ class AppSensorManager @Inject constructor(
     private val hasLoggedThreadInfo = AtomicBoolean(false)
 
     private var lastDisplayState = Display.STATE_UNKNOWN
-    private var lastDisplayTransitionTs = 0L
+    private var lastDisplayTransitionRt = 0L
     private val isDisplayFlickering = AtomicBoolean(false)
 
-    private var lastStayAliveTs = 0L
+    private var lastStayAliveRt = 0L
 
     fun isScreenOn(): Boolean {
         if (lastDisplayState == Display.STATE_UNKNOWN) {
@@ -88,8 +83,8 @@ class AppSensorManager @Inject constructor(
             val newState = display.state
             
             if (newState != lastDisplayState) {
-                val now = timeProvider.elapsedRealtime()
-                val delta = now - lastDisplayTransitionTs
+                val nowRt = timeProvider.elapsedRealtime()
+                val delta = nowRt - lastDisplayTransitionRt
                 if (delta < 1000L) {
                     if (!isDisplayFlickering.get()) {
                         isDisplayFlickering.set(true)
@@ -99,7 +94,7 @@ class AppSensorManager @Inject constructor(
                     isDisplayFlickering.set(false)
                 }
                 lastDisplayState = newState
-                lastDisplayTransitionTs = now
+                lastDisplayTransitionRt = nowRt
             }
         }
     }
@@ -133,6 +128,7 @@ class AppSensorManager @Inject constructor(
     private var internalPeakVibration: Double = 0.0
     private var internalPeakVerticalVelocity: Double = 0.0
     private var internalPeakVerticalVelocityTs: Long = 0L
+    private var internalPeakVerticalVelocityRt: Long = 0L
     private var internalPeakVerticalDisplacement: Double = 0.0
     
     @Volatile
@@ -146,6 +142,7 @@ class AppSensorManager @Inject constructor(
 
     data class SensorSnapshot(
         val ts: Long,
+        val rt: Long,
         val lux: Double,
         val vibe: Double,
         val proxIdx: Double,
@@ -155,7 +152,7 @@ class AppSensorManager @Inject constructor(
         val isSitDetected: Boolean = false
     )
     private val sensorSampleBuffer = ConcurrentLinkedQueue<SensorSnapshot>()
-    private var lastBufferRecordTs = 0L
+    private var lastBufferRecordRt = 0L
 
     private var secPeakLux = 0.0
     private var secPeakVibe = 0.0
@@ -176,14 +173,14 @@ class AppSensorManager @Inject constructor(
     private var fastPathLightSpikeThreshold: Double = LIGHT_THRESHOLD_LUX_JUMP
     private var onLightSpike: (() -> Unit)? = null
     
-    private var lastAcousticSpikeTs: Long = 0L
-    private var lastLightSpikeTs: Long = 0L
+    private var lastAcousticSpikeRt: Long = 0L
+    private var lastLightSpikeRt: Long = 0L
 
-    var lastFastPathAcousticSpikeTs: Long = 0L
+    var lastAcousticLockoutRt: Long = 0L
         private set
 
-    private var sessionStartTs = 0L
-    val isWarming: Boolean get() = (timeProvider.elapsedRealtime() - sessionStartTs < SENSOR_WARMING_MS)
+    private var sessionStartRt = 0L
+    val isWarming: Boolean get() = (timeProvider.elapsedRealtime() - sessionStartRt < SENSOR_WARMING_MS)
 
     private var onHardwareFailure: ((String) -> Unit)? = null
 
@@ -240,21 +237,21 @@ class AppSensorManager @Inject constructor(
         private set
 
     private var lastLinearAccelTs: Long = 0L
-    private var stationaryStartTs: Long = 0L
+    private var stationaryStartRt: Long = 0L
 
     private var emaPressure: Double = 0.0
-    private var lastBaroZeroingTs: Long = 0L
+    private var lastBaroZeroingRt: Long = 0L
 
     private var initialRotationMatrix = FloatArray(9)
     private var hasInitialRotation = false
 
     private var plungePhase = 0 
     private var plungeMatched = false
-    private var lastPlungePhaseTs = 0L
+    private var lastPlungePhaseRt = 0L
 
     fun start() {
-        sessionStartTs = timeProvider.elapsedRealtime()
-        lastBaroZeroingTs = sessionStartTs
+        sessionStartRt = timeProvider.elapsedRealtime()
+        lastBaroZeroingRt = sessionStartRt
         hasLoggedThreadInfo.set(false)
         proximityMaxRange = proximity?.maximumRange?.toDouble() ?: 5.0
 
@@ -329,13 +326,13 @@ class AppSensorManager @Inject constructor(
             Timber.i("Forensic: AppSensorManager offloading verified. Thread: $threadName (isMain: $isMain)")
         }
 
-        val now = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime()
         val wallNow = timeProvider.currentTimeMillis()
         val values = event.values
         
         when (event.sensor.type) {
             Sensor.TYPE_STEP_DETECTOR -> {
-                lastStayAliveTs = now
+                lastStayAliveRt = nowRt
             }
             Sensor.TYPE_ACCELEROMETER -> {
                 val v0 = values[0].toDouble()
@@ -355,8 +352,8 @@ class AppSensorManager @Inject constructor(
                 
                 // R405 Fallback: If hardware Step Detector is missing OR registration failed (Issue #098),
                 // use Accelerometer pulses to maintain process priority on Samsung devices.
-                if (!isStepDetectorRegistered && now - lastStayAliveTs > 10000L) {
-                    lastStayAliveTs = now
+                if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) {
+                    lastStayAliveRt = nowRt
                     Timber.v("Stay-Alive Pulse (Accel Fallback)")
                 }
             }
@@ -381,8 +378,8 @@ class AppSensorManager @Inject constructor(
                     rawProximityNear = newValue; proximityJob?.cancel()
                     val baseDebounceMs = if (isStationary()) PROXIMITY_DEBOUNCE_STATIONARY_MS else PROXIMITY_DEBOUNCE_MOVING_MS
                     var calcDebounceMs = baseDebounceMs
-                    if (isStationary() && stationaryStartTs > 0) {
-                        val hoursStationary = (now - stationaryStartTs) / 3600000.0
+                    if (isStationary() && stationaryStartRt > 0) {
+                        val hoursStationary = (nowRt - stationaryStartRt) / 3600000.0
                         calcDebounceMs += (hoursStationary * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR).toLong()
                     }
                     if (isHighLoad) calcDebounceMs = (calcDebounceMs * PROXIMITY_STRESS_SCALING_MULTIPLIER).toLong()
@@ -405,7 +402,7 @@ class AppSensorManager @Inject constructor(
                         val alpha = SentinelValidator.accelerateAlpha(LUX_EMA_FAST, isWarming)
                         fastPathLightBaseline = (fastPathLightBaseline * (1.0 - alpha)) + (lux * alpha)
                         if (!isWarming && onLightSpike != null && (lux - fastPathLightBaseline) > fastPathLightSpikeThreshold) {
-                            if (now - lastLightSpikeTs > SPIKE_DEBOUNCE_MS) { lastLightSpikeTs = now; onLightSpike?.invoke() }
+                            if (nowRt - lastLightSpikeRt > SPIKE_DEBOUNCE_MS) { lastLightSpikeRt = nowRt; onLightSpike?.invoke() }
                         }
                     }
                 }
@@ -413,11 +410,11 @@ class AppSensorManager @Inject constructor(
             Sensor.TYPE_ROTATION_VECTOR -> processRotation(values)
         }
         
-        if (now - lastBufferRecordTs >= TICK_INTERVAL_MS) {
+        if (nowRt - lastBufferRecordRt >= TICK_INTERVAL_MS) {
             val sitForForensics: Boolean
             synchronized(this) { sitForForensics = secSitDetected; secSitDetected = false }
-            sensorSampleBuffer.add(SensorSnapshot(ts = wallNow, lux = secPeakLux, vibe = secPeakVibe, proxIdx = secMinProxIdx, tilt = secPeakTilt, lift = secPeakLift, acoustic = secPeakDb, isSitDetected = sitForForensics))
-            lastBufferRecordTs = now
+            sensorSampleBuffer.add(SensorSnapshot(ts = wallNow, rt = nowRt, lux = secPeakLux, vibe = secPeakVibe, proxIdx = secMinProxIdx, tilt = secPeakTilt, lift = secPeakLift, acoustic = secPeakDb, isSitDetected = sitForForensics))
+            lastBufferRecordRt = nowRt
             secPeakLux = currentLux; secPeakVibe = currentVibrationIndex; secMinProxIdx = proximityIdx; secPeakTilt = currentTiltDegrees; secPeakLift = abs(relativeAltitude); secPeakDb = currentAcousticDb
             while (sensorSampleBuffer.size > 0 && (wallNow - (sensorSampleBuffer.peek()?.ts ?: wallNow)) > SENSOR_SAMPLE_BUFFER_MAX_AGE_MS) sensorSampleBuffer.poll()
         }
@@ -475,7 +472,7 @@ class AppSensorManager @Inject constructor(
                                 if (db < internalMinDb) internalMinDb = db; if (db > secPeakDb) secPeakDb = db
                                 if (!isWarming && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) {
                                     val nowRt = timeProvider.elapsedRealtime()
-                                    if (nowRt - lastAcousticSpikeTs > SPIKE_DEBOUNCE_MS) { lastAcousticSpikeTs = nowRt; lastFastPathAcousticSpikeTs = nowRt; onAcousticSpike?.invoke() }
+                                    if (nowRt - lastAcousticSpikeRt > SPIKE_DEBOUNCE_MS) { lastAcousticSpikeRt = nowRt; lastAcousticLockoutRt = nowRt; onAcousticSpike?.invoke() }
                                 }
                             }
                         } else if (read < 0) {
@@ -503,6 +500,7 @@ class AppSensorManager @Inject constructor(
     fun consumePeakVibration(): Double { synchronized(this) { val p = internalPeakVibration; internalPeakVibration = 0.0; return p } }
     fun consumePeakVerticalVelocity(): Double { synchronized(this) { val p = internalPeakVerticalVelocity; internalPeakVerticalVelocity = 0.0; return p } }
     fun consumePeakVerticalVelocityTs(): Long { synchronized(this) { val p = internalPeakVerticalVelocityTs; internalPeakVerticalVelocityTs = 0L; return p } }
+    fun consumePeakVerticalVelocityRt(): Long { synchronized(this) { val p = internalPeakVerticalVelocityRt; internalPeakVerticalVelocityRt = 0L; return p } }
     fun consumePeakVerticalDisplacement(): Double { synchronized(this) { val p = internalPeakVerticalDisplacement; internalPeakVerticalDisplacement = 0.0; return p } }
     fun consumePlungeMatched(): Boolean { synchronized(this) { val m = !isWarming && plungeMatched; plungeMatched = false; return m } }
 
@@ -513,9 +511,9 @@ class AppSensorManager @Inject constructor(
         lastAccelX = x; lastAccelY = y; lastAccelZ = z
         val oldVal = vibrationCircularBuffer[vibrationCircularIdx]; vibrationCircularBuffer[vibrationCircularIdx] = delta; vibrationRollingSum = vibrationRollingSum - oldVal + delta; vibrationCircularIdx = (vibrationCircularIdx + 1) % VIBRATION_WINDOW_SIZE; if (vibrationBufferCount < VIBRATION_WINDOW_SIZE) vibrationBufferCount++
         currentVibrationIndex = if (vibrationBufferCount > 0) vibrationRollingSum / vibrationBufferCount else 0.0; if (currentVibrationIndex > secPeakVibe) secPeakVibe = currentVibrationIndex
-        val now = timeProvider.elapsedRealtime()
-        if (plungePhase == 2) { if (isStationary()) { synchronized(this) { plungeMatched = true; secSitDetected = true }; plungePhase = 0 } else if (now - lastPlungePhaseTs > CHAIR_PLUNGE_PHASE_TIMEOUT_MS) { plungePhase = 0 } }
-        if (isStationary()) { if (stationaryStartTs == 0L) stationaryStartTs = now else if (now - stationaryStartTs > MUZZLE_HYSTERESIS_MS) { currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; if (plungePhase != 2) plungePhase = 0 } } else { stationaryStartTs = 0L }
+        val nowRt = timeProvider.elapsedRealtime()
+        if (plungePhase == 2) { if (isStationary()) { synchronized(this) { plungeMatched = true; secSitDetected = true }; plungePhase = 0 } else if (nowRt - lastPlungePhaseRt > CHAIR_PLUNGE_PHASE_TIMEOUT_MS) { plungePhase = 0 } }
+        if (isStationary()) { if (stationaryStartRt == 0L) stationaryStartRt = nowRt else if (nowRt - stationaryStartRt > MUZZLE_HYSTERESIS_MS) { currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; if (plungePhase != 2) plungePhase = 0 } } else { stationaryStartRt = 0L }
     }
 
     private fun processLinearAcceleration(val0: Double, val1: Double, val2: Double, timestampNs: Long) {
@@ -529,13 +527,13 @@ class AppSensorManager @Inject constructor(
             val vz_accel = if (gravMag > 0.1) dot / gravMag else 0.0
             currentVerticalVelocity += vz_accel * dt; currentVerticalDisplacement += currentVerticalVelocity * dt 
             if (abs(currentVerticalVelocity) > VERTICAL_VELOCITY_MAX_MPS) currentVerticalVelocity = if (currentVerticalVelocity > 0) VERTICAL_VELOCITY_MAX_MPS else -VERTICAL_VELOCITY_MAX_MPS
-            val now = timeProvider.elapsedRealtime(); val wallNow = timeProvider.currentTimeMillis()
-            if (plungePhase > 0 && now - lastPlungePhaseTs > CHAIR_PLUNGE_PHASE_TIMEOUT_MS) plungePhase = 0
+            val nowRt = timeProvider.elapsedRealtime(); val wallNow = timeProvider.currentTimeMillis()
+            if (plungePhase > 0 && nowRt - lastPlungePhaseRt > CHAIR_PLUNGE_PHASE_TIMEOUT_MS) plungePhase = 0
             when (plungePhase) {
-                0 -> if (!isWarming && currentVerticalVelocity < -CHAIR_PLUNGE_VELOCITY_THRESHOLD) { plungePhase = 1; lastPlungePhaseTs = now; currentVerticalDisplacement = 0.0 }
-                1 -> { val timeInPhase = now - lastPlungePhaseTs; if (timeInPhase > CHAIR_PLUNGE_WINDOW_MS) { plungePhase = 0 } else if (currentVerticalVelocity > -CHAIR_PLUNGE_VELOCITY_THRESHOLD * 0.2) { if (abs(currentVerticalDisplacement) > CHAIR_PLUNGE_DISTANCE_THRESHOLD) { plungePhase = 2; lastPlungePhaseTs = now } else { plungePhase = 0 } } }
+                0 -> if (!isWarming && currentVerticalVelocity < -CHAIR_PLUNGE_VELOCITY_THRESHOLD) { plungePhase = 1; lastPlungePhaseRt = nowRt; currentVerticalDisplacement = 0.0 }
+                1 -> { val timeInPhaseRt = nowRt - lastPlungePhaseRt; if (timeInPhaseRt > CHAIR_PLUNGE_WINDOW_MS) { plungePhase = 0 } else if (currentVerticalVelocity > -CHAIR_PLUNGE_VELOCITY_THRESHOLD * 0.2) { if (abs(currentVerticalDisplacement) > CHAIR_PLUNGE_DISTANCE_THRESHOLD) { plungePhase = 2; lastPlungePhaseRt = nowRt } else { plungePhase = 0 } } }
             }
-            synchronized(this) { if (abs(currentVerticalVelocity) > abs(internalPeakVerticalVelocity)) { internalPeakVerticalVelocity = currentVerticalVelocity; internalPeakVerticalVelocityTs = wallNow }; if (abs(currentVerticalDisplacement) > abs(internalPeakVerticalDisplacement)) internalPeakVerticalDisplacement = currentVerticalDisplacement }
+            synchronized(this) { if (abs(currentVerticalVelocity) > abs(internalPeakVerticalVelocity)) { internalPeakVerticalVelocity = currentVerticalVelocity; internalPeakVerticalVelocityTs = wallNow; internalPeakVerticalVelocityRt = nowRt }; if (abs(currentVerticalDisplacement) > abs(internalPeakVerticalDisplacement)) internalPeakVerticalDisplacement = currentVerticalDisplacement }
         }
     }
 
@@ -544,8 +542,8 @@ class AppSensorManager @Inject constructor(
         currentPressure = pressure
         val alpha = SentinelValidator.accelerateAlpha(1.0 - BARO_EMA_SLOW, isWarming)
         emaPressure = (emaPressure * (1.0 - alpha)) + (pressure * alpha)
-        val now = timeProvider.elapsedRealtime(); val stationaryDuration = if (stationaryStartTs > 0L) now - stationaryStartTs else 0L
-        if (now - lastBaroZeroingTs > BARO_ZEROING_INTERVAL_MS && stationaryDuration >= PASSIVE_ZEROING_STATIONARY_MS) { emaPressure = pressure; lastBaroZeroingTs = now }
+        val nowRt = timeProvider.elapsedRealtime(); val stationaryDuration = if (stationaryStartRt > 0L) nowRt - stationaryStartRt else 0L
+        if (nowRt - lastBaroZeroingRt > BARO_ZEROING_INTERVAL_MS && stationaryDuration >= PASSIVE_ZEROING_STATIONARY_MS) { emaPressure = pressure; lastBaroZeroingRt = nowRt }
         val currentAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure.toFloat()).toDouble()
         val baselineAlt = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure.toFloat()).toDouble()
         absoluteAltitude = currentAlt; relativeAltitude = if (isWarming) 0.0 else currentAlt - baselineAlt
@@ -554,8 +552,8 @@ class AppSensorManager @Inject constructor(
 
     private fun processRotation(rotationVector: FloatArray) {
         AndroidSensorManager.getRotationMatrixFromVector(currentRotationVectorMatrixBuffer, rotationVector)
-        val now = timeProvider.elapsedRealtime()
-        if (!hasInitialRotation) { if (!isWarming && stationaryStartTs != 0L && (now - stationaryStartTs > ROTATION_INIT_STATIONARY_MS)) { System.arraycopy(currentRotationVectorMatrixBuffer, 0, initialRotationMatrix, 0, 9); hasInitialRotation = true }; return }
+        val nowRt = timeProvider.elapsedRealtime()
+        if (!hasInitialRotation) { if (!isWarming && stationaryStartRt != 0L && (nowRt - stationaryStartRt > ROTATION_INIT_STATIONARY_MS)) { System.arraycopy(currentRotationVectorMatrixBuffer, 0, initialRotationMatrix, 0, 9); hasInitialRotation = true }; return }
         val dotProduct = (initialRotationMatrix[2] * currentRotationVectorMatrixBuffer[2]) + (initialRotationMatrix[5] * currentRotationVectorMatrixBuffer[5]) + (initialRotationMatrix[8] * currentRotationVectorMatrixBuffer[8])
         val cosTheta = dotProduct.coerceIn(-1.0f, 1.0f); currentTiltDegrees = if (isWarming) 0.0 else Math.toDegrees(cosTheta.toDouble())
         if (currentTiltDegrees > secPeakTilt) secPeakTilt = currentTiltDegrees
@@ -563,6 +561,6 @@ class AppSensorManager @Inject constructor(
 
     private fun updateOrientation() { if (hasGravity && hasGeomagnetic) { if (AndroidSensorManager.getRotationMatrix(rotationMatrixBuffer, inclinationMatrixBuffer, gravityBuffer, geomagneticBuffer)) { AndroidSensorManager.getOrientation(rotationMatrixBuffer, orientationBuffer); currentCompassHeading = (Math.toDegrees(orientationBuffer[0].toDouble()) + 360.0) % 360.0 } } }
     fun isStationary(): Boolean = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
-    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartTs = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartTs = timeProvider.elapsedRealtime(); lastBaroZeroingTs = sessionStartTs; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0) }
+    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0) }
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 }
