@@ -6,6 +6,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
@@ -14,9 +15,9 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * v9.4.01:
- * - Issue #103: Drift Reference Persistence. Persisting clockDriftRef to 
- *   ensure forensic continuity across process restarts.
+ * v9.4.02:
+ * - Issue #105: Forensic Ribbon Continuity Verification. Hardened initialization 
+ *   to prevent race conditions and ensure gap detection across process death.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -52,10 +53,14 @@ class HistoryManager @Inject constructor(
         this.listener = listener
     }
 
-    fun initialize(scope: CoroutineScope) {
+    /**
+     * Issue #105: Made suspend to ensure drift reference is restored before 
+     * the first ribbon update tick occurs.
+     */
+    suspend fun initialize(scope: CoroutineScope) {
         this.scope = scope
         
-        scope.launch {
+        withContext(Dispatchers.IO) {
             // v9.4.00: We prioritize monotonic reference for sit duplicate guard if possible
             val lastSitTs = repository.getLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, 0L)
             if (lastSitTs > 0) {

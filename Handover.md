@@ -1,31 +1,32 @@
-# Handover (July.20.00) - Startup Hardening & Forensic Integrity
+# Handover (July.20.01) - Forensic Continuity & Startup Hardening
 
 ## 🎯 Current Objective
-Release July.20.00: Hardened startup sequence against ANRs via proactive database maintenance.
+Release July.20.01: Hardened forensic continuity across process boundaries and startup sequence.
 
 ## 📊 Forensic Status (Authoritative)
-1. **Startup Hardening (Issue #104 COMPLETE)**: 
+1. **Forensic Ribbon Continuity (Issue #105 COMPLETE)**:
+   - Reconstructed monotonic timeline on startup in `TrackerService` and `ViewerService`.
+   - Replaced \"reset on start\" behavior with a bridged timeline using `clock_drift_ref` and `lastServiceTickTs`.
+   - Hardened `HistoryManager.initialize` to ensure drift restoration before the first pulse.
+   - Verified that \"Stability Gaps\" occurring during process death are now visible and filled by the 1Hz ribbon logic.
+2. **Startup Hardening (Issue #104 COMPLETE)**: 
    - Proactive pruning integrated into `MainViewModel.loadInitialData`.
-   - Log pruning now uses a dual-stage transaction: 
-     - Stage 1: Aggressive shedding of routine heartbeats (keep 100).
-     - Stage 2: General pruning of non-forensic logs (keep 500).
-   - Forensic Integrity: Logs with `isImportant=1` or `isSpecial=1` (Pink) are strictly preserved.
-2. **Temporal Architecture**: Dual-time stream (`rt` vs `ts`) is stable.
-3. **Persistence State**: Room DB v57, DataStore v58 (includes `clock_drift_ref`).
+   - Routine heartbeats are shed first while preserving Pink logs (`isImportant`/`isSpecial`).
+3. **Temporal Architecture**: Dual-time stream (`rt` vs `ts`) is stable across all services.
+4. **Persistence State**: Room DB v57, DataStore v58.
 
 ## 🟢 System Status: STABLE
 - **Build**: `app:assembleDebug` Verified.
-- **Integrity**: Forensic markers preserved across deep pruning.
-- **ANR Risk**: Low (Startup bottlenecks eliminated).
+- **Integrity**: Forensic markers and 1Hz fidelity preserved across process death.
+- **ANR Risk**: Low (Startup bottlenecks offloaded to IO).
 
-## 🚀 Resumption Strategy (Next Chat)
-1. Read `Handover.md` and `issues.md`.
-2. Continue with the next issue in the backlog.
+## 🚀 Next Steps
+1. Tag and Release July.20.01.
 
 ### Git Release Sequence
 ```bash
 git add .
-git commit -m "Release July.20.00: Issue #104 Complete - Startup ANR Hardening"
-git tag -a vJuly.20.00 -m "Startup Hardening Baseline"
+git commit -m \"Release July.20.01: Issue #105 Complete - Forensic Ribbon Continuity\"
+git tag -a vJuly.20.01 -m \"Forensic Continuity & Startup Hardening\"
 git push origin main --tags
 ```

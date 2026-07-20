@@ -20,9 +20,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * v9.4.00:
- * - Issue #102: Temporal Forensic Integrity. Propagating monotonic 'rt' timestamps 
- *   to engine components to ensure logic immunity to system clock drifts.
+ * v9.4.02:
+ * - Issue #105: Forensic Ribbon Continuity Verification. Reconstructing monotonic 
+ *   timeline on startup to detect and fill gaps occurring during process downtime.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -131,6 +131,9 @@ class TrackerService : BaseMonitorService() {
                     logManager.logServiceEvent(message, important)
                 }
             })
+            
+            // Issue #105: Await initialization to ensure clock drift ref is restored 
+            // before the first tick loop update.
             historyManager.initialize(lifecycleScope)
 
             sensorManager.start()
@@ -208,8 +211,18 @@ class TrackerService : BaseMonitorService() {
             }
 
             val recoveredTs = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+            val recoveredDrift = repository.getLong(MainRepository.CLOCK_DRIFT_REF_KEY, 0L)
+            
             lastServiceTickTs = recoveredTs
-            lastServiceTickRealtime = timeProvider.elapsedRealtime()
+            
+            // Issue #105: Reconstruct monotonic history to ensure the gap between process 
+            // death and restart is visible to HistoryManager.
+            lastServiceTickRealtime = if (recoveredDrift != 0L) {
+                recoveredTs - recoveredDrift
+            } else {
+                timeProvider.elapsedRealtime()
+            }
+
             locationProcessor.setLastValidFixRt(timeProvider.elapsedRealtime()) 
             
             serviceStartRealtime = timeProvider.elapsedRealtime()

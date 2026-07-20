@@ -17,9 +17,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * v9.4.00:
- * - Issue #102: Temporal Forensic Integrity. Propagating monotonic 'nowRt' 
- *   to engine components to ensure logic immunity to system clock drifts.
+ * v9.4.02:
+ * - Issue #105: Forensic Ribbon Continuity Verification. Reconstructing monotonic 
+ *   timeline on startup to detect and fill gaps occurring during process downtime.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -112,6 +112,9 @@ class ViewerService : BaseMonitorService() {
                     logManager.logServiceEvent(message, important)
                 }
             })
+            
+            // Issue #105: Await initialization to ensure clock drift ref is restored 
+            // before the first tick loop update.
             historyManager.initialize(lifecycleScope)
 
             delay(1000)
@@ -165,8 +168,18 @@ class ViewerService : BaseMonitorService() {
             }
 
             val recoveredTs = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+            val recoveredDrift = repository.getLong(MainRepository.CLOCK_DRIFT_REF_KEY, 0L)
+            
             lastServiceTickTs = recoveredTs
-            lastServiceTickRealtime = timeProvider.elapsedRealtime()
+            
+            // Issue #105: Reconstruct monotonic history to ensure the gap between process 
+            // death and restart is visible to HistoryManager.
+            lastServiceTickRealtime = if (recoveredDrift != 0L) {
+                recoveredTs - recoveredDrift
+            } else {
+                timeProvider.elapsedRealtime()
+            }
+            
             locationProcessor.setLastValidFixRt(timeProvider.elapsedRealtime())
             
             serviceStartRealtime = timeProvider.elapsedRealtime()
@@ -452,7 +465,6 @@ class ViewerService : BaseMonitorService() {
         }
 
         repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, now)
-        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
         lastServiceTickTs = now
         lastServiceTickRealtime = nowRt
         serviceTickCounter++
