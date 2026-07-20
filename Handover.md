@@ -1,32 +1,39 @@
-# Handover (July.20.01) - Forensic Continuity & Startup Hardening
+# Handover (July.20.05) - Unified Forensic Ribbon Continuity
 
 ## 🎯 Current Objective
-Release July.20.01: Hardened forensic continuity across process boundaries and startup sequence.
+Complete implementation and verification of **R106: Unified Forensic Ribbon Continuity**. This consolidated the forensic UI into a single scale-aware engine with synchronized sensor/connection baselines and explicit data-loss (Black Gap) visualization.
+
+## 📝 Guidelines for Implementation
+1. Display the selected issue here before starting the fix.
+2. Remediate the issues using only root-cause-oriented solutions, keep consistency with the project's architecture, design principles, and long-term maintainability objectives. Avoid temporary mitigations or workaround-based implementations. Rigorously remove leftovers, and leftovers of the leftovers, etc. Try to keep the app simple.
+3. Document any newly identified concerns in `issues.md`. Concerns include - risks, defects, inconsistencies.
+4. Record all fixed issues in the relevant status tracking file and mark them as resolved.
+5. Update `Handover.md` after each modification to any `.kt` file.
+6. Briefly explain each action before executing it.
+7. Completion:
+    - a. Rebuild the app.
+    - b. Verify that ALL fixed issues are updated in `issues.md` or another status tracking md file.
+    - c. Check that no *.md or *.xml file was accidentally truncated.
+    - d. Verify that there is no inconsistency with this change of the app and other code portions or documentation.
+    - e. Verify that new requirements are added to `STATUS/SOT_MASTER_REQUIREMENTS.md`.
+    - f. Prepare a block of Git commands to stage the changes and to commit them as a new release with a tag the version and to push everything to the remote repository. The subversion number will be incremented automatically, but this time set the version to July.20.05
+    - g. Suggest your ideas, if you have, how to simplify the code and the app, so that it will be easier to work with.
 
 ## 📊 Forensic Status (Authoritative)
-1. **Forensic Ribbon Continuity (Issue #105 COMPLETE)**:
-   - Reconstructed monotonic timeline on startup in `TrackerService` and `ViewerService`.
-   - Replaced \"reset on start\" behavior with a bridged timeline using `clock_drift_ref` and `lastServiceTickTs`.
-   - Hardened `HistoryManager.initialize` to ensure drift restoration before the first pulse.
-   - Verified that \"Stability Gaps\" occurring during process death are now visible and filled by the 1Hz ribbon logic.
-2. **Startup Hardening (Issue #104 COMPLETE)**: 
+1. **Unified Forensic Ribbon Continuity (Issue #106 COMPLETE)**:
+   - Consolidated `AnalyticalRibbons` to a single `activeHistoryFlow` based on `selectedScale`.
+   - Extracted `ForensicRibbonContainer` for unified rendering baseline (ticks, gaps, alignment).
+   - Implemented explicit "Black Gap" visualization for data loss segments.
+   - Synchronized "Chain GPS" and sensor stacks on a single temporal axis.
+2. **Forensic Ribbon Continuity (Issue #105 COMPLETE)**:
+   - Reconstructed monotonic timeline on startup.
+3. **Startup Hardening (Issue #104 COMPLETE)**: 
    - Proactive pruning integrated into `MainViewModel.loadInitialData`.
-   - Routine heartbeats are shed first while preserving Pink logs (`isImportant`/`isSpecial`).
-3. **Temporal Architecture**: Dual-time stream (`rt` vs `ts`) is stable across all services.
-4. **Persistence State**: Room DB v57, DataStore v58.
 
 ## 🟢 System Status: STABLE
-- **Build**: `app:assembleDebug` Verified.
-- **Integrity**: Forensic markers and 1Hz fidelity preserved across process death.
-- **ANR Risk**: Low (Startup bottlenecks offloaded to IO).
+- **Build**: `app:assembleDebug` Pending verification after R106.
+- **Integrity**: Forensic markers preserved across process death.
 
 ## 🚀 Next Steps
-1. Tag and Release July.20.01.
-
-### Git Release Sequence
-```bash
-git add .
-git commit -m \"Release July.20.01: Issue #105 Complete - Forensic Ribbon Continuity\"
-git tag -a vJuly.20.01 -m \"Forensic Continuity & Startup Hardening\"
-git push origin main --tags
-```
+1. Rebuild and verify UI responsiveness with unified ribbons on target hardware (Samsung A15).
+2. Prepare release July.20.05.

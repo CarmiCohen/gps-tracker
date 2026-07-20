@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - July.20.01
+# System Source of Truth (SoT) - July.20.05
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
+*   **Unified Forensic Ribbon Continuity (R106)**: To ensure synchronized multi-metric auditing, the system MUST implement a unified method for rendering \"moving\" ribbons across all scales. Sensor and connection ribbons MUST share a synchronized temporal baseline where missing data periods (e.g., app-off or service-death) are explicitly visualized as \"Black Gaps.\" Vertical clock ticks MUST proceed smoothly through these gaps to maintain timeline integrity, allowing for forensic correlation between telemetry loss and sensor trends. (July.20.05 / Issue #106)
 *   **Monotonic Timeline Reconstruction (R105)**: To ensure \"1Hz Ribbon Fidelity\" across process boundaries, the system MUST reconstruct the monotonic timeline on startup. The background services (`TrackerService`/`ViewerService`) MUST calculate a virtual `lastServiceTickRealtime` by subtracting the persisted `clock_drift_ref` from the persisted wall-clock `lastServiceTickTs`. This allows `HistoryManager` to accurately identify and fill gaps that occurred while the process was inactive. (July.20.01 / Issue #105)
 *   **Startup Maintenance Authority (R104)**: To prevent I/O bottlenecks and ANRs during cold starts or schema migrations on low-end hardware (Samsung A15), the system MUST execute a proactive `deepPruneLogs` operation on `Dispatchers.IO` immediately upon initialization. This operation MUST prioritize the shedding of routine heartbeats while strictly preserving forensic integrity. (July.20.00 / Issue #104)
 *   **Drift Reference Persistence (R103)**: To maintain forensic continuity across process restarts, the system MUST persist the monotonic-to-wall-clock drift reference (`clock_drift_ref`). This ensures that gap-filling logic in `HistoryManager` can correctly identify system clock adjustments made while the application was inactive. (July.19.04 / Issue #103)
@@ -68,7 +69,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Telemetry Freshness Authority (Issue #029)**: Data health (`DAT` badge) is determined by arrival of any packet.
 *   **Document Integrity Authority (R969)**: Core documentation is subject to a Growth-Only Constraint.
 *   **A15 Jitter Stabilization (R970)**: The system applies hardened spatial gates and 5s muzzle on Samsung A15.
-*   **G990E Display Hardening (R971)**: The system muzzles proximity transitions during ON/DOZE toggling on S21 FE.
+*   **G990E Display Hardening (R971)**: The system muzzles proximity proximity transitions during ON/DOZE toggling on S21 FE.
 *   **Forensic Staleness Authority (R972)**: The system enforces a strict 15-second staleness gate for forensic fields.
 *   **Identity Uniqueness Authority (R974)**: The system enforces uniqueness between Tracker and Viewer identities.
 *   **Identity Sanitization Authority (R975)**: The system enforces a strict alphanumeric contract for all IDs.

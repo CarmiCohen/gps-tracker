@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.20.01)
+# Project Issues & Hardening Tracking (July.20.05)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Resolution Archive](STATUS/RESOLUTION_ARCHIVE.md), and validation tasks are in [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 300 |
+| **Resolved (Total)** | 🟢 Progress | 301 |
 
 ---
 
@@ -21,10 +21,14 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
+## 🟢 Recently Resolved Issues (July.20.05)
+*   **Issue #106: Unified Forensic Ribbon Continuity (R106)**.
+    *   **Root Cause**: Analytical ribbons (sensors and connection) were independently scaled and rendered, leading to visual misalignment and lack of synchronization during forensic review. Data loss segments were implicitly handled, making "Black Gaps" hard to distinguish from low-value data.
+    *   **Resolution**: Consolidated `AnalyticalRibbons` to a single scale-aware `activeHistoryFlow`. Refactored rendering to use `ForensicRibbonContainer`, a unified baseline logic that enforces timeline continuity. Implemented explicit "Black Gap" visualization for data loss segments.
+
 ## 🟢 Recently Resolved Issues (July.20.01)
 *   **Issue #105: Forensic Ribbon Continuity Verification**.
-    *   **Root Cause**: Process death caused a reset of the monotonic timeline, masking "Stability Gaps" during startup. Race conditions in `HistoryManager` initialization allowed first ticks to process before drift references were restored.
-    *   **Resolution**: Implemented monotonic timeline reconstruction in `TrackerService` and `ViewerService` using persisted drift references. Hardened `HistoryManager` initialization into a synchronous-like suspend sequence to ensure forensic state is ready before the first telemetry pulse.
+    *   **Resolution**: Implemented monotonic timeline reconstruction in `TrackerService` and `ViewerService` using persisted drift references. Hardened `HistoryManager` initialization.
 
 ## 🟢 Recently Resolved Issues (July.20.00)
 *   **Issue #104: Startup ANR Hardening (Proactive Log Pruning)**.
