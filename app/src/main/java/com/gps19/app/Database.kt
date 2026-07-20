@@ -7,8 +7,9 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Database: persistence configuration for GPS Tracker.
- * v9.4.00:
+ * v9.4.01:
  * - Issue #102: Temporal Forensic Integrity. Renamed lastValidFixRealtime to lastValidFixRt.
+ * - Issue #104: Unified pruning logic into deepPruneLogs to ensure forensic integrity.
  */
 @Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
 data class LogEntity(
@@ -136,19 +137,37 @@ data class PendingStatusEntity(
 )
 
 @Dao
-interface LogDao {
-    @Insert suspend fun insert(log: LogEntity): Long
-    @Update suspend fun update(log: LogEntity)
-    @Query("SELECT * FROM logs WHERE localId = :localId") suspend fun getLogByLocalId(localId: String): LogEntity?
-    @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1") suspend fun getLastLog(): LogEntity?
-    @Query("SELECT * FROM logs WHERE type = :type AND role = :role AND deviceId = :deviceId ORDER BY timestamp DESC LIMIT 1") suspend fun getLastLogByMetadata(type: String, role: String, deviceId: String): LogEntity?
-    @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1000") fun getAllLogs(): Flow<List<LogEntity>>
-    @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1000") suspend fun getAllLogsStatic(): List<LogEntity>
-    @Query("SELECT * FROM logs WHERE synced = 0 ORDER BY timestamp ASC LIMIT :limit") suspend fun getUnsyncedLogs(limit: Int): List<LogEntity>
-    @Query("UPDATE logs SET synced = 1 WHERE localId IN (:localIds)") suspend fun markLogsAsSynced(localIds: List<String>)
-    @Query("DELETE FROM logs") suspend fun clearAll()
-    @Query("SELECT COUNT(*) FROM logs") suspend fun getCount(): Int
-    @Query("DELETE FROM logs WHERE timestamp < (SELECT timestamp FROM logs ORDER BY timestamp DESC LIMIT 1 OFFSET 999)") suspend fun pruneLogs()
+abstract class LogDao {
+    @Insert abstract suspend fun insert(log: LogEntity): Long
+    @Update abstract suspend fun update(log: LogEntity)
+    @Query("SELECT * FROM logs WHERE localId = :localId") abstract suspend fun getLogByLocalId(localId: String): LogEntity?
+    @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1") abstract suspend fun getLastLog(): LogEntity?
+    @Query("SELECT * FROM logs WHERE type = :type AND role = :role AND deviceId = :deviceId ORDER BY timestamp DESC LIMIT 1") abstract suspend fun getLastLogByMetadata(type: String, role: String, deviceId: String): LogEntity?
+    @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1000") abstract fun getAllLogs(): Flow<List<LogEntity>>
+    @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1000") abstract suspend fun getAllLogsStatic(): List<LogEntity>
+    @Query("SELECT * FROM logs WHERE synced = 0 ORDER BY timestamp ASC LIMIT :limit") abstract suspend fun getUnsyncedLogs(limit: Int): List<LogEntity>
+    @Query("UPDATE logs SET synced = 1 WHERE localId IN (:localIds)") abstract suspend fun markLogsAsSynced(localIds: List<String>)
+    @Query("DELETE FROM logs") abstract suspend fun clearAll()
+    @Query("SELECT COUNT(*) FROM logs") abstract suspend fun getCount(): Int
+
+    /**
+     * Issue #104: Startup ANR Hardening.
+     * Authoritative pruning logic. Reduces the log table while prioritizing forensic markers. 
+     * Sheds routine heartbeats aggressively.
+     */
+    @Transaction
+    open suspend fun deepPruneLogs() {
+        // 1. Aggressively shed routine telemetry heartbeats (keep last 100)
+        pruneRoutineHeartbeats(100)
+        // 2. General prune of non-forensic logs (keep last 500)
+        pruneNonForensicLogs(500)
+    }
+
+    @Query("DELETE FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') AND id NOT IN (SELECT id FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT :limit)")
+    abstract suspend fun pruneRoutineHeartbeats(limit: Int)
+
+    @Query("DELETE FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND id NOT IN (SELECT id FROM logs ORDER BY timestamp DESC LIMIT :limit)")
+    abstract suspend fun pruneNonForensicLogs(limit: Int)
 }
 
 @Dao

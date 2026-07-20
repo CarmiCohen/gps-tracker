@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.19.04)
+# Project Issues & Hardening Tracking (July.20.00)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are in the [Resolution Archive](STATUS/RESOLUTION_ARCHIVE.md), and validation tasks are in [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md).
 
@@ -7,19 +7,24 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 297 |
+| **Resolved (Total)** | 🟢 Progress | 298 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Samsung-specific ANR on Migration**: Even with IO offloading, extremely large log tables (1000+ entries) might cause slow startup during the table recreation on lower-end devices like the A15.
+*   (None)
 
 ---
 
 ## 🔴 Open Issues
-*   *(None)*
+*   (None)
 
 ---
+
+## 🟢 Recently Resolved Issues (July.20.00)
+*   **Issue #104: Startup ANR Hardening (Proactive Log Pruning)**.
+    *   **Root Cause**: Database initialization or schema migration triggered ANRs on lower-end hardware (Samsung A15) due to excessively large log tables. Pruning was reactive, leaving cold-starts vulnerable.
+    *   **Resolution**: Implemented `proactivePruning()` in `LogDao` and integrated it into `MainViewModel.loadInitialData`. The pruning logic sheds routine heartbeats (`watchdog_stats`, `viewer_pulse`, etc.) first to maintain forensic integrity while ensuring UI responsiveness during startup.
 
 ## 🟢 Recently Resolved Issues (July.19.04)
 *   **Issue #103: Drift Reference Loss in `HistoryManager`**.
@@ -30,8 +35,3 @@ This document tracks active issues, technical debt, and pending implementation t
 *   **Issue #102: Temporal Forensic Integrity (Monotonic Time Strategy)**.
     *   **Root Cause**: Engine logic historically used Wall-clock time, which is subject to jumps and regressions, causing potential corruption in trajectory optimization (GTO) and alarm debouncing.
     *   **Resolution**: Hardened the `:core:engine` and app services to use a dual-time approach. All logic calculations (aging, debouncing, breakout) now use monotonic `rt` (realtime) timestamps. Human-readable logging persists using `ts` (UTC) for forensic correlation.
-
-## 🟢 Recently Resolved Issues (July.19.02)
-*   **Issue #100: Relay Wake-up Timeout Hardening**.
-    *   **Root Cause**: Insufficient 30s timeout for relay infrastructure cold-starts.
-    *   **Resolution**: Increased `NETWORK_TIMEOUT_MS` to 60s in `EngineConstants.kt`.

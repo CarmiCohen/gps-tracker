@@ -16,9 +16,8 @@ import kotlin.math.abs
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * v9.3.49:
- * - ANR Hardening (#092): Corrected variable references in addLog and 
- *   confirmed offloading of eventLogsFlow mapping.
+ * v9.4.01:
+ * - Issue #104: Unified pruning logic using proactivePruning for both startup and reactive maintenance.
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -153,12 +152,28 @@ class LogRepository @Inject constructor(
                     if (logWriteCount >= DB_PRUNE_THRESHOLD) {
                         logWriteCount = 0
                         if (logDao.getCount() > 1000) {
-                            logDao.pruneLogs()
+                            // Issue #104: Use authoritative deep prune logic reactively.
+                            logDao.deepPruneLogs()
                         }
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "Error adding log to database")
                 }
+            }
+        }
+    }
+
+    /**
+     * Issue #104: Startup ANR Hardening.
+     * Executes a deep prune of the log table.
+     */
+    suspend fun proactivePruning() {
+        logMutex.withLock {
+            try {
+                logDao.deepPruneLogs()
+                Timber.d("Proactive pruning completed.")
+            } catch (e: Exception) {
+                Timber.e(e, "Error during proactive pruning")
             }
         }
     }

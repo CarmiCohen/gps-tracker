@@ -20,6 +20,7 @@ import kotlin.math.abs
  * MainRepository: Centralized data hub for the application.
  * v9.4.01:
  * - Issue #103: Added CLOCK_DRIFT_REF_KEY for forensic integrity.
+ * - Issue #104: Exposed proactivePruning for startup hardening.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -252,6 +253,12 @@ class MainRepository @Inject constructor(
 
     fun clearLogs() { logRepository.clearLogs() }
     suspend fun loadAllLogsStatic(): List<LogEntry> = logRepository.loadAllLogsStatic()
+
+    /**
+     * Issue #104: Startup ANR Hardening.
+     * Executes a deep prune of the log table.
+     */
+    suspend fun proactivePruning() = logRepository.proactivePruning()
 
     fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, isJump: Boolean = false, timestamp: Long? = null, force: Boolean = false, isHindsightCorrected: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
         if (lat == 0.0 || lng == 0.0) return

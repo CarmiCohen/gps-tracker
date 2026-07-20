@@ -20,9 +20,10 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * v9.4.00:
+ * v9.4.01:
  * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
  *   parameter naming to 'nowRt'.
+ * - Issue #104: Integrated proactivePruning in loadInitialData for startup hardening.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -544,8 +545,11 @@ class MainViewModel @Inject constructor(
     }
 
     private fun loadInitialData() {
-        // v9.3.55: Explicitly offload to IO as this triggers DB opening and heavy migrations.
+        // v9.4.01: Explicitly offload to IO as this triggers DB opening, migrations, and proactive maintenance.
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            // Issue #104: Startup ANR Hardening - Prune logs before heavy startup queries.
+            repository.proactivePruning()
+
             val initial = settingsUseCase.loadAllSettings()
             withContext(Dispatchers.Main) {
                 appStartTime = initial.appStartTime
