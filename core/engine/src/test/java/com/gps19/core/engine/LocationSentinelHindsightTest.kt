@@ -31,8 +31,8 @@ class LocationSentinelHindsightTest {
             snr = 40.0,
             satsUsed = 12,
             timestamp = 1000L,
-            nowWall = 1000L,
-            nowRealtime = 1000L
+            nowTs = 1000L,
+            nowRt = 1000L
         )
     }
 
@@ -51,8 +51,8 @@ class LocationSentinelHindsightTest {
             snr = 40.0,
             satsUsed = 12,
             timestamp = jumpTime,
-            nowWall = jumpTime,
-            nowRealtime = jumpTime
+            nowTs = jumpTime,
+            nowRt = jumpTime
         )
 
         assertEquals(SentinelStatus.JITTER, result1.status)
@@ -71,8 +71,8 @@ class LocationSentinelHindsightTest {
             snr = 40.0,
             satsUsed = 12,
             timestamp = consistentTime,
-            nowWall = consistentTime,
-            nowRealtime = consistentTime
+            nowTs = consistentTime,
+            nowRt = consistentTime
         )
 
         assertEquals(SentinelStatus.TRAJECTORY_PROMOTED, result2.status)
@@ -88,26 +88,26 @@ class LocationSentinelHindsightTest {
         // P1: Bearing 0
         val p1Lat = baseLat + jitterOffset 
         val p1Time = 2000L
-        sentinel.processLocation(p1Lat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, p1Time, nowWall = p1Time, nowRealtime = p1Time)
+        sentinel.processLocation(p1Lat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, p1Time, nowTs = p1Time, nowRt = p1Time)
         
         // P2: Bearing 90 (Inconsistent with P1)
         val p2Lat = p1Lat + jitterOffset
         val p2Lng = baseLng + jitterOffset
         val p2Time = 3000L
-        sentinel.processLocation(p2Lat, p2Lng, baseAlt, 10.0, 10.0, 90.0, 40.0, 12, p2Time, nowWall = p2Time, nowRealtime = p2Time)
+        sentinel.processLocation(p2Lat, p2Lng, baseAlt, 10.0, 10.0, 90.0, 40.0, 12, p2Time, nowTs = p2Time, nowRt = p2Time)
 
         // P3: Bearing 180 (Inconsistent with P2)
         val p3Lat = p2Lat + jitterOffset
         val p3Lng = p2Lng + jitterOffset
         val p3Time = 4000L
-        sentinel.processLocation(p3Lat, p3Lng, baseAlt, 10.0, 10.0, 180.0, 40.0, 12, p3Time, nowWall = p3Time, nowRealtime = p3Time)
+        sentinel.processLocation(p3Lat, p3Lng, baseAlt, 10.0, 10.0, 180.0, 40.0, 12, p3Time, nowTs = p3Time, nowRt = p3Time)
 
         assertEquals(3, sentinel.getHindsightBuffer().size)
 
         // Final point P4 consistent with P3
         val p4Lat = p3Lat + jitterOffset
         val p4Time = 5000L
-        val result = sentinel.processLocation(p4Lat, p3Lng, baseAlt, 10.0, 10.0, 180.0, 40.0, 12, p4Time, nowWall = p4Time, nowRealtime = p4Time)
+        val result = sentinel.processLocation(p4Lat, p3Lng, baseAlt, 10.0, 10.0, 180.0, 40.0, 12, p4Time, nowTs = p4Time, nowRt = p4Time)
 
         assertEquals(SentinelStatus.TRAJECTORY_PROMOTED, result.status)
         assertEquals(3, result.promotedPoints?.size)
@@ -118,12 +118,12 @@ class LocationSentinelHindsightTest {
     fun `promotion fails if angle exceeds tolerance`() {
         val jumpLat = baseLat + jitterOffset
         val jumpTime = 2000L
-        sentinel.processLocation(jumpLat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, jumpTime, nowWall = jumpTime, nowRealtime = jumpTime)
+        sentinel.processLocation(jumpLat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, jumpTime, nowTs = jumpTime, nowRt = jumpTime)
 
         val nextLat = jumpLat
         val nextLng = baseLng + jitterOffset
         val nextTime = 3000L
-        val result = sentinel.processLocation(nextLat, nextLng, baseAlt, 10.0, 10.0, 90.0, 40.0, 12, nextTime, nowWall = nextTime, nowRealtime = nextTime)
+        val result = sentinel.processLocation(nextLat, nextLng, baseAlt, 10.0, 10.0, 90.0, 40.0, 12, nextTime, nowTs = nextTime, nowRt = nextTime)
 
         assertTrue(result.status == SentinelStatus.JUMP || result.status == SentinelStatus.JITTER)
         assertEquals(2, sentinel.getHindsightBuffer().size)
@@ -133,11 +133,11 @@ class LocationSentinelHindsightTest {
     fun `promotion fails if speed delta exceeds tolerance`() {
         val jumpLat = baseLat + jitterOffset
         val jumpTime = 2000L 
-        sentinel.processLocation(jumpLat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, jumpTime, nowWall = jumpTime, nowRealtime = jumpTime)
+        sentinel.processLocation(jumpLat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, jumpTime, nowTs = jumpTime, nowRt = jumpTime)
 
         val nextLat = jumpLat + normalOffset
         val nextTime = 3000L
-        val result = sentinel.processLocation(nextLat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, nextTime, nowWall = nextTime, nowRealtime = nextTime)
+        val result = sentinel.processLocation(nextLat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, nextTime, nowTs = nextTime, nowRt = nextTime)
 
         assertTrue(result.status == SentinelStatus.JUMP || result.status == SentinelStatus.JITTER)
         assertEquals(2, sentinel.getHindsightBuffer().size)
@@ -146,13 +146,13 @@ class LocationSentinelHindsightTest {
     @Test
     fun `hindsight buffer prunes points older than max age`() {
         // 1. Add a jitter point
-        sentinel.processLocation(baseLat + jitterOffset, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, 2000L, nowWall = 2000L, nowRealtime = 2000L)
+        sentinel.processLocation(baseLat + jitterOffset, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, 2000L, nowTs = 2000L, nowRt = 2000L)
         assertEquals(1, sentinel.getHindsightBuffer().size)
 
         // 2. Send ANOTHER jitter point much later with a bearing shift to prevent promotion.
         val lateTime = 33000L 
         val lateOffset = 0.0135 // Keeps speed at ~50m/s
-        sentinel.processLocation(baseLat + lateOffset, baseLng, baseAlt, 10.0, 10.0, 180.0, 40.0, 12, lateTime, nowWall = lateTime, nowRealtime = lateTime)
+        sentinel.processLocation(baseLat + lateOffset, baseLng, baseAlt, 10.0, 10.0, 180.0, 40.0, 12, lateTime, nowTs = lateTime, nowRt = lateTime)
         
         // The first point should have been pruned.
         assertEquals(1, sentinel.getHindsightBuffer().size)
@@ -162,13 +162,13 @@ class LocationSentinelHindsightTest {
     @Test
     fun `hindsight buffer respects maximum size`() {
         sentinel.reset()
-        sentinel.processLocation(baseLat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, 1000L, nowWall = 1000L, nowRealtime = 1000L)
+        sentinel.processLocation(baseLat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, 1000L, nowTs = 1000L, nowRt = 1000L)
         
         for (i in 1..15) {
             val ts = 1000L + (i * 1000L)
             // Use massive bearing shifts to ensure points are jumps but NEVER promote
             val bearing = (i * 90.0) % 360.0
-            sentinel.processLocation(baseLat + (jitterOffset * i), baseLng, baseAlt, 10.0, 10.0, bearing, 40.0, 12, ts, nowWall = ts, nowRealtime = ts)
+            sentinel.processLocation(baseLat + (jitterOffset * i), baseLng, baseAlt, 10.0, 10.0, bearing, 40.0, 12, ts, nowTs = ts, nowRt = ts)
         }
 
         assertEquals(10, sentinel.getHindsightBuffer().size)

@@ -1,6 +1,7 @@
 package com.gps19.core.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 class ForensicIdentityTest {
@@ -18,7 +19,13 @@ class ForensicIdentityTest {
         override fun onGpsStallDetected(ts: Long) { }
     }
 
-    private val processor = LocationProcessor(listener, timeProvider)
+    private lateinit var processor: LocationProcessor
+
+    @Before
+    fun setup() {
+        processor = LocationProcessor(timeProvider)
+        processor.setListener(listener)
+    }
 
     @Test
     fun `processGpsPoint handles valid point`() {

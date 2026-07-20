@@ -83,16 +83,20 @@ object PhysicsUtils {
         altitudeDelta: Double = 0.0,
         hasPhysicalMotion: Boolean = true
     ): JumpConfidence {
-        if (lastLat == 0.0 || timeDeltaMs < 100) return JumpConfidence()
+        if (lastLat == 0.0) return JumpConfidence()
         
         val dist = calculateDistance(lastLat, lastLng, newLat, newLng)
-        val timeDeltaSec = timeDeltaMs / 1000.0
-        val speedMps = dist / max(0.1, timeDeltaSec)
+        val timeDeltaSec = max(0.1, timeDeltaMs / 1000.0)
+        val speedMps = dist / timeDeltaSec
         
         // Tier 1: Outlier Filter
+        // v9.4.01: Perform outlier check before time delta guard to catch massive spatial jumps 
+        // even if timestamps are identical or jittery.
         if (dist > OUTLIER_DISTANCE_THRESHOLD || speedMps > OUTLIER_SPEED_CAP_MPS) {
             return JumpConfidence(score = 100, isJump = true, isOutlier = true, tier = 1, reason = "Hardware/Cold-Start Outlier")
         }
+
+        if (timeDeltaMs < 100) return JumpConfidence()
         
         var score = 0
         var isAdaptiveJump = false
@@ -109,14 +113,14 @@ object PhysicsUtils {
         }
         
         // Velocity Inertia
-        val accel = abs(speedMps - lastSpeedMps) / max(0.1, timeDeltaSec)
+        val accel = abs(speedMps - lastSpeedMps) / timeDeltaSec
         val accelLimit = if (isParking) PARKING_ACCEL_LIMIT else MAX_TRACTOR_ACCEL
         if (accel > accelLimit && dist > ACCEL_CHECK_MIN_DIST) { 
             score += JUMP_WEIGHT_ACCEL_CHECK
         }
         
         // 3D Validation
-        if (abs(altitudeDelta) / max(0.1, timeDeltaSec) > ALTITUDE_VELOCITY_CAP) { 
+        if (abs(altitudeDelta) / timeDeltaSec > ALTITUDE_VELOCITY_CAP) {
             score += JUMP_WEIGHT_ALTITUDE_DELTA
         }
 

@@ -17,6 +17,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * v9.4.03:
+ * - Issue #108 Hardening: Immediately update LAST_SERVICE_TICK_TS_KEY on 
+ *   creation to prevent MaintenanceWorker startup race.
  * v9.4.02:
  * - Issue #105: Forensic Ribbon Continuity Verification. Reconstructing monotonic 
  *   timeline on startup to detect and fill gaps occurring during process downtime.
@@ -63,6 +66,9 @@ class ViewerService : BaseMonitorService() {
     override fun onCreate() {
         super.onCreate()
         
+        // Issue #108 Hardening: Claim the service as alive immediately to prevent redundant recovery logic.
+        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
             val trackerId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
             val viewerId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
@@ -90,12 +96,12 @@ class ViewerService : BaseMonitorService() {
             delay(1000)
             
             val savedMaxAcc = repository.getDouble(MainRepository.MAX_ACCURACY_KEY, 0.0)
-            val savedLastSit = repository.getLong(MainRepository.LAST_SIT_TS_KEY, 0L)
+            val savedLast_sit_ts = repository.getLong(MainRepository.LAST_SIT_TS_KEY, 0L)
             val savedBaseline = repository.getDouble(MainRepository.CHAIR_BASELINE_TILT_KEY, -1000.0)
             val trackerState = repository.loadTrackerState()
             val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
             val maxDist = repository.getDouble(MainRepository.MAX_DISTANCE_STORAGE_KEY, 60.0)
-            locationProcessor.loadState(savedMaxAcc, savedLastSit, savedBaseline, trackerState, homePoints, maxDist)
+            locationProcessor.loadState(savedMaxAcc, savedLast_sit_ts, savedBaseline, trackerState, homePoints, maxDist)
 
             delay(1000)
             networkManager.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, false)
@@ -497,9 +503,9 @@ class ViewerService : BaseMonitorService() {
                 trackerLastValidFixRt = remoteHandler.trackerLastValidFixRt,
                 trackerSpeed = remoteHandler.trackerSpeed, trackerBattery = remoteHandler.trackerBattery, trackerTemp = remoteHandler.trackerTemp,
                 isHardwareOnline = remoteHandler.isTrackerConnected, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()),
-                isJammerSuspicion = isTrackerJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(),
+                isJammerSuspicion = isTrackerJammerSuspicion, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isTrackerGap = isTrackerGap, isUiVisible = isUiVisible(),
                 distToHomeAuthority = remoteHandler.trackerDistToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(),
-                isGpsGap = isTrackerGap, isSuspicious = remoteHandler.isTrackerSuspicious, isTamperDetected = remoteHandler.isTrackerTamperDetected,
+                isSuspicious = remoteHandler.isTrackerSuspicious, isTamperDetected = remoteHandler.isTrackerTamperDetected,
                 isPowerTamper = remoteHandler.isTrackerPowerTamper, trackerTiltDegrees = remoteHandler.trackerTiltDegrees, 
                 trackerAcousticDb = remoteHandler.trackerAcousticDb, trackerBaroAlt = remoteHandler.trackerBaroAlt, trackerLux = remoteHandler.trackerLux,
                 isNear = remoteHandler.isTrackerNear, luxBaseline = remoteHandler.trackerLuxBaseline, acousticFloorDb = remoteHandler.trackerAcousticFloorDb,

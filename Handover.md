@@ -1,7 +1,7 @@
-# Handover (July.20.05) - Unified Forensic Ribbon Continuity
+# Handover (July.20.07) - Release Hardening & Monitoring
 
 ## 🎯 Current Objective
-Complete implementation and verification of **R106: Unified Forensic Ribbon Continuity**. This involves a consolidated forensic UI into a single scale-aware engine with synchronized sensor/connection baselines and explicit data-loss (Black Gap) visualization.
+Finalize and verify the **July.20.07** release. This includes system-wide version synchronization, final hardening of **R106: Unified Forensic Ribbon Continuity**, and addressing newly identified startup anomalies.
 
 ## 📝 Guidelines for Implementation
 1. Display the selected issue here before starting the fix.
@@ -16,24 +16,27 @@ Complete implementation and verification of **R106: Unified Forensic Ribbon Cont
     - c. Check that no *.md or *.xml file was accidentally truncated.
     - d. Verify that there is no inconsistency with this change of the app and other code portions or documentation.
     - e. Verify that new requirements are added to `STATUS/SOT_MASTER_REQUIREMENTS.md`.
-    - f. Prepare a block of Git commands to stage the changes and to commit them as a new release with a tag the version and to push everything to the remote repository. The subversion number will be incremented automatically, but this time set the version to July.20.05
+    - f. Prepare a block of Git commands to stage the changes and to commit them as a new release with a tag the version and to push everything to the remote repository. The subversion number will be incremented automatically, but this time set the version to July.20.07
     - g. Suggest your ideas, if you have, how to simplify the code and the app, so that it will be easier to work with.
 
 ## 📊 Forensic Status (Authoritative)
-1. **Unified Forensic Ribbon Continuity (Issue #106 COMPLETE)**:
+1. **Version Synchronization (July.20.07 COMPLETE)**:
+   - Updated `app/build.gradle` `versionName` to `July.20.07`.
+   - Synchronized file headers in `SharedUiComponents.kt`, `MainActivity.kt`, and `MainViewModel.kt`.
+2. **MaintenanceWorker Startup Race (Issue #108 HARDENED)**:
+   - Implemented immediate "last tick" update in `TrackerService.onCreate()` and `ViewerService.onCreate()` to prevent redundant recovery triggers during staggered initialization.
+3. **Unified Forensic Ribbon Continuity (Issue #106 COMPLETE)**:
    - Consolidated `AnalyticalRibbons` to a single `activeHistoryFlow` based on `selectedScale`.
    - Extracted `ForensicRibbonContainer` for unified rendering baseline (ticks, gaps, alignment).
-   - Implemented explicit "Black Gap" visualization for data loss segments.
-   - Synchronized "Chain GPS" and sensor stacks on a single temporal axis.
-2. **Forensic Ribbon Continuity (Issue #105 COMPLETE)**:
-   - Reconstructed monotonic timeline on startup.
-3. **Startup Hardening (Issue #104 COMPLETE)**: 
-   - Proactive pruning integrated into `MainViewModel.loadInitialData`.
+4. **Forensic Ribbon Continuity (Issue #105 COMPLETE)**:
+   - Reconstructed monotonic timeline on startup using persisted drift references.
 
 ## 🟢 System Status: STABLE
-- **Build**: `app:assembleDebug` **VERIFIED SUCCESSFUL**.
-- **Integrity**: Forensic markers and timeline continuity preserved across process death and UI scaling.
+- **Monitor Findings**: Identified 4 new issues (Step Detector failure, Startup race, Startup jank, Missing mbrainSDK).
+- **Hardening**: Issue #108 addressed.
 
 ## 🚀 Next Steps
-1. Perform final field testing on Samsung A15 to verify smoothness of the unified ribbon drawing.
-2. Finalize the July.20.05 release.
+1. Investigate **Issue #109 (Startup Jank)**: Profile `MainViewModel.loadInitialData` and `LogRepository.proactivePruning` for blocking I/O.
+2. Investigate **Issue #110 (Missing mbrainSDK)**: Determine origin of `loadLibrary` calls for `libmbrainSDK`.
+3. Verify **Issue #107 (Step Detector failure)**: Confirm R405c fallback efficacy on Samsung A15 hardware.
+4. Perform final verification and prepare Git release block.

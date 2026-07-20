@@ -18,11 +18,11 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * July.20.07:
+ * - Release hardening and monitoring.
  * July.19.01:
  * - Issue #099: ANR Hardening. Offloaded hardware property checks to ViewModel 
  *   to prevent frame skipping in onResume.
- * July.19.00:
- * - Version bump and project-wide harmonization for Issue #098.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -146,8 +146,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
         
-        // R405: Proactive check for Samsung A15 hardening
-        // July.19.01: Use cached state to prevent Main-thread SysProp access (ANR Hardening)
+        // R405: Samsung A15 detected without battery exemption. Prompting user.
         val state = viewModel.uiState.value
         if (state.permissions.isA15Device && !state.permissions.isBatteryWhitelisted && !state.navigation.isPhoneSetupVisible) {
             Timber.i("R405: Samsung A15 detected without battery exemption. Prompting user.")

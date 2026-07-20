@@ -20,7 +20,11 @@ import java.util.Locale
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * v9.4.01:
+ * July.20.07:
+ * - Release hardening and monitoring.
+ * July.20.06:
+ * - Version synchronization and release hardening.
+ * July.20.05:
  * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
  *   parameter naming to 'nowRt'.
  * - Issue #104: Integrated proactivePruning in loadInitialData for startup hardening.
@@ -515,7 +519,7 @@ class MainViewModel @Inject constructor(
                     trackerLocation = telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime),
                     connectivity = current.connectivity.copy(isTrackerConnected = true, lastUpdateTs = nowMs, lastRemoteActivityTs = nowMs),
                     trackerStats = telemetryUseCase.mapStats(update, current.trackerStats),
-                    trackerBattery = if (current.appMode == "tracker") current.trackerBattery.copy(level = update.battery, temp = update.temp, isCharging = update.isCharging, isChargingStable = update.isCharging) else current.trackerBattery,
+                    trackerBattery = if (current.appMode == "tracker") current.trackerBattery.copy(level = update.battery, temp = update.batteryTemp, isCharging = update.isCharging, isChargingStable = update.isCharging) else current.trackerBattery,
                     trackerSatsView = update.satsView,
                     trackerSatsUsed = update.satsUsed,
                     distanceTrackerToHome = if (current.appMode == "viewer" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceTrackerToHome,

@@ -13,12 +13,13 @@ class AdaptationMuzzleTest {
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Double, snr: Double?, vibe: Double?) {}
         override fun onMaxAccuracyChanged(accuracy: Double) {}
         override fun onChairBaselineChanged(baseline: Double) {}
-        override fun onGpsStallDetected(ts: Long) {}
+        override fun onGpsStallDetected(rt: Long) {}
     }
 
     @Before
     fun setup() {
-        processor = LocationProcessor(listener, timeProvider)
+        processor = LocationProcessor(timeProvider)
+        processor.setListener(listener)
     }
 
     @Test

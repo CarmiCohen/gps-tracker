@@ -1,10 +1,11 @@
-# System Source of Truth (SoT) - July.20.05
+# System Source of Truth (SoT) - July.20.07
 
 This document serves as the definitive operational specification for the GPS-Tracker system. All Issue IDs referenced here are Authoritative.
 
 ### 1. Core Architectural Baselines
-*   **Unified Forensic Ribbon Continuity (R106)**: To ensure synchronized multi-metric auditing, the system MUST implement a unified method for rendering \"moving\" ribbons across all scales. Sensor and connection ribbons MUST share a synchronized temporal baseline where missing data periods (e.g., app-off or service-death) are explicitly visualized as \"Black Gaps.\" Vertical clock ticks MUST proceed smoothly through these gaps to maintain timeline integrity, allowing for forensic correlation between telemetry loss and sensor trends. (July.20.05 / Issue #106)
-*   **Monotonic Timeline Reconstruction (R105)**: To ensure \"1Hz Ribbon Fidelity\" across process boundaries, the system MUST reconstruct the monotonic timeline on startup. The background services (`TrackerService`/`ViewerService`) MUST calculate a virtual `lastServiceTickRealtime` by subtracting the persisted `clock_drift_ref` from the persisted wall-clock `lastServiceTickTs`. This allows `HistoryManager` to accurately identify and fill gaps that occurred while the process was inactive. (July.20.01 / Issue #105)
+*   **Startup Recovery Hardening (R108)**: To ensure MaintenanceWorker reliability during staggered bootstrap, background services MUST explicitly refresh the `last_service_tick_ts` immediately upon `onCreate()`. This prevents redundant recovery triggers during the service initialization window. (July.20.07 / Issue #108)
+*   **Unified Forensic Ribbon Continuity (R106)**: To ensure synchronized multi-metric auditing, the system MUST implement a unified method for rendering "moving" ribbons across all scales. Sensor and connection ribbons MUST share a synchronized temporal baseline where missing data periods (e.g., app-off or service-death) are explicitly visualized as "Black Gaps." Vertical clock ticks MUST proceed smoothly through these gaps to maintain timeline integrity, allowing for forensic correlation between telemetry loss and sensor trends. (July.20.06 / Issue #106)
+*   **Monotonic Timeline Reconstruction (R105)**: To ensure "1Hz Ribbon Fidelity" across process boundaries, the system MUST reconstruct the monotonic timeline on startup. The background services (`TrackerService`/`ViewerService`) MUST calculate a virtual `lastServiceTickRealtime` by subtracting the persisted `clock_drift_ref` from the persisted wall-clock `lastServiceTickTs`. This allows `HistoryManager` to accurately identify and fill gaps that occurred while the process was inactive. (July.20.01 / Issue #105)
 *   **Startup Maintenance Authority (R104)**: To prevent I/O bottlenecks and ANRs during cold starts or schema migrations on low-end hardware (Samsung A15), the system MUST execute a proactive `deepPruneLogs` operation on `Dispatchers.IO` immediately upon initialization. This operation MUST prioritize the shedding of routine heartbeats while strictly preserving forensic integrity. (July.20.00 / Issue #104)
 *   **Drift Reference Persistence (R103)**: To maintain forensic continuity across process restarts, the system MUST persist the monotonic-to-wall-clock drift reference (`clock_drift_ref`). This ensures that gap-filling logic in `HistoryManager` can correctly identify system clock adjustments made while the application was inactive. (July.19.04 / Issue #103)
 *   **Temporal Forensic Integrity (R102)**: To ensure logic stability against system clock drifts or manual adjustments, the engine MUST employ a dual-time strategy using monotonic `rt` for logic and wall-clock `ts` for forensic logging. (July.19.01 / Issue #102)
@@ -12,8 +13,8 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Samsung Stay-Alive Hardware Fallback (R405c)**: The system MUST detect hardware sensor registration failures and immediately engage the Accelerometer-based stay-alive pulse. (July.19.00 / Issue #098)
 *   **Samsung A15 Battery Prompt Authority (R405b)**: The system MUST proactively trigger the configuration overlay if battery exemption is missing on Samsung A15 hardware. (July.18.03 / Issue #101)
 *   **Database Migration Integrity (R956b)**: Any change to an `@Entity` class MUST be accompanied by a version bump and an explicit `Migration` object. (July.18.01 / Issue #097)
-*   **Dynamic Anchor Breakout Authority (R990)**: To prevent \"sticky anchors\" during physical movement, the system MUST employ a displacement-weighted monitor (`anchorEscapeScore`). (v9.3.56 / Issue #062)
-*   **Database Default Normalization (R956)**: ALL `Double` (REAL) column defaults MUST use integer string representation \"0\". (July.18.00 / Issue #096)
+*   **Dynamic Anchor Breakout Authority (R990)**: To prevent "sticky anchors" during physical movement, the system MUST employ a displacement-weighted monitor (`anchorEscapeScore`). (v9.3.56 / Issue #062)
+*   **Database Default Normalization (R956)**: ALL `Double` (REAL) column defaults MUST use integer string representation "0". (July.18.00 / Issue #096)
 *   **Startup IO Offloading Authority (R955)**: All operations that trigger database opening or initial persistence loading MUST be executed on `Dispatchers.IO`. (v9.3.55 / Issue #096)
 *   **Landing Page Event Suppression (R954)**: To ensure state purity, the system MUST reject all frame notices and telemetry events while the Landing Page is active. (v9.3.52)
 *   **Data Flow Offloading Authority (R953)**: All mapping operations from database entities to UI models MUST be offloaded to `Dispatchers.Default`. (v9.3.52 / Issue #092)
@@ -51,7 +52,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Engine Unification**: `MainAlarmLogic` in `:core:engine` is the exclusive source for violation detection.
 *   **Module Hardening**: `:core:engine` is a pure `java-library` with zero Android dependencies.
 *   **Sensor Processing Authority (R965)**: `AppSensorManager` offloads high-frequency sensor event processing to a dedicated thread.
-*   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate \"Hard-Lock\" when stationary. (Issue #018 / v9.2.1)
+*   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018 / v9.2.1)
 *   **Connectivity Integrity (R966)**: `AppNetworkManager` implements reactive reconnection.
 *   **Transport Authority**: The system strictly enforces `websocket` transport.
 *   **Service Launch Integrity (R926)**: The system enforces a mandatory 2,000ms delay during session transitions.
@@ -59,7 +60,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Time Integrity**: All alarm evaluations use monotonic time.
 *   **Bootstrap Staggering (R984)**: All background services MUST implement a staggered initialization sequence.
 *   **Foreground Service Hardening (R983)**: The system strictly enforces state-aware foreground service types.
-*   **Foreground Service Transition (R967)**: The system maintains a 45-second \"Recent UI Pulse\" window.
+*   **Foreground Service Transition (R967)**: The system maintains a 45-second "Recent UI Pulse" window.
 *   **Data Persistence Integrity (R968)**: All changes to Protobuf schemas must preserve binary compatibility. (Issue #076 / v9.3.12)
 *   **Database Schema Hardening (R985)**: Room Entity fields MUST be decorated with explicit `@ColumnInfo(defaultValue)`.
 *   **Authoritative State Model (R986)**: The `TrackerState` MUST be computed exclusively by the Tracker.
@@ -77,7 +78,7 @@ This document serves as the definitive operational specification for the GPS-Tra
 *   **Temporal Authority (#075)**: The system MUST use receipt-time deltas for skew-immune GPS freshness. (v9.3.12)
 
 ### 2. Branding & UI Standards
-*   **Branding Authority (R799e)**: \"Unified Identity Green\" is JD Vivid Green (#78BE20).
-*   **Viewer Identity Color (R799d)**: \"Viewer Role Identity\" is Cyan (#06B6D4).
+*   **Branding Authority (R799e)**: "Unified Identity Green" is JD Vivid Green (#78BE20).
+*   **Viewer Identity Color (R799d)**: "Viewer Role Identity" is Cyan (#06B6D4).
 *   **Icon Authority (R935)**: The authoritative application icon is the deer logo.
-*   **Role Identity Standards (R182)**: IDs are free-form strings. Prefixes \"T\" and \"V\" mandated.
+*   **Role Identity Standards (R182)**: IDs are free-form strings. Prefixes "T" and "V" mandated.

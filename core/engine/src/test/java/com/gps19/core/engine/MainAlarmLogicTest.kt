@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.ceil
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
@@ -17,9 +18,12 @@ import org.junit.Test
 class MainAlarmLogicTest {
 
     private fun createDefaultState(now: Long = 1700000000000L): AlarmEvaluationState {
+        val nowRt = 100000L
         return AlarmEvaluationState(
             now = now,
+            nowRt = nowRt,
             serviceStartTime = now - 60000, // 60s uptime (past grace)
+            serviceStartRt = nowRt - 60000,
             lastAlarmAckTs = 0L,
             appStartTime = now - 60000,
             isRelayConnected = true,
@@ -38,7 +42,9 @@ class MainAlarmLogicTest {
             trackerGpsAccuracy = 5.0,
             maxTrackerAccuracy = 5.0,
             trackerLastValidFixTs = now,
+            trackerLastValidFixRt = nowRt,
             lastGpsPacketTs = now,
+            lastGpsPacketRt = nowRt,
             trackerBattery = 100,
             trackerTemp = 30.0,
             wasDistanceViolated = false,
@@ -79,10 +85,13 @@ class MainAlarmLogicTest {
     @Test
     fun `Verify Bayesian Expansion triggers Geofence breach during GPS gap`() {
         val now = 1700000000000L
+        val nowRt = 100000L
         
         val stateWithGap = createDefaultState(now + 10000).copy(
+            nowRt = nowRt + 10000,
             trackerLat = 10.002, // ~220m away.
             trackerLastValidFixTs = now,
+            trackerLastValidFixRt = nowRt,
             isLocationPending = true,
             trackerSpeed = 20.0 
         )
@@ -96,23 +105,28 @@ class MainAlarmLogicTest {
     @Test
     fun `Verify SNR Latch (Adaptive Jump) hold duration`() {
         val now = 1700000000000L
+        val nowRt = 100000L
         val baseState = createDefaultState(now).copy(
             trackerLat = 10.005, // ~550m away (Violation)
             isTrackerVisualJump = true,
             isAdaptiveJump = true,
             jumpTier = 2,
             firstViolationTs = now,
+            firstViolationRt = nowRt,
             firstViolationWasJump = true
         )
 
         // Scenario 1: 2 minutes later
-        val stateAt2Min = baseState.copy(now = now + 120000)
+        val stateAt2Min = baseState.copy(now = now + 120000, nowRt = nowRt + 120000)
         val report1 = MainAlarmLogic.detectViolations(stateAt2Min)
         assertFalse("Adaptive jump should be latched for 6 mins", 
             report1.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
 
         // Scenario 2: 7 minutes later (Past limit)
-        val stateAt7Min = baseState.copy(now = now + 420000)
+        // JUMP_HOLD_DURATION_MS = 180000 (3 mins)
+        // ADAPTIVE_JUMP_HOLD_MULTIPLIER = 2.0
+        // Total hold = 360000 ms (6 mins)
+        val stateAt7Min = baseState.copy(now = now + 420000, nowRt = nowRt + 420000)
         val report3 = MainAlarmLogic.detectViolations(stateAt7Min)
         assertTrue("Adaptive jump latch should expire after 6 mins", 
             report3.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
@@ -125,7 +139,8 @@ class MainAlarmLogicTest {
             isXiaomiDevice = true,
             xiaomiStatus = EngineXiaomiStatus.DENIED,
             xiaomiAutostartStatus = EngineXiaomiStatus.DENIED,
-            serviceStartTime = now - 10000 // 10s uptime
+            serviceStartTime = now - 10000, // 10s uptime
+            serviceStartRt = 100000L - 10000
         )
         
         val report = MainAlarmLogic.detectViolations(stateInGrace)
@@ -139,7 +154,8 @@ class MainAlarmLogicTest {
         val state = createDefaultState(now).copy(
             trackerLat = 10.0011, // ~120m away
             trackerSpeed = 5.0,
-            maxDistance = 100.0
+            maxDistance = 100.0,
+            lastGpsPacketRt = 100000L
         )
         val report = MainAlarmLogic.detectViolations(state)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }

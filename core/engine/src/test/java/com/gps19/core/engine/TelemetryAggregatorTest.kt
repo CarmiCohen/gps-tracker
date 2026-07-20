@@ -28,23 +28,25 @@ class TelemetryAggregatorTest {
     }
 
     @Test
-    fun `processPoint aligns with 16M scale (4s interval)`() {
-        val baseTs = 1000L 
+    fun `processPoint aligns with 16M scale (4 ticks = 8s interval)`() {
+        // R405: TICK_INTERVAL_MS is 2000ms. 
+        // RibbonScale.SIXTEEN_MIN has intervalSeconds = 4 (which means 4 ticks).
+        val baseTs = 2000L 
         
-        // Input points at 1s, 2s, 3s
+        // Input points at ticks 1, 2, 3 (2s, 4s, 6s)
         aggregator.processPoint(createPoint(baseTs))
-        aggregator.processPoint(createPoint(baseTs + 1000L))
         aggregator.processPoint(createPoint(baseTs + 2000L))
+        aggregator.processPoint(createPoint(baseTs + 4000L))
         
-        // Input 4th point at 4s (should trigger 16M result since 4 % 4 == 0)
-        val alignedTs = 4000L 
+        // Input 4th point at tick 4 (8s) (should trigger 16M result since 4 % 4 == 0)
+        val alignedTs = 8000L 
         val results = aggregator.processPoint(createPoint(alignedTs))
         
         val sixteenMinMatch = results.find { it.first == RibbonScale.SIXTEEN_MIN }
-        assertNotNull("16M scale should have produced a point at 4s mark", sixteenMinMatch)
+        assertNotNull("16M scale should have produced a point at 8s mark (tick 4)", sixteenMinMatch)
     }
 
     private fun createPoint(ts: Long) = EngineConnectionPoint(
-        ts = ts, rtt = 0, remoteSig = 0, isConnected = true
+        ts = ts, rt = ts, rtt = 0, remoteSig = 0, isConnected = true
     )
 }

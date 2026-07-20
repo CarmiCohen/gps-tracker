@@ -20,6 +20,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * v9.4.03:
+ * - Issue #108 Hardening: Immediately update LAST_SERVICE_TICK_TS_KEY on 
+ *   creation to prevent MaintenanceWorker startup race.
  * v9.4.02:
  * - Issue #105: Forensic Ribbon Continuity Verification. Reconstructing monotonic 
  *   timeline on startup to detect and fill gaps occurring during process downtime.
@@ -77,6 +80,9 @@ class TrackerService : BaseMonitorService() {
     override fun onCreate() {
         super.onCreate()
         
+        // Issue #108 Hardening: Claim the service as alive immediately to prevent redundant recovery logic.
+        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
             configManager.deviceId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
             configManager.viewerId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)

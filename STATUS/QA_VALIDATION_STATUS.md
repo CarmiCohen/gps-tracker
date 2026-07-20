@@ -10,15 +10,16 @@ This document tracks pending unit tests, integration tests, and manual validatio
 ## 🟡 Pending Manual Validation (Field Tests)
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
+| **#113** | **R405c Verification** | **New**. Perform long-term field testing on Samsung A15 hardware (SM-A155F) to confirm the Accelerometer fallback pulse prevents OS-level eviction when the Step Detector fails to register. |
 | **#072** | **Map Stabilization** | Verify tracker marker on viewer map does not jump to gray/raw locations during clock drift. |
 | **#071** | **Forensic Stress Test** | Verify manual trigger of Jammer/Stall markers and HUD/Log reflection. |
-| **#062** | **Anchor Breakout (#053)** | **Pending**. Physically move the device after a Hard-Lock and verify immediate breakout with the new displacement-weighted monitor. |
+| **#062** | **Anchor Breakout (#053)** | Physically move the device after a Hard-Lock and verify immediate breakout with the new displacement-weighted monitor. |
 
 ## 🔵 Ready for Verification
 | ID | Task | Result |
 | :--- | :--- | :--- |
+| **#108** | **Startup Recovery Race** | Verify that MaintenanceWorker does not trigger recovery during the staggered startup delay on vJuly.20.06. |
 | **#080** | **Lift Detection Parity** | Verify `MainAlarmLogic` correctly uses `trackerBaroAltEma` delta for lift violations instead of raw altitude. |
-| **#079** | **API Synchronization** | Verify `TrackerService` background loop stability on v9.3.16. Ensure location processing, alarm evaluation, and sync submissions match engine signatures. |
 
 ## 🟢 Recently Verified (v9.3.15)
 | ID | Task | Result |
