@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.22.07 (Startup & Stability Hardened)
+# System Source of Truth (SoT) - July.22.08 (Startup & DI Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -6,7 +6,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Cold-Start Hardening (R955b)**: To prevent Main-thread frame skipping and ANRs on low-end hardware, the system MUST implement a mandatory 500ms staggered delay before starting base observations. (Issue #099)
 *   **Startup Recovery Protection (R955c)**: To prevent redundant service restarts during the staggered startup window, the `MaintenanceWorker` MUST implement a 60-second grace period from the `appStartTime` before attempting any recovery. (Issue #108)
-*   **Startup Maintenance Authority (R104)**: To prevent I/O bottlenecks and ANRs during cold starts, the system MUST execute a proactive `deepPruneLogs` operation on `Dispatchers.IO` immediately upon initialization. (Issue #104)
+*   **Startup Maintenance Authority (R104)**: To prevent I/O bottlenecks and ANRs during cold starts, the system MUST execute a proactive `deepPruneLogs` operation on `Dispatchers.IO` immediately upon initialization. This applies to both UI (ViewModel) and Background Service lifecycles. (Issue #104, #104b)
 *   **Stability Audit Authority (R951)**: To ensure engine resilience during high-frequency tracking, the system MUST perform continuous stability auditing. Gaps > 200ms (`GPS_STABILITY_GAP_THRESHOLD_MS`) relative to the 2s heartbeat MUST be logged as "STABILITY GAP," and Reliability % MUST be reported every 10s. (Issue #031)
 *   **Lazy Safety**: All Hilt managers and repositories MUST use `LazyThreadSafetyMode.PUBLICATION` if any internal state requires lazy initialization to prevent thread stalling.
 
@@ -25,9 +25,9 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Standardized Proto Path (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`. (Issue #030)
 
 ### 4. Dependency & Hardware Hardening
-*   **Hilt Universal Authority (R120b)**: The manual `AppContainer` is fully decommissioned. All core repositories, UseCases, and managers MUST be integrated into the Hilt graph using `@Inject` constructors and `@Singleton` scoping. Manual DI is forbidden. Circularities MUST be resolved via Dagger `Provider<T>`. (Issue #120, #124, #126)
+*   **Hilt Universal Authority (R120b)**: The manual `AppContainer` and its legacy artifacts are fully decommissioned. All core repositories, UseCases, and managers MUST be integrated into the Hilt graph using `@Inject` constructors and `@Singleton` scoping. Manual DI is forbidden. Circularities MUST be resolved via Dagger `Provider<T>`. (Issue #120, #124, #126, #126b)
 *   **Samsung A15 Battery Authority (R405b)**: The system MUST proactively trigger the configuration overlay if battery exemption is missing on Samsung A15 hardware. (Issue #101)
-*   **Samsung Stay-Alive Hardening (R405c)**: The system MUST detect hardware sensor registration failures and immediately engage the Accelerometer-based stay-alive pulse. (Issue #098, #113)
+*   **Samsung Stay-Alive Hardening (R405c)**: The system MUST detect hardware sensor registration failures and engage the Accelerometer-based stay-alive pulse. On budget hardware (A15), this pulse MUST perform a hardware "poke" via `SystemMonitor` WakeLock to prevent OS eviction. (Issue #098, #113)
 *   **Step Detector Permission (R107)**: The system MUST explicitly track `android.permission.ACTIVITY_RECOGNITION` to ensure hardware Step Detector availability on API 29+. (Issue #107)
 
 ### 5. Architectural Baselines
@@ -37,5 +37,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: `July.22.07`.
+*   **Current Release**: `July.22.08`.
 *   **Source of Truth**: `app/build.gradle` `versionName`.

@@ -27,18 +27,20 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.22.08:
+ * - Issue #113 (R405c Hardening): Upgraded Stay-Alive pulse to hardware poke via SystemMonitor 
+ *   to prevent OS eviction on Samsung A15.
  * July.22.06:
  * - Issue #113 (R405c Hardening): Implemented Self-Healing Step Detector recovery loop (5-minute interval).
- * - Issue #113: Enhanced Accelerometer fallback pulse visibility.
  * July.20.07:
  * - Issue #077 Hardening: Optimized sensor pipeline for Float-first processing.
  * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timing variables with 'Rt'.
- * - Issue #107: Step Detector Hardening. Implemented R405 fallback for registration failure.
  */
 class AppSensorManager(
     private val context: Context,
     private val scope: CoroutineScope,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val systemMonitor: SystemMonitor
 ) : SensorEventListener {
 
     private val sensorManager by lazy { context.getSystemService(Context.SENSOR_SERVICE) as AndroidSensorManager }
@@ -365,7 +367,9 @@ class AppSensorManager(
                 // use Accelerometer pulses to maintain process priority on Samsung devices.
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) {
                     lastStayAliveRt = nowRt
-                    Timber.i("Issue #113: Stay-Alive Pulse (Accel Fallback Active)")
+                    // Issue #113: Hardware poke to signal activity to OS Power Manager
+                    systemMonitor.acquireWakeLock(force = true)
+                    Timber.i("Issue #113: Stay-Alive Pulse (Accel Fallback Poked)")
                 }
             }
             Sensor.TYPE_LINEAR_ACCELERATION -> {

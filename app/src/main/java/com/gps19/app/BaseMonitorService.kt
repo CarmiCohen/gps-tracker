@@ -20,7 +20,7 @@ import kotlin.math.max
  * - Issue #104b: Global Startup Maintenance Authority. Integrated proactivePruning into onCreate 
  *   to ensure background service starts also benefit from log pruning (R104).
  * July.22.04:
- * - Hilt Hardening: Migrated from manual AppContainer to Hilt field injection.
+ * - Hilt Hardening: Standardized field injection.
  * July.21.00:
  * - Build Hardening: Removed invalid isInitialized check on lazy repository property.
  * July.20.07:

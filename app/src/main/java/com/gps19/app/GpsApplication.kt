@@ -18,7 +18,7 @@ import java.io.File
 /**
  * GpsApplication: Application entry point and global dependency management.
  * July.22.04:
- * - Hilt Hardening: Fully decommissioned manual AppContainer.
+ * - Hilt Hardening: Standardized dependency graph.
  * July.21.00:
  * - Build Hardening: Added missing HiltWorkerFactory import.
  * July.20.07:

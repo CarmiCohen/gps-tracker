@@ -87,9 +87,10 @@ abstract class AppModule {
         fun provideAppSensorManager(
             @ApplicationContext context: Context, 
             @ApplicationScope scope: CoroutineScope,
-            timeProvider: TimeProvider
+            timeProvider: TimeProvider,
+            systemMonitor: SystemMonitor
         ): AppSensorManager {
-            return AppSensorManager(context, scope, timeProvider)
+            return AppSensorManager(context, scope, timeProvider, systemMonitor)
         }
 
         @Provides
