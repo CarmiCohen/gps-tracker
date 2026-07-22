@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.22.09)
+# Project Issues & Hardening Tracking (July.22.10)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,12 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 336 |
+| **Resolved (Total)** | 🟢 Progress | 337 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*None.*
+*None. All known technical debt and leftovers have been purged.*
 
 ---
 
@@ -20,6 +20,10 @@ This document tracks active issues, technical debt, and pending implementation t
 *None.*
 
 ---
+
+## 🟢 Recently Resolved Issues (July.22.10)
+*   **Issue #513: Dead-Weight Purge & Release Alignment**.
+    *   **Resolution**: Physically removed 6 redundant/decommissioned files: `AppContainer.kt`, `MainViewModelFactory.kt`, `VideoComponents.kt`, `ChatViewModel.kt`, `WebRtcManager.kt`, and `SIMPLIFICATION_PLAN.md`. This eliminates documentation debt and historical logic leftovers, resulting in a lean, high-assurance codebase.
 
 ## 🟢 Recently Resolved Issues (July.22.09)
 *   **Issue #120b: Budget Hardware Initialization Spikes**.
@@ -35,9 +39,3 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ## 🟢 Recently Resolved Issues (July.22.08)
 *   *(Baseline established - all technical debt cleared)*
-
-## 🟢 Recently Resolved Issues (July.22.07)
-*   **Issue #031: Stability Audit Hardening**.
-    *   **Resolution**: Standardized stability auditing across both `TrackerService` and `ViewerService`. Fixed a logic error in the Viewer role where the audit condition prevented execution.
-*   **Issue #108: Startup Recovery Race Hardening**.
-    *   **Resolution**: Implemented a `RECOVERY_GRACE_PERIOD_MS` (60s) in `MaintenanceWorker.kt` to protect the staggered startup sequence (Requirement R955b).

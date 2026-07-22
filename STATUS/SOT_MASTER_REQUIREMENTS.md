@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.22.09 (Samsung Hardening & DI Finality)
+# System Source of Truth (SoT) - July.22.10 (Artifact Purge & Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -25,7 +25,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Standardized Proto Path (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`. (Issue #030)
 
 ### 4. Dependency & Hardware Hardening
-*   **Hilt Universal Authority (R120b)**: The manual `AppContainer` and its legacy artifacts are fully decommissioned. All core repositories, UseCases, and managers MUST be integrated into the Hilt graph using `@Inject` constructors and `@Singleton` scoping. Manual DI is forbidden. Circularities MUST be resolved via Dagger `Provider<T>`. (Issue #120, #124, #126, #126b)
+*   **Hilt Universal Authority (R120b)**: The manual `AppContainer` and its legacy artifacts are fully decommissioned and physically removed. All core repositories, UseCases, and managers MUST be integrated into the Hilt graph using `@Inject` constructors and `@Singleton` scoping. Manual DI is forbidden. Circularities MUST be resolved via Dagger `Provider<T>`. (Issue #120, #124, #126, #126b, #513)
 *   **Samsung A15 Battery Authority (R405b)**: The system MUST proactively trigger the configuration overlay if battery exemption is missing on Samsung A15 hardware. (Issue #101)
 *   **Samsung Stay-Alive Hardening (R405c)**: The system MUST detect hardware sensor registration failures and engage the Accelerometer-based stay-alive pulse. On budget hardware (A15), this pulse MUST perform a hardware "poke" via `SystemMonitor` WakeLock to prevent OS eviction. (Issue #098, #113)
 *   **Step Detector Permission (R107)**: The system MUST explicitly track `android.permission.ACTIVITY_RECOGNITION` to ensure hardware Step Detector availability on API 29+. (Issue #107)
@@ -37,5 +37,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: `July.22.09`.
+*   **Current Release**: `July.22.10`.
 *   **Source of Truth**: `app/build.gradle` `versionName`.
