@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.22.01 (Forensic Parity)
+# System Source of Truth (SoT) - July.22.03 (DataStore Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -17,6 +17,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 
 ### 3. Persistence & Service Reliability
 *   **Activation Authority**: The `isSystemActive` flag in `DataStore` is the definitive authority for background lifecycle revival. Background services MUST NOT restart automatically unless this flag is set.
+*   **DataStore Singleton Authority (R511)**: To prevent `IllegalStateException` during startup, Jetpack DataStore MUST be initialized via the `Context.dataStore` property delegate. This ensures exactly one instance exists per file across both Hilt and manual DI containers. (Issue #511)
 *   **Notification Throttling (R993)**: Foreground notification updates MUST BE throttled (default 30s) to prevent system-wide Logcat flooding and reduce CPU wakeups. (Issue #R993)
 *   **Database Migration Integrity (R956b)**: Any change to an `@Entity` class MUST be accompanied by a version bump and an explicit `Migration` object. (Issue #097, #118)
 *   **Standardized Proto Path (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`. (Issue #030)
@@ -34,5 +35,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: `July.22.01`.
+*   **Current Release**: `July.22.03`.
 *   **Source of Truth**: `app/build.gradle` `versionName`.

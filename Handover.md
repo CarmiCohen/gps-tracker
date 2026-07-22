@@ -1,29 +1,18 @@
-# Handover (July.22.02) - Forensic Parity & Release Finalization COMPLETE
+# Handover (July.22.03) - DataStore Singleton Hardening COMPLETE
 
 ## 🎯 Current Objective
-The **July.22.02** release is now ready. The primary focus of this cycle was **Forensic Parity Hardening** and **Relay Telemetry Integrity**. All models, database schemas, and telemetry payloads (including binary Protobuf) are now perfectly aligned.
+The **July.22.03** cycle focused on resolving a critical startup crash caused by multiple `DataStore` instances competing for the same file. This was triggered by the coexistence of Hilt and `AppContainer` DI mechanisms.
 
-## 📊 Forensic Status (July.22.02)
+## 📊 Hardening Status (July.22.03)
 
-### 1. Forensic Alignment Matrix (HARDENED)
-The following indices and SIT fields are now standardized across `LocationUpdate`, `TrackerStatus`, `SystemHealthState`, `HistoryEntity`, and `RealtimeStatus` (Proto):
-- **Forensic Indices**: `snrIdx`, `noiseIdx`, `luxIdx`, `vibeIdx`, `liftIdx`, `proxIdx`, `tiltIdx`, `baroIdx`.
-- **SIT Detection**: `isSitDetected`, `isSitActive`, `lastSitTs`, `sitVz`, `sitDz`, `sitBaro`, `sitTilt`, `sitShock`.
-- **Temporal Integrity**: Dual-time strategy (Monotonic `rt` / Wall-clock `ts`) is fully implemented in `TelemetryAggregator` and propagated to the UI.
+### 1. DataStore Singleton Enforcement (FIXED)
+- **Issue #511 Resolved**: Refactored `SettingsRepository` to use the idiomatic `Context.dataStore` property delegate.
+- **Root Cause Remediation**: Even if the repository is instantiated multiple times during the DI transition, the underlying `DataStore` connection is now globally shared across the application process via the `Context` extension.
+- **Migration Continuity**: All existing migrations (`AppSettingsMigration`, `typeMigration`, `identitySanitizationMigration`) were preserved and correctly linked to the new delegate.
 
-### 2. Relay & Telemetry Pipeline (AUDITED)
-- **Issue #122 Resolved**: Verified that the relay-server handles the expanded 15+ field payload.
-- **Binary Parity**: `RealtimeStatus` Protobuf now explicitly includes all forensic indices and SIT parameters.
-- **Mapping Logic**: `CommunicationManager` and `Models.kt` now correctly propagate deep forensic state from binary payloads to the UI.
-
-### 3. Persistence Layer (STABLE)
-- **Database Version**: **59**.
-- **Schema**: `pending_status_updates` now includes full forensic parity via `MIGRATION_58_59`.
-- **Migration**: `MIGRATION_56_57`, `57_58`, and `58_59` ensure schema harmony.
-
-### 4. Hilt & Architecture
-- **DI Graph**: All core components (Repositories, UseCases, Managers) are Hilt-injected.
-- **Lazy Loading**: Hardware lookups are off-loaded from the main thread during startup.
+### 2. Forensic Parity & Release Finalization
+- **July.22.02 Baseline**: Maintained all 15+ forensic parameters and Protobuf alignment.
+- **Stability**: Deployed and verified logcat; the `IllegalStateException` related to `DataStore` is resolved.
 
 ## 🔴 Remaining Tasks
 1. **Field Testing**: Verify SIT detection sensitivity on hardware in the next cycle.
@@ -32,11 +21,11 @@ The following indices and SIT fields are now standardized across `LocationUpdate
 ## 🚀 Git Release Commands
 ```bash
 git add .
-git commit -m "Forensic Parity Release July.22.02: Hardened 15+ Forensic Indices across Relay and Binary Pipelines"
-git tag -a July.22.02 -m "July.22.02 Forensic Parity Release"
+git commit -m "Hardening Release July.22.03: Resolved DataStore Singleton Violation (#511)"
+git tag -a July.22.03 -m "July.22.03 Hardening Release"
 git push origin main --tags
 ```
 
 ## 💡 Simplification Ideas
-- **Unified Telemetry Mapper**: Currently, mapping logic is duplicated across `TelemetryUseCase`, `Models.kt`, and `CommunicationManager`. Consolidating this into a single `ForensicMapper` in `core:engine` would prevent future field-drift.
-- **Protobuf BLOB Persistence**: Migrating `HistoryEntity` to store Protobuf BLOBs would eliminate the need for manual SQL schema migrations when new forensic parameters are added.
+- **Complete Hilt Migration**: The primary source of DI conflict is the dual-use of `AppContainer` and Hilt. Migrating the remaining `BaseMonitorService` components to Hilt will allow for the complete removal of `AppContainer.kt`.
+- **Unified Telemetry Mapper**: Consolidating mapping logic into `core:engine` remains a high-priority simplification task.
