@@ -4,7 +4,7 @@ This document contains the unified record of all resolved issues and technical d
 
 **Total Unique Resolutions: 324**
 
-## 1. DI Purge & Global Startup Maintenance (July.22.08)
+## 1. DI Purge & Global Startup Maintenance (July.22.09)
 *   **Issue #126b**: DI Leftover Purge. Physically decommissioned `AppContainer.kt` and `MainViewModelFactory.kt`. Scrubbed all legacy comments and historical references from the primary application entry points and service infrastructure to ensure architectural purity.
 *   **Issue #113**: Samsung A15 Fallback Hardening (R405c). Upgraded the Accelerometer "Stay-Alive Pulse" to perform a hardware "poke" via `SystemMonitor.acquireWakeLock(force = true)` every 10 seconds when the hardware Step Detector is missing or registration fails. This ensures budget hardware maintains process priority.
 *   **Issue #104b**: Global Startup Maintenance Authority. Extended the proactive `deepPruneLogs` operation (Requirement R104) to the background service layer via `BaseMonitorService.kt`. This ensures that even background-initiated startups benefit from log pruning, preventing I/O bottlenecks on budget hardware.

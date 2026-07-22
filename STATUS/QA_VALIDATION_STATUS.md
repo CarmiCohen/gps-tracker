@@ -1,4 +1,4 @@
-# Testing & Validation Status - July.22.07
+# Testing & Validation Status - July.22.09
 
 This document tracks pending unit tests, integration tests, and manual validation tasks.
 
@@ -10,7 +10,8 @@ This document tracks pending unit tests, integration tests, and manual validatio
 ## 🟡 Pending Manual Validation (Field Tests)
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
-| **#113** | **R405c Verification** | **New**. Perform long-term field testing on Samsung A15 hardware (SM-A155F) to confirm the Accelerometer fallback pulse prevents OS-level eviction. |
+| **#113** | **R405c Field Validation** | **Pending**. Perform long-term field testing on Samsung A15 hardware (SM-A155F) to confirm the WakeLock "poke" prevents OS-level eviction. |
+| **#120b** | **I/O Stabilization Check** | **Pending**. Verify absence of "UI ERROR" or frame drops during first 5s of startup on A15 hardware after the 2s pruning stagger. |
 | **#072** | **Map Stabilization** | Verify tracker marker on viewer map does not jump to gray/raw locations during clock drift. |
 | **#071** | **Forensic Stress Test** | Verify manual trigger of Jammer/Stall markers and HUD/Log reflection. |
 
@@ -19,15 +20,14 @@ This document tracks pending unit tests, integration tests, and manual validatio
 | :--- | :--- | :--- |
 | | | |
 
-## 🟢 Recently Verified (July.22.07)
+## 🟢 Recently Verified (July.22.09)
 | ID | Task | Result |
 | :--- | :--- | :--- |
-| **#031** | **Soak Test Monitoring** | **Verified**: Standardized stability auditing across Tracker and Viewer roles. Fixed logic error in Viewer audit condition. Ready for 24h field audit. |
-| **#108** | **Startup Recovery Race** | **Verified & Hardened**: Implemented a 60s grace period in `MaintenanceWorker` to protect the staggered startup sequence (R955b) from redundant recovery triggers. |
-| **#512** | **Doc Integrity** | **Verified**: Systematic synchronization of all status tracking files to July.22.05 baseline. |
-| **#124** | **Hilt Migration** | **Verified**: Successful decommission of `AppContainer` and migration to Hilt. |
-| **#511** | **DataStore Singleton** | **Verified**: Prevention of `IllegalStateException` via property delegate initialization. |
-| **#062** | **Anchor Breakout** | **Verified**: Displacement-weighted monitor successfully triggers breakout from Hard-Lock. |
+| **#126b** | **DI Purity Audit** | **Verified**: Successful decommission of manual DI artifacts. Scrubbed all code comments/references. |
+| **#104b** | **Service Pruning** | **Verified**: BaseMonitorService correctly triggers proactive log pruning on startup. |
+| **#121** | **Provider Caching** | **Verified**: LogManager overhead reduced via lazy thread-safe caching. |
+| **#031** | **Soak Test Monitoring** | **Verified**: Standardized stability auditing across Tracker and Viewer roles. |
+| **#108** | **Startup Recovery Race** | **Verified**: 60s grace period protecting staggered startup (R955b). |
 
 ---
 *For manual testing procedures, refer to [DOCS/TESTS.md](../DOCS/TESTS.md).*

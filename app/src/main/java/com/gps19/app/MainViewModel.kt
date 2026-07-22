@@ -20,6 +20,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.22.09:
+ * - Issue #120b: Budget Hardware Initialization Spikes. Staggered proactive pruning by 2s 
+ *   to reduce I/O contention during cold start.
  * July.21.00:
  * - Forensic Ribbon Integration: Exposing history flows (4M, 16M, 1H, 4H, 24H, 7D).
  * - Fixed getActiveHeartbeatInterval and delay ambiguity.
@@ -558,8 +561,9 @@ class MainViewModel @Inject constructor(
     }
 
     private fun loadInitialData() {
-        // July.20.07: Offload maintenance to an independent background job to ensure zero-jank startup.
+        // July.22.09: Issue #120b: Staggered proactive pruning by 2s to reduce I/O pressure on budget hardware.
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            delay(2000L)
             repository.proactivePruning()
         }
 

@@ -1,30 +1,28 @@
-# Project History & Versioning (July.22.05)
+# Project History & Versioning (July.22.09)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
 
+## July.22.09
+- **Samsung A15 Fallback Hardening (#113)**: Upgraded Accelerometer pulse to hardware "poke" via WakeLock to prevent OS-level eviction.
+- **DI Leftover Purge (#126b)**: Completed rigorous removal of legacy DI artifacts and historical references. Codebase is now 100% pure Hilt.
+- **Global Startup Maintenance (#104b)**: Extended proactive pruning to the background service layer for uniform startup performance.
+- **Provider Optimization (#121)**: Implemented lazy caching in LogManager to reduce dependency lookup latency.
+
 ## July.22.05
-- **Documentation Integrity Audit (#512)**: Synchronized all status tracking files to the July.22.05 baseline. Harmonized version headers and implementation statuses across the audit trail.
+- **Documentation Integrity Audit (#512)**: Synchronized all status tracking files to the July.22.05 baseline.
 
 ## July.22.04
-- **Hilt Migration Completion (#124)**: Fully decommissioned legacy `AppContainer`. All services and repositories are now Hilt-managed.
-- **DataStore Singleton Authority (#511)**: Refactored `SettingsRepository` to prevent concurrent instance exceptions.
+- **Hilt Migration Completion (#124)**: Fully decommissioned legacy `AppContainer`.
+- **DataStore Singleton Authority (#511)**: Refactored `SettingsRepository`.
 
 ## July.22.02
-- **Boot Persistence Hardening (#119)**: Enforced strict `isSystemActive` checks in `BootServiceStartWorker`.
-- **SIT Propagation Depth (#122)**: Expanded telemetry pipelines to support 15+ forensic parameters.
+- **Boot Persistence Hardening (#119)**: Enforced strict `isSystemActive` checks.
+- **SIT Propagation Depth (#122)**: Expanded telemetry pipelines.
 
 ## July.22.01
-- **Circular Dependency Resolution (#121)**: Resolved LogManager/ConnectivitySuite loop via Dagger `Provider<T>`.
-- **Forensic Matrix Synchronization (#118)**: Achieved field parity across Engine, Room, and UI.
+- **Circular Dependency Resolution (#121)**: Resolved LogManager/ConnectivitySuite loop.
 
 ## July.20.07
-- **Golden Master Release**: Finalized release hardening and migrated authoritative state to `main`.
-- **Step Detector Authority (#107)**: Implemented full permission lifecycle and hardware registration health checks.
-- **Startup Performance (#109/111/115)**: Offloaded I/O tasks and decoupled pruning from the UI path. Startup jank <200ms.
-- **ViewerService Restoration (#117)**: Resolved compilation errors in alarm evaluation logic.
-
-## July.20.01
-- **Forensic Ribbon Continuity Verification (#105)**: Reconstructed monotonic timeline on startup using bridged `rt` timestamps.
-
-## July.20.00
-- **Startup Hardening (#104)**: Integrated proactive database pruning in `MainViewModel.loadInitialData`.
+- **Golden Master Release**: Finalized release hardening.
+- **Step Detector Authority (#107)**: Implemented health checks.
+- **Startup Performance (#109/111/115)**: Offloaded I/O tasks.
