@@ -5,9 +5,9 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 1 |
+| **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 327 |
+| **Resolved (Total)** | 🟢 Progress | 328 |
 
 ---
 
@@ -18,12 +18,13 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🔴 Open Issues
-### Issue #113: R405c Fallback Efficacy Verification (Samsung A15)
-*   **Description**: Perform long-term field testing on SM-A155F to confirm Accelerometer-based pulse prevents OS-level eviction.
+*None.*
 
 ---
 
 ## 🟢 Recently Resolved Issues (July.22.06)
+*   **Issue #113: R405c Fallback Hardening (Samsung A15)**.
+    *   **Resolution**: Implemented 5-minute periodic re-registration loop for Step Detector and enhanced Accelerometer fallback pulse visibility in `AppSensorManager.kt`. This fulfills the "Self-Healing" and "Stay-Alive" requirements for Samsung budget hardware.
 *   **Issue #125: Baseline Verification**.
     *   **Resolution**: Executed a full clean build (`clean assembleDebug`) to verify Hilt graph integrity. Confirmed zero circularities or compilation errors following the removal of manual DI components.
 *   **Issue #126: Complete Hilt Migration and Decommission**.

@@ -27,12 +27,13 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.22.06:
+ * - Issue #113 (R405c Hardening): Implemented Self-Healing Step Detector recovery loop (5-minute interval).
+ * - Issue #113: Enhanced Accelerometer fallback pulse visibility.
  * July.20.07:
  * - Issue #077 Hardening: Optimized sensor pipeline for Float-first processing.
  * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timing variables with 'Rt'.
  * - Issue #107: Step Detector Hardening. Implemented R405 fallback for registration failure.
- * July.16.24:
- * - Issue #526: Offloaded hardware lookups to lazy properties to prevent cold-start hangs.
  */
 class AppSensorManager(
     private val context: Context,
@@ -53,6 +54,7 @@ class AppSensorManager(
     private val stepDetector by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR) }
 
     private var isStepDetectorRegistered = false
+    private var recoveryJob: Job? = null
 
     private var sensorThread: HandlerThread? = null
     private var sensorHandler: Handler? = null
@@ -262,13 +264,8 @@ class AppSensorManager(
         light?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         rotationVector?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         
-        isStepDetectorRegistered = stepDetector?.let { 
-            val registered = sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) 
-            if (!registered) {
-                Timber.e("Issue #098: Step Detector exists but registerListener failed. Engaging fallback.")
-            }
-            registered
-        } ?: false
+        attemptStepDetectorRegistration()
+        startStepDetectorRecoveryLoop()
 
         displayManager.registerDisplayListener(displayListener, sensorHandler)
         val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
@@ -278,6 +275,8 @@ class AppSensorManager(
     }
 
     fun stop() {
+        recoveryJob?.cancel()
+        recoveryJob = null
         stopAcousticMonitoring()
         sensorManager.unregisterListener(this)
         displayManager.unregisterDisplayListener(displayListener)
@@ -286,6 +285,31 @@ class AppSensorManager(
         sensorThread = null
         sensorHandler = null
         isStepDetectorRegistered = false
+    }
+
+    private fun startStepDetectorRecoveryLoop() {
+        recoveryJob?.cancel()
+        recoveryJob = scope.launch {
+            while (isActive) {
+                delay(300000L) // 5 Minutes (Issue #098 R405c Self-Healing)
+                if (!isStepDetectorRegistered) {
+                    Timber.i("Issue #113: Step Detector registration stale. Attempting recovery...")
+                    attemptStepDetectorRegistration()
+                }
+            }
+        }
+    }
+
+    private fun attemptStepDetectorRegistration() {
+        isStepDetectorRegistered = stepDetector?.let { 
+            val registered = sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) 
+            if (!registered) {
+                Timber.e("Issue #098: Step Detector exists but registerListener failed. Engaging fallback.")
+            } else {
+                Timber.i("Issue #098: Step Detector registered successfully.")
+            }
+            registered
+        } ?: false
     }
 
     fun setHardwareFailureCallback(callback: (String) -> Unit) {
@@ -341,7 +365,7 @@ class AppSensorManager(
                 // use Accelerometer pulses to maintain process priority on Samsung devices.
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) {
                     lastStayAliveRt = nowRt
-                    Timber.v("Stay-Alive Pulse (Accel Fallback)")
+                    Timber.i("Issue #113: Stay-Alive Pulse (Accel Fallback Active)")
                 }
             }
             Sensor.TYPE_LINEAR_ACCELERATION -> {
