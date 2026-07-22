@@ -10,6 +10,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * July.22.01:
+ * - Forensic Parity: Added missing indices (noiseIdx, luxIdx, vibeIdx, liftIdx) to TrackerStatus and Proto/JSON mappings.
  * July.21.00:
  * - Forensic Hardening: Added missing indices (SNR, NOI, LUX, VIB, SIT) to ConnectionPoint and TrackerStatus.
  * - Monotonic Rt: Standardized all timestamps to use 'Rt' suffix.
@@ -252,6 +254,10 @@ data class TrackerStatus(
     val isCoolingModeActive: Boolean = false,
     val trackerState: TrackerState = TrackerState.UNKNOWN,
     val snrIdx: Double = 0.0,
+    val noiseIdx: Double = 0.0,
+    val luxIdx: Double = 0.0,
+    val vibeIdx: Double = 0.0,
+    val liftIdx: Double = 0.0,
     val isAnchorLocked: Boolean = false,
     val isSitDetected: Boolean = false,
     val isSitActive: Boolean = false,
@@ -298,6 +304,7 @@ data class TrackerStatus(
             put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_mode_active", isCoolingModeActive)
             put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
             put("is_jump", isJump); put("mic_pending", micPending)
+            put("snr_idx", snrIdx); put("noise_idx", noiseIdx); put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)
         }
     }
 
@@ -332,6 +339,17 @@ data class TrackerStatus(
             .setPendingReason(mapPendingReasonToProto(locationPendingReason))
             .setIsBatterySteepDischarge(isBatterySteepDischarge)
             .setIsCoolingModeActive(isCoolingModeActive)
+            .setSnrIdx(snrIdx)
+            .setNoiseIdx(noiseIdx)
+            .setLuxIdx(luxIdx)
+            .setVibeIdx(vibeIdx)
+            .setLiftIdx(liftIdx)
+            .setProxIdx(proxIdx)
+            .setIsSitDetected(isSitDetected)
+            .setIsSitActive(isSitActive)
+            .setLastSitTs(lastSitTs)
+            .setSitVz(sitVz)
+            .setSitDz(sitDz)
             .build()
     }
 

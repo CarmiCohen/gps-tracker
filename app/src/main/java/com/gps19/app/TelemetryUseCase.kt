@@ -5,12 +5,13 @@ import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * July.22.01:
+ * - Forensic Parity: Added mapping for noiseIdx, luxIdx, vibeIdx, and liftIdx.
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor.
  * July.21.00:
  * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamps to 'Rt'.
  * - Issue #516: De-duplicate "Status" Logic. Using SystemHealthState for all health/sensor metadata.
- * - Resolved merge conflicts and aligned with Golden Master architecture.
  */
 class TelemetryUseCase @Inject constructor(
     private val timeProvider: TimeProvider
@@ -44,7 +45,6 @@ class TelemetryUseCase @Inject constructor(
     }
 
     fun mapHealthFromUpdate(update: LocationUpdate, current: SystemHealthState): SystemHealthState {
-        val nowMs = timeProvider.currentTimeMillis()
         return current.copy(
             signalLoss = update.signal?.let { it < 2 } ?: current.signalLoss,
             gpsStalled = update.locationPendingReason == LocationPendingReason.GPS_STALL,
@@ -73,6 +73,10 @@ class TelemetryUseCase @Inject constructor(
             isCoolingModeActive = update.isCoolingModeActive,
             gnssDetail = update.gnssDetail ?: current.gnssDetail,
             snrIdx = update.snrIdx,
+            noiseIdx = update.noiseIdx,
+            luxIdx = update.luxIdx,
+            vibeIdx = update.vibeIdx,
+            liftIdx = update.liftIdx,
             uptimeMs = update.uptimeMs ?: current.uptimeMs,
             lastConnTs = update.lastConnTs ?: current.lastConnTs,
             lastDiscTs = update.lastDiscTs ?: current.lastDiscTs,
@@ -100,6 +104,7 @@ class TelemetryUseCase @Inject constructor(
             proximityDebounceMs = update.proximityDebounceMs ?: current.proximityDebounceMs,
             vibrationRollingSum = update.vibrationRollingSum ?: current.vibrationRollingSum,
             isSitDetected = update.isSitDetected,
+            isSitActive = update.isSitActive,
             lastSitTs = update.lastSitTs,
             verticalVelocity = update.verticalVelocity ?: current.verticalVelocity,
             sitVz = update.sitVz ?: current.sitVz,
@@ -134,6 +139,10 @@ class TelemetryUseCase @Inject constructor(
             isCoolingModeActive = status.isCoolingModeActive,
             gnssDetail = status.gnssDetail,
             snrIdx = status.snrIdx,
+            noiseIdx = status.noiseIdx,
+            luxIdx = status.luxIdx,
+            vibeIdx = status.vibeIdx,
+            liftIdx = status.liftIdx,
             uptimeMs = status.uptimeMs,
             lastConnTs = status.lastConnTs,
             lastDiscTs = status.lastDiscTs,

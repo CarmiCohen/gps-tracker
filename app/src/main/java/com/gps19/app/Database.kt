@@ -8,6 +8,9 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * July.22.01:
+ * - Issue #118: Forensic Parity. Added missing indices to PendingStatusEntity.
+ * - Incremented version to 59.
  * July.21.00:
  * - Issue #105: Incremented version to 58 to resolve Room identity hash mismatch.
  * - Restored Sit Detection and Anchor Lock forensic fields across all entities.
@@ -113,6 +116,11 @@ data class PendingStatusEntity(
     val satsView: Int, val satsUsed: Int, val name: String? = null, val maxAccuracy: Double,
     val distToTracker: Double? = null, val distToHome: Double? = null,
     @ColumnInfo(defaultValue = "0") val snrIdx: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val noiseIdx: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val luxIdx: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val vibeIdx: Double = 0.0,
+    @ColumnInfo(defaultValue = "1") val proxIdx: Double = 1.0,
+    @ColumnInfo(defaultValue = "0") val liftIdx: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val tiltIdx: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val baroIdx: Double = 0.0,
     @ColumnInfo(name = "isBatterySteepDischarge", defaultValue = "0") val isBatterySteepDischarge: Boolean = false,
@@ -204,7 +212,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 58, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 59, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -252,6 +260,16 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #105: Room identity hash mismatch resolution. 
                 // All schema changes already handled in harmonized MIGRATION_56_57.
+            }
+        }
+        val MIGRATION_58_59 = object : Migration(58, 59) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #118: Forensic Parity for pending_status_updates.
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN noiseIdx REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN luxIdx REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN vibeIdx REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN liftIdx REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN proxIdx REAL NOT NULL DEFAULT 1")
             }
         }
     }

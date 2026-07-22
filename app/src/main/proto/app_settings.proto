@@ -5,6 +5,8 @@ option java_multiple_files = true;
 
 /**
  * AppSettings: Persistence schema for DataStore.
+ * July.22.01:
+ * - Forensic Parity: Added indices (snr, noise, lux, vibe, lift, prox) and SIT fields to RealtimeStatus.
  * July.20.07:
  * - Synchronized with SettingsRepository for Forensic Hardening.
  * - Added clock_drift_ref for forensic integrity.
@@ -147,6 +149,19 @@ message RealtimeStatus {
     int64 last_valid_fix_rt = 32;
     bool is_battery_steep_discharge = 33;
     bool is_cooling_mode_active = 34;
+
+    // Forensic Fields (July.22.01)
+    double snr_idx = 35;
+    double noise_idx = 36;
+    double lux_idx = 37;
+    double vibe_idx = 38;
+    double lift_idx = 39;
+    double prox_idx = 40;
+    bool is_sit_detected = 41;
+    bool is_sit_active = 42;
+    int64 last_sit_ts = 43;
+    double sit_vz = 44;
+    double sit_dz = 45;
 }
 
 message GeoPointProto {
