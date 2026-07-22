@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.22.03)
+# Project Issues & Hardening Tracking (July.22.04)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -23,7 +23,7 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (July.22.03)
+## 🟢 Recently Resolved Issues (July.22.04)
 *   **Issue #511: DataStore Singleton Violation**.
     *   **Resolution**: Refactored `SettingsRepository` to use a single `DataStore` instance via `Context` extension delegate. This ensures that even during the Hilt transition, multiple repository instances share the same underlying `DataStore` connection, preventing `IllegalStateException`.
 

@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.22.03 (DataStore Hardening)
+# System Source of Truth (SoT) - July.22.04 (DataStore Hardening Final)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -35,5 +35,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: `July.22.03`.
+*   **Current Release**: `July.22.04`.
 *   **Source of Truth**: `app/build.gradle` `versionName`.
