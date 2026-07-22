@@ -45,8 +45,12 @@ class TrackerService : BaseMonitorService() {
     private var lastHardwareRecoveryTs = 0L
     private var capabilities = HardwareCapabilities()
 
+    // R951: Stability Audit State
     private var lastGpsFixRealtime = 0L
+    private var stabilityAuditFixCount = 0
+    private var stabilityAuditViolationCount = 0
     private var lastStabilityAuditTs = 0L
+    
     private var lastFastPathAcousticSpikeTs = 0L
 
     private val localProcessorListener = object : LocationProcessorListener {
@@ -266,6 +270,8 @@ class TrackerService : BaseMonitorService() {
         integrityMonitor.resetStats()
         forensicUseCase.resetLatches()
         lastHardwareRecoveryTs = 0L
+        stabilityAuditFixCount = 0
+        stabilityAuditViolationCount = 0
         logManager.logServiceEvent("Session Terminated", false)
     }
 
@@ -330,6 +336,21 @@ class TrackerService : BaseMonitorService() {
                 systemMonitor.acquireWakeLock() // Force hardware active
                 connectivitySuite.connect(configManager.relayUrl) // Re-establish signaling
             }
+        }
+
+        // R951: Stability Audit Reporting
+        if (nowRt - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
+            if (stabilityAuditFixCount > 0) {
+                val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
+                if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
+                    val proc = lastProcessedLocation
+                    logManager.logServiceEvent("STABILITY AUDIT (T): Reliability ${String.format(Locale.getDefault(), "%.1f", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true,
+                        lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                }
+                stabilityAuditFixCount = 0
+                stabilityAuditViolationCount = 0
+            }
+            lastStabilityAuditTs = nowRt
         }
         
         val isSocketConnected = connectivitySuite.isConnected() && !transientDropDetected.getAndSet(false)
@@ -452,15 +473,30 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun onLocationChanged(location: Location) {
+        val nowRt = timeProvider.elapsedRealtime()
         lastKnownLocation = location
         lastGpsSpeed = location.speed.toDouble()
         lastGpsAccuracy = location.accuracy.toDouble()
         lastGpsBearing = location.bearing.toDouble()
         
-        lastGpsFixRealtime = timeProvider.elapsedRealtime()
+        // R951: Stability Gap Detection
+        if (lastGpsFixRealtime > 0) {
+            val gap = nowRt - lastGpsFixRealtime
+            if (HIGH_FREQUENCY_GPS_POLLING_MS == TICK_INTERVAL_MS) {
+                stabilityAuditFixCount++
+                if (gap > TICK_INTERVAL_MS + GPS_STABILITY_GAP_THRESHOLD_MS) {
+                    stabilityAuditViolationCount++
+                    val proc = lastProcessedLocation
+                    logManager.logServiceEvent("STABILITY GAP (T): ${gap}ms detected during logic pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                        lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
+                }
+            }
+        }
+
+        lastGpsFixRealtime = nowRt
         systemMonitor.gpsStallStartTs = 0L
         
-        if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = timeProvider.elapsedRealtime()
+        if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = nowRt
     }
 
     private fun evaluateAlarmsInternal(

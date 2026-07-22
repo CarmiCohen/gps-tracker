@@ -210,17 +210,21 @@ class ViewerService : BaseMonitorService() {
         lastGpsAccuracy = location.accuracy.toDouble()
         lastGpsBearing = location.bearing.toDouble()
 
-        val currentHeartbeat = getRequiredTickInterval()
-        if (VIEWER_GPS_POLLING_MS == TICK_INTERVAL_MS && lastGpsFixRealtime > 0) {
+        // R951: Stability Gap Detection
+        if (lastGpsFixRealtime > 0) {
             val gap = nowRt - lastGpsFixRealtime
-            stabilityAuditFixCount++
-            if (gap > currentHeartbeat + GPS_STABILITY_GAP_THRESHOLD_MS) {
-                stabilityAuditViolationCount++
-                val proc = lastProcessedLocation
-                logManager.logServiceEvent("STABILITY GAP (V): ${gap}ms detected during logic pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
-                    lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
+            // Audit against the default high-accuracy interval (TICK_INTERVAL_MS)
+            if (HIGH_FREQUENCY_GPS_POLLING_MS == TICK_INTERVAL_MS) {
+                stabilityAuditFixCount++
+                if (gap > TICK_INTERVAL_MS + GPS_STABILITY_GAP_THRESHOLD_MS) {
+                    stabilityAuditViolationCount++
+                    val proc = lastProcessedLocation
+                    logManager.logServiceEvent("STABILITY GAP (V): ${gap}ms detected during logic pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR,
+                        lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
+                }
             }
         }
+        
         lastGpsFixRealtime = nowRt
 
         val processed = locationProcessor.processGpsPoint(
@@ -359,6 +363,7 @@ class ViewerService : BaseMonitorService() {
              systemMonitor.renewWakeLock()
         }
 
+        // R951: Stability Audit Reporting
         if (nowRt - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
             if (stabilityAuditFixCount > 0) {
                 val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount

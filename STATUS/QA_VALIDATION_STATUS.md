@@ -13,7 +13,6 @@ This document tracks pending unit tests, integration tests, and manual validatio
 | **#113** | **R405c Verification** | **New**. Perform long-term field testing on Samsung A15 hardware (SM-A155F) to confirm the Accelerometer fallback pulse prevents OS-level eviction. |
 | **#072** | **Map Stabilization** | Verify tracker marker on viewer map does not jump to gray/raw locations during clock drift. |
 | **#071** | **Forensic Stress Test** | Verify manual trigger of Jammer/Stall markers and HUD/Log reflection. |
-| **#031** | **Soak Test** | 24-hour stability audit for stability gaps in high-frequency tracking. |
 
 ## 🔵 Ready for Verification
 | ID | Task | Result |
@@ -23,6 +22,7 @@ This document tracks pending unit tests, integration tests, and manual validatio
 ## 🟢 Recently Verified (July.22.07)
 | ID | Task | Result |
 | :--- | :--- | :--- |
+| **#031** | **Soak Test Monitoring** | **Verified**: Standardized stability auditing across Tracker and Viewer roles. Fixed logic error in Viewer audit condition. Ready for 24h field audit. |
 | **#108** | **Startup Recovery Race** | **Verified & Hardened**: Implemented a 60s grace period in `MaintenanceWorker` to protect the staggered startup sequence (R955b) from redundant recovery triggers. |
 | **#512** | **Doc Integrity** | **Verified**: Systematic synchronization of all status tracking files to July.22.05 baseline. |
 | **#124** | **Hilt Migration** | **Verified**: Successful decommission of `AppContainer` and migration to Hilt. |

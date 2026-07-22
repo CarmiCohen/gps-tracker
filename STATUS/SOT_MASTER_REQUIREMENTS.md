@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.22.07 (Startup Hardened)
+# System Source of Truth (SoT) - July.22.07 (Startup & Stability Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -7,6 +7,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Cold-Start Hardening (R955b)**: To prevent Main-thread frame skipping and ANRs on low-end hardware, the system MUST implement a mandatory 500ms staggered delay before starting base observations. (Issue #099)
 *   **Startup Recovery Protection (R955c)**: To prevent redundant service restarts during the staggered startup window, the `MaintenanceWorker` MUST implement a 60-second grace period from the `appStartTime` before attempting any recovery. (Issue #108)
 *   **Startup Maintenance Authority (R104)**: To prevent I/O bottlenecks and ANRs during cold starts, the system MUST execute a proactive `deepPruneLogs` operation on `Dispatchers.IO` immediately upon initialization. (Issue #104)
+*   **Stability Audit Authority (R951)**: To ensure engine resilience during high-frequency tracking, the system MUST perform continuous stability auditing. Gaps > 200ms (`GPS_STABILITY_GAP_THRESHOLD_MS`) relative to the 2s heartbeat MUST be logged as "STABILITY GAP," and Reliability % MUST be reported every 10s. (Issue #031)
 *   **Lazy Safety**: All Hilt managers and repositories MUST use `LazyThreadSafetyMode.PUBLICATION` if any internal state requires lazy initialization to prevent thread stalling.
 
 ### 2. Temporal & Forensic Integrity
@@ -26,7 +27,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 ### 4. Dependency & Hardware Hardening
 *   **Hilt Universal Authority (R120b)**: The manual `AppContainer` is fully decommissioned. All core repositories, UseCases, and managers MUST be integrated into the Hilt graph using `@Inject` constructors and `@Singleton` scoping. Manual DI is forbidden. Circularities MUST be resolved via Dagger `Provider<T>`. (Issue #120, #124, #126)
 *   **Samsung A15 Battery Authority (R405b)**: The system MUST proactively trigger the configuration overlay if battery exemption is missing on Samsung A15 hardware. (Issue #101)
-*   **Samsung Stay-Alive Fallback (R405c)**: The system MUST detect hardware sensor registration failures and immediately engage the Accelerometer-based stay-alive pulse. (Issue #098)
+*   **Samsung Stay-Alive Hardening (R405c)**: The system MUST detect hardware sensor registration failures and immediately engage the Accelerometer-based stay-alive pulse. (Issue #098, #113)
 *   **Step Detector Permission (R107)**: The system MUST explicitly track `android.permission.ACTIVITY_RECOGNITION` to ensure hardware Step Detector availability on API 29+. (Issue #107)
 
 ### 5. Architectural Baselines

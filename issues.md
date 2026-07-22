@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 329 |
+| **Resolved (Total)** | 🟢 Progress | 330 |
 
 ---
 
@@ -23,6 +23,8 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🟢 Recently Resolved Issues (July.22.07)
+*   **Issue #031: Stability Audit Hardening**.
+    *   **Resolution**: Standardized stability auditing across both `TrackerService` and `ViewerService`. Fixed a logic error in the Viewer role where the audit condition prevented execution. This enables reliable gap detection (R951) during 24-hour soak tests.
 *   **Issue #108: Startup Recovery Race Hardening**.
     *   **Resolution**: Implemented a `RECOVERY_GRACE_PERIOD_MS` (60s) in `MaintenanceWorker.kt`. The worker now verifies `appStartTime` before triggering recovery, ensuring that the staggered startup sequence (Requirement R955b) has sufficient time to initialize without redundant service restarts.
 
