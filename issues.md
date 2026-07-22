@@ -7,12 +7,11 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 325 |
+| **Resolved (Total)** | 🟢 Progress | 327 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Issue #125: Baseline Verification**: A full clean build is required to ensure no residual circularities exist in the generated Dagger graph after the AppContainer removal.
 *   **Issue #121: Provider Latency**: Circularity resolution via `Provider<T>` is stable but introduces minor lookup overhead in `LogManager`.
 *   **Issue #120b: Budget Hardware Initialization Spikes**: Budget devices (A15) remain sensitive. The 500ms staggered startup is critical.
 
@@ -25,6 +24,8 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🟢 Recently Resolved Issues (July.22.06)
+*   **Issue #125: Baseline Verification**.
+    *   **Resolution**: Executed a full clean build (`clean assembleDebug`) to verify Hilt graph integrity. Confirmed zero circularities or compilation errors following the removal of manual DI components.
 *   **Issue #126: Complete Hilt Migration and Decommission**.
     *   **Resolution**: Finalized Hilt transition by decommissioning legacy `AppContainer.kt` and `MainViewModelFactory.kt`. Conducted code-wide audit to confirm zero remaining references to manual DI container.
 

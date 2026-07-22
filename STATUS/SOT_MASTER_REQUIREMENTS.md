@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.22.05 (Baseline Hardening)
+# System Source of Truth (SoT) - July.22.06 (Hilt Baseline)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -23,7 +23,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Standardized Proto Path (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`. (Issue #030)
 
 ### 4. Dependency & Hardware Hardening
-*   **Hilt Universal Authority (R120b)**: The manual `AppContainer` is fully decommissioned. All core repositories, UseCases, and managers MUST be integrated into the Hilt graph using `@Inject` constructors and `@Singleton` scoping. Manual DI is forbidden. Circularities MUST be resolved via Dagger `Provider<T>`. (Issue #120, #124)
+*   **Hilt Universal Authority (R120b)**: The manual `AppContainer` is fully decommissioned. All core repositories, UseCases, and managers MUST be integrated into the Hilt graph using `@Inject` constructors and `@Singleton` scoping. Manual DI is forbidden. Circularities MUST be resolved via Dagger `Provider<T>`. (Issue #120, #124, #126)
 *   **Samsung A15 Battery Authority (R405b)**: The system MUST proactively trigger the configuration overlay if battery exemption is missing on Samsung A15 hardware. (Issue #101)
 *   **Samsung Stay-Alive Fallback (R405c)**: The system MUST detect hardware sensor registration failures and immediately engage the Accelerometer-based stay-alive pulse. (Issue #098)
 *   **Step Detector Permission (R107)**: The system MUST explicitly track `android.permission.ACTIVITY_RECOGNITION` to ensure hardware Step Detector availability on API 29+. (Issue #107)
@@ -35,5 +35,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: `July.22.05`.
+*   **Current Release**: `July.22.06`.
 *   **Source of Truth**: `app/build.gradle` `versionName`.
