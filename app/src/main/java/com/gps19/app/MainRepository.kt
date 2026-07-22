@@ -15,7 +15,8 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
- * July.22.00:
+ * July.22.01:
+ * - Forensic Parity: Hardened History mapping for all 15+ forensic parameters in ConnectionPoint.
  * - Hilt Hardening: Added @Inject constructor and @ApplicationContext.
  * July.21.00:
  * - Forensic Hardening: Added missing sit-detection and history keys.
@@ -335,7 +336,25 @@ class MainRepository @Inject constructor(
                 isCoolingModeActive = entity.isCoolingModeActive,
                 speed = entity.speed, bearing = entity.bearing,
                 currentMa = entity.currentMa,
-                locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
+                locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE },
+                
+                // Forensic Indices (July.22.01)
+                gpsIndex = entity.gpsIndex,
+                noiseIdx = entity.noiseIdx,
+                luxIdx = entity.luxIdx,
+                vibeIdx = entity.vibeIdx,
+                proxIdx = entity.proxIdx,
+                liftIdx = entity.liftIdx,
+                snrIdx = entity.snrIdx,
+                tiltIdx = entity.tiltIdx,
+                baroIdx = entity.baroIdx,
+                isSitDetected = entity.isSitDetected,
+                isSitActive = entity.isSitActive,
+                sitVz = entity.sitVz,
+                sitDz = entity.sitDz,
+                sitBaro = entity.sitBaro,
+                sitTilt = entity.sitTilt,
+                sitShock = entity.sitShock
             ) 
         }
     }.flowOn(Dispatchers.Default)
@@ -367,7 +386,25 @@ class MainRepository @Inject constructor(
                 currentMa = point.currentMa,
                 locationPendingReason = point.locationPendingReason.name,
                 accuracy = point.gpsAccuracy,
-                maxAccuracy = point.maxAccuracy
+                maxAccuracy = point.maxAccuracy,
+                
+                // Forensic Indices (July.22.01)
+                gpsIndex = point.gpsIndex,
+                noiseIdx = point.noiseIdx,
+                luxIdx = point.luxIdx,
+                vibeIdx = point.vibeIdx,
+                proxIdx = point.proxIdx,
+                liftIdx = point.liftIdx,
+                snrIdx = point.snrIdx,
+                tiltIdx = point.tiltIdx,
+                baroIdx = point.baroIdx,
+                isSitDetected = point.isSitDetected,
+                isSitActive = point.isSitActive,
+                sitVz = point.sitVz,
+                sitDz = point.sitDz,
+                sitBaro = point.sitBaro,
+                sitTilt = point.sitTilt,
+                sitShock = point.sitShock
             ))
         }
 

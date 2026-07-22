@@ -17,6 +17,7 @@ import javax.inject.Singleton
 /**
  * Socket.io implementation of the SignalingProvider.
  * July.22.01:
+ * - Forensic Parity: Expanded binary payload parsing to include all 15+ forensic SIT parameters.
  * - Hilt Hardening: Added @ApplicationContext to constructor.
  * July.20.07:
  * - Issue #102: Temporal Forensic Integrity. Propagated monotonic 'rt' in binary payloads.
@@ -266,6 +267,25 @@ class CommunicationManager @Inject constructor(
                 put("last_valid_fix_rt", status.lastValidFixRt)
                 put("is_battery_steep_discharge", status.isBatterySteepDischarge)
                 put("is_cooling_mode_active", status.isCoolingModeActive)
+                
+                // Forensic Fields (July.22.01)
+                put("snr_idx", status.snrIdx)
+                put("noise_idx", status.noiseIdx)
+                put("lux_idx", status.luxIdx)
+                put("vibe_idx", status.vibeIdx)
+                put("lift_idx", status.liftIdx)
+                put("prox_idx", status.proxIdx)
+                put("tilt_idx", status.tiltIdx)
+                put("baro_idx", status.baroIdx)
+                put("is_sit_detected", status.isSitDetected)
+                put("is_sit_active", status.isSitActive)
+                put("last_sit_ts", status.lastSitTs)
+                put("sit_vz", status.sitVz)
+                put("sit_dz", status.sitDz)
+                put("sit_baro", status.sitBaro)
+                put("sit_tilt", status.sitTilt)
+                put("sit_shock", status.sitShock)
+                put("vertical_velocity", status.verticalVelocity)
             }
             remoteUpdateListener?.onUpdate(json)
         } catch (e: Exception) {

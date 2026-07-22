@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.22.01)
+# Project Issues & Hardening Tracking (July.22.02)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,15 +7,13 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 317 |
+| **Resolved (Total)** | 🟢 Progress | 320 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Issue #122: SIT Propagation Depth**: Forensic fields are now 15+ deep (snrIdx, noiseIdx, luxIdx, vibeIdx, liftIdx, etc.). Relay-server must be verified for JSON/Proto compatibility with this expanded payload.
 *   **Issue #121: Provider Latency**: Circularity resolution via `Provider<T>` is stable but introduces minor lookup overhead in `LogManager`.
 *   **Issue #120b: Budget Hardware Initialization Spikes**: Budget devices (A15) remain sensitive. The 500ms staggered startup is critical.
-*   **Issue #119: Boot Persistence Integrity**: `isSystemActive` is the single source of truth for service revival.
 
 ---
 
@@ -25,11 +23,17 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
+## 🟢 Recently Resolved Issues (July.22.02)
+*   **Issue #119: Boot Persistence Integrity**.
+    *   **Resolution**: Hardened the system revival master switch. `BootServiceStartWorker` and `MaintenanceWorker` now rigorously check `isSystemActive` before attempting to start or recover foreground services.
+*   **Issue #120: Hilt Worker Hardening**.
+    *   **Resolution**: Systematic conversion of all background workers (`MaintenanceWorker`, `BootServiceStartWorker`) to `@HiltWorker` with assisted injection to ensure dependency integrity across process boundaries.
+*   **Issue #122: SIT Propagation Depth & Relay Audit**.
+    *   **Resolution**: Hardened the binary and JSON telemetry pipelines. Updated `RealtimeStatus` Protobuf and `TrackerStatus` mapping to include all 15+ forensic parameters (tiltIdx, baroIdx, sitBaro, sitTilt, sitShock, etc.). Verified relay-server schema-agnostic compatibility.
+
 ## 🟢 Recently Resolved Issues (July.22.01)
 *   **Issue #118: Final Forensic Parity Synchronization**.
     *   **Resolution**: Standardized 15+ forensic parameters (`snrIdx`, `noiseIdx`, `luxIdx`, `vibeIdx`, `liftIdx`, `proxIdx`, and SIT fields) across `LocationUpdate`, `TrackerStatus`, `SystemHealthState`, `HistoryEntity`, and Protobuf (`RealtimeStatus`).
-*   **Issue #120: Hilt Hardening & Dependency Restoration**.
-    *   **Resolution**: Systematically added `@Inject` constructors and `@Singleton` annotations to 20+ core components. Resolved circularities using `Provider<T>`.
 *   **Issue #123: Version Consolidation**.
     *   **Resolution**: Updated all version references to `July.22.01` and synchronized `app/build.gradle`.
 

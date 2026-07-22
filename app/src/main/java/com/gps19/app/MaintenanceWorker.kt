@@ -9,16 +9,22 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.work.*
 import com.gps19.core.engine.*
+import androidx.hilt.work.HiltWorker
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
+import kotlinx.coroutines.flow.firstOrNull
 import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Converted to standard CoroutineWorker.
+ * July.22.02:
+ * - Issue #119: Boot Persistence Integrity. Added mandatory check for isSystemActive before recovery.
+ * - Issue #120: Hilt Hardening. Converted to @HiltWorker for DI integrity.
  */
-class MaintenanceWorker(
-    context: Context,
-    params: WorkerParameters,
+@HiltWorker
+class MaintenanceWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider
 ) : CoroutineWorker(context, params) {
@@ -27,6 +33,8 @@ class MaintenanceWorker(
 
     override suspend fun doWork(): Result {
         val savedMode = repository.getAppMode()
+        // Issue #119: isSystemActive is the SoT for lifecycle revival
+        val isSystemActive = repository.isSystemActiveFlow.firstOrNull() ?: repository.getBoolean(MainRepository.IS_SYSTEM_ACTIVE_KEY, false)
         
         val recoveryThresholdMs = 180000L
         val lastTick = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, 0L)
@@ -36,9 +44,9 @@ class MaintenanceWorker(
         val isNetworkAlive = isNetworkAvailable(applicationContext)
         val networkStatus = if (isNetworkAlive) "ALIVE" else "DEAD"
 
-        Log.d("GPS19", "MAINTENANCE: Periodic check. Mode: $savedMode, Silence: ${silenceDurationMs/1000}s, Net: $networkStatus")
+        Log.d("GPS19", "MAINTENANCE: Periodic check. Mode: $savedMode, Active: $isSystemActive, Silence: ${silenceDurationMs/1000}s, Net: $networkStatus")
 
-        if (savedMode != null) {
+        if (savedMode != null && isSystemActive) {
             if (lastTick == 0L || silenceDurationMs > recoveryThresholdMs) {
                 
                 if (isStorageCritical()) {
@@ -93,6 +101,8 @@ class MaintenanceWorker(
             } else {
                 Log.d("GPS19", "MAINTENANCE: Service is healthy (${silenceDurationMs/1000}s ago)")
             }
+        } else if (savedMode != null && !isSystemActive) {
+            Log.d("GPS19", "MAINTENANCE: System is INACTIVE. Skipping recovery check.")
         }
 
         return Result.success()

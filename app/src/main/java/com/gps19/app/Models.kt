@@ -11,10 +11,9 @@ import java.util.*
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
  * July.22.01:
- * - Forensic Parity: Added missing indices (noiseIdx, luxIdx, vibeIdx, liftIdx) to TrackerStatus and Proto/JSON mappings.
- * July.21.00:
- * - Forensic Hardening: Added missing indices (SNR, NOI, LUX, VIB, SIT) to ConnectionPoint and TrackerStatus.
- * - Monotonic Rt: Standardized all timestamps to use 'Rt' suffix.
+ * - Forensic Parity: Expanded ConnectionPoint with full SIT suite (isSitDetected, sitBaro, sitTilt, sitShock).
+ * - Added missing indices (noiseIdx, luxIdx, vibeIdx, liftIdx, tiltIdx, baroIdx) to TrackerStatus and Proto/JSON mappings.
+ * - SIT Synchronization: Fully propagated all SIT parameters (Vz, Dz, Baro, Tilt, Shock) to Telemetry payloads.
  */
 
 @Serializable
@@ -98,9 +97,13 @@ data class ConnectionPoint(
     val liftIdx: Double = 0.0,
     val tiltIdx: Double = 0.0,
     val baroIdx: Double = 0.0,
+    val isSitDetected: Boolean = false,
     val isSitActive: Boolean = false,
     val sitVz: Double = 0.0,
-    val sitDz: Double = 0.0
+    val sitDz: Double = 0.0,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0
 )
 
 data class ViolationPoint(
@@ -305,6 +308,10 @@ data class TrackerStatus(
             put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
             put("is_jump", isJump); put("mic_pending", micPending)
             put("snr_idx", snrIdx); put("noise_idx", noiseIdx); put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)
+            put("prox_idx", proxIdx); put("tilt_idx", tiltIdx); put("baro_idx", baroIdx)
+            put("is_sit_active", isSitActive)
+            put("sit_vz", sitVz); put("sit_dz", sitDz); put("sit_baro", sitBaro); put("sit_tilt", sitTilt); put("sit_shock", sitShock)
+            put("vertical_velocity", verticalVelocity)
         }
     }
 
@@ -345,11 +352,17 @@ data class TrackerStatus(
             .setVibeIdx(vibeIdx)
             .setLiftIdx(liftIdx)
             .setProxIdx(proxIdx)
+            .setTiltIdx(tiltIdx)
+            .setBaroIdx(baroIdx)
             .setIsSitDetected(isSitDetected)
             .setIsSitActive(isSitActive)
             .setLastSitTs(lastSitTs)
             .setSitVz(sitVz)
             .setSitDz(sitDz)
+            .setSitBaro(sitBaro)
+            .setSitTilt(sitTilt)
+            .setSitShock(sitShock)
+            .setVerticalVelocity(verticalVelocity)
             .build()
     }
 

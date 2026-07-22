@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
  * July.22.01:
- * - Forensic Parity: Added missing indices (noiseIdx, luxIdx, vibeIdx, liftIdx).
+ * - Forensic Parity: Added missing indices (noiseIdx, luxIdx, vibeIdx, liftIdx, tiltIdx, baroIdx).
  * July.20.07:
  * - Renamed lastValidFixRealtime to lastValidFixRt (Issue #102).
  * - Added Forensic Sit Detection fields.
@@ -45,6 +45,8 @@ data class SystemHealthState(
     val luxIdx: Double = 0.0,
     val vibeIdx: Double = 0.0,
     val liftIdx: Double = 0.0,
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
     
     // Connectivity Stats
     val uptimeMs: Long = 0L,

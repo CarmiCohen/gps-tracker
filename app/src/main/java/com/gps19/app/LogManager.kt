@@ -9,21 +9,26 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * July.22.02:
+ * - Issue #121: Provider Latency Optimization. Cached ConnectivitySuite instance to reduce lookup overhead.
  * July.21.00:
  * - Hilt Hardening: Added @Inject constructor and migrated to Provider<ConnectivitySuite>.
- * July.17.03:
- * - Fixed #R998: Added recursion guard to submitToLogSink to prevent infinite loops.
  */
 @Singleton
 class LogManager @Inject constructor(
     private val logRepository: LogRepository,
     private val telemetry: TelemetryRepository,
-    private val connectivitySuite: Provider<ConnectivitySuite>,
+    private val connectivitySuiteProvider: Provider<ConnectivitySuite>,
     private val configManager: ConfigManager,
     private val timeProvider: TimeProvider
 ) {
     private var sessionStartTs = 0L
     private val isLoggingInProgress = AtomicBoolean(false)
+
+    // Issue #121: Cache the provider result to avoid repeated lookup overhead in high-frequency paths.
+    private val connectivitySuite: ConnectivitySuite by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        connectivitySuiteProvider.get()
+    }
 
     fun startNewSession() {
         sessionStartTs = timeProvider.currentTimeMillis()
@@ -120,7 +125,8 @@ class LogManager @Inject constructor(
                 vibeSnapshot = finalVibe
             )
             
-            val suite = connectivitySuite.get()
+            // Accessing the cached instance
+            val suite = connectivitySuite
             val isConnected = suite.isConnected()
             
             val data = log.toJSONObject().apply {

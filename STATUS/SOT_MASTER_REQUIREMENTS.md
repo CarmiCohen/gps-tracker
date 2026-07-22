@@ -10,15 +10,15 @@ This document serves as the definitive operational specification. All Issue IDs 
 
 ### 2. Temporal & Forensic Integrity
 *   **Temporal Forensic Integrity (R102)**: To ensure logic stability against system clock drifts or manual adjustments, the engine MUST employ a dual-time strategy using monotonic `rt` for logic and wall-clock `ts` for forensic logging. (Issue #102)
-*   **Forensic Parity Authority (R118)**: The system MUST maintain strict field parity across engine models (`LocationUpdate`), persistence (`HistoryEntity`, Database `v58`), and UI data structures for all 10+ forensic SIT (Sit Detection) and Indexing parameters. (Issue #118)
+*   **Forensic Parity Authority (R118)**: The system MUST maintain strict field parity across engine models (`LocationUpdate`), persistence (`HistoryEntity`, Database `v59`), telemetry pipelines (Binary/JSON Relay), and UI data structures for all 15+ forensic SIT (Sit Detection) and Indexing parameters. (Issue #118, #122)
 *   **Monotonic Timeline Reconstruction (R105)**: To ensure "1Hz Ribbon Fidelity" across process boundaries, the system MUST reconstruct the monotonic timeline on startup using `clock_drift_ref`. (Issue #105)
-*   **Unified Forensic Ribbon Continuity (R106)**: The system MUST implement a unified method for rendering ribbons across all scales. Missing data periods (app-off or service-death) MUST be explicitly visualized as "Black Gaps." (Issue #106)
+*   **Unified Method for Ribbon Rendering (R106)**: The system MUST implement a unified method for rendering ribbons across all scales. Missing data periods (app-off or service-death) MUST be explicitly visualized as "Black Gaps." (Issue #106)
 *   **Forensic Visual Authority (R404b)**: The system MUST use a standardized `FORENSIC_PINK_COLOR` (#FF1493) for all forensic events. (v9.3.18)
 
 ### 3. Persistence & Service Reliability
 *   **Activation Authority**: The `isSystemActive` flag in `DataStore` is the definitive authority for background lifecycle revival. Background services MUST NOT restart automatically unless this flag is set.
 *   **Notification Throttling (R993)**: Foreground notification updates MUST BE throttled (default 30s) to prevent system-wide Logcat flooding and reduce CPU wakeups. (Issue #R993)
-*   **Database Migration Integrity (R956b)**: Any change to an `@Entity` class MUST be accompanied by a version bump and an explicit `Migration` object. (Issue #097)
+*   **Database Migration Integrity (R956b)**: Any change to an `@Entity` class MUST be accompanied by a version bump and an explicit `Migration` object. (Issue #097, #118)
 *   **Standardized Proto Path (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`. (Issue #030)
 
 ### 4. Dependency & Hardware Hardening

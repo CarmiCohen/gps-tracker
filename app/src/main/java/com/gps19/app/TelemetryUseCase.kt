@@ -6,7 +6,7 @@ import javax.inject.Inject
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
  * July.22.01:
- * - Forensic Parity: Added mapping for noiseIdx, luxIdx, vibeIdx, and liftIdx.
+ * - Forensic Parity: Added mapping for tiltIdx, baroIdx, noiseIdx, luxIdx, vibeIdx, and liftIdx.
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor.
  * July.21.00:
@@ -77,6 +77,8 @@ class TelemetryUseCase @Inject constructor(
             luxIdx = update.luxIdx,
             vibeIdx = update.vibeIdx,
             liftIdx = update.liftIdx,
+            tiltIdx = update.tiltIdx,
+            baroIdx = update.baroIdx,
             uptimeMs = update.uptimeMs ?: current.uptimeMs,
             lastConnTs = update.lastConnTs ?: current.lastConnTs,
             lastDiscTs = update.lastDiscTs ?: current.lastDiscTs,
@@ -143,6 +145,8 @@ class TelemetryUseCase @Inject constructor(
             luxIdx = status.luxIdx,
             vibeIdx = status.vibeIdx,
             liftIdx = status.liftIdx,
+            tiltIdx = status.tiltIdx,
+            baroIdx = status.baroIdx,
             uptimeMs = status.uptimeMs,
             lastConnTs = status.lastConnTs,
             lastDiscTs = status.lastDiscTs,
