@@ -3,22 +3,29 @@ package com.gps19.app
 import android.content.Context
 import androidx.room.withTransaction
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.osmdroid.util.GeoPoint
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
- * July.17.02:
- * - Added IS_SYSTEM_ACTIVE_KEY for persistent arming state.
- * July.16.18:
- * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor and @ApplicationContext.
+ * July.21.00:
+ * - Forensic Hardening: Added missing sit-detection and history keys.
+ * July.20.07:
+ * - Issue #103: Added CLOCK_DRIFT_REF_KEY for forensic integrity.
+ * - Issue #104: Exposed proactivePruning for startup hardening.
  */
-class MainRepository(
-    private val context: Context,
+@Singleton
+class MainRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val trailDao: TrailDao,
     private val historyDao: HistoryDao,
     private val violationDao: ViolationDao,
@@ -92,6 +99,15 @@ class MainRepository(
         const val IS_SYSTEM_ACTIVE_KEY = SettingsRepository.IS_SYSTEM_ACTIVE_KEY
         
         const val IDENTITY_SANITIZED_KEY = SettingsRepository.IDENTITY_SANITIZED_KEY
+        const val CLOCK_DRIFT_REF_KEY = SettingsRepository.CLOCK_DRIFT_REF_KEY
+        
+        const val LAST_SIT_TS_KEY = SettingsRepository.LAST_SIT_TS_KEY
+        const val CHAIR_BASELINE_TILT_KEY = SettingsRepository.CHAIR_BASELINE_TILT_KEY
+        const val LAST_HISTORY_SIT_TS_KEY = SettingsRepository.LAST_HISTORY_SIT_TS_KEY
+
+        private const val HISTORY_BATCH_WRITE_INTERVAL_MS = 5000L
+        private const val HISTORY_BUFFER_MAX_SIZE = 100
+        private const val DB_PRUNE_THRESHOLD = 50
     }
 
     val isRelayConnected = telemetry.isRelayConnected
@@ -107,13 +123,15 @@ class MainRepository(
 
     val trackerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(false).map { entities -> 
         entities.map { TrailPoint(it.lat, it.lng, it.timestamp, SentinelStatus.valueOf(it.status), it.accuracy, it.maxAccuracy) } 
-    }
+    }.flowOn(Dispatchers.Default)
+
     val viewerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(true).map { entities -> 
         entities.map { TrailPoint(it.lat, it.lng, it.timestamp, SentinelStatus.valueOf(it.status), it.accuracy, it.maxAccuracy) } 
-    }
+    }.flowOn(Dispatchers.Default)
+
     val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> 
         entities.map { ViolationPoint(point = GeoPoint(it.lat, it.lng), type = it.type, ts = it.ts, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy) } 
-    }
+    }.flowOn(Dispatchers.Default)
 
     private val _uiCommands = MutableSharedFlow<UiCommand>(extraBufferCapacity = 10)
     val uiCommands: SharedFlow<UiCommand> = _uiCommands.asSharedFlow()
@@ -198,7 +216,7 @@ class MainRepository(
 
     suspend fun loadAlertSettings() = settings.loadAlertSettings()
     suspend fun saveAlertSettings(s: AlertSettings) = settings.saveAlertSettings(s)
-    suspend fun saveDraftAlertSettings(s: AlertSettings) = settings.saveDraftAlertSettings(s)
+    suspend fun saveDraftAlertSettings(s: AlertSettings) = settings.saveAlertSettings(s)
     suspend fun loadDraftAlertSettings() = settings.loadDraftAlertSettings()
     fun clearDraftSettings() { scope.launch { settings.clearDraftSettings() } }
     
@@ -241,6 +259,12 @@ class MainRepository(
 
     fun clearLogs() { logRepository.clearLogs() }
     suspend fun loadAllLogsStatic(): List<LogEntry> = logRepository.loadAllLogsStatic()
+
+    /**
+     * Issue #104: Startup ANR Hardening.
+     * Executes a deep prune of the log table.
+     */
+    suspend fun proactivePruning() = logRepository.proactivePruning()
 
     fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, status: SentinelStatus = SentinelStatus.VALID, timestamp: Long? = null, force: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
         if (lat == 0.0 || lng == 0.0) return
@@ -314,7 +338,7 @@ class MainRepository(
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
             ) 
         }
-    }
+    }.flowOn(Dispatchers.Default)
 
     private var lastBatchWriteRealtime = 0L
     private val historyBuffer = ConcurrentLinkedQueue<HistoryEntity>()

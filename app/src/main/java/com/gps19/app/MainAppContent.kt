@@ -43,8 +43,11 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * v9.4.0:
- * - Issue #502: Device Independency. Genericized hardware permission handling.
+ * July.20.07:
+ * - Issue #117: Fixed typo in AlarmOverlay onGoToMap callback.
+ * - Issue #107: Added ACTIVITY_RECOGNITION to core permission flow for Tracker mode (API 29+).
+ * v9.3.40:
+ * - Issue #095 Hardening: Implemented reactive permission flow.
  */
 @Composable
 fun MainAppContent(
@@ -57,12 +60,11 @@ fun MainAppContent(
     onRequestAppInfo: () -> Unit,
     onRequestExactAlarm: () -> Unit,
     onRequestHardwarePermission: () -> Unit,
-    checkAndRequestPermissions: (String) -> Unit,
     onStopTracking: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val systemPulse by viewModel.systemPulse.collectAsStateWithLifecycle()
-    val systemPulseRealtime by viewModel.systemPulseRealtime.collectAsStateWithLifecycle()
+    val systemPulseRt by viewModel.systemPulseRt.collectAsStateWithLifecycle()
     val redScreenVisible by viewModel.redScreenVisible.collectAsStateWithLifecycle()
     
     val navController = rememberNavController()
@@ -87,36 +89,74 @@ fun MainAppContent(
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
     var isManualSelectionInProgress by remember { mutableStateOf(false) }
 
-    fun hasRequiredPermissions(mode: String): Boolean {
-        val fineLocation = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarseLocation = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    fun proceedToMode(mode: String) {
+        isManualSelectionInProgress = true
+        viewModel.onEvent(UiEvent.SetAppMode(mode))
+        onStartService(mode)
         
-        val audio = if (mode == "tracker") {
-            ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        } else true
-        
-        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        } else true
-        
-        return fineLocation && coarseLocation && audio && notification
+        if (!uiState.isSystemReady) {
+            viewModel.onEvent(UiEvent.TogglePhoneSetup(true))
+        }
     }
 
-    // R926/Issue #092: Automatic transition once required permissions are granted
-    LaunchedEffect(uiState.permissions, uiState.navigation.pendingMode) {
-        val mode = uiState.navigation.pendingMode
-        if (mode != null && hasRequiredPermissions(mode)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
-                ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                showBackgroundDisclosure = true
-            } else {
-                Timber.d("Proceeding to mode $mode after permission grant")
-                isManualSelectionInProgress = true
-                viewModel.onEvent(UiEvent.SetAppMode(mode))
-                onStartService(mode)
+    val backgroundPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) {
+            uiState.navigation.pendingMode?.let { mode ->
+                proceedToMode(mode)
+                viewModel.onEvent(UiEvent.SetPendingMode(null))
+            }
+        } else {
+            isManualSelectionInProgress = false
+            Toast.makeText(activity, context.getString(R.string.perm_background_denied_toast), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val requestPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+        viewModel.onEvent(UiEvent.RefreshPermissionStatus)
+        val allGranted = permissions.entries.all { it.value }
+        if (allGranted) {
+            uiState.navigation.pendingMode?.let { mode ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
+                    ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    showBackgroundDisclosure = true
+                } else {
+                    proceedToMode(mode)
+                    viewModel.onEvent(UiEvent.SetPendingMode(null))
+                }
+            }
+        } else {
+            isManualSelectionInProgress = false
+            uiState.navigation.pendingMode?.let { mode ->
+                proceedToMode(mode)
                 viewModel.onEvent(UiEvent.SetPendingMode(null))
             }
         }
+    }
+
+    fun checkAndRequestPermissions(mode: String) {
+        val permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (mode == "tracker") {
+            permissions.add(Manifest.permission.RECORD_AUDIO)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                permissions.add(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        
+        viewModel.onEvent(UiEvent.SetPendingMode(mode))
+        requestPermissionLauncher.launch(permissions.toTypedArray())
+    }
+
+    fun hasRequiredPermissions(mode: String): Boolean {
+        val fineLocation = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val audio = if (mode == "tracker") ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED else true
+        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true
+        val activityRec = if (mode == "tracker" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(activity, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+        } else true
+        return fineLocation && audio && notification && activityRec
     }
 
     // Navigation logic based on app mode and diagnostics visibility
@@ -153,7 +193,6 @@ fun MainAppContent(
                 }
             }
             null -> {
-                // v9.3.39: Only reset flag if no selection is currently pending
                 if (uiState.navigation.pendingMode == null) {
                     isManualSelectionInProgress = false
                 }
@@ -188,20 +227,6 @@ fun MainAppContent(
         }
     }
 
-    val backgroundPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        if (isGranted) {
-            uiState.navigation.pendingMode?.let { mode ->
-                isManualSelectionInProgress = true
-                viewModel.onEvent(UiEvent.SetAppMode(mode))
-                onStartService(mode)
-                viewModel.onEvent(UiEvent.SetPendingMode(null))
-            }
-        } else {
-            isManualSelectionInProgress = false
-            Toast.makeText(activity, context.getString(R.string.perm_background_denied_toast), Toast.LENGTH_LONG).show()
-        }
-    }
-
     if (showBackgroundDisclosure) {
         AlertDialog(
             onDismissRequest = { showBackgroundDisclosure = false; isManualSelectionInProgress = false },
@@ -219,6 +244,8 @@ fun MainAppContent(
                 Button(onClick = { 
                     showBackgroundDisclosure = false
                     isManualSelectionInProgress = false
+                    uiState.navigation.pendingMode?.let { proceedToMode(it) }
+                    viewModel.onEvent(UiEvent.SetPendingMode(null))
                 }) { Text(stringResource(R.string.perm_background_btn_reject)) } 
             }
         )
@@ -258,15 +285,13 @@ fun MainAppContent(
                         LandingScreen { mode -> 
                             if (hasRequiredPermissions(mode)) { 
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                                    isManualSelectionInProgress = true
-                                    viewModel.onEvent(UiEvent.SetPendingMode(mode)); showBackgroundDisclosure = true
+                                    viewModel.onEvent(UiEvent.SetPendingMode(mode))
+                                    showBackgroundDisclosure = true
                                 } else {
-                                    isManualSelectionInProgress = true
-                                    viewModel.onEvent(UiEvent.SetAppMode(mode)); onStartService(mode)
+                                    proceedToMode(mode)
                                 }
                             } else { 
-                                isManualSelectionInProgress = true
-                                viewModel.onEvent(UiEvent.SetPendingMode(mode)); checkAndRequestPermissions(mode)
+                                checkAndRequestPermissions(mode)
                             } 
                         }
                     }
@@ -286,7 +311,7 @@ fun MainAppContent(
                         }
                         TrackerScreen(
                             uiState = uiState, viewModel = viewModel, logs = eventLogs, trail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
-                            systemPulse = systemPulse, systemPulseRealtime = systemPulseRealtime,
+                            systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
                             onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
@@ -312,7 +337,7 @@ fun MainAppContent(
                         }
                         ViewerScreen(
                             uiState = uiState, viewModel = viewModel, logs = eventLogs, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
-                            systemPulse = systemPulse, systemPulseRealtime = systemPulseRealtime,
+                            systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
                             onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
@@ -323,9 +348,7 @@ fun MainAppContent(
                         )
                     }
                     composable(Screen.Diagnostics.route) {
-                        BackHandler {
-                            viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
-                        }
+                        BackHandler { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) }
                         DiagnosticsScreen(
                             viewModel = viewModel,
                             onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },

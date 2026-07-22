@@ -5,15 +5,18 @@ import android.widget.Toast
 import com.gps19.core.engine.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor.
  * July.17.02:
  * - Added isSystemActive to InitialSettings.
  * v9.5.0:
  * - Issue #503: Hilt Removal.
  */
-class SettingsUseCase(
+class SettingsUseCase @Inject constructor(
     private val repository: MainRepository,
     private val settingsRepository: SettingsRepository,
     private val timeProvider: TimeProvider,

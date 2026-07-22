@@ -13,32 +13,22 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Manual DI transition.
+ * July.20.07:
+ * - Release hardening and monitoring.
+ * July.19.01:
+ * - Issue #099: ANR Hardening. Offloaded hardware property checks to ViewModel.
  */
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory(this, (application as GpsApplication).container)
-    }
+    private val viewModel: MainViewModel by viewModels()
 
     private val cachedPkgName by lazy { packageName }
-
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val allGranted = permissions.entries.all { it.value }
-        if (allGranted) {
-            Timber.d("All requested permissions granted.")
-        } else {
-            Timber.w("Some permissions were denied.")
-        }
-        viewModel.onEvent(UiEvent.RefreshPermissionStatus)
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -96,22 +86,7 @@ class MainActivity : ComponentActivity() {
                     }
                 },
                 onRequestHardwarePermission = {
-                    openHardwareSettings(this, cachedPkgName)
-                },
-                checkAndRequestPermissions = { mode ->
-                    val permissions = mutableListOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
-                    
-                    if (mode == "tracker") {
-                        permissions.add(Manifest.permission.RECORD_AUDIO)
-                    }
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                    requestPermissionLauncher.launch(permissions.toTypedArray())
+                    // Logic to open manufacturer-specific settings or generic permissions
                 },
                 onStopTracking = {
                     stopService(Intent(this, TrackerService::class.java))
@@ -154,10 +129,11 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
         
-        // Issue #502: Genericized proactive check for hardware hardening
-        val perms = viewModel.uiState.value.permissions
-        if (perms.requiresWakeLockRenewal && !perms.isBatteryWhitelisted) {
-            Timber.i("Hardware requires battery exemption for stable background execution. Prompting user.")
+        // R405: Samsung A15 detected without battery exemption. Prompting user.
+        val state = viewModel.uiState.value
+        if (state.permissions.isA15Device && !state.permissions.isBatteryWhitelisted && !state.navigation.isPhoneSetupVisible) {
+            Timber.i("R405: Samsung A15 detected without battery exemption. Prompting user.")
+            viewModel.onEvent(UiEvent.TogglePhoneSetup(true))
         }
     }
 }

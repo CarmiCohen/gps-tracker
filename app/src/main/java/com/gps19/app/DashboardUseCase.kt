@@ -2,13 +2,16 @@ package com.gps19.app
 
 import com.gps19.core.engine.*
 import java.util.Locale
+import javax.inject.Inject
 
 /**
  * DashboardUseCase: Logic for computing the analytical dashboard state.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor.
  * July.16.18:
  * - Issue #516: De-duplicate "Status" Logic. Use localHealth and trackerHealth.
  */
-class DashboardUseCase {
+class DashboardUseCase @Inject constructor() {
 
     fun computeDashboardState(
         state: MainUiState,

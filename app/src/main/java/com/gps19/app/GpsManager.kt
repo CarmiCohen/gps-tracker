@@ -8,18 +8,26 @@ import android.location.LocationManager
 import android.os.*
 import com.google.android.gms.location.*
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
+import java.util.concurrent.ConcurrentLinkedQueue
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
- * July.16.24: 
+ * July.22.01:
+ * - Hilt Hardening: Added @Inject constructor and @Singleton.
+ * July.21.00: 
+ * - Restored getSnrSamples and internal buffering for forensic backfilling.
  * - Issue #526: Offloaded hardware lookups to lazy properties to prevent cold-start hangs.
  */
-class GpsManager(
-    private val context: Context,
+@Singleton
+class GpsManager @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val timeProvider: TimeProvider
 ) {
 
@@ -33,6 +41,7 @@ class GpsManager(
     var averageSnr = 0.0
         private set
 
+    private val snrSampleBuffer = ConcurrentLinkedQueue<Pair<Long, Double>>()
     private val _gnssDetailFlow = MutableStateFlow<GnssDetail?>(null)
     val gnssDetailFlow: StateFlow<GnssDetail?> = _gnssDetailFlow.asStateFlow()
 
@@ -60,9 +69,24 @@ class GpsManager(
                 ))
             }
             satellitesUsed = used
-            averageSnr = if (snrCount > 0) snrSum / snrCount else 0.0
+            val avg = if (snrCount > 0) snrSum / snrCount else 0.0
+            averageSnr = avg
+            
+            val now = timeProvider.currentTimeMillis()
+            snrSampleBuffer.add(now to avg)
+            while (snrSampleBuffer.size > 0 && (now - (snrSampleBuffer.peek()?.first ?: now)) > SENSOR_SAMPLE_BUFFER_MAX_AGE_MS) {
+                snrSampleBuffer.poll()
+            }
+
             _gnssDetailFlow.value = GnssDetail(satellites = satList.sortedByDescending { it.cn0 })
         }
+    }
+
+    /**
+     * Returns SNR samples in the given time range for forensic backfilling.
+     */
+    fun getSnrSamples(fromTs: Long, toTs: Long): List<Pair<Long, Double>> {
+        return snrSampleBuffer.filter { it.first in fromTs..toTs }
     }
 
     @SuppressLint("MissingPermission")

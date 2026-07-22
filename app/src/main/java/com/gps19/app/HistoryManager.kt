@@ -2,18 +2,21 @@ package com.gps19.app
 
 import android.content.Context
 import com.gps19.core.engine.*
-import com.gps19.core.engine.LocationProcessor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * July.16.18:
- * - Issue #514: Simplified GpsManager. Removed SNR sampling logic.
+ * July.21.00:
+ * - Issue #105: Forensic Ribbon Continuity Verification.
+ * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timing.
+ * - Restored SNR and expanded sensor snapshots (Sit, Proximity, Baro) for high-fidelity backfilling.
+ * - Maintained Hilt compatibility.
  */
 class HistoryManager(
     private val context: Context,
@@ -42,17 +45,35 @@ class HistoryManager(
     private var lastAuditTs = 0L
     private var lastTimeTriggerTs = 0L
 
+    private var lastSitDetectedRt = 0L
+
     fun setListener(listener: Listener) {
         this.listener = listener
     }
 
-    fun initialize(scope: CoroutineScope) {
+    /**
+     * Issue #105: Hardened initialization to ensure drift reference is restored before 
+     * the first ribbon update tick occurs.
+     */
+    suspend fun initialize(scope: CoroutineScope) {
         this.scope = scope
+        
+        withContext(Dispatchers.IO) {
+            val lastSitTs = repository.getLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, 0L)
+            if (lastSitTs > 0) {
+                 lastSitDetectedRt = timeProvider.elapsedRealtime() - (timeProvider.currentTimeMillis() - lastSitTs)
+            }
+            
+            // v9.4.01: Restore persisted clock drift reference (Issue #103)
+            clockDriftRef = repository.getLong(MainRepository.CLOCK_DRIFT_REF_KEY, 0L)
+        }
     }
 
     suspend fun updateRibbons(
         now: Long,
+        nowRt: Long,
         lastTickTs: Long,
+        lastTickRt: Long,
         serviceTickCounter: Int,
         rtt: Int,
         peerSignal: Int,
@@ -61,16 +82,32 @@ class HistoryManager(
         isTrackerMode: Boolean,
         accuracy: Double = 0.0,
         maxAccuracy: Double = 0.0,
+        noiseIdx: Double = 0.0,
+        luxIdx: Double = 0.0,
+        vibeIdx: Double = 0.0,
+        proxIdx: Double = 1.0,
+        liftIdx: Double = 0.0,
+        snrIdx: Double = 0.0,
+        tiltIdx: Double = 0.0,
+        baroIdx: Double = 0.0,
+        verticalVelocity: Double = 0.0,
+        sitVz: Double = 0.0,
+        sitDz: Double = 0.0,
+        sitBaro: Double = 0.0,
+        sitTilt: Double = 0.0,
+        sitShock: Double = 0.0,
         isBatterySteepDischarge: Boolean = false,
         isCoolingModeActive: Boolean = false,
         speed: Double = 0.0,
         bearing: Double = 0.0,
+        isSitDetected: Boolean = false,
+        isSitActive: Boolean = false,
         currentMa: Int = 0,
         locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
     ) {
         detectClockTampering(now)
 
-        val deltaMs = now - lastTickTs
+        val deltaRt = if (lastTickRt > 0) nowRt - lastTickRt else 0L
         
         if (now - lastAuditTs > 60000L) {
             if (backfillAuditCount > 0) {
@@ -80,12 +117,15 @@ class HistoryManager(
             lastAuditTs = now
         }
 
-        if (lastTickTs > 0 && deltaMs > REAL_TIME_GAP_LIMIT_MS) {
-            fillRealGap(lastTickTs, now, isTrackerMode)
-        } else if (lastTickTs > 0 && deltaMs > 1500L) {
+        // v9.4.00: Use monotonic delta for gap detection (Issue #102)
+        if (lastTickRt > 0 && deltaRt > REAL_TIME_GAP_LIMIT_MS) {
+            fillRealGap(lastTickTs, lastTickRt, now, nowRt, isTrackerMode)
+        } else if (lastTickRt > 0 && deltaRt > 1500L) {
             backfillAnalyticalGaps(
                 lastTickTs = lastTickTs,
+                lastTickRt = lastTickRt,
                 now = now,
+                nowRt = nowRt,
                 rtt = rtt,
                 peerSignal = peerSignal,
                 peerAvail = peerAvail,
@@ -93,10 +133,26 @@ class HistoryManager(
                 isTrackerMode = isTrackerMode,
                 accuracy = accuracy,
                 maxAccuracy = maxAccuracy,
+                noiseIdx = noiseIdx,
+                luxIdx = luxIdx,
+                vibeIdx = vibeIdx,
+                proxIdx = proxIdx,
+                liftIdx = liftIdx,
+                snrIdx = snrIdx,
+                tiltIdx = tiltIdx,
+                baroIdx = baroIdx,
+                verticalVelocity = verticalVelocity,
+                sitVz = sitVz,
+                sitDz = sitDz,
+                sitBaro = sitBaro,
+                sitTilt = sitTilt,
+                sitShock = sitShock,
                 isBatterySteepDischarge = isBatterySteepDischarge,
                 isCoolingModeActive = isCoolingModeActive,
                 speed = speed,
                 bearing = bearing,
+                isSitDetected = isSitDetected,
+                isSitActive = isSitActive,
                 currentMa = currentMa,
                 locationPendingReason = locationPendingReason
             )
@@ -104,6 +160,7 @@ class HistoryManager(
 
         val currentPoint = EngineConnectionPoint(
             ts = now,
+            rt = nowRt,
             rtt = rtt,
             remoteSig = peerSignal,
             isConnected = peerAvail,
@@ -111,6 +168,23 @@ class HistoryManager(
             hasGps = hasGps,
             accuracy = accuracy,
             maxAccuracy = maxAccuracy,
+            gpsIndex = 0.0, // Calculated in processTick if needed
+            noiseIdx = noiseIdx,
+            luxIdx = luxIdx,
+            vibeIdx = vibeIdx,
+            proxIdx = proxIdx,
+            liftIdx = liftIdx,
+            snrIdx = snrIdx,
+            tiltIdx = tiltIdx,
+            baroIdx = baroIdx,
+            isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt),
+            isSitActive = isSitActive,
+            verticalVelocity = verticalVelocity,
+            sitVz = sitVz,
+            sitDz = sitDz,
+            sitBaro = sitBaro,
+            sitTilt = sitTilt,
+            sitShock = sitShock,
             isBatterySteepDischarge = isBatterySteepDischarge,
             isCoolingModeActive = isCoolingModeActive,
             speed = speed,
@@ -142,7 +216,9 @@ class HistoryManager(
 
     private fun backfillAnalyticalGaps(
         lastTickTs: Long,
+        lastTickRt: Long,
         now: Long,
+        nowRt: Long,
         rtt: Int,
         peerSignal: Int,
         peerAvail: Boolean,
@@ -150,27 +226,64 @@ class HistoryManager(
         isTrackerMode: Boolean,
         accuracy: Double,
         maxAccuracy: Double,
+        noiseIdx: Double,
+        luxIdx: Double,
+        vibeIdx: Double,
+        proxIdx: Double,
+        liftIdx: Double,
+        snrIdx: Double,
+        tiltIdx: Double,
+        baroIdx: Double,
+        verticalVelocity: Double,
+        sitVz: Double,
+        sitDz: Double,
+        sitBaro: Double,
+        sitTilt: Double,
+        sitShock: Double,
         isBatterySteepDischarge: Boolean,
         isCoolingModeActive: Boolean,
         speed: Double,
         bearing: Double,
+        isSitDetected: Boolean,
+        isSitActive: Boolean,
         currentMa: Int,
         locationPendingReason: LocationPendingReason
     ) {
+        val snrSamples = if (isTrackerMode) {
+            gpsManager.getSnrSamples(lastTickTs + 1, now).map { EngineSnrSample(it.first, it.first - (now - nowRt), it.second) }
+        } else emptyList()
+
         val sensorSamples = if (isTrackerMode) {
             sensorManager.getSensorSamples(lastTickTs + 1, now).map { 
-                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe) 
+                EngineSensorSnapshot(it.ts, it.rt, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
             }
         } else emptyList()
 
         val baseTemplate = EngineConnectionPoint(
             ts = 0L,
+            rt = 0L,
             rtt = rtt,
             remoteSig = peerSignal,
             isConnected = peerAvail,
             hasGps = hasGps,
             accuracy = accuracy,
             maxAccuracy = maxAccuracy,
+            noiseIdx = noiseIdx,
+            luxIdx = luxIdx,
+            vibeIdx = vibeIdx,
+            proxIdx = proxIdx,
+            liftIdx = liftIdx,
+            snrIdx = snrIdx,
+            tiltIdx = tiltIdx,
+            baroIdx = baroIdx,
+            verticalVelocity = verticalVelocity,
+            sitVz = sitVz,
+            sitDz = sitDz,
+            sitBaro = sitBaro,
+            sitTilt = sitTilt,
+            sitShock = sitShock,
+            isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt),
+            isSitActive = isSitActive,
             isBatterySteepDischarge = isBatterySteepDischarge,
             isCoolingModeActive = isCoolingModeActive,
             speed = speed,
@@ -179,7 +292,7 @@ class HistoryManager(
             locationPendingReason = locationPendingReason
         )
 
-        val results = aggregator.backfillGaps(lastTickTs, now, sensorSamples, baseTemplate)
+        val results = aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplate)
         
         val fourMPoints = results.filter { it.first == RibbonScale.FOUR_MIN }.map { mapToAppPoint(it.second) }
         if (fourMPoints.isNotEmpty()) {
@@ -193,15 +306,19 @@ class HistoryManager(
         }
     }
 
-    private fun fillRealGap(lastTickTs: Long, now: Long, isTrackerMode: Boolean) {
+    private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
+        val snrSamples = if (isTrackerMode) {
+            gpsManager.getSnrSamples(lastTickTs, now).map { EngineSnrSample(it.first, it.first - (now - nowRt), it.second) }
+        } else emptyList()
+
         val sensorSamples = if (isTrackerMode) {
             sensorManager.getSensorSamples(lastTickTs, now).map { 
-                EngineSensorSnapshot(it.ts, it.acoustic, it.lux, it.vibe) 
+                EngineSensorSnapshot(it.ts, it.rt, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
             }
         } else emptyList()
 
         RibbonScale.entries.forEach { scale ->
-            val gapPoints = aggregator.fillRealGap(scale.key, scale.intervalSeconds, lastTickTs, now, sensorSamples)
+            val gapPoints = aggregator.fillRealGap(scale.key, scale.intervalSeconds, lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb())
             if (gapPoints.isNotEmpty()) {
                 repository.addHistoryPoints(scale.key, gapPoints.map { mapToAppPoint(it) })
             }
@@ -214,6 +331,8 @@ class HistoryManager(
         
         if (clockDriftRef == 0L) {
             clockDriftRef = currentDrift
+            // v9.4.01: Persist initial drift reference (Issue #103)
+            scope?.launch { repository.saveLong(MainRepository.CLOCK_DRIFT_REF_KEY, currentDrift) }
             return
         }
         
@@ -223,7 +342,21 @@ class HistoryManager(
             val direction = if (currentDrift > clockDriftRef) "forward" else "backward"
             listener?.onLogEvent("FORENSIC ALERT: System clock jump detected ($direction ${jumpSec}s). Monotonic uptime preserved.", true)
             clockDriftRef = currentDrift
+            // v9.4.01: Persist updated drift reference (Issue #103)
+            scope?.launch { repository.saveLong(MainRepository.CLOCK_DRIFT_REF_KEY, currentDrift) }
         }
+    }
+
+    private fun applySitDuplicateGuard(isDetected: Boolean, ts: Long, rt: Long): Boolean {
+        if (!isDetected) return false
+        if (abs(rt - lastSitDetectedRt) < SIT_DUPLICATE_GUARD_MS) {
+            return false
+        }
+        lastSitDetectedRt = rt
+        scope?.launch {
+            repository.saveLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, ts)
+        }
+        return true
     }
 
     private fun mapToAppPoint(p: EngineConnectionPoint): ConnectionPoint {

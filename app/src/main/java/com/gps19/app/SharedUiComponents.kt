@@ -5,7 +5,6 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
@@ -44,11 +43,15 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * July.1.16:
- * - Issue #510 & #511: Removed Sit Detection and detailed sensor ribbons.
- * July.1.13:
- * - Issue #511: Simplify Ribbon Telemetry. Removed obsolete sensor ribbons; added core SPD/ACC ribbons.
- * - Issue #502: Device Independency. Plumbed requiresExtraTopPadding through to HeaderBar.
+ * July.21.00:
+ * - Forensic Ribbon Integration: Binding to MainViewModel history flows.
+ * - Version synchronization and release hardening.
+ * July.20.07:
+ * - Finalized R106: Unified Forensic Ribbon Continuity.
+ * July.20.05:
+ * - R106: Consolidated AnalyticalRibbons to a single scale-aware flow.
+ *   Shared rendering baseline for sensors and connection.
+ *   Implemented explicit Black Gap visualization for data loss segments.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -76,7 +79,7 @@ fun RibbonsOverlay(viewModel: MainViewModel, onDismiss: () -> Unit) {
 fun AnalyticalRibbons(viewModel: MainViewModel) {
     var selectedScale by remember { mutableStateOf("4M") }
     
-    val sensorFlow = when(selectedScale) {
+    val activeHistoryFlow = when(selectedScale) {
         "16M" -> viewModel.history16MFlow
         "1H" -> viewModel.history1HFlow
         "4H" -> viewModel.history4HFlow
@@ -87,7 +90,7 @@ fun AnalyticalRibbons(viewModel: MainViewModel) {
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -97,35 +100,132 @@ fun AnalyticalRibbons(viewModel: MainViewModel) {
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
                         .clickable { selectedScale = scale }
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                     color = if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent
                 ) {
                     Text(
                         text = scale,
                         color = if (isSelected) Color.White else Color.Gray,
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
                         fontFamily = FontFamily.Monospace
                     )
                 }
             }
         }
-        
-        // Core Metrics
-        StatefulSensorRibbon(sensorFlow, "SPD", selectedScale, lineColor = Color(0xFF4ADE80), valueSelector = { (it.speed.toFloat() / MAX_PHYSICAL_SPEED_MPS.toFloat()).coerceIn(0f, 1f) })
-        StatefulSensorRibbon(sensorFlow, "ACC", selectedScale, lineColor = Color(0xFFF87171), valueSelector = { (1.0f - (it.gpsAccuracy.toFloat() / 100f)).coerceIn(0f, 1f) })
-        StatefulSensorRibbon(sensorFlow, "BAT", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isBatterySteepDischarge) 1f else 0f })
-        StatefulSensorRibbon(sensorFlow, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isCoolingModeActive) 1f else 0f })
-        StatefulSensorRibbon(sensorFlow, "CUR", selectedScale, lineColor = Color(0xFFFB923C), valueSelector = { (kotlin.math.abs(it.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) })
-        
-        HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
 
-        StatefulConnectionQualityRibbon(viewModel.history4MFlow, "4M")
-        StatefulConnectionQualityRibbon(viewModel.history16MFlow, "16M")
-        StatefulConnectionQualityRibbon(viewModel.history1HFlow, "1H")
-        StatefulConnectionQualityRibbon(viewModel.history4HFlow, "4H")
-        StatefulConnectionQualityRibbon(viewModel.history24HFlow, "24H")
-        StatefulConnectionQualityRibbon(viewModel.history7DFlow, "7D")
+        // Consolidated Connection & Health Ribbon
+        StatefulConnectionRibbon(activeHistoryFlow, selectedScale)
+        
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
+
+        // Synchronized Sensor Stack
+        StatefulSensorRibbon(activeHistoryFlow, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), valueSelector = { it.snrIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "NOI", selectedScale, lineColor = Amber500, valueSelector = { it.noiseIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "LUX", selectedScale, lineColor = Color.White, valueSelector = { it.luxIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "VIB", selectedScale, lineColor = Color.Magenta, valueSelector = { it.vibeIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "PRX", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { it.proxIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "LIF", selectedScale, lineColor = Color(0xFFFACC15), valueSelector = { it.liftIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "BAT", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isBatterySteepDischarge) 1f else 0f })
+        StatefulSensorRibbon(activeHistoryFlow, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isCoolingModeActive) 1f else 0f })
+        StatefulSensorRibbon(activeHistoryFlow, "CUR", selectedScale, lineColor = Color(0xFFFB923C), valueSelector = { (kotlin.math.abs(it.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) })
+        StatefulSensorRibbon(activeHistoryFlow, "SIT", selectedScale, lineColor = BrandJd, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isSitActive) 1f else 0f })
+        StatefulSensorRibbon(activeHistoryFlow, "TLT", selectedScale, lineColor = Color(0xFF818CF8), valueSelector = { it.tiltIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), valueSelector = { it.baroIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "SVZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f) })
+        StatefulSensorRibbon(activeHistoryFlow, "SDZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f) })
+    }
+}
+
+@Composable
+fun ForensicRibbonContainer(
+    title: String,
+    titleColor: Color,
+    height: androidx.compose.ui.unit.Dp,
+    history: List<ConnectionPoint>,
+    scale: String,
+    content: androidx.compose.ui.graphics.drawscope.DrawScope.(
+        totalPoints: Float,
+        pointWidth: Float,
+        baseLineY: Float,
+        maxHeight: Float,
+        isLandscape: Boolean
+    ) -> Unit
+) {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = title, 
+            color = titleColor.copy(alpha = 0.7f), 
+            fontSize = 9.sp, 
+            fontWeight = FontWeight.Black, 
+            modifier = Modifier.width(28.dp).padding(start = 2.dp)
+        )
+        Box(modifier = Modifier
+            .weight(1f)
+            .height(height)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+            .drawWithCache {
+                onDrawWithContent {
+                    drawContent()
+                    val totalPoints = MAX_HISTORY_POINTS_PER_RIBBONS.toFloat()
+                    val pointWidth = size.width / totalPoints
+                    val maxHeight = size.height * 0.8f
+                    val baseLineY = size.height * 0.9f
+                    
+                    // Unified Grid/Baseline
+                    drawLine(
+                        color = Color.White.copy(alpha = 0.1f),
+                        start = Offset(0f, baseLineY),
+                        end = Offset(size.width, baseLineY),
+                        strokeWidth = 0.5.dp.toPx()
+                    )
+
+                    // Draw Scale Ticks
+                    val intervalMs = when(scale) {
+                        "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 1 * 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
+                    }
+                    val alignMs = when(scale) {
+                        "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
+                    }
+                    val firstTs = history.firstOrNull()?.ts ?: 0L
+                    val baseTickTs = ((firstTs + alignMs - 1) / alignMs) * alignMs
+
+                    history.forEachIndexed { index, p ->
+                        val xPos = (totalPoints - history.size + index) * pointWidth
+                        
+                        // Scale Ticks
+                        if (intervalMs > 0 && p.ts >= baseTickTs) {
+                            val tickCount = (p.ts - baseTickTs) / intervalMs
+                            val prevTickCount = if (index > 0) {
+                                if (history[index - 1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / intervalMs else -1L
+                            } else -2L
+                            if (tickCount >= 0 && tickCount > prevTickCount) {
+                                drawLine(
+                                    color = Color.White.copy(alpha = 0.2f),
+                                    start = Offset(xPos, baseLineY - maxHeight),
+                                    end = Offset(xPos, baseLineY + 2.dp.toPx()),
+                                    strokeWidth = 1.dp.toPx()
+                                )
+                            }
+                        }
+
+                        // Explicit Black Gap Visualization (R106)
+                        if (p.isGap) {
+                            drawRect(
+                                color = Color.Black,
+                                topLeft = Offset(xPos, baseLineY - maxHeight),
+                                size = Size(maxOf(1f, pointWidth), maxHeight + 2.dp.toPx())
+                            )
+                        }
+                    }
+
+                    // Delegate Content Rendering
+                    content(totalPoints, pointWidth, baseLineY, maxHeight, isLandscape)
+                }
+            }
+        )
     }
 }
 
@@ -143,15 +243,6 @@ fun StatefulSensorRibbon(
 }
 
 @Composable
-fun StatefulConnectionQualityRibbon(
-    flow: StateFlow<List<ConnectionPoint>>,
-    title: String
-) {
-    val history by flow.collectAsStateWithLifecycle()
-    ConnectionQualityRibbon(history, title)
-}
-
-@Composable
 fun GenericSensorRibbon(
     history: List<ConnectionPoint>, 
     title: String, 
@@ -163,156 +254,158 @@ fun GenericSensorRibbon(
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val boxHeight = if (isLandscape) 40.dp else 24.dp
     
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, color = lineColor.copy(alpha = 0.7f), fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.width(28.dp).padding(start = 2.dp))
-        Box(modifier = Modifier.weight(1f).height(boxHeight).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)).drawWithCache {
-            onDrawWithContent {
-                drawContent()
-                val totalPoints = MAX_HISTORY_POINTS_PER_RIBBONS.toFloat()
-                val pointWidth = size.width / totalPoints
-                val maxHeight = size.height * 0.8f
-                val baseLineY = size.height * 0.9f
-                
-                drawLine(
-                    color = Color.White.copy(alpha = 0.15f),
-                    start = Offset(0f, baseLineY),
-                    end = Offset(size.width, baseLineY),
-                    strokeWidth = 0.5.dp.toPx()
-                )
-
-                drawLine(
-                    color = Color.White.copy(alpha = 0.1f),
-                    start = Offset(0f, baseLineY - maxHeight),
-                    end = Offset(size.width, baseLineY - maxHeight),
-                    strokeWidth = 0.5.dp.toPx()
-                )
-
-                val intervalMs = when(scale) {
-                    "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 1 * 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
-                }
-                val alignMs = when(scale) {
-                    "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
-                }
-                val firstTs = history.firstOrNull()?.ts ?: 0L
-                val baseTickTs = ((firstTs + alignMs - 1) / alignMs) * alignMs
-
-                var lastPos: Offset? = null
-                history.forEachIndexed { index, p ->
-                    val xPos = (totalPoints - history.size + index) * pointWidth
-                    
-                    if (intervalMs > 0 && p.ts >= baseTickTs) {
-                        val tickCount = (p.ts - baseTickTs) / intervalMs
-                        val prevTickCount = if (index > 0) {
-                            if (history[index - 1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / intervalMs else -1L
-                        } else -2L
-                        if (tickCount >= 0 && tickCount > prevTickCount) {
-                            drawLine(color = Color.White.copy(alpha = 0.2f), start = Offset(xPos, baseLineY - maxHeight), end = Offset(xPos, baseLineY + 2.dp.toPx()), strokeWidth = 1.dp.toPx())
-                        }
-                    }
-
-                    val value = valueSelector(p).coerceIn(0f, 1f)
-                    
-                    if (p.isGap) {
-                        lastPos = null
-                        return@forEachIndexed
-                    }
-
-                    if (renderType == RibbonRenderType.BAR) {
-                        val barHeight = value * maxHeight
-                        drawRect(lineColor.copy(alpha = 0.6f), Offset(xPos, baseLineY - barHeight), Size(maxOf(1f, pointWidth), barHeight))
-                    } else {
-                        val yPos = baseLineY - (value * maxHeight)
-                        val currentPos = Offset(xPos + (maxOf(1f, pointWidth) / 2f), yPos)
-                        
-                        lastPos?.let { lp ->
-                            if (currentPos.x - lp.x < pointWidth * 10) {
-                                drawLine(color = lineColor, start = lp, end = currentPos, strokeWidth = (if (isLandscape) { 1.5.dp.toPx() } else { 1.dp.toPx() }))
-                            }
-                        }
-                        if (value > 0.05f) {
-                            drawCircle(color = lineColor, radius = (if (isLandscape) { 1.5.dp.toPx() } else { 1.dp.toPx() }), center = currentPos)
-                        }
-                        lastPos = currentPos
-                    }
-                }
+    ForensicRibbonContainer(
+        title = title,
+        titleColor = lineColor,
+        height = boxHeight,
+        history = history,
+        scale = scale
+    ) { totalPoints, pointWidth, baseLineY, maxHeight, landscape ->
+        var lastPos: Offset? = null
+        history.forEachIndexed { index, p ->
+            if (p.isGap) {
+                lastPos = null
+                return@forEachIndexed
             }
-        })
+
+            val xPos = (totalPoints - history.size + index) * pointWidth
+            val value = valueSelector(p).coerceIn(0f, 1f)
+            
+            if (renderType == RibbonRenderType.BAR) {
+                val barHeight = value * maxHeight
+                drawRect(lineColor.copy(alpha = 0.6f), Offset(xPos, baseLineY - barHeight), Size(maxOf(1f, pointWidth), barHeight))
+            } else {
+                val yPos = baseLineY - (value * maxHeight)
+                val currentPos = Offset(xPos + (maxOf(1f, pointWidth) / 2f), yPos)
+                
+                lastPos?.let { lp ->
+                    if (currentPos.x - lp.x < pointWidth * 10) {
+                        drawLine(
+                            color = lineColor, 
+                            start = lp, 
+                            end = currentPos, 
+                            strokeWidth = (if (landscape) 1.5.dp.toPx() else 1.dp.toPx())
+                        )
+                    }
+                }
+                if (value > 0.05f) {
+                    drawCircle(
+                        color = lineColor, 
+                        radius = (if (landscape) 1.5.dp.toPx() else 1.dp.toPx()), 
+                        center = currentPos
+                    )
+                }
+                lastPos = currentPos
+            }
+        }
     }
 }
 
 @Composable
-fun ConnectionQualityRibbon(history: List<ConnectionPoint>, title: String) {
+fun StatefulConnectionRibbon(
+    flow: StateFlow<List<ConnectionPoint>>,
+    scale: String
+) {
+    val history by flow.collectAsStateWithLifecycle()
+    ConnectionQualityRibbon(history, scale)
+}
+
+@Composable
+fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String) {
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val dateFormatter = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val boxHeight = if (isLandscape) 60.dp else 30.dp
+    val boxHeight = if (isLandscape) 60.dp else 34.dp
     
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp).padding(start = 2.dp))
-        Box(modifier = Modifier.weight(1f).height(boxHeight).background(MaterialTheme.colorScheme.surface).drawWithCache {
-                onDrawWithContent {
-                    drawContent()
-                    val totalPoints = MAX_HISTORY_POINTS_PER_RIBBONS.toFloat()
-                    val pointWidth = size.width / totalPoints
-                    val ribbonMaxHeight = if (isLandscape) 16.dp.toPx() else 8.dp.toPx()
-                    val baseLineY = if (isLandscape) 44.dp.toPx() else 22.dp.toPx() 
+    ForensicRibbonContainer(
+        title = scale,
+        titleColor = Color.Gray,
+        height = boxHeight,
+        history = history,
+        scale = scale
+    ) { totalPoints, pointWidth, connectionBaseY, _, landscape ->
+        val ribbonMaxHeight = if (landscape) 16.dp.toPx() else 10.dp.toPx()
+        // Connection baseline is slightly above the container's baseline to allow for labels
+        val effectiveBaseY = connectionBaseY - (if (landscape) 4.dp.toPx() else 2.dp.toPx())
+        var lastGpsPos: Offset? = null
+        val cyanColor = Color(0xFF00FFFF)
 
-                    drawLine(
-                        color = Color.White.copy(alpha = 0.1f),
-                        start = Offset(0f, baseLineY),
-                        end = Offset(size.width, baseLineY),
-                        strokeWidth = 0.5.dp.toPx()
-                    )
+        val textPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.WHITE
+            textSize = (if (landscape) 10.sp.toPx() else 7.sp.toPx())
+            textAlign = android.graphics.Paint.Align.CENTER
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
 
-                    val textPaint = android.graphics.Paint().apply {
-                        color = android.graphics.Color.WHITE
-                        textSize = (if (isLandscape) { 10.sp.toPx() } else { 6.sp.toPx() })
-                        textAlign = android.graphics.Paint.Align.CENTER
-                        typeface = android.graphics.Typeface.MONOSPACE
-                    }
+        val intervalMs = when(scale) {
+            "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 1 * 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
+        }
+        val alignMs = when(scale) {
+            "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
+        }
+        val firstTs = history.firstOrNull()?.ts ?: 0L
+        val baseTickTs = ((firstTs + alignMs - 1) / alignMs) * alignMs
 
-                    val intervalMs = when(title) {
-                        "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 1 * 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
-                    }
-                    val alignMs = when(title) {
-                        "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
-                    }
-
-                    val firstTs = history.firstOrNull()?.ts ?: 0L
-                    val baseTickTs = ((firstTs + alignMs - 1) / alignMs) * alignMs
-
-                    history.forEachIndexed { index, p ->
-                        val xPos = (totalPoints - history.size + index) * pointWidth
-                        val pColor = when { 
-                            p.isGap -> Color.Black
-                            p.isConnected -> BrandJd
-                            else -> Rose500
+        history.forEachIndexed { index, p ->
+            val xPos = (totalPoints - history.size + index) * pointWidth
+            
+            if (!p.isGap) {
+                val pColor = if (p.isConnected) BrandJd else Rose500
+                val commIdx = if (p.isConnected) TelemetryUtils.calculateCommIndex(p.rtt, p.remoteSig, p.localSig) else 0
+                val hFactor = if (p.isConnected) (commIdx.toFloat() / 10f).coerceIn(0.1f, 1f) else 1f
+                
+                drawRect(
+                    color = pColor, 
+                    topLeft = Offset(xPos, effectiveBaseY - (ribbonMaxHeight * hFactor)), 
+                    size = Size(maxOf(1f, pointWidth), ribbonMaxHeight * hFactor)
+                )
+                
+                // Chain GPS Overlay
+                if (p.hasGps && p.gpsIndex > 0.0) {
+                    val dotRadius = (if (landscape) 1.2.dp.toPx() else 0.8.dp.toPx())
+                    val baseHeight = if (landscape) 24.dp.toPx() else 14.dp.toPx()
+                    val normalizedHeight = (p.gpsIndex.toFloat().coerceIn(0f, 1f) * baseHeight)
+                    val yPos = effectiveBaseY - ribbonMaxHeight - (if (landscape) 4.dp.toPx() else 2.dp.toPx()) - normalizedHeight
+                    val currentPos = Offset(xPos + (maxOf(1f, pointWidth) / 2f), yPos)
+                    
+                    lastGpsPos?.let { lastPos ->
+                        if (currentPos.x - lastPos.x < pointWidth * 10) {
+                            drawLine(
+                                color = cyanColor, 
+                                start = lastPos, 
+                                end = currentPos, 
+                                strokeWidth = (if (landscape) 1.dp.toPx() else 0.5.dp.toPx())
+                            )
                         }
-                        
-                        val commIdx = if (p.isConnected) TelemetryUtils.calculateCommIndex(p.rtt, p.remoteSig, p.localSig) else 0
-                        val hFactor = if (p.isConnected) (commIdx.toFloat() / 10f).coerceIn(0.1f, 1f) else 1f
-                        
-                        drawRect(pColor, Offset(xPos, baseLineY - (ribbonMaxHeight * hFactor)), Size(maxOf(1f, pointWidth), ribbonMaxHeight * hFactor))
-                        
-                        if (intervalMs > 0 && history.isNotEmpty() && p.ts >= baseTickTs) {
-                            val tickCount = (p.ts - baseTickTs) / intervalMs
-                            val prevTickCount = if (index > 0) {
-                                if (history[index - 1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / intervalMs else -1L
-                            } else -2L
+                    }
+                    drawCircle(color = cyanColor, radius = dotRadius, center = currentPos)
+                    lastGpsPos = currentPos
+                }
+            } else {
+                lastGpsPos = null
+            }
 
-                            if (tickCount >= 0 && tickCount > prevTickCount) {
-                                drawLine(color = Color.White, start = Offset(xPos, baseLineY - ribbonMaxHeight), end = Offset(xPos, baseLineY + (if (isLandscape) 4.dp.toPx() else 2.dp.toPx())), strokeWidth = (if (isLandscape) 2.dp.toPx() else 1.dp.toPx()))
-                                val timeStr = if (title == "7D") dateFormatter.format(Date(p.ts)) else timeFormatter.format(Date(p.ts))
-                                drawIntoCanvas { canvas ->
-                                    val finalX = xPos.coerceIn(15.dp.toPx(), size.width - 15.dp.toPx())
-                                    canvas.nativeCanvas.drawText(timeStr, finalX, baseLineY + (if (isLandscape) { 14.dp.toPx() } else { 8.dp.toPx() }), textPaint)
-                                }
-                            }
-                        }
+            // Time Labels on Connection Ribbon
+            if (intervalMs > 0 && history.isNotEmpty() && p.ts >= baseTickTs) {
+                val tickCount = (p.ts - baseTickTs) / intervalMs
+                val prevTickCount = if (index > 0) {
+                    if (history[index - 1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / intervalMs else -1L
+                } else -2L
+
+                if (tickCount >= 0 && tickCount > prevTickCount) {
+                    val timeStr = if (scale == "7D") dateFormatter.format(Date(p.ts)) else timeFormatter.format(Date(p.ts))
+                    drawIntoCanvas { canvas ->
+                        val finalX = xPos.coerceIn(18.dp.toPx(), size.width - 18.dp.toPx())
+                        canvas.nativeCanvas.drawText(
+                            timeStr, 
+                            finalX, 
+                            size.height - (if (landscape) 4.dp.toPx() else 2.dp.toPx()), 
+                            textPaint
+                        )
                     }
                 }
             }
-        )
+        }
     }
 }
 
@@ -500,7 +593,7 @@ fun StatusBar(
                     Box(modifier = Modifier.weight(1f)) { StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = vAge, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = isLocalTelemetryFresh, isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS) }
                     
                     val tAge = if(lastGpsTs > 0) now - lastGpsTs else -1L
-                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = isTelemetryFresh, isGpsFresh = isGpsFresh) }
+                    Box(modifier = Modifier.weight(1f)) { StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxViewerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = isTelemetryFresh, isGpsFresh = isGpsFresh) }
                 }
             } else {
                 if (mode == "viewer") {

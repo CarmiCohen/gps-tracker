@@ -2,13 +2,16 @@ package com.gps19.app
 
 import com.gps19.core.engine.PhysicsUtils
 import org.osmdroid.util.GeoPoint
+import javax.inject.Inject
 
 /**
  * HomePointUseCase: Business logic for managing geofence center points.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor.
  * v9.5.0:
  * - Issue #503: Hilt Removal.
  */
-class HomePointUseCase(
+class HomePointUseCase @Inject constructor(
     private val repository: MainRepository
 ) {
     suspend fun addHomePoint(currentPoints: List<GeoPoint>, newPoint: GeoPoint, maxDistance: Double): List<GeoPoint> {

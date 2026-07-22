@@ -9,9 +9,11 @@ import kotlinx.coroutines.SupervisorJob
 
 /**
  * AppContainer: Manual Dependency Injection container.
+ * July.21.00:
+ * - Forensic Hardening: Corrected MainRepository instantiation with full persistence stack.
+ * - Issue #115: CommunicationManager constructor alignment.
  * July.17.00:
  * - Issue #526: Performance Hardening. Consolidated all UseCases into lazy properties.
- *   Ensures MainViewModelFactory and Services are zero-cost on the Main thread.
  */
 class AppContainer(private val context: Context) {
 
@@ -39,7 +41,10 @@ class AppContainer(private val context: Context) {
     val offlineRepository by lazy(LazyThreadSafetyMode.PUBLICATION) { OfflineRepository(pendingStatusDao, telemetryRepository) }
 
     val mainRepository by lazy(LazyThreadSafetyMode.PUBLICATION) {
-        MainRepository(context, trailDao, historyDao, violationDao, pendingStatusDao, database, settingsRepository, telemetryRepository, logRepository, offlineRepository, timeProvider)
+        MainRepository(
+            context, trailDao, historyDao, violationDao, pendingStatusDao, database, 
+            settingsRepository, telemetryRepository, logRepository, offlineRepository, timeProvider
+        )
     }
 
     val configManager by lazy(LazyThreadSafetyMode.PUBLICATION) { ConfigManager(context, mainRepository) }
@@ -54,7 +59,7 @@ class AppContainer(private val context: Context) {
     }
 
     val communicationManager: CommunicationManager by lazy(LazyThreadSafetyMode.PUBLICATION) {
-        CommunicationManager(context, configManager, logManager, timeProvider)
+        CommunicationManager(context, configManager, logManager, telemetryRepository, logRepository, timeProvider)
     }
 
     val systemMonitor by lazy(LazyThreadSafetyMode.PUBLICATION) { SystemMonitor(context, timeProvider) }

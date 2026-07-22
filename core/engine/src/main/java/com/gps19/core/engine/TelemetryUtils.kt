@@ -4,8 +4,10 @@ import kotlin.math.*
 
 /**
  * TelemetryUtils: Logic for scoring and evaluating signal quality.
- * v9.3.15:
- * - Hardening: Finalized Double standardization.
+ * v9.4.06:
+ * - Issue #077 Hardening: Cleaned up satsIndex math to leverage implicit promotion.
+ * v9.4.05:
+ * - Issue #077 Hardening: Simplified GPS index calculation math.
  */
 
 data class GpsIndexData(val ageIndex: Double, val accIndex: Double, val satsIndex: Double, val totalIndex: Double)
@@ -39,8 +41,8 @@ object TelemetryUtils {
         } else 0.001 
         
         val satsIndex = if (satsUsed >= GPS_INDEX_SATS_TARGET) 1.0 else {
-            val diff = GPS_INDEX_SATS_TARGET.toDouble() - satsUsed.toDouble()
-            if (diff <= 1.0) 1.0 else 1.0 / diff
+            val diff = GPS_INDEX_SATS_TARGET - satsUsed
+            if (diff <= 1) 1.0 else 1.0 / diff
         }
         
         val total = (ageIndex + accIndex + satsIndex) / 3.0

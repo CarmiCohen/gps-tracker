@@ -1,11 +1,15 @@
 package com.gps19.app
 
+import javax.inject.Inject
+
 /**
  * NavigationUseCase: Logic for handling UI navigation state transitions.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor.
  * v9.5.0:
  * - Issue #503: Hilt Removal.
  */
-class NavigationUseCase {
+class NavigationUseCase @Inject constructor() {
     fun handleNavigationEvent(event: UiEvent, currentState: MainUiState): NavigationState {
         val nav = currentState.navigation
         return when (event) {

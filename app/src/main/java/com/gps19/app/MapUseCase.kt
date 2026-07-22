@@ -1,11 +1,15 @@
 package com.gps19.app
 
+import javax.inject.Inject
+
 /**
  * MapUseCase: Logic for map-related UI state transitions and triggers.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor.
  * v9.5.0:
  * - Issue #503: Hilt Removal.
  */
-class MapUseCase {
+class MapUseCase @Inject constructor() {
     fun handleMapEvent(event: UiEvent, currentState: MainUiState): MainUiState {
         return when (event) {
             is UiEvent.SetFenceVisible -> currentState.copy(isFenceVisible = event.visible)

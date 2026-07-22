@@ -2,10 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * July.17.02:
- * - Issue #R993: Increased NOTIFICATION_THROTTLE_MS to 30s to prevent Logcat spam.
- * July.1.16:
- * - Issue #510: Abandoned Chair Sit Detection. Removed all sit-related thresholds and constants.
+ * July.21.00:
+ * - Forensic Hardening: Added scaling constants for Sit Detection and Proximity.
+ * - Requirement R999b: Added Chair Plunge detection thresholds.
+ * - GPS Strategy: Centralized polling intervals for adaptive power management.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -99,6 +99,14 @@ const val ROTATION_INIT_STATIONARY_MS = 3000L
 const val BARO_ZEROING_INTERVAL_MS = 300000L 
 const val SPIKE_DEBOUNCE_MS = 5000L
 
+// Sitting Detection: Chair Plunge (R999b)
+const val CHAIR_PLUNGE_PHASE_TIMEOUT_MS = 5000L
+const val CHAIR_PLUNGE_WINDOW_MS = 1000L
+const val CHAIR_PLUNGE_VELOCITY_THRESHOLD = 0.25
+const val CHAIR_PLUNGE_DISTANCE_THRESHOLD = 0.15
+const val SIT_DUPLICATE_GUARD_MS = 10000L
+const val MUZZLE_HYSTERESIS_MS = 2000L
+
 // Filtering Thresholds (R810-P Zero-Lag)
 const val SUSPICIOUS_Q_SCALE = 1000.0
 const val HIGH_ACCURACY_THRESHOLD_METERS = 35.0
@@ -139,7 +147,7 @@ const val GPS_GAP_THRESHOLD_MS = 60000L
 const val GPS_STALL_THRESHOLD_MS = 60000L
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
 
-// R406a: Unified 2s heartbeat for all tasks and devices.
+// Adaptive Polling Strategy (R406a)
 const val TICK_INTERVAL_MS = 2000L
 const val UI_PULSE_TIMEOUT_MS = 45000L 
 const val FGS_STICKY_DELAY_MS = 45000L
@@ -153,6 +161,15 @@ const val MAX_REVIVAL_ATTEMPTS = 3
 const val HARDWARE_BOOT_GRACE_MS = 30000L
 const val LANDING_PAGE_PAUSE_MS = 2000L
 
+// GPS Polling Intervals (Central Authority)
+const val HIGH_FREQUENCY_GPS_POLLING_MS = 2000L
+const val MOVING_GPS_POLLING_MS = 5000L
+const val STATIONARY_GPS_POLLING_MS = 60000L
+const val SCREEN_OFF_GPS_POLLING_MS = 45000L
+const val SUSPICIOUS_GPS_POLLING_MS = 10000L
+const val COOLING_GPS_POLLING_MS = 30000L
+const val VIEWER_GPS_POLLING_MS = 10000L
+
 // Hardware Heuristic Recovery (Issue #502)
 const val HARDWARE_SUPPRESSION_THRESHOLD_MS = 15000L
 const val HARDWARE_RECOVERY_COOLDOWN_MS = 60000L
@@ -160,7 +177,17 @@ const val HARDWARE_RECOVERY_COOLDOWN_MS = 60000L
 const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 20000L 
 
-const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 
+// Stationary Anchor Monitor (Issue #062 - R990)
+const val PARKING_ANCHOR_MIN_DIST = 20.0
+const val PARKING_ANCHOR_FACTOR = 0.8
+const val ANCHOR_ENGAGEMENT_PROBABILITY = 0.9
+const val ANCHOR_ESCAPE_SCORE_THRESHOLD = 100.0
+const val ANCHOR_TREND_WINDOW_SIZE = 3
+const val ANCHOR_TRANSITION_ZONE_START = 0.7 // Start accumulating score at 70% of threshold
+const val ANCHOR_VELOCITY_WEIGHT_MPS = 15.0 // Score points per m/s of estimated speed
+const val ANCHOR_DISPLACEMENT_WEIGHT = 2.0 // Score points per meter of net displacement in transition zone
+
+const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 // Issue #450: Authoritative multiplier
 
 // Behavioral State Thresholds (Issue #302)
 const val SUSTAINED_SPEED_THRESHOLD = 2 
@@ -213,6 +240,8 @@ const val RIBBON_VIBRATION_SCALE_G = 2.0
 const val RIBBON_LIFT_SCALE_METERS = 5.0
 const val RIBBON_SNR_SCALE_DB = 45.0
 const val RIBBON_CURRENT_SCALE_MA = 1000.0
+const val RIBBON_SIT_TILT_SCALE_DEG = 15.0
+const val RIBBON_SIT_BARO_SCALE_METERS = 2.0
 
 const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 
@@ -220,7 +249,7 @@ const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0
-const val NETWORK_TIMEOUT_MS = 10000
+const val NETWORK_TIMEOUT_MS = 60000 // Issue #100: Increased to 60s to handle relay cold-start
 const val NET_REJOIN_THRESHOLD_MS = 15000L
 const val NET_HEAL_THRESHOLD_MS = 45000L
 const val PING_INTERVAL_MS = 10000L
@@ -260,6 +289,7 @@ const val ALERT_ID_TRACKER_TAMPER = "TRACKER_TAMPER"
 const val ALERT_ID_TRACKER_TILT = "TILT_ALERT"
 const val ALERT_ID_TRACKER_ACOUSTIC = "ACOUSTIC_ALERT"
 const val ALERT_ID_TRACKER_LIFT = "LIFT_ALERT"
+const val ALERT_ID_TRACKER_CHAIR = "CHAIR_SIT"
 const val ALERT_ID_SYSTEM_STORAGE_LOW = "SYSTEM_STORAGE_LOW"
 const val ALERT_ID_SYSTEM_STORAGE_CRITICAL = "SYSTEM_STORAGE_CRITICAL"
 const val ALERT_ID_BATTERY_STEEP_DISCHARGE = "BATTERY_HEALTH"
@@ -314,6 +344,7 @@ const val PROXIMITY_DEBOUNCE_MOVING_MS = 1000L
 
 // Issue #012: Adaptive Proximity Debounce
 const val PROXIMITY_DEBOUNCE_MAX_MS = 15000L
+const val PROXIMITY_STARY_SCALING_MS_PER_HOUR = 2000L
 const val PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR = 2000L
 const val PROXIMITY_STRESS_SCALING_MULTIPLIER = 2.0
 

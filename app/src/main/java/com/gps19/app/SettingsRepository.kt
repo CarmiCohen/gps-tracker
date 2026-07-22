@@ -6,6 +6,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.dataStoreFile
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -13,6 +14,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * CommitResult: Result of an atomic draft commit to primary settings.
@@ -29,13 +32,15 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
- * July.17.02:
- * - Added IS_SYSTEM_ACTIVE_KEY to prevent unintended engine starts on boot.
- * v9.5.0:
- * - Issue #503: Hilt Removal.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor and @ApplicationContext.
+ * July.20.07:
+ * - Issue #103: Added CLOCK_DRIFT_REF_KEY for forensic integrity.
+ * - Added CHAIR_BASELINE_TILT_KEY and LAST_SIT_TS_KEY for session forensic state.
  */
-class SettingsRepository(
-    private val context: Context,
+@Singleton
+class SettingsRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val timeProvider: TimeProvider
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
@@ -154,6 +159,11 @@ class SettingsRepository(
         const val IS_SYSTEM_ACTIVE_KEY = "is_system_active"
         
         const val IDENTITY_SANITIZED_KEY = "identity_sanitized"
+        const val CLOCK_DRIFT_REF_KEY = "clock_drift_ref"
+
+        const val LAST_SIT_TS_KEY = "last_sit_ts"
+        const val CHAIR_BASELINE_TILT_KEY = "chair_baseline_tilt"
+        const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
     }
 
     val appModeFlow: Flow<String?> = dataStore.data.map { it.appMode.ifEmpty { null } }
@@ -207,7 +217,10 @@ class SettingsRepository(
                 MAX_DROP_TS_KEY -> builder.setMaxDropTs(value)
                 LAST_GPS_TS_KEY -> builder.setLastGpsTs(value)
                 VIOLATION_UPTIME_MS_KEY -> builder.setViolationUptimeMs(value)
-                LAST_SERVICE_TICK_REALTIME_KEY -> builder.setLastServiceTickRealtime(value)
+                LAST_SERVICE_TICK_REALTIME_KEY -> builder.setLastServiceTickRt(value)
+                CLOCK_DRIFT_REF_KEY -> builder.setClockDriftRef(value)
+                LAST_SIT_TS_KEY -> builder.setLastSitTs(value)
+                LAST_HISTORY_SIT_TS_KEY -> builder.setLastHistorySitTs(value)
             }
             builder.build()
         }
@@ -223,6 +236,7 @@ class SettingsRepository(
                 TRACKER_LUX_BASELINE_KEY -> builder.setTrackerLuxBaseline(value)
                 TRACKER_ACOUSTIC_FLOOR_KEY -> builder.setTrackerAcousticFloor(value)
                 DRAFT_MAX_DISTANCE -> builder.setDraftMaxDistance(value)
+                CHAIR_BASELINE_TILT_KEY -> builder.setChairBaselineTilt(value)
             }
             builder.build()
         }
@@ -286,7 +300,10 @@ class SettingsRepository(
             MAX_DROP_TS_KEY -> settings.maxDropTs
             LAST_GPS_TS_KEY -> settings.lastGpsTs
             VIOLATION_UPTIME_MS_KEY -> settings.violationUptimeMs
-            LAST_SERVICE_TICK_REALTIME_KEY -> settings.lastServiceTickRealtime
+            LAST_SERVICE_TICK_REALTIME_KEY -> settings.lastServiceTickRt
+            CLOCK_DRIFT_REF_KEY -> if (settings.hasClockDriftRef()) settings.clockDriftRef else 0L
+            LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else 0L
+            LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else 0L
             else -> 0L
         }
         return if (value == 0L) default else value
@@ -301,6 +318,7 @@ class SettingsRepository(
             TRACKER_LUX_BASELINE_KEY -> settings.trackerLuxBaseline
             TRACKER_ACOUSTIC_FLOOR_KEY -> settings.trackerAcousticFloor
             DRAFT_MAX_DISTANCE -> settings.draftMaxDistance
+            CHAIR_BASELINE_TILT_KEY -> settings.chairBaselineTilt
             else -> 0.0
         }
         return if (value == 0.0) default else value

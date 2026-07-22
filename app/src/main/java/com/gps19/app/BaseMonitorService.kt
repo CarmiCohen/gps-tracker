@@ -15,10 +15,10 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * July.17.00:
- * - Issue #526: Definitive performance hardening. All logic including foreground start
- *   is deferred to background scope to prevent Main thread hangs on Samsung A15.
- * - Converted all common dependencies to lazy delegates.
+ * July.21.00:
+ * - Build Hardening: Removed invalid isInitialized check on lazy repository property.
+ * July.20.07:
+ * - Issue #102: Temporal Forensic Integrity. Added serviceStartWall and standardized on nowRt.
  */
 abstract class BaseMonitorService : LifecycleService() {
 
@@ -46,15 +46,15 @@ abstract class BaseMonitorService : LifecycleService() {
     val locationProcessor by lazy { container.locationProcessor }
     val commandRouter by lazy { container.commandRouter }
     
-    // Shared managers that were previously triggering Main-thread spikes
     val appSensorManager by lazy { container.appSensorManager }
     val serviceBehaviorUseCase by lazy { container.serviceBehaviorUseCase }
     
     protected val cachedPkgName by lazy { packageName }
 
-    protected var serviceStartRealtime = 0L
-    protected var lastServiceTickTs = 0L
-    protected var lastServiceTickRealtime = 0L
+    protected var serviceStartRealtime = 0L // Monotonic
+    protected var serviceStartWall = 0L // Wall-clock (Issue #102)
+    protected var lastServiceTickTs = 0L // Wall-clock
+    protected var lastServiceTickRealtime = 0L // Monotonic
     protected var serviceTickCounter = 0
     protected var lastNotificationUpdateTs = 0L
     
@@ -75,13 +75,11 @@ abstract class BaseMonitorService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         
-        // v9.5.4: Completely defer all logic off the Main thread. 
-        // This prevents the "Lazy Cascade" from triggering DB/Manager init during startup.
+        serviceStartRealtime = timeProvider.elapsedRealtime()
+        serviceStartWall = timeProvider.currentTimeMillis()
+        
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
-            // Building notification off-thread to avoid triggering database load on Main.
             startServiceForeground()
-            
-            serviceStartRealtime = timeProvider.elapsedRealtime()
             
             systemMonitor.setWatchdogListener { set, skipped ->
                 lifecycleScope.launch(Dispatchers.IO) {
@@ -95,7 +93,7 @@ abstract class BaseMonitorService : LifecycleService() {
 
     abstract fun startServiceForeground()
     abstract fun updateForegroundServiceType()
-    abstract suspend fun processTick(now: Long, nowRealtime: Long)
+    abstract suspend fun processTick(now: Long, nowRt: Long)
     abstract fun getRequiredTickInterval(): Long
 
     protected fun startTickLoop() {
@@ -104,10 +102,10 @@ abstract class BaseMonitorService : LifecycleService() {
             while (isActive) { 
                 val startTime = timeProvider.elapsedRealtime()
                 val now = timeProvider.currentTimeMillis()
-                val nowRealtime = timeProvider.elapsedRealtime()
+                val nowRt = timeProvider.elapsedRealtime()
                 
                 systemMonitor.scheduleWatchdogAlarm()
-                processTick(now, nowRealtime) 
+                processTick(now, nowRt) 
                 
                 val elapsed = timeProvider.elapsedRealtime() - startTime
                 val interval = getRequiredTickInterval()
@@ -149,10 +147,10 @@ abstract class BaseMonitorService : LifecycleService() {
         tickJob?.cancel()
         fgsUpdateJob?.cancel()
         
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
+        runBlocking {
+            withTimeoutOrNull(1000) {
                 repository.flushHistory()
-            } catch (e: Exception) {}
+            }
         }
 
         systemMonitor.cancelWatchdogAlarm()

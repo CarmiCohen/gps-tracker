@@ -4,9 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * July.16.22:
- * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState in AlarmEvaluationState.
- * - Issue #517: Refactor AppAlarmManager. Added AlarmHistory to AlarmEvaluationState.
+ * July.21.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized 'rt' and 'ts'.
+ * - Forensic Hardening: Expanded SentinelStatus and JumpConfidence for deep auditing.
  */
 
 @Serializable
@@ -15,6 +15,7 @@ data class EngineGeoPoint(
     val lng: Double, 
     val alt: Double = 0.0,
     val ts: Long = 0L,
+    val rt: Long = 0L,
     val accuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0
 )
@@ -27,21 +28,13 @@ enum class DiscoveryPhase {
 }
 
 enum class SentinelStatus {
-    VALID, // Point is usable
-    JUMP,  // Point rejected due to physical impossibility or jitter
-    TAMPER // Point accompanied by hardware violation (Tilt, Shock, etc.)
+    VALID, JUMP, TAMPER, TRAJECTORY_PROMOTED, OUTLIER, JITTER, JAMMER_SUSPICION
 }
 
-/**
- * CapabilityStatus: Status of a specific hardware or OS capability/permission.
- */
 enum class CapabilityStatus {
     GRANTED, DENIED, UNKNOWN
 }
 
-/**
- * HardwareCapabilities: Abstract representation of device-specific behaviors and restrictions.
- */
 @Serializable
 data class HardwareCapabilities(
     val hasBackgroundRestriction: Boolean = false,
@@ -52,9 +45,6 @@ data class HardwareCapabilities(
     val isManualOverrideActive: Boolean = false
 )
 
-/**
- * LocationPendingReason: Contextual cause for Bayesian uncertainty expansion.
- */
 enum class LocationPendingReason {
     NONE,
     GPS_STALL,
@@ -64,12 +54,10 @@ enum class LocationPendingReason {
     JAMMER_SUSPICION
 }
 
-/**
- * EngineConnectionPoint: Pure Kotlin representation of a forensic telemetry slice.
- */
 @Serializable
 data class EngineConnectionPoint(
     val ts: Long,
+    val rt: Long = 0L,
     val rtt: Int,
     val remoteSig: Int,
     val isConnected: Boolean,
@@ -83,7 +71,26 @@ data class EngineConnectionPoint(
     val bearing: Double = 0.0,
     val isTick: Boolean = false,
     val currentMa: Int = 0,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    
+    // Forensic Indices (Issue #102)
+    val gpsIndex: Double = 0.0,
+    val noiseIdx: Double = 0.0,
+    val luxIdx: Double = 0.0,
+    val vibeIdx: Double = 0.0,
+    val proxIdx: Double = 1.0,
+    val liftIdx: Double = 0.0,
+    val snrIdx: Double = 0.0,
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
+    val isSitDetected: Boolean = false,
+    val isSitActive: Boolean = false,
+    val verticalVelocity: Double = 0.0,
+    val sitVz: Double = 0.0,
+    val sitDz: Double = 0.0,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0
 )
 
 enum class RibbonScale(val key: String, val intervalSeconds: Int) {
@@ -95,14 +102,18 @@ enum class RibbonScale(val key: String, val intervalSeconds: Int) {
     SEVEN_DAY("7D", 2700)
 }
 
-/**
- * Sensor snapshots for gap filling.
- */
+data class EngineSnrSample(val ts: Long, val rt: Long = 0L, val snr: Double)
+
 data class EngineSensorSnapshot(
     val ts: Long,
+    val rt: Long = 0L,
     val acoustic: Double,
     val lux: Double,
-    val vibe: Double
+    val vibe: Double,
+    val proxIdx: Double = 1.0,
+    val lift: Double = 0.0,
+    val tilt: Double = 0.0,
+    val isSitDetected: Boolean = false
 )
 
 @Serializable
@@ -111,7 +122,8 @@ data class SentinelResult(
     val reason: String = "",
     val optimizedPoint: EngineGeoPoint? = null,
     val jumpConfidence: JumpConfidence? = null,
-    val suppressionNote: String? = null
+    val suppressionNote: String? = null,
+    val promotedPoints: List<EngineGeoPoint>? = null
 )
 
 @Serializable
@@ -120,7 +132,8 @@ data class JumpConfidence(
     val isJump: Boolean = false,
     val isOutlier: Boolean = false,
     val tier: Int = 0, 
-    val reason: String = ""
+    val reason: String = "",
+    val isAdaptiveJump: Boolean = false
 )
 
 @Serializable
@@ -136,15 +149,24 @@ data class GnssDetail(
     val satellites: List<SatelliteInfo> = emptyList()
 )
 
-/**
- * SpatialAnchor: Minimal interface for position recovery.
- */
+data class RejectedPoint(
+    val lat: Double,
+    val lng: Double,
+    val alt: Double,
+    val accuracy: Double,
+    val bearing: Double,
+    val speedMps: Double,
+    val ts: Long,
+    val rt: Long = 0L
+)
+
 interface SpatialAnchor {
     val lat: Double
     val lng: Double
     val alt: Double
     val gpsTs: Long
     val ts: Long
+    val rt: Long
 }
 
 @Serializable
@@ -170,8 +192,10 @@ data class AlarmHistory(
 )
 
 data class AlarmEvaluationState(
-    val now: Long, 
+    val now: Long,
+    val nowRt: Long,
     val serviceStartTime: Long, 
+    val serviceStartRt: Long,
     val lastAlarmAckTs: Long, 
     val appStartTime: Long,
     val isRelayConnected: Boolean, 
@@ -182,10 +206,19 @@ data class AlarmEvaluationState(
     val trackerGpsAccuracy: Double,
     val maxTrackerAccuracy: Double,
     val lastGpsPacketTs: Long,
+    val lastGpsPacketRt: Long = 0L,
     val trackerLastValidFixTs: Long = 0L, 
+    val trackerLastValidFixRt: Long = 0L,
     val trackerSpeed: Double = 0.0,
     val jumpTier: Int = 0,
-    val history: AlarmHistory = AlarmHistory(),
+    val isAdaptiveJump: Boolean = false,
+    val trackerBattery: Int, 
+    val trackerTemp: Double,
+    var wasDistanceViolated: Boolean = false, 
+    var distanceViolationCounter: Int = 0, 
+    var firstViolationTs: Long = 0L, 
+    var firstViolationRt: Long = 0L,
+    var firstViolationWasJump: Boolean = false,
     val homePoints: List<EngineGeoPoint> = emptyList(),
     val maxDistance: Double = 60.0,
     val distToHomeAuthority: Double? = null,

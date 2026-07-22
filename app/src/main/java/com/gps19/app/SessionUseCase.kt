@@ -3,15 +3,18 @@ package com.gps19.app
 import com.gps19.core.engine.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
 /**
  * SessionUseCase: Logic for managing tracking sessions, mode transitions, and resource cleanup.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor.
  * July.17.02:
  * - Added setSystemActive to persist arming state across reboots.
  * v9.5.0:
  * - Issue #503: Hilt Removal.
  */
-class SessionUseCase(
+class SessionUseCase @Inject constructor(
     private val repository: MainRepository,
     private val timeProvider: TimeProvider
 ) {

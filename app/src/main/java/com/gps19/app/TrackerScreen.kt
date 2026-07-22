@@ -31,8 +31,11 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerScreen: Tracker-mode UI.
- * v9.4.1:
- * - Issue #510: Removed Chair Sit Detection UI references.
+ * July.21.00:
+ * - Aligned with SystemHealthState and standardized monotonic timing.
+ * - Issue #338: Propagated isTelemetryFresh for unified staleness.
+ * - Issue #221: Propagating systemPulseRt for Bayesian uncertainty scaling.
+ * - Maintained Hilt compatibility as per hardened Golden Master architecture.
  */
 
 @Composable
@@ -44,7 +47,7 @@ fun TrackerScreen(
     viewerTrail: List<TrailPoint>,
     violations: List<ViolationPoint>,
     systemPulse: Long,
-    systemPulseRealtime: Long,
+    systemPulseRt: Long,
     onToggleMap: () -> Unit,
     onToggleLog: () -> Unit,
     onToggleSettings: () -> Unit,
@@ -115,7 +118,7 @@ fun TrackerScreen(
                             AppMapContainer(
                                 uiState = uiState,
                                 systemPulse = systemPulse,
-                                systemPulseRealtime = systemPulseRealtime,
+                                systemPulseRt = systemPulseRt,
                                 onEvent = { viewModel.onEvent(it) },
                                 onClearTrails = { viewModel.clearTrails(context) },
                                 trail = trail, viewerTrail = viewerTrail, 
@@ -135,7 +138,7 @@ fun TrackerScreen(
                 AppMapContainer(
                     uiState = uiState,
                     systemPulse = systemPulse,
-                    systemPulseRealtime = systemPulseRealtime,
+                    systemPulseRt = systemPulseRt,
                     onEvent = { viewModel.onEvent(it) },
                     onClearTrails = { viewModel.clearTrails(context) },
                     trail = trail, viewerTrail = viewerTrail, 

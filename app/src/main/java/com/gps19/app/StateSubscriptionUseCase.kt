@@ -2,21 +2,27 @@ package com.gps19.app
 
 import com.gps19.core.engine.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.osmdroid.util.GeoPoint
 import timber.log.Timber
+import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
- * July.17.02:
- * - Added isSystemActive to observeRepositorySettings.
- * July.16.18:
- * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor.
+ * July.21.00:
+ * - Issue #102: Temporal Forensic Integrity.
+ * - Issue #516: De-duplicate "Status" Logic. Using SystemHealthState.
+ * - ANR Hardening (#092): Offloaded history processing and integrity parsing to Dispatchers.Default.
+ * - Maintained Hilt compatibility as per hardened Golden Master architecture.
  */
-class StateSubscriptionUseCase(
+class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
     private val gpsStatusManager: GpsStatusManager,
     private val systemStatusProvider: SystemStatusProvider,
@@ -37,7 +43,7 @@ class StateSubscriptionUseCase(
 
     fun startHistoryObservations(scope: CoroutineScope) {
         _historyFlows.forEach { (key, stateFlow) ->
-            scope.launch {
+            scope.launch(Dispatchers.Default) {
                 repository.getHistoryFlow(key).collect { dbList ->
                     stateFlow.update { current ->
                         val lastDbTs = dbList.lastOrNull()?.ts ?: 0L
@@ -48,7 +54,7 @@ class StateSubscriptionUseCase(
             }
         }
 
-        scope.launch {
+        scope.launch(Dispatchers.Default) {
             repository.liveHistoryFlow.collect { (key, points) ->
                 _historyFlows[key]?.update { (it + points).takeLast(240) }
             }
@@ -98,7 +104,7 @@ class StateSubscriptionUseCase(
                 appMode = args[7] as String?,
                 isSystemActive = args[8] as Boolean
             )
-        }
+        }.flowOn(Dispatchers.Default)
     }
 
     fun observeConnectivityBasics(): Flow<ConnectivityUpdate> {
@@ -108,13 +114,12 @@ class StateSubscriptionUseCase(
             repository.lastRemoteActivityTs
         ) { connected, rtt, remoteTs ->
             ConnectivityUpdate(connected, rtt, remoteTs)
-        }
+        }.flowOn(Dispatchers.Default)
     }
 
     fun observeIntegrityUpdates(): Flow<IntegrityUpdate> = repository.systemHealth.map { health ->
-        // Note: Alarms are now managed by AppAlarmManager and synchronized via LogManager/Repository
-        // We can still derive active alarm types from health if needed, but for now we keep the UI compatible.
-        val alarms = emptyList<AlarmInfo>() // Alarms to be refactored in a future issue if needed
+        // Note: Alarms are managed by AppAlarmManager and synchronized via LogManager/Repository
+        val alarms = emptyList<AlarmInfo>()
 
         IntegrityUpdate(
             health = health,
@@ -126,7 +131,7 @@ class StateSubscriptionUseCase(
             activeAlarms = alarms,
             activeAlarmTypes = emptySet()
         )
-    }
+    }.flowOn(Dispatchers.Default)
 
     data class IntegrityUpdate(
         val health: SystemHealthState,

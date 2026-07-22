@@ -10,16 +10,22 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor and @Singleton.
  * July.16.24:
  * - Issue #526: Performance hardening. Removed ConfigManager dependency to prevent
  *   Main-thread lazy-loading of the database during cold start.
  */
-class AppNotificationManager(
-    private val context: Context
+@Singleton
+class AppNotificationManager @Inject constructor(
+    @ApplicationContext private val context: Context
 ) {
 
     private val channelId = "location_service_channel"

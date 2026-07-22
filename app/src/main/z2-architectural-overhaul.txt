@@ -1,4 +1,4 @@
-Refactor Summary v4.640:
+Refactor Summary v4.680:
 1. TrackerStateManager decoupled from ViewModel.
 2. HomePointUseCase, DashboardUseCase, and GpsStatusManager extracted.
 3. SystemStatusProvider created for pure reactive OS monitoring.
@@ -6,3 +6,5 @@ Refactor Summary v4.640:
 5. Standardized Dashboard state computation in business layer.
 6. Reactive Battery/Network monitoring (no polling).
 7. Full State Hoisting for SettingsOverlay and LogOverlay.
+8. Requirement 8: UI-Layer Lifecycle Gating (ANR Hardening). The UI shall reject all telemetry frame notices and logging events while the Landing Page is active. Full state processing for ribbons, trails, and logs shall only resume after a mode is explicitly selected. This strategy ensures transition smoothness and prevents ANRs by eliminating Main Thread congestion ("Backfill Storm") during role navigation.
+9. Requirement 9: Computational Isolation (Transition Hardening). To ensure Landing Page responsiveness, the system shall implement total event rejection during the selection phase rather than relying solely on engine-level optimizations. Processing of resource-intensive data shall only 'restart' from the moment a mode is selected, effectively isolating UI transition animations from background state reconciliation.

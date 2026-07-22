@@ -7,6 +7,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,20 +17,25 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import javax.inject.Inject
+import javax.inject.Provider
+import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity, telemetry sync, and remote peer handling.
- * July.16.22:
- * - Issue #526: A15 Landing Page Hang. Offloaded initialization and loops to background dispatchers
- *   to prevent Main thread contention during cold start.
- * July.16.18:
- * - Issue #516: De-duplicate "Status" Logic. Updated pushCurrentStatus to include all health fields.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor and @Singleton.
+ * - Circularity Management: Migrated logManager to Provider<LogManager>.
+ * July.21.00:
+ * - Forensic Hardening: Expanded pushCurrentStatus to include SIT/Acoustic forensic fields.
+ * - Monotonic Rt Alignment: Standardized timing variables (lastValidFixRt, nowRt).
  */
-class ConnectivitySuite(
-    private val context: Context,
+@Singleton
+class ConnectivitySuite @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
     private val telemetryRepository: TelemetryRepository,
-    private val logManager: () -> LogManager,
+    private val logManagerProvider: Provider<LogManager>,
     private val timeProvider: TimeProvider,
     private val signalingProvider: SignalingProvider,
     private val sessionManager: SessionManager,
@@ -60,11 +66,10 @@ class ConnectivitySuite(
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
         Timber.e(throwable, "ConnectivitySuite CRITICAL error")
-        logManager().logServiceEvent("CRITICAL: ConnectivitySuite failure: ${throwable.message}", true)
+        logManagerProvider.get().logServiceEvent("CRITICAL: ConnectivitySuite failure: ${throwable.message}", true)
         restartLoops()
     }
 
-    // Issue #526: Moved internal scope to Dispatchers.Default to prevent UI hangs on cold start
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + suiteExceptionHandler)
     private var keepAliveJob: Job? = null
     private var syncJob: Job? = null
@@ -72,7 +77,7 @@ class ConnectivitySuite(
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
 
-    // Remote Peer State (Merged from RemoteHandler)
+    // Remote Peer State
     var isTrackerConnected = false
     var lastPeerActivityTs = 0L 
     var peerSignal = 0
@@ -81,7 +86,7 @@ class ConnectivitySuite(
 
     var trackerLat = 0.0; var trackerLng = 0.0; var trackerSpeed = 0.0; var trackerBearing = 0.0
     var trackerAccuracy = 0.0; var trackerMaxAccuracy = 0.0; var trackerLastGpsTs = 0L
-    var trackerLastValidFixRealtime = 0L; var trackerBattery = 0; var trackerTemp = 0.0
+    var trackerLastValidFixRt = 0L; var trackerBattery = 0; var trackerTemp = 0.0
     var trackerMaxTemp = 0.0; var trackerCurrentMa = 0; var trackerSatsView = 0; var trackerSatsUsed = 0
     var isTrackerCharging = false; var isTrackerJammerSuspicion = false; var isTrackerVisualJump = false
     var trackerJumpTier = 0; var trackerStatus = SentinelStatus.VALID
@@ -108,19 +113,19 @@ class ConnectivitySuite(
         override fun onAvailable(network: Network) {
             if (isStopped.get() || relayUrl.isEmpty()) return
             scope.launch {
-                val now = timeProvider.elapsedRealtime()
-                if (now - lastReconnectTs < 3000L || signalingProvider.isConnected()) return@launch
+                val nowRt = timeProvider.elapsedRealtime()
+                if (nowRt - lastReconnectTs < 3000L || signalingProvider.isConnected()) return@launch
                 if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) return@launch
 
-                logManager().logServiceEvent("Network Handover: Interface Available. Reconnecting.", false)
-                lastReconnectTs = now
+                logManagerProvider.get().logServiceEvent("Network Handover: Available. Reconnecting.", false)
+                lastReconnectTs = nowRt
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                 wakeUpRelay()
             }
         }
         override fun onLost(network: Network) {
             if (isStopped.get()) return
-            logManager().logServiceEvent("Network Handover: Interface Lost.", false)
+            logManagerProvider.get().logServiceEvent("Network Handover: Interface Lost.", false)
             telemetryRepository.updateRelayStatus(false)
         }
     }
@@ -137,15 +142,14 @@ class ConnectivitySuite(
 
         signalingProvider.setConnectionLostCallback {
             if (!isStopped.get() && relayUrl.isNotEmpty()) {
-                val now = timeProvider.elapsedRealtime()
-                if (now - lastReconnectTs > 10000L) {
-                    lastReconnectTs = now
+                val nowRt = timeProvider.elapsedRealtime()
+                if (nowRt - lastReconnectTs > 10000L) {
+                    lastReconnectTs = nowRt
                     wakeUpRelay()
                 }
             }
         }
 
-        // Issue #526: Offload initial connection to background to prevent cold start hang
         scope.launch {
             if (relayUrl.isNotEmpty() && SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
@@ -204,17 +208,17 @@ class ConnectivitySuite(
             conn.disconnect()
             consecutiveHttpFailures.set(0)
 
-            val now = timeProvider.elapsedRealtime()
+            val nowRt = timeProvider.elapsedRealtime()
             if (signalingProvider.isConnected()) {
-                if (now - signalingProvider.getLastRelayTrafficTs() > NET_REJOIN_THRESHOLD_MS) {
+                if (nowRt - signalingProvider.getLastRelayTrafficTs() > NET_REJOIN_THRESHOLD_MS) {
                     withContext(Dispatchers.Default) {
                         signalingProvider.updateIdentity(deviceId, viewerId, isTrackerMode, force = true)
                         wakeUpRelay()
                     }
                 }
-            } else if (now - lastReconnectTs > NET_REJOIN_THRESHOLD_MS) {
+            } else if (nowRt - lastReconnectTs > NET_REJOIN_THRESHOLD_MS) {
                 withContext(Dispatchers.Default) {
-                    lastReconnectTs = now
+                    lastReconnectTs = nowRt
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                     wakeUpRelay()
                 }
@@ -227,7 +231,7 @@ class ConnectivitySuite(
     private fun wakeUpRelay() {
         if (relayUrl.isEmpty() || isStopped.get()) return
         scope.launch(Dispatchers.IO) {
-            repeat(4) { attempt ->
+            repeat(4) {
                 try {
                     val conn = URL(relayUrl).openConnection() as HttpURLConnection
                     conn.connectTimeout = 30000; conn.readTimeout = 30000
@@ -271,7 +275,7 @@ class ConnectivitySuite(
                 jumpTier = 0, isJammer = false, isStalled = false, peakVibrationShock = 0.0, peakVibrationShockTs = 0L,
                 isTamperDetected = false, isPowerTamper = false, status = try { SentinelStatus.valueOf(entity.status) } catch(e: Exception) { SentinelStatus.VALID },
                 isLocationPending = false, locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE },
-                lastValidFixRealtime = entity.lastValidFixRealtime, isBatterySteepDischarge = entity.isBatterySteepDischarge,
+                lastValidFixRt = entity.lastValidFixRt, isBatterySteepDischarge = entity.isBatterySteepDischarge,
                 isCoolingModeActive = entity.isCoolingModeActive, battery = entity.battery, temp = entity.temp, isCharging = entity.isCharging,
                 trackerState = try { TrackerState.valueOf(entity.trackerState) } catch(e: Exception) { TrackerState.UNKNOWN },
                 isStorageLow = entity.isStorageLow, isStorageCritical = entity.isStorageCritical,
@@ -295,7 +299,7 @@ class ConnectivitySuite(
                     isBatterySteepDischarge = status.isBatterySteepDischarge, isCoolingModeActive = status.isCoolingModeActive,
                     isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical,
                     isPowerSaveMode = status.isPowerSaveMode, standbyBucket = status.standbyBucket,
-                    netInterface = status.netInterface, lastValidFixRealtime = status.lastValidFixRealtime,
+                    netInterface = status.netInterface, lastValidFixRt = status.lastValidFixRt,
                     locationPendingReason = status.locationPendingReason.name, trackerState = status.trackerState.name, status = status.status.name
                 ))
             }
@@ -320,11 +324,13 @@ class ConnectivitySuite(
         tiltDegrees: Double, acousticDb: Double, jumpTier: Int,
         isJammer: Boolean, isStalled: Boolean, peakShock: Double, peakShockTs: Long,
         luxBaseline: Double, acousticFloorDb: Double, adaptiveVibrationFloor: Double, proxIdx: Double, proximityCm: Double,
-        proximityDebounceMs: Long, vibrationRollingSum: Double,
+        proximityDebounceMs: Long, vibrationRollingSum: Double, micPending: Boolean,
         isTamperDetected: Boolean, isPowerTamper: Boolean,
-        receiptRealtime: Long, violationUptimeMs: Long, violationPercentage: Double,
+        isSitDetected: Boolean, isSitActive: Boolean, lastSitTs: Long,
+        receiptRt: Long, violationUptimeMs: Long, violationPercentage: Double,
+        verticalVelocity: Double, sitVz: Double, sitDz: Double, sitBaro: Double, sitTilt: Double, sitShock: Double,
         isClockRegression: Boolean, isLocationPending: Boolean, locationPendingReason: LocationPendingReason,
-        lastValidFixRealtime: Long, gnssDetail: GnssDetail?,
+        lastValidFixRt: Long, gnssDetail: GnssDetail?,
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
         batteryLevel: Int, batteryTemp: Double, isCharging: Boolean,
         trackerState: TrackerState = TrackerState.UNKNOWN,
@@ -333,7 +339,10 @@ class ConnectivitySuite(
         isStorageCritical: Boolean = false,
         isPowerSaveMode: Boolean = false,
         standbyBucket: Int = -1,
-        netInterface: String = "UNKNOWN"
+        netInterface: String = "UNKNOWN",
+        snrIdx: Double = 0.0,
+        tiltIdx: Double = 0.0,
+        baroIdx: Double = 0.0
     ) {
         val trackerStatus = TrackerStatus(
             deviceId = deviceId, viewerId = viewerId, ts = timeProvider.currentTimeMillis(),
@@ -348,12 +357,15 @@ class ConnectivitySuite(
             vibrationRollingSum = vibrationRollingSum, isTamperDetected = isTamperDetected, isPowerTamper = isPowerTamper,
             violationUptimeMs = violationUptimeMs, violationPercentage = violationPercentage, status = status,
             isClockRegression = isClockRegression, isLocationPending = isLocationPending,
-            locationPendingReason = locationPendingReason, lastValidFixRealtime = lastValidFixRealtime,
+            locationPendingReason = locationPendingReason, lastValidFixRt = lastValidFixRt,
             isBatterySteepDischarge = isBatterySteepDischarge, isCoolingModeActive = isCoolingModeActive,
             gnssDetail = gnssDetail, battery = batteryLevel, temp = batteryTemp, isCharging = isCharging,
             trackerState = trackerState,
             isStorageLow = isStorageLow, isStorageCritical = isStorageCritical,
-            isPowerSaveMode = isPowerSaveMode, standbyBucket = standbyBucket, netInterface = netInterface
+            isPowerSaveMode = isPowerSaveMode, standbyBucket = standbyBucket, netInterface = netInterface,
+            snrIdx = snrIdx, tiltIdx = tiltIdx, baroIdx = baroIdx,
+            micPending = micPending, isSitDetected = isSitDetected, isSitActive = isSitActive, lastSitTs = lastSitTs,
+            verticalVelocity = verticalVelocity, sitVz = sitVz, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock
         )
         sendTelemetry(trackerStatus)
     }
@@ -361,7 +373,6 @@ class ConnectivitySuite(
     private fun initializePeerState() {
         scope.launch {
             try {
-                // Issue #526: Use IO dispatcher for multiple repository fetches during cold start
                 val (luxBaseline, acousticFloor, trackerState) = withContext(Dispatchers.IO) {
                     Triple(
                         mainRepository.getDouble(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0),
@@ -390,11 +401,14 @@ class ConnectivitySuite(
                         sessionConnectedMs = s.sessionConnectedMs, lastConnTs = s.lastConnTs, lastDiscTs = s.lastDiscTs,
                         violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage,
                         isLocationPending = s.isLocationPending, locationPendingReason = s.locationPendingReason,
-                        lastValidFixRealtime = s.lastValidFixRealtime, isPowerSaveMode = s.isPowerSaveMode,
+                        lastValidFixRt = s.lastValidFixRt, isPowerSaveMode = s.isPowerSaveMode,
                         standbyBucket = s.standbyBucket, netInterface = s.netInterface, isStorageLow = s.isStorageLow,
                         isStorageCritical = s.isStorageCritical, gnssDetail = s.gnssDetail,
-                        isBatterySteepDischarge = s.isBatterySteepDischarge, isCoolingModeActive = s.isCoolingModeActive,
-                        trackerState = s.trackerState, ts = s.ts 
+                        isBatterySteepDischarge = this@ConnectivitySuite.isTrackerBatterySteepDischarge, isCoolingModeActive = this@ConnectivitySuite.isTrackerCoolingModeActive,
+                        trackerState = s.trackerState, ts = s.ts,
+                        snrIdx = s.snrIdx, tiltIdx = s.tiltIdx, baroIdx = s.baroIdx,
+                        isSitDetected = s.isSitDetected, isSitActive = s.isSitActive, lastSitTs = s.lastSitTs,
+                        verticalVelocity = s.verticalVelocity, sitVz = s.sitVz, sitDz = s.sitDz, sitBaro = s.sitBaro, sitTilt = s.sitTilt, sitShock = s.sitShock
                     ))
                 }
             } catch (e: Exception) { Timber.e(e, "Peer state init failed") }
@@ -421,7 +435,7 @@ class ConnectivitySuite(
         isTrackerCoolingModeActive = s.isCoolingModeActive; isTrackerPowerSaveMode = s.isPowerSaveMode
         trackerStandbyBucket = s.standbyBucket; trackerNetInterface = s.netInterface
         isTrackerStorageLow = s.isStorageLow; isTrackerStorageCritical = s.isStorageCritical
-        trackerState = s.trackerState; trackerLastValidFixRealtime = s.lastValidFixRealtime
+        trackerState = s.trackerState; trackerLastValidFixRt = s.lastValidFixRt
     }
 
     fun handleRemoteUpdate(data: JSONObject) {
@@ -432,7 +446,7 @@ class ConnectivitySuite(
         }
 
         val fromId = data.optString("id"); val fromViewerId = data.optString("viewer_id"); val fromViewer = data.optBoolean("from_viewer", false)
-        val now = timeProvider.currentTimeMillis(); val nowRealtime = timeProvider.elapsedRealtime()
+        val now = timeProvider.currentTimeMillis(); val nowRt = timeProvider.elapsedRealtime()
         val peerId = if (isTrackerMode) (if (fromViewerId.isNotEmpty()) fromViewerId else fromId) else fromId
 
         if (isTrackerMode && fromViewer && data.has("home_points")) {
@@ -443,7 +457,7 @@ class ConnectivitySuite(
                         val obj = array.getJSONObject(i); newList.add(org.osmdroid.util.GeoPoint(obj.getDouble("lat"), obj.getDouble("lng")))
                     }
                     mainRepository.saveHomePoints(newList, data.optDouble("max_dist", -1.0).takeIf { it > 0 }, data.optLong("settings_ts", 0L).takeIf { it > 0 })
-                    peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRealtime; mainRepository.updateRemoteActivity(now)
+                    peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRt; mainRepository.updateRemoteActivity(now)
                 } catch (e: Exception) { Timber.e(e, "Remote settings parse error") }
             }
             return
@@ -451,13 +465,13 @@ class ConnectivitySuite(
 
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
             if ((isTrackerMode && fromViewer) || (!isTrackerMode && !fromViewer)) {
-                peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRealtime; isTrackerConnected = !isTrackerMode; mainRepository.updateRemoteActivity(now)
+                peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRt; isTrackerConnected = !isTrackerMode; mainRepository.updateRemoteActivity(now)
             }
             return
         }
 
         if (isTrackerMode && fromViewer) {
-            peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRealtime; mainRepository.updateRemoteActivity(now); return
+            peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRt; mainRepository.updateRemoteActivity(now); return
         }
 
         if (!isTrackerMode && !fromViewer) {
@@ -465,7 +479,7 @@ class ConnectivitySuite(
             if (remoteTs > 0 && remoteTs < lastRemotePacketTs) return
             if (remoteTs > 0) lastRemotePacketTs = remoteTs
 
-            peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRealtime; isTrackerConnected = true; mainRepository.updateRemoteActivity(now)
+            peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRt; isTrackerConnected = true; mainRepository.updateRemoteActivity(now)
             peerSignal = data.optInt("signal", 0)
 
             val statusStr = data.optString("status", SentinelStatus.VALID.name)
@@ -474,9 +488,9 @@ class ConnectivitySuite(
             isTrackerPowerTamper = data.optBoolean("is_power_tamper", isTrackerPowerTamper)
             isTrackerLocationPending = data.optBoolean("is_location_pending", false)
             trackerLocationPendingReason = try { LocationPendingReason.valueOf(data.optString("location_pending_reason", "NONE")) } catch(e: Exception) { LocationPendingReason.NONE }
-            trackerLastValidFixRealtime = data.optLong("last_valid_fix_realtime", trackerLastValidFixRealtime)
-            isTrackerBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false)
-            isTrackerCoolingModeActive = data.optBoolean("is_cooling_mode_active", false)
+            trackerLastValidFixRt = data.optLong("last_valid_fix_rt", trackerLastValidFixRt)
+            this.isTrackerBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false)
+            this.isTrackerCoolingModeActive = data.optBoolean("is_cooling_mode_active", false)
             isTrackerPowerSaveMode = data.optBoolean("is_power_save_mode", isTrackerPowerSaveMode)
             trackerStandbyBucket = data.optInt("standard_bucket", trackerStandbyBucket)
             trackerNetInterface = data.optString("net_interface", trackerNetInterface)
@@ -508,12 +522,12 @@ class ConnectivitySuite(
                     satsUsed = data.optInt("sats_used", trackerSatsUsed), isViewerTrail = false, lastGpsTs = trackerLastGpsTs,
                     providedMaxAccuracy = rawMaxAcc, providedJumpTier = data.optInt("jump_tier", 0), providedIsJammer = data.optBoolean("is_jammer", false),
                     providedIsStalled = data.optBoolean("is_stalled", false), providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending || trackerStatus == SentinelStatus.TAMPER,
-                    nowWall = now, nowRealtime = nowRealtime
+                    nowWall = now, nowRt = nowRt
                 )
                 isTrackerClockRegression = processed.isClockRegression
                 if (processed.optimizedPoint.lat != 0.0 && processed.optimizedPoint.lng != 0.0) {
                     trackerLat = processed.optimizedPoint.lat; trackerLng = processed.optimizedPoint.lng; trackerLastGpsTs = processed.optimizedPoint.ts; lastPeerGpsTs = trackerLastGpsTs
-                    if (!processed.isStalled) trackerLastValidFixRealtime = nowRealtime
+                    if (!processed.isStalled) trackerLastValidFixRt = nowRt
                 }
                 trackerSpeed = processed.filteredSpeed; trackerBearing = rawBearing
                 if (rawAcc > 0.0) trackerAccuracy = rawAcc
@@ -540,7 +554,7 @@ class ConnectivitySuite(
             locationProcessor.sentinel.updateSensorState(
                 vibration = trackerVibration, heading = trackerHeading, baroAlt = trackerBaroAlt, lux = trackerLux, isNear = isTrackerNear,
                 powerTamper = isTrackerPowerTamper, tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb, peakShock = trackerPeakVibrationShock,
-                acousticMinDb = -1.0, nowRealtime = nowRealtime, nowWall = now
+                acousticMinDb = -1.0, nowRt = nowRt, nowTs = now
             )
 
             trackerUptimeMs = data.optLong("uptime_ms", trackerUptimeMs); trackerTotalDropMs = data.optLong("total_drop_ms", trackerTotalDropMs)
@@ -549,7 +563,7 @@ class ConnectivitySuite(
             trackerLastConnTs = data.optLong("last_conn_ts", trackerLastConnTs); trackerLastDiscTs = data.optLong("last_disc_ts", trackerLastDiscTs)
             
             val violationUptimeMs = data.optLong("violation_uptime_ms", 0L); val violationPercentage = data.optDouble("violation_percentage", 0.0)
-            if (data.optBoolean("is_stalled", false) && trackerGpsStallStartTs == 0L) trackerGpsStallStartTs = nowRealtime else if (!data.optBoolean("is_stalled", false)) trackerGpsStallStartTs = 0L
+            if (data.optBoolean("is_stalled", false) && trackerGpsStallStartTs == 0L) trackerGpsStallStartTs = nowRt else if (!data.optBoolean("is_stalled", false)) trackerGpsStallStartTs = 0L
 
             scope.launch {
                 try {
@@ -560,10 +574,12 @@ class ConnectivitySuite(
                         status = trackerStatus, isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
                         violationUptimeMs = violationUptimeMs, violationPercentage = violationPercentage, isClockRegression = isTrackerClockRegression,
                         isLocationPending = isTrackerLocationPending, locationPendingReason = trackerLocationPendingReason,
-                        lastValidFixRealtime = trackerLastValidFixRealtime, isPowerSaveMode = isTrackerPowerSaveMode, standbyBucket = trackerStandbyBucket,
+                        lastValidFixRt = trackerLastValidFixRt, isPowerSaveMode = isTrackerPowerSaveMode, standbyBucket = trackerStandbyBucket,
                         netInterface = trackerNetInterface, isStorageLow = isTrackerStorageLow, isStorageCritical = isTrackerStorageCritical,
-                        gnssDetail = trackerLocationDetail, isBatterySteepDischarge = isTrackerBatterySteepDischarge, isCoolingModeActive = isTrackerCoolingModeActive,
-                        trackerState = trackerState, ts = now
+                        gnssDetail = trackerLocationDetail, isBatterySteepDischarge = this@ConnectivitySuite.isTrackerBatterySteepDischarge, isCoolingModeActive = this@ConnectivitySuite.isTrackerCoolingModeActive,
+                        trackerState = trackerState, ts = now, snrIdx = data.optDouble("snr_idx", 0.0),
+                        tiltIdx = data.optDouble("tilt_idx", 0.0), baroIdx = data.optDouble("baro_idx", 0.0),
+                        isSitDetected = data.optBoolean("is_sit_detected", false), lastSitTs = data.optLong("last_sit_ts", 0L)
                     )
                     mainRepository.updateLocation(locationUpdate)
                     mainRepository.saveTrackerState(TrackerStatus(
@@ -579,10 +595,12 @@ class ConnectivitySuite(
                         adaptiveVibrationFloor = trackerAdaptiveVibrationFloor, proxIdx = trackerProxIdx, proximityCm = trackerProximityCm,
                         proximityDebounceMs = trackerProximityDebounceMs, vibrationRollingSum = trackerVibrationRollingSum, status = trackerStatus, 
                         isTamperDetected = isTrackerTamperDetected, jumpTier = trackerJumpTier, isLocationPending = isTrackerLocationPending,
-                        locationPendingReason = trackerLocationPendingReason, lastValidFixRealtime = trackerLastValidFixRealtime,
+                        locationPendingReason = trackerLocationPendingReason, lastValidFixRt = trackerLastValidFixRt,
                         isPowerSaveMode = isTrackerPowerSaveMode, standbyBucket = trackerStandbyBucket, netInterface = trackerNetInterface,
                         isStorageLow = isTrackerStorageLow, isStorageCritical = isTrackerStorageCritical, gnssDetail = trackerLocationDetail,
-                        isBatterySteepDischarge = isTrackerBatterySteepDischarge, isCoolingModeActive = isTrackerCoolingModeActive, trackerState = trackerState
+                        isBatterySteepDischarge = this@ConnectivitySuite.isTrackerBatterySteepDischarge, isCoolingModeActive = this@ConnectivitySuite.isTrackerCoolingModeActive, trackerState = trackerState,
+                        snrIdx = data.optDouble("snr_idx", 0.0), tiltIdx = data.optDouble("tilt_idx", 0.0), baroIdx = data.optDouble("baro_idx", 0.0),
+                        isSitDetected = data.optBoolean("is_sit_detected", false), lastSitTs = data.optLong("last_sit_ts", 0L)
                     ))
                 } catch (e: Exception) { Timber.e(e, "Peer DB update failed") }
             }
@@ -590,8 +608,8 @@ class ConnectivitySuite(
     }
 
     private fun handleRemoteLog(entry: LogEntry) {
-        val now = timeProvider.currentTimeMillis(); val nowRealtime = timeProvider.elapsedRealtime()
-        lastPeerActivityTs = nowRealtime; mainRepository.updateRemoteActivity(now)
+        val now = timeProvider.currentTimeMillis(); val nowRt = timeProvider.elapsedRealtime()
+        lastPeerActivityTs = nowRt; mainRepository.updateRemoteActivity(now)
     }
 
     fun onRelayLost() { isTrackerConnected = false }
@@ -606,7 +624,7 @@ class ConnectivitySuite(
         trackerAcousticDb = 0.0; trackerPeakVibrationShock = 0.0; trackerPeakVibrationShockTs = 0L; trackerLuxBaseline = 0.0; trackerAcousticFloorDb = 0.0
         trackerAdaptiveVibrationFloor = 0.12; trackerProxIdx = 1.0; trackerProximityCm = -1.0; trackerProximityDebounceMs = 0L; trackerVibrationRollingSum = 0.0
         trackerUptimeMs = 0L; trackerTotalDropMs = 0L; trackerMaxDropMs = 0L; trackerMaxDropTs = 0L; trackerTotalConnectedMs = 0L
-        trackerSessionConnectedMs = 0L; trackerLastConnTs = 0L; trackerLastDiscTs = 0L; trackerGpsStallStartTs = 0L; trackerLastValidFixRealtime = 0L
+        trackerSessionConnectedMs = 0L; trackerLastConnTs = 0L; trackerLastDiscTs = 0L; trackerGpsStallStartTs = 0L; trackerLastValidFixRt = 0L
         isTrackerClockRegression = false; isTrackerLocationPending = false; trackerLocationPendingReason = LocationPendingReason.NONE; trackerLocationDetail = null
         isTrackerBatterySteepDischarge = false; isTrackerCoolingModeActive = false; isTrackerPowerSaveMode = false; trackerStandbyBucket = -1
         trackerNetInterface = "UNKNOWN"; isTrackerStorageLow = false; isTrackerStorageCritical = false; trackerState = TrackerState.UNKNOWN

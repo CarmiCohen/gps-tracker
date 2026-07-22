@@ -3,6 +3,7 @@ package com.gps19.app
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -11,15 +12,21 @@ import timber.log.Timber
 import java.util.UUID
 import kotlin.math.abs
 import com.gps19.core.engine.TimeProvider
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Manual dependency injection.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor and @Singleton.
+ * July.21.00:
+ * - Issue #104: Unified pruning logic using proactivePruning for both startup and reactive maintenance.
+ * - Maintained Hilt compatibility as per hardened Golden Master architecture.
  */
-class LogRepository(
+@Singleton
+class LogRepository @Inject constructor(
     private val logDao: LogDao,
-    private val scope: CoroutineScope,
+    @ApplicationScope private val scope: CoroutineScope,
     private val timeProvider: TimeProvider
 ) {
     private val logMutex = Mutex()
@@ -54,12 +61,9 @@ class LogRepository(
                 vibeSnapshot = it.vibeSnapshot
             ) 
         }
-    }
+    }.flowOn(Dispatchers.Default)
 
     fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
-        // Issue #503: Storage-critical suppression logic moved to LogManager or 
-        // delegated back if needed. For now, maintaining core persistence logic.
-        
         scope.launch(Dispatchers.IO) {
             logMutex.withLock {
                 try {
@@ -76,7 +80,7 @@ class LogRepository(
                             isSpecial = entry.isSpecial,
                             specialColor = entry.specialColor,
                             role = entry.role,
-                            synced = initiallySynced, // Update sync status if requested
+                            synced = initiallySynced,
                             lat = entry.lat,
                             lng = entry.lng,
                             accuracy = entry.accuracy,
@@ -107,7 +111,7 @@ class LogRepository(
                                 extremeValue = newExtreme,
                                 timestamp = entry.timestamp,
                                 message = entry.message,
-                                synced = initiallySynced, // Reset/update sync status on merge
+                                synced = initiallySynced,
                                 lat = entry.lat,
                                 lng = entry.lng,
                                 accuracy = entry.accuracy,
@@ -147,12 +151,26 @@ class LogRepository(
                     if (logWriteCount >= DB_PRUNE_THRESHOLD) {
                         logWriteCount = 0
                         if (logDao.getCount() > 1000) {
-                            logDao.pruneLogs()
+                            logDao.deepPruneLogs()
                         }
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "Error adding log to database")
                 }
+            }
+        }
+    }
+
+    /**
+     * Executes a deep prune of the log table.
+     */
+    suspend fun proactivePruning() {
+        logMutex.withLock {
+            try {
+                logDao.deepPruneLogs()
+                Timber.d("Proactive pruning completed.")
+            } catch (e: Exception) {
+                Timber.e(e, "Error during proactive pruning")
             }
         }
     }

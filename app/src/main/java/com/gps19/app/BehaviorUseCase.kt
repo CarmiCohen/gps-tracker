@@ -1,13 +1,18 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
+import javax.inject.Inject
 
 /**
  * BehaviorUseCase: Logic for determining high-level behavioral states and UI visibility gates.
- * v9.5.0:
- * - Issue #503: Hilt Removal.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor.
+ * July.21.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
+ *   parameter naming to 'nowRt'.
+ * - Maintained Hilt compatibility as per hardened Golden Master architecture.
  */
-class BehaviorUseCase {
+class BehaviorUseCase @Inject constructor() {
 
     fun computeTrackerState(
         currentState: MainUiState,
@@ -50,8 +55,8 @@ class BehaviorUseCase {
 
     fun shouldShowRedScreen(
         currentState: MainUiState,
-        nowRealtime: Long,
-        lastAckRealtime: Long,
+        nowRt: Long,
+        lastAckRt: Long,
         currentVisible: Boolean
     ): Boolean {
         // R872: No visual alerts (red screen) in tracker mode.
@@ -61,7 +66,7 @@ class BehaviorUseCase {
         if (!hasAlertToDisplay) return false
 
         // Use monotonic time for lockout to survive system clock jumps
-        val lockoutActive = (nowRealtime - lastAckRealtime < ALARM_OVERLAY_THROTTLE_MS)
+        val lockoutActive = (nowRt - lastAckRt < ALARM_OVERLAY_THROTTLE_MS)
         
         return if (!lockoutActive || currentState.isNewViolationDetected) {
             true

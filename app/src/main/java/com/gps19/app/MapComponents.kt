@@ -47,15 +47,18 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * July.1.16:
- * - Issue #515: Stationary Anchor Removal.
+ * July.21.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized all monotonic 
+ *   timestamps to use 'Rt' suffix.
+ * - Aligned with SystemHealthState for forensic metadata (Location Pending, Last Valid Fix).
+ * - Simplified LocationState usage to pure position data.
  */
 
 @Composable
 fun AppMapContainer(
     uiState: MainUiState,
     systemPulse: Long,
-    systemPulseRealtime: Long,
+    systemPulseRt: Long,
     onEvent: (UiEvent) -> Unit,
     onClearTrails: () -> Unit,
     trail: List<TrailPoint>,
@@ -92,14 +95,14 @@ fun AppMapContainer(
     val trackerLat = trackerLoc.lat; val trackerLng = trackerLoc.lng
     val trackerBearing = trackerLoc.bearing; val trackerAccuracy = trackerLoc.accuracy
     val trackerMaxAcc = trackerLoc.maxAccuracy; val trackerSpeed = trackerLoc.speed
-    val trackerLastValidFixRealtime = trackerHealth.lastValidFixRealtime
+    val trackerLastValidFixRt = trackerHealth.lastValidFixRt
     val trackerLocationPending = trackerHealth.isLocationPending
     val trackerLocationPendingReason = trackerHealth.locationPendingReason
 
     val viewerLat = viewerLoc.lat; val viewerLng = viewerLoc.lng
     val viewerBearing = viewerLoc.bearing; val viewerAccuracy = viewerLoc.accuracy
     val viewerMaxAcc = viewerLoc.maxAccuracy; val viewerSpeed = viewerLoc.speed
-    val viewerLastValidFixRealtime = viewerHealth.lastValidFixRealtime
+    val viewerLastValidFixRt = viewerHealth.lastValidFixRt
     val viewerLocationPending = viewerHealth.isLocationPending
     val viewerLocationPendingReason = viewerHealth.locationPendingReason
 
@@ -122,9 +125,9 @@ fun AppMapContainer(
             accuracy = trackerAccuracy, maxAcc = trackerMaxAcc, speed = trackerSpeed, myAccuracy = viewerAccuracy, myMaxAcc = viewerMaxAcc, mySpeed = viewerSpeed,
             initialCenter = initialCenter, centeringTrackerTrigger = uiState.centeringTrackerTrigger, centeringViewerTrigger = uiState.centeringViewerTrigger,
             zoomInTrigger = uiState.zoomInTrigger, zoomOutTrigger = uiState.zoomOutTrigger, lastGpsTs = trackerLoc.timestamp, isTrackerMode = isTrackerMode,
-            isLocked = uiState.isMapLocked, mapFollowMode = uiState.mapFollowMode, onLockChange = { onLockChangeInternal(it, onEvent) }, mapViewRef = mapViewRef, geofenceMode = uiState.geofenceMode,
-            systemPulse = now, systemPulseRealtime = systemPulseRealtime, isLocationPending = trackerLocationPending, locationPendingReason = trackerLocationPendingReason,
-            lastValidFixRealtime = trackerLastValidFixRealtime, isMeLocationPending = viewerLocationPending, meLocationPendingReason = viewerLocationPendingReason, meLastValidFixRealtime = viewerLastValidFixRealtime
+            isLocked = uiState.isMapLocked, mapFollowMode = uiState.mapFollowMode, onLockChange = { onEvent(UiEvent.SetMapLocked(it)) }, mapViewRef = mapViewRef, geofenceMode = uiState.geofenceMode,
+            systemPulse = now, systemPulseRt = systemPulseRt, isLocationPending = trackerLocationPending, locationPendingReason = trackerLocationPendingReason,
+            lastValidFixRt = trackerLastValidFixRt, isMeLocationPending = viewerLocationPending, meLocationPendingReason = viewerLocationPendingReason, meLastValidFixRt = viewerLastValidFixRt
         )
 
         Text(text = BuildConfig.VERSION_NAME, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 4.dp, bottom = 2.dp).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(2.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
@@ -155,10 +158,6 @@ fun AppMapContainer(
     }
 }
 
-private fun onLockChangeInternal(locked: Boolean, onEvent: (UiEvent) -> Unit) {
-    onEvent(UiEvent.SetMapLocked(locked))
-}
-
 @Composable
 fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     val purple = Color(0xFF800080); val backgroundColor = if (isMapButtonsVisible) purple.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.85f)
@@ -184,13 +183,13 @@ fun OsmMap(
     mapViewRef: MutableState<MapView?> = remember { mutableStateOf(null) },
     geofenceMode: GeofenceMode = GeofenceMode.IDLE,
     systemPulse: Long = 0L,
-    systemPulseRealtime: Long = 0L,
+    systemPulseRt: Long = 0L,
     isLocationPending: Boolean = false,
     locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    lastValidFixRealtime: Long = 0L,
+    lastValidFixRt: Long = 0L,
     isMeLocationPending: Boolean = false,
     meLocationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    meLastValidFixRealtime: Long = 0L
+    meLastValidFixRt: Long = 0L
 ) {
     val context = LocalContext.current; val resources = remember(context) { context.resources }
     val currentOnTap by rememberUpdatedState(onTap); val currentOnRemoveMarker by rememberUpdatedState(onRemoveMarker); val currentGeofenceMode by rememberUpdatedState(geofenceMode)
@@ -369,7 +368,7 @@ fun OsmMap(
             val baseAcc = if (maxAcc > 0.0) maxAcc else accuracy
             if (baseAcc > 0.0) {
                 trackerCircleRef.value?.let { p ->
-                    val drift = if (isLocationPending && lastValidFixRealtime > 0) baseAcc + (if (speed > 1.0) speed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRealtime - lastValidFixRealtime) / 1000.0) else baseAcc
+                    val drift = if (isLocationPending && lastValidFixRt > 0) baseAcc + (if (speed > 1.0) speed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRt - lastValidFixRt) / 1000.0) else baseAcc
                     p.points = Polygon.pointsAsCircle(GeoPoint(lat, lng), drift).map { GeoPoint(it.latitude, it.longitude) }
                     p.outlinePaint.color = if (isFresh) BrandJd.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb(); accuracyCirclesFolderRef.value?.add(p)
                 }
@@ -382,7 +381,7 @@ fun OsmMap(
             val baseMyAcc = if (myMaxAcc > 0.0) myMaxAcc else myAccuracy!!
             if (baseMyAcc > 0.0) {
                 viewerCircleRef.value?.let { p ->
-                    val drift = if (isMeLocationPending && meLastValidFixRealtime > 0) baseMyAcc + (if (mySpeed > 1.0) mySpeed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRealtime - meLastValidFixRealtime) / 1000.0) else baseMyAcc
+                    val drift = if (isMeLocationPending && meLastValidFixRt > 0) baseMyAcc + (if (mySpeed > 1.0) mySpeed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRt - meLastValidFixRt) / 1000.0) else baseMyAcc
                     p.points = Polygon.pointsAsCircle(GeoPoint(myLat!!, myLng!!), drift).map { GeoPoint(it.latitude, it.longitude) }
                     p.outlinePaint.color = if (isMeFresh) ViewerCyan.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb(); accuracyCirclesFolderRef.value?.add(p)
                 }

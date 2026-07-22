@@ -10,8 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * July.16.18:
- * - Issue #516: De-duplicate "Status" Logic. Purged IntegrityState, simplified LocationState.
+ * July.21.00:
+ * - Forensic Hardening: Added missing indices (SNR, NOI, LUX, VIB, SIT) to ConnectionPoint and TrackerStatus.
+ * - Monotonic Rt: Standardized all timestamps to use 'Rt' suffix.
  */
 
 @Serializable
@@ -83,7 +84,21 @@ data class ConnectionPoint(
     val speed: Double = 0.0, val bearing: Double = 0.0,
     val currentMa: Int = 0,
     val status: SentinelStatus = SentinelStatus.VALID,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    
+    // Forensic Indices
+    val gpsIndex: Double = 0.0,
+    val snrIdx: Double = 0.0,
+    val noiseIdx: Double = 0.0,
+    val luxIdx: Double = 0.0,
+    val vibeIdx: Double = 0.0,
+    val proxIdx: Double = 1.0,
+    val liftIdx: Double = 0.0,
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
+    val isSitActive: Boolean = false,
+    val sitVz: Double = 0.0,
+    val sitDz: Double = 0.0
 )
 
 data class ViolationPoint(
@@ -183,6 +198,7 @@ data class TrackerStatus(
     val maxAccuracy: Double = 0.0,
     override val gpsTs: Long = 0L,
     override val ts: Long = 0L,
+    override val rt: Long = 0L, 
     val uptimeMs: Long = 0L,
     val lastConnTs: Long = 0L,
     val lastDiscTs: Long = 0L,
@@ -225,7 +241,7 @@ data class TrackerStatus(
     val jumpTier: Int = 0,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRealtime: Long = 0L,
+    val lastValidFixRt: Long = 0L,
     val isPowerSaveMode: Boolean = false, 
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",
@@ -234,73 +250,54 @@ data class TrackerStatus(
     val gnssDetail: GnssDetail? = null,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val trackerState: TrackerState = TrackerState.UNKNOWN
+    val trackerState: TrackerState = TrackerState.UNKNOWN,
+    val snrIdx: Double = 0.0,
+    val isAnchorLocked: Boolean = false,
+    val isSitDetected: Boolean = false,
+    val isSitActive: Boolean = false,
+    val lastSitTs: Long = 0L,
+    val verticalVelocity: Double = 0.0,
+    val sitVz: Double = 0.0, val sitDz: Double = 0.0,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0,
+    val isJump: Boolean = false,
+    val isTrajectoryPromoted: Boolean = false,
+    val isSuspicious: Boolean = false,
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
+    val micPending: Boolean = false
 ) : SpatialAnchor {
     fun toJSONObject(fromViewer: Boolean): JSONObject {
         return JSONObject().apply {
             put("id", SignalingConstants.getTransmissionId(deviceId))
             put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
             put("from_viewer", fromViewer)
-            put("lat", lat)
-            put("lng", lng)
-            put("alt", alt)
-            put("speed", speed)
-            put("bearing", bearing)
-            put("accuracy", accuracy)
-            put("max_accuracy", maxAccuracy)
-            put("gps_ts", gpsTs)
-            put("ts", ts)
-            put("uptime_ms", uptimeMs)
-            put("last_conn_ts", lastConnTs)
-            put("last_disc_ts", lastDiscTs)
-            put("total_drop_ms", totalDropMs)
-            put("max_drop_ms", maxDropMs)
-            put("max_drop_ts", maxDropTs)
-            put("total_connected_ms", totalConnectedMs)
-            put("session_connected_ms", sessionConnectedMs)
-            put("battery", battery)
-            put("temp", temp)
-            put("max_temp", maxTemp)
-            put("is_charging", isCharging)
-            put("current_ma", currentMa)
-            put("sats_view", satsView)
-            put("sats_used", satsUsed)
-            put("peak_vibration_shock", peakVibrationShock)
-            put("peak_shock_ts", peakVibrationShockTs)
+            put("lat", lat); put("lng", lng); put("alt", alt)
+            put("speed", speed); put("bearing", bearing); put("accuracy", accuracy); put("max_accuracy", maxAccuracy)
+            put("gps_ts", gpsTs); put("ts", ts); put("rt", rt)
+            put("uptime_ms", uptimeMs); put("last_conn_ts", lastConnTs); put("last_disc_ts", lastDiscTs)
+            put("total_drop_ms", totalDropMs); put("max_drop_ms", maxDropMs); put("max_drop_ts", maxDropTs)
+            put("total_connected_ms", totalConnectedMs); put("session_connected_ms", sessionConnectedMs)
+            put("battery", battery); put("temp", temp); put("max_temp", maxTemp)
+            put("is_charging", isCharging); put("current_ma", currentMa)
+            put("sats_view", satsView); put("sats_used", satsUsed)
+            put("peak_vibration_shock", peakVibrationShock); put("peak_shock_ts", peakVibrationShockTs)
             put("is_power_tamper", isPowerTamper)
-            put("violation_uptime_ms", violationUptimeMs)
-            put("violation_percentage", violationPercentage)
-            put("status", status.name)
-            put("is_jammer", isJammer)
-            put("is_stalled", isStalled)
-            put("is_tamper_detected", isTamperDetected)
-            put("vibration", vibration)
-            put("heading", heading)
-            put("tilt_degrees", tiltDegrees)
-            put("acoustic_db", acousticDb)
-            put("baro_alt", baroAlt)
-            put("lux", lux)
-            put("is_near", isNear)
-            put("lux_baseline", luxBaseline)
-            put("acoustic_floor_db", acousticFloorDb)
-            put("adaptiveVibrationFloor", adaptiveVibrationFloor)
-            put("prox_idx", proxIdx)
-            put("proximity_cm", proximityCm)
-            put("proximity_debounce_ms", proximityDebounceMs)
-            put("vibration_rolling_sum", vibrationRollingSum)
-            put("is_clock_regression", isClockRegression)
-            put("jump_tier", jumpTier)
-            put("is_location_pending", isLocationPending)
-            put("location_pending_reason", locationPendingReason.name)
-            put("last_valid_fixRealtime", lastValidFixRealtime)
-            put("is_power_save_mode", isPowerSaveMode)
-            put("standby_bucket", standbyBucket)
-            put("net_interface", netInterface)
-            put("is_storage_low", isStorageLow)
-            put("is_storage_critical", isStorageCritical)
-            put("is_battery_steep_discharge", isBatterySteepDischarge)
-            put("is_cooling_modeActive", isCoolingModeActive)
-            put("tracker_state", trackerState.name)
+            put("violation_uptime_ms", violationUptimeMs); put("violation_percentage", violationPercentage)
+            put("status", status.name); put("is_jammer", isJammer); put("is_stalled", isStalled); put("is_tamper_detected", isTamperDetected)
+            put("vibration", vibration); put("heading", heading); put("tilt_degrees", tiltDegrees)
+            put("acoustic_db", acousticDb); put("baro_alt", baroAlt); put("lux", lux); put("is_near", isNear)
+            put("lux_baseline", luxBaseline); put("acoustic_floor_db", acousticFloorDb); put("adaptiveVibrationFloor", adaptiveVibrationFloor)
+            put("prox_idx", proxIdx); put("proximity_cm", proximityCm); put("proximity_debounce_ms", proximityDebounceMs)
+            put("vibration_rolling_sum", vibrationRollingSum); put("is_clock_regression", isClockRegression)
+            put("jump_tier", jumpTier); put("is_location_pending", isLocationPending); put("location_pending_reason", locationPendingReason.name)
+            put("last_valid_fix_rt", lastValidFixRt); put("is_power_save_mode", isPowerSaveMode)
+            put("standby_bucket", standbyBucket); put("net_interface", netInterface)
+            put("is_storage_low", isStorageLow); put("is_storage_critical", isStorageCritical)
+            put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_mode_active", isCoolingModeActive)
+            put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
+            put("is_jump", isJump); put("mic_pending", micPending)
         }
     }
 
@@ -333,7 +330,6 @@ data class TrackerStatus(
             .setState(mapTrackerStateToProto(trackerState))
             .setIsLocationPending(isLocationPending)
             .setPendingReason(mapPendingReasonToProto(locationPendingReason))
-            .setLastValidFixRealtime(lastValidFixRealtime)
             .setIsBatterySteepDischarge(isBatterySteepDischarge)
             .setIsCoolingModeActive(isCoolingModeActive)
             .build()
@@ -486,6 +482,7 @@ sealed class UiEvent {
     data class SetAppMode(val mode: String?) : UiEvent()
     data class SetPendingMode(val mode: String?) : UiEvent()
     data class SetSystemActive(val active: Boolean) : UiEvent()
+    data class SetSystemMode(val mode: String) : UiEvent()
     data class StopSiren(val causes: String? = null) : UiEvent()
     object ResetStats : UiEvent()
     object ClearLogs : UiEvent()

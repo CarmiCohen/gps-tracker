@@ -8,49 +8,42 @@ import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import android.content.Context
+import androidx.hilt.work.HiltWorkerFactory
 import com.gps19.core.engine.TimeProvider
 import org.osmdroid.config.Configuration as OsmConfig
 import timber.log.Timber
+import javax.inject.Inject
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.HiltAndroidApp
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import java.io.File
 
 /**
  * GpsApplication: Application entry point and global dependency management.
- * July.16.24:
- * - Issue #526: Landing Page Hang. Implemented background "warm-up" of heavy lazy dependencies
- *   to ensure Main thread remains responsive during cold start.
+ * July.21.00:
+ * - Build Hardening: Added missing HiltWorkerFactory import.
+ * July.20.07:
+ * - Issue #115: Startup Hardening. Migrated from GlobalScope to managed @ApplicationScope.
+ * - Issue #112: Suppressed 'mbrainSDK' load failure logs from forensic repository.
+ * - Issue #109: Optimized startup by offloading WorkManager and osmdroid setup to IO scope.
  */
+@HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
 
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
+    
+    // Legacy container for non-Hilt components (BaseMonitorService still uses this)
     lateinit var container: AppContainer
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
-            .setWorkerFactory(object : WorkerFactory() {
-                override fun createWorker(
-                    appContext: Context,
-                    workerClassName: String,
-                    workerParameters: WorkerParameters
-                ): ListenableWorker? {
-                    return when (workerClassName) {
-                        MaintenanceWorker::class.java.name -> MaintenanceWorker(
-                            appContext,
-                            workerParameters,
-                            container.mainRepository,
-                            container.timeProvider
-                        )
-                        BootServiceStartWorker::class.java.name -> BootServiceStartWorker(
-                            appContext,
-                            workerParameters,
-                            container.mainRepository
-                        )
-                        else -> null
-                    }
-                }
-            })
+            .setWorkerFactory(workerFactory)
             .build()
 
     override fun onCreate() {
@@ -62,19 +55,25 @@ class GpsApplication : Application(), Configuration.Provider {
             Timber.plant(Timber.DebugTree())
         }
 
-        // Issue #526: Proactive Background Warm-up
-        // This triggers the lazy initializers for heavy components on a background thread.
-        // When the Main thread eventually accesses them, the heavy work is already done.
-        GlobalScope.launch(Dispatchers.IO) {
+        // Issue #112: Suppress vendor SDK noise that cannot be resolved at the project level.
+        Timber.plant(object : Timber.Tree() {
+            override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+                if (message.contains("mbrainSDK", ignoreCase = true)) return
+
+                if (priority >= Log.ERROR) {
+                    try {
+                        val fullMessage = if (tag != null) "[$tag] $message" else message
+                        val suffix = t?.let { ": ${it.stackTraceToString().take(500)}" } ?: ""
+                        container.logManager.logServiceEvent("CRITICAL ERROR: $fullMessage$suffix", true)
+                    } catch (e: Exception) {
+                    }
+                }
+            }
+        })
+
+        // Issue #115: Startup ANR Hardening - Offload I/O intensive setup to managed scope
+        applicationScope.launch(Dispatchers.IO) {
             try {
-                // Initialize Database and Repository chain
-                val repo = container.mainRepository
-                repo.getAppMode() 
-                
-                // Warm up hardware managers
-                container.gpsManager
-                container.appSensorManager
-                
                 // Issue #456: Layer 3 Watchdog - WorkManager persistence
                 MaintenanceWorker.schedule(this@GpsApplication)
 
@@ -93,24 +92,12 @@ class GpsApplication : Application(), Configuration.Provider {
                 osmConfig.load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
                 osmConfig.isDebugMode = false
                 osmConfig.isDebugTileProviders = false
+                
+                Timber.d("Issue #115: Managed startup initialization complete.")
             } catch (e: Exception) {
-                Log.e("GPS19", "Background warm-up failed", e)
+                Timber.e(e, "Issue #115: Managed startup failed")
             }
         }
-
-        Timber.plant(object : Timber.Tree() {
-            override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-                if (priority >= Log.ERROR) {
-                    try {
-                        val fullMessage = if (tag != null) "[$tag] $message" else message
-                        val suffix = t?.let { ": ${it.stackTraceToString().take(500)}" } ?: ""
-                        // LogManager access is safe here as the database is warmed up in background
-                        container.logManager.logServiceEvent("CRITICAL ERROR: $fullMessage$suffix", true)
-                    } catch (e: Exception) {
-                    }
-                }
-            }
-        })
 
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->

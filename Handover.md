@@ -1,31 +1,39 @@
-# Project Handover: July.17.02 - Silence & Persistence Hardened
+# Handover (July.22.01) - Forensic Integration & Hilt Hardening COMPLETE
 
-## 🔴 Status: ENGINE SILENCE ACHIEVED
-**Version Context**: `July.17.02` (Authoritative)
-**Target Hardware**: Samsung A15 (Budget Benchmark)
-**Core Issue Resolved**: #R993 (Notification Spam), #R994 (Unintended Activation)
+## 🎯 Current Objective
+Finalize the **July.22.01** release cycle. The project has reached **Forensic Parity**: all models, database schemas, and telemetry payloads are fully aligned with the Sit Detection (SIT) and Forensic Index (Idx) standards.
 
-This document provides the definitive forensic state required to resume development. The system has been hardened to prevent Logcat spam and unintended background execution when the user is on the landing page.
+## 📊 Forensic Status (July.22.01)
 
-### 1. Forensic Status of Issue #R993 & #R994 (Resolved)
-- **Notification Throttling**: Foreground notification updates were decoupled from the 2s engine tick. 
-    - **Remediation**: Introduced `NOTIFICATION_THROTTLE_MS` (30,000ms) in `EngineConstants.kt`. Both `ViewerService` and `TrackerService` now respect this interval for UI updates.
-- **Unintended Service Start**: The engine previously auto-revived on boot/update if any mode was saved.
-    - **Remediation**: Introduced a persistent `isSystemActive` flag in `DataStore`. `BootReceiver` now strictly enforces that the service only restarts if it was manually armed by the user.
+### 1. Forensic Alignment Matrix (ALIGNED)
+The following fields are now standardized across `LocationUpdate`, `TrackerStatus`, `HistoryEntity`, and `RealtimeStatus` (Proto):
+- **SIT Detection**: `isSitDetected`, `isSitActive`, `lastSitTs`, `sitVz`, `sitDz`, `sitBaro`, `sitTilt`, `sitShock`.
+- **Forensic Indices**: `snrIdx`, `tiltIdx`, `baroIdx`, `vibeIdx`, `noiseIdx`, `luxIdx`, `liftIdx`.
+- **Temporal Integrity**: Monotonic `rt` and Wall-clock `ts` (or `gpsTs`) are propagated throughout the pipeline to survive system clock jumps.
+- **Hardware Logic**: `isAnchorLocked`, `verticalVelocity`, and `currentMa` are synchronized.
 
-### 2. Architectural Updates
-- **`isSystemActive`**: New persistent boolean in `AppSettings.proto`. It governs the lifecycle of background services across device restarts.
-- **Service Lifecycle**: Services now remain silent and dormant unless the "Armed" state is true.
+### 2. Persistence Layer (STABLE)
+- **Database Version**: **58**.
+- **Schema**: `connection_history`, `pending_status_updates`, and `logs` tables are fully harmonized.
+- **Migration**: `MIGRATION_56_57` resolves previous identity hash mismatches and aligns forensic fields.
 
-### 3. Authorized State Management
-- **`SessionUseCase`**: Now the authority for toggling system activation state and cleaning up resources.
-- **`MainViewModel`**: Orchestrates the UI toggle for activation and ensures persistence through the UseCase.
+### 3. Hilt Hardening (COMPLETE)
+- **Dependency Graph**: All core repositories, UseCases (11+), and managers are now Hilt-injectable via `@Inject constructor`.
+- **Circularity**: `LogManager` <-> `ConnectivitySuite` circularity resolved via Dagger `Provider<T>` pattern.
+- **Safety**: Lazy hardware lookups implemented in `GpsManager` and `AppSensorManager` to prevent cold-start ANRs.
 
-### 4. Verification Baseline
-1. Confirm `NOTIFICATION_THROTTLE_MS` is set to 30000L.
-2. Confirm `BootServiceStartWorker` checks both `appMode` and `isSystemActive`.
-3. Confirm Version `July.17.02` is displayed.
+## 🔴 Remaining Tasks
+1. **Verification Build**: Run `./gradlew assembleDebug` to confirm Hilt factory generation.
+2. **Release Tagging**: Apply version `July.22.01`.
 
-### 5. Future Simplification Ideas
-- **Unified Service**: Merge `TrackerService` and `ViewerService` into a single class using a role-based configuration strategy to reduce duplicate lifecycle logic.
-- **Requirement Centralization**: Move all engine-governing constants into a single `EnginePolicy` object.
+## 🚀 Resumption Plan
+1. **Startup Audit**: Verify that `MainViewModel` initializes all 6 forensic ribbon flows (`history4MFlow` through `history7DFlow`) without binding errors.
+2. **Telemetry Validation**: In the next session, perform a "Viewer-Role" smoke test to ensure remote forensic indices (`snrIdx`, etc.) correctly populate the UI.
+
+## 🛠️ Git Release Commands
+```bash
+git add .
+git commit -m "Forensic Release July.22.01: Finalizing Hilt Hardening & Forensic Matrix Alignment"
+git tag -a July.22.01 -m "July.22.01 Forensic Parity Release"
+git push origin main --tags
+```

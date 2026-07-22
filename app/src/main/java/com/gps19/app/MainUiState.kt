@@ -6,8 +6,10 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Unified immutable state for the entire UI structure.
- * July.16.18:
- * - Issue #516: De-duplicate "Status" Logic. Use localHealth and trackerHealth.
+ * July.20.07:
+ * - Issue #107: Added isActivityRecognitionGranted to PermissionState.
+ * - Issue #099: Added isA15Device to PermissionState.
+ * - Issue #516: Unified background status using CapabilityStatus (R502).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -58,6 +60,7 @@ data class MainUiState(
     val distanceTrackerToHome: Double? = null,
     val distanceTrackerToViewer: Double? = null,
     val distanceViewerToHome: Double? = null,
+    val distanceViewerToTracker: Double? = null,
     val draftSettings: DraftSettings = DraftSettings(),
     val isIdentitySanitized: Boolean = false
 ) {
@@ -68,6 +71,7 @@ data class MainUiState(
                 permissions.isOverlayGranted &&
                 permissions.isPostNotificationsGranted &&
                 permissions.isBackgroundLocationGranted &&
+                permissions.isActivityRecognitionGranted &&
                 (appMode != null) &&
                 (appMode != "tracker" || permissions.isMicrophoneGranted) &&
                 (appMode == "tracker" || homePoints.isNotEmpty()) &&
@@ -84,6 +88,7 @@ data class MainUiState(
             if (!permissions.isOverlayGranted) count++
             if (!permissions.isPostNotificationsGranted) count++
             if (!permissions.isBackgroundLocationGranted) count++
+            if (!permissions.isActivityRecognitionGranted) count++
             if (appMode == "tracker" && !permissions.isMicrophoneGranted) count++
             if (appMode != "tracker" && homePoints.isEmpty()) count++
             
@@ -115,13 +120,15 @@ data class PermissionState(
     val isExactAlarmGranted: Boolean = false,
     val isPostNotificationsGranted: Boolean = true,
     val isBackgroundLocationGranted: Boolean = true,
+    val isActivityRecognitionGranted: Boolean = true,
     val hasBackgroundRestriction: Boolean = false,
     val backgroundStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
     val autostartStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
     val isManualOverride: Boolean = false,
     val requiresWakeLockRenewal: Boolean = false,
     val requiresExtraTopPadding: Boolean = false,
-    val requiresAdaptationMuzzle: Boolean = false
+    val requiresAdaptationMuzzle: Boolean = false,
+    val isA15Device: Boolean = false
 )
 
 data class NavigationState(

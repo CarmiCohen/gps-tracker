@@ -1,13 +1,16 @@
 package com.gps19.app
 
 import com.gps19.core.engine.TimeProvider
+import javax.inject.Inject
 
 /**
  * AlertUseCase: Handles logic for alarm dismissal and siren control.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor.
  * v9.5.0:
  * - Issue #503: Hilt Removal.
  */
-class AlertUseCase(
+class AlertUseCase @Inject constructor(
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
     private val logManager: LogManager

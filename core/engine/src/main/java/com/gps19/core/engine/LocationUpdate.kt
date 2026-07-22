@@ -4,10 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
- * July.1.16:
- * - Issue #510: Abandoned Chair Sit Detection. Removed sit-related fields.
- * - Issue #508 & #515: Optimization Removal. Removed isAdaptiveJump and isAnchorLocked.
- * - Issue #512: Consolidate Sentinel Statuses. Removed legacy boolean flags (isJump, isJammer, etc.).
+ * July.21.00:
+ * - Forensic Hardening: Added missing sit-detection and forensic index fields.
+ * - Issue #102: Temporal Forensic Integrity. Standardized 'rt' and 'ts'.
  */
 @Serializable
 data class LocationUpdate(
@@ -15,8 +14,11 @@ data class LocationUpdate(
     val speed: Double = 0.0, val accuracy: Double = 0.0, val bearing: Double = 0.0,
     val battery: Int = -1, val temp: Double = 0.0, val maxTemp: Double = 0.0,
     val isCharging: Boolean = false, val gpsTs: Long = 0L, val isMe: Boolean = true,
-    val ts: Long = 0L,
+    val ts: Long = 0L, // Wall-clock
+    val rt: Long = 0L, // Monotonic (Issue #102)
     val status: SentinelStatus = SentinelStatus.VALID,
+    val isJump: Boolean = false, 
+    val isTrajectoryPromoted: Boolean = false,
     val jumpTier: Int = 0,
     val distToTracker: Double? = null, val distToHome: Double? = null,
     val totalConnectedMs: Long? = null, val sessionConnectedMs: Long? = null,
@@ -46,7 +48,7 @@ data class LocationUpdate(
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRealtime: Long = 0L,
+    val lastValidFixRt: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",
@@ -55,5 +57,23 @@ data class LocationUpdate(
     val gnssDetail: GnssDetail? = null,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val trackerState: TrackerState = TrackerState.UNKNOWN
+    val trackerState: TrackerState = TrackerState.UNKNOWN,
+    val isJammer: Boolean = false,
+    val isStalled: Boolean = false,
+    val isSuspicious: Boolean = false,
+    val isAnchorLocked: Boolean = false,
+    
+    // Forensic Fields
+    val snrIdx: Double = 0.0,
+    val tiltIdx: Double = 0.0,
+    val baroIdx: Double = 0.0,
+    val isSitDetected: Boolean = false,
+    val isSitActive: Boolean = false,
+    val lastSitTs: Long = 0L,
+    val verticalVelocity: Double = 0.0,
+    val sitVz: Double = 0.0,
+    val sitDz: Double = 0.0,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0
 )

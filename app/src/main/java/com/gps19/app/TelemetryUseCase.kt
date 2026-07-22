@@ -1,13 +1,18 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
+import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
- * July.16.18:
- * - Issue #516: De-duplicate "Status" Logic. Added mapping for SystemHealthState.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor.
+ * July.21.00:
+ * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamps to 'Rt'.
+ * - Issue #516: De-duplicate "Status" Logic. Using SystemHealthState for all health/sensor metadata.
+ * - Resolved merge conflicts and aligned with Golden Master architecture.
  */
-class TelemetryUseCase(
+class TelemetryUseCase @Inject constructor(
     private val timeProvider: TimeProvider
 ) {
     fun mapTrackerLocation(
@@ -39,6 +44,7 @@ class TelemetryUseCase(
     }
 
     fun mapHealthFromUpdate(update: LocationUpdate, current: SystemHealthState): SystemHealthState {
+        val nowMs = timeProvider.currentTimeMillis()
         return current.copy(
             signalLoss = update.signal?.let { it < 2 } ?: current.signalLoss,
             gpsStalled = update.locationPendingReason == LocationPendingReason.GPS_STALL,
@@ -57,7 +63,7 @@ class TelemetryUseCase(
             isClockRegression = update.isClockRegression,
             isLocationPending = update.isLocationPending,
             locationPendingReason = update.locationPendingReason,
-            lastValidFixRealtime = update.lastValidFixRealtime,
+            lastValidFixRt = if (update.lastValidFixRt > 0L) update.lastValidFixRt else current.lastValidFixRt,
             isPowerSaveMode = update.isPowerSaveMode,
             standbyBucket = update.standbyBucket,
             netInterface = update.netInterface,
@@ -65,7 +71,8 @@ class TelemetryUseCase(
             isStorageCritical = update.isStorageCritical,
             isBatterySteepDischarge = update.isBatterySteepDischarge,
             isCoolingModeActive = update.isCoolingModeActive,
-            gnssDetail = update.gnssDetail,
+            gnssDetail = update.gnssDetail ?: current.gnssDetail,
+            snrIdx = update.snrIdx,
             uptimeMs = update.uptimeMs ?: current.uptimeMs,
             lastConnTs = update.lastConnTs ?: current.lastConnTs,
             lastDiscTs = update.lastDiscTs ?: current.lastDiscTs,
@@ -91,7 +98,15 @@ class TelemetryUseCase(
             proxIdx = update.proxIdx ?: current.proxIdx,
             proximityCm = update.proximityCm ?: current.proximityCm,
             proximityDebounceMs = update.proximityDebounceMs ?: current.proximityDebounceMs,
-            vibrationRollingSum = update.vibrationRollingSum ?: current.vibrationRollingSum
+            vibrationRollingSum = update.vibrationRollingSum ?: current.vibrationRollingSum,
+            isSitDetected = update.isSitDetected,
+            lastSitTs = update.lastSitTs,
+            verticalVelocity = update.verticalVelocity ?: current.verticalVelocity,
+            sitVz = update.sitVz ?: current.sitVz,
+            sitDz = update.sitDz ?: current.sitDz,
+            sitBaro = update.sitBaro ?: current.sitBaro,
+            sitTilt = update.sitTilt ?: current.sitTilt,
+            sitShock = update.sitShock ?: current.sitShock
         )
     }
 
@@ -109,7 +124,7 @@ class TelemetryUseCase(
             isPowerTamper = status.isPowerTamper,
             isLocationPending = status.isLocationPending,
             locationPendingReason = status.locationPendingReason,
-            lastValidFixRealtime = status.lastValidFixRealtime,
+            lastValidFixRt = status.lastValidFixRt,
             isPowerSaveMode = status.isPowerSaveMode,
             standbyBucket = status.standbyBucket,
             netInterface = status.netInterface,
@@ -118,6 +133,7 @@ class TelemetryUseCase(
             isBatterySteepDischarge = status.isBatterySteepDischarge,
             isCoolingModeActive = status.isCoolingModeActive,
             gnssDetail = status.gnssDetail,
+            snrIdx = status.snrIdx,
             uptimeMs = status.uptimeMs,
             lastConnTs = status.lastConnTs,
             lastDiscTs = status.lastDiscTs,
@@ -143,7 +159,16 @@ class TelemetryUseCase(
             proxIdx = status.proxIdx,
             proximityCm = status.proximityCm,
             proximityDebounceMs = status.proximityDebounceMs,
-            vibrationRollingSum = status.vibrationRollingSum
+            vibrationRollingSum = status.vibrationRollingSum,
+            isSitDetected = status.isSitDetected,
+            isSitActive = status.isSitActive,
+            lastSitTs = status.lastSitTs,
+            verticalVelocity = status.verticalVelocity,
+            sitVz = status.sitVz,
+            sitDz = status.sitDz,
+            sitBaro = status.sitBaro,
+            sitTilt = status.sitTilt,
+            sitShock = status.sitShock
         )
     }
 
@@ -179,7 +204,7 @@ class TelemetryUseCase(
             telemetryTs = if (update.ts > 0) update.ts else nowMs,
             status = update.status,
             trackerState = update.trackerState,
-            gnssDetail = update.gnssDetail
+            gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail
         )
     }
 
@@ -209,10 +234,5 @@ class TelemetryUseCase(
             violationUptimeMs = status.violationUptimeMs,
             violationPercentage = status.violationPercentage
         )
-    }
-
-    fun calculateViolationPercentage(violationMs: Long?, totalMs: Long): Double {
-        if (violationMs == null || totalMs <= 0) return 0.0
-        return (violationMs.toDouble() / totalMs.toDouble()).coerceIn(0.0, 1.0)
     }
 }

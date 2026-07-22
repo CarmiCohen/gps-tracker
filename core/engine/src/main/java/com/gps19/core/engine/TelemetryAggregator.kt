@@ -4,8 +4,10 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
- * July.16.18:
- * - Issue #514: Simplified backfillGaps. Removed snrSamples parameter.
+ * July.21.00:
+ * - Issue #102: Temporal Forensic Integrity. Switched internal aggregation and 
+ *   gap detection logic to use monotonic 'rt' timestamps.
+ * - Restored SNR and expanded sensor snapshot integration for high-fidelity backfilling.
  */
 class TelemetryAggregator {
 
@@ -15,9 +17,6 @@ class TelemetryAggregator {
         private const val MAX_BACKFILL_POINTS = 1000
     }
 
-    /**
-     * Merges high-resolution points into a "Worst Case" summary for lower resolutions.
-     */
     fun mergeWorstCase(acc: EngineConnectionPoint, cur: EngineConnectionPoint): EngineConnectionPoint {
         return acc.copy(
             rtt = max(acc.rtt, cur.rtt),
@@ -53,12 +52,11 @@ class TelemetryAggregator {
         }
     }
 
-    /**
-     * Processes a single telemetry slice and returns any aggregated points that reached their time interval.
-     */
     fun processPoint(point: EngineConnectionPoint): List<Pair<RibbonScale, EngineConnectionPoint>> {
         val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
-        val totalSeconds = (point.ts / TICK_INTERVAL_MS).toInt()
+        // v9.4.00: Use monotonic 'rt' for bucket calculations (Issue #102)
+        val timeRef = if (point.rt > 0) point.rt else point.ts
+        val totalSeconds = (timeRef / TICK_INTERVAL_MS).toInt()
 
         RibbonScale.entries.forEach { scale ->
             if (scale == RibbonScale.FOUR_MIN) {
@@ -80,70 +78,140 @@ class TelemetryAggregator {
         return results
     }
 
-    /**
-     * Generates forensic gap points to maintain ribbon continuity during throttled periods.
-     */
     fun backfillGaps(
+        lastTickRt: Long,
+        nowRt: Long,
         lastTickTs: Long,
-        now: Long,
+        nowTs: Long,
+        snrSamples: List<EngineSnrSample>,
         sensorSamples: List<EngineSensorSnapshot>,
+        acousticFloor: Double,
         baseTemplate: EngineConnectionPoint
     ): List<Pair<RibbonScale, EngineConnectionPoint>> {
         val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
+        var fillRt = lastTickRt + TICK_INTERVAL_MS
         var fillTs = lastTickTs + TICK_INTERVAL_MS
         var pointsGenerated = 0
+        
+        var snrIdx = 0
+        var sensorIdx = 0
 
-        while (fillTs < now && pointsGenerated < MAX_BACKFILL_POINTS) {
-            val totalSeconds = (fillTs / TICK_INTERVAL_MS).toInt()
+        while (fillRt < nowRt && pointsGenerated < MAX_BACKFILL_POINTS) {
+            val totalSeconds = (fillRt / TICK_INTERVAL_MS).toInt()
+            val windowEndRt = fillRt + TICK_INTERVAL_MS - 1
             
+            // v9.4.00: Use monotonic 'rt' for window matching (Issue #102)
+            while (snrIdx < snrSamples.size && snrSamples[snrIdx].rt < fillRt) snrIdx++
+            while (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].rt < fillRt) sensorIdx++
+
+            val resolvedSnr = if (snrIdx < snrSamples.size && snrSamples[snrIdx].rt <= windowEndRt) {
+                (snrSamples[snrIdx].snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
+            } else baseTemplate.snrIdx
+            
+            val snapshot = if (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].rt <= windowEndRt) sensorSamples[sensorIdx] else null
+            
+            val resolvedNoise = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: baseTemplate.noiseIdx
+            val resolvedLux = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: baseTemplate.luxIdx
+            val resolvedVibe = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: baseTemplate.vibeIdx
+            val resolvedProx = snapshot?.proxIdx ?: baseTemplate.proxIdx
+            val resolvedLift = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.liftIdx
+            val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: baseTemplate.tiltIdx
+            val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.baroIdx
+            val resolvedSit = snapshot?.isSitDetected ?: false
+
             val fillPoint = baseTemplate.copy(
                 ts = fillTs,
+                rt = fillRt,
                 isGap = false,
+                snrIdx = resolvedSnr,
+                noiseIdx = resolvedNoise,
+                luxIdx = resolvedLux,
+                vibeIdx = resolvedVibe,
+                proxIdx = resolvedProx,
+                liftIdx = resolvedLift,
+                tiltIdx = resolvedTilt,
+                baroIdx = resolvedBaro,
+                isSitDetected = resolvedSit,
                 currentMa = baseTemplate.currentMa,
                 locationPendingReason = baseTemplate.locationPendingReason
             )
 
             results.addAll(processPoint(fillPoint))
+            fillRt += TICK_INTERVAL_MS
             fillTs += TICK_INTERVAL_MS
             pointsGenerated++
         }
         return results
     }
 
-    /**
-     * Specifically handles large blackouts by generating minimal "Gap" markers.
-     */
     fun fillRealGap(
         ribbonKey: String,
         intervalSeconds: Int,
+        lastTickRt: Long,
+        nowRt: Long,
         lastTickTs: Long,
-        now: Long,
-        sensorSamples: List<EngineSensorSnapshot>
+        nowTs: Long,
+        snrSamples: List<EngineSnrSample>,
+        sensorSamples: List<EngineSensorSnapshot>,
+        acousticFloor: Double
     ): List<EngineConnectionPoint> {
         val intervalMs = intervalSeconds * TICK_INTERVAL_MS
         val maxGapMs = intervalMs * 240
-        val effectiveStartTs = maxOf(lastTickTs, now - maxGapMs)
+        val effectiveStartRt = maxOf(lastTickRt, nowRt - maxGapMs)
+        val rtToTsOffset = lastTickTs - lastTickRt
 
-        var currentTs = alignToInterval(effectiveStartTs, intervalSeconds)
-        if (currentTs <= lastTickTs) currentTs += intervalMs
+        var currentRt = alignToInterval(effectiveStartRt, intervalSeconds)
+        if (currentRt <= lastTickRt) currentRt += intervalMs
 
         val gapPoints = mutableListOf<EngineConnectionPoint>()
         var pointsGenerated = 0
         
-        while (currentTs < now && pointsGenerated < MAX_BACKFILL_POINTS) {
-            val totalSeconds = (currentTs / TICK_INTERVAL_MS).toInt()
+        var snrIdx = 0
+        var sensorIdx = 0
+        
+        while (currentRt < nowRt && pointsGenerated < MAX_BACKFILL_POINTS) {
+            val totalSeconds = (currentRt / TICK_INTERVAL_MS).toInt()
+            val windowEndRt = currentRt + intervalMs - 1
             
+            while (snrIdx < snrSamples.size && snrSamples[snrIdx].rt < currentRt) snrIdx++
+            while (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].rt < currentRt) sensorIdx++
+
+            val resolvedSnr = if (snrIdx < snrSamples.size && snrSamples[snrIdx].rt <= windowEndRt) {
+                (snrSamples[snrIdx].snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
+            } else 0.0
+            
+            val snapshot = if (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].rt <= windowEndRt) sensorSamples[sensorIdx] else null
+            
+            val resolvedNoise = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: 0.0
+            val resolvedLux = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: 0.0
+            val resolvedVibe = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: 0.0
+            val resolvedProx = snapshot?.proxIdx ?: 1.0
+            val resolvedLift = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
+            val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: 0.0
+            val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
+            val resolvedSit = snapshot?.isSitDetected ?: false
+
             gapPoints.add(EngineConnectionPoint(
-                ts = currentTs,
+                ts = currentRt + rtToTsOffset,
+                rt = currentRt,
                 rtt = 0,
                 remoteSig = 0,
                 isConnected = false,
                 isGap = true,
+                snrIdx = resolvedSnr,
+                noiseIdx = resolvedNoise,
+                luxIdx = resolvedLux,
+                vibeIdx = resolvedVibe,
+                proxIdx = resolvedProx,
+                liftIdx = resolvedLift,
+                tiltIdx = resolvedTilt,
+                baroIdx = resolvedBaro,
+                isSitDetected = resolvedSit,
                 isTick = isScaleTick(getScaleByKey(ribbonKey), totalSeconds),
                 currentMa = 0,
                 locationPendingReason = LocationPendingReason.NONE
             ))
-            currentTs += intervalMs
+            currentRt += intervalMs
             pointsGenerated++
         }
         return gapPoints

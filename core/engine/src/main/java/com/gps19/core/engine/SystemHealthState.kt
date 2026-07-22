@@ -4,8 +4,10 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
- * Consolidates redundant flags from IntegrityState, TrackerStatus, and LocationState.
- * Issue #516: De-duplicate "Status" Logic.
+ * July.20.07:
+ * - Renamed lastValidFixRealtime to lastValidFixRt (Issue #102).
+ * - Added Forensic Sit Detection fields.
+ * - Added snrIdx for GNSS health tracking.
  */
 @Serializable
 data class SystemHealthState(
@@ -27,7 +29,7 @@ data class SystemHealthState(
     val isClockRegression: Boolean = false,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRealtime: Long = 0L,
+    val lastValidFixRt: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",
@@ -36,6 +38,7 @@ data class SystemHealthState(
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
     val gnssDetail: GnssDetail? = null,
+    val snrIdx: Double = 0.0,
     
     // Connectivity Stats
     val uptimeMs: Long = 0L,
@@ -49,7 +52,7 @@ data class SystemHealthState(
     val violationUptimeMs: Long = 0L,
     val violationPercentage: Double = 0.0,
 
-    // Sensor Metadata (Merged from LocationState)
+    // Sensor Metadata
     val vibration: Double = 0.0,
     val heading: Double = 0.0,
     val tiltDegrees: Double = 0.0,
@@ -65,5 +68,16 @@ data class SystemHealthState(
     val proxIdx: Double = 1.0,
     val proximityCm: Double = -1.0,
     val proximityDebounceMs: Long = 0L,
-    val vibrationRollingSum: Double = 0.0
+    val vibrationRollingSum: Double = 0.0,
+
+    // Forensic Sit Detection (Issue #102/R990)
+    val isSitDetected: Boolean = false,
+    val isSitActive: Boolean = false,
+    val lastSitTs: Long = 0L,
+    val verticalVelocity: Double = 0.0,
+    val sitVz: Double = 0.0,
+    val sitDz: Double = 0.0,
+    val sitBaro: Double = 0.0,
+    val sitTilt: Double = 0.0,
+    val sitShock: Double = 0.0
 )

@@ -3,6 +3,7 @@ package com.gps19.app
 import android.content.Context
 import android.util.Log
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.*
@@ -10,19 +11,26 @@ import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
 import java.util.*
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * July.22.01:
+ * - Hilt Hardening: Added @ApplicationContext to constructor.
+ * July.20.07:
+ * - Issue #102: Temporal Forensic Integrity. Propagated monotonic 'rt' in binary payloads.
+ * - Issue #115: Startup Hardening. Integrated into Hilt-managed @ApplicationScope.
  * July.17.03:
- * - Fixed #R997: markTraffic() now called on emit/emitBinary to prevent keep-alive logic
- *   from falsely detecting silence during active outgoing traffic.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Manual dependency injection.
+ * - Fixed #R997: markTraffic() consistency in keep-alive logic.
  */
-class CommunicationManager(
-    private val context: Context,
+@Singleton
+class CommunicationManager @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val configManager: ConfigManager,
     private val logManager: LogManager,
+    private val telemetryRepository: TelemetryRepository,
+    private val logRepository: LogRepository,
     private val timeProvider: TimeProvider
 ) : SignalingProvider {
 
@@ -39,6 +47,7 @@ class CommunicationManager(
     private var lastRelayTrafficTs = timeProvider.elapsedRealtime()
 
     private var onConnectionLost: (() -> Unit)? = null
+    private var remoteUpdateListener: RemoteUpdateListener? = null
 
     private val commExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped) return@CoroutineExceptionHandler
@@ -49,6 +58,14 @@ class CommunicationManager(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
     private var pendingLocationUpdate: JSONObject? = null
     private var conflationJob: Job? = null
+
+    interface RemoteUpdateListener {
+        fun onUpdate(data: JSONObject)
+    }
+
+    fun setRemoteUpdateListener(listener: RemoteUpdateListener) {
+        this.remoteUpdateListener = listener
+    }
 
     private fun isDefaultViewer(id: String) = id == SignalingConstants.DEFAULT_VIEWER_ID || id.isEmpty()
 
@@ -100,7 +117,6 @@ class CommunicationManager(
             }
             if (this.deviceId.isNotEmpty()) {
                 val transNew = SignalingConstants.getTransmissionId(this.deviceId)
-                // R997: Log join as non-important to prevent recursive emission loop if keep-alive triggered it
                 logToApp("Joining room: $transNew (Force: $force)", false)
                 socket?.emit("join", createJoinPayload())
                 markTraffic()
@@ -187,13 +203,204 @@ class CommunicationManager(
             onConnectionLost?.invoke()
         }
 
-        s.on("location_relay") { markTraffic(); /* handleLocationRelay delegated */ }
-        s.on("location_relay_bin") { markTraffic(); /* handleLocationRelayBinary delegated */ }
-        s.on("log_relay") { markTraffic(); /* handleLogRelay delegated */ }
-        s.on("settings_relay") { markTraffic(); /* handleSettingsRelay delegated */ }
-        s.on("viewer_status_relay") { markTraffic(); /* handleViewerStatusRelay delegated */ }
-        s.on("ping_relay") { markTraffic(); /* handlePingRelay delegated */ }
-        s.on("pong_relay") { markTraffic(); /* handlePongRelay delegated */ }
+        s.on("location_relay") { args -> markTraffic(); handleLocationRelay(args) }
+        s.on("location_relay_bin") { args -> markTraffic(); handleLocationRelayBinary(args) }
+        s.on("log_relay") { args -> markTraffic(); handleLogRelay(args) }
+        s.on("settings_relay") { args -> markTraffic(); handleSettingsRelay(args) }
+        s.on("viewer_status_relay") { args -> markTraffic(); handleViewerStatusRelay(args) }
+        s.on("ping_relay") { args -> markTraffic(); handlePingRelay(args) }
+        s.on("pong_relay") { args -> markTraffic(); handlePongRelay(args) }
+    }
+
+    private fun handleLocationRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            val incomingId = data.optString("id")
+            val incomingViewerId = data.optString("viewer_id")
+            val fromViewer = data.optBoolean("from_viewer")
+
+            if (!SignalingValidator.shouldProcessLocationUpdate(
+                    incomingId = incomingId,
+                    ownDeviceId = deviceId,
+                    isFromViewer = fromViewer,
+                    viewerId = incomingViewerId,
+                    ownViewerId = viewerId,
+                    isTrackerMode = isTrackerMode
+            )) return
+            
+            remoteUpdateListener?.onUpdate(data)
+        } catch (e: Exception) {
+            Log.e("GPS19", "location_relay parse error")
+        }
+    }
+
+    private fun handleLocationRelayBinary(args: Array<Any>) {
+        try {
+            val data = args[0] as ByteArray
+            val status = RealtimeStatus.parseFrom(data)
+            
+            if (!SignalingValidator.shouldProcessLocationUpdate(
+                    incomingId = status.id,
+                    ownDeviceId = deviceId,
+                    isFromViewer = status.fromViewer,
+                    viewerId = status.viewerId,
+                    ownViewerId = viewerId,
+                    isTrackerMode = isTrackerMode
+            )) return
+            
+            val json = JSONObject().apply {
+                put("id", status.id); put("viewer_id", status.viewerId); put("from_viewer", status.fromViewer)
+                put("lat", status.lat); put("lng", status.lng); put("speed", status.speed)
+                put("accuracy", status.accuracy); put("max_accuracy", status.maxAccuracy)
+                put("bearing", status.bearing); put("battery", status.battery); put("temp", status.temp)
+                put("is_charging", status.isCharging); put("ts", status.ts); put("gps_ts", status.gpsTs)
+                put("sats_view", status.satsView); put("sats_used", status.satsUsed)
+                put("uptime_ms", status.uptimeMs)
+                put("total_connected_ms", status.totalConnectedMs); put("session_connected_ms", status.sessionConnectedMs)
+                put("total_drop_ms", status.totalDropMs); put("max_drop_ms", status.maxDropMs)
+                put("last_conn_ts", status.lastConnTs); put("last_disc_ts", status.lastDiscTs); put("is_historical", status.isHistorical)
+                put("alt", status.alt)
+                put("tracker_state", TrackerStatus.mapProtoToTrackerState(status.state).name)
+                put("is_location_pending", status.isLocationPending)
+                put("location_pending_reason", TrackerStatus.mapProtoToPendingReason(status.pendingReason).name)
+                put("last_valid_fix_rt", status.lastValidFixRt)
+                put("is_battery_steep_discharge", status.isBatterySteepDischarge)
+                put("is_cooling_mode_active", status.isCoolingModeActive)
+            }
+            remoteUpdateListener?.onUpdate(json)
+        } catch (e: Exception) {
+            Log.e("GPS19", "location_relay_bin parse error")
+        }
+    }
+
+    private fun handleLogRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            if (!SignalingValidator.shouldProcessLogRelay(
+                    incomingId = data.optString("id"),
+                    ownDeviceId = deviceId,
+                    incomingViewerId = data.optString("viewer_id"),
+                    ownViewerId = viewerId,
+                    isTrackerMode = isTrackerMode
+            )) return
+            
+            val entry = LogEntry.fromJSONObject(data)
+            logRepository.addLog(entry)
+
+            val wrapped = JSONObject(data.toString())
+            wrapped.put("type", "remote_log")
+            remoteUpdateListener?.onUpdate(wrapped)
+        } catch (e: Exception) {
+            Timber.e(e, "log_relay parse error")
+        }
+    }
+
+    private fun handleSettingsRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            if (!SignalingValidator.shouldProcessSettingsUpdate(
+                    incomingId = data.optString("id"),
+                    ownDeviceId = deviceId,
+                    incomingViewerId = data.optString("viewer_id"),
+                    ownViewerId = viewerId,
+                    fromViewer = data.optBoolean("from_viewer"),
+                    isTrackerMode = isTrackerMode
+            )) return
+            
+            remoteUpdateListener?.onUpdate(data)
+        } catch (e: Exception) {
+            Timber.e(e, "settings_relay parse error")
+        }
+    }
+
+    private fun handleViewerStatusRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            val incomingViewerId = data.optString("viewer_id")
+            
+            if (isTrackerMode) {
+                if (!SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
+            } else {
+                if (SignalingConstants.isViewerMatch(incomingViewerId, viewerId)) return
+            }
+
+            remoteUpdateListener?.onUpdate(JSONObject().apply {
+                put("type", "viewer_pulse")
+                put("id", deviceId) 
+                put("viewer_id", incomingViewerId)
+                put("from_viewer", true)
+            })
+        } catch (e: Exception) {
+            Timber.e(e, "viewer_status_relay parse error")
+        }
+    }
+
+    private fun handlePingRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            val pingDeviceId = data.optString("id", "")
+            val incomingViewerId = data.optString("viewer_id", "")
+            
+            if (SignalingConstants.isTrackerMatch(pingDeviceId, deviceId) && deviceId.isNotEmpty()) {
+                val isViewerPing = SignalingValidator.isViewerRole(data.optString("from"))
+                
+                if (isTrackerMode && isViewerPing && !SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
+                
+                if ((isTrackerMode && isViewerPing) || (!isTrackerMode && !isViewerPing)) {
+                    val incomingMap = mutableMapOf<String, Any>()
+                    data.keys().forEach { incomingMap[it] = data.get(it) }
+                    
+                    SignalPayloadGenerator.createPongPayload(incomingMap, deviceId, isTrackerMode)?.let { pongMap ->
+                        socket?.emit("pong_cmd", JSONObject(pongMap))
+                    }
+                    
+                    remoteUpdateListener?.onUpdate(JSONObject().apply {
+                        put("type", SignalingConstants.getPulseType(isTrackerMode))
+                        put("id", deviceId)
+                        put("viewer_id", incomingViewerId)
+                        put("from_viewer", isViewerPing)
+                    })
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "ping_relay parse error")
+        }
+    }
+
+    private fun handlePongRelay(args: Array<Any>) {
+        try {
+            val data = args[0] as JSONObject
+            val pingDeviceId = data.optString("id", "")
+            val pongViewerId = data.optString("viewer_id", "")
+            
+            if (SignalingConstants.isTrackerMatch(pingDeviceId, deviceId) && deviceId.isNotEmpty()) {
+                val isFromViewer = SignalingValidator.isViewerRole(data.optString("from"))
+                val isMyPong = if (isTrackerMode) !isFromViewer else isFromViewer
+
+                if (isMyPong) {
+                    remoteUpdateListener?.onUpdate(JSONObject().apply { 
+                        put("type", "pong_activity"); put("id", deviceId); put("viewer_id", pongViewerId); put("from_viewer", isFromViewer) 
+                    })
+                    val rtt = (timeProvider.currentTimeMillis() - data.optLong("ts")).toInt()
+                    if (rtt > 0) {
+                        rtts.add(rtt); if (rtts.size > 5) rtts.removeAt(0)
+                        lastRttInternal = rtts.minOrNull() ?: rtt
+                        telemetryRepository.updateLastRtt(lastRttInternal)
+                    }
+                } else {
+                    if (isTrackerMode && !SignalingConstants.isViewerMatch(pongViewerId, viewerId) && !isDefaultViewer(viewerId)) return
+
+                    remoteUpdateListener?.onUpdate(JSONObject().apply {
+                        put("type", SignalingConstants.getPulseType(isTrackerMode))
+                        put("id", deviceId)
+                        put("viewer_id", pongViewerId)
+                        put("from_viewer", isFromViewer)
+                    })
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "pong_relay parse error")
+        }
     }
 
     override fun setConnectionLostCallback(callback: () -> Unit) {

@@ -7,13 +7,18 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.scan
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * GpsStatusManager: Centralized reactive Flow for the GPS-Index.
+ * July.22.01:
+ * - Hilt Hardening: Added @Inject constructor and @Singleton.
  * v9.5.0:
  * - Issue #503: Hilt Removal. Manual dependency injection.
  */
-class GpsStatusManager(
+@Singleton
+class GpsStatusManager @Inject constructor(
     private val telemetryRepository: TelemetryRepository,
     private val settingsRepository: SettingsRepository
 ) {

@@ -3,13 +3,18 @@ package com.gps19.app
 import com.gps19.core.engine.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * TelemetryRepository: In-memory store for live system status.
+ * July.22.00:
+ * - Hilt Hardening: Added @Inject constructor and @Singleton.
  * July.16.18:
  * - Issue #516: De-duplicate "Status" Logic. Replaced IntegrityState with SystemHealthState.
  */
-class TelemetryRepository() {
+@Singleton
+class TelemetryRepository @Inject constructor() {
     private val _isRelayConnected = MutableStateFlow(false)
     val isRelayConnected = _isRelayConnected.asStateFlow()
 

@@ -5,6 +5,8 @@ import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gps19.core.engine.*
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -14,15 +16,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.Locale
+import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * July.17.02:
- * - Persisting isSystemActive state to prevent unintended engine starts on landing page.
- * July.16.18:
- * - Issue #516: De-duplicate "Status" Logic. Use localHealth and trackerHealth.
+ * July.21.00:
+ * - Forensic Ribbon Integration: Exposing history flows (4M, 16M, 1H, 4H, 24H, 7D).
+ * - Fixed getActiveHeartbeatInterval and delay ambiguity.
  */
-class MainViewModel(
+@HiltViewModel
+class MainViewModel @Inject constructor(
     val repository: MainRepository,
     private val logManager: LogManager,
     private val systemStatusProvider: SystemStatusProvider,
@@ -37,7 +40,7 @@ class MainViewModel(
     private val alertUseCase: AlertUseCase,
     private val mapUseCase: MapUseCase,
     val timeProvider: TimeProvider,
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val uiExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -51,8 +54,8 @@ class MainViewModel(
     private val _systemPulse = MutableStateFlow(timeProvider.currentTimeMillis())
     val systemPulse: StateFlow<Long> = _systemPulse.asStateFlow()
 
-    private val _systemPulseRealtime = MutableStateFlow(timeProvider.elapsedRealtime())
-    val systemPulseRealtime: StateFlow<Long> = _systemPulseRealtime.asStateFlow()
+    private val _systemPulseRt = MutableStateFlow(timeProvider.elapsedRealtime())
+    val systemPulseRt: StateFlow<Long> = _systemPulseRt.asStateFlow()
 
     private val _rtt = MutableStateFlow(0)
     val rtt: StateFlow<Int> = _rtt.asStateFlow()
@@ -84,29 +87,7 @@ class MainViewModel(
     private val _trackerMaxTemp = MutableStateFlow(0.0)
     val trackerMaxTemp: StateFlow<Double> = _trackerMaxTemp.asStateFlow()
 
-    val activeGnssDetail: StateFlow<GnssDetail?> = _uiState.combine(_gnssDetail) { state, localDetail ->
-        if (state.appMode == "viewer") state.trackerLocation.gnssDetail else localDetail
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), null)
-
-    val dashboardState: StateFlow<DashboardState> = combine(
-        _uiState, _systemPulse, _trackerState, _localMaxTemp, _trackerMaxTemp
-    ) { state, pulse, trkState, lMax, tMax ->
-        dashboardUseCase.computeDashboardState(state, pulse, trkState, lMax, tMax)
-    }
-    .flowOn(Dispatchers.Default)
-    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), DashboardState())
-
-    val eventLogsFlow: StateFlow<List<LogEntry>> = repository.eventLogsFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), emptyList())
-
-    val trackerTrailFlow: StateFlow<List<TrailPoint>> = repository.trackerTrailFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), emptyList())
-
-    val viewerTrailFlow: StateFlow<List<TrailPoint>> = repository.viewerTrailFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), emptyList())
-
-    val violationPointsFlow: Flow<List<ViolationPoint>> = repository.violationsFlow
-
+    // History Flows for Forensic Ribbons
     val history4MFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("4M")
     val history16MFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("16M")
     val history1HFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("1H")
@@ -114,22 +95,54 @@ class MainViewModel(
     val history24HFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("24H")
     val history7DFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("7D")
 
+    val activeGnssDetail: StateFlow<GnssDetail?> = _uiState.combine(_gnssDetail) { state, localDetail ->
+        if (state.appMode == "viewer") state.trackerLocation.gnssDetail else localDetail
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val dashboardState: StateFlow<DashboardState> = combine(
+        _uiState, _systemPulse, _trackerState, _localMaxTemp, _trackerMaxTemp
+    ) { state, pulse, trkState, lMax, tMax ->
+        dashboardUseCase.computeDashboardState(state, pulse, trkState, lMax, tMax)
+    }
+    .flowOn(Dispatchers.Default)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
+
+    val eventLogsFlow: StateFlow<List<LogEntry>> = _uiState.map { it.appMode }.distinctUntilChanged()
+        .flatMapLatest { mode -> if (mode != null) repository.eventLogsFlow else flowOf(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val trackerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
+        .flatMapLatest { mode -> if (mode != null) repository.trackerTrailFlow else flowOf(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val viewerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
+        .flatMapLatest { mode -> if (mode != null) repository.viewerTrailFlow else flowOf(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val violationPointsFlow: Flow<List<ViolationPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
+        .flatMapLatest { mode -> if (mode != null) repository.violationsFlow else flowOf(emptyList()) }
+
     var appStartTime: Long = 0L
     private var autoSaveJob: Job? = null
     private var lastKnownAlarmTypes: Set<String> = emptySet()
 
-    private var lastAlarmAckRealtime: Long = 0L
+    private var lastAlarmAckRt: Long = 0L
+    private var isHeavyObservationStarted = false
+
+    private val INITIAL_RENDER_DELAY_MS = 500L
 
     init {
         viewModelScope.launch(uiExceptionHandler) {
             loadInitialData()
-            startReactiveObservations()
+            delay(INITIAL_RENDER_DELAY_MS)
+            startBaseObservations()
             startGlobalTimer()
-            stateSubscriptionUseCase.startHistoryObservations(viewModelScope)
+            _uiState.filter { it.isInitialized && it.appMode != null }.first()
+            startHeavyObservations()
         }
     }
 
-    private fun startReactiveObservations() {
+    private fun startBaseObservations() {
         stateSubscriptionUseCase.observeRepositorySettings()
             .distinctUntilChanged()
             .onEach { update ->
@@ -141,6 +154,26 @@ class MainViewModel(
                 )}
             }.launchIn(viewModelScope)
 
+        stateSubscriptionUseCase.observeInternetStatus().onEach { online -> updateState { it.copy(connectivity = it.connectivity.copy(isLocalOnline = online)) } }.launchIn(viewModelScope)
+        
+        viewModelScope.launch(Dispatchers.IO) { 
+            while(true) { 
+                val newState = systemStatusProvider.getPermissionState()
+                withContext(Dispatchers.Main) { 
+                    updateState { it.copy(permissions = newState.copy(isA15Device = systemStatusProvider.isA15Hardware())) } 
+                }
+                val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
+                delay(if (refreshFast) PERMISSION_REFRESH_INTERVAL_FAST_MS else PERMISSION_REFRESH_INTERVAL_SLOW_MS) 
+            } 
+        }
+
+        repository.identitySanitizedFlow.onEach { sanitized -> updateState { it.copy(isIdentitySanitized = sanitized) } }.launchIn(viewModelScope)
+    }
+
+    private fun startHeavyObservations() {
+        if (isHeavyObservationStarted) return
+        isHeavyObservationStarted = true
+        
         stateSubscriptionUseCase.observeConnectivityBasics()
             .distinctUntilChanged()
             .onEach { update ->
@@ -163,19 +196,13 @@ class MainViewModel(
                 if (_uiState.value.appMode == "tracker") _trackerMaxTemp.value = update.maxTemp
             }.launchIn(viewModelScope)
 
-        stateSubscriptionUseCase.observeInternetStatus()
-            .distinctUntilChanged()
-            .onEach { online -> updateState { it.copy(connectivity = it.connectivity.copy(isLocalOnline = online)) } }.launchIn(viewModelScope)
-            
-        stateSubscriptionUseCase.observeBatteryStatus()
-            .distinctUntilChanged()
-            .onEach { status -> 
-                updateState { current -> current.copy(
-                    battery = current.battery.copy(level = status.level, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging),
-                    trackerBattery = if (current.appMode == "tracker") current.trackerBattery.copy(level = status.level, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging) else current.trackerBattery
-                ) } 
-                _currentMa.value = status.currentMa
-            }.launchIn(viewModelScope)
+        stateSubscriptionUseCase.observeBatteryStatus().onEach { status -> 
+            updateState { current -> current.copy(
+                battery = current.battery.copy(level = status.level, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging),
+                trackerBattery = if (current.appMode == "tracker") current.trackerBattery.copy(level = status.level, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging) else current.trackerBattery
+            ) } 
+            _currentMa.value = status.currentMa
+        }.launchIn(viewModelScope)
 
         stateSubscriptionUseCase.observeGnssDetail().distinctUntilChanged().onEach { _gnssDetail.value = it }.launchIn(viewModelScope)
         stateSubscriptionUseCase.observeGpsIndex().distinctUntilChanged().onEach { _gpsIndexData.value = it }.launchIn(viewModelScope)
@@ -184,20 +211,7 @@ class MainViewModel(
         viewModelScope.launch { repository.trackerLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
         viewModelScope.launch { repository.connectedViewers.collect { viewers -> updateState { it.copy(connectivity = it.connectivity.copy(connectedViewers = viewers)) } } }
 
-        viewModelScope.launch(Dispatchers.IO) { 
-            while(true) { 
-                val newState = systemStatusProvider.getPermissionState()
-                withContext(Dispatchers.Main) {
-                    updateState { it.copy(permissions = newState) }
-                }
-                val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
-                delay(if (refreshFast) PERMISSION_REFRESH_INTERVAL_FAST_MS else PERMISSION_REFRESH_INTERVAL_SLOW_MS) 
-            } 
-        }
-
-        repository.identitySanitizedFlow.distinctUntilChanged().onEach { sanitized ->
-            updateState { it.copy(isIdentitySanitized = sanitized) }
-        }.launchIn(viewModelScope)
+        stateSubscriptionUseCase.startHistoryObservations(viewModelScope)
     }
 
     fun onEvent(event: UiEvent) {
@@ -260,7 +274,9 @@ class MainViewModel(
             is UiEvent.SetLogFilterShowRecovered -> viewModelScope.launch { repository.updateLogFilters(recovered = event.show) }
             is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
                 val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
-                withContext(Dispatchers.Main) { updateState { it.copy(permissions = newState) } }
+                withContext(Dispatchers.Main) { 
+                    updateState { it.copy(permissions = newState.copy(isA15Device = systemStatusProvider.isA15Hardware())) } 
+                }
             }
             is UiEvent.TriggerTestAlarm -> { addPersistentLog("user", "USER ACTION: Test alarm triggered", true); repository.sendCommand(UiCommand.TriggerTestAlarm) }
             is UiEvent.TriggerForensicTest -> { addPersistentLog("user", "USER ACTION: Forensic stress test triggered", true); repository.sendCommand(UiCommand.TriggerForensicTest) }
@@ -374,14 +390,14 @@ class MainViewModel(
 
     private fun handleAlarmEvent(event: UiEvent) {
         viewModelScope.launch(uiExceptionHandler) {
-            val nowRealtime = timeProvider.elapsedRealtime()
+            val nowRt = timeProvider.elapsedRealtime()
             val nowWall = when (event) {
                 is UiEvent.DismissAlarms -> alertUseCase.dismissAlarms()
                 is UiEvent.StopSiren -> alertUseCase.stopSiren(event.causes)
                 else -> 0L
             }
             if (nowWall > 0) {
-                lastAlarmAckRealtime = nowRealtime
+                lastAlarmAckRt = nowRt
                 updateState { it.copy(isAlarmSilenced = true, lastAlarmAckTs = nowWall) }
                 _redScreenVisible.value = false
             }
@@ -392,6 +408,7 @@ class MainViewModel(
         when (event) {
             is UiEvent.SetAppMode -> { 
                 addPersistentLog("user", "USER ACTION: App mode set to ${event.mode ?: "NONE"}", true)
+                if (event.mode != null) startHeavyObservations()
                 viewModelScope.launch(uiExceptionHandler) {
                     val newStartTime = sessionUseCase.setAppMode(event.mode)
                     updateState { it.copy(appMode = event.mode, appStartTime = newStartTime ?: it.appStartTime) }
@@ -459,31 +476,37 @@ class MainViewModel(
                 val stateSnapshot = _uiState.value
                 if (stateSnapshot.isInitialized && stateSnapshot.appMode != null) {
                     val now = timeProvider.currentTimeMillis()
-                    val nowRealtime = timeProvider.elapsedRealtime()
+                    val nowRt = timeProvider.elapsedRealtime()
                     _systemPulse.value = now
-                    _systemPulseRealtime.value = nowRealtime
+                    _systemPulseRt.value = nowRt
                     updateState { state -> state.copy(isSirenPlaying = AudioSynthesizer.isPlaying()) }
                     
                     repository.sendCommand(UiCommand.SyncRequest)
                     withContext(Dispatchers.Default) {
                         val currentState = _uiState.value
                         val newState = behaviorUseCase.computeTrackerState(currentState, now)
-                        val shouldShowRed = behaviorUseCase.shouldShowRedScreen(currentState, nowRealtime, lastAlarmAckRealtime, _redScreenVisible.value)
+                        val shouldShowRedScreen = behaviorUseCase.shouldShowRedScreen(currentState, nowRt, lastAlarmAckRt, _redScreenVisible.value)
                         
                         withContext(Dispatchers.Main) {
                             if (newState != _trackerState.value && newState != TrackerState.UNKNOWN) {
                                 addPersistentLog("event", "Tracker is $newState", true)
                             }
                             _trackerState.value = newState
-                            _redScreenVisible.value = shouldShowRed
+                            _redScreenVisible.value = shouldShowRedScreen
                         }
                     }
                     updateState { state -> state.copy(isAlarmSilenced = behaviorUseCase.isAlarmSilenced(state.lastAlarmAckTs, now)) }
                 }
 
-                delay(TICK_INTERVAL_MS)
+                val currentInterval = getActiveHeartbeatInterval(0)
+                delay(currentInterval.toLong())
             }
         }
+    }
+
+    private fun getActiveHeartbeatInterval(idleCount: Int): Long {
+        val nav = _uiState.value.navigation
+        return if (nav.isSettingsOpen || nav.isLogVisible || nav.isPhoneSetupVisible || nav.isRibbonsVisible) 1000L else TICK_INTERVAL_MS
     }
 
     private fun handleLocationUpdateInternal(update: LocationUpdate) {
@@ -534,30 +557,38 @@ class MainViewModel(
         }
     }
 
-    private suspend fun loadInitialData() {
-        val initial = settingsUseCase.loadAllSettings()
-        appStartTime = initial.appStartTime
-        updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, isSystemActive = initial.isSystemActive, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings, isIdentitySanitized = initial.identitySanitized) }
-        _localMaxTemp.value = initial.maxTemp; if (initial.appMode == "tracker") _trackerMaxTemp.value = initial.maxTemp
-        initial.trackerStatus?.let { status -> 
-            updateState { it.copy(
-                trackerLocation = telemetryUseCase.mapTrackerLocationFromStatus(status, it.trackerLocation),
-                trackerHealth = telemetryUseCase.mapHealthFromStatus(status, it.trackerHealth),
-                connectivity = it.connectivity.copy(lastUpdateTs = status.ts), 
-                trackerStats = telemetryUseCase.mapStatsFromStatus(status, it.trackerStats), 
-                trackerBattery = it.trackerBattery.copy(level = status.battery, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging), 
-                trackerSatsView = status.satsView, trackerSatsUsed = status.satsUsed, 
-                maxTrackerAccuracy = if (status.maxAccuracy > 0.0) status.maxAccuracy else it.maxTrackerAccuracy
-            ) }
-            _trackerMaxTemp.value = status.maxTemp
-            _trackerCurrentMa.value = status.currentMa
-            if (_uiState.value.appMode == "tracker") _localMaxTemp.value = status.maxTemp 
+    private fun loadInitialData() {
+        // July.20.07: Offload maintenance to an independent background job to ensure zero-jank startup.
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            repository.proactivePruning()
         }
-        
-        updateState { it.copy(isInitialized = true) }
+
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            val initial = settingsUseCase.loadAllSettings()
+            withContext(Dispatchers.Main) {
+                appStartTime = initial.appStartTime
+                updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, isSystemActive = initial.isSystemActive, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings, isIdentitySanitized = initial.identitySanitized) }
+                _localMaxTemp.value = initial.maxTemp; if (initial.appMode == "tracker") _trackerMaxTemp.value = initial.maxTemp
+                initial.trackerStatus?.let { status -> 
+                    updateState { it.copy(
+                        trackerLocation = telemetryUseCase.mapTrackerLocationFromStatus(status, it.trackerLocation),
+                        trackerHealth = telemetryUseCase.mapHealthFromStatus(status, it.trackerHealth),
+                        connectivity = it.connectivity.copy(lastUpdateTs = status.ts), 
+                        trackerStats = telemetryUseCase.mapStatsFromStatus(status, it.trackerStats), 
+                        trackerBattery = it.trackerBattery.copy(level = status.battery, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging), 
+                        trackerSatsView = status.satsView, trackerSatsUsed = status.satsUsed, 
+                        maxTrackerAccuracy = if (status.maxAccuracy > 0.0) status.maxAccuracy else it.maxTrackerAccuracy
+                    ) }
+                    _trackerMaxTemp.value = status.maxTemp
+                    _trackerCurrentMa.value = status.currentMa
+                    if (_uiState.value.appMode == "tracker") _localMaxTemp.value = status.maxTemp 
+                }
+                updateState { it.copy(isInitialized = true) }
+            }
+        }
     }
 
-    fun addPersistentLog(type: String, message: String, isImportant: Boolean = false, isSpecial: Boolean = false, specialColor: Int? = null) { logManager.submitToLogSink(message, type, important = isImportant, isSpecial = isSpecial, specialColor = specialColor) }
+    fun addPersistentLog(type: String, message: String, isImportant: Boolean = false, isSpecial: Boolean = false, specialColor: Int? = null) { logManager.submitToLogSink(message = message, type = type, important = isImportant, isSpecial = isSpecial, specialColor = specialColor) }
 
     fun fullInitialization(context: Context) {
         viewModelScope.launch(uiExceptionHandler) {

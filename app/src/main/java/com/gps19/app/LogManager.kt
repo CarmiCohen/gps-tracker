@@ -3,19 +3,22 @@ package com.gps19.app
 import com.gps19.core.engine.*
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.inject.Inject
+import javax.inject.Provider
+import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * July.21.00:
+ * - Hilt Hardening: Added @Inject constructor and migrated to Provider<ConnectivitySuite>.
  * July.17.03:
- * - Fixed #R998: Added recursion guard to submitToLogSink to prevent infinite loops if
- *   logging logic itself triggers an error (via Timber tree in GpsApplication).
- * July.16.18:
- * - Issue #516: De-duplicate "Status" Logic. Use systemHealth.
+ * - Fixed #R998: Added recursion guard to submitToLogSink to prevent infinite loops.
  */
-class LogManager(
+@Singleton
+class LogManager @Inject constructor(
     private val logRepository: LogRepository,
     private val telemetry: TelemetryRepository,
-    private val connectivitySuite: () -> ConnectivitySuite,
+    private val connectivitySuite: Provider<ConnectivitySuite>,
     private val configManager: ConfigManager,
     private val timeProvider: TimeProvider
 ) {
@@ -117,7 +120,7 @@ class LogManager(
                 vibeSnapshot = finalVibe
             )
             
-            val suite = connectivitySuite()
+            val suite = connectivitySuite.get()
             val isConnected = suite.isConnected()
             
             val data = log.toJSONObject().apply {
