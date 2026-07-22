@@ -16,6 +16,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * July.22.08:
+ * - Issue #104b: Global Startup Maintenance Authority. Integrated proactivePruning into onCreate 
+ *   to ensure background service starts also benefit from log pruning (R104).
  * July.22.04:
  * - Hilt Hardening: Migrated from manual AppContainer to Hilt field injection.
  * July.21.00:
@@ -80,6 +83,10 @@ abstract class BaseMonitorService : LifecycleService() {
         
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
             startServiceForeground()
+            
+            // Issue #104b: Global Startup Maintenance Authority
+            // Ensure proactive log pruning is triggered during service startup to prevent I/O bottlenecks.
+            repository.proactivePruning()
             
             systemMonitor.setWatchdogListener { set, skipped ->
                 lifecycleScope.launch(Dispatchers.IO) {
