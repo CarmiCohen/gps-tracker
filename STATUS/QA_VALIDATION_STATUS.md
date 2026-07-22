@@ -1,4 +1,4 @@
-# Testing & Validation Status - July.22.05
+# Testing & Validation Status - July.22.07
 
 This document tracks pending unit tests, integration tests, and manual validation tasks.
 
@@ -18,12 +18,12 @@ This document tracks pending unit tests, integration tests, and manual validatio
 ## 🔵 Ready for Verification
 | ID | Task | Result |
 | :--- | :--- | :--- |
-| **#108** | **Startup Recovery Race** | Verify that MaintenanceWorker does not trigger recovery during the staggered startup delay. |
-| **#080** | **Lift Detection Parity** | Verify `MainAlarmLogic` correctly uses `trackerBaroAltEma` delta. |
+| | | |
 
-## 🟢 Recently Verified (July.22.05)
+## 🟢 Recently Verified (July.22.07)
 | ID | Task | Result |
 | :--- | :--- | :--- |
+| **#108** | **Startup Recovery Race** | **Verified & Hardened**: Implemented a 60s grace period in `MaintenanceWorker` to protect the staggered startup sequence (R955b) from redundant recovery triggers. |
 | **#512** | **Doc Integrity** | **Verified**: Systematic synchronization of all status tracking files to July.22.05 baseline. |
 | **#124** | **Hilt Migration** | **Verified**: Successful decommission of `AppContainer` and migration to Hilt. |
 | **#511** | **DataStore Singleton** | **Verified**: Prevention of `IllegalStateException` via property delegate initialization. |

@@ -1,30 +1,30 @@
-# Handover (July.22.06) - R405c Hardening & Hilt Finalization
+# Handover (July.22.07) - Startup & Recovery Hardening
 
 ## 🎯 Current Objective
-The **July.22.06** cycle successfully addressed the **R405c** requirement for Samsung hardware stability and finalized the decommissioning of the manual dependency injection container.
+The **July.22.07** cycle focused on hardening the synchronization between background maintenance and the staggered startup sequence required for budget hardware stability.
 
 ## 📊 Status Summary
 
-### 1. Samsung Stay-Alive Hardening (Issue #113 - COMPLETE)
-- **Self-Healing Loop**: Implemented a 5-minute periodic re-registration job in `AppSensorManager.kt` to recover Step Detector failures on budget hardware (Samsung A15).
-- **Pulse Efficacy**: Enhanced the Accelerometer-based stay-alive pulse to be more visible and consistent when primary hardware sensors are unavailable.
+### 1. Startup Recovery Hardening (Issue #108 - COMPLETE)
+- **Grace Period**: Implemented a 60-second `RECOVERY_GRACE_PERIOD_MS` in `MaintenanceWorker.kt`.
+- **Race Prevention**: The worker now defers recovery if `appStartTime` indicates a recent initialization, preventing redundant service restarts during the 4-second staggered startup (R955b).
 
-### 2. Hilt Universal Authority (Issue #126 - COMPLETE)
-- **Architecture Unified**: Every core component now utilizes constructor injection.
-- **Service Layer Hardened**: `BaseMonitorService`, `TrackerService`, and `ViewerService` are 100% Hilt-compliant.
-- **Physical Decommissioning**: `AppContainer.kt` and `MainViewModelFactory.kt` are no longer part of the build.
+### 2. Samsung Stay-Alive Hardening (Issue #113 - COMPLETE)
+- **Self-Healing Loop**: Periodic re-registration for Step Detector failures on budget hardware.
+- **Pulse Efficacy**: Enhanced Accelerometer-based stay-alive pulse for fallback scenarios.
 
-### 3. Forensic & Temporal Baseline (v9.5 Standards)
-- **DataStore Singleton (#511)**: Enforced via `Context.settingsDataStore` extension.
-- **Monotonic Continuity (#105)**: `HistoryManager` and `TrackerService` restore monotonic 'Rt' timelines.
+### 3. Hilt Universal Authority (Issue #126 - COMPLETE)
+- **Architecture Unified**: 100% Hilt-compliant service layer.
+- **Decommissioned**: `AppContainer.kt` and `MainViewModelFactory.kt` removed.
 
 ## 🔴 Immediate Next Tasks
-1. **QA Field Validation**: Monitor SM-A155F logs for "Stay-Alive Pulse (Accel Fallback Active)" and "Step Detector registration successful" events to confirm recovery in real-world scenarios.
+1. **QA Field Validation**: Monitor for "Within startup grace period" logs in Logcat during cold starts to verify the deferral logic.
+2. **Issue #031**: 24-hour stability audit for high-frequency tracking.
 
 ## 🚀 Git Release Commands
 ```bash
 git add .
-git commit -m "Hardening Release July.22.06: Samsung Stay-Alive Fallback (R405c) & Finalized Hilt Migration (#113, #125, #126)"
-git tag -a July.22.06 -m "July.22.06 Release: Unified Hilt DI & R405c Hardening"
+git commit -m "Hardening Release July.22.07: Startup Recovery Race Protection (#108) & R955b Integrity"
+git tag -a July.22.07 -m "July.22.07 Release: Startup Grace Period & Recovery Hardening"
 git push origin main --tags
 ```

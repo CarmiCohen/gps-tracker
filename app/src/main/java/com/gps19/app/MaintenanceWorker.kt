@@ -17,6 +17,9 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * July.22.07:
+ * - Issue #108: Startup Recovery Race Hardening. Added RECOVERY_GRACE_PERIOD_MS to prevent 
+ *   redundant recovery during staggered startup (R955b).
  * July.22.02:
  * - Issue #119: Boot Persistence Integrity. Added mandatory check for isSystemActive before recovery.
  * - Issue #120: Hilt Hardening. Converted to @HiltWorker for DI integrity.
@@ -31,23 +34,49 @@ class MaintenanceWorker @AssistedInject constructor(
     
     private val cachedPkgName = applicationContext.packageName
 
+    companion object {
+        private const val WORK_NAME = "GPS_Maintenance"
+        private const val RECOVERY_THRESHOLD_MS = 180000L // 3 minutes
+        private const val RECOVERY_GRACE_PERIOD_MS = 60000L // 1 minute startup protection
+
+        fun schedule(context: Context) {
+            val request = PeriodicWorkRequestBuilder<MaintenanceWorker>(15, TimeUnit.MINUTES)
+                .setBackoffCriteria(BackoffPolicy.LINEAR, 1, TimeUnit.MINUTES)
+                .build()
+
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                WORK_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
+                request
+            )
+            Log.d("GPS19", "MAINTENANCE: Work scheduled")
+        }
+    }
+
     override suspend fun doWork(): Result {
         val savedMode = repository.getAppMode()
-        // Issue #119: isSystemActive is the SoT for lifecycle revival
         val isSystemActive = repository.isSystemActiveFlow.firstOrNull() ?: repository.getBoolean(MainRepository.IS_SYSTEM_ACTIVE_KEY, false)
         
-        val recoveryThresholdMs = 180000L
-        val lastTick = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, 0L)
         val now = timeProvider.currentTimeMillis()
+        val lastTick = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, 0L)
+        val appStartTime = repository.getLong(MainRepository.APP_START_TIME_KEY, 0L)
+        
         val silenceDurationMs = now - lastTick
+        val appUptimeMs = now - appStartTime
         
         val isNetworkAlive = isNetworkAvailable(applicationContext)
         val networkStatus = if (isNetworkAlive) "ALIVE" else "DEAD"
 
-        Log.d("GPS19", "MAINTENANCE: Periodic check. Mode: $savedMode, Active: $isSystemActive, Silence: ${silenceDurationMs/1000}s, Net: $networkStatus")
+        Log.d("GPS19", "MAINTENANCE: Periodic check. Mode: $savedMode, Active: $isSystemActive, Silence: ${silenceDurationMs/1000}s, Uptime: ${appUptimeMs/1000}s, Net: $networkStatus")
+
+        // Issue #108: If the app just started, give it a grace period to complete staggered initialization (R955b)
+        if (appUptimeMs < RECOVERY_GRACE_PERIOD_MS) {
+            Log.d("GPS19", "MAINTENANCE: Within startup grace period (${appUptimeMs/1000}s). Skipping recovery check.")
+            return Result.success()
+        }
 
         if (savedMode != null && isSystemActive) {
-            if (lastTick == 0L || silenceDurationMs > recoveryThresholdMs) {
+            if (lastTick == 0L || silenceDurationMs > RECOVERY_THRESHOLD_MS) {
                 
                 if (isStorageCritical()) {
                     val storageMsg = "MAINTENANCE: Recovery ABORTED. Storage is CRITICAL."
@@ -123,23 +152,6 @@ class MaintenanceWorker @AssistedInject constructor(
             megabytesAvailable < SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB
         } catch (e: Exception) {
             false
-        }
-    }
-
-    companion object {
-        private const val WORK_NAME = "GPS_Maintenance"
-
-        fun schedule(context: Context) {
-            val request = PeriodicWorkRequestBuilder<MaintenanceWorker>(15, TimeUnit.MINUTES)
-                .setBackoffCriteria(BackoffPolicy.LINEAR, 1, TimeUnit.MINUTES)
-                .build()
-
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
-                request
-            )
-            Log.d("GPS19", "MAINTENANCE: Work scheduled")
         }
     }
 }

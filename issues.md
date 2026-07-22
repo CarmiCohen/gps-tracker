@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.22.06)
+# Project Issues & Hardening Tracking (July.22.07)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 328 |
+| **Resolved (Total)** | 🟢 Progress | 329 |
 
 ---
 
@@ -21,6 +21,10 @@ This document tracks active issues, technical debt, and pending implementation t
 *None.*
 
 ---
+
+## 🟢 Recently Resolved Issues (July.22.07)
+*   **Issue #108: Startup Recovery Race Hardening**.
+    *   **Resolution**: Implemented a `RECOVERY_GRACE_PERIOD_MS` (60s) in `MaintenanceWorker.kt`. The worker now verifies `appStartTime` before triggering recovery, ensuring that the staggered startup sequence (Requirement R955b) has sufficient time to initialize without redundant service restarts.
 
 ## 🟢 Recently Resolved Issues (July.22.06)
 *   **Issue #113: R405c Fallback Hardening (Samsung A15)**.

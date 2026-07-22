@@ -1,10 +1,11 @@
-# System Source of Truth (SoT) - July.22.06 (Hilt Baseline)
+# System Source of Truth (SoT) - July.22.07 (Startup Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Cold-Start Hardening (R955b)**: To prevent Main-thread frame skipping and ANRs on low-end hardware, the system MUST implement a mandatory 500ms staggered delay before starting base observations. (Issue #099)
+*   **Startup Recovery Protection (R955c)**: To prevent redundant service restarts during the staggered startup window, the `MaintenanceWorker` MUST implement a 60-second grace period from the `appStartTime` before attempting any recovery. (Issue #108)
 *   **Startup Maintenance Authority (R104)**: To prevent I/O bottlenecks and ANRs during cold starts, the system MUST execute a proactive `deepPruneLogs` operation on `Dispatchers.IO` immediately upon initialization. (Issue #104)
 *   **Lazy Safety**: All Hilt managers and repositories MUST use `LazyThreadSafetyMode.PUBLICATION` if any internal state requires lazy initialization to prevent thread stalling.
 
@@ -35,5 +36,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: `July.22.06`.
+*   **Current Release**: `July.22.07`.
 *   **Source of Truth**: `app/build.gradle` `versionName`.
