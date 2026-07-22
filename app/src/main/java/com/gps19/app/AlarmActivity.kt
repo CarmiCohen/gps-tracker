@@ -17,18 +17,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
 /**
  * AlarmActivity: Full-screen alarm overlay that bypasses the lock screen.
+ * July.22.04:
+ * - Hilt Hardening: Added @AndroidEntryPoint and migrated to Hilt-managed MainViewModel.
  * v9.5.0:
  * - Issue #503: Hilt Removal. Manual DI transition.
  */
+@AndroidEntryPoint
 class AlarmActivity : ComponentActivity() {
-    private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory(this, (application as GpsApplication).container)
-    }
+    private val viewModel: MainViewModel by viewModels()
     
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(

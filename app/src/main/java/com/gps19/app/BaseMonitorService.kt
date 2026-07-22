@@ -11,10 +11,13 @@ import com.gps19.core.engine.*
 import kotlinx.coroutines.*
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.inject.Inject
 import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * July.22.04:
+ * - Hilt Hardening: Migrated from manual AppContainer to Hilt field injection.
  * July.21.00:
  * - Build Hardening: Removed invalid isInitialized check on lazy repository property.
  * July.20.07:
@@ -22,32 +25,29 @@ import kotlin.math.max
  */
 abstract class BaseMonitorService : LifecycleService() {
 
-    protected val container by lazy { (application as GpsApplication).container }
-
-    // Lazy delegates ensure no Main-thread blocking during service creation
-    val configManager by lazy { container.configManager }
-    val logManager by lazy { container.logManager }
-    val connectivitySuite by lazy { container.connectivitySuite }
-    val repository by lazy { container.mainRepository }
-    val telemetryRepository by lazy { container.telemetryRepository }
-    val offlineRepository by lazy { container.offlineRepository }
-    val timeProvider by lazy { container.timeProvider }
+    @Inject lateinit var configManager: ConfigManager
+    @Inject lateinit var logManager: LogManager
+    @Inject lateinit var connectivitySuite: ConnectivitySuite
+    @Inject lateinit var repository: MainRepository
+    @Inject lateinit var telemetryRepository: TelemetryRepository
+    @Inject lateinit var offlineRepository: OfflineRepository
+    @Inject lateinit var timeProvider: TimeProvider
     
-    val systemMonitor by lazy { container.systemMonitor }
-    val notificationManager by lazy { container.appNotificationManager }
+    @Inject lateinit var systemMonitor: SystemMonitor
+    @Inject lateinit var notificationManager: AppNotificationManager
 
-    val gpsManager by lazy { container.gpsManager }
-    val sessionManager by lazy { container.sessionManager }
-    val systemStatusProvider by lazy { container.systemStatusProvider }
-    val forensicUseCase by lazy { container.serviceForensicUseCase }
-    val integrityMonitor by lazy { container.integrityMonitor }
-    val alarmManager by lazy { container.appAlarmManager }
-    val historyManager by lazy { container.historyManager }
-    val locationProcessor by lazy { container.locationProcessor }
-    val commandRouter by lazy { container.commandRouter }
+    @Inject lateinit var gpsManager: GpsManager
+    @Inject lateinit var sessionManager: SessionManager
+    @Inject lateinit var systemStatusProvider: SystemStatusProvider
+    @Inject lateinit var forensicUseCase: ServiceForensicUseCase
+    @Inject lateinit var integrityMonitor: IntegrityMonitor
+    @Inject lateinit var alarmManager: AppAlarmManager
+    @Inject lateinit var historyManager: HistoryManager
+    @Inject lateinit var locationProcessor: LocationProcessor
+    @Inject lateinit var commandRouter: CommandRouter
     
-    val appSensorManager by lazy { container.appSensorManager }
-    val serviceBehaviorUseCase by lazy { container.serviceBehaviorUseCase }
+    @Inject lateinit var appSensorManager: AppSensorManager
+    @Inject lateinit var serviceBehaviorUseCase: ServiceBehaviorUseCase
     
     protected val cachedPkgName by lazy { packageName }
 

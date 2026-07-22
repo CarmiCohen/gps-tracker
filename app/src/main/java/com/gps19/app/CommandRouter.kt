@@ -7,6 +7,7 @@ import android.content.IntentFilter
 import android.os.Build
 import com.gps19.core.engine.*
 import com.gps19.core.engine.LocationProcessor
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -16,13 +17,18 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import timber.log.Timber
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * July.22.04:
+ * - Hilt Hardening: Added @Inject constructor and @Singleton.
  * v9.5.0: Issue #513 - Flatten Service Architecture (ConnectivitySuite).
  */
-class CommandRouter(
-    private val context: Context,
+@Singleton
+class CommandRouter @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val configManager: ConfigManager,
     private val logManager: LogManager,
     private val connectivitySuite: ConnectivitySuite,

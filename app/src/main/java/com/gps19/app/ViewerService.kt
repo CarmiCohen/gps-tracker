@@ -7,6 +7,7 @@ import android.location.Location
 import android.os.Build
 import androidx.lifecycle.lifecycleScope
 import com.gps19.core.engine.*
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
@@ -15,12 +16,15 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.22.04:
+ * - Hilt Hardening: Added @AndroidEntryPoint.
  * July.21.00:
  * - Forensic Alignment: Renamed trackerLastValidFixRealtime to trackerLastValidFixRt.
  * - Build Hardening: Fully aligned pushCurrentStatus with expanded forensic signature.
  * July.20.07:
  * - Issue #117 Fix: Corrected property names in evaluateAlarmsInternal (trackerLuxBaseline, trackerAcousticFloorDb).
  */
+@AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
 
     private var settingsJob: Job? = null

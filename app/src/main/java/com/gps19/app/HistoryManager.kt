@@ -2,24 +2,30 @@ package com.gps19.app
 
 import android.content.Context
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * July.22.04:
+ * - Hilt Hardening: Added @Inject constructor and @Singleton.
  * July.21.00:
  * - Issue #105: Forensic Ribbon Continuity Verification.
  * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timing.
  * - Restored SNR and expanded sensor snapshots (Sit, Proximity, Baro) for high-fidelity backfilling.
  * - Maintained Hilt compatibility.
  */
-class HistoryManager(
-    private val context: Context,
+@Singleton
+class HistoryManager @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
     private val gpsManager: GpsManager,

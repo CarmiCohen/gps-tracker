@@ -4,20 +4,12 @@ import android.app.Application
 import android.util.Log
 import androidx.preference.PreferenceManager
 import androidx.work.Configuration
-import androidx.work.ListenableWorker
-import androidx.work.WorkerFactory
-import androidx.work.WorkerParameters
 import android.content.Context
 import androidx.hilt.work.HiltWorkerFactory
-import com.gps19.core.engine.TimeProvider
 import org.osmdroid.config.Configuration as OsmConfig
 import timber.log.Timber
 import javax.inject.Inject
-import dagger.hilt.android.EntryPointAccessors
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
 import dagger.hilt.android.HiltAndroidApp
-import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,21 +17,19 @@ import java.io.File
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * July.22.04:
+ * - Hilt Hardening: Fully decommissioned manual AppContainer.
  * July.21.00:
  * - Build Hardening: Added missing HiltWorkerFactory import.
  * July.20.07:
  * - Issue #115: Startup Hardening. Migrated from GlobalScope to managed @ApplicationScope.
- * - Issue #112: Suppressed 'mbrainSDK' load failure logs from forensic repository.
- * - Issue #109: Optimized startup by offloading WorkManager and osmdroid setup to IO scope.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
-    
-    // Legacy container for non-Hilt components (BaseMonitorService still uses this)
-    lateinit var container: AppContainer
+    @Inject lateinit var logManager: LogManager
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -49,13 +39,11 @@ class GpsApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         
-        container = AppContainer(this)
-        
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
 
-        // Issue #112: Suppress vendor SDK noise that cannot be resolved at the project level.
+        // Issue #112: Suppress vendor SDK noise and route errors to hardened LogManager sink.
         Timber.plant(object : Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
                 if (message.contains("mbrainSDK", ignoreCase = true)) return
@@ -64,7 +52,7 @@ class GpsApplication : Application(), Configuration.Provider {
                     try {
                         val fullMessage = if (tag != null) "[$tag] $message" else message
                         val suffix = t?.let { ": ${it.stackTraceToString().take(500)}" } ?: ""
-                        container.logManager.logServiceEvent("CRITICAL ERROR: $fullMessage$suffix", true)
+                        logManager.logServiceEvent("CRITICAL ERROR: $fullMessage$suffix", true)
                     } catch (e: Exception) {
                     }
                 }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.gps19.core.engine.LocationProcessor
 import com.gps19.core.engine.TimeProvider
+import com.gps19.core.engine.ViolationProcessor
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -95,6 +96,12 @@ abstract class AppModule {
         @Singleton
         fun provideLocationProcessor(timeProvider: TimeProvider): LocationProcessor {
             return LocationProcessor(timeProvider)
+        }
+
+        @Provides
+        @Singleton
+        fun provideViolationProcessor(timeProvider: TimeProvider): ViolationProcessor {
+            return ViolationProcessor(timeProvider)
         }
     }
 }

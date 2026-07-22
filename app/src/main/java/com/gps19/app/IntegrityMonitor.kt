@@ -11,19 +11,25 @@ import android.os.Build
 import android.os.PowerManager
 import android.os.StatFs
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * July.22.04:
+ * - Hilt Hardening: Added @Inject constructor and @Singleton.
  * July.21.00:
  * - Forensic Timing: Fully aligned with monotonic Rt pipeline.
  * - Issue #516: De-duplicate "Status" Logic. Using SystemHealthState.
  * - Issue #523: Thread Safety. Synchronized access to currentHealth.
  * - Issue #524: Power Reset. Added onViolationResolved to clear pending power alarms.
  */
-class IntegrityMonitor(
-    private val context: Context,
+@Singleton
+class IntegrityMonitor @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider
 ) {

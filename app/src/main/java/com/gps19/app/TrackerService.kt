@@ -10,6 +10,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.gps19.core.engine.*
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
@@ -18,11 +19,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.22.04:
+ * - Hilt Hardening: Added @AndroidEntryPoint.
  * July.21.00:
  * - Forensic Hardening: Aligned pushCurrentStatus and updateRibbons with SIT/Forensic indices.
  * - Issue #108 Hardening: Immediate timestamp refresh in onCreate.
  * - Issue #102: Temporal Forensic Integrity. Standardized on nowRt.
  */
+@AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
 
     private var gpsCollectionJob: Job? = null

@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 322 |
+| **Resolved (Total)** | 🟢 Progress | 323 |
 
 ---
 
@@ -24,25 +24,12 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🟢 Recently Resolved Issues (July.22.04)
+*   **Issue #124: Hilt Migration Completion & AppContainer Decommissioning**.
+    *   **Resolution**: Fully migrated all services, activities, repositories, and managers to Hilt. Removed manual DI logic from `GpsApplication` and `BaseMonitorService`.
 *   **Issue #511: DataStore Singleton Violation**.
-    *   **Resolution**: Refactored `SettingsRepository` to use a single `DataStore` instance via `Context` extension delegate. This ensures that even during the Hilt transition, multiple repository instances share the same underlying `DataStore` connection, preventing `IllegalStateException`.
+    *   **Resolution**: Refactored `SettingsRepository` to use a single `DataStore` instance via `Context` extension delegate.
 
 ## 🟢 Recently Resolved Issues (July.22.02)
 *   **Issue #119: Boot Persistence Integrity**.
-    *   **Resolution**: Hardened the system revival master switch. `BootServiceStartWorker` and `MaintenanceWorker` now rigorously check `isSystemActive` before attempting to start or recover foreground services.
 *   **Issue #120: Hilt Worker Hardening**.
-    *   **Resolution**: Systematic conversion of all background workers (`MaintenanceWorker`, `BootServiceStartWorker`) to `@HiltWorker` with assisted injection to ensure dependency integrity across process boundaries.
 *   **Issue #122: SIT Propagation Depth & Relay Audit**.
-    *   **Resolution**: Hardened the binary and JSON telemetry pipelines. Updated `RealtimeStatus` Protobuf and `TrackerStatus` mapping to include all 15+ forensic parameters (tiltIdx, baroIdx, sitBaro, sitTilt, sitShock, etc.). Verified relay-server schema-agnostic compatibility.
-
-## 🟢 Recently Resolved Issues (July.22.01)
-*   **Issue #118: Final Forensic Parity Synchronization**.
-    *   **Resolution**: Standardized 15+ forensic parameters (`snrIdx`, `noiseIdx`, `luxIdx`, `vibeIdx`, `liftIdx`, `proxIdx`, and SIT fields) across `LocationUpdate`, `TrackerStatus`, `SystemHealthState`, `HistoryEntity`, and Protobuf (`RealtimeStatus`).
-*   **Issue #123: Version Consolidation**.
-    *   **Resolution**: Updated all version references to `July.22.01` and synchronized `app/build.gradle`.
-
-## 🟢 Recently Resolved Issues (July.20.07)
-*   **Issue #117: ViewerService Compilation Restoration**.
-*   **Issue #107: Step Detector Hardware Registration Hardening**.
-*   **Issue #114: Monotonic Timeline Boundary Audit**.
-*   **Issue #115: Startup Scope Hardening (GlobalScope Removal)**.

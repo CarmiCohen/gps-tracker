@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.22.04 (DataStore Hardening Final)
+# System Source of Truth (SoT) - July.22.04 (Hilt Migration Complete)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -6,7 +6,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Cold-Start Hardening (R955b)**: To prevent Main-thread frame skipping and ANRs on low-end hardware, the system MUST implement a mandatory 500ms staggered delay before starting base observations. (Issue #099)
 *   **Startup Maintenance Authority (R104)**: To prevent I/O bottlenecks and ANRs during cold starts, the system MUST execute a proactive `deepPruneLogs` operation on `Dispatchers.IO` immediately upon initialization. (Issue #104)
-*   **Lazy Safety**: All properties in `AppContainer` (and now Hilt managers) MUST use `LazyThreadSafetyMode.PUBLICATION` to prevent thread stalling during background warm-ups.
+*   **Lazy Safety**: All Hilt managers and repositories MUST use `LazyThreadSafetyMode.PUBLICATION` if any internal state requires lazy initialization to prevent thread stalling.
 
 ### 2. Temporal & Forensic Integrity
 *   **Temporal Forensic Integrity (R102)**: To ensure logic stability against system clock drifts or manual adjustments, the engine MUST employ a dual-time strategy using monotonic `rt` for logic and wall-clock `ts` for forensic logging. (Issue #102)
@@ -17,13 +17,13 @@ This document serves as the definitive operational specification. All Issue IDs 
 
 ### 3. Persistence & Service Reliability
 *   **Activation Authority**: The `isSystemActive` flag in `DataStore` is the definitive authority for background lifecycle revival. Background services MUST NOT restart automatically unless this flag is set.
-*   **DataStore Singleton Authority (R511)**: To prevent `IllegalStateException` during startup, Jetpack DataStore MUST be initialized via the `Context.dataStore` property delegate. This ensures exactly one instance exists per file across both Hilt and manual DI containers. (Issue #511)
+*   **DataStore Singleton Authority (R511)**: To prevent `IllegalStateException` during startup, Jetpack DataStore MUST be initialized via the `Context.dataStore` property delegate. This ensures exactly one instance exists per process across all Hilt entry points. (Issue #511)
 *   **Notification Throttling (R993)**: Foreground notification updates MUST BE throttled (default 30s) to prevent system-wide Logcat flooding and reduce CPU wakeups. (Issue #R993)
 *   **Database Migration Integrity (R956b)**: Any change to an `@Entity` class MUST be accompanied by a version bump and an explicit `Migration` object. (Issue #097, #118)
 *   **Standardized Proto Path (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`. (Issue #030)
 
 ### 4. Dependency & Hardware Hardening
-*   **DI Integrity Authority (R120)**: All core repositories, UseCases, and managers MUST be integrated into the Hilt graph using `@Inject` constructors and `@Singleton` scoping. Circularities MUST be resolved via Dagger `Provider<T>` at the injection site. (Issue #120)
+*   **Hilt Universal Authority (R120b)**: The manual `AppContainer` is fully decommissioned. All core repositories, UseCases, and managers MUST be integrated into the Hilt graph using `@Inject` constructors and `@Singleton` scoping. Manual DI is forbidden. Circularities MUST be resolved via Dagger `Provider<T>`. (Issue #120, #124)
 *   **Samsung A15 Battery Authority (R405b)**: The system MUST proactively trigger the configuration overlay if battery exemption is missing on Samsung A15 hardware. (Issue #101)
 *   **Samsung Stay-Alive Fallback (R405c)**: The system MUST detect hardware sensor registration failures and immediately engage the Accelerometer-based stay-alive pulse. (Issue #098)
 *   **Step Detector Permission (R107)**: The system MUST explicitly track `android.permission.ACTIVITY_RECOGNITION` to ensure hardware Step Detector availability on API 29+. (Issue #107)
