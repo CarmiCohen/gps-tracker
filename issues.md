@@ -7,12 +7,11 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 321 |
+| **Resolved (Total)** | 🟢 Progress | 322 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Issue #511: DataStore Singleton Violation**: Multiple instances of `SettingsRepository` (Hilt + AppContainer) causing `IllegalStateException`.
 *   **Issue #121: Provider Latency**: Circularity resolution via `Provider<T>` is stable but introduces minor lookup overhead in `LogManager`.
 *   **Issue #120b: Budget Hardware Initialization Spikes**: Budget devices (A15) remain sensitive. The 500ms staggered startup is critical.
 

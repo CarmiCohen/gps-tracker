@@ -3,8 +3,7 @@ package com.gps19.app
 import android.content.Context
 import androidx.datastore.core.DataMigration
 import androidx.datastore.core.DataStore
-import androidx.datastore.core.DataStoreFactory
-import androidx.datastore.dataStoreFile
+import androidx.datastore.dataStore
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +15,22 @@ import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * Extension property to ensure a single instance of DataStore per process.
+ * Resolved Issue #511: DataStore Singleton Violation.
+ */
+private val Context.settingsDataStore: DataStore<AppSettings> by dataStore(
+    fileName = "app_settings.pb",
+    serializer = AppSettingsSerializer,
+    produceMigrations = { context ->
+        listOf(
+            AppSettingsMigration(context),
+            SettingsRepository.typeMigration,
+            SettingsRepository.identitySanitizationMigration
+        )
+    }
+)
 
 /**
  * CommitResult: Result of an atomic draft commit to primary settings.
@@ -32,11 +47,10 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * July.22.03:
+ * - Issue #511: DataStore Singleton Hardening. Switched to Context.dataStore delegate.
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor and @ApplicationContext.
- * July.20.07:
- * - Issue #103: Added CLOCK_DRIFT_REF_KEY for forensic integrity.
- * - Added CHAIR_BASELINE_TILT_KEY and LAST_SIT_TS_KEY for session forensic state.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -44,68 +58,7 @@ class SettingsRepository @Inject constructor(
     private val timeProvider: TimeProvider
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
-
-    private val typeMigration = object : DataMigration<AppSettings> {
-        override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
-            return currentData.hasLegacyMaxDistance() || 
-                   currentData.hasLegacyMaxAccuracy() || 
-                   currentData.hasLegacyMaxTemp()
-        }
-
-        override suspend fun migrate(currentData: AppSettings): AppSettings {
-            val builder = currentData.toBuilder()
-            if (currentData.hasLegacyMaxDistance()) {
-                builder.setMaxDistance(currentData.legacyMaxDistance.toDouble())
-                builder.clearLegacyMaxDistance()
-            }
-            if (currentData.hasLegacyMaxAccuracy()) {
-                builder.setMaxAccuracy(currentData.legacyMaxAccuracy.toDouble())
-                builder.clearLegacyMaxAccuracy()
-            }
-            if (currentData.hasLegacyMaxTemp()) {
-                builder.setMaxTemp(currentData.legacyMaxTemp.toDouble())
-                builder.clearLegacyMaxTemp()
-            }
-            return builder.build()
-        }
-
-        override suspend fun cleanUp() {}
-    }
-
-    private val identitySanitizationMigration = object : DataMigration<AppSettings> {
-        override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
-            val t = currentData.trackerId
-            val v = currentData.viewerId
-            val isTrackerInvalid = t.isNotEmpty() && !SignalingConstants.isValidTrackerId(t)
-            val isViewerInvalid = v.isNotEmpty() && !SignalingConstants.isValidViewerId(v)
-            return isTrackerInvalid || isViewerInvalid
-        }
-
-        override suspend fun migrate(currentData: AppSettings): AppSettings {
-            val builder = currentData.toBuilder()
-            if (currentData.trackerId.isNotEmpty() && !SignalingConstants.isValidTrackerId(currentData.trackerId)) {
-                builder.setTrackerId(DEFAULT_TRACKER_ID)
-                builder.setIdentitySanitized(true)
-            }
-            if (currentData.viewerId.isNotEmpty() && !SignalingConstants.isValidViewerId(currentData.viewerId)) {
-                builder.setViewerId(DEFAULT_VIEWER_ID)
-                builder.setIdentitySanitized(true)
-            }
-            return builder.build()
-        }
-
-        override suspend fun cleanUp() {}
-    }
-
-    private val dataStore: DataStore<AppSettings> = DataStoreFactory.create(
-        serializer = AppSettingsSerializer,
-        produceFile = { context.dataStoreFile("app_settings.pb") },
-        migrations = listOf(
-            AppSettingsMigration(context), 
-            typeMigration,
-            identitySanitizationMigration
-        )
-    )
+    private val dataStore = context.settingsDataStore
 
     companion object {
         const val APP_MODE_KEY = "app_mode"
@@ -164,6 +117,58 @@ class SettingsRepository @Inject constructor(
         const val LAST_SIT_TS_KEY = "last_sit_ts"
         const val CHAIR_BASELINE_TILT_KEY = "chair_baseline_tilt"
         const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
+
+        internal val typeMigration = object : DataMigration<AppSettings> {
+            override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
+                return currentData.hasLegacyMaxDistance() || 
+                       currentData.hasLegacyMaxAccuracy() || 
+                       currentData.hasLegacyMaxTemp()
+            }
+
+            override suspend fun migrate(currentData: AppSettings): AppSettings {
+                val builder = currentData.toBuilder()
+                if (currentData.hasLegacyMaxDistance()) {
+                    builder.setMaxDistance(currentData.legacyMaxDistance.toDouble())
+                    builder.clearLegacyMaxDistance()
+                }
+                if (currentData.hasLegacyMaxAccuracy()) {
+                    builder.setMaxAccuracy(currentData.legacyMaxAccuracy.toDouble())
+                    builder.clearLegacyMaxAccuracy()
+                }
+                if (currentData.hasLegacyMaxTemp()) {
+                    builder.setMaxTemp(currentData.legacyMaxTemp.toDouble())
+                    builder.clearLegacyMaxTemp()
+                }
+                return builder.build()
+            }
+
+            override suspend fun cleanUp() {}
+        }
+
+        internal val identitySanitizationMigration = object : DataMigration<AppSettings> {
+            override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
+                val t = currentData.trackerId
+                val v = currentData.viewerId
+                val isTrackerInvalid = t.isNotEmpty() && !SignalingConstants.isValidTrackerId(t)
+                val isViewerInvalid = v.isNotEmpty() && !SignalingConstants.isValidViewerId(v)
+                return isTrackerInvalid || isViewerInvalid
+            }
+
+            override suspend fun migrate(currentData: AppSettings): AppSettings {
+                val builder = currentData.toBuilder()
+                if (currentData.trackerId.isNotEmpty() && !SignalingConstants.isValidTrackerId(currentData.trackerId)) {
+                    builder.setTrackerId(DEFAULT_TRACKER_ID)
+                    builder.setIdentitySanitized(true)
+                }
+                if (currentData.viewerId.isNotEmpty() && !SignalingConstants.isValidViewerId(currentData.viewerId)) {
+                    builder.setViewerId(DEFAULT_VIEWER_ID)
+                    builder.setIdentitySanitized(true)
+                }
+                return builder.build()
+            }
+
+            override suspend fun cleanUp() {}
+        }
     }
 
     val appModeFlow: Flow<String?> = dataStore.data.map { it.appMode.ifEmpty { null } }
