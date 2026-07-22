@@ -1,4 +1,4 @@
-# Setup Guide & Configuration Mechanism (v8.9.37)
+# Setup Guide & Configuration Mechanism (July.22.05)
 
 This document describes the implementation of the "Phone Setup" guide and the persistence logic for application settings.
 
@@ -10,34 +10,21 @@ The guide targets specific system bottlenecks:
 1.  **Lock in Recents**: Prevents OS-level eviction.
 2.  **Battery Mode**: Directs the user to enable "Unrestricted" battery mode.
 3.  **Display Over Apps**: Essential for the `AlarmOverlay` to bypass the lock screen.
-4.  **Microphone Access**: Essential for the Acoustic Sentinel.
-5.  **Auto-start & Background Restrictions**: Specifically targets Xiaomi (MIUI/HyperOS) and Samsung. Verified via `isXiaomiAutostartGranted`.
-6.  **Wi-Fi Power Saving**: Advises disabling Wi-Fi sleep policies.
-7.  **Exact Alarms**: Required for the watchdog system on Android 12+.
-8.  **Notification Permission**: Required for Foreground Service visibility.
+4.  **Samsung A15 Battery Authority (R405b)**: Specialized guidance for Samsung A15 devices to prevent background service termination (Issue #101).
+5.  **Auto-start & Background Restrictions**: Specifically targets Xiaomi (MIUI/HyperOS) and Samsung.
 
-### B. Device-Specific Logic
-- **Xiaomi Detection**: Adds specialized sections for MIUI-specific permissions. Includes `ALERT_ID_XIAOMI_SYSTEM_MISSING` monitoring and manual override support. Guidance updated for v8.9.37 (Issue #190).
-- **Samsung A15 Detection**: Adjusts proximity debounce thresholds (Issue #363).
+## 2. Setting Persistence (`SettingsRepository`)
+The application uses a **Hilt-managed Jetpack DataStore** for configuration.
 
-## 2. Setting Persistence (`MainViewModel` & `SettingsRepository`)
-The application uses a **Reactive Draft System** for managing settings.
+### A. Singleton Authority (R511)
+To prevent `IllegalStateException` during startup, the `SettingsRepository` accesses DataStore via a `Context.dataStore` property delegate. This ensures exactly one instance exists per process, shared across all Hilt entry points (Issue #511).
 
-### A. Draft Logic
-1.  A "Draft" copy of the settings is created in `MainViewModel`.
-2.  UI interactions modify the **Draft** only.
-3.  **Commit on Exit**: Exiting the Settings overlay triggers an atomic write to `DataStore` (**Requirement R800**).
-
-### B. Role Agnostic Parity
-Configuration fields are accessible and modifiable in both Tracker and Viewer roles.
+### B. Reactive Updates
+UI components observe settings via a `Flow<Settings>` exposed by the repository, ensuring real-time UI updates across Tracker and Viewer roles.
 
 ### C. Debounced Sync
-Significant changes (Relay URL/IDs) trigger a debounced re-initialization of the network stack and service roles.
+Significant changes (Relay URL/IDs) trigger a debounced re-initialization of the network stack.
 
 ## 3. Configuration Management
 - **Load Config**: Import JSON configuration for instant setup.
-- **Export Logs**: Provides a forensic snapshot of event history. Standardized to include the mandatory `role` field and **Log Spatial Anchors** (Issue #208).
-
-## 4. Navigation Refinement
-- **Implicit Navigation**: The Settings page uses system Back gestures as the primary "Apply" trigger.
-- **Ghost Mode UX**: Visual staleness indicators are applied globally (Issue #338).
+- **Export Logs**: Provides a forensic snapshot of event history. Standardized to include mandatory role fields and Log Spatial Anchors.

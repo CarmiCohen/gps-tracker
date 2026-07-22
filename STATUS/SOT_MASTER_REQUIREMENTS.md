@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.22.04 (Hilt Migration Complete)
+# System Source of Truth (SoT) - July.22.05 (Baseline Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -35,5 +35,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: `July.22.04`.
+*   **Current Release**: `July.22.05`.
 *   **Source of Truth**: `app/build.gradle` `versionName`.

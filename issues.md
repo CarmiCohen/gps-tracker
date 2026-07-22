@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 324 |
+| **Resolved (Total)** | 🟢 Progress | 325 |
 
 ---
 
@@ -25,6 +25,8 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🟢 Recently Resolved Issues (July.22.05)
+*   **Issue #126: Complete Hilt Migration and Decommission**.
+    *   **Resolution**: Finalized Hilt transition by decommissioning legacy `AppContainer.kt` and `MainViewModelFactory.kt`. Conducted code-wide audit to confirm zero remaining references to manual DI container.
 *   **Issue #124: Hilt Migration Completion & AppContainer Decommissioning**.
     *   **Resolution**: Fully migrated all services, activities, repositories, and managers to Hilt. Removed manual DI logic from `GpsApplication` and `BaseMonitorService`.
 
