@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.23.00 (Remote State Centralized)
+# System Source of Truth (SoT) - July.23.02 (Forensic Pipeline Atomic)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -14,6 +14,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Temporal Forensic Integrity (R102)**: To ensure logic stability against system clock drifts or manual adjustments, the engine MUST employ a dual-time strategy using monotonic `rt` for logic and wall-clock `ts` for forensic logging. (Issue #102)
 *   **Forensic Parity Authority (R118)**: The system MUST maintain strict field parity across engine models (`LocationUpdate`), persistence (`HistoryEntity`, Database `v59`), telemetry pipelines (Binary/JSON Relay), and UI data structures for all 15+ forensic SIT (Sit Detection) and Indexing parameters. (Issue #118, #122)
 *   **Remote Peer State Authority (R522)**: All remote tracker telemetry (GPS, Battery, 15+ SIT forensic parameters) MUST be centralized in the Hilt-managed `RemoteStatusRepository`. `ConnectivitySuite` and UI (`MainViewModel`) MUST use this repository as the single source of truth to prevent state fragmentation. (Issue #522)
+*   **Forensic Pipeline Consolidation (R523)**: The system MUST employ an atomic `ForensicSnapshot` for all sensor-based evaluations (Alarms, SIT heuristics, Telemetry) to prevent race conditions and double-consumption of peak values during the logic tick. (Issue #523)
 *   **Monotonic Timeline Reconstruction (R105)**: To ensure "1Hz Ribbon Fidelity" across process boundaries, the system MUST reconstruct the monotonic timeline on startup using `clock_drift_ref`. (Issue #105)
 *   **Unified Method for Ribbon Rendering (R106)**: The system MUST implement a unified method for rendering ribbons across all scales. Missing data periods (app-off or service-death) MUST be explicitly visualized as "Black Gaps." (Issue #106)
 *   **Forensic Visual Authority (R404b)**: The system MUST use a standardized `FORENSIC_PINK_COLOR` (#FF1493) for all forensic events. (v9.3.18)
@@ -38,5 +39,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: `July.23.00`.
+*   **Current Release**: `July.23.02`.
 *   **Source of Truth**: `app/build.gradle` `versionName`.

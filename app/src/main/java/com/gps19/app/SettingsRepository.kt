@@ -197,9 +197,9 @@ class SettingsRepository @Inject constructor(
                 LAST_GPS_TS_KEY -> builder.setLastGpsTs(value)
                 VIOLATION_UPTIME_MS_KEY -> builder.setViolationUptimeMs(value)
                 LAST_SERVICE_TICK_REALTIME_KEY -> builder.setLastServiceTickRt(value)
-                CLOCK_DRIFT_REF_KEY -> if (settings.hasClockDriftRef()) settings.clockDriftRef else 0L
-                LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else 0L
-                LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else 0L
+                CLOCK_DRIFT_REF_KEY -> if (current.hasClockDriftRef()) builder.setClockDriftRef(value) else builder.setClockDriftRef(value)
+                LAST_SIT_TS_KEY -> builder.setLastSitTs(value)
+                LAST_HISTORY_SIT_TS_KEY -> builder.setLastHistorySitTs(value)
             }
             builder.build()
         }
@@ -318,7 +318,7 @@ class SettingsRepository @Inject constructor(
     suspend fun getInt(keyName: String, default: Int): Int {
         val settings = dataStore.data.first()
         val value = when (keyName) {
-            LAST_AUTO_SAVE_HOUR_KEY -> settings.lastAuto_save_hour
+            LAST_AUTO_SAVE_HOUR_KEY -> settings.lastAutoSaveHour
             LAST_VERSION_CODE_KEY -> settings.lastVersionCode
             else -> -1
         }

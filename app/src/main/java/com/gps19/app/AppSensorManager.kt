@@ -27,14 +27,12 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.23.01:
+ * - Forensic Consolidation: Implemented consumeForensicSnapshot() to provide an atomic 
+ *   state of all forensic parameters, preventing double-consumption bugs (Issue #523).
  * July.22.08:
  * - Issue #113 (R405c Hardening): Upgraded Stay-Alive pulse to hardware poke via SystemMonitor 
  *   to prevent OS eviction on Samsung A15.
- * July.22.06:
- * - Issue #113 (R405c Hardening): Implemented Self-Healing Step Detector recovery loop (5-minute interval).
- * July.20.07:
- * - Issue #077 Hardening: Optimized sensor pipeline for Float-first processing.
- * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timing variables with 'Rt'.
  */
 class AppSensorManager(
     private val context: Context,
@@ -151,6 +149,29 @@ class AppSensorManager(
         val acoustic: Double,
         val isSitDetected: Boolean
     )
+
+    data class ForensicSnapshot(
+        val vibration: Double,
+        val heading: Double,
+        val baroAlt: Double,
+        val lux: Double,
+        val isNear: Boolean,
+        val tiltDegrees: Double,
+        val acousticDb: Double,
+        val peakShock: Double,
+        val peakVerticalVelocity: Double,
+        val peakVerticalVelocityTs: Long,
+        val peakVerticalVelocityRt: Long,
+        val plungeMatched: Boolean,
+        val peakVerticalDisplacement: Double,
+        val proximityIdx: Double,
+        val proximityCm: Double,
+        val proximityDebounceMs: Long,
+        val vibrationRollingSum: Double,
+        val acousticPeak: Double,
+        val acousticMin: Double
+    )
+
     private val sensorSampleBuffer = ConcurrentLinkedQueue<SensorSnapshot>()
     private var lastBufferRecordRt = 0L
 
@@ -296,7 +317,7 @@ class AppSensorManager(
                 delay(300000L) // 5 Minutes (Issue #098 R405c Self-Healing)
                 if (!isStepDetectorRegistered) {
                     Timber.i("Issue #113: Step Detector registration stale. Attempting recovery...")
-                    attemptStepDetectorRegistration()
+                    attemptStepRegistration()
                 }
             }
         }
@@ -312,6 +333,10 @@ class AppSensorManager(
             }
             registered
         } ?: false
+    }
+
+    private fun attemptStepRegistration() {
+        attemptStepDetectorRegistration()
     }
 
     fun setHardwareFailureCallback(callback: (String) -> Unit) {
@@ -363,11 +388,8 @@ class AppSensorManager(
                 processVibration(values[0], values[1], values[2])
                 updateOrientation()
                 
-                // R405 Fallback: If hardware Step Detector is missing OR registration failed (Issue #098),
-                // use Accelerometer pulses to maintain process priority on Samsung devices.
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) {
                     lastStayAliveRt = nowRt
-                    // Issue #113: Hardware poke to signal activity to OS Power Manager
                     systemMonitor.acquireWakeLock(force = true)
                     Timber.i("Issue #113: Stay-Alive Pulse (Accel Fallback Poked)")
                 }
@@ -507,16 +529,47 @@ class AppSensorManager(
 
     private fun stopAcousticMonitoring() { isMonitoring = false; isAcousticRunning = false; acousticThread?.interrupt(); acousticThread = null }
     fun isAcousticMonitoringActive(): Boolean = isAcousticRunning
-    fun consumeAcousticPeak(): Double { synchronized(this) { val p = internalPeakDb; internalPeakDb = 0.0; currentAcousticDb = p; return p } }
-    fun consumeAcousticMin(): Double { synchronized(this) { val m = if (internalMinDb >= 100.0) -1.0 else internalMinDb; internalMinDb = 100.0; return m } }
+
+    fun consumeForensicSnapshot(): ForensicSnapshot {
+        synchronized(this) {
+            val snapshot = ForensicSnapshot(
+                vibration = currentVibrationIndex,
+                heading = currentCompassHeading,
+                baroAlt = absoluteAltitude,
+                lux = currentLux,
+                isNear = isProximityNear,
+                tiltDegrees = currentTiltDegrees,
+                acousticDb = currentAcousticDb,
+                peakShock = internalPeakVibration,
+                peakVerticalVelocity = internalPeakVerticalVelocity,
+                peakVerticalVelocityTs = internalPeakVerticalVelocityTs,
+                peakVerticalVelocityRt = internalPeakVerticalVelocityRt,
+                plungeMatched = !isWarming && plungeMatched,
+                peakVerticalDisplacement = internalPeakVerticalDisplacement,
+                proximityIdx = proximityIdx,
+                proximityCm = currentProximityCm,
+                proximityDebounceMs = proximityDebounceMs,
+                vibrationRollingSum = vibrationRollingSum,
+                acousticPeak = internalPeakDb,
+                acousticMin = if (internalMinDb >= 100.0) -1.0 else internalMinDb
+            )
+            
+            // Atomic Reset of Peaks
+            internalPeakVibration = 0.0
+            internalPeakVerticalVelocity = 0.0
+            internalPeakVerticalVelocityTs = 0L
+            internalPeakVerticalVelocityRt = 0L
+            internalPeakVerticalDisplacement = 0.0
+            plungeMatched = false
+            internalPeakDb = 0.0
+            internalMinDb = 100.0
+            
+            return snapshot
+        }
+    }
+
     fun getSensorSamples(fromTs: Long, toTs: Long): List<SensorSnapshot> = sensorSampleBuffer.filter { it.ts in fromTs..toTs }
     fun getAcousticSamples(fromTs: Long, toTs: Long): List<Pair<Long, Double>> = sensorSampleBuffer.filter { it.ts in fromTs..toTs }.map { it.ts to it.acoustic }
-    fun consumePeakVibration(): Double { synchronized(this) { val p = internalPeakVibration; internalPeakVibration = 0.0; return p } }
-    fun consumePeakVerticalVelocity(): Double { synchronized(this) { val p = internalPeakVerticalVelocity; internalPeakVerticalVelocity = 0.0; return p } }
-    fun consumePeakVerticalVelocityTs(): Long { synchronized(this) { val p = internalPeakVerticalVelocityTs; internalPeakVerticalVelocityTs = 0L; return p } }
-    fun consumePeakVerticalVelocityRt(): Long { synchronized(this) { val p = internalPeakVerticalVelocityRt; internalPeakVerticalVelocityRt = 0L; return p } }
-    fun consumePeakVerticalDisplacement(): Double { synchronized(this) { val p = internalPeakVerticalDisplacement; internalPeakVerticalDisplacement = 0.0; return p } }
-    fun consumePlungeMatched(): Boolean { synchronized(this) { val m = !isWarming && plungeMatched; plungeMatched = false; return m } }
 
     private fun processVibration(x: Float, y: Float, z: Float) {
         val dx = x - lastAccelX; val dy = y - lastAccelY; val dz = z - lastAccelZ

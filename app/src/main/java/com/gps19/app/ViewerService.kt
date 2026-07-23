@@ -503,7 +503,7 @@ class ViewerService : BaseMonitorService() {
                 serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime,
                 appStartTime = sessionManager.appStartTime, isTrackerMode = false,
                 isRelayConnected = isSocketConnected, isTrackerConnected = isTrackerConnected,
-                status = connectivitySuite.trackerStatus,
+                status = connectivitySuite.trackerStatus.status,
                 isJammer = isTrackerJammerSuspicion,
                 jumpTier = connectivitySuite.trackerJumpTier,
                 trackerLat = connectivitySuite.trackerLat, trackerLng = connectivitySuite.trackerLng, trackerAccuracy = connectivitySuite.trackerAccuracy,

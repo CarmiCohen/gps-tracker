@@ -19,12 +19,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.23.01:
+ * - Forensic Consolidation: Integrated AppSensorManager.consumeForensicSnapshot() 
+ *   to ensure atomic state propagation and prevent peak double-consumption (Issue #523).
  * July.23.00:
  * - SIT Hardening (Issue #522): Fed local sensor telemetry into LocationProcessor 
  *   to activate refined Sit-Detection heuristic. Captured and propagated all 
  *   forensic parameters (Vz, Dz, Plunge, Shock).
- * July.22.04:
- * - Hilt Hardening: Added @AndroidEntryPoint.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -347,30 +348,25 @@ class TrackerService : BaseMonitorService() {
         val isViewerActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isPeerAvailable = isSocketConnected && isViewerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
-        // Capture forensic parameters (Single consumption)
-        val localPlunge = appSensorManager.consumePlungeMatched()
-        val localVz = appSensorManager.consumePeakVerticalVelocity()
-        val localVzTs = appSensorManager.consumePeakVerticalVelocityTs()
-        val localVzRt = appSensorManager.consumePeakVerticalVelocityRt()
-        val localDz = appSensorManager.consumePeakVerticalDisplacement()
-        val localShock = appSensorManager.consumePeakVibration()
+        // Atomic Forensic Snapshot (Issue #523)
+        val snapshot = appSensorManager.consumeForensicSnapshot()
 
         // Feed Local Sensor Data to LocationProcessor for SIT detection
         locationProcessor.updateSensorData(
-            vibration = appSensorManager.currentVibrationIndex,
-            heading = appSensorManager.currentCompassHeading,
-            baroAlt = appSensorManager.absoluteAltitude,
-            lux = appSensorManager.currentLux,
-            isNear = appSensorManager.isProximityNear,
+            vibration = snapshot.vibration,
+            heading = snapshot.heading,
+            baroAlt = snapshot.baroAlt,
+            lux = snapshot.lux,
+            isNear = snapshot.isNear,
             powerTamper = health.isPowerTamper,
-            tiltDegrees = appSensorManager.currentTiltDegrees,
-            acousticDb = appSensorManager.currentAcousticDb,
-            peakShock = localShock,
-            peakVerticalVelocity = localVz,
-            peakVerticalVelocityTs = localVzTs,
-            peakVerticalVelocityRt = localVzRt,
-            plungeMatched = localPlunge,
-            peakVerticalDisplacement = localDz,
+            tiltDegrees = snapshot.tiltDegrees,
+            acousticDb = snapshot.acousticDb,
+            peakShock = snapshot.peakShock,
+            peakVerticalVelocity = snapshot.peakVerticalVelocity,
+            peakVerticalVelocityTs = snapshot.peakVerticalVelocityTs,
+            peakVerticalVelocityRt = snapshot.peakVerticalVelocityRt,
+            plungeMatched = snapshot.plungeMatched,
+            peakVerticalDisplacement = snapshot.peakVerticalDisplacement,
             nowRt = nowRt,
             nowWall = now
         )
@@ -389,26 +385,26 @@ class TrackerService : BaseMonitorService() {
             )
             lastProcessedLocation = processed
 
-            evaluateAlarmsInternal(now, nowRt, isSocketConnected, isViewerActive, processed)
+            evaluateAlarmsInternal(now, nowRt, isSocketConnected, isViewerActive, processed, snapshot)
             
             connectivitySuite.pushCurrentStatus(
                 deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true,
                 loc = location, filtered = processed.optimizedPoint, distToTracker = null, distToHome = processed.distToHome,
-                maxAccuracy = processed.maxAccuracy, filteredSpeed = processed.filteredSpeed, vibration = appSensorManager.currentVibrationIndex,
-                heading = appSensorManager.currentCompassHeading, baroAlt = appSensorManager.absoluteAltitude, lux = appSensorManager.currentLux,
-                isNear = appSensorManager.isProximityNear,
-                tiltDegrees = appSensorManager.currentTiltDegrees, acousticDb = appSensorManager.currentAcousticDb,
+                maxAccuracy = processed.maxAccuracy, filteredSpeed = processed.filteredSpeed, vibration = snapshot.vibration,
+                heading = snapshot.heading, baroAlt = snapshot.baroAlt, lux = snapshot.lux,
+                isNear = snapshot.isNear,
+                tiltDegrees = snapshot.tiltDegrees, acousticDb = snapshot.acousticDb,
                 jumpTier = processed.jumpTier, isJammer = processed.jammerDetected,
-                isStalled = processed.isStalled, peakShock = localShock,
+                isStalled = processed.isStalled, peakShock = snapshot.peakShock,
                 peakShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
-                adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = appSensorManager.proximityIdx,
-                proximityCm = appSensorManager.currentProximityCm, proximityDebounceMs = appSensorManager.proximityDebounceMs,
-                vibrationRollingSum = appSensorManager.vibrationRollingSum, micPending = false,
+                adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = snapshot.proximityIdx,
+                proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs,
+                vibrationRollingSum = snapshot.vibrationRollingSum, micPending = false,
                 isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper,
                 isSitDetected = locationProcessor.consumeSitDetected(), isSitActive = false,
                 lastSitTs = locationProcessor.getLastSitTs(), receiptRt = nowRt, violationUptimeMs = sessionManager.violationUptimeMs,
-                violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = localVz,
-                sitVz = localVz, sitDz = localDz, sitBaro = appSensorManager.absoluteAltitude, sitTilt = appSensorManager.currentTiltDegrees, sitShock = localShock,
+                violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = snapshot.peakVerticalVelocity,
+                sitVz = snapshot.peakVerticalVelocity, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock,
                 isClockRegression = processed.isClockRegression, isLocationPending = false, locationPendingReason = LocationPendingReason.NONE,
                 lastValidFixRt = locationProcessor.getLastValidFixRt(), gnssDetail = latestGnssDetail, snrIdx = 0.0, tiltIdx = 0.0, baroIdx = 0.0,
                 isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive,
@@ -430,20 +426,20 @@ class TrackerService : BaseMonitorService() {
                 isTrackerMode = true,
                 accuracy = processed.currentAccuracy,
                 maxAccuracy = processed.maxAccuracy,
-                noiseIdx = (appSensorManager.currentAcousticDb - locationProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB,
-                luxIdx = log10(appSensorManager.currentLux + 1.0) / RIBBON_LUX_LOG_SCALE,
-                vibeIdx = appSensorManager.currentVibrationIndex / RIBBON_VIBRATION_SCALE_G,
-                proxIdx = appSensorManager.proximityIdx,
-                liftIdx = (appSensorManager.absoluteAltitude - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS,
+                noiseIdx = (snapshot.acousticDb - locationProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB,
+                luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE,
+                vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G,
+                proxIdx = snapshot.proximityIdx,
+                liftIdx = (snapshot.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS,
                 snrIdx = (latestGnssDetail?.satellites?.map { it.cn0 }?.average() ?: 0.0) / RIBBON_SNR_SCALE_DB,
-                tiltIdx = abs(appSensorManager.currentTiltDegrees - locationProcessor.getChairBaselineTilt()).coerceIn(0.0, 15.0) / 15.0,
-                baroIdx = (appSensorManager.absoluteAltitude - locationProcessor.getBaroBaseline()).coerceIn(0.0, 5.0) / 5.0,
-                verticalVelocity = localVz,
-                sitVz = localVz,
-                sitDz = localDz,
-                sitBaro = appSensorManager.absoluteAltitude,
-                sitTilt = appSensorManager.currentTiltDegrees,
-                sitShock = localShock,
+                tiltIdx = abs(snapshot.tiltDegrees - locationProcessor.getChairBaselineTilt()).coerceIn(0.0, 15.0) / 15.0,
+                baroIdx = (snapshot.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, 5.0) / 5.0,
+                verticalVelocity = snapshot.peakVerticalVelocity,
+                sitVz = snapshot.peakVerticalVelocity,
+                sitDz = snapshot.peakVerticalDisplacement,
+                sitBaro = snapshot.baroAlt,
+                sitTilt = snapshot.tiltDegrees,
+                sitShock = snapshot.peakShock,
                 isBatterySteepDischarge = health.isBatterySteepDischarge,
                 isCoolingModeActive = health.isCoolingModeActive,
                 speed = processed.filteredSpeed,
@@ -513,7 +509,8 @@ class TrackerService : BaseMonitorService() {
         nowRt: Long,
         isSocketConnected: Boolean,
         isViewerConnected: Boolean,
-        processed: LocationProcessor.ProcessedLocation
+        processed: LocationProcessor.ProcessedLocation,
+        snapshot: AppSensorManager.ForensicSnapshot
     ) {
         val health = integrityMonitor.currentHealth
         alarmEvalJob?.cancel()
@@ -538,12 +535,12 @@ class TrackerService : BaseMonitorService() {
                 isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome,
                 maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = false,
                 isTamperDetected = processed.tamperDetected,
-                isPowerTamper = health.isPowerTamper, trackerTiltDegrees = appSensorManager.currentTiltDegrees,
-                trackerAcousticDb = appSensorManager.currentAcousticDb, trackerBaroAlt = appSensorManager.absoluteAltitude,
+                isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees,
+                trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt,
                 trackerBaroAltEma = locationProcessor.getBaroBaseline(),
-                trackerLux = appSensorManager.currentLux, isNear = appSensorManager.isProximityNear,
+                trackerLux = snapshot.lux, isNear = snapshot.isNear,
                 luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(),
-                adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = appSensorManager.consumePeakVibration(),
+                adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = snapshot.peakShock,
                 trackerCurrentMa = health.currentMa,
                 capabilities = capabilities
             )
