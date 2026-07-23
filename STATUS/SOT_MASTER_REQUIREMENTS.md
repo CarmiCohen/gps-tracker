@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.23.12 (ANR & Permission Hardening)
+# System Source of Truth (SoT) - July.24.01 (Permission Immediacy)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -28,6 +28,8 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Notification Throttling (R993)**: Foreground notification updates MUST BE throttled (default 30s). (Issue #R993)
 
 ### 4. Dependency & Hardware Hardening
+*   **Permission Immediacy (R107c)**: Permission state queries following a user-initiated refresh MUST be synchronous to ensure UI consistency and prevent stale setup alerts. (Issue #098, July.24.01)
+*   **Reactive Sensor Recovery (R107d)**: Transitions of critical permissions (specifically `ACTIVITY_RECOGNITION`) from DENIED to GRANTED state MUST trigger an immediate sensor re-synchronization command to the background service. (Issue #098, July.24.01)
 *   **Restoration Permission Authority (R107b)**: The Automatic Restoration flow in `MainAppContent` MUST verify all critical permissions (including `ACTIVITY_RECOGNITION`) before reviving a session. If permissions are missing, the UI MUST trigger the request launcher instead of allowing the background service to stall. (Issue #113, July.23.12)
 *   **Hilt Universal Authority (R120b)**: Full migration to Hilt. Manual DI is forbidden. Circularities resolved via `Provider<T>`. (Issue #120, #124, #126, #126b, #513)
 *   **Samsung A15 Battery Authority (R405b)**: Proactively trigger configuration overlay if battery exemption is missing on Samsung A15. (Issue #101)
@@ -40,5 +42,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Binary Telemetry Authority (R988)**: Prioritize binary Protobuf-based telemetry for tracker updates.
 
 ### 6. Version Authority
-*   **Current Release**: July.23.12.
+*   **Current Release**: July.24.01.
 *   **Source of Truth**: app/build.gradle versionName.

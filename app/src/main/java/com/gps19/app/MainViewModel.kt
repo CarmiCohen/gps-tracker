@@ -20,13 +20,13 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.24.01:
+ * - Issue #098: Reactive Sensor Sync. Modified RefreshPermissionStatus to 
+ *   detect ACTIVITY_RECOGNITION grant transitions and trigger immediate 
+ *   sensor re-registration via SettingsUpdated command.
+ * - Fix: Removed incorrect UiCommand check in handleConfigEvent.
  * July.23.03:
  * - Issue #528: Finalized DashboardUseCase decommissioning.
- * July.23.02:
- * - Issue #524: UI Decoupling. Switched to DashboardStateProvider.
- * July.23.00:
- * - Issue #522: Architectural Consolidation. Integrated RemoteStatusRepository 
- *   as the single source of truth for remote telemetry.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -305,9 +305,17 @@ class MainViewModel @Inject constructor(
             is UiEvent.SetLogFilterShowDetails -> viewModelScope.launch { repository.updateLogFilters(details = event.show) }
             is UiEvent.SetLogFilterShowRecovered -> viewModelScope.launch { repository.updateLogFilters(recovered = event.show) }
             is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
+                val oldState = _uiState.value.permissions
                 val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
+                
                 withContext(Dispatchers.Main) { 
                     updateState { it.copy(permissions = newState.copy(isA15Device = systemStatusProvider.isA15Hardware())) } 
+                    
+                    // Issue #098: Reactive Sensor Sync
+                    if (!oldState.isActivityRecognitionGranted && newState.isActivityRecognitionGranted) {
+                        Timber.i("Issue #098: ACTIVITY_RECOGNITION granted. Triggering reactive sensor sync.")
+                        repository.sendCommand(UiCommand.SettingsUpdated)
+                    }
                 }
             }
             is UiEvent.TriggerTestAlarm -> { addPersistentLog("user", "USER ACTION: Test alarm triggered", true); repository.sendCommand(UiCommand.TriggerTestAlarm) }

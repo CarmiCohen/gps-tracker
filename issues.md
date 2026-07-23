@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.23.12)
+# Project Issues & Hardening Tracking (July.24.01)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 374 |
+| **Resolved (Total)** | 🟢 Progress | 376 |
 
 ---
 
@@ -21,6 +21,12 @@ This document tracks active issues, technical debt, and pending implementation t
 *   **Background Worker Compilation Failure**: `BootServiceStartWorker` and `MaintenanceWorker` failing to compile due to Hilt annotation processing errors.
 
 ---
+
+## 🟢 Recently Resolved Issues (July.24.01)
+*   **Stale Permission Detection (Issue #098)**.
+    *   **Resolution**: Hardened `SystemStatusProviderImpl.kt` by replacing background-only refreshes with a `Mutex`-protected synchronous path for forced refresh requests. This ensures the UI reflects the true OS permission state immediately after a user grant.
+*   **Delayed Step Detector Recovery**.
+    *   **Resolution**: Implemented reactive sensor synchronization in `MainViewModel.kt`. The app now detects when `ACTIVITY_RECOGNITION` transitions to `GRANTED` and immediately commands the background service to re-register sensors, bypassing the previous 5-minute failure recovery loop.
 
 ## 🟢 Recently Resolved Issues (July.23.12)
 *   **Main-Thread Notification Flood (ANR)**.

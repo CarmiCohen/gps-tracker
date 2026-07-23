@@ -2,7 +2,6 @@ package com.gps19.app
 
 import android.Manifest
 import android.app.AlarmManager
-import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -26,18 +25,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.24.01:
+ * - Issue #098: Hardened permission refresh logic. Added Mutex-protected synchronous 
+ *   refresh for getPermissionState(forceRefresh = true) to prevent stale UI alerts.
  * July.21.00:
  * - ANR Hardening (#099): Uses AtomicReference and background refresh to prevent cold-start frame skips.
- * - Issue #526: Performance hardening. Hardware lookups are lazy and cached.
- * - Issue #516: Unified background status using CapabilityStatus.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -68,11 +69,10 @@ class SystemStatusProviderImpl @Inject constructor(
     private val batteryManager by lazy { context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager }
     
     private val cachedPackageName = context.packageName
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
+    
     private var lastFullRefreshTime: Long = 0
     private val cachedState = AtomicReference<PermissionState>(PermissionState())
-    private val isRefreshing = AtomicBoolean(false)
+    private val refreshMutex = Mutex()
     
     private val isXiaomi by lazy { isXiaomiDevice() }
     private val isSamsung by lazy { isSamsungDevice() }
@@ -100,41 +100,42 @@ class SystemStatusProviderImpl @Inject constructor(
 
     override suspend fun getPermissionState(forceRefresh: Boolean): PermissionState {
         val now = SystemClock.elapsedRealtime()
-        val current = cachedState.get()
-        
         val isStale = now - lastFullRefreshTime > PERMISSION_TTL_MS
-        if ((isStale || forceRefresh) && isRefreshing.compareAndSet(false, true)) {
-            scope.launch {
-                try {
-                    val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
-                    val xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
-                    val xiaomiAutostart = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
+        
+        if (isStale || forceRefresh) {
+            refreshMutex.withLock {
+                // Double-check staleness inside lock
+                if (SystemClock.elapsedRealtime() - lastFullRefreshTime > PERMISSION_TTL_MS || forceRefresh) {
+                    try {
+                        val current = cachedState.get()
+                        val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
+                        val xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
+                        val xiaomiAutostart = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
 
-                    val newState = PermissionState(
-                        isBatteryWhitelisted = batteryWhitelisted,
-                        isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, cachedPackageName) else batteryWhitelisted,
-                        isOverlayGranted = Settings.canDrawOverlays(context),
-                        isMicrophoneGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
-                        isExactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true,
-                        isPostNotificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true,
-                        isBackgroundLocationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true,
-                        isActivityRecognitionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true,
-                        
-                        hasBackgroundRestriction = isXiaomi,
-                        backgroundStatus = toCapabilityStatus(xiaomiStatus),
-                        autostartStatus = toCapabilityStatus(xiaomiAutostart),
-                        isManualOverride = current.isManualOverride, // Persist manual override bit
-                        requiresWakeLockRenewal = isSamsung,
-                        requiresExtraTopPadding = isXiaomi,
-                        requiresAdaptationMuzzle = isS21FE,
-                        isA15Device = isA15
-                    )
-                    cachedState.set(newState)
-                    lastFullRefreshTime = now
-                } catch (e: Exception) {
-                    Timber.e(e, "Issue #099: Permission check failed during refresh")
-                } finally {
-                    isRefreshing.set(false)
+                        val newState = PermissionState(
+                            isBatteryWhitelisted = batteryWhitelisted,
+                            isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, cachedPackageName) else batteryWhitelisted,
+                            isOverlayGranted = Settings.canDrawOverlays(context),
+                            isMicrophoneGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
+                            isExactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true,
+                            isPostNotificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true,
+                            isBackgroundLocationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true,
+                            isActivityRecognitionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true,
+                            
+                            hasBackgroundRestriction = isXiaomi,
+                            backgroundStatus = toCapabilityStatus(xiaomiStatus),
+                            autostartStatus = toCapabilityStatus(xiaomiAutostart),
+                            isManualOverride = current.isManualOverride,
+                            requiresWakeLockRenewal = isSamsung,
+                            requiresExtraTopPadding = isXiaomi,
+                            requiresAdaptationMuzzle = isS21FE,
+                            isA15Device = isA15
+                        )
+                        cachedState.set(newState)
+                        lastFullRefreshTime = SystemClock.elapsedRealtime()
+                    } catch (e: Exception) {
+                        Timber.e(e, "Permission check failed during refresh")
+                    }
                 }
             }
         }
