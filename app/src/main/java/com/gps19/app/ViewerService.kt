@@ -16,11 +16,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.24.02:
+ * - Issue #534/535: ANR & IPC Hardening. Implemented strict 10s startup 
+ *   suppression for FGS updates to prevent main-thread starvation on budget hardware.
  * July.23.12:
- * - Issue #113: Hardened status updates. Notifications are now suppressed 
- *   unless isSystemActive is true, preventing main-thread ANRs during setup.
- * July.22.04:
- * - Hilt Hardening: Added @AndroidEntryPoint.
+ * - Issue #113: Hardened status updates. Notifications suppressed until isSystemActive.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -43,6 +43,10 @@ class ViewerService : BaseMonitorService() {
     private var stabilityAuditFixCount = 0
     private var stabilityAuditViolationCount = 0
     private var lastStabilityAuditTs = 0L
+    
+    // Issue #535: FGS Update Throttling
+    private var lastFgsUpdateRt = 0L
+    private val FGS_TYPE_UPDATE_THROTTLE_MS = 10_000L
 
     private var capabilities = HardwareCapabilities()
 
@@ -328,6 +332,19 @@ class ViewerService : BaseMonitorService() {
     @SuppressLint("InlinedApi")
     override fun updateForegroundServiceType() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val nowRt = timeProvider.elapsedRealtime()
+            
+            // Issue #534/535: Suppress FGS updates during startup and apply strict throttling
+            val startupWindowActive = nowRt - serviceStartRealtime < 10_000L
+            if (startupWindowActive && lastFgsUpdateRt != 0L) {
+                return 
+            }
+            
+            if (nowRt - lastFgsUpdateRt < FGS_TYPE_UPDATE_THROTTLE_MS) {
+                return
+            }
+            
+            lastFgsUpdateRt = nowRt
             fgsUpdateJob?.cancel()
             fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main) {
                 try {

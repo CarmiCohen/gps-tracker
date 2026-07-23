@@ -1,30 +1,29 @@
-# Handover (July.23.12) - ANR Mitigation & Permission Hardening
+# Handover (July.24.01) - Permission Immediacy & Reactive Sync
 
 ## 🎯 Current Objective
-Cycle **July.23.12** focused on resolving a critical main-thread ANR caused by notification flooding and hardening the permission flow for background sensors (Step Detector).
+Cycle **July.24.01** focused on eliminating stale setup alerts by hardening the permission detection pipeline and implementing reactive hardware synchronization between the UI and background services.
 
 ## 📊 Status Summary
 
-### 1. Resolved: Main-Thread Notification Flood (ANR)
-- **Hard Throttling**: Implemented a 2000ms gate in `AppNotificationManager.kt` and a 5000ms gate in `BaseMonitorService.kt`. This prevents the IPC flood that occurs during hardware recovery loops.
-- **State-Aware Suppression**: Services now ignore status update requests unless `isSystemActive` is true. This ensures the Landing Page remains responsive even if restoration logic is running.
+### 1. Resolved: Stale Permission Detection (Issue #098)
+- **Synchronous Refresh**: Hardened `SystemStatusProviderImpl.kt` by replacing background-only refreshes with a `Mutex`-protected synchronous path for `getPermissionState(forceRefresh = true)`. This ensures the UI reflects the true OS permission state immediately after a user grant, satisfying Requirement **R107c**.
 
-### 2. Resolved: Auto-Restoration Stalling
-- **Permission Verification**: Hardened `MainAppContent.kt` to verify `ACTIVITY_RECOGNITION` (and other critical permissions) during cold-start restoration. If missing, the app now triggers the permission request flow instead of allowing the background service to enter a failure loop.
-- **UI Transparency**: Added Physical Activity permission status to `PhoneSetupOverlay` for manual verification.
+### 2. Resolved: Reactive Sensor Synchronization
+- **Permission Transition Detection**: Updated `MainViewModel.kt` to detect when critical permissions (specifically `ACTIVITY_RECOGNITION`) transition to `GRANTED`.
+- **Immediate Re-Registration**: The app now immediately sends a `SettingsUpdated` command to the background service upon permission grant, bypassing the previous 5-minute failure recovery loop and satisfying Requirement **R107d**.
 
-### 3. Build & Dependency Stabilization
-- **Dependency Realignment**: Added missing `appcompat` and `hilt-work` libraries to `app/build.gradle`.
-- **Hilt Integration**: Verified worker injection authority in `GpsApplication.kt`.
+### 3. Build & Logic Hardening
+- **MainViewModel Cleanup**: Resolved a logic error where a `UiCommand` type check was incorrectly placed in a `UiEvent` handler.
+- **SOT Alignment**: Synchronized `SOT_MASTER_REQUIREMENTS.md` and advanced the project version to **July.24.01**.
 
 ## 🚀 Git Release Procedure
 ```bash
 git add .
-git commit -m "release: July.23.12 - fixed notification flood ANR and hardened sensor permission flow"
-git tag -a July.23.12 -m "July.23.12: Notification throttling and Activity Recognition flow hardening."
+git commit -m "release: July.24.01 - implemented synchronous permission refresh and reactive sensor sync"
+git tag -a July.24.01 -m "July.24.01: Permission immediacy and reactive Step Detector recovery."
 git push origin main --tags
 ```
 
 ## 💡 Code Simplification Ideas
-- **Throttle Delegation**: Move notification throttling logic into a `NotificationDebouncer` class to separate UI building from system emission logic.
-- **Sensor Recovery Manager**: Extract the Step Detector recovery logic from `AppSensorManager` into a standalone manager that respects the global permission state.
+- **Permission Registry**: Create a centralized `PermissionRegistry` in the `:core:engine` that both UI and Service subscribe to, removing the need for manual signaling.
+- **Hilt Worker Factory**: Simplify background worker injection by moving to a standard Hilt `WorkerFactory` to resolve current compilation conflicts (#536).

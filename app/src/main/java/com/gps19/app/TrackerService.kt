@@ -19,11 +19,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * July.23.12:
- * - Issue #113: Throttled status updates. Notifications are now suppressed 
- *   unless isSystemActive is true, preventing main-thread ANRs during startup.
- * July.23.11:
- * - Bug Fix: Removed local siren maintenance in processTick. 
+ * July.24.02:
+ * - Issue #534/535: ANR & IPC Hardening. Implemented strict 10s startup
+ *   suppression for FGS updates to prevent main-thread starvation on budget hardware.
+ * July.24.01:
+ * - Issue #098: Permission-aware Step Detector recovery.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -57,6 +57,10 @@ class TrackerService : BaseMonitorService() {
     // Issue #113: Samsung A15 Poke Logic
     private var lastA15PokeRt = 0L
     private val A15_POKE_INTERVAL_MS = 10_000L
+
+    // Issue #535: FGS Update Throttling
+    private var lastFgsUpdateRt = 0L
+    private val FGS_TYPE_UPDATE_THROTTLE_MS = 10_000L
 
     private val localProcessorListener = object : LocationProcessorListener {
         override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, status: SentinelStatus, timestamp: Long, accuracy: Double, maxAccuracy: Double) {
@@ -289,6 +293,19 @@ class TrackerService : BaseMonitorService() {
 
     override fun updateForegroundServiceType() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val nowRt = timeProvider.elapsedRealtime()
+
+            // Issue #534/535: Suppress FGS updates during startup and apply strict throttling
+            val startupWindowActive = nowRt - serviceStartRealtime < 10_000L
+            if (startupWindowActive && lastFgsUpdateRt != 0L) {
+                return
+            }
+
+            if (nowRt - lastFgsUpdateRt < FGS_TYPE_UPDATE_THROTTLE_MS) {
+                return
+            }
+
+            lastFgsUpdateRt = nowRt
             fgsUpdateJob?.cancel()
             fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main) {
                 delay(200)

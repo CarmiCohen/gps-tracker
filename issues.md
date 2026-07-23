@@ -1,38 +1,39 @@
-# Project Issues & Hardening Tracking (July.24.01)
+# Project Issues & Hardening Tracking (July.24.02)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 1 |
+| **Open Technical Issues** | Active | 2 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
 | **Resolved (Total)** | 🟢 Progress | 376 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Hilt-Work Kapt Regression**: Recent dependency alignment for background workers is triggering `NonExistentClass` errors during stub generation.
-*   **IPC Congestion**: Even with throttling, frequent notification requests from multiple threads can still put pressure on the system's `NotificationManagerService`.
+*   **Issue #098: Step Detector Permission Stalling**: On Samsung A15 hardware, the Step Detector fails to register even after permissions are granted. A race condition exists between UI permission grants and background service capability re-evaluation.
+*   **Issue #536: Worker Dependency Conflict**: Recent dependency alignment for background workers is triggering `NonExistentClass` errors during Hilt stub generation.
 
 ---
 
 ## 🔴 Open Issues
-*   **Background Worker Compilation Failure**: `BootServiceStartWorker` and `MaintenanceWorker` failing to compile due to Hilt annotation processing errors.
+*   **Issue #098: Step Detector Permission Stalling**: Investigate why `ACTIVITY_RECOGNITION` is reported as missing by the engine after grant. Implement reactive re-registration (Partially implemented via MainViewModel sync).
+*   **Issue #536: Background Worker Compilation Failure**: Resolve Hilt annotation processing errors in `BootServiceStartWorker` and `MaintenanceWorker`.
 
 ---
 
-## 🟢 Recently Resolved Issues (July.24.01)
-*   **Stale Permission Detection (Issue #098)**.
-    *   **Resolution**: Hardened `SystemStatusProviderImpl.kt` by replacing background-only refreshes with a `Mutex`-protected synchronous path for forced refresh requests. This ensures the UI reflects the true OS permission state immediately after a user grant.
-*   **Delayed Step Detector Recovery**.
-    *   **Resolution**: Implemented reactive sensor synchronization in `MainViewModel.kt`. The app now detects when `ACTIVITY_RECOGNITION` transitions to `GRANTED` and immediately commands the background service to re-register sensors, bypassing the previous 5-minute failure recovery loop.
+## 🟢 Recently Resolved Issues (July.24.02)
+*   **Startup ANR Mitigation (Issue #534)**.
+    *   **Resolution**: Implemented a 10s startup suppression window for Foreground Service updates in both `TrackerService` and `ViewerService`. This prevents main-thread starvation during the critical cold-start initialization phase on budget hardware.
+*   **IPC Congestion Hardening (Issue #535)**.
+    *   **Resolution**: Enforced a strict 10,000ms global throttle for `updateForegroundServiceType`. This drastically reduces redundant IPC calls to the system's `NotificationManagerService` when the UI pulses.
 
-## 🟢 Recently Resolved Issues (July.23.12)
-*   **Main-Thread Notification Flood (ANR)**.
-    *   **Resolution**: Implemented hard throttling (2s/5s) in `AppNotificationManager.kt` and `BaseMonitorService.kt`. Suppression of status updates when the system is not explicitly "Active" ensures the Landing Page remains responsive.
-*   **Auto-Restoration Permission Stalling**.
-    *   **Resolution**: Hardened `MainAppContent.kt` to verify critical permissions (including `ACTIVITY_RECOGNITION`) during the cold-start restoration flow. Missing permissions now trigger the request launcher instead of allowing the service to start and fail in the background.
+## 🟢 Recently Resolved Issues (July.24.01)
+*   **Permission Refresh Logic Hardening**.
+    *   **Resolution**: Hardened `SystemStatusProviderImpl.kt` with a `Mutex`-protected synchronous path for `getPermissionState(forceRefresh = true)`.
+*   **Reactive Sensor Synchronization Protocol**.
+    *   **Resolution**: Updated `MainViewModel.kt` to detect permission grant transitions and signal the background service immediately.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*)
