@@ -5,12 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * July.23.03:
+ * - Issue #533: Hardening - Stationary Anchor Refinement. 
+ *   Implemented coordinate-averaging convergence and refined breakout scoring.
  * July.21.00:
  * - Release Hardening: Fixed dependency inversion (TrackerStatus -> SpatialAnchor).
  * - Forensic Alignment: Synchronized with expanded SentinelStatus enum.
- * July.20.07:
- * - Issue #102: Temporal Forensic Integrity. Refactored timing to monotonic 'rt'.
- * - Issue #062: Integrated Stationary Anchor Breakout (R990).
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -50,6 +50,7 @@ class LocationProcessor(
     private var parkingAnchorPoint: EngineGeoPoint? = null
     private var anchorEscapeScore = 0.0
     private val anchorTrendPoints = mutableListOf<EngineGeoPoint>()
+    private val anchorAveragingBuffer = mutableListOf<EngineGeoPoint>()
     private var isAnchorLockedState = false
 
     private var cachedHomePoints: List<EngineGeoPoint>? = null
@@ -323,10 +324,20 @@ class LocationProcessor(
                 parkingAnchorPoint = persistencePoint
                 anchorEscapeScore = 0.0
                 anchorTrendPoints.clear()
+                anchorAveragingBuffer.clear()
+                anchorAveragingBuffer.add(persistencePoint)
                 listener?.onLogAdded("Stationary Anchor engaged at ${String.format(Locale.getDefault(), "%.5f, %.5f", persistencePoint.lat, persistencePoint.lng)} (Prob: ${String.format(Locale.getDefault(), "%.2f", stationaryProb)})", "system", false, false, persistencePoint.lat, persistencePoint.lng, accuracy, snr, sentinel.currentVibrationIndex)
             }
             
             if (parkingAnchorPoint != null) {
+                // Issue #533: Coordinate-averaging convergence
+                anchorAveragingBuffer.add(persistencePoint)
+                if (anchorAveragingBuffer.size > ANCHOR_AVERAGING_WINDOW_SIZE) anchorAveragingBuffer.removeAt(0)
+                
+                val avgLat = anchorAveragingBuffer.map { it.lat }.average()
+                val avgLng = anchorAveragingBuffer.map { it.lng }.average()
+                parkingAnchorPoint = parkingAnchorPoint!!.copy(lat = avgLat, lng = avgLng)
+
                 val breakoutThreshold = max(PARKING_ANCHOR_MIN_DIST, maxAccuracy * PARKING_ANCHOR_FACTOR)
                 val distFromAnchor = PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, persistencePoint.lat, persistencePoint.lng)
                 
@@ -365,6 +376,7 @@ class LocationProcessor(
                     parkingAnchorPoint = null
                     anchorEscapeScore = 0.0
                     anchorTrendPoints.clear()
+                    anchorAveragingBuffer.clear()
                 }
             }
         } else {
@@ -373,6 +385,7 @@ class LocationProcessor(
                 parkingAnchorPoint = null
                 anchorEscapeScore = 0.0
                 anchorTrendPoints.clear()
+                anchorAveragingBuffer.clear()
             }
         }
         isAnchorLockedState = isAnchorLockedNow
@@ -422,7 +435,12 @@ class LocationProcessor(
     }
     
     fun getEstimatedBearing(): Double = sentinel.getEstimatedBearing()
-    fun resetFilter() { sentinel.reset(); parkingAnchorPoint = null; isAnchorLockedState = false }
+    fun resetFilter() { 
+        sentinel.reset()
+        parkingAnchorPoint = null
+        isAnchorLockedState = false
+        anchorAveragingBuffer.clear()
+    }
     fun invalidateHomePointsCache() { cachedHomePoints = null }
     fun resetStats() {
         lastProcessedAccuracy = 0.0; maxAccuracy = 0.0; accuracyWindow.clear(); lastWindowUpdateRt = 0L
@@ -433,6 +451,7 @@ class LocationProcessor(
         isAnchorLockedState = false
         anchorEscapeScore = 0.0
         anchorTrendPoints.clear()
+        anchorAveragingBuffer.clear()
         invalidateHomePointsCache(); sentinel.reset(); 
         listener?.onMaxAccuracyChanged(0.0)
     }

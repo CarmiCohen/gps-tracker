@@ -20,8 +20,10 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.23.03:
+ * - Issue #528: Finalized DashboardUseCase decommissioning.
  * July.23.02:
- * - Issue #524: UI Decoupling. Switched from DashboardUseCase to DashboardStateProvider.
+ * - Issue #524: UI Decoupling. Switched to DashboardStateProvider.
  * July.23.00:
  * - Issue #522: Architectural Consolidation. Integrated RemoteStatusRepository 
  *   as the single source of truth for remote telemetry.
@@ -559,8 +561,7 @@ class MainViewModel @Inject constructor(
                     connectivity = current.connectivity.copy(isTrackerConnected = true, lastUpdateTs = nowMs, lastRemoteActivityTs = nowMs),
                     trackerStats = telemetryUseCase.mapStats(update, current.trackerStats),
                     trackerBattery = if (current.appMode == "tracker") current.trackerBattery.copy(level = update.battery, temp = update.temp, isCharging = update.isCharging, isChargingStable = update.isCharging) else current.trackerBattery,
-                    trackerSatsView = update.satsView,
-                    trackerSatsUsed = update.satsUsed,
+                    trackerSatsView = update.satsView, trackerSatsUsed = update.satsUsed,
                     distanceTrackerToHome = if (current.appMode == "viewer" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceTrackerToHome,
                     distanceViewerToHome = if (current.appMode == "tracker" && PhysicsUtils.isValidLocation(update.lat, update.lng)) distToHome else current.distanceViewerToHome,
                     distanceTrackerToViewer = if (PhysicsUtils.isValidLocation(current.localLocation.lat, current.localLocation.lng) && PhysicsUtils.isValidLocation(update.lat, update.lng)) PhysicsUtils.calculateDistance(update.lat, update.lng, current.localLocation.lat, current.localLocation.lng) else current.distanceTrackerToViewer,

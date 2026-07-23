@@ -1,4 +1,4 @@
-# Testing & Validation Status - July.22.11
+# Testing & Validation Status - July.23.03
 
 This document tracks pending unit tests, integration tests, and manual validation tasks.
 
@@ -10,25 +10,26 @@ This document tracks pending unit tests, integration tests, and manual validatio
 ## 🟡 Pending Manual Validation (Field Tests)
 | ID | Task | Verification Requirement |
 | :--- | :--- | :--- |
-| **#113** | **R405c Field Validation** | **Pending**. Perform long-term field testing on Samsung A15 hardware (SM-A155F) to confirm the WakeLock "poke" prevents OS-level eviction. |
-| **#120b** | **I/O Stabilization Check** | **Pending**. Verify absence of "UI ERROR" or frame drops during first 5s of startup on A15 hardware after the 2s pruning stagger. |
+| **#530** | **Urban Multipath Suppression** | **Pending**. Verify "Accuracy Recovery" logic in Level 4 urban canyons. Ensure no regression in real movement detection. |
+| **#113** | **R405c Field Validation** | **Pending**. Perform long-term field testing on Samsung A15 hardware to confirm WakeLock "poke" prevents OS eviction. |
+| **#120b** | **I/O Stabilization Check** | **Pending**. Verify absence of "UI ERROR" during first 5s of startup on A15 hardware. |
 | **#072** | **Map Stabilization** | Verify tracker marker on viewer map does not jump to gray/raw locations during clock drift. |
-| **#071** | **Forensic Stress Test** | Verify manual trigger of Jammer/Stall markers and HUD/Log reflection. |
 
 ## 🔵 Ready for Verification
 | ID | Task | Result |
 | :--- | :--- | :--- |
-| | | |
+| **#531** | **Acoustic Cycle FGS Consistency** | Ensure Mic icon does not flicker in notification shade during 8s "OFF" duty cycle phases. |
 
-## 🟢 Recently Verified (July.22.11)
+## 🟢 Recently Verified (July.23.03)
 | ID | Task | Result |
 | :--- | :--- | :--- |
+| **#529** | **Accuracy Recovery Logic** | **Verified**: Jump Engine suppresses snaps when accuracy improves significantly within the previous uncertainty range. |
+| **#527** | **Siren Persistence** | **Verified**: Alarm state restored and audio resumed after manual process kill/restart. |
+| **#526** | **Adaptive Sampling** | **Verified**: Logic cycle extends to 10s and sensor sampling downgrades to NORMAL when stationary. |
+| **#525** | **Forensic Pipeline Audit** | **Verified**: End-to-end parity for all 15+ parameters across UI ribbons and telemetry. |
+| **#523** | **Snapshot Consolidation** | **Verified**: Atomic ForensicSnapshot prevents double-consumption spikes. |
 | **#513** | **Dead-Weight Purge** | **Verified**: Successful physical removal of 6 redundant files and documentation consolidation. |
-| **#126b** | **DI Purity Audit** | **Verified**: Successful decommission of manual DI artifacts. Scrubbed all code comments/references. |
-| **#104b** | **Service Pruning** | **Verified**: BaseMonitorService correctly triggers proactive log pruning on startup. |
-| **#121** | **Provider Caching** | **Verified**: LogManager overhead reduced via lazy thread-safe caching. |
-| **#031** | **Soak Test Monitoring** | **Verified**: Standardized stability auditing across Tracker and Viewer roles. |
-| **#108** | **Startup Recovery Race** | **Verified**: 60s grace period protecting staggered startup (R955b). |
+| **#126b** | **DI Purity Audit** | **Verified**: Successful decommission of manual DI artifacts. Code is 100% Hilt. |
 
 ---
 *For manual testing procedures, refer to [DOCS/TESTS.md](../DOCS/TESTS.md).*

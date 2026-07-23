@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.23.03 (Hardening & Persistence)
+# System Source of Truth (SoT) - July.23.04 (Hardening & Persistence)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -32,16 +32,17 @@ This document serves as the definitive operational specification. All Issue IDs 
 ### 4. Dependency & Hardware Hardening
 *   **Hilt Universal Authority (R120b)**: Full migration to Hilt. Manual DI is forbidden. Circularities resolved via `Provider<T>`. (Issue #120, #124, #126, #126b, #513)
 *   **Samsung A15 Battery Authority (R405b)**: Proactively trigger configuration overlay if battery exemption is missing on Samsung A15. (Issue #101)
-*   **Samsung Stay-Alive Hardening (R405c)**: Engage Accelerometer-based stay-alive pulse on sensor failure. Perform hardware "poke" via `SystemMonitor` on budget hardware. (Issue #098, #113)
+*   **Samsung Stay-Alive Hardening (R405c)**: Engage Accelerometer-based stay-alive pulse on sensor failure. Perform hardware "poke" via `SystemMonitor` on budget budget hardware. (Issue #098, #113)
 *   **Step Detector Permission (R107)**: Explicitly track `android.permission.ACTIVITY_RECOGNITION`. (Issue #107)
 
 ### 5. Architectural Baselines
 *   **Accuracy Recovery Grace (R529)**: The Jump Engine MUST implement an "Accuracy Recovery" grace logic. Spatial corrections resulting from a transition from low to high accuracy MUST NOT be flagged as erratic jumps if the displacement is within the previous fix's uncertainty range. (Issue #529)
+*   **Stationary Anchor Convergence (R990c)**: Use a coordinate-averaging buffer (8-point sliding window) to stabilize the stationary position. Refine breakout scoring with displacement trends and velocity weights to suppress GPS drift and "spaghetti" trails. (Issue #533)
 *   **Unified System Heartbeat (R403)**: Global 2000ms heartbeat standard (`TICK_INTERVAL_MS`).
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077)
 *   **Binary Telemetry Authority (R988)**: Prioritize binary Protobuf-based telemetry for tracker updates.
 *   **Stationary Anchor Hard-Lock (R990b)**: Establish coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: `July.23.03`.
+*   **Current Release**: `July.23.04`.
 *   **Source of Truth**: `app/build.gradle` `versionName`.

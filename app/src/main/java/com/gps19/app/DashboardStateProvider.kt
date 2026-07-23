@@ -8,8 +8,10 @@ import javax.inject.Singleton
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard states.
  * Handles all formatting logic to keep ViewModels and UseCases focused on data.
+ * July.23.03:
+ * - Issue #528: Finalized decommissioning of legacy dashboard logic.
  * July.23.02:
- * - Issue #524: UI Decoupling. Extracted from DashboardUseCase.
+ * - Issue #524: UI Decoupling. Extracted from legacy dashboard component.
  */
 interface DashboardStateProvider {
     fun buildDashboardState(

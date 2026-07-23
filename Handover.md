@@ -1,40 +1,43 @@
-# Handover (July.23.03) - Hardening & Reliability
+# Handover (July.23.04) - Hardening & Forensic Integrity
 
 ## 🎯 Current Objective
-Cycle **July.23.03** focuses on reducing hardware footprint, pruning legacy code, and hardening the engine against urban signal noise and OS-level service interruptions.
+Cycle **July.23.04** marks the completion of the engine hardening phase, specifically addressing stationary drift and forensic type safety.
 
 ## 📊 Status Summary
 
-### 1. Geofence Reliability: Accuracy Recovery (Issue #529 - RESOLVED)
-- **Problem**: GPS "snaps" during transitions from low to high accuracy in urban canyons were triggering false "Visual Jump" alerts.
-- **Solution**: Implemented "Accuracy Recovery" grace logic in `PhysicsUtils.isVisualJump`. The engine now suppresses jump scores if a significant accuracy improvement occurs and the spatial movement is within the previous fix's uncertainty range.
-- **Propagation**: Updated `LocationSentinel` to track `lastValidAccuracy` for multi-frame validation.
+### 1. Stationary Anchor Refinement (Issue #533 - RESOLVED)
+- **Convergence**: Implemented a coordinate-averaging buffer (`anchorAveragingBuffer`) using an 8-point sliding window in `LocationProcessor.kt`. This settles the anchor point to the weighted mean of fixes when stationary.
+- **Breakout Scoring**: Refined the breakout scoring logic to integrate displacement trends and velocity weights. This suppresses micro-drifts and "spaghetti" trails while maintaining high sensitivity to physical IMU triggers.
 
-### 2. Siren Persistence: State Restoration (Issue #527 - RESOLVED)
-- **Problem**: Active alarm states and siren audio were lost if the Android OS killed and restarted the `TrackerService`.
-- **Solution**: 
-    - Implemented persistence for active alarm types in `AppAlarmManager` using DataStore.
-    - Integrated `restoreState()` in `TrackerService.onCreate()` to reload violations.
-    - Added background maintenance logic in `TrackerService.processTick()` to resume siren audio automatically if a violation remains unresolved.
+### 2. Forensic Pipeline & Type Safety (Issue #532 - RESOLVED)
+- **Standardization (R999)**: Completed a full audit of the telemetry pipeline. Upgraded `AppSensorManager.kt` to use strict `Double` precision for all hardware-level kinematic integrations.
+- **Integrity**: Verified zero precision leakage in `TelemetryAggregator`, `LocationProcessor`, and Room/Protobuf persistence layers.
 
-### 3. Power Optimization: Dynamic Sampling (Issue #526 - RESOLVED)
-- **Hardening**: Dynamically downgrades `Linear Acceleration` sampling when stationary and implements a 20% acoustic duty cycle during long-idle logic ticks (10s).
+### 3. Power Optimization: Dynamic Sampling & Acoustic Duty Cycle (Issue #526, #531 - RESOLVED)
+- **Duty Cycle Refinement**: Implemented 20% acoustic duty cycle (2s ON / 8s OFF). 
+- **FGS Consistency**: Refined `ForegroundServiceType` logic to prevent OS notification flickering during "OFF" phases.
 
-### 4. Cleanup: DashboardUseCase Removal (Issue #524 - RESOLVED)
-- **Status**: Logic migrated to `DashboardStateProvider`. `DashboardUseCase.kt` is orphaned (Issue #528).
+### 4. Geofence Reliability: Accuracy Recovery (Issue #529 - RESOLVED)
+- **Solution**: Implemented grace logic in `PhysicsUtils.isVisualJump` to suppress false "Visual Jump" alerts during transitions from low to high accuracy in urban canyons.
 
-## 🚀 Next Objective
-- **Issue #530: Urban Multipath Stress Testing**. Conduct field tests in high-density urban areas to verify the suppression logic under extreme multipath conditions.
+### 5. Siren & State Persistence (Issue #527 - RESOLVED)
+- **Persistence**: Active alarm states are now persisted via DataStore, ensuring sirens resume automatically after service restarts.
+
+### 6. Cleanup: DashboardUseCase Tombstone (Issue #528 - RESOLVED)
+- **Status**: Logic migrated to `DashboardStateProvider`. `DashboardUseCase.kt` decommissioned.
+
+## 🔍 Validation Status
+- **Issue #530: Urban Multipath Stress Testing (PENDING)**. Requires field verification of the Suppression Logic (#529) and Anchor Refinement (#533) in Level 4 urban canyons.
 
 ## 🚀 Git Release Commands
 ```bash
-# Stage all changes including build.gradle version bump
+# Stage all changes
 git add .
-git commit -m "Hardening Release July.23.03: Geofence Reliability & Siren Persistence"
+git commit -m "Hardening Release July.23.04: Stationary Anchor Refinement & Final Hardening"
 
-# If the tag already exists, force update it to this commit
-git tag -f -a July.23.03 -m "July.23.03 Release: Fixed urban accuracy snap false positives and implemented siren state restoration."
+# Create new version tag
+git tag -f -a July.23.04 -m "July.23.04 Release: Hardened stationary anchor convergence, breakout refinement, and forensic precision."
 
-# Push changes and tags to remote
+# Push to remote
 git push origin main --tags -f
 ```

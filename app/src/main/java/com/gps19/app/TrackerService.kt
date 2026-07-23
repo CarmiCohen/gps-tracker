@@ -20,11 +20,9 @@ import kotlin.math.*
 /**
  * TrackerService: The "Black Box" background process.
  * July.23.03:
+ * - Issue #531: Hardening - Acoustic Duty Cycle. Consistent FGS type management.
  * - Issue #527: Siren Persistence. Implemented alarm state restoration and 
  *   background siren maintenance in processTick.
- * July.23.02:
- * - Issue #526: Power Optimization. Centralized power-save evaluation in ServiceBehaviorUseCase.
- * - Issue #525: State Audit. Centralized forensic index computation.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -299,7 +297,9 @@ class TrackerService : BaseMonitorService() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED && isRecentUiPulse()) {
+            val isMicEnabled = appSensorManager.isAcousticMonitoringEnabled()
+            val hasPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            if (hasPermission && (isMicEnabled || isRecentUiPulse())) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE 
             }
         }
@@ -413,6 +413,11 @@ class TrackerService : BaseMonitorService() {
                 isPowerSaveActive = shouldBePowerSave
                 appSensorManager.setPowerSaveMode(shouldBePowerSave)
                 logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED (10s logic cycle)" else "DISENGAGED (2s logic cycle)"}", false)
+                
+                // Issue #531: Trigger FGS type update when power-save state changes to ensure Mic flag reflects monitoring intent
+                withContext(Dispatchers.Main) {
+                    updateForegroundServiceType()
+                }
             }
             lastPowerSaveCheckRt = nowRt
         }

@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.23.03:
+ * - Issue #533: Added ANCHOR_AVERAGING_WINDOW_SIZE for stationary hardening.
  * July.23.02:
  * - Issue #526: Power Optimization. Added power-save tick and acoustic duty cycle constants.
  * July.21.00:
@@ -188,6 +190,7 @@ const val PARKING_ANCHOR_FACTOR = 0.8
 const val ANCHOR_ENGAGEMENT_PROBABILITY = 0.9
 const val ANCHOR_ESCAPE_SCORE_THRESHOLD = 100.0
 const val ANCHOR_TREND_WINDOW_SIZE = 3
+const val ANCHOR_AVERAGING_WINDOW_SIZE = 8
 const val ANCHOR_TRANSITION_ZONE_START = 0.7 // Start accumulating score at 70% of threshold
 const val ANCHOR_VELOCITY_WEIGHT_MPS = 15.0 // Score points per m/s of estimated speed
 const val ANCHOR_DISPLACEMENT_WEIGHT = 2.0 // Score points per meter of net displacement in transition zone
