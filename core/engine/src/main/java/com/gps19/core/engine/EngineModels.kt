@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * July.23.07:
+ * - Issue #113: Hardened HardwareCapabilities for Samsung A15 stabilization.
  * July.21.00:
  * - Issue #102: Temporal Forensic Integrity. Standardized 'rt' and 'ts'.
  * - Forensic Hardening: Expanded SentinelStatus and JumpConfidence for deep auditing.
@@ -42,7 +44,8 @@ data class HardwareCapabilities(
     val autostartStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
     val requiresWakeLockRenewal: Boolean = false,
     val requiresExtraTopPadding: Boolean = false,
-    val isManualOverrideActive: Boolean = false
+    val isManualOverrideActive: Boolean = false,
+    val isA15Device: Boolean = false
 )
 
 enum class LocationPendingReason {

@@ -16,15 +16,14 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * July.23.07:
+ * - Issue #120b: Startup I/O Stabilization. Staggered proactivePruning (2000ms delay) 
+ *   to prevent Room/IO contention during cold starts (R104b).
  * July.22.08:
  * - Issue #104b: Global Startup Maintenance Authority. Integrated proactivePruning into onCreate 
  *   to ensure background service starts also benefit from log pruning (R104).
  * July.22.04:
  * - Hilt Hardening: Standardized field injection.
- * July.21.00:
- * - Build Hardening: Removed invalid isInitialized check on lazy repository property.
- * July.20.07:
- * - Issue #102: Temporal Forensic Integrity. Added serviceStartWall and standardized on nowRt.
  */
 abstract class BaseMonitorService : LifecycleService() {
 
@@ -84,8 +83,9 @@ abstract class BaseMonitorService : LifecycleService() {
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
             startServiceForeground()
             
-            // Issue #104b: Global Startup Maintenance Authority
-            // Ensure proactive log pruning is triggered during service startup to prevent I/O bottlenecks.
+            // Issue #120b: Global Startup Maintenance Authority
+            // Ensure proactive log pruning is triggered with a delay to prevent I/O bottlenecks during initialization.
+            delay(2000L)
             repository.proactivePruning()
             
             systemMonitor.setWatchdogListener { set, skipped ->

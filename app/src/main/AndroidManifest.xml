@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -60,7 +61,10 @@
             android:name=".TrackerService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="location|microphone" />
+            android:foregroundServiceType="location|microphone|specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_TYPE"
+                android:value="This service provides critical background system monitoring and hardware watchdog pokes for budget hardware stabilization." />
+        </service>
 
         <service
             android:name=".ViewerService"

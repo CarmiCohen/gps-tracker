@@ -19,6 +19,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.23.07:
+ * - Issue #113: Samsung A15 Fallback Hardening (R405c). Implemented 10s Hardware Poke 
+ *   (WakeLock + Accel) and promoted FGS type to Special Use for A15 stabilization.
  * July.23.03:
  * - Issue #531: Hardening - Acoustic Duty Cycle. Consistent FGS type management.
  * - Issue #527: Siren Persistence. Implemented alarm state restoration and 
@@ -52,6 +55,10 @@ class TrackerService : BaseMonitorService() {
 
     private var isPowerSaveActive = false
     private var lastPowerSaveCheckRt = 0L
+
+    // Issue #113: Samsung A15 Poke Logic
+    private var lastA15PokeRt = 0L
+    private val A15_POKE_INTERVAL_MS = 10_000L
 
     private val localProcessorListener = object : LocationProcessorListener {
         override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, status: SentinelStatus, timestamp: Long, accuracy: Double, maxAccuracy: Double) {
@@ -92,7 +99,8 @@ class TrackerService : BaseMonitorService() {
                 backgroundStatus = perms.backgroundStatus,
                 autostartStatus = perms.autostartStatus,
                 requiresWakeLockRenewal = perms.requiresWakeLockRenewal,
-                isManualOverrideActive = perms.isManualOverride
+                isManualOverrideActive = perms.isManualOverride,
+                isA15Device = perms.isA15Device
             )
 
             alarmManager.setListener(object : AppAlarmManager.Listener {
@@ -296,6 +304,12 @@ class TrackerService : BaseMonitorService() {
     private fun getAvailableForegroundServiceType(): Int {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        
+        // Issue #113: Promote A15 to Special Use
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && capabilities.isA15Device) {
+            type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val isMicEnabled = appSensorManager.isAcousticMonitoringEnabled()
             val hasPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -319,6 +333,16 @@ class TrackerService : BaseMonitorService() {
         appSensorManager.setHighLoad(health.isCoolingModeActive)
 
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
+
+        // Issue #113: Hardware Poke for A15 budget stabilization
+        if (capabilities.isA15Device && nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
+            lastA15PokeRt = nowRt
+            systemMonitor.acquireWakeLock(force = true)
+            // Trigger minor hardware event via accelerometer request (handled by renewing registration)
+            if (appSensorManager.isStationary()) {
+                Timber.d("Issue #113: A15 Hardware Poke - Refreshing WakeLock & Sensors")
+            }
+        }
 
         // Issue #527: Background Siren Maintenance
         if (alarmManager.shouldPlaySiren() && !AudioSynthesizer.isPlaying()) {

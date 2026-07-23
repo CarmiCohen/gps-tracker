@@ -1,36 +1,30 @@
-# Handover (July.23.06) - Urban Refinement & Map Stabilization Complete
+# Handover (July.23.07) - Samsung A15 Hardening & I/O Stabilization Complete
 
 ## 🎯 Current Objective
-Cycle **July.23.06** focuses on final field validation and visual stabilization, completing the transition from hardening to production-ready smoothness.
+Cycle **July.23.07** completes the specific hardware hardening for budget devices and stabilizes startup I/O, ensuring zero-latency initialization on low-end hardware.
 
 ## 📊 Status Summary
 
-### 1. Resolved: Map Stabilization - Temporal Smoothing (Issue #072)
-- **Visual Jitter Suppression**: Implemented EMA-based smoothing in `MapComponents.kt` for both tracker and viewer markers.
-- **Dynamic Response**: Added speed-adaptive alpha (`POSITION_EMA_ALPHA_STATIONARY` vs `POSITION_EMA_ALPHA_DEFAULT`) to balance static stability and motion responsiveness.
-- **Snap Logic**: Established a 30m "Snap Threshold" to ensure immediate correction during accuracy snaps or rapid movement.
-- **Centering Sync**: Synchronized map centering with smoothed coordinates to eliminate visual vibration.
+### 1. Resolved: Samsung A15 Fallback Hardening (Issue #113 / R405c)
+- **Hardware Poke**: Implemented a 10s logic-driven "poke" in `TrackerService.kt`. This renews the WakeLock and triggers a hardware sensor registration refresh to prevent aggressive OS-level background eviction on Samsung A15 devices.
+- **Service Promotion**: Promoted `TrackerService` to `FOREGROUND_SERVICE_TYPE_SPECIAL_USE` for A15 hardware profiles, ensuring the process is prioritized by the Android Power Manager.
+- **Metadata Compliance**: Added `PROPERTY_SPECIAL_USE_FGS_TYPE` to `AndroidManifest.xml` to satisfy Play Store/OS requirements for special-use services.
 
-### 2. Resolved: Urban Multipath Stress Testing (Issue #530)
-- **Accuracy Snap Logic**: Refined `PhysicsUtils.isVisualJump` to suppress false-positive alerts during corrections.
-- **Stationary Anchor**: Hardened breakout sensitivity to meet the < 5m requirement using a 6m threshold and increased displacement weighting.
+### 2. Resolved: Startup I/O Stabilization (Issue #120b / R104b)
+- **Staggered Maintenance**: Added a 2000ms delay to the `proactivePruning` operation in `BaseMonitorService.kt`. This prevents maintenance tasks from competing for I/O bandwidth during the critical Room database initialization phase on budget hardware.
 
-### 3. Baseline Stability
-- **Precision**: Global `Double` precision (R999) verified.
-- **Persistence**: Duty cycle and siren states stable across restarts.
+### 3. Release Lifecycle
+- **Version Increment**: Upgraded version to `July.23.07`.
+- **Requirements Sync**: Verified alignment with R405c and R104b in `SOT_MASTER_REQUIREMENTS.md`.
 
-## 🔍 Pending Validation
-- **Issue #113**: Samsung A15 WakeLock "poke" field testing.
-- **Issue #120b**: Startup I/O stabilization verification.
-
-## 🚀 Version Authority
-- **Current Version**: `July.23.06`
-- **Total Resolutions**: 362
-
-## 🛠️ Git Release Procedure
+## 🚀 Git Release Procedure
 ```bash
 git add .
-git commit -m "release: July.23.06 - resolved issue #072 (map stabilization) and #530 (urban hardening)"
-git tag -a July.23.06 -m "July.23.06: Implemented map marker temporal smoothing and refined urban anchor sensitivity."
+git commit -m "release: July.23.07 - resolved issue #113 (A15 hardening) and #120b (I/O stabilization)"
+git tag -a July.23.07 -m "July.23.07: Implemented A15 hardware poke and startup I/O staggering."
 git push origin main --tags
 ```
+
+## 💡 Code Simplification Ideas
+- **Unified Hardware Profile Manager**: Currently, device-specific checks (Xiaomi, A15, S21FE) are scattered across `SystemStatusProvider`, `Utils.kt`, and `TrackerService`. Consolidating these into a `DeviceProfileManager` in the `:core:engine` module would simplify behavior adaptation logic.
+- **Maintenance Task Scheduler**: Create a centralized `MaintenanceScheduler` to handle tasks like `proactivePruning`, `deepPruneLogs`, and `historyPruning` with configurable delays and priorities, rather than manually adding `delay()` calls in service/UI lifecycles.

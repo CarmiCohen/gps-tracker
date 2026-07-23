@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.23.06)
+# Project Issues & Hardening Tracking (July.23.07)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 362 |
+| **Resolved (Total)** | 🟢 Progress | 364 |
 
 ---
 
@@ -21,13 +21,13 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (July.23.06)
-*   **Issue #072: Map Stabilization - Temporal Smoothing**.
-    *   **Resolution**: Implemented EMA-based smoothing for tracker and viewer markers in `OsmMap`. Added a 30m snap threshold to ensure visual continuity during large movements while suppressing high-zoom jitter.
-    *   **Verification**: Markers remain stable when stationary or moving slowly, but snap instantly to new positions upon significant displacement.
-*   **Issue #530: Validation - Urban Multipath Stress Testing**.
-    *   **Resolution**: Hardened "Accuracy Recovery" logic by explicitly suppressing jump flags during snaps. Refined "Stationary Anchor" sensitivity by reducing the minimum breakout distance to 6m and increasing the displacement score weight (8.0).
-    *   **Verification**: Breakout sensitivity now meets the < 5m requirement for real movement while suppressing visual jumps during accuracy recovery.
+## 🟢 Recently Resolved Issues (July.23.07)
+*   **Issue #113: Samsung A15 Fallback Hardening - Hardware Poke**.
+    *   **Resolution**: Implemented a 10-second hardware "poke" in `TrackerService` (WakeLock renewal + sensor request) to prevent aggressive OS-level background eviction on budget hardware. Promoted Foreground Service to `specialUse` for this hardware profile.
+    *   **Verification**: Service stability verified during extended stationary periods on A15 hardware.
+*   **Issue #120b: I/O Stabilization - Startup Pruning Delay**.
+    *   **Resolution**: Implemented a 2000ms delay for `proactivePruning` in `BaseMonitorService` to eliminate I/O contention during cold starts.
+    *   **Verification**: Zero "UI ERROR" logs or stuttering observed during first 10 seconds of service initialization.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*
