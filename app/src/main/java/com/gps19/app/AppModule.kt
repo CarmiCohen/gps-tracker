@@ -37,6 +37,10 @@ abstract class AppModule {
     @Singleton
     abstract fun bindSignalingProvider(impl: CommunicationManager): SignalingProvider
 
+    @Binds
+    @Singleton
+    abstract fun bindDashboardStateProvider(impl: DashboardStateProviderImpl): DashboardStateProvider
+
     companion object {
         @Provides
         @Singleton

@@ -20,6 +20,8 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.23.02:
+ * - Issue #524: UI Decoupling. Switched from DashboardUseCase to DashboardStateProvider.
  * July.23.00:
  * - Issue #522: Architectural Consolidation. Integrated RemoteStatusRepository 
  *   as the single source of truth for remote telemetry.
@@ -30,7 +32,7 @@ class MainViewModel @Inject constructor(
     private val logManager: LogManager,
     private val systemStatusProvider: SystemStatusProvider,
     private val homePointUseCase: HomePointUseCase,
-    private val dashboardUseCase: DashboardUseCase,
+    private val dashboardStateProvider: DashboardStateProvider,
     private val navigationUseCase: NavigationUseCase,
     private val settingsUseCase: SettingsUseCase,
     private val telemetryUseCase: TelemetryUseCase,
@@ -103,7 +105,7 @@ class MainViewModel @Inject constructor(
     val dashboardState: StateFlow<DashboardState> = combine(
         _uiState, _systemPulse, _trackerState, _localMaxTemp, _trackerMaxTemp
     ) { state, pulse, trkState, lMax, tMax ->
-        dashboardUseCase.computeDashboardState(state, pulse, trkState, lMax, tMax)
+        dashboardStateProvider.buildDashboardState(state, pulse, trkState, lMax, tMax)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())

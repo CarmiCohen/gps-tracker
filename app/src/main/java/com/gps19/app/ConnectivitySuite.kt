@@ -25,10 +25,10 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.23.02:
+ * - Issue #525: State Audit. Expanded pushCurrentStatus with full forensic indices.
  * July.23.00:
- * - Issue #522: Architectural Consolidation. Migrated remote peer state to 
- *   RemoteStatusRepository. Implemented SignalingProvider.RemoteUpdateListener.
- * - Forensic Parity: Fully integrated all SIT parameters and remote commands from RemoteHandler.
+ * - Issue #522: Architectural Consolidation.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -376,6 +376,10 @@ class ConnectivitySuite @Inject constructor(
         standbyBucket: Int = -1,
         netInterface: String = "UNKNOWN",
         snrIdx: Double = 0.0,
+        noiseIdx: Double = 0.0,
+        luxIdx: Double = 0.0,
+        vibeIdx: Double = 0.0,
+        liftIdx: Double = 0.0,
         tiltIdx: Double = 0.0,
         baroIdx: Double = 0.0
     ) {
@@ -398,7 +402,8 @@ class ConnectivitySuite @Inject constructor(
             trackerState = trackerState,
             isStorageLow = isStorageLow, isStorageCritical = isStorageCritical,
             isPowerSaveMode = isPowerSaveMode, standbyBucket = standbyBucket, netInterface = netInterface,
-            snrIdx = snrIdx, tiltIdx = tiltIdx, baroIdx = baroIdx,
+            snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, liftIdx = liftIdx,
+            tiltIdx = tiltIdx, baroIdx = baroIdx,
             micPending = micPending, isSitDetected = isSitDetected, isSitActive = isSitActive, lastSitTs = lastSitTs,
             verticalVelocity = verticalVelocity, sitVz = sitVz, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock
         )
@@ -537,7 +542,10 @@ class ConnectivitySuite @Inject constructor(
                     totalConnectedMs = data.optLong("total_connected_ms", current.totalConnectedMs), sessionConnectedMs = data.optLong("session_connected_ms", current.sessionConnectedMs),
                     lastConnTs = data.optLong("last_conn_ts", current.lastConnTs), lastDiscTs = data.optLong("last_disc_ts", current.lastDiscTs),
                     isClockRegression = isClockReg, isJump = isVisualJump, ts = now,
-                    snrIdx = data.optDouble("snr_idx", current.snrIdx), tiltIdx = data.optDouble("tilt_idx", current.tiltIdx), baroIdx = data.optDouble("baro_idx", current.baroIdx),
+                    snrIdx = data.optDouble("snr_idx", current.snrIdx), noiseIdx = data.optDouble("noise_idx", current.noiseIdx), 
+                    luxIdx = data.optDouble("lux_idx", current.luxIdx), vibeIdx = data.optDouble("vibe_idx", current.vibeIdx), 
+                    liftIdx = data.optDouble("lift_idx", current.liftIdx),
+                    tiltIdx = data.optDouble("tilt_idx", current.tiltIdx), baroIdx = data.optDouble("baro_idx", current.baroIdx),
                     isSitDetected = data.optBoolean("is_sit_detected", current.isSitDetected), lastSitTs = data.optLong("last_sit_ts", current.lastSitTs),
                     isSuspicious = data.optBoolean("is_suspicious", current.isSuspicious), isAnchorLocked = data.optBoolean("is_anchor_locked", current.isAnchorLocked),
                     verticalVelocity = data.optDouble("vertical_velocity", current.verticalVelocity),
@@ -556,7 +564,9 @@ class ConnectivitySuite @Inject constructor(
                         isPowerSaveMode = updatedStatus.isPowerSaveMode, standbyBucket = updatedStatus.standbyBucket,
                         netInterface = updatedStatus.netInterface, isStorageLow = updatedStatus.isStorageLow, isStorageCritical = updatedStatus.isStorageCritical,
                         gnssDetail = updatedStatus.gnssDetail, isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge, isCoolingModeActive = updatedStatus.isCoolingModeActive,
-                        trackerState = updatedStatus.trackerState, ts = now, snrIdx = updatedStatus.snrIdx, tiltIdx = updatedStatus.tiltIdx, baroIdx = updatedStatus.baroIdx,
+                        trackerState = updatedStatus.trackerState, ts = now, 
+                        snrIdx = updatedStatus.snrIdx, noiseIdx = updatedStatus.noiseIdx, luxIdx = updatedStatus.luxIdx, vibeIdx = updatedStatus.vibeIdx, liftIdx = updatedStatus.liftIdx,
+                        tiltIdx = updatedStatus.tiltIdx, baroIdx = updatedStatus.baroIdx,
                         isSitDetected = updatedStatus.isSitDetected, lastSitTs = updatedStatus.lastSitTs,
                         verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitDz = updatedStatus.sitDz,
                         sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock

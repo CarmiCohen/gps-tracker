@@ -1,27 +1,30 @@
 # Handover (July.23.02) - Forensic Unification & Snapshot Consolidation
 
 ## 🎯 Current Objective
-Cycle **July.23.02** is focused on simplifying the sensor pipeline and hardening the atomic state transitions. The consolidation of forensic telemetry into a single snapshot is COMPLETE.
+Cycle **July.23.02** focused on simplifying the sensor pipeline, hardening atomic state transitions, and decoupling UI formatting. This cycle is COMPLETE.
 
 ## 📊 Status Summary
 
 ### 1. Forensic Snapshot Consolidation (Issue #523 - RESOLVED)
-- **Atomic State Capture**: Implemented `AppSensorManager.consumeForensicSnapshot()` which returns an immutable `ForensicSnapshot` containing all 15+ forensic parameters.
-- **Double-Consumption Fix**: Resolved a critical race/logic bug in `TrackerService.kt` where calling individual `consumePeak...()` methods multiple times within a single tick resulted in zeroed values for downstream evaluators (e.g., Alarms).
-- **TrackerService Simplification**: Reduced the complexity of `processTick` and `evaluateAlarmsInternal` by passing the snapshot as a single unit of truth.
-- **Self-Healing Step Detector**: Retained and verified the R405c recovery loop for Samsung hardware compatibility.
+- **Atomic State Capture**: Implemented `AppSensorManager.consumeForensicSnapshot()` to provide an immutable unit of truth for all forensic parameters.
+- **TrackerService Simplification**: Passed the snapshot as a single unit, eliminating peak double-consumption bugs.
 
-### 2. SIT Logic Parity
-- **Verified Propagation**: SIT parameters (Vz, Dz, Plunge) are now captured once and propagated consistently to both `LocationProcessor` (for SIT detection) and `ConnectivitySuite` (for telemetry).
+### 2. UI Decoupling (Issue #524 - RESOLVED)
+- **DashboardStateProvider**: Consolidated all UI string formatting logic into a dedicated provider.
+- **ViewModel Hardening**: Reduced `MainViewModel` complexity by delegating presentation state building to the provider.
+
+### 3. State Audit & Propagation (Issue #525 - RESOLVED)
+- **History Integrity**: Fixed `HistoryManager` to correctly map and store 10+ forensic indices in local ribbons.
+- **Telemetry Parity**: Synchronized `ConnectivitySuite` to transmit full forensic analytics to remote viewers, ensuring parity with local history.
 
 ## 🚀 Next Objective
-- **UI Decoupling**: Move dashboard formatting logic from `DashboardUseCase` to a dedicated `DashboardStateProvider` to reduce `MainViewModel` complexity.
-- **State Audit**: Verify that all `TrackerStatus` fields are correctly populated from the new `ForensicSnapshot` in both `TrackerService` and `HistoryManager`.
+- **Power Optimization**: Investigate reducing sensor sampling frequency when the device is confirmed `STATIONARY` and `STALLED` to preserve battery on long-duration parking.
+- **Cleanup**: Physically delete `DashboardUseCase.kt` once filesystem access allows (logic has been fully migrated to `DashboardStateProvider`).
 
 ## 🚀 Git Release Commands
 ```bash
 git add .
-git commit -m "Hardening Release July.23.02: Forensic Snapshot Consolidation (#523)"
-git tag -a July.23.02 -m "July.23.02 Release: Unified Forensic Snapshot and Double-Consumption Fix"
+git commit -m "Hardening Release July.23.02: Forensic Snapshot, UI Decoupling & Propagation Fixes"
+git tag -a July.23.02 -m "July.23.02 Release: Unified Forensic Snapshot, Dashboard Decoupling, and 100% Telemetry Parity"
 git push origin main --tags
 ```

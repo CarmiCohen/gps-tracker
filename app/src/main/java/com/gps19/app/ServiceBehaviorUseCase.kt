@@ -6,12 +6,10 @@ import javax.inject.Singleton
 
 /**
  * ServiceBehaviorUseCase: Encapsulates high-level logic for service-level state transitions.
+ * July.23.02:
+ * - Issue #526: Power Optimization. Centralized power-save mode evaluation.
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * July.21.00:
- * - Issue #102: Temporal Forensic Integrity. Standardized 'nowRt'.
- * - Maintained Hilt compatibility as per hardened Golden Master architecture.
- * - Restored dynamic GPS polling interval calculations and suspicious mode gates.
  */
 @Singleton
 class ServiceBehaviorUseCase @Inject constructor(
@@ -44,6 +42,19 @@ class ServiceBehaviorUseCase @Inject constructor(
             deviceSpecialFlags.isS21FE || deviceSpecialFlags.isXiaomi -> HIGH_FREQUENCY_GPS_POLLING_MS
             else -> MOVING_GPS_POLLING_MS
         }
+    }
+
+    /**
+     * Issue #526: Evaluates if the system should enter logic-level power save.
+     * Criteria: Physically stationary, GPS stalled, no pending alarms, and UI not visible.
+     */
+    fun evaluatePowerSaveMode(
+        isStationary: Boolean,
+        isGpsStalled: Boolean,
+        hasUnresolvedAlarms: Boolean,
+        isUiVisible: Boolean
+    ): Boolean {
+        return isStationary && isGpsStalled && !hasUnresolvedAlarms && !isUiVisible
     }
 
     /**

@@ -2,10 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.23.02:
+ * - Issue #526: Power Optimization. Added power-save tick and acoustic duty cycle constants.
  * July.21.00:
  * - Forensic Hardening: Added scaling constants for Sit Detection and Proximity.
- * - Requirement R999b: Added Chair Plunge detection thresholds.
- * - GPS Strategy: Centralized polling intervals for adaptive power management.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -82,6 +82,10 @@ const val ACOUSTIC_INIT_RETRY_COUNT = 3
 const val ACOUSTIC_INIT_RETRY_DELAY_MS = 200L
 const val ACOUSTIC_GENERIC_RECOVERY_DELAY_MS = 2000L
 
+// Issue #526: Acoustic Duty Cycle
+const val ACOUSTIC_DUTY_CYCLE_ON_MS = 2000L
+const val ACOUSTIC_DUTY_CYCLE_OFF_MS = 8000L
+
 // Physical Security Sentinel (R810-M)
 const val LIGHT_THRESHOLD_LUX_JUMP = 150.0
 const val TILT_THRESHOLD_DEGREES = 15.0
@@ -149,6 +153,7 @@ const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
 
 // Adaptive Polling Strategy (R406a)
 const val TICK_INTERVAL_MS = 2000L
+const val POWER_SAVE_TICK_INTERVAL_MS = 10000L
 const val UI_PULSE_TIMEOUT_MS = 45000L 
 const val FGS_STICKY_DELAY_MS = 45000L
 const val WATCH_TIMEOUT_MS = 15000L 

@@ -15,13 +15,10 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * July.22.04:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
+ * July.23.02:
+ * - Issue #525: State Audit. Fixed missing forensic mapping in mapToAppPoint.
  * July.21.00:
  * - Issue #105: Forensic Ribbon Continuity Verification.
- * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timing.
- * - Restored SNR and expanded sensor snapshots (Sit, Proximity, Baro) for high-fidelity backfilling.
- * - Maintained Hilt compatibility.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -57,10 +54,6 @@ class HistoryManager @Inject constructor(
         this.listener = listener
     }
 
-    /**
-     * Issue #105: Hardened initialization to ensure drift reference is restored before 
-     * the first ribbon update tick occurs.
-     */
     suspend fun initialize(scope: CoroutineScope) {
         this.scope = scope
         
@@ -69,8 +62,6 @@ class HistoryManager @Inject constructor(
             if (lastSitTs > 0) {
                  lastSitDetectedRt = timeProvider.elapsedRealtime() - (timeProvider.currentTimeMillis() - lastSitTs)
             }
-            
-            // v9.4.01: Restore persisted clock drift reference (Issue #103)
             clockDriftRef = repository.getLong(MainRepository.CLOCK_DRIFT_REF_KEY, 0L)
         }
     }
@@ -123,7 +114,6 @@ class HistoryManager @Inject constructor(
             lastAuditTs = now
         }
 
-        // v9.4.00: Use monotonic delta for gap detection (Issue #102)
         if (lastTickRt > 0 && deltaRt > REAL_TIME_GAP_LIMIT_MS) {
             fillRealGap(lastTickTs, lastTickRt, now, nowRt, isTrackerMode)
         } else if (lastTickRt > 0 && deltaRt > 1500L) {
@@ -174,7 +164,7 @@ class HistoryManager @Inject constructor(
             hasGps = hasGps,
             accuracy = accuracy,
             maxAccuracy = maxAccuracy,
-            gpsIndex = 0.0, // Calculated in processTick if needed
+            gpsIndex = 0.0,
             noiseIdx = noiseIdx,
             luxIdx = luxIdx,
             vibeIdx = vibeIdx,
@@ -337,7 +327,6 @@ class HistoryManager @Inject constructor(
         
         if (clockDriftRef == 0L) {
             clockDriftRef = currentDrift
-            // v9.4.01: Persist initial drift reference (Issue #103)
             scope?.launch { repository.saveLong(MainRepository.CLOCK_DRIFT_REF_KEY, currentDrift) }
             return
         }
@@ -348,7 +337,6 @@ class HistoryManager @Inject constructor(
             val direction = if (currentDrift > clockDriftRef) "forward" else "backward"
             listener?.onLogEvent("FORENSIC ALERT: System clock jump detected ($direction ${jumpSec}s). Monotonic uptime preserved.", true)
             clockDriftRef = currentDrift
-            // v9.4.01: Persist updated drift reference (Issue #103)
             scope?.launch { repository.saveLong(MainRepository.CLOCK_DRIFT_REF_KEY, currentDrift) }
         }
     }
@@ -382,7 +370,23 @@ class HistoryManager @Inject constructor(
             speed = p.speed,
             bearing = p.bearing,
             currentMa = p.currentMa,
-            locationPendingReason = p.locationPendingReason
+            locationPendingReason = p.locationPendingReason,
+            gpsIndex = p.gpsIndex,
+            noiseIdx = p.noiseIdx,
+            luxIdx = p.luxIdx,
+            vibeIdx = p.vibeIdx,
+            proxIdx = p.proxIdx,
+            liftIdx = p.liftIdx,
+            snrIdx = p.snrIdx,
+            tiltIdx = p.tiltIdx,
+            baroIdx = p.baroIdx,
+            isSitDetected = p.isSitDetected,
+            isSitActive = p.isSitActive,
+            sitVz = p.sitVz,
+            sitDz = p.sitDz,
+            sitBaro = p.sitBaro,
+            sitTilt = p.sitTilt,
+            sitShock = p.sitShock
         )
     }
 

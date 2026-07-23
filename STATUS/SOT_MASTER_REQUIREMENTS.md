@@ -4,39 +4,40 @@ This document serves as the definitive operational specification. All Issue IDs 
 
 ### 1. Performance & Startup Authority
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
-*   **Cold-Start Hardening (R955b)**: To prevent Main-thread frame skipping and ANRs on low-end hardware, the system MUST implement a mandatory 500ms staggered delay before starting base observations. (Issue #099)
-*   **Startup Recovery Protection (R955c)**: To prevent redundant service restarts during the staggered startup window, the `MaintenanceWorker` MUST implement a 60-second grace period from the `appStartTime` before attempting any recovery. (Issue #108)
-*   **Startup Maintenance Authority (R104)**: To prevent I/O bottlenecks and ANRs during cold starts, the system MUST execute a proactive `deepPruneLogs` operation on `Dispatchers.IO` immediately upon initialization. This applies to both UI (ViewModel) and Background Service lifecycles. (Issue #104, #104b)
-*   **Stability Audit Authority (R951)**: To ensure engine resilience during high-frequency tracking, the system MUST perform continuous stability auditing. Gaps > 200ms (`GPS_STABILITY_GAP_THRESHOLD_MS`) relative to the 2s heartbeat MUST be logged as "STABILITY GAP," and Reliability % MUST be reported every 10s. (Issue #031)
-*   **Lazy Safety**: All Hilt managers and repositories MUST use `LazyThreadSafetyMode.PUBLICATION` if any internal state requires lazy initialization to prevent thread stalling.
+*   **Cold-Start Hardening (R955b)**: Implement a mandatory 500ms staggered delay before starting base observations. (Issue #099)
+*   **Startup Recovery Protection (R955c)**: `MaintenanceWorker` MUST implement a 60-second grace period from the `appStartTime` before attempting recovery. (Issue #108)
+*   **Startup Maintenance Authority (R104)**: Execute a proactive `deepPruneLogs` operation immediately upon initialization in both UI and Service lifecycles. (Issue #104, #104b)
+*   **Stability Audit Authority (R951)**: Continuous stability auditing. Gaps > 200ms relative to heartbeat MUST be logged. (Issue #031)
+*   **Power Optimization (R403b)**: To preserve battery during long-duration parking, the system MUST adaptively increase the logic tick interval from 2s to 10s when the device is confirmed `STATIONARY` and the GPS is `STALLED`. (Issue #526)
+*   **Acoustic Duty Cycle (R810-L2)**: During logic-level power save, the microphone MUST switch to a 20% duty cycle (2s ON / 8s OFF) to reduce energy footprint while maintaining forensic sampling. (Issue #526)
 
 ### 2. Temporal & Forensic Integrity
-*   **Temporal Forensic Integrity (R102)**: To ensure logic stability against system clock drifts or manual adjustments, the engine MUST employ a dual-time strategy using monotonic `rt` for logic and wall-clock `ts` for forensic logging. (Issue #102)
-*   **Forensic Parity Authority (R118)**: The system MUST maintain strict field parity across engine models (`LocationUpdate`), persistence (`HistoryEntity`, Database `v59`), telemetry pipelines (Binary/JSON Relay), and UI data structures for all 15+ forensic SIT (Sit Detection) and Indexing parameters. (Issue #118, #122)
-*   **Remote Peer State Authority (R522)**: All remote tracker telemetry (GPS, Battery, 15+ SIT forensic parameters) MUST be centralized in the Hilt-managed `RemoteStatusRepository`. `ConnectivitySuite` and UI (`MainViewModel`) MUST use this repository as the single source of truth to prevent state fragmentation. (Issue #522)
-*   **Forensic Pipeline Consolidation (R523)**: The system MUST employ an atomic `ForensicSnapshot` for all sensor-based evaluations (Alarms, SIT heuristics, Telemetry) to prevent race conditions and double-consumption of peak values during the logic tick. (Issue #523)
-*   **Monotonic Timeline Reconstruction (R105)**: To ensure "1Hz Ribbon Fidelity" across process boundaries, the system MUST reconstruct the monotonic timeline on startup using `clock_drift_ref`. (Issue #105)
-*   **Unified Method for Ribbon Rendering (R106)**: The system MUST implement a unified method for rendering ribbons across all scales. Missing data periods (app-off or service-death) MUST be explicitly visualized as "Black Gaps." (Issue #106)
-*   **Forensic Visual Authority (R404b)**: The system MUST use a standardized `FORENSIC_PINK_COLOR` (#FF1493) for all forensic events. (v9.3.18)
+*   **Temporal Forensic Integrity (R102)**: Dual-time strategy using monotonic `rt` for logic and wall-clock `ts` for forensic logging. (Issue #102)
+*   **Forensic Parity Authority (R118)**: Strict field parity across engine, persistence, telemetry, and UI for all 15+ forensic parameters. (Issue #118, #122, #525)
+*   **Remote Peer State Authority (R522)**: All remote tracker telemetry MUST be centralized in `RemoteStatusRepository`. (Issue #522)
+*   **Forensic Pipeline Consolidation (R523)**: Use an atomic `ForensicSnapshot` for all sensor-based evaluations to prevent peak double-consumption. (Issue #523)
+*   **Monotonic Timeline Reconstruction (R105)**: Reconstruct monotonic timeline on startup using `clock_drift_ref`. (Issue #105)
+*   **Unified Method for Ribbon Rendering (R106)**: Unified method for rendering ribbons across all scales. Explicitly visualize "Black Gaps." (Issue #106)
+*   **Forensic Visual Authority (R404b)**: Use standardized `FORENSIC_PINK_COLOR` (#FF1493) for all forensic events. (v9.3.18)
 
 ### 3. Persistence & Service Reliability
-*   **Activation Authority**: The `isSystemActive` flag in `DataStore` is the definitive authority for background lifecycle revival. Background services MUST NOT restart automatically unless this flag is set.
-*   **DataStore Singleton Authority (R511)**: To prevent `IllegalStateException` during startup, Jetpack DataStore MUST be initialized via the `Context.dataStore` property delegate. This ensures exactly one instance exists per process across all Hilt entry points. (Issue #511)
-*   **Notification Throttling (R993)**: Foreground notification updates MUST BE throttled (default 30s) to prevent system-wide Logcat flooding and reduce CPU wakeups. (Issue #R993)
-*   **Database Migration Integrity (R956b)**: Any change to an `@Entity` class MUST be accompanied by a version bump and an explicit `Migration` object. (Issue #097, #118)
+*   **Activation Authority**: The `isSystemActive` flag in `DataStore` is the definitive authority for background lifecycle revival.
+*   **DataStore Singleton Authority (R511)**: Initialize DataStore via `Context.dataStore` property delegate to ensure singleton instance. (Issue #511)
+*   **Notification Throttling (R993)**: Foreground notification updates MUST BE throttled (default 30s). (Issue #R993)
+*   **Database Migration Integrity (R956b)**: Version bump and explicit `Migration` for any `@Entity` change. (Issue #097, #118)
 *   **Standardized Proto Path (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`. (Issue #030)
 
 ### 4. Dependency & Hardware Hardening
-*   **Hilt Universal Authority (R120b)**: The manual `AppContainer` and its legacy artifacts are fully decommissioned and physically removed. All core repositories, UseCases, and managers MUST be integrated into the Hilt graph using `@Inject` constructors and `@Singleton` scoping. Manual DI is forbidden. Circularities MUST be resolved via Dagger `Provider<T>`. (Issue #120, #124, #126, #126b, #513)
-*   **Samsung A15 Battery Authority (R405b)**: The system MUST proactively trigger the configuration overlay if battery exemption is missing on Samsung A15 hardware. (Issue #101)
-*   **Samsung Stay-Alive Hardening (R405c)**: The system MUST detect hardware sensor registration failures and engage the Accelerometer-based stay-alive pulse. On budget hardware (A15), this pulse MUST perform a hardware "poke" via `SystemMonitor` WakeLock to prevent OS eviction. (Issue #098, #113)
-*   **Step Detector Permission (R107)**: The system MUST explicitly track `android.permission.ACTIVITY_RECOGNITION` to ensure hardware Step Detector availability on API 29+. (Issue #107)
+*   **Hilt Universal Authority (R120b)**: Full migration to Hilt. Manual DI is forbidden. Circularities resolved via `Provider<T>`. (Issue #120, #124, #126, #126b, #513)
+*   **Samsung A15 Battery Authority (R405b)**: Proactively trigger configuration overlay if battery exemption is missing on Samsung A15. (Issue #101)
+*   **Samsung Stay-Alive Hardening (R405c)**: Engage Accelerometer-based stay-alive pulse on sensor failure. Perform hardware "poke" via `SystemMonitor` on budget hardware. (Issue #098, #113)
+*   **Step Detector Permission (R107)**: Explicitly track `android.permission.ACTIVITY_RECOGNITION`. (Issue #107)
 
 ### 5. Architectural Baselines
 *   **Unified System Heartbeat (R403)**: Global 2000ms heartbeat standard (`TICK_INTERVAL_MS`).
-*   **Type Safety Authority (R999)**: All internal telemetry, sensor data, and engine pipelines MUST use `Double` precision. (Issue #077)
-*   **Binary Telemetry Authority (R988)**: The system MUST prioritize binary Protobuf-based telemetry for high-frequency tracker updates.
-*   **Stationary Anchor Hard-Lock (R990b)**: The engine MUST establish a coordinate "Hard-Lock" when stationary. (Issue #018)
+*   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077)
+*   **Binary Telemetry Authority (R988)**: Prioritize binary Protobuf-based telemetry for tracker updates.
+*   **Stationary Anchor Hard-Lock (R990b)**: Establish coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
 *   **Current Release**: `July.23.02`.

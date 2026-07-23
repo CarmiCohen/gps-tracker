@@ -27,12 +27,11 @@ import kotlin.math.sqrt
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.23.02:
+ * - Issue #526: Power Optimization. Implemented Acoustic Duty Cycling to reduce 
+ *   energy footprint during stationary/stalled states.
  * July.23.01:
- * - Forensic Consolidation: Implemented consumeForensicSnapshot() to provide an atomic 
- *   state of all forensic parameters, preventing double-consumption bugs (Issue #523).
- * July.22.08:
- * - Issue #113 (R405c Hardening): Upgraded Stay-Alive pulse to hardware poke via SystemMonitor 
- *   to prevent OS eviction on Samsung A15.
+ * - Forensic Consolidation: Integrated consumeForensicSnapshot() (Issue #523).
  */
 class AppSensorManager(
     private val context: Context,
@@ -137,6 +136,9 @@ class AppSensorManager(
 
     @Volatile
     private var isHighLoad = false
+
+    @Volatile
+    private var powerSaveMode = false
 
     data class SensorSnapshot(
         val ts: Long,
@@ -314,7 +316,7 @@ class AppSensorManager(
         recoveryJob?.cancel()
         recoveryJob = scope.launch {
             while (isActive) {
-                delay(300000L) // 5 Minutes (Issue #098 R405c Self-Healing)
+                delay(300000L) 
                 if (!isStepDetectorRegistered) {
                     Timber.i("Issue #113: Step Detector registration stale. Attempting recovery...")
                     attemptStepRegistration()
@@ -327,7 +329,7 @@ class AppSensorManager(
         isStepDetectorRegistered = stepDetector?.let { 
             val registered = sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) 
             if (!registered) {
-                Timber.e("Issue #098: Step Detector exists but registerListener failed. Engaging fallback.")
+                Timber.e("Issue #098: Step Detector exists but registerListener failed.")
             } else {
                 Timber.i("Issue #098: Step Detector registered successfully.")
             }
@@ -362,6 +364,13 @@ class AppSensorManager(
 
     fun setHighLoad(high: Boolean) {
         this.isHighLoad = high
+    }
+
+    fun setPowerSaveMode(active: Boolean) {
+        if (this.powerSaveMode != active) {
+            this.powerSaveMode = active
+            Timber.i("Issue #526: Power Save Mode ${if (active) "ENABLED" else "DISABLED"}. Acoustic Duty Cycling triggered.")
+        }
     }
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -465,7 +474,7 @@ class AppSensorManager(
                 val sampleRate = ACOUSTIC_SAMPLE_RATE
                 val bufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
                 if (bufferSize <= 0) {
-                    if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Invalid buffer size (Retrying...)")
+                    if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Invalid buffer size")
                     try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }
                     continue
                 }
@@ -480,25 +489,49 @@ class AppSensorManager(
                     }
                     if (!isMonitoring) break
                     if (audioRecord == null || audioRecord.state != AudioRecord.STATE_INITIALIZED) {
-                        if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Init failed (Retrying...)")
+                        if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Init failed")
                         try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }
                         continue
                     }
                     try { audioRecord.startRecording() } catch (e: IllegalStateException) {
-                        if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Mic occupied (Retrying...)")
+                        if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Mic occupied")
                         try { audioRecord.release() } catch (ex: Exception) {}
                         try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }
                         continue
                     }
                     if (audioRecord.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
-                        if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Contention (Retrying...)")
+                        if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Contention")
                         try { audioRecord.release() } catch (ex: Exception) {}
                         try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }
                         continue
                     }
                     isAcousticRunning = true
                     val buffer = ShortArray(bufferSize)
+                    var lastDutyCycleTransitionRt = timeProvider.elapsedRealtime()
+                    var isInOffCycle = false
+
                     while (isMonitoring && !Thread.currentThread().isInterrupted) {
+                        val nowRt = timeProvider.elapsedRealtime()
+                        
+                        // Issue #526: Acoustic Duty Cycle Logic
+                        if (powerSaveMode) {
+                            if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUTY_CYCLE_ON_MS)) {
+                                isInOffCycle = true; lastDutyCycleTransitionRt = nowRt
+                                try { audioRecord.stop() } catch (e: Exception) {}
+                            } else if (isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUTY_CYCLE_OFF_MS)) {
+                                isInOffCycle = false; lastDutyCycleTransitionRt = nowRt
+                                try { audioRecord.startRecording() } catch (e: Exception) { break }
+                            }
+                        } else if (isInOffCycle) {
+                            isInOffCycle = false; lastDutyCycleTransitionRt = nowRt
+                            try { audioRecord.startRecording() } catch (e: Exception) { break }
+                        }
+
+                        if (isInOffCycle) {
+                            try { Thread.sleep(500) } catch (ie: InterruptedException) { break }
+                            continue
+                        }
+
                         val read = audioRecord.read(buffer, 0, bufferSize)
                         if (read > 0) {
                             var maxAmp = 0; for (i in 0 until read) { val a = Math.abs(buffer[i].toInt()); if (a > maxAmp) maxAmp = a }
@@ -507,18 +540,18 @@ class AppSensorManager(
                                 currentAcousticDb = db; if (db > internalPeakDb) internalPeakDb = db
                                 if (db < internalMinDb) internalMinDb = db; if (db > secPeakDb) secPeakDb = db
                                 if (!isWarming && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) {
-                                    val nowRt = timeProvider.elapsedRealtime()
-                                    if (nowRt - lastAcousticSpikeRt > SPIKE_DEBOUNCE_MS) { lastAcousticSpikeRt = nowRt; lastAcousticLockoutRt = nowRt; onAcousticSpike?.invoke() }
+                                    val spikeRt = timeProvider.elapsedRealtime()
+                                    if (spikeRt - lastAcousticSpikeRt > SPIKE_DEBOUNCE_MS) { lastAcousticSpikeRt = spikeRt; lastAcousticLockoutRt = spikeRt; onAcousticSpike?.invoke() }
                                 }
                             }
                         } else if (read < 0) {
                             if (!isMonitoring) break
-                            onHardwareFailure?.invoke("AudioRecord: Hardware error (Retrying...)"); break
+                            onHardwareFailure?.invoke("AudioRecord: Hardware error"); break
                         }
                     }
                     try { audioRecord.stop() } catch (ex: Exception) {}
                 } catch (e: Exception) {
-                    if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Exception - ${e.message} (Retrying...)")
+                    if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Exception - ${e.message}")
                 } finally {
                     isAcousticRunning = false; try { audioRecord?.release() } catch (ex: Exception) {}
                     if (isMonitoring) try { Thread.sleep(ACOUSTIC_GENERIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { }
@@ -554,7 +587,6 @@ class AppSensorManager(
                 acousticMin = if (internalMinDb >= 100.0) -1.0 else internalMinDb
             )
             
-            // Atomic Reset of Peaks
             internalPeakVibration = 0.0
             internalPeakVerticalVelocity = 0.0
             internalPeakVerticalVelocityTs = 0L

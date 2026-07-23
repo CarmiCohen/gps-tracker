@@ -19,13 +19,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * July.23.01:
- * - Forensic Consolidation: Integrated AppSensorManager.consumeForensicSnapshot() 
- *   to ensure atomic state propagation and prevent peak double-consumption (Issue #523).
- * July.23.00:
- * - SIT Hardening (Issue #522): Fed local sensor telemetry into LocationProcessor 
- *   to activate refined Sit-Detection heuristic. Captured and propagated all 
- *   forensic parameters (Vz, Dz, Plunge, Shock).
+ * July.23.02:
+ * - Issue #526: Power Optimization. Centralized power-save evaluation in ServiceBehaviorUseCase.
+ * - Issue #525: State Audit. Centralized forensic index computation.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -46,13 +42,15 @@ class TrackerService : BaseMonitorService() {
     private var lastHardwareRecoveryTs = 0L
     private var capabilities = HardwareCapabilities()
 
-    // R951: Stability Audit State
     private var lastGpsFixRealtime = 0L
     private var stabilityAuditFixCount = 0
     private var stabilityAuditViolationCount = 0
     private var lastStabilityAuditTs = 0L
     
     private var lastFastPathAcousticSpikeTs = 0L
+
+    private var isPowerSaveActive = false
+    private var lastPowerSaveCheckRt = 0L
 
     private val localProcessorListener = object : LocationProcessorListener {
         override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, status: SentinelStatus, timestamp: Long, accuracy: Double, maxAccuracy: Double) {
@@ -302,7 +300,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     override fun getRequiredTickInterval(): Long {
-        return TICK_INTERVAL_MS
+        return if (isPowerSaveActive) POWER_SAVE_TICK_INTERVAL_MS else TICK_INTERVAL_MS
     }
 
     override suspend fun processTick(now: Long, nowRt: Long): Unit = withContext(Dispatchers.Default) {
@@ -348,10 +346,8 @@ class TrackerService : BaseMonitorService() {
         val isViewerActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isPeerAvailable = isSocketConnected && isViewerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
-        // Atomic Forensic Snapshot (Issue #523)
         val snapshot = appSensorManager.consumeForensicSnapshot()
 
-        // Feed Local Sensor Data to LocationProcessor for SIT detection
         locationProcessor.updateSensorData(
             vibration = snapshot.vibration,
             heading = snapshot.heading,
@@ -371,13 +367,41 @@ class TrackerService : BaseMonitorService() {
             nowWall = now
         )
 
+        // Unified Forensic Index Computation (Issue #525)
+        val noiseIdx = (snapshot.acousticDb - locationProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
+        val luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE
+        val vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G
+        val liftIdx = (snapshot.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS
+        val avgCn0 = latestGnssDetail?.satellites?.map { it.cn0 }?.average() ?: 0.0
+        val snrIdx = avgCn0 / RIBBON_SNR_SCALE_DB
+        val tiltIdx = abs(snapshot.tiltDegrees - locationProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG
+        val baroIdx = (snapshot.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS
+        val sitDetected = locationProcessor.consumeSitDetected()
+
+        // Issue #526: Power Save State Evaluation
+        if (nowRt - lastPowerSaveCheckRt > 5000L) {
+            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(
+                isStationary = appSensorManager.isStationary(),
+                isGpsStalled = lastProcessedLocation?.isStalled ?: true,
+                hasUnresolvedAlarms = alarmManager.hasUnresolvedAlarms(),
+                isUiVisible = isUiVisible()
+            )
+            
+            if (shouldBePowerSave != isPowerSaveActive) {
+                isPowerSaveActive = shouldBePowerSave
+                appSensorManager.setPowerSaveMode(shouldBePowerSave)
+                logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED (10s logic cycle)" else "DISENGAGED (2s logic cycle)"}", false)
+            }
+            lastPowerSaveCheckRt = nowRt
+        }
+
         val hasLocation = lastKnownLocation != null
         if (isViewerActive && hasLocation) {
             val location = lastKnownLocation!!
             val processed = locationProcessor.processGpsPoint(
                 lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed,
                 gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing,
-                snr = latestGnssDetail?.satellites?.map { it.cn0 }?.average() ?: 0.0,
+                snr = avgCn0,
                 satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0,
                 isViewerTrail = false, lastGpsTs = lastGpsFixRealtime, isLocal = true,
                 providedAcousticLockoutRt = lastFastPathAcousticSpikeTs,
@@ -401,18 +425,19 @@ class TrackerService : BaseMonitorService() {
                 proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs,
                 vibrationRollingSum = snapshot.vibrationRollingSum, micPending = false,
                 isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper,
-                isSitDetected = locationProcessor.consumeSitDetected(), isSitActive = false,
+                isSitDetected = sitDetected, isSitActive = false,
                 lastSitTs = locationProcessor.getLastSitTs(), receiptRt = nowRt, violationUptimeMs = sessionManager.violationUptimeMs,
                 violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = snapshot.peakVerticalVelocity,
                 sitVz = snapshot.peakVerticalVelocity, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock,
                 isClockRegression = processed.isClockRegression, isLocationPending = false, locationPendingReason = LocationPendingReason.NONE,
-                lastValidFixRt = locationProcessor.getLastValidFixRt(), gnssDetail = latestGnssDetail, snrIdx = 0.0, tiltIdx = 0.0, baroIdx = 0.0,
+                lastValidFixRt = locationProcessor.getLastValidFixRt(), gnssDetail = latestGnssDetail, 
+                snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, liftIdx = liftIdx, tiltIdx = tiltIdx, baroIdx = baroIdx,
                 isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive,
                 batteryLevel = health.batteryLevel, batteryTemp = health.batteryTemp, isCharging = health.isCharging,
                 trackerState = if (processed.filteredSpeed > 0.5) TrackerState.MOVING else TrackerState.PARKING,
                 status = processed.status,
                 isStorageLow = health.isStorageLow, isStorageCritical = health.isStorageCritical,
-                isPowerSaveMode = health.isPowerSaveMode, standbyBucket = health.standbyBucket, netInterface = health.netInterface
+                isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode, standbyBucket = health.standbyBucket, netInterface = health.netInterface
             )
             
             historyManager.updateRibbons(
@@ -426,14 +451,14 @@ class TrackerService : BaseMonitorService() {
                 isTrackerMode = true,
                 accuracy = processed.currentAccuracy,
                 maxAccuracy = processed.maxAccuracy,
-                noiseIdx = (snapshot.acousticDb - locationProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB,
-                luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE,
-                vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G,
+                noiseIdx = noiseIdx,
+                luxIdx = luxIdx,
+                vibeIdx = vibeIdx,
                 proxIdx = snapshot.proximityIdx,
-                liftIdx = (snapshot.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS,
-                snrIdx = (latestGnssDetail?.satellites?.map { it.cn0 }?.average() ?: 0.0) / RIBBON_SNR_SCALE_DB,
-                tiltIdx = abs(snapshot.tiltDegrees - locationProcessor.getChairBaselineTilt()).coerceIn(0.0, 15.0) / 15.0,
-                baroIdx = (snapshot.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, 5.0) / 5.0,
+                liftIdx = liftIdx,
+                snrIdx = snrIdx,
+                tiltIdx = tiltIdx,
+                baroIdx = baroIdx,
                 verticalVelocity = snapshot.peakVerticalVelocity,
                 sitVz = snapshot.peakVerticalVelocity,
                 sitDz = snapshot.peakVerticalDisplacement,
@@ -444,7 +469,7 @@ class TrackerService : BaseMonitorService() {
                 isCoolingModeActive = health.isCoolingModeActive,
                 speed = processed.filteredSpeed,
                 bearing = location.bearing.toDouble(),
-                isSitDetected = locationProcessor.consumeSitDetected(),
+                isSitDetected = sitDetected,
                 isSitActive = false,
                 currentMa = health.currentMa,
                 locationPendingReason = LocationPendingReason.NONE
@@ -469,7 +494,7 @@ class TrackerService : BaseMonitorService() {
                 sats = gpsManager.satellitesUsed,
                 battery = health.batteryLevel,
                 isSecure = !alarmManager.hasUnresolvedAlarms(),
-                isPowerSave = health.isPowerSaveMode
+                isPowerSave = isPowerSaveActive || health.isPowerSaveMode
             )
         }
 
