@@ -10,10 +10,9 @@ import javax.inject.Singleton
 
 /**
  * RemoteStatusRepository: Single Source of Truth for Remote Peer Telemetry.
- * July.23.00:
- * - Issue #522: Architectural Consolidation. Unified remote peer state from 
- *   ConnectivitySuite and RemoteHandler.
- * - Forensic Parity: Preserves all 15+ SIT forensic parameters.
+ * July.23.01:
+ * - SIT Hardening (Issue #522): Consolidated forensic state authority.
+ * - Deep Purge: Removed references to the obsolete RemoteHandler.
  */
 @Singleton
 class RemoteStatusRepository @Inject constructor(
@@ -81,8 +80,5 @@ class RemoteStatusRepository @Inject constructor(
         _lastPeerActivityTs.value = 0L
         _peerSignal.value = 0
         lastRemotePacketTs = 0L
-        // We do not clear MainRepository.saveTrackerState here to avoid accidental data loss 
-        // if reset is called during transient connectivity issues, but resetPeerStats usually 
-        // implies a hard reset of session.
     }
 }

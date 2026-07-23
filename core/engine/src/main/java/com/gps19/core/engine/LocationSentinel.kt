@@ -5,12 +5,10 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * July.21.00:
- * - Forensic Hardening: Replaced ImmFilter with low-latency EMA smoothing.
- * - Monotonic Rt Alignment: Standardized timing to 'nowRt'.
- * July.20.07:
- * - Issue #102: Temporal Forensic Integrity. Refactored timing to monotonic 'rt'.
- * - Issue #107: Forensic Sitting Detection restored.
+ * July.23.00:
+ * - SIT Hardening (Issue #522): Refined forensic Sit-Detection heuristic. Integrated 
+ *   plungeMatched, Vz, Dz, and Baro into a unified state machine.
+ * - Forensic Alignment: Standardized SIT parameter propagation.
  */
 class LocationSentinel {
 
@@ -56,13 +54,14 @@ class LocationSentinel {
     var lastSitRt: Long = 0L // Monotonic
     var baselineSitTilt: Double = -1.0
     
-    private var lastSitVz: Double = 0.0
-    private var lastSitVzTs: Long = 0L
-    private var lastSitVzRt: Long = 0L
-    private var lastSitDz: Double = 0.0
-    private var lastSitBaro: Double = 0.0
-    private var lastSitTilt: Double = 0.0
-    private var lastSitShock: Double = 0.0
+    // SIT Forensic Parameters (Forensic Parity R522)
+    var lastSitVz: Double = 0.0; private set
+    var lastSitVzTs: Long = 0L; private set
+    var lastSitVzRt: Long = 0L; private set
+    var lastSitDz: Double = 0.0; private set
+    var lastSitBaro: Double = 0.0; private set
+    var lastSitTilt: Double = 0.0; private set
+    var lastSitShock: Double = 0.0; private set
 
     private var sitDetectionCooldownRt: Long = 0L 
     private var stationaryStartRt: Long = 0L 
@@ -147,35 +146,42 @@ class LocationSentinel {
             this.peakVibrationShockRt = nowRt
         }
 
-        val tiltDelta = abs(safeD(tiltDegrees) - baselineSitTilt)
+        val currentTilt = safeD(tiltDegrees)
+        val tiltDelta = if (baselineSitTilt >= 0.0) abs(currentTilt - baselineSitTilt) else 0.0
         val baroDelta = if (baroBaseline > -999.0) abs(safeD(baroAlt) - baroBaseline) else 0.0
         
-        if (nowRt > sitDetectionCooldownRt && !isMuzzled) {
+        // SIT Detection Heuristic Hardening (Issue #522)
+        if (nowRt > sitDetectionCooldownRt && !isMuzzled && !isWarming) {
             val isSpatialTriggered = (tiltDelta > TILT_THRESHOLD_DEGREES) || 
                                      (baroDelta > BARO_LIFT_THRESHOLD_METERS) || 
                                      plungeMatched
             
-            if (isSpatialTriggered && (peakShock > VIBRATION_SHOCK_THRESHOLD_G || plungeMatched)) {
-                isSitDetected = true
-                lastSitTs = nowTs
-                lastSitRt = nowRt
-                sitDetectionCooldownRt = nowRt + 60000L // 1 minute cooldown
+            // Integrated Logic: Must have a physical plunge signal OR significant spatial change combined with shock
+            if (isSpatialTriggered) {
+                val hasSufficientForce = (peakShock > VIBRATION_SHOCK_THRESHOLD_G) || plungeMatched || (abs(peakVerticalVelocity) > CHAIR_PLUNGE_VELOCITY_THRESHOLD)
                 
-                lastSitVz = safeD(peakVerticalVelocity)
-                lastSitVzTs = peakVerticalVelocityTs
-                lastSitVzRt = peakVerticalVelocityRt
-                lastSitDz = safeD(peakVerticalDisplacement)
-                lastSitBaro = safeD(baroDelta)
-                lastSitTilt = safeD(tiltDelta)
-                lastSitShock = safeD(peakShock)
+                if (hasSufficientForce) {
+                    isSitDetected = true
+                    lastSitTs = nowTs
+                    lastSitRt = nowRt
+                    sitDetectionCooldownRt = nowRt + SIT_DUPLICATE_GUARD_MS
+                    
+                    lastSitVz = safeD(peakVerticalVelocity)
+                    lastSitVzTs = if (peakVerticalVelocityTs > 0) peakVerticalVelocityTs else nowTs
+                    lastSitVzRt = if (peakVerticalVelocityRt > 0) peakVerticalVelocityRt else nowRt
+                    lastSitDz = safeD(peakVerticalDisplacement)
+                    lastSitBaro = safeD(baroDelta)
+                    lastSitTilt = safeD(tiltDelta)
+                    lastSitShock = safeD(peakShock)
+                }
             }
         }
 
         if (isStationary() && !isSitDetected) {
             if (stationaryStartRt == 0L) stationaryStartRt = nowRt
             else if (nowRt - stationaryStartRt > PASSIVE_ZEROING_STATIONARY_MS) {
-                if (abs(baselineSitTilt - tiltDegrees) > 0.1 && !tiltDegrees.isNaN()) {
-                    baselineSitTilt = tiltDegrees
+                if (abs(baselineSitTilt - currentTilt) > 0.1 && !currentTilt.isNaN()) {
+                    baselineSitTilt = currentTilt
                     baselineChanged = true
                 }
                 stationaryStartRt = 0L
@@ -189,7 +195,7 @@ class LocationSentinel {
         this.currentLux = safeD(lux)
         this.isNear = isNear
         this.isPowerTamper = powerTamper
-        this.currentTiltDegrees = safeD(tiltDegrees)
+        this.currentTiltDegrees = currentTilt
         this.currentAcousticDb = safeD(acousticDb)
 
         if (luxBaseline < 0) {
