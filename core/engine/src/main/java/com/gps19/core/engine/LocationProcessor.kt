@@ -5,11 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * July.23.08:
+ * - Refactored: Extracted Stationary Anchor logic into AnchorEvaluator.
+ * - Refined: Integrated Safety Valve for stationary breakout.
  * July.23.07:
  * - Issue #530: Refined Stationary Anchor. Implemented accuracy-weighted breakout 
  *   and IMU damping to suppress urban multipath "spaghetti" trails.
- * July.23.03:
- * - Issue #533: Hardening - Stationary Anchor Refinement. 
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -22,6 +23,10 @@ class LocationProcessor(
 
     val sentinel = LocationSentinel()
     
+    private val anchorEvaluator = AnchorEvaluator { msg, lat, lng, acc, vibe ->
+        listener?.onLogAdded(msg, "system", false, false, lat, lng, acc, null, vibe)
+    }
+
     private var lastProcessedAccuracy = 0.0
     private var maxAccuracy = 0.0
     private val accuracyWindow = mutableListOf<Double>()
@@ -45,12 +50,6 @@ class LocationProcessor(
     private var lastHighAccLng = 0.0
     private var lastHighAccTs = 0L // Wall-clock
     private var lastHighAccRt = 0L // Monotonic
-
-    private var parkingAnchorPoint: EngineGeoPoint? = null
-    private var anchorEscapeScore = 0.0
-    private val anchorTrendPoints = mutableListOf<EngineGeoPoint>()
-    private val anchorAveragingBuffer = mutableListOf<EngineGeoPoint>()
-    private var isAnchorLockedState = false
 
     private var cachedHomePoints: List<EngineGeoPoint>? = null
     private var maxDistanceAuthority: Double = 60.0
@@ -80,6 +79,7 @@ class LocationProcessor(
 
         this.cachedHomePoints = homePoints
         this.maxDistanceAuthority = maxDistance
+        anchorEvaluator.reset()
     }
 
     fun setMaxDistanceAuthority(distance: Double) {
@@ -312,99 +312,22 @@ class LocationProcessor(
         val isThrottled = sentinel.shouldThrottlePolling()
         val estimatedSpeed = sentinel.getEstimatedSpeedMps()
         val stationaryProb = sentinel.getStationaryProbability()
-        val isPhysicallyStationary = isStationary()
         
-        var skipPersistence = false
-        var isAnchorLockedNow = false
+        // Refactored Anchor Evaluation (Issue #530 Refinement / July.23.08)
+        val anchorResult = anchorEvaluator.evaluate(
+            point = persistencePoint,
+            isPhysicallyStationary = sentinel.isStationary(),
+            stationaryProb = stationaryProb,
+            estimatedSpeed = estimatedSpeed,
+            maxAccuracy = maxAccuracy,
+            isSuspicious = isSuspicious || isAdaptationMuzzled,
+            isAdaptationMuzzled = isAdaptationMuzzled,
+            isAccuracySnap = sentinelResult.jumpConfidence?.reason?.contains("Suppressed Accuracy Snap") == true,
+            vibeIndex = sentinel.currentVibrationIndex
+        )
 
-        // Issue #062 - Dynamic Anchor Breakout Logic (R990)
-        // Issue #530 - Refinement: Accuracy-weighted breakout score.
-        if (!isSuspicious && !isAdaptationMuzzled && stationaryProb > ANCHOR_ENGAGEMENT_PROBABILITY) {
-            if (parkingAnchorPoint == null && isPhysicallyStationary) {
-                parkingAnchorPoint = persistencePoint
-                anchorEscapeScore = 0.0
-                anchorTrendPoints.clear()
-                anchorAveragingBuffer.clear()
-                anchorAveragingBuffer.add(persistencePoint)
-                listener?.onLogAdded("Stationary Anchor engaged at ${String.format(Locale.getDefault(), "%.5f, %.5f", persistencePoint.lat, persistencePoint.lng)} (Prob: ${String.format(Locale.getDefault(), "%.2f", stationaryProb)})", "system", false, false, persistencePoint.lat, persistencePoint.lng, accuracy, snr, sentinel.currentVibrationIndex)
-            }
-            
-            if (parkingAnchorPoint != null) {
-                // Issue #533: Coordinate-averaging convergence
-                anchorAveragingBuffer.add(persistencePoint)
-                if (anchorAveragingBuffer.size > ANCHOR_AVERAGING_WINDOW_SIZE) anchorAveragingBuffer.removeAt(0)
-                
-                val avgLat = anchorAveragingBuffer.map { it.lat }.average()
-                val avgLng = anchorAveragingBuffer.map { it.lng }.average()
-                parkingAnchorPoint = parkingAnchorPoint!!.copy(lat = avgLat, lng = avgLng)
-
-                val breakoutThreshold = max(PARKING_ANCHOR_MIN_DIST, maxAccuracy * PARKING_ANCHOR_FACTOR)
-                val distFromAnchor = PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, persistencePoint.lat, persistencePoint.lng)
-                
-                if (!isPhysicallyStationary) {
-                    anchorEscapeScore = ANCHOR_ESCAPE_SCORE_THRESHOLD
-                } else {
-                    val transitionZoneStart = breakoutThreshold * ANCHOR_TRANSITION_ZONE_START
-                    if (distFromAnchor > transitionZoneStart) {
-                        // Issue #530: Penalize score accumulation based on accuracy (urban canyon protection)
-                        val accuracyPenalty = if (accuracy > ANCHOR_ACCURACY_PENALTY_LIMIT) {
-                            (ANCHOR_ACCURACY_PENALTY_LIMIT / accuracy).coerceIn(0.2, 1.0)
-                        } else 1.0
-                        
-                        // Issue #530: IMU damping (if IMU says we are still stationary, dampen the GPS-based breakout score)
-                        val imuDamping = if (isPhysicallyStationary) ANCHOR_IMU_DAMPING_FACTOR else 1.0
-                        
-                        val zoneProgress = (distFromAnchor - transitionZoneStart) / (breakoutThreshold - transitionZoneStart)
-                        var increment = (zoneProgress * 25.0).coerceIn(0.0, 50.0)
-                        increment += (distFromAnchor - transitionZoneStart) * ANCHOR_DISPLACEMENT_WEIGHT
-                        
-                        anchorEscapeScore += (increment * accuracyPenalty * imuDamping)
-                    } else {
-                        anchorEscapeScore = (anchorEscapeScore * 0.8).coerceAtLeast(0.0)
-                    }
-                    
-                    anchorEscapeScore += estimatedSpeed * ANCHOR_VELOCITY_WEIGHT_MPS
-                    
-                    anchorTrendPoints.add(persistencePoint)
-                    if (anchorTrendPoints.size > ANCHOR_TREND_WINDOW_SIZE) anchorTrendPoints.removeAt(0)
-                    if (anchorTrendPoints.size >= ANCHOR_TREND_WINDOW_SIZE) {
-                        val d1 = PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, anchorTrendPoints[0].lat, anchorTrendPoints[0].lng)
-                        val d2 = PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, anchorTrendPoints[1].lat, anchorTrendPoints[1].lng)
-                        val d3 = PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, anchorTrendPoints[2].lat, anchorTrendPoints[2].lng)
-                        if (d3 > d2 && d2 > d1 && d3 > transitionZoneStart) {
-                            anchorEscapeScore += 30.0 
-                        }
-                    }
-                }
-                
-                // Final Check: Suppress breakout if it's an "Accuracy Snap" (Issue #529 recovery logic)
-                val isAccuracySnap = sentinelResult.jumpConfidence?.reason?.contains("Suppressed Accuracy Snap") == true
-                if (isAccuracySnap) {
-                    anchorEscapeScore = (anchorEscapeScore * 0.5).coerceAtLeast(0.0)
-                }
-                
-                if (anchorEscapeScore < ANCHOR_ESCAPE_SCORE_THRESHOLD && distFromAnchor < breakoutThreshold) {
-                    skipPersistence = true 
-                    isAnchorLockedNow = true
-                } else {
-                    val reason = if (!isPhysicallyStationary) "Physical Motion" else if (anchorEscapeScore >= ANCHOR_ESCAPE_SCORE_THRESHOLD) "Displacement Trend (Score: ${anchorEscapeScore.toInt()})" else "Distance Threshold"
-                    listener?.onLogAdded("Stationary Anchor breakout ($reason): Distance ${String.format(Locale.getDefault(), "%.1f", distFromAnchor)}m", "system", false, false, persistencePoint.lat, persistencePoint.lng, accuracy, snr, sentinel.currentVibrationIndex)
-                    parkingAnchorPoint = null
-                    anchorEscapeScore = 0.0
-                    anchorTrendPoints.clear()
-                    anchorAveragingBuffer.clear()
-                }
-            }
-        } else {
-            if (parkingAnchorPoint != null) {
-                listener?.onLogAdded("Stationary Anchor released (Prob: ${String.format(Locale.getDefault(), "%.2f", stationaryProb)})", "system", false, false, persistencePoint.lat, persistencePoint.lng, accuracy, snr, sentinel.currentVibrationIndex)
-                parkingAnchorPoint = null
-                anchorEscapeScore = 0.0
-                anchorTrendPoints.clear()
-                anchorAveragingBuffer.clear()
-            }
-        }
-        isAnchorLockedState = isAnchorLockedNow
+        val skipPersistence = anchorResult.shouldSkipPersistence
+        val isAnchorLockedNow = anchorResult.isLocked
 
         val timeSinceLastGpsSaveRt = if (nowRt > 0 && lastSavedRt > 0) nowRt - lastSavedRt else 0L
         if (shouldSavePoint(isSuspicious || isAdaptationMuzzled, isThrottled, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSaveRt, maxAccuracy, nowRt) && !skipPersistence) {
@@ -414,8 +337,8 @@ class LocationProcessor(
         
         lastProcessedAccuracy = accuracy
         
-        val finalOptimized = if (isAnchorLockedNow && !isViewerTrail && parkingAnchorPoint != null) {
-            optimizedPoint.copy(lat = parkingAnchorPoint!!.lat, lng = parkingAnchorPoint!!.lng)
+        val finalOptimized = if (isAnchorLockedNow && !isViewerTrail) {
+            anchorResult.optimizedPoint
         } else {
             optimizedPoint
         }
@@ -453,9 +376,7 @@ class LocationProcessor(
     fun getEstimatedBearing(): Double = sentinel.getEstimatedBearing()
     fun resetFilter() { 
         sentinel.reset()
-        parkingAnchorPoint = null
-        isAnchorLockedState = false
-        anchorAveragingBuffer.clear()
+        anchorEvaluator.reset()
     }
     fun invalidateHomePointsCache() { cachedHomePoints = null }
     fun resetStats() {
@@ -463,11 +384,8 @@ class LocationProcessor(
         lastDistanceToTracker = null; lastNearestHomeDistance = null
         lastLat = 0.0; lastLng = 0.0; lastTs = 0L; lastRt = 0L; lastAcc = 0.0; lastMaxAcc = 0.0
         lastSavedLat = 0.0; lastSavedLng = 0.0; lastSavedTs = 0L; lastSavedRt = 0L; lastSavedGpsTs = 0L
-        lastHighAccLat = 0.0; lastHighAccLng = 0.0; lastHighAccTs = 0L; lastHighAccRt = 0L; lastValidFixRt = 0L; parkingAnchorPoint = null
-        isAnchorLockedState = false
-        anchorEscapeScore = 0.0
-        anchorTrendPoints.clear()
-        anchorAveragingBuffer.clear()
+        lastHighAccLat = 0.0; lastHighAccLng = 0.0; lastHighAccTs = 0L; lastHighAccRt = 0L; lastValidFixRt = 0L
+        anchorEvaluator.reset()
         invalidateHomePointsCache(); sentinel.reset(); 
         listener?.onMaxAccuracyChanged(0.0)
     }

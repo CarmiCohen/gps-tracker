@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.23.07)
+# Project Issues & Hardening Tracking (July.23.08)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,12 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 365 |
+| **Resolved (Total)** | 🟢 Progress | 366 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Stationary Sensitivity (Issue #530 Refinement)**: The new IMU-damping factor (`0.5`) on anchor breakout scoring relies heavily on the `isPhysicallyStationary` flag. If a device has a faulty accelerometer or extremely high vibration floor, it might lead to "sticky" anchors during real movement.
+*   **AnchorEvaluator Test Coverage**: The newly extracted `AnchorEvaluator` currently lacks dedicated unit tests. Given its criticality in suppressing urban multipath, behavioral simulation is recommended.
 
 ---
 
@@ -21,16 +21,11 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (July.23.07)
-*   **Issue #530: Urban Multipath Suppression - Accuracy-Weighted Anchor**.
-    *   **Resolution**: Refined the stationary anchor breakout logic in `LocationProcessor.kt`. Displacement toward breakout is now penalized by fix accuracy (high uncertainty = lower breakout vote) and damped by IMU stationary confirmation. Added suppression for "Accuracy Snaps" to prevent false breakouts during accuracy recovery.
-    *   **Verification**: Backlog validation #530 requirements met for urban canyon stability and 5m breakout.
-*   **Issue #113: Samsung A15 Fallback Hardening - Hardware Poke**.
-    *   **Resolution**: Implemented a 10-second hardware "poke" in `TrackerService` (WakeLock renewal + sensor request) to prevent aggressive OS-level background eviction on budget hardware. Promoted Foreground Service to `specialUse` for this hardware profile.
-    *   **Verification**: Service stability verified during extended stationary periods on A15 hardware.
-*   **Issue #120b: I/O Stabilization - Startup Pruning Delay**.
-    *   **Resolution**: Implemented a 2000ms delay for `proactivePruning` in `BaseMonitorService` to eliminate I/O contention during cold starts.
-    *   **Verification**: Zero "UI ERROR" logs or stuttering observed during first 10 seconds of service initialization.
+## 🟢 Recently Resolved Issues (July.23.08)
+*   **Issue #533b: Architectural Simplification - AnchorEvaluator Extraction**.
+    *   **Resolution**: Extracted stationary anchor logic from `LocationProcessor.kt` into `AnchorEvaluator.kt`. This decouples the complex scoring and averaging logic from the main processing pipeline.
+    *   **Hardening (Safety Valve)**: Mitigated the "sticky anchor" risk (Issue #530 concern) by implementing a Safety Valve. If GPS displacement consistently exceeds 2x the threshold, the breakout score accumulation is accelerated (ignoring IMU damping) to ensure escape even if the accelerometer is faulty or excessively muzzled.
+*   **Issue #530: Urban Multipath Suppression - Accuracy-Weighted Anchor**. (Verified in July.23.07, Refactored in July.23.08)
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*
