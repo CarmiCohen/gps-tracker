@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 356 |
+| **Resolved (Total)** | 🟢 Progress | 358 |
 
 ---
 
@@ -23,7 +23,8 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🟢 Recently Resolved Issues (July.23.05)
-*   (None yet in this cycle)
+*   **Issue #534: Telemetry Pipeline Refinement**. Standardized engine constants and signaling keys for improved event processing and viewer service synchronization.
+*   **Issue #535: Documentation Integrity Audit**. Synchronized `SOT_MASTER_REQUIREMENTS.md`, `issues.md`, and technical guides to ensure documentation integrity.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*

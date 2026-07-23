@@ -24,7 +24,11 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R118** | **Forensic Parity**: Full parity across Engine/Persistence/UI. | **Verified (July.22.01)** |
 | **R405c** | **Samsung Stay-Alive**: Accelerometer fallback pulse. | **Verified (July.20.07)** |
 
-## 2. Recent Hardening Phase Resolutions (July.23.04)
+## 2. Recent Hardening Phase Resolutions (July.23.05)
+*   **FIXED #534**: Telemetry Pipeline Refinement and Signaling Constants.
+*   **FIXED #535**: Documentation Integrity Audit and SOT synchronization.
+
+## 3. Historical Hardening Phase Resolutions (July.23.04)
 *   **FIXED #533**: Stationary Anchor Convergence logic.
 *   **FIXED #532**: Type Safety / Double precision audit.
 *   **FIXED #531**: Acoustic Duty Cycle FGS flickering.
