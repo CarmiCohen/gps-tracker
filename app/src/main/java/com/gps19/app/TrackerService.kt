@@ -19,12 +19,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.23.12:
+ * - Issue #113: Throttled status updates. Notifications are now suppressed 
+ *   unless isSystemActive is true, preventing main-thread ANRs during startup.
  * July.23.11:
- * - Bug Fix: Removed local siren maintenance in processTick. Trackers must 
- *   remain silent as per R872 (Stealth requirement).
- * July.23.07:
- * - Issue #113: Samsung A15 Fallback Hardening (R405c). Implemented 10s Hardware Poke 
- *   (WakeLock + Accel) and promoted FGS type to Special Use for A15 stabilization.
+ * - Bug Fix: Removed local siren maintenance in processTick. 
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -284,7 +283,8 @@ class TrackerService : BaseMonitorService() {
 
     override fun startServiceForeground() {
         val type = getAvailableForegroundServiceType()
-        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification("Tracking system active."), type)
+        // Issue #113: Force = true for initial startup notification
+        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification("Tracking system active."), type, force = true)
     }
 
     override fun updateForegroundServiceType() {
@@ -422,7 +422,7 @@ class TrackerService : BaseMonitorService() {
                 appSensorManager.setPowerSaveMode(shouldBePowerSave)
                 logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED (10s logic cycle)" else "DISENGAGED (2s logic cycle)"}", false)
                 
-                // Issue #531: Trigger FGS type update when power-save state changes to ensure Mic flag reflects monitoring intent
+                // Issue #531: Trigger FGS type update when power-save state changes
                 withContext(Dispatchers.Main) {
                     updateForegroundServiceType()
                 }
@@ -523,7 +523,8 @@ class TrackerService : BaseMonitorService() {
             )
         }
 
-        if (now - lastNotificationUpdateTs >= NOTIFICATION_THROTTLE_MS) {
+        // Issue #113: Throttled Pulse - Suppress noise if system is not Active
+        if (isSystemActive && (now - lastNotificationUpdateTs >= NOTIFICATION_THROTTLE_MS)) {
             lastNotificationUpdateTs = now
             notificationManager.updatePulse(
                 sats = gpsManager.satellitesUsed,

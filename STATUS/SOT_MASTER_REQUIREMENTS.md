@@ -1,17 +1,17 @@
-# System Source of Truth (SoT) - July.23.11 (Stealth & Startup Hardening)
+# System Source of Truth (SoT) - July.23.12 (ANR & Permission Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Foreground Service Immediacy (R406b)**: `startForeground` MUST be invoked directly in the Main-thread `onCreate` of any `LifecycleService`. Delayed or background-threaded invocation is forbidden to prevent `ForegroundServiceDidNotStartInTimeException`. (July.23.11)
+*   **Notification IPC Throttling (R993b)**: To prevent Main-thread ANRs during hardware recovery bursts, Foreground Service notification updates MUST be double-throttled: a 2000ms hard gate in `AppNotificationManager` and a 5000ms gate in `BaseMonitorService`. (Issue #113, July.23.12)
+*   **Startup Silence Authority (R993c)**: Background services MUST suppress status notification pulses (Battery/Satellites) until the system is explicitly marked as "Active" via `isSystemActiveFlow`. This ensures the Landing Page remains responsive during cold starts. (Issue #113, July.23.12)
 *   **Cold-Start Hardening (R955b)**: Implement a mandatory 500ms staggered delay before starting base observations. (Issue #099)
 *   **Startup Recovery Protection (R955c)**: `MaintenanceWorker` MUST implement a 60-second grace period from the `appStartTime` before attempting recovery. (Issue #108)
 *   **Startup Maintenance Authority (R104)**: Execute a proactive `deepPruneLogs` operation immediately upon initialization in both UI and Service lifecycles. (Issue #104, #104b)
 *   **Stability Audit Authority (R951)**: Continuous stability auditing. Gaps > 200ms relative to heartbeat MUST be logged. (Issue #031)
-*   **Power Optimization (R403b)**: To preserve battery during long-duration parking, the system MUST adaptively increase the logic tick interval from 2s to 10s when the device is confirmed `STATIONARY` and the GPS is `STALLED`. (Issue #526)
-*   **Adaptive Hardware Sampling (R406a-H)**: When the device enters logic-level power save, high-frequency hardware sensors (Linear Acceleration) MUST be downgraded to `SENSOR_DELAY_NORMAL` to reduce CPU wake-up frequency. (Issue #526)
-*   **Acoustic Duty Cycle (R810-L2)**: During logic-level power save, the microphone MUST switch to a 20% duty cycle (2s ON / 8s OFF) to reduce energy footprint while maintaining forensic sampling. (Issue #526, #531)
+*   **Power Optimization (R403b)**: System MUST adaptively increase logic tick interval (2s to 10s) when device is `STATIONARY` and GPS is `STALLED`. (Issue #526)
 
 ### 2. Temporal & Forensic Integrity
 *   **Temporal Forensic Integrity (R102)**: Dual-time strategy using monotonic `rt` for logic and wall-clock `ts` for forensic logging. (Issue #102)
@@ -20,35 +20,25 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Forensic Pipeline Consolidation (R523)**: Use an atomic `ForensicSnapshot` for all sensor-based evaluations to prevent peak double-consumption. (Issue #523)
 *   **Monotonic Timeline Reconstruction (R105)**: Reconstruct monotonic timeline on startup using `clock_drift_ref`. (Issue #105)
 *   **Unified Method for Ribbon Rendering (R106)**: Unified method for rendering ribbons across all scales. Explicitly visualize "Black Gaps." (Issue #106)
-*   **Map Visual Stabilization (R106b)**: Implement temporal smoothing (EMA) for map markers to suppress visual jitter at high zoom levels. Use speed-adaptive alpha and a 30m snap threshold for responsiveness. (Issue #072)
-*   **Forensic Visual Authority (R404b)**: Use standardized `FORENSIC_PINK_COLOR` (#FF1493) for all forensic events. (v9.3.18)
 
 ### 3. Persistence & Service Reliability
 *   **Activation Authority**: The `isSystemActive` flag in `DataStore` is the definitive authority for background lifecycle revival.
-*   **Tracker Stealth Authority (R872)**: The device MUST remain silent and visually dark when operating in Tracker mode. Local audio sirens and red-screen overlays MUST be suppressed. Violations are transmitted to the Viewer only. (July.23.11)
-*   **Siren Persistence (R527)**: Active alarm states MUST be persisted to DataStore. If the background service is killed and restarted by the OS, the siren state MUST be restored and audio MUST automatically resume if the violation is unresolved. (Issue #527)
-*   **DataStore Singleton Authority (R511)**: Initialize DataStore via `Context.dataStore` property delegate to ensure singleton instance. (Issue #511)
+*   **Tracker Stealth Authority (R872)**: The device MUST remain silent and visually dark when operating in Tracker mode. Local audio sirens and red-screen overlays MUST be suppressed. (July.23.11)
+*   **Siren Persistence (R527)**: Active alarm states MUST be persisted to DataStore and restored upon service revival. (Issue #527)
 *   **Notification Throttling (R993)**: Foreground notification updates MUST BE throttled (default 30s). (Issue #R993)
-*   **Database Migration Integrity (R956b)**: Version bump and explicit `Migration` for any `@Entity` change. (Issue #097, #118)
-*   **Standardized Proto Path (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`. (Issue #030)
 
 ### 4. Dependency & Hardware Hardening
-*   **Proactive Status Propagation (R533)**: The signaling layer MUST proactively update the telemetry repository's connection status upon every lifecycle event (Connect, Disconnect, Error). (Issue #533)
+*   **Restoration Permission Authority (R107b)**: The Automatic Restoration flow in `MainAppContent` MUST verify all critical permissions (including `ACTIVITY_RECOGNITION`) before reviving a session. If permissions are missing, the UI MUST trigger the request launcher instead of allowing the background service to stall. (Issue #113, July.23.12)
 *   **Hilt Universal Authority (R120b)**: Full migration to Hilt. Manual DI is forbidden. Circularities resolved via `Provider<T>`. (Issue #120, #124, #126, #126b, #513)
 *   **Samsung A15 Battery Authority (R405b)**: Proactively trigger configuration overlay if battery exemption is missing on Samsung A15. (Issue #101)
-*   **Samsung Stay-Alive Hardening (R405c)**: Engage Accelerometer-based stay-alive pulse on sensor failure. Perform hardware "poke" via `SystemMonitor` on budget hardware. (Issue #098, #113)
-*   **Step Detector Permission (R107)**: Explicitly track `android.permission.ACTIVITY_RECOGNITION`. Hardware registration MUST be deferred if permission is not granted to prevent fail(2) denials. (Issue #098, #107)
+*   **Samsung Stay-Alive Hardening (R405c)**: Engage Accelerometer-based stay-alive pulse on sensor failure. Perform hardware "poke" via `SystemMonitor`. (Issue #098, #113)
+*   **Step Detector Permission (R107)**: Explicitly track `android.permission.ACTIVITY_RECOGNITION`. Hardware registration MUST be deferred if permission is not granted. (Issue #098, #107)
 
 ### 5. Architectural Baselines
-*   **Accuracy Recovery Grace (R529)**: The Jump Engine MUST implement an "Accuracy Recovery" grace logic. Spatial corrections resulting from a transition from low to high accuracy MUST NOT be flagged as erratic jumps if the displacement is within the previous fix's uncertainty range. (Issue #529)
-*   **Stationary Anchor Convergence (R990c)**: Use a coordinate-averaging buffer (8-point sliding window) to stabilize the stationary position. The logic MUST maintain < 5m breakout sensitivity. **Hardening (July.23.09)**: The averaging buffer MUST only include points within the breakout threshold to prevent the anchor from drifting with urban multipath noise. (Issue #533, #530)
-*   **Urban Multipath Suppression (R990d)**: The stationary anchor breakout score MUST be accuracy-weighted (penalizing high-uncertainty fixes) and damped by IMU stationary confirmation to prevent urban "spaghetti" trails. (Issue #530)
-*   **Anchor Logic Authority (R990e)**: `AnchorEvaluator` is the central authority for stationary state. It MUST implement a safety valve that accelerates breakout if GPS displacement consistently exceeds 2x the threshold, regardless of IMU status, to prevent "sticky" anchors on faulty hardware. (Issue #533b)
-*   **Unified System Heartbeat (R403)**: Global 2000ms heartbeat standard (`TICK_INTERVAL_MS`).
+*   **Anchor Logic Authority (R990e)**: `AnchorEvaluator` is the central authority for stationary state. It MUST implement a safety valve that accelerates breakout if GPS displacement consistently exceeds 2x the threshold. (Issue #533b)
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077, #532)
 *   **Binary Telemetry Authority (R988)**: Prioritize binary Protobuf-based telemetry for tracker updates.
-*   **Stationary Anchor Hard-Lock (R990b)**: Establish coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: July.23.11.
+*   **Current Release**: July.23.12.
 *   **Source of Truth**: app/build.gradle versionName.

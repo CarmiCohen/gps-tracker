@@ -16,13 +16,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.23.12:
+ * - Issue #113: Hardened status updates. Notifications are now suppressed 
+ *   unless isSystemActive is true, preventing main-thread ANRs during setup.
  * July.22.04:
  * - Hilt Hardening: Added @AndroidEntryPoint.
- * July.21.00:
- * - Forensic Alignment: Renamed trackerLastValidFixRealtime to trackerLastValidFixRt.
- * - Build Hardening: Fully aligned pushCurrentStatus with expanded forensic signature.
- * July.20.07:
- * - Issue #117 Fix: Corrected property names in evaluateAlarmsInternal (trackerLuxBaseline, trackerAcousticFloorDb).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -70,7 +68,7 @@ class ViewerService : BaseMonitorService() {
     override fun onCreate() {
         super.onCreate()
         
-        // Issue #108 Hardening: Claim the service as alive immediately to prevent redundant recovery logic.
+        // Issue #108 Hardening: Claim the service as alive immediately
         repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
 
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
@@ -130,8 +128,6 @@ class ViewerService : BaseMonitorService() {
                 }
             })
             
-            // Issue #105: Await initialization to ensure clock drift ref is restored 
-            // before the first tick loop update.
             historyManager.initialize(lifecycleScope)
 
             delay(1000)
@@ -174,9 +170,6 @@ class ViewerService : BaseMonitorService() {
             val recoveredDrift = repository.getLong(MainRepository.CLOCK_DRIFT_REF_KEY, 0L)
             
             lastServiceTickTs = recoveredTs
-            
-            // Issue #105: Reconstruct monotonic history to ensure the gap between process 
-            // death and restart is visible to HistoryManager.
             lastServiceTickRealtime = if (recoveredDrift != 0L) {
                 recoveredTs - recoveredDrift
             } else {
@@ -213,7 +206,6 @@ class ViewerService : BaseMonitorService() {
         // R951: Stability Gap Detection
         if (lastGpsFixRealtime > 0) {
             val gap = nowRt - lastGpsFixRealtime
-            // Audit against the default high-accuracy interval (TICK_INTERVAL_MS)
             if (HIGH_FREQUENCY_GPS_POLLING_MS == TICK_INTERVAL_MS) {
                 stabilityAuditFixCount++
                 if (gap > TICK_INTERVAL_MS + GPS_STABILITY_GAP_THRESHOLD_MS) {
@@ -329,7 +321,8 @@ class ViewerService : BaseMonitorService() {
     override fun startServiceForeground() {
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
         val msg = "Monitoring system active."
-        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
+        // Issue #113: Force = true for initial startup notification
+        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type, force = true)
     }
 
     @SuppressLint("InlinedApi")
@@ -468,7 +461,8 @@ class ViewerService : BaseMonitorService() {
 
         evaluateAlarmsInternal(now, nowRt, isSignalLoss, isTrackerJammerSuspicion, isTrackerStalled, isTrackerGap, isTrackerActive)
 
-        if (now - lastNotificationUpdateTs >= NOTIFICATION_THROTTLE_MS) {
+        // Issue #113: Throttled Pulse - Suppress noise if system is not Active
+        if (isSystemActive && (now - lastNotificationUpdateTs >= NOTIFICATION_THROTTLE_MS)) {
             lastNotificationUpdateTs = now
             notificationManager.updatePulse(
                 sats = gpsManager.satellitesUsed,

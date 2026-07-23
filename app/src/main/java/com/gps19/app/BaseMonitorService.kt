@@ -5,10 +5,12 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.gps19.core.engine.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -16,14 +18,12 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * July.23.11:
+ * - Issue #113: Throttled Foreground Service updates (5s) to prevent Main-thread 
+ *   notification floods and ANRs during hardware recovery bursts.
+ * - Added isSystemActive authority to suppress non-essential background noise.
  * July.23.07:
- * - Issue #120b: Startup I/O Stabilization. Staggered proactivePruning (2000ms delay) 
- *   to prevent Room/IO contention during cold starts (R104b).
- * July.22.08:
- * - Issue #104b: Global Startup Maintenance Authority. Integrated proactivePruning into onCreate 
- *   to ensure background service starts also benefit from log pruning (R104).
- * July.22.04:
- * - Hilt Hardening: Standardized field injection.
+ * - Issue #120b: Startup I/O Stabilization. Staggered proactivePruning.
  */
 abstract class BaseMonitorService : LifecycleService() {
 
@@ -68,6 +68,13 @@ abstract class BaseMonitorService : LifecycleService() {
     
     protected val transientDropDetected = AtomicBoolean(false)
 
+    // Issue #113: FGS Throttling
+    private var lastFgsUpdateRealtime = 0L
+    private val FGS_UPDATE_THROTTLE_MS = 5000L
+
+    protected var isSystemActive = false
+        private set
+
     protected val serviceExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException) return@CoroutineExceptionHandler
         logManager.logServiceEvent("CRITICAL: Coroutine failure in Service: ${throwable.message}", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
@@ -83,8 +90,13 @@ abstract class BaseMonitorService : LifecycleService() {
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
             startServiceForeground()
             
-            // Issue #120b: Global Startup Maintenance Authority
-            // Ensure proactive log pruning is triggered with a delay to prevent I/O bottlenecks during initialization.
+            // Sync with system active state
+            repository.isSystemActiveFlow.collectLatest { active ->
+                isSystemActive = active
+            }
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
             delay(2000L)
             repository.proactivePruning()
             
@@ -130,7 +142,15 @@ abstract class BaseMonitorService : LifecycleService() {
         return (timeProvider.currentTimeMillis() - lastUiPulseTs < UI_PULSE_TIMEOUT_MS)
     }
 
-    protected fun safeStartForeground(id: Int, notification: Notification, type: Int = 0) {
+    /**
+     * safeStartForeground: Wrapped FGS start/update with internal throttling.
+     * July.23.11: Added hard 5s throttle to prevent system flood.
+     */
+    protected fun safeStartForeground(id: Int, notification: Notification, type: Int = 0, force: Boolean = false) {
+        val now = SystemClock.elapsedRealtime()
+        if (!force && lastFgsUpdateRealtime != 0L && (now - lastFgsUpdateRealtime < FGS_UPDATE_THROTTLE_MS)) return
+        
+        lastFgsUpdateRealtime = now
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 val enforcedType = if (type == 0) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else type

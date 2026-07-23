@@ -1,32 +1,32 @@
-# Project Issues & Hardening Tracking (July.23.11)
+# Project Issues & Hardening Tracking (July.23.12)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 0 |
+| **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 372 |
+| **Resolved (Total)** | 🟢 Progress | 374 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Samsung A15 Sensor Latency**: Budget hardware may exhibit registration delays under high thermal load. Issue #098 mitigation ensures we don't crash or spam logs, but registration timing remains hardware-dependent.
-*   **Permission Revocation Flow**: Revoking `ACTIVITY_RECOGNITION` at runtime results in sensor silence until the next recovery cycle.
+*   **Hilt-Work Kapt Regression**: Recent dependency alignment for background workers is triggering `NonExistentClass` errors during stub generation.
+*   **IPC Congestion**: Even with throttling, frequent notification requests from multiple threads can still put pressure on the system's `NotificationManagerService`.
 
 ---
 
 ## 🔴 Open Issues
-*   (None currently identified)
+*   **Background Worker Compilation Failure**: `BootServiceStartWorker` and `MaintenanceWorker` failing to compile due to Hilt annotation processing errors.
 
 ---
 
-## 🟢 Recently Resolved Issues (July.23.11)
-*   **Tracker Stealth Violation (Audio Alarm)**.
-    *   **Resolution**: Hardened `AppAlarmManager.kt` to suppress `shouldPlaySiren` in tracker mode. Trackers now remain silent even during violations, adhering to stealth requirements.
-*   **FGS Startup Crash Loop (v23.09)**.
-    *   **Resolution**: Moved `startServiceForeground()` to Main-thread `onCreate` in `BaseMonitorService.kt`. This prevents `ForegroundServiceDidNotStartInTimeException` during automatic restoration from the landing page.
+## 🟢 Recently Resolved Issues (July.23.12)
+*   **Main-Thread Notification Flood (ANR)**.
+    *   **Resolution**: Implemented hard throttling (2s/5s) in `AppNotificationManager.kt` and `BaseMonitorService.kt`. Suppression of status updates when the system is not explicitly "Active" ensures the Landing Page remains responsive.
+*   **Auto-Restoration Permission Stalling**.
+    *   **Resolution**: Hardened `MainAppContent.kt` to verify critical permissions (including `ACTIVITY_RECOGNITION`) during the cold-start restoration flow. Missing permissions now trigger the request launcher instead of allowing the service to start and fail in the background.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*)

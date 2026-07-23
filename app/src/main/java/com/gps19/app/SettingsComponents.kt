@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.HelpCenter
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -26,9 +27,11 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * July.23.11:
+ * - Issue #113: Added Physical Activity (Step Detector) permission section to PhoneSetupOverlay.
+ * - Fix: Updated DirectionsRun icon to AutoMirrored version.
  * v9.4.1:
  * - Issue #510: Removed Chair Sit Detection UI and settings.
- * - Issue #502: Device Independency. Genericized PhoneSetupOverlay and hardware-specific instructions.
  */
 
 @Composable
@@ -226,6 +229,7 @@ fun PhoneSetupOverlay(
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 Spacer(Modifier.height(16.dp)); GuideSection(title = "Background Location", description = "Allows tracking and geofencing to work while the screen is off or app is in background.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, reason = if (!permissions.isBackgroundLocationGranted) "Background Location: Set to 'Allow all the time' in system settings" else null)
+                Spacer(Modifier.height(16.dp)); GuideSection(title = "Physical Activity", description = "Required for Step Detector and stay-alive pulsing to stabilize background performance.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isActivityRecognitionGranted, icon = Icons.AutoMirrored.Filled.DirectionsRun, reason = if (!permissions.isActivityRecognitionGranted) "Physical Activity: Permission NOT granted" else null)
             }
 
             if (permissions.hasBackgroundRestriction) { 

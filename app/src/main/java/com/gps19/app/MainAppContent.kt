@@ -33,6 +33,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -43,11 +44,12 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * July.23.11:
+ * - Issue #113: Hardened automatic restoration flow to verify permissions 
+ *   (including ACTIVITY_RECOGNITION) before starting background services.
  * July.20.07:
  * - Issue #117: Fixed typo in AlarmOverlay onGoToMap callback.
  * - Issue #107: Added ACTIVITY_RECOGNITION to core permission flow for Tracker mode (API 29+).
- * v9.3.40:
- * - Issue #095 Hardening: Implemented reactive permission flow.
  */
 @Composable
 fun MainAppContent(
@@ -175,9 +177,15 @@ fun MainAppContent(
 
         if (mode != null) {
             if (navController.currentDestination?.route == Screen.Landing.route && !isManualSelectionInProgress) {
-                Timber.d("Automatic restoration: waiting ${LANDING_PAGE_PAUSE_MS}ms")
-                delay(LANDING_PAGE_PAUSE_MS)
-                onStartService(mode)
+                // Issue #113: Verify permissions during automatic restoration
+                if (hasRequiredPermissions(mode)) {
+                    Timber.d("Automatic restoration: waiting ${LANDING_PAGE_PAUSE_MS}ms")
+                    delay(LANDING_PAGE_PAUSE_MS)
+                    onStartService(mode)
+                } else {
+                    Timber.i("Automatic restoration: Missing permissions for mode $mode. Triggering request flow.")
+                    checkAndRequestPermissions(mode)
+                }
             }
         }
 
