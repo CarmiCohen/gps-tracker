@@ -7,12 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 364 |
+| **Resolved (Total)** | 🟢 Progress | 365 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Anchor Jitter Sensitivity (Issue #530)**: The reduction of `PARKING_ANCHOR_MIN_DIST` to 6m (to meet the 5m breakout requirement) makes the engine more sensitive to extreme multipath bursts. The 8-sample averaging window is now the primary defense against static "spaghetti" trails.
+*   **Stationary Sensitivity (Issue #530 Refinement)**: The new IMU-damping factor (`0.5`) on anchor breakout scoring relies heavily on the `isPhysicallyStationary` flag. If a device has a faulty accelerometer or extremely high vibration floor, it might lead to "sticky" anchors during real movement.
 
 ---
 
@@ -22,6 +22,9 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🟢 Recently Resolved Issues (July.23.07)
+*   **Issue #530: Urban Multipath Suppression - Accuracy-Weighted Anchor**.
+    *   **Resolution**: Refined the stationary anchor breakout logic in `LocationProcessor.kt`. Displacement toward breakout is now penalized by fix accuracy (high uncertainty = lower breakout vote) and damped by IMU stationary confirmation. Added suppression for "Accuracy Snaps" to prevent false breakouts during accuracy recovery.
+    *   **Verification**: Backlog validation #530 requirements met for urban canyon stability and 5m breakout.
 *   **Issue #113: Samsung A15 Fallback Hardening - Hardware Poke**.
     *   **Resolution**: Implemented a 10-second hardware "poke" in `TrackerService` (WakeLock renewal + sensor request) to prevent aggressive OS-level background eviction on budget hardware. Promoted Foreground Service to `specialUse` for this hardware profile.
     *   **Verification**: Service stability verified during extended stationary periods on A15 hardware.

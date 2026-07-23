@@ -5,12 +5,11 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * July.23.07:
+ * - Issue #530: Refined Stationary Anchor. Implemented accuracy-weighted breakout 
+ *   and IMU damping to suppress urban multipath "spaghetti" trails.
  * July.23.03:
  * - Issue #533: Hardening - Stationary Anchor Refinement. 
- *   Implemented coordinate-averaging convergence and refined breakout scoring.
- * July.21.00:
- * - Release Hardening: Fixed dependency inversion (TrackerStatus -> SpatialAnchor).
- * - Forensic Alignment: Synchronized with expanded SentinelStatus enum.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -319,6 +318,7 @@ class LocationProcessor(
         var isAnchorLockedNow = false
 
         // Issue #062 - Dynamic Anchor Breakout Logic (R990)
+        // Issue #530 - Refinement: Accuracy-weighted breakout score.
         if (!isSuspicious && !isAdaptationMuzzled && stationaryProb > ANCHOR_ENGAGEMENT_PROBABILITY) {
             if (parkingAnchorPoint == null && isPhysicallyStationary) {
                 parkingAnchorPoint = persistencePoint
@@ -346,9 +346,19 @@ class LocationProcessor(
                 } else {
                     val transitionZoneStart = breakoutThreshold * ANCHOR_TRANSITION_ZONE_START
                     if (distFromAnchor > transitionZoneStart) {
+                        // Issue #530: Penalize score accumulation based on accuracy (urban canyon protection)
+                        val accuracyPenalty = if (accuracy > ANCHOR_ACCURACY_PENALTY_LIMIT) {
+                            (ANCHOR_ACCURACY_PENALTY_LIMIT / accuracy).coerceIn(0.2, 1.0)
+                        } else 1.0
+                        
+                        // Issue #530: IMU damping (if IMU says we are still stationary, dampen the GPS-based breakout score)
+                        val imuDamping = if (isPhysicallyStationary) ANCHOR_IMU_DAMPING_FACTOR else 1.0
+                        
                         val zoneProgress = (distFromAnchor - transitionZoneStart) / (breakoutThreshold - transitionZoneStart)
-                        anchorEscapeScore += (zoneProgress * 25.0).coerceIn(0.0, 50.0)
-                        anchorEscapeScore += (distFromAnchor - transitionZoneStart) * ANCHOR_DISPLACEMENT_WEIGHT
+                        var increment = (zoneProgress * 25.0).coerceIn(0.0, 50.0)
+                        increment += (distFromAnchor - transitionZoneStart) * ANCHOR_DISPLACEMENT_WEIGHT
+                        
+                        anchorEscapeScore += (increment * accuracyPenalty * imuDamping)
                     } else {
                         anchorEscapeScore = (anchorEscapeScore * 0.8).coerceAtLeast(0.0)
                     }
@@ -365,6 +375,12 @@ class LocationProcessor(
                             anchorEscapeScore += 30.0 
                         }
                     }
+                }
+                
+                // Final Check: Suppress breakout if it's an "Accuracy Snap" (Issue #529 recovery logic)
+                val isAccuracySnap = sentinelResult.jumpConfidence?.reason?.contains("Suppressed Accuracy Snap") == true
+                if (isAccuracySnap) {
+                    anchorEscapeScore = (anchorEscapeScore * 0.5).coerceAtLeast(0.0)
                 }
                 
                 if (anchorEscapeScore < ANCHOR_ESCAPE_SCORE_THRESHOLD && distFromAnchor < breakoutThreshold) {

@@ -2,12 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.23.07:
+ * - Issue #530: Refined Stationary Anchor with accuracy-weighted breakout and IMU damping.
  * July.23.06:
  * - Issue #530: Refined Stationary Anchor for 5m breakout sensitivity.
  * July.23.03:
  * - Issue #533: Added ANCHOR_AVERAGING_WINDOW_SIZE for stationary hardening.
- * July.21.00:
- * - Forensic Hardening: Added scaling constants for Sit Detection and Proximity.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -185,7 +185,7 @@ const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 20000L 
 
 // Stationary Anchor Monitor (Issue #062 - R990)
-// Issue #530 Refinement: Adjusted for 5m breakout sensitivity.
+// Issue #530 Refinement: Adjusted for 5m breakout sensitivity with urban canyon hardening.
 const val PARKING_ANCHOR_MIN_DIST = 6.0
 const val PARKING_ANCHOR_FACTOR = 0.8
 const val ANCHOR_ENGAGEMENT_PROBABILITY = 0.9
@@ -194,7 +194,9 @@ const val ANCHOR_TREND_WINDOW_SIZE = 3
 const val ANCHOR_AVERAGING_WINDOW_SIZE = 8
 const val ANCHOR_TRANSITION_ZONE_START = 0.5 // Start accumulating score at 50% of threshold
 const val ANCHOR_VELOCITY_WEIGHT_MPS = 15.0 
-const val ANCHOR_DISPLACEMENT_WEIGHT = 8.0 // Increased for aggressive breakout on real motion
+const val ANCHOR_DISPLACEMENT_WEIGHT = 8.0 // Impact of distance on breakout score
+const val ANCHOR_IMU_DAMPING_FACTOR = 0.5 // Penalty to score accumulation when IMU says stationary
+const val ANCHOR_ACCURACY_PENALTY_LIMIT = 40.0 // Accuracy threshold where displacement weight starts being penalized
 
 const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 
 
