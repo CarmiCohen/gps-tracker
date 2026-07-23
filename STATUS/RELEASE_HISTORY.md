@@ -1,25 +1,21 @@
-# Project History & Versioning (July.23.06)
+# Project History & Versioning (July.23.09)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
 
-## July.23.06 (Status Sync & Version Increment)
-- **Documentation Integrity**: Synchronized all `STATUS` tracking files (`SOT_MASTER_REQUIREMENTS.md`, `QA_VALIDATION_STATUS.md`, `RESOLUTION_ARCHIVE.md`) to reflect the latest project state.
-- **Version Bump**: Incremented system version to `July.23.06` across the build configuration and documentation headers.
-- **Archive Maintenance**: Formally archived resolved issues #534 and #535.
+## July.23.09 (Validation & Engine Hardening)
+- **AnchorEvaluator Validation (#533b)**: Implemented comprehensive unit tests verifying coordinate averaging, urban multipath suppression, and Safety Valve breakout behavior.
+- **Anchor Logic Hardening (R990c)**: Hardened the coordinate averaging logic to strictly exclude points outside the breakout threshold, preventing anchor "chase" and preserving escape sensitivity.
+- **Test Suite Remediation**: Fixed compilation and logic regressions in `AdaptationMuzzleTest`, `ForensicIdentityTest`, `SignalingTest`, `TelemetryAggregatorTest`, and `LocationSentinelHindsightTest`.
+- **Telemetry Fix (#523)**: Corrected logic inversion in `mergeWorstCase` aggregation for forensic indices and signal strength.
 
-## July.23.05 (Telemetry Refinement & Documentation Audit)
-- **Telemetry Aggregator Hardening**: Refined the `TelemetryAggregator` logic and engine constants to improve event processing reliability.
-- **Documentation Integrity Audit**: Synchronized `SOT_MASTER_REQUIREMENTS.md`, `issues.md`, and technical guides (`EVENTS_AND_LOGGING_MECHANISM.md`) to reflect the latest architectural state.
-- **Signaling Constants Cleanup**: Standardized signaling keys and constants across the core engine and viewer service.
+## July.23.08 (Architectural Simplification)
+- **AnchorEvaluator Extraction (#533b)**: Decoupled stationary anchor logic from `LocationProcessor.kt` into a dedicated component.
+- **Safety Valve Hardening**: Implemented an automated breakout path to prevent "sticky" anchors on faulty hardware or in extreme vibration scenarios.
+- **Code Cleanup**: Removed redundant state variables and centralized anchor management.
 
-## July.23.04 (Hardening & Finality)
-- **Stationary Anchor Refinement (#533)**: Implemented sliding-window coordinate averaging to stabilize urban canyon positioning.
-- **Type Safety Audit (#532)**: Enforced `Double` precision across the entire kinematics and persistence pipeline (R999).
-- **Acoustic Duty Cycle (#531)**: Fixed FGS notification flickering by decoupling recording state from monitoring intent.
-- **Geofence Reliability (#529)**: Implemented "Accuracy Recovery" to suppress false visual jumps during GPS stabilization.
-- **Persistence Hardening (#527)**: Added DataStore-backed alarm state restoration to survive OS-level service kills.
-- **Power Optimization (#526)**: Implemented adaptive two-tier sensor sampling based on device movement state.
-- **Forensic Audit (#525, #523)**: Consolidated forensic snapshots for atomic state evaluation and fixed mapping bugs in local history.
-- **Architectural Cleanup (#528, #524)**: Decommissioned `DashboardUseCase` and decoupled UI formatting into `DashboardStateProvider`.
+## July.23.07 (Urban Hardening & Hardware Stabilization)
+- **Urban Multipath Suppression (#530)**: Implemented accuracy-weighted breakout and IMU-damping to stabilize the stationary anchor in urban canyons.
+- **Samsung A15 Hardening (#113)**: Added logic-driven hardware "pokes" to maintain service priority and prevent background eviction on budget devices.
+- **Startup I/O Stabilization (#120b)**: Introduced staggered pruning to eliminate I/O contention during cold-start Room DB initialization.
 
 ... [See historical logs for full records]

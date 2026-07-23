@@ -7,6 +7,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * SignalingTest: Verifies role-based message filtering and payload generation.
+ * July.23.09:
+ * - Remediated: Removed orphaned tests for purged shouldProcessSettingsUpdate (Issue #521 leftover).
+ */
 class SignalingTest {
 
     @Test
@@ -56,27 +61,9 @@ class SignalingTest {
             )
         )
 
-        // 4. Settings Guard: Tracker accepts settings from linked viewer
-        assertTrue("Tracker should accept settings from linked viewer",
-            SignalingValidator.shouldProcessSettingsUpdate(
-                incomingId = trackerId, ownDeviceId = trackerId,
-                incomingViewerId = customViewer, ownViewerId = customViewer,
-                fromViewer = true, isTrackerMode = true
-            )
-        )
-
-        // 5. Settings Guard: Tracker rejects settings from hacker
-        assertFalse("Tracker MUST reject settings from unauthorized viewer",
-            SignalingValidator.shouldProcessSettingsUpdate(
-                incomingId = trackerId, ownDeviceId = trackerId,
-                incomingViewerId = hackerViewer, ownViewerId = customViewer,
-                fromViewer = true, isTrackerMode = true
-            )
-        )
-
         // --- VIEWERS MODE TESTS ---
 
-        // 6. Echo Suppression: Viewer ignores its own packets
+        // 4. Echo Suppression: Viewer ignores its own packets
         assertFalse("Viewer should suppress its own echoes",
             SignalingValidator.shouldProcessLocationUpdate(
                 incomingId = trackerId, ownDeviceId = trackerId,
@@ -85,7 +72,7 @@ class SignalingTest {
             )
         )
 
-        // 7. Multi-Viewer: Viewer accepts packets from other viewers (Relay mode)
+        // 5. Multi-Viewer: Viewer accepts packets from other viewers (Relay mode)
         assertTrue("Viewer should accept packets from other viewers",
             SignalingValidator.shouldProcessLocationUpdate(
                 incomingId = trackerId, ownDeviceId = trackerId,

@@ -4,10 +4,12 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * July.23.09:
+ * - Fix: Corrected mergeWorstCase logic. Worst-case for GPS goodness (gpsIndex/snrIdx) 
+ *   is the minimum value (Issue #523).
  * July.21.00:
  * - Issue #102: Temporal Forensic Integrity. Switched internal aggregation and 
  *   gap detection logic to use monotonic 'rt' timestamps.
- * - Restored SNR and expanded sensor snapshot integration for high-fidelity backfilling.
  */
 class TelemetryAggregator {
 
@@ -20,17 +22,30 @@ class TelemetryAggregator {
     fun mergeWorstCase(acc: EngineConnectionPoint, cur: EngineConnectionPoint): EngineConnectionPoint {
         return acc.copy(
             rtt = max(acc.rtt, cur.rtt),
-            remoteSig = min(acc.remoteSig, cur.remoteSig),
+            remoteSig = min(acc.remoteSig, cur.remoteSig), // Worst signal
             isConnected = acc.isConnected && cur.isConnected,
             hasGps = acc.hasGps && cur.hasGps,
-            accuracy = max(acc.accuracy, cur.accuracy),
+            accuracy = max(acc.accuracy, cur.accuracy), // Worst accuracy
             maxAccuracy = max(acc.maxAccuracy, cur.maxAccuracy),
             isBatterySteepDischarge = acc.isBatterySteepDischarge || cur.isBatterySteepDischarge,
             isCoolingModeActive = acc.isCoolingModeActive || cur.isCoolingModeActive,
             speed = max(acc.speed, cur.speed),
             bearing = if (cur.hasGps) cur.bearing else acc.bearing,
-            currentMa = min(acc.currentMa, cur.currentMa),
-            locationPendingReason = getHigherPriorityReason(acc.locationPendingReason, cur.locationPendingReason)
+            currentMa = min(acc.currentMa, cur.currentMa), // Lowest (most discharging) current
+            locationPendingReason = getHigherPriorityReason(acc.locationPendingReason, cur.locationPendingReason),
+            
+            // Forensic Aggregation (Issue #523): Pick peaks/worst-case for ribbons
+            gpsIndex = min(acc.gpsIndex, cur.gpsIndex), // Worst GPS goodness (R102)
+            noiseIdx = max(acc.noiseIdx, cur.noiseIdx),
+            luxIdx = max(acc.luxIdx, cur.luxIdx),
+            vibeIdx = max(acc.vibeIdx, cur.vibeIdx),
+            proxIdx = min(acc.proxIdx, cur.proxIdx), // Lower index = closer/restricted
+            liftIdx = max(acc.liftIdx, cur.liftIdx),
+            snrIdx = min(acc.snrIdx, cur.snrIdx), // Worst SNR
+            tiltIdx = max(acc.tiltIdx, cur.tiltIdx),
+            baroIdx = max(acc.baroIdx, cur.baroIdx),
+            isSitDetected = acc.isSitDetected || cur.isSitDetected,
+            isSitActive = acc.isSitActive || cur.isSitActive
         )
     }
 
@@ -54,7 +69,6 @@ class TelemetryAggregator {
 
     fun processPoint(point: EngineConnectionPoint): List<Pair<RibbonScale, EngineConnectionPoint>> {
         val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
-        // v9.4.00: Use monotonic 'rt' for bucket calculations (Issue #102)
         val timeRef = if (point.rt > 0) point.rt else point.ts
         val totalSeconds = (timeRef / TICK_INTERVAL_MS).toInt()
 
@@ -100,7 +114,6 @@ class TelemetryAggregator {
             val totalSeconds = (fillRt / TICK_INTERVAL_MS).toInt()
             val windowEndRt = fillRt + TICK_INTERVAL_MS - 1
             
-            // v9.4.00: Use monotonic 'rt' for window matching (Issue #102)
             while (snrIdx < snrSamples.size && snrSamples[snrIdx].rt < fillRt) snrIdx++
             while (sensorIdx < sensorSamples.size && sensorSamples[sensorIdx].rt < fillRt) sensorIdx++
 

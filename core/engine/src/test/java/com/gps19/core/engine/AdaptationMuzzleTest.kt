@@ -9,7 +9,7 @@ class AdaptationMuzzleTest {
     private lateinit var processor: LocationProcessor
     private val timeProvider = TestTimeProvider()
     private val listener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, isJump: Boolean, timestamp: Long, isHindsightCorrected: Boolean, accuracy: Double, maxAccuracy: Double) {}
+        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, status: SentinelStatus, timestamp: Long, accuracy: Double, maxAccuracy: Double) {}
         override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Double, snr: Double?, vibe: Double?) {}
         override fun onMaxAccuracyChanged(accuracy: Double) {}
         override fun onChairBaselineChanged(baseline: Double) {}
@@ -38,10 +38,6 @@ class AdaptationMuzzleTest {
         )
 
         // 2. Simulate a "Jump" artifact.
-        // Lat 0.001 is ~111 meters.
-        // We use a 2-second gap so speed is ~55.5 m/s.
-        // This is > MAX_PHYSICAL_SPEED_MPS (33.33) and < OUTLIER_SPEED_CAP_MPS (83.33).
-        // And dist > JUMP_POINT_DISTANCE_THRESHOLD (100.0).
         val jumpLat = 52.5210 
         val jumpTs = now + 2000L
         timeProvider.wallTime = jumpTs

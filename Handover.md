@@ -1,31 +1,34 @@
-# Handover (July.23.08) - Anchor Logic Extraction & Safety Hardening
+# Handover (July.23.09) - Anchor Logic Validation & Engine Hardening Complete
 
 ## 🎯 Current Objective
-Cycle **July.23.08** focuses on architectural simplification by extracting stationary anchor logic and hardening the breakout mechanism against faulty IMU data (Safety Valve).
+Cycle **July.23.09** focused on validating the stationary anchor logic through comprehensive unit testing and remediating the `:core:engine` test suite to ensure architectural integrity.
 
 ## 📊 Status Summary
 
-### 1. In Progress: AnchorEvaluator Extraction (Issue #530 / #533 / R990)
-- **Component Decoupling**: Successfully extracted stationary anchor breakout, coordinate averaging, and score calculation from `LocationProcessor.kt` into a standalone `AnchorEvaluator.kt`.
-- **Logic Integrity**: Maintained accuracy-weighted penalties and IMU damping within the new component.
-- **Safety Valve Implementation**: Added a "Safety Valve" breakout path that accelerates escape scores if GPS displacement consistently exceeds 2x the threshold, protecting against "sticky" anchors caused by accelerometer drift or excessive vibration damping.
+### 1. Resolved: AnchorEvaluator Validation (Issue #533b / R990c)
+- **Hardened Averaging**: Modified `AnchorEvaluator.kt` to ensure coordinate averaging only incorporates points within the breakout threshold. This prevents the anchor from "chasing" GPS noise (R990c).
+- **Comprehensive Testing**: Created `AnchorEvaluatorTest.kt` covering engagement, averaging, physical motion breakout, and the "Safety Valve" mechanism (R990e).
 
-### 2. Resolved: LocationProcessor Cleanup
-- **Simplification**: Removed redundant state variables and manual anchor management from `LocationProcessor.kt`.
-- **Integration**: Integrated `AnchorEvaluator` as a delegated component.
+### 2. Resolved: Test Suite Remediation
+- **Interface Alignment**: Fixed compilation errors in `AdaptationMuzzleTest.kt` and `ForensicIdentityTest.kt` by updating implementation of `LocationProcessorListener`.
+- **Logic Restoration**:
+    - **TelemetryAggregator**: Corrected `mergeWorstCase` logic to properly aggregate forensic peaks and signal minimums.
+    - **Hindsight Logic**: Updated `LocationSentinelHindsightTest.kt` to match the current `TRAJECTORY_PROMOTED` behavior and buffer constraints.
+    - **Signaling**: Cleaned up orphaned tests for purged methods in `SignalingTest.kt`.
 
-## 🚀 Planned for this Cycle
-- **Verification**: Rebuild and verify that stationary behavior remains consistent with previous hardening.
-- **Documentation**: Update `SOT_MASTER_REQUIREMENTS.md` to reflect the `AnchorEvaluator` as the central authority for stationary state.
+### 3. Resolved: Documentation & Versioning
+- **Requirements Sync**: Updated **R990c** in `SOT_MASTER_REQUIREMENTS.md`.
+- **Version Bump**: Promoted system version to `July.23.09` in `app/build.gradle`.
+- **History Tracking**: Updated `RELEASE_HISTORY.md` and `issues.md`.
 
-## 🚀 Git Release Procedure (Draft)
+## 🚀 Git Release Procedure
 ```bash
 git add .
-git commit -m "release: July.23.08 - extracted AnchorEvaluator and implemented safety valve"
-git tag -a July.23.08 -m "July.23.08: Architectural simplification and stationary anchor safety hardening."
+git commit -m "release: July.23.09 - validated AnchorEvaluator and remediated engine test suite"
+git tag -a July.23.09 -m "July.23.09: Unit testing for stationary anchor (R990c/d/e) and telemetry aggregation fixes."
 git push origin main --tags
 ```
 
 ## 💡 Code Simplification Ideas
-- **Unified Hardware Profile Manager**: (Pending) Consolidate device-specific adaptations.
-- **AnchorEvaluator Testing**: Create unit tests for `AnchorEvaluator` to simulate urban canyon scenarios and safety valve triggers.
+- **Listener Adapter Pattern**: Introduce a `DefaultLocationProcessorListener` to avoid breaking tests when the interface expands.
+- **Unified Test Factory**: Centralize mock data generation for `EngineGeoPoint` and `EngineConnectionPoint`.

@@ -5,6 +5,9 @@ import kotlin.math.max
 
 /**
  * AnchorEvaluator: Manages stationary anchor state and breakout logic.
+ * July.23.09:
+ * - Fix: Coordinate averaging now only includes points within the breakout threshold
+ *   to prevent the anchor from "chasing" a breakout drift (R990c hardening).
  * July.23.08:
  * - Extracted from LocationProcessor for architectural purity.
  * - Added Safety Valve: Accelerates breakout if displacement is consistently high 
@@ -66,17 +69,20 @@ class AnchorEvaluator(
             }
 
             if (parkingAnchorPoint != null) {
-                // 2. Coordinate-averaging convergence (R990c)
-                anchorAveragingBuffer.add(point)
-                if (anchorAveragingBuffer.size > ANCHOR_AVERAGING_WINDOW_SIZE) anchorAveragingBuffer.removeAt(0)
-
-                val avgLat = anchorAveragingBuffer.map { it.lat }.average()
-                val avgLng = anchorAveragingBuffer.map { it.lng }.average()
-                parkingAnchorPoint = parkingAnchorPoint!!.copy(lat = avgLat, lng = avgLng)
-
-                // 3. Score Calculation
+                // 2. Score Calculation & Breakout Threshold
                 val breakoutThreshold = max(PARKING_ANCHOR_MIN_DIST, maxAccuracy * PARKING_ANCHOR_FACTOR)
                 val distFromAnchor = PhysicsUtils.calculateDistance(parkingAnchorPoint!!.lat, parkingAnchorPoint!!.lng, point.lat, point.lng)
+
+                // 3. Coordinate-averaging convergence (R990c Hardening)
+                // Only include points that are NOT currently causing a major breakout score accumulation
+                if (distFromAnchor < breakoutThreshold) {
+                    anchorAveragingBuffer.add(point)
+                    if (anchorAveragingBuffer.size > ANCHOR_AVERAGING_WINDOW_SIZE) anchorAveragingBuffer.removeAt(0)
+
+                    val avgLat = anchorAveragingBuffer.map { it.lat }.average()
+                    val avgLng = anchorAveragingBuffer.map { it.lng }.average()
+                    parkingAnchorPoint = parkingAnchorPoint!!.copy(lat = avgLat, lng = avgLng)
+                }
 
                 if (!isPhysicallyStationary) {
                     anchorEscapeScore = ANCHOR_ESCAPE_SCORE_THRESHOLD

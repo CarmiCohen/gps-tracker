@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.23.08 (Refactored Logic)
+# System Source of Truth (SoT) - July.23.09 (Hardened Logic)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -38,7 +38,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 
 ### 5. Architectural Baselines
 *   **Accuracy Recovery Grace (R529)**: The Jump Engine MUST implement an "Accuracy Recovery" grace logic. Spatial corrections resulting from a transition from low to high accuracy MUST NOT be flagged as erratic jumps if the displacement is within the previous fix's uncertainty range. (Issue #529)
-*   **Stationary Anchor Convergence (R990c)**: Use a coordinate-averaging buffer (8-point sliding window) to stabilize the stationary position. The logic MUST maintain < 5m breakout sensitivity for intentional movement. (Issue #533, #530)
+*   **Stationary Anchor Convergence (R990c)**: Use a coordinate-averaging buffer (8-point sliding window) to stabilize the stationary position. The logic MUST maintain < 5m breakout sensitivity. **Hardening (July.23.09)**: The averaging buffer MUST only include points within the breakout threshold to prevent the anchor from drifting with urban multipath noise. (Issue #533, #530)
 *   **Urban Multipath Suppression (R990d)**: The stationary anchor breakout score MUST be accuracy-weighted (penalizing high-uncertainty fixes) and damped by IMU stationary confirmation to prevent urban "spaghetti" trails. (Issue #530)
 *   **Anchor Logic Authority (R990e)**: `AnchorEvaluator` is the central authority for stationary state. It MUST implement a safety valve that accelerates breakout if GPS displacement consistently exceeds 2x the threshold, regardless of IMU status, to prevent "sticky" anchors on faulty hardware. (Issue #533b)
 *   **Unified System Heartbeat (R403)**: Global 2000ms heartbeat standard (`TICK_INTERVAL_MS`).
@@ -47,5 +47,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stationary Anchor Hard-Lock (R990b)**: Establish coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: July.23.08.
+*   **Current Release**: July.23.09.
 *   **Source of Truth**: app/build.gradle versionName.
