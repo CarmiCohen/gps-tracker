@@ -2,10 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.23.06:
+ * - Issue #530: Refined Stationary Anchor for 5m breakout sensitivity.
  * July.23.03:
  * - Issue #533: Added ANCHOR_AVERAGING_WINDOW_SIZE for stationary hardening.
- * July.23.02:
- * - Issue #526: Power Optimization. Added power-save tick and acoustic duty cycle constants.
  * July.21.00:
  * - Forensic Hardening: Added scaling constants for Sit Detection and Proximity.
  */
@@ -185,17 +185,18 @@ const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 20000L 
 
 // Stationary Anchor Monitor (Issue #062 - R990)
-const val PARKING_ANCHOR_MIN_DIST = 20.0
+// Issue #530 Refinement: Adjusted for 5m breakout sensitivity.
+const val PARKING_ANCHOR_MIN_DIST = 6.0
 const val PARKING_ANCHOR_FACTOR = 0.8
 const val ANCHOR_ENGAGEMENT_PROBABILITY = 0.9
 const val ANCHOR_ESCAPE_SCORE_THRESHOLD = 100.0
 const val ANCHOR_TREND_WINDOW_SIZE = 3
 const val ANCHOR_AVERAGING_WINDOW_SIZE = 8
-const val ANCHOR_TRANSITION_ZONE_START = 0.7 // Start accumulating score at 70% of threshold
-const val ANCHOR_VELOCITY_WEIGHT_MPS = 15.0 // Score points per m/s of estimated speed
-const val ANCHOR_DISPLACEMENT_WEIGHT = 2.0 // Score points per meter of net displacement in transition zone
+const val ANCHOR_TRANSITION_ZONE_START = 0.5 // Start accumulating score at 50% of threshold
+const val ANCHOR_VELOCITY_WEIGHT_MPS = 15.0 
+const val ANCHOR_DISPLACEMENT_WEIGHT = 8.0 // Increased for aggressive breakout on real motion
 
-const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 // Issue #450: Authoritative multiplier
+const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 
 
 // Behavioral State Thresholds (Issue #302)
 const val SUSTAINED_SPEED_THRESHOLD = 2 
@@ -257,7 +258,7 @@ const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0
-const val NETWORK_TIMEOUT_MS = 60000 // Issue #100: Increased to 60s to handle relay cold-start
+const val NETWORK_TIMEOUT_MS = 60000
 const val NET_REJOIN_THRESHOLD_MS = 15000L
 const val NET_HEAL_THRESHOLD_MS = 45000L
 const val PING_INTERVAL_MS = 10000L

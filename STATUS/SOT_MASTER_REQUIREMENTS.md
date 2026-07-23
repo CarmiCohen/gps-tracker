@@ -37,7 +37,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 
 ### 5. Architectural Baselines
 *   **Accuracy Recovery Grace (R529)**: The Jump Engine MUST implement an "Accuracy Recovery" grace logic. Spatial corrections resulting from a transition from low to high accuracy MUST NOT be flagged as erratic jumps if the displacement is within the previous fix's uncertainty range. (Issue #529)
-*   **Stationary Anchor Convergence (R990c)**: Use a coordinate-averaging buffer (8-point sliding window) to stabilize the stationary position. Refine breakout scoring with displacement trends and velocity weights to suppress GPS drift and "spaghetti" trails. (Issue #533)
+*   **Stationary Anchor Convergence (R990c)**: Use a coordinate-averaging buffer (8-point sliding window) to stabilize the stationary position. The logic MUST maintain < 5m breakout sensitivity for intentional movement while suppressing urban multipath drift. (Issue #533, #530)
 *   **Unified System Heartbeat (R403)**: Global 2000ms heartbeat standard (`TICK_INTERVAL_MS`).
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077, #532)
 *   **Binary Telemetry Authority (R988)**: Prioritize binary Protobuf-based telemetry for tracker updates.

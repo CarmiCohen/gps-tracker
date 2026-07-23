@@ -129,8 +129,9 @@ object PhysicsUtils {
         val isAccuracyImproving = lastAccuracy > 0.0 && accuracy < (lastAccuracy * 0.8)
         val isWithinPreviousError = lastAccuracy > 0.0 && dist < lastAccuracy
         
-        if (isAccuracyImproving && isWithinPreviousError && score > 0) {
-            // Apply 60% reduction to score to prevent false jump triggers during snapping
+        val isSnap = isAccuracyImproving && isWithinPreviousError
+        if (isSnap && score > 0) {
+            // Apply reduction to score to prevent false jump triggers during snapping
             score = (score * 0.4).toInt()
         }
 
@@ -139,10 +140,15 @@ object PhysicsUtils {
         val jitterThreshold = JUMP_GATE_VISUAL_JITTER_METERS
         val isTier3 = dist >= jitterThreshold && dist < JUMP_POINT_DISTANCE_THRESHOLD && score >= 30
         
-        val isJump = isTier2 || isTier3 || score >= 50
+        var isJump = (isTier2 || isTier3 || score >= 50)
+        
+        // Hard suppression for Accuracy Snaps to allow the UI to recover/snap to high accuracy
+        if (isSnap) {
+            isJump = false
+        }
         
         val reason = when {
-            isAccuracyImproving && isWithinPreviousError && isJump -> "Suppressed Accuracy Snap"
+            isSnap -> "Suppressed Accuracy Snap"
             !hasPhysicalMotion && speedMps > mismatchGate -> "Sensor Mismatch Jump (Urban Canyon)"
             isTier2 -> "Security Jump"
             isTier3 -> "Visual Jitter"
