@@ -1,43 +1,31 @@
-# Handover (July.23.04) - Hardening & Forensic Integrity
+# Handover (July.23.05) - Post-Hardening Validation
 
 ## 🎯 Current Objective
-Cycle **July.23.04** marks the completion of the engine hardening phase, specifically addressing stationary drift and forensic type safety.
+Cycle **July.23.05** focuses on the final field validation of the July hardening push, specifically targeting urban multipath suppression and long-term stability on budget hardware.
 
 ## 📊 Status Summary
 
-### 1. Stationary Anchor Refinement (Issue #533 - RESOLVED)
-- **Convergence**: Implemented a coordinate-averaging buffer (`anchorAveragingBuffer`) using an 8-point sliding window in `LocationProcessor.kt`. This settles the anchor point to the weighted mean of fixes when stationary.
-- **Breakout Scoring**: Refined the breakout scoring logic to integrate displacement trends and velocity weights. This suppresses micro-drifts and "spaghetti" trails while maintaining high sensitivity to physical IMU triggers.
+### 1. Active Verification: Urban Multipath Stress Testing (Issue #530)
+- **Focus**: Validating "Accuracy Recovery" (#529) and "Stationary Anchor" (#533) in Level 4 urban canyons.
+- **Goal**: Confirm zero regressions in real-theft detection while maintaining high static stability.
 
-### 2. Forensic Pipeline & Type Safety (Issue #532 - RESOLVED)
-- **Standardization (R999)**: Completed a full audit of the telemetry pipeline. Upgraded `AppSensorManager.kt` to use strict `Double` precision for all hardware-level kinematic integrations.
-- **Integrity**: Verified zero precision leakage in `TelemetryAggregator`, `LocationProcessor`, and Room/Protobuf persistence layers.
+### 2. Baseline Stability
+- **Hardening Finalized**: Stationary anchor averaging and global `Double` precision (R999) are now part of the stable baseline.
+- **Persistence**: Siren and duty-cycle state restoration verified as stable.
 
-### 3. Power Optimization: Dynamic Sampling & Acoustic Duty Cycle (Issue #526, #531 - RESOLVED)
-- **Duty Cycle Refinement**: Implemented 20% acoustic duty cycle (2s ON / 8s OFF). 
-- **FGS Consistency**: Refined `ForegroundServiceType` logic to prevent OS notification flickering during "OFF" phases.
+## 🔍 Pending Validation
+- **Issue #113**: Samsung A15 WakeLock "poke" field testing.
+- **Issue #120b**: Startup I/O stabilization verification.
+- **Issue #072**: Map marker jitter suppression.
 
-### 4. Geofence Reliability: Accuracy Recovery (Issue #529 - RESOLVED)
-- **Solution**: Implemented grace logic in `PhysicsUtils.isVisualJump` to suppress false "Visual Jump" alerts during transitions from low to high accuracy in urban canyons.
+## 🚀 Version Authority
+- **Current Version**: `July.23.05`
+- **Total Resolutions**: 356 (Archived)
 
-### 5. Siren & State Persistence (Issue #527 - RESOLVED)
-- **Persistence**: Active alarm states are now persisted via DataStore, ensuring sirens resume automatically after service restarts.
-
-### 6. Cleanup: DashboardUseCase Tombstone (Issue #528 - RESOLVED)
-- **Status**: Logic migrated to `DashboardStateProvider`. `DashboardUseCase.kt` decommissioned.
-
-## 🔍 Validation Status
-- **Issue #530: Urban Multipath Stress Testing (PENDING)**. Requires field verification of the Suppression Logic (#529) and Anchor Refinement (#533) in Level 4 urban canyons.
-
-## 🚀 Git Release Commands
+## 🛠️ Git Release Procedure
 ```bash
-# Stage all changes
 git add .
-git commit -m "Hardening Release July.23.04: Stationary Anchor Refinement & Final Hardening"
-
-# Create new version tag
-git tag -f -a July.23.04 -m "July.23.04 Release: Hardened stationary anchor convergence, breakout refinement, and forensic precision."
-
-# Push to remote
-git push origin main --tags -f
+git commit -m "release: July.23.05 - transition to post-hardening validation cycle"
+git tag -a July.23.05 -m "July.23.05: Baseline for final field validation."
+git push origin main --tags
 ```

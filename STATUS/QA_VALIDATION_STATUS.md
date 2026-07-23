@@ -1,4 +1,4 @@
-# Testing & Validation Status - July.23.03
+# Testing & Validation Status - July.23.05
 
 This document tracks pending unit tests, integration tests, and manual validation tasks.
 
@@ -18,18 +18,19 @@ This document tracks pending unit tests, integration tests, and manual validatio
 ## 🔵 Ready for Verification
 | ID | Task | Result |
 | :--- | :--- | :--- |
-| **#531** | **Acoustic Cycle FGS Consistency** | Ensure Mic icon does not flicker in notification shade during 8s "OFF" duty cycle phases. |
+| | | |
 
-## 🟢 Recently Verified (July.23.03)
+## 🟢 Recently Verified (July.23.05)
 | ID | Task | Result |
 | :--- | :--- | :--- |
-| **#529** | **Accuracy Recovery Logic** | **Verified**: Jump Engine suppresses snaps when accuracy improves significantly within the previous uncertainty range. |
-| **#527** | **Siren Persistence** | **Verified**: Alarm state restored and audio resumed after manual process kill/restart. |
-| **#526** | **Adaptive Sampling** | **Verified**: Logic cycle extends to 10s and sensor sampling downgrades to NORMAL when stationary. |
-| **#525** | **Forensic Pipeline Audit** | **Verified**: End-to-end parity for all 15+ parameters across UI ribbons and telemetry. |
-| **#523** | **Snapshot Consolidation** | **Verified**: Atomic ForensicSnapshot prevents double-consumption spikes. |
-| **#513** | **Dead-Weight Purge** | **Verified**: Successful physical removal of 6 redundant files and documentation consolidation. |
-| **#126b** | **DI Purity Audit** | **Verified**: Successful decommission of manual DI artifacts. Code is 100% Hilt. |
+| | | |
+
+## 🟢 Historical Verifications (July.23.04)
+| ID | Task | Result |
+| :--- | :--- | :--- |
+| **#533** | **Stationary Anchor Buffer** | **Verified**: 8-point sliding window successfully stabilizes position in static urban tests. |
+| **#532** | **Type Safety (Double)** | **Verified**: Precision audit confirms zero bit-truncation across the telemetry pipeline. |
+| **#531** | **Acoustic Cycle FGS Consistency** | **Verified**: Mic icon remains steady in notification shade during "OFF" duty cycle phases. |
 
 ---
 *For manual testing procedures, refer to [DOCS/TESTS.md](../DOCS/TESTS.md).*

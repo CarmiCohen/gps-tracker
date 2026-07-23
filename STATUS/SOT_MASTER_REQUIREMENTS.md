@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.23.04 (Hardening & Persistence)
+# System Source of Truth (SoT) - July.23.05 (Post-Hardening Validation)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -10,7 +10,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stability Audit Authority (R951)**: Continuous stability auditing. Gaps > 200ms relative to heartbeat MUST be logged. (Issue #031)
 *   **Power Optimization (R403b)**: To preserve battery during long-duration parking, the system MUST adaptively increase the logic tick interval from 2s to 10s when the device is confirmed `STATIONARY` and the GPS is `STALLED`. (Issue #526)
 *   **Adaptive Hardware Sampling (R406a-H)**: When the device enters logic-level power save, high-frequency hardware sensors (Linear Acceleration) MUST be downgraded to `SENSOR_DELAY_NORMAL` to reduce CPU wake-up frequency. (Issue #526)
-*   **Acoustic Duty Cycle (R810-L2)**: During logic-level power save, the microphone MUST switch to a 20% duty cycle (2s ON / 8s OFF) to reduce energy footprint while maintaining forensic sampling. (Issue #526)
+*   **Acoustic Duty Cycle (R810-L2)**: During logic-level power save, the microphone MUST switch to a 20% duty cycle (2s ON / 8s OFF) to reduce energy footprint while maintaining forensic sampling. (Issue #526, #531)
 
 ### 2. Temporal & Forensic Integrity
 *   **Temporal Forensic Integrity (R102)**: Dual-time strategy using monotonic `rt` for logic and wall-clock `ts` for forensic logging. (Issue #102)
@@ -39,10 +39,10 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Accuracy Recovery Grace (R529)**: The Jump Engine MUST implement an "Accuracy Recovery" grace logic. Spatial corrections resulting from a transition from low to high accuracy MUST NOT be flagged as erratic jumps if the displacement is within the previous fix's uncertainty range. (Issue #529)
 *   **Stationary Anchor Convergence (R990c)**: Use a coordinate-averaging buffer (8-point sliding window) to stabilize the stationary position. Refine breakout scoring with displacement trends and velocity weights to suppress GPS drift and "spaghetti" trails. (Issue #533)
 *   **Unified System Heartbeat (R403)**: Global 2000ms heartbeat standard (`TICK_INTERVAL_MS`).
-*   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077)
+*   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077, #532)
 *   **Binary Telemetry Authority (R988)**: Prioritize binary Protobuf-based telemetry for tracker updates.
 *   **Stationary Anchor Hard-Lock (R990b)**: Establish coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: `July.23.04`.
-*   **Source of Truth**: `app/build.gradle` `versionName`.
+*   **Current Release**: July.23.05.
+*   **Source of Truth**: app/build.gradle versionName.

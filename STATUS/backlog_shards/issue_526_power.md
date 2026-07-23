@@ -1,6 +1,6 @@
 # Issue #526: Power Optimization - Adaptive Sensor Sampling
 
-## Status: Resolved (July.23.04)
+## Status: Resolved (July.23.03)
 ## Requirement: R403b, R406a-H, R810-L2
 
 ### Description
@@ -13,6 +13,6 @@ The system required deeper power-saving measures when the device is stationary a
 - **Centralized Management**: Unified power-save state evaluation in `ServiceBehaviorUseCase.kt`.
 
 ### Verification
-- [x] Verified power consumption reduction on Samsung A15 hardware.
+- [x] Verified power consumption reduction on Samsung A15.
 - [x] Confirmed immediate breakout from power-save when physical IMU triggers occur.
 - [x] Verified Forensic Snapshot integrity during duty cycle transitions.
