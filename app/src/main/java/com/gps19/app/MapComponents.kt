@@ -47,6 +47,9 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * July.23.06:
+ * - Issue #072: Map Stabilization. Implemented Temporal Smoothing (EMA) 
+ *   to suppress visual jitter at high zoom.
  * July.21.00:
  * - Issue #102: Temporal Forensic Integrity. Standardized all monotonic 
  *   timestamps to use 'Rt' suffix.
@@ -79,6 +82,7 @@ fun AppMapContainer(
     val viewerLoc = if (isTrackerMode) uiState.trackerLocation else uiState.localLocation
     
     val trackerHealth = if (isTrackerMode) uiState.localHealth else uiState.trackerHealth
+    // Viewer health is local health when in viewer mode, or tracker health when viewer is acting as tracker (relay)
     val viewerHealth = if (isTrackerMode) uiState.trackerHealth else uiState.localHealth
 
     // Skew-Immune Freshness Logic for Map
@@ -215,6 +219,41 @@ fun OsmMap(
 
     val trackerMarkerRef = remember { mutableStateOf<Marker?>(null) }; val viewerMarkerRef = remember { mutableStateOf<Marker?>(null) }
     val trackerCircleRef = remember { mutableStateOf<Polygon?>(null) }; val viewerCircleRef = remember { mutableStateOf<Polygon?>(null) }
+    
+    // Issue #072: Temporal Smoothing States for visual stabilization
+    val smoothedTrackerPos = remember { mutableStateOf<GeoPoint?>(null) }
+    val smoothedViewerPos = remember { mutableStateOf<GeoPoint?>(null) }
+
+    LaunchedEffect(lat, lng, speed) {
+        if (PhysicsUtils.isValidLocation(lat, lng)) {
+            val last = smoothedTrackerPos.value
+            val alpha = if (speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+            smoothedTrackerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, lat, lng) > 30.0) {
+                GeoPoint(lat, lng)
+            } else {
+                GeoPoint(
+                    PhysicsUtils.smoothCoordinate(last.latitude, lat, alpha),
+                    PhysicsUtils.smoothCoordinate(last.longitude, lng, alpha)
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(myLat, myLng, mySpeed) {
+        if (myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)) {
+            val last = smoothedViewerPos.value
+            val alpha = if (mySpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+            smoothedViewerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, myLat, myLng) > 30.0) {
+                GeoPoint(myLat, myLng)
+            } else {
+                GeoPoint(
+                    PhysicsUtils.smoothCoordinate(last.latitude, myLat, alpha),
+                    PhysicsUtils.smoothCoordinate(last.longitude, myLng, alpha)
+                )
+            }
+        }
+    }
+
     val trailFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }; val viewerTrailFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
     val fenceFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }; val homeMarkersFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
     val accuracyCirclesFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }; val violationMarkersFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }; val violationAccuracyFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
@@ -230,30 +269,32 @@ fun OsmMap(
     val lastHomeRendered = remember { mutableStateOf<List<GeoPoint>?>(null) }; val lastFenceState = remember { mutableStateOf<Boolean?>(null) }
     val lastViolationsRendered = remember { mutableStateOf<List<ViolationPoint>?>(null) }; val lastViolationVisibility = remember { mutableStateOf<Pair<Boolean, Boolean>?>(null) }
 
-    LaunchedEffect(localLockStatus.value, lat, lng, myLat, myLng, isFresh, isMeFresh, mapFollowMode) {
+    LaunchedEffect(localLockStatus.value, lat, lng, myLat, myLng, isFresh, isMeFresh, mapFollowMode, smoothedTrackerPos.value, smoothedViewerPos.value) {
         if (localLockStatus.value) {
             if (systemPulse - lastTriggerTs < 500) return@LaunchedEffect
-            val trackerValid = PhysicsUtils.isValidLocation(lat, lng)
-            val meValid = myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)
+            val sTrk = smoothedTrackerPos.value
+            val sVwr = smoothedViewerPos.value
+            val trackerValid = sTrk != null
+            val meValid = sVwr != null
             val view = mapViewRef.value ?: return@LaunchedEffect
             
             when (mapFollowMode) {
                 MapFollowMode.VIEWER -> {
-                    if (meValid) view.controller.setCenter(GeoPoint(myLat!!, myLng!!))
+                    if (meValid) view.controller.setCenter(sVwr!!)
                 }
                 MapFollowMode.TRACKER -> {
-                    if (trackerValid) view.controller.setCenter(GeoPoint(lat, lng))
+                    if (trackerValid) view.controller.setCenter(sTrk!!)
                 }
                 MapFollowMode.AUTO -> {
                     if (trackerValid && meValid && isFresh && isMeFresh) {
-                        val dist = PhysicsUtils.calculateDistance(lat, lng, myLat!!, myLng!!)
+                        val dist = PhysicsUtils.calculateDistance(sTrk!!.latitude, sTrk.longitude, sVwr!!.latitude, sVwr.longitude)
                         if (dist in 100.0..100000.0) {
-                            val box = BoundingBox.fromGeoPoints(listOf(GeoPoint(lat, lng), GeoPoint(myLat, myLng)))
+                            val box = BoundingBox.fromGeoPoints(listOf(sTrk, sVwr))
                             view.zoomToBoundingBox(box.increaseByScale(1.4f), false)
                             if (view.zoomLevelDouble > 18.0) view.controller.setZoom(18.0)
-                        } else view.controller.setCenter(GeoPoint(lat, lng))
+                        } else view.controller.setCenter(sTrk)
                     } else if (trackerValid || meValid) {
-                        val center = if (trackerValid) GeoPoint(lat, lng) else GeoPoint(myLat!!, myLng!!)
+                        val center = sTrk ?: sVwr!!
                         view.controller.setCenter(center)
                     }
                 }
@@ -262,14 +303,16 @@ fun OsmMap(
     }
 
     LaunchedEffect(centeringTrackerTrigger) {
-        if (centeringTrackerTrigger > 0 && PhysicsUtils.isValidLocation(lat, lng)) {
-            lastTriggerTs = systemPulse; mapViewRef.value?.controller?.animateTo(GeoPoint(lat, lng)); mapViewRef.value?.controller?.setZoom(18.0)
+        val sTrk = smoothedTrackerPos.value
+        if (centeringTrackerTrigger > 0 && sTrk != null) {
+            lastTriggerTs = systemPulse; mapViewRef.value?.controller?.animateTo(sTrk); mapViewRef.value?.controller?.setZoom(18.0)
         }
     }
 
     LaunchedEffect(centeringViewerTrigger) {
-        if (centeringViewerTrigger > 0 && myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)) {
-            lastTriggerTs = systemPulse; mapViewRef.value?.controller?.animateTo(GeoPoint(myLat, myLng)); mapViewRef.value?.controller?.setZoom(18.0)
+        val sVwr = smoothedViewerPos.value
+        if (centeringViewerTrigger > 0 && sVwr != null) {
+            lastTriggerTs = systemPulse; mapViewRef.value?.controller?.animateTo(sVwr); mapViewRef.value?.controller?.setZoom(18.0)
         }
     }
 
@@ -308,7 +351,10 @@ fun OsmMap(
         } 
     }, update = { view ->
         val trackerMarker = trackerMarkerRef.value ?: return@AndroidView; val viewerMarker = viewerMarkerRef.value ?: return@AndroidView
-        val trackerValid = PhysicsUtils.isValidLocation(lat, lng); val meValid = myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)
+        val sTrk = smoothedTrackerPos.value
+        val sVwr = smoothedViewerPos.value
+        val trackerValid = sTrk != null
+        val meValid = sVwr != null
 
         if (lastHomeRendered.value != home || lastFenceState.value != isFenceVisible) {
             fenceFolderRef.value?.items?.clear(); homeMarkersFolderRef.value?.items?.clear()
@@ -369,11 +415,11 @@ fun OsmMap(
             if (baseAcc > 0.0) {
                 trackerCircleRef.value?.let { p ->
                     val drift = if (isLocationPending && lastValidFixRt > 0) baseAcc + (if (speed > 1.0) speed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRt - lastValidFixRt) / 1000.0) else baseAcc
-                    p.points = Polygon.pointsAsCircle(GeoPoint(lat, lng), drift).map { GeoPoint(it.latitude, it.longitude) }
+                    p.points = Polygon.pointsAsCircle(sTrk!!, drift).map { GeoPoint(it.latitude, it.longitude) }
                     p.outlinePaint.color = if (isFresh) BrandJd.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb(); accuracyCirclesFolderRef.value?.add(p)
                 }
             }
-            trackerMarker.position = GeoPoint(lat, lng); trackerMarker.icon = if (isFresh) trackerIconFresh else trackerIconStale
+            trackerMarker.position = sTrk; trackerMarker.icon = if (isFresh) trackerIconFresh else trackerIconStale
             if (!view.overlays.contains(trackerMarker)) view.overlays.add(trackerMarker) 
         } else view.overlays.remove(trackerMarker)
         
@@ -382,11 +428,11 @@ fun OsmMap(
             if (baseMyAcc > 0.0) {
                 viewerCircleRef.value?.let { p ->
                     val drift = if (isMeLocationPending && meLastValidFixRt > 0) baseMyAcc + (if (mySpeed > 1.0) mySpeed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRt - meLastValidFixRt) / 1000.0) else baseMyAcc
-                    p.points = Polygon.pointsAsCircle(GeoPoint(myLat!!, myLng!!), drift).map { GeoPoint(it.latitude, it.longitude) }
+                    p.points = Polygon.pointsAsCircle(sVwr!!, drift).map { GeoPoint(it.latitude, it.longitude) }
                     p.outlinePaint.color = if (isMeFresh) ViewerCyan.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb(); accuracyCirclesFolderRef.value?.add(p)
                 }
             }
-            viewerMarker.position = GeoPoint(myLat!!, myLng!!); viewerMarker.icon = if (isMeFresh) viewerIconFresh else viewerIconStale
+            viewerMarker.position = sVwr; viewerMarker.icon = if (isMeFresh) viewerIconFresh else viewerIconStale
             if (!view.overlays.contains(viewerMarker)) view.overlays.add(viewerMarker) 
         } else view.overlays.remove(viewerMarker)
         view.invalidate()
@@ -451,7 +497,7 @@ fun MapToolsOverlay(
     isTrackerMode: Boolean, trackerValid: Boolean = true, viewerValid: Boolean = true, showFence: Boolean, onToggleFence: () -> Unit,
     geofenceMode: GeofenceMode, onSetGeofenceMode: (GeofenceMode) -> Unit, showViolations: Boolean = true, onToggleViolations: () -> Unit = {},
     showGeofenceViolations: Boolean = true, onToggleGeofenceViolations: () -> Unit = {}, onClear: () -> Unit, onSave: () -> Unit, 
-    onToggleLog: () -> Unit = {}, onSaveTrail: () -> Unit = {}, onLoad: () -> Unit, onCenterTracker: () -> Unit = {}, onCenterViewer: () -> Unit = {},
+    onLoad: () -> Unit, onCenterTracker: () -> Unit = {}, onCenterViewer: () -> Unit = {},
     onZoomIn: () -> Unit = {}, onZoomOut: () -> Unit = {}
 ) {
     val sc = rememberScrollState(); val sp = 16.dp; val prp = Color(0xFF800080)

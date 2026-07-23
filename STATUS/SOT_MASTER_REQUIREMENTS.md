@@ -19,6 +19,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Forensic Pipeline Consolidation (R523)**: Use an atomic `ForensicSnapshot` for all sensor-based evaluations to prevent peak double-consumption. (Issue #523)
 *   **Monotonic Timeline Reconstruction (R105)**: Reconstruct monotonic timeline on startup using `clock_drift_ref`. (Issue #105)
 *   **Unified Method for Ribbon Rendering (R106)**: Unified method for rendering ribbons across all scales. Explicitly visualize "Black Gaps." (Issue #106)
+*   **Map Visual Stabilization (R106b)**: Implement temporal smoothing (EMA) for map markers to suppress visual jitter at high zoom levels. Use speed-adaptive alpha and a 30m snap threshold for responsiveness. (Issue #072)
 *   **Forensic Visual Authority (R404b)**: Use standardized `FORENSIC_PINK_COLOR` (#FF1493) for all forensic events. (v9.3.18)
 
 ### 3. Persistence & Service Reliability

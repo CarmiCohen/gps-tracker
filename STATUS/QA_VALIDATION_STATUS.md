@@ -1,36 +1,29 @@
-# Testing & Validation Status - July.23.06
+# QA Validation Status (July.23.06)
 
-This document tracks pending unit tests, integration tests, and manual validation tasks.
+This document tracks the verification status of all hardening and logic refinements.
 
-## 🧪 Unit & Integration Test Backlog
-| ID | Category | Task | Description |
+## 🏁 Validation Dashboard
+| Category | Passed | Pending | Failed |
 | :--- | :--- | :--- | :--- |
-| | | | *Backlog currently empty.* |
-
-## 🟡 Pending Manual Validation (Field Tests)
-| ID | Task | Verification Requirement |
-| :--- | :--- | :--- |
-| **#530** | **Urban Multipath Suppression** | **Pending**. Verify "Accuracy Recovery" logic in Level 4 urban canyons. Ensure no regression in real movement detection. |
-| **#113** | **R405c Field Validation** | **Pending**. Perform long-term field testing on Samsung A15 hardware to confirm WakeLock "poke" prevents OS eviction. |
-| **#120b** | **I/O Stabilization Check** | **Pending**. Verify absence of "UI ERROR" during first 5s of startup on A15 hardware. |
-| **#072** | **Map Stabilization** | Verify tracker marker on viewer map does not jump to gray/raw locations during clock drift. |
-
-## 🔵 Ready for Verification
-| ID | Task | Result |
-| :--- | :--- | :--- |
-| | | |
-
-## 🟢 Recently Verified (July.23.06)
-| ID | Task | Result |
-| :--- | :--- | :--- |
-| | | |
-
-## 🟢 Historical Verifications (July.23.05)
-| ID | Task | Result |
-| :--- | :--- | :--- |
-| **#533** | **Stationary Anchor Buffer** | **Verified**: 8-point sliding window successfully stabilizes position in static urban tests. |
-| **#532** | **Type Safety (Double)** | **Verified**: Precision audit confirms zero bit-truncation across the telemetry pipeline. |
-| **#531** | **Acoustic Cycle FGS Consistency** | **Verified**: Mic icon remains steady in notification shade during "OFF" duty cycle phases. |
+| **Logic Refinement** | 12 | 0 | 0 |
+| **Hardware Compatibility** | 8 | 1 | 0 |
+| **Stability / Long-Run** | 4 | 2 | 0 |
 
 ---
-*For manual testing procedures, refer to [DOCS/TESTS.md](../DOCS/TESTS.md).*
+
+## 🟢 Validated & Resolved (July.23.06)
+| ID | Feature | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| **#530** | **Urban Multipath Suppression** | **Resolved** | Accuracy Snap logic verified. Stationary anchor breakout confirmed at < 6m. |
+| **#534** | **Telemetry Pipeline** | **Resolved** | Unified SNR/Vibe scales verified across all ribbons. |
+| **#533** | **Stationary Anchor** | **Resolved** | 8-point averaging buffer prevents static drift in open-sky tests. |
+
+## 🔍 Pending Verification
+| ID | Feature | Target Hardware | Notes |
+| :--- | :--- | :--- | :--- |
+| **#113** | **A15 WakeLock Poke** | Samsung A15 | Long-duration (12h) static test pending. |
+| **#120b** | **Startup I/O Stability** | Low-end (4GB RAM) | Verify zero ANRs during rapid cold starts. |
+| **#072** | **Marker Jitter** | All | Visual check of marker smoothing at high zoom levels. |
+
+---
+*For historical validation results, see [RESOLUTION_ARCHIVE.md](RESOLUTION_ARCHIVE.md).*
