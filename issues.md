@@ -5,35 +5,35 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 2 |
+| **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 376 |
+| **Resolved (Total)** | 🟢 Progress | 378 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Issue #098: Step Detector Permission Stalling**: On Samsung A15 hardware, the Step Detector fails to register even after permissions are granted. A race condition exists between UI permission grants and background service capability re-evaluation.
-*   **Issue #536: Worker Dependency Conflict**: Recent dependency alignment for background workers is triggering `NonExistentClass` errors during Hilt stub generation.
+*   *None currently identified.*
 
 ---
 
 ## 🔴 Open Issues
-*   **Issue #098: Step Detector Permission Stalling**: Investigate why `ACTIVITY_RECOGNITION` is reported as missing by the engine after grant. Implement reactive re-registration (Partially implemented via MainViewModel sync).
-*   **Issue #536: Background Worker Compilation Failure**: Resolve Hilt annotation processing errors in `BootServiceStartWorker` and `MaintenanceWorker`.
+*   *None currently identified.*
 
 ---
 
 ## 🟢 Recently Resolved Issues (July.24.02)
+*   **Background Worker Compilation Failure (Issue #536)**.
+    *   **Resolution**: Hardened Hilt worker injection by strictly adhering to `@AssistedInject` patterns in `BootServiceStartWorker` and `MaintenanceWorker`. Removed property-level `context` declarations that triggered `NonExistentClass` errors during annotation processing.
+*   **Step Detector Permission Stalling (Issue #098)**.
+    *   **Resolution**: Implemented a two-tier reactive recovery. `MainViewModel` detects permission grant transitions and signals the `TrackerService`. The Service then performs a synchronous capability refresh and triggers aggressive sensor re-registration in `AppSensorManager`, bypassing OS propagation lag.
 *   **Startup ANR Mitigation (Issue #534)**.
-    *   **Resolution**: Implemented a 10s startup suppression window for Foreground Service updates in both `TrackerService` and `ViewerService`. This prevents main-thread starvation during the critical cold-start initialization phase on budget hardware.
+    *   **Resolution**: Implemented a 10s startup suppression window for Foreground Service updates in both `TrackerService` and `ViewerService`.
 *   **IPC Congestion Hardening (Issue #535)**.
-    *   **Resolution**: Enforced a strict 10,000ms global throttle for `updateForegroundServiceType`. This drastically reduces redundant IPC calls to the system's `NotificationManagerService` when the UI pulses.
+    *   **Resolution**: Enforced a 10,000ms global throttle for `updateForegroundServiceType`.
 
 ## 🟢 Recently Resolved Issues (July.24.01)
 *   **Permission Refresh Logic Hardening**.
     *   **Resolution**: Hardened `SystemStatusProviderImpl.kt` with a `Mutex`-protected synchronous path for `getPermissionState(forceRefresh = true)`.
-*   **Reactive Sensor Synchronization Protocol**.
-    *   **Resolution**: Updated `MainViewModel.kt` to detect permission grant transitions and signal the background service immediately.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*)

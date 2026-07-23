@@ -28,14 +28,12 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.24.02:
+ * - Issue #098: Hardened Step Detector registration. Added aggressive re-registration 
+ *   logic and pre-registration cleanup to bypass OS propagation lag.
  * July.23.10:
  * - Issue #098: Permission-aware Step Detector registration. Added explicit 
  *   ACTIVITY_RECOGNITION check to prevent fail(2) denials.
- * July.23.03:
- * - Issue #532: Type Safety Audit (R999). Upgraded sensor processing to Double precision.
- * - Issue #531: Hardening - Acoustic Duty Cycle. Added isAcousticMonitoringEnabled.
- * July.23.02:
- * - Issue #526: Power Optimization. Implemented Dynamic Hardware Sampling.
  */
 class AppSensorManager(
     private val context: Context,
@@ -351,6 +349,9 @@ class AppSensorManager(
                 return
             }
         }
+
+        // Issue #098: Aggressive re-registration cleanup. Ensure no stale listeners.
+        sensorManager.unregisterListener(this, detector)
 
         isStepDetectorRegistered = sensorManager.registerListener(this, detector, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) 
         if (!isStepDetectorRegistered) {

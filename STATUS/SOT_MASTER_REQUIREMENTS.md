@@ -24,6 +24,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 ### 4. Dependency & Hardware Hardening
 *   **Permission Immediacy (R107c)**: Permission state queries following a user-initiated refresh MUST be synchronous to ensure UI consistency and prevent stale setup alerts. (Issue #098, July.24.01)
 *   **Reactive Sensor Recovery (R107d)**: Transitions of critical permissions (specifically `ACTIVITY_RECOGNITION`) from DENIED to GRANTED state MUST trigger an immediate sensor re-synchronization command to the background service. (Issue #098, July.24.01)
+*   **Aggressive Sensor Re-Registration (R107e)**: Upon receipt of a sensor sync command, the background service MUST perform a synchronous capability refresh and trigger `unregisterListener` / `registerListener` cycles for hardware sensors to bypass OS permission propagation lag. (Issue #098, July.24.02)
 *   **Restoration Permission Authority (R107b)**: The Automatic Restoration flow in `MainAppContent` MUST verify all critical permissions before reviving a session. (Issue #113, July.23.12)
 *   **Samsung Stay-Alive Hardening (R405c)**: Engage Accelerometer-based stay-alive pulse on sensor failure. Perform hardware "poke" via `SystemMonitor`. (Issue #098, #113)
 *   **Step Detector Permission (R107)**: Explicitly track `android.permission.ACTIVITY_RECOGNITION`. Hardware registration MUST be deferred if permission is not granted. (Issue #098, #107)

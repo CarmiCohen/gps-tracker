@@ -23,7 +23,8 @@ import kotlin.math.*
  * - Issue #534/535: ANR & IPC Hardening. Implemented strict 10s startup
  *   suppression for FGS updates to prevent main-thread starvation on budget hardware.
  * July.24.01:
- * - Issue #098: Permission-aware Step Detector recovery.
+ * - Issue #098: Permission-aware Step Detector recovery. Hardened onSyncSensors 
+ *   to refresh hardware capabilities synchronously.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -95,15 +96,7 @@ class TrackerService : BaseMonitorService() {
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
             configManager.isTrackerMode = true
             
-            val perms = systemStatusProvider.getPermissionState()
-            capabilities = HardwareCapabilities(
-                hasBackgroundRestriction = perms.hasBackgroundRestriction,
-                backgroundStatus = perms.backgroundStatus,
-                autostartStatus = perms.autostartStatus,
-                requiresWakeLockRenewal = perms.requiresWakeLockRenewal,
-                isManualOverrideActive = perms.isManualOverride,
-                isA15Device = perms.isA15Device
-            )
+            refreshCapabilitiesInternal()
 
             alarmManager.setListener(object : AppAlarmManager.Listener {
                 override fun onLogEvent(type: String, message: String, important: Boolean, extremeValue: Double?, logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, snr: Double?, vibe: Double?) {
@@ -180,7 +173,12 @@ class TrackerService : BaseMonitorService() {
                 override fun onUiVisibilityChanged(visible: Boolean) { onUiVisibilityChangedInternal(visible) }
                 override fun onTransientDrop(drop: Boolean) { transientDropDetected.set(drop) }
                 override fun onResetTimers() { resetServiceTimers() }
-                override fun onSyncSensors() { appSensorManager.start() }
+                override fun onSyncSensors() {
+                    lifecycleScope.launch(Dispatchers.Default) {
+                        refreshCapabilitiesInternal()
+                        appSensorManager.start()
+                    }
+                }
                 override fun onTriggerForensicTest() {
                     lifecycleScope.launch {
                         val proc = lastProcessedLocation
@@ -236,6 +234,19 @@ class TrackerService : BaseMonitorService() {
             
             logManager.logServiceEvent("Tracker Engine Online (Staggered)", important = true)
         }
+    }
+
+    private suspend fun refreshCapabilitiesInternal() {
+        val perms = systemStatusProvider.getPermissionState(forceRefresh = true)
+        capabilities = HardwareCapabilities(
+            hasBackgroundRestriction = perms.hasBackgroundRestriction,
+            backgroundStatus = perms.backgroundStatus,
+            autostartStatus = perms.autostartStatus,
+            requiresWakeLockRenewal = perms.requiresWakeLockRenewal,
+            isManualOverrideActive = perms.isManualOverride,
+            isA15Device = perms.isA15Device
+        )
+        Timber.i("Issue #098: Capabilities refreshed. Activity Recognition: ${perms.isActivityRecognitionGranted}")
     }
 
     private fun setupPhysicalFastPaths() {

@@ -38,7 +38,7 @@ class BootReceiver : BroadcastReceiver() {
  */
 @HiltWorker
 class BootServiceStartWorker @AssistedInject constructor(
-    @Assisted val context: Context,
+    @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val repository: MainRepository
 ) : CoroutineWorker(context, params) {
@@ -50,12 +50,12 @@ class BootServiceStartWorker @AssistedInject constructor(
         if (isSystemActive && appMode != null) {
             Timber.i("BootWorker: Restarting service in $appMode mode (System Active)")
             val serviceClass = if (appMode == "tracker") TrackerService::class.java else ViewerService::class.java
-            val serviceIntent = Intent(context, serviceClass)
+            val serviceIntent = Intent(applicationContext, serviceClass)
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
+                    applicationContext.startForegroundService(serviceIntent)
                 } else {
-                    context.startService(serviceIntent)
+                    applicationContext.startService(serviceIntent)
                 }
                 return Result.success()
             } catch (e: Exception) {
