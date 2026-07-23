@@ -20,12 +20,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * July.22.09:
- * - Issue #120b: Budget Hardware Initialization Spikes. Staggered proactive pruning by 2s 
- *   to reduce I/O contention during cold start.
- * July.21.00:
- * - Forensic Ribbon Integration: Exposing history flows (4M, 16M, 1H, 4H, 24H, 7D).
- * - Fixed getActiveHeartbeatInterval and delay ambiguity.
+ * July.23.00:
+ * - Issue #522: Architectural Consolidation. Integrated RemoteStatusRepository 
+ *   as the single source of truth for remote telemetry.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -43,6 +40,7 @@ class MainViewModel @Inject constructor(
     private val alertUseCase: AlertUseCase,
     private val mapUseCase: MapUseCase,
     val timeProvider: TimeProvider,
+    private val remoteStatusRepository: RemoteStatusRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -214,6 +212,33 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { repository.trackerLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
         viewModelScope.launch { repository.connectedViewers.collect { viewers -> updateState { it.copy(connectivity = it.connectivity.copy(connectedViewers = viewers)) } } }
 
+        // Consolidating remote status observation
+        remoteStatusRepository.remoteStatus.onEach { status ->
+            if (_uiState.value.appMode == "viewer") {
+                _remoteSignal.value = remoteStatusRepository.peerSignal.value
+                _trackerCurrentMa.value = status.currentMa
+                _trackerState.value = status.trackerState
+                _trackerMaxTemp.value = status.maxTemp
+                
+                updateState { current ->
+                    current.copy(
+                        trackerLocation = telemetryUseCase.mapTrackerLocationFromStatus(status, current.trackerLocation),
+                        trackerHealth = telemetryUseCase.mapHealthFromStatus(status, current.trackerHealth),
+                        connectivity = current.connectivity.copy(
+                            isTrackerConnected = remoteStatusRepository.isTrackerConnected.value,
+                            lastUpdateTs = status.ts,
+                            lastRemoteActivityTs = remoteStatusRepository.lastPeerActivityTs.value
+                        ),
+                        trackerStats = telemetryUseCase.mapStatsFromStatus(status, current.trackerStats),
+                        trackerBattery = current.trackerBattery.copy(level = status.battery, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging),
+                        trackerSatsView = status.satsView,
+                        trackerSatsUsed = status.satsUsed,
+                        maxTrackerAccuracy = if (status.maxAccuracy > 0.0) status.maxAccuracy else current.maxTrackerAccuracy
+                    )
+                }
+            }
+        }.launchIn(viewModelScope)
+
         stateSubscriptionUseCase.startHistoryObservations(viewModelScope)
     }
 
@@ -326,11 +351,11 @@ class MainViewModel @Inject constructor(
                 is UiEvent.SetDeviceId -> { 
                     settingsUseCase.updateDeviceId(event.id)
                     updateState { it.copy(deviceId = event.id, trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = it.connectivity.copy(isTrackerConnected = false, lastUpdateTs = 0L)) }
-                    _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; repository.resetStats(); repository.sendCommand(UiCommand.StatsReset); repository.sendCommand(UiCommand.SettingsUpdated)
+                    _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; remoteStatusRepository.reset(); repository.resetStats(); repository.sendCommand(UiCommand.StatsReset); repository.sendCommand(UiCommand.SettingsUpdated)
                 }
                 is UiEvent.SetViewerId -> {
                     settingsUseCase.updateViewerId(event.id)
-                    updateState { it.copy(viewerId = event.id) }; repository.resetStats(); repository.resetStats(); repository.sendCommand(UiCommand.StatsReset); repository.sendCommand(UiCommand.SettingsUpdated)
+                    updateState { it.copy(viewerId = event.id) }; remoteStatusRepository.reset(); repository.resetStats(); repository.resetStats(); repository.sendCommand(UiCommand.StatsReset); repository.sendCommand(UiCommand.SettingsUpdated)
                 }
                 is UiEvent.SetRelayUrl -> {
                     settingsUseCase.updateRelayUrl(event.url)
@@ -375,7 +400,7 @@ class MainViewModel @Inject constructor(
                 if (result.relayUrlChanged) addPersistentLog("user", "USER ACTION: Relay URL changed", true)
                 if (result.maxDistanceChanged) addPersistentLog("user", "USER ACTION: Geofence distance updated", true)
                 if (result.trackerIdChanged || result.viewerIdChanged) {
-                    repository.resetStats(); repository.sendCommand(UiCommand.StatsReset)
+                    remoteStatusRepository.reset(); repository.resetStats(); repository.sendCommand(UiCommand.StatsReset)
                     _trackerMaxTemp.value = 0.0; _remoteSignal.value = 0; _trackerCurrentMa.value = 0; _gnssDetail.value = null; _trackerState.value = TrackerState.UNKNOWN
                     updateState { current -> current.copy(trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = current.connectivity.copy(isTrackerConnected = false, lastUpdateTs = 0L, lastRemoteActivityTs = 0L), distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, maxTrackerAccuracy = 0.0) }
                 }
@@ -423,6 +448,7 @@ class MainViewModel @Inject constructor(
                 updateNavigation { it.copy(isStopTrackingConfirmationVisible = false) }
                 viewModelScope.launch(uiExceptionHandler) {
                     sessionUseCase.stopTrackingSession()
+                    remoteStatusRepository.reset()
                     updateState { it.copy(appMode = null, isSystemActive = false, trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = ConnectivityState(isTrackerConnected = false, lastUpdateTs = 0L, lastRemoteActivityTs = 0L), distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, maxTrackerAccuracy = 0.0, maxViewerAccuracy = 0.0, localHealth = SystemHealthState(), trackerHealth = SystemHealthState()) }
                     _remoteSignal.value = 0; _trackerCurrentMa.value = 0; _gnssDetail.value = null; _trackerState.value = TrackerState.UNKNOWN; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _redScreenVisible.value = false; _rtt.value = 0; _gpsIndexData.value = GpsIndexData(0.0, 0.0, 0.0, 0.0); stateSubscriptionUseCase.clearHistory()
                 }
@@ -437,6 +463,7 @@ class MainViewModel @Inject constructor(
                 viewModelScope.launch(uiExceptionHandler) {
                     val newStartTime = sessionUseCase.resetStats()
                     appStartTime = newStartTime
+                    remoteStatusRepository.reset()
                     updateState { it.copy(appStartTime = appStartTime) }
                     addPersistentLog("user", "USER ACTION: Connectivity stats reset", true); stateSubscriptionUseCase.clearHistory(); Toast.makeText(context, "Connectivity stats reset", Toast.LENGTH_SHORT).show()
                 }
@@ -560,7 +587,6 @@ class MainViewModel @Inject constructor(
     }
 
     private fun loadInitialData() {
-        // July.22.09: Issue #120b: Staggered proactive pruning by 2s to reduce I/O pressure on budget hardware.
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             delay(2000L)
             repository.proactivePruning()
@@ -596,6 +622,7 @@ class MainViewModel @Inject constructor(
     fun fullInitialization(context: Context) {
         viewModelScope.launch(uiExceptionHandler) {
             appStartTime = settingsUseCase.fullInitialization(context)
+            remoteStatusRepository.reset()
             updateState { state -> state.copy(trackerLocation = LocationState(), connectivity = ConnectivityState(), trackerBattery = BatteryState(level = -1), trackerStats = StatsState(), stats = StatsState(), trackerSatsView = 0, trackerSatsUsed = 0, viewerSatsView = 0, viewerSatsUsed = 0, distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, localLocation = LocationState(), battery = BatteryState(level = -1), maxTrackerAccuracy = 0.0, maxViewerAccuracy = 0.0, activeAlarms = emptyList(), appStartTime = appStartTime, geofenceMode = GeofenceMode.IDLE, draftSettings = DraftSettings(), isIdentitySanitized = false, localHealth = SystemHealthState(), trackerHealth = SystemHealthState()) }
             _trackerState.value = TrackerState.UNKNOWN; _redScreenVisible.value = false; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; stateSubscriptionUseCase.clearHistory(); loadInitialData()
         }

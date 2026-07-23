@@ -7,20 +7,16 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.*
-import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
-import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * July.22.12:
- * - Issue #521: Deep Purge of Remote Settings Leftovers. Removed handleSettingsRelay and listener.
- * July.22.01:
- * - Forensic Parity: Expanded binary payload parsing to include all 15+ forensic SIT parameters.
- * - Hilt Hardening: Added @ApplicationContext to constructor.
+ * July.23.00:
+ * - Issue #522: Architectural Consolidation. Implemented SignalingProvider.RemoteUpdateListener 
+ *   to unify telemetry flow.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -45,7 +41,7 @@ class CommunicationManager @Inject constructor(
     private var lastRelayTrafficTs = timeProvider.elapsedRealtime()
 
     private var onConnectionLost: (() -> Unit)? = null
-    private var remoteUpdateListener: RemoteUpdateListener? = null
+    private var remoteUpdateListener: SignalingProvider.RemoteUpdateListener? = null
 
     private val commExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped) return@CoroutineExceptionHandler
@@ -57,11 +53,7 @@ class CommunicationManager @Inject constructor(
     private var pendingLocationUpdate: JSONObject? = null
     private var conflationJob: Job? = null
 
-    interface RemoteUpdateListener {
-        fun onUpdate(data: JSONObject)
-    }
-
-    fun setRemoteUpdateListener(listener: RemoteUpdateListener) {
+    override fun setRemoteUpdateListener(listener: SignalingProvider.RemoteUpdateListener?) {
         this.remoteUpdateListener = listener
     }
 

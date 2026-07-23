@@ -1,0 +1,88 @@
+package com.gps19.app
+
+import com.gps19.core.engine.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import timber.log.Timber
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * RemoteStatusRepository: Single Source of Truth for Remote Peer Telemetry.
+ * July.23.00:
+ * - Issue #522: Architectural Consolidation. Unified remote peer state from 
+ *   ConnectivitySuite and RemoteHandler.
+ * - Forensic Parity: Preserves all 15+ SIT forensic parameters.
+ */
+@Singleton
+class RemoteStatusRepository @Inject constructor(
+    private val mainRepository: MainRepository,
+    private val timeProvider: TimeProvider
+) {
+    private val _remoteStatus = MutableStateFlow(TrackerStatus())
+    val remoteStatus = _remoteStatus.asStateFlow()
+
+    private val _isTrackerConnected = MutableStateFlow(false)
+    val isTrackerConnected = _isTrackerConnected.asStateFlow()
+
+    private val _lastPeerActivityTs = MutableStateFlow(0L)
+    val lastPeerActivityTs = _lastPeerActivityTs.asStateFlow()
+
+    private val _peerSignal = MutableStateFlow(0)
+    val peerSignal = _peerSignal.asStateFlow()
+
+    private var lastRemotePacketTs = 0L
+
+    suspend fun initialize() {
+        try {
+            mainRepository.loadTrackerState()?.let { savedStatus ->
+                _remoteStatus.value = savedStatus
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to initialize RemoteStatusRepository")
+        }
+    }
+
+    fun updateStatus(status: TrackerStatus) {
+        _remoteStatus.value = status
+        mainRepository.saveTrackerState(status)
+    }
+
+    fun updateStatusAtomic(action: (TrackerStatus) -> TrackerStatus) {
+        _remoteStatus.update { current ->
+            val next = action(current)
+            mainRepository.saveTrackerState(next)
+            next
+        }
+    }
+
+    fun setTrackerConnected(connected: Boolean) {
+        _isTrackerConnected.value = connected
+    }
+
+    fun updatePeerActivity(ts: Long) {
+        _lastPeerActivityTs.value = ts
+    }
+
+    fun setPeerSignal(signal: Int) {
+        _peerSignal.value = signal
+    }
+
+    fun shouldProcessPacket(remoteTs: Long): Boolean {
+        if (remoteTs > 0 && remoteTs < lastRemotePacketTs) return false
+        if (remoteTs > 0) lastRemotePacketTs = remoteTs
+        return true
+    }
+
+    fun reset() {
+        _remoteStatus.value = TrackerStatus()
+        _isTrackerConnected.value = false
+        _lastPeerActivityTs.value = 0L
+        _peerSignal.value = 0
+        lastRemotePacketTs = 0L
+        // We do not clear MainRepository.saveTrackerState here to avoid accidental data loss 
+        // if reset is called during transient connectivity issues, but resetPeerStats usually 
+        // implies a hard reset of session.
+    }
+}

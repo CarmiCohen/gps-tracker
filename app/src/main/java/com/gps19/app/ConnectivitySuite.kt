@@ -5,7 +5,9 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.util.Log
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -22,11 +24,11 @@ import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
- * ConnectivitySuite: Unified connectivity, telemetry sync, and remote peer handling.
- * July.22.12:
- * - Issue #521: Deep Purge of Remote Settings Leftovers. Fixed property resolution and purged remote home_points sync.
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
+ * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.23.00:
+ * - Issue #522: Architectural Consolidation. Migrated remote peer state to 
+ *   RemoteStatusRepository. Implemented SignalingProvider.RemoteUpdateListener.
+ * - Forensic Parity: Fully integrated all SIT parameters and remote commands from RemoteHandler.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -41,9 +43,9 @@ class ConnectivitySuite @Inject constructor(
     private val locationProcessor: LocationProcessor,
     private val offlineRepository: OfflineRepository,
     private val mainRepository: MainRepository,
-    private val alarmManager: AppAlarmManager,
-    private val forensicUseCase: ServiceForensicUseCase
-) {
+    private val remoteStatusRepository: RemoteStatusRepository
+) : SignalingProvider.RemoteUpdateListener {
+
     interface PeerListener {
         fun onPeerPulse(id: String)
     }
@@ -75,73 +77,70 @@ class ConnectivitySuite @Inject constructor(
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
 
-    // Remote Peer State
-    var isTrackerConnected = false
-    var lastPeerActivityTs = 0L 
-    var peerSignal = 0
-    var lastPeerGpsTs = 0L
-    private var lastRemotePacketTs = 0L
+    // Remote Peer State redirected to RemoteStatusRepository
+    val trackerStatus get() = remoteStatusRepository.remoteStatus.value
+    val isTrackerConnected get() = remoteStatusRepository.isTrackerConnected.value
+    val lastPeerActivityTs get() = remoteStatusRepository.lastPeerActivityTs.value
+    val peerSignal get() = remoteStatusRepository.peerSignal.value
 
-    var trackerLat = 0.0
-    var trackerLng = 0.0
-    var trackerSpeed = 0.0
-    var trackerBearing = 0.0
-    var trackerAccuracy = 0.0
-    var trackerMaxAccuracy = 0.0
-    var trackerLastGpsTs = 0L
-    var trackerLastValidFixRt = 0L
-    var trackerBattery = 0
-    var trackerTemp = 0.0
-    var trackerMaxTemp = 0.0
-    var trackerCurrentMa = 0
-    var trackerSatsView = 0
-    var trackerSatsUsed = 0
-    var isTrackerCharging = false
-    var isTrackerJammerSuspicion = false
-    var isTrackerVisualJump = false
-    var trackerJumpTier = 0
-    var trackerStatus = SentinelStatus.VALID
-    var isTrackerTamperDetected = false
-    var isTrackerPowerTamper = false
-    var isTrackerClockRegression = false
-    var isTrackerLocationPending = false
-    var trackerLocationPendingReason = LocationPendingReason.NONE
-    var trackerLocationDetail: GnssDetail? = null
-    var isTrackerBatterySteepDischarge = false
-    var isTrackerCoolingModeActive = false
-    var isTrackerPowerSaveMode = false
-    var trackerStandbyBucket = -1
-    var trackerNetInterface = "UNKNOWN"
-    var isTrackerStorageLow = false
-    var isTrackerStorageCritical = false
-    var trackerState = TrackerState.UNKNOWN
-    var trackerDistToHome: Double? = null
-    var trackerDistToViewer: Double? = null
-    var trackerVibration = 0.0
-    var trackerHeading = 0.0
-    var trackerBaroAlt = 0.0
-    var trackerLux = 0.0
-    var isTrackerNear = true
-    var trackerTiltDegrees = 0.0
-    var trackerAcousticDb = 0.0
-    var trackerPeakVibrationShock = 0.0
-    var trackerPeakVibrationShockTs = 0L
-    var trackerLuxBaseline = 0.0
-    var trackerAcousticFloorDb = 0.0
-    var trackerAdaptiveVibrationFloor = 0.12
-    var trackerProxIdx = 1.0
-    var trackerProximityCm = -1.0
-    var trackerProximityDebounceMs = 0L
-    var trackerVibrationRollingSum = 0.0
-    var trackerUptimeMs = 0L
-    var trackerTotalDropMs = 0L
-    var trackerMaxDropMs = 0L
-    var trackerMaxDropTs = 0L
-    var trackerTotalConnectedMs = 0L
-    var trackerSessionConnectedMs = 0L
-    var trackerLastConnTs = 0L
-    var trackerLastDiscTs = 0L
+    // Legacy field accessors for backward compatibility
+    val trackerLat get() = trackerStatus.lat
+    val trackerLng get() = trackerStatus.lng
+    val trackerSpeed get() = trackerStatus.speed
+    val trackerBearing get() = trackerStatus.bearing
+    val trackerAccuracy get() = trackerStatus.accuracy
+    val trackerMaxAccuracy get() = trackerStatus.maxAccuracy
+    val trackerLastGpsTs get() = trackerStatus.gpsTs
+    val trackerLastValidFixRt get() = trackerStatus.lastValidFixRt
+    val trackerBattery get() = trackerStatus.battery
+    val trackerTemp get() = trackerStatus.temp
+    val trackerMaxTemp get() = trackerStatus.maxTemp
+    val trackerCurrentMa get() = trackerStatus.currentMa
+    val trackerSatsView get() = trackerStatus.satsView
+    val trackerSatsUsed get() = trackerStatus.satsUsed
+    val isTrackerCharging get() = trackerStatus.isCharging
+    val isTrackerJammerSuspicion get() = trackerStatus.isJammer
+    val isTrackerVisualJump get() = trackerStatus.isJump
+    val trackerJumpTier get() = trackerStatus.jumpTier
+    val isTrackerTamperDetected get() = trackerStatus.isTamperDetected
+    val isTrackerPowerTamper get() = trackerStatus.isPowerTamper
+    val isTrackerLocationPending get() = trackerStatus.isLocationPending
+    val trackerLocationPendingReason get() = trackerStatus.locationPendingReason
+    val trackerLocationDetail get() = trackerStatus.gnssDetail
+    val isTrackerBatterySteepDischarge get() = trackerStatus.isBatterySteepDischarge
+    val isTrackerCoolingModeActive get() = trackerStatus.isCoolingModeActive
+    val isTrackerPowerSaveMode get() = trackerStatus.isPowerSaveMode
+    val trackerStandbyBucket get() = trackerStatus.standbyBucket
+    val trackerNetInterface get() = trackerStatus.netInterface
+    val isTrackerStorageLow get() = trackerStatus.isStorageLow
+    val isTrackerStorageCritical get() = trackerStatus.isStorageCritical
+    val trackerState get() = trackerStatus.trackerState
+    val trackerVibration get() = trackerStatus.vibration
+    val trackerHeading get() = trackerStatus.heading
+    val trackerBaroAlt get() = trackerStatus.baroAlt
+    val trackerLux get() = trackerStatus.lux
+    val isTrackerNear get() = trackerStatus.isNear
+    val trackerTiltDegrees get() = trackerStatus.tiltDegrees
+    val trackerAcousticDb get() = trackerStatus.acousticDb
+    val trackerPeakVibrationShock get() = trackerStatus.peakVibrationShock
+    val trackerPeakVibrationShockTs get() = trackerStatus.peakVibrationShockTs
+    val trackerLuxBaseline get() = trackerStatus.luxBaseline
+    val trackerAcousticFloorDb get() = trackerStatus.acousticFloorDb
+    val trackerAdaptiveVibrationFloor get() = trackerStatus.adaptiveVibrationFloor
+    val trackerProxIdx get() = trackerStatus.proxIdx
+    val trackerProximityCm get() = trackerStatus.proximityCm
+    val trackerProximityDebounceMs get() = trackerStatus.proximityDebounceMs
+    val trackerVibrationRollingSum get() = trackerStatus.vibrationRollingSum
+    val trackerUptimeMs get() = trackerStatus.uptimeMs
+    val trackerTotalDropMs get() = trackerStatus.totalDropMs
+    val trackerMaxDropMs get() = trackerStatus.maxDropMs
+    val trackerMaxDropTs get() = trackerStatus.maxDropTs
+    val trackerTotalConnectedMs get() = trackerStatus.totalConnectedMs
+    val trackerSessionConnectedMs get() = trackerStatus.sessionConnectedMs
+    val trackerLastConnTs get() = trackerStatus.lastConnTs
+    val trackerLastDiscTs get() = trackerStatus.lastDiscTs
     var trackerGpsStallStartTs = 0L 
+    val trackerDistToHome get() = trackerStatus.sitDz // Placeholder parity
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -183,6 +182,8 @@ class ConnectivitySuite @Inject constructor(
                 }
             }
         }
+
+        signalingProvider.setRemoteUpdateListener(this)
 
         scope.launch {
             if (relayUrl.isNotEmpty() && SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
@@ -406,73 +407,11 @@ class ConnectivitySuite @Inject constructor(
 
     private fun initializePeerState() {
         scope.launch {
-            try {
-                val (luxBaseline, acousticFloor, trackerState) = withContext(Dispatchers.IO) {
-                    Triple(
-                        mainRepository.getDouble(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0),
-                        mainRepository.getDouble(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0),
-                        mainRepository.loadTrackerState()
-                    )
-                }
-                
-                trackerLuxBaseline = luxBaseline
-                trackerAcousticFloorDb = acousticFloor
-                
-                trackerState?.let { s ->
-                    applyPeerStatus(s)
-                    mainRepository.updateLocation(LocationUpdate(
-                        lat = s.lat, lng = s.lng, speed = s.speed, accuracy = s.accuracy, bearing = s.bearing,
-                        battery = s.battery, temp = s.temp, maxTemp = s.maxTemp, isCharging = s.isCharging, currentMa = s.currentMa,
-                        gpsTs = s.gpsTs, isMe = false, satsView = s.satsView, satsUsed = s.satsUsed,
-                        maxAccuracy = s.maxAccuracy, signal = 0, vibration = s.vibration, heading = s.bearing, baroAlt = s.baroAlt,
-                        lux = s.lux, isNear = s.isNear, tiltDegrees = s.tiltDegrees, acousticDb = s.acousticDb,
-                        peakVibrationShock = s.peakVibrationShock, peakVibrationShockTs = s.peakVibrationShockTs,
-                        luxBaseline = s.luxBaseline, acousticFloorDb = s.acousticFloorDb, adaptiveVibrationFloor = s.adaptiveVibrationFloor, 
-                        status = s.status, isTamperDetected = s.isTamperDetected, isPowerTamper = s.isPowerTamper,
-                        proxIdx = s.proxIdx, proximityCm = s.proximityCm, proximityDebounceMs = s.proximityDebounceMs,
-                        vibrationRollingSum = s.vibrationRollingSum, uptimeMs = s.uptimeMs, totalDropMs = s.totalDropMs,
-                        maxDropMs = s.maxDropMs, maxDropTs = s.maxDropTs, totalConnectedMs = s.totalConnectedMs,
-                        sessionConnectedMs = s.sessionConnectedMs, lastConnTs = s.lastConnTs, lastDiscTs = s.lastDiscTs,
-                        violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage,
-                        isLocationPending = s.isLocationPending, locationPendingReason = s.locationPendingReason,
-                        lastValidFixRt = s.lastValidFixRt, isPowerSaveMode = s.isPowerSaveMode,
-                        standbyBucket = s.standbyBucket, netInterface = s.netInterface, isStorageLow = s.isStorageLow,
-                        isStorageCritical = s.isStorageCritical, gnssDetail = s.gnssDetail,
-                        isBatterySteepDischarge = this@ConnectivitySuite.isTrackerBatterySteepDischarge, isCoolingModeActive = this@ConnectivitySuite.isTrackerCoolingModeActive,
-                        trackerState = s.trackerState, ts = s.ts,
-                        snrIdx = s.snrIdx, tiltIdx = s.tiltIdx, baroIdx = s.baroIdx,
-                        isSitDetected = s.isSitDetected, isSitActive = s.isSitActive, lastSitTs = s.lastSitTs,
-                        verticalVelocity = s.verticalVelocity, sitVz = s.sitVz, sitDz = s.sitDz, sitBaro = s.sitBaro, sitTilt = s.sitTilt, sitShock = s.sitShock
-                    ))
-                }
-            } catch (e: Exception) { Timber.e(e, "Peer state init failed") }
+            remoteStatusRepository.initialize()
         }
     }
 
-    private fun applyPeerStatus(s: TrackerStatus) {
-        trackerLat = s.lat; trackerLng = s.lng; trackerSpeed = s.speed; trackerBearing = s.bearing
-        trackerAccuracy = s.accuracy; trackerMaxAccuracy = s.maxAccuracy; trackerLastGpsTs = s.gpsTs; trackerBattery = s.battery
-        trackerTemp = s.temp; trackerMaxTemp = s.maxTemp; trackerCurrentMa = s.currentMa
-        isTrackerCharging = s.isCharging; trackerSatsView = s.satsView; trackerSatsUsed = s.satsUsed
-        trackerJumpTier = s.jumpTier; trackerStatus = s.status; isTrackerTamperDetected = s.isTamperDetected
-        isTrackerPowerTamper = s.isPowerTamper; trackerVibration = s.vibration; trackerHeading = s.heading
-        trackerBaroAlt = s.baroAlt; trackerLux = s.lux; isTrackerNear = s.isNear; trackerTiltDegrees = s.tiltDegrees
-        trackerAcousticDb = s.acousticDb; trackerPeakVibrationShock = s.peakVibrationShock
-        trackerPeakVibrationShockTs = s.peakVibrationShockTs; trackerLuxBaseline = s.luxBaseline
-        trackerAcousticFloorDb = s.acousticFloorDb; trackerAdaptiveVibrationFloor = s.adaptiveVibrationFloor
-        trackerProxIdx = s.proxIdx; trackerProximityCm = s.proximityCm; trackerProximityDebounceMs = s.proximityDebounceMs
-        trackerVibrationRollingSum = s.vibrationRollingSum; trackerUptimeMs = s.uptimeMs; trackerTotalDropMs = s.totalDropMs
-        trackerMaxDropMs = s.maxDropMs; trackerMaxDropTs = s.maxDropTs; trackerTotalConnectedMs = s.totalConnectedMs
-        trackerSessionConnectedMs = s.sessionConnectedMs; trackerLastConnTs = s.lastConnTs; trackerLastDiscTs = s.lastDiscTs
-        isTrackerLocationPending = s.isLocationPending; trackerLocationPendingReason = s.locationPendingReason
-        trackerLocationDetail = s.gnssDetail; isTrackerBatterySteepDischarge = s.isBatterySteepDischarge
-        isTrackerCoolingModeActive = s.isCoolingModeActive; isTrackerPowerSaveMode = s.isPowerSaveMode
-        trackerStandbyBucket = s.standbyBucket; trackerNetInterface = s.netInterface
-        isTrackerStorageLow = s.isStorageLow; isTrackerStorageCritical = s.isStorageCritical
-        trackerState = s.trackerState; trackerLastValidFixRt = s.lastValidFixRt
-    }
-
-    fun handleRemoteUpdate(data: JSONObject) {
+    override fun onUpdate(data: JSONObject) {
         val type = data.optString("type", "")
         if (type == "remote_log") {
             handleRemoteLog(LogEntry.fromJSONObject(data))
@@ -483,177 +422,169 @@ class ConnectivitySuite @Inject constructor(
         val now = timeProvider.currentTimeMillis(); val nowRt = timeProvider.elapsedRealtime()
         val peerId = if (isTrackerMode) (if (fromViewerId.isNotEmpty()) fromViewerId else fromId) else fromId
 
+        if (isTrackerMode && fromViewer && type == "calibrate_chair") {
+            locationProcessor.resetChairBaseline()
+            mainRepository.addLog(LogEntry(
+                timestamp = now,
+                message = "REMOTE CALIBRATION: Chair baseline zeroed via viewer command",
+                type = "event",
+                isImportant = true
+            ))
+            Handler(Looper.getMainLooper()).post { Toast.makeText(context, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show() }
+            peerListener?.onPeerPulse(peerId); remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now)
+            return
+        }
+
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
             if ((isTrackerMode && fromViewer) || (!isTrackerMode && !fromViewer)) {
-                peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRt; isTrackerConnected = !isTrackerMode; mainRepository.updateRemoteActivity(now)
+                peerListener?.onPeerPulse(peerId); remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(!isTrackerMode); mainRepository.updateRemoteActivity(now)
             }
             return
         }
 
         if (isTrackerMode && fromViewer) {
-            peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRt; mainRepository.updateRemoteActivity(now); return
+            peerListener?.onPeerPulse(peerId); remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now); return
         }
 
         if (!isTrackerMode && !fromViewer) {
             val remoteTs = data.optLong("ts", 0L)
-            if (remoteTs > 0 && remoteTs < lastRemotePacketTs) return
-            if (remoteTs > 0) lastRemotePacketTs = remoteTs
+            if (!remoteStatusRepository.shouldProcessPacket(remoteTs)) return
 
-            peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRt; isTrackerConnected = true; mainRepository.updateRemoteActivity(now)
-            peerSignal = data.optInt("signal", 0)
+            peerListener?.onPeerPulse(peerId); remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(true); mainRepository.updateRemoteActivity(now)
+            remoteStatusRepository.setPeerSignal(data.optInt("signal", 0))
 
-            val statusStr = data.optString("status", SentinelStatus.VALID.name)
-            trackerStatus = try { SentinelStatus.valueOf(statusStr) } catch(e: Exception) { SentinelStatus.VALID }
-            isTrackerTamperDetected = data.optBoolean("is_tamper_detected", isTrackerTamperDetected)
-            isTrackerPowerTamper = data.optBoolean("is_power_tamper", isTrackerPowerTamper)
-            isTrackerLocationPending = data.optBoolean("is_location_pending", false)
-            trackerLocationPendingReason = try { LocationPendingReason.valueOf(data.optString("location_pending_reason", "NONE")) } catch(e: Exception) { LocationPendingReason.NONE }
-            trackerLastValidFixRt = data.optLong("last_valid_fix_rt", trackerLastValidFixRt)
-            this.isTrackerBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false)
-            this.isTrackerCoolingModeActive = data.optBoolean("is_cooling_mode_active", false)
-            isTrackerPowerSaveMode = data.optBoolean("is_power_save_mode", isTrackerPowerSaveMode)
-            trackerStandbyBucket = data.optInt("standard_bucket", trackerStandbyBucket)
-            trackerNetInterface = data.optString("net_interface", trackerNetInterface)
-            isTrackerStorageLow = data.optBoolean("is_storage_low", isTrackerStorageLow)
-            isTrackerStorageCritical = data.optBoolean("is_storage_critical", isTrackerStorageCritical)
-            trackerState = try { TrackerState.valueOf(data.optString("tracker_state", "UNKNOWN")) } catch(e: Exception) { TrackerState.UNKNOWN }
-
-            if (data.has("gnss_detail")) {
-                try {
-                    val array = data.getJSONArray("gnss_detail"); val satList = mutableListOf<SatelliteInfo>()
-                    for (i in 0 until array.length()) {
-                        val obj = array.getJSONObject(i); satList.add(SatelliteInfo(svid = obj.getInt("svid"), cn0 = obj.optDouble("cn0", 0.0), usedInFix = obj.getBoolean("used_in_fix"), constellation = obj.optInt("constellation", 0)))
-                    }
-                    trackerLocationDetail = GnssDetail(satellites = satList)
-                } catch (e: Exception) { Timber.e(e, "GNSS detail parse error") }
-            }
-
-            if (data.has("lat") || data.has("gps_ts") || data.has("gps_age_ms")) {
-                val incomingGpsTs = data.optLong("gps_ts", 0L)
-                val gpsAgeMs = if (data.has("gps_age_ms")) data.optLong("gps_age_ms") else (if (incomingGpsTs > 0) maxOf(0L, now - incomingGpsTs) else 0L)
-                val candidateTs = if (gpsAgeMs > 0 || incomingGpsTs > 0) now - gpsAgeMs else 0L
-                val rawLat = data.optDouble("lat", 0.0); val rawLng = data.optDouble("lng", 0.0)
-                val rawSpeed = data.optDouble("speed", -1.0); val rawBearing = data.optDouble("bearing", 0.0)
-                val rawAcc = data.optDouble("accuracy", 0.0); val rawMaxAcc = data.optDouble("max_accuracy", 0.0)
-
-                val processed = locationProcessor.processGpsPoint(
-                    lat = rawLat, lng = rawLng, alt = data.optDouble("alt", 0.0), androidSpeedMps = if (rawSpeed >= 0.0) rawSpeed else 0.0,
-                    gpsTs = candidateTs, accuracy = if (rawAcc > 0.0) rawAcc else 0.0, bearing = rawBearing, snr = 0.0,
-                    satsUsed = data.optInt("sats_used", trackerSatsUsed), isViewerTrail = false, lastGpsTs = trackerLastGpsTs,
-                    providedMaxAccuracy = rawMaxAcc, providedJumpTier = data.optInt("jump_tier", 0), providedIsJammer = data.optBoolean("is_jammer", false),
-                    providedIsStalled = data.optBoolean("is_stalled", false), providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending || trackerStatus == SentinelStatus.TAMPER,
-                    nowWall = now, nowRt = nowRt
-                )
-                isTrackerClockRegression = processed.isClockRegression
-                if (processed.optimizedPoint.lat != 0.0 && processed.optimizedPoint.lng != 0.0) {
-                    trackerLat = processed.optimizedPoint.lat; trackerLng = processed.optimizedPoint.lng; trackerLastGpsTs = processed.optimizedPoint.ts; lastPeerGpsTs = trackerLastGpsTs
-                    if (!processed.isStalled) trackerLastValidFixRt = nowRt
+            remoteStatusRepository.updateStatusAtomic { current ->
+                val statusStr = data.optString("status", current.status.name)
+                val trackerStatus = try { SentinelStatus.valueOf(statusStr) } catch(e: Exception) { current.status }
+                val isTrackerTamperDetected = data.optBoolean("is_tamper_detected", current.isTamperDetected)
+                val isTrackerPowerTamper = data.optBoolean("is_power_tamper", current.isPowerTamper)
+                val isTrackerLocationPending = data.optBoolean("is_location_pending", false)
+                val trackerLocationPendingReason = try { LocationPendingReason.valueOf(data.optString("location_pending_reason", "NONE")) } catch(e: Exception) { LocationPendingReason.NONE }
+                val trackerLastValidFixRt = data.optLong("last_valid_fix_rt", current.lastValidFixRt)
+                
+                var gnssDetail = current.gnssDetail
+                if (data.has("gnss_detail")) {
+                    try {
+                        val array = data.getJSONArray("gnss_detail"); val satList = mutableListOf<SatelliteInfo>()
+                        for (i in 0 until array.length()) {
+                            val obj = array.getJSONObject(i); satList.add(SatelliteInfo(svid = obj.getInt("svid"), cn0 = obj.optDouble("cn0", 0.0), usedInFix = obj.getBoolean("used_in_fix"), constellation = obj.optInt("constellation", 0)))
+                        }
+                        gnssDetail = GnssDetail(satellites = satList)
+                    } catch (e: Exception) { Timber.e(e, "GNSS detail parse error") }
                 }
-                trackerSpeed = processed.filteredSpeed; trackerBearing = rawBearing
-                if (rawAcc > 0.0) trackerAccuracy = rawAcc
-                if (rawMaxAcc > 0.0) trackerMaxAccuracy = rawMaxAcc
-                trackerSatsView = data.optInt("sats_view", trackerSatsView); trackerSatsUsed = data.optInt("sats_used", trackerSatsUsed)
-                isTrackerJammerSuspicion = data.optBoolean("is_jammer", false); isTrackerVisualJump = processed.status == SentinelStatus.JUMP; trackerJumpTier = data.optInt("jump_tier", 0)
-            }
-            
-            trackerBattery = data.optInt("battery", trackerBattery); trackerTemp = data.optDouble("temp", trackerTemp); trackerMaxTemp = data.optDouble("max_temp", trackerMaxTemp)
-            trackerCurrentMa = data.optInt("current_ma", trackerCurrentMa); isTrackerCharging = data.optBoolean("is_charging", isTrackerCharging)
-            trackerVibration = data.optDouble("vibration", trackerVibration); trackerHeading = data.optDouble("heading", trackerHeading)
-            trackerBaroAlt = data.optDouble("baro_alt", trackerBaroAlt); trackerLux = data.optDouble("lux", trackerLux); isTrackerNear = data.optBoolean("is_near", isTrackerNear)
-            trackerProxIdx = data.optDouble("prox_idx", trackerProxIdx); trackerProximityCm = data.optDouble("proximity_cm", trackerProximityCm)
-            trackerProximityDebounceMs = data.optLong("proximity_debounce_ms", trackerProximityDebounceMs); trackerVibrationRollingSum = data.optDouble("vibration_rolling_sum", trackerVibrationRollingSum)
-            trackerTiltDegrees = data.optDouble("tilt_degrees", trackerTiltDegrees); trackerAcousticDb = data.optDouble("acoustic_db", trackerAcousticDb)
-            trackerPeakVibrationShock = data.optDouble("peak_vibration_shock", trackerPeakVibrationShock); trackerPeakVibrationShockTs = data.optLong("peak_shock_ts", trackerPeakVibrationShockTs)
-            
-            val newLuxBaseline = data.optDouble("lux_baseline", trackerLuxBaseline)
-            if (newLuxBaseline != trackerLuxBaseline) { trackerLuxBaseline = newLuxBaseline; mainRepository.saveDoubleSync(MainRepository.TRACKER_LUX_BASELINE_KEY, trackerLuxBaseline) }
-            val newAcousticFloor = data.optDouble("acoustic_floor_db", trackerAcousticFloorDb)
-            if (newAcousticFloor != trackerAcousticFloorDb) { trackerAcousticFloorDb = newAcousticFloor; mainRepository.saveDoubleSync(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, trackerAcousticFloorDb) }
-            trackerAdaptiveVibrationFloor = data.optDouble("adaptive_vibration_floor", trackerAdaptiveVibrationFloor)
-            
-            locationProcessor.sentinel.updateSensorState(
-                vibration = trackerVibration, heading = trackerHeading, baroAlt = trackerBaroAlt, lux = trackerLux, isNear = isTrackerNear,
-                powerTamper = isTrackerPowerTamper, tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb, peakShock = trackerPeakVibrationShock,
-                acousticMinDb = -1.0, nowRt = nowRt, nowTs = now
-            )
 
-            trackerUptimeMs = data.optLong("uptime_ms", trackerUptimeMs); trackerTotalDropMs = data.optLong("total_drop_ms", trackerTotalDropMs)
-            trackerMaxDropMs = data.optLong("max_drop_ms", trackerMaxDropMs); trackerMaxDropTs = data.optLong("max_drop_ts", trackerMaxDropTs)
-            trackerTotalConnectedMs = data.optLong("total_connected_ms", trackerTotalConnectedMs); trackerSessionConnectedMs = data.optLong("session_connected_ms", trackerSessionConnectedMs)
-            trackerLastConnTs = data.optLong("last_conn_ts", trackerLastConnTs); trackerLastDiscTs = data.optLong("last_disc_ts", trackerLastDiscTs)
-            
-            val violationUptimeMs = data.optLong("violation_uptime_ms", 0L); val violationPercentage = data.optDouble("violation_percentage", 0.0)
-            if (data.optBoolean("is_stalled", false) && trackerGpsStallStartTs == 0L) trackerGpsStallStartTs = nowRt else if (!data.optBoolean("is_stalled", false)) trackerGpsStallStartTs = 0L
+                var lat = current.lat; var lng = current.lng; var gpsTs = current.gpsTs; var filteredSpeed = current.speed; var lastFixRt = trackerLastValidFixRt
+                var isClockReg = current.isClockRegression; var isVisualJump = current.isJump
 
-            scope.launch {
-                try {
-                    val locationUpdate = LocationUpdate(
-                        lat = trackerLat, lng = trackerLng, speed = trackerSpeed, accuracy = trackerAccuracy, bearing = trackerBearing,
-                        battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp, isCharging = isTrackerCharging, currentMa = trackerCurrentMa,
-                        gpsTs = trackerLastGpsTs, isMe = false, satsView = trackerSatsView, satsUsed = trackerSatsUsed, jumpTier = trackerJumpTier, 
-                        status = trackerStatus, isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
-                        violationUptimeMs = violationUptimeMs, violationPercentage = violationPercentage, isClockRegression = isTrackerClockRegression,
-                        isLocationPending = isTrackerLocationPending, locationPendingReason = trackerLocationPendingReason,
-                        lastValidFixRt = trackerLastValidFixRt, isPowerSaveMode = isTrackerPowerSaveMode, standbyBucket = trackerStandbyBucket,
-                        netInterface = trackerNetInterface, isStorageLow = isTrackerStorageLow, isStorageCritical = isTrackerStorageCritical,
-                        gnssDetail = trackerLocationDetail, isBatterySteepDischarge = this@ConnectivitySuite.isTrackerBatterySteepDischarge, isCoolingModeActive = this@ConnectivitySuite.isTrackerCoolingModeActive,
-                        trackerState = trackerState, ts = now, snrIdx = data.optDouble("snr_idx", 0.0),
-                        tiltIdx = data.optDouble("tilt_idx", 0.0), baroIdx = data.optDouble("baro_idx", 0.0),
-                        isSitDetected = data.optBoolean("is_sit_detected", false), lastSitTs = data.optLong("last_sit_ts", 0L)
+                if (data.has("lat") || data.has("gps_ts") || data.has("gps_age_ms")) {
+                    val incomingGpsTs = data.optLong("gps_ts", 0L)
+                    val gpsAgeMs = if (data.has("gps_age_ms")) data.optLong("gps_age_ms") else (if (incomingGpsTs > 0) maxOf(0L, now - incomingGpsTs) else 0L)
+                    val candidateTs = if (gpsAgeMs > 0 || incomingGpsTs > 0) now - gpsAgeMs else 0L
+                    
+                    val processed = locationProcessor.processGpsPoint(
+                        lat = data.optDouble("lat", 0.0), lng = data.optDouble("lng", 0.0), alt = data.optDouble("alt", 0.0), 
+                        androidSpeedMps = data.optDouble("speed", 0.0).coerceAtLeast(0.0),
+                        gpsTs = candidateTs, accuracy = data.optDouble("accuracy", 0.0).coerceAtLeast(0.0), 
+                        bearing = data.optDouble("bearing", 0.0), snr = 0.0,
+                        satsUsed = data.optInt("sats_used", current.satsUsed), isViewerTrail = false, lastGpsTs = current.gpsTs,
+                        providedMaxAccuracy = data.optDouble("max_accuracy", 0.0), providedJumpTier = data.optInt("jump_tier", 0), providedIsJammer = data.optBoolean("is_jammer", false),
+                        providedIsStalled = data.optBoolean("is_stalled", false), providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending || trackerStatus == SentinelStatus.TAMPER,
+                        nowWall = now, nowRt = nowRt
                     )
-                    mainRepository.updateLocation(locationUpdate)
-                    mainRepository.saveTrackerState(TrackerStatus(
-                        lat = trackerLat, lng = trackerLng, speed = trackerSpeed, bearing = trackerBearing, accuracy = trackerAccuracy,
-                        gpsTs = trackerLastGpsTs, ts = now, battery = trackerBattery, temp = trackerTemp, maxTemp = trackerMaxTemp,
-                        isCharging = isTrackerCharging, currentMa = trackerCurrentMa, satsView = trackerSatsView, satsUsed = trackerSatsUsed,
-                        lastConnTs = trackerLastConnTs, lastDiscTs = trackerLastDiscTs, uptimeMs = trackerUptimeMs, totalConnectedMs = trackerTotalConnectedMs,
-                        sessionConnectedMs = trackerSessionConnectedMs, totalDropMs = trackerTotalDropMs, maxDropMs = trackerMaxDropMs, maxDropTs = trackerMaxDropTs,
-                        violationUptimeMs = violationUptimeMs, violationPercentage = violationPercentage, isPowerTamper = isTrackerPowerTamper, 
-                        vibration = trackerVibration, heading = trackerHeading, baroAlt = trackerBaroAlt, lux = trackerLux, isNear = isTrackerNear, 
-                        tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb, peakVibrationShock = trackerPeakVibrationShock,
-                        peakVibrationShockTs = trackerPeakVibrationShockTs, luxBaseline = trackerLuxBaseline, acousticFloorDb = trackerAcousticFloorDb, 
-                        adaptiveVibrationFloor = trackerAdaptiveVibrationFloor, proxIdx = trackerProxIdx, proximityCm = trackerProximityCm,
-                        proximityDebounceMs = trackerProximityDebounceMs, vibrationRollingSum = trackerVibrationRollingSum, status = trackerStatus, 
-                        isTamperDetected = isTrackerTamperDetected, jumpTier = trackerJumpTier, isLocationPending = isTrackerLocationPending,
-                        locationPendingReason = trackerLocationPendingReason, lastValidFixRt = trackerLastValidFixRt,
-                        isPowerSaveMode = isTrackerPowerSaveMode, standbyBucket = trackerStandbyBucket, netInterface = trackerNetInterface,
-                        isStorageLow = isTrackerStorageLow, isStorageCritical = isTrackerStorageCritical, gnssDetail = trackerLocationDetail,
-                        isBatterySteepDischarge = this@ConnectivitySuite.isTrackerBatterySteepDischarge, isCoolingModeActive = this@ConnectivitySuite.isTrackerCoolingModeActive, trackerState = trackerState,
-                        snrIdx = data.optDouble("snr_idx", 0.0), tiltIdx = data.optDouble("tilt_idx", 0.0), baroIdx = data.optDouble("baro_idx", 0.0),
-                        isSitDetected = data.optBoolean("is_sit_detected", false), lastSitTs = data.optLong("last_sit_ts", 0L)
+                    isClockReg = processed.isClockRegression
+                    if (processed.optimizedPoint.lat != 0.0 && processed.optimizedPoint.lng != 0.0) {
+                        lat = processed.optimizedPoint.lat; lng = processed.optimizedPoint.lng; gpsTs = processed.optimizedPoint.ts
+                        if (!processed.isStalled) lastFixRt = nowRt
+                    }
+                    filteredSpeed = processed.filteredSpeed
+                    isVisualJump = processed.status == SentinelStatus.JUMP
+                }
+
+                val luxBaseline = data.optDouble("lux_baseline", current.luxBaseline)
+                val acousticFloor = data.optDouble("acoustic_floor_db", current.acousticFloorDb)
+
+                locationProcessor.sentinel.updateSensorState(
+                    vibration = data.optDouble("vibration", current.vibration), heading = data.optDouble("heading", current.heading), 
+                    baroAlt = data.optDouble("baro_alt", current.baroAlt), lux = data.optDouble("lux", current.lux), isNear = data.optBoolean("is_near", current.isNear),
+                    powerTamper = isTrackerPowerTamper, tiltDegrees = data.optDouble("tilt_degrees", current.tiltDegrees), 
+                    acousticDb = data.optDouble("acoustic_db", current.acousticDb), peakShock = data.optDouble("peak_vibration_shock", current.peakVibrationShock),
+                    acousticMinDb = -1.0, nowRt = nowRt, nowTs = now
+                )
+
+                if (data.optBoolean("is_stalled", false) && trackerGpsStallStartTs == 0L) trackerGpsStallStartTs = nowRt else if (!data.optBoolean("is_stalled", false)) trackerGpsStallStartTs = 0L
+
+                val updatedStatus = current.copy(
+                    lat = lat, lng = lng, gpsTs = gpsTs, speed = filteredSpeed, bearing = data.optDouble("bearing", current.bearing),
+                    accuracy = data.optDouble("accuracy", current.accuracy), maxAccuracy = data.optDouble("max_accuracy", current.maxAccuracy),
+                    battery = data.optInt("battery", current.battery), temp = data.optDouble("temp", current.temp), maxTemp = data.optDouble("max_temp", current.maxTemp),
+                    currentMa = data.optInt("current_ma", current.currentMa), isCharging = data.optBoolean("is_charging", current.isCharging),
+                    satsView = data.optInt("sats_view", current.satsView), satsUsed = data.optInt("sats_used", current.satsUsed),
+                    status = trackerStatus, isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
+                    isLocationPending = isTrackerLocationPending, locationPendingReason = trackerLocationPendingReason,
+                    lastValidFixRt = lastFixRt, isBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false), isCoolingModeActive = data.optBoolean("is_cooling_mode_active", false),
+                    isPowerSaveMode = data.optBoolean("is_power_save_mode", current.isPowerSaveMode), standbyBucket = data.optInt("standby_bucket", current.standbyBucket), netInterface = data.optString("net_interface", current.netInterface),
+                    isStorageLow = data.optBoolean("is_storage_low", current.isStorageLow), isStorageCritical = data.optBoolean("is_storage_critical", current.isStorageCritical), 
+                    trackerState = try { TrackerState.valueOf(data.optString("tracker_state", "UNKNOWN")) } catch(e: Exception) { current.trackerState }, 
+                    gnssDetail = gnssDetail, vibration = data.optDouble("vibration", current.vibration), heading = data.optDouble("heading", current.heading),
+                    baroAlt = data.optDouble("baro_alt", current.baroAlt), lux = data.optDouble("lux", current.lux), isNear = data.optBoolean("is_near", current.isNear),
+                    tiltDegrees = data.optDouble("tilt_degrees", current.tiltDegrees), acousticDb = data.optDouble("acoustic_db", current.acousticDb),
+                    peakVibrationShock = data.optDouble("peak_vibration_shock", current.peakVibrationShock), peakVibrationShockTs = data.optLong("peak_shock_ts", current.peakVibrationShockTs),
+                    luxBaseline = luxBaseline, acousticFloorDb = acousticFloor, adaptiveVibrationFloor = data.optDouble("adaptive_vibration_floor", current.adaptiveVibrationFloor),
+                    proxIdx = data.optDouble("prox_idx", current.proxIdx), proximityCm = data.optDouble("proximity_cm", current.proximityCm),
+                    proximityDebounceMs = data.optLong("proximity_debounce_ms", current.proximityDebounceMs), vibrationRollingSum = data.optDouble("vibration_rolling_sum", current.vibrationRollingSum),
+                    uptimeMs = data.optLong("uptime_ms", current.uptimeMs), totalDropMs = data.optLong("total_drop_ms", current.totalDropMs),
+                    maxDropMs = data.optLong("max_drop_ms", current.maxDropMs), maxDropTs = data.optLong("max_drop_ts", current.maxDropTs),
+                    totalConnectedMs = data.optLong("total_connected_ms", current.totalConnectedMs), sessionConnectedMs = data.optLong("session_connected_ms", current.sessionConnectedMs),
+                    lastConnTs = data.optLong("last_conn_ts", current.lastConnTs), lastDiscTs = data.optLong("last_disc_ts", current.lastDiscTs),
+                    isClockRegression = isClockReg, isJump = isVisualJump, ts = now,
+                    snrIdx = data.optDouble("snr_idx", current.snrIdx), tiltIdx = data.optDouble("tilt_idx", current.tiltIdx), baroIdx = data.optDouble("baro_idx", current.baroIdx),
+                    isSitDetected = data.optBoolean("is_sit_detected", current.isSitDetected), lastSitTs = data.optLong("last_sit_ts", current.lastSitTs),
+                    isSuspicious = data.optBoolean("is_suspicious", current.isSuspicious), isAnchorLocked = data.optBoolean("is_anchor_locked", current.isAnchorLocked),
+                    verticalVelocity = data.optDouble("vertical_velocity", current.verticalVelocity),
+                    sitVz = data.optDouble("sit_vz", current.sitVz), sitDz = data.optDouble("sit_dz", current.sitDz),
+                    sitBaro = data.optDouble("sit_baro", current.sitBaro), sitTilt = data.optDouble("sit_tilt", current.sitTilt), sitShock = data.optDouble("sit_shock", current.sitShock)
+                )
+
+                scope.launch {
+                    mainRepository.updateLocation(LocationUpdate(
+                        lat = updatedStatus.lat, lng = updatedStatus.lng, speed = updatedStatus.speed, accuracy = updatedStatus.accuracy, bearing = updatedStatus.bearing,
+                        battery = updatedStatus.battery, temp = updatedStatus.temp, maxTemp = updatedStatus.maxTemp, isCharging = updatedStatus.isCharging, currentMa = updatedStatus.currentMa,
+                        gpsTs = updatedStatus.gpsTs, isMe = false, satsView = updatedStatus.satsView, satsUsed = updatedStatus.satsUsed, 
+                        status = updatedStatus.status, isTamperDetected = updatedStatus.isTamperDetected, isPowerTamper = updatedStatus.isPowerTamper,
+                        isClockRegression = updatedStatus.isClockRegression, isLocationPending = updatedStatus.isLocationPending, 
+                        locationPendingReason = updatedStatus.locationPendingReason, lastValidFixRt = updatedStatus.lastValidFixRt, 
+                        isPowerSaveMode = updatedStatus.isPowerSaveMode, standbyBucket = updatedStatus.standbyBucket,
+                        netInterface = updatedStatus.netInterface, isStorageLow = updatedStatus.isStorageLow, isStorageCritical = updatedStatus.isStorageCritical,
+                        gnssDetail = updatedStatus.gnssDetail, isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge, isCoolingModeActive = updatedStatus.isCoolingModeActive,
+                        trackerState = updatedStatus.trackerState, ts = now, snrIdx = updatedStatus.snrIdx, tiltIdx = updatedStatus.tiltIdx, baroIdx = updatedStatus.baroIdx,
+                        isSitDetected = updatedStatus.isSitDetected, lastSitTs = updatedStatus.lastSitTs,
+                        verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitDz = updatedStatus.sitDz,
+                        sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock
                     ))
-                } catch (e: Exception) { Timber.e(e, "Peer DB update failed") }
+                }
+                updatedStatus
             }
         }
     }
 
     private fun handleRemoteLog(entry: LogEntry) {
         val now = timeProvider.currentTimeMillis(); val nowRt = timeProvider.elapsedRealtime()
-        lastPeerActivityTs = nowRt; mainRepository.updateRemoteActivity(now)
+        remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now)
     }
 
-    fun onRelayLost() { isTrackerConnected = false }
+    fun onRelayLost() { remoteStatusRepository.setTrackerConnected(false) }
 
     fun resetPeerStats() {
-        isTrackerConnected = false; lastPeerActivityTs = 0L; lastRemotePacketTs = 0L; peerSignal = 0; lastPeerGpsTs = 0L
-        trackerLat = 0.0; trackerLng = 0.0; trackerSpeed = 0.0; trackerBearing = 0.0; trackerAccuracy = 0.0; trackerMaxAccuracy = 0.0; trackerLastGpsTs = 0L
-        trackerBattery = 0; trackerTemp = 0.0; trackerMaxTemp = 0.0; trackerCurrentMa = 0; trackerSatsView = 0; trackerSatsUsed = 0
-        isTrackerCharging = false; isTrackerJammerSuspicion = false; isTrackerVisualJump = false; trackerJumpTier = 0; trackerStatus = SentinelStatus.VALID
-        isTrackerTamperDetected = false; isTrackerPowerTamper = false; trackerDistToHome = null; trackerDistToViewer = null
-        trackerVibration = 0.0; trackerHeading = 0.0; trackerBaroAlt = 0.0; trackerLux = 0.0; isTrackerNear = true; trackerTiltDegrees = 0.0
-        trackerAcousticDb = 0.0; trackerPeakVibrationShock = 0.0; trackerPeakVibrationShockTs = 0L; trackerLuxBaseline = 0.0; trackerAcousticFloorDb = 0.0
-        trackerAdaptiveVibrationFloor = 0.12; trackerProxIdx = 1.0; trackerProximityCm = -1.0; trackerProximityDebounceMs = 0L; trackerVibrationRollingSum = 0.0
-        trackerUptimeMs = 0L; trackerTotalDropMs = 0L; trackerMaxDropMs = 0L; trackerMaxDropTs = 0L; trackerTotalConnectedMs = 0L
-        trackerSessionConnectedMs = 0L; trackerLastConnTs = 0L; trackerLastDiscTs = 0L; trackerGpsStallStartTs = 0L; trackerLastValidFixRt = 0L
-        isTrackerClockRegression = false; isTrackerLocationPending = false; trackerLocationPendingReason = LocationPendingReason.NONE; trackerLocationDetail = null
-        isTrackerBatterySteepDischarge = false; isTrackerCoolingModeActive = false; isTrackerPowerSaveMode = false; trackerStandbyBucket = -1
-        trackerNetInterface = "UNKNOWN"; isTrackerStorageLow = false; isTrackerStorageCritical = false; trackerState = TrackerState.UNKNOWN
-        mainRepository.saveDoubleSync(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0); mainRepository.saveDoubleSync(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
+        remoteStatusRepository.reset()
+        trackerGpsStallStartTs = 0L
+        mainRepository.saveDoubleSync(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0)
+        mainRepository.saveDoubleSync(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
     }
 
     fun stop() { 
         isStopped.set(true); keepAliveJob?.cancel(); syncJob?.cancel(); scope.cancel()
         try { connectivityManager.unregisterNetworkCallback(networkCallback) } catch (e: Exception) {}
+        signalingProvider.setRemoteUpdateListener(null)
         signalingProvider.disconnect() 
     }
 

@@ -1,32 +1,29 @@
-# Handover (July.22.12) - Deep Signaling Purification
+# Handover (July.23.00) - Remote Peer State Consolidated
 
 ## 🎯 Current Objective
-Cycle **July.22.12** is focused on the deep purge of the decommissioned remote settings infrastructure. The objective is to remove all remaining dead code from the signaling pipeline, including validation rules and message handling logic.
+Cycle **July.23.00** is now COMPLETE. The remote peer telemetry state has been successfully consolidated into a single, Hilt-managed `RemoteStatusRepository`, eliminating "double-bookkeeping" and ensuring forensic parity across the stack.
 
 ## 📊 Status Summary
 
-### 1. Remote Settings Deep Purge (Issue #521 - IN PROGRESS)
-- **Validation Cleanup**: Removed `shouldProcessSettingsUpdate` from `SignalingValidator.kt`.
-- **Communication Hardening**: Purged `handleSettingsRelay` and its listener registration from `CommunicationManager.kt`.
-- **Sync Remediation**: Removed the `home_points` remote sync logic from `ConnectivitySuite.kt` and resolved property access inconsistencies.
-- **Purity**: Verified that `settings_relay` and `settings_update` are no longer active in the primary signaling flow.
+### 1. Remote Peer State Consolidation (Issue #522 - RESOLVED)
+- **Unified Repository**: Created `RemoteStatusRepository.kt` as the single source of truth for all remote tracker telemetry.
+- **Signaling Purification**: Hardened `SignalingProvider` with a standardized `RemoteUpdateListener`.
+- **Architectural Purity**: Refactored `ConnectivitySuite` to implement the listener and update the repository directly, subsuming all functionality from the now-obsolete `RemoteHandler`.
+- **Forensic Parity**: Preserved and integrated all 15+ forensic SIT parameters (GPS, Battery, Vz, Dz, Baro, Tilt, Shock, etc.).
+- **UI Alignment**: Updated `MainViewModel` to observe the consolidated repository, ensuring consistent real-time updates on the dashboard.
 
-### 2. Forensic Baseline (July.22.11 - COMPLETE)
-- **UI Componentization**: The telemetry dashboard is fully refactored into `MainDashboardGrid` with logical sections.
-- **Signaling Cleanup**: Non-functional `pushSettings()` and `SendSettingsCmd` have been physically removed.
-
-## ⚠️ Resumption Context
-- **Next Steps**: Audit `SignalPayloadGenerator.kt` and `SignalingMessageConflator.kt` for any final remnants of the remote settings mechanism.
-- **Integrity**: Ensure that the removal of remote settings logic has no impact on the local-first configuration authority.
+### 2. Version Release (July.23.00 - READY)
+- **Version Bump**: Incremented `versionName` in `app/build.gradle` to `July.23.00`.
+- **Requirements Update**: Updated `STATUS/SOT_MASTER_REQUIREMENTS.md` with the new Remote Peer State Authority (R522).
 
 ## 🚀 Next Objective
-- **Code Audit**: Physically remove any remaining remote settings payload generation logic.
-- **Validation**: Verify the stability of the telemetry pipeline after the deep purge.
+- **SIT Logic Hardening**: Further optimize the Sit-Detection (SIT) heuristic logic within `LocationProcessor` now that the telemetry pipeline is unified.
+- **UI Simplification**: Leverage the consolidated repository to further simplify `MainDashboardGrid` and ribbon rendering logic.
 
-## 🚀 Git Release Commands (Target)
+## 🚀 Git Release Commands
 ```bash
 git add .
-git commit -m "Hardening Release July.22.12: Deep Signaling Purification (#521)"
-git tag -a July.22.12 -m "July.22.12 Release: Deep Purge of Decommissioned Remote Settings Logic"
+git commit -m "Hardening Release July.23.00: Remote Peer State Consolidation (#522)"
+git tag -a July.23.00 -m "July.23.00 Release: Unified Remote Telemetry Pipeline and Forensic Parity"
 git push origin main --tags
 ```

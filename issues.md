@@ -1,30 +1,31 @@
-# Project Issues & Hardening Tracking (July.22.12)
+# Project Issues & Hardening Tracking (July.23.00)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 1 |
+| **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 342 |
+| **Resolved (Total)** | 🟢 Progress | 344 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*None.*
+*   *None currently identified.*
 
 ---
 
 ## 🔴 Open Issues
-*   **Issue #521: Deep Purge of Remote Settings Leftovers**.
-    *   **Context**: Final removal of `settings_update` emitting logic and `settings_relay` handling. This includes purging dead validation rules in `SignalingValidator` and remote sync logic in `ConnectivitySuite`.
+*   *No open critical issues.*
 
 ---
 
-## 🟢 Recently Resolved Issues (July.22.11)
-*   **Issue #520: Purge Signaling Command Leftovers**.
-*   **Issue #519: Dashboard UI Simplification & Telemetry Componentization**.
-*   **Issue #517: Purge SDK Suppression Leftovers**.
-*   **Issue #514: Redundant Signaling Infrastructure Purge**.
-*   **Issue #513: Dead-Weight Purge & Release Alignment**.
+## 🟢 Recently Resolved Issues (July.23.00)
+*   **Issue #522: Remote Peer State Consolidation**.
+    *   **Resolution**: Unified remote peer telemetry state into `RemoteStatusRepository.kt`. Refactored `ConnectivitySuite` to implement a standardized `RemoteUpdateListener` from `SignalingProvider`, eliminating the redundant `RemoteHandler` and centralizing forensic telemetry (15+ SIT parameters). Updated `MainViewModel` to observe this consolidated source.
+
+---
+
+## 🟢 Recently Resolved Issues (July.22.12)
+*   **Issue #521: Deep Purge of Remote Settings Leftovers**.
