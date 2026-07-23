@@ -16,11 +16,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.24.03:
+ * - Issue #098: Reactive Capability Sync. Hardened onSyncSensors to refresh hardware capabilities.
  * July.24.02:
  * - Issue #534/535: ANR & IPC Hardening. Implemented strict 10s startup 
  *   suppression for FGS updates to prevent main-thread starvation on budget hardware.
- * July.23.12:
- * - Issue #113: Hardened status updates. Notifications suppressed until isSystemActive.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -84,14 +84,7 @@ class ViewerService : BaseMonitorService() {
             configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
             configManager.isTrackerMode = false
 
-            val perms = systemStatusProvider.getPermissionState()
-            capabilities = HardwareCapabilities(
-                hasBackgroundRestriction = perms.hasBackgroundRestriction,
-                backgroundStatus = perms.backgroundStatus,
-                autostartStatus = perms.autostartStatus,
-                requiresWakeLockRenewal = perms.requiresWakeLockRenewal,
-                isManualOverrideActive = perms.isManualOverride
-            )
+            refreshCapabilitiesInternal()
 
             alarmManager.setListener(object : AppAlarmManager.Listener {
                 override fun onLogEvent(type: String, message: String, important: Boolean, extremeValue: Double?, logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, snr: Double?, vibe: Double?) {
@@ -142,7 +135,11 @@ class ViewerService : BaseMonitorService() {
                 override fun onUiVisibilityChanged(visible: Boolean) { onUiVisibilityChangedInternal(visible) }
                 override fun onTransientDrop(drop: Boolean) { transientDropDetected.set(drop) }
                 override fun onResetTimers() { resetServiceTimers() }
-                override fun onSyncSensors() { }
+                override fun onSyncSensors() {
+                    lifecycleScope.launch(Dispatchers.Default) {
+                        refreshCapabilitiesInternal()
+                    }
+                }
                 override fun onTriggerForensicTest() { }
             })
             commandRouter.register()
@@ -193,6 +190,19 @@ class ViewerService : BaseMonitorService() {
             
             logManager.logServiceEvent("Viewer Engine Online (Staggered)", important = true)
         }
+    }
+
+    private suspend fun refreshCapabilitiesInternal() {
+        val perms = systemStatusProvider.getPermissionState(forceRefresh = true)
+        capabilities = HardwareCapabilities(
+            hasBackgroundRestriction = perms.hasBackgroundRestriction,
+            backgroundStatus = perms.backgroundStatus,
+            autostartStatus = perms.autostartStatus,
+            requiresWakeLockRenewal = perms.requiresWakeLockRenewal,
+            isManualOverrideActive = perms.isManualOverride,
+            isA15Device = perms.isA15Device
+        )
+        Timber.i("Issue #098: Viewer capabilities refreshed.")
     }
 
     private fun onLocationChanged(location: Location) {
