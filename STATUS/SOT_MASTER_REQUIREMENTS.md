@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.23.02 (Forensic Pipeline Atomic)
+# System Source of Truth (SoT) - July.23.03 (Power & Sampling)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -9,6 +9,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Startup Maintenance Authority (R104)**: Execute a proactive `deepPruneLogs` operation immediately upon initialization in both UI and Service lifecycles. (Issue #104, #104b)
 *   **Stability Audit Authority (R951)**: Continuous stability auditing. Gaps > 200ms relative to heartbeat MUST be logged. (Issue #031)
 *   **Power Optimization (R403b)**: To preserve battery during long-duration parking, the system MUST adaptively increase the logic tick interval from 2s to 10s when the device is confirmed `STATIONARY` and the GPS is `STALLED`. (Issue #526)
+*   **Adaptive Hardware Sampling (R406a-H)**: When the device enters logic-level power save, high-frequency hardware sensors (Linear Acceleration) MUST be downgraded to `SENSOR_DELAY_NORMAL` to reduce CPU wake-up frequency. (Issue #526)
 *   **Acoustic Duty Cycle (R810-L2)**: During logic-level power save, the microphone MUST switch to a 20% duty cycle (2s ON / 8s OFF) to reduce energy footprint while maintaining forensic sampling. (Issue #526)
 
 ### 2. Temporal & Forensic Integrity
@@ -40,5 +41,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stationary Anchor Hard-Lock (R990b)**: Establish coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: `July.23.02`.
+*   **Current Release**: `July.23.03`.
 *   **Source of Truth**: `app/build.gradle` `versionName`.

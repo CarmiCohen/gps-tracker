@@ -28,10 +28,8 @@ import kotlin.math.sqrt
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
  * July.23.02:
- * - Issue #526: Power Optimization. Implemented Acoustic Duty Cycling to reduce 
- *   energy footprint during stationary/stalled states.
- * July.23.01:
- * - Forensic Consolidation: Integrated consumeForensicSnapshot() (Issue #523).
+ * - Issue #526: Power Optimization. Implemented Dynamic Hardware Sampling.
+ *   Downgrades Linear Acceleration from FASTEST to NORMAL during power-save.
  */
 class AppSensorManager(
     private val context: Context,
@@ -281,8 +279,20 @@ class AppSensorManager(
             sensorHandler = Handler(sensorThread!!.looper)
         }
 
+        registerSensors()
+        
+        displayManager.registerDisplayListener(displayListener, sensorHandler)
+        val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
+        if (display != null) lastDisplayState = display.state
+
+        startAcousticMonitoring()
+    }
+
+    private fun registerSensors() {
+        val delay = if (powerSaveMode) AndroidSensorManager.SENSOR_DELAY_NORMAL else AndroidSensorManager.SENSOR_DELAY_FASTEST
+        
         accelerometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
-        linearAccel?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_FASTEST, sensorHandler) }
+        linearAccel?.let { sensorManager.registerListener(this, it, delay, sensorHandler) }
         magnetometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         barometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         proximity?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
@@ -291,12 +301,6 @@ class AppSensorManager(
         
         attemptStepDetectorRegistration()
         startStepDetectorRecoveryLoop()
-
-        displayManager.registerDisplayListener(displayListener, sensorHandler)
-        val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
-        if (display != null) lastDisplayState = display.state
-
-        startAcousticMonitoring()
     }
 
     fun stop() {
@@ -369,7 +373,11 @@ class AppSensorManager(
     fun setPowerSaveMode(active: Boolean) {
         if (this.powerSaveMode != active) {
             this.powerSaveMode = active
-            Timber.i("Issue #526: Power Save Mode ${if (active) "ENABLED" else "DISABLED"}. Acoustic Duty Cycling triggered.")
+            Timber.i("Issue #526: Power Save Mode ${if (active) "ENABLED" else "DISABLED"}. Adjusting sensor sampling.")
+            if (sensorHandler != null) {
+                sensorManager.unregisterListener(this)
+                registerSensors()
+            }
         }
     }
 
