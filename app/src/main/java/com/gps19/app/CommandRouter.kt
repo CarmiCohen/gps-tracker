@@ -22,6 +22,8 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * July.22.11:
+ * - Issue #520: Purge Signaling Command Leftovers. Removed SendSettingsCmd handling.
  * July.22.04:
  * - Hilt Hardening: Added @Inject constructor and @Singleton.
  * v9.5.0: Issue #513 - Flatten Service Architecture (ConnectivitySuite).
@@ -112,23 +114,10 @@ class CommandRouter @Inject constructor(
                             locationProcessor.resetStats()
                             connectivitySuite.resetPeerStats()
                         }
-                        is UiCommand.SendSettingsCmd -> {
-                            try {
-                                val data = JSONObject(command.data)
-                                data.put("viewer_id", configManager.viewerId)
-                                data.put("from_viewer", true)
-                                connectivitySuite.emit("settings_update", data)
-                            } catch (e: Exception) {
-                                Timber.e(e, "Error parsing settings command data")
-                            }
-                        }
                         is UiCommand.SettingsUpdated -> {
                             listener?.onSyncSensors()
                             connectivitySuite.connect(configManager.relayUrl)
                             connectivitySuite.updateIdentity(configManager.deviceId, configManager.viewerId, configManager.isTrackerMode)
-                        }
-                        is UiCommand.PushSettings -> {
-                            connectivitySuite.pushSettings()
                         }
                         is UiCommand.ZoomIn, is UiCommand.ZoomOut, is UiCommand.MapZoomIn, is UiCommand.MapZoomOut -> {}
                         is UiCommand.FullInitializationReset -> {

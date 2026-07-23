@@ -5,6 +5,8 @@ option java_multiple_files = true;
 
 /**
  * AppSettings: Persistence schema for DataStore.
+ * July.22.11:
+ * - Issue #518: Purged legacy float fields (8, 9, 33).
  * July.22.01:
  * - Forensic Parity: Added indices (snr, noise, lux, vibe, lift, prox, tilt, baro) and SIT fields to RealtimeStatus.
  * July.20.07:
@@ -23,9 +25,7 @@ message AppSettings {
     optional int64 last_alarm_ack_ts = 6;
     optional int64 home_points_ts = 7;
 
-    // Legacy float fields (Binary compatibility for Issue #023)
-    optional float legacy_max_distance = 8;
-    optional float legacy_max_accuracy = 9;
+    reserved 8, 9;
 
     optional bool is_manual_exit = 10;
 
@@ -54,11 +54,8 @@ message AppSettings {
     optional int64 max_accuracy_ts = 29;
     optional int64 last_auto_save_ts = 30;
 
-    reserved 31;
+    reserved 31, 33;
     optional int32 last_version_code = 32;
-
-    // Legacy float field (Binary compatibility for Issue #023)
-    optional float legacy_max_temp = 33;
 
     optional double tracker_lux_baseline = 34;
     optional double tracker_acoustic_floor = 35;

@@ -10,6 +10,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * July.22.11:
+ * - Issue #520: Purge Signaling Command Leftovers. Removed SendSettingsCmd.
  * July.22.01:
  * - Forensic Parity: Expanded ConnectionPoint with full SIT suite (isSitDetected, sitBaro, sitTilt, sitShock).
  * - Added missing indices (noiseIdx, luxIdx, vibeIdx, liftIdx, tiltIdx, baroIdx) to TrackerStatus and Proto/JSON mappings.
@@ -582,9 +584,7 @@ sealed class UiCommand {
     data class StopSiren(val causes: String? = null) : UiCommand()
     object ClearTrails : UiCommand()
     object StatsReset : UiCommand()
-    data class SendSettingsCmd(val data: String) : UiCommand()
     object SettingsUpdated : UiCommand()
-    object PushSettings : UiCommand()
     object ZoomIn : UiCommand()
     object ZoomOut : UiCommand()
     object FullInitializationReset : UiCommand()

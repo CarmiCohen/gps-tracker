@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * SignalingValidator: Pure logic for enforcing role-based message filtering.
+ * July.22.12:
+ * - Issue #521: Deep Purge of Remote Settings Leftovers. Removed shouldProcessSettingsUpdate.
  * v9.3.22:
  * - Legacy Compatibility: Support both "viewer" and "client" labels.
  * - Alias-Aware Matching: Integrated SignalingConstants.isTrackerMatch and 
@@ -40,23 +42,6 @@ object SignalingValidator {
         if (!isTrackerMode && isFromViewer && SignalingConstants.isViewerMatch(viewerId, ownViewerId)) return false
 
         return true
-    }
-
-    /**
-     * Determines if a settings update should be processed.
-     */
-    fun shouldProcessSettingsUpdate(
-        incomingId: String,
-        ownDeviceId: String,
-        incomingViewerId: String,
-        ownViewerId: String,
-        fromViewer: Boolean,
-        isTrackerMode: Boolean
-    ): Boolean {
-        if (!SignalingConstants.isTrackerMatch(incomingId, ownDeviceId)) return false
-        
-        // Only Trackers process incoming settings updates, and they must come from the AUTHORIZED or UNLOCKED Viewer.
-        return isTrackerMode && fromViewer && (SignalingConstants.isViewerMatch(incomingViewerId, ownViewerId) || isDefault(ownViewerId))
     }
     
     /**

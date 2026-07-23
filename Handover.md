@@ -1,31 +1,32 @@
-# Handover (July.22.11) - Release Finalized
+# Handover (July.22.12) - Deep Signaling Purification
 
 ## 🎯 Current Objective
-Cycle **July.22.11** is CLOSED. All historical leftovers have been purged, documentation is consolidated, and version authorities are synchronized to resolve the tagging conflict.
+Cycle **July.22.12** is focused on the deep purge of the decommissioned remote settings infrastructure. The objective is to remove all remaining dead code from the signaling pipeline, including validation rules and message handling logic.
 
 ## 📊 Status Summary
 
-### 1. Dead-Weight Purge (Issue #513 - COMPLETE)
-- **Physical Deletion**: Successfully removed `AppContainer.kt`, `MainViewModelFactory.kt`, `VideoComponents.kt`, `ChatViewModel.kt`, `WebRtcManager.kt`, and `SIMPLIFICATION_PLAN.md`.
-- **Logic Integrity**: Verified zero references remain in the active codebase.
+### 1. Remote Settings Deep Purge (Issue #521 - IN PROGRESS)
+- **Validation Cleanup**: Removed `shouldProcessSettingsUpdate` from `SignalingValidator.kt`.
+- **Communication Hardening**: Purged `handleSettingsRelay` and its listener registration from `CommunicationManager.kt`.
+- **Sync Remediation**: Removed the `home_points` remote sync logic from `ConnectivitySuite.kt` and resolved property access inconsistencies.
+- **Purity**: Verified that `settings_relay` and `settings_update` are no longer active in the primary signaling flow.
 
-### 2. Release Baseline (July.22.11 - COMPLETE)
-- **Samsung Hardening**: Hardware WakeLock "poke" implemented for A15 longevity.
-- **DI Purity**: 100% Hilt-managed graph with zero legacy artifacts.
-- **I/O Stabilization**: 2s pruning stagger active in MainViewModel.
+### 2. Forensic Baseline (July.22.11 - COMPLETE)
+- **UI Componentization**: The telemetry dashboard is fully refactored into `MainDashboardGrid` with logical sections.
+- **Signaling Cleanup**: Non-functional `pushSettings()` and `SendSettingsCmd` have been physically removed.
 
-### 3. Version Authority
-- **Build Sync**: `app/build.gradle` updated to `July.22.11`.
-- **SoT Sync**: Master Requirements and Status files synchronized to the new baseline.
+## ⚠️ Resumption Context
+- **Next Steps**: Audit `SignalPayloadGenerator.kt` and `SignalingMessageConflator.kt` for any final remnants of the remote settings mechanism.
+- **Integrity**: Ensure that the removal of remote settings logic has no impact on the local-first configuration authority.
 
 ## 🚀 Next Objective
-- Perform 24h soak test on Samsung A15 (SM-A155F) to confirm process priority maintenance.
-- Monitor log integrity during extended background sessions.
+- **Code Audit**: Physically remove any remaining remote settings payload generation logic.
+- **Validation**: Verify the stability of the telemetry pipeline after the deep purge.
 
-## 🚀 Git Release Commands
+## 🚀 Git Release Commands (Target)
 ```bash
 git add .
-git commit -m "Hardening Release July.22.11: Dead-Weight Purge (#513), Samsung Stay-Alive (#113) & DI Finality"
-git tag -a July.22.11 -m "July.22.11 Release: Total Artifact Purge & Hardening"
+git commit -m "Hardening Release July.22.12: Deep Signaling Purification (#521)"
+git tag -a July.22.12 -m "July.22.12 Release: Deep Purge of Decommissioned Remote Settings Logic"
 git push origin main --tags
 ```

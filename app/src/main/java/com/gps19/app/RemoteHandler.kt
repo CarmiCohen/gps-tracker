@@ -19,9 +19,11 @@ import javax.inject.Singleton
 
 /**
  * RemoteHandler: Handles incoming telemetry from the tracker in Viewer mode.
+ * July.22.12:
+ * - Issue #521: Deep Purge of Remote Settings Leftovers. Removed remote home_points sync.
  * v9.4.00:
  * - Issue #102: Temporal Forensic Integrity. Standardized all monotonic 
- *   timestamps to use 'Rt' suffix (e.g., 'nowRt', 'trackerLastValidFixRt').
+ *   timestamps to use 'Rt' suffix.
  */
 @Singleton
 class RemoteHandler @Inject constructor(
@@ -331,30 +333,6 @@ class RemoteHandler @Inject constructor(
             listener?.onPeerPulse(peerId)
             lastPeerActivityTs = nowRt
             repository.updateRemoteActivity(now)
-            return
-        }
-
-        if (isTrackerMode && fromViewer && data.has("home_points")) {
-            scope?.launch {
-                try {
-                    val array = data.getJSONArray("home_points")
-                    val newList = mutableListOf<GeoPoint>()
-                    for (i in 0 until array.length()) {
-                        val obj = array.getJSONObject(i)
-                        newList.add(GeoPoint(obj.getDouble("lat"), obj.getDouble("lng")))
-                    }
-                    val maxDist = data.optDouble("max_dist", -1.0)
-                    val ts = data.optLong("settings_ts", 0L)
-                    
-                    repository.saveHomePoints(newList, if (maxDist > 0) maxDist else null, if (ts > 0) ts else null)
-                    listener?.onPeerPulse(peerId)
-                    lastPeerActivityTs = nowRt
-                    repository.updateRemoteActivity(now)
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
-                    Timber.e(e, "Error parsing remote settings")
-                }
-            }
             return
         }
 

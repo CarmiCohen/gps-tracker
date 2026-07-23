@@ -26,7 +26,6 @@ private val Context.settingsDataStore: DataStore<AppSettings> by dataStore(
     produceMigrations = { context ->
         listOf(
             AppSettingsMigration(context),
-            SettingsRepository.typeMigration,
             SettingsRepository.identitySanitizationMigration
         )
     }
@@ -47,6 +46,8 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * July.22.11:
+ * - Issue #518: Purged legacy typeMigration and associated logic.
  * July.22.03:
  * - Issue #511: DataStore Singleton Hardening. Switched to Context.dataStore delegate.
  * July.22.00:
@@ -117,33 +118,6 @@ class SettingsRepository @Inject constructor(
         const val LAST_SIT_TS_KEY = "last_sit_ts"
         const val CHAIR_BASELINE_TILT_KEY = "chair_baseline_tilt"
         const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
-
-        internal val typeMigration = object : DataMigration<AppSettings> {
-            override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
-                return currentData.hasLegacyMaxDistance() || 
-                       currentData.hasLegacyMaxAccuracy() || 
-                       currentData.hasLegacyMaxTemp()
-            }
-
-            override suspend fun migrate(currentData: AppSettings): AppSettings {
-                val builder = currentData.toBuilder()
-                if (currentData.hasLegacyMaxDistance()) {
-                    builder.setMaxDistance(currentData.legacyMaxDistance.toDouble())
-                    builder.clearLegacyMaxDistance()
-                }
-                if (currentData.hasLegacyMaxAccuracy()) {
-                    builder.setMaxAccuracy(currentData.legacyMaxAccuracy.toDouble())
-                    builder.clearLegacyMaxAccuracy()
-                }
-                if (currentData.hasLegacyMaxTemp()) {
-                    builder.setMaxTemp(currentData.legacyMaxTemp.toDouble())
-                    builder.clearLegacyMaxTemp()
-                }
-                return builder.build()
-            }
-
-            override suspend fun cleanUp() {}
-        }
 
         internal val identitySanitizationMigration = object : DataMigration<AppSettings> {
             override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
@@ -223,9 +197,9 @@ class SettingsRepository @Inject constructor(
                 LAST_GPS_TS_KEY -> builder.setLastGpsTs(value)
                 VIOLATION_UPTIME_MS_KEY -> builder.setViolationUptimeMs(value)
                 LAST_SERVICE_TICK_REALTIME_KEY -> builder.setLastServiceTickRt(value)
-                CLOCK_DRIFT_REF_KEY -> builder.setClockDriftRef(value)
-                LAST_SIT_TS_KEY -> builder.setLastSitTs(value)
-                LAST_HISTORY_SIT_TS_KEY -> builder.setLastHistorySitTs(value)
+                CLOCK_DRIFT_REF_KEY -> if (settings.hasClockDriftRef()) settings.clockDriftRef else 0L
+                LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else 0L
+                LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else 0L
             }
             builder.build()
         }
@@ -344,7 +318,7 @@ class SettingsRepository @Inject constructor(
     suspend fun getInt(keyName: String, default: Int): Int {
         val settings = dataStore.data.first()
         val value = when (keyName) {
-            LAST_AUTO_SAVE_HOUR_KEY -> settings.lastAutoSaveHour
+            LAST_AUTO_SAVE_HOUR_KEY -> settings.lastAuto_save_hour
             LAST_VERSION_CODE_KEY -> settings.lastVersionCode
             else -> -1
         }
@@ -400,6 +374,14 @@ class SettingsRepository @Inject constructor(
     suspend fun saveDraftAlertSettings(s: AlertSettings) {
         dataStore.updateData { current ->
             current.toBuilder().setDraftAlertSettings(SettingsMapper.alertSettingsToProto(s)).build()
+        }
+    }
+
+    fun saveTrackerStatus(status: TrackerStatus) {
+        scope.launch {
+            dataStore.updateData { current ->
+                current.toBuilder().setTrackerState(SettingsMapper.mapTrackerStatusToProto(status)).build()
+            }
         }
     }
 

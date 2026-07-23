@@ -466,7 +466,6 @@ class MainViewModel @Inject constructor(
                 is UiEvent.SaveHomePoints -> repository.saveHomePoints(_uiState.value.homePoints, _uiState.value.maxDistance)
                 else -> {}
             }
-            repository.sendCommand(UiCommand.PushSettings)
         }
     }
 

@@ -43,17 +43,16 @@ class GpsApplication : Application(), Configuration.Provider {
             Timber.plant(Timber.DebugTree())
         }
 
-        // Issue #112: Suppress vendor SDK noise and route errors to hardened LogManager sink.
+        // Standardized Timber logging for critical errors
         Timber.plant(object : Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-                if (message.contains("mbrainSDK", ignoreCase = true)) return
-
                 if (priority >= Log.ERROR) {
                     try {
                         val fullMessage = if (tag != null) "[$tag] $message" else message
                         val suffix = t?.let { ": ${it.stackTraceToString().take(500)}" } ?: ""
                         logManager.logServiceEvent("CRITICAL ERROR: $fullMessage$suffix", true)
                     } catch (e: Exception) {
+                        // Fail-safe to prevent logging loops
                     }
                 }
             }

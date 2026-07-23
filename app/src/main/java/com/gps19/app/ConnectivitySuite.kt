@@ -23,12 +23,10 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity, telemetry sync, and remote peer handling.
+ * July.22.12:
+ * - Issue #521: Deep Purge of Remote Settings Leftovers. Fixed property resolution and purged remote home_points sync.
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * - Circularity Management: Migrated logManager to Provider<LogManager>.
- * July.21.00:
- * - Forensic Hardening: Expanded pushCurrentStatus to include SIT/Acoustic forensic fields.
- * - Monotonic Rt Alignment: Standardized timing variables (lastValidFixRt, nowRt).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -84,29 +82,65 @@ class ConnectivitySuite @Inject constructor(
     var lastPeerGpsTs = 0L
     private var lastRemotePacketTs = 0L
 
-    var trackerLat = 0.0; var trackerLng = 0.0; var trackerSpeed = 0.0; var trackerBearing = 0.0
-    var trackerAccuracy = 0.0; var trackerMaxAccuracy = 0.0; var trackerLastGpsTs = 0L
-    var trackerLastValidFixRt = 0L; var trackerBattery = 0; var trackerTemp = 0.0
-    var trackerMaxTemp = 0.0; var trackerCurrentMa = 0; var trackerSatsView = 0; var trackerSatsUsed = 0
-    var isTrackerCharging = false; var isTrackerJammerSuspicion = false; var isTrackerVisualJump = false
-    var trackerJumpTier = 0; var trackerStatus = SentinelStatus.VALID
-    var isTrackerTamperDetected = false; var isTrackerPowerTamper = false
-    var isTrackerClockRegression = false; var isTrackerLocationPending = false
+    var trackerLat = 0.0
+    var trackerLng = 0.0
+    var trackerSpeed = 0.0
+    var trackerBearing = 0.0
+    var trackerAccuracy = 0.0
+    var trackerMaxAccuracy = 0.0
+    var trackerLastGpsTs = 0L
+    var trackerLastValidFixRt = 0L
+    var trackerBattery = 0
+    var trackerTemp = 0.0
+    var trackerMaxTemp = 0.0
+    var trackerCurrentMa = 0
+    var trackerSatsView = 0
+    var trackerSatsUsed = 0
+    var isTrackerCharging = false
+    var isTrackerJammerSuspicion = false
+    var isTrackerVisualJump = false
+    var trackerJumpTier = 0
+    var trackerStatus = SentinelStatus.VALID
+    var isTrackerTamperDetected = false
+    var isTrackerPowerTamper = false
+    var isTrackerClockRegression = false
+    var isTrackerLocationPending = false
     var trackerLocationPendingReason = LocationPendingReason.NONE
     var trackerLocationDetail: GnssDetail? = null
-    var isTrackerBatterySteepDischarge = false; var isTrackerCoolingModeActive = false
-    var isTrackerPowerSaveMode = false; var trackerStandbyBucket = -1
-    var trackerNetInterface = "UNKNOWN"; var isTrackerStorageLow = false; var isTrackerStorageCritical = false
+    var isTrackerBatterySteepDischarge = false
+    var isTrackerCoolingModeActive = false
+    var isTrackerPowerSaveMode = false
+    var trackerStandbyBucket = -1
+    var trackerNetInterface = "UNKNOWN"
+    var isTrackerStorageLow = false
+    var isTrackerStorageCritical = false
     var trackerState = TrackerState.UNKNOWN
-    var trackerDistToHome: Double? = null; var trackerDistToViewer: Double? = null
-    var trackerVibration = 0.0; var trackerHeading = 0.0; var trackerBaroAlt = 0.0; var trackerLux = 0.0
-    var isTrackerNear = true; var trackerTiltDegrees = 0.0; var trackerAcousticDb = 0.0
-    var trackerPeakVibrationShock = 0.0; var trackerPeakVibrationShockTs = 0L
-    var trackerLuxBaseline = 0.0; var trackerAcousticFloorDb = 0.0
-    var trackerAdaptiveVibrationFloor = 0.12; var trackerProxIdx = 1.0; var trackerProximityCm = -1.0
-    var trackerProximityDebounceMs = 0L; var trackerVibrationRollingSum = 0.0
-    var trackerUptimeMs = 0L; var trackerTotalDropMs = 0L; var trackerMaxDropMs = 0L; var trackerMaxDropTs = 0L
-    var trackerTotalConnectedMs = 0L; var trackerSessionConnectedMs = 0L; var trackerLastConnTs = 0L; var trackerLastDiscTs = 0L
+    var trackerDistToHome: Double? = null
+    var trackerDistToViewer: Double? = null
+    var trackerVibration = 0.0
+    var trackerHeading = 0.0
+    var trackerBaroAlt = 0.0
+    var trackerLux = 0.0
+    var isTrackerNear = true
+    var trackerTiltDegrees = 0.0
+    var trackerAcousticDb = 0.0
+    var trackerPeakVibrationShock = 0.0
+    var trackerPeakVibrationShockTs = 0L
+    var trackerLuxBaseline = 0.0
+    var trackerAcousticFloorDb = 0.0
+    var trackerAdaptiveVibrationFloor = 0.12
+    var trackerProxIdx = 1.0
+    var trackerProximityCm = -1.0
+    var trackerProximityDebounceMs = 0L
+    var trackerVibrationRollingSum = 0.0
+    var trackerUptimeMs = 0L
+    var trackerTotalDropMs = 0L
+    var trackerMaxDropMs = 0L
+    var trackerMaxDropTs = 0L
+    var trackerTotalConnectedMs = 0L
+    var trackerSessionConnectedMs = 0L
+    var trackerLastConnTs = 0L
+    var trackerLastDiscTs = 0L
     var trackerGpsStallStartTs = 0L 
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -449,20 +483,6 @@ class ConnectivitySuite @Inject constructor(
         val now = timeProvider.currentTimeMillis(); val nowRt = timeProvider.elapsedRealtime()
         val peerId = if (isTrackerMode) (if (fromViewerId.isNotEmpty()) fromViewerId else fromId) else fromId
 
-        if (isTrackerMode && fromViewer && data.has("home_points")) {
-            scope.launch {
-                try {
-                    val array = data.getJSONArray("home_points"); val newList = mutableListOf<org.osmdroid.util.GeoPoint>()
-                    for (i in 0 until array.length()) {
-                        val obj = array.getJSONObject(i); newList.add(org.osmdroid.util.GeoPoint(obj.getDouble("lat"), obj.getDouble("lng")))
-                    }
-                    mainRepository.saveHomePoints(newList, data.optDouble("max_dist", -1.0).takeIf { it > 0 }, data.optLong("settings_ts", 0L).takeIf { it > 0 })
-                    peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRt; mainRepository.updateRemoteActivity(now)
-                } catch (e: Exception) { Timber.e(e, "Remote settings parse error") }
-            }
-            return
-        }
-
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
             if ((isTrackerMode && fromViewer) || (!isTrackerMode && !fromViewer)) {
                 peerListener?.onPeerPulse(peerId); lastPeerActivityTs = nowRt; isTrackerConnected = !isTrackerMode; mainRepository.updateRemoteActivity(now)
@@ -642,7 +662,6 @@ class ConnectivitySuite @Inject constructor(
     fun clearRtt() = signalingProvider.clearRtt()
     fun emit(event: String, data: JSONObject) { if (!isStopped.get()) signalingProvider.emit(event, data) }
     fun emitBinary(event: String, routingId: String, data: ByteArray) { if (!isStopped.get()) signalingProvider.emitBinary(event, routingId, data) }
-    fun pushSettings() { if (!isStopped.get()) signalingProvider.pushSettings() }
     fun updateRelayStatus(connected: Boolean) { telemetryRepository.updateRelayStatus(connected) }
     fun updateIdentity(dId: String, vId: String, isTracker: Boolean) {
         if (isStopped.get()) return

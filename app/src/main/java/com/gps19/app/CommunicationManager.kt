@@ -16,14 +16,11 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * July.22.12:
+ * - Issue #521: Deep Purge of Remote Settings Leftovers. Removed handleSettingsRelay and listener.
  * July.22.01:
  * - Forensic Parity: Expanded binary payload parsing to include all 15+ forensic SIT parameters.
  * - Hilt Hardening: Added @ApplicationContext to constructor.
- * July.20.07:
- * - Issue #102: Temporal Forensic Integrity. Propagated monotonic 'rt' in binary payloads.
- * - Issue #115: Startup Hardening. Integrated into Hilt-managed @ApplicationScope.
- * July.17.03:
- * - Fixed #R997: markTraffic() consistency in keep-alive logic.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -180,7 +177,6 @@ class CommunicationManager @Inject constructor(
             if (deviceId.isNotEmpty()) {
                 s.emit("join", createJoinPayload())
             }
-            pushSettings()
         }
 
         s.on(Socket.EVENT_CONNECT) { onConnectAction() }
@@ -207,7 +203,6 @@ class CommunicationManager @Inject constructor(
         s.on("location_relay") { args -> markTraffic(); handleLocationRelay(args) }
         s.on("location_relay_bin") { args -> markTraffic(); handleLocationRelayBinary(args) }
         s.on("log_relay") { args -> markTraffic(); handleLogRelay(args) }
-        s.on("settings_relay") { args -> markTraffic(); handleSettingsRelay(args) }
         s.on("viewer_status_relay") { args -> markTraffic(); handleViewerStatusRelay(args) }
         s.on("ping_relay") { args -> markTraffic(); handlePingRelay(args) }
         s.on("pong_relay") { args -> markTraffic(); handlePongRelay(args) }
@@ -268,23 +263,13 @@ class CommunicationManager @Inject constructor(
                 put("is_battery_steep_discharge", status.isBatterySteepDischarge)
                 put("is_cooling_mode_active", status.isCoolingModeActive)
                 
-                // Forensic Fields (July.22.01)
-                put("snr_idx", status.snrIdx)
-                put("noise_idx", status.noiseIdx)
-                put("lux_idx", status.luxIdx)
-                put("vibe_idx", status.vibeIdx)
-                put("lift_idx", status.liftIdx)
-                put("prox_idx", status.proxIdx)
-                put("tilt_idx", status.tiltIdx)
-                put("baro_idx", status.baroIdx)
-                put("is_sit_detected", status.isSitDetected)
-                put("is_sit_active", status.isSitActive)
-                put("last_sit_ts", status.lastSitTs)
-                put("sit_vz", status.sitVz)
-                put("sit_dz", status.sitDz)
-                put("sit_baro", status.sitBaro)
-                put("sit_tilt", status.sitTilt)
-                put("sit_shock", status.sitShock)
+                // Forensic Fields
+                put("snr_idx", status.snrIdx); put("noise_idx", status.noiseIdx); put("lux_idx", status.luxIdx)
+                put("vibe_idx", status.vibeIdx); put("lift_idx", status.liftIdx); put("prox_idx", status.proxIdx)
+                put("tilt_idx", status.tiltIdx); put("baro_idx", status.baroIdx)
+                put("is_sit_detected", status.isSitDetected); put("is_sit_active", status.isSitActive)
+                put("last_sit_ts", status.lastSitTs); put("sit_vz", status.sitVz); put("sit_dz", status.sitDz)
+                put("sit_baro", status.sitBaro); put("sit_tilt", status.sitTilt); put("sit_shock", status.sitShock)
                 put("vertical_velocity", status.verticalVelocity)
             }
             remoteUpdateListener?.onUpdate(json)
@@ -312,24 +297,6 @@ class CommunicationManager @Inject constructor(
             remoteUpdateListener?.onUpdate(wrapped)
         } catch (e: Exception) {
             Timber.e(e, "log_relay parse error")
-        }
-    }
-
-    private fun handleSettingsRelay(args: Array<Any>) {
-        try {
-            val data = args[0] as JSONObject
-            if (!SignalingValidator.shouldProcessSettingsUpdate(
-                    incomingId = data.optString("id"),
-                    ownDeviceId = deviceId,
-                    incomingViewerId = data.optString("viewer_id"),
-                    ownViewerId = viewerId,
-                    fromViewer = data.optBoolean("from_viewer"),
-                    isTrackerMode = isTrackerMode
-            )) return
-            
-            remoteUpdateListener?.onUpdate(data)
-        } catch (e: Exception) {
-            Timber.e(e, "settings_relay parse error")
         }
     }
 
@@ -442,7 +409,6 @@ class CommunicationManager @Inject constructor(
     override fun emitBinary(event: String, routingId: String, data: ByteArray) {
         if (isStopped) return
         markTraffic()
-        Log.d("GPS19_COMM", "EMIT BINARY: $event for $routingId (${data.size} bytes)")
         socket?.emit(event, routingId, data) 
     }
 
@@ -476,10 +442,6 @@ class CommunicationManager @Inject constructor(
     }
 
     override fun isConnected() = socket?.connected() ?: false
-
-    override fun pushSettings() {
-        if (isTrackerMode || deviceId.isEmpty() || isStopped) return
-    }
 
     override fun disconnect() { 
         isStopped = true

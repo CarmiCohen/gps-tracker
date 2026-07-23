@@ -26,7 +26,7 @@ interface SignalingProvider {
      * @param routingId The target room/ID for the relay to broadcast to.
      */
     fun emitBinary(event: String, routingId: String, data: ByteArray)
-    fun pushSettings()
+
     /**
      * R568a: Returns the monotonic timestamp (elapsedRealtime) of the last message received from the relay.
      * Used for zombie connection detection.
