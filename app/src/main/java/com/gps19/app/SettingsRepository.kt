@@ -46,12 +46,10 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * July.23.03:
+ * - Issue #527: Siren Persistence. Added LAST_ALARMS_JSON_KEY.
  * July.22.11:
  * - Issue #518: Purged legacy typeMigration and associated logic.
- * July.22.03:
- * - Issue #511: DataStore Singleton Hardening. Switched to Context.dataStore delegate.
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor and @ApplicationContext.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -118,6 +116,8 @@ class SettingsRepository @Inject constructor(
         const val LAST_SIT_TS_KEY = "last_sit_ts"
         const val CHAIR_BASELINE_TILT_KEY = "chair_baseline_tilt"
         const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
+        
+        const val LAST_ALARMS_JSON_KEY = "last_alarms_json"
 
         internal val identitySanitizationMigration = object : DataMigration<AppSettings> {
             override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
@@ -157,6 +157,7 @@ class SettingsRepository @Inject constructor(
     val isXiaomiManualOverrideFlow: Flow<Boolean> = dataStore.data.map { it.isXiaomiManualOverride }
     val identitySanitizedFlow: Flow<Boolean> = dataStore.data.map { it.identitySanitized }
     val isSystemActiveFlow: Flow<Boolean> = dataStore.data.map { it.isSystemActive }
+    val lastAlarmsJsonFlow: Flow<String> = dataStore.data.map { it.lastAlarmsJson }
 
     suspend fun getSettingsSnapshot(): AppSettings = dataStore.data.first()
 
@@ -174,6 +175,7 @@ class SettingsRepository @Inject constructor(
                 DRAFT_RELAY_URL -> builder.setDraftRelayUrl(value)
                 LAST_DAILY_ARCHIVE_DATE_KEY -> builder.setLastDailyArchiveDate(value)
                 LAST_DAILY_CLEANUP_DATE_KEY -> builder.setLastDailyCleanupDate(value)
+                LAST_ALARMS_JSON_KEY -> builder.setLastAlarmsJson(value)
             }
             builder.build()
         }
@@ -258,6 +260,7 @@ class SettingsRepository @Inject constructor(
             DRAFT_RELAY_URL -> settings.draftRelayUrl
             LAST_DAILY_ARCHIVE_DATE_KEY -> settings.lastDailyArchiveDate
             LAST_DAILY_CLEANUP_DATE_KEY -> settings.lastDailyCleanupDate
+            LAST_ALARMS_JSON_KEY -> settings.lastAlarmsJson
             else -> ""
         }
         return value.ifEmpty { default }

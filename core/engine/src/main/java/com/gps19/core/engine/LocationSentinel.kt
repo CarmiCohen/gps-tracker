@@ -5,10 +5,11 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * July.23.03:
+ * - Issue #529: Urban Accuracy Snap. Tracking lastValidAccuracy to suppress false 
+ *   positive jumps during accuracy recovery transitions.
  * July.23.00:
- * - SIT Hardening (Issue #522): Refined forensic Sit-Detection heuristic. Integrated 
- *   plungeMatched, Vz, Dz, and Baro into a unified state machine.
- * - Forensic Alignment: Standardized SIT parameter propagation.
+ * - SIT Hardening (Issue #522): Refined forensic Sit-Detection heuristic.
  */
 class LocationSentinel {
 
@@ -21,6 +22,7 @@ class LocationSentinel {
     private var lastValidRt: Long = 0L // Monotonic
     private var lastValidSpeedMps: Double = 0.0
     private var lastValidBearing: Double = 0.0
+    private var lastValidAccuracy: Double = 0.0
 
     private var estimatedSpeedMps: Double = 0.0
     private var estimatedBearing: Double = 0.0
@@ -91,8 +93,8 @@ class LocationSentinel {
         this.baselineSitTilt = savedBaseline
     }
 
-    fun setSpatialAnchor(lat: Double, lng: Double, alt: Double, timestamp: Long, rt: Long) {
-        lastValidLat = lat; lastValidLng = lng; lastValidAlt = alt; lastValidTs = timestamp; lastValidRt = rt
+    fun setSpatialAnchor(lat: Double, lng: Double, alt: Double, timestamp: Long, rt: Long, accuracy: Double = 0.0) {
+        lastValidLat = lat; lastValidLng = lng; lastValidAlt = alt; lastValidTs = timestamp; lastValidRt = rt; lastValidAccuracy = accuracy
         updateFilters(lat, lng, timestamp, 1.0)
     }
 
@@ -150,13 +152,11 @@ class LocationSentinel {
         val tiltDelta = if (baselineSitTilt >= 0.0) abs(currentTilt - baselineSitTilt) else 0.0
         val baroDelta = if (baroBaseline > -999.0) abs(safeD(baroAlt) - baroBaseline) else 0.0
         
-        // SIT Detection Heuristic Hardening (Issue #522)
         if (nowRt > sitDetectionCooldownRt && !isMuzzled && !isWarming) {
             val isSpatialTriggered = (tiltDelta > TILT_THRESHOLD_DEGREES) || 
                                      (baroDelta > BARO_LIFT_THRESHOLD_METERS) || 
                                      plungeMatched
             
-            // Integrated Logic: Must have a physical plunge signal OR significant spatial change combined with shock
             if (isSpatialTriggered) {
                 val hasSufficientForce = (peakShock > VIBRATION_SHOCK_THRESHOLD_G) || plungeMatched || (abs(peakVerticalVelocity) > CHAIR_PLUNGE_VELOCITY_THRESHOLD)
                 
@@ -297,7 +297,7 @@ class LocationSentinel {
         }
         
         if (lastValidTs == 0L) {
-            updateLastValid(lat, lng, alt, timestamp, nowRt, 0.0, bearing)
+            updateLastValid(lat, lng, alt, timestamp, nowRt, 0.0, bearing, accuracy)
             updateFilters(lat, lng, timestamp, 1.0)
             return SentinelResult(SentinelStatus.VALID, optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy))
         }
@@ -325,6 +325,7 @@ class LocationSentinel {
             newLat = lat, newLng = lng,
             timeDeltaMs = if (lastValidRt > 0) (nowRt - lastValidRt) else timeDeltaMs, 
             accuracy = accuracy,
+            lastAccuracy = lastValidAccuracy,
             snr = snr,
             lastSpeedMps = lastValidSpeedMps,
             isParking = isParking,
@@ -354,11 +355,11 @@ class LocationSentinel {
                 gtoEngine.getWindow().forEach { p ->
                     updateFilters(p.lat, p.lng, p.ts, SUSPICIOUS_Q_SCALE)
                     promoted.add(EngineGeoPoint(p.lat, p.lng, p.alt, p.ts, p.rt, p.accuracy, p.maxAccuracy))
-                    updateLastValid(p.lat, p.lng, p.alt, p.ts, p.rt, p.speedMps, p.bearing)
+                    updateLastValid(p.lat, p.lng, p.alt, p.ts, p.rt, p.speedMps, p.bearing, p.accuracy)
                 }
                 gtoEngine.clear()
                 updateFilters(lat, lng, timestamp, SUSPICIOUS_Q_SCALE)
-                updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing)
+                updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
                 return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted (GTO)", EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy), finalJumpConfidence, promotedPoints = promoted)
             }
 
@@ -375,14 +376,14 @@ class LocationSentinel {
             
             if (sensorSentinel.status == SentinelStatus.VALID && sensorSentinel.suppressionNote != null) {
                 updateFilters(lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
-                updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing)
+                updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
                 gtoEngine.clear()
                 return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy), jumpConfidence = finalJumpConfidence, suppressionNote = sensorSentinel.suppressionNote)
             }
         }
 
         updateFilters(lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
-        updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing)
+        updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
         gtoEngine.clear()
         return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy), jumpConfidence = finalJumpConfidence)
     }
@@ -438,9 +439,9 @@ class LocationSentinel {
                currentTiltDegrees < THROTTLE_TILT_LIMIT && (currentAcousticDb - acousticFloorDb < THROTTLE_ACOUSTIC_LIMIT)
     }
 
-    private fun updateLastValid(lat: Double, lng: Double, alt: Double, ts: Long, rt: Long, speedMps: Double, bearing: Double) {
+    private fun updateLastValid(lat: Double, lng: Double, alt: Double, ts: Long, rt: Long, speedMps: Double, bearing: Double, accuracy: Double) {
         lastValidLat = lat; lastValidLng = lng; lastValidAlt = alt; lastValidTs = ts; lastValidRt = rt
-        lastValidSpeedMps = speedMps; lastValidBearing = bearing
+        lastValidSpeedMps = speedMps; lastValidBearing = bearing; lastValidAccuracy = accuracy
     }
 
     fun reset() {
@@ -456,6 +457,7 @@ class LocationSentinel {
         estimatedSpeedMps = 0.0
         estimatedBearing = 0.0
         stationaryProb = 1.0
+        lastValidAccuracy = 0.0
         gtoEngine.clear()
     }
 }

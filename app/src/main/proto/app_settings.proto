@@ -5,6 +5,8 @@ option java_multiple_files = true;
 
 /**
  * AppSettings: Persistence schema for DataStore.
+ * July.23.03:
+ * - Issue #527: Siren Persistence. Added last_alarms_json to restore alarm state after service kill.
  * July.22.11:
  * - Issue #518: Purged legacy float fields (8, 9, 33).
  * July.22.01:
@@ -92,6 +94,8 @@ message AppSettings {
     optional int64 last_sit_ts = 65;
     optional double chair_baseline_tilt = 66;
     optional int64 last_history_sit_ts = 67;
+
+    optional string last_alarms_json = 68;
 }
 
 enum TrackerStateProto {

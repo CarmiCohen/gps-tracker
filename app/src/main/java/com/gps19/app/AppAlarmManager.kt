@@ -5,6 +5,7 @@ import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.json.JSONArray
 import org.json.JSONObject
+import timber.log.Timber
 import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -12,11 +13,11 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * July.23.03:
+ * - Issue #527: Siren Persistence. Added restoreState and persistence logic. 
+ *   Updated shouldPlaySiren to respect AudioSynthesizer cooldown.
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * July.20.07:
- * - Issue #102: Temporal Forensic Integrity. Propagated monotonic 'rt' timestamps 
- *   to AlarmEvaluationState for skew-immune alarm evaluation.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -87,16 +88,48 @@ class AppAlarmManager @Inject constructor(
         if (currentSettings.globalMute) return false
         if (!hasUnresolvedAlarms()) return false
         
-        val now = timeProvider.elapsedRealtime()
-        if (now - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) {
-            return false
-        }
+        val nowRt = timeProvider.elapsedRealtime()
+        
+        // Respect manual stop cooldown
+        if (nowRt - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) return false
+        
+        // Respect AudioSynthesizer internal cooldown (auto-stop)
+        if (nowRt < AudioSynthesizer.getSilencedUntilRt()) return false
         
         return true
     }
     
     fun notifySirenManualStop() {
         lastSirenStopTs = timeProvider.elapsedRealtime()
+    }
+
+    /**
+     * Issue #527: Restores the alarm state from persisted storage.
+     */
+    fun restoreState(json: String) {
+        if (json.isEmpty() || json == "[]") return
+        try {
+            val array = JSONArray(json)
+            synchronized(activeAlarms) {
+                activeAlarms.clear()
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val type = obj.getString("type")
+                    val eval = AlarmEvaluation(
+                        type = type,
+                        title = obj.optString("title", "Violation"),
+                        subtitle = obj.optString("subtitle", ""),
+                        isTriggered = obj.optBoolean("isTriggered", false),
+                        isResolved = obj.optBoolean("isResolved", true)
+                    )
+                    activeAlarms[type] = eval
+                }
+            }
+            lastAlarmsJson = json
+            Timber.d("Siren Persistence: Restored ${activeAlarms.size} alarms.")
+        } catch (e: Exception) {
+            Timber.e(e, "Siren Persistence: Failed to restore alarm state")
+        }
     }
 
     fun evaluateAlarms(
@@ -319,7 +352,11 @@ class AppAlarmManager @Inject constructor(
                 jsonArray.put(obj)
             }
         }
-        lastAlarmsJson = jsonArray.toString()
+        val newJson = jsonArray.toString()
+        if (newJson != lastAlarmsJson) {
+            lastAlarmsJson = newJson
+            repository.saveAlarmsJsonSync(newJson)
+        }
     }
 
     private fun isAlarmEnabled(type: String): Boolean {
@@ -365,6 +402,7 @@ class AppAlarmManager @Inject constructor(
             activeAlarms.clear()
         }
         lastAlarmsJson = "[]"
+        repository.saveAlarmsJsonSync("[]")
         wasDistanceViolated = false
         distanceViolationCounter = 0
         firstViolationTs = 0L

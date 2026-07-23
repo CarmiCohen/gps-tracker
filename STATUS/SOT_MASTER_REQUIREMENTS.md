@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.23.03 (Power & Sampling)
+# System Source of Truth (SoT) - July.23.03 (Hardening & Persistence)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -23,6 +23,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 
 ### 3. Persistence & Service Reliability
 *   **Activation Authority**: The `isSystemActive` flag in `DataStore` is the definitive authority for background lifecycle revival.
+*   **Siren Persistence (R527)**: Active alarm states MUST be persisted to DataStore. If the background service is killed and restarted by the OS, the siren state MUST be restored and audio MUST automatically resume if the violation is unresolved. (Issue #527)
 *   **DataStore Singleton Authority (R511)**: Initialize DataStore via `Context.dataStore` property delegate to ensure singleton instance. (Issue #511)
 *   **Notification Throttling (R993)**: Foreground notification updates MUST BE throttled (default 30s). (Issue #R993)
 *   **Database Migration Integrity (R956b)**: Version bump and explicit `Migration` for any `@Entity` change. (Issue #097, #118)
@@ -35,6 +36,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Step Detector Permission (R107)**: Explicitly track `android.permission.ACTIVITY_RECOGNITION`. (Issue #107)
 
 ### 5. Architectural Baselines
+*   **Accuracy Recovery Grace (R529)**: The Jump Engine MUST implement an "Accuracy Recovery" grace logic. Spatial corrections resulting from a transition from low to high accuracy MUST NOT be flagged as erratic jumps if the displacement is within the previous fix's uncertainty range. (Issue #529)
 *   **Unified System Heartbeat (R403)**: Global 2000ms heartbeat standard (`TICK_INTERVAL_MS`).
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077)
 *   **Binary Telemetry Authority (R988)**: Prioritize binary Protobuf-based telemetry for tracker updates.

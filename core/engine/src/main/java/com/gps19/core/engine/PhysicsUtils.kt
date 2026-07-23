@@ -4,6 +4,9 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: High-performance geospatial and kinematic calculations.
+ * July.23.03:
+ * - Issue #529: Urban Accuracy Snap. Added lastAccuracy to isVisualJump to 
+ *   suppress false positives during accuracy recovery.
  * July.1.16:
  * - Issue #508: Optimization Removal. Removed Adaptive Jump and SNR-based scaling.
  */
@@ -76,6 +79,7 @@ object PhysicsUtils {
         lastLat: Double, lastLng: Double, 
         newLat: Double, newLng: Double, 
         timeDeltaMs: Long, accuracy: Double,
+        lastAccuracy: Double = 0.0,
         snr: Double = 0.0,
         lastSpeedMps: Double = 0.0,
         isParking: Boolean = false,
@@ -89,8 +93,6 @@ object PhysicsUtils {
         val speedMps = dist / timeDeltaSec
         
         // Tier 1: Outlier Filter
-        // v9.4.01: Perform outlier check before time delta guard to catch massive spatial jumps 
-        // even if timestamps are identical or jittery.
         if (dist > OUTLIER_DISTANCE_THRESHOLD || speedMps > OUTLIER_SPEED_CAP_MPS) {
             return JumpConfidence(score = 100, isJump = true, isOutlier = true, tier = 1, reason = "Hardware/Cold-Start Outlier")
         }
@@ -121,6 +123,17 @@ object PhysicsUtils {
         if (speedMps > JUMP_GATE_SPEED_ACCURACY_LOW_MPS && accuracy > JUMP_GATE_ACCURACY_LOW_THRESHOLD) score += JUMP_WEIGHT_ACCURACY_LOW
         if (speedMps > JUMP_GATE_SPEED_ACCURACY_HIGH_MPS && accuracy > JUMP_GATE_ACCURACY_HIGH_THRESHOLD) score += JUMP_WEIGHT_ACCURACY_HIGH
         
+        // Issue #529: Accuracy Recovery Mitigation
+        // If accuracy is significantly improving, and the distance moved is within the previous error margin, 
+        // this is likely an "Accuracy Snap" (correction) rather than an erratic move.
+        val isAccuracyImproving = lastAccuracy > 0.0 && accuracy < (lastAccuracy * 0.8)
+        val isWithinPreviousError = lastAccuracy > 0.0 && dist < lastAccuracy
+        
+        if (isAccuracyImproving && isWithinPreviousError && score > 0) {
+            // Apply 60% reduction to score to prevent false jump triggers during snapping
+            score = (score * 0.4).toInt()
+        }
+
         val isTier2 = dist >= JUMP_POINT_DISTANCE_THRESHOLD && (speedMps > MAX_PHYSICAL_SPEED_MPS || score >= 40)
         
         val jitterThreshold = JUMP_GATE_VISUAL_JITTER_METERS
@@ -129,6 +142,7 @@ object PhysicsUtils {
         val isJump = isTier2 || isTier3 || score >= 50
         
         val reason = when {
+            isAccuracyImproving && isWithinPreviousError && isJump -> "Suppressed Accuracy Snap"
             !hasPhysicalMotion && speedMps > mismatchGate -> "Sensor Mismatch Jump (Urban Canyon)"
             isTier2 -> "Security Jump"
             isTier3 -> "Visual Jitter"

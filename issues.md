@@ -5,23 +5,29 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 0 |
+| **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 350 |
+| **Resolved (Total)** | 🟢 Progress | 352 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Tooling Limitation**: Unable to physically delete `DashboardUseCase.kt` due to lack of file deletion tool in the current environment. The file is orphaned but remains in the filesystem.
+*   **Issue #528: Tooling Limitation - Orphaned DashboardUseCase.kt**.
+    *   **Description**: Unable to physically delete `DashboardUseCase.kt` due to lack of file deletion tool in the current environment. The file is orphaned but remains in the filesystem.
 
 ---
 
 ## 🔴 Open Issues
-*   *No open critical issues.*
+*   **Issue #530: Validation - Urban Multipath Stress Testing**.
+    *   **Description**: Need to verify the "Accuracy Recovery" grace logic (#529) through field tests in high-density urban areas (Level 4 canyons) to ensure no regression in real theft detection.
 
 ---
 
 ## 🟢 Recently Resolved Issues (July.23.03)
+*   **Issue #529: Geofence Reliability - Urban Accuracy Snap False Positives**.
+    *   **Resolution**: Implemented "Accuracy Recovery" grace logic in `PhysicsUtils.isVisualJump`. The engine now detects significant accuracy improvements and suppresses jump scores if the spatial movement is within the previous fix's uncertainty range.
+*   **Issue #527: Siren Persistence - State Restoration after Service Kill**.
+    *   **Resolution**: Implemented alarm state persistence using DataStore. Added `restoreState()` to `AppAlarmManager` and integrated it into `TrackerService.onCreate()`. Added background siren maintenance in `TrackerService.processTick()` to ensure audio resumes if the service is restarted during an active violation.
 *   **Issue #526: Power Optimization - Adaptive Sensor Sampling**.
     *   **Resolution**: Implemented two-tier power saving. 
         1. **Logic Tier**: Logic tick interval extends from 2s to 10s and Microphone uses a 20% duty cycle.
@@ -32,9 +38,3 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Extracted UI formatting logic from `DashboardUseCase` into a dedicated `DashboardStateProvider`. `MainViewModel` now depends on the provider, reducing its complexity.
 *   **Issue #523: Forensic Snapshot Consolidation**.
     *   **Resolution**: Implemented `AppSensorManager.consumeForensicSnapshot()` to provide an atomic immutable state of all forensic parameters. Refactored `TrackerService.kt` to use this snapshot.
-
----
-
-## 🟢 Recently Resolved Issues (July.23.01)
-*   **Issue #522: SIT Logic Hardening & Forensic Pipeline Unification**.
-    *   **Resolution**: Optimized the forensic Sit-Detection (SIT) heuristic in `LocationSentinel.kt`. Unified the local telemetry pipeline in `TrackerService.kt` to feed all 7+ forensic parameters directly into the processor.

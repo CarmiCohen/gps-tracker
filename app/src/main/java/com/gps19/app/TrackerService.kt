@@ -19,6 +19,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.23.03:
+ * - Issue #527: Siren Persistence. Implemented alarm state restoration and 
+ *   background siren maintenance in processTick.
  * July.23.02:
  * - Issue #526: Power Optimization. Centralized power-save evaluation in ServiceBehaviorUseCase.
  * - Issue #525: State Audit. Centralized forensic index computation.
@@ -132,6 +135,10 @@ class TrackerService : BaseMonitorService() {
             val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
             val maxDist = repository.getDouble(MainRepository.MAX_DISTANCE_STORAGE_KEY, 60.0)
             locationProcessor.loadState(savedMaxAcc, savedLastSitTs, savedBaseline, trackerState, homePoints, maxDist)
+
+            // Issue #527: Restore persisted alarm state
+            val savedAlarms = repository.getLastAlarmsJson()
+            alarmManager.restoreState(savedAlarms)
 
             appSensorManager.setHardwareFailureCallback { reason ->
                 val proc = lastProcessedLocation
@@ -312,6 +319,21 @@ class TrackerService : BaseMonitorService() {
         appSensorManager.setHighLoad(health.isCoolingModeActive)
 
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
+
+        // Issue #527: Background Siren Maintenance
+        if (alarmManager.shouldPlaySiren() && !AudioSynthesizer.isPlaying()) {
+            val sirenType = repository.getString(MainRepository.SELECTED_SIREN_KEY, "Siren")
+            AudioSynthesizer.playSiren(
+                type = sirenType,
+                force = false,
+                volume = 1.0f,
+                overrideSilence = true,
+                context = this@TrackerService,
+                loop = true,
+                vibrate = true,
+                timeProvider = timeProvider
+            )
+        }
 
         if (lastServiceTickRealtime > 0) {
             val tickGap = nowRt - lastServiceTickRealtime

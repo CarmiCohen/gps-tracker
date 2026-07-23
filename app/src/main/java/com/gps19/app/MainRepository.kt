@@ -15,14 +15,10 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * July.23.03:
+ * - Issue #527: Siren Persistence. Exposed lastAlarmsJsonFlow and saveAlarmsJson.
  * July.22.01:
  * - Forensic Parity: Hardened History mapping for all 15+ forensic parameters in ConnectionPoint.
- * - Hilt Hardening: Added @Inject constructor and @ApplicationContext.
- * July.21.00:
- * - Forensic Hardening: Added missing sit-detection and history keys.
- * July.20.07:
- * - Issue #103: Added CLOCK_DRIFT_REF_KEY for forensic integrity.
- * - Issue #104: Exposed proactivePruning for startup hardening.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -105,6 +101,8 @@ class MainRepository @Inject constructor(
         const val LAST_SIT_TS_KEY = SettingsRepository.LAST_SIT_TS_KEY
         const val CHAIR_BASELINE_TILT_KEY = SettingsRepository.CHAIR_BASELINE_TILT_KEY
         const val LAST_HISTORY_SIT_TS_KEY = SettingsRepository.LAST_HISTORY_SIT_TS_KEY
+        
+        const val LAST_ALARMS_JSON_KEY = SettingsRepository.LAST_ALARMS_JSON_KEY
 
         private const val HISTORY_BATCH_WRITE_INTERVAL_MS = 5000L
         private const val HISTORY_BUFFER_MAX_SIZE = 100
@@ -161,6 +159,7 @@ class MainRepository @Inject constructor(
     val isXiaomiManualOverrideFlow = settings.isXiaomiManualOverrideFlow
     val identitySanitizedFlow = settings.identitySanitizedFlow
     val isSystemActiveFlow = settings.isSystemActiveFlow
+    val lastAlarmsJsonFlow = settings.lastAlarmsJsonFlow
 
     init {
         scope.launch {
@@ -225,10 +224,6 @@ class MainRepository @Inject constructor(
     suspend fun commitDraftSettings() = settings.commitDraftSettings()
     suspend fun hasPendingDrafts(): Boolean = settings.hasPendingDrafts()
 
-    /**
-     * Atomically saves multiple primary settings.
-     * v9.3.3: Throws IllegalArgumentException on identity collision (Issue #039).
-     */
     suspend fun saveSettingsBulk(
         deviceId: String? = null, 
         viewerId: String? = null, 
@@ -261,10 +256,6 @@ class MainRepository @Inject constructor(
     fun clearLogs() { logRepository.clearLogs() }
     suspend fun loadAllLogsStatic(): List<LogEntry> = logRepository.loadAllLogsStatic()
 
-    /**
-     * Issue #104: Startup ANR Hardening.
-     * Executes a deep prune of the log table.
-     */
     suspend fun proactivePruning() = logRepository.proactivePruning()
 
     fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, status: SentinelStatus = SentinelStatus.VALID, timestamp: Long? = null, force: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
@@ -467,6 +458,9 @@ class MainRepository @Inject constructor(
     suspend fun getPendingStatusUpdates(limit: Int): List<PendingStatusEntity> = offlineRepository.getPendingStatusUpdates(limit)
     suspend fun deletePendingStatusUpdate(id: Long) = offlineRepository.deletePendingStatusUpdate(id)
     
+    suspend fun getLastAlarmsJson(): String = settings.getString(LAST_ALARMS_JSON_KEY, "[]")
+    fun saveAlarmsJsonSync(json: String) { scope.launch { settings.saveString(LAST_ALARMS_JSON_KEY, json) } }
+
     private val _logFilterDetails = MutableStateFlow(false)
     val logFilterDetails = _logFilterDetails.asStateFlow()
     
