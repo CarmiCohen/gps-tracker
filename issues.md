@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.23.09)
+# Project Issues & Hardening Tracking (July.23.11)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,12 +7,13 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 368 |
+| **Resolved (Total)** | 🟢 Progress | 372 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **LocationProcessor Integration Coverage**: While `AnchorEvaluator` and `LocationSentinel` now have strong unit test coverage, the integration between them within `LocationProcessor` (specifically state persistence during process death) should be the next validation target.
+*   **Samsung A15 Sensor Latency**: Budget hardware may exhibit registration delays under high thermal load. Issue #098 mitigation ensures we don't crash or spam logs, but registration timing remains hardware-dependent.
+*   **Permission Revocation Flow**: Revoking `ACTIVITY_RECOGNITION` at runtime results in sensor silence until the next recovery cycle.
 
 ---
 
@@ -21,11 +22,11 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (July.23.09)
-*   **Issue #533b follow-up: AnchorEvaluator Test Coverage & Validation**.
-    *   **Resolution**: Implemented comprehensive unit tests for `AnchorEvaluator`. Hardened coordinate averaging logic (R990c) to prevent anchor drift during breakout attempts. Verified Safety Valve functionality (R990e).
-*   **Test Suite Remediation & Regression Fixes**.
-    *   **Resolution**: Fixed compilation errors in existing tests (`AdaptationMuzzleTest`, `ForensicIdentityTest`, `SignalingTest`). Corrected logic inversion in `TelemetryAggregator` (Issue #523) and updated stale expectations in `LocationSentinelHindsightTest`.
+## 🟢 Recently Resolved Issues (July.23.11)
+*   **Tracker Stealth Violation (Audio Alarm)**.
+    *   **Resolution**: Hardened `AppAlarmManager.kt` to suppress `shouldPlaySiren` in tracker mode. Trackers now remain silent even during violations, adhering to stealth requirements.
+*   **FGS Startup Crash Loop (v23.09)**.
+    *   **Resolution**: Moved `startServiceForeground()` to Main-thread `onCreate` in `BaseMonitorService.kt`. This prevents `ForegroundServiceDidNotStartInTimeException` during automatic restoration from the landing page.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*

@@ -14,6 +14,9 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * July.23.10:
+ * - Issue #533: Fixed SRV status inconsistency. Proactively updating TelemetryRepository 
+ *   on socket connection state changes.
  * July.23.00:
  * - Issue #522: Architectural Consolidation. Implemented SignalingProvider.RemoteUpdateListener 
  *   to unify telemetry flow.
@@ -166,13 +169,17 @@ class CommunicationManager @Inject constructor(
         val onConnectAction = {
             logToApp("Connected to relay", true)
             markTraffic()
+            telemetryRepository.updateRelayStatus(true)
             if (deviceId.isNotEmpty()) {
                 s.emit("join", createJoinPayload())
             }
         }
 
         s.on(Socket.EVENT_CONNECT) { onConnectAction() }
-        s.on("reconnecting") { logToApp("Relay Reconnecting...", true) }
+        s.on("reconnecting") { 
+            logToApp("Relay Reconnecting...", true)
+            telemetryRepository.updateRelayStatus(false)
+        }
         s.on("reconnect") {
             logToApp("Relay Reconnected", true)
             onConnectAction() 
@@ -181,6 +188,7 @@ class CommunicationManager @Inject constructor(
         s.on(Socket.EVENT_DISCONNECT) { args ->
             val reason = args?.getOrNull(0)?.toString() ?: "unknown"
             logToApp("Relay Disconnected ($reason)", true)
+            telemetryRepository.updateRelayStatus(false)
             if (reason != "io client disconnect") {
                 onConnectionLost?.invoke()
             }
@@ -189,6 +197,7 @@ class CommunicationManager @Inject constructor(
         s.on(Socket.EVENT_CONNECT_ERROR) { args ->
             val error = args?.getOrNull(0)?.toString() ?: "Transport Error"
             logToApp("Relay Connect Error: $error", true)
+            telemetryRepository.updateRelayStatus(false)
             onConnectionLost?.invoke()
         }
 
@@ -439,5 +448,6 @@ class CommunicationManager @Inject constructor(
         isStopped = true
         scope.cancel()
         socket?.disconnect() 
+        telemetryRepository.updateRelayStatus(false)
     }
 }

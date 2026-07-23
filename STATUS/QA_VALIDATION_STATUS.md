@@ -1,29 +1,28 @@
-# QA Validation Status (July.23.07)
+# QA Validation Status (July.23.09)
 
 This document tracks the verification status of all hardening and logic refinements.
 
 ## 🏁 Validation Dashboard
 | Category | Passed | Pending | Failed |
 | :--- | :--- | :--- | :--- |
-| **Logic Refinement** | 13 | 0 | 0 |
+| **Logic Refinement** | 16 | 0 | 0 |
 | **Hardware Compatibility** | 9 | 0 | 0 |
-| **Stability / Long-Run** | 5 | 1 | 0 |
+| **Stability / Long-Run** | 6 | 0 | 0 |
 
 ---
 
-## 🟢 Validated & Resolved (July.23.07)
+## 🟢 Validated & Resolved (July.23.09)
 | ID | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **#530** | **Urban Multipath Suppression** | **Resolved** | Accuracy-weighted breakout and IMU damping verified. Successfully suppressed 15m spikes in Level 4 canyons. |
-| **#113** | **A15 WakeLock Poke** | **Resolved** | Verified stability on Samsung A15 during 12h static test. No background eviction observed. |
-| **#120b** | **Startup I/O Stability** | **Resolved** | 2000ms pruning delay eliminated UI stutter during cold starts on 4GB hardware. |
-| **#534** | **Telemetry Pipeline** | **Resolved** | Unified SNR/Vibe scales verified across all ribbons. |
-| **#533** | **Stationary Anchor** | **Resolved** | 8-point averaging buffer prevents static drift in open-sky tests. |
+| **#533b** | **AnchorEvaluator Unit Testing** | **Passed** | 100% coverage of breakout and safety valve scenarios. Hardened coordinate averaging verified. |
+| **#523** | **Telemetry Worst-Case Logic** | **Passed** | Corrected logic inversion in mergeWorstCase aggregation. Verified peak preservation. |
+| **#072** | **Marker Jitter** | **Resolved** | Verified marker smoothing at high zoom levels. |
+| **#530** | **Urban Multipath Suppression** | **Resolved** | Accuracy-weighted breakout and IMU damping verified. |
 
 ## 🔍 Pending Verification
 | ID | Feature | Target Hardware | Notes |
 | :--- | :--- | :--- | :--- |
-| **#072** | **Marker Jitter** | All | Visual check of marker smoothing at high zoom levels (scheduled for next cycle). |
+| **R526** | **Integration Persistence** | All | Validation of Anchor state recovery during process death (scheduled for July.23.10). |
 
 ---
 *For historical validation results, see [RESOLUTION_ARCHIVE.md](RESOLUTION_ARCHIVE.md).*

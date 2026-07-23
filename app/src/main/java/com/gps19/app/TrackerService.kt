@@ -19,13 +19,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.23.11:
+ * - Bug Fix: Removed local siren maintenance in processTick. Trackers must 
+ *   remain silent as per R872 (Stealth requirement).
  * July.23.07:
  * - Issue #113: Samsung A15 Fallback Hardening (R405c). Implemented 10s Hardware Poke 
  *   (WakeLock + Accel) and promoted FGS type to Special Use for A15 stabilization.
- * July.23.03:
- * - Issue #531: Hardening - Acoustic Duty Cycle. Consistent FGS type management.
- * - Issue #527: Siren Persistence. Implemented alarm state restoration and 
- *   background siren maintenance in processTick.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -342,21 +341,6 @@ class TrackerService : BaseMonitorService() {
             if (appSensorManager.isStationary()) {
                 Timber.d("Issue #113: A15 Hardware Poke - Refreshing WakeLock & Sensors")
             }
-        }
-
-        // Issue #527: Background Siren Maintenance
-        if (alarmManager.shouldPlaySiren() && !AudioSynthesizer.isPlaying()) {
-            val sirenType = repository.getString(MainRepository.SELECTED_SIREN_KEY, "Siren")
-            AudioSynthesizer.playSiren(
-                type = sirenType,
-                force = false,
-                volume = 1.0f,
-                overrideSilence = true,
-                context = this@TrackerService,
-                loop = true,
-                vibrate = true,
-                timeProvider = timeProvider
-            )
         }
 
         if (lastServiceTickRealtime > 0) {

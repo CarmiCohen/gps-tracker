@@ -1,7 +1,9 @@
 package com.gps19.app
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -10,10 +12,12 @@ import android.hardware.display.DisplayManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
 import android.view.Display
+import androidx.core.content.ContextCompat
 import com.gps19.core.engine.*
 import kotlinx.coroutines.*
 import timber.log.Timber
@@ -24,6 +28,9 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.23.10:
+ * - Issue #098: Permission-aware Step Detector registration. Added explicit 
+ *   ACTIVITY_RECOGNITION check to prevent fail(2) denials.
  * July.23.03:
  * - Issue #532: Type Safety Audit (R999). Upgraded sensor processing to Double precision.
  * - Issue #531: Hardening - Acoustic Duty Cycle. Added isAcousticMonitoringEnabled.
@@ -329,15 +336,28 @@ class AppSensorManager(
     }
 
     private fun attemptStepDetectorRegistration() {
-        isStepDetectorRegistered = stepDetector?.let { 
-            val registered = sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) 
-            if (!registered) {
-                Timber.e("Issue #098: Step Detector exists but registerListener failed.")
-            } else {
-                Timber.i("Issue #098: Step Detector registered successfully.")
+        val detector = stepDetector
+        if (detector == null) {
+            Timber.w("Issue #098: Step Detector not available on this hardware.")
+            return
+        }
+
+        // Issue #098: Android 10+ requires ACTIVITY_RECOGNITION for Step Detector
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val permStatus = ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION)
+            if (permStatus != PackageManager.PERMISSION_GRANTED) {
+                Timber.w("Issue #098: Step Detector registration deferred - ACTIVITY_RECOGNITION permission missing.")
+                isStepDetectorRegistered = false
+                return
             }
-            registered
-        } ?: false
+        }
+
+        isStepDetectorRegistered = sensorManager.registerListener(this, detector, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) 
+        if (!isStepDetectorRegistered) {
+            Timber.e("Issue #098: Step Detector exists but registerListener failed (hardware refusal).")
+        } else {
+            Timber.i("Issue #098: Step Detector registered successfully.")
+        }
     }
 
     private fun attemptStepRegistration() {

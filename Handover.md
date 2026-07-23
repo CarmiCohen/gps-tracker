@@ -1,34 +1,30 @@
-# Handover (July.23.09) - Anchor Logic Validation & Engine Hardening Complete
+# Handover (July.23.11) - Stealth Hardening & Startup Stability
 
 ## 🎯 Current Objective
-Cycle **July.23.09** focused on validating the stationary anchor logic through comprehensive unit testing and remediating the `:core:engine` test suite to ensure architectural integrity.
+Cycle **July.23.11** focused on enforcing tracker stealth (silence) and resolving service startup crashes that led to restoration loops on the landing page.
 
 ## 📊 Status Summary
 
-### 1. Resolved: AnchorEvaluator Validation (Issue #533b / R990c)
-- **Hardened Averaging**: Modified `AnchorEvaluator.kt` to ensure coordinate averaging only incorporates points within the breakout threshold. This prevents the anchor from "chasing" GPS noise (R990c).
-- **Comprehensive Testing**: Created `AnchorEvaluatorTest.kt` covering engagement, averaging, physical motion breakout, and the "Safety Valve" mechanism (R990e).
+### 1. Resolved: Tracker Audio Alarms (R872)
+- **Centralized Silence**: Updated `AppAlarmManager.kt` to suppress siren playback (`shouldPlaySiren`) when in tracker mode. This ensures stealth even if the viewer sees a violation.
+- **Redundancy Removal**: Stripped explicit siren maintenance from `TrackerService.kt` to prevent any accidental audio triggers in the background.
 
-### 2. Resolved: Test Suite Remediation
-- **Interface Alignment**: Fixed compilation errors in `AdaptationMuzzleTest.kt` and `ForensicIdentityTest.kt` by updating implementation of `LocationProcessorListener`.
-- **Logic Restoration**:
-    - **TelemetryAggregator**: Corrected `mergeWorstCase` logic to properly aggregate forensic peaks and signal minimums.
-    - **Hindsight Logic**: Updated `LocationSentinelHindsightTest.kt` to match the current `TRAJECTORY_PROMOTED` behavior and buffer constraints.
-    - **Signaling**: Cleaned up orphaned tests for purged methods in `SignalingTest.kt`.
+### 2. Resolved: FGS Startup Crash (R406b)
+- **Main-Thread Immediacy**: Moved `startServiceForeground()` call to `BaseMonitorService.onCreate()` on the Main thread. This fixes the restoration crash where the system killed the service before it could claim foreground status inside a coroutine.
+- **Landing Page Stability**: Confirmed that the 2000ms restoration delay on the landing page now successfully transitions to active tracking without process death.
 
-### 3. Resolved: Documentation & Versioning
-- **Requirements Sync**: Updated **R990c** in `SOT_MASTER_REQUIREMENTS.md`.
-- **Version Bump**: Promoted system version to `July.23.09` in `app/build.gradle`.
-- **History Tracking**: Updated `RELEASE_HISTORY.md` and `issues.md`.
+### 3. Documentation & Versioning
+- **Version Bump**: Promoted system version to `July.23.11` in `app/build.gradle`.
+- **SoT Alignment**: Formalized **R406b** (Foreground Immediacy) and **R872** (Tracker Stealth) in `SOT_MASTER_REQUIREMENTS.md`.
 
 ## 🚀 Git Release Procedure
 ```bash
 git add .
-git commit -m "release: July.23.09 - validated AnchorEvaluator and remediated engine test suite"
-git tag -a July.23.09 -m "July.23.09: Unit testing for stationary anchor (R990c/d/e) and telemetry aggregation fixes."
+git commit -m "release: July.23.11 - hardened tracker stealth and fixed FGS startup crash"
+git tag -a July.23.11 -m "July.23.11: Tracker silent mode enforcement and FGS onCreate stabilization."
 git push origin main --tags
 ```
 
 ## 💡 Code Simplification Ideas
-- **Listener Adapter Pattern**: Introduce a `DefaultLocationProcessorListener` to avoid breaking tests when the interface expands.
-- **Unified Test Factory**: Centralize mock data generation for `EngineGeoPoint` and `EngineConnectionPoint`.
+- **Unified Alarm Signal**: Consider moving haptic feedback and notification updates into `AppAlarmManager` to further decouple `TrackerService` and `ViewerService` from hardware side-effects.
+- **Navigation State Ownership**: Migrate the "Automatic Restoration" logic from `MainAppContent` into a dedicated `LifecycleUseCase` to simplify the UI layer.

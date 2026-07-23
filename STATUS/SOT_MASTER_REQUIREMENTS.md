@@ -1,9 +1,10 @@
-# System Source of Truth (SoT) - July.23.09 (Hardened Logic)
+# System Source of Truth (SoT) - July.23.11 (Stealth & Startup Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
+*   **Foreground Service Immediacy (R406b)**: `startForeground` MUST be invoked directly in the Main-thread `onCreate` of any `LifecycleService`. Delayed or background-threaded invocation is forbidden to prevent `ForegroundServiceDidNotStartInTimeException`. (July.23.11)
 *   **Cold-Start Hardening (R955b)**: Implement a mandatory 500ms staggered delay before starting base observations. (Issue #099)
 *   **Startup Recovery Protection (R955c)**: `MaintenanceWorker` MUST implement a 60-second grace period from the `appStartTime` before attempting recovery. (Issue #108)
 *   **Startup Maintenance Authority (R104)**: Execute a proactive `deepPruneLogs` operation immediately upon initialization in both UI and Service lifecycles. (Issue #104, #104b)
@@ -24,6 +25,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 
 ### 3. Persistence & Service Reliability
 *   **Activation Authority**: The `isSystemActive` flag in `DataStore` is the definitive authority for background lifecycle revival.
+*   **Tracker Stealth Authority (R872)**: The device MUST remain silent and visually dark when operating in Tracker mode. Local audio sirens and red-screen overlays MUST be suppressed. Violations are transmitted to the Viewer only. (July.23.11)
 *   **Siren Persistence (R527)**: Active alarm states MUST be persisted to DataStore. If the background service is killed and restarted by the OS, the siren state MUST be restored and audio MUST automatically resume if the violation is unresolved. (Issue #527)
 *   **DataStore Singleton Authority (R511)**: Initialize DataStore via `Context.dataStore` property delegate to ensure singleton instance. (Issue #511)
 *   **Notification Throttling (R993)**: Foreground notification updates MUST BE throttled (default 30s). (Issue #R993)
@@ -31,10 +33,11 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Standardized Proto Path (R973)**: All Protobuf schemas MUST be located in `app/src/main/proto`. (Issue #030)
 
 ### 4. Dependency & Hardware Hardening
+*   **Proactive Status Propagation (R533)**: The signaling layer MUST proactively update the telemetry repository's connection status upon every lifecycle event (Connect, Disconnect, Error). (Issue #533)
 *   **Hilt Universal Authority (R120b)**: Full migration to Hilt. Manual DI is forbidden. Circularities resolved via `Provider<T>`. (Issue #120, #124, #126, #126b, #513)
 *   **Samsung A15 Battery Authority (R405b)**: Proactively trigger configuration overlay if battery exemption is missing on Samsung A15. (Issue #101)
 *   **Samsung Stay-Alive Hardening (R405c)**: Engage Accelerometer-based stay-alive pulse on sensor failure. Perform hardware "poke" via `SystemMonitor` on budget hardware. (Issue #098, #113)
-*   **Step Detector Permission (R107)**: Explicitly track `android.permission.ACTIVITY_RECOGNITION`. (Issue #107)
+*   **Step Detector Permission (R107)**: Explicitly track `android.permission.ACTIVITY_RECOGNITION`. Hardware registration MUST be deferred if permission is not granted to prevent fail(2) denials. (Issue #098, #107)
 
 ### 5. Architectural Baselines
 *   **Accuracy Recovery Grace (R529)**: The Jump Engine MUST implement an "Accuracy Recovery" grace logic. Spatial corrections resulting from a transition from low to high accuracy MUST NOT be flagged as erratic jumps if the displacement is within the previous fix's uncertainty range. (Issue #529)
@@ -47,5 +50,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Stationary Anchor Hard-Lock (R990b)**: Establish coordinate "Hard-Lock" when stationary. (Issue #018)
 
 ### 6. Version Authority
-*   **Current Release**: July.23.09.
+*   **Current Release**: July.23.11.
 *   **Source of Truth**: app/build.gradle versionName.

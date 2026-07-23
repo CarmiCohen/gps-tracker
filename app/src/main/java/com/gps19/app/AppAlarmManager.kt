@@ -13,11 +13,12 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * July.23.11:
+ * - Tracker Silence: Suppressed shouldPlaySiren in tracker mode to ensure 
+ *   stealth and prevent un-stoppable alarms (no red screen in tracker mode).
  * July.23.03:
  * - Issue #527: Siren Persistence. Added restoreState and persistence logic. 
  *   Updated shouldPlaySiren to respect AudioSynthesizer cooldown.
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -55,6 +56,7 @@ class AppAlarmManager @Inject constructor(
     
     private var lastSirenStopTs: Long = 0L
     private var lastGlobalTriggerTs: Long = 0L
+    private var isTrackerMode: Boolean = false
 
     fun updateSettings(settings: AlertSettings) {
         this.currentSettings = settings
@@ -85,6 +87,7 @@ class AppAlarmManager @Inject constructor(
     }
 
     fun shouldPlaySiren(): Boolean {
+        if (isTrackerMode) return false // Requirement: No local alarm/siren in tracker mode.
         if (currentSettings.globalMute) return false
         if (!hasUnresolvedAlarms()) return false
         
@@ -190,6 +193,7 @@ class AppAlarmManager @Inject constructor(
         snrSnapshot: Double? = null,
         vibeSnapshot: Double? = null
     ) {
+        this.isTrackerMode = isTrackerMode
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
         
         val lastAlarmAckTs = repository.getLastAlarmAckTsSync()
