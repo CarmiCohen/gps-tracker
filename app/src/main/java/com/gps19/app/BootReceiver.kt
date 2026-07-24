@@ -11,6 +11,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.OutOfQuotaPolicy
+import com.gps19.core.engine.TimeProvider
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.firstOrNull
@@ -21,7 +22,8 @@ import timber.log.Timber
  * July.24.04:
  * - Issue #539: Background Start Hardening. Migrated to Expedited Work Request
  *   to ensure API 34+ reliability for background-to-foreground transitions.
- * - Fix: Corrected ForegroundInfo construction using AppNotificationManager.
+ * - Redundancy Hardening: Now updates APP_START_TIME_KEY to notify 
+ *   MaintenanceWorker of the revival attempt, preventing duplicate starts.
  * July.22.02:
  * - Issue #120: Hilt Hardening.
  */
@@ -49,7 +51,8 @@ class BootServiceStartWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val repository: MainRepository,
-    private val notificationManager: AppNotificationManager
+    private val notificationManager: AppNotificationManager,
+    private val timeProvider: TimeProvider
 ) : CoroutineWorker(context, params) {
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
@@ -65,6 +68,10 @@ class BootServiceStartWorker @AssistedInject constructor(
         
         if (isSystemActive && appMode != null) {
             Timber.i("BootWorker: Restarting service in $appMode mode (System Active)")
+            
+            // Redundancy Hardening: Update start time to trigger MaintenanceWorker grace period
+            repository.setAppStartTime(timeProvider.currentTimeMillis())
+
             val serviceClass = if (appMode == "tracker") TrackerService::class.java else ViewerService::class.java
             val serviceIntent = Intent(applicationContext, serviceClass)
             try {

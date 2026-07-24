@@ -17,6 +17,8 @@ import javax.inject.Singleton
  * July.24.04:
  * - Issue #541: Direct Binary Flow. Updated location_relay_bin handler to 
  *   dispatch raw bytes via onBinaryUpdate, bypassing JSONObject allocation.
+ * - Issue #538: Churn Optimization. Optimized handleLogRelay and conflation 
+ *   path to minimize Map/JSONObject conversions.
  * July.23.10:
  * - Issue #533: Fixed SRV status inconsistency.
  */
@@ -52,7 +54,7 @@ class CommunicationManager @Inject constructor(
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
-    private var pendingLocationUpdate: JSONObject? = null
+    private var pendingLocationMap: MutableMap<String, Any>? = null
     private var conflationJob: Job? = null
 
     override fun setRemoteUpdateListener(listener: SignalingProvider.RemoteUpdateListener?) {
@@ -254,9 +256,15 @@ class CommunicationManager @Inject constructor(
             val entry = LogEntry.fromJSONObject(data)
             logRepository.addLog(entry)
 
-            val wrapped = JSONObject(data.toString())
-            wrapped.put("type", "remote_log")
-            remoteUpdateListener?.onUpdate(wrapped)
+            // Issue #538: Optimized dispatch. Instead of deep copy, we use a 
+            // shallow clone of keys if listener is active, or just pass if safe.
+            remoteUpdateListener?.let { listener ->
+                val wrapped = JSONObject()
+                val keys = data.keys()
+                while(keys.hasNext()) { val k = keys.next(); wrapped.put(k, data.get(k)) }
+                wrapped.put("type", "remote_log")
+                listener.onUpdate(wrapped)
+            }
         } catch (e: Exception) {
             Timber.e(e, "log_relay parse error")
         }
@@ -375,19 +383,18 @@ class CommunicationManager @Inject constructor(
     }
 
     private fun emitLocationConflated(data: JSONObject) {
-        val pending = pendingLocationUpdate?.toMap()
+        // Issue #538: Optimized conflation. We maintain the pending state as a Map
+        // and only convert the incoming JSONObject once.
         val incoming = data.toMap()
-        
-        val result = SignalingMessageConflator.conflate(pending, incoming)
-        pendingLocationUpdate = JSONObject(result)
+        pendingLocationMap = SignalingMessageConflator.conflate(pendingLocationMap, incoming).toMutableMap()
 
         if (conflationJob == null || !conflationJob!!.isActive) {
             conflationJob = scope.launch {
                 delay(100)
-                val toSend = pendingLocationUpdate
-                if (toSend != null && isConnected() && !isStopped) { 
-                    socket?.emit("location_update", toSend)
-                    pendingLocationUpdate = null
+                val mapToSend = pendingLocationMap
+                if (mapToSend != null && isConnected() && !isStopped) { 
+                    socket?.emit("location_update", JSONObject(mapToSend))
+                    pendingLocationMap = null
                 }
             }
         }
