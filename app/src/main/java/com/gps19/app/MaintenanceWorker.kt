@@ -17,19 +17,19 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * July.24.04:
+ * - Issue #539: Background Start Hardening. Implemented setForeground() during 
+ *   recovery to ensure API 34+ compliance for background-to-foreground transitions.
  * July.22.07:
- * - Issue #108: Startup Recovery Race Hardening. Added RECOVERY_GRACE_PERIOD_MS to prevent 
- *   redundant recovery during staggered startup (R955b).
- * July.22.02:
- * - Issue #119: Boot Persistence Integrity. Added mandatory check for isSystemActive before recovery.
- * - Issue #120: Hilt Hardening. Converted to @HiltWorker for DI integrity.
+ * - Issue #108: Startup Recovery Race Hardening.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val repository: MainRepository,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val notificationManager: AppNotificationManager
 ) : CoroutineWorker(context, params) {
     
     private val cachedPkgName = applicationContext.packageName
@@ -53,6 +53,13 @@ class MaintenanceWorker @AssistedInject constructor(
         }
     }
 
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        return ForegroundInfo(
+            notificationManager.getNotificationId(),
+            notificationManager.buildForegroundNotification("System maintenance check...")
+        )
+    }
+
     override suspend fun doWork(): Result {
         val savedMode = repository.getAppMode()
         val isSystemActive = repository.isSystemActiveFlow.firstOrNull() ?: repository.getBoolean(MainRepository.IS_SYSTEM_ACTIVE_KEY, false)
@@ -69,7 +76,6 @@ class MaintenanceWorker @AssistedInject constructor(
 
         Log.d("GPS19", "MAINTENANCE: Periodic check. Mode: $savedMode, Active: $isSystemActive, Silence: ${silenceDurationMs/1000}s, Uptime: ${appUptimeMs/1000}s, Net: $networkStatus")
 
-        // Issue #108: If the app just started, give it a grace period to complete staggered initialization (R955b)
         if (appUptimeMs < RECOVERY_GRACE_PERIOD_MS) {
             Log.d("GPS19", "MAINTENANCE: Within startup grace period (${appUptimeMs/1000}s). Skipping recovery check.")
             return Result.success()
@@ -78,6 +84,13 @@ class MaintenanceWorker @AssistedInject constructor(
         if (savedMode != null && isSystemActive) {
             if (lastTick == 0L || silenceDurationMs > RECOVERY_THRESHOLD_MS) {
                 
+                // Issue #539: Elevate to foreground to ensure background-start exemption on API 34+
+                try {
+                    setForeground(getForegroundInfo())
+                } catch (e: Exception) {
+                    Log.w("GPS19", "MAINTENANCE: Could not set foreground, attempting recovery anyway.")
+                }
+
                 if (isStorageCritical()) {
                     val storageMsg = "MAINTENANCE: Recovery ABORTED. Storage is CRITICAL."
                     Log.e("GPS19", storageMsg)

@@ -14,12 +14,11 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * July.24.04:
+ * - Issue #541: Direct Binary Flow. Updated location_relay_bin handler to 
+ *   dispatch raw bytes via onBinaryUpdate, bypassing JSONObject allocation.
  * July.23.10:
- * - Issue #533: Fixed SRV status inconsistency. Proactively updating TelemetryRepository 
- *   on socket connection state changes.
- * July.23.00:
- * - Issue #522: Architectural Consolidation. Implemented SignalingProvider.RemoteUpdateListener 
- *   to unify telemetry flow.
+ * - Issue #533: Fixed SRV status inconsistency.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -234,48 +233,10 @@ class CommunicationManager @Inject constructor(
     private fun handleLocationRelayBinary(args: Array<Any>) {
         try {
             val data = args[0] as ByteArray
-            val status = RealtimeStatus.parseFrom(data)
-            
-            if (!SignalingValidator.shouldProcessLocationUpdate(
-                    incomingId = status.id,
-                    ownDeviceId = deviceId,
-                    isFromViewer = status.fromViewer,
-                    viewerId = status.viewerId,
-                    ownViewerId = viewerId,
-                    isTrackerMode = isTrackerMode
-            )) return
-            
-            val json = JSONObject().apply {
-                put("id", status.id); put("viewer_id", status.viewerId); put("from_viewer", status.fromViewer)
-                put("lat", status.lat); put("lng", status.lng); put("speed", status.speed)
-                put("accuracy", status.accuracy); put("max_accuracy", status.maxAccuracy)
-                put("bearing", status.bearing); put("battery", status.battery); put("temp", status.temp)
-                put("is_charging", status.isCharging); put("ts", status.ts); put("gps_ts", status.gpsTs)
-                put("sats_view", status.satsView); put("sats_used", status.satsUsed)
-                put("uptime_ms", status.uptimeMs)
-                put("total_connected_ms", status.totalConnectedMs); put("session_connected_ms", status.sessionConnectedMs)
-                put("total_drop_ms", status.totalDropMs); put("max_drop_ms", status.maxDropMs)
-                put("last_conn_ts", status.lastConnTs); put("last_disc_ts", status.lastDiscTs); put("is_historical", status.isHistorical)
-                put("alt", status.alt)
-                put("tracker_state", TrackerStatus.mapProtoToTrackerState(status.state).name)
-                put("is_location_pending", status.isLocationPending)
-                put("location_pending_reason", TrackerStatus.mapProtoToPendingReason(status.pendingReason).name)
-                put("last_valid_fix_rt", status.lastValidFixRt)
-                put("is_battery_steep_discharge", status.isBatterySteepDischarge)
-                put("is_cooling_mode_active", status.isCoolingModeActive)
-                
-                // Forensic Fields
-                put("snr_idx", status.snrIdx); put("noise_idx", status.noiseIdx); put("lux_idx", status.luxIdx)
-                put("vibe_idx", status.vibeIdx); put("lift_idx", status.liftIdx); put("prox_idx", status.proxIdx)
-                put("tilt_idx", status.tiltIdx); put("baro_idx", status.baroIdx)
-                put("is_sit_detected", status.isSitDetected); put("is_sit_active", status.isSitActive)
-                put("last_sit_ts", status.lastSitTs); put("sit_vz", status.sitVz); put("sit_dz", status.sitDz)
-                put("sit_baro", status.sitBaro); put("sit_tilt", status.sitTilt); put("sit_shock", status.sitShock)
-                put("vertical_velocity", status.verticalVelocity)
-            }
-            remoteUpdateListener?.onUpdate(json)
+            // Issue #541: Prioritize direct binary delivery
+            remoteUpdateListener?.onBinaryUpdate(data)
         } catch (e: Exception) {
-            Log.e("GPS19", "location_relay_bin parse error")
+            Log.e("GPS19", "location_relay_bin direct dispatch failure")
         }
     }
 

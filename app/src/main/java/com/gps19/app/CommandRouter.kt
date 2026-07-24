@@ -22,11 +22,9 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
- * July.22.11:
- * - Issue #520: Purge Signaling Command Leftovers. Removed SendSettingsCmd handling.
- * July.22.04:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * v9.5.0: Issue #513 - Flatten Service Architecture (ConnectivitySuite).
+ * July.24.04:
+ * - Issue #542: Stealth Enforcement. Added isTrackerMode check to TriggerTestAlarm 
+ *   to prevent siren activation in tracker mode.
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -128,6 +126,10 @@ class CommandRouter @Inject constructor(
                             listener?.onSyncSensors()
                         }
                         is UiCommand.TriggerTestAlarm -> {
+                            if (configManager.isTrackerMode) {
+                                logManager.logServiceEvent("TEST ALARM: Suppressed in Tracker Mode (Stealth)", false)
+                                return@onEach
+                            }
                             scope.launch {
                                 try {
                                     logManager.logServiceEvent("TEST ALARM: Triggering 3s physical siren", true)
@@ -140,7 +142,8 @@ class CommandRouter @Inject constructor(
                                         context = context,
                                         loop = true,
                                         vibrate = true,
-                                        timeProvider = timeProvider
+                                        timeProvider = timeProvider,
+                                        isTrackerMode = false // Explicitly false as we checked mode above
                                     )
                                     delay(3000)
                                     AudioSynthesizer.stopSiren(0, timeProvider = timeProvider)

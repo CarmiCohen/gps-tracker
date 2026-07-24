@@ -9,6 +9,8 @@ import androidx.work.WorkerParameters
 import android.content.BroadcastReceiver
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
+import androidx.work.OutOfQuotaPolicy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.firstOrNull
@@ -16,9 +18,12 @@ import timber.log.Timber
 
 /**
  * BootReceiver: Triggered when the device restarts.
+ * July.24.04:
+ * - Issue #539: Background Start Hardening. Migrated to Expedited Work Request
+ *   to ensure API 34+ reliability for background-to-foreground transitions.
+ * - Fix: Corrected ForegroundInfo construction using AppNotificationManager.
  * July.22.02:
- * - Issue #119: Boot Persistence Integrity. Enforced isSystemActive check.
- * - Issue #120: Hilt Hardening. Converted BootServiceStartWorker to @HiltWorker.
+ * - Issue #120: Hilt Hardening.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -26,8 +31,11 @@ class BootReceiver : BroadcastReceiver() {
             intent?.action == Intent.ACTION_MY_PACKAGE_REPLACED ||
             intent?.action == "android.intent.action.QUICKBOOT_POWERON") {
             
-            Timber.d("Boot detected, scheduling service start via WorkManager")
-            val workRequest = OneTimeWorkRequestBuilder<BootServiceStartWorker>().build()
+            Timber.d("Boot detected, scheduling expedited service start via WorkManager")
+            val workRequest = OneTimeWorkRequestBuilder<BootServiceStartWorker>()
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .build()
+            
             WorkManager.getInstance(context).enqueue(workRequest)
         }
     }
@@ -40,10 +48,18 @@ class BootReceiver : BroadcastReceiver() {
 class BootServiceStartWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
-    private val repository: MainRepository
+    private val repository: MainRepository,
+    private val notificationManager: AppNotificationManager
 ) : CoroutineWorker(context, params) {
+
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        return ForegroundInfo(
+            notificationManager.getNotificationId(),
+            notificationManager.buildForegroundNotification("System revival in progress...")
+        )
+    }
+
     override suspend fun doWork(): Result {
-        // Issue #119: isSystemActive is the single source of truth for revival
         val isSystemActive = repository.isSystemActiveFlow.firstOrNull() ?: repository.getBoolean(MainRepository.IS_SYSTEM_ACTIVE_KEY, false)
         val appMode = repository.appModeFlow.firstOrNull() ?: repository.getAppMode()
         

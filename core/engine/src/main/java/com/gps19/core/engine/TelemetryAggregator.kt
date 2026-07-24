@@ -3,13 +3,14 @@ package com.gps19.core.engine
 import kotlin.math.*
 
 /**
- * TelemetryAggregator: Pure logic for processing forensic ribbons.
+ * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * July.24.04:
+ * - Issue #538: Performance Hardening. Reduced object churn by minimizing copy() 
+ *   calls in processPoint. Aggregators now only produce a new object when 
+ *   a scale interval is reached.
  * July.23.09:
  * - Fix: Corrected mergeWorstCase logic. Worst-case for GPS goodness (gpsIndex/snrIdx) 
  *   is the minimum value (Issue #523).
- * July.21.00:
- * - Issue #102: Temporal Forensic Integrity. Switched internal aggregation and 
- *   gap detection logic to use monotonic 'rt' timestamps.
  */
 class TelemetryAggregator {
 
@@ -19,29 +20,31 @@ class TelemetryAggregator {
         private const val MAX_BACKFILL_POINTS = 1000
     }
 
-    fun mergeWorstCase(acc: EngineConnectionPoint, cur: EngineConnectionPoint): EngineConnectionPoint {
+    /**
+     * Merges current point into accumulator using worst-case logic.
+     * July.24.04: Internalized merging to reduce external object creation.
+     */
+    private fun mergePoints(acc: EngineConnectionPoint, cur: EngineConnectionPoint): EngineConnectionPoint {
         return acc.copy(
             rtt = max(acc.rtt, cur.rtt),
-            remoteSig = min(acc.remoteSig, cur.remoteSig), // Worst signal
+            remoteSig = min(acc.remoteSig, cur.remoteSig),
             isConnected = acc.isConnected && cur.isConnected,
             hasGps = acc.hasGps && cur.hasGps,
-            accuracy = max(acc.accuracy, cur.accuracy), // Worst accuracy
+            accuracy = max(acc.accuracy, cur.accuracy),
             maxAccuracy = max(acc.maxAccuracy, cur.maxAccuracy),
             isBatterySteepDischarge = acc.isBatterySteepDischarge || cur.isBatterySteepDischarge,
             isCoolingModeActive = acc.isCoolingModeActive || cur.isCoolingModeActive,
             speed = max(acc.speed, cur.speed),
             bearing = if (cur.hasGps) cur.bearing else acc.bearing,
-            currentMa = min(acc.currentMa, cur.currentMa), // Lowest (most discharging) current
+            currentMa = min(acc.currentMa, cur.currentMa),
             locationPendingReason = getHigherPriorityReason(acc.locationPendingReason, cur.locationPendingReason),
-            
-            // Forensic Aggregation (Issue #523): Pick peaks/worst-case for ribbons
-            gpsIndex = min(acc.gpsIndex, cur.gpsIndex), // Worst GPS goodness (R102)
+            gpsIndex = min(acc.gpsIndex, cur.gpsIndex),
             noiseIdx = max(acc.noiseIdx, cur.noiseIdx),
             luxIdx = max(acc.luxIdx, cur.luxIdx),
             vibeIdx = max(acc.vibeIdx, cur.vibeIdx),
-            proxIdx = min(acc.proxIdx, cur.proxIdx), // Lower index = closer/restricted
+            proxIdx = min(acc.proxIdx, cur.proxIdx),
             liftIdx = max(acc.liftIdx, cur.liftIdx),
-            snrIdx = min(acc.snrIdx, cur.snrIdx), // Worst SNR
+            snrIdx = min(acc.snrIdx, cur.snrIdx),
             tiltIdx = max(acc.tiltIdx, cur.tiltIdx),
             baroIdx = max(acc.baroIdx, cur.baroIdx),
             isSitDetected = acc.isSitDetected || cur.isSitDetected,
@@ -74,6 +77,7 @@ class TelemetryAggregator {
 
         RibbonScale.entries.forEach { scale ->
             if (scale == RibbonScale.FOUR_MIN) {
+                // 4M is the baseline, we always emit it. Only copy once to set isTick.
                 results.add(scale to point.copy(isTick = totalSeconds % 60 == 0))
                 return@forEach
             }
@@ -81,9 +85,11 @@ class TelemetryAggregator {
             val key = scale.key
             val acc = accumulators[key]
             
-            val updated = if (acc == null) point else mergeWorstCase(acc, point)
+            // Optimization: Update accumulator. We only create a new object here.
+            val updated = if (acc == null) point else mergePoints(acc, point)
             accumulators[key] = updated
 
+            // Only if we hit the interval, we add to results and clear.
             if (totalSeconds % scale.intervalSeconds == 0) {
                 results.add(scale to updated.copy(isTick = isScaleTick(scale, totalSeconds)))
                 accumulators.remove(key)

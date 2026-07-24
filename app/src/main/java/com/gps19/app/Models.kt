@@ -10,12 +10,11 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * July.24.04:
+ * - Issue #541: Direct Binary Flow. Updated TrackerStatus.toProto to include 
+ *   behavioral fields (jammer, stall, tamper, jumpTier) for parity with RealtimeStatus proto.
  * July.22.11:
- * - Issue #520: Purge Signaling Command Leftovers. Removed SendSettingsCmd.
- * July.22.01:
- * - Forensic Parity: Expanded ConnectionPoint with full SIT suite (isSitDetected, sitBaro, sitTilt, sitShock).
- * - Added missing indices (noiseIdx, luxIdx, vibeIdx, liftIdx, tiltIdx, baroIdx) to TrackerStatus and Proto/JSON mappings.
- * - SIT Synchronization: Fully propagated all SIT parameters (Vz, Dz, Baro, Tilt, Shock) to Telemetry payloads.
+ * - Issue #520: Purge Signaling Command Leftovers.
  */
 
 @Serializable
@@ -365,6 +364,11 @@ data class TrackerStatus(
             .setSitTilt(sitTilt)
             .setSitShock(sitShock)
             .setVerticalVelocity(verticalVelocity)
+            .setIsJammer(isJammer)
+            .setIsStalled(isStalled)
+            .setIsTamperDetected(isTamperDetected)
+            .setJumpTier(jumpTier)
+            .setSentinelStatus(status.name)
             .build()
     }
 

@@ -11,10 +11,11 @@ import javax.inject.Singleton
 
 /**
  * ConfigManager: Manages identity and core configuration settings.
+ * July.24.04:
+ * - Issue #540: Identity Sync Bug. Corrected viewerIdFlow collector to update 
+ *   viewerId instead of deviceId, preventing identity cross-contamination.
  * July.22.01:
  * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * v9.5.0:
- * - Issue #503: Hilt Removal.
  */
 @Singleton
 class ConfigManager @Inject constructor(

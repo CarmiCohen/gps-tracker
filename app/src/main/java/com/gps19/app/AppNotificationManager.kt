@@ -11,17 +11,17 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
+import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * July.16.24:
- * - Issue #526: Performance hardening. Removed ConfigManager dependency to prevent
- *   Main-thread lazy-loading of the database during cold start.
+ * July.24.04:
+ * - Stealth Enforcement: Added isTrackerMode check to createNotificationChannels 
+ *   and updateAlarmNotification. Critical Alarms are forced to IMPORTANCE_LOW 
+ *   in Tracker Mode to prevent audible leaks.
  */
 @Singleton
 class AppNotificationManager @Inject constructor(
@@ -34,23 +34,33 @@ class AppNotificationManager @Inject constructor(
     private val alarmNotificationId = 1920
     
     private val cachedPkgName = context.packageName
+    private var isTrackerMode = false
 
-    init {
-        createNotificationChannels()
+    fun setTrackerMode(active: Boolean) {
+        if (this.isTrackerMode != active) {
+            this.isTrackerMode = active
+            createNotificationChannels()
+        }
     }
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = context.getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(
+            val manager = context.getSystemService(NotificationManager::class.java) ?: return
+            
+            // Service Channel: Always Low
+            manager.createNotificationChannel(
                 NotificationChannel(channelId, "Service", NotificationManager.IMPORTANCE_LOW)
             )
-            manager?.createNotificationChannel(
-                NotificationChannel(alarmChannelId, "Alarms", NotificationManager.IMPORTANCE_HIGH).apply {
-                    setSound(null, null) 
-                    enableVibration(true)
-                }
-            )
+            
+            // Alarm Channel: Suppressed if in Tracker Mode
+            val alarmImportance = if (isTrackerMode) NotificationManager.IMPORTANCE_LOW else NotificationManager.IMPORTANCE_HIGH
+            val alarmChannel = NotificationChannel(alarmChannelId, "Alarms", alarmImportance).apply {
+                setSound(null, null) 
+                enableVibration(!isTrackerMode)
+                setShowBadge(!isTrackerMode)
+            }
+            manager.createNotificationChannel(alarmChannel)
+            Timber.d("Channels updated. TrackerMode: $isTrackerMode (Importance: $alarmImportance)")
         }
     }
 
@@ -84,6 +94,11 @@ class AppNotificationManager @Inject constructor(
     }
 
     fun updateAlarmNotification(causes: String, showPermissionAction: Boolean = false) {
+        if (isTrackerMode) {
+            Timber.d("Alarm notification suppressed: Tracker Mode")
+            return
+        }
+
         val intent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             putExtra("causes", causes)

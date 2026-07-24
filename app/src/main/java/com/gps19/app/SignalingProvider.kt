@@ -5,13 +5,16 @@ import org.json.JSONObject
 
 /**
  * Interface for signaling implementations (Socket.io, MQTT, etc.)
+ * July.24.04:
+ * - Issue #541: Direct Binary Flow. Added onBinaryUpdate to bypass 
+ *   JSON overhead for high-frequency telemetry.
  * July.23.00:
- * - Issue #522: Architectural Consolidation. Added RemoteUpdateListener to 
- *   standardize telemetry reception.
+ * - Issue #522: Architectural Consolidation.
  */
 interface SignalingProvider {
     interface RemoteUpdateListener {
         fun onUpdate(data: JSONObject)
+        fun onBinaryUpdate(data: ByteArray) // New direct path
     }
 
     fun connect(url: String, deviceId: String, viewerId: String, isTracker: Boolean)

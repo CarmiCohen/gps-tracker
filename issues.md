@@ -1,41 +1,43 @@
-# Project Issues & Hardening Tracking (July.24.03)
+# Project Issues & Hardening Tracking (July.24.04)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 0 |
+| **Open Technical Issues** | Active | 3 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 378 |
+| **Resolved (Total)** | 🟢 Progress | 381 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   *None currently identified.*
+*   **Inefficient Telemetry Path**: High memory churn due to Binary -> JSON -> DataClass conversion for every incoming packet. This triggers GC every ~100ms during active tracking.
+*   **Maintenance Worker Redundancy**: The recovery logic in `MaintenanceWorker` may conflict with `BootReceiver`'s expedited work on some devices.
 
 ---
 
 ## 🔴 Open Issues
-*   *None currently identified.*
+*   **Issue #538: High-Frequency Memory Allocations**.
+    *   *Symptom*: Continuous Background GC logs.
+    *   *Status*: Optimized aggregator; needs serialization optimization (see #541).
+*   **Issue #539: Background Start Reliability (API 34+)**.
+    *   *Resolution*: Migrated to Expedited Work and enforced `setForeground` in both `BootReceiver` and `MaintenanceWorker`.
+*   **Issue #541: Inefficient Telemetry Serialization**.
+    *   *Symptom*: High object churn in `CommunicationManager` and `ConnectivitySuite`.
+    *   *Impact*: Performance degradation and GC pressure.
 
 ---
 
-## 🟢 Recently Resolved Issues (July.24.03)
-*   **Background Worker Compilation Failure (Issue #536)**.
-    *   **Resolution**: Hardened Hilt worker injection by strictly adhering to `@AssistedInject` patterns in `BootServiceStartWorker` and `MaintenanceWorker`. Removed property-level `context` declarations that triggered `NonExistentClass` errors during annotation processing.
-*   **Step Detector Permission Stalling (Issue #098)**.
-    *   **Resolution**: Implemented a two-tier reactive recovery. `MainViewModel` detects permission grant transitions and signals the `TrackerService`. The Service then performs a synchronous capability refresh and triggers aggressive sensor re-registration in `AppSensorManager`, bypassing OS propagation lag.
-
-## 🟢 Recently Resolved Issues (July.24.02)
-*   **Startup ANR Mitigation (Issue #534)**.
-    *   **Resolution**: Implemented a 10s startup suppression window for Foreground Service updates in both `TrackerService` and `ViewerService`.
-*   **IPC Congestion Hardening (Issue #535)**.
-    *   **Resolution**: Enforced a 10,000ms global throttle for `updateForegroundServiceType`.
-
-## 🟢 Recently Resolved Issues (July.24.01)
-*   **Permission Refresh Logic Hardening**.
-    *   **Resolution**: Hardened `SystemStatusProviderImpl.kt` with a `Mutex`-protected synchronous path for `getPermissionState(forceRefresh = true)`.
+## 🟢 Recently Resolved Issues (July.24.04)
+*   **Tracker Stealth Violation (No Loud Alarms)**.
+    *   **Resolution**: Enforced stealth in `AudioSynthesizer` and `CommandRouter`. Even direct test commands are suppressed in Tracker Mode.
+*   **Issue #540: Signaling Rejoin Loop / IPC Congestion**.
+    *   **Resolution**: Implemented `lastForceJoinTs` cooldown in `ConnectivitySuite` and increased traffic staleness tolerance.
+*   **Issue #537: Main Thread Initialization Bottleneck**. 
+    *   **Resolution**: Refactored `MainViewModel` to prioritize UI initialization and fully decouple repository pruning and heavy observations.
+*   **Telemetry Aggregator Churn (Issue #538a)**.
+    *   **Resolution**: Minimized `copy()` calls in `TelemetryAggregator.processPoint`.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*

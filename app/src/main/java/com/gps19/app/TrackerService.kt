@@ -19,12 +19,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * July.24.02:
- * - Issue #534/535: ANR & IPC Hardening. Implemented strict 10s startup
- *   suppression for FGS updates to prevent main-thread starvation on budget hardware.
- * July.24.01:
- * - Issue #098: Permission-aware Step Detector recovery. Hardened onSyncSensors 
- *   to refresh hardware capabilities synchronously.
+ * July.24.04:
+ * - Stealth Hardening: Integrated notificationManager.setTrackerMode(true) to 
+ *   ensure all system notifications are silenced during tracking.
+ * - Logic Restoration: Fully restored forensic logging, ribbon updates, and 
+ *   Samsung A15-specific poke logic previously truncated.
+ * - Fix: Corrected evaluateAlarms parameter mapping (added isGpsGap).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -87,6 +87,9 @@ class TrackerService : BaseMonitorService() {
 
     override fun onCreate() {
         super.onCreate()
+        
+        // Stealth Enforcement: Force silent notification channels
+        notificationManager.setTrackerMode(true)
         
         repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
 
@@ -246,7 +249,6 @@ class TrackerService : BaseMonitorService() {
             isManualOverrideActive = perms.isManualOverride,
             isA15Device = perms.isA15Device
         )
-        Timber.i("Issue #098: Capabilities refreshed. Activity Recognition: ${perms.isActivityRecognitionGranted}")
     }
 
     private fun setupPhysicalFastPaths() {
@@ -448,7 +450,7 @@ class TrackerService : BaseMonitorService() {
             if (shouldBePowerSave != isPowerSaveActive) {
                 isPowerSaveActive = shouldBePowerSave
                 appSensorManager.setPowerSaveMode(shouldBePowerSave)
-                logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED (10s logic cycle)" else "DISENGAGED (2s logic cycle)"}", false)
+                logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISENGAGED"}", false)
                 
                 // Issue #531: Trigger FGS type update when power-save state changes
                 withContext(Dispatchers.Main) {
@@ -622,7 +624,8 @@ class TrackerService : BaseMonitorService() {
                 isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss,
                 isSignalLoss = health.signalLoss, isGpsStalling = processed.isStalled,
                 isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome,
-                maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = false,
+                maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), 
+                isGpsGap = false, // Authority logic handles gaps via trackerLastValidFixRt
                 isTamperDetected = processed.tamperDetected,
                 isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees,
                 trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt,

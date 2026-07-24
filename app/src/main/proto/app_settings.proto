@@ -5,18 +5,6 @@ option java_multiple_files = true;
 
 /**
  * AppSettings: Persistence schema for DataStore.
- * July.23.03:
- * - Issue #527: Siren Persistence. Added last_alarms_json to restore alarm state after service kill.
- * July.22.11:
- * - Issue #518: Purged legacy float fields (8, 9, 33).
- * July.22.01:
- * - Forensic Parity: Added indices (snr, noise, lux, vibe, lift, prox, tilt, baro) and SIT fields to RealtimeStatus.
- * July.20.07:
- * - Synchronized with SettingsRepository for Forensic Hardening.
- * - Added clock_drift_ref for forensic integrity.
- * - Restored Sit Detection fields (last_sit_ts, chair_baseline_tilt, last_history_sit_ts)
- *   as part of the Forensic Merge.
- * - Maintained is_system_active and identity_sanitized.
  */
 message AppSettings {
     optional string app_mode = 1;
@@ -82,7 +70,6 @@ message AppSettings {
 
     optional int64 clock_drift_ref = 50;
 
-    // New high-precision fields (Issue #023)
     optional double max_distance = 60;
     optional double max_accuracy = 61;
     optional double max_temp = 62;
@@ -151,7 +138,7 @@ message RealtimeStatus {
     bool is_battery_steep_discharge = 33;
     bool is_cooling_mode_active = 34;
 
-    // Forensic Fields (July.22.01)
+    // Forensic Fields
     double snr_idx = 35;
     double noise_idx = 36;
     double lux_idx = 37;
@@ -169,6 +156,14 @@ message RealtimeStatus {
     double sit_tilt = 49;
     double sit_shock = 50;
     double vertical_velocity = 51;
+
+    // Issue #541: Missing behavioral fields for hot-path binary updates
+    bool is_jammer = 52;
+    bool is_stalled = 53;
+    bool is_tamper_detected = 54;
+    int32 jump_tier = 55;
+    int64 gps_age_ms = 56;
+    string sentinel_status = 57;
 }
 
 message GeoPointProto {

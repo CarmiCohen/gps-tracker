@@ -20,13 +20,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.24.04:
+ * - Issue #537: Startup Resilience. Refactored loadInitialData to prevent landing 
+ *   page hangs. Essential data is prioritized, and heavy pruning is fully decoupled 
+ *   from the initialization state.
  * July.24.01:
- * - Issue #098: Reactive Sensor Sync. Modified RefreshPermissionStatus to 
- *   detect ACTIVITY_RECOGNITION grant transitions and trigger immediate 
- *   sensor re-registration via SettingsUpdated command.
- * - Fix: Removed incorrect UiCommand check in handleConfigEvent.
- * July.23.03:
- * - Issue #528: Finalized DashboardUseCase decommissioning.
+ * - Issue #098: Reactive Sensor Sync.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -134,16 +133,27 @@ class MainViewModel @Inject constructor(
     private var lastAlarmAckRt: Long = 0L
     private var isHeavyObservationStarted = false
 
-    private val INITIAL_RENDER_DELAY_MS = 500L
+    private val INITIAL_RENDER_DELAY_MS = 800L 
 
     init {
         viewModelScope.launch(uiExceptionHandler) {
+            // Priority 1: Immediate Essential Data
             loadInitialData()
+            
+            // Priority 2: UI Initialization - Ensure landing page can draw even if IO is slow
+            delay(200) 
+            updateState { it.copy(isInitialized = true) }
+
+            // Priority 3: Base observations (Settings/Internet)
             delay(INITIAL_RENDER_DELAY_MS)
             startBaseObservations()
             startGlobalTimer()
-            _uiState.filter { it.isInitialized && it.appMode != null }.first()
-            startHeavyObservations()
+            
+            // Priority 4: Heavy forensic observations only when mode is confirmed
+            viewModelScope.launch {
+                _uiState.filter { it.appMode != null }.first()
+                startHeavyObservations()
+            }
         }
     }
 
@@ -159,13 +169,16 @@ class MainViewModel @Inject constructor(
                 )}
             }.launchIn(viewModelScope)
 
-        stateSubscriptionUseCase.observeInternetStatus().onEach { online -> updateState { it.copy(connectivity = it.connectivity.copy(isLocalOnline = online)) } }.launchIn(viewModelScope)
+        stateSubscriptionUseCase.observeInternetStatus()
+            .onEach { online -> updateState { it.copy(connectivity = it.connectivity.copy(isLocalOnline = online)) } }
+            .launchIn(viewModelScope)
         
         viewModelScope.launch(Dispatchers.IO) { 
             while(true) { 
                 val newState = systemStatusProvider.getPermissionState()
+                val isA15 = systemStatusProvider.isA15Hardware()
                 withContext(Dispatchers.Main) { 
-                    updateState { it.copy(permissions = newState.copy(isA15Device = systemStatusProvider.isA15Hardware())) } 
+                    updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
                 }
                 val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
                 delay(if (refreshFast) PERMISSION_REFRESH_INTERVAL_FAST_MS else PERMISSION_REFRESH_INTERVAL_SLOW_MS) 
@@ -216,7 +229,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { repository.trackerLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
         viewModelScope.launch { repository.connectedViewers.collect { viewers -> updateState { it.copy(connectivity = it.connectivity.copy(connectedViewers = viewers)) } } }
 
-        // Consolidating remote status observation
         remoteStatusRepository.remoteStatus.onEach { status ->
             if (_uiState.value.appMode == "viewer") {
                 _remoteSignal.value = remoteStatusRepository.peerSignal.value
@@ -310,8 +322,6 @@ class MainViewModel @Inject constructor(
                 
                 withContext(Dispatchers.Main) { 
                     updateState { it.copy(permissions = newState.copy(isA15Device = systemStatusProvider.isA15Hardware())) } 
-                    
-                    // Issue #098: Reactive Sensor Sync
                     if (!oldState.isActivityRecognitionGranted && newState.isActivityRecognitionGranted) {
                         Timber.i("Issue #098: ACTIVITY_RECOGNITION granted. Triggering reactive sensor sync.")
                         repository.sendCommand(UiCommand.SettingsUpdated)
@@ -598,11 +608,7 @@ class MainViewModel @Inject constructor(
     }
 
     private fun loadInitialData() {
-        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            delay(2000L)
-            repository.proactivePruning()
-        }
-
+        // Issue #537: Essential settings only.
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             val initial = settingsUseCase.loadAllSettings()
             withContext(Dispatchers.Main) {
@@ -623,8 +629,13 @@ class MainViewModel @Inject constructor(
                     _trackerCurrentMa.value = status.currentMa
                     if (_uiState.value.appMode == "tracker") _localMaxTemp.value = status.maxTemp 
                 }
-                updateState { it.copy(isInitialized = true) }
             }
+        }
+
+        // Issue #537: Pruning is fully deferred and does not block isInitialized
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            delay(10000L)
+            repository.proactivePruning()
         }
     }
 

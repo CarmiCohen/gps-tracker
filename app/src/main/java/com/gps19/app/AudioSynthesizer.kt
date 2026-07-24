@@ -23,6 +23,9 @@ import kotlin.math.min
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
+ * July.24.04:
+ * - Stealth Enforcement: Added check for isTrackerMode in playSiren to prevent 
+ *   accidental local alarms in stealth mode.
  * v9.4.00:
  * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
  *   parameter naming to 'nowRt'.
@@ -70,8 +73,14 @@ object AudioSynthesizer {
         context: Context? = null, 
         loop: Boolean = true,
         vibrate: Boolean = false,
-        timeProvider: TimeProvider
+        timeProvider: TimeProvider,
+        isTrackerMode: Boolean = false // Added for stealth enforcement
     ) {
+        if (isTrackerMode) {
+            Log.d("AudioSynthesizer", "Siren suppressed: Tracker mode (Stealth enforced)")
+            return
+        }
+
         if (!force && timeProvider.elapsedRealtime() < silencedUntilRt.get()) return
         
         if (context != null && !overrideSilence) {

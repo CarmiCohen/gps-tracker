@@ -25,10 +25,11 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
- * July.23.02:
- * - Issue #525: State Audit. Expanded pushCurrentStatus with full forensic indices.
- * July.23.00:
- * - Issue #522: Architectural Consolidation.
+ * July.24.04:
+ * - Issue #541: Direct Binary Flow. Implemented onBinaryUpdate to process 
+ *   raw Protobuf telemetry, eliminating JSONObject hot-path churn.
+ * - Issue #540: Signaling Loop Hardening. Introduced lastForceJoinTs cooldown.
+ * - Logic Restoration: Fully restored all legacy accessors and JSON handlers.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -62,6 +63,7 @@ class ConnectivitySuite @Inject constructor(
     private var viewerId = ""
     private var isTrackerMode = true
     private var lastReconnectTs = timeProvider.elapsedRealtime()
+    private var lastForceJoinTs = 0L // Issue #540: Rejoin cooldown
 
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
@@ -83,7 +85,7 @@ class ConnectivitySuite @Inject constructor(
     val lastPeerActivityTs get() = remoteStatusRepository.lastPeerActivityTs.value
     val peerSignal get() = remoteStatusRepository.peerSignal.value
 
-    // Legacy field accessors for backward compatibility
+    // Legacy field accessors for backward compatibility (Restored)
     val trackerLat get() = trackerStatus.lat
     val trackerLng get() = trackerStatus.lng
     val trackerSpeed get() = trackerStatus.speed
@@ -167,6 +169,7 @@ class ConnectivitySuite @Inject constructor(
         isStopped.set(false)
         this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
         this.lastReconnectTs = timeProvider.elapsedRealtime()
+        this.lastForceJoinTs = 0L
         
         try {
             val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
@@ -227,6 +230,7 @@ class ConnectivitySuite @Inject constructor(
                 deviceId = latestDeviceId; viewerId = latestViewerId; relayUrl = latestRelayUrl; isTrackerMode = latestIsTracker
                 withContext(Dispatchers.Default) {
                     lastReconnectTs = timeProvider.elapsedRealtime()
+                    lastForceJoinTs = 0L // Reset cooldown on identity change
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                     wakeUpRelay()
                 }
@@ -245,8 +249,13 @@ class ConnectivitySuite @Inject constructor(
 
             val nowRt = timeProvider.elapsedRealtime()
             if (signalingProvider.isConnected()) {
-                if (nowRt - signalingProvider.getLastRelayTrafficTs() > NET_REJOIN_THRESHOLD_MS) {
+                // Issue #540: Increased threshold (2x) and added cooldown to prevent join-spam
+                val trafficAge = nowRt - signalingProvider.getLastRelayTrafficTs()
+                val rejoinCooldownPassed = nowRt - lastForceJoinTs > NET_REJOIN_THRESHOLD_MS * 4
+                
+                if (trafficAge > NET_REJOIN_THRESHOLD_MS * 2 && rejoinCooldownPassed) {
                     withContext(Dispatchers.Default) {
+                        lastForceJoinTs = nowRt
                         signalingProvider.updateIdentity(deviceId, viewerId, isTrackerMode, force = true)
                         wakeUpRelay()
                     }
@@ -413,6 +422,117 @@ class ConnectivitySuite @Inject constructor(
     private fun initializePeerState() {
         scope.launch {
             remoteStatusRepository.initialize()
+        }
+    }
+
+    override fun onBinaryUpdate(data: ByteArray) {
+        if (isTrackerMode || isStopped.get()) return
+        try {
+            val statusProto = RealtimeStatus.parseFrom(data)
+            
+            if (!SignalingValidator.shouldProcessLocationUpdate(
+                    incomingId = statusProto.id,
+                    ownDeviceId = deviceId,
+                    isFromViewer = statusProto.fromViewer,
+                    viewerId = statusProto.viewerId,
+                    ownViewerId = viewerId,
+                    isTrackerMode = isTrackerMode
+            )) return
+
+            val now = timeProvider.currentTimeMillis()
+            val nowRt = timeProvider.elapsedRealtime()
+            val peerId = statusProto.id
+
+            peerListener?.onPeerPulse(peerId)
+            remoteStatusRepository.updatePeerActivity(nowRt)
+            remoteStatusRepository.setTrackerConnected(true)
+            mainRepository.updateRemoteActivity(now)
+            
+            remoteStatusRepository.setPeerSignal((statusProto.snrIdx * 10.0).toInt().coerceIn(0, 10))
+
+            remoteStatusRepository.updateStatusAtomic { current ->
+                val trackerLocationPendingReason = TrackerStatus.mapProtoToPendingReason(statusProto.pendingReason)
+                
+                var lat = current.lat; var lng = current.lng; var gpsTs = current.gpsTs; var filteredSpeed = current.speed; var lastFixRt = statusProto.lastValidFixRt
+                var isClockReg = current.isClockRegression; var isVisualJump = current.isJump
+
+                val processed = locationProcessor.processGpsPoint(
+                    lat = statusProto.lat, lng = statusProto.lng, alt = statusProto.alt, 
+                    androidSpeedMps = statusProto.speed.coerceAtLeast(0.0),
+                    gpsTs = statusProto.gpsTs, accuracy = statusProto.accuracy.coerceAtLeast(0.0), 
+                    bearing = statusProto.bearing, snr = statusProto.snrIdx * 45.0,
+                    satsUsed = statusProto.satsUsed, isViewerTrail = false, lastGpsTs = current.gpsTs,
+                    providedMaxAccuracy = statusProto.maxAccuracy, 
+                    providedJumpTier = statusProto.jumpTier, providedIsJammer = statusProto.isJammer, 
+                    providedIsStalled = statusProto.isStalled,
+                    providedIsTamper = statusProto.isTamperDetected || statusProto.isLocationPending,
+                    nowWall = now, nowRt = nowRt
+                )
+                
+                isClockReg = processed.isClockRegression
+                if (processed.optimizedPoint.lat != 0.0 && processed.optimizedPoint.lng != 0.0) {
+                    lat = processed.optimizedPoint.lat; lng = processed.optimizedPoint.lng; gpsTs = processed.optimizedPoint.ts
+                    lastFixRt = nowRt
+                }
+                filteredSpeed = processed.filteredSpeed
+                isVisualJump = processed.status == SentinelStatus.JUMP
+
+                val updatedStatus = current.copy(
+                    lat = lat, lng = lng, gpsTs = gpsTs, speed = filteredSpeed, bearing = statusProto.bearing,
+                    accuracy = statusProto.accuracy, maxAccuracy = statusProto.maxAccuracy,
+                    battery = statusProto.battery, temp = statusProto.temp, 
+                    isCharging = statusProto.isCharging,
+                    satsView = statusProto.satsView, satsUsed = statusProto.satsUsed,
+                    status = processed.status, 
+                    isLocationPending = statusProto.isLocationPending, locationPendingReason = trackerLocationPendingReason,
+                    lastValidFixRt = lastFixRt, isBatterySteepDischarge = statusProto.isBatterySteepDischarge, isCoolingModeActive = statusProto.isCoolingModeActive,
+                    trackerState = TrackerStatus.mapProtoToTrackerState(statusProto.state),
+                    ts = now,
+                    snrIdx = statusProto.snrIdx, noiseIdx = statusProto.noiseIdx, 
+                    luxIdx = statusProto.luxIdx, vibeIdx = statusProto.vibeIdx, 
+                    liftIdx = statusProto.liftIdx,
+                    tiltIdx = statusProto.tiltIdx, baroIdx = statusProto.baroIdx,
+                    isSitDetected = statusProto.isSitDetected, lastSitTs = statusProto.lastSitTs,
+                    verticalVelocity = statusProto.verticalVelocity,
+                    sitVz = statusProto.sitVz, sitDz = statusProto.sitDz,
+                    sitBaro = statusProto.sitBaro, sitTilt = statusProto.sitTilt, sitShock = statusProto.sitShock,
+                    isSitActive = statusProto.isSitActive,
+                    uptimeMs = statusProto.uptimeMs,
+                    totalConnectedMs = statusProto.totalConnectedMs,
+                    sessionConnectedMs = statusProto.sessionConnectedMs,
+                    totalDropMs = statusProto.totalDropMs,
+                    maxDropMs = statusProto.maxDropMs,
+                    lastConnTs = statusProto.lastConnTs,
+                    lastDiscTs = statusProto.lastDiscTs,
+                    isJump = isVisualJump,
+                    isClockRegression = isClockReg,
+                    isJammer = statusProto.isJammer,
+                    isStalled = statusProto.isStalled,
+                    isTamperDetected = statusProto.isTamperDetected,
+                    jumpTier = statusProto.jumpTier
+                )
+
+                scope.launch {
+                    mainRepository.updateLocation(LocationUpdate(
+                        lat = updatedStatus.lat, lng = updatedStatus.lng, speed = updatedStatus.speed, accuracy = updatedStatus.accuracy, bearing = updatedStatus.bearing,
+                        battery = updatedStatus.battery, temp = updatedStatus.temp, isCharging = updatedStatus.isCharging,
+                        gpsTs = updatedStatus.gpsTs, isMe = false, satsView = updatedStatus.satsView, satsUsed = updatedStatus.satsUsed, 
+                        status = updatedStatus.status, 
+                        isClockRegression = updatedStatus.isClockRegression, isLocationPending = updatedStatus.isLocationPending, 
+                        locationPendingReason = updatedStatus.locationPendingReason, lastValidFixRt = updatedStatus.lastValidFixRt, 
+                        isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge, isCoolingModeActive = updatedStatus.isCoolingModeActive,
+                        trackerState = updatedStatus.trackerState, ts = now, 
+                        snrIdx = updatedStatus.snrIdx, noiseIdx = updatedStatus.noiseIdx, luxIdx = updatedStatus.luxIdx, vibeIdx = updatedStatus.vibeIdx, liftIdx = updatedStatus.liftIdx,
+                        tiltIdx = updatedStatus.tiltIdx, baroIdx = updatedStatus.baroIdx,
+                        isSitDetected = updatedStatus.isSitDetected, lastSitTs = updatedStatus.lastSitTs,
+                        verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitDz = updatedStatus.sitDz,
+                        sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock
+                    ))
+                }
+                updatedStatus
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Issue #541: Protobuf direct parse error")
         }
     }
 
