@@ -1,13 +1,18 @@
-# Issue #014: System-Wide Type Safety
-**Status**: Resolved (v9.1.7)
-**Priority**: Medium
-**Requirement**: R014
+# Issue #014: Type Safety Optimization (Double Precision)
 
-## Description
-Standardize all telemetry fields (latitude, longitude, speed, accuracy, etc.) to `Double` across the engine and app modules to prevent precision loss and truncation issues.
+## 🎯 Status: Resolved (Historical)
+**Category**: Engine / Math
 
-## Resolution
-- Audited all data classes in `:core:engine` and standardized fields to `Double`.
-- Updated Room database entities and migrations to support double precision.
-- Verified that calculations in `LocationProcessor` and `ImmFilter` use high-precision doubles.
-- Added explicit type checks in `handleLocationRelayBinary`.
+---
+
+## 📝 Description
+The telemetry pipeline was using mixed numeric types (Float/Double) for coordinate and speed calculations, leading to precision loss and "kinematic drift" during long-term monitoring.
+
+## 🛠️ Resolution
+- Standardized all kinematic parameters to `Double` precision in `ViolationProcessor.kt`.
+- Refactored `EngineGeoPoint` to enforce `Double` for Latitude, Longitude, and Speed.
+- Updated persistence layer to use `Double` for all spatial coordinates.
+
+## 🔗 References
+- **Requirement**: R999 (Type Safety Authority)
+- **File**: `core/engine/src/main/java/com/gps19/core/engine/ViolationProcessor.kt`

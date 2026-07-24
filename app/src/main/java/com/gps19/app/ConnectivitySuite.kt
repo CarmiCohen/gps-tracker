@@ -25,11 +25,12 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.24.05:
+ * - Issue #538d: Redundant Telemetry Conversions. Refactored sendTelemetryInternal 
+ *   to use emitMap, eliminating redundant JSONObject conversions in Viewer mode.
  * July.24.04:
- * - Issue #541: Direct Binary Flow. Implemented onBinaryUpdate to process 
- *   raw Protobuf telemetry, eliminating JSONObject hot-path churn.
+ * - Issue #541: Direct Binary Flow. Implemented onBinaryUpdate.
  * - Issue #540: Signaling Loop Hardening. Introduced lastForceJoinTs cooldown.
- * - Logic Restoration: Fully restored all legacy accessors and JSON handlers.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -63,7 +64,7 @@ class ConnectivitySuite @Inject constructor(
     private var viewerId = ""
     private var isTrackerMode = true
     private var lastReconnectTs = timeProvider.elapsedRealtime()
-    private var lastForceJoinTs = 0L // Issue #540: Rejoin cooldown
+    private var lastForceJoinTs = 0L 
 
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
@@ -85,7 +86,7 @@ class ConnectivitySuite @Inject constructor(
     val lastPeerActivityTs get() = remoteStatusRepository.lastPeerActivityTs.value
     val peerSignal get() = remoteStatusRepository.peerSignal.value
 
-    // Legacy field accessors for backward compatibility (Restored)
+    // Legacy field accessors for backward compatibility
     val trackerLat get() = trackerStatus.lat
     val trackerLng get() = trackerStatus.lng
     val trackerSpeed get() = trackerStatus.speed
@@ -142,7 +143,7 @@ class ConnectivitySuite @Inject constructor(
     val trackerLastConnTs get() = trackerStatus.lastConnTs
     val trackerLastDiscTs get() = trackerStatus.lastDiscTs
     var trackerGpsStallStartTs = 0L 
-    val trackerDistToHome get() = trackerStatus.sitDz // Placeholder parity
+    val trackerDistToHome get() = trackerStatus.sitDz 
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -230,7 +231,7 @@ class ConnectivitySuite @Inject constructor(
                 deviceId = latestDeviceId; viewerId = latestViewerId; relayUrl = latestRelayUrl; isTrackerMode = latestIsTracker
                 withContext(Dispatchers.Default) {
                     lastReconnectTs = timeProvider.elapsedRealtime()
-                    lastForceJoinTs = 0L // Reset cooldown on identity change
+                    lastForceJoinTs = 0L 
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                     wakeUpRelay()
                 }
@@ -249,7 +250,6 @@ class ConnectivitySuite @Inject constructor(
 
             val nowRt = timeProvider.elapsedRealtime()
             if (signalingProvider.isConnected()) {
-                // Issue #540: Increased threshold (2x) and added cooldown to prevent join-spam
                 val trafficAge = nowRt - signalingProvider.getLastRelayTrafficTs()
                 val rejoinCooldownPassed = nowRt - lastForceJoinTs > NET_REJOIN_THRESHOLD_MS * 4
                 
@@ -356,7 +356,8 @@ class ConnectivitySuite @Inject constructor(
         if (isTrackerMode) {
             signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), status.toProto(false).toByteArray())
         } else {
-            signalingProvider.emit("location_update", status.toJSONObject(true))
+            // Issue #538d: Use emitMap to eliminate redundant JSONObject conversion
+            signalingProvider.emitMap("location_update", status.toMap(true))
         }
         return true
     }

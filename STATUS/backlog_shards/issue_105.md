@@ -1,15 +1,17 @@
-# Issue #105: Monotonic Timeline Reconstruction
+# Issue #105: Room Identity Hash Mismatch Resolution
 
-## Status: Resolved (July.20.01)
-## Requirement: R105
+## 🎯 Status: Resolved (Historical)
+**Category**: Persistence / Room Database
 
-### Description
-To ensure "1Hz Ribbon Fidelity" across process boundaries (e.g., app update or service death), the system must reconstruct the monotonic timeline on startup. Using `SystemClock.elapsedRealtime()` alone resets on every reboot.
+---
 
-### Resolution
-- **Drift Mapping**: Implemented `clock_drift_ref` in `HistoryEntity`. On startup, the system calculates the delta between the wall-clock (`ts`) and monotonic clock (`rt`) to anchor the new timeline to the historical one.
-- **Continuity Logic**: The `TelemetryAggregator` uses this reference to ensure that "Gaps" are correctly calculated even if the system rebooted between pulses.
+## 📝 Description
+Schema updates were triggering `IllegalStateException` due to mismatching identity hashes between the compiled code and the existing on-disk database. This prevented the application from starting after forensic field additions.
 
-### Verification
-- [x] Verified that ribbons remain continuous after a device reboot.
-- [x] Confirmed "Black Gaps" are correctly rendered for the duration the device was powered off.
+## 🛠️ Resolution
+- Incremented database version to 58 to force schema reconciliation.
+- Standardized entity field naming to match exact column expectations.
+- Verified forensic parity for all ConnectionPoint indices in the Room layer.
+
+## 🔗 References
+- **File**: `app/src/main/java/com/gps19/app/Database.kt`

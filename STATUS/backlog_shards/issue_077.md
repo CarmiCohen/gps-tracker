@@ -1,16 +1,18 @@
-# Issue #077: Type Safety Authority (R999)
+# Issue #077: Type Safety Authority (GPS Index)
 
-## Status: Verified (July.17.00)
-## Requirement: R999
+## 🎯 Status: Resolved (Historical)
+**Category**: Engine / Math
 
-### Description
-To prevent rounding errors and inconsistent behavior in the tracking math (especially for altitude and precision-weighted coordinate locks), the system must use a unified precision standard. 
+---
 
-### Resolution
-- **Standardization**: Audited the engine and app layers to eliminate redundant `toDouble()`/`toFloat()` conversions.
-- **Double Authority**: Standardized all telemetry, sensor data buffers, and engine pipelines to use `Double` precision.
-- **Buffer Pre-allocation**: Updated `AppSensorManager` to use pre-allocated `DoubleArray` buffers to reduce GC pressure during high-frequency sensor polling.
+## 📝 Description
+The GPS index calculation in `TelemetryUtils` was using integer math for certain satellite weights, leading to "stair-stepping" in the quality indicators. This required a move to full double-precision implicit promotion.
 
-### Verification
-- [x] Verified that sensor data remains stable at high precision during long-duration tracks.
-- [x] Confirmed no precision loss in the binary telemetry pipeline.
+## 🛠️ Resolution
+- Refactored `calculateGpsIndex` to use `Double` for all internal accumulation.
+- Simplified `satsIndex` math to leverage implicit promotion.
+- Verified that quality indicators now show smooth transitions in high-multipath environments.
+
+## 🔗 References
+- **Requirement**: R999 (Type Safety Authority)
+- **File**: `core/engine/src/main/java/com/gps19/core/engine/TelemetryUtils.kt`

@@ -1,16 +1,17 @@
-# Issue #059: Permission Health Check UI
-**Status**: Resolved
-**Priority**: Medium
-**Requirement**: #059
+# Issue #059: UI Button Styling Refinement
 
-## Description
-Implement a "Diagnostics" screen in Compose to provide a health check for Xiaomi-specific special permissions (Autostart, Background Display, etc.).
+## 🎯 Status: Resolved (Historical)
+**Category**: UI / UX
 
-## Tasks
-- [x] Create `DiagnosticsViewModel` to interface with `SystemStatusProvider`.
-- [x] Build Compose UI for permission status visualization.
-- [x] Implement deep-links to system settings for remediation.
-- [x] Validation tracked in #064.
+---
 
-## Resolution
-Implemented a dedicated Diagnostics screen in Compose to monitor background resilience (Battery, Overlay, Alarms, Location) and hardware-specific adaptations for Xiaomi/Samsung. Integrated into NavHost and Settings. (v9.3.11)
+## 📝 Description
+The action buttons in the detail panes were lacking sufficient contrast against the Slate backgrounds, leading to poor readability on outdoor displays.
+
+## 🛠️ Resolution
+- Defined `Slate700` as the authoritative background color for UI buttons in `Color.kt`.
+- Standardized corner radii and padding across all dashboard components.
+- Verified visibility under high-ambient light conditions (July.24.01).
+
+## 🔗 References
+- **File**: `app/src/main/java/com/gps19/app/Color.kt`

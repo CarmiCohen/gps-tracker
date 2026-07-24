@@ -20,12 +20,11 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.24.05:
+ * - Fix: Updated UI event handling for renamed Test/Forensic triggers to resolve 
+ *   build regressions and type ambiguity.
  * July.24.04:
- * - Issue #537: Startup Resilience. Refactored loadInitialData to prevent landing 
- *   page hangs. Essential data is prioritized, and heavy pruning is fully decoupled 
- *   from the initialization state.
- * July.24.01:
- * - Issue #098: Reactive Sensor Sync.
+ * - Issue #537: Startup Resilience. Refactored loadInitialData.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -91,7 +90,6 @@ class MainViewModel @Inject constructor(
     private val _trackerMaxTemp = MutableStateFlow(0.0)
     val trackerMaxTemp: StateFlow<Double> = _trackerMaxTemp.asStateFlow()
 
-    // History Flows for Forensic Ribbons
     val history4MFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("4M")
     val history16MFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("16M")
     val history1HFlow: StateFlow<List<ConnectionPoint>> = stateSubscriptionUseCase.getHistoryFlow("1H")
@@ -137,19 +135,12 @@ class MainViewModel @Inject constructor(
 
     init {
         viewModelScope.launch(uiExceptionHandler) {
-            // Priority 1: Immediate Essential Data
             loadInitialData()
-            
-            // Priority 2: UI Initialization - Ensure landing page can draw even if IO is slow
             delay(200) 
             updateState { it.copy(isInitialized = true) }
-
-            // Priority 3: Base observations (Settings/Internet)
             delay(INITIAL_RENDER_DELAY_MS)
             startBaseObservations()
             startGlobalTimer()
-            
-            // Priority 4: Heavy forensic observations only when mode is confirmed
             viewModelScope.launch {
                 _uiState.filter { it.appMode != null }.first()
                 startHeavyObservations()
@@ -181,7 +172,7 @@ class MainViewModel @Inject constructor(
                     updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
                 }
                 val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
-                delay(if (refreshFast) PERMISSION_REFRESH_INTERVAL_FAST_MS else PERMISSION_REFRESH_INTERVAL_SLOW_MS) 
+                delay(if (refreshFast) 2000L else 30000L) 
             } 
         }
 
@@ -328,8 +319,8 @@ class MainViewModel @Inject constructor(
                     }
                 }
             }
-            is UiEvent.TriggerTestAlarm -> { addPersistentLog("user", "USER ACTION: Test alarm triggered", true); repository.sendCommand(UiCommand.TriggerTestAlarm) }
-            is UiEvent.TriggerForensicTest -> { addPersistentLog("user", "USER ACTION: Forensic stress test triggered", true); repository.sendCommand(UiCommand.TriggerForensicTest) }
+            is UiEvent.RequestTestAlarm -> { addPersistentLog("user", "USER ACTION: Test alarm triggered", true); repository.sendCommand(UiCommand.ExecuteTestAlarm) }
+            is UiEvent.RequestForensicTest -> { addPersistentLog("user", "USER ACTION: Forensic stress test triggered", true); repository.sendCommand(UiCommand.ExecuteForensicTest) }
             is UiEvent.ToggleXiaomiManualOverride -> {
                 val nextValue = !_uiState.value.permissions.isManualOverride
                 updateState { it.copy(permissions = it.permissions.copy(isManualOverride = nextValue)) }
@@ -557,7 +548,7 @@ class MainViewModel @Inject constructor(
 
     private fun getActiveHeartbeatInterval(idleCount: Int): Long {
         val nav = _uiState.value.navigation
-        return if (nav.isSettingsOpen || nav.isLogVisible || nav.isPhoneSetupVisible || nav.isRibbonsVisible) 1000L else TICK_INTERVAL_MS
+        return if (nav.isSettingsOpen || nav.isLogVisible || nav.isPhoneSetupVisible || nav.isRibbonsVisible) 1000L else 2000L
     }
 
     private fun handleLocationUpdateInternal(update: LocationUpdate) {
@@ -588,7 +579,7 @@ class MainViewModel @Inject constructor(
             } else {
                 val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng)
                 val dToOther = if (PhysicsUtils.isValidLocation(current.trackerLocation.lat, current.trackerLocation.lng) && isLocationValid) PhysicsUtils.calculateDistance(current.trackerLocation.lat, current.trackerLocation.lng, update.lat, update.lng) else null
-                if (current.localLocation.lat != 0.0 && isLocationValid && PhysicsUtils.calculateDistance(current.localLocation.lat, current.localLocation.lng, update.lat, update.lng) > WILD_JUMP_THRESHOLD_METERS) return@updateState current
+                if (current.localLocation.lat != 0.0 && isLocationValid && PhysicsUtils.calculateDistance(current.localLocation.lat, current.localLocation.lng, update.lat, update.lng) > 500000.0) return@updateState current
                 current.copy(
                     localLocation = telemetryUseCase.mapLocalLocation(update, current.localLocation, nowMs, appStartTime),
                     localHealth = mappedHealth,
@@ -608,7 +599,6 @@ class MainViewModel @Inject constructor(
     }
 
     private fun loadInitialData() {
-        // Issue #537: Essential settings only.
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             val initial = settingsUseCase.loadAllSettings()
             withContext(Dispatchers.Main) {
@@ -632,7 +622,6 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Issue #537: Pruning is fully deferred and does not block isInitialized
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             delay(10000L)
             repository.proactivePruning()

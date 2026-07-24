@@ -14,13 +14,11 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * July.24.04:
- * - Issue #541: Direct Binary Flow. Updated location_relay_bin handler to 
- *   dispatch raw bytes via onBinaryUpdate, bypassing JSONObject allocation.
- * - Issue #538: Churn Optimization. Optimized handleLogRelay and conflation 
- *   path to minimize Map/JSONObject conversions.
- * July.23.10:
- * - Issue #533: Fixed SRV status inconsistency.
+ * July.24.05:
+ * - Issue #538d: Implemented emitMap to eliminate redundant JSONObject 
+ *   conversions. Telemetry path now flows directly from Map to conflation.
+ * - Issue #541: Direct Binary Flow. Updated location_relay_bin handler.
+ * - Issue #538: Churn Optimization. Optimized handleLogRelay and conflation.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -54,7 +52,7 @@ class CommunicationManager @Inject constructor(
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
-    private var pendingLocationMap: MutableMap<String, Any>? = null
+    private var pendingLocationMap: MutableMap<String, Any?>? = null
     private var conflationJob: Job? = null
 
     override fun setRemoteUpdateListener(listener: SignalingProvider.RemoteUpdateListener?) {
@@ -235,7 +233,6 @@ class CommunicationManager @Inject constructor(
     private fun handleLocationRelayBinary(args: Array<Any>) {
         try {
             val data = args[0] as ByteArray
-            // Issue #541: Prioritize direct binary delivery
             remoteUpdateListener?.onBinaryUpdate(data)
         } catch (e: Exception) {
             Log.e("GPS19", "location_relay_bin direct dispatch failure")
@@ -256,8 +253,6 @@ class CommunicationManager @Inject constructor(
             val entry = LogEntry.fromJSONObject(data)
             logRepository.addLog(entry)
 
-            // Issue #538: Optimized dispatch. Instead of deep copy, we use a 
-            // shallow clone of keys if listener is active, or just pass if safe.
             remoteUpdateListener?.let { listener ->
                 val wrapped = JSONObject()
                 val keys = data.keys()
@@ -304,11 +299,11 @@ class CommunicationManager @Inject constructor(
                 if (isTrackerMode && isViewerPing && !SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
                 
                 if ((isTrackerMode && isViewerPing) || (!isTrackerMode && !isViewerPing)) {
-                    val incomingMap = mutableMapOf<String, Any>()
+                    val incomingMap = mutableMapOf<String, Any?>()
                     data.keys().forEach { incomingMap[it] = data.get(it) }
                     
-                    SignalPayloadGenerator.createPongPayload(incomingMap, deviceId, isTrackerMode)?.let { pongMap ->
-                        socket?.emit("pong_cmd", JSONObject(pongMap))
+                    SignalPayloadGenerator.createPongPayload(incomingMap as Map<String, Any>, deviceId, isTrackerMode)?.let { pongMap ->
+                        socket?.emit("pong_cmd", JSONObject(pongMap as Map<*, *>))
                     }
                     
                     remoteUpdateListener?.onUpdate(JSONObject().apply {
@@ -373,7 +368,21 @@ class CommunicationManager @Inject constructor(
     override fun emit(event: String, data: JSONObject) {
         if (isStopped) return
         markTraffic()
-        if (event == "location_update") { emitLocationConflated(data) } else { socket?.emit(event, data) }
+        if (event == "location_update") { 
+            emitLocationConflated(data.toMap()) 
+        } else { 
+            socket?.emit(event, data) 
+        }
+    }
+
+    override fun emitMap(event: String, data: Map<String, Any?>) {
+        if (isStopped) return
+        markTraffic()
+        if (event == "location_update") {
+            emitLocationConflated(data)
+        } else {
+            socket?.emit(event, JSONObject(data as Map<*, *>))
+        }
     }
 
     override fun emitBinary(event: String, routingId: String, data: ByteArray) {
@@ -382,10 +391,8 @@ class CommunicationManager @Inject constructor(
         socket?.emit(event, routingId, data) 
     }
 
-    private fun emitLocationConflated(data: JSONObject) {
-        // Issue #538: Optimized conflation. We maintain the pending state as a Map
-        // and only convert the incoming JSONObject once.
-        val incoming = data.toMap()
+    private fun emitLocationConflated(incoming: Map<String, Any?>) {
+        // Issue #538d: Direct conflation from Map.
         pendingLocationMap = SignalingMessageConflator.conflate(pendingLocationMap, incoming).toMutableMap()
 
         if (conflationJob == null || !conflationJob!!.isActive) {
@@ -393,15 +400,15 @@ class CommunicationManager @Inject constructor(
                 delay(100)
                 val mapToSend = pendingLocationMap
                 if (mapToSend != null && isConnected() && !isStopped) { 
-                    socket?.emit("location_update", JSONObject(mapToSend))
+                    socket?.emit("location_update", JSONObject(mapToSend as Map<*, *>))
                     pendingLocationMap = null
                 }
             }
         }
     }
 
-    private fun JSONObject.toMap(): Map<String, Any> {
-        val map = mutableMapOf<String, Any>()
+    private fun JSONObject.toMap(): Map<String, Any?> {
+        val map = mutableMapOf<String, Any?>()
         val keys = keys()
         while (keys.hasNext()) {
             val key = keys.next()

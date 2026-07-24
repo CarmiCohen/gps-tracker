@@ -28,12 +28,9 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * July.24.02:
- * - Issue #098: Hardened Step Detector registration. Added aggressive re-registration 
- *   logic and pre-registration cleanup to bypass OS propagation lag.
- * July.23.10:
- * - Issue #098: Permission-aware Step Detector registration. Added explicit 
- *   ACTIVITY_RECOGNITION check to prevent fail(2) denials.
+ * July.24.05:
+ * - Issue #538e: Optimized sample retrieval for forensic backfilling. 
+ *   Replaced List with Sequence to eliminate intermediate allocations.
  */
 class AppSensorManager(
     private val context: Context,
@@ -340,7 +337,6 @@ class AppSensorManager(
             return
         }
 
-        // Issue #098: Android 10+ requires ACTIVITY_RECOGNITION for Step Detector
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val permStatus = ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION)
             if (permStatus != PackageManager.PERMISSION_GRANTED) {
@@ -350,7 +346,6 @@ class AppSensorManager(
             }
         }
 
-        // Issue #098: Aggressive re-registration cleanup. Ensure no stale listeners.
         sensorManager.unregisterListener(this, detector)
 
         isStepDetectorRegistered = sensorManager.registerListener(this, detector, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) 
@@ -628,8 +623,19 @@ class AppSensorManager(
         }
     }
 
-    fun getSensorSamples(fromTs: Long, toTs: Long): List<SensorSnapshot> = sensorSampleBuffer.filter { it.ts in fromTs..toTs }
-    fun getAcousticSamples(fromTs: Long, toTs: Long): List<Pair<Long, Double>> = sensorSampleBuffer.filter { it.ts in fromTs..toTs }.map { it.ts to it.acoustic }
+    /**
+     * Returns sensor samples in range as a Sequence to eliminate allocations.
+     */
+    fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<SensorSnapshot> {
+        return sensorSampleBuffer.asSequence().filter { it.ts in fromTs..toTs }
+    }
+
+    /**
+     * Returns acoustic samples in range as a Sequence of Pairs.
+     */
+    fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<Pair<Long, Double>> {
+        return sensorSampleBuffer.asSequence().filter { it.ts in fromTs..toTs }.map { it.ts to it.acoustic }
+    }
 
     private fun processVibration(x: Float, y: Float, z: Float) {
         val dx = x.toDouble() - lastAccelX.toDouble()

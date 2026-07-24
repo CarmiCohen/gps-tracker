@@ -1,16 +1,20 @@
-# Issue #102: Temporal Forensic Integrity (Monotonic rt Authority)
+# Issue #102: Temporal Forensic Integrity
 
-## Status: Resolved (July.21.00)
-## Requirement: R102
+## 🎯 Status: Resolved (Historical)
+**Category**: Core Engine / Data Integrity
 
-### Description
-The system must be immune to system clock drifts, manual user adjustments, and NITZ updates during forensic recording. Relying on Wall-Clock time (`ts`) for logic leads to "ribbon jumping" or duplicate buckets if the clock moves backward.
+---
 
-### Resolution
-- **Monotonic Authority**: Switched `TelemetryAggregator` and `LocationProcessor` to use `rt` (SystemClock.elapsedRealtime) for all bucket calculations, gap detection, and interpolation logic.
-- **Dual-Time Strategy**: `ts` (Wall-Clock) is preserved solely for UI display and forensic log timestamps, but logic flows strictly through the monotonic timeline.
-- **Drift Mapping**: Implemented `clock_drift_ref` in `HistoryEntity` to allow reconstruction of the monotonic timeline across process boundaries (Issue #105).
+## 📝 Description
+The system lacked a reliable way to distinguish between wall-clock time (subject to user tampering or NTP jumps) and monotonic time (elapsed since boot) in forensic logs. This caused "clock regression" errors and inconsistent duration calculations.
 
-### Verification
-- [x] Verified that manual clock rollback does not affect ribbon continuity.
-- [x] Verified `TelemetryAggregator.processPoint` correctly buckets using `rt`.
+## 🛠️ Resolution
+- Implemented a **Dual-Time Strategy**: 
+    - `rt` (Realtime): Monotonic nanoseconds for logic, debounce, and duration calculations.
+    - `ts` (Timestamp): Wall-clock milliseconds for human-readable forensic logging.
+- Standardized all engine models (`EngineGeoPoint`, `EngineConnectionPoint`, etc.) to include both fields.
+- Added clock jump detection in `HistoryManager` to flag NTP/Manual changes.
+
+## 🔗 References
+- **Requirement**: R102 (Temporal Forensic Integrity)
+- **Files**: `core:engine`, `HistoryManager.kt`, `Models.kt`

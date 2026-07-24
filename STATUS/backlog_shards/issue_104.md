@@ -1,16 +1,17 @@
-# Issue #104: Startup Maintenance Authority (Proactive Log Pruning)
+# Issue #104: Unified Repository Pruning
 
-## Status: Resolved (July.20.00)
-## Requirement: R104
+## 🎯 Status: Resolved (Historical)
+**Category**: Persistence / Maintenance
 
-### Description
-Large database logs from previous sessions can cause I/O bottlenecks and ANRs during the critical startup phase, especially on devices with slow eMMC storage.
+---
 
-### Resolution
-- **Proactive Pruning**: Integrated `deepPruneLogs` into the `MainViewModel` and `TrackerService` initialization sequence.
-- **Thread Isolation**: The pruning operation is strictly executed on `Dispatchers.IO` to ensure it does not compete for Main-thread resources.
-- **Retention Policy**: Enforced a strict 7-day retention policy for forensic logs and a 24-hour policy for high-frequency telemetry pulses.
+## 📝 Description
+Database pruning logic was fragmented across multiple DAO methods, leading to inconsistent storage recovery and potential I/O spikes during high-frequency tracking.
 
-### Verification
-- [x] Verified that startup time is not negatively impacted by the background pruning task.
-- [x] Confirmed database size remains stable after multiple days of high-frequency tracking.
+## 🛠️ Resolution
+- Unified pruning logic using `proactivePruning` in `LogRepository`.
+- Established a standard threshold of 50 records before triggering background cleanup.
+- Synchronized pruning for both startup initialization and reactive maintenance cycles.
+
+## 🔗 References
+- **File**: `app/src/main/java/com/gps19/app/LogRepository.kt`

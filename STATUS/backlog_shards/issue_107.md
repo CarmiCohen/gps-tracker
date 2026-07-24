@@ -1,16 +1,18 @@
-# Issue #107: Step Detector Permission Hardening (R107)
+# Issue #107: Activity Recognition Permission Hardening
 
-## Status: Resolved (July.20.07)
-## Requirement: R107
+## 🎯 Status: Resolved (Historical)
+**Category**: Permissions / Android 10+
 
-### Description
-On Android 10 (API 29) and above, the hardware Step Detector requires the `android.permission.ACTIVITY_RECOGNITION` permission. Without it, sensor registration fails silently, leading to gaps in forensic SIT detection.
+---
 
-### Resolution
-- **Permission Lifecycle**: Implemented a mandatory permission check in `AppSensorManager` before attempting to register the `TYPE_STEP_DETECTOR` listener.
-- **Health Checks**: Added a diagnostic event to the log if the permission is missing, and integrated a prompt into the `PhoneSetupOverlay`.
-- **Graceful Fallback**: If the Step Detector is unavailable or permission is denied, the system automatically engages the Accelerometer-based "Stay-Alive" pulse (Issue #098).
+## 📝 Description
+Android 10 (API 29) introduced the requirement for the `ACTIVITY_RECOGNITION` permission to access physical sensors like the Step Detector. The app was failing to register these sensors on modern devices because the permission wasn't part of the core flow.
 
-### Verification
-- [x] Verified that SIT detection resumes immediately after granting the permission on Android 14.
-- [x] Confirmed the diagnostic warning appears when the permission is revoked.
+## 🛠️ Resolution
+- Added `android.permission.ACTIVITY_RECOGNITION` to the `AndroidManifest.xml`.
+- Integrated the permission check into `MainAppContent` and `AppSensorManager`.
+- Ensured hardware registration is deferred until the permission is explicitly granted by the user.
+
+## 🔗 References
+- **Requirement**: R107 (Permission Immediacy)
+- **Files**: `MainAppContent.kt`, `AppSensorManager.kt`, `MainUiState.kt`

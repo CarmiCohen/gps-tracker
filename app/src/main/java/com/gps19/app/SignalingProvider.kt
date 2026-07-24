@@ -5,11 +5,12 @@ import org.json.JSONObject
 
 /**
  * Interface for signaling implementations (Socket.io, MQTT, etc.)
+ * July.24.05:
+ * - Issue #538d: Added emitMap to eliminate redundant JSONObject conversions 
+ *   in the telemetry path.
  * July.24.04:
  * - Issue #541: Direct Binary Flow. Added onBinaryUpdate to bypass 
  *   JSON overhead for high-frequency telemetry.
- * July.23.00:
- * - Issue #522: Architectural Consolidation.
  */
 interface SignalingProvider {
     interface RemoteUpdateListener {
@@ -24,6 +25,7 @@ interface SignalingProvider {
     fun getRtt(): Int
     fun clearRtt()
     fun emit(event: String, data: JSONObject)
+    fun emitMap(event: String, data: Map<String, Any?>) // Optimized path
     fun emitBinary(event: String, routingId: String, data: ByteArray)
     fun getLastRelayTrafficTs(): Long
     fun setConnectionLostCallback(callback: () -> Unit)

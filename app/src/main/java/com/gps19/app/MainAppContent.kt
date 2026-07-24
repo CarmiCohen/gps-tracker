@@ -44,12 +44,11 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * July.24.05:
+ * - Fix: Corrected type mismatch in onToggleLog callback (reverted to UiEvent).
+ * - Fix: Updated UI event call to RequestTestAlarm to resolve build regression.
  * July.23.11:
- * - Issue #113: Hardened automatic restoration flow to verify permissions 
- *   (including ACTIVITY_RECOGNITION) before starting background services.
- * July.20.07:
- * - Issue #117: Fixed typo in AlarmOverlay onGoToMap callback.
- * - Issue #107: Added ACTIVITY_RECOGNITION to core permission flow for Tracker mode (API 29+).
+ * - Issue #113: Hardened automatic restoration flow.
  */
 @Composable
 fun MainAppContent(
@@ -161,7 +160,6 @@ fun MainAppContent(
         return fineLocation && audio && notification && activityRec
     }
 
-    // Navigation logic based on app mode and diagnostics visibility
     LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible, isManualSelectionInProgress) {
         if (!uiState.isInitialized) return@LaunchedEffect
         
@@ -177,7 +175,6 @@ fun MainAppContent(
 
         if (mode != null) {
             if (navController.currentDestination?.route == Screen.Landing.route && !isManualSelectionInProgress) {
-                // Issue #113: Verify permissions during automatic restoration
                 if (hasRequiredPermissions(mode)) {
                     Timber.d("Automatic restoration: waiting ${LANDING_PAGE_PAUSE_MS}ms")
                     delay(LANDING_PAGE_PAUSE_MS)
@@ -347,7 +344,7 @@ fun MainAppContent(
                             uiState = uiState, viewModel = viewModel, logs = eventLogs, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
                             systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
-                            onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
+                            onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) },
                             onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
                             onExit = onCleanupAndExit,
                             onImportConfig = { importLauncher.launch("application/json") }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) },
@@ -379,7 +376,7 @@ fun MainAppContent(
                         onHardwarePermission = { onRequestHardwarePermission() },
                         onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, 
                         onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
-                        onTestAlarm = { viewModel.onEvent(UiEvent.TriggerTestAlarm) },
+                        onTestAlarm = { viewModel.onEvent(UiEvent.RequestTestAlarm) },
                         onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
                         permissions = uiState.permissions,
                         homePointsCount = uiState.homePoints.size,

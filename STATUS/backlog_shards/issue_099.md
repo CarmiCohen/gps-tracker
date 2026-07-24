@@ -1,16 +1,18 @@
-# Issue #099: Cold-Start Hardening (R955b)
+# Issue #099: ANR Hardening (Cold-Start Delay)
 
-## Status: Resolved (July.20.00)
-## Requirement: R955b
+## 🎯 Status: Resolved (Historical)
+**Category**: Performance / Startup
 
-### Description
-Low-end hardware (Samsung A15) experienced ANRs when the application attempted to initialize all hardware monitors and database connections simultaneously upon cold start.
+---
 
-### Resolution
-- **Staggered Delay**: Implemented a mandatory 500ms delay in the `MainViewModel` and `TrackerService` startup sequence before initiating secondary observations.
-- **Resource Prioritization**: Critical connectivity checks are performed immediately, while forensic sensor registration is deferred.
-- **Boot Sequence Optimization**: Decoupled the notification channel creation from the heavy service initialization path.
+## 📝 Description
+Budget hardware was experiencing Application Not Responding (ANR) errors during cold start due to simultaneous initialization of high-frequency GPS listeners and repository pruning.
 
-### Verification
-- [x] Verified that startup frame time on Samsung A15 remains under 16ms.
-- [x] Confirmed no ANR reports during device reboot stress tests.
+## 🛠️ Resolution
+- Implemented a mandatory 500ms staggered delay before starting base observations in `MainActivity.kt`.
+- Offloaded non-essential hardware property checks to the `MainViewModel`.
+- Established the **Cold-Start Hardening (R955b)** requirement to gate logic pulses during the first second of application life.
+
+## 🔗 References
+- **Requirement**: R955b (Cold-Start Hardening)
+- **File**: `app/src/main/java/com/gps19/app/MainActivity.kt`, `SOT_MASTER_REQUIREMENTS.md`

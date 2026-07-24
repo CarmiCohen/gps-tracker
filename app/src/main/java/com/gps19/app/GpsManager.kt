@@ -19,11 +19,9 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
- * July.22.01:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * July.21.00: 
- * - Restored getSnrSamples and internal buffering for forensic backfilling.
- * - Issue #526: Offloaded hardware lookups to lazy properties to prevent cold-start hangs.
+ * July.24.05:
+ * - Issue #538e: Optimized SNR sample retrieval for forensic backfilling. 
+ *   Replaced List with Sequence to eliminate intermediate allocations.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -85,8 +83,8 @@ class GpsManager @Inject constructor(
     /**
      * Returns SNR samples in the given time range for forensic backfilling.
      */
-    fun getSnrSamples(fromTs: Long, toTs: Long): List<Pair<Long, Double>> {
-        return snrSampleBuffer.filter { it.first in fromTs..toTs }
+    fun getSnrSamples(fromTs: Long, toTs: Long): Sequence<Pair<Long, Double>> {
+        return snrSampleBuffer.asSequence().filter { it.first in fromTs..toTs }
     }
 
     @SuppressLint("MissingPermission")

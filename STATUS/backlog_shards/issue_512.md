@@ -1,17 +1,18 @@
-# Issue #512: Documentation Integrity Audit
+# Issue #512: Consolidate Sentinel Statuses
 
-## Status: Resolved (July.22.05)
-## Requirement: Documentation Integrity
+## 🎯 Status: Resolved (Historical)
+**Category**: Engine / Refactoring
 
-### Description
-The project's status tracking and documentation files had become desynchronized with the actual codebase (e.g., still referencing manual DI when Hilt was implemented). This discrepancy undermined the "Source of Truth" and complicated onboarding and auditing.
+---
 
-### Resolution
-- **Baseline Synchronization**: Audited all `.md` files in `STATUS/` and `DOCS/` to align with the `July.22.05` release version.
-- **Shard Restoration**: Created 15+ missing backlog shards to document legacy and recent hardening resolutions.
-- **Manifest Realignment**: Updated the `VERIFICATION_MANIFEST.md` to serve as a comprehensive, verified requirement list.
-- **Roadmap Correction**: Updated `SIMPLIFICATION_PLAN.md` to reflect that Hilt and Forensic indicators are current architectural pillars.
+## 📝 Description
+The tracking engine used multiple boolean flags (isJump, isJammer, isStalled) to track point validity, leading to complex and error-prone conditional logic. This task migrates the system to a unified `SentinelStatus` enum.
 
-### Verification
-- [x] All status files reference the correct version (`July.22.05`).
-- [x] All requirements in the SoT have corresponding implementation records.
+## 🛠️ Resolution
+- Defined `SentinelStatus` enum with states: `VALID`, `JUMP`, `TAMPER`, `OUTLIER`, `JAMMER_SUSPICION`.
+- Refactored `TelemetryMerger.kt` to process the single status field.
+- Simplified UI binding logic by mapping the enum to specific visual indicators.
+
+## 🔗 References
+- **Requirement**: R502 (Status Authority)
+- **File**: `core/engine/src/main/java/com/gps19/core/engine/TelemetryMerger.kt`

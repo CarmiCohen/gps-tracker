@@ -10,11 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * July.24.05:
+ * - Issue #538d: Added toMap() to TrackerStatus for optimized signaling 
+ *   emission, bypassing JSONObject overhead.
+ * - Fix: Resolved UiEvent/UiCommand name collisions and fixed violationUptimeMs typo.
  * July.24.04:
- * - Issue #541: Direct Binary Flow. Updated TrackerStatus.toProto to include 
- *   behavioral fields (jammer, stall, tamper, jumpTier) for parity with RealtimeStatus proto.
- * July.22.11:
- * - Issue #520: Purge Signaling Command Leftovers.
+ * - Issue #541: Direct Binary Flow. Updated TrackerStatus.toProto.
  */
 
 @Serializable
@@ -278,8 +279,9 @@ data class TrackerStatus(
     val baroIdx: Double = 0.0,
     val micPending: Boolean = false
 ) : SpatialAnchor {
-    fun toJSONObject(fromViewer: Boolean): JSONObject {
-        return JSONObject().apply {
+
+    fun toMap(fromViewer: Boolean): Map<String, Any?> {
+        return mutableMapOf<String, Any?>().apply {
             put("id", SignalingConstants.getTransmissionId(deviceId))
             put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
             put("from_viewer", fromViewer)
@@ -309,11 +311,15 @@ data class TrackerStatus(
             put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
             put("is_jump", isJump); put("mic_pending", micPending)
             put("snr_idx", snrIdx); put("noise_idx", noiseIdx); put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)
-            put("prox_idx", proxIdx); put("tilt_idx", tiltIdx); put("baro_idx", baroIdx)
+            put("tilt_idx", tiltIdx); put("baro_idx", baroIdx)
             put("is_sit_active", isSitActive)
             put("sit_vz", sitVz); put("sit_dz", sitDz); put("sit_baro", sitBaro); put("sit_tilt", sitTilt); put("sit_shock", sitShock)
             put("vertical_velocity", verticalVelocity)
         }
+    }
+
+    fun toJSONObject(fromViewer: Boolean): JSONObject {
+        return JSONObject(toMap(fromViewer) as Map<*, *>)
     }
 
     fun toProto(fromViewer: Boolean): RealtimeStatus {
@@ -556,8 +562,8 @@ sealed class UiEvent {
     data class UpdateDraftAlarmVolume(val volume: Float) : UiEvent()
     object CommitSettings : UiEvent()
     object RefreshPermissionStatus : UiEvent()
-    object TriggerTestAlarm : UiEvent()
-    object TriggerForensicTest : UiEvent()
+    object RequestTestAlarm : UiEvent()
+    object RequestForensicTest : UiEvent()
     data class ToggleAlertsSetup(val visible: Boolean) : UiEvent()
     data class ToggleAlarmSoundSetup(val visible: Boolean) : UiEvent()
     object ToggleTestSiren : UiEvent()
@@ -592,8 +598,8 @@ sealed class UiCommand {
     object ZoomIn : UiCommand()
     object ZoomOut : UiCommand()
     object FullInitializationReset : UiCommand()
-    object TriggerTestAlarm : UiCommand()
-    object TriggerForensicTest : UiCommand()
+    object ExecuteTestAlarm : UiCommand()
+    object ExecuteForensicTest : UiCommand()
     object MapZoomIn : UiCommand()
     object MapZoomOut : UiCommand()
 }

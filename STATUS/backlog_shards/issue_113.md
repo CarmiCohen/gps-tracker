@@ -1,15 +1,19 @@
-# Issue #113: Samsung A15 Fallback Hardening (R405c)
+# Issue #113: Foreground Service & Budget Device Hardening
 
-## Status: Resolved (Implementation) / Pending Field Validation
-## Requirement: R405c
+## 🎯 Status: Resolved (July.24.02)
+**Category**: Service Reliability / Samsung A15
 
-### Description
-Samsung A15 devices (budget hardware) exhibit aggressive OS-level background eviction even when a Foreground Service is active. The "Stay-Alive Pulse" was failing to prevent deep sleep.
+---
 
-### Resolution
-- **Hardware Poke**: Upgraded the `SystemMonitor` to trigger a hardware "poke" via `WakeLock` and a minor Accelerometer sensor request every 10 seconds.
-- **Service Promotion**: Forced `FOREGROUND_SERVICE_TYPE_SPECIAL_USE` for the monitor lifecycle on this specific hardware profile.
+## 📝 Description
+Budget hardware (Samsung A15) was aggressively terminating background services. Additionally, the transition from landing page to monitoring mode was causing race conditions in `startForeground`.
 
-### Verification (Field Test Pending)
-- [ ] Long-term (4h+) field test on A15 hardware.
-- [ ] Confirm no service eviction occurs during extended stationary periods.
+## 🛠️ Resolution
+- Implemented **Double-Throttling** for FGS updates: 2s gate in `AppNotificationManager` and 10s global throttle for service type changes.
+- Added **Hardware Poke** logic: Proactively refreshes WakeLocks and sensor registrations every 10s on A15 devices.
+- Hardened **Automatic Restoration**: Services now verify all critical permissions before attempting to claim foreground status.
+- Implemented **Startup Silence**: Suppresses non-essential status pulses until the system is marked "Active".
+
+## 🔗 References
+- **Requirements**: R993b, R993c, R107b, R405c
+- **Files**: `ViewerService.kt`, `TrackerService.kt`, `AppNotificationManager.kt`

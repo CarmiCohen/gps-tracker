@@ -22,9 +22,10 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * July.24.05:
+ * - Fix: Updated UI command handling for renamed ExecuteTestAlarm/ExecuteForensicTest.
  * July.24.04:
- * - Issue #542: Stealth Enforcement. Added isTrackerMode check to TriggerTestAlarm 
- *   to prevent siren activation in tracker mode.
+ * - Issue #542: Stealth Enforcement. Added isTrackerMode check to TriggerTestAlarm.
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -125,7 +126,7 @@ class CommandRouter @Inject constructor(
                             connectivitySuite.resetPeerStats()
                             listener?.onSyncSensors()
                         }
-                        is UiCommand.TriggerTestAlarm -> {
+                        is UiCommand.ExecuteTestAlarm -> {
                             if (configManager.isTrackerMode) {
                                 logManager.logServiceEvent("TEST ALARM: Suppressed in Tracker Mode (Stealth)", false)
                                 return@onEach
@@ -143,7 +144,7 @@ class CommandRouter @Inject constructor(
                                         loop = true,
                                         vibrate = true,
                                         timeProvider = timeProvider,
-                                        isTrackerMode = false // Explicitly false as we checked mode above
+                                        isTrackerMode = false 
                                     )
                                     delay(3000)
                                     AudioSynthesizer.stopSiren(0, timeProvider = timeProvider)
@@ -154,7 +155,7 @@ class CommandRouter @Inject constructor(
                                 }
                             }
                         }
-                        is UiCommand.TriggerForensicTest -> {
+                        is UiCommand.ExecuteForensicTest -> {
                             listener?.onTriggerForensicTest()
                         }
                     }

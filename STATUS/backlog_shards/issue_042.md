@@ -1,13 +1,17 @@
-# Issue #042: Identity Sanitization Visibility
-**Status**: Resolved (v9.3.2)
-**Priority**: Medium
-**Requirement**: R976
+# Issue #042: Sanitization Visibility Hardening
 
-## Description
-The system must notify the user if their Tracker or Viewer ID is automatically sanitized or reset to default during a migration or due to illegal characters (Requirement R975).
+## 🎯 Status: Resolved (Historical)
+**Category**: UI / UX
 
-## Resolution
-- Implemented `identitySanitizedFlow` in `SettingsRepository`.
-- Added a migration flag that triggers a UI notification (AlertDialog) when a sanitization event occurs.
-- Verified that malformed IDs are reset to "T" or "V" prefixes without app crashes.
-- Verified in v9.3.2; validation tracked in #067.
+---
+
+## 📝 Description
+The identity sanitization overlay was intermittently failing to appear or was being prematurely dismissed, leading to cases where default IDs (T/V) were used without user confirmation.
+
+## 🛠️ Resolution
+- Implemented a dedicated `identitySanitizedFlow` in `MainRepository` and `SettingsRepository`.
+- Added an explicit `UiEvent.DismissIdentitySanitization` to ensure state-backed dismissal.
+- Hardened the `AlertDialog` logic in `MainAppContent.kt` to persist until explicitly acknowledged.
+
+## 🔗 References
+- **File**: `app/src/main/res/values/strings.xml`, `MainAppContent.kt`

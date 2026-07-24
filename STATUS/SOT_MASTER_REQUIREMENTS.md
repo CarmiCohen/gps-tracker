@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.24.03 (Hilt & Sensor Hardening)
+# System Source of Truth (SoT) - July.24.06 (Performance & Boot Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -9,17 +9,23 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Foreground Service Immediacy (R406b)**: `startForeground` MUST be invoked directly in the Main-thread `onCreate` of any `LifecycleService`. (July.23.11)
 *   **Startup Silence Authority (R993c)**: Background services MUST suppress status notification pulses (Battery/Satellites) until the system is explicitly marked as "Active". (Issue #113, July.23.12)
 *   **Cold-Start Hardening (R955b)**: Implement a mandatory 500ms staggered delay before starting base observations. (Issue #099)
+*   **Telemetry Churn Authority (R538)**: All high-frequency telemetry paths MUST avoid redundant conversions between `JSONObject` and `Map` to minimize GC pressure during active tracking. (Issue #538, July.24.05)
+*   **Mutable Aggregation Authority (R538c)**: Telemetry aggregation logic MUST use mutable state containers for intermediate calculations to eliminate redundant object allocations (`copy()` calls) during high-frequency processing across multiple scales. (Issue #538c, July.24.05)
+*   **Direct Map Authority (R538d)**: The signaling pipeline MUST support direct `Map` emission to bypass intermediate `JSONObject` allocations in non-binary telemetry paths. (Issue #538d, July.24.05)
+*   **Forensic Stream Authority (R538e/f)**: Forensic backfilling and results processing MUST use lazy `Sequence` iteration and single-pass processing to eliminate intermediate list allocations. (Issue #538e, #538f, July.24.05)
 
 ### 2. Temporal & Forensic Integrity
 *   **Temporal Forensic Integrity (R102)**: Dual-time strategy using monotonic `rt` for logic and wall-clock `ts` for forensic logging. (Issue #102)
 *   **Forensic Parity Authority (R118)**: Strict field parity across engine, persistence, telemetry, and UI for all 15+ forensic parameters. (Issue #118, #122, #525)
 *   **Remote Peer State Authority (R522)**: All remote tracker telemetry MUST be centralized in `RemoteStatusRepository`. (Issue #522)
 *   **Forensic Pipeline Consolidation (R523)**: Use an atomic `ForensicSnapshot` for all sensor-based evaluations. (Issue #523)
+*   **Direct Binary Flow (R541)**: Tracker-to-Viewer telemetry MUST prioritize the raw Protobuf binary path to bypass JSON parsing overhead. (Issue #541, July.24.05)
 
 ### 3. Persistence & Service Reliability
 *   **Activation Authority**: The `isSystemActive` flag in `DataStore` is the definitive authority for background lifecycle revival.
 *   **Tracker Stealth Authority (R872)**: The device MUST remain silent and visually dark when operating in Tracker mode. (July.23.11)
 *   **Siren Persistence (R527)**: Active alarm states MUST be persisted to DataStore and restored upon service revival. (Issue #527)
+*   **Boot Redundancy Hardening (R539b)**: The `BootReceiver` MUST update the `APP_START_TIME_KEY` immediately upon execution to ensure `MaintenanceWorker` respects its startup grace period. (July.24.05)
 
 ### 4. Dependency & Hardware Hardening
 *   **Permission Immediacy (R107c)**: Permission state queries following a user-initiated refresh MUST be synchronous to ensure UI consistency and prevent stale setup alerts. (Issue #098, July.24.01)
@@ -34,5 +40,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.24.03.
+*   **Current Release**: July.24.06.
 *   **Source of Truth**: app/build.gradle versionName.
