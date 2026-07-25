@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.25.00 (State Decomposition & Map Refactor)
+# System Source of Truth (SoT) - July.25.02 (Map Trail Optimization)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -6,6 +6,8 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Deferred Flow Collection (R542)**: Heavy Room-backed flows (logs, trails, violations) MUST be collected only within their respective screen routes (Tracker/Viewer) rather than the top-level MainAppContent to minimize cold-start main thread congestion and eliminate frame skips. (Issue #542, July.24.07)
 *   **UI State Decomposition (R547)**: The application UI MUST decompose monolithic state objects into persistent (Settings/Navigation) and transient (Telemetry/Health) streams to minimize heap churn and mitigate kernel-level memory moving overhead (`userfaultfd` fallback) on Android 15 hardware. (Issue #547, July.24.08)
+*   **Reactive Siren Surfacing (R547c)**: To achieve zero-latency alarm visibility, UI visibility gates (specifically `isRedScreenVisible`) MUST be integrated directly into the `TelemetryState` stream. Computation of these gates MUST occur immediately upon receipt of integrity updates in the ViewModel to bypass global timer pulse latency. (Issue #547c, July.25.01)
+*   **Granular Trail Thinning (R548)**: To prevent memory bloat and UI jank during long sessions, map trail polylines MUST be simplified using radial distance pruning. A 1.0m threshold MUST be applied to prune redundant nodes while strictly preserving segment boundaries and valid/jump status changes. (Issue #548, July.25.02)
 *   **Startup Suppression Window (R993d)**: To prevent Main-thread starvation during cold-start, all Foreground Service notification type updates MUST be suppressed for the first 10 seconds of service life if a previous notification has already been successfully posted. (Issue #534, July.24.02)
 *   **Notification IPC Throttling (R993b)**: To prevent Main-thread ANRs during hardware recovery bursts, Foreground Service notification updates MUST be double-throttled: a 2000ms hard gate in `AppNotificationManager` and a 10,000ms global throttle for service type changes in `BaseMonitorService` descendants. (Issue #113, #535, July.24.02)
 *   **Foreground Service Immediacy (R406b)**: `startForeground` MUST be invoked directly in the Main-thread `onCreate` of any `LifecycleService`. (July.23.11)
@@ -45,5 +47,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.25.00.
+*   **Current Release**: July.25.02.
 *   **Source of Truth**: app/build.gradle versionName.

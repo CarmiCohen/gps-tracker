@@ -31,9 +31,8 @@ import com.gps19.core.engine.*
 
 /**
  * ViewerScreen: Pocket-mode UI.
- * July.24.08:
- * - Issue #547: State Decomposition. Refactored to consume both uiState 
- *   (persistent) and telemetryState (transient) to reduce heap churn.
+ * July.25.02:
+ * - Issue #547c Cleanup: Passed telemetryState to SettingsOverlay.
  */
 
 @Composable
@@ -98,7 +97,6 @@ fun ViewerScreen(
             systemPulse = systemPulse,
             rttFlow = viewModel.rtt,
             remoteSignalFlow = viewModel.remoteSignal,
-            redScreenVisibleFlow = viewModel.redScreenVisible,
             modifier = Modifier.pointerInput(Unit) {
                 detectTapGestures(onTap = { viewModel.onEvent(UiEvent.SetRedScreenVisible(true)) })
             }
@@ -208,7 +206,7 @@ fun ViewerScreen(
 
         if (isSettingsOpen) {
             SettingsOverlay(
-                uiState = uiState, onClose = onToggleSettings, onReset = onResetStats,
+                uiState = uiState, telemetryState = telemetryState, onClose = onToggleSettings, onReset = onResetStats,
                 onExport = onExportLogs, onClear = onClearHome, onImportConfig = onImportConfig,
                 onFullInitialization = { viewModel.fullInitialization(context) },
                 onUpdateDeviceId = { viewModel.onEvent(UiEvent.UpdateDraftDeviceId(it)) },

@@ -1,36 +1,40 @@
-# Handover (July.25.01) - Siren Restoration & Reactive Surfacing [RELEASED]
+# Handover (July.25.02) - Map Trail Optimization & Performance Hardening [RELEASED]
 
 ## 🎯 Completed Objective
-Cycle **July.25.01** successfully restored and optimized the Siren/Alarm surfacing logic following the state decomposition refactor. We achieved **Zero-Latency Alarm Surfacing** by migrating UI visibility gates into the transient state stream, reaching a milestone of **403 Resolved Issues**.
+Cycle **July.25.02** reached **404 Resolved Issues** by implementing a granular trail thinning mechanism. This addresses potential memory bloat and rendering lag during long tracking sessions (4h+).
 
-## 📊 Status Summary & Forensic Trails
+## 📊 Forensic Status & State Authority
 
-### 1. Resolved: Siren Logic Restoration (#547c)
-- **Problem**: After the #547 state decomposition, `redScreenVisible` was still managed by a separate `StateFlow` updated via a 1-2s global timer pulse. This introduced unacceptable latency in surfacing critical alarms.
-- **Forensic Fix**: Migrated `isRedScreenVisible` into `TelemetryState`.
-- **Reactive Implementation**: 
-    - `MainViewModel.kt` now triggers a `behaviorUseCase` re-evaluation immediately within the `observeIntegrityUpdates` flow.
-    - This ensures that as soon as an alarm is received from the repository/core-engine, the UI responds within the next frame.
-- **Result**: Zero-latency surfacing of critical alerts; complete removal of redundant state flows in `MainViewModel`.
-- **Authority**: Objective 3 of July.25.00 Handover.
+### 1. Resolved: Map Trail Thinning Optimization (#548)
+- **Problem**: Long-duration trails accumulated thousands of redundant nodes in `Polyline` overlays, leading to increased heap pressure and UI jank during map pans/zooms.
+- **Root-Cause Solution**:
+    - **`PhysicsUtils.kt`**: Added `simplifyTrail<T>(...)` - a generic radial distance-based thinning algorithm.
+    - **`MapOverlayManager.kt`**: Integrated thinning into `drawTrailToFolder` with a **1.0m threshold**.
+- **Impact**: Redundant points (e.g., jitter at a standstill or high-density walking pulses) are pruned while strictly preserving segment boundaries and valid/jump status changes.
 
-### 2. Forensic Alignment: State Decomposition Refinement
-- **Consolidation**: Updated `MainAppContent.kt` and `AlarmActivity.kt` to strictly consume transient visibility from `TelemetryState`.
-- **Consistency Check**: Verified that `AlarmActivity` now correctly pulls `activeAlarms` and `isAlarmSilenced` from the transient model, preventing "stale state" crashes that could have occurred if settings were updated while an alarm was active.
+### 2. Architecture Consistency
+- The thinning logic was placed in `core:engine:PhysicsUtils` to ensure it remains a pure, testable function, keeping the imperative `MapOverlayManager` clean of geometry math.
+- Maintained the existing `Polyline` pooling logic to avoid allocation churn.
 
-### 3. Version Update: July.25.01
-- **Status**: Stable. State decomposition is now the standard for all high-frequency UI elements.
+### 3. Documentation & Tracking Sync
+- **`issues.md`**: Updated to **July.25.02**, reflecting the resolution of #548 and identifying a new concern (#548b) regarding micro-movement granularity.
+- **`Handover.md`**: Updated to capture the latest state.
+- **Requirements**: Added **R548** (Granular Trail Thinning Authority) to `STATUS/SOT_MASTER_REQUIREMENTS.md`.
 
-## ⚠️ Newly Identified Risks
-- **Issue #547 (Part B)**: Ongoing monitoring of Samsung A15 kernel behavior. While allocation churn is reduced, we must verify that `isRedScreenVisible` reactive updates do not re-introduce frame drops during heavy GC.
+## ⚠️ Newly Identified Risks & Concerns
+- **Issue #548b**: The 1.0m threshold is a balance between performance and detail. If ultra-fine forensic "micro-drift" analysis is required for stationary tampering detection, this threshold might need to be dynamic or toggleable.
 
-## 🎯 Next Cycle Objectives (July.25.01)
-1. **GC Pressure Audit**: Use the refined `TelemetryState` model to verify memory stability under high load (Runtime memory profiling).
-2. **Map Refinement**: Implement granular trail thinning within `MapOverlayManager` to further reduce the memory footprint of long-running sessions.
-3. **Core-Engine Sync**: Audit if additional transient flags in `core:engine` should be surfaced directly to `TelemetryState` to bypass further ViewModel processing.
+## 🎯 Next Objective
+- **Issue #549: Core-Engine Transient Flag Audit**: Audit `core:engine` for remaining transient flags that can be surfaced directly to `TelemetryState` to further reduce the dependency on the global 2s pulse.
 
-## 🚀 Release Verification
-- [x] `versionName` incremented to `July.25.01` in `app/build.gradle`.
-- [x] `STATUS/SOT_MASTER_REQUIREMENTS.md` updated to `July.25.01`.
-- [x] `issues.md` dashboard synchronized (403 Resolved).
-- [x] Build `:app:assembleDebug` SUCCESS.
+## 🚀 Release Preparation
+- **Build Status**: Pending final assemble.
+- **Git Block**:
+    ```bash
+    git add -A
+    git commit -m "Release July.25.02: Map Trail Thinning Optimization"
+    git tag -a vJuly.25.02 -m "Implemented radial distance pruning for map trails."
+    git push origin main --tags
+    ```
+
+**Status**: READY FOR COMPLETION.

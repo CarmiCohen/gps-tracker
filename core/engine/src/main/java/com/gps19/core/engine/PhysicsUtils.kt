@@ -4,11 +4,11 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: High-performance geospatial and kinematic calculations.
+ * July.25.02:
+ * - Issue #548: Added simplifyTrail for granular map trail thinning.
  * July.23.03:
  * - Issue #529: Urban Accuracy Snap. Added lastAccuracy to isVisualJump to 
  *   suppress false positives during accuracy recovery.
- * July.1.16:
- * - Issue #508: Optimization Removal. Removed Adaptive Jump and SNR-based scaling.
  */
 object PhysicsUtils {
 
@@ -29,6 +29,41 @@ object PhysicsUtils {
         val dist = 6371000.0 * 2 * atan2(sqrt(clampedA), sqrt(1.0 - clampedA))
 
         return if (dist.isNaN()) 0.0 else dist
+    }
+
+    /**
+     * Simplifies a list of points by removing points that are closer than [minDistance] 
+     * from the previous kept point. Always preserves the first and last points.
+     */
+    fun <T> simplifyTrail(
+        points: List<T>,
+        minDistance: Double,
+        getLat: (T) -> Double,
+        getLng: (T) -> Double
+    ): List<T> {
+        if (points.size <= 2) return points
+        
+        val result = mutableListOf<T>()
+        result.add(points.first())
+        
+        var lastLat = getLat(points.first())
+        var lastLng = getLng(points.first())
+        
+        for (i in 1 until points.size - 1) {
+            val curr = points[i]
+            val currLat = getLat(curr)
+            val currLng = getLng(curr)
+            
+            val dist = calculateDistance(lastLat, lastLng, currLat, currLng)
+            if (dist >= minDistance) {
+                result.add(curr)
+                lastLat = currLat
+                lastLng = currLng
+            }
+        }
+        
+        result.add(points.last())
+        return result
     }
 
     fun isValidLocation(lat: Double, lng: Double): Boolean {
@@ -124,28 +159,20 @@ object PhysicsUtils {
         if (speedMps > JUMP_GATE_SPEED_ACCURACY_HIGH_MPS && accuracy > JUMP_GATE_ACCURACY_HIGH_THRESHOLD) score += JUMP_WEIGHT_ACCURACY_HIGH
         
         // Issue #529: Accuracy Recovery Mitigation
-        // If accuracy is significantly improving, and the distance moved is within the previous error margin, 
-        // this is likely an "Accuracy Snap" (correction) rather than an erratic move.
         val isAccuracyImproving = lastAccuracy > 0.0 && accuracy < (lastAccuracy * 0.8)
         val isWithinPreviousError = lastAccuracy > 0.0 && dist < lastAccuracy
         
         val isSnap = isAccuracyImproving && isWithinPreviousError
         if (isSnap && score > 0) {
-            // Apply reduction to score to prevent false jump triggers during snapping
             score = (score * 0.4).toInt()
         }
 
         val isTier2 = dist >= JUMP_POINT_DISTANCE_THRESHOLD && (speedMps > MAX_PHYSICAL_SPEED_MPS || score >= 40)
-        
         val jitterThreshold = JUMP_GATE_VISUAL_JITTER_METERS
         val isTier3 = dist >= jitterThreshold && dist < JUMP_POINT_DISTANCE_THRESHOLD && score >= 30
         
         var isJump = (isTier2 || isTier3 || score >= 50)
-        
-        // Hard suppression for Accuracy Snaps to allow the UI to recover/snap to high accuracy
-        if (isSnap) {
-            isJump = false
-        }
+        if (isSnap) isJump = false
         
         val reason = when {
             isSnap -> "Suppressed Accuracy Snap"

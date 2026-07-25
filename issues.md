@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.25.01)
+# Project Issues & Hardening Tracking (July.25.02)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,12 +7,13 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 2 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 403 |
+| **Resolved (Total)** | 🟢 Progress | 404 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
 *   **Issue #547: Kernel Warning (Part B)**: `userfaultfd: MOVE ioctl seems unsupported` still active on Samsung A15; monitoring GC pressure after state decomposition.
+*   **Issue #548b: Thinning Granularity Concern**: 1.0m threshold is optimal for walking/driving, but may need adjustment if "Micro-Movement" forensics become a priority.
 
 ---
 
@@ -26,6 +27,11 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Impact**: Post-decomposition monitoring required to verify that reduced heap churn has stabilized GC pause times on Android 15.
 
 ---
+
+## 🟢 Recently Resolved Issues (July.25.02)
+*   **Issue #548: Map Trail Thinning Optimization**.
+    *   **Resolution**: Implemented `PhysicsUtils.simplifyTrail` using radial distance pruning (1.0m threshold). Integrated into `MapOverlayManager.drawTrailToFolder`.
+    *   **Impact**: Significantly reduced `Polyline` node count for long-duration sessions, lowering memory pressure and improving map render performance.
 
 ## 🟢 Recently Resolved Issues (July.25.01)
 *   **Issue #547c: Siren Logic & Zero-Latency Surfacing**.

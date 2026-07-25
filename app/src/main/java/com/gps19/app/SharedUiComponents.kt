@@ -43,9 +43,9 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * July.24.08:
- * - Issue #547: State Decomposition. Refactored GlobalStatusBar to consume 
- *   TelemetryState separately from MainUiState to reduce heap churn.
+ * July.25.01:
+ * - Issue #547c: State Decomposition Refinement. Updated GlobalStatusBar to 
+ *   consume isRedScreenVisible from TelemetryState for zero-latency surfacing.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -411,7 +411,6 @@ fun GlobalStatusBar(
     systemPulse: Long, 
     rttFlow: StateFlow<Int>,
     remoteSignalFlow: StateFlow<Int>,
-    redScreenVisibleFlow: StateFlow<Boolean>,
     modifier: Modifier = Modifier
 ) {
     val mode = uiState.appMode ?: return
@@ -424,7 +423,7 @@ fun GlobalStatusBar(
     
     val rtt by rttFlow.collectAsStateWithLifecycle()
     val remoteSignal by remoteSignalFlow.collectAsStateWithLifecycle()
-    val redScreenVisible by redScreenVisibleFlow.collectAsStateWithLifecycle()
+    val redScreenVisible = telemetryState.isRedScreenVisible
 
     val commIndex = if (uiState.isSystemActive && isRelayConnected) {
         TelemetryUtils.calculateCommIndex(rtt, 10, 10)

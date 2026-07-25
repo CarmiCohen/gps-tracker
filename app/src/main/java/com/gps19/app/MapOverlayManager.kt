@@ -19,9 +19,10 @@ import kotlin.math.log10
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * July.25.02:
+ * - Issue #548: Integrated simplifyTrail thinning in drawTrailToFolder (1.0m threshold).
  * July.24.08:
  * - Issue #544 Cleanup: Extracted imperative overlay management to MapOverlayManager.
- * - Optimization: Used KTX extensions and consolidated bitmap creation logic.
  */
 class MapOverlayManager(
     private val context: Context,
@@ -232,15 +233,20 @@ class MapOverlayManager(
         if (trailPoints.isEmpty()) return 0
         var poolIdx = 0; var startIdx = 0
         while (startIdx < trailPoints.size) {
-            val segmentPoints = mutableListOf<GeoPoint>(); var currentIdx = startIdx
+            val segmentPoints = mutableListOf<TrailPoint>(); var currentIdx = startIdx
             while (currentIdx < trailPoints.size) {
                 val pt = trailPoints[currentIdx]; if (pt.status != SentinelStatus.VALID && currentIdx > startIdx) break
-                segmentPoints.add(pt.toGeoPoint()); currentIdx++
+                segmentPoints.add(pt); currentIdx++
                 if (pt.status != SentinelStatus.VALID) { startIdx = currentIdx; break }
             }
             if (segmentPoints.size > 1) {
-                val line = if (poolIdx < pool.size) pool[poolIdx] else Polyline(view).also { l -> l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); pool.add(l) }
-                line.setPoints(segmentPoints); line.outlinePaint.color = color; folder.add(line); poolIdx++
+                // Issue #548: Radial thinning (1.0m) to reduce redundant polyline points
+                val simplified = PhysicsUtils.simplifyTrail(segmentPoints, 1.0, { it.lat }, { it.lng })
+                
+                if (simplified.size > 1) {
+                    val line = if (poolIdx < pool.size) pool[poolIdx] else Polyline(view).also { l -> l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); pool.add(l) }
+                    line.setPoints(simplified.map { it.toGeoPoint() }); line.outlinePaint.color = color; folder.add(line); poolIdx++
+                }
             }
             if (currentIdx == trailPoints.size) break
             startIdx = if (startIdx < currentIdx) (if (trailPoints[currentIdx - 1].status == SentinelStatus.VALID) currentIdx - 1 else currentIdx) else startIdx + 1

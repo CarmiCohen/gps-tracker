@@ -27,16 +27,14 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
- * July.23.11:
- * - Issue #113: Added Physical Activity (Step Detector) permission section to PhoneSetupOverlay.
- * - Fix: Updated DirectionsRun icon to AutoMirrored version.
- * v9.4.1:
- * - Issue #510: Removed Chair Sit Detection UI and settings.
+ * July.25.02:
+ * - Issue #547c Cleanup: Updated SettingsOverlay and AlarmSoundOverlay to consume 
+ *   isSirenPlaying from TelemetryState instead of MainUiState.
  */
 
 @Composable
 fun SettingsOverlay(
-    uiState: MainUiState, onClose: () -> Unit, onReset: (() -> Unit)?=null, onExport: (() -> Unit)?=null, 
+    uiState: MainUiState, telemetryState: TelemetryState, onClose: () -> Unit, onReset: (() -> Unit)?=null, onExport: (() -> Unit)?=null, 
     onClear: (() -> Unit)?=null, onImportConfig: () -> Unit, onFullInitialization: () -> Unit,
     onUpdateDeviceId: (String) -> Unit, onUpdateViewerId: (String) -> Unit, onUpdateRelayUrl: (String) -> Unit,
     onUpdateMaxDistance: (String) -> Unit, onUpdateAlertSettings: (AlertSettings) -> Unit, onUpdateSirenType: (String) -> Unit,
@@ -114,7 +112,7 @@ fun SettingsOverlay(
         when (activeSub) {
             SubSettings.CLEAN -> CleanSetupOverlay(uiState = uiState, onClear = onClear, onReset = onReset, onFullInitialization = onFullInitialization, onClose = { viewModel?.onEvent(UiEvent.SetSubSettings(null)) })
             SubSettings.ALERTS -> AlertManagementOverlay(uiState = uiState, onUpdateAlertSettings = onUpdateAlertSettings, onClose = { viewModel?.onEvent(UiEvent.SetSubSettings(null)) })
-            SubSettings.SOUND -> AlarmSoundOverlay(uiState = uiState, onUpdateAlertSettings = onUpdateAlertSettings, onUpdateSirenType = onUpdateSirenType, onUpdateAlarmVolume = onUpdateAlarmVolume, onTestSiren = onTestSiren, onClose = { viewModel?.onEvent(UiEvent.SetSubSettings(null)) })
+            SubSettings.SOUND -> AlarmSoundOverlay(uiState = uiState, telemetryState = telemetryState, onUpdateAlertSettings = onUpdateAlertSettings, onUpdateSirenType = onUpdateSirenType, onUpdateAlarmVolume = onUpdateAlarmVolume, onTestSiren = onTestSiren, onClose = { viewModel?.onEvent(UiEvent.SetSubSettings(null)) })
             else -> {}
         }
     }
@@ -182,12 +180,12 @@ fun AlertManagementOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSe
 }
 
 @Composable
-fun AlarmSoundOverlay(uiState: MainUiState, onUpdateAlertSettings: (AlertSettings) -> Unit, onUpdateSirenType: (String) -> Unit, onUpdateAlarmVolume: (Float) -> Unit, onTestSiren: () -> Unit, onClose: () -> Unit) {
+fun AlarmSoundOverlay(uiState: MainUiState, telemetryState: TelemetryState, onUpdateAlertSettings: (AlertSettings) -> Unit, onUpdateSirenType: (String) -> Unit, onUpdateAlarmVolume: (Float) -> Unit, onTestSiren: () -> Unit, onClose: () -> Unit) {
     val sirenOptions = listOf("Siren", "Chimes", "Pulse"); val settings = uiState.draftSettings.alertSettings
     Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate900) {
         Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.sound_title), color = Violet500, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
-            Spacer(Modifier.height(24.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.sound_label_test_audio), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium); Button(onClick = onTestSiren, colors = ButtonDefaults.buttonColors(containerColor = BrandJd)) { Icon(if (uiState.isSirenPlaying) Icons.Default.Stop else Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(if (uiState.isSirenPlaying) stringResource(R.string.btn_test_audio_stop) else stringResource(R.string.btn_test_audio_test)) } }
+            Spacer(Modifier.height(24.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.sound_label_test_audio), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium); Button(onClick = onTestSiren, colors = ButtonDefaults.buttonColors(containerColor = BrandJd)) { Icon(if (telemetryState.isSirenPlaying) Icons.Default.Stop else Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(if (telemetryState.isSirenPlaying) stringResource(R.string.btn_test_audio_stop) else stringResource(R.string.btn_test_audio_test)) } }
             Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_type), Amber500); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { sirenOptions.forEach { type -> FilterChip(selected = uiState.selectedSirenType == type, onClick = { onUpdateSirenType(type) }, label = { Text(type) }) } }
             Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_behaviors), ViewerCyan)
             AlarmToggle(stringResource(R.string.sound_label_vibration), settings.vibrationEnabled) { onUpdateAlertSettings(settings.copy(vibrationEnabled = it)) }

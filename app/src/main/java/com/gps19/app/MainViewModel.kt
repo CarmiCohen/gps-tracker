@@ -20,10 +20,10 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * July.24.08:
- * - Issue #547: State Decomposition. Separated transient TelemetryState 
- *   from persistent MainUiState to reduce heap churn and mitigate kernel 
- *   performance issues on Samsung A15.
+ * July.25.01:
+ * - Issue #547: State Decomposition (Refinement). Migrated redScreenVisible into 
+ *   TelemetryState for architectural consistency and zero-latency reactive surfacing.
+ * - Build Fix: Resolved combine() type mismatch for dashboardState.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -83,9 +83,6 @@ class MainViewModel @Inject constructor(
     private val _trackerState = MutableStateFlow(TrackerState.UNKNOWN)
     val trackerState: StateFlow<TrackerState> = _trackerState.asStateFlow()
 
-    private val _redScreenVisible = MutableStateFlow(false)
-    val redScreenVisible: StateFlow<Boolean> = _redScreenVisible.asStateFlow()
-
     private val _localMaxTemp = MutableStateFlow(0.0)
     val localMaxTemp: StateFlow<Double> = _localMaxTemp.asStateFlow()
 
@@ -105,7 +102,13 @@ class MainViewModel @Inject constructor(
 
     val dashboardState: StateFlow<DashboardState> = combine(
         _uiState, _telemetryState, _systemPulse, _trackerState, _localMaxTemp, _trackerMaxTemp
-    ) { ui, tele, pulse, trkState, lMax, tMax ->
+    ) { args ->
+        val ui = args[0] as MainUiState
+        val tele = args[1] as TelemetryState
+        val pulse = args[2] as Long
+        val trkState = args[3] as TrackerState
+        val lMax = args[4] as Double
+        val tMax = args[5] as Double
         dashboardStateProvider.buildDashboardState(ui, tele, pulse, trkState, lMax, tMax)
     }
     .flowOn(Dispatchers.Default)
@@ -189,19 +192,28 @@ class MainViewModel @Inject constructor(
             .distinctUntilChanged()
             .onEach { update ->
                 _rtt.value = update.lastRtt
-                updateTelemetryState { it.copy(connectivity = it.connectivity.copy(isRelayConnected = update.isRelayConnected, lastRemoteActivityTs = update.lastRemoteActivityTs))}
+                updateTelemetryState { current -> current.copy(connectivity = current.connectivity.copy(isRelayConnected = update.isRelayConnected, lastRemoteActivityTs = update.lastRemoteActivityTs))}
             }.launchIn(viewModelScope)
 
         stateSubscriptionUseCase.observeIntegrityUpdates()
             .distinctUntilChanged()
             .onEach { update ->
-                updateTelemetryState { current -> current.copy(
-                    localHealth = update.health,
-                    connectivity = current.connectivity.copy(isLocalOnline = update.isLocalOnline),
-                    trackerBattery = if (_uiState.value.appMode == "tracker") current.trackerBattery.copy(level = update.batteryLevel, temp = update.batteryTemp, isCharging = update.isCharging, isChargingStable = update.isCharging) else current.trackerBattery,
-                    activeAlarms = update.activeAlarms,
-                    isNewViolationDetected = update.activeAlarmTypes.any { it !in lastKnownAlarmTypes }
-                )}
+                updateTelemetryState { current -> 
+                    val isNewViolation = update.activeAlarmTypes.any { it !in lastKnownAlarmTypes }
+                    val nextTele = current.copy(
+                        localHealth = update.health,
+                        connectivity = current.connectivity.copy(isLocalOnline = update.isLocalOnline),
+                        trackerBattery = if (_uiState.value.appMode == "tracker") current.trackerBattery.copy(level = update.batteryLevel, temp = update.batteryTemp, isCharging = update.isCharging, isChargingStable = update.isCharging) else current.trackerBattery,
+                        activeAlarms = update.activeAlarms,
+                        isNewViolationDetected = isNewViolation
+                    )
+                    
+                    // Zero-latency reactive red screen update
+                    val shouldShowRedScreen = behaviorUseCase.shouldShowRedScreen(
+                        _uiState.value, nextTele, timeProvider.elapsedRealtime(), lastAlarmAckRt, nextTele.isRedScreenVisible
+                    )
+                    nextTele.copy(isRedScreenVisible = shouldShowRedScreen)
+                }
                 lastKnownAlarmTypes = update.activeAlarmTypes
                 _localMaxTemp.value = update.maxTemp
                 if (_uiState.value.appMode == "tracker") _trackerMaxTemp.value = update.maxTemp
@@ -264,7 +276,7 @@ class MainViewModel @Inject constructor(
                 updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
             }
             is UiEvent.SetPendingMode -> updateNavigation { it.copy(pendingMode = event.mode) }
-            is UiEvent.SetRedScreenVisible -> _redScreenVisible.value = event.visible
+            is UiEvent.SetRedScreenVisible -> updateTelemetryState { it.copy(isRedScreenVisible = event.visible) }
             is UiEvent.SetUiVisible -> {
                 repository.sendCommand(UiCommand.UiVisibilityChanged(event.visible))
                 if (!event.visible && _uiState.value.navigation.isSettingsOpen) commitDraft()
@@ -366,7 +378,7 @@ class MainViewModel @Inject constructor(
                 is UiEvent.SetDeviceId -> { 
                     settingsUseCase.updateDeviceId(event.id)
                     updateState { it.copy(deviceId = event.id) }
-                    updateTelemetryState { it.copy(trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = it.connectivity.copy(isTrackerConnected = false, lastUpdateTs = 0L)) }
+                    updateTelemetryState { it.copy(trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = it.connectivity.copy(isTrackerConnected = false, lastUpdateTs = 0L), isRedScreenVisible = false) }
                     _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; remoteStatusRepository.reset(); repository.resetStats(); repository.sendCommand(UiCommand.StatsReset); repository.sendCommand(UiCommand.SettingsUpdated)
                 }
                 is UiEvent.SetViewerId -> {
@@ -418,7 +430,7 @@ class MainViewModel @Inject constructor(
                 if (result.trackerIdChanged || result.viewerIdChanged) {
                     remoteStatusRepository.reset(); repository.resetStats(); repository.sendCommand(UiCommand.StatsReset)
                     _trackerMaxTemp.value = 0.0; _remoteSignal.value = 0; _trackerCurrentMa.value = 0; _gnssDetail.value = null; _trackerState.value = TrackerState.UNKNOWN
-                    updateTelemetryState { current -> current.copy(trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = current.connectivity.copy(isTrackerConnected = false, lastUpdateTs = 0L, lastRemoteActivityTs = 0L), distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, maxTrackerAccuracy = 0.0) }
+                    updateTelemetryState { current -> current.copy(trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = current.connectivity.copy(isTrackerConnected = false, lastUpdateTs = 0L, lastRemoteActivityTs = 0L), distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, maxTrackerAccuracy = 0.0, isRedScreenVisible = false) }
                 }
                 repository.sendCommand(UiCommand.SettingsUpdated)
             }
@@ -443,8 +455,7 @@ class MainViewModel @Inject constructor(
             if (nowWall > 0) {
                 lastAlarmAckRt = nowRt
                 updateState { it.copy(lastAlarmAckTs = nowWall) }
-                updateTelemetryState { it.copy(isAlarmSilenced = true) }
-                _redScreenVisible.value = false
+                updateTelemetryState { it.copy(isAlarmSilenced = true, isRedScreenVisible = false) }
             }
         }
     }
@@ -467,8 +478,8 @@ class MainViewModel @Inject constructor(
                     sessionUseCase.stopTrackingSession()
                     remoteStatusRepository.reset()
                     updateState { it.copy(appMode = null, isSystemActive = false) }
-                    updateTelemetryState { it.copy(trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = ConnectivityState(isTrackerConnected = false, lastUpdateTs = 0L, lastRemoteActivityTs = 0L), distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, maxTrackerAccuracy = 0.0, maxViewerAccuracy = 0.0, localHealth = SystemHealthState(), trackerHealth = SystemHealthState()) }
-                    _remoteSignal.value = 0; _trackerCurrentMa.value = 0; _gnssDetail.value = null; _trackerState.value = TrackerState.UNKNOWN; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _redScreenVisible.value = false; _rtt.value = 0; _gpsIndexData.value = GpsIndexData(0.0, 0.0, 0.0, 0.0); stateSubscriptionUseCase.clearHistory()
+                    updateTelemetryState { it.copy(trackerLocation = LocationState(), trackerStats = StatsState(), trackerBattery = BatteryState(level = -1), connectivity = ConnectivityState(isTrackerConnected = false, lastUpdateTs = 0L, lastRemoteActivityTs = 0L), distanceTrackerToHome = null, distanceTrackerToViewer = null, distanceViewerToHome = null, maxTrackerAccuracy = 0.0, maxViewerAccuracy = 0.0, localHealth = SystemHealthState(), trackerHealth = SystemHealthState(), isRedScreenVisible = false) }
+                    _remoteSignal.value = 0; _trackerCurrentMa.value = 0; _gnssDetail.value = null; _trackerState.value = TrackerState.UNKNOWN; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _rtt.value = 0; _gpsIndexData.value = GpsIndexData(0.0, 0.0, 0.0, 0.0); stateSubscriptionUseCase.clearHistory()
                 }
             }
             else -> {}
@@ -535,14 +546,14 @@ class MainViewModel @Inject constructor(
                         val currentUi = _uiState.value
                         val currentTele = _telemetryState.value
                         val newState = behaviorUseCase.computeTrackerState(currentUi, currentTele, now)
-                        val shouldShowRedScreen = behaviorUseCase.shouldShowRedScreen(currentUi, currentTele, nowRt, lastAlarmAckRt, _redScreenVisible.value)
+                        val shouldShowRedScreen = behaviorUseCase.shouldShowRedScreen(currentUi, currentTele, nowRt, lastAlarmAckRt, currentTele.isRedScreenVisible)
                         
                         withContext(Dispatchers.Main) {
                             if (newState != _trackerState.value && newState != TrackerState.UNKNOWN) {
                                 addPersistentLog("event", "Tracker is $newState", true)
                             }
                             _trackerState.value = newState
-                            _redScreenVisible.value = shouldShowRedScreen
+                            updateTelemetryState { it.copy(isRedScreenVisible = shouldShowRedScreen) }
                         }
                     }
                     updateTelemetryState { state -> state.copy(isAlarmSilenced = behaviorUseCase.isAlarmSilenced(stateSnapshot.lastAlarmAckTs, now)) }
@@ -644,7 +655,7 @@ class MainViewModel @Inject constructor(
             remoteStatusRepository.reset()
             updateState { state -> state.copy(appStartTime = appStartTime, geofenceMode = GeofenceMode.IDLE, draftSettings = DraftSettings(), isIdentitySanitized = false) }
             updateTelemetryState { state -> TelemetryState() }
-            _trackerState.value = TrackerState.UNKNOWN; _redScreenVisible.value = false; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; stateSubscriptionUseCase.clearHistory(); loadInitialData()
+            _trackerState.value = TrackerState.UNKNOWN; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; stateSubscriptionUseCase.clearHistory(); loadInitialData()
         }
     }
     
