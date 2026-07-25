@@ -25,12 +25,13 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.24.07:
+ * - Issue #546: Handshake Hardening. Integrated isConnecting() check to 
+ *   prevent redundant handshake storms on budget hardware.
  * July.24.05:
  * - Issue #538d: Redundant Telemetry Conversions. Refactored sendTelemetryInternal 
  *   to use emitMap, eliminating redundant JSONObject conversions in Viewer mode.
- * July.24.04:
  * - Issue #541: Direct Binary Flow. Implemented onBinaryUpdate.
- * - Issue #540: Signaling Loop Hardening. Introduced lastForceJoinTs cooldown.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -150,7 +151,8 @@ class ConnectivitySuite @Inject constructor(
             if (isStopped.get() || relayUrl.isEmpty()) return
             scope.launch {
                 val nowRt = timeProvider.elapsedRealtime()
-                if (nowRt - lastReconnectTs < 3000L || signalingProvider.isConnected()) return@launch
+                // Issue #546: Added isConnecting() to prevent race conditions during network switch
+                if (nowRt - lastReconnectTs < 3000L || signalingProvider.isConnected() || signalingProvider.isConnecting()) return@launch
                 if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) return@launch
 
                 logManagerProvider.get().logServiceEvent("Network Handover: Available. Reconnecting.", false)
@@ -191,8 +193,11 @@ class ConnectivitySuite @Inject constructor(
 
         scope.launch {
             if (relayUrl.isNotEmpty() && SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
-                signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
-                wakeUpRelay()
+                // Initial connect attempt
+                if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
+                    signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+                    wakeUpRelay()
+                }
             }
         }
 
@@ -260,7 +265,8 @@ class ConnectivitySuite @Inject constructor(
                         wakeUpRelay()
                     }
                 }
-            } else if (nowRt - lastReconnectTs > NET_REJOIN_THRESHOLD_MS) {
+            } else if (!signalingProvider.isConnecting() && nowRt - lastReconnectTs > NET_REJOIN_THRESHOLD_MS) {
+                // Issue #546: Guarded by isConnecting() to avoid redundant calls during budget handshake
                 withContext(Dispatchers.Default) {
                     lastReconnectTs = nowRt
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
@@ -356,7 +362,6 @@ class ConnectivitySuite @Inject constructor(
         if (isTrackerMode) {
             signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), status.toProto(false).toByteArray())
         } else {
-            // Issue #538d: Use emitMap to eliminate redundant JSONObject conversion
             signalingProvider.emitMap("location_update", status.toMap(true))
         }
         return true
@@ -735,8 +740,11 @@ class ConnectivitySuite @Inject constructor(
         if (isStopped.get()) return
         this.relayUrl = url; this.lastReconnectTs = timeProvider.elapsedRealtime()
         if (SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
-            signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
-            wakeUpRelay()
+            // Issue #546: Handshake hardening check
+            if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
+                signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+                wakeUpRelay()
+            }
         }
     }
 }

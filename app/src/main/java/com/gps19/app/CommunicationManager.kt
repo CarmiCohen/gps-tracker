@@ -14,11 +14,13 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * July.24.07:
+ * - Issue #546: Handshake Hardening. Implemented isConnecting() and 
+ *   optimized socket options for Samsung A15 stability.
  * July.24.05:
  * - Issue #538d: Implemented emitMap to eliminate redundant JSONObject 
  *   conversions. Telemetry path now flows directly from Map to conflation.
  * - Issue #541: Direct Binary Flow. Updated location_relay_bin handler.
- * - Issue #538: Churn Optimization. Optimized handleLogRelay and conflation.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -32,6 +34,7 @@ class CommunicationManager @Inject constructor(
 
     private var socket: Socket? = null
     private var isStopped = false
+    private var isConnectingInternal = false
     
     private var deviceId = ""
     private var viewerId = ""
@@ -132,25 +135,32 @@ class CommunicationManager @Inject constructor(
             return
         }
 
-        socket?.disconnect()
-        socket?.off()
-
         if (relayUrl.isEmpty()) {
             logToApp("Connect aborted: URL is empty", false)
             return
         }
 
+        // Issue #546: Prevent redundant connection attempts during handshake
+        if (isConnectingInternal || isConnected()) {
+            return
+        }
+
+        socket?.disconnect()
+        socket?.off()
+
         logToApp("Starting connection to $relayUrl", true)
         markTraffic() 
+        isConnectingInternal = true
 
         val opts = IO.Options().apply {
             transports = arrayOf("websocket")
-            timeout = 45000 
+            timeout = 30000 // Issue #546: Reduced timeout for faster failure detection on budget A15
             reconnection = true
             reconnectionAttempts = Int.MAX_VALUE
             reconnectionDelay = 2000 
             reconnectionDelayMax = 10000
             randomizationFactor = 0.5
+            forceNew = true // Issue #546: Ensure a clean slate for budget hardware
         }
 
         try {
@@ -158,6 +168,7 @@ class CommunicationManager @Inject constructor(
             registerSocketListeners()
             socket?.connect()
         } catch (e: Exception) {
+            isConnectingInternal = false
             logToApp("Socket creation failed: ${e.message}", true)
         }
     }
@@ -166,6 +177,7 @@ class CommunicationManager @Inject constructor(
         val s = socket ?: return
 
         val onConnectAction = {
+            isConnectingInternal = false
             logToApp("Connected to relay", true)
             markTraffic()
             telemetryRepository.updateRelayStatus(true)
@@ -185,6 +197,7 @@ class CommunicationManager @Inject constructor(
         }
         
         s.on(Socket.EVENT_DISCONNECT) { args ->
+            isConnectingInternal = false
             val reason = args?.getOrNull(0)?.toString() ?: "unknown"
             logToApp("Relay Disconnected ($reason)", true)
             telemetryRepository.updateRelayStatus(false)
@@ -194,6 +207,7 @@ class CommunicationManager @Inject constructor(
         }
 
         s.on(Socket.EVENT_CONNECT_ERROR) { args ->
+            isConnectingInternal = false
             val error = args?.getOrNull(0)?.toString() ?: "Transport Error"
             logToApp("Relay Connect Error: $error", true)
             telemetryRepository.updateRelayStatus(false)
@@ -392,7 +406,6 @@ class CommunicationManager @Inject constructor(
     }
 
     private fun emitLocationConflated(incoming: Map<String, Any?>) {
-        // Issue #538d: Direct conflation from Map.
         pendingLocationMap = SignalingMessageConflator.conflate(pendingLocationMap, incoming).toMutableMap()
 
         if (conflationJob == null || !conflationJob!!.isActive) {
@@ -419,8 +432,11 @@ class CommunicationManager @Inject constructor(
 
     override fun isConnected() = socket?.connected() ?: false
 
+    override fun isConnecting(): Boolean = isConnectingInternal
+
     override fun disconnect() { 
         isStopped = true
+        isConnectingInternal = false
         scope.cancel()
         socket?.disconnect() 
         telemetryRepository.updateRelayStatus(false)

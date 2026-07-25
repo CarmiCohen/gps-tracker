@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,14 +48,12 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * July.24.07:
+ * - Issue #544: Snapshot Restoration. Restored SnapshotStateList for marker 
+ *   and polyline pools to resolve 'conditionalUpdate' lock verification failures.
  * July.23.06:
  * - Issue #072: Map Stabilization. Implemented Temporal Smoothing (EMA) 
  *   to suppress visual jitter at high zoom.
- * July.21.00:
- * - Issue #102: Temporal Forensic Integrity. Standardized all monotonic 
- *   timestamps to use 'Rt' suffix.
- * - Aligned with SystemHealthState for forensic metadata (Location Pending, Last Valid Fix).
- * - Simplified LocationState usage to pure position data.
  */
 
 @Composable
@@ -82,7 +81,6 @@ fun AppMapContainer(
     val viewerLoc = if (isTrackerMode) uiState.trackerLocation else uiState.localLocation
     
     val trackerHealth = if (isTrackerMode) uiState.localHealth else uiState.trackerHealth
-    // Viewer health is local health when in viewer mode, or tracker health when viewer is acting as tracker (relay)
     val viewerHealth = if (isTrackerMode) uiState.trackerHealth else uiState.localHealth
 
     // Skew-Immune Freshness Logic for Map
@@ -258,8 +256,12 @@ fun OsmMap(
     val fenceFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }; val homeMarkersFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
     val accuracyCirclesFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }; val violationMarkersFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }; val violationAccuracyFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
 
-    val homeMarkerPool = remember { mutableListOf<Marker>() }; val violationMarkerPool = remember { mutableListOf<Marker>() }; val violationCirclePool = remember { mutableListOf<Polygon>() }
-    val trackerPolylinePool = remember { mutableListOf<Polyline>() }; val viewerPolylinePool = remember { mutableListOf<Polyline>() }
+    // Issue #544: Restore SnapshotStateList for pools to resolve lock verification failures
+    val homeMarkerPool = remember { mutableStateListOf<Marker>() }
+    val violationMarkerPool = remember { mutableStateListOf<Marker>() }
+    val violationCirclePool = remember { mutableStateListOf<Polygon>() }
+    val trackerPolylinePool = remember { mutableStateListOf<Polyline>() }
+    val viewerPolylinePool = remember { mutableStateListOf<Polyline>() }
 
     var lastTriggerTs by remember { mutableLongStateOf(0L) }
     val localLockStatus = remember { mutableStateOf(isLocked) }
@@ -439,7 +441,7 @@ fun OsmMap(
     }, onRelease = { view -> view.onDetach(); view.tileProvider.tileCache.clear(); view.tileProvider.detach() }, modifier = Modifier.fillMaxSize())
 }
 
-private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, color: Int, pool: MutableList<Polyline>): Int {
+private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, color: Int, pool: SnapshotStateList<Polyline>): Int {
     if (trailPoints.isEmpty()) return 0
     var poolIdx = 0; var startIdx = 0
     while (startIdx < trailPoints.size) {

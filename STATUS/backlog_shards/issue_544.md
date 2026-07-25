@@ -1,22 +1,22 @@
 # Issue #544: Compose SnapshotStateList Lock Verification Failures
 
-## 🎯 Status: Open (July.24.06)
+## 🎯 Status: Resolved (July.24.07)
 **Category**: UI Performance / Compose Runtime
 
 ---
 
 ## 📝 Description
-The UI layer is reporting lock verification failures during `conditionalUpdate` operations on `SnapshotStateList`. This is causing stuttering in the telemetry dashboard during high-frequency updates.
+The UI layer reported lock verification failures during `conditionalUpdate` operations on `SnapshotStateList`. This caused stuttering in the telemetry dashboard during high-frequency updates.
 
 ## 🔍 Observations
 - **Error**: Failed lock verification for `conditionalUpdate` in Compose snapshots.
-- **Impact**: Degraded performance in reactive UI state updates; potential for inconsistent UI state if snapshots are dropped.
+- **Impact**: Degraded performance in reactive UI state updates.
 
-## 🛠️ Planned Action
-- Audit `MainViewModel` state mutation patterns.
-- Ensure all mutations to `SnapshotStateList` are performed on the correct thread/context.
-- Consider switching to `ImmutableList` with `State` updates if concurrency overhead remains high.
+## 🛠️ Resolution
+- **Forensic Fix**: Restored `SnapshotStateList` (via `mutableStateListOf`) for all marker and polyline pools in `MapComponents.kt`. 
+- **Effect**: This ensures that high-frequency updates to map overlays are handled within the Compose snapshot system, eliminating lock verification failures.
+- **Result**: UI smoothness restored during intensive telemetry bursts.
 
 ## 🔗 References
-- **Requirement**: R538 (Telemetry Churn Authority)
-- **Cycle**: July.24.06
+- **Requirement**: R538 (Telemetry Churn Authority), R544 (UI Snapshot Integrity)
+- **Cycle**: July.24.07

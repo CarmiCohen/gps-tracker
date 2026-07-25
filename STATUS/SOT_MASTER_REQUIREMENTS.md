@@ -1,9 +1,10 @@
-# System Source of Truth (SoT) - July.24.06 (Performance & Boot Hardening)
+# System Source of Truth (SoT) - July.24.07 (Startup & Handshake Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
+*   **Deferred Flow Collection (R542)**: Heavy Room-backed flows (logs, trails, violations) MUST be collected only within their respective screen routes (Tracker/Viewer) rather than the top-level MainAppContent to minimize cold-start main thread congestion and eliminate frame skips. (Issue #542, July.24.07)
 *   **Startup Suppression Window (R993d)**: To prevent Main-thread starvation during cold-start, all Foreground Service notification type updates MUST be suppressed for the first 10 seconds of service life if a previous notification has already been successfully posted. (Issue #534, July.24.02)
 *   **Notification IPC Throttling (R993b)**: To prevent Main-thread ANRs during hardware recovery bursts, Foreground Service notification updates MUST be double-throttled: a 2000ms hard gate in `AppNotificationManager` and a 10,000ms global throttle for service type changes in `BaseMonitorService` descendants. (Issue #113, #535, July.24.02)
 *   **Foreground Service Immediacy (R406b)**: `startForeground` MUST be invoked directly in the Main-thread `onCreate` of any `LifecycleService`. (July.23.11)
@@ -13,6 +14,8 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Mutable Aggregation Authority (R538c)**: Telemetry aggregation logic MUST use mutable state containers for intermediate calculations to eliminate redundant object allocations (`copy()` calls) during high-frequency processing across multiple scales. (Issue #538c, July.24.05)
 *   **Direct Map Authority (R538d)**: The signaling pipeline MUST support direct `Map` emission to bypass intermediate `JSONObject` allocations in non-binary telemetry paths. (Issue #538d, July.24.05)
 *   **Forensic Stream Authority (R538e/f)**: Forensic backfilling and results processing MUST use lazy `Sequence` iteration and single-pass processing to eliminate intermediate list allocations. (Issue #538e, #538f, July.24.05)
+*   **Handshake Hardening (R546)**: To prevent `EngineIOException` and "handshake storms" on budget hardware, the signaling pipeline MUST track the "connecting" state and suppress redundant connection attempts during an active handshake. (Issue #546, July.24.07)
+*   **UI Snapshot Integrity (R544)**: High-frequency UI components, specifically map marker and polyline pools, MUST use `SnapshotStateList` to ensure thread-safe reactive updates and prevent `conditionalUpdate` lock verification failures within the Compose Runtime. (Issue #544, July.24.07)
 
 ### 2. Temporal & Forensic Integrity
 *   **Temporal Forensic Integrity (R102)**: Dual-time strategy using monotonic `rt` for logic and wall-clock `ts` for forensic logging. (Issue #102)
@@ -40,5 +43,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.24.06.
+*   **Current Release**: July.24.07.
 *   **Source of Truth**: app/build.gradle versionName.
