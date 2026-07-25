@@ -1,18 +1,22 @@
-# Issue #542: Tracker Stealth Enforcement
+# Issue #542: Startup Frame Skipping / Main Thread Congestion
 
-## 🎯 Status: Resolved (July.24.04)
-**Category**: Security / Operational Stealth
+## 🎯 Status: Open (July.24.06)
+**Category**: Performance / UX
 
 ---
 
 ## 📝 Description
-Trackers must remain strictly silent and visually dark to prevent detection. Previous implementations allowed certain test commands or system alerts to trigger audio/visual pulses even in Tracker mode.
+Significant frame skipping detected during `MainActivity` creation. Cold start frame skipping has escalated from 70 frames to **305 frames (~5.1s)** on target hardware (Samsung A15).
 
-## 🛠️ Resolution
-- **Audio Suppression**: Hardened `CommandRouter` and `AudioSynthesizer` to explicitly block siren triggers if `isTrackerMode` is active.
-- **Visual Silence**: Integrated `notificationManager.setTrackerMode(true)` to silence system-level notification channels.
-- **Stealth Priority**: Even user-initiated "Test Alarms" from the UI are suppressed at the service level to prevent accidental exposure.
+## 🔍 Observations
+- **Observation**: "Skipped 305 frames!" in Logcat during app launch.
+- **Impact**: Critical first-frame delay, poor user perception, and potential ANR risk if the main thread remains congested.
+
+## 🛠️ Planned Action
+- Profile `MainActivity.onCreate` and `MainAppContent` composition.
+- Identify heavy initialization tasks (Database, Hardware Managers) that can be deferred or moved to background threads.
+- Implement staggered initialization for non-critical UI components.
 
 ## 🔗 References
-- **Requirement**: R872 (Tracker Stealth Authority)
-- **Cycle**: July.24.04
+- **Requirement**: R526 (Main-Thread Purity)
+- **Cycle**: July.24.06

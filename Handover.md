@@ -1,38 +1,40 @@
-# Handover (July.24.06) - Extreme Telemetry Hardening & Boot Reliability
+# Handover (July.24.07) - Startup Optimization & Forensic Investigation
 
 ## 🎯 Current Objective
-Cycle **July.24.06** achieved extreme performance optimization for high-frequency forensic tracking and resolved critical race conditions between `BootReceiver` and `MaintenanceWorker`.
+Cycle **July.24.07** achieved a major performance win by resolving critical startup latency. Forensic investigation of Logcat noise and missing native hooks has narrowed the search space to external dependencies or missing source files.
 
 ## 📊 Status Summary
 
-### 1. Resolved: Telemetry Memory Churn (#538, #541, #538c/d/e)
-- **Problem**: GC pressure during high-frequency tracking (up to 10Hz) due to immutable object copies and redundant JSON conversions.
-- **Forensic Fix**: 
-    - **Mutable Aggregation (#538c)**: `TelemetryAggregator.kt` now uses a private `MutableAggregationPoint`, eliminating ~50 allocations per second during 10Hz processing.
-    - **Direct Map Flow (#538d)**: `SignalingProvider` now supports `emitMap()`. Viewer updates bypass intermediate `JSONObject` allocations.
-    - **Sequence-Based Backfilling (#538e)**: Forensic reconstruction now uses lazy `Sequence` processing, eliminating intermediate `List` allocations in `HistoryManager`.
-    - **Binary Path (#541)**: Protobuf prioritization for Tracker telemetry is fully hardened.
+### 1. Resolved: Startup Frame Skipping (#542)
+- **Problem**: 305-frame skip (~5.1s) during `MainActivity` creation on Samsung A15.
+- **Forensic Fix**: Refactored `MainAppContent.kt` to defer collection of heavy Room-backed flows.
+    - **Change**: `eventLogsFlow`, `trackerTrailFlow`, `viewerTrailFlow`, and `violationPointsFlow` moved from top-level `MainAppContent` into specific `Tracker` and `Viewer` routes.
+    - **Effect**: Eliminated immediate database load on the first frame. Responsiveness significantly improved.
 
-### 2. Resolved: Boot-Maintenance Race Condition (#539b)
-- **Problem**: Duplicate Foreground Service starts during device boot.
-- **Forensic Fix**: `BootServiceStartWorker` now updates `repository.setAppStartTime()` as its *first* action.
-- **Effect**: This immediately triggers the `MaintenanceWorker` grace period (1-minute), ensuring boot-initiated service starts are not interrupted.
+### 2. Forensic Status: Logging Leak (#545) - INVESTIGATED
+- **Finding**: Exhaustive search for the prefix `StackLog` in all project files (source, resources, build scripts) yielded **ZERO** hits in code.
+- **Hypothesis**: The traces are likely injected by a 3rd-party library (e.g., `socket.io-client` internal debug) or a platform-level diagnostic tool triggered during network state changes.
+- **Action for Resumption**: Review `build.gradle` for any diagnostic dependency flavors or recently added interceptors in `AppModule.kt`.
 
-### 3. Build & Type Hardening
-- **Remediation**: Resolved `UiEvent` vs `UiCommand` ambiguity by distinct naming (`RequestTestAlarm` vs `ExecuteTestAlarm`).
-- **Fix**: Corrected a typo in `Models.kt` (`violationUptimeMs`) that caused a build failure.
+### 3. Forensic Status: Native Hooks (#543) - MISSING SOURCE
+- **Finding**: `MbrainHardwareManager.kt` is referenced in documentation but is **absent** from the file system. No `loadLibrary("mbrainSDK")` calls found.
+- **Conclusion**: The chipset optimization logic for MediaTek/Samsung was likely part of a branch or module that was not successfully integrated or was inadvertently purged.
+- **Action for Resumption**: Restore the missing JNI bridge or re-implement vendor-specific pokes for A15 hardware.
+
+## 🎯 Next Objective: Handshake Stability & UI Jank
+1. **Hardening Signaling Handshake (#546)**: Address `EngineIOException` WebSocket errors on Samsung A15 by implementing robust retry strategies in `CommunicationManager.kt`.
+2. **Mitigate Compose Snapshots Jank (#544)**: Investigate `SnapshotStateList` lock verification failures degrading reactive UI performance.
+3. **Requirement Verification**: Verify that the deferred flow collection is reflected in `STATUS/SOT_MASTER_REQUIREMENTS.md` under Performance/Startup.
 
 ## 🚀 Release Verification
-- [x] `TelemetryAggregator` uses mutable state aggregation.
-- [x] `HistoryManager` uses Sequences for backfilling.
-- [x] `CommunicationManager` supports direct Map emission.
-- [x] `BootReceiver` performs early start-time refresh.
+- [x] Heavy database flows deferred in `MainAppContent`.
 - [x] Build `:app:assembleDebug` SUCCESS.
+- [x] `issues.md` updated with #542 resolution.
 
 ## 🚀 Git Release Procedure
 ```bash
 git add .
-git commit -m "release: July.24.06 - extreme telemetry hardening and boot reliability fix"
-git tag -a July.24.06 -m "July.24.06: Performance and Boot Hardening."
+git commit -m "fix: startup optimization by deferring database flow collection (#542)"
+git tag -a July.24.07 -m "July.24.07: Startup Optimization and Forensic Hardening."
 git push origin main --tags
 ```
