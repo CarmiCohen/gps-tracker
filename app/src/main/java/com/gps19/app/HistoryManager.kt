@@ -15,13 +15,12 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * July.25.02:
+ * - Issue #570: Forensic Snapshot Pooling. Refactored backfill sequences to 
+ *   eliminate intermediate object churn.
  * July.24.05:
- * - Issue #538f: Backfill Results Optimization. Refactored backfillAnalyticalGaps 
- *   to use a single-pass iteration for result processing, eliminating redundant 
- *   List allocations from multiple filter/map operations.
+ * - Issue #538f: Backfill Results Optimization.
  * - Issue #538e: Ribbon Backfill Optimization. Leveraged lazy Sequences.
- * July.23.02:
- * - Issue #525: State Audit. Fixed missing forensic mapping in mapToAppPoint.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -157,6 +156,8 @@ class HistoryManager @Inject constructor(
             )
         }
 
+        // Issue #570: Single point allocation per tick is acceptable, but 
+        // using the mutable EngineConnectionPoint here.
         val currentPoint = EngineConnectionPoint(
             ts = now,
             rt = nowRt,
@@ -248,15 +249,9 @@ class HistoryManager @Inject constructor(
         currentMa: Int,
         locationPendingReason: LocationPendingReason
     ) {
-        val snrSamples = if (isTrackerMode) {
-            gpsManager.getSnrSamples(lastTickTs + 1, now).map { EngineSnrSample(it.first, it.first - (now - nowRt), it.second) }
-        } else emptySequence()
-
-        val sensorSamples = if (isTrackerMode) {
-            sensorManager.getSensorSamples(lastTickTs + 1, now).map { 
-                EngineSensorSnapshot(it.ts, it.rt, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
-            }
-        } else emptySequence()
+        // Issue #570: Direct use of sequences without redundant re-mapping
+        val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
+        val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
 
         val baseTemplate = EngineConnectionPoint(
             ts = 0L,
@@ -293,7 +288,6 @@ class HistoryManager @Inject constructor(
 
         val results = aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplate)
         
-        // Issue #538f: Single-pass optimization. Collect 4M points for batching and process others immediately.
         val fourMPoints = ArrayList<ConnectionPoint>()
         results.forEach { (scale, point) ->
             val appPoint = mapToAppPoint(point)
@@ -312,21 +306,12 @@ class HistoryManager @Inject constructor(
     }
 
     private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
-        val snrSamples = if (isTrackerMode) {
-            gpsManager.getSnrSamples(lastTickTs, now).map { EngineSnrSample(it.first, it.first - (now - nowRt), it.second) }
-        } else emptySequence()
-
-        val sensorSamples = if (isTrackerMode) {
-            sensorManager.getSensorSamples(lastTickTs, now).map { 
-                EngineSensorSnapshot(it.ts, it.rt, it.acoustic, it.lux, it.vibe, it.proxIdx, it.lift, it.tilt, it.isSitDetected) 
-            }
-        } else emptySequence()
+        val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs, now) else emptySequence()
+        val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs, now) else emptySequence()
 
         RibbonScale.entries.forEach { scale ->
             val gapPoints = aggregator.fillRealGap(scale.key, scale.intervalSeconds, lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb())
             if (gapPoints.isNotEmpty()) {
-                // Issue #538f: Use reusable list for mapping to avoid sequence overhead here if list is small, 
-                // but gapPoints.map is already a single allocation. Batch sending is preserved.
                 repository.addHistoryPoints(scale.key, gapPoints.map { mapToAppPoint(it) })
             }
         }
@@ -368,7 +353,7 @@ class HistoryManager @Inject constructor(
         return ConnectionPoint(
             ts = p.ts,
             rtt = p.rtt,
-            localSig = 10, // DEFAULT_SIGNAL_STRENGTH fallback if constant not visible
+            localSig = 10,
             remoteSig = p.remoteSig,
             isConnected = p.isConnected,
             isGap = p.isGap,

@@ -28,6 +28,9 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.25.02:
+ * - Issue #570: Forensic Snapshot Pooling. Refactored ForensicSnapshot to a mutable 
+ *   flyweight and optimized backfill iteration to eliminate transient churn.
  * July.25.03:
  * - Issue #570: Forensic Snapshot Pooling. Refactored getSensorSamples and 
  *   getAcousticSamples to use flyweight iteration, eliminating transient object churn.
@@ -144,28 +147,32 @@ class AppSensorManager(
     // Issue #570: Flyweights for forensic iteration
     private val sensorFlyweight = EngineSensorSnapshot()
     private val snrFlyweight = EngineSnrSample()
+    private val forensicFlyweight = ForensicSnapshot()
 
-    data class ForensicSnapshot(
-        val vibration: Double,
-        val heading: Double,
-        val baroAlt: Double,
-        val lux: Double,
-        val isNear: Boolean,
-        val tiltDegrees: Double,
-        val acousticDb: Double,
-        val peakShock: Double,
-        val peakVerticalVelocity: Double,
-        val peakVerticalVelocityTs: Long,
-        val peakVerticalVelocityRt: Long,
-        val plungeMatched: Boolean,
-        val peakVerticalDisplacement: Double,
-        val proximityIdx: Double,
-        val proximityCm: Double,
-        val proximityDebounceMs: Long,
-        val vibrationRollingSum: Double,
-        val acousticPeak: Double,
-        val acousticMin: Double
-    )
+    /**
+     * Issue #570: Mutable flyweight for forensic snapshots.
+     */
+    class ForensicSnapshot {
+        var vibration: Double = 0.0
+        var heading: Double = 0.0
+        var baroAlt: Double = 0.0
+        var lux: Double = 0.0
+        var isNear: Boolean = true
+        var tiltDegrees: Double = 0.0
+        var acousticDb: Double = 0.0
+        var peakShock: Double = 0.0
+        var peakVerticalVelocity: Double = 0.0
+        var peakVerticalVelocityTs: Long = 0L
+        var peakVerticalVelocityRt: Long = 0L
+        var plungeMatched: Boolean = false
+        var peakVerticalDisplacement: Double = 0.0
+        var proximityIdx: Double = 1.0
+        var proximityCm: Double = 0.0
+        var proximityDebounceMs: Long = 0L
+        var vibrationRollingSum: Double = 0.0
+        var acousticPeak: Double = 0.0
+        var acousticMin: Double = 0.0
+    }
 
     // Issue #550: Primitive buffers for zero-churn forensics
     private val bufferTs = LongArray(256)
@@ -604,29 +611,33 @@ class AppSensorManager(
     fun isAcousticMonitoringActive(): Boolean = isAcousticRunning
     fun isAcousticMonitoringEnabled(): Boolean = isMonitoring
 
+    /**
+     * Issue #570: Zero-churn forensic snapshot consumption.
+     * Fills and returns the flyweight instance.
+     */
     fun consumeForensicSnapshot(): ForensicSnapshot {
         synchronized(this) {
-            val snapshot = ForensicSnapshot(
-                vibration = currentVibrationIndex,
-                heading = currentCompassHeading,
-                baroAlt = absoluteAltitude,
-                lux = currentLux,
-                isNear = isProximityNear,
-                tiltDegrees = currentTiltDegrees,
-                acousticDb = currentAcousticDb,
-                peakShock = internalPeakVibration,
-                peakVerticalVelocity = internalPeakVerticalVelocity,
-                peakVerticalVelocityTs = internalPeakVerticalVelocityTs,
-                peakVerticalVelocityRt = internalPeakVerticalVelocityRt,
-                plungeMatched = !isWarming && plungeMatched,
-                peakVerticalDisplacement = internalPeakVerticalDisplacement,
-                proximityIdx = proximityIdx,
-                proximityCm = currentProximityCm,
-                proximityDebounceMs = proximityDebounceMs,
-                vibrationRollingSum = vibrationRollingSum,
-                acousticPeak = internalPeakDb,
+            forensicFlyweight.apply {
+                vibration = currentVibrationIndex
+                heading = currentCompassHeading
+                baroAlt = absoluteAltitude
+                lux = currentLux
+                isNear = isProximityNear
+                tiltDegrees = currentTiltDegrees
+                acousticDb = currentAcousticDb
+                peakShock = internalPeakVibration
+                peakVerticalVelocity = internalPeakVerticalVelocity
+                peakVerticalVelocityTs = internalPeakVerticalVelocityTs
+                peakVerticalVelocityRt = internalPeakVerticalVelocityRt
+                plungeMatched = !isWarming && plungeMatched
+                peakVerticalDisplacement = internalPeakVerticalDisplacement
+                proximityIdx = proximityIdx
+                proximityCm = currentProximityCm
+                proximityDebounceMs = proximityDebounceMs
+                vibrationRollingSum = vibrationRollingSum
+                acousticPeak = internalPeakDb
                 acousticMin = if (internalMinDb >= 100.0) -1.0 else internalMinDb
-            )
+            }
             
             internalPeakVibration = 0.0
             internalPeakVerticalVelocity = 0.0
@@ -637,36 +648,57 @@ class AppSensorManager(
             internalPeakDb = 0.0
             internalMinDb = 100.0
             
-            return snapshot
+            return forensicFlyweight
         }
     }
 
     /**
      * Issue #570: Zero-churn retrieval via flyweight iteration.
-     * Yields the same EngineSensorSnapshot instance with updated fields.
+     * Optimized to avoid buffer snapshots and intermediate object creation.
      */
-    @Synchronized
     fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<EngineSensorSnapshot> = sequence {
-        val c = bufferCount
-        if (c == 0) return@sequence
+        val c: Int
+        val startIdx: Int
+        synchronized(this@AppSensorManager) {
+            c = bufferCount
+            startIdx = (bufferIdx - c + 256) % 256
+        }
         
-        val startIdx = (bufferIdx - c + 256) % 256
-        
-        // Iterate through buffer directly to avoid array allocations
         for (i in 0 until c) {
             val idx = (startIdx + i) % 256
-            val ts = bufferTs[idx]
+            val ts: Long
+            val rt: Long
+            val lux: Double
+            val vibe: Double
+            val proxIdx: Double
+            val tilt: Double
+            val lift: Double
+            val acoustic: Double
+            val sit: Boolean
+            
+            synchronized(this@AppSensorManager) {
+                ts = bufferTs[idx]
+                rt = bufferRt[idx]
+                lux = bufferLux[idx]
+                vibe = bufferVibe[idx]
+                proxIdx = bufferProxIdx[idx]
+                tilt = bufferTilt[idx]
+                lift = bufferLift[idx]
+                acoustic = bufferAcoustic[idx]
+                sit = bufferSit[idx]
+            }
+
             if (ts in fromTs..toTs) {
                 sensorFlyweight.apply {
                     this.ts = ts
-                    this.rt = bufferRt[idx]
-                    this.lux = bufferLux[idx]
-                    this.vibe = bufferVibe[idx]
-                    this.proxIdx = bufferProxIdx[idx]
-                    this.tilt = bufferTilt[idx]
-                    this.lift = bufferLift[idx]
-                    this.acoustic = bufferAcoustic[idx]
-                    this.isSitDetected = bufferSit[idx]
+                    this.rt = rt
+                    this.lux = lux
+                    this.vibe = vibe
+                    this.proxIdx = proxIdx
+                    this.tilt = tilt
+                    this.lift = lift
+                    this.acoustic = acoustic
+                    this.isSitDetected = sit
                 }
                 yield(sensorFlyweight)
             }
@@ -675,20 +707,33 @@ class AppSensorManager(
 
     /**
      * Issue #570: Zero-churn retrieval via flyweight iteration.
-     * Yields the same EngineSnrSample instance with updated fields.
+     * Reuses snrFlyweight to eliminate transient object churn.
      */
-    @Synchronized
     fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
-        val c = bufferCount
-        if (c == 0) return@sequence
-        val startIdx = (bufferIdx - c + 256) % 256
+        val c: Int
+        val startIdx: Int
+        synchronized(this@AppSensorManager) {
+            c = bufferCount
+            startIdx = (bufferIdx - c + 256) % 256
+        }
+
         for (i in 0 until c) {
             val idx = (startIdx + i) % 256
-            val ts = bufferTs[idx]
+            val ts: Long
+            val rt: Long
+            val acoustic: Double
+            
+            synchronized(this@AppSensorManager) {
+                ts = bufferTs[idx]
+                rt = bufferRt[idx]
+                acoustic = bufferAcoustic[idx]
+            }
+
             if (ts in fromTs..toTs) {
                 snrFlyweight.apply {
                     this.ts = ts
-                    this.snr = bufferAcoustic[idx] // Reusing snr field for acoustic val
+                    this.rt = rt
+                    this.snr = acoustic
                 }
                 yield(snrFlyweight)
             }

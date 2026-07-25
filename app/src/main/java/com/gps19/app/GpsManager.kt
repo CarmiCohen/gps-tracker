@@ -19,10 +19,10 @@ import javax.inject.Singleton
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
  * July.25.02:
+ * - Issue #570: Forensic Snapshot Pooling. Refactored getSnrSamples to use 
+ *   EngineSnrSample flyweight and zero-allocation primitive iteration.
  * - Issue #550: Refactored SNR history to primitive arrays (LongArray/DoubleArray) 
- *   to eliminate heap churn and achieve zero-allocation forensic buffering.
- * July.24.05:
- * - Issue #538e: Optimized SNR sample retrieval for forensic backfilling. 
+ *   to eliminate heap churn.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -40,11 +40,15 @@ class GpsManager @Inject constructor(
     var averageSnr = 0.0
         private set
 
-    // Issue #550: Primitive buffers for zero-churn forensics
+    // Issue #550 & #570: Primitive buffers for zero-churn forensics
     private val snrTsBuffer = LongArray(512)
+    private val snrRtBuffer = LongArray(512)
     private val snrValBuffer = DoubleArray(512)
     private var snrBufferIdx = 0
     private var snrBufferCount = 0
+
+    // Issue #570: Flyweight for SNR retrieval
+    private val snrFlyweight = EngineSnrSample()
 
     private val _gnssDetailFlow = MutableStateFlow<GnssDetail?>(null)
     val gnssDetailFlow: StateFlow<GnssDetail?> = _gnssDetailFlow.asStateFlow()
@@ -77,8 +81,10 @@ class GpsManager @Inject constructor(
             averageSnr = avg
             
             val now = timeProvider.currentTimeMillis()
+            val nowRt = timeProvider.elapsedRealtime()
             synchronized(snrTsBuffer) {
                 snrTsBuffer[snrBufferIdx] = now
+                snrRtBuffer[snrBufferIdx] = nowRt
                 snrValBuffer[snrBufferIdx] = avg
                 snrBufferIdx = (snrBufferIdx + 1) % 512
                 if (snrBufferCount < 512) snrBufferCount++
@@ -89,27 +95,34 @@ class GpsManager @Inject constructor(
     }
 
     /**
-     * Returns SNR samples in the given time range for forensic backfilling.
-     * Uses sequence generator to eliminate intermediate list allocations.
+     * Issue #570: Returns SNR samples via flyweight iteration.
+     * Eliminates intermediate list and Pair allocations.
      */
-    fun getSnrSamples(fromTs: Long, toTs: Long): Sequence<Pair<Long, Double>> = sequence {
-        // Snapshot the buffer state to avoid holding lock during yield
-        val (tsCopy, valCopy, count) = synchronized(snrTsBuffer) {
-            val c = snrBufferCount
-            val tsArr = LongArray(c)
-            val valArr = DoubleArray(c)
-            val startIdx = (snrBufferIdx - c + 512) % 512
-            for (i in 0 until c) {
-                val idx = (startIdx + i) % 512
-                tsArr[i] = snrTsBuffer[idx]
-                valArr[i] = snrValBuffer[idx]
-            }
-            Triple(tsArr, valArr, c)
+    fun getSnrSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
+        val c: Int
+        val startIdx: Int
+        synchronized(snrTsBuffer) {
+            c = snrBufferCount
+            startIdx = (snrBufferIdx - c + 512) % 512
         }
-        
-        for (i in 0 until count) {
-            if (tsCopy[i] in fromTs..toTs) {
-                yield(tsCopy[i] to valCopy[i])
+
+        for (i in 0 until c) {
+            val idx = (startIdx + i) % 512
+            val ts: Long
+            val rt: Long
+            val snr: Double
+            
+            synchronized(snrTsBuffer) {
+                ts = snrTsBuffer[idx]
+                rt = snrRtBuffer[idx]
+                snr = snrValBuffer[idx]
+            }
+            
+            if (ts in fromTs..toTs) {
+                snrFlyweight.ts = ts
+                snrFlyweight.rt = rt
+                snrFlyweight.snr = snr
+                yield(snrFlyweight)
             }
         }
     }

@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * July.25.02:
+ * - Issue #570: Forensic Snapshot Pooling. Refactored EngineConnectionPoint to 
+ *   a mutable class to eliminate heap churn during forensic backfilling.
  * July.25.03:
  * - Issue #570: Forensic Snapshot Pooling. Refactored EngineSensorSnapshot and 
  *   EngineSnrSample to mutable classes to eliminate forensic backfill churn.
@@ -57,44 +60,83 @@ enum class LocationPendingReason {
     JAMMER_SUSPICION
 }
 
+/**
+ * Issue #570: Refactored to mutable class for zero-churn forensics.
+ */
 @Serializable
-data class EngineConnectionPoint(
-    val ts: Long,
-    val rt: Long = 0L,
-    val rtt: Int,
-    val remoteSig: Int,
-    val isConnected: Boolean,
-    val isGap: Boolean = false,
-    val hasGps: Boolean = false,
-    val accuracy: Double = 0.0,
-    val maxAccuracy: Double = 0.0,
-    val isBatterySteepDischarge: Boolean = false,
-    val isCoolingModeActive: Boolean = false,
-    val speed: Double = 0.0,
-    val bearing: Double = 0.0,
-    val isTick: Boolean = false,
-    val currentMa: Int = 0,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+class EngineConnectionPoint(
+    var ts: Long = 0L,
+    var rt: Long = 0L,
+    var rtt: Int = 0,
+    var remoteSig: Int = 0,
+    var isConnected: Boolean = false,
+    var isGap: Boolean = false,
+    var hasGps: Boolean = false,
+    var accuracy: Double = 0.0,
+    var maxAccuracy: Double = 0.0,
+    var isBatterySteepDischarge: Boolean = false,
+    var isCoolingModeActive: Boolean = false,
+    var speed: Double = 0.0,
+    var bearing: Double = 0.0,
+    var isTick: Boolean = false,
+    var currentMa: Int = 0,
+    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     
-    // Forensic Indices (Issue #102)
-    val gpsIndex: Double = 0.0,
-    val noiseIdx: Double = 0.0,
-    val luxIdx: Double = 0.0,
-    val vibeIdx: Double = 0.0,
-    val proxIdx: Double = 1.0,
-    val liftIdx: Double = 0.0,
-    val snrIdx: Double = 0.0,
-    val tiltIdx: Double = 0.0,
-    val baroIdx: Double = 0.0,
-    val isSitDetected: Boolean = false,
-    val isSitActive: Boolean = false,
-    val verticalVelocity: Double = 0.0,
-    val sitVz: Double = 0.0,
-    val sitDz: Double = 0.0,
-    val sitBaro: Double = 0.0,
-    val sitTilt: Double = 0.0,
-    val sitShock: Double = 0.0
-)
+    // Forensic Indices
+    var gpsIndex: Double = 0.0,
+    var noiseIdx: Double = 0.0,
+    var luxIdx: Double = 0.0,
+    var vibeIdx: Double = 0.0,
+    var proxIdx: Double = 1.0,
+    var liftIdx: Double = 0.0,
+    var snrIdx: Double = 0.0,
+    var tiltIdx: Double = 0.0,
+    var baroIdx: Double = 0.0,
+    var isSitDetected: Boolean = false,
+    var isSitActive: Boolean = false,
+    var verticalVelocity: Double = 0.0,
+    var sitVz: Double = 0.0,
+    var sitDz: Double = 0.0,
+    var sitBaro: Double = 0.0,
+    var sitTilt: Double = 0.0,
+    var sitShock: Double = 0.0
+) {
+    fun copyFrom(other: EngineConnectionPoint) {
+        this.ts = other.ts
+        this.rt = other.rt
+        this.rtt = other.rtt
+        this.remoteSig = other.remoteSig
+        this.isConnected = other.isConnected
+        this.isGap = other.isGap
+        this.hasGps = other.hasGps
+        this.accuracy = other.accuracy
+        this.maxAccuracy = other.maxAccuracy
+        this.isBatterySteepDischarge = other.isBatterySteepDischarge
+        this.isCoolingModeActive = other.isCoolingModeActive
+        this.speed = other.speed
+        this.bearing = other.bearing
+        this.isTick = other.isTick
+        this.currentMa = other.currentMa
+        this.locationPendingReason = other.locationPendingReason
+        this.gpsIndex = other.gpsIndex
+        this.noiseIdx = other.noiseIdx
+        this.luxIdx = other.luxIdx
+        this.vibeIdx = other.vibeIdx
+        this.proxIdx = other.proxIdx
+        this.liftIdx = other.liftIdx
+        this.snrIdx = other.snrIdx
+        this.tiltIdx = other.tiltIdx
+        this.baroIdx = other.baroIdx
+        this.isSitDetected = other.isSitDetected
+        this.isSitActive = other.isSitActive
+        this.verticalVelocity = other.verticalVelocity
+        this.sitVz = other.sitVz
+        this.sitDz = other.sitDz
+        this.sitBaro = other.sitBaro
+        this.sitTilt = other.sitTilt
+        this.sitShock = other.sitShock
+    }
+}
 
 enum class RibbonScale(val key: String, val intervalSeconds: Int) {
     FOUR_MIN("4M", 1),

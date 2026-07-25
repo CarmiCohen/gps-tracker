@@ -1,41 +1,37 @@
-# Handover (July.25.03) - Forensic Zero-Churn [READY]
+# Handover (July.25.05) - Mbrain JNI Hardening [READY]
 
 ## 🎯 Completed Objective
-Cycle **July.25.03** reached **407 Resolved Issues** by implementing "Zero-Churn" telemetry signaling.
+Cycle **July.25.05** achieved **409 Resolved Issues** by hardening the native hardware bridge.
 
 ## 📊 Forensic Status & State Authority
 
-### 1. Resolved: Pipeline Serialization Hardening (#560)
-- **Problem**: High-frequency telemetry (1-2s) caused heap churn due to Protobuf Builder, Message, and ByteArray allocations in `ConnectivitySuite.kt`.
+### 1. Resolved: Mbrain JNI Hardening (#580)
+- **Problem**: Potential for signal collisions and memory safety violations in the `libmbrainSDK` bridge during rapid Foreground Service type transitions.
 - **Root-Cause Solution**:
-    - **`Models.kt`**: Added `writeTo(builder: RealtimeStatus.Builder)` to `TrackerStatus` to support builder reuse.
-    - **`ConnectivitySuite.kt`**: Implemented a 4KB `serializationBuffer` and a reusable `RealtimeStatus.Builder`.
-    - **Zero-Allocation Write**: Utilized `CodedOutputStream` to write directly into the pre-allocated buffer, bypassing the intermediate `toByteArray()` allocation.
-    - **Signaling Layer**: Updated `SignalingProvider` and `CommunicationManager` to support `emitBinary` with a length parameter.
-- **Impact**: Achieved "Zero-Churn" signaling. Eliminated transient object allocations in the hot-path telemetry pulse.
+    - **Thread Safety**: Implemented `ReentrantLock` in `MbrainHardwareManager` to synchronize all native JNI calls (`initMbrain`, `punchHardware`, `setPowerBudget`).
+    - **JNI Hardening**: Refactored native implementations in `mbrain-jni.cpp` to include robust `jstring` null-checking and renamed external declarations to `native...` for better JVM-to-Native encapsulation.
+    - **Availability Verification**: Added defensive checks to ensure the library is successfully loaded before attempting native execution.
+- **Impact**: Secured hardware stay-alive pokes against race conditions and crash vectors on Samsung A15 and similar chipset-sensitive devices.
 
-### 2. Resolved: Dashboard State Alignment
-- **Fix**: Propagated `currentMa` -> `trackerCurrentMa` renaming across `DashboardState`, `DashboardStateProviderImpl`, and `OverlayComponents` to ensure UI consistency and build integrity.
-
-### 3. Build & Integrity
-- **Version Authority**: Set to `July.25.03` in `app/build.gradle`.
-- **SOT Alignment**: Updated `SOT_MASTER_REQUIREMENTS.md` with **R560** authority.
-- **Issue Tracking**: Updated `issues.md` to reflect 407 resolved issues.
+### 2. Build & Integrity
+- **Version Authority**: Set to `July.25.05` in `app/build.gradle`.
+- **SOT Alignment**: Updated `SOT_MASTER_REQUIREMENTS.md` with **R580** (Mbrain JNI Hardening) authority.
+- **Issue Tracking**: Updated `issues.md` to reflect 409 resolved issues.
 
 ## ⚠️ Newly Identified Risks & Concerns
-- **Issue #560b**: The 4KB buffer is sufficient for standard telemetry, but extreme GNSS detail expansion could exceed it. A safe resizing or pooling strategy should be monitored.
-- **Issue #550b**: `AppSensorManager.getSensorSamples` still yields transient `SensorSnapshot` objects.
+- **Issue #580b**: Native Signal Latency: While `ReentrantLock` prevents collisions, prolonged native execution in `libmbrainSDK` could theoretically delay the high-frequency tick loop. Monitor `punchHardware` execution time.
+- **Issue #570b**: Flyweight Thread Safety: While forensic sequences use synchronized access to primitive buffers, the flyweight objects themselves are reused. Consumers must process or copy fields immediately before the next `yield`.
 
 ## 🎯 Next Objective
-- **Issue #570: Forensic Snapshot Pooling**: Implement an object pool or primitive-iterator for `SensorSnapshot` retrieval to achieve zero-churn in the forensic backfilling path.
+- **Issue #560b: Buffer Overflow Resilience**: Implement dynamic resizing or safety clamps for the 4KB Protobuf serialization buffer in `ConnectivitySuite` to handle extreme GNSS satellite density spikes.
 
 ## 🚀 Release Preparation
 - **Build Status**: 🟢 Success.
 - **Git Block**:
     ```bash
     git add -A
-    git commit -m "Release July.25.03: Pipeline Serialization Hardening (Zero-Churn Signaling)"
-    git tag -a vJuly.25.03 -m "Refactored ConnectivitySuite and TrackerStatus to use pre-allocated buffers and reusable builders for zero-allocation telemetry signaling."
+    git commit -m "Release July.25.05: Mbrain JNI Hardening (Signal Stability)"
+    git tag -a vJuly.25.05 -m "Hardened native Mbrain bridge with thread-safe wrappers and robust null-checking to ensure stability during FGS type transitions."
     git push origin main --tags
     ```
 
