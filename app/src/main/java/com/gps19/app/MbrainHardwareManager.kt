@@ -1,12 +1,15 @@
 package com.gps19.app
 
-import android.os.SystemClock
+import com.gps19.core.engine.LatencyMonitor
+import com.gps19.core.engine.TimeProvider
 import timber.log.Timber
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 /**
  * MbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * July.25.11:
+ * - Issue #590: Refactored to use unified LatencyMonitor.
  * July.25.10:
  * - Issue #580b: Native Signal Latency Audit. Added execution time monitoring 
  *   for JNI calls to prevent tick loop jitter on budget hardware.
@@ -33,25 +36,20 @@ object MbrainHardwareManager {
         }
     }
 
-    private inline fun <T> measureLatency(tag: String, block: () -> T): T {
-        val start = SystemClock.elapsedRealtime()
-        val result = block()
-        val duration = SystemClock.elapsedRealtime() - start
-        
-        if (duration > NATIVE_LATENCY_THRESHOLD_MS) {
-            Timber.w("FORENSIC ALERT: Native $tag latency spike detected (${duration}ms). Threshold: ${NATIVE_LATENCY_THRESHOLD_MS}ms")
-        }
-        return result
-    }
-
     /**
      * Initializes the Mbrain engine with vendor-specific parameters.
      * Thread-safe wrapper for native init.
      */
-    fun initMbrain(deviceId: String, flags: Int): Int {
+    fun initMbrain(timeProvider: TimeProvider, deviceId: String, flags: Int): Int {
         if (!isLibraryLoaded) return -1
         return jniLock.withLock {
-            measureLatency("initMbrain") {
+            LatencyMonitor.measure(
+                timeProvider = timeProvider,
+                thresholdMs = NATIVE_LATENCY_THRESHOLD_MS,
+                onSpike = { duration ->
+                    Timber.w("FORENSIC ALERT: Native initMbrain latency spike detected (${duration}ms). Threshold: ${NATIVE_LATENCY_THRESHOLD_MS}ms")
+                }
+            ) {
                 try {
                     nativeInitMbrain(deviceId, flags)
                 } catch (e: UnsatisfiedLinkError) {
@@ -66,10 +64,16 @@ object MbrainHardwareManager {
      * Triggers a hardware-level "poke" to prevent aggressive CPU idling.
      * Synchronized to prevent overlapping pokes during FGS type re-evaluations.
      */
-    fun punchHardware(): Int {
+    fun punchHardware(timeProvider: TimeProvider): Int {
         if (!isLibraryLoaded) return -1
         return jniLock.withLock {
-            measureLatency("punchHardware") {
+            LatencyMonitor.measure(
+                timeProvider = timeProvider,
+                thresholdMs = NATIVE_LATENCY_THRESHOLD_MS,
+                onSpike = { duration ->
+                    Timber.w("FORENSIC ALERT: Native punchHardware latency spike detected (${duration}ms). Threshold: ${NATIVE_LATENCY_THRESHOLD_MS}ms")
+                }
+            ) {
                 try {
                     nativePunchHardware()
                 } catch (e: UnsatisfiedLinkError) {
@@ -83,10 +87,16 @@ object MbrainHardwareManager {
     /**
      * Sets the power budget for the radio/GNSS stack.
      */
-    fun setPowerBudget(budgetLevel: Int): Int {
+    fun setPowerBudget(timeProvider: TimeProvider, budgetLevel: Int): Int {
         if (!isLibraryLoaded) return -1
         return jniLock.withLock {
-            measureLatency("setPowerBudget") {
+            LatencyMonitor.measure(
+                timeProvider = timeProvider,
+                thresholdMs = NATIVE_LATENCY_THRESHOLD_MS,
+                onSpike = { duration ->
+                    Timber.w("FORENSIC ALERT: Native setPowerBudget latency spike detected (${duration}ms). Threshold: ${NATIVE_LATENCY_THRESHOLD_MS}ms")
+                }
+            ) {
                 try {
                     nativeSetPowerBudget(budgetLevel)
                 } catch (e: UnsatisfiedLinkError) {

@@ -15,10 +15,11 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * July.25.11:
+ * - Issue #590: Unified Latency Monitoring. Integrated LatencyMonitor into DB 
+ *   hot-paths (History, Trail, Violations) to detect I/O jitter.
  * July.23.03:
  * - Issue #527: Siren Persistence. Exposed lastAlarmsJsonFlow and saveAlarmsJson.
- * July.22.01:
- * - Forensic Parity: Hardened History mapping for all 15+ forensic parameters in ConnectionPoint.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -107,6 +108,8 @@ class MainRepository @Inject constructor(
         private const val HISTORY_BATCH_WRITE_INTERVAL_MS = 5000L
         private const val HISTORY_BUFFER_MAX_SIZE = 100
         private const val DB_PRUNE_THRESHOLD = 50
+        
+        private const val DB_LATENCY_THRESHOLD_MS = 500L
     }
 
     val isRelayConnected = telemetry.isRelayConnected
@@ -268,18 +271,24 @@ class MainRepository @Inject constructor(
         )) return
 
         scope.launch {
-            val wallTs = timestamp ?: timeProvider.currentTimeMillis()
-            trailDao.insert(TrailEntity(
-                lat = lat, lng = lng, timestamp = wallTs, 
-                isViewerTrail = isViewer, status = status.name, 
-                accuracy = accuracy,
-                maxAccuracy = maxAccuracy
-            ))
-            
-            trailWriteCount++
-            if (force || trailWriteCount >= DB_PRUNE_THRESHOLD) {
-                trailWriteCount = 0
-                trailDao.pruneTrail(isViewer)
+            LatencyMonitor.measure(
+                timeProvider = timeProvider,
+                thresholdMs = DB_LATENCY_THRESHOLD_MS,
+                onSpike = { duration -> logLatencySpike("Trail Write", duration) }
+            ) {
+                val wallTs = timestamp ?: timeProvider.currentTimeMillis()
+                trailDao.insert(TrailEntity(
+                    lat = lat, lng = lng, timestamp = wallTs, 
+                    isViewerTrail = isViewer, status = status.name, 
+                    accuracy = accuracy,
+                    maxAccuracy = maxAccuracy
+                ))
+                
+                trailWriteCount++
+                if (force || trailWriteCount >= DB_PRUNE_THRESHOLD) {
+                    trailWriteCount = 0
+                    trailDao.pruneTrail(isViewer)
+                }
             }
         }
     }
@@ -307,12 +316,18 @@ class MainRepository @Inject constructor(
 
         val wallTs = timestamp ?: timeProvider.currentTimeMillis()
         scope.launch { 
-            violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
-            
-            violationWriteCount++
-            if (violationWriteCount >= DB_PRUNE_THRESHOLD) {
-                violationWriteCount = 0
-                violationDao.prune()
+            LatencyMonitor.measure(
+                timeProvider = timeProvider,
+                thresholdMs = DB_LATENCY_THRESHOLD_MS,
+                onSpike = { duration -> logLatencySpike("Violation Write", duration) }
+            ) {
+                violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
+                
+                violationWriteCount++
+                if (violationWriteCount >= DB_PRUNE_THRESHOLD) {
+                    violationWriteCount = 0
+                    violationDao.prune()
+                }
             }
         }
     }
@@ -417,34 +432,39 @@ class MainRepository @Inject constructor(
         
         if (dbPoints.isNotEmpty()) {
             lastBatchWriteRealtime = nowRt
-            val start = timeProvider.elapsedRealtime()
-            database.withTransaction {
-                historyDao.insertAll(dbPoints)
-                
-                historyWriteCount += dbPoints.size
-                if (historyWriteCount >= DB_PRUNE_THRESHOLD) {
-                    historyWriteCount = 0
-                    listOf("4M", "16M", "1H", "4H", "24H", "7D").forEach { key ->
-                        historyDao.pruneHistory(key)
+            LatencyMonitor.measure(
+                timeProvider = timeProvider,
+                thresholdMs = DB_LATENCY_THRESHOLD_MS,
+                onSpike = { duration -> logLatencySpike("History Batch Write (${dbPoints.size} pts)", duration) }
+            ) {
+                database.withTransaction {
+                    historyDao.insertAll(dbPoints)
+                    
+                    historyWriteCount += dbPoints.size
+                    if (historyWriteCount >= DB_PRUNE_THRESHOLD) {
+                        historyWriteCount = 0
+                        listOf("4M", "16M", "1H", "4H", "24H", "7D").forEach { key ->
+                            historyDao.pruneHistory(key)
+                        }
                     }
                 }
             }
-            val duration = timeProvider.elapsedRealtime() - start
-            if (duration > 500) {
-                Timber.w("Database I/O Audit: Slow history batch write detected: ${duration}ms for ${dbPoints.size} points")
-                addLog(LogEntry(
-                    localId = UUID.randomUUID().toString(),
-                    timestamp = timeProvider.currentTimeMillis(),
-                    message = "Forensic I/O Audit: Slow history write (${duration}ms)",
-                    type = "SYSTEM",
-                    isImportant = false,
-                    id = "SYSTEM",
-                    viewerId = "SYSTEM",
-                    isSpecial = true,
-                    specialColor = 0xFFFFD700.toInt()
-                ), initiallySynced = true) 
-            }
         }
+    }
+
+    private fun logLatencySpike(tag: String, duration: Long) {
+        Timber.w("Database I/O Audit: Slow $tag detected: ${duration}ms")
+        addLog(LogEntry(
+            localId = UUID.randomUUID().toString(),
+            timestamp = timeProvider.currentTimeMillis(),
+            message = "Forensic I/O Audit: Slow $tag (${duration}ms)",
+            type = "SYSTEM",
+            isImportant = false,
+            id = "SYSTEM",
+            viewerId = "SYSTEM",
+            isSpecial = true,
+            specialColor = 0xFFFFD700.toInt() // Gold for warnings
+        ), initiallySynced = true)
     }
 
     fun saveTrackerState(status: TrackerStatus) = settings.saveTrackerState(status)

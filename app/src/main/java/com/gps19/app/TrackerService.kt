@@ -19,12 +19,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.25.11:
+ * - Issue #590: Updated MbrainHardwareManager calls to pass timeProvider for 
+ *   unified latency monitoring.
  * July.25.02:
  * - Issue #543: Integrated MbrainHardwareManager JNI bridge. Service now attempts 
  *   to initialize libmbrainSDK on supported hardware to harden stay-alive budget.
  * - Issue #113: Refined A15 Poke. JNI punchHardware() now preferred over 
  *   generic WakeLock cycling if the native library is available.
- * - Build Fix: Resolved syntax errors from previous turn.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -103,7 +105,7 @@ class TrackerService : BaseMonitorService() {
 
             // Issue #543: Initialize Mbrain Native SDK if available
             if (capabilities.isA15Device && MbrainHardwareManager.isAvailable()) {
-                val res = MbrainHardwareManager.initMbrain(configManager.deviceId, 0)
+                val res = MbrainHardwareManager.initMbrain(timeProvider, configManager.deviceId, 0)
                 logManager.logServiceEvent("HARDWARE: libmbrainSDK initialized (Result: $res)", important = true)
             }
 
@@ -375,7 +377,7 @@ class TrackerService : BaseMonitorService() {
             
             // Issue #543: Prefer JNI punch over generic WakeLock if library is available
             if (MbrainHardwareManager.isAvailable()) {
-                MbrainHardwareManager.punchHardware()
+                MbrainHardwareManager.punchHardware(timeProvider)
             } else {
                 systemMonitor.acquireWakeLock(force = true)
             }

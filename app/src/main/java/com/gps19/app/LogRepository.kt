@@ -12,16 +12,17 @@ import timber.log.Timber
 import java.util.UUID
 import kotlin.math.abs
 import com.gps19.core.engine.TimeProvider
+import com.gps19.core.engine.LatencyMonitor
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * July.25.11:
+ * - Issue #590: Unified Latency Monitoring. Integrated LatencyMonitor into addLog 
+ *   and proactivePruning to detect I/O bottlenecks.
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * July.21.00:
- * - Issue #104: Unified pruning logic using proactivePruning for both startup and reactive maintenance.
- * - Maintained Hilt compatibility as per hardened Golden Master architecture.
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -34,6 +35,7 @@ class LogRepository @Inject constructor(
 
     companion object {
         private const val DB_PRUNE_THRESHOLD = 50
+        private const val LOG_LATENCY_THRESHOLD_MS = 500L
     }
 
     val eventLogsFlow: Flow<List<LogEntry>> = logDao.getAllLogs().map { entities ->
@@ -66,19 +68,84 @@ class LogRepository @Inject constructor(
     fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
         scope.launch(Dispatchers.IO) {
             logMutex.withLock {
-                try {
-                    val existing = if (entry.localId.isNotBlank()) logDao.getLogByLocalId(entry.localId) else null
-                    if (existing != null) {
-                        logDao.update(existing.copy(
-                            timestamp = entry.timestamp,
-                            message = entry.message,
-                            type = entry.type,
-                            isImportant = entry.isImportant,
-                            extremeValue = entry.extremeValue,
-                            count = entry.count,
-                            durationMs = entry.durationMs,
-                            isSpecial = entry.isSpecial,
+                LatencyMonitor.measure(
+                    timeProvider = timeProvider,
+                    thresholdMs = LOG_LATENCY_THRESHOLD_MS,
+                    onSpike = { duration -> 
+                        Timber.w("Forensic I/O Audit: Slow log write detected: ${duration}ms for ${entry.type}")
+                    }
+                ) {
+                    try {
+                        val existing = if (entry.localId.isNotBlank()) logDao.getLogByLocalId(entry.localId) else null
+                        if (existing != null) {
+                            logDao.update(existing.copy(
+                                timestamp = entry.timestamp,
+                                message = entry.message,
+                                type = entry.type,
+                                isImportant = entry.isImportant,
+                                extremeValue = entry.extremeValue,
+                                count = entry.count,
+                                durationMs = entry.durationMs,
+                                isSpecial = entry.isSpecial,
+                                specialColor = entry.specialColor,
+                                role = entry.role,
+                                synced = initiallySynced,
+                                lat = entry.lat,
+                                lng = entry.lng,
+                                accuracy = entry.accuracy,
+                                maxAccuracy = entry.maxAccuracy,
+                                snrSnapshot = entry.snrSnapshot,
+                                vibeSnapshot = entry.vibeSnapshot
+                            ))
+                            return@measure
+                        }
+
+                        val last = logDao.getLastLogByMetadata(entry.type, entry.role, entry.id)
+                        if (last != null) {
+                            val lastBase = stripLogVariableParts(last.message)
+                            val currentBase = stripLogVariableParts(entry.message)
+                            
+                            if (lastBase == currentBase && lastBase.isNotEmpty() && last.isSpecial == entry.isSpecial) {
+                                val newCount = last.count + entry.count
+                                val newDuration = last.durationMs + entry.durationMs
+                                val newExtreme = if (entry.extremeValue != null) {
+                                    val lastExtreme = last.extremeValue ?: 0.0
+                                    if (abs(entry.extremeValue) > abs(lastExtreme)) entry.extremeValue else lastExtreme
+                                } else last.extremeValue
+                                
+                                logDao.update(last.copy(
+                                    localId = if (last.localId.isBlank()) entry.localId else last.localId,
+                                    count = newCount,
+                                    durationMs = newDuration,
+                                    extremeValue = newExtreme,
+                                    timestamp = entry.timestamp,
+                                    message = entry.message,
+                                    synced = initiallySynced,
+                                    lat = entry.lat,
+                                    lng = entry.lng,
+                                    accuracy = entry.accuracy,
+                                    maxAccuracy = entry.maxAccuracy,
+                                    snrSnapshot = entry.snrSnapshot,
+                                    vibeSnapshot = entry.vibeSnapshot
+                                ))
+                                return@measure
+                            }
+                        }
+                        
+                        logDao.insert(LogEntity(
+                            localId = if (entry.localId.isBlank()) UUID.randomUUID().toString() else entry.localId, 
+                            timestamp = entry.timestamp, 
+                            message = entry.message, 
+                            type = entry.type, 
+                            isImportant = entry.isImportant, 
+                            deviceId = entry.id, 
+                            viewerId = entry.viewerId, 
+                            count = entry.count, 
+                            extremeValue = entry.extremeValue, 
+                            durationMs = entry.durationMs, 
+                            isSpecial = entry.isSpecial, 
                             specialColor = entry.specialColor,
+                            firstSeenTs = if (entry.firstSeenTs == 0L) (entry.timestamp - entry.durationMs) else entry.firstSeenTs,
                             role = entry.role,
                             synced = initiallySynced,
                             lat = entry.lat,
@@ -88,74 +155,17 @@ class LogRepository @Inject constructor(
                             snrSnapshot = entry.snrSnapshot,
                             vibeSnapshot = entry.vibeSnapshot
                         ))
-                        return@withLock
-                    }
-
-                    val last = logDao.getLastLogByMetadata(entry.type, entry.role, entry.id)
-                    if (last != null) {
-                        val lastBase = stripLogVariableParts(last.message)
-                        val currentBase = stripLogVariableParts(entry.message)
                         
-                        if (lastBase == currentBase && lastBase.isNotEmpty() && last.isSpecial == entry.isSpecial) {
-                            val newCount = last.count + entry.count
-                            val newDuration = last.durationMs + entry.durationMs
-                            val newExtreme = if (entry.extremeValue != null) {
-                                val lastExtreme = last.extremeValue ?: 0.0
-                                if (abs(entry.extremeValue) > abs(lastExtreme)) entry.extremeValue else lastExtreme
-                            } else last.extremeValue
-                            
-                            logDao.update(last.copy(
-                                localId = if (last.localId.isBlank()) entry.localId else last.localId,
-                                count = newCount,
-                                durationMs = newDuration,
-                                extremeValue = newExtreme,
-                                timestamp = entry.timestamp,
-                                message = entry.message,
-                                synced = initiallySynced,
-                                lat = entry.lat,
-                                lng = entry.lng,
-                                accuracy = entry.accuracy,
-                                maxAccuracy = entry.maxAccuracy,
-                                snrSnapshot = entry.snrSnapshot,
-                                vibeSnapshot = entry.vibeSnapshot
-                            ))
-                            return@withLock
+                        logWriteCount++
+                        if (logWriteCount >= DB_PRUNE_THRESHOLD) {
+                            logWriteCount = 0
+                            if (logDao.getCount() > 1000) {
+                                logDao.deepPruneLogs()
+                            }
                         }
+                    } catch (e: Exception) {
+                        Timber.e(e, "Error adding log to database")
                     }
-                    
-                    logDao.insert(LogEntity(
-                        localId = if (entry.localId.isBlank()) UUID.randomUUID().toString() else entry.localId, 
-                        timestamp = entry.timestamp, 
-                        message = entry.message, 
-                        type = entry.type, 
-                        isImportant = entry.isImportant, 
-                        deviceId = entry.id, 
-                        viewerId = entry.viewerId, 
-                        count = entry.count, 
-                        extremeValue = entry.extremeValue, 
-                        durationMs = entry.durationMs, 
-                        isSpecial = entry.isSpecial, 
-                        specialColor = entry.specialColor,
-                        firstSeenTs = if (entry.firstSeenTs == 0L) (entry.timestamp - entry.durationMs) else entry.firstSeenTs,
-                        role = entry.role,
-                        synced = initiallySynced,
-                        lat = entry.lat,
-                        lng = entry.lng,
-                        accuracy = entry.accuracy,
-                        maxAccuracy = entry.maxAccuracy,
-                        snrSnapshot = entry.snrSnapshot,
-                        vibeSnapshot = entry.vibeSnapshot
-                    ))
-                    
-                    logWriteCount++
-                    if (logWriteCount >= DB_PRUNE_THRESHOLD) {
-                        logWriteCount = 0
-                        if (logDao.getCount() > 1000) {
-                            logDao.deepPruneLogs()
-                        }
-                    }
-                } catch (e: Exception) {
-                    Timber.e(e, "Error adding log to database")
                 }
             }
         }
@@ -166,11 +176,19 @@ class LogRepository @Inject constructor(
      */
     suspend fun proactivePruning() {
         logMutex.withLock {
-            try {
-                logDao.deepPruneLogs()
-                Timber.d("Proactive pruning completed.")
-            } catch (e: Exception) {
-                Timber.e(e, "Error during proactive pruning")
+            LatencyMonitor.measure(
+                timeProvider = timeProvider,
+                thresholdMs = LOG_LATENCY_THRESHOLD_MS,
+                onSpike = { duration -> 
+                    Timber.w("Forensic I/O Audit: Slow proactive pruning detected: ${duration}ms")
+                }
+            ) {
+                try {
+                    logDao.deepPruneLogs()
+                    Timber.d("Proactive pruning completed.")
+                } catch (e: Exception) {
+                    Timber.e(e, "Error during proactive pruning")
+                }
             }
         }
     }

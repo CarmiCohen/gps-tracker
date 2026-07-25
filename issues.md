@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.25.10)
+# Project Issues & Hardening Tracking (July.25.11)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 414 |
+| **Resolved (Total)** | 🟢 Progress | 415 |
 
 ---
 
@@ -21,20 +21,20 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (July.25.10)
-*   **Issue #580b: Native Signal Latency Audit**.
-    *   **Resolution**: Integrated execution time monitoring into `MbrainHardwareManager` using a `measureLatency` wrapper. Implemented a 50ms threshold warning to detect JNI execution spikes that could impact tick loop stability.
-    *   **Impact**: Ensures forensic visibility into native hardware "pokes" and GNSS budget stabilization on Samsung A15 hardware, preventing silent jitter in the high-frequency engine.
-*   **Issue #570b: Flyweight Thread Safety Audit**.
-    *   **Resolution**: Eliminated class-level flyweight properties in `AppSensorManager`, `GpsManager`, and `TelemetryAggregator`. Scoped mutable flyweights to their respective sequence generators and refactored `consumeForensicSnapshot` to return new instances.
-    *   **Impact**: Secured forensic data integrity across asynchronous coroutine boundaries and suspension points.
+## 🟢 Recently Resolved Issues (July.25.11)
+*   **Issue #590: Generic Latency Monitoring Framework**.
+    *   **Resolution**: Implemented a platform-agnostic `LatencyMonitor` utility in `:core:engine`. Migrated `MbrainHardwareManager` (JNI), `MainRepository` (DB), and `LogRepository` (Logs) to use this unified framework with standardized thresholds (50ms for native, 500ms for I/O).
+    *   **Impact**: Ensures forensic visibility into "silent jitter" and I/O stalls that could impact the 1Hz tracking pulse stability.
 
 ---
 
-## 🟢 Recently Resolved Issues (July.25.08)
-*   **Issue #560c: Signaling Pressure Audit**.
-    *   **Resolution**: Implemented a Dual-Queue Priority Dispatcher in `CommunicationManager`.
-    *   **Impact**: Prevents head-of-line blocking during network congestion.
+## 🟢 Recently Resolved Issues (July.25.10)
+*   **Issue #580b: Native Signal Latency Audit**.
+    *   **Resolution**: Integrated execution time monitoring into `MbrainHardwareManager`. (Refactored to #590 framework in July.25.11).
+    *   **Impact**: Detects JNI execution spikes on Samsung A15 hardware.
+*   **Issue #570b: Flyweight Thread Safety Audit**.
+    *   **Resolution**: Eliminated class-level flyweight properties; scoped mutable flyweights to method/iterator levels.
+    *   **Impact**: Secured forensic data integrity across asynchronous coroutine boundaries.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*
