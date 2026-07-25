@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.25.05)
+# Project Issues & Hardening Tracking (July.25.06)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,12 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 409 |
+| **Resolved (Total)** | 🟢 Progress | 410 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Issue #560b: Buffer Overflow Resilience**: When using pre-allocated buffers for Protobuf serialization, the system must safely handle cases where the payload exceeds the initial buffer size (e.g., extreme GNSS satellite density) without causing frequent re-allocations.
+*   **Issue #560c: Socket-Level Pressure**: With larger Protobuf payloads now allowed (up to 64KB), monitor the impact on `SignalingProvider` socket buffers during low-bandwidth conditions to ensure large frames don't block high-priority pulses.
 *   **Issue #547: Kernel Warning (Part B)**: `userfaultfd: MOVE ioctl seems unsupported` still active on Samsung A15; monitoring GC pressure after state decomposition.
 *   **Issue #570b: Flyweight Thread Safety**: While forensic sequences use synchronized access to primitive buffers, the flyweight objects themselves are reused. Consumers must process or copy fields immediately before the next `yield`.
 *   **Issue #580b: Native Signal Latency**: While `ReentrantLock` prevents collisions, prolonged native execution in `libmbrainSDK` could theoretically delay the high-frequency tick loop. Monitor `punchHardware` execution time.
@@ -24,6 +24,13 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Observation**: `userfaultfd: MOVE ioctl seems unsupported`.
     *   **Investigation**: Root cause identified as kernel-level IOCTL limitation. Architectural mitigation (State Decomposition) implemented.
     *   **Status**: MONITORING. Tracking GC pause times on Android 15 to ensure stability.
+
+---
+
+## 🟢 Recently Resolved Issues (July.25.06)
+*   **Issue #560b: Buffer Overflow Resilience**.
+    *   **Resolution**: Implemented a self-expanding `ByteArray` buffer in `ConnectivitySuite` for Protobuf serialization. The buffer grows dynamically to accommodate high GNSS satellite density spikes (up to a 64KB safety clamp), preventing fallback to heap-churning `toByteArray()` calls.
+    *   **Impact**: Maintained "Zero-Churn" telemetry reliability even under extreme satellite visibility conditions.
 
 ---
 

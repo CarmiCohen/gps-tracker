@@ -26,6 +26,10 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.25.06:
+ * - Issue #560b: Buffer Overflow Resilience. Implemented self-expanding 
+ *   serialization buffer with exponential growth and 64KB safety clamp to 
+ *   handle GNSS density spikes without heap churn.
  * July.25.03:
  * - Issue #560: Pipeline Serialization Hardening. Implemented zero-churn 
  *   serialization using a pre-allocated ByteArray buffer and CodedOutputStream.
@@ -69,7 +73,8 @@ class ConnectivitySuite @Inject constructor(
 
     // Issue #560: Pre-allocated resources for zero-churn signaling
     private val statusBuilder = RealtimeStatus.newBuilder()
-    private val serializationBuffer = ByteArray(4096) 
+    private var serializationBuffer = ByteArray(4096) 
+    private val MAX_SERIALIZATION_BUFFER_SIZE = 65536 // 64KB Safety Clamp
 
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
@@ -359,8 +364,8 @@ class ConnectivitySuite @Inject constructor(
     }
 
     /**
-     * Issue #560: Pipeline Serialization Hardening.
-     * Uses pre-allocated buffer and CodedOutputStream to achieve zero-churn signaling.
+     * Issue #560b: Pipeline Serialization Hardening.
+     * Uses self-expanding pre-allocated buffer and CodedOutputStream to achieve zero-churn signaling.
      */
     @Synchronized
     private fun sendTelemetryInternal(status: TrackerStatus): Boolean {
@@ -370,6 +375,13 @@ class ConnectivitySuite @Inject constructor(
             val message = statusBuilder.buildPartial()
             val size = message.serializedSize
             
+            // Issue #560b: Dynamic buffer resizing with exponential growth and safety clamp
+            if (size > serializationBuffer.size && size <= MAX_SERIALIZATION_BUFFER_SIZE) {
+                val nextSize = (serializationBuffer.size * 2).coerceAtLeast(size).coerceAtMost(MAX_SERIALIZATION_BUFFER_SIZE)
+                serializationBuffer = ByteArray(nextSize)
+                Timber.d("Issue #560b: Serialization buffer expanded to $nextSize bytes")
+            }
+
             if (size <= serializationBuffer.size) {
                 try {
                     val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
@@ -378,10 +390,10 @@ class ConnectivitySuite @Inject constructor(
                     signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size)
                     return true
                 } catch (e: Exception) {
-                    Timber.e(e, "Issue #560: Pre-allocated serialization failed")
+                    Timber.e(e, "Issue #560b: Pre-allocated serialization failed")
                 }
             }
-            // Fallback for oversized payloads
+            // Fallback for oversized payloads (>64KB) or serialization failure
             signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray())
         } else {
             signalingProvider.emitMap("location_update", status.toMap(true))
