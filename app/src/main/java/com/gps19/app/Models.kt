@@ -10,12 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * July.25.03:
+ * - Issue #560: Pipeline Serialization Hardening. Added writeTo(Builder) to 
+ *   TrackerStatus to support zero-allocation telemetry signaling via builder reuse.
  * July.24.05:
  * - Issue #538d: Added toMap() to TrackerStatus for optimized signaling 
  *   emission, bypassing JSONObject overhead.
- * - Fix: Resolved UiEvent/UiCommand name collisions and fixed violationUptimeMs typo.
- * July.24.04:
- * - Issue #541: Direct Binary Flow. Updated TrackerStatus.toProto.
  */
 
 @Serializable
@@ -322,8 +322,11 @@ data class TrackerStatus(
         return JSONObject(toMap(fromViewer) as Map<*, *>)
     }
 
-    fun toProto(fromViewer: Boolean): RealtimeStatus {
-        return RealtimeStatus.newBuilder()
+    /**
+     * Refactored: Reuses a builder to avoid allocation churn.
+     */
+    fun writeTo(builder: RealtimeStatus.Builder, fromViewer: Boolean) {
+        builder.clear()
             .setId(SignalingConstants.getTransmissionId(deviceId))
             .setViewerId(SignalingConstants.getTransmissionId(viewerId))
             .setFromViewer(fromViewer)
@@ -375,7 +378,13 @@ data class TrackerStatus(
             .setIsTamperDetected(isTamperDetected)
             .setJumpTier(jumpTier)
             .setSentinelStatus(status.name)
-            .build()
+            .setLastValidFixRt(lastValidFixRt)
+    }
+
+    fun toProto(fromViewer: Boolean): RealtimeStatus {
+        val builder = RealtimeStatus.newBuilder()
+        writeTo(builder, fromViewer)
+        return builder.build()
     }
 
     private fun mapTrackerStateToProto(state: TrackerState): TrackerStateProto {
@@ -509,7 +518,7 @@ data class DashboardState(
     val isLinkVisible: Boolean = true,   
     val isBatterySteepDischarge: Boolean = false, 
     val isCoolingModeActive: Boolean = false,
-    val currentMa: String = "--"
+    val trackerCurrentMa: String = "--"
 )
 
 sealed class UiEvent {

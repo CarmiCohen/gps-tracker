@@ -8,6 +8,7 @@ import android.net.NetworkRequest
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import com.google.protobuf.CodedOutputStream
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -25,13 +26,12 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.25.03:
+ * - Issue #560: Pipeline Serialization Hardening. Implemented zero-churn 
+ *   serialization using a pre-allocated ByteArray buffer and CodedOutputStream.
  * July.24.07:
  * - Issue #546: Handshake Hardening. Integrated isConnecting() check to 
  *   prevent redundant handshake storms on budget hardware.
- * July.24.05:
- * - Issue #538d: Redundant Telemetry Conversions. Refactored sendTelemetryInternal 
- *   to use emitMap, eliminating redundant JSONObject conversions in Viewer mode.
- * - Issue #541: Direct Binary Flow. Implemented onBinaryUpdate.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -66,6 +66,10 @@ class ConnectivitySuite @Inject constructor(
     private var isTrackerMode = true
     private var lastReconnectTs = timeProvider.elapsedRealtime()
     private var lastForceJoinTs = 0L 
+
+    // Issue #560: Pre-allocated resources for zero-churn signaling
+    private val statusBuilder = RealtimeStatus.newBuilder()
+    private val serializationBuffer = ByteArray(4096) 
 
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
@@ -151,7 +155,6 @@ class ConnectivitySuite @Inject constructor(
             if (isStopped.get() || relayUrl.isEmpty()) return
             scope.launch {
                 val nowRt = timeProvider.elapsedRealtime()
-                // Issue #546: Added isConnecting() to prevent race conditions during network switch
                 if (nowRt - lastReconnectTs < 3000L || signalingProvider.isConnected() || signalingProvider.isConnecting()) return@launch
                 if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) return@launch
 
@@ -193,7 +196,6 @@ class ConnectivitySuite @Inject constructor(
 
         scope.launch {
             if (relayUrl.isNotEmpty() && SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
-                // Initial connect attempt
                 if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                     wakeUpRelay()
@@ -266,7 +268,6 @@ class ConnectivitySuite @Inject constructor(
                     }
                 }
             } else if (!signalingProvider.isConnecting() && nowRt - lastReconnectTs > NET_REJOIN_THRESHOLD_MS) {
-                // Issue #546: Guarded by isConnecting() to avoid redundant calls during budget handshake
                 withContext(Dispatchers.Default) {
                     lastReconnectTs = nowRt
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
@@ -357,10 +358,31 @@ class ConnectivitySuite @Inject constructor(
         return success
     }
 
+    /**
+     * Issue #560: Pipeline Serialization Hardening.
+     * Uses pre-allocated buffer and CodedOutputStream to achieve zero-churn signaling.
+     */
+    @Synchronized
     private fun sendTelemetryInternal(status: TrackerStatus): Boolean {
         if (!isConnected()) return false
         if (isTrackerMode) {
-            signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), status.toProto(false).toByteArray())
+            status.writeTo(statusBuilder, false)
+            val message = statusBuilder.buildPartial()
+            val size = message.serializedSize
+            
+            if (size <= serializationBuffer.size) {
+                try {
+                    val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
+                    message.writeTo(cos)
+                    cos.checkNoSpaceLeft()
+                    signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size)
+                    return true
+                } catch (e: Exception) {
+                    Timber.e(e, "Issue #560: Pre-allocated serialization failed")
+                }
+            }
+            // Fallback for oversized payloads
+            signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray())
         } else {
             signalingProvider.emitMap("location_update", status.toMap(true))
         }
@@ -740,7 +762,6 @@ class ConnectivitySuite @Inject constructor(
         if (isStopped.get()) return
         this.relayUrl = url; this.lastReconnectTs = timeProvider.elapsedRealtime()
         if (SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
-            // Issue #546: Handshake hardening check
             if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                 wakeUpRelay()

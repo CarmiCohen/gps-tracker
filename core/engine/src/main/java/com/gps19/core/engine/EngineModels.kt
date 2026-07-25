@@ -4,11 +4,11 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * July.25.03:
+ * - Issue #570: Forensic Snapshot Pooling. Refactored EngineSensorSnapshot and 
+ *   EngineSnrSample to mutable classes to eliminate forensic backfill churn.
  * July.23.07:
  * - Issue #113: Hardened HardwareCapabilities for Samsung A15 stabilization.
- * July.21.00:
- * - Issue #102: Temporal Forensic Integrity. Standardized 'rt' and 'ts'.
- * - Forensic Hardening: Expanded SentinelStatus and JumpConfidence for deep auditing.
  */
 
 @Serializable
@@ -105,19 +105,41 @@ enum class RibbonScale(val key: String, val intervalSeconds: Int) {
     SEVEN_DAY("7D", 2700)
 }
 
-data class EngineSnrSample(val ts: Long, val rt: Long = 0L, val snr: Double)
-
-data class EngineSensorSnapshot(
-    val ts: Long,
-    val rt: Long = 0L,
-    val acoustic: Double,
-    val lux: Double,
-    val vibe: Double,
-    val proxIdx: Double = 1.0,
-    val lift: Double = 0.0,
-    val tilt: Double = 0.0,
-    val isSitDetected: Boolean = false
+/**
+ * Mutable flyweight for zero-churn SNR forensics.
+ */
+class EngineSnrSample(
+    var ts: Long = 0L, 
+    var rt: Long = 0L, 
+    var snr: Double = 0.0
 )
+
+/**
+ * Mutable flyweight for zero-churn sensor forensics.
+ */
+class EngineSensorSnapshot(
+    var ts: Long = 0L,
+    var rt: Long = 0L,
+    var acoustic: Double = 0.0,
+    var lux: Double = 0.0,
+    var vibe: Double = 0.0,
+    var proxIdx: Double = 1.0,
+    var lift: Double = 0.0,
+    var tilt: Double = 0.0,
+    var isSitDetected: Boolean = false
+) {
+    fun copyFrom(other: EngineSensorSnapshot) {
+        this.ts = other.ts
+        this.rt = other.rt
+        this.acoustic = other.acoustic
+        this.lux = other.lux
+        this.vibe = other.vibe
+        this.proxIdx = other.proxIdx
+        this.lift = other.lift
+        this.tilt = other.tilt
+        this.isSitDetected = other.isSitDetected
+    }
+}
 
 @Serializable
 data class SentinelResult(

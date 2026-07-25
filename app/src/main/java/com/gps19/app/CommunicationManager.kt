@@ -9,18 +9,18 @@ import io.socket.client.Socket
 import kotlinx.coroutines.*
 import org.json.JSONObject
 import timber.log.Timber
+import java.util.Arrays
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * July.25.03:
+ * - Issue #560: Pipeline Serialization Hardening. Updated emitBinary to 
+ *   honor length parameter for pre-allocated buffer support.
  * July.24.07:
  * - Issue #546: Handshake Hardening. Implemented isConnecting() and 
  *   optimized socket options for Samsung A15 stability.
- * July.24.05:
- * - Issue #538d: Implemented emitMap to eliminate redundant JSONObject 
- *   conversions. Telemetry path now flows directly from Map to conflation.
- * - Issue #541: Direct Binary Flow. Updated location_relay_bin handler.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -140,7 +140,6 @@ class CommunicationManager @Inject constructor(
             return
         }
 
-        // Issue #546: Prevent redundant connection attempts during handshake
         if (isConnectingInternal || isConnected()) {
             return
         }
@@ -154,13 +153,13 @@ class CommunicationManager @Inject constructor(
 
         val opts = IO.Options().apply {
             transports = arrayOf("websocket")
-            timeout = 30000 // Issue #546: Reduced timeout for faster failure detection on budget A15
+            timeout = 30000 
             reconnection = true
             reconnectionAttempts = Int.MAX_VALUE
             reconnectionDelay = 2000 
             reconnectionDelayMax = 10000
             randomizationFactor = 0.5
-            forceNew = true // Issue #546: Ensure a clean slate for budget hardware
+            forceNew = true 
         }
 
         try {
@@ -399,10 +398,15 @@ class CommunicationManager @Inject constructor(
         }
     }
 
-    override fun emitBinary(event: String, routingId: String, data: ByteArray) {
+    /**
+     * Issue #560: Honor length for zero-allocation buffer support.
+     * Uses copyOf to avoid sending trailing zeros from the pre-allocated buffer.
+     */
+    override fun emitBinary(event: String, routingId: String, data: ByteArray, length: Int) {
         if (isStopped) return
         markTraffic()
-        socket?.emit(event, routingId, data) 
+        val payload = if (length == data.size) data else Arrays.copyOf(data, length)
+        socket?.emit(event, routingId, payload)
     }
 
     private fun emitLocationConflated(incoming: Map<String, Any?>) {

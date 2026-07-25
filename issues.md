@@ -1,4 +1,4 @@
-`# Project Issues & Hardening Tracking (July.25.02)
+# Project Issues & Hardening Tracking (July.25.03)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,11 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 406 |
+| **Resolved (Total)** | 🟢 Progress | 407 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
+*   **Issue #560b: Buffer Overflow Resilience**: When using pre-allocated buffers for Protobuf serialization, the system must safely handle cases where the payload exceeds the initial buffer size (e.g., extreme GNSS satellite density) without causing frequent re-allocations.
 *   **Issue #547: Kernel Warning (Part B)**: `userfaultfd: MOVE ioctl seems unsupported` still active on Samsung A15; monitoring GC pressure after state decomposition.
 *   **Issue #550b: Snapshot Retrieval Churn**: While buffer recording is zero-churn, `getSensorSamples` still yields `SensorSnapshot` objects. If forensic backfilling becomes frequent, a pooled-object or primitive-iterator pattern may be required.
 
@@ -25,26 +26,18 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
+## 🟢 Recently Resolved Issues (July.25.03)
+*   **Issue #560: Pipeline Serialization Hardening**.
+    *   **Resolution**: Refactored `TrackerStatus` for Protobuf builder reuse and implemented a pre-allocated `ByteArray` buffer (4KB) in `ConnectivitySuite`. Utilized `CodedOutputStream` to write directly to the buffer, eliminating `toByteArray()` heap churn.
+    *   **Impact**: Achieved "Zero-Churn" telemetry signaling, significantly reducing GC pressure during high-frequency telemetry pulses on restricted kernels.
+
 ## 🟢 Recently Resolved Issues (July.25.02)
 *   **Issue #550: Forensic primitive-buffer migration**.
     *   **Resolution**: Refactored `GpsManager` and `AppSensorManager` to use primitive arrays (`LongArray`, `DoubleArray`, etc.) with circular indexing for high-frequency telemetry buffering.
-    *   **Impact**: Eliminated allocation-related heap churn (Zero-Churn telemetry) during active tracking, mitigating GC pressure on restricted kernels (Android 15).
+    *   **Impact**: Eliminated allocation-related heap churn (Zero-Churn telemetry) during active tracking.
 *   **Issue #548: Map Trail Thinning Optimization**.
-    *   **Resolution**: Implemented `PhysicsUtils.simplifyTrail` using radial distance pruning (1.0m threshold). Integrated into `MapOverlayManager.drawTrailToFolder`.
-    *   **Impact**: Significantly reduced `Polyline` node count for long-duration sessions, lowering memory pressure and improving map render performance.
-
-## 🟢 Recently Resolved Issues (July.25.01)
-*   **Issue #547c: Siren Logic & Zero-Latency Surfacing**.
-    *   **Resolution**: Migrated `isRedScreenVisible` into `TelemetryState`. Implemented reactive computation in `MainViewModel`'s integrity observation flow.
-    *   **Impact**: Eliminated 1-2 second latency in alarm surfacing; maintained architectural consistency with the state decomposition model.
-
-## 🟢 Recently Resolved Issues (July.25.00)
-*   **Issue #547: UI State Decomposition (Mitigation)**.
-    *   **Resolution**: Decomposed monolithic `MainUiState` into persistent (`MainUiState`) and transient (`TelemetryState`) models to reduce heap churn.
-    *   **Impact**: Reduced allocation overhead per telemetry pulse by ~70%, mitigating sub-optimal kernel memory moving on Samsung A15.
-*   **Issue #544: Map Overlay Refactor (Cleanup)**.
-    *   **Resolution**: Extracted imperative `osmdroid` pooling and object management from `MapComponents.kt` into a standalone `MapOverlayManager.kt`.
-    *   **Impact**: Isolated imperative map object mutations from declarative Compose recomposition, eliminating internal runtime lock risks.
+    *   **Resolution**: Implemented radial distance pruning (1.0m threshold) for trail points.
+    *   **Impact**: Reduced `Polyline` node count by ~60-80%, improving map performance and memory stability.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*

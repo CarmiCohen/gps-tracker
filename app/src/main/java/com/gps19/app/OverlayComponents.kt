@@ -24,6 +24,8 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * July.25.03:
+ * - Issue #560: Alignment with DashboardState field renaming (trackerCurrentMa).
  * July.24.08:
  * - Issue #547: State Decomposition. Refactored components to consume 
  *   TelemetryState separately from MainUiState to reduce heap churn.
@@ -186,7 +188,7 @@ private fun ForensicSection(d: DashboardState, telemetryColor: Color, isViewer: 
 
     InfoRow(leftVal = d.peakShock, leftLabel = "Peak Shock", leftColor = if (!tFresh) staleColor else Rose500, rightVal = d.vibrationFloor, rightLabel = "Vibration Floor", rightColor = if (tFresh) Slate400 else staleColor)
     InfoRow(leftVal = d.luxBaseline, leftLabel = "Lux Baseline", leftColor = if(!tFresh) staleColor else Amber500, rightVal = d.acousticFloor, rightLabel = "Acoustic Floor", rightColor = if(!tFresh) staleColor else Color(0xFF38BDF8))
-    InfoRow(leftVal = d.currentMa, leftLabel = stringResource(R.string.log_diag_battery), leftColor = if(!tFresh) staleColor else Color.White, rightVal = "", rightLabel = "")
+    InfoRow(leftVal = d.trackerCurrentMa, leftLabel = stringResource(R.string.log_diag_battery), leftColor = if(!tFresh) staleColor else Color.White, rightVal = "", rightLabel = "")
 }
 
 @Composable

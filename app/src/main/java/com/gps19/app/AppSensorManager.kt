@@ -23,16 +23,16 @@ import kotlinx.coroutines.*
 import timber.log.Timber
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.25.03:
+ * - Issue #570: Forensic Snapshot Pooling. Refactored getSensorSamples and 
+ *   getAcousticSamples to use flyweight iteration, eliminating transient object churn.
  * July.25.02:
- * - Issue #550: Refactored sensor history to primitive arrays to eliminate heap churn.
- *   Achieved zero-allocation forensic buffering during active tracking.
- *   Optimized retrieval path to use sequences over primitive snapshots to avoid list churn.
- * July.24.05:
- * - Issue #538e: Optimized sample retrieval for forensic backfilling. 
+ * - Issue #550: Refactored sensor history to primitive arrays.
  */
 class AppSensorManager(
     private val context: Context,
@@ -141,17 +141,9 @@ class AppSensorManager(
     @Volatile
     private var powerSaveMode = false
 
-    data class SensorSnapshot(
-        val ts: Long,
-        val rt: Long,
-        val lux: Double,
-        val vibe: Double,
-        val proxIdx: Double,
-        val tilt: Double,
-        val lift: Double,
-        val acoustic: Double,
-        val isSitDetected: Boolean
-    )
+    // Issue #570: Flyweights for forensic iteration
+    private val sensorFlyweight = EngineSensorSnapshot()
+    private val snrFlyweight = EngineSnrSample()
 
     data class ForensicSnapshot(
         val vibration: Double,
@@ -650,85 +642,55 @@ class AppSensorManager(
     }
 
     /**
-     * Returns sensor samples in range as a Sequence to eliminate allocations.
-     * Uses sequence generator over array snapshots to avoid intermediate list churn.
+     * Issue #570: Zero-churn retrieval via flyweight iteration.
+     * Yields the same EngineSensorSnapshot instance with updated fields.
      */
-    fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<SensorSnapshot> = sequence {
-        // Snapshot the buffer state to avoid holding lock during yield
-        val snapshot = synchronized(this@AppSensorManager) {
-            val c = bufferCount
-            if (c == 0) return@synchronized null
-            
-            val startIdx = (bufferIdx - c + 256) % 256
-            val tsArr = LongArray(c)
-            val rtArr = LongArray(c)
-            val luxArr = DoubleArray(c)
-            val vibeArr = DoubleArray(c)
-            val proxArr = DoubleArray(c)
-            val tiltArr = DoubleArray(c)
-            val liftArr = DoubleArray(c)
-            val acArr = DoubleArray(c)
-            val sitArr = BooleanArray(c)
-            
-            for (i in 0 until c) {
-                val idx = (startIdx + i) % 256
-                tsArr[i] = bufferTs[idx]
-                rtArr[i] = bufferRt[idx]
-                luxArr[i] = bufferLux[idx]
-                vibeArr[i] = bufferVibe[idx]
-                proxArr[i] = bufferProxIdx[idx]
-                tiltArr[i] = bufferTilt[idx]
-                liftArr[i] = bufferLift[idx]
-                acArr[i] = bufferAcoustic[idx]
-                sitArr[i] = bufferSit[idx]
-            }
-            
-            object {
-                val ts = tsArr; val rt = rtArr; val lux = luxArr; val vibe = vibeArr; val prox = proxArr; val tilt = tiltArr; val lift = liftArr; val ac = acArr; val sit = sitArr; val count = c
-            }
-        } ?: return@sequence
-
-        for (i in 0 until snapshot.count) {
-            if (snapshot.ts[i] in fromTs..toTs) {
-                yield(SensorSnapshot(
-                    ts = snapshot.ts[i],
-                    rt = snapshot.rt[i],
-                    lux = snapshot.lux[i],
-                    vibe = snapshot.vibe[i],
-                    proxIdx = snapshot.prox[i],
-                    tilt = snapshot.tilt[i],
-                    lift = snapshot.lift[i],
-                    acoustic = snapshot.ac[i],
-                    isSitDetected = snapshot.sit[i]
-                ))
+    @Synchronized
+    fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<EngineSensorSnapshot> = sequence {
+        val c = bufferCount
+        if (c == 0) return@sequence
+        
+        val startIdx = (bufferIdx - c + 256) % 256
+        
+        // Iterate through buffer directly to avoid array allocations
+        for (i in 0 until c) {
+            val idx = (startIdx + i) % 256
+            val ts = bufferTs[idx]
+            if (ts in fromTs..toTs) {
+                sensorFlyweight.apply {
+                    this.ts = ts
+                    this.rt = bufferRt[idx]
+                    this.lux = bufferLux[idx]
+                    this.vibe = bufferVibe[idx]
+                    this.proxIdx = bufferProxIdx[idx]
+                    this.tilt = bufferTilt[idx]
+                    this.lift = bufferLift[idx]
+                    this.acoustic = bufferAcoustic[idx]
+                    this.isSitDetected = bufferSit[idx]
+                }
+                yield(sensorFlyweight)
             }
         }
     }
 
     /**
-     * Returns acoustic samples in range as a Sequence of Pairs.
-     * Uses sequence generator over array snapshots to avoid intermediate list churn.
+     * Issue #570: Zero-churn retrieval via flyweight iteration.
+     * Yields the same EngineSnrSample instance with updated fields.
      */
-    fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<Pair<Long, Double>> = sequence {
-        val snapshot = synchronized(this@AppSensorManager) {
-            val c = bufferCount
-            if (c == 0) return@synchronized null
-            val startIdx = (bufferIdx - c + 256) % 256
-            val tsArr = LongArray(c)
-            val acArr = DoubleArray(c)
-            for (i in 0 until c) {
-                val idx = (startIdx + i) % 256
-                tsArr[i] = bufferTs[idx]
-                acArr[i] = bufferAcoustic[idx]
-            }
-            tsArr to acArr
-        } ?: return@sequence
-        
-        val ts = snapshot.first
-        val ac = snapshot.second
-        for (i in 0 until ts.size) {
-            if (ts[i] in fromTs..toTs) {
-                yield(ts[i] to ac[i])
+    @Synchronized
+    fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
+        val c = bufferCount
+        if (c == 0) return@sequence
+        val startIdx = (bufferIdx - c + 256) % 256
+        for (i in 0 until c) {
+            val idx = (startIdx + i) % 256
+            val ts = bufferTs[idx]
+            if (ts in fromTs..toTs) {
+                snrFlyweight.apply {
+                    this.ts = ts
+                    this.snr = bufferAcoustic[idx] // Reusing snr field for acoustic val
+                }
+                yield(snrFlyweight)
             }
         }
     }

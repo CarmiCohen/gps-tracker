@@ -7,6 +7,8 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard states.
+ * July.25.03:
+ * - Issue #560: Alignment with DashboardState field renaming (trackerCurrentMa).
  * July.24.08:
  * - Issue #547: State Decomposition. Updated buildDashboardState to accept 
  *   TelemetryState separately to reduce heap churn.
@@ -140,7 +142,7 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             isLinkVisible = isTelemetryVisible,
             isBatterySteepDischarge = health.isBatterySteepDischarge,
             isCoolingModeActive = health.isCoolingModeActive,
-            currentMa = sensorVal("${health.currentMa}mA"),
+            trackerCurrentMa = sensorVal("${health.currentMa}mA"),
             isLocationPending = health.isLocationPending,
             locationPendingReason = health.locationPendingReason
         )

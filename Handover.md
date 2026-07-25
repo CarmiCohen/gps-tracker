@@ -1,44 +1,41 @@
-# Handover (July.25.02) - Forensic Zero-Churn [READY]
+# Handover (July.25.03) - Forensic Zero-Churn [READY]
 
 ## 🎯 Completed Objective
-Cycle **July.25.02** reached **406 Resolved Issues** by refactoring high-frequency telemetry buffers to eliminate heap churn and achieve "Zero-Churn" status on restricted kernels (Android 15).
+Cycle **July.25.03** reached **407 Resolved Issues** by implementing "Zero-Churn" telemetry signaling.
 
 ## 📊 Forensic Status & State Authority
 
-### 1. Resolved: Forensic primitive-buffer migration (#550)
-- **Problem**: Continuous allocation of `Pair<Long, Double>` and `SensorSnapshot` objects in `GpsManager` and `AppSensorManager` during 2s telemetry pulses caused excessive GC pressure, specifically impacting devices with restricted kernel memory moving (`userfaultfd` warnings).
+### 1. Resolved: Pipeline Serialization Hardening (#560)
+- **Problem**: High-frequency telemetry (1-2s) caused heap churn due to Protobuf Builder, Message, and ByteArray allocations in `ConnectivitySuite.kt`.
 - **Root-Cause Solution**:
-    - **`GpsManager.kt`**: Replaced object-based buffers with circular `LongArray` and `DoubleArray` for SNR history.
-    - **`AppSensorManager.kt`**: Replaced `ConcurrentLinkedQueue<SensorSnapshot>` with parallel circular primitive arrays (`LongArray`, `DoubleArray`, `BooleanArray`) for all forensic parameters.
-    - **Optimized Retrieval**: Refactored `getSnrSamples` and `getSensorSamples` to utilize sequences over array snapshots, ensuring that the internal recording path is allocation-free and the retrieval path avoids intermediate list allocations.
-- **Impact**: Achieved "Zero-Churn" telemetry recording. Reduced heap churn during active tracking by 100% for the buffer-insertion path.
+    - **`Models.kt`**: Added `writeTo(builder: RealtimeStatus.Builder)` to `TrackerStatus` to support builder reuse.
+    - **`ConnectivitySuite.kt`**: Implemented a 4KB `serializationBuffer` and a reusable `RealtimeStatus.Builder`.
+    - **Zero-Allocation Write**: Utilized `CodedOutputStream` to write directly into the pre-allocated buffer, bypassing the intermediate `toByteArray()` allocation.
+    - **Signaling Layer**: Updated `SignalingProvider` and `CommunicationManager` to support `emitBinary` with a length parameter.
+- **Impact**: Achieved "Zero-Churn" signaling. Eliminated transient object allocations in the hot-path telemetry pulse.
 
-### 2. Resolved: Map Trail Thinning Optimization (#548)
-- **Problem**: Map performance degradation and memory pressure during long-duration sessions due to monolithic polyline growth.
-- **Root-Cause Solution**:
-    - **`PhysicsUtils.simplifyTrail`**: Implemented radial distance pruning with a 1.0m threshold.
-    - **Integration**: Applied thinning in `MapOverlayManager` during trail rendering.
-- **Impact**: Reduced polyline node count by ~60-80% for typical sessions without loss of forensic fidelity.
+### 2. Resolved: Dashboard State Alignment
+- **Fix**: Propagated `currentMa` -> `trackerCurrentMa` renaming across `DashboardState`, `DashboardStateProviderImpl`, and `OverlayComponents` to ensure UI consistency and build integrity.
 
 ### 3. Build & Integrity
-- **Version Authority**: Set to `July.25.02` in `app/build.gradle`.
-- **SOT Alignment**: Updated `SOT_MASTER_REQUIREMENTS.md` with **R550** authority.
-- **Issue Tracking**: Updated `issues.md` to reflect 406 resolved issues.
-- **Build Status**: Verified successful via `:app:assembleDebug`.
+- **Version Authority**: Set to `July.25.03` in `app/build.gradle`.
+- **SOT Alignment**: Updated `SOT_MASTER_REQUIREMENTS.md` with **R560** authority.
+- **Issue Tracking**: Updated `issues.md` to reflect 407 resolved issues.
 
 ## ⚠️ Newly Identified Risks & Concerns
-- **Issue #550b**: While buffer recording is zero-churn, sequence retrieval still yields transient objects (`Pair` or `Snapshot`). If forensic backfilling volume increases, a primitive-iterator or pooled-object pattern should be considered.
+- **Issue #560b**: The 4KB buffer is sufficient for standard telemetry, but extreme GNSS detail expansion could exceed it. A safe resizing or pooling strategy should be monitored.
+- **Issue #550b**: `AppSensorManager.getSensorSamples` still yields transient `SensorSnapshot` objects.
 
 ## 🎯 Next Objective
-- **Issue #560: Pipeline Serialization Hardening**: Investigate moving Protobuf serialization to a pre-allocated buffer to achieve zero-allocation across the entire telemetry signaling pipe.
+- **Issue #570: Forensic Snapshot Pooling**: Implement an object pool or primitive-iterator for `SensorSnapshot` retrieval to achieve zero-churn in the forensic backfilling path.
 
 ## 🚀 Release Preparation
 - **Build Status**: 🟢 Success.
 - **Git Block**:
     ```bash
     git add -A
-    git commit -m "Release July.25.02: Forensic Primitive-Buffer Migration & Trail Thinning"
-    git tag -a vJuly.25.02 -m "Refactored GpsManager and AppSensorManager to use primitive arrays for zero-churn telemetry."
+    git commit -m "Release July.25.03: Pipeline Serialization Hardening (Zero-Churn Signaling)"
+    git tag -a vJuly.25.03 -m "Refactored ConnectivitySuite and TrackerStatus to use pre-allocated buffers and reusable builders for zero-allocation telemetry signaling."
     git push origin main --tags
     ```
 

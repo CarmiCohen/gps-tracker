@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.25.02 (Map Trail Optimization)
+# System Source of Truth (SoT) - July.25.03 (Pipeline Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -9,6 +9,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Reactive Siren Surfacing (R547c)**: To achieve zero-latency alarm visibility, UI visibility gates (specifically `isRedScreenVisible`) MUST be integrated directly into the `TelemetryState` stream. Computation of these gates MUST occur immediately upon receipt of integrity updates in the ViewModel to bypass global timer pulse latency. (Issue #547c, July.25.01)
 *   **Granular Trail Thinning (R548)**: To prevent memory bloat and UI jank during long sessions, map trail polylines MUST be simplified using radial distance pruning. A 1.0m threshold MUST be applied to prune redundant nodes while strictly preserving segment boundaries and valid/jump status changes. (Issue #548, July.25.02)
 *   **Forensic Primitive Buffering (R550)**: To eliminate heap churn and GC pressure during high-frequency telemetry updates, `GpsManager` and `AppSensorManager` MUST use circular primitive arrays (LongArray, DoubleArray, BooleanArray) for historical sample storage. All sample retrieval for forensic backfilling MUST utilize sequences to bypass intermediate list allocations. (Issue #550, July.25.02)
+*   **Pipeline Serialization Hardening (R560)**: To achieve zero-churn telemetry signaling on restricted kernels, the signaling pipeline MUST utilize pre-allocated `ByteArray` buffers and reusable Protobuf builders. High-frequency updates MUST be serialized via `CodedOutputStream` directly into the reusable buffer to eliminate `toByteArray()` heap allocations. (Issue #560, July.25.03)
 *   **Startup Suppression Window (R993d)**: To prevent Main-thread starvation during cold-start, all Foreground Service notification type updates MUST be suppressed for the first 10 seconds of service life if a previous notification has already been successfully posted. (Issue #534, July.24.02)
 *   **Notification IPC Throttling (R993b)**: To prevent Main-thread ANRs during hardware recovery bursts, Foreground Service notification updates MUST be double-throttled: a 2000ms hard gate in `AppNotificationManager` and a 10,000ms global throttle for service type changes in `BaseMonitorService` descendants. (Issue #113, #535, July.24.02)
 *   **Foreground Service Immediacy (R406b)**: `startForeground` MUST be invoked directly in the Main-thread `onCreate` of any `LifecycleService`. (July.23.11)
@@ -48,5 +49,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.25.02.
+*   **Current Release**: July.25.03.
 *   **Source of Truth**: app/build.gradle versionName.
