@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.25.08)
+# Project Issues & Hardening Tracking (July.25.10)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,13 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 412 |
+| **Resolved (Total)** | 🟢 Progress | 414 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Issue #570b: Flyweight Thread Safety**: While forensic sequences use synchronized access to primitive buffers, the flyweight objects themselves are reused. Consumers must process or copy fields immediately before the next `yield`.
-*   **Issue #580b: Native Signal Latency**: While `ReentrantLock` prevents collisions, prolonged native execution in `libmbrainSDK` could theoretically delay the high-frequency tick loop. Monitor `punchHardware` execution time.
+*   *No high-priority risks identified.*
 
 ---
 
@@ -22,18 +21,20 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (July.25.08)
-*   **Issue #560c: Signaling Pressure Audit**.
-    *   **Resolution**: Implemented a Dual-Queue Priority Dispatcher in `CommunicationManager`. High-priority pulses (Pings, Identity) skip application-layer buffering for immediate emission, while Normal-priority bulk data (64KB telemetry Protobufs) are queued with an inter-frame throttle (50ms) to prevent socket buffer saturation.
-    *   **Data Integrity**: Synchronized the `is_clock_regression` field across the Protobuf schema, `TrackerStatus` model, and `ConnectivitySuite` pipeline to ensure forensic regression flags are preserved in expanded binary payloads.
-    *   **Impact**: Prevents head-of-line blocking during network congestion, ensuring heartbeats remain stable even when large telemetry payloads are being synchronized.
+## 🟢 Recently Resolved Issues (July.25.10)
+*   **Issue #580b: Native Signal Latency Audit**.
+    *   **Resolution**: Integrated execution time monitoring into `MbrainHardwareManager` using a `measureLatency` wrapper. Implemented a 50ms threshold warning to detect JNI execution spikes that could impact tick loop stability.
+    *   **Impact**: Ensures forensic visibility into native hardware "pokes" and GNSS budget stabilization on Samsung A15 hardware, preventing silent jitter in the high-frequency engine.
+*   **Issue #570b: Flyweight Thread Safety Audit**.
+    *   **Resolution**: Eliminated class-level flyweight properties in `AppSensorManager`, `GpsManager`, and `TelemetryAggregator`. Scoped mutable flyweights to their respective sequence generators and refactored `consumeForensicSnapshot` to return new instances.
+    *   **Impact**: Secured forensic data integrity across asynchronous coroutine boundaries and suspension points.
 
 ---
 
-## 🟢 Recently Resolved Issues (July.25.07)
-*   **Issue #547b: Kernel I/O Optimization (Samsung A15 Resilience)**.
-    *   **Resolution**: Refactored high-frequency engine components (`GtoEngine` and `LocationProcessor`) to use primitive circular buffers (`DoubleArray`, `LongArray`) for kinematic windows and accuracy tracking.
-    *   **Impact**: Mitigated performance impact of missing `userfaultfd: MOVE` support on Android 15 (Samsung A15).
+## 🟢 Recently Resolved Issues (July.25.08)
+*   **Issue #560c: Signaling Pressure Audit**.
+    *   **Resolution**: Implemented a Dual-Queue Priority Dispatcher in `CommunicationManager`.
+    *   **Impact**: Prevents head-of-line blocking during network congestion.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*

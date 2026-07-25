@@ -4,21 +4,18 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * July.25.10:
+ * - Issue #570b: Flyweight Thread Safety Audit. Moved fillPointFlyweight to 
+ *   method scope in backfillGaps to ensure thread safety across concurrent callers.
  * July.25.02:
  * - Issue #570: Forensic Snapshot Pooling. Refactored backfillGaps and 
  *   fillRealGap to use a reusable flyweight EngineConnectionPoint, achieving 
  *   zero-churn during forensic reconstruction.
- * July.24.05:
- * - Issue #538e: Ribbon Backfill Optimization. Refactored backfillGaps and 
- *   fillRealGap to accept Sequence instead of List.
  */
 class TelemetryAggregator {
 
     private val accumulators = mutableMapOf<String, MutableAggregationPoint>()
     
-    // Issue #570: Reusable flyweight for backfill/gap filling
-    private val fillPointFlyweight = EngineConnectionPoint()
-
     companion object {
         private const val MAX_BACKFILL_POINTS = 1000
 
@@ -119,8 +116,6 @@ class TelemetryAggregator {
         }
 
         fun toImmutable(base: EngineConnectionPoint, isTick: Boolean): EngineConnectionPoint {
-            // Issue #570: Returns a new instance for long-term storage, 
-            // but the hot-path backfill uses the mutable aggregator directly.
             return EngineConnectionPoint().apply {
                 this.copyFrom(base)
                 this.rtt = this@MutableAggregationPoint.rtt
@@ -158,7 +153,6 @@ class TelemetryAggregator {
 
         RibbonScale.entries.forEach { scale ->
             if (scale == RibbonScale.FOUR_MIN) {
-                // Return a new instance for 4M storage as it's the primary trail
                 val p = EngineConnectionPoint().apply { copyFrom(point); isTick = totalSeconds % 60 == 0 }
                 results.add(scale to p)
                 return@forEach
@@ -184,6 +178,7 @@ class TelemetryAggregator {
 
     /**
      * Issue #570: Refactored to eliminate copy() and achieve zero-churn backfill.
+     * July.25.10: Flyweight scoped to method for thread safety.
      */
     fun backfillGaps(
         lastTickRt: Long,
@@ -195,6 +190,7 @@ class TelemetryAggregator {
         acousticFloor: Double,
         baseTemplate: EngineConnectionPoint
     ): List<Pair<RibbonScale, EngineConnectionPoint>> {
+        val fillPointFlyweight = EngineConnectionPoint()
         val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
         var fillRt = lastTickRt + TICK_INTERVAL_MS
         var fillTs = lastTickTs + TICK_INTERVAL_MS
@@ -232,7 +228,6 @@ class TelemetryAggregator {
             val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.baroIdx
             val resolvedSit = snapshot?.isSitDetected ?: false
 
-            // Issue #570: Using flyweight instead of copy()
             fillPointFlyweight.apply {
                 copyFrom(baseTemplate)
                 ts = fillTs
@@ -314,7 +309,6 @@ class TelemetryAggregator {
             val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
             val resolvedSit = snapshot?.isSitDetected ?: false
 
-            // Return new instances for gap points as they are stored in the database
             gapPoints.add(EngineConnectionPoint(
                 ts = currentRt + rtToTsOffset,
                 rt = currentRt,

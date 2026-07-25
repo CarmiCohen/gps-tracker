@@ -18,6 +18,9 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * July.25.10:
+ * - Issue #570b: Flyweight Thread Safety Audit. Moved snrFlyweight to method 
+ *   scope in getSnrSamples to ensure safe concurrent iteration.
  * July.25.02:
  * - Issue #570: Forensic Snapshot Pooling. Refactored getSnrSamples to use 
  *   EngineSnrSample flyweight and zero-allocation primitive iteration.
@@ -46,9 +49,6 @@ class GpsManager @Inject constructor(
     private val snrValBuffer = DoubleArray(512)
     private var snrBufferIdx = 0
     private var snrBufferCount = 0
-
-    // Issue #570: Flyweight for SNR retrieval
-    private val snrFlyweight = EngineSnrSample()
 
     private val _gnssDetailFlow = MutableStateFlow<GnssDetail?>(null)
     val gnssDetailFlow: StateFlow<GnssDetail?> = _gnssDetailFlow.asStateFlow()
@@ -96,9 +96,10 @@ class GpsManager @Inject constructor(
 
     /**
      * Issue #570: Returns SNR samples via flyweight iteration.
-     * Eliminates intermediate list and Pair allocations.
+     * July.25.10: Flyweight scoped to sequence generator for thread safety.
      */
     fun getSnrSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
+        val flyweight = EngineSnrSample()
         val c: Int
         val startIdx: Int
         synchronized(snrTsBuffer) {
@@ -119,10 +120,10 @@ class GpsManager @Inject constructor(
             }
             
             if (ts in fromTs..toTs) {
-                snrFlyweight.ts = ts
-                snrFlyweight.rt = rt
-                snrFlyweight.snr = snr
-                yield(snrFlyweight)
+                flyweight.ts = ts
+                flyweight.rt = rt
+                flyweight.snr = snr
+                yield(flyweight)
             }
         }
     }

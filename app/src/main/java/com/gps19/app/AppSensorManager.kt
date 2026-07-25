@@ -28,9 +28,10 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * July.25.02:
- * - Issue #570: Forensic Snapshot Pooling. Refactored ForensicSnapshot to a mutable 
- *   flyweight and optimized backfill iteration to eliminate transient churn.
+ * July.25.10:
+ * - Issue #570b: Flyweight Thread Safety Audit. Moved sequence flyweights to method scope 
+ *   and refactored consumeForensicSnapshot to return new instances, securing 
+ *   asynchronous alarm evaluation boundaries.
  * July.25.03:
  * - Issue #570: Forensic Snapshot Pooling. Refactored getSensorSamples and 
  *   getAcousticSamples to use flyweight iteration, eliminating transient object churn.
@@ -144,13 +145,10 @@ class AppSensorManager(
     @Volatile
     private var powerSaveMode = false
 
-    // Issue #570: Flyweights for forensic iteration
-    private val sensorFlyweight = EngineSensorSnapshot()
-    private val snrFlyweight = EngineSnrSample()
-    private val forensicFlyweight = ForensicSnapshot()
-
     /**
-     * Issue #570: Mutable flyweight for forensic snapshots.
+     * ForensicSnapshot: Data container for forensic sensor state.
+     * July.25.10: Secured instance per consumption to ensure thread safety 
+     * across asynchronous boundaries.
      */
     class ForensicSnapshot {
         var vibration: Double = 0.0
@@ -612,12 +610,13 @@ class AppSensorManager(
     fun isAcousticMonitoringEnabled(): Boolean = isMonitoring
 
     /**
-     * Issue #570: Zero-churn forensic snapshot consumption.
-     * Fills and returns the flyweight instance.
+     * consumeForensicSnapshot: Returns a snapshot of current forensic state.
+     * July.25.10: Secured instance per consumption to ensure thread safety 
+     * across asynchronous boundaries.
      */
     fun consumeForensicSnapshot(): ForensicSnapshot {
         synchronized(this) {
-            forensicFlyweight.apply {
+            val snapshot = ForensicSnapshot().apply {
                 vibration = currentVibrationIndex
                 heading = currentCompassHeading
                 baroAlt = absoluteAltitude
@@ -631,10 +630,10 @@ class AppSensorManager(
                 peakVerticalVelocityRt = internalPeakVerticalVelocityRt
                 plungeMatched = !isWarming && plungeMatched
                 peakVerticalDisplacement = internalPeakVerticalDisplacement
-                proximityIdx = proximityIdx
+                proximityIdx = this@AppSensorManager.proximityIdx
                 proximityCm = currentProximityCm
-                proximityDebounceMs = proximityDebounceMs
-                vibrationRollingSum = vibrationRollingSum
+                proximityDebounceMs = this@AppSensorManager.proximityDebounceMs
+                vibrationRollingSum = this@AppSensorManager.vibrationRollingSum
                 acousticPeak = internalPeakDb
                 acousticMin = if (internalMinDb >= 100.0) -1.0 else internalMinDb
             }
@@ -648,15 +647,16 @@ class AppSensorManager(
             internalPeakDb = 0.0
             internalMinDb = 100.0
             
-            return forensicFlyweight
+            return snapshot
         }
     }
 
     /**
      * Issue #570: Zero-churn retrieval via flyweight iteration.
-     * Optimized to avoid buffer snapshots and intermediate object creation.
+     * July.25.10: Flyweight scoped to sequence generator for thread safety.
      */
     fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<EngineSensorSnapshot> = sequence {
+        val flyweight = EngineSensorSnapshot()
         val c: Int
         val startIdx: Int
         synchronized(this@AppSensorManager) {
@@ -689,7 +689,7 @@ class AppSensorManager(
             }
 
             if (ts in fromTs..toTs) {
-                sensorFlyweight.apply {
+                flyweight.apply {
                     this.ts = ts
                     this.rt = rt
                     this.lux = lux
@@ -700,16 +700,17 @@ class AppSensorManager(
                     this.acoustic = acoustic
                     this.isSitDetected = sit
                 }
-                yield(sensorFlyweight)
+                yield(flyweight)
             }
         }
     }
 
     /**
      * Issue #570: Zero-churn retrieval via flyweight iteration.
-     * Reuses snrFlyweight to eliminate transient object churn.
+     * July.25.10: Flyweight scoped to sequence generator for thread safety.
      */
     fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
+        val flyweight = EngineSnrSample()
         val c: Int
         val startIdx: Int
         synchronized(this@AppSensorManager) {
@@ -730,12 +731,12 @@ class AppSensorManager(
             }
 
             if (ts in fromTs..toTs) {
-                snrFlyweight.apply {
+                flyweight.apply {
                     this.ts = ts
                     this.rt = rt
                     this.snr = acoustic
                 }
-                yield(snrFlyweight)
+                yield(flyweight)
             }
         }
     }
