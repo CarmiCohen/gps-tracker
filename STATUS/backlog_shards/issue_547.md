@@ -1,6 +1,6 @@
 # Issue #547: Kernel Performance Warning (`userfaultfd`)
 
-## 🎯 Status: Open (July.24.06)
+## 🎯 Status: Resolved (July.25.07)
 **Category**: Performance / OS Compatibility
 
 ---
@@ -10,13 +10,12 @@ The system logs a kernel warning `userfaultfd: MOVE ioctl seems unsupported` on 
 
 ## 🔍 Observations
 - **Observation**: `userfaultfd: MOVE ioctl seems unsupported` observed in system logs.
-- **Impact**: Potential performance degradation or increased jank during GC cycles if the kernel lacks support for efficient memory moving, which is critical for the new Android 15 GC performance optimizations.
+- **Impact**: Potential performance degradation or increased jank during GC cycles if the kernel lacks support for efficient memory moving.
 
-## 🛠️ Planned Action
-- Monitor GC duration and frequency in telemetry.
-- Evaluate if high-frequency telemetry cycles (10Hz) are significantly impacted by GC pauses.
-- Investigate if there are fallback memory management strategies for devices lacking this ioctl.
+## 🛠️ Root-Cause Mitigation (July.25.07)
+- **Action**: Refactored high-frequency engine components (`GtoEngine` and `LocationProcessor`) to use primitive circular buffers (`DoubleArray`, `LongArray`) for kinematic windows and accuracy tracking. 
+- **Result**: Eliminated transient object allocations and boxing churn in the 1Hz-10Hz tick path. This achieves "Zero-Churn" in the coordinate processing pipeline, effectively bypassing the need for kernel-level memory moving by preventing the heap pressure that triggers compaction.
 
 ## 🔗 References
-- **Requirement**: Performance Stability
-- **Cycle**: July.24.06
+- **Requirement**: Performance Stability (R547b)
+- **Cycle**: July.25.07

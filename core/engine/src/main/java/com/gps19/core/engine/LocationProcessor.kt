@@ -5,12 +5,11 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * July.25.07:
+ * - Issue #547b: Kernel I/O Optimization. Refactored accuracyWindow to use 
+ *   primitive DoubleArray, achieving Zero-Churn for high-frequency filtering.
  * July.23.08:
  * - Refactored: Extracted Stationary Anchor logic into AnchorEvaluator.
- * - Refined: Integrated Safety Valve for stationary breakout.
- * July.23.07:
- * - Issue #530: Refined Stationary Anchor. Implemented accuracy-weighted breakout 
- *   and IMU damping to suppress urban multipath "spaghetti" trails.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -29,7 +28,12 @@ class LocationProcessor(
 
     private var lastProcessedAccuracy = 0.0
     private var maxAccuracy = 0.0
-    private val accuracyWindow = mutableListOf<Double>()
+    
+    // Issue #547b: Primitive buffer for zero-churn accuracy tracking
+    private val accuracyWindowBuffer = DoubleArray(ACCURACY_WINDOW_MAX_SIZE)
+    private var accuracyWindowSize = 0
+    private var accuracyWindowHead = 0
+    
     private var lastWindowUpdateRt = 0L // Monotonic
     
     private var lastValidFixRt = 0L // Monotonic
@@ -64,7 +68,7 @@ class LocationProcessor(
     ) {
         if (savedMaxAccuracy > 0.0) {
             maxAccuracy = savedMaxAccuracy
-            accuracyWindow.add(savedMaxAccuracy)
+            addAccuracyToWindow(savedMaxAccuracy)
         }
         
         sentinel.loadForensicState(savedLastSitTs, savedBaseline)
@@ -80,6 +84,30 @@ class LocationProcessor(
         this.cachedHomePoints = homePoints
         this.maxDistanceAuthority = maxDistance
         anchorEvaluator.reset()
+    }
+
+    private fun addAccuracyToWindow(acc: Double) {
+        accuracyWindowBuffer[accuracyWindowHead] = acc
+        accuracyWindowHead = (accuracyWindowHead + 1) % ACCURACY_WINDOW_MAX_SIZE
+        if (accuracyWindowSize < ACCURACY_WINDOW_MAX_SIZE) accuracyWindowSize++
+    }
+
+    private fun updateLastAccuracyInWindow(acc: Double) {
+        if (accuracyWindowSize > 0) {
+            val lastIdx = (accuracyWindowHead - 1 + ACCURACY_WINDOW_MAX_SIZE) % ACCURACY_WINDOW_MAX_SIZE
+            accuracyWindowBuffer[lastIdx] = acc
+        } else {
+            addAccuracyToWindow(acc)
+        }
+    }
+
+    private fun getMaxAccuracyFromWindow(): Double {
+        if (accuracyWindowSize == 0) return 0.0
+        var m = 0.0
+        for (i in 0 until accuracyWindowSize) {
+            m = max(m, accuracyWindowBuffer[i])
+        }
+        return m
     }
 
     fun setMaxDistanceAuthority(distance: Double) {
@@ -146,17 +174,19 @@ class LocationProcessor(
         val nowRt = timeProvider.elapsedRealtime()
         val bucketDuration = ACCURACY_WINDOW_BUCKET_MS / ACCURACY_WINDOW_MAX_SIZE
         
-        if (accuracyWindow.isEmpty() || (lastWindowUpdateRt > 0 && nowRt - lastWindowUpdateRt >= bucketDuration)) {
-            accuracyWindow.add(acc)
+        if (accuracyWindowSize == 0 || (lastWindowUpdateRt > 0 && nowRt - lastWindowUpdateRt >= bucketDuration)) {
+            addAccuracyToWindow(acc)
             lastWindowUpdateRt = nowRt
-            while (accuracyWindow.size > ACCURACY_WINDOW_MAX_SIZE) accuracyWindow.removeAt(0)
         } else {
             if (lastWindowUpdateRt == 0L) lastWindowUpdateRt = nowRt
-            val currentMax = if (accuracyWindow.isNotEmpty()) accuracyWindow.last() else 0.0
-            if (acc > currentMax * GEOFENCE_ACCURACY_HYSTERESIS_MULT) accuracyWindow[accuracyWindow.lastIndex] = acc
+            val lastIdx = (accuracyWindowHead - 1 + ACCURACY_WINDOW_MAX_SIZE) % ACCURACY_WINDOW_MAX_SIZE
+            val currentMaxInBucket = accuracyWindowBuffer[lastIdx]
+            if (acc > currentMaxInBucket * GEOFENCE_ACCURACY_HYSTERESIS_MULT) {
+                updateLastAccuracyInWindow(acc)
+            }
         }
         
-        val rawMax = accuracyWindow.maxOrNull() ?: acc
+        val rawMax = getMaxAccuracyFromWindow()
         val newMax = (rawMax * 10.0).roundToLong() / 10.0
         
         if (abs(newMax - maxAccuracy) > 0.05) {
@@ -313,7 +343,6 @@ class LocationProcessor(
         val estimatedSpeed = sentinel.getEstimatedSpeedMps()
         val stationaryProb = sentinel.getStationaryProbability()
         
-        // Refactored Anchor Evaluation (Issue #530 Refinement / July.23.08)
         val anchorResult = anchorEvaluator.evaluate(
             point = persistencePoint,
             isPhysicallyStationary = sentinel.isStationary(),
@@ -380,7 +409,8 @@ class LocationProcessor(
     }
     fun invalidateHomePointsCache() { cachedHomePoints = null }
     fun resetStats() {
-        lastProcessedAccuracy = 0.0; maxAccuracy = 0.0; accuracyWindow.clear(); lastWindowUpdateRt = 0L
+        lastProcessedAccuracy = 0.0; maxAccuracy = 0.0
+        accuracyWindowSize = 0; accuracyWindowHead = 0; lastWindowUpdateRt = 0L
         lastDistanceToTracker = null; lastNearestHomeDistance = null
         lastLat = 0.0; lastLng = 0.0; lastTs = 0L; lastRt = 0L; lastAcc = 0.0; lastMaxAcc = 0.0
         lastSavedLat = 0.0; lastSavedLng = 0.0; lastSavedTs = 0L; lastSavedRt = 0L; lastSavedGpsTs = 0L

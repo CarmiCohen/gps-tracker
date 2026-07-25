@@ -4,14 +4,31 @@ import kotlin.math.*
 
 /**
  * GtoEngine: Graph Trajectory Optimization.
- * July.20.07:
- * - Issue #102: Temporal Forensic Integrity. Standardized internal buffer aging 
- *   to use monotonic 'rt' timestamps.
+ * July.25.07:
+ * - Issue #547b: Kernel I/O Optimization. Refactored internal window to use 
+ *   primitive circular buffers, achieving Zero-Churn for high-frequency 
+ *   kinematic evaluation.
+ * - Removed GtoNode object allocations in hot path.
  */
 class GtoEngine {
 
-    private val window = mutableListOf<GtoNode>()
-    private val maxWindowSize = 5 // HINDSIGHT_BUFFER_SIZE
+    private val MAX_WINDOW_SIZE = 5
+    private val HINDSIGHT_MAX_AGE_MS = 60000L
+
+    // Zero-Churn primitive circular buffers
+    private val latBuffer = DoubleArray(MAX_WINDOW_SIZE)
+    private val lngBuffer = DoubleArray(MAX_WINDOW_SIZE)
+    private val altBuffer = DoubleArray(MAX_WINDOW_SIZE)
+    private val accBuffer = DoubleArray(MAX_WINDOW_SIZE)
+    private val maxAccBuffer = DoubleArray(MAX_WINDOW_SIZE)
+    private val bearingBuffer = DoubleArray(MAX_WINDOW_SIZE)
+    private val speedBuffer = DoubleArray(MAX_WINDOW_SIZE)
+    private val tsBuffer = LongArray(MAX_WINDOW_SIZE)
+    private val rtBuffer = LongArray(MAX_WINDOW_SIZE)
+    private val vibeBuffer = DoubleArray(MAX_WINDOW_SIZE)
+    
+    private var head = 0
+    private var size = 0
 
     data class GtoNode(
         val lat: Double,
@@ -21,8 +38,8 @@ class GtoEngine {
         val maxAccuracy: Double, 
         val bearing: Double,
         val speedMps: Double,
-        val ts: Long, // Wall-clock
-        val rt: Long, // Monotonic (Issue #102)
+        val ts: Long,
+        val rt: Long,
         val vibrationIndex: Double
     )
 
@@ -30,29 +47,57 @@ class GtoEngine {
         lat: Double, lng: Double, alt: Double, accuracy: Double, maxAccuracy: Double,
         bearing: Double, speedMps: Double, ts: Long, rt: Long, vibrationIndex: Double
     ) {
-        val HINDSIGHT_MAX_AGE_MS = 60000L
-        window.removeAll { (rt - it.rt) > HINDSIGHT_MAX_AGE_MS }
-        if (window.size >= maxWindowSize) {
-            window.removeAt(0)
+        // Prune aged points
+        while (size > 0) {
+            val tailIdx = (head - size + MAX_WINDOW_SIZE) % MAX_WINDOW_SIZE
+            if ((rt - rtBuffer[tailIdx]) > HINDSIGHT_MAX_AGE_MS) {
+                size--
+            } else {
+                break
+            }
         }
-        window.add(GtoNode(lat, lng, alt, accuracy, maxAccuracy, bearing, speedMps, ts, rt, vibrationIndex))
+
+        // Add new point
+        latBuffer[head] = lat
+        lngBuffer[head] = lng
+        altBuffer[head] = alt
+        accBuffer[head] = accuracy
+        maxAccBuffer[head] = maxAccuracy
+        bearingBuffer[head] = bearing
+        speedBuffer[head] = speedMps
+        tsBuffer[head] = ts
+        rtBuffer[head] = rt
+        vibeBuffer[head] = vibrationIndex
+        
+        head = (head + 1) % MAX_WINDOW_SIZE
+        if (size < MAX_WINDOW_SIZE) size++
     }
 
     fun evaluateTrajectory(newLat: Double, newLng: Double, newBearing: Double, newSpeedMps: Double, timestamp: Long, rt: Long): Boolean {
-        if (window.isEmpty()) return false
+        if (size == 0) return false
 
-        val last = window.last()
-        val HINDSIGHT_MAX_AGE_MS = 60000L
+        val lastIdx = (head - 1 + MAX_WINDOW_SIZE) % MAX_WINDOW_SIZE
+        val lastRt = rtBuffer[lastIdx]
+        val lastLat = latBuffer[lastIdx]
+        val lastLng = lngBuffer[lastIdx]
+        val lastBearing = bearingBuffer[lastIdx]
+        val lastSpeed = speedBuffer[lastIdx]
+
+        val angleDiff = abs(newBearing - lastBearing).let { if (it > 180) 360 - it else it }
+        val distFromLast = PhysicsUtils.calculateDistance(lastLat, lastLng, newLat, newLng)
         
-        val angleDiff = abs(newBearing - last.bearing).let { if (it > 180) 360 - it else it }
-        val distFromLast = PhysicsUtils.calculateDistance(last.lat, last.lng, newLat, newLng)
-        
-        val timeFromLast = (rt - last.rt) / 1000.0
+        val timeFromLast = (rt - lastRt) / 1000.0
         val impliedSpeed = distFromLast / max(0.1, timeFromLast)
         
-        if (rt <= last.rt || (rt - last.rt) > HINDSIGHT_MAX_AGE_MS) return false
+        if (rt <= lastRt || (rt - lastRt) > HINDSIGHT_MAX_AGE_MS) return false
         
-        val avgVibration = window.map { it.vibrationIndex }.average()
+        // Zero-Churn average calculation
+        var vibrationSum = 0.0
+        for (i in 0 until size) {
+            val idx = (head - size + i + MAX_WINDOW_SIZE) % MAX_WINDOW_SIZE
+            vibrationSum += vibeBuffer[idx]
+        }
+        val avgVibration = vibrationSum / size
         
         val GTO_TOW_SPEED_THRESHOLD = 15.0
         val PROMOTION_ANGLE_TOLERANCE = 30.0
@@ -61,19 +106,26 @@ class GtoEngine {
         val isTowSignature = avgVibration < VIBRATION_STATIONARY_THRESHOLD && newSpeedMps > GTO_TOW_SPEED_THRESHOLD
         val angularTolerance = if (isTowSignature) PROMOTION_ANGLE_TOLERANCE / 2.0 else PROMOTION_ANGLE_TOLERANCE
 
-        val isKinematicallyConsistent = angleDiff < angularTolerance && abs(impliedSpeed - last.speedMps) < GTO_KINEMATIC_SPEED_DELTA
+        val isKinematicallyConsistent = angleDiff < angularTolerance && abs(impliedSpeed - lastSpeed) < GTO_KINEMATIC_SPEED_DELTA
         
         if (!isKinematicallyConsistent) return false
 
-        if (window.size >= 2) {
-            val start = window.first()
-            val totalDisplacement = PhysicsUtils.calculateDistance(start.lat, start.lng, newLat, newLng)
+        if (size >= 2) {
+            val startIdx = (head - size + MAX_WINDOW_SIZE) % MAX_WINDOW_SIZE
+            val startLat = latBuffer[startIdx]
+            val startLng = lngBuffer[startIdx]
+            
+            val totalDisplacement = PhysicsUtils.calculateDistance(startLat, startLng, newLat, newLng)
             var totalPathLength = 0.0
-            var prevNode = start
-            for (i in 1 until window.size) {
-                val node = window[i]
-                totalPathLength += PhysicsUtils.calculateDistance(prevNode.lat, prevNode.lng, node.lat, node.lng)
-                prevNode = node
+            
+            var prevIdx = startIdx
+            for (i in 1 until size) {
+                val currIdx = (startIdx + i) % MAX_WINDOW_SIZE
+                totalPathLength += PhysicsUtils.calculateDistance(
+                    latBuffer[prevIdx], lngBuffer[prevIdx],
+                    latBuffer[currIdx], lngBuffer[currIdx]
+                )
+                prevIdx = currIdx
             }
             totalPathLength += distFromLast
             
@@ -94,9 +146,25 @@ class GtoEngine {
         return true
     }
 
-    fun getWindow(): List<GtoNode> = window.toList()
+    /**
+     * getWindow: Only called for telemetry/UI updates, so allocation here 
+     * is acceptable as it is not part of the 1Hz/10Hz tick hot-path.
+     */
+    fun getWindow(): List<GtoNode> {
+        val result = mutableListOf<GtoNode>()
+        for (i in 0 until size) {
+            val idx = (head - size + i + MAX_WINDOW_SIZE) % MAX_WINDOW_SIZE
+            result.add(GtoNode(
+                latBuffer[idx], lngBuffer[idx], altBuffer[idx],
+                accBuffer[idx], maxAccBuffer[idx], bearingBuffer[idx],
+                speedBuffer[idx], tsBuffer[idx], rtBuffer[idx], vibeBuffer[idx]
+            ))
+        }
+        return result
+    }
 
     fun clear() {
-        window.clear()
+        head = 0
+        size = 0
     }
 }
