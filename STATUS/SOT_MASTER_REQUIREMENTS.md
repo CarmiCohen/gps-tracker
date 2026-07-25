@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.25.07 (Kernel I/O Optimization)
+# System Source of Truth (SoT) - July.25.08 (Signaling Pressure Audit)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -13,6 +13,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Forensic Primitive Buffering (R550)**: To eliminate heap churn and GC pressure during high-frequency telemetry updates, `GpsManager` and `AppSensorManager` MUST use circular primitive arrays (LongArray, DoubleArray, BooleanArray) for historical sample storage. All sample retrieval for forensic backfilling MUST utilize sequences to bypass intermediate list allocations. (Issue #550, July.25.02)
 *   **Pipeline Serialization Hardening (R560)**: To achieve zero-churn telemetry signaling on restricted kernels, the signaling pipeline MUST utilize pre-allocated `ByteArray` buffers and reusable Protobuf builders. High-frequency updates MUST be serialized via `CodedOutputStream` directly into the reusable buffer to eliminate `toByteArray()` heap allocations. (Issue #560, July.25.03)
 *   **Buffer Overflow Resilience (R560b)**: To handle GNSS satellite density spikes without heap churn, the Protobuf serialization buffer MUST be self-expanding up to a 64KB safety clamp. Once expanded, the buffer MUST be reused for subsequent pulses to maintain Zero-Churn objectives. (Issue #560b, July.25.06)
+*   **Priority-Aware Signaling (R560c)**: To prevent large frames (up to 64KB) from blocking time-critical pulses (pings/commands) during network congestion, the signaling pipeline MUST utilize a Dual-Queue Priority Dispatcher. `HIGH` priority pulses MUST skip application-layer buffering for immediate emission, while `NORMAL` priority bulk data MUST be throttled (e.g., 50ms inter-frame delay) to manage socket buffer pressure. (Issue #560c, July.25.08)
 *   **Mbrain JNI Hardening (R580)**: The `libmbrainSDK` bridge MUST utilize thread-safe wrappers (`ReentrantLock`) for all native calls to prevent signal collisions during rapid Foreground Service type transitions. All native JNI implementations MUST include explicit null-checking for `jstring` and other reference types to prevent memory safety violations. (Issue #580, July.25.05)
 *   **Startup Suppression Window (R993d)**: To prevent Main-thread starvation during cold-start, all Foreground Service notification type updates MUST be suppressed for the first 10 seconds of service life if a previous notification has already been successfully posted. (Issue #534, July.24.02)
 *   **Notification IPC Throttling (R993b)**: To prevent Main-thread ANRs during hardware recovery bursts, Foreground Service notification updates MUST be double-throttled: a 2000ms hard gate in `AppNotificationManager` and a 10,000ms global throttle for service type changes in `BaseMonitorService` descendants. (Issue #113, #535, July.24.02)
@@ -53,5 +54,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.25.07.
+*   **Current Release**: July.25.08.
 *   **Source of Truth**: app/build.gradle versionName.

@@ -10,12 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * July.25.08:
+ * - Issue #560c: Signaling Pressure Audit. Updated TrackerStatus to 
+ *   support isClockRegression in Protobuf serialization.
  * July.25.03:
  * - Issue #560: Pipeline Serialization Hardening. Added writeTo(Builder) to 
  *   TrackerStatus to support zero-allocation telemetry signaling via builder reuse.
- * July.24.05:
- * - Issue #538d: Added toMap() to TrackerStatus for optimized signaling 
- *   emission, bypassing JSONObject overhead.
  */
 
 @Serializable
@@ -324,6 +324,7 @@ data class TrackerStatus(
 
     /**
      * Refactored: Reuses a builder to avoid allocation churn.
+     * Issue #560c: Populate isClockRegression.
      */
     fun writeTo(builder: RealtimeStatus.Builder, fromViewer: Boolean) {
         builder.clear()
@@ -379,6 +380,7 @@ data class TrackerStatus(
             .setJumpTier(jumpTier)
             .setSentinelStatus(status.name)
             .setLastValidFixRt(lastValidFixRt)
+            .setIsClockRegression(isClockRegression)
     }
 
     fun toProto(fromViewer: Boolean): RealtimeStatus {

@@ -4,12 +4,23 @@ import com.gps19.core.engine.SignalingConstants
 import org.json.JSONObject
 
 /**
+ * SignalingPriority: Classification for frame prioritization.
+ * July.25.08:
+ * - Issue #560c: Socket-Level Pressure. Introduced priority levels to ensure 
+ *   high-frequency pulses (pings/commands) aren't blocked by 64KB telemetry frames.
+ */
+enum class SignalingPriority {
+    HIGH,   // Time-critical: Pings, Pongs, Commands, Identity (Join/Leave)
+    NORMAL  // Bulk data: Telemetry, Logs
+}
+
+/**
  * Interface for signaling implementations (Socket.io, MQTT, etc.)
+ * July.25.08:
+ * - Issue #560c: Added SignalingPriority support to all emit methods.
  * July.25.03:
  * - Issue #560: Pipeline Serialization Hardening. Added length parameter to 
  *   emitBinary to support pre-allocated buffer reuse.
- * July.24.07:
- * - Issue #546: Added isConnecting() to prevent redundant handshake attempts.
  */
 interface SignalingProvider {
     interface RemoteUpdateListener {
@@ -24,9 +35,9 @@ interface SignalingProvider {
     fun isConnecting(): Boolean
     fun getRtt(): Int
     fun clearRtt()
-    fun emit(event: String, data: JSONObject)
-    fun emitMap(event: String, data: Map<String, Any?>) 
-    fun emitBinary(event: String, routingId: String, data: ByteArray, length: Int = data.size)
+    fun emit(event: String, data: JSONObject, priority: SignalingPriority = SignalingPriority.NORMAL)
+    fun emitMap(event: String, data: Map<String, Any?>, priority: SignalingPriority = SignalingPriority.NORMAL) 
+    fun emitBinary(event: String, routingId: String, data: ByteArray, length: Int = data.size, priority: SignalingPriority = SignalingPriority.NORMAL)
     fun getLastRelayTrafficTs(): Long
     fun setConnectionLostCallback(callback: () -> Unit)
     fun setRemoteUpdateListener(listener: RemoteUpdateListener?)

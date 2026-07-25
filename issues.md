@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.25.07)
+# Project Issues & Hardening Tracking (July.25.08)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,12 +7,11 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 411 |
+| **Resolved (Total)** | 🟢 Progress | 412 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Issue #560c: Socket-Level Pressure**: With larger Protobuf payloads now allowed (up to 64KB), monitor the impact on `SignalingProvider` socket buffers during low-bandwidth conditions to ensure large frames don't block high-priority pulses.
 *   **Issue #570b: Flyweight Thread Safety**: While forensic sequences use synchronized access to primitive buffers, the flyweight objects themselves are reused. Consumers must process or copy fields immediately before the next `yield`.
 *   **Issue #580b: Native Signal Latency**: While `ReentrantLock` prevents collisions, prolonged native execution in `libmbrainSDK` could theoretically delay the high-frequency tick loop. Monitor `punchHardware` execution time.
 
@@ -23,17 +22,18 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (July.25.07)
-*   **Issue #547b: Kernel I/O Optimization (Samsung A15 Resilience)**.
-    *   **Resolution**: Refactored high-frequency engine components (`GtoEngine` and `LocationProcessor`) to use primitive circular buffers (`DoubleArray`, `LongArray`) for kinematic windows and accuracy tracking. This eliminates transient object allocations and boxing churn in the 1Hz-10Hz tick path.
-    *   **Impact**: Mitigated the performance impact of missing `userfaultfd: MOVE` support on Android 15 (Samsung A15) by achieving "Zero-Churn" in the coordinate processing pipeline, reducing GC pressure and potential jank.
+## 🟢 Recently Resolved Issues (July.25.08)
+*   **Issue #560c: Signaling Pressure Audit**.
+    *   **Resolution**: Implemented a Dual-Queue Priority Dispatcher in `CommunicationManager`. High-priority pulses (Pings, Identity) skip application-layer buffering for immediate emission, while Normal-priority bulk data (64KB telemetry Protobufs) are queued with an inter-frame throttle (50ms) to prevent socket buffer saturation.
+    *   **Data Integrity**: Synchronized the `is_clock_regression` field across the Protobuf schema, `TrackerStatus` model, and `ConnectivitySuite` pipeline to ensure forensic regression flags are preserved in expanded binary payloads.
+    *   **Impact**: Prevents head-of-line blocking during network congestion, ensuring heartbeats remain stable even when large telemetry payloads are being synchronized.
 
 ---
 
-## 🟢 Recently Resolved Issues (July.25.06)
-*   **Issue #560b: Buffer Overflow Resilience**.
-    *   **Resolution**: Implemented a self-expanding `ByteArray` buffer in `ConnectivitySuite` for Protobuf serialization. The buffer grows dynamically to accommodate high GNSS satellite density spikes (up to a 64KB safety clamp).
-    *   **Impact**: Maintained "Zero-Churn" telemetry reliability even under extreme satellite visibility conditions.
+## 🟢 Recently Resolved Issues (July.25.07)
+*   **Issue #547b: Kernel I/O Optimization (Samsung A15 Resilience)**.
+    *   **Resolution**: Refactored high-frequency engine components (`GtoEngine` and `LocationProcessor`) to use primitive circular buffers (`DoubleArray`, `LongArray`) for kinematic windows and accuracy tracking.
+    *   **Impact**: Mitigated performance impact of missing `userfaultfd: MOVE` support on Android 15 (Samsung A15).
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*

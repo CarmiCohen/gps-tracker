@@ -26,16 +26,12 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.25.08:
+ * - Issue #560c: Socket-Level Pressure. Integrated SignalingPriority support 
+ *   into the telemetry pipeline to prevent large frames from blocking pulses.
  * July.25.06:
  * - Issue #560b: Buffer Overflow Resilience. Implemented self-expanding 
- *   serialization buffer with exponential growth and 64KB safety clamp to 
- *   handle GNSS density spikes without heap churn.
- * July.25.03:
- * - Issue #560: Pipeline Serialization Hardening. Implemented zero-churn 
- *   serialization using a pre-allocated ByteArray buffer and CodedOutputStream.
- * July.24.07:
- * - Issue #546: Handshake Hardening. Integrated isConnecting() check to 
- *   prevent redundant handshake storms on budget hardware.
+ *   serialization buffer with exponential growth and 64KB safety clamp.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -71,7 +67,6 @@ class ConnectivitySuite @Inject constructor(
     private var lastReconnectTs = timeProvider.elapsedRealtime()
     private var lastForceJoinTs = 0L 
 
-    // Issue #560: Pre-allocated resources for zero-churn signaling
     private val statusBuilder = RealtimeStatus.newBuilder()
     private var serializationBuffer = ByteArray(4096) 
     private val MAX_SERIALIZATION_BUFFER_SIZE = 65536 // 64KB Safety Clamp
@@ -90,13 +85,11 @@ class ConnectivitySuite @Inject constructor(
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
 
-    // Remote Peer State redirected to RemoteStatusRepository
     val trackerStatus get() = remoteStatusRepository.remoteStatus.value
     val isTrackerConnected get() = remoteStatusRepository.isTrackerConnected.value
     val lastPeerActivityTs get() = remoteStatusRepository.lastPeerActivityTs.value
     val peerSignal get() = remoteStatusRepository.peerSignal.value
 
-    // Legacy field accessors for backward compatibility
     val trackerLat get() = trackerStatus.lat
     val trackerLng get() = trackerStatus.lng
     val trackerSpeed get() = trackerStatus.speed
@@ -337,6 +330,7 @@ class ConnectivitySuite @Inject constructor(
                 isStorageLow = entity.isStorageLow, isStorageCritical = entity.isStorageCritical,
                 isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface
             )
+            // Pending updates are bulk data (NORMAL priority)
             if (sendTelemetryInternal(status)) offlineRepository.deletePendingStatusUpdate(entity.id)
         }
     }
@@ -364,8 +358,8 @@ class ConnectivitySuite @Inject constructor(
     }
 
     /**
-     * Issue #560b: Pipeline Serialization Hardening.
-     * Uses self-expanding pre-allocated buffer and CodedOutputStream to achieve zero-churn signaling.
+     * Issue #560b/c: Pipeline Serialization and Priority dispatch.
+     * Binary telemetry is sent with NORMAL priority to prevent blocking pulses.
      */
     @Synchronized
     private fun sendTelemetryInternal(status: TrackerStatus): Boolean {
@@ -375,11 +369,9 @@ class ConnectivitySuite @Inject constructor(
             val message = statusBuilder.buildPartial()
             val size = message.serializedSize
             
-            // Issue #560b: Dynamic buffer resizing with exponential growth and safety clamp
             if (size > serializationBuffer.size && size <= MAX_SERIALIZATION_BUFFER_SIZE) {
                 val nextSize = (serializationBuffer.size * 2).coerceAtLeast(size).coerceAtMost(MAX_SERIALIZATION_BUFFER_SIZE)
                 serializationBuffer = ByteArray(nextSize)
-                Timber.d("Issue #560b: Serialization buffer expanded to $nextSize bytes")
             }
 
             if (size <= serializationBuffer.size) {
@@ -387,16 +379,17 @@ class ConnectivitySuite @Inject constructor(
                     val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
                     message.writeTo(cos)
                     cos.checkNoSpaceLeft()
-                    signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size)
+                    // Telemetry is NORMAL priority
+                    signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size, SignalingPriority.NORMAL)
                     return true
                 } catch (e: Exception) {
                     Timber.e(e, "Issue #560b: Pre-allocated serialization failed")
                 }
             }
-            // Fallback for oversized payloads (>64KB) or serialization failure
-            signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray())
+            signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray(), priority = SignalingPriority.NORMAL)
         } else {
-            signalingProvider.emitMap("location_update", status.toMap(true))
+            // Viewer JSON telemetry is also NORMAL priority
+            signalingProvider.emitMap("location_update", status.toMap(true), SignalingPriority.NORMAL)
         }
         return true
     }
@@ -545,7 +538,7 @@ class ConnectivitySuite @Inject constructor(
                     lastConnTs = statusProto.lastConnTs,
                     lastDiscTs = statusProto.lastDiscTs,
                     isJump = isVisualJump,
-                    isClockRegression = isClockReg,
+                    isClockRegression = statusProto.isClockRegression, // Protobuf carries reg flag
                     isJammer = statusProto.isJammer,
                     isStalled = statusProto.isStalled,
                     isTamperDetected = statusProto.isTamperDetected,
@@ -761,8 +754,15 @@ class ConnectivitySuite @Inject constructor(
     fun isConnected() = signalingProvider.isConnected()
     fun getRtt() = signalingProvider.getRtt()
     fun clearRtt() = signalingProvider.clearRtt()
-    fun emit(event: String, data: JSONObject) { if (!isStopped.get()) signalingProvider.emit(event, data) }
-    fun emitBinary(event: String, routingId: String, data: ByteArray) { if (!isStopped.get()) signalingProvider.emitBinary(event, routingId, data) }
+    
+    // Issue #560c: Expose priority support in the facade
+    fun emit(event: String, data: JSONObject, priority: SignalingPriority = SignalingPriority.NORMAL) { 
+        if (!isStopped.get()) signalingProvider.emit(event, data, priority) 
+    }
+    fun emitBinary(event: String, routingId: String, data: ByteArray, priority: SignalingPriority = SignalingPriority.NORMAL) { 
+        if (!isStopped.get()) signalingProvider.emitBinary(event, routingId, data, priority = priority) 
+    }
+
     fun updateRelayStatus(connected: Boolean) { telemetryRepository.updateRelayStatus(connected) }
     fun updateIdentity(dId: String, vId: String, isTracker: Boolean) {
         if (isStopped.get()) return

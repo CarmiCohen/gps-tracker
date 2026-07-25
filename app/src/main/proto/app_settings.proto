@@ -164,6 +164,9 @@ message RealtimeStatus {
     int32 jump_tier = 55;
     int64 gps_age_ms = 56;
     string sentinel_status = 57;
+
+    // Issue #560c: Signaling Pressure Audit - Carry regression flag in binary payloads
+    bool is_clock_regression = 58;
 }
 
 message GeoPointProto {

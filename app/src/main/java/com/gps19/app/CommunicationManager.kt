@@ -7,6 +7,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import org.json.JSONObject
 import timber.log.Timber
 import java.util.Arrays
@@ -15,12 +16,13 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * July.25.08:
+ * - Issue #560c: Socket-Level Pressure. Implemented Dual-Queue Priority 
+ *   dispatching with inter-frame throttling for NORMAL priority messages to 
+ *   prevent 64KB payloads from blocking pulses.
  * July.25.03:
  * - Issue #560: Pipeline Serialization Hardening. Updated emitBinary to 
  *   honor length parameter for pre-allocated buffer support.
- * July.24.07:
- * - Issue #546: Handshake Hardening. Implemented isConnecting() and 
- *   optimized socket options for Samsung A15 stability.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -31,6 +33,11 @@ class CommunicationManager @Inject constructor(
     private val logRepository: LogRepository,
     private val timeProvider: TimeProvider
 ) : SignalingProvider {
+
+    private sealed class SignalingCommand {
+        data class Emit(val event: String, val data: JSONObject) : SignalingCommand()
+        data class EmitBinary(val event: String, val routingId: String, val data: ByteArray) : SignalingCommand()
+    }
 
     private var socket: Socket? = null
     private var isStopped = false
@@ -55,8 +62,40 @@ class CommunicationManager @Inject constructor(
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
+    
+    // Issue #560c: Dual-Queue Dispatcher components
+    private val normalPriorityQueue = Channel<SignalingCommand>(capacity = Channel.UNLIMITED)
+    private var queueProcessorJob: Job? = null
+    
     private var pendingLocationMap: MutableMap<String, Any?>? = null
     private var conflationJob: Job? = null
+
+    init {
+        startQueueProcessor()
+    }
+
+    private fun startQueueProcessor() {
+        queueProcessorJob?.cancel()
+        queueProcessorJob = scope.launch(Dispatchers.IO) {
+            for (command in normalPriorityQueue) {
+                if (isStopped) break
+                
+                if (!isConnected()) {
+                    delay(1000)
+                    continue
+                }
+
+                when (command) {
+                    is SignalingCommand.Emit -> socket?.emit(command.event, command.data)
+                    is SignalingCommand.EmitBinary -> socket?.emit(command.event, command.routingId, command.data)
+                }
+
+                // Issue #560c: Inter-frame delay to prevent socket buffer saturation 
+                // especially for 64KB payloads.
+                delay(50) 
+            }
+        }
+    }
 
     override fun setRemoteUpdateListener(listener: SignalingProvider.RemoteUpdateListener?) {
         this.remoteUpdateListener = listener
@@ -108,11 +147,13 @@ class CommunicationManager @Inject constructor(
             if (idChanged && oldId.isNotEmpty()) {
                 val transOld = SignalingConstants.getTransmissionId(oldId)
                 logToApp("Identity changed. Leaving $transOld", true)
+                // Identity management is HIGH priority - Bypass queue
                 socket?.emit("leave", transOld)
             }
             if (this.deviceId.isNotEmpty()) {
                 val transNew = SignalingConstants.getTransmissionId(this.deviceId)
                 logToApp("Joining room: $transNew (Force: $force)", false)
+                // Identity management is HIGH priority - Bypass queue
                 socket?.emit("join", createJoinPayload())
                 markTraffic()
             }
@@ -316,7 +357,8 @@ class CommunicationManager @Inject constructor(
                     data.keys().forEach { incomingMap[it] = data.get(it) }
                     
                     SignalPayloadGenerator.createPongPayload(incomingMap as Map<String, Any>, deviceId, isTrackerMode)?.let { pongMap ->
-                        socket?.emit("pong_cmd", JSONObject(pongMap as Map<*, *>))
+                        // Pongs are HIGH priority
+                        emitMap("pong_cmd", pongMap, SignalingPriority.HIGH)
                     }
                     
                     remoteUpdateListener?.onUpdate(JSONObject().apply {
@@ -378,35 +420,48 @@ class CommunicationManager @Inject constructor(
 
     override fun getRtt(): Int = lastRttInternal
 
-    override fun emit(event: String, data: JSONObject) {
+    override fun emit(event: String, data: JSONObject, priority: SignalingPriority) {
         if (isStopped) return
         markTraffic()
-        if (event == "location_update") { 
-            emitLocationConflated(data.toMap()) 
-        } else { 
-            socket?.emit(event, data) 
+        if (priority == SignalingPriority.HIGH) {
+            socket?.emit(event, data)
+        } else {
+            if (event == "location_update") { 
+                emitLocationConflated(data.toMap()) 
+            } else { 
+                normalPriorityQueue.trySend(SignalingCommand.Emit(event, data))
+            }
         }
     }
 
-    override fun emitMap(event: String, data: Map<String, Any?>) {
+    override fun emitMap(event: String, data: Map<String, Any?>, priority: SignalingPriority) {
         if (isStopped) return
         markTraffic()
-        if (event == "location_update") {
-            emitLocationConflated(data)
-        } else {
+        if (priority == SignalingPriority.HIGH) {
             socket?.emit(event, JSONObject(data as Map<*, *>))
+        } else {
+            if (event == "location_update") {
+                emitLocationConflated(data)
+            } else {
+                normalPriorityQueue.trySend(SignalingCommand.Emit(event, JSONObject(data as Map<*, *>)))
+            }
         }
     }
 
     /**
      * Issue #560: Honor length for zero-allocation buffer support.
-     * Uses copyOf to avoid sending trailing zeros from the pre-allocated buffer.
+     * Issue #560c: Priority-aware binary emission with throttling.
      */
-    override fun emitBinary(event: String, routingId: String, data: ByteArray, length: Int) {
+    override fun emitBinary(event: String, routingId: String, data: ByteArray, length: Int, priority: SignalingPriority) {
         if (isStopped) return
         markTraffic()
         val payload = if (length == data.size) data else Arrays.copyOf(data, length)
-        socket?.emit(event, routingId, payload)
+        
+        if (priority == SignalingPriority.HIGH) {
+            socket?.emit(event, routingId, payload)
+        } else {
+            normalPriorityQueue.trySend(SignalingCommand.EmitBinary(event, routingId, payload))
+        }
     }
 
     private fun emitLocationConflated(incoming: Map<String, Any?>) {
@@ -417,7 +472,8 @@ class CommunicationManager @Inject constructor(
                 delay(100)
                 val mapToSend = pendingLocationMap
                 if (mapToSend != null && isConnected() && !isStopped) { 
-                    socket?.emit("location_update", JSONObject(mapToSend as Map<*, *>))
+                    // Location updates are NORMAL priority - Queue them
+                    normalPriorityQueue.trySend(SignalingCommand.Emit("location_update", JSONObject(mapToSend as Map<*, *>)))
                     pendingLocationMap = null
                 }
             }
@@ -441,6 +497,8 @@ class CommunicationManager @Inject constructor(
     override fun disconnect() { 
         isStopped = true
         isConnectingInternal = false
+        queueProcessorJob?.cancel()
+        normalPriorityQueue.close()
         scope.cancel()
         socket?.disconnect() 
         telemetryRepository.updateRelayStatus(false)
