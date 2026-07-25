@@ -22,15 +22,17 @@ import com.gps19.core.engine.*
 import kotlinx.coroutines.*
 import timber.log.Timber
 import java.util.Locale
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.25.02:
+ * - Issue #550: Refactored sensor history to primitive arrays to eliminate heap churn.
+ *   Achieved zero-allocation forensic buffering during active tracking.
+ *   Optimized retrieval path to use sequences over primitive snapshots to avoid list churn.
  * July.24.05:
  * - Issue #538e: Optimized sample retrieval for forensic backfilling. 
- *   Replaced List with Sequence to eliminate intermediate allocations.
  */
 class AppSensorManager(
     private val context: Context,
@@ -173,7 +175,19 @@ class AppSensorManager(
         val acousticMin: Double
     )
 
-    private val sensorSampleBuffer = ConcurrentLinkedQueue<SensorSnapshot>()
+    // Issue #550: Primitive buffers for zero-churn forensics
+    private val bufferTs = LongArray(256)
+    private val bufferRt = LongArray(256)
+    private val bufferLux = DoubleArray(256)
+    private val bufferVibe = DoubleArray(256)
+    private val bufferProxIdx = DoubleArray(256)
+    private val bufferTilt = DoubleArray(256)
+    private val bufferLift = DoubleArray(256)
+    private val bufferAcoustic = DoubleArray(256)
+    private val bufferSit = BooleanArray(256)
+    private var bufferIdx = 0
+    private var bufferCount = 0
+
     private var lastBufferRecordRt = 0L
 
     private var secPeakLux = 0.0
@@ -480,11 +494,23 @@ class AppSensorManager(
         
         if (nowRt - lastBufferRecordRt >= TICK_INTERVAL_MS) {
             val sitForForensics: Boolean
-            synchronized(this) { sitForForensics = secSitDetected; secSitDetected = false }
-            sensorSampleBuffer.add(SensorSnapshot(ts = wallNow, rt = nowRt, lux = secPeakLux, vibe = secPeakVibe, proxIdx = secMinProxIdx, tilt = secPeakTilt, lift = secPeakLift, acoustic = secPeakDb, isSitDetected = sitForForensics))
+            synchronized(this) {
+                sitForForensics = secSitDetected; secSitDetected = false
+                bufferTs[bufferIdx] = wallNow
+                bufferRt[bufferIdx] = nowRt
+                bufferLux[bufferIdx] = secPeakLux
+                bufferVibe[bufferIdx] = secPeakVibe
+                bufferProxIdx[bufferIdx] = secMinProxIdx
+                bufferTilt[bufferIdx] = secPeakTilt
+                bufferLift[bufferIdx] = secPeakLift
+                bufferAcoustic[bufferIdx] = secPeakDb
+                bufferSit[bufferIdx] = sitForForensics
+                
+                bufferIdx = (bufferIdx + 1) % 256
+                if (bufferCount < 256) bufferCount++
+            }
             lastBufferRecordRt = nowRt
             secPeakLux = currentLux; secPeakVibe = currentVibrationIndex; secMinProxIdx = proximityIdx; secPeakTilt = currentTiltDegrees; secPeakLift = abs(relativeAltitude); secPeakDb = currentAcousticDb
-            while (sensorSampleBuffer.size > 0 && (wallNow - (sensorSampleBuffer.peek()?.ts ?: wallNow)) > SENSOR_SAMPLE_BUFFER_MAX_AGE_MS) sensorSampleBuffer.poll()
         }
     }
 
@@ -625,16 +651,86 @@ class AppSensorManager(
 
     /**
      * Returns sensor samples in range as a Sequence to eliminate allocations.
+     * Uses sequence generator over array snapshots to avoid intermediate list churn.
      */
-    fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<SensorSnapshot> {
-        return sensorSampleBuffer.asSequence().filter { it.ts in fromTs..toTs }
+    fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<SensorSnapshot> = sequence {
+        // Snapshot the buffer state to avoid holding lock during yield
+        val snapshot = synchronized(this@AppSensorManager) {
+            val c = bufferCount
+            if (c == 0) return@synchronized null
+            
+            val startIdx = (bufferIdx - c + 256) % 256
+            val tsArr = LongArray(c)
+            val rtArr = LongArray(c)
+            val luxArr = DoubleArray(c)
+            val vibeArr = DoubleArray(c)
+            val proxArr = DoubleArray(c)
+            val tiltArr = DoubleArray(c)
+            val liftArr = DoubleArray(c)
+            val acArr = DoubleArray(c)
+            val sitArr = BooleanArray(c)
+            
+            for (i in 0 until c) {
+                val idx = (startIdx + i) % 256
+                tsArr[i] = bufferTs[idx]
+                rtArr[i] = bufferRt[idx]
+                luxArr[i] = bufferLux[idx]
+                vibeArr[i] = bufferVibe[idx]
+                proxArr[i] = bufferProxIdx[idx]
+                tiltArr[i] = bufferTilt[idx]
+                liftArr[i] = bufferLift[idx]
+                acArr[i] = bufferAcoustic[idx]
+                sitArr[i] = bufferSit[idx]
+            }
+            
+            object {
+                val ts = tsArr; val rt = rtArr; val lux = luxArr; val vibe = vibeArr; val prox = proxArr; val tilt = tiltArr; val lift = liftArr; val ac = acArr; val sit = sitArr; val count = c
+            }
+        } ?: return@sequence
+
+        for (i in 0 until snapshot.count) {
+            if (snapshot.ts[i] in fromTs..toTs) {
+                yield(SensorSnapshot(
+                    ts = snapshot.ts[i],
+                    rt = snapshot.rt[i],
+                    lux = snapshot.lux[i],
+                    vibe = snapshot.vibe[i],
+                    proxIdx = snapshot.prox[i],
+                    tilt = snapshot.tilt[i],
+                    lift = snapshot.lift[i],
+                    acoustic = snapshot.ac[i],
+                    isSitDetected = snapshot.sit[i]
+                ))
+            }
+        }
     }
 
     /**
      * Returns acoustic samples in range as a Sequence of Pairs.
+     * Uses sequence generator over array snapshots to avoid intermediate list churn.
      */
-    fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<Pair<Long, Double>> {
-        return sensorSampleBuffer.asSequence().filter { it.ts in fromTs..toTs }.map { it.ts to it.acoustic }
+    fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<Pair<Long, Double>> = sequence {
+        val snapshot = synchronized(this@AppSensorManager) {
+            val c = bufferCount
+            if (c == 0) return@synchronized null
+            val startIdx = (bufferIdx - c + 256) % 256
+            val tsArr = LongArray(c)
+            val acArr = DoubleArray(c)
+            for (i in 0 until c) {
+                val idx = (startIdx + i) % 256
+                tsArr[i] = bufferTs[idx]
+                acArr[i] = bufferAcoustic[idx]
+            }
+            tsArr to acArr
+        } ?: return@sequence
+        
+        val ts = snapshot.first
+        val ac = snapshot.second
+        for (i in 0 until ts.size) {
+            if (ts[i] in fromTs..toTs) {
+                yield(ts[i] to ac[i])
+            }
+        }
     }
 
     private fun processVibration(x: Float, y: Float, z: Float) {
@@ -774,6 +870,6 @@ class AppSensorManager(
         } 
     }
     fun isStationary(): Boolean = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
-    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0) }
+    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); synchronized(this) { bufferIdx = 0; bufferCount = 0 } }
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 }

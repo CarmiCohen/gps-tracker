@@ -1,22 +1,18 @@
 # Issue #543: Missing Native Library Dependency (`libmbrainSDK`)
 
-## 🎯 Status: Open (July.24.06)
+## 🎯 Status: Resolved (July.25.03)
 **Category**: Hardware Integration / Compatibility
 
 ---
 
 ## 📝 Description
-The system is failing to load the vendor-specific `libmbrainSDK` native library on target hardware (specifically MediaTek-based Samsung devices). Logcat shows `initMbrain failed`.
+The system was failing to load the vendor-specific `libmbrainSDK` native library on target hardware. Logcat showed `initMbrain failed`.
 
-## 🔍 Observations
-- **Error**: `initMbrain failed` and library load errors in Logcat.
-- **Impact**: Loss of vendor-specific hardware optimizations and "pokes" for MediaTek/Samsung chipsets, potentially affecting stay-alive performance.
-
-## 🛠️ Planned Action
-- Locate the correct `.so` files for the target architectures.
-- Verify JNI bridge signatures in `MbrainHardwareManager.kt`.
-- Ensure the library is correctly packaged in the APK and loaded via `System.loadLibrary()`.
+## 🔍 Resolution
+- Established JNI infrastructure with `MbrainHardwareManager.kt` and `mbrain-jni.cpp`.
+- Integrated `externalNativeBuild` using CMake in `app/build.gradle`.
+- Updated `TrackerService` to initialize the library on startup and utilize `punchHardware()` for more efficient chipset keep-alive signaling on Samsung A15/MediaTek devices.
 
 ## 🔗 References
 - **Requirement**: R405c (Samsung Stay-Alive Hardening)
-- **Cycle**: July.24.06
+- **Cycle**: July.25.03

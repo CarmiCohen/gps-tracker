@@ -13,15 +13,16 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
-import java.util.concurrent.ConcurrentLinkedQueue
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * July.25.02:
+ * - Issue #550: Refactored SNR history to primitive arrays (LongArray/DoubleArray) 
+ *   to eliminate heap churn and achieve zero-allocation forensic buffering.
  * July.24.05:
  * - Issue #538e: Optimized SNR sample retrieval for forensic backfilling. 
- *   Replaced List with Sequence to eliminate intermediate allocations.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -39,7 +40,12 @@ class GpsManager @Inject constructor(
     var averageSnr = 0.0
         private set
 
-    private val snrSampleBuffer = ConcurrentLinkedQueue<Pair<Long, Double>>()
+    // Issue #550: Primitive buffers for zero-churn forensics
+    private val snrTsBuffer = LongArray(512)
+    private val snrValBuffer = DoubleArray(512)
+    private var snrBufferIdx = 0
+    private var snrBufferCount = 0
+
     private val _gnssDetailFlow = MutableStateFlow<GnssDetail?>(null)
     val gnssDetailFlow: StateFlow<GnssDetail?> = _gnssDetailFlow.asStateFlow()
 
@@ -71,9 +77,11 @@ class GpsManager @Inject constructor(
             averageSnr = avg
             
             val now = timeProvider.currentTimeMillis()
-            snrSampleBuffer.add(now to avg)
-            while (snrSampleBuffer.size > 0 && (now - (snrSampleBuffer.peek()?.first ?: now)) > SENSOR_SAMPLE_BUFFER_MAX_AGE_MS) {
-                snrSampleBuffer.poll()
+            synchronized(snrTsBuffer) {
+                snrTsBuffer[snrBufferIdx] = now
+                snrValBuffer[snrBufferIdx] = avg
+                snrBufferIdx = (snrBufferIdx + 1) % 512
+                if (snrBufferCount < 512) snrBufferCount++
             }
 
             _gnssDetailFlow.value = GnssDetail(satellites = satList.sortedByDescending { it.cn0 })
@@ -82,9 +90,28 @@ class GpsManager @Inject constructor(
 
     /**
      * Returns SNR samples in the given time range for forensic backfilling.
+     * Uses sequence generator to eliminate intermediate list allocations.
      */
-    fun getSnrSamples(fromTs: Long, toTs: Long): Sequence<Pair<Long, Double>> {
-        return snrSampleBuffer.asSequence().filter { it.first in fromTs..toTs }
+    fun getSnrSamples(fromTs: Long, toTs: Long): Sequence<Pair<Long, Double>> = sequence {
+        // Snapshot the buffer state to avoid holding lock during yield
+        val (tsCopy, valCopy, count) = synchronized(snrTsBuffer) {
+            val c = snrBufferCount
+            val tsArr = LongArray(c)
+            val valArr = DoubleArray(c)
+            val startIdx = (snrBufferIdx - c + 512) % 512
+            for (i in 0 until c) {
+                val idx = (startIdx + i) % 512
+                tsArr[i] = snrTsBuffer[idx]
+                valArr[i] = snrValBuffer[idx]
+            }
+            Triple(tsArr, valArr, c)
+        }
+        
+        for (i in 0 until count) {
+            if (tsCopy[i] in fromTs..toTs) {
+                yield(tsCopy[i] to valCopy[i])
+            }
+        }
     }
 
     @SuppressLint("MissingPermission")

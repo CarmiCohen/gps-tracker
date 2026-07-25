@@ -19,12 +19,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * July.24.04:
- * - Stealth Hardening: Integrated notificationManager.setTrackerMode(true) to 
- *   ensure all system notifications are silenced during tracking.
- * - Logic Restoration: Fully restored forensic logging, ribbon updates, and 
- *   Samsung A15-specific poke logic previously truncated.
- * - Fix: Corrected evaluateAlarms parameter mapping (added isGpsGap).
+ * July.25.02:
+ * - Issue #543: Integrated MbrainHardwareManager JNI bridge. Service now attempts 
+ *   to initialize libmbrainSDK on supported hardware to harden stay-alive budget.
+ * - Issue #113: Refined A15 Poke. JNI punchHardware() now preferred over 
+ *   generic WakeLock cycling if the native library is available.
+ * - Build Fix: Resolved syntax errors from previous turn.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -100,6 +100,12 @@ class TrackerService : BaseMonitorService() {
             configManager.isTrackerMode = true
             
             refreshCapabilitiesInternal()
+
+            // Issue #543: Initialize Mbrain Native SDK if available
+            if (capabilities.isA15Device && MbrainHardwareManager.isAvailable()) {
+                val res = MbrainHardwareManager.initMbrain(configManager.deviceId, 0)
+                logManager.logServiceEvent("HARDWARE: libmbrainSDK initialized (Result: $res)", important = true)
+            }
 
             alarmManager.setListener(object : AppAlarmManager.Listener {
                 override fun onLogEvent(type: String, message: String, important: Boolean, extremeValue: Double?, logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, snr: Double?, vibe: Double?) {
@@ -366,10 +372,17 @@ class TrackerService : BaseMonitorService() {
         // Issue #113: Hardware Poke for A15 budget stabilization
         if (capabilities.isA15Device && nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
             lastA15PokeRt = nowRt
-            systemMonitor.acquireWakeLock(force = true)
+            
+            // Issue #543: Prefer JNI punch over generic WakeLock if library is available
+            if (MbrainHardwareManager.isAvailable()) {
+                MbrainHardwareManager.punchHardware()
+            } else {
+                systemMonitor.acquireWakeLock(force = true)
+            }
+            
             // Trigger minor hardware event via accelerometer request (handled by renewing registration)
             if (appSensorManager.isStationary()) {
-                Timber.d("Issue #113: A15 Hardware Poke - Refreshing WakeLock & Sensors")
+                Timber.d("Issue #113: A15 Hardware Poke - Refreshing Budget")
             }
         }
 

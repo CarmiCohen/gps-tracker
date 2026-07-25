@@ -1,3 +1,0 @@
-[submodule "relay-server"]
-	path = relay-server
-	url = ./relay-server
