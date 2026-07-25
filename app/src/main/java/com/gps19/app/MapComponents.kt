@@ -1,30 +1,23 @@
 package com.gps19.app
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.drawable.BitmapDrawable
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,28 +30,22 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.overlay.MapEventsOverlay
-import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.Polygon
-import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.ScaleBarOverlay
-import org.osmdroid.views.overlay.FolderOverlay
 import org.osmdroid.views.overlay.Overlay
 import com.gps19.app.BuildConfig
 import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * July.24.07:
- * - Issue #544: Snapshot Restoration. Restored SnapshotStateList for marker 
- *   and polyline pools to resolve 'conditionalUpdate' lock verification failures.
- * July.23.06:
- * - Issue #072: Map Stabilization. Implemented Temporal Smoothing (EMA) 
- *   to suppress visual jitter at high zoom.
+ * July.24.08:
+ * - Issue #544 Cleanup: Extracted imperative overlay management to MapOverlayManager.
+ * - Issue #547: State Decomposition. Consumes TelemetryState for high-frequency updates.
  */
 
 @Composable
 fun AppMapContainer(
     uiState: MainUiState,
+    telemetryState: TelemetryState,
     systemPulse: Long,
     systemPulseRt: Long,
     onEvent: (UiEvent) -> Unit,
@@ -76,14 +63,10 @@ fun AppMapContainer(
     val now = systemPulse
     
     val isTrackerMode = uiState.appMode == "tracker"
-    
-    val trackerLoc = if (isTrackerMode) uiState.localLocation else uiState.trackerLocation
-    val viewerLoc = if (isTrackerMode) uiState.trackerLocation else uiState.localLocation
-    
-    val trackerHealth = if (isTrackerMode) uiState.localHealth else uiState.trackerHealth
-    val viewerHealth = if (isTrackerMode) uiState.trackerHealth else uiState.localHealth
+    val trackerLoc = if (isTrackerMode) telemetryState.localLocation else telemetryState.trackerLocation
+    val viewerLoc = if (isTrackerMode) telemetryState.trackerLocation else telemetryState.localLocation
 
-    // Skew-Immune Freshness Logic for Map
+    // Freshness Logic
     fun calculateFreshness(loc: LocationState): Boolean {
         if (loc.timestamp <= 0) return false
         val telemetryAge = if (loc.telemetryTs > 0) now - loc.telemetryTs else Long.MAX_VALUE
@@ -94,24 +77,10 @@ fun AppMapContainer(
     val isTrackerFresh = calculateFreshness(trackerLoc)
     val isViewerFresh = calculateFreshness(viewerLoc)
 
-    val trackerLat = trackerLoc.lat; val trackerLng = trackerLoc.lng
-    val trackerBearing = trackerLoc.bearing; val trackerAccuracy = trackerLoc.accuracy
-    val trackerMaxAcc = trackerLoc.maxAccuracy; val trackerSpeed = trackerLoc.speed
-    val trackerLastValidFixRt = trackerHealth.lastValidFixRt
-    val trackerLocationPending = trackerHealth.isLocationPending
-    val trackerLocationPendingReason = trackerHealth.locationPendingReason
-
-    val viewerLat = viewerLoc.lat; val viewerLng = viewerLoc.lng
-    val viewerBearing = viewerLoc.bearing; val viewerAccuracy = viewerLoc.accuracy
-    val viewerMaxAcc = viewerLoc.maxAccuracy; val viewerSpeed = viewerLoc.speed
-    val viewerLastValidFixRt = viewerHealth.lastValidFixRt
-    val viewerLocationPending = viewerHealth.isLocationPending
-    val viewerLocationPendingReason = viewerHealth.locationPendingReason
-
-    val initialCenter = remember(uiState.trackerLocation.lat, uiState.localLocation.lat) {
+    val initialCenter = remember(telemetryState.trackerLocation.lat, telemetryState.localLocation.lat) {
         when {
-            PhysicsUtils.isValidLocation(trackerLat, trackerLng) -> GeoPoint(trackerLat, trackerLng)
-            PhysicsUtils.isValidLocation(viewerLat, viewerLng) -> GeoPoint(viewerLat, viewerLng)
+            PhysicsUtils.isValidLocation(trackerLoc.lat, trackerLoc.lng) -> GeoPoint(trackerLoc.lat, trackerLoc.lng)
+            PhysicsUtils.isValidLocation(viewerLoc.lat, viewerLoc.lng) -> GeoPoint(viewerLoc.lat, viewerLoc.lng)
             else -> GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
         }
     }
@@ -120,16 +89,20 @@ fun AppMapContainer(
 
     Box(modifier = Modifier.fillMaxSize()) {
         OsmMap(
-            lat = trackerLat, lng = trackerLng, bearing = trackerBearing, myLat = viewerLat, myLng = viewerLng, myB = viewerBearing,
-            trail = trail, viewerTrail = viewerTrail, home = uiState.homePoints, onTap = { onEvent(UiEvent.MapTap(it)) },
-            isFresh = isTrackerFresh, isMeFresh = isViewerFresh, maxD = uiState.maxDistance, onRemoveMarker = { if (!isTrackerMode) onEvent(UiEvent.RemoveHomePoint(it)) },
-            violations = violations, isFenceVisible = uiState.isFenceVisible, isViolationsVisible = uiState.isViolationsVisible, isGeofenceViolationsVisible = uiState.isGeofenceViolationsVisible,
-            accuracy = trackerAccuracy, maxAcc = trackerMaxAcc, speed = trackerSpeed, myAccuracy = viewerAccuracy, myMaxAcc = viewerMaxAcc, mySpeed = viewerSpeed,
-            initialCenter = initialCenter, centeringTrackerTrigger = uiState.centeringTrackerTrigger, centeringViewerTrigger = uiState.centeringViewerTrigger,
-            zoomInTrigger = uiState.zoomInTrigger, zoomOutTrigger = uiState.zoomOutTrigger, lastGpsTs = trackerLoc.timestamp, isTrackerMode = isTrackerMode,
-            isLocked = uiState.isMapLocked, mapFollowMode = uiState.mapFollowMode, onLockChange = { onEvent(UiEvent.SetMapLocked(it)) }, mapViewRef = mapViewRef, geofenceMode = uiState.geofenceMode,
-            systemPulse = now, systemPulseRt = systemPulseRt, isLocationPending = trackerLocationPending, locationPendingReason = trackerLocationPendingReason,
-            lastValidFixRt = trackerLastValidFixRt, isMeLocationPending = viewerLocationPending, meLocationPendingReason = viewerLocationPendingReason, meLastValidFixRt = viewerLastValidFixRt
+            uiState = uiState,
+            telemetryState = telemetryState,
+            trail = trail,
+            viewerTrail = viewerTrail,
+            violations = violations,
+            onTap = { onEvent(UiEvent.MapTap(it)) },
+            onRemoveMarker = { if (!isTrackerMode) onEvent(UiEvent.RemoveHomePoint(it)) },
+            isTrackerFresh = isTrackerFresh,
+            isViewerFresh = isViewerFresh,
+            initialCenter = initialCenter,
+            systemPulse = now,
+            systemPulseRt = systemPulseRt,
+            onLockChange = { onEvent(UiEvent.SetMapLocked(it)) },
+            mapViewRef = mapViewRef
         )
 
         Text(text = BuildConfig.VERSION_NAME, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 4.dp, bottom = 2.dp).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(2.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
@@ -142,7 +115,9 @@ fun AppMapContainer(
             Box(Modifier.fillMaxSize()) {
                 Box(Modifier.align(Alignment.CenterStart).padding(start = 8.dp).fillMaxHeight(0.85f).width(140.dp)) { 
                     MapToolsOverlay(
-                        isTrackerMode = isTrackerMode, trackerValid = PhysicsUtils.isValidLocation(trackerLat, trackerLng), viewerValid = PhysicsUtils.isValidLocation(viewerLat, viewerLng),
+                        isTrackerMode = isTrackerMode, 
+                        trackerValid = PhysicsUtils.isValidLocation(trackerLoc.lat, trackerLoc.lng), 
+                        viewerValid = PhysicsUtils.isValidLocation(viewerLoc.lat, viewerLoc.lng),
                         showFence = uiState.isFenceVisible, onToggleFence = { onEvent(UiEvent.SetFenceVisible(!uiState.isFenceVisible)) }, geofenceMode = uiState.geofenceMode, onSetGeofenceMode = { onEvent(UiEvent.SetGeofenceMode(it)) },
                         showViolations = uiState.isViolationsVisible, onToggleViolations = { onEvent(UiEvent.SetViolationsVisible(!uiState.isViolationsVisible)) },
                         showGeofenceViolations = uiState.isGeofenceViolationsVisible, onToggleGeofenceViolations = { onEvent(UiEvent.SetGeofenceViolationsVisible(!uiState.isGeofenceViolationsVisible)) },
@@ -152,9 +127,10 @@ fun AppMapContainer(
             }
         }
 
-        if (trackerLocationPending && trackerLocationPendingReason != LocationPendingReason.NONE) {
+        val trackerHealth = if (isTrackerMode) telemetryState.localHealth else telemetryState.trackerHealth
+        if (trackerHealth.isLocationPending && trackerHealth.locationPendingReason != LocationPendingReason.NONE) {
             Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp).background(Amber500.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                Text(text = "UNCERTAINTY: ${trackerLocationPendingReason.name.replace("_", " ")}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                Text(text = "UNCERTAINTY: ${trackerHealth.locationPendingReason.name.replace("_", " ")}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
             }
         }
     }
@@ -170,180 +146,134 @@ fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifi
 
 @Composable
 fun OsmMap(
-    lat: Double, lng: Double, bearing: Double, myLat: Double?, myLng: Double?, myB: Double?, 
-    trail: List<TrailPoint>, viewerTrail: List<TrailPoint>, home: List<GeoPoint>, 
-    onTap: (GeoPoint) -> Unit, isFresh: Boolean, isMeFresh: Boolean = true,
-    maxD: Double, onRemoveMarker: (Int) -> Unit, violations: List<ViolationPoint>, 
-    isFenceVisible: Boolean, isViolationsVisible: Boolean = true, isGeofenceViolationsVisible: Boolean = true, 
-    accuracy: Double, maxAcc: Double, speed: Double = 0.0, 
-    myAccuracy: Double? = null, myMaxAcc: Double = 0.0, mySpeed: Double = 0.0,
-    initialCenter: GeoPoint? = null, centeringTrackerTrigger: Int = 0, centeringViewerTrigger: Int = 0,
-    zoomInTrigger: Int = 0, zoomOutTrigger: Int = 0,
-    lastGpsTs: Long = 0L, isTrackerMode: Boolean = false,
-    isLocked: Boolean = true, mapFollowMode: MapFollowMode = MapFollowMode.AUTO,
-    onLockChange: (Boolean) -> Unit = {},
-    mapViewRef: MutableState<MapView?> = remember { mutableStateOf(null) },
-    geofenceMode: GeofenceMode = GeofenceMode.IDLE,
-    systemPulse: Long = 0L,
-    systemPulseRt: Long = 0L,
-    isLocationPending: Boolean = false,
-    locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    lastValidFixRt: Long = 0L,
-    isMeLocationPending: Boolean = false,
-    meLocationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    meLastValidFixRt: Long = 0L
+    uiState: MainUiState,
+    telemetryState: TelemetryState,
+    trail: List<TrailPoint>,
+    viewerTrail: List<TrailPoint>,
+    home: List<GeoPoint> = uiState.homePoints,
+    violations: List<ViolationPoint>, 
+    onTap: (GeoPoint) -> Unit,
+    onRemoveMarker: (Int) -> Unit,
+    isTrackerFresh: Boolean,
+    isViewerFresh: Boolean,
+    initialCenter: GeoPoint? = null,
+    systemPulse: Long,
+    systemPulseRt: Long,
+    onLockChange: (Boolean) -> Unit,
+    mapViewRef: MutableState<MapView?>
 ) {
-    val context = LocalContext.current; val resources = remember(context) { context.resources }
-    val currentOnTap by rememberUpdatedState(onTap); val currentOnRemoveMarker by rememberUpdatedState(onRemoveMarker); val currentGeofenceMode by rememberUpdatedState(geofenceMode)
+    val context = LocalContext.current
+    val density = context.resources.displayMetrics.density
     
-    val mapEventsReceiver = remember {
-        object : MapEventsReceiver {
-            override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                if (!isTrackerMode) { mapViewRef.value?.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY); currentOnTap(p) }
-                return true
-            }
-            override fun longPressHelper(p: GeoPoint): Boolean { return true }
-        }
-    }
+    val isTrackerMode = uiState.appMode == "tracker"
+    val trackerLoc = if (isTrackerMode) telemetryState.localLocation else telemetryState.trackerLocation
+    val viewerLoc = if (isTrackerMode) telemetryState.trackerLocation else telemetryState.localLocation
     
-    val mapEventsOverlay = remember { MapEventsOverlay(mapEventsReceiver) }; val density = resources.displayMetrics.density
-    val trackerIconFresh = remember(density) { BitmapDrawable(resources, createTrackerBitmap(density, true)) }
-    val trackerIconStale = remember(density) { BitmapDrawable(resources, createTrackerBitmap(density, false)) }
-    val viewerIconFresh = remember(density) { BitmapDrawable(resources, createViewerBitmap(density, true)) }
-    val viewerIconStale = remember(density) { BitmapDrawable(resources, createViewerBitmap(density, false)) }
-    val jumpIcon = remember(density) { BitmapDrawable(resources, createJumpMarkerBitmap(density)) }
-    val geofenceIcon = remember(density) { BitmapDrawable(resources, createGeofenceViolationBitmap(density)) }
-    val homeIcons = remember(density) { mutableMapOf<Int, BitmapDrawable>() }
+    val trackerHealth = if (isTrackerMode) telemetryState.localHealth else telemetryState.trackerHealth
+    val viewerHealth = if (isTrackerMode) telemetryState.trackerHealth else telemetryState.localHealth
 
-    val trackerMarkerRef = remember { mutableStateOf<Marker?>(null) }; val viewerMarkerRef = remember { mutableStateOf<Marker?>(null) }
-    val trackerCircleRef = remember { mutableStateOf<Polygon?>(null) }; val viewerCircleRef = remember { mutableStateOf<Polygon?>(null) }
-    
-    // Issue #072: Temporal Smoothing States for visual stabilization
+    val overlayManager = remember(mapViewRef.value) {
+        mapViewRef.value?.let { MapOverlayManager(context, it, density) }
+    }
+
+    // Smoothing States
     val smoothedTrackerPos = remember { mutableStateOf<GeoPoint?>(null) }
     val smoothedViewerPos = remember { mutableStateOf<GeoPoint?>(null) }
 
-    LaunchedEffect(lat, lng, speed) {
-        if (PhysicsUtils.isValidLocation(lat, lng)) {
+    LaunchedEffect(trackerLoc.lat, trackerLoc.lng, trackerLoc.speed) {
+        if (PhysicsUtils.isValidLocation(trackerLoc.lat, trackerLoc.lng)) {
             val last = smoothedTrackerPos.value
-            val alpha = if (speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
-            smoothedTrackerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, lat, lng) > 30.0) {
-                GeoPoint(lat, lng)
+            val alpha = if (trackerLoc.speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+            smoothedTrackerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, trackerLoc.lat, trackerLoc.lng) > 30.0) {
+                GeoPoint(trackerLoc.lat, trackerLoc.lng)
             } else {
                 GeoPoint(
-                    PhysicsUtils.smoothCoordinate(last.latitude, lat, alpha),
-                    PhysicsUtils.smoothCoordinate(last.longitude, lng, alpha)
+                    PhysicsUtils.smoothCoordinate(last.latitude, trackerLoc.lat, alpha),
+                    PhysicsUtils.smoothCoordinate(last.longitude, trackerLoc.lng, alpha)
                 )
             }
         }
     }
 
-    LaunchedEffect(myLat, myLng, mySpeed) {
-        if (myLat != null && myLng != null && PhysicsUtils.isValidLocation(myLat, myLng)) {
+    LaunchedEffect(viewerLoc.lat, viewerLoc.lng, viewerLoc.speed) {
+        if (PhysicsUtils.isValidLocation(viewerLoc.lat, viewerLoc.lng)) {
             val last = smoothedViewerPos.value
-            val alpha = if (mySpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
-            smoothedViewerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, myLat, myLng) > 30.0) {
-                GeoPoint(myLat, myLng)
+            val alpha = if (viewerLoc.speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+            smoothedViewerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, viewerLoc.lat, viewerLoc.lng) > 30.0) {
+                GeoPoint(viewerLoc.lat, viewerLoc.lng)
             } else {
                 GeoPoint(
-                    PhysicsUtils.smoothCoordinate(last.latitude, myLat, alpha),
-                    PhysicsUtils.smoothCoordinate(last.longitude, myLng, alpha)
+                    PhysicsUtils.smoothCoordinate(last.latitude, viewerLoc.lat, alpha),
+                    PhysicsUtils.smoothCoordinate(last.longitude, viewerLoc.lng, alpha)
                 )
             }
         }
     }
 
-    val trailFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }; val viewerTrailFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
-    val fenceFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }; val homeMarkersFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
-    val accuracyCirclesFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }; val violationMarkersFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }; val violationAccuracyFolderRef = remember { mutableStateOf<FolderOverlay?>(null) }
-
-    // Issue #544: Restore SnapshotStateList for pools to resolve lock verification failures
-    val homeMarkerPool = remember { mutableStateListOf<Marker>() }
-    val violationMarkerPool = remember { mutableStateListOf<Marker>() }
-    val violationCirclePool = remember { mutableStateListOf<Polygon>() }
-    val trackerPolylinePool = remember { mutableStateListOf<Polyline>() }
-    val viewerPolylinePool = remember { mutableStateListOf<Polyline>() }
+    val localLockStatus = remember { mutableStateOf(uiState.isMapLocked) }
+    LaunchedEffect(uiState.isMapLocked) { localLockStatus.value = uiState.isMapLocked }
 
     var lastTriggerTs by remember { mutableLongStateOf(0L) }
-    val localLockStatus = remember { mutableStateOf(isLocked) }
-    LaunchedEffect(isLocked) { localLockStatus.value = isLocked }
 
-    val lastTrailRendered = remember { mutableStateOf<List<TrailPoint>?>(null) }; val lastViewerTrailRendered = remember { mutableStateOf<List<TrailPoint>?>(null) }
-    val lastHomeRendered = remember { mutableStateOf<List<GeoPoint>?>(null) }; val lastFenceState = remember { mutableStateOf<Boolean?>(null) }
-    val lastViolationsRendered = remember { mutableStateOf<List<ViolationPoint>?>(null) }; val lastViolationVisibility = remember { mutableStateOf<Pair<Boolean, Boolean>?>(null) }
-
-    LaunchedEffect(localLockStatus.value, lat, lng, myLat, myLng, isFresh, isMeFresh, mapFollowMode, smoothedTrackerPos.value, smoothedViewerPos.value) {
+    LaunchedEffect(localLockStatus.value, trackerLoc.lat, trackerLoc.lng, viewerLoc.lat, viewerLoc.lng, isTrackerFresh, isViewerFresh, uiState.mapFollowMode, smoothedTrackerPos.value, smoothedViewerPos.value) {
         if (localLockStatus.value) {
             if (systemPulse - lastTriggerTs < 500) return@LaunchedEffect
             val sTrk = smoothedTrackerPos.value
             val sVwr = smoothedViewerPos.value
-            val trackerValid = sTrk != null
-            val meValid = sVwr != null
             val view = mapViewRef.value ?: return@LaunchedEffect
             
-            when (mapFollowMode) {
-                MapFollowMode.VIEWER -> {
-                    if (meValid) view.controller.setCenter(sVwr!!)
-                }
-                MapFollowMode.TRACKER -> {
-                    if (trackerValid) view.controller.setCenter(sTrk!!)
-                }
+            when (uiState.mapFollowMode) {
+                MapFollowMode.VIEWER -> { if (sVwr != null) view.controller.setCenter(sVwr) }
+                MapFollowMode.TRACKER -> { if (sTrk != null) view.controller.setCenter(sTrk) }
                 MapFollowMode.AUTO -> {
-                    if (trackerValid && meValid && isFresh && isMeFresh) {
-                        val dist = PhysicsUtils.calculateDistance(sTrk!!.latitude, sTrk.longitude, sVwr!!.latitude, sVwr.longitude)
+                    if (sTrk != null && sVwr != null && isTrackerFresh && isViewerFresh) {
+                        val dist = PhysicsUtils.calculateDistance(sTrk.latitude, sTrk.longitude, sVwr.latitude, sVwr.longitude)
                         if (dist in 100.0..100000.0) {
                             val box = BoundingBox.fromGeoPoints(listOf(sTrk, sVwr))
                             view.zoomToBoundingBox(box.increaseByScale(1.4f), false)
                             if (view.zoomLevelDouble > 18.0) view.controller.setZoom(18.0)
                         } else view.controller.setCenter(sTrk)
-                    } else if (trackerValid || meValid) {
-                        val center = sTrk ?: sVwr!!
-                        view.controller.setCenter(center)
+                    } else if (sTrk != null || sVwr != null) {
+                        view.controller.setCenter(sTrk ?: sVwr!!)
                     }
                 }
             }
         }
     }
 
-    LaunchedEffect(centeringTrackerTrigger) {
+    LaunchedEffect(uiState.centeringTrackerTrigger) {
         val sTrk = smoothedTrackerPos.value
-        if (centeringTrackerTrigger > 0 && sTrk != null) {
+        if (uiState.centeringTrackerTrigger > 0 && sTrk != null) {
             lastTriggerTs = systemPulse; mapViewRef.value?.controller?.animateTo(sTrk); mapViewRef.value?.controller?.setZoom(18.0)
         }
     }
 
-    LaunchedEffect(centeringViewerTrigger) {
+    LaunchedEffect(uiState.centeringViewerTrigger) {
         val sVwr = smoothedViewerPos.value
-        if (centeringViewerTrigger > 0 && sVwr != null) {
+        if (uiState.centeringViewerTrigger > 0 && sVwr != null) {
             lastTriggerTs = systemPulse; mapViewRef.value?.controller?.animateTo(sVwr); mapViewRef.value?.controller?.setZoom(18.0)
         }
     }
 
-    LaunchedEffect(zoomInTrigger) { if (zoomInTrigger > 0) mapViewRef.value?.controller?.zoomIn() }
-    LaunchedEffect(zoomOutTrigger) { if (zoomOutTrigger > 0) mapViewRef.value?.controller?.zoomOut() }
+    LaunchedEffect(uiState.zoomInTrigger) { if (uiState.zoomInTrigger > 0) mapViewRef.value?.controller?.zoomIn() }
+    LaunchedEffect(uiState.zoomOutTrigger) { if (uiState.zoomOutTrigger > 0) mapViewRef.value?.controller?.zoomOut() }
 
     AndroidView(factory = { 
         MapView(context).apply { 
             mapViewRef.value = this; setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); isClickable = true
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-            val sp = if (initialCenter != null && PhysicsUtils.isValidLocation(initialCenter.latitude, initialCenter.longitude)) initialCenter else GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
+            val sp = if (initialCenter != null) initialCenter else GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
             controller.setZoom(18.0); controller.setCenter(sp)
-            val scaleBar = ScaleBarOverlay(this).apply { setUnitsOfMeasure(ScaleBarOverlay.UnitsOfMeasure.metric) }
-            trackerMarkerRef.value = Marker(this).apply { setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); setInfoWindow(null) }
-            viewerMarkerRef.value = Marker(this).apply { setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); setInfoWindow(null) }
-            trackerCircleRef.value = Polygon(this).apply { fillPaint.color = 0; outlinePaint.strokeWidth = 3f; setInfoWindow(null) }
-            viewerCircleRef.value = Polygon(this).apply { fillPaint.color = 0; outlinePaint.strokeWidth = 3f; setInfoWindow(null) }
-            trailFolderRef.value = FolderOverlay(); viewerTrailFolderRef.value = FolderOverlay(); fenceFolderRef.value = FolderOverlay(); accuracyCirclesFolderRef.value = FolderOverlay()
-            homeMarkersFolderRef.value = FolderOverlay(); violationMarkersFolderRef.value = FolderOverlay(); violationAccuracyFolderRef.value = FolderOverlay()
+            ScaleBarOverlay(this).apply { setUnitsOfMeasure(ScaleBarOverlay.UnitsOfMeasure.metric) }
             
-            overlays.add(trailFolderRef.value); overlays.add(viewerTrailFolderRef.value); overlays.add(violationAccuracyFolderRef.value); overlays.add(violationMarkersFolderRef.value)
-            overlays.add(accuracyCirclesFolderRef.value); overlays.add(fenceFolderRef.value); overlays.add(mapEventsOverlay); overlays.add(homeMarkersFolderRef.value); overlays.add(scaleBar)
-            
-            addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
-                val wInt = v.width; val hInt = v.height
-                if (wInt > 0 && hInt > 0) {
-                    scaleBar.setCentred(true); val offX = (wInt / 2).toInt(); val offY = (hInt - (48 * density).toInt()).toInt(); scaleBar.setScaleBarOffset(offX, offY)
+            overlays.add(MapEventsOverlay(object : MapEventsReceiver {
+                override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
+                    if (!isTrackerMode) { performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY); onTap(p) }
+                    return true
                 }
-            }
+                override fun longPressHelper(p: GeoPoint): Boolean = true
+            }))
+
             overlays.add(object : Overlay() {
                 override fun onTouchEvent(event: MotionEvent, mapView: MapView): Boolean {
                     if (event.action == MotionEvent.ACTION_DOWN) { localLockStatus.value = false; onLockChange(false) }
@@ -352,146 +282,32 @@ fun OsmMap(
             })
         } 
     }, update = { view ->
-        val trackerMarker = trackerMarkerRef.value ?: return@AndroidView; val viewerMarker = viewerMarkerRef.value ?: return@AndroidView
-        val sTrk = smoothedTrackerPos.value
-        val sVwr = smoothedViewerPos.value
-        val trackerValid = sTrk != null
-        val meValid = sVwr != null
-
-        if (lastHomeRendered.value != home || lastFenceState.value != isFenceVisible) {
-            fenceFolderRef.value?.items?.clear(); homeMarkersFolderRef.value?.items?.clear()
-            val activeHomeSize = if (isFenceVisible) home.size else 0
-            if (homeMarkerPool.size > activeHomeSize + MARKER_POOL_PRUNE_THRESHOLD) {
-                while (homeMarkerPool.size > maxOf(activeHomeSize + 5, MARKER_POOL_PRUNE_THRESHOLD)) homeMarkerPool.removeAt(homeMarkerPool.size - 1)
-            }
-            if (isFenceVisible) {
-                home.forEachIndexed { idx, p ->
-                    fenceFolderRef.value?.add(Polygon(view).apply { 
-                        points = Polygon.pointsAsCircle(p, maxD).map { GeoPoint(it.latitude, it.longitude) }
-                        fillPaint.color = 0x28CBD5E1.toInt(); outlinePaint.color = 0xC8CBD5E1.toInt(); outlinePaint.strokeWidth = 2f; setInfoWindow(null) 
-                    })
-                    val marker = if (idx < homeMarkerPool.size) homeMarkerPool[idx] else Marker(view).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); homeMarkerPool.add(m) }
-                    marker.position = p; marker.icon = homeIcons.getOrPut(idx + 1) { BitmapDrawable(resources, createHomeBitmap(density, idx + 1)) }
-                    marker.setOnMarkerClickListener { mk, mv -> 
-                        if (!isTrackerMode && currentGeofenceMode == GeofenceMode.REMOVE) { mv.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY); currentOnTap(p); currentOnRemoveMarker(idx); Toast.makeText(context, "Home point removed", Toast.LENGTH_SHORT).show() }
-                        else if (!isTrackerMode && currentGeofenceMode == GeofenceMode.ADD) Toast.makeText(context, "Switch to DEL mode to remove points", Toast.LENGTH_SHORT).show()
-                        true 
-                    }
-                    homeMarkersFolderRef.value?.add(marker)
-                }
-            }
-            lastHomeRendered.value = home.toList(); lastFenceState.value = isFenceVisible
+        overlayManager?.let { om ->
+            om.updateHomePoints(home, uiState.isFenceVisible, uiState.maxDistance, isTrackerMode, uiState.geofenceMode, onTap, onRemoveMarker)
+            om.updateTrails(trail, viewerTrail)
+            om.updateViolations(violations, uiState.isViolationsVisible, uiState.isGeofenceViolationsVisible)
+            om.updateCurrentPositions(
+                trackerValid = smoothedTrackerPos.value != null,
+                trackerPos = smoothedTrackerPos.value,
+                isTrackerFresh = isTrackerFresh,
+                trackerAccuracy = trackerLoc.accuracy,
+                maxTrackerAccuracy = trackerLoc.maxAccuracy,
+                trackerSpeed = trackerLoc.speed,
+                isTrackerPending = trackerHealth.isLocationPending,
+                trackerLastValidFixRt = trackerHealth.lastValidFixRt,
+                viewerValid = smoothedViewerPos.value != null,
+                viewerPos = smoothedViewerPos.value,
+                isViewerFresh = isViewerFresh,
+                viewerAccuracy = viewerLoc.accuracy,
+                viewerMaxAcc = viewerLoc.maxAccuracy,
+                viewerSpeed = viewerLoc.speed,
+                isViewerPending = viewerHealth.isLocationPending,
+                viewerLastValidFixRt = viewerHealth.lastValidFixRt,
+                systemPulseRt = systemPulseRt
+            )
         }
-
-        if (lastTrailRendered.value != trail || lastViewerTrailRendered.value != viewerTrail) {
-            trailFolderRef.value?.items?.clear(); val trSegs = drawTrailToFolder(view, trailFolderRef.value!!, trail, BrandJd.toArgb(), trackerPolylinePool)
-            viewerTrailFolderRef.value?.items?.clear(); val viSegs = drawTrailToFolder(view, viewerTrailFolderRef.value!!, viewerTrail, ViewerCyan.toArgb(), viewerPolylinePool)
-            lastTrailRendered.value = trail.toList(); lastViewerTrailRendered.value = viewerTrail.toList()
-            while(trackerPolylinePool.size > maxOf(trSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)) trackerPolylinePool.removeAt(trackerPolylinePool.size - 1)
-            while(viewerPolylinePool.size > maxOf(viSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)) viewerPolylinePool.removeAt(viewerPolylinePool.size - 1)
-        }
-
-        val visibilityPair = Pair(isViolationsVisible, isGeofenceViolationsVisible)
-        if (lastViolationsRendered.value != violations || lastViolationVisibility.value != visibilityPair) {
-            violationMarkersFolderRef.value?.items?.clear(); violationAccuracyFolderRef.value?.items?.clear()
-            val filteredViolations = violations.filter { v -> val isJump = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP; val isGeo = v.type == ALERT_ID_TRACKER_GEOFENCE; (isJump && isViolationsVisible) || (isGeo && isGeofenceViolationsVisible) }
-            if (violationMarkerPool.size > filteredViolations.size + MARKER_POOL_PRUNE_THRESHOLD) {
-                while (violationMarkerPool.size > maxOf(filteredViolations.size + 5, MARKER_POOL_PRUNE_THRESHOLD)) { violationMarkerPool.removeAt(violationMarkerPool.size - 1); violationCirclePool.removeAt(violationCirclePool.size - 1) }
-            }
-            filteredViolations.forEachIndexed { index, v ->
-                val m = if (index < violationMarkerPool.size) violationMarkerPool[index] else Marker(view).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); violationMarkerPool.add(m) }
-                val isJump = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
-                m.position = v.point; m.icon = if (isJump) jumpIcon else geofenceIcon; violationMarkersFolderRef.value?.add(m)
-                val hAcc = if (v.maxAccuracy > 0.0) v.maxAccuracy else v.accuracy
-                if (hAcc > 0.0) {
-                    val c = if (index < violationCirclePool.size) violationCirclePool[index] else Polygon(view).also { p -> p.fillPaint.color = 0; p.outlinePaint.strokeWidth = 2f; p.setInfoWindow(null); violationCirclePool.add(p) }
-                    c.points = Polygon.pointsAsCircle(v.point, hAcc).map { GeoPoint(it.latitude, it.longitude) }; c.outlinePaint.color = (if (isJump) 0x60FF00FF else 0x60FF0000).toInt(); violationAccuracyFolderRef.value?.add(c)
-                }
-            }
-            lastViolationsRendered.value = violations.toList(); lastViolationVisibility.value = visibilityPair
-        }
-
-        accuracyCirclesFolderRef.value?.items?.clear()
-        if (trackerValid) {
-            val baseAcc = if (maxAcc > 0.0) maxAcc else accuracy
-            if (baseAcc > 0.0) {
-                trackerCircleRef.value?.let { p ->
-                    val drift = if (isLocationPending && lastValidFixRt > 0) baseAcc + (if (speed > 1.0) speed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRt - lastValidFixRt) / 1000.0) else baseAcc
-                    p.points = Polygon.pointsAsCircle(sTrk!!, drift).map { GeoPoint(it.latitude, it.longitude) }
-                    p.outlinePaint.color = if (isFresh) BrandJd.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb(); accuracyCirclesFolderRef.value?.add(p)
-                }
-            }
-            trackerMarker.position = sTrk; trackerMarker.icon = if (isFresh) trackerIconFresh else trackerIconStale
-            if (!view.overlays.contains(trackerMarker)) view.overlays.add(trackerMarker) 
-        } else view.overlays.remove(trackerMarker)
-        
-        if (meValid) {
-            val baseMyAcc = if (myMaxAcc > 0.0) myMaxAcc else myAccuracy!!
-            if (baseMyAcc > 0.0) {
-                viewerCircleRef.value?.let { p ->
-                    val drift = if (isMeLocationPending && meLastValidFixRt > 0) baseMyAcc + (if (mySpeed > 1.0) mySpeed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRt - meLastValidFixRt) / 1000.0) else baseMyAcc
-                    p.points = Polygon.pointsAsCircle(sVwr!!, drift).map { GeoPoint(it.latitude, it.longitude) }
-                    p.outlinePaint.color = if (isMeFresh) ViewerCyan.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb(); accuracyCirclesFolderRef.value?.add(p)
-                }
-            }
-            viewerMarker.position = sVwr; viewerMarker.icon = if (isMeFresh) viewerIconFresh else viewerIconStale
-            if (!view.overlays.contains(viewerMarker)) view.overlays.add(viewerMarker) 
-        } else view.overlays.remove(viewerMarker)
         view.invalidate()
     }, onRelease = { view -> view.onDetach(); view.tileProvider.tileCache.clear(); view.tileProvider.detach() }, modifier = Modifier.fillMaxSize())
-}
-
-private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, color: Int, pool: SnapshotStateList<Polyline>): Int {
-    if (trailPoints.isEmpty()) return 0
-    var poolIdx = 0; var startIdx = 0
-    while (startIdx < trailPoints.size) {
-        val segmentPoints = mutableListOf<GeoPoint>(); var currentIdx = startIdx
-        while (currentIdx < trailPoints.size) {
-            val pt = trailPoints[currentIdx]; if (pt.status != SentinelStatus.VALID && currentIdx > startIdx) break
-            segmentPoints.add(pt.toGeoPoint()); currentIdx++
-            if (pt.status != SentinelStatus.VALID) { startIdx = currentIdx; break }
-        }
-        if (segmentPoints.size > 1) {
-            val line = if (poolIdx < pool.size) pool[poolIdx] else Polyline(view).also { l -> l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); pool.add(l) }
-            line.setPoints(segmentPoints); line.outlinePaint.color = color; folder.add(line); poolIdx++
-        }
-        if (currentIdx == trailPoints.size) break
-        startIdx = if (startIdx < currentIdx) (if (trailPoints[currentIdx - 1].status == SentinelStatus.VALID) currentIdx - 1 else currentIdx) else startIdx + 1
-    }
-    return poolIdx
-}
-
-private fun createTrackerBitmap(density: Float, isFresh: Boolean): Bitmap { 
-    val sz = (32 * density).toInt(); val b = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888); val c = Canvas(b); val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    p.style = Paint.Style.STROKE; p.color = android.graphics.Color.WHITE; p.strokeWidth = density; c.drawCircle(sz/2f, sz/2f, sz/2f - density, p)
-    p.color = if (isFresh) BrandJd.toArgb() else Slate500.toArgb(); p.strokeWidth = 3f * density; c.drawCircle(sz/2f, sz/2f, sz/2f - 3.5f * density, p)
-    return b
-}
-
-private fun createViewerBitmap(density: Float, isFresh: Boolean): Bitmap {
-    val sz = (20 * density).toInt(); val b = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888); val c = Canvas(b); val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    p.style = Paint.Style.STROKE; p.color = android.graphics.Color.WHITE; p.strokeWidth = density; c.drawCircle(sz/2f, sz/2f, sz/2f - density, p)
-    p.color = if (isFresh) ViewerCyan.toArgb() else Slate500.toArgb(); p.style = Paint.Style.FILL; c.drawCircle(sz/2f, sz/2f, sz/2f - 3.5f * density, p)
-    return b
-}
-
-private fun createHomeBitmap(density: Float, index: Int): Bitmap {
-    val sz = (32 * density).toInt(); val b = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888); val c = Canvas(b); val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    p.color = 0xFFCBD5E1.toInt(); c.drawCircle(sz/2f, sz/2f, sz/2.2f, p); p.style = Paint.Style.STROKE; p.color = 0xFF334155.toInt(); p.strokeWidth = 2 * density; c.drawCircle(sz/2f, sz/2f, sz/2.2f, p)
-    p.style = Paint.Style.FILL; p.color = android.graphics.Color.RED; p.textSize = 14 * density; p.textAlign = Paint.Align.CENTER; p.isFakeBoldText = true; c.drawText("$index", sz/2f, sz/2f + (p.textSize/3f), p)
-    return b
-}
-
-private fun createJumpMarkerBitmap(density: Float): Bitmap {
-    val sz = (10 * density).toInt(); val b = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888); val c = Canvas(b); val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    p.style = Paint.Style.STROKE; p.color = 0xFFFF00FF.toInt(); p.strokeWidth = 2f * density; val off = p.strokeWidth / 2f; c.drawRect(off, off, sz - off, sz - off, p)
-    return b
-}
-
-private fun createGeofenceViolationBitmap(density: Float): Bitmap {
-    val sz = (12 * density).toInt(); val b = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888); val c = Canvas(b); val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    p.style = Paint.Style.STROKE; p.color = android.graphics.Color.RED; p.strokeWidth = 2f * density; val off = p.strokeWidth / 2f; c.drawCircle(sz/2f, sz/2f, sz/2f - off, p)
-    return b
 }
 
 @Composable

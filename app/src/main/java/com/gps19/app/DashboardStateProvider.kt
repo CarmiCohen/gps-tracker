@@ -7,15 +7,14 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard states.
- * Handles all formatting logic to keep ViewModels and UseCases focused on data.
- * July.23.03:
- * - Issue #528: Finalized decommissioning of legacy dashboard logic.
- * July.23.02:
- * - Issue #524: UI Decoupling. Extracted from legacy dashboard component.
+ * July.24.08:
+ * - Issue #547: State Decomposition. Updated buildDashboardState to accept 
+ *   TelemetryState separately to reduce heap churn.
  */
 interface DashboardStateProvider {
     fun buildDashboardState(
-        state: MainUiState,
+        uiState: MainUiState,
+        telemetryState: TelemetryState,
         now: Long,
         trackerState: TrackerState,
         localMaxTemp: Double,
@@ -27,19 +26,18 @@ interface DashboardStateProvider {
 class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider {
 
     override fun buildDashboardState(
-        state: MainUiState,
+        uiState: MainUiState,
+        telemetryState: TelemetryState,
         now: Long,
         trackerState: TrackerState,
         localMaxTemp: Double,
         trackerMaxTemp: Double
     ): DashboardState {
-        val s = state.stats
-        val ts = state.trackerStats
-        val mode = state.appMode
+        val mode = uiState.appMode
         val isTrackerMode = mode == "tracker"
         val isViewer = mode == "viewer"
 
-        val activeStats = if (isViewer) ts else s
+        val activeStats = if (isViewer) telemetryState.trackerStats else telemetryState.stats
         
         val totalUptime = formatDuration(activeStats.uptimeMs)
         val session = if (activeStats.lastConnTs > 0) formatDuration(activeStats.sessionConnectedMs) else "00:00:00"
@@ -49,18 +47,18 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         val totalDrop = formatDuration(activeStats.totalDropMs)
         val maxDrop = formatDuration(activeStats.maxDropMs)
         
-        val lastSeen = if (state.connectivity.lastRemoteActivityTs > 0) {
-            val delta = (now - state.connectivity.lastRemoteActivityTs) / 1000
+        val lastSeen = if (telemetryState.connectivity.lastRemoteActivityTs > 0) {
+            val delta = (now - telemetryState.connectivity.lastRemoteActivityTs) / 1000
             if (delta < 60) "${delta}s" else "${delta / 60}m"
         } else "--"
 
-        val watchdogSec = if (state.connectivity.lastRemoteActivityTs > 0) {
-            val remaining = (WATCH_TIMEOUT_MS - (now - state.connectivity.lastRemoteActivityTs)) / 1000
+        val watchdogSec = if (telemetryState.connectivity.lastRemoteActivityTs > 0) {
+            val remaining = (WATCH_TIMEOUT_MS - (now - telemetryState.connectivity.lastRemoteActivityTs)) / 1000
             maxOf(0L, remaining)
         } else 0L
 
-        val loc = if (isViewer) state.trackerLocation else state.localLocation
-        val health = if (isViewer) state.trackerHealth else state.localHealth
+        val loc = if (isViewer) telemetryState.trackerLocation else telemetryState.localLocation
+        val health = if (isViewer) telemetryState.trackerHealth else telemetryState.localHealth
         
         // Receipt-based freshness calculation
         val telemetryAge = if (loc.telemetryTs > 0) now - loc.telemetryTs else Long.MAX_VALUE
@@ -104,10 +102,10 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             lng = gpsVal("%.6f".format(Locale.getDefault(), loc.lng)),
             trackerAccuracy = gpsVal("±%.1fm".format(Locale.getDefault(), rawAcc)),
             trackerMaxAcc = gpsVal("±%.1fm".format(Locale.getDefault(), filteredAcc)),
-            satsIndex = gpsVal("${state.trackerSatsUsed}/${state.trackerSatsView}"),
-            isSatsIndexWarning = (state.trackerSatsUsed < 4 && state.trackerSatsView > 0),
-            viewerAccuracy = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), state.localLocation.accuracy),
-            viewerMaxAcc = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), if(state.localLocation.maxAccuracy > 0) state.localLocation.maxAccuracy else state.localLocation.accuracy),
+            satsIndex = gpsVal("${telemetryState.trackerSatsUsed}/${telemetryState.trackerSatsView}"),
+            isSatsIndexWarning = (telemetryState.trackerSatsUsed < 4 && telemetryState.trackerSatsView > 0),
+            viewerAccuracy = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), telemetryState.localLocation.accuracy),
+            viewerMaxAcc = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), if(telemetryState.localLocation.maxAccuracy > 0) telemetryState.localLocation.maxAccuracy else telemetryState.localLocation.accuracy),
             vibration = sensorVal("%.2fG".format(Locale.getDefault(), health.vibration)),
             heading = sensorVal("%.0f°".format(Locale.getDefault(), health.heading)),
             tilt = sensorVal("%.1f°".format(Locale.getDefault(), health.tiltDegrees)),
@@ -133,8 +131,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             isStorageLow = health.isStorageLow,
             isStorageCritical = health.isStorageCritical,
             snr = snrValue,
-            distToHome = formatDist(state.distanceTrackerToHome),
-            distToViewer = formatDist(state.distanceTrackerToViewer),
+            distToHome = formatDist(telemetryState.distanceTrackerToHome),
+            distToViewer = formatDist(telemetryState.distanceTrackerToViewer),
             isGpsFresh = isGpsActive,
             isLinkFresh = (telemetryAge < WATCH_DOG_UI_GRACE_MS),
             isTelemetryFresh = isTelemetryFresh,

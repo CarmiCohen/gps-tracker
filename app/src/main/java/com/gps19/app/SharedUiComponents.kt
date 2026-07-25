@@ -43,15 +43,9 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * July.21.00:
- * - Forensic Ribbon Integration: Binding to MainViewModel history flows.
- * - Version synchronization and release hardening.
- * July.20.07:
- * - Finalized R106: Unified Forensic Ribbon Continuity.
- * July.20.05:
- * - R106: Consolidated AnalyticalRibbons to a single scale-aware flow.
- *   Shared rendering baseline for sensors and connection.
- *   Implemented explicit Black Gap visualization for data loss segments.
+ * July.24.08:
+ * - Issue #547: State Decomposition. Refactored GlobalStatusBar to consume 
+ *   TelemetryState separately from MainUiState to reduce heap churn.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -412,6 +406,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String) {
 @Composable
 fun GlobalStatusBar(
     uiState: MainUiState, 
+    telemetryState: TelemetryState,
     dashboardState: DashboardState, 
     systemPulse: Long, 
     rttFlow: StateFlow<Int>,
@@ -420,9 +415,9 @@ fun GlobalStatusBar(
     modifier: Modifier = Modifier
 ) {
     val mode = uiState.appMode ?: return
-    val isLocalOnline = uiState.connectivity.isLocalOnline
-    val isRelayConnected = uiState.connectivity.isRelayConnected
-    val lastIncomingActivity = uiState.connectivity.lastRemoteActivityTs
+    val isLocalOnline = telemetryState.connectivity.isLocalOnline
+    val isRelayConnected = telemetryState.connectivity.isRelayConnected
+    val lastIncomingActivity = telemetryState.connectivity.lastRemoteActivityTs
     
     // Rationale: isPeerActive uses receipt time already, but we align it with isTelemetryFresh.
     val isPeerActive = dashboardState.isTelemetryFresh
@@ -439,13 +434,13 @@ fun GlobalStatusBar(
         TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10)
     } else 0
 
-    val loc = if (mode == "viewer") uiState.trackerLocation else uiState.localLocation
-    val health = if (mode == "viewer") uiState.trackerHealth else uiState.localHealth
+    val loc = if (mode == "viewer") telemetryState.trackerLocation else telemetryState.localLocation
+    val health = if (mode == "viewer") telemetryState.trackerHealth else telemetryState.localHealth
     val lastGpsTs = loc.timestamp
     
     // Issue #044: Differentiate Local vs Tracker GPS Health for HUD top-level badges.
     // Fixed: Now relies on dashboardState skew-immune logic.
-    val isLocalGpsActive = if (mode == "tracker") dashboardState.isGpsFresh else (systemPulse - uiState.localLocation.timestamp < GPS_UI_FAIL_THRESHOLD_MS)
+    val isLocalGpsActive = if (mode == "tracker") dashboardState.isGpsFresh else (systemPulse - telemetryState.localLocation.timestamp < GPS_UI_FAIL_THRESHOLD_MS)
 
     // Issue #049: Ensure Tracker health badge follows active context (local or remote).
     val isTrackerGpsActive = dashboardState.isGpsFresh
@@ -455,28 +450,28 @@ fun GlobalStatusBar(
     val lastTelemetryTs = maxOf(loc.timestamp, loc.telemetryTs)
     val progressPulse = if (mode == "tracker") lastIncomingActivity else lastTelemetryTs
 
-    val speedValueMps = if (mode == "viewer") uiState.trackerLocation.speed else uiState.localLocation.speed
-    val hasUnresolved = uiState.activeAlarms.any { !it.isResolved }
+    val speedValueMps = if (mode == "viewer") telemetryState.trackerLocation.speed else telemetryState.localLocation.speed
+    val hasUnresolved = telemetryState.activeAlarms.any { !it.isResolved }
 
     StatusBar(
         modifier = modifier, isInternet = isLocalOnline, isRelay = isRelayConnected, isPeerActive = isPeerActive, isDataHealthy = isDataHealthy, 
         isLocalGpsActive = isLocalGpsActive, isTrackerGpsActive = isTrackerGpsActive,
-        mode = mode, battery = uiState.battery.level, lastP = progressPulse, 
-        commIndex = commIndex, remoteCommIndex = remoteCommIndex, remoteBattery = if (mode == "viewer") uiState.trackerBattery.level else -1, 
-        isCharging = uiState.battery.isChargingStable, remoteCharging = if (mode == "viewer") uiState.trackerBattery.isChargingStable else false,
+        mode = mode, battery = telemetryState.battery.level, lastP = progressPulse, 
+        commIndex = commIndex, remoteCommIndex = remoteCommIndex, remoteBattery = if (mode == "viewer") telemetryState.trackerBattery.level else -1, 
+        isCharging = telemetryState.battery.isChargingStable, remoteCharging = if (mode == "viewer") telemetryState.trackerBattery.isChargingStable else false,
         speedMps = speedValueMps.toFloat(), trackerAccuracy = loc.accuracy.toFloat(),
         maxTrackerAccuracy = loc.maxAccuracy.toFloat(), 
-        viewerAccuracy = if (uiState.localLocation.lat != 0.0) uiState.localLocation.accuracy.toFloat() else 0f,
-        maxViewerAccuracy = uiState.localLocation.maxAccuracy.toFloat(), now = systemPulse, satsView = uiState.trackerSatsView, satsUsed = uiState.trackerSatsUsed,
-        trackerTemp = uiState.trackerBattery.temp.toFloat(), viewerTemp = uiState.battery.temp.toFloat(), distToHome = uiState.distanceTrackerToHome, distToViewer = uiState.distanceTrackerToViewer,
-        viewerSatsUsed = if (mode == "viewer") uiState.viewerSatsUsed else 0, viewerSatsView = if (mode == "viewer") uiState.viewerSatsView else 0,
-        viewerGpsTs = uiState.localLocation.timestamp, trackerId = uiState.deviceId, viewerId = uiState.viewerId, watchdogOk = dashboardState.watchdogOk,
+        viewerAccuracy = if (telemetryState.localLocation.lat != 0.0) telemetryState.localLocation.accuracy.toFloat() else 0f,
+        maxViewerAccuracy = telemetryState.localLocation.maxAccuracy.toFloat(), now = systemPulse, satsView = telemetryState.trackerSatsView, satsUsed = telemetryState.trackerSatsUsed,
+        trackerTemp = telemetryState.trackerBattery.temp.toFloat(), viewerTemp = telemetryState.battery.temp.toFloat(), distToHome = telemetryState.distanceTrackerToHome, distToViewer = telemetryState.distanceTrackerToViewer,
+        viewerSatsUsed = if (mode == "viewer") telemetryState.viewerSatsUsed else 0, viewerSatsView = if (mode == "viewer") telemetryState.viewerSatsView else 0,
+        viewerGpsTs = telemetryState.localLocation.timestamp, trackerId = uiState.deviceId, viewerId = uiState.viewerId, watchdogOk = dashboardState.watchdogOk,
         trackerState = dashboardState.trackerState, hasActiveAlarms = hasUnresolved, isRedScreenSuppressed = (hasUnresolved && !redScreenVisible),
-        isSirenPlaying = uiState.isSirenPlaying,
+        isSirenPlaying = telemetryState.isSirenPlaying,
         isTrackerLocPending = health.isLocationPending, 
         trackerLocPendingReason = health.locationPendingReason,
-        isViewerLocPending = uiState.localHealth.isLocationPending,
-        viewerLocPendingReason = uiState.localHealth.locationPendingReason,
+        isViewerLocPending = telemetryState.localHealth.isLocationPending,
+        viewerLocPendingReason = telemetryState.localHealth.locationPendingReason,
         lastGpsTs = lastGpsTs,
         isTelemetryFresh = dashboardState.isTelemetryFresh,
         isGpsFresh = dashboardState.isGpsFresh

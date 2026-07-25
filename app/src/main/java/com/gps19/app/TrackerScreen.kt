@@ -31,16 +31,15 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerScreen: Tracker-mode UI.
- * July.21.00:
- * - Aligned with SystemHealthState and standardized monotonic timing.
- * - Issue #338: Propagated isTelemetryFresh for unified staleness.
- * - Issue #221: Propagating systemPulseRt for Bayesian uncertainty scaling.
- * - Maintained Hilt compatibility as per hardened Golden Master architecture.
+ * July.24.08:
+ * - Issue #547: State Decomposition. Refactored to consume both uiState 
+ *   (persistent) and telemetryState (transient) to reduce heap churn.
  */
 
 @Composable
 fun TrackerScreen(
     uiState: MainUiState,
+    telemetryState: TelemetryState,
     viewModel: MainViewModel,
     logs: List<LogEntry>,
     trail: List<TrailPoint>,
@@ -94,6 +93,7 @@ fun TrackerScreen(
     val statusBar = @Composable {
         GlobalStatusBar(
             uiState = uiState,
+            telemetryState = telemetryState,
             dashboardState = dashboardState,
             systemPulse = systemPulse,
             rttFlow = viewModel.rtt,
@@ -117,6 +117,7 @@ fun TrackerScreen(
                         if (isMapVisible) {
                             AppMapContainer(
                                 uiState = uiState,
+                                telemetryState = telemetryState,
                                 systemPulse = systemPulse,
                                 systemPulseRt = systemPulseRt,
                                 onEvent = { viewModel.onEvent(it) },
@@ -128,7 +129,7 @@ fun TrackerScreen(
                                 showToolsOverlay = true
                             )
                         } else {
-                            TrackerDashboard(uiState, dashboardState, systemPulse, viewModel, onEvent = { viewModel.onEvent(it) })
+                            TrackerDashboard(uiState, telemetryState, dashboardState, systemPulse, viewModel, onEvent = { viewModel.onEvent(it) })
                         }
                     }
                 }
@@ -137,6 +138,7 @@ fun TrackerScreen(
             if (isMapVisible) {
                 AppMapContainer(
                     uiState = uiState,
+                    telemetryState = telemetryState,
                     systemPulse = systemPulse,
                     systemPulseRt = systemPulseRt,
                     onEvent = { viewModel.onEvent(it) },
@@ -175,8 +177,8 @@ fun TrackerScreen(
                             Box(Modifier.fillMaxWidth().padding(end = 8.dp), contentAlignment = Alignment.CenterEnd) {
                                 MapToolsOverlay(
                                     isTrackerMode = true,
-                                    trackerValid = PhysicsUtils.isValidLocation(uiState.localLocation.lat, uiState.localLocation.lng),
-                                    viewerValid = PhysicsUtils.isValidLocation(uiState.trackerLocation.lat, uiState.trackerLocation.lng),
+                                    trackerValid = PhysicsUtils.isValidLocation(telemetryState.localLocation.lat, telemetryState.localLocation.lng),
+                                    viewerValid = PhysicsUtils.isValidLocation(telemetryState.trackerLocation.lat, telemetryState.trackerLocation.lng),
                                     showFence = uiState.isFenceVisible,
                                     onToggleFence = { viewModel.onEvent(UiEvent.SetFenceVisible(!uiState.isFenceVisible)) },
                                     geofenceMode = uiState.geofenceMode,
@@ -198,7 +200,7 @@ fun TrackerScreen(
                     }
                     
                     if (!isMapVisible) {
-                        TrackerDashboard(uiState, dashboardState, systemPulse, viewModel, onEvent = { viewModel.onEvent(it) })
+                        TrackerDashboard(uiState, telemetryState, dashboardState, systemPulse, viewModel, onEvent = { viewModel.onEvent(it) })
                     }
                 }
             }
@@ -217,7 +219,7 @@ fun TrackerScreen(
                 onUpdateSirenType = { viewModel.onEvent(UiEvent.SetSirenType(it)) },
                 onUpdateAlarmVolume = { viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(uiState.draftSettings.alertSettings.copy(alarmVolume = it))) },
                 onTestSiren = { 
-                    if (uiState.isSirenPlaying) {
+                    if (telemetryState.isSirenPlaying) {
                         AudioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
                     } else {
                         val s = uiState.draftSettings.alertSettings
@@ -257,11 +259,11 @@ fun TrackerScreen(
 }
 
 @Composable
-fun TrackerDashboard(uiState: MainUiState, dashboardState: DashboardState, systemPulse: Long, viewModel: MainViewModel, onEvent: (UiEvent) -> Unit) {
+fun TrackerDashboard(uiState: MainUiState, telemetryState: TelemetryState, dashboardState: DashboardState, systemPulse: Long, viewModel: MainViewModel, onEvent: (UiEvent) -> Unit) {
     val now = systemPulse
-    val gpsAge = if (uiState.localLocation.timestamp > 0) now - uiState.localLocation.timestamp else Long.MAX_VALUE
+    val gpsAge = if (telemetryState.localLocation.timestamp > 0) now - telemetryState.localLocation.timestamp else Long.MAX_VALUE
     val isGpsActive = uiState.isSystemActive && gpsAge < GPS_UI_FAIL_THRESHOLD_MS
-    val hasFix = isGpsActive && uiState.localLocation.lat != 0.0 && uiState.localLocation.lat != DEFAULT_LAT
+    val hasFix = isGpsActive && telemetryState.localLocation.lat != 0.0 && telemetryState.localLocation.lat != DEFAULT_LAT
     
     LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         item {
@@ -271,6 +273,7 @@ fun TrackerDashboard(uiState: MainUiState, dashboardState: DashboardState, syste
                 Spacer(Modifier.height(4.dp))
                 TelemetryBox(
                     uiState = uiState, 
+                    telemetryState = telemetryState,
                     dashboard = dashboardState, 
                     systemPulse = systemPulse, 
                     gpsIndexDataFlow = viewModel.gpsIndexData, 
@@ -279,6 +282,7 @@ fun TrackerDashboard(uiState: MainUiState, dashboardState: DashboardState, syste
                 )
                 DebugTable(
                     uiState = uiState, 
+                    telemetryState = telemetryState,
                     dashboard = dashboardState, 
                     systemPulse = systemPulse,
                     rttFlow = viewModel.rtt,

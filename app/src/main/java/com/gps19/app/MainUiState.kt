@@ -5,11 +5,10 @@ import com.gps19.core.engine.SystemHealthState
 import org.osmdroid.util.GeoPoint
 
 /**
- * MainUiState: Unified immutable state for the entire UI structure.
- * July.20.07:
- * - Issue #107: Added isActivityRecognitionGranted to PermissionState.
- * - Issue #099: Added isA15Device to PermissionState.
- * - Issue #516: Unified background status using CapabilityStatus (R502).
+ * MainUiState: Persistent and slow-changing state for the UI structure.
+ * July.24.08:
+ * - Issue #547: State Decomposition. Extracted high-frequency fields into 
+ *   TelemetryState to reduce heap churn and mitigate kernel memory overhead.
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -18,26 +17,8 @@ data class MainUiState(
     val deviceId: String = MainRepository.DEFAULT_TRACKER_ID,
     val viewerId: String = MainRepository.DEFAULT_VIEWER_ID,
     val relayUrl: String = DEFAULT_RELAY_URL,
-    val localLocation: LocationState = LocationState(),
-    val battery: BatteryState = BatteryState(),
-    val stats: StatsState = StatsState(),
-    val viewerSatsView: Int = 0,
-    val viewerSatsUsed: Int = 0,
-    val trackerLocation: LocationState = LocationState(),
-    val trackerStats: StatsState = StatsState(),
-    val trackerBattery: BatteryState = BatteryState(),
-    val trackerSatsView: Int = 0,
-    val trackerSatsUsed: Int = 0,
-    val connectivity: ConnectivityState = ConnectivityState(),
-    val localHealth: SystemHealthState = SystemHealthState(),
-    val trackerHealth: SystemHealthState = SystemHealthState(),
     val alertSettings: AlertSettings = AlertSettings(),
-    val isAlarmSilenced: Boolean = false,
-    val isSirenPlaying: Boolean = false,
     val lastAlarmAckTs: Long = 0L,
-    val activeAlarms: List<AlarmInfo> = emptyList(),
-    val isNewViolationDetected: Boolean = false,
-    val powerAlarmPending: Boolean = false,
     val selectedSirenType: String = "Siren",
     val navigation: NavigationState = NavigationState(isMapVisible = true),
     val homePoints: List<GeoPoint> = emptyList(),
@@ -55,12 +36,6 @@ data class MainUiState(
     val isMapButtonsVisible: Boolean = false,
     val isMapLocked: Boolean = true,
     val mapFollowMode: MapFollowMode = MapFollowMode.AUTO,
-    val maxTrackerAccuracy: Double = 0.0,
-    val maxViewerAccuracy: Double = 0.0,
-    val distanceTrackerToHome: Double? = null,
-    val distanceTrackerToViewer: Double? = null,
-    val distanceViewerToHome: Double? = null,
-    val distanceViewerToTracker: Double? = null,
     val draftSettings: DraftSettings = DraftSettings(),
     val isIdentitySanitized: Boolean = false
 ) {
@@ -101,6 +76,38 @@ data class MainUiState(
             return count
         }
 }
+
+/**
+ * TelemetryState: High-frequency transient state.
+ * Decomposed from MainUiState to minimize allocation overhead during rapid updates.
+ */
+data class TelemetryState(
+    val localLocation: LocationState = LocationState(),
+    val battery: BatteryState = BatteryState(),
+    val stats: StatsState = StatsState(),
+    val viewerSatsView: Int = 0,
+    val viewerSatsUsed: Int = 0,
+    val trackerLocation: LocationState = LocationState(),
+    val trackerStats: StatsState = StatsState(),
+    val trackerBattery: BatteryState = BatteryState(),
+    val trackerSatsView: Int = 0,
+    val trackerSatsUsed: Int = 0,
+    val connectivity: ConnectivityState = ConnectivityState(),
+    val localHealth: SystemHealthState = SystemHealthState(),
+    val trackerHealth: SystemHealthState = SystemHealthState(),
+    val activeAlarms: List<AlarmInfo> = emptyList(),
+    val isNewViolationDetected: Boolean = false,
+    val powerAlarmPending: Boolean = false,
+    val isAlarmSilenced: Boolean = false,
+    val isSirenPlaying: Boolean = false,
+    val isRedScreenVisible: Boolean = false,
+    val maxTrackerAccuracy: Double = 0.0,
+    val maxViewerAccuracy: Double = 0.0,
+    val distanceTrackerToHome: Double? = null,
+    val distanceTrackerToViewer: Double? = null,
+    val distanceViewerToHome: Double? = null,
+    val distanceViewerToTracker: Double? = null
+)
 
 enum class MapFollowMode { TRACKER, VIEWER, AUTO }
 

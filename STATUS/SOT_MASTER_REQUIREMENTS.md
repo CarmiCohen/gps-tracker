@@ -1,10 +1,11 @@
-# System Source of Truth (SoT) - July.24.07 (Startup & Handshake Hardening)
+# System Source of Truth (SoT) - July.25.00 (State Decomposition & Map Refactor)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Deferred Flow Collection (R542)**: Heavy Room-backed flows (logs, trails, violations) MUST be collected only within their respective screen routes (Tracker/Viewer) rather than the top-level MainAppContent to minimize cold-start main thread congestion and eliminate frame skips. (Issue #542, July.24.07)
+*   **UI State Decomposition (R547)**: The application UI MUST decompose monolithic state objects into persistent (Settings/Navigation) and transient (Telemetry/Health) streams to minimize heap churn and mitigate kernel-level memory moving overhead (`userfaultfd` fallback) on Android 15 hardware. (Issue #547, July.24.08)
 *   **Startup Suppression Window (R993d)**: To prevent Main-thread starvation during cold-start, all Foreground Service notification type updates MUST be suppressed for the first 10 seconds of service life if a previous notification has already been successfully posted. (Issue #534, July.24.02)
 *   **Notification IPC Throttling (R993b)**: To prevent Main-thread ANRs during hardware recovery bursts, Foreground Service notification updates MUST be double-throttled: a 2000ms hard gate in `AppNotificationManager` and a 10,000ms global throttle for service type changes in `BaseMonitorService` descendants. (Issue #113, #535, July.24.02)
 *   **Foreground Service Immediacy (R406b)**: `startForeground` MUST be invoked directly in the Main-thread `onCreate` of any `LifecycleService`. (July.23.11)
@@ -40,8 +41,9 @@ This document serves as the definitive operational specification. All Issue IDs 
 
 ### 5. Architectural Baselines
 *   **Anchor Logic Authority (R990e)**: `AnchorEvaluator` is the central authority for stationary state. (Issue #533b)
+*   **Map Overlay Management (R544b)**: Imperative `osmdroid` object lifecycles (Markers, Polylines) MUST be managed by a standalone `MapOverlayManager` to isolate imperative mutations from the declarative Compose recomposition cycle and prevent internal runtime lock collisions. (Issue #544, July.24.08)
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.24.07.
+*   **Current Release**: July.25.00.
 *   **Source of Truth**: app/build.gradle versionName.

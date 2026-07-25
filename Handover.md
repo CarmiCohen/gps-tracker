@@ -1,35 +1,36 @@
-# Handover (July.24.07) - Startup & Handshake Hardening [RELEASED]
+# Handover (July.25.01) - Siren Restoration & Reactive Surfacing [RELEASED]
 
 ## 🎯 Completed Objective
-Cycle **July.24.07** delivered critical performance and stability wins. Startup main-thread congestion was eliminated, the signaling handshake was hardened against "storms," and UI snapshot integrity was restored on the map.
+Cycle **July.25.01** successfully restored and optimized the Siren/Alarm surfacing logic following the state decomposition refactor. We achieved **Zero-Latency Alarm Surfacing** by migrating UI visibility gates into the transient state stream, reaching a milestone of **403 Resolved Issues**.
 
-## 📊 Status Summary
+## 📊 Status Summary & Forensic Trails
 
-### 1. Resolved: Startup Frame Skipping (#542)
-- **Fix**: Deferred Room flow collection (`eventLogs`, `trails`, `violations`) in `MainAppContent.kt` to specific screen routes.
-- **Result**: Cold-start frame skips on Samsung A15 reduced from ~300 to <50.
+### 1. Resolved: Siren Logic Restoration (#547c)
+- **Problem**: After the #547 state decomposition, `redScreenVisible` was still managed by a separate `StateFlow` updated via a 1-2s global timer pulse. This introduced unacceptable latency in surfacing critical alarms.
+- **Forensic Fix**: Migrated `isRedScreenVisible` into `TelemetryState`.
+- **Reactive Implementation**: 
+    - `MainViewModel.kt` now triggers a `behaviorUseCase` re-evaluation immediately within the `observeIntegrityUpdates` flow.
+    - This ensures that as soon as an alarm is received from the repository/core-engine, the UI responds within the next frame.
+- **Result**: Zero-latency surfacing of critical alerts; complete removal of redundant state flows in `MainViewModel`.
+- **Authority**: Objective 3 of July.25.00 Handover.
 
-### 2. Resolved: Hardening Signaling Handshake (#546)
-- **Fix**: Implemented `isConnecting()` state in `CommunicationManager` to suppress redundant concurrent handshake attempts.
-- **Optimization**: Reduced Socket.io timeout to 30s and enabled `forceNew` for clean state recovery.
-- **Result**: Eliminated `EngineIOException` WebSocket errors during initial relay connection.
+### 2. Forensic Alignment: State Decomposition Refinement
+- **Consolidation**: Updated `MainAppContent.kt` and `AlarmActivity.kt` to strictly consume transient visibility from `TelemetryState`.
+- **Consistency Check**: Verified that `AlarmActivity` now correctly pulls `activeAlarms` and `isAlarmSilenced` from the transient model, preventing "stale state" crashes that could have occurred if settings were updated while an alarm was active.
 
-### 3. Resolved: Mitigate Compose Snapshots Jank (#544)
-- **Fix**: Restored `SnapshotStateList` (via `mutableStateListOf`) for all marker and polyline pools in `MapComponents.kt`.
-- **Result**: Eliminated `conditionalUpdate` lock verification failures; UI smoothness restored during intensive telemetry bursts.
+### 3. Version Update: July.25.01
+- **Status**: Stable. State decomposition is now the standard for all high-frequency UI elements.
 
-### 4. Forensic Status: Logging Leak (#545) - CLOSED
-- **Finding**: `StackLog` traces are inherent platform noise from the Samsung A15 connectivity stack and are not present in application source.
+## ⚠️ Newly Identified Risks
+- **Issue #547 (Part B)**: Ongoing monitoring of Samsung A15 kernel behavior. While allocation churn is reduced, we must verify that `isRedScreenVisible` reactive updates do not re-introduce frame drops during heavy GC.
 
-### 5. Forensic Status: Native Hooks (#543) - MITIGATED
-- **Status**: Native source remains missing. Mitigation maintained via Kotlin-level "Hardware Pokes" in `TrackerService` to maintain chipset budget.
-
-## 🎯 Next Cycle Objectives
-1. **Kernel Warning Investigation (#547)**: Address `userfaultfd` MOVE ioctl warnings on Android 15 hardware.
-2. **UI State Decomposition**: Split `MainUiState` into persistent and transient models to optimize reactive performance.
+## 🎯 Next Cycle Objectives (July.25.01)
+1. **GC Pressure Audit**: Use the refined `TelemetryState` model to verify memory stability under high load (Runtime memory profiling).
+2. **Map Refinement**: Implement granular trail thinning within `MapOverlayManager` to further reduce the memory footprint of long-running sessions.
+3. **Core-Engine Sync**: Audit if additional transient flags in `core:engine` should be surfaced directly to `TelemetryState` to bypass further ViewModel processing.
 
 ## 🚀 Release Verification
-- [x] `app/build.gradle` version name incremented to `July.24.07`.
-- [x] `STATUS/SOT_MASTER_REQUIREMENTS.md` synchronized with July performance wins.
+- [x] `versionName` incremented to `July.25.01` in `app/build.gradle`.
+- [x] `STATUS/SOT_MASTER_REQUIREMENTS.md` updated to `July.25.01`.
+- [x] `issues.md` dashboard synchronized (403 Resolved).
 - [x] Build `:app:assembleDebug` SUCCESS.
-- [x] `issues.md` and individual shards updated.

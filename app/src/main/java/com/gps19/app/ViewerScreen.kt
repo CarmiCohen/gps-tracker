@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,16 +31,15 @@ import com.gps19.core.engine.*
 
 /**
  * ViewerScreen: Pocket-mode UI.
- * July.21.00:
- * - Aligned with SystemHealthState and standardized monotonic timing.
- * - Issue #338: Propagated isTelemetryFresh for unified staleness.
- * - Issue #221: Propagating systemPulseRt for Bayesian uncertainty scaling.
- * - Maintained Hilt compatibility as per hardened Golden Master architecture.
+ * July.24.08:
+ * - Issue #547: State Decomposition. Refactored to consume both uiState 
+ *   (persistent) and telemetryState (transient) to reduce heap churn.
  */
 
 @Composable
 fun ViewerScreen(
     uiState: MainUiState,
+    telemetryState: TelemetryState,
     viewModel: MainViewModel,
     logs: List<LogEntry>,
     trackerTrail: List<TrailPoint>,
@@ -93,6 +93,7 @@ fun ViewerScreen(
     val statusBar = @Composable {
         GlobalStatusBar(
             uiState = uiState,
+            telemetryState = telemetryState,
             dashboardState = dashboardState,
             systemPulse = systemPulse,
             rttFlow = viewModel.rtt,
@@ -116,6 +117,7 @@ fun ViewerScreen(
                         if (isMapVisible) {
                             AppMapContainer(
                                 uiState = uiState,
+                                telemetryState = telemetryState,
                                 systemPulse = systemPulse,
                                 systemPulseRt = systemPulseRt,
                                 onEvent = { viewModel.onEvent(it) },
@@ -127,7 +129,7 @@ fun ViewerScreen(
                                 showToolsOverlay = true
                             )
                         } else {
-                            ViewerDashboard(uiState, dashboardState, systemPulse, viewModel, onEvent = { viewModel.onEvent(it) })
+                            ViewerDashboard(uiState, telemetryState, dashboardState, systemPulse, viewModel, onEvent = { viewModel.onEvent(it) })
                         }
                     }
                 }
@@ -136,6 +138,7 @@ fun ViewerScreen(
             if (isMapVisible) {
                 AppMapContainer(
                     uiState = uiState,
+                    telemetryState = telemetryState,
                     systemPulse = systemPulse,
                     systemPulseRt = systemPulseRt,
                     onEvent = { viewModel.onEvent(it) },
@@ -174,8 +177,8 @@ fun ViewerScreen(
                             Box(Modifier.fillMaxWidth().padding(end = 8.dp), contentAlignment = Alignment.CenterEnd) {
                                 MapToolsOverlay(
                                     isTrackerMode = false,
-                                    trackerValid = PhysicsUtils.isValidLocation(uiState.trackerLocation.lat, uiState.trackerLocation.lng),
-                                    viewerValid = PhysicsUtils.isValidLocation(uiState.localLocation.lat, uiState.localLocation.lng),
+                                    trackerValid = PhysicsUtils.isValidLocation(telemetryState.trackerLocation.lat, telemetryState.trackerLocation.lng),
+                                    viewerValid = PhysicsUtils.isValidLocation(telemetryState.localLocation.lat, telemetryState.localLocation.lng),
                                     showFence = uiState.isFenceVisible,
                                     onToggleFence = { viewModel.onEvent(UiEvent.SetFenceVisible(!uiState.isFenceVisible)) },
                                     geofenceMode = uiState.geofenceMode,
@@ -197,7 +200,7 @@ fun ViewerScreen(
                     }
                     
                     if (!isMapVisible) {
-                        ViewerDashboard(uiState, dashboardState, systemPulse, viewModel, onEvent = { viewModel.onEvent(it) })
+                        ViewerDashboard(uiState, telemetryState, dashboardState, systemPulse, viewModel, onEvent = { viewModel.onEvent(it) })
                     }
                 }
             }
@@ -216,7 +219,7 @@ fun ViewerScreen(
                 onUpdateSirenType = { viewModel.onEvent(UiEvent.SetSirenType(it)) },
                 onUpdateAlarmVolume = { viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(uiState.draftSettings.alertSettings.copy(alarmVolume = it))) },
                 onTestSiren = { 
-                    if (uiState.isSirenPlaying) {
+                    if (telemetryState.isSirenPlaying) {
                         AudioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
                     } else {
                         val s = uiState.draftSettings.alertSettings
@@ -256,7 +259,7 @@ fun ViewerScreen(
 }
 
 @Composable
-fun ViewerDashboard(uiState: MainUiState, dashboardState: DashboardState, systemPulse: Long, viewModel: MainViewModel, onEvent: (UiEvent) -> Unit) {
+fun ViewerDashboard(uiState: MainUiState, telemetryState: TelemetryState, dashboardState: DashboardState, systemPulse: Long, viewModel: MainViewModel, onEvent: (UiEvent) -> Unit) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -266,6 +269,7 @@ fun ViewerDashboard(uiState: MainUiState, dashboardState: DashboardState, system
                     Spacer(Modifier.height(4.dp))
                     TelemetryBox(
                         uiState = uiState, 
+                        telemetryState = telemetryState,
                         dashboard = dashboardState, 
                         systemPulse = systemPulse, 
                         gpsIndexDataFlow = viewModel.gpsIndexData, 
@@ -274,6 +278,7 @@ fun ViewerDashboard(uiState: MainUiState, dashboardState: DashboardState, system
                     )
                     DebugTable(
                         uiState = uiState, 
+                        telemetryState = telemetryState,
                         dashboard = dashboardState, 
                         systemPulse = systemPulse,
                         rttFlow = viewModel.rtt,
