@@ -5,11 +5,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import timber.log.Timber
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * RemoteStatusRepository: Single Source of Truth for Remote Peer Telemetry.
+ * July.26.02:
+ * - Issue #545b: Lifecycle Idempotency. Added isInitialized AtomicBoolean guard 
+ *   to initialize() to prevent redundant state restoration from MainRepository 
+ *   during service re-attachment or multi-mode transitions.
  * July.23.01:
  * - SIT Hardening (Issue #522): Consolidated forensic state authority.
  * - Deep Purge: Removed references to the obsolete RemoteHandler.
@@ -32,8 +37,11 @@ class RemoteStatusRepository @Inject constructor(
     val peerSignal = _peerSignal.asStateFlow()
 
     private var lastRemotePacketTs = 0L
+    private val isInitialized = AtomicBoolean(false)
 
     suspend fun initialize() {
+        if (isInitialized.getAndSet(true)) return
+
         try {
             mainRepository.loadTrackerState()?.let { savedStatus ->
                 _remoteStatus.value = savedStatus
@@ -80,5 +88,6 @@ class RemoteStatusRepository @Inject constructor(
         _lastPeerActivityTs.value = 0L
         _peerSignal.value = 0
         lastRemotePacketTs = 0L
+        isInitialized.set(false)
     }
 }

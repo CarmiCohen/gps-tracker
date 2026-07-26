@@ -9,18 +9,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * July.26.01:
+ * - Issue #592: Lifecycle Idempotency. Added isInitialized AtomicBoolean guard 
+ *   to initialize() to prevent redundant state restoration and scope assignment.
  * July.25.02:
  * - Issue #570: Forensic Snapshot Pooling. Refactored backfill sequences to 
  *   eliminate intermediate object churn.
- * July.24.05:
- * - Issue #538f: Backfill Results Optimization.
- * - Issue #538e: Ribbon Backfill Optimization. Leveraged lazy Sequences.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -37,6 +38,7 @@ class HistoryManager @Inject constructor(
 
     private var scope: CoroutineScope? = null
     private var listener: Listener? = null
+    private val isInitialized = AtomicBoolean(false)
 
     private var lastProcessedHour = -1
     private var lastCleanupDate = ""
@@ -57,6 +59,8 @@ class HistoryManager @Inject constructor(
     }
 
     suspend fun initialize(scope: CoroutineScope) {
+        if (isInitialized.getAndSet(true)) return
+
         this.scope = scope
         
         withContext(Dispatchers.IO) {
@@ -156,8 +160,6 @@ class HistoryManager @Inject constructor(
             )
         }
 
-        // Issue #570: Single point allocation per tick is acceptable, but 
-        // using the mutable EngineConnectionPoint here.
         val currentPoint = EngineConnectionPoint(
             ts = now,
             rt = nowRt,
@@ -249,7 +251,6 @@ class HistoryManager @Inject constructor(
         currentMa: Int,
         locationPendingReason: LocationPendingReason
     ) {
-        // Issue #570: Direct use of sequences without redundant re-mapping
         val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
         val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
 

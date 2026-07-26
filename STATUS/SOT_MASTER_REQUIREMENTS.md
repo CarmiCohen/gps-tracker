@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.26.01 (Cold Start Hardening)
+# System Source of Truth (SoT) - July.26.02 (Lifecycle Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -15,6 +15,8 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Flyweight Thread Safety (R570b)**: To ensure forensic data integrity across asynchronous coroutine boundaries and suspension points, mutable flyweight objects used in sequences MUST be scoped to the method/iterator level. Forensic snapshots handed over to asynchronous consumers (e.g., for alarm evaluation) MUST be returned as fresh instances to prevent race conditions during concurrent telemetry processing. (Issue #570b, July.25.10)
 *   **Unified Latency Monitoring (R590)**: To maintain 1Hz engine stability on budget hardware (e.g., Samsung A15), all critical native JNI calls, Database transactions (History/Trail/Violation), and heavy I/O operations MUST be monitored via `LatencyMonitor`. Execution spikes exceeding 50ms (Native) or 500ms (I/O) MUST be logged as forensic warnings to detect "silent jitter" in the high-frequency pulse. (Issue #590, July.25.11)
 *   **Idempotent Network Lifecycle (R545)**: To eliminate platform-level diagnostic noise (e.g., Samsung 'StackLog' floods), registration of system-level network callbacks MUST be idempotent. The `ConnectivitySuite` MUST utilize internal state guarding (`isStarted`) to ensure `registerNetworkCallback` is invoked exactly once per application lifecycle, preventing redundant I/O and Logcat saturation. (Issue #545, July.25.12)
+*   **Component Lifecycle Idempotency (R545b)**: Core repositories and managers (e.g., `CommandRouter`, `RemoteStatusRepository`) MUST implement internal guards (`isRegistered`, `isInitialized`) to prevent redundant broadcast registrations, duplicate Flow collections, or unnecessary database state restoration during service re-attachment or background lifecycle events. (Issue #545b, July.26.02)
+*   **Lifecycle Idempotency (AppSensorManager) (R591)**: Registration of hardware sensors and display listeners MUST be idempotent. `AppSensorManager` MUST utilize an internal `isStarted` AtomicBoolean to prevent redundant platform-level registrations when triggered by service synchronization or hardware recovery events. (Issue #591, July.26.01)
 *   **Forensic Primitive Buffering (R550)**: To eliminate heap churn and GC pressure during high-frequency telemetry updates, `GpsManager` and `AppSensorManager` use circular primitive arrays (LongArray, DoubleArray, BooleanArray) for historical sample storage. (Issue #550, July.25.02)
 *   **Pipeline Serialization Hardening (R560)**: To achieve zero-churn telemetry signaling on restricted kernels, the signaling pipeline MUST utilize pre-allocated `ByteArray` buffers and reusable Protobuf builders. (Issue #560, July.25.03)
 *   **Buffer Overflow Resilience (R560b)**: To handle GNSS satellite density spikes without heap churn, the Protobuf serialization buffer MUST be self-expanding up to a 64KB safety clamp. (Issue #560b, July.25.06)
@@ -45,5 +47,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077, #532)
 
 ### 5. Version Authority
-*   **Current Release**: July.26.01.
+*   **Current Release**: July.26.02.
 *   **Source of Truth**: app/build.gradle versionName.

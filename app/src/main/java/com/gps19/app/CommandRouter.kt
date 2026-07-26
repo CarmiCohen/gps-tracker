@@ -17,11 +17,16 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import timber.log.Timber
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * July.26.02:
+ * - Issue #545b: Lifecycle Idempotency. Added isRegistered and isObserving 
+ *   AtomicBoolean guards to prevent redundant receiver registrations and 
+ *   duplicate Flow collections during service restarts.
  * July.24.05:
  * - Fix: Updated UI command handling for renamed ExecuteTestAlarm/ExecuteForensicTest.
  * July.24.04:
@@ -53,6 +58,8 @@ class CommandRouter @Inject constructor(
     }
 
     private var listener: Listener? = null
+    private val isRegistered = AtomicBoolean(false)
+    private val isObserving = AtomicBoolean(false)
 
     fun setListener(listener: Listener) {
         this.listener = listener
@@ -90,6 +97,8 @@ class CommandRouter @Inject constructor(
     }
 
     fun startObservingCommands(scope: CoroutineScope) {
+        if (isObserving.getAndSet(true)) return
+
         repository.uiCommands
             .onEach { command ->
                 try {
@@ -169,6 +178,8 @@ class CommandRouter @Inject constructor(
     }
 
     fun register() {
+        if (isRegistered.getAndSet(true)) return
+
         val legacyFilter = IntentFilter().apply {
             addAction(ACTION_ALARM_WAKEUP); addAction(ACTION_RELAY_STATUS)
         }
@@ -186,6 +197,8 @@ class CommandRouter @Inject constructor(
     }
 
     fun unregister() {
+        if (!isRegistered.getAndSet(false)) return
+
         try { context.unregisterReceiver(legacyReceiver) } catch (e: Exception) {}
         try { context.unregisterReceiver(powerReceiver) } catch (e: Exception) {}
     }

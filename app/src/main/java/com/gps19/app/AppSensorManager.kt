@@ -28,15 +28,13 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.26.01:
+ * - Issue #591: Lifecycle Idempotency. Added isStarted AtomicBoolean guard to 
+ *   prevent redundant platform-level sensor and display listener registrations.
  * July.25.10:
  * - Issue #570b: Flyweight Thread Safety Audit. Moved sequence flyweights to method scope 
  *   and refactored consumeForensicSnapshot to return new instances, securing 
  *   asynchronous alarm evaluation boundaries.
- * July.25.03:
- * - Issue #570: Forensic Snapshot Pooling. Refactored getSensorSamples and 
- *   getAcousticSamples to use flyweight iteration, eliminating transient object churn.
- * July.25.02:
- * - Issue #550: Refactored sensor history to primitive arrays.
  */
 class AppSensorManager(
     private val context: Context,
@@ -63,6 +61,7 @@ class AppSensorManager(
     private var sensorThread: HandlerThread? = null
     private var sensorHandler: Handler? = null
     private val hasLoggedThreadInfo = AtomicBoolean(false)
+    private val isStarted = AtomicBoolean(false)
 
     private var lastDisplayState = Display.STATE_UNKNOWN
     private var lastDisplayTransitionRt = 0L
@@ -147,8 +146,6 @@ class AppSensorManager(
 
     /**
      * ForensicSnapshot: Data container for forensic sensor state.
-     * July.25.10: Secured instance per consumption to ensure thread safety 
-     * across asynchronous boundaries.
      */
     class ForensicSnapshot {
         var vibration: Double = 0.0
@@ -281,6 +278,8 @@ class AppSensorManager(
     private var lastPlungePhaseRt = 0L
 
     fun start() {
+        if (isStarted.getAndSet(true)) return
+
         sessionStartRt = timeProvider.elapsedRealtime()
         lastBaroZeroingRt = sessionStartRt
         hasLoggedThreadInfo.set(false)
@@ -316,6 +315,8 @@ class AppSensorManager(
     }
 
     fun stop() {
+        if (!isStarted.getAndSet(false)) return
+
         recoveryJob?.cancel()
         recoveryJob = null
         stopAcousticMonitoring()
@@ -400,7 +401,7 @@ class AppSensorManager(
         if (this.powerSaveMode != active) {
             this.powerSaveMode = active
             Timber.i("Issue #526: Power Save Mode ${if (active) "ENABLED" else "DISABLED"}. Adjusting sensor sampling.")
-            if (sensorHandler != null) {
+            if (isStarted.get() && sensorHandler != null) {
                 sensorManager.unregisterListener(this)
                 registerSensors()
             }
@@ -609,11 +610,6 @@ class AppSensorManager(
     fun isAcousticMonitoringActive(): Boolean = isAcousticRunning
     fun isAcousticMonitoringEnabled(): Boolean = isMonitoring
 
-    /**
-     * consumeForensicSnapshot: Returns a snapshot of current forensic state.
-     * July.25.10: Secured instance per consumption to ensure thread safety 
-     * across asynchronous boundaries.
-     */
     fun consumeForensicSnapshot(): ForensicSnapshot {
         synchronized(this) {
             val snapshot = ForensicSnapshot().apply {
@@ -651,10 +647,6 @@ class AppSensorManager(
         }
     }
 
-    /**
-     * Issue #570: Zero-churn retrieval via flyweight iteration.
-     * July.25.10: Flyweight scoped to sequence generator for thread safety.
-     */
     fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<EngineSensorSnapshot> = sequence {
         val flyweight = EngineSensorSnapshot()
         val c: Int
@@ -705,10 +697,6 @@ class AppSensorManager(
         }
     }
 
-    /**
-     * Issue #570: Zero-churn retrieval via flyweight iteration.
-     * July.25.10: Flyweight scoped to sequence generator for thread safety.
-     */
     fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
         val flyweight = EngineSnrSample()
         val c: Int
