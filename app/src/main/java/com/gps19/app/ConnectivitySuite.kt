@@ -26,16 +26,13 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.26.01:
+ * - Issue #575: Network Handshake Latency. Zero-initialized lastReconnectTs 
+ *   to allow immediate connection on startup, bypassing the 3s flapping guard.
  * July.25.12:
  * - Issue #545: Production Logging Leak (StackLog). Implemented idempotent 
  *   lifecycle management with isStarted check to prevent redundant 
  *   registerNetworkCallback calls that trigger platform diagnostic noise.
- * July.25.08:
- * - Issue #560c: Socket-Level Pressure. Integrated SignalingPriority support 
- *   into the telemetry pipeline to prevent large frames from blocking pulses.
- * July.25.06:
- * - Issue #560b: Buffer Overflow Resilience. Implemented self-expanding 
- *   serialization buffer with exponential growth and 64KB safety clamp.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -69,7 +66,7 @@ class ConnectivitySuite @Inject constructor(
     private var deviceId = ""
     private var viewerId = ""
     private var isTrackerMode = true
-    private var lastReconnectTs = timeProvider.elapsedRealtime()
+    private var lastReconnectTs = 0L // Issue #575: Initialized to 0 to permit immediate startup connection
     private var lastForceJoinTs = 0L 
 
     private val statusBuilder = RealtimeStatus.newBuilder()
@@ -158,7 +155,9 @@ class ConnectivitySuite @Inject constructor(
             if (isStopped.get() || relayUrl.isEmpty()) return
             scope.launch {
                 val nowRt = timeProvider.elapsedRealtime()
-                if (nowRt - lastReconnectTs < 3000L || signalingProvider.isConnected() || signalingProvider.isConnecting()) return@launch
+                // Issue #575: Allow immediate connection on first callback trigger (lastReconnectTs=0)
+                if (lastReconnectTs > 0L && nowRt - lastReconnectTs < 3000L) return@launch
+                if (signalingProvider.isConnected() || signalingProvider.isConnecting()) return@launch
                 if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) return@launch
 
                 logManagerProvider.get().logServiceEvent("Network Handover: Available. Reconnecting.", false)
@@ -176,9 +175,7 @@ class ConnectivitySuite @Inject constructor(
 
     fun start(url: String, dId: String, vId: String, isTracker: Boolean) {
         // Issue #545: Idempotent start. Prevent redundant network callback registrations
-        // which trigger 'StackLog' diagnostic noise on Samsung A15.
         if (isStarted.getAndSet(true)) {
-            // If already started, update credentials and trigger a reconnect if needed
             this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
             if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
@@ -192,7 +189,7 @@ class ConnectivitySuite @Inject constructor(
         }
         
         this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
-        this.lastReconnectTs = timeProvider.elapsedRealtime()
+        // Issue #575: Do not set lastReconnectTs here to allow the NetworkCallback to fire immediately
         this.lastForceJoinTs = 0L
         
         try {
@@ -350,7 +347,6 @@ class ConnectivitySuite @Inject constructor(
                 isStorageLow = entity.isStorageLow, isStorageCritical = entity.isStorageCritical,
                 isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface
             )
-            // Pending updates are bulk data (NORMAL priority)
             if (sendTelemetryInternal(status)) offlineRepository.deletePendingStatusUpdate(entity.id)
         }
     }
@@ -377,10 +373,6 @@ class ConnectivitySuite @Inject constructor(
         return success
     }
 
-    /**
-     * Issue #560b/c: Pipeline Serialization and Priority dispatch.
-     * Binary telemetry is sent with NORMAL priority to prevent blocking pulses.
-     */
     @Synchronized
     private fun sendTelemetryInternal(status: TrackerStatus): Boolean {
         if (!isConnected()) return false
@@ -399,7 +391,6 @@ class ConnectivitySuite @Inject constructor(
                     val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
                     message.writeTo(cos)
                     cos.checkNoSpaceLeft()
-                    // Telemetry is NORMAL priority
                     signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size, SignalingPriority.NORMAL)
                     return true
                 } catch (e: Exception) {
@@ -408,7 +399,6 @@ class ConnectivitySuite @Inject constructor(
             }
             signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray(), priority = SignalingPriority.NORMAL)
         } else {
-            // Viewer JSON telemetry is also NORMAL priority
             signalingProvider.emitMap("location_update", status.toMap(true), SignalingPriority.NORMAL)
         }
         return true
@@ -558,7 +548,7 @@ class ConnectivitySuite @Inject constructor(
                     lastConnTs = statusProto.lastConnTs,
                     lastDiscTs = statusProto.lastDiscTs,
                     isJump = isVisualJump,
-                    isClockRegression = statusProto.isClockRegression, // Protobuf carries reg flag
+                    isClockRegression = statusProto.isClockRegression,
                     isJammer = statusProto.isJammer,
                     isStalled = statusProto.isStalled,
                     isTamperDetected = statusProto.isTamperDetected,
@@ -776,7 +766,6 @@ class ConnectivitySuite @Inject constructor(
     fun getRtt() = signalingProvider.getRtt()
     fun clearRtt() = signalingProvider.clearRtt()
     
-    // Issue #560c: Expose priority support in the facade
     fun emit(event: String, data: JSONObject, priority: SignalingPriority = SignalingPriority.NORMAL) { 
         if (!isStopped.get()) signalingProvider.emit(event, data, priority) 
     }

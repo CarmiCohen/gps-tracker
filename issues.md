@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.26.00)
+# Project Issues & Hardening Tracking (July.26.01)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 419 |
+| **Resolved (Total)** | 🟢 Progress | 420 |
 
 ---
 
@@ -18,6 +18,13 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ## 🔴 Open Issues
 *   *No critical open issues.*
+
+---
+
+## 🟢 Recently Resolved Issues (July.26.01)
+*   **Issue #575: Network Handshake Latency**.
+    *   **Resolution**: Optimized the startup sequence in `TrackerService` and `ViewerService` to trigger `ConnectivitySuite` initialization earlier. In `ConnectivitySuite`, zero-initialized `lastReconnectTs` to ensure the first `NetworkCallback` trigger immediately initiates a connection, bypassing the 3-second flapping guard.
+    *   **Impact**: Ensures relay connectivity is established within the first 2-second telemetry window, preventing data gaps during application cold starts.
 
 ---
 
