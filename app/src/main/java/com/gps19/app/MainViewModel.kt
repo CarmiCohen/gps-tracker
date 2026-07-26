@@ -20,6 +20,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.26.00:
+ * - Issue #565: Cold Start I/O Optimization. Coordinated proactivePruning with 
+ *   INITIAL_RENDER_DELAY_MS to prevent I/O contention during the first pulse.
  * July.25.13:
  * - Issue #547: Kernel Performance Hardening. Integrated LatencyMonitor into 
  *   dashboardState computation to detect "silent jitter" on A15 hardware.
@@ -162,7 +165,19 @@ class MainViewModel @Inject constructor(
             loadInitialData()
             delay(200) 
             updateState { it.copy(isInitialized = true) }
+            
+            // Issue #565: Cold Start I/O Coordination.
+            // Execute proactive pruning during the render delay window to avoid I/O collision 
+            // with the upcoming high-frequency telemetry pulse.
+            val pruningJob = viewModelScope.launch(Dispatchers.IO) {
+                repository.proactivePruning()
+            }
+            
             delay(INITIAL_RENDER_DELAY_MS)
+            
+            // Ensure pruning is complete before starting heavy observations to prevent jitter on A15.
+            pruningJob.join()
+
             startBaseObservations()
             startGlobalTimer()
             viewModelScope.launch {
@@ -658,11 +673,6 @@ class MainViewModel @Inject constructor(
                     if (_uiState.value.appMode == "tracker") _localMaxTemp.value = status.maxTemp 
                 }
             }
-        }
-
-        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            delay(10000L)
-            repository.proactivePruning()
         }
     }
 

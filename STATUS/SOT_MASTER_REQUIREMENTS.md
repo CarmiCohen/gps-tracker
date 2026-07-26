@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.25.13 (Kernel Performance Hardening)
+# System Source of Truth (SoT) - July.26.00 (Cold Start Optimization)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -6,9 +6,9 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Deferred Flow Collection (R542)**: Heavy Room-backed flows (logs, trails, violations) MUST be collected only within their respective screen routes (Tracker/Viewer) rather than the top-level MainAppContent to minimize cold-start main thread congestion and eliminate frame skips. (Issue #542, July.24.07)
 *   **UI State Decomposition (R547)**: The application UI MUST decompose monolithic state objects into persistent (Settings/Navigation) and transient (Telemetry/Health) streams to minimize heap churn and mitigate kernel-level memory moving overhead (`userfaultfd` fallback) on Android 15 hardware. (Issue #547, July.24.08)
-*   **Kernel Jitter Monitoring (R547d)**: To verify the effectiveness of Zero-Churn buffers on budget hardware (e.g., Samsung A15), the high-frequency UI state computation MUST be monitored via `LatencyMonitor`. Execution jitter exceeding 30ms on A15 hardware MUST be logged as a forensic warning to detect ART compaction stalls caused by missing `userfaultfd` support. (Issue #547, July.25.13)
 *   **Zero-Churn Engine Windows (R547b)**: To eliminate GC pressure and mitigate missing `userfaultfd: MOVE` support on budget hardware (e.g., Samsung A15), high-frequency kinematic windows in `GtoEngine` and accuracy filters in `LocationProcessor` MUST utilize circular primitive buffers (`DoubleArray`, `LongArray`). Transient object allocations and boxing churn MUST be strictly avoided in the 1Hz-10Hz tick path. (Issue #547b, July.25.07)
 *   **Reactive Siren Surfacing (R547c)**: To achieve zero-latency alarm visibility, UI visibility gates (specifically `isRedScreenVisible`) MUST be integrated directly into the `TelemetryState` stream. Computation of these gates MUST occur immediately upon receipt of integrity updates in the ViewModel to bypass global timer pulse latency. (Issue #547c, July.25.01)
+*   **Cold Start Maintenance Coordination (R565)**: To prevent I/O contention during the critical first telemetry pulse, heavy background maintenance tasks (e.g., `proactivePruning`) MUST be coordinated with the `INITIAL_RENDER_DELAY_MS` window. Pruning MUST be explicitly joined before high-frequency telemetry observations are permitted to start. (Issue #565, July.26.00)
 *   **Granular Trail Thinning (R548)**: To prevent memory bloat and UI jank during long sessions, map trail polylines MUST be simplified using radial distance pruning. A 1.0m threshold MUST be applied to prune redundant nodes while strictly preserving segment boundaries and valid/jump status changes. (Issue #548, July.25.02)
 *   **Forensic Snapshot Pooling (R570)**: To achieve "Zero-Churn" forensic reconstruction, retrieval of sensor and SNR samples MUST utilize mutable flyweight objects (`EngineSensorSnapshot`, `EngineSnrSample`, `ForensicSnapshot`). Telemetry aggregation and backfilling MUST utilize reusable mutable containers (`EngineConnectionPoint`) to eliminate transient heap allocations during high-frequency pulse and forensic reconstruction paths. (Issue #570, July.25.02)
 *   **Flyweight Thread Safety (R570b)**: To ensure forensic data integrity across asynchronous coroutine boundaries and suspension points, mutable flyweight objects used in sequences MUST be scoped to the method/iterator level. Forensic snapshots handed over to asynchronous consumers (e.g., for alarm evaluation) MUST be returned as fresh instances to prevent race conditions during concurrent telemetry processing. (Issue #570b, July.25.10)
@@ -44,5 +44,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: All internal telemetry and pipelines MUST use `Double` precision. (Issue #077, #532)
 
 ### 5. Version Authority
-*   **Current Release**: July.25.13.
+*   **Current Release**: July.26.00.
 *   **Source of Truth**: app/build.gradle versionName.

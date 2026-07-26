@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.25.13)
+# Project Issues & Hardening Tracking (July.26.00)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 417 |
+| **Resolved (Total)** | 🟢 Progress | 419 |
 
 ---
 
@@ -21,24 +21,20 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
+## 🟢 Recently Resolved Issues (July.26.00)
+*   **Issue #565: Cold Start I/O Optimization**.
+    *   **Resolution**: Coordinated the `proactivePruning` database maintenance task in `MainViewModel` with the `INITIAL_RENDER_DELAY_MS` window. The task now executes during the UI initialization pause and is explicitly joined before high-frequency telemetry observations begin.
+    *   **Impact**: Prevents I/O contention and "silent jitter" on restricted kernels (A15) during the critical first telemetry pulse of a cold start.
+
+---
+
 ## 🟢 Recently Resolved Issues (July.25.13)
+*   **Issue #555: Forensic Snapshot Integrity**.
+    *   **Resolution**: Audited `TelemetryAggregator` flyweight lifecycle. Confirmed that mutable snapshots are deep-copied/mapped into immutable `ConnectionPoint` data classes in `HistoryManager` before reaching the `MainRepository`.
+    *   **Impact**: Eliminates the risk of race conditions during rapid forensic ribbon refreshes on multi-core hardware.
 *   **Issue #547: Kernel Performance Warning (`userfaultfd`)**.
     *   **Resolution**: Finalized the verification and monitoring stack for Zero-Churn performance. Integrated `LatencyMonitor` into the high-frequency `dashboardState` computation in `MainViewModel`. Added forensic jitter logging specifically for A15 hardware to detect ART compaction stalls caused by missing kernel `userfaultfd` support.
     *   **Impact**: Ensures performance stability on budget Android 15 hardware (Samsung A15) by providing forensic visibility into GC-related "silent jitter" while maintaining a zero-allocation hot path.
-
----
-
-## 🟢 Recently Resolved Issues (July.25.12)
-*   **Issue #545: Production Logging Leak (`StackLog`)**.
-    *   **Resolution**: Implemented idempotent lifecycle management in `ConnectivitySuite`. Added `isStarted` state guarding to prevent redundant `registerNetworkCallback` calls and loop initializations.
-    *   **Impact**: Eliminates platform-level diagnostic "StackLog" floods on Samsung A15 hardware, reducing Logcat noise and I/O overhead.
-
----
-
-## 🟢 Recently Resolved Issues (July.25.11)
-*   **Issue #590: Generic Latency Monitoring Framework**.
-    *   **Resolution**: Implemented a platform-agnostic `LatencyMonitor` utility in `:core:engine`. Migrated `MbrainHardwareManager` (JNI), `MainRepository` (DB), and `LogRepository` (Logs) to use this unified framework with standardized thresholds (50ms for native, 500ms for I/O).
-    *   **Impact**: Ensures forensic visibility into "silent jitter" and I/O stalls that could impact the 1Hz tracking pulse stability.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*
