@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.25.12)
+# Project Issues & Hardening Tracking (July.25.13)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 416 |
+| **Resolved (Total)** | 🟢 Progress | 417 |
 
 ---
 
@@ -18,6 +18,13 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ## 🔴 Open Issues
 *   *No critical open issues.*
+
+---
+
+## 🟢 Recently Resolved Issues (July.25.13)
+*   **Issue #547: Kernel Performance Warning (`userfaultfd`)**.
+    *   **Resolution**: Finalized the verification and monitoring stack for Zero-Churn performance. Integrated `LatencyMonitor` into the high-frequency `dashboardState` computation in `MainViewModel`. Added forensic jitter logging specifically for A15 hardware to detect ART compaction stalls caused by missing kernel `userfaultfd` support.
+    *   **Impact**: Ensures performance stability on budget Android 15 hardware (Samsung A15) by providing forensic visibility into GC-related "silent jitter" while maintaining a zero-allocation hot path.
 
 ---
 

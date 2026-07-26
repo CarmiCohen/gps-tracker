@@ -20,6 +20,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.25.13:
+ * - Issue #547: Kernel Performance Hardening. Integrated LatencyMonitor into 
+ *   dashboardState computation to detect "silent jitter" on A15 hardware.
  * July.25.01:
  * - Issue #547: State Decomposition (Refinement). Migrated redScreenVisible into 
  *   TelemetryState for architectural consistency and zero-latency reactive surfacing.
@@ -100,6 +103,11 @@ class MainViewModel @Inject constructor(
         if (state.appMode == "viewer") tele.trackerLocation.gnssDetail else localDetail
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    /**
+     * Dashboard State Pipeline: Hardened for A15 Performance Monitoring (Issue #547).
+     * Wrapping the high-frequency state reconstruction in LatencyMonitor to detect 
+     * GC compaction pressure on restricted kernels.
+     */
     val dashboardState: StateFlow<DashboardState> = combine(
         _uiState, _telemetryState, _systemPulse, _trackerState, _localMaxTemp, _trackerMaxTemp
     ) { args ->
@@ -109,7 +117,18 @@ class MainViewModel @Inject constructor(
         val trkState = args[3] as TrackerState
         val lMax = args[4] as Double
         val tMax = args[5] as Double
-        dashboardStateProvider.buildDashboardState(ui, tele, pulse, trkState, lMax, tMax)
+        
+        LatencyMonitor.measure(
+            timeProvider = timeProvider,
+            thresholdMs = if (ui.permissions.isA15Device) 30L else 100L,
+            onSpike = { duration ->
+                if (ui.permissions.isA15Device) {
+                    Timber.w("FORENSIC ALERT: UI State Computation Jitter on A15 (${duration}ms). Potential GC Pressure.")
+                }
+            }
+        ) {
+            dashboardStateProvider.buildDashboardState(ui, tele, pulse, trkState, lMax, tMax)
+        }
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
