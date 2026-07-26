@@ -26,6 +26,10 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.25.12:
+ * - Issue #545: Production Logging Leak (StackLog). Implemented idempotent 
+ *   lifecycle management with isStarted check to prevent redundant 
+ *   registerNetworkCallback calls that trigger platform diagnostic noise.
  * July.25.08:
  * - Issue #560c: Socket-Level Pressure. Integrated SignalingPriority support 
  *   into the telemetry pipeline to prevent large frames from blocking pulses.
@@ -57,6 +61,7 @@ class ConnectivitySuite @Inject constructor(
     fun setPeerListener(listener: PeerListener) { this.peerListener = listener }
 
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val isStarted = AtomicBoolean(false)
     private val isStopped = AtomicBoolean(false)
     private val consecutiveHttpFailures = AtomicInteger(0)
     
@@ -78,7 +83,7 @@ class ConnectivitySuite @Inject constructor(
         restartLoops()
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + suiteExceptionHandler)
+    private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + suiteExceptionHandler)
     private var keepAliveJob: Job? = null
     private var syncJob: Job? = null
 
@@ -170,7 +175,22 @@ class ConnectivitySuite @Inject constructor(
     }
 
     fun start(url: String, dId: String, vId: String, isTracker: Boolean) {
+        // Issue #545: Idempotent start. Prevent redundant network callback registrations
+        // which trigger 'StackLog' diagnostic noise on Samsung A15.
+        if (isStarted.getAndSet(true)) {
+            // If already started, update credentials and trigger a reconnect if needed
+            this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
+            if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
+                signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+            }
+            return
+        }
+
         isStopped.set(false)
+        if (!scope.isActive) {
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + suiteExceptionHandler)
+        }
+        
         this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
         this.lastReconnectTs = timeProvider.elapsedRealtime()
         this.lastForceJoinTs = 0L
@@ -745,6 +765,7 @@ class ConnectivitySuite @Inject constructor(
     }
 
     fun stop() { 
+        isStarted.set(false)
         isStopped.set(true); keepAliveJob?.cancel(); syncJob?.cancel(); scope.cancel()
         try { connectivityManager.unregisterNetworkCallback(networkCallback) } catch (e: Exception) {}
         signalingProvider.setRemoteUpdateListener(null)

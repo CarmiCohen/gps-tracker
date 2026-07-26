@@ -1,35 +1,25 @@
-# Handover (July.25.11) - Unified Latency Monitoring [READY]
+# Handover (July.25.12) - Network Lifecycle Hardening [READY]
 
 ## 🎯 Completed Objective
-Cycle **July.25.11** achieved **415 Resolved Issues** by implementing a unified monitoring framework to detect and log execution jitter in JNI, Database, and I/O operations.
+Cycle **July.25.12** achieved **416 Resolved Issues** by implementing idempotent lifecycle management in the connectivity stack, successfully eliminating the `StackLog` production leak.
 
 ## 📊 Status Tracker
-- **Issue #590: Generic Latency Monitoring Framework**: 🟢 Resolved.
-    - Created platform-agnostic `LatencyMonitor` in `:core:engine`.
-    - Refactored `MbrainHardwareManager` to use unified native thresholds (50ms).
-    - Integrated monitoring into `MainRepository` and `LogRepository` (500ms I/O threshold).
+- **Issue #545: Production Logging Leak (StackLog)**: 🟢 Resolved.
+    - Added `isStarted` state guarding to `ConnectivitySuite`.
+    - Prevented redundant `registerNetworkCallback` calls that triggered platform diagnostic noise on Samsung A15.
+- **Issue #590: Generic Latency Monitoring**: 🟢 Resolved (Previous Cycle).
 
 ## 📊 State Authority & SOT Alignment
-- **Requirement R590**: Established authority for unified latency monitoring across all modules.
-- **Forensic Visibility**: DB stalls and JNI spikes are now automatically injected into the forensic log stream.
+- **Requirement R545**: Idempotent Network Lifecycle. Registration of system-level network callbacks is now strictly guarded.
+- **Version Authority**: `July.25.12`
 
 ## ⚠️ Newly Identified Risks & Concerns
 - *No new risks identified.*
 
 ## 💡 Simplification Ideas
-- **Log Rate Limiting**: Consider adding a throttle to the forensic spike logger to prevent DB floods during sustained I/O congestion.
+- **Manual Callback Unregistration Audit**: Periodically verify that all `awaitClose` blocks in `callbackFlow` constructors (e.g., in `SystemStatusProvider`) are actually hit during service transitions to prevent other potential platform warnings.
 
 ## 🎯 Next Objective
-- **Awaiting triage** for next performance or security hardening cycle.
-
-## 🚀 Release Preparation
-- **Version Authority**: `July.25.11`
-- **Git Block**:
-    ```bash
-    git add -A
-    git commit -m "Release July.25.11: Unified Latency Monitoring Framework"
-    git tag -a vJuly.25.11 -m "Implemented platform-agnostic LatencyMonitor. Refactored MbrainHardwareManager, MainRepository, and LogRepository to detect and log execution spikes in JNI and DB hot-paths."
-    git push origin main --tags
-    ```
+- **Issue #547: Kernel Performance Warning (`userfaultfd`)**: Monitor GC pressure on Samsung A15 to verify if the UI state decomposition and zero-churn buffers have mitigated ART performance warnings.
 
 **Status**: READY FOR COMPLETION.
