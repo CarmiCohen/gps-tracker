@@ -19,12 +19,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized PreferenceKeys.
  * July.26.04:
  * - Issue #595: Forensic Playback Hardening.
- * - Issue #589: Performance Audit. Fixed type mismatch in forensic log routing and 
- *   ensured exhaustive sensor event handling.
- * - Issue #545c: Service Reactive Migration. Refactored to collect from standardized 
- *   SharedFlow event streams.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -61,13 +59,16 @@ class TrackerService : BaseMonitorService() {
     private var lastFgsUpdateRt = 0L
     private val FGS_TYPE_UPDATE_THROTTLE_MS = 10_000L
 
+    // Helper for low-churn formatting
+    private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
+
     override suspend fun onServiceInitialize() {
         notificationManager.setTrackerMode(true)
-        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
 
-        configManager.deviceId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
-        configManager.viewerId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
-        configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
+        configManager.deviceId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
+        configManager.viewerId = repository.getString(VIEWER_ID_KEY, SettingsRepository.DEFAULT_VIEWER_ID)
+        configManager.relayUrl = repository.getString(RELAY_URL_KEY, SettingsRepository.DEFAULT_RELAY_URL)
         configManager.isTrackerMode = true
         
         refreshCapabilitiesInternal()
@@ -89,12 +90,12 @@ class TrackerService : BaseMonitorService() {
         connectivitySuite.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
         
         // Ensure state is restored before starting high-frequency collectors
-        val savedMaxAcc = repository.getDouble(MainRepository.MAX_ACCURACY_KEY, 0.0)
-        val savedLastSitTs = repository.getLong(MainRepository.LAST_SIT_TS_KEY, 0L)
-        val savedBaseline = repository.getDouble(MainRepository.CHAIR_BASELINE_TILT_KEY, -1000.0)
+        val savedMaxAcc = repository.getDouble(MAX_ACCURACY_KEY, 0.0)
+        val savedLastSitTs = repository.getLong(LAST_SIT_TS_KEY, 0L)
+        val savedBaseline = repository.getDouble(CHAIR_BASELINE_TILT_KEY, -1000.0)
         val trackerState = repository.loadTrackerState()
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
-        val maxDist = repository.getDouble(MainRepository.MAX_DISTANCE_STORAGE_KEY, 60.0)
+        val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
         locationProcessor.loadState(savedMaxAcc, savedLastSitTs, savedBaseline, trackerState, homePoints, maxDist)
 
         val savedAlarms = repository.getLastAlarmsJson()
@@ -115,8 +116,8 @@ class TrackerService : BaseMonitorService() {
             launch { repository.maxDistanceFlow.collectLatest { dist -> locationProcessor.setMaxDistanceAuthority(dist) } }
         }
 
-        val recoveredTs = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
-        val recoveredDrift = repository.getLong(MainRepository.CLOCK_DRIFT_REF_KEY, 0L)
+        val recoveredTs = repository.getLong(LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        val recoveredDrift = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
         
         lastServiceTickTs = recoveredTs
         lastServiceTickRealtime = if (recoveredDrift != 0L) recoveredTs - recoveredDrift else timeProvider.elapsedRealtime()
@@ -202,13 +203,13 @@ class TrackerService : BaseMonitorService() {
                         )
                     }
                     is ProcessorEvent.MaxAccuracyChanged -> {
-                        repository.saveDoubleSync(MainRepository.MAX_ACCURACY_KEY, event.accuracy)
+                        repository.saveDoubleSync(MAX_ACCURACY_KEY, event.accuracy)
                     }
                     is ProcessorEvent.ChairBaselineChanged -> {
                         val proc = lastProcessedLocation
-                        logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", event.baseline)}°",
+                        logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°",
                             lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                        lifecycleScope.launch { repository.saveDouble(MainRepository.CHAIR_BASELINE_TILT_KEY, event.baseline) }
+                        lifecycleScope.launch { repository.saveDouble(CHAIR_BASELINE_TILT_KEY, event.baseline) }
                     }
                     is ProcessorEvent.GpsStallDetected -> {
                         if (systemMonitor.gpsStallStartTs == 0L) systemMonitor.gpsStallStartTs = event.rt
@@ -304,10 +305,10 @@ class TrackerService : BaseMonitorService() {
         if (!SignalingConstants.isValidViewerId(id)) return
         repository.updateRemoteActivity(timeProvider.currentTimeMillis())
 
-        if ((configManager.viewerId == MainRepository.DEFAULT_TRACKER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
+        if ((configManager.viewerId == SettingsRepository.DEFAULT_TRACKER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
             configManager.viewerId = id
             connectivitySuite.updateIdentity(configManager.deviceId, id, true)
-            lifecycleScope.launch { repository.saveString(MainRepository.VIEWER_ID_KEY, id) } 
+            lifecycleScope.launch { repository.saveString(VIEWER_ID_KEY, id) } 
         }
         if (sessionManager.onViewerPulse(id, timeProvider.currentTimeMillis(), true)) { 
             logManager.logServiceEvent("Viewer connected: $id")
@@ -408,7 +409,7 @@ class TrackerService : BaseMonitorService() {
                 val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
                 if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
                     val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY AUDIT (T): Reliability ${String.format(Locale.getDefault(), "%.1f", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                    logManager.logServiceEvent("STABILITY AUDIT (T): Reliability ${reliability.roundToOneDecimal()}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                 }
                 stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
             }
@@ -474,7 +475,7 @@ class TrackerService : BaseMonitorService() {
         }
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
-        repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, now)
+        repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, now)
         serviceTickCounter++
     }
 

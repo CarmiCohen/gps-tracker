@@ -21,6 +21,7 @@ const val LATENCY_THRESHOLD_GPS_PROCESS_MS = 50L
 const val LATENCY_THRESHOLD_SENSOR_PROCESS_MS = 20L
 const val LATENCY_THRESHOLD_DB_WRITE_MS = 500L
 const val LATENCY_THRESHOLD_JNI_MS = 50L
+const val LOG_LATENCY_THRESHOLD_MS = 500L
 
 // Physics & Motion Limits
 const val MAX_PHYSICAL_SPEED_MPS = 33.33 // 120 km/h
@@ -259,6 +260,7 @@ const val RIBBON_SIT_TILT_SCALE_DEG = 15.0
 const val RIBBON_SIT_BARO_SCALE_METERS = 2.0
 
 const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
+const val MAX_BACKFILL_POINTS = 1000
 
 // Network Communication (v8.8.21)
 const val MAX_ALLOWED_RTT_MS = 5000
@@ -381,3 +383,12 @@ const val MARKER_POOL_PRUNE_THRESHOLD = 50
 const val LOG_MUZZLE_STARTUP_MS = 60000L
 
 const val FORENSIC_PINK_COLOR = 0xFFFF00FF.toInt()
+
+// Maintenance Recovery (Issue #108)
+const val MAINTENANCE_WORK_NAME = "GPS_Maintenance"
+const val RECOVERY_THRESHOLD_MS = 180000L
+const val RECOVERY_GRACE_PERIOD_MS = 60000L
+
+// Audio Synthesizer Parameters
+const val SIREN_SAMPLE_RATE = 44100
+const val SIREN_FADE_IN_DURATION_MS = 1000L

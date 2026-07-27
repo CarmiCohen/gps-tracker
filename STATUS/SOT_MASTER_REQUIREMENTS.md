@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.26.04 (Forensic & Performance Audit)
+# System Source of Truth (SoT) - July.27.00 (Architecture Consolidation)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -25,22 +25,26 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Pipeline Serialization Hardening (R560)**: The signaling pipeline MUST utilize pre-allocated buffers and reusable Protobuf builders. (Issue #560, #560b, July.25.03)
 *   **Priority-Aware Signaling (R560c)**: The signaling pipeline MUST utilize a Dual-Queue Priority Dispatcher. (Issue #560c, July.25.08)
 
-### 2. Temporal & Forensic Integrity
+### 2. Architectural Integrity & Centralization
+*   **Consolidated Constants (R597)**: All engine-specific thresholds, tuning parameters, and system-wide default values MUST be centralized in `core:engine:EngineConstants.kt`. (Issue #597, July.27.00)
+*   **Preference Key Authority (R597b)**: All `DataStore` and `SharedPreferences` keys MUST be defined in `app:PreferenceKeys.kt`. Redundant aliases in Repositories or Services are STRICTLY PROHIBITED to ensure a single source of truth for persistence. (Issue #597, July.27.00)
+
+### 3. Temporal & Forensic Integrity
 *   **Temporal Forensic Integrity (R102)**: Logic MUST use monotonic `rt` for calculations, while forensic logs use wall-clock `ts`. (Issue #102)
 *   **Forensic Parity Authority (R118)**: Strict field parity MUST be maintained across engine, persistence, telemetry, and UI layers. (Issue #118, #122, #525)
 *   **Strict Forensic Reconstruction (R595)**: The Analytical Ribbon UI MUST provide a "Strict Mode" that validates packet sequence continuity and clock-drift corrections. Hidden gaps and drift anomalies MUST be visually highlighted to ensure data integrity during historical playback. (Issue #595, July.26.04)
 *   **Direct Binary Flow (R541)**: Telemetry MUST prioritize the raw Protobuf binary path. (Issue #541, July.24.05)
 
-### 3. Persistence & Service Reliability
+### 4. Persistence & Service Reliability
 *   **Activation Authority**: `isSystemActive` flag in DataStore is the definitive authority for lifecycle revival.
 *   **Siren Persistence (R527)**: Active alarm states MUST be persisted and restored upon revival. (Issue #527)
 *   **Boot Redundancy Hardening (R539b)**: `BootReceiver` MUST update `APP_START_TIME_KEY` immediately. (July.24.05)
 
-### 4. Architectural Baselines
+### 5. Architectural Baselines
 *   **Anchor Logic Authority (R990e)**: `AnchorEvaluator` is the central authority for stationary state. (Issue #533b)
 *   **Map Overlay Management (R544b)**: OsmDroid object lifecycles MUST be managed by `MapOverlayManager`. (Issue #544, July.24.08)
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
-### 5. Version Authority
-*   **Current Release**: July.26.04.
+### 6. Version Authority
+*   **Current Release**: July.27.00.
 *   **Source of Truth**: app/build.gradle versionName.

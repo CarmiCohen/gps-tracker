@@ -16,13 +16,10 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * July.27.00:
+ * - Architecture Audit: Centralized PreferenceKeys and removed redundant aliases.
  * July.26.04:
- * - Issue #595: Forensic Playback Hardening. Updated history mapping to include 
- *   'rt' (monotonic time) for strict forensic auditing.
- * July.26.03:
- * - Issue #585: Forensic I/O Optimization. Decoupled DB pruning from insertion 
- *   hot-paths. Implemented asynchronous, throttled pruning for history, trails, 
- *   and violations to prevent DB latency spikes on low-end hardware.
+ * - Issue #595: Forensic Playback Hardening.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -56,67 +53,13 @@ class MainRepository @Inject constructor(
     private val isPruningActive = AtomicBoolean(false)
 
     companion object {
-        const val APP_MODE_KEY = SettingsRepository.APP_MODE_KEY
-        const val TRACKER_ID_KEY = SettingsRepository.TRACKER_ID_KEY
-        const val VIEWER_ID_KEY = SettingsRepository.VIEWER_ID_KEY
-        const val RELAY_URL_KEY = SettingsRepository.RELAY_URL_KEY
         const val DEFAULT_RELAY_URL = SettingsRepository.DEFAULT_RELAY_URL
         const val DEFAULT_TRACKER_ID = SettingsRepository.DEFAULT_TRACKER_ID
         const val DEFAULT_VIEWER_ID = SettingsRepository.DEFAULT_VIEWER_ID
-        const val MAX_DISTANCE_STORAGE_KEY = SettingsRepository.MAX_DISTANCE_STORAGE_KEY
         const val DEFAULT_MAX_DISTANCE = SettingsRepository.DEFAULT_MAX_DISTANCE
-        const val MAX_ACCURACY_KEY = SettingsRepository.MAX_ACCURACY_KEY
-        const val MAX_TEMP_KEY = SettingsRepository.MAX_TEMP_KEY
-        const val LAST_ALARM_ACK_TS_KEY = SettingsRepository.LAST_ALARM_ACK_TS_KEY
-        const val HOME_POINTS_TS_KEY = SettingsRepository.HOME_POINTS_TS_KEY
-        const val IS_MANUAL_EXIT_KEY = SettingsRepository.IS_MANUAL_EXIT_KEY
-        const val APP_START_TIME_KEY = SettingsRepository.APP_START_TIME_KEY
-        
-        const val TOTAL_CONNECTED_KEY = SettingsRepository.TOTAL_CONNECTED_KEY
-        const val UPTIME_KEY = SettingsRepository.UPTIME_KEY
-        const val LAST_CONNECTION_TS_KEY = SettingsRepository.LAST_CONNECTION_TS_KEY
-        const val LAST_DISCONNECTION_TS_KEY = SettingsRepository.LAST_DISCONNECTION_TS_KEY
-        const val TOTAL_DROP_KEY = SettingsRepository.TOTAL_DROP_KEY
-        const val MAX_DROP_KEY = SettingsRepository.MAX_DROP_KEY
-        const val MAX_DROP_TS_KEY = SettingsRepository.MAX_DROP_TS_KEY
-        const val LAST_GPS_TS_KEY = SettingsRepository.LAST_GPS_TS_KEY
-        const val VIOLATION_UPTIME_MS_KEY = SettingsRepository.VIOLATION_UPTIME_MS_KEY
-
-        const val TRACKER_LUX_BASELINE_KEY = SettingsRepository.TRACKER_LUX_BASELINE_KEY
-        const val TRACKER_ACOUSTIC_FLOOR_KEY = SettingsRepository.TRACKER_ACOUSTIC_FLOOR_KEY
-        
-        const val SELECTED_SIREN_KEY = SettingsRepository.SELECTED_SIREN_KEY
-        const val LAST_SERVICE_TICK_TS_KEY = SettingsRepository.LAST_SERVICE_TICK_TS_KEY
-        const val LAST_SERVICE_TICK_REALTIME_KEY = SettingsRepository.LAST_SERVICE_TICK_REALTIME_KEY
-        const val LAST_AUTO_SAVE_HOUR_KEY = SettingsRepository.LAST_AUTO_SAVE_HOUR_KEY
-        
-        const val LAST_DAILY_ARCHIVE_DATE_KEY =SettingsRepository.LAST_DAILY_ARCHIVE_DATE_KEY
-        const val LAST_DAILY_CLEANUP_DATE_KEY = SettingsRepository.LAST_DAILY_CLEANUP_DATE_KEY
-
-        const val DRAFT_TRACKER_ID = SettingsRepository.DRAFT_TRACKER_ID
-        const val DRAFT_VIEWER_ID = SettingsRepository.DRAFT_VIEWER_ID
-        const val DRAFT_RELAY_URL = SettingsRepository.DRAFT_RELAY_URL
-        const val DRAFT_MAX_DISTANCE = SettingsRepository.DRAFT_MAX_DISTANCE
-
-        const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = SettingsRepository.IS_XIAOMI_MANUAL_OVERRIDE_KEY
-        const val IS_SYSTEM_ACTIVE_KEY = SettingsRepository.IS_SYSTEM_ACTIVE_KEY
-        
-        const val IDENTITY_SANITIZED_KEY = SettingsRepository.IDENTITY_SANITIZED_KEY
-        const val CLOCK_DRIFT_REF_KEY = SettingsRepository.CLOCK_DRIFT_REF_KEY
-        
-        const val LAST_SIT_TS_KEY = SettingsRepository.LAST_SIT_TS_KEY
-        const val CHAIR_BASELINE_TILT_KEY = SettingsRepository.CHAIR_BASELINE_TILT_KEY
-        const val LAST_HISTORY_SIT_TS_KEY = SettingsRepository.LAST_HISTORY_SIT_TS_KEY
-        
-        const val LAST_ALARMS_JSON_KEY = SettingsRepository.LAST_ALARMS_JSON_KEY
-
-        private const val HISTORY_BATCH_WRITE_INTERVAL_MS = 5000L
-        private const val HISTORY_BUFFER_MAX_SIZE = 100
         
         private const val DB_PRUNE_THRESHOLD_HISTORY = 500
         private const val DB_PRUNE_THRESHOLD_TRAIL = 100
-        
-        private const val DB_LATENCY_THRESHOLD_MS = 500L
     }
 
     val isRelayConnected = telemetry.isRelayConnected
@@ -280,7 +223,7 @@ class MainRepository @Inject constructor(
         scope.launch {
             LatencyMonitor.measure(
                 timeProvider = timeProvider,
-                thresholdMs = DB_LATENCY_THRESHOLD_MS,
+                thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
                 onSpike = { duration -> logLatencySpike("Trail Write", duration) }
             ) {
                 val wallTs = timestamp ?: timeProvider.currentTimeMillis()
@@ -325,7 +268,7 @@ class MainRepository @Inject constructor(
         scope.launch { 
             LatencyMonitor.measure(
                 timeProvider = timeProvider,
-                thresholdMs = DB_LATENCY_THRESHOLD_MS,
+                thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
                 onSpike = { duration -> logLatencySpike("Violation Write", duration) }
             ) {
                 violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
@@ -439,7 +382,7 @@ class MainRepository @Inject constructor(
             lastBatchWriteRealtime = nowRt
             LatencyMonitor.measure(
                 timeProvider = timeProvider,
-                thresholdMs = DB_LATENCY_THRESHOLD_MS,
+                thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
                 onSpike = { duration -> logLatencySpike("History Batch Write (${dbPoints.size} pts)", duration) }
             ) {
                 database.withTransaction {
@@ -462,7 +405,7 @@ class MainRepository @Inject constructor(
             try {
                 LatencyMonitor.measure(
                     timeProvider = timeProvider,
-                    thresholdMs = DB_LATENCY_THRESHOLD_MS * 4, 
+                    thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS * 4,
                     onSpike = { duration -> logLatencySpike("Background Pruning", duration) }
                 ) {
                     database.withTransaction {

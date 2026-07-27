@@ -17,8 +17,6 @@ class TelemetryAggregator {
     private val accumulators = mutableMapOf<String, MutableAggregationPoint>()
     
     companion object {
-        private const val MAX_BACKFILL_POINTS = 1000
-
         private fun getReasonPriority(reason: LocationPendingReason): Int {
             return when (reason) {
                 LocationPendingReason.NONE -> 0

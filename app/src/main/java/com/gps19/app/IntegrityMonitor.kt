@@ -32,11 +32,10 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized PreferenceKeys.
  * July.26.03:
- * - Issue #545c: Flow Architecture Standardization. Replaced legacy Listener 
- *   with a SharedFlow (integrityEvents) for reactive status dispatching.
- * July.22.04:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
+ * - Issue #545c: Flow Architecture Standardization.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -97,7 +96,7 @@ class IntegrityMonitor @Inject constructor(
             var maxTemp = workingHealth.maxTemp
             if (batteryTemp > maxTemp) {
                 maxTemp = batteryTemp
-                repository.saveDoubleSync(MainRepository.MAX_TEMP_KEY, maxTemp)
+                repository.saveDoubleSync(MAX_TEMP_KEY, maxTemp)
             }
 
             var isCooling = workingHealth.isCoolingModeActive

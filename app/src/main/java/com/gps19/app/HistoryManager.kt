@@ -26,11 +26,10 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized PreferenceKeys.
  * July.26.04:
- * - Issue #595: Forensic Playback Hardening. Updated mapToAppPoint to include 'rt' 
- *   (monotonic time) for forensic clock-drift auditing in UI ribbons.
- * - Issue #589: Performance Audit. Integrated LatencyMonitor into high-frequency 
- *   ribbon processing and DB write paths to detect I/O contention.
+ * - Issue #595: Forensic Playback Hardening.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -67,11 +66,11 @@ class HistoryManager @Inject constructor(
         this.scope = scope
         
         withContext(Dispatchers.IO) {
-            val lastSitTs = repository.getLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, 0L)
+            val lastSitTs = repository.getLong(LAST_HISTORY_SIT_TS_KEY, 0L)
             if (lastSitTs > 0) {
                  lastSitDetectedRt = timeProvider.elapsedRealtime() - (timeProvider.currentTimeMillis() - lastSitTs)
             }
-            clockDriftRef = repository.getLong(MainRepository.CLOCK_DRIFT_REF_KEY, 0L)
+            clockDriftRef = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
         }
     }
 
@@ -351,7 +350,7 @@ class HistoryManager @Inject constructor(
         
         if (clockDriftRef == 0L) {
             clockDriftRef = currentDrift
-            scope?.launch { repository.saveLong(MainRepository.CLOCK_DRIFT_REF_KEY, currentDrift) }
+            scope?.launch { repository.saveLong(CLOCK_DRIFT_REF_KEY, currentDrift) }
             return
         }
         
@@ -361,7 +360,7 @@ class HistoryManager @Inject constructor(
             val direction = if (currentDrift > clockDriftRef) "forward" else "backward"
             _historyEvents.tryEmit(HistoryEvent.LogEvent("FORENSIC ALERT: System clock jump detected ($direction ${jumpSec}s). Monotonic uptime preserved.", true))
             clockDriftRef = currentDrift
-            scope?.launch { repository.saveLong(MainRepository.CLOCK_DRIFT_REF_KEY, currentDrift) }
+            scope?.launch { repository.saveLong(CLOCK_DRIFT_REF_KEY, currentDrift) }
         }
     }
 
@@ -372,7 +371,7 @@ class HistoryManager @Inject constructor(
         }
         lastSitDetectedRt = rt
         scope?.launch {
-            repository.saveLong(MainRepository.LAST_HISTORY_SIT_TS_KEY, ts)
+            repository.saveLong(LAST_HISTORY_SIT_TS_KEY, ts)
         }
         return true
     }
@@ -418,10 +417,10 @@ class HistoryManager @Inject constructor(
     private fun handleHourlyAutoSave(hour: Int) {
         scope?.launch {
             if (lastProcessedHour != hour) {
-                val repoHour = repository.getInt("last_auto_save_hour", -1)
+                val repoHour = repository.getInt(LAST_AUTO_SAVE_HOUR_KEY, -1)
                 if (repoHour != hour) {
                     lastProcessedHour = hour
-                    repository.saveIntSync("last_auto_save_hour", hour)
+                    repository.saveIntSync(LAST_AUTO_SAVE_HOUR_KEY, hour)
                     
                     if (hourlyBackfillTotal > 0) {
                         _historyEvents.tryEmit(HistoryEvent.LogEvent("Forensic: Hourly Continuity Audit - Backfilled $hourlyBackfillTotal points to maintain 1Hz fidelity during power-save ticks.", false))
@@ -445,9 +444,9 @@ class HistoryManager @Inject constructor(
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                 val todayDate = dateFormat.format(calendar.time)
                 if (lastCleanupDate != todayDate) {
-                    if (repository.getString("last_daily_cleanup_date", "") != todayDate) {
+                    if (repository.getString(LAST_DAILY_CLEANUP_DATE_KEY, "") != todayDate) {
                         lastCleanupDate = todayDate
-                        repository.saveStringSync("last_daily_cleanup_date", todayDate)
+                        repository.saveStringSync(LAST_DAILY_CLEANUP_DATE_KEY, todayDate)
                         _historyEvents.tryEmit(HistoryEvent.LogEvent("Periodic daily cleanup of trails", true))
                         repository.clearTrails()
                     } else {
@@ -464,9 +463,9 @@ class HistoryManager @Inject constructor(
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                 val todayDate = dateFormat.format(calendar.time)
                 if (lastArchiveDate != todayDate) {
-                    if (repository.getString("last_daily_archive_date", "") != todayDate) {
+                    if (repository.getString(LAST_DAILY_ARCHIVE_DATE_KEY, "") != todayDate) {
                         lastArchiveDate = todayDate
-                        repository.saveStringSync("last_daily_archive_date", todayDate)
+                        repository.saveStringSync(LAST_DAILY_ARCHIVE_DATE_KEY, todayDate)
                         _historyEvents.tryEmit(HistoryEvent.LogEvent("Periodic daily archiving of old files", true))
                         scope?.launch(Dispatchers.IO) {
                             MainFileHelper.performDailyArchiving(context, timeProvider)

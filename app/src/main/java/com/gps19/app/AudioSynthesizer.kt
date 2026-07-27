@@ -9,9 +9,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
-import com.gps19.core.engine.SIREN_AUTO_STOP_MS
-import com.gps19.core.engine.SIREN_RESUME_COOLDOWN_MS
-import com.gps19.core.engine.TimeProvider
+import com.gps19.core.engine.*
 import kotlinx.coroutines.*
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
@@ -19,7 +17,6 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.math.exp
-import kotlin.math.min
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
@@ -31,8 +28,6 @@ import kotlin.math.min
  *   parameter naming to 'nowRt'.
  */
 object AudioSynthesizer {
-    private const val SAMPLE_RATE = 44100
-    private const val FADE_IN_DURATION_MS = 1000L
     private val isLooping = AtomicBoolean(false)
     private val isForced = AtomicBoolean(false)
     private val silencedUntilRt = AtomicLong(0)
@@ -111,9 +106,9 @@ object AudioSynthesizer {
                         break
                     }
 
-                    // Calculate fade-in factor (0.0 to 1.0 over 1s)
-                    val fadeInFactor = if (elapsed < FADE_IN_DURATION_MS) {
-                        elapsed.toFloat() / FADE_IN_DURATION_MS
+                    // Calculate fade-in factor (0.0 to 1.0 over fade-in duration)
+                    val fadeInFactor = if (elapsed < SIREN_FADE_IN_DURATION_MS) {
+                        elapsed.toFloat() / SIREN_FADE_IN_DURATION_MS
                     } else 1.0f
                     
                     val effectiveVolume = volume * fadeInFactor
@@ -157,11 +152,11 @@ object AudioSynthesizer {
 
     private suspend fun playSirenCycle(volume: Float, overrideSilence: Boolean, timeProvider: TimeProvider): Long {
         val cycleDuration = 2.0 
-        val numSamples = (SAMPLE_RATE * cycleDuration).toInt()
+        val numSamples = (SIREN_SAMPLE_RATE * cycleDuration).toInt()
         val samples = ShortArray(numSamples)
         for (i in 0 until numSamples) {
             if (!currentCoroutineContext().isActive) return 0L
-            val t = i.toDouble() / SAMPLE_RATE
+            val t = i.toDouble() / SIREN_SAMPLE_RATE
             val progress = (i.toDouble() / numSamples)
             val modulation = sin(2.0 * PI * progress - PI/2) * 0.5 + 0.5 
             val freq = 600.0 + (modulation * 800.0)
@@ -232,7 +227,7 @@ object AudioSynthesizer {
                     .build())
                 .setAudioFormat(AudioFormat.Builder()
                     .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setSampleRate(SAMPLE_RATE)
+                    .setSampleRate(SIREN_SAMPLE_RATE)
                     .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                     .build())
                 .setBufferSizeInBytes(samples.size * 2)
@@ -242,7 +237,7 @@ object AudioSynthesizer {
             audioTrack.write(samples, 0, samples.size)
             audioTrack.play()
             
-            val durationMs = (samples.size.toDouble() / SAMPLE_RATE * 1000).toLong()
+            val durationMs = (samples.size.toDouble() / SIREN_SAMPLE_RATE * 1000).toLong()
             val startRt = timeProvider.elapsedRealtime()
             while (isActive && timeProvider.elapsedRealtime() - startRt < durationMs) {
                 delay(50)
@@ -261,10 +256,10 @@ object AudioSynthesizer {
 
     private suspend fun playNote(frequency: Double, duration: Double, decay: Boolean, ignoreLooping: Boolean, volume: Float, overrideSilence: Boolean, timeProvider: TimeProvider? = null) = withContext(Dispatchers.Default) {
         if (!ignoreLooping && !isActive) return@withContext
-        val count = (SAMPLE_RATE * duration).toInt()
+        val count = (SIREN_SAMPLE_RATE * duration).toInt()
         val samples = ShortArray(count)
         for (i in 0 until count) {
-            val t = i.toDouble() / SAMPLE_RATE
+            val t = i.toDouble() / SIREN_SAMPLE_RATE
             var amplitude = 0.8 * volume
             if (decay) amplitude *= exp(-5.0 * t / duration)
             samples[i] = (sin(2.0 * PI * frequency * t) * amplitude * Short.MAX_VALUE).toInt().toShort()
@@ -279,7 +274,7 @@ object AudioSynthesizer {
                     .build())
                 .setAudioFormat(AudioFormat.Builder()
                     .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setSampleRate(SAMPLE_RATE)
+                    .setSampleRate(SIREN_SAMPLE_RATE)
                     .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                     .build())
                 .setBufferSizeInBytes(count * 2)

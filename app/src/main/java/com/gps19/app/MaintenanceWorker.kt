@@ -17,11 +17,10 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized PreferenceKeys and EngineConstants.
  * July.24.04:
- * - Issue #539: Background Start Hardening. Implemented setForeground() during 
- *   recovery to ensure API 34+ compliance for background-to-foreground transitions.
- * July.22.07:
- * - Issue #108: Startup Recovery Race Hardening.
+ * - Issue #539: Background Start Hardening.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -35,17 +34,13 @@ class MaintenanceWorker @AssistedInject constructor(
     private val cachedPkgName = applicationContext.packageName
 
     companion object {
-        private const val WORK_NAME = "GPS_Maintenance"
-        private const val RECOVERY_THRESHOLD_MS = 180000L // 3 minutes
-        private const val RECOVERY_GRACE_PERIOD_MS = 60000L // 1 minute startup protection
-
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<MaintenanceWorker>(15, TimeUnit.MINUTES)
                 .setBackoffCriteria(BackoffPolicy.LINEAR, 1, TimeUnit.MINUTES)
                 .build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                WORK_NAME,
+                MAINTENANCE_WORK_NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
                 request
             )
@@ -62,11 +57,11 @@ class MaintenanceWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         val savedMode = repository.getAppMode()
-        val isSystemActive = repository.isSystemActiveFlow.firstOrNull() ?: repository.getBoolean(MainRepository.IS_SYSTEM_ACTIVE_KEY, false)
+        val isSystemActive = repository.isSystemActiveFlow.firstOrNull() ?: repository.getBoolean(IS_SYSTEM_ACTIVE_KEY, false)
         
         val now = timeProvider.currentTimeMillis()
-        val lastTick = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, 0L)
-        val appStartTime = repository.getLong(MainRepository.APP_START_TIME_KEY, 0L)
+        val lastTick = repository.getLong(LAST_SERVICE_TICK_TS_KEY, 0L)
+        val appStartTime = repository.getLong(APP_START_TIME_KEY, 0L)
         
         val silenceDurationMs = now - lastTick
         val appUptimeMs = now - appStartTime

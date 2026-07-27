@@ -1,28 +1,24 @@
-# Handover (July.26.04) - Forensic & Performance Audit [READY]
+# Handover (July.27.00) - Architecture Consolidation [READY]
 
 ## 🎯 Completed Objective
-Cycle **July.26.04** achieved **431 Resolved Issues** by completing the performance audit and implementing a "Strict Mode" for forensic reconstruction. The engine now self-audits processing latency, and the UI provides authoritative validation of historical telemetry sequence continuity and clock-drift corrections.
+Cycle **July.27.00** achieved **432 Resolved Issues** by centralizing all system-wide thresholds, tuning parameters, and persistence keys. This architectural clean-up eliminated significant code churn and technical debt, ensuring a single source of truth (SoT) for engine logic and DataStore management.
 
 ## 📊 Status Tracker
-- **Issue #595: Forensic Playback Hardening**: 🟢 Resolved.
-    - Implemented "Strict Mode" in `SharedUiComponents.kt` to highlight sequence gaps (Red) and clock-drift anomalies (Yellow).
-    - Updated `Database.kt` to version 60, persisting monotonic `rt` for historical auditing.
-    - Synchronized `HistoryManager.kt` and `MainRepository.kt` to flow `rt` telemetry through the pipeline.
-- **Issue #589: Latency Monitoring & Performance Audit**: 🟢 Resolved.
-    - Integrated `LatencyMonitor` in `LocationProcessor.kt`, `MainAlarmLogic.kt`, and `AppSensorManager.kt`.
-    - Standardized thresholds in `EngineConstants.kt`.
-    - Fixed exhaustive `when` branches in `TrackerService.kt` for reactive sensor event routing.
-- **Issue #588: Architecture Simplification**: 🟢 Resolved.
+- **Issue #597: Constants & Preferences Centralization**: 🟢 Resolved.
+    - Centralized all engine thresholds (I/O latency, maintenance grace periods, audio sample rates) into `core:engine:EngineConstants.kt`.
+    - Created `app:PreferenceKeys.kt` to house all `DataStore` and `SharedPreferences` keys.
+    - Purged over 40 redundant constant aliases and pass-through definitions in `MainRepository.kt` and `SettingsRepository.kt`.
+    - Refactored `MaintenanceWorker.kt` and `AudioSynthesizer.kt` to consume centralized thresholds.
+    - Updated `LogRepository.kt` to use engine-wide latency and pruning constants.
 
 ## 🔍 Comprehensive Forensic Status
-- **Strict Mode Validation (R595)**: The Analytical Ribbons now detect and visualize "Hidden Gaps" (delta-ts > expected interval) and clock-drift shifts (> 2s), ensuring data integrity during forensic playback.
-- **Performance Visibility (R589)**: The engine reports logic or I/O spikes via forensic logs, providing real-time visibility into main-thread contention on budget hardware (Samsung A15).
-- **Temporal Integrity**: Monotonic `rt` is now the single source of truth for logic, while wall-clock `ts` is used strictly for forensic display and sequence validation.
+- **Architecture Integrity (R597)**: The codebase now adheres to a strict centralization policy. Functional classes no longer define their own "magic numbers" or tuning thresholds, facilitating easier global optimization.
+- **Persistence SoT**: Repositories no longer duplicate preference keys, eliminating the risk of key-name desynchronization during refactors.
+- **Version Authority**: `July.27.00` finalized in `app/build.gradle`.
 
 ## 📊 State Authority & SOT Alignment
-- **Requirement R595**: Added to `SOT_MASTER_REQUIREMENTS.md` as the authority for strict forensic reconstruction.
-- **Version Authority**: `July.26.04` finalized in `app/build.gradle`.
-- **Issues.md**: Total resolved issues count incremented to 431.
+- **Requirements R597/R597b**: Added to `SOT_MASTER_REQUIREMENTS.md` as the authority for centralized constants and preference keys.
+- **Issues.md**: Total resolved issues count incremented to 432.
 
 ## ⚠️ Newly Identified Risks & Concerns
 - *(None identified in this cycle)*

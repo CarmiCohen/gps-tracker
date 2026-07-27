@@ -13,6 +13,8 @@ import java.util.UUID
 import kotlin.math.abs
 import com.gps19.core.engine.TimeProvider
 import com.gps19.core.engine.LatencyMonitor
+import com.gps19.core.engine.DB_PRUNE_THRESHOLD
+import com.gps19.core.engine.LOG_LATENCY_THRESHOLD_MS
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,11 +34,6 @@ class LogRepository @Inject constructor(
 ) {
     private val logMutex = Mutex()
     private var logWriteCount = 0
-
-    companion object {
-        private const val DB_PRUNE_THRESHOLD = 50
-        private const val LOG_LATENCY_THRESHOLD_MS = 500L
-    }
 
     val eventLogsFlow: Flow<List<LogEntry>> = logDao.getAllLogs().map { entities ->
         entities.map { 

@@ -32,12 +32,8 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
- * July.26.04:
- * - Issue #545c: Flow Architecture Standardization. Replaced legacy PeerListener 
- *   with a SharedFlow (connectivityEvents) for reactive signaling.
- * July.26.03:
- * - Issue #545c: Flow Architecture Standardization. Migrated from legacy 
- *   RemoteUpdateListener to reactive signalingFlow collection.
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized PreferenceKeys and fixed parameter naming.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -254,9 +250,9 @@ class ConnectivitySuite @Inject constructor(
 
     private suspend fun performKeepAlive() = withContext(Dispatchers.IO) {
         val latestMode = settingsRepository.getAppMode() ?: (if (isTrackerMode) "tracker" else "viewer")
-        val latestDeviceId = settingsRepository.getString(SettingsRepository.TRACKER_ID_KEY, deviceId)
-        val latestViewerId = settingsRepository.getString(SettingsRepository.VIEWER_ID_KEY, viewerId)
-        val latestRelayUrl = settingsRepository.getString(SettingsRepository.RELAY_URL_KEY, relayUrl)
+        val latestDeviceId = settingsRepository.getString(TRACKER_ID_KEY, deviceId)
+        val latestViewerId = settingsRepository.getString(VIEWER_ID_KEY, viewerId)
+        val latestRelayUrl = settingsRepository.getString(RELAY_URL_KEY, relayUrl)
         val latestIsTracker = latestMode == "tracker"
 
         if (latestDeviceId != deviceId || latestViewerId != viewerId || latestRelayUrl != relayUrl || latestIsTracker != isTrackerMode) {
@@ -419,8 +415,7 @@ class ConnectivitySuite @Inject constructor(
         deviceId: String, viewerId: String, isTrackerMode: Boolean, loc: android.location.Location?, filtered: EngineGeoPoint?,
         distToTracker: Double?, distToHome: Double?, maxAccuracy: Double, filteredSpeed: Double,
         vibration: Double, heading: Double, baroAlt: Double, lux: Double, isNear: Boolean,
-        tiltDegrees: Double, acousticDb: Double, jumpTier: Int,
-        isJammer: Boolean, isStalled: Boolean, peakShock: Double, peakShockTs: Long,
+        tiltDegrees: Double, acousticDb: Double, peakShock: Double, peakShockTs: Long,
         luxBaseline: Double, acousticFloorDb: Double, adaptiveVibrationFloor: Double, proxIdx: Double, proximityCm: Double,
         proximityDebounceMs: Long, vibrationRollingSum: Double, micPending: Boolean,
         isTamperDetected: Boolean, isPowerTamper: Boolean,
@@ -430,7 +425,7 @@ class ConnectivitySuite @Inject constructor(
         isClockRegression: Boolean, isLocationPending: Boolean, locationPendingReason: LocationPendingReason,
         lastValidFixRt: Long, gnssDetail: GnssDetail?,
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
-        batteryLevel: Int, batteryTemp: Double, isCharging: Boolean,
+        batteryLevel: Int, temp: Double, isCharging: Boolean,
         trackerState: TrackerState = TrackerState.UNKNOWN,
         status: SentinelStatus = SentinelStatus.VALID,
         isStorageLow: Boolean = false,
@@ -452,8 +447,7 @@ class ConnectivitySuite @Inject constructor(
             alt = loc?.altitude ?: 0.0, accuracy = loc?.accuracy?.toDouble() ?: 0.0,
             maxAccuracy = maxAccuracy, speed = filteredSpeed, bearing = loc?.bearing?.toDouble() ?: 0.0,
             vibration = vibration, heading = heading, baroAlt = baroAlt, lux = lux, isNear = isNear,
-            tiltDegrees = tiltDegrees, acousticDb = acousticDb, jumpTier = jumpTier, isJammer = isJammer,
-            isStalled = isStalled, peakVibrationShock = peakShock, peakVibrationShockTs = peakShockTs,
+            tiltDegrees = tiltDegrees, acousticDb = acousticDb, peakVibrationShock = peakShock, peakVibrationShockTs = peakShockTs,
             luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb, adaptiveVibrationFloor = adaptiveVibrationFloor,
             proxIdx = proxIdx, proximityCm = proximityCm, proximityDebounceMs = proximityDebounceMs,
             vibrationRollingSum = vibrationRollingSum, isTamperDetected = isTamperDetected, isPowerTamper = isPowerTamper,
@@ -461,7 +455,7 @@ class ConnectivitySuite @Inject constructor(
             isClockRegression = isClockRegression, isLocationPending = isLocationPending,
             locationPendingReason = locationPendingReason, lastValidFixRt = lastValidFixRt,
             isBatterySteepDischarge = isBatterySteepDischarge, isCoolingModeActive = isCoolingModeActive,
-            gnssDetail = gnssDetail, battery = batteryLevel, temp = batteryTemp, isCharging = isCharging,
+            gnssDetail = gnssDetail, battery = batteryLevel, temp = temp, isCharging = isCharging,
             trackerState = trackerState,
             isStorageLow = isStorageLow, isStorageCritical = isStorageCritical,
             isPowerSaveMode = isPowerSaveMode, standbyBucket = standbyBucket, netInterface = netInterface,
@@ -734,14 +728,12 @@ class ConnectivitySuite @Inject constructor(
                 scope.launch {
                     mainRepository.updateLocation(LocationUpdate(
                         lat = updatedStatus.lat, lng = updatedStatus.lng, speed = updatedStatus.speed, accuracy = updatedStatus.accuracy, bearing = updatedStatus.bearing,
-                        battery = updatedStatus.battery, temp = updatedStatus.temp, maxTemp = updatedStatus.maxTemp, isCharging = updatedStatus.isCharging, currentMa = updatedStatus.currentMa,
+                        battery = updatedStatus.battery, temp = updatedStatus.temp, isCharging = updatedStatus.isCharging,
                         gpsTs = updatedStatus.gpsTs, isMe = false, satsView = updatedStatus.satsView, satsUsed = updatedStatus.satsUsed, 
-                        status = updatedStatus.status, isTamperDetected = updatedStatus.isTamperDetected, isPowerTamper = updatedStatus.isPowerTamper,
+                        status = updatedStatus.status, 
                         isClockRegression = updatedStatus.isClockRegression, isLocationPending = updatedStatus.isLocationPending, 
                         locationPendingReason = updatedStatus.locationPendingReason, lastValidFixRt = updatedStatus.lastValidFixRt, 
-                        isPowerSaveMode = updatedStatus.isPowerSaveMode, standbyBucket = updatedStatus.standbyBucket,
-                        netInterface = updatedStatus.netInterface, isStorageLow = updatedStatus.isStorageLow, isStorageCritical = updatedStatus.isStorageCritical,
-                        gnssDetail = updatedStatus.gnssDetail, isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge, isCoolingModeActive = updatedStatus.isCoolingModeActive,
+                        isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge, isCoolingModeActive = updatedStatus.isCoolingModeActive,
                         trackerState = updatedStatus.trackerState, ts = now, 
                         snrIdx = updatedStatus.snrIdx, noiseIdx = updatedStatus.noiseIdx, luxIdx = updatedStatus.luxIdx, vibeIdx = updatedStatus.vibeIdx, liftIdx = updatedStatus.liftIdx,
                         tiltIdx = updatedStatus.tiltIdx, baroIdx = updatedStatus.baroIdx,
@@ -765,8 +757,8 @@ class ConnectivitySuite @Inject constructor(
     fun resetPeerStats() {
         remoteStatusRepository.reset()
         trackerGpsStallStartTs = 0L
-        mainRepository.saveDoubleSync(MainRepository.TRACKER_LUX_BASELINE_KEY, 0.0)
-        mainRepository.saveDoubleSync(MainRepository.TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
+        mainRepository.saveDoubleSync(TRACKER_LUX_BASELINE_KEY, 0.0)
+        mainRepository.saveDoubleSync(TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
     }
 
     fun stop() { 

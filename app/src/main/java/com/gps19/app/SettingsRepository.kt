@@ -46,10 +46,10 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * July.27.00:
+ * - Architecture Audit: Centralized PreferenceKeys into PreferenceKeys.kt.
  * July.23.03:
  * - Issue #527: Siren Persistence. Added LAST_ALARMS_JSON_KEY.
- * July.22.11:
- * - Issue #518: Purged legacy typeMigration and associated logic.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -60,64 +60,10 @@ class SettingsRepository @Inject constructor(
     private val dataStore = context.settingsDataStore
 
     companion object {
-        const val APP_MODE_KEY = "app_mode"
-        const val TRACKER_ID_KEY = "tracker_id"
-        const val VIEWER_ID_KEY = "viewer_id"
-        const val RELAY_URL_KEY = "relay_url"
         const val DEFAULT_RELAY_URL = "https://gps-survival-relay.onrender.com"
-        
         const val DEFAULT_TRACKER_ID = SignalingConstants.DEFAULT_TRACKER_ID
         const val DEFAULT_VIEWER_ID = SignalingConstants.DEFAULT_VIEWER_ID
-        
-        const val MAX_DISTANCE_STORAGE_KEY = "max_distance"
         const val DEFAULT_MAX_DISTANCE = 60.0
-        const val MAX_ACCURACY_KEY = "max_accuracy"
-        const val MAX_TEMP_KEY = "max_temp"
-        const val LAST_ALARM_ACK_TS_KEY = "last_alarm_ack_ts"
-        const val HOME_POINTS_TS_KEY = "home_points_ts"
-        const val IS_MANUAL_EXIT_KEY = "is_manual_exit"
-        const val APP_START_TIME_KEY = "app_start_time"
-        const val LAST_VERSION_CODE_KEY = "last_version_code"
-        
-        const val TOTAL_CONNECTED_KEY = "total_connected"
-        const val UPTIME_KEY = "uptime"
-        const val LAST_CONNECTION_TS_KEY = "last_conn_ts"
-        const val LAST_DISCONNECTION_TS_KEY = "last_disc_ts"
-        const val TOTAL_DROP_KEY = "total_drop"
-        const val MAX_DROP_KEY = "max_drop"
-        const val MAX_DROP_TS_KEY = "max_drop_ts"
-        const val LAST_GPS_TS_KEY = "last_gps_ts"
-        const val VIOLATION_UPTIME_MS_KEY = "violation_uptime_ms"
-
-        const val TRACKER_LUX_BASELINE_KEY = "tracker_lux_baseline"
-        const val TRACKER_ACOUSTIC_FLOOR_KEY = "tracker_acoustic_floor"
-        
-        const val IS_MIC_TYPE_STARTED_KEY = "is_mic_type_started"
-
-        const val SELECTED_SIREN_KEY = "selected_siren"
-        const val LAST_SERVICE_TICK_TS_KEY = "last_service_tick_ts"
-        const val LAST_SERVICE_TICK_REALTIME_KEY = "last_service_tick_realtime"
-        const val LAST_AUTO_SAVE_HOUR_KEY = "last_auto_save_hour"
-        
-        const val LAST_DAILY_ARCHIVE_DATE_KEY = "last_daily_archive_date"
-        const val LAST_DAILY_CLEANUP_DATE_KEY = "last_daily_cleanup_date"
-
-        const val DRAFT_TRACKER_ID = "draft_tracker_id"
-        const val DRAFT_VIEWER_ID = "draft_viewer_id"
-        const val DRAFT_RELAY_URL = "draft_relay_url"
-        const val DRAFT_MAX_DISTANCE = "draft_max_distance"
-
-        const val IS_XIAOMI_MANUAL_OVERRIDE_KEY = "is_xiaomi_manual_override"
-        const val IS_SYSTEM_ACTIVE_KEY = "is_system_active"
-        
-        const val IDENTITY_SANITIZED_KEY = "identity_sanitized"
-        const val CLOCK_DRIFT_REF_KEY = "clock_drift_ref"
-
-        const val LAST_SIT_TS_KEY = "last_sit_ts"
-        const val CHAIR_BASELINE_TILT_KEY = "chair_baseline_tilt"
-        const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
-        
-        const val LAST_ALARMS_JSON_KEY = "last_alarms_json"
 
         internal val identitySanitizationMigration = object : DataMigration<AppSettings> {
             override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
@@ -199,7 +145,7 @@ class SettingsRepository @Inject constructor(
                 LAST_GPS_TS_KEY -> builder.setLastGpsTs(value)
                 VIOLATION_UPTIME_MS_KEY -> builder.setViolationUptimeMs(value)
                 LAST_SERVICE_TICK_REALTIME_KEY -> builder.setLastServiceTickRt(value)
-                CLOCK_DRIFT_REF_KEY -> if (current.hasClockDriftRef()) builder.setClockDriftRef(value) else builder.setClockDriftRef(value)
+                CLOCK_DRIFT_REF_KEY -> builder.setClockDriftRef(value)
                 LAST_SIT_TS_KEY -> builder.setLastSitTs(value)
                 LAST_HISTORY_SIT_TS_KEY -> builder.setLastHistorySitTs(value)
             }
@@ -374,9 +320,9 @@ class SettingsRepository @Inject constructor(
         return SettingsMapper.mapTrackerStatusFromProto(settings.trackerState)
     }
 
-    suspend fun saveDraftAlertSettings(s: AlertSettings) {
+    suspend fun saveDraftAlertSettings(alertSettings: AlertSettings) {
         dataStore.updateData { current ->
-            current.toBuilder().setDraftAlertSettings(SettingsMapper.alertSettingsToProto(s)).build()
+            current.toBuilder().setDraftAlertSettings(SettingsMapper.alertSettingsToProto(alertSettings)).build()
         }
     }
 
