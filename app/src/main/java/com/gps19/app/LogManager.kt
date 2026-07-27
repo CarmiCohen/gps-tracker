@@ -9,10 +9,9 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
- * July.22.02:
- * - Issue #121: Provider Latency Optimization. Cached ConnectivitySuite instance to reduce lookup overhead.
- * July.21.00:
- * - Hilt Hardening: Added @Inject constructor and migrated to Provider<ConnectivitySuite>.
+ * July.27.00:
+ * - Issue #596: Signaling Reliability Audit. Promoted Important/Special logs to HIGH 
+ *   priority to ensure Alarms and Tamper events bypass forensic log throttling.
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -134,7 +133,10 @@ class LogManager @Inject constructor(
             }
             
             if (isConnected) {
-                suite.emit("log_update", data)
+                // Issue #596: Critical logs (Alarms, confirmed Tampers) use HIGH priority 
+                // to bypass the forensic log throttled queue.
+                val priority = if (important || isSpecial) SignalingPriority.HIGH else SignalingPriority.NORMAL
+                suite.emit("log_update", data, priority)
             }
             
             logRepository.addLog(log, initiallySynced = isConnected)

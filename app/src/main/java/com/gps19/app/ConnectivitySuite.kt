@@ -33,7 +33,9 @@ sealed class ConnectivityEvent {
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
  * July.27.00:
- * - Architecture Audit: Updated to use centralized PreferenceKeys and fixed parameter naming.
+ * - Issue #596: Signaling Reliability Audit. Promoted telemetry (location_update_bin) 
+ *   to HIGH priority to bypass throttled forensic log queue.
+ * - Architecture Audit: Updated to use centralized PreferenceKeys and fixed build errors.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -354,12 +356,14 @@ class ConnectivitySuite @Inject constructor(
                 isStorageLow = entity.isStorageLow, isStorageCritical = entity.isStorageCritical,
                 isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface
             )
-            if (sendTelemetryInternal(status)) offlineRepository.deletePendingStatusUpdate(entity.id)
+            // Issue #596: Flushed updates use NORMAL to avoid blocking live traffic.
+            if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) offlineRepository.deletePendingStatusUpdate(entity.id)
         }
     }
 
     suspend fun sendTelemetry(status: TrackerStatus): Boolean {
-        val success = sendTelemetryInternal(status)
+        // Issue #596: Live telemetry uses HIGH priority to bypass forensic log queue.
+        val success = sendTelemetryInternal(status, SignalingPriority.HIGH)
         if (isTrackerMode) {
             mainRepository.saveTrackerState(status)
             if (!success) {
@@ -381,7 +385,7 @@ class ConnectivitySuite @Inject constructor(
     }
 
     @Synchronized
-    private fun sendTelemetryInternal(status: TrackerStatus): Boolean {
+    private fun sendTelemetryInternal(status: TrackerStatus, priority: SignalingPriority): Boolean {
         if (!isConnected()) return false
         if (isTrackerMode) {
             status.writeTo(statusBuilder, false)
@@ -398,15 +402,15 @@ class ConnectivitySuite @Inject constructor(
                     val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
                     message.writeTo(cos)
                     cos.checkNoSpaceLeft()
-                    signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size, SignalingPriority.NORMAL)
+                    signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size, priority)
                     return true
                 } catch (e: Exception) {
                     Timber.e(e, "Issue #560b: Pre-allocated serialization failed")
                 }
             }
-            signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray(), priority = SignalingPriority.NORMAL)
+            signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray(), priority = priority)
         } else {
-            signalingProvider.emitMap("location_update", status.toMap(true), SignalingPriority.NORMAL)
+            signalingProvider.emitMap("location_update", status.toMap(true), priority)
         }
         return true
     }
@@ -415,7 +419,8 @@ class ConnectivitySuite @Inject constructor(
         deviceId: String, viewerId: String, isTrackerMode: Boolean, loc: android.location.Location?, filtered: EngineGeoPoint?,
         distToTracker: Double?, distToHome: Double?, maxAccuracy: Double, filteredSpeed: Double,
         vibration: Double, heading: Double, baroAlt: Double, lux: Double, isNear: Boolean,
-        tiltDegrees: Double, acousticDb: Double, peakShock: Double, peakShockTs: Long,
+        tiltDegrees: Double, acousticDb: Double, jumpTier: Int,
+        isJammer: Boolean, isStalled: Boolean, peakShock: Double, peakShockTs: Long,
         luxBaseline: Double, acousticFloorDb: Double, adaptiveVibrationFloor: Double, proxIdx: Double, proximityCm: Double,
         proximityDebounceMs: Long, vibrationRollingSum: Double, micPending: Boolean,
         isTamperDetected: Boolean, isPowerTamper: Boolean,
@@ -447,7 +452,8 @@ class ConnectivitySuite @Inject constructor(
             alt = loc?.altitude ?: 0.0, accuracy = loc?.accuracy?.toDouble() ?: 0.0,
             maxAccuracy = maxAccuracy, speed = filteredSpeed, bearing = loc?.bearing?.toDouble() ?: 0.0,
             vibration = vibration, heading = heading, baroAlt = baroAlt, lux = lux, isNear = isNear,
-            tiltDegrees = tiltDegrees, acousticDb = acousticDb, peakVibrationShock = peakShock, peakVibrationShockTs = peakShockTs,
+            tiltDegrees = tiltDegrees, acousticDb = acousticDb, jumpTier = jumpTier, isJammer = isJammer,
+            isStalled = isStalled, peakVibrationShock = peakShock, peakVibrationShockTs = peakShockTs,
             luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb, adaptiveVibrationFloor = adaptiveVibrationFloor,
             proxIdx = proxIdx, proximityCm = proximityCm, proximityDebounceMs = proximityDebounceMs,
             vibrationRollingSum = vibrationRollingSum, isTamperDetected = isTamperDetected, isPowerTamper = isPowerTamper,

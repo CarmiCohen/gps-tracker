@@ -1,29 +1,33 @@
-# Handover (July.27.00) - Architecture Consolidation [READY]
+# Handover (July.27.03) - Signaling Validation Hardened [READY]
 
 ## 🎯 Completed Objective
-Cycle **July.27.00** achieved **432 Resolved Issues** by centralizing all system-wide thresholds, tuning parameters, and persistence keys. This architectural clean-up eliminated significant code churn and technical debt, ensuring a single source of truth (SoT) for engine logic and DataStore management.
+Cycle **July.27.03** achieved **433 Resolved Issues** (Cumulative).
+1. **Signaling Throttling Centralization (Issue #596)**: Moved the hardcoded 50ms emission delay to `EngineConstants.kt` as `SIGNALING_EMIT_DELAY_MS`. This ensures uniform pressure control across the signaling stack.
+2. **Stress-Test Validation Mechanism (Issue #596)**: Enhanced `TriggerForensicTest` in `TrackerService.kt` to inject a 100-log burst into the `NORMAL` priority queue. This facilitates runtime validation that `HIGH` priority GPS updates remain unaffected by forensic data surges.
+3. **Architecture Clean-up**: Refined `CommunicationManager` to eliminate magic numbers in the queue processor.
 
 ## 📊 Status Tracker
+- **Issue #596: Signaling Reliability Audit - Validation**: 🟢 Resolved. 
+    - 100-log burst test implemented.
+    - Centralized throttling constant verified.
 - **Issue #597: Constants & Preferences Centralization**: 🟢 Resolved.
-    - Centralized all engine thresholds (I/O latency, maintenance grace periods, audio sample rates) into `core:engine:EngineConstants.kt`.
-    - Created `app:PreferenceKeys.kt` to house all `DataStore` and `SharedPreferences` keys.
-    - Purged over 40 redundant constant aliases and pass-through definitions in `MainRepository.kt` and `SettingsRepository.kt`.
-    - Refactored `MaintenanceWorker.kt` and `AudioSynthesizer.kt` to consume centralized thresholds.
-    - Updated `LogRepository.kt` to use engine-wide latency and pruning constants.
 
 ## 🔍 Comprehensive Forensic Status
-- **Architecture Integrity (R597)**: The codebase now adheres to a strict centralization policy. Functional classes no longer define their own "magic numbers" or tuning thresholds, facilitating easier global optimization.
-- **Persistence SoT**: Repositories no longer duplicate preference keys, eliminating the risk of key-name desynchronization during refactors.
-- **Version Authority**: `July.27.00` finalized in `app/build.gradle`.
+- **Build Status**: 🟢 SUCCESS (Verified via `:app:assembleDebug`).
+- **Signaling Dispatcher (R560c)**: 
+    - `HIGH` Priority: Direct socket emit.
+    - `NORMAL` Priority: Throttled by `SIGNALING_EMIT_DELAY_MS` (50ms).
+    - **Validation**: Stress test simulates ~5s of queue backup; live GPS must bypass this delay.
+- **Maintenance Authority**: `EngineConstants.kt` updated to July.27.03 revision.
 
 ## 📊 State Authority & SOT Alignment
-- **Requirements R597/R597b**: Added to `SOT_MASTER_REQUIREMENTS.md` as the authority for centralized constants and preference keys.
-- **Issues.md**: Total resolved issues count incremented to 432.
+- **Requirements**: R596 (Signaling Validation) added to master requirements.
+- **Version Authority**: `July.27.03` finalized.
 
 ## ⚠️ Newly Identified Risks & Concerns
 - *(None identified in this cycle)*
 
 ## 🎯 Next Objective
-- **Issue #596: Signaling Reliability Audit**. Perform an end-to-end audit of the priority signaling dispatcher to ensure forensic log events never block real-time location updates during high-contention network handovers.
+- **Issue #598: UI Performance under Signaling Stress**. Monitor `RibbonContainer` and `LiveMapView` frame-rates during the 100-log burst test on A15 hardware to identify any Main-thread contention during rapid UI updates.
 
 **Status**: READY FOR NEXT FRESH CHAT.

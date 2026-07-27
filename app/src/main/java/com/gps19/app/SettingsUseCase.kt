@@ -9,12 +9,8 @@ import javax.inject.Inject
 
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor.
- * July.17.02:
- * - Added isSystemActive to InitialSettings.
- * v9.5.0:
- * - Issue #503: Hilt Removal.
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized PreferenceKeys and removed redundant repository prefixes.
  */
 class SettingsUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -85,7 +81,7 @@ class SettingsUseCase @Inject constructor(
         var appStartTime = s.appStartTime
         if (appStartTime == 0L) {
             appStartTime = timeProvider.currentTimeMillis()
-            repository.saveLong(MainRepository.APP_START_TIME_KEY, appStartTime)
+            repository.saveLong(APP_START_TIME_KEY, appStartTime)
         }
 
         var draftSettings: DraftSettings? = null
@@ -116,17 +112,17 @@ class SettingsUseCase @Inject constructor(
             repository.resetStats()
             repository.clearLogs()
             repository.clearTrails()
-            repository.saveHomePoints(emptyList(), MainRepository.DEFAULT_MAX_DISTANCE)
+            repository.saveHomePoints(emptyList(), SettingsRepository.DEFAULT_MAX_DISTANCE)
             repository.saveAlertSettings(AlertSettings())
-            repository.saveString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
-            repository.saveString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
-            repository.saveString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
-            repository.saveBoolean(MainRepository.IDENTITY_SANITIZED_KEY, false)
-            repository.saveBoolean(MainRepository.IS_SYSTEM_ACTIVE_KEY, false)
+            repository.saveString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
+            repository.saveString(VIEWER_ID_KEY, SettingsRepository.DEFAULT_VIEWER_ID)
+            repository.saveString(RELAY_URL_KEY, SettingsRepository.DEFAULT_RELAY_URL)
+            repository.saveBoolean(IDENTITY_SANITIZED_KEY, false)
+            repository.saveBoolean(IS_SYSTEM_ACTIVE_KEY, false)
             repository.clearDraftSettings()
             
             val appStartTime = timeProvider.currentTimeMillis()
-            repository.saveLong(MainRepository.APP_START_TIME_KEY, appStartTime)
+            repository.saveLong(APP_START_TIME_KEY, appStartTime)
             repository.sendCommand(UiCommand.FullInitializationReset)
             
             withContext(Dispatchers.Main) {
@@ -138,17 +134,17 @@ class SettingsUseCase @Inject constructor(
 
     suspend fun updateDeviceId(id: String) {
         logManager.submitToLogSink("USER ACTION: Tracker ID changed to: $id", "user", important = true)
-        repository.saveString(MainRepository.TRACKER_ID_KEY, id)
+        repository.saveString(TRACKER_ID_KEY, id)
     }
 
     suspend fun updateViewerId(id: String) {
         logManager.submitToLogSink("USER ACTION: Viewer ID changed to: $id", "user", important = true)
-        repository.saveString(MainRepository.VIEWER_ID_KEY, id)
+        repository.saveString(VIEWER_ID_KEY, id)
     }
 
     suspend fun updateRelayUrl(url: String) {
         logManager.submitToLogSink("USER ACTION: Relay URL changed to: $url", "user", important = true)
-        repository.saveString(MainRepository.RELAY_URL_KEY, url)
+        repository.saveString(RELAY_URL_KEY, url)
     }
 
     /**

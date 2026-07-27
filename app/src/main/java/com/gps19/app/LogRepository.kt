@@ -20,11 +20,11 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized EngineConstants and fixed it/entry reference error.
  * July.25.11:
  * - Issue #590: Unified Latency Monitoring. Integrated LatencyMonitor into addLog 
  *   and proactivePruning to detect I/O bottlenecks.
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
  */
 @Singleton
 class LogRepository @Inject constructor(

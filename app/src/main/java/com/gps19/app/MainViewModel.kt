@@ -20,12 +20,10 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized PreferenceKeys and fixed build errors.
  * July.26.04:
- * - Issue #595: Forensic Playback Hardening. Added handler for ToggleStrictMode 
- *   to enable enhanced data integrity validation in forensic ribbons.
- * July.26.00:
- * - Issue #565: Cold Start I/O Optimization. Coordinated proactivePruning with 
- *   INITIAL_RENDER_DELAY_MS to prevent I/O contention during the first pulse.
+ * - Issue #595: Forensic Playback Hardening.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -348,7 +346,7 @@ class MainViewModel @Inject constructor(
             }
             is UiEvent.SetSirenType -> { 
                 addPersistentLog("user", "USER ACTION: Siren type set to ${event.type}", true)
-                viewModelScope.launch(uiExceptionHandler) { repository.saveString(MainRepository.SELECTED_SIREN_KEY, event.type); updateState { it.copy(selectedSirenType = event.type) } } 
+                viewModelScope.launch(uiExceptionHandler) { repository.saveString(SELECTED_SIREN_KEY, event.type); updateState { it.copy(selectedSirenType = event.type) } } 
             }
             is UiEvent.UpdateDraftDeviceId, is UiEvent.UpdateDraftViewerId, is UiEvent.UpdateDraftRelayUrl, 
             is UiEvent.UpdateDraftMaxDistance, is UiEvent.UpdateDraftAlertSettings, is UiEvent.UpdateDraftAlarmVolume, 
@@ -372,11 +370,11 @@ class MainViewModel @Inject constructor(
             is UiEvent.ToggleXiaomiManualOverride -> {
                 val nextValue = !_uiState.value.permissions.isManualOverride
                 updateState { it.copy(permissions = it.permissions.copy(isManualOverride = nextValue)) }
-                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { repository.saveBoolean(MainRepository.IS_XIAOMI_MANUAL_OVERRIDE_KEY, nextValue); addPersistentLog("user", "USER ACTION: Xiaomi manual override set to $nextValue", true) }
+                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { repository.saveBoolean(IS_XIAOMI_MANUAL_OVERRIDE_KEY, nextValue); addPersistentLog("user", "USER ACTION: Xiaomi manual override set to $nextValue", true) }
             }
             is UiEvent.DismissIdentitySanitization -> {
                 updateState { it.copy(isIdentitySanitized = false) }
-                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { repository.saveBoolean(MainRepository.IDENTITY_SANITIZED_KEY, false) }
+                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { repository.saveBoolean(IDENTITY_SANITIZED_KEY, false) }
             }
             is UiEvent.BulkUpdateSettings -> {
                 viewModelScope.launch(uiExceptionHandler) {

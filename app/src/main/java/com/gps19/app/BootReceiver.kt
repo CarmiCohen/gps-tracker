@@ -19,13 +19,10 @@ import timber.log.Timber
 
 /**
  * BootReceiver: Triggered when the device restarts.
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized PreferenceKeys.
  * July.24.04:
- * - Issue #539: Background Start Hardening. Migrated to Expedited Work Request
- *   to ensure API 34+ reliability for background-to-foreground transitions.
- * - Redundancy Hardening: Now updates APP_START_TIME_KEY to notify 
- *   MaintenanceWorker of the revival attempt, preventing duplicate starts.
- * July.22.02:
- * - Issue #120: Hilt Hardening.
+ * - Issue #539: Background Start Hardening.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -63,7 +60,7 @@ class BootServiceStartWorker @AssistedInject constructor(
     }
 
     override suspend fun doWork(): Result {
-        val isSystemActive = repository.isSystemActiveFlow.firstOrNull() ?: repository.getBoolean(MainRepository.IS_SYSTEM_ACTIVE_KEY, false)
+        val isSystemActive = repository.isSystemActiveFlow.firstOrNull() ?: repository.getBoolean(IS_SYSTEM_ACTIVE_KEY, false)
         val appMode = repository.appModeFlow.firstOrNull() ?: repository.getAppMode()
         
         if (isSystemActive && appMode != null) {

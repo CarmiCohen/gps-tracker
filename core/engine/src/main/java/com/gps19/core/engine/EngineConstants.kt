@@ -263,6 +263,7 @@ const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 const val MAX_BACKFILL_POINTS = 1000
 
 // Network Communication (v8.8.21)
+const val SIGNALING_EMIT_DELAY_MS = 50L
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0

@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.27.00 (Architecture Consolidation)
+# System Source of Truth (SoT) - July.27.03 (Signaling Validation Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -24,6 +24,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Forensic Primitive Buffering (R550)**: Circular primitive arrays MUST be used for historical sample storage. (Issue #550, July.25.02)
 *   **Pipeline Serialization Hardening (R560)**: The signaling pipeline MUST utilize pre-allocated buffers and reusable Protobuf builders. (Issue #560, #560b, July.25.03)
 *   **Priority-Aware Signaling (R560c)**: The signaling pipeline MUST utilize a Dual-Queue Priority Dispatcher. (Issue #560c, July.25.08)
+*   **Signaling Validation (R596b)**: The system MUST provide a diagnostic trigger to simulate heavy signaling load (e.g., 100-log burst) to validate that HIGH priority telemetry remains responsive during forensic data surges. (Issue #596, July.27.03)
 
 ### 2. Architectural Integrity & Centralization
 *   **Consolidated Constants (R597)**: All engine-specific thresholds, tuning parameters, and system-wide default values MUST be centralized in `core:engine:EngineConstants.kt`. (Issue #597, July.27.00)
@@ -46,5 +47,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.27.00.
+*   **Current Release**: July.27.03.
 *   **Source of Truth**: app/build.gradle versionName.

@@ -24,6 +24,8 @@ import javax.inject.Singleton
  *   with a SharedFlow (signalingFlow) for reactive event dispatching.
  * July.25.08:
  * - Issue #560c: Socket-Level Pressure.
+ * July.27.03:
+ * - Issue #596: Centralized SIGNALING_EMIT_DELAY_MS usage.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -93,7 +95,7 @@ class CommunicationManager @Inject constructor(
                     is SignalingCommand.EmitBinary -> socket?.emit(command.event, command.routingId, command.data)
                 }
 
-                delay(50) 
+                delay(SIGNALING_EMIT_DELAY_MS)
             }
         }
     }

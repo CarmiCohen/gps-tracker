@@ -20,6 +20,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized PreferenceKeys.
  * v9.4.1:
  * - Issue #510: Removed Chair Sit Detection from import/export.
  */
@@ -366,7 +368,7 @@ object MainFileHelper {
     suspend fun autoExportData(context: Context, repository: MainRepository, timeProvider: TimeProvider) {
         try {
             val now = timeProvider.currentTimeMillis()
-            val deviceId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
+            val deviceId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
             val appMode = repository.getAppMode()
             
             val logs = repository.loadAllLogsStatic()

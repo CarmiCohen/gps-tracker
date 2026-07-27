@@ -6,10 +6,13 @@ import org.json.JSONObject
 
 /**
  * SignalingPriority: Classification for frame prioritization.
+ * July.27.00 Audit:
+ * - Telemetry (Location Updates) promoted to HIGH to prevent head-of-line blocking 
+ *   from high-volume forensic logs.
  */
 enum class SignalingPriority {
-    HIGH,   // Time-critical: Pings, Pongs, Commands, Identity (Join/Leave)
-    NORMAL  // Bulk data: Telemetry, Logs
+    HIGH,   // Time-critical: Telemetry, Alarms, Pings, Commands, Identity
+    NORMAL  // Bulk data: Forensic Logs, Status Snapshots
 }
 
 /**

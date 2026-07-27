@@ -5,10 +5,8 @@ import javax.inject.Inject
 
 /**
  * AlertUseCase: Handles logic for alarm dismissal and siren control.
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor.
- * v9.5.0:
- * - Issue #503: Hilt Removal.
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized PreferenceKeys.
  */
 class AlertUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -17,7 +15,7 @@ class AlertUseCase @Inject constructor(
 ) {
     suspend fun dismissAlarms(): Long {
         val now = timeProvider.currentTimeMillis()
-        repository.saveLong(MainRepository.LAST_ALARM_ACK_TS_KEY, now)
+        repository.saveLong(LAST_ALARM_ACK_TS_KEY, now)
         repository.sendCommand(UiCommand.StopSiren("User Dismissed"))
         logManager.submitToLogSink("USER ACTION: Alerts acknowledged", "user", important = true)
         return now
@@ -25,7 +23,7 @@ class AlertUseCase @Inject constructor(
 
     suspend fun stopSiren(causes: String?): Long {
         val now = timeProvider.currentTimeMillis()
-        repository.saveLong(MainRepository.LAST_ALARM_ACK_TS_KEY, now)
+        repository.saveLong(LAST_ALARM_ACK_TS_KEY, now)
         repository.sendCommand(UiCommand.StopSiren(causes))
         logManager.submitToLogSink("USER ACTION: Siren stopped ${causes ?: ""}", "user", important = true)
         return now

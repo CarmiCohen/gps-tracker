@@ -33,11 +33,11 @@ sealed class CommandEvent {
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * July.27.00:
+ * - Architecture Audit: Updated to use centralized PreferenceKeys.
  * July.26.03:
  * - Issue #545c: Flow Architecture Standardization. Replaced legacy Listener 
  *   with a SharedFlow (commandEvents) for reactive event dispatching.
- * July.26.02:
- * - Issue #545b: Lifecycle Idempotency.
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -103,7 +103,7 @@ class CommandRouter @Inject constructor(
                         is UiCommand.SyncRequest -> _commandEvents.emit(CommandEvent.UiPulse)
                         is UiCommand.UiVisibilityChanged -> _commandEvents.emit(CommandEvent.UiVisibilityChanged(command.visible))
                         is UiCommand.StopSiren -> {
-                            repository.saveLongSync(MainRepository.LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
+                            repository.saveLongSync(LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
                             alarmManager.setPowerAlarmPending(false)
                             alarmManager.notifySirenManualStop() 
                             alarmManager.dismissResolvedAlarms()
@@ -140,7 +140,7 @@ class CommandRouter @Inject constructor(
                             scope.launch {
                                 try {
                                     logManager.logServiceEvent("TEST ALARM: Triggering 3s physical siren", true)
-                                    val sirenType = repository.getString(MainRepository.SELECTED_SIREN_KEY, "Siren")
+                                    val sirenType = repository.getString(SELECTED_SIREN_KEY, "Siren")
                                     AudioSynthesizer.playSiren(
                                         type = sirenType,
                                         force = true,

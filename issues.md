@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.27.00)
+# Project Issues & Hardening Tracking (July.27.03)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 432 |
+| **Resolved (Total)** | 🟢 Progress | 433 |
 
 ---
 
@@ -21,14 +21,15 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (July.27.00)
-*   **Issue #597: Architecture Clean-up - Constants & Preferences Centralization**.
-    *   **Resolution**: Performed a global audit of constant declarations. Centralized engine tuning parameters, maintenance thresholds, and audio parameters into `EngineConstants.kt`. Created `PreferenceKeys.kt` to house all `DataStore` keys. Eliminated over 40 redundant constant aliases and pass-through definitions in `MainRepository.kt` and `SettingsRepository.kt`.
-    *   **Impact**: Significantly reduces code churn and technical debt. Ensures a single source of truth for system thresholds and persistence keys, preventing synchronization errors during future repository refactors.
+## 🟢 Recently Resolved Issues (July.27.03)
+*   **Issue #596: Signaling Reliability Audit - Validation**.
+    *   **Resolution**: Centralized signaling emission delay into `EngineConstants.kt` for system-wide tuning. Enhanced the `TriggerForensicTest` command in `TrackerService.kt` to generate a 100-log stress burst (simulating 5 seconds of `NORMAL` priority queue backup).
+    *   **Validation**: This allows confirmation that `HIGH` priority GPS packets (which bypass the queue) maintain real-time responsiveness even during massive forensic data surges.
 
 ---
 
-## 🟢 Recently Resolved Issues (July.26.04)
+## 🟢 Recently Resolved Issues (July.27.00)
+*   **Issue #597: Architecture Clean-up - Constants & Preferences Centralization**.
 *   **Issue #595: Forensic Playback Hardening**.
 *   **Issue #589: Latency Monitoring & Performance Audit**.
 *   **Issue #588: Architecture Simplification & Code Churn Reduction**.
