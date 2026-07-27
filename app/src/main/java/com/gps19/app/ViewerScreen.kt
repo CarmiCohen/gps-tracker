@@ -28,11 +28,14 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.osmdroid.util.GeoPoint
 import com.gps19.core.engine.*
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
- * July.25.02:
- * - Issue #547c Cleanup: Passed telemetryState to SettingsOverlay.
+ * July.27.04:
+ * - Issue #598: UI Performance under Signaling Stress. Passed eventLogsFlow 
+ *   directly to LogOverlay to de-couple high-frequency log updates from 
+ *   the main screen re-composition logic.
  */
 
 @Composable
@@ -40,7 +43,7 @@ fun ViewerScreen(
     uiState: MainUiState,
     telemetryState: TelemetryState,
     viewModel: MainViewModel,
-    logs: List<LogEntry>,
+    logsFlow: StateFlow<List<LogEntry>>,
     trackerTrail: List<TrailPoint>,
     viewerTrail: List<TrailPoint>,
     violations: List<ViolationPoint>,
@@ -237,7 +240,7 @@ fun ViewerScreen(
             val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()
             val showRecovered by viewModel.repository.logFilterRecovered.collectAsStateWithLifecycle()
             LogOverlay(
-                logs = logs, onExport = onExportLogs, onToggle = onToggleLog, onClear = onClearLogs,
+                logsFlow = logsFlow, onExport = onExportLogs, onToggle = onToggleLog, onClear = onClearLogs,
                 showDetails = showDetails, showRecovered = showRecovered, 
                 onSetShowDetails = { viewModel.onEvent(UiEvent.SetLogFilterShowDetails(it)) }, 
                 onSetShowRecovered = { viewModel.onEvent(UiEvent.SetLogFilterShowRecovered(it)) },

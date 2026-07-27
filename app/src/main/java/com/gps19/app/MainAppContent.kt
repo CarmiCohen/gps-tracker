@@ -44,9 +44,9 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * July.25.00:
- * - Issue #547: State Decomposition. Refactored to consume isRedScreenVisible 
- *   from telemetryState for zero-latency surfacing.
+ * July.27.04:
+ * - Issue #598: UI Performance under Signaling Stress. Passed eventLogsFlow 
+ *   directly to Tracker/Viewer screens to support de-coupled log collection.
  */
 @Composable
 fun MainAppContent(
@@ -211,8 +211,6 @@ fun MainAppContent(
         return
     }
 
-    // Issue #542: Flow collections moved to respective screen routes to avoid startup congestion.
-    
     val configuration = LocalConfiguration.current
     val view = LocalView.current
     val window = activity.window
@@ -296,7 +294,6 @@ fun MainAppContent(
                         }
                     }
                     composable(Screen.Tracker.route) {
-                        val eventLogs by viewModel.eventLogsFlow.collectAsStateWithLifecycle()
                         val trackerTrail by viewModel.trackerTrailFlow.collectAsStateWithLifecycle()
                         val viewerTrail by viewModel.viewerTrailFlow.collectAsStateWithLifecycle()
                         val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -315,7 +312,7 @@ fun MainAppContent(
                             }
                         }
                         TrackerScreen(
-                            uiState = uiState, telemetryState = telemetryState, viewModel = viewModel, logs = eventLogs, trail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
+                            uiState = uiState, telemetryState = telemetryState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
                             systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
@@ -327,7 +324,6 @@ fun MainAppContent(
                         )
                     }
                     composable(Screen.Viewer.route) {
-                        val eventLogs by viewModel.eventLogsFlow.collectAsStateWithLifecycle()
                         val trackerTrail by viewModel.trackerTrailFlow.collectAsStateWithLifecycle()
                         val viewerTrail by viewModel.viewerTrailFlow.collectAsStateWithLifecycle()
                         val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -346,7 +342,7 @@ fun MainAppContent(
                             }
                         }
                         ViewerScreen(
-                            uiState = uiState, telemetryState = telemetryState, viewModel = viewModel, logs = eventLogs, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
+                            uiState = uiState, telemetryState = telemetryState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
                             systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) },

@@ -26,30 +26,40 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.engine.*
+import kotlinx.coroutines.flow.StateFlow
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
  * LogComponents: UI for system logs and diagnostic history.
+ * July.27.04:
+ * - Issue #598: UI Performance under Signaling Stress. De-coupled log collection 
+ *   from top-level screens. LogOverlay now collects logsFlow internally to 
+ *   prevent Main-thread contention during high-frequency forensic bursts.
  * v9.1.0:
  * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
- * v9.0.4:
- * - R799d: Changed Viewer color to ViewerCyan.
- * v8.9.48:
- * - Issue #425: R865 Color Compliance. Swapped Emerald500 for authoritative 
- *   BrandJd (#367C2B) in log rendering for restored/connected events.
  */
 
 @Composable
 fun LogOverlay(
-    logs: List<LogEntry>, onExport: () -> Unit, onToggle: () -> Unit, onClear: () -> Unit,
-    showDetails: Boolean, showRecovered: Boolean, onSetShowDetails: (Boolean) -> Unit,
-    onSetShowRecovered: (Boolean) -> Unit, appStartTime: Long, systemPulse: Long,
+    logsFlow: StateFlow<List<LogEntry>>, 
+    onExport: () -> Unit, 
+    onToggle: () -> Unit, 
+    onClear: () -> Unit,
+    showDetails: Boolean, 
+    showRecovered: Boolean, 
+    onSetShowDetails: (Boolean) -> Unit,
+    onSetShowRecovered: (Boolean) -> Unit, 
+    appStartTime: Long, 
+    systemPulse: Long,
     isTelemetryFresh: Boolean = true
 ) {
+    val logs by logsFlow.collectAsStateWithLifecycle()
     val timeFormatter = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
     val now = systemPulse
+    
     val filteredLogs by remember(showDetails, showRecovered, logs, appStartTime) {
         derivedStateOf { 
             logs.filter { log -> 
@@ -95,7 +105,6 @@ fun LogOverlay(
                             val durationText = if (log.count > 1 && log.durationMs > 0) {
                                 val windowMs = maxOf(1000L, log.timestamp - log.firstSeenTs)
                                 val pct = (log.durationMs * 100.0 / windowMs).coerceIn(0.0, 100.0)
-                                // Issue #428: Aligned with 15s jitter buffer
                                 val generalized = if (log.durationMs < 15000L) "less than 15s" else FormatterUtils.formatDurationSimple(log.durationMs)
                                 " - persistence was $generalized, ${String.format(Locale.getDefault(), "%.1f", pct)}% of window"
                             } else if (log.durationMs > 0) {
@@ -177,7 +186,6 @@ fun LogDetailPane(log: LogEntry, onClose: () -> Unit) {
                 label2 = "LONGITUDE", val2 = if (log.lng != 0.0) "%.6f".format(log.lng) else "--", color2 = Color.White
             )
             
-            // R325: Dual-Metric Accuracy Display
             val accText = if (log.accuracy > 0) "%.1fm".format(log.accuracy) else "--"
             val maxAccText = if (log.maxAccuracy > 0) "%.1fm".format(log.maxAccuracy) else "--"
             

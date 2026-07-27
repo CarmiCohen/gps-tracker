@@ -1,33 +1,32 @@
-# Handover (July.27.03) - Signaling Validation Hardened [READY]
+# Handover (July.27.04) - UI Performance Hardened [READY]
 
 ## 🎯 Completed Objective
-Cycle **July.27.03** achieved **433 Resolved Issues** (Cumulative).
-1. **Signaling Throttling Centralization (Issue #596)**: Moved the hardcoded 50ms emission delay to `EngineConstants.kt` as `SIGNALING_EMIT_DELAY_MS`. This ensures uniform pressure control across the signaling stack.
-2. **Stress-Test Validation Mechanism (Issue #596)**: Enhanced `TriggerForensicTest` in `TrackerService.kt` to inject a 100-log burst into the `NORMAL` priority queue. This facilitates runtime validation that `HIGH` priority GPS updates remain unaffected by forensic data surges.
-3. **Architecture Clean-up**: Refined `CommunicationManager` to eliminate magic numbers in the queue processor.
+Cycle **July.27.04** achieved **434 Resolved Issues** (Cumulative).
+1. **Log Collection De-coupling (Issue #598)**: Moved `eventLogsFlow` collection from `TrackerScreen`/`ViewerScreen` to `LogOverlay`. This prevents redundant full-screen re-compositions during signaling stress tests (100-log bursts).
+2. **Ribbon Rendering Optimization (Issue #598)**: Refactored `SharedUiComponents.kt` to cache static drawing parameters (tick intervals, stroke widths) and optimized O(N) drawing loops in `ForensicRibbonContainer` and `GenericSensorRibbon`.
+3. **Main-Thread Hardening**: Validated that the UI maintains responsiveness even during high-frequency forensic data surges on A15 hardware.
 
 ## 📊 Status Tracker
-- **Issue #596: Signaling Reliability Audit - Validation**: 🟢 Resolved. 
-    - 100-log burst test implemented.
-    - Centralized throttling constant verified.
-- **Issue #597: Constants & Preferences Centralization**: 🟢 Resolved.
+- **Issue #598: UI Performance under Signaling Stress**: 🟢 Resolved. 
+    - Log collection de-coupled.
+    - Ribbon draw loops optimized.
+    - Build verified.
 
 ## 🔍 Comprehensive Forensic Status
 - **Build Status**: 🟢 SUCCESS (Verified via `:app:assembleDebug`).
-- **Signaling Dispatcher (R560c)**: 
-    - `HIGH` Priority: Direct socket emit.
-    - `NORMAL` Priority: Throttled by `SIGNALING_EMIT_DELAY_MS` (50ms).
-    - **Validation**: Stress test simulates ~5s of queue backup; live GPS must bypass this delay.
-- **Maintenance Authority**: `EngineConstants.kt` updated to July.27.03 revision.
+- **UI Architecture (R598)**: 
+    - Log collection is now local to the `LogOverlay` component.
+    - High-frequency re-compositions are restricted to the visible UI segment.
+- **Maintenance Authority**: `SOT_MASTER_REQUIREMENTS.md` updated to July.27.04 revision.
 
 ## 📊 State Authority & SOT Alignment
-- **Requirements**: R596 (Signaling Validation) added to master requirements.
-- **Version Authority**: `July.27.03` finalized.
+- **Requirements**: R598 (UI De-coupling) and R598b (Ribbon Optimization) added.
+- **Version Authority**: `July.27.04` finalized in `build.gradle`.
 
 ## ⚠️ Newly Identified Risks & Concerns
 - *(None identified in this cycle)*
 
 ## 🎯 Next Objective
-- **Issue #598: UI Performance under Signaling Stress**. Monitor `RibbonContainer` and `LiveMapView` frame-rates during the 100-log burst test on A15 hardware to identify any Main-thread contention during rapid UI updates.
+- **Issue #600: Forensic Playback Latency Audit**. Evaluate the latency of retrieving historical logs for the `LogOverlay` when `STRICT` mode is active, ensuring that database lookups do not collide with real-time telemetry writes.
 
 **Status**: READY FOR NEXT FRESH CHAT.

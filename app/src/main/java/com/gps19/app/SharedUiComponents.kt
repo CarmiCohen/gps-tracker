@@ -43,13 +43,11 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * July.27.04:
+ * - Issue #598: UI Performance under Signaling Stress. Optimized Ribbon rendering 
+ *   by caching static drawing parameters and reducing O(N) overhead in draw blocks.
  * July.26.04:
- * - Issue #595: Forensic Playback Hardening. Implemented "Strict Mode" for 
- *   forensic reconstruction. Ribbons now perform real-time sequence validation 
- *   and clock-drift auditing when isStrictMode is active.
- * July.25.01:
- * - Issue #547c: State Decomposition Refinement. Updated GlobalStatusBar to 
- *   consume isRedScreenVisible from TelemetryState for zero-latency surfacing.
+ * - Issue #595: Forensic Playback Hardening.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -113,7 +111,6 @@ fun AnalyticalRibbons(viewModel: MainViewModel) {
                 }
             }
             
-            // Issue #595: Strict Mode Toggle
             Surface(
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
@@ -131,12 +128,9 @@ fun AnalyticalRibbons(viewModel: MainViewModel) {
             }
         }
 
-        // Consolidated Connection & Health Ribbon
         StatefulConnectionRibbon(activeHistoryFlow, selectedScale, isStrictMode)
-        
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
 
-        // Synchronized Sensor Stack
         StatefulSensorRibbon(activeHistoryFlow, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), isStrictMode = isStrictMode, valueSelector = { it.snrIdx.toFloat() })
         StatefulSensorRibbon(activeHistoryFlow, "NOI", selectedScale, lineColor = Amber500, isStrictMode = isStrictMode, valueSelector = { it.noiseIdx.toFloat() })
         StatefulSensorRibbon(activeHistoryFlow, "LUX", selectedScale, lineColor = Color.White, isStrictMode = isStrictMode, valueSelector = { it.luxIdx.toFloat() })
@@ -172,6 +166,17 @@ fun ForensicRibbonContainer(
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     
+    val tickIntervalMs = remember(scale) {
+        when(scale) {
+            "7D" -> 2700 * 1000L; "24H" -> 360 * 1000L; "4H" -> 60 * 1000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1000L
+        }
+    }
+    val tickAlignMs = remember(scale) {
+        when(scale) {
+            "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
+        }
+    }
+
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = title, 
@@ -192,7 +197,6 @@ fun ForensicRibbonContainer(
                     val maxHeight = size.height * 0.8f
                     val baseLineY = size.height * 0.9f
                     
-                    // Unified Grid/Baseline
                     drawLine(
                         color = Color.White.copy(alpha = 0.1f),
                         start = Offset(0f, baseLineY),
@@ -200,27 +204,21 @@ fun ForensicRibbonContainer(
                         strokeWidth = 0.5.dp.toPx()
                     )
 
-                    // Draw Scale Ticks
-                    val intervalSeconds = when(scale) {
-                        "7D" -> 2700; "24H" -> 360; "4H" -> 60; "1H" -> 15; "16M" -> 4; "4M" -> 1; else -> 1
-                    }
-                    val intervalMs = intervalSeconds * 1000L
-                    
-                    val alignMs = when(scale) {
-                        "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
-                    }
-                    val firstTs = history.firstOrNull()?.ts ?: 0L
-                    val baseTickTs = ((firstTs + alignMs - 1) / alignMs) * alignMs
+                    if (history.isEmpty()) return@onDrawWithContent
 
-                    history.forEachIndexed { index, p ->
+                    val firstTs = history[0].ts
+                    val baseTickTs = ((firstTs + tickAlignMs - 1) / tickAlignMs) * tickAlignMs
+
+                    for (index in history.indices) {
+                        val p = history[index]
                         val xPos = (totalPoints - history.size + index) * pointWidth
                         
-                        // Scale Ticks
-                        if (intervalMs > 0 && p.ts >= baseTickTs) {
-                            val tickCount = (p.ts - baseTickTs) / intervalMs
+                        if (p.ts >= baseTickTs) {
+                            val tickCount = (p.ts - baseTickTs) / tickIntervalMs
                             val prevTickCount = if (index > 0) {
-                                if (history[index - 1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / intervalMs else -1L
+                                if (history[index - 1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / tickIntervalMs else -1L
                             } else -2L
+                            
                             if (tickCount >= 0 && tickCount > prevTickCount) {
                                 drawLine(
                                     color = Color.White.copy(alpha = 0.2f),
@@ -231,22 +229,16 @@ fun ForensicRibbonContainer(
                             }
                         }
 
-                        // Explicit Black Gap Visualization (R106)
                         if (p.isGap) {
                             drawRect(
                                 color = Color.Black,
                                 topLeft = Offset(xPos, baseLineY - maxHeight),
                                 size = Size(maxOf(1f, pointWidth), maxHeight + 2.dp.toPx())
                             )
-                        }
-
-                        // Issue #595: Strict Mode Integrity Validations
-                        if (isStrictMode && index > 0) {
+                        } else if (isStrictMode && index > 0) {
                             val prev = history[index - 1]
-                            
-                            // 1. Sequence Continuity Validation (Hidden Gaps)
                             val tsDelta = p.ts - prev.ts
-                            if (!p.isGap && !prev.isGap && tsDelta > intervalMs * 2) {
+                            if (!prev.isGap && tsDelta > tickIntervalMs * 2) {
                                 drawRect(
                                     color = Color.Red.copy(alpha = 0.4f),
                                     topLeft = Offset(xPos - pointWidth, baseLineY - maxHeight),
@@ -255,8 +247,6 @@ fun ForensicRibbonContainer(
                             }
                         }
                     }
-
-                    // Delegate Content Rendering
                     content(totalPoints, pointWidth, baseLineY, maxHeight, isLandscape)
                 }
             }
@@ -299,11 +289,19 @@ fun GenericSensorRibbon(
         scale = scale,
         isStrictMode = isStrictMode
     ) { totalPoints, pointWidth, baseLineY, maxHeight, landscape ->
+        if (history.isEmpty()) return@ForensicRibbonContainer
+        
         var lastPos: Offset? = null
-        history.forEachIndexed { index, p ->
+        val gapLimitWidth = pointWidth * 10
+        val strokeW = if (landscape) 1.5.dp.toPx() else 1.dp.toPx()
+        val circleR = if (landscape) 1.5.dp.toPx() else 1.dp.toPx()
+        val rectW = maxOf(1f, pointWidth)
+
+        for (index in history.indices) {
+            val p = history[index]
             if (p.isGap) {
                 lastPos = null
-                return@forEachIndexed
+                continue
             }
 
             val xPos = (totalPoints - history.size + index) * pointWidth
@@ -311,27 +309,18 @@ fun GenericSensorRibbon(
             
             if (renderType == RibbonRenderType.BAR) {
                 val barHeight = value * maxHeight
-                drawRect(lineColor.copy(alpha = 0.6f), Offset(xPos, baseLineY - barHeight), Size(maxOf(1f, pointWidth), barHeight))
+                drawRect(lineColor.copy(alpha = 0.6f), Offset(xPos, baseLineY - barHeight), Size(rectW, barHeight))
             } else {
                 val yPos = baseLineY - (value * maxHeight)
-                val currentPos = Offset(xPos + (maxOf(1f, pointWidth) / 2f), yPos)
+                val currentPos = Offset(xPos + (rectW / 2f), yPos)
                 
                 lastPos?.let { lp ->
-                    if (currentPos.x - lp.x < pointWidth * 10) {
-                        drawLine(
-                            color = lineColor, 
-                            start = lp, 
-                            end = currentPos, 
-                            strokeWidth = (if (landscape) 1.5.dp.toPx() else 1.dp.toPx())
-                        )
+                    if (currentPos.x - lp.x < gapLimitWidth) {
+                        drawLine(color = lineColor, start = lp, end = currentPos, strokeWidth = strokeW)
                     }
                 }
                 if (value > 0.05f) {
-                    drawCircle(
-                        color = lineColor, 
-                        radius = (if (landscape) 1.5.dp.toPx() else 1.dp.toPx()), 
-                        center = currentPos
-                    )
+                    drawCircle(color = lineColor, radius = circleR, center = currentPos)
                 }
                 lastPos = currentPos
             }
@@ -351,11 +340,23 @@ fun StatefulConnectionRibbon(
 
 @Composable
 fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStrictMode: Boolean = false) {
-    val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-    val dateFormatter = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val boxHeight = if (isLandscape) 60.dp else 34.dp
     
+    val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    val dateFormatter = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
+
+    val intervalMs = remember(scale) {
+        when(scale) {
+            "7D" -> 2700 * 1000L; "24H" -> 360 * 1000L; "4H" -> 60 * 1000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
+        }
+    }
+    val alignMs = remember(scale) {
+        when(scale) {
+            "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
+        }
+    }
+
     ForensicRibbonContainer(
         title = scale,
         titleColor = Color.Gray,
@@ -364,11 +365,13 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
         scale = scale,
         isStrictMode = isStrictMode
     ) { totalPoints, pointWidth, connectionBaseY, _, landscape ->
+        if (history.isEmpty()) return@ForensicRibbonContainer
+
         val ribbonMaxHeight = if (landscape) 16.dp.toPx() else 10.dp.toPx()
-        // Connection baseline is slightly above the container's baseline to allow for labels
         val effectiveBaseY = connectionBaseY - (if (landscape) 4.dp.toPx() else 2.dp.toPx())
         var lastGpsPos: Offset? = null
         val cyanColor = Color(0xFF00FFFF)
+        val rectW = maxOf(1f, pointWidth)
 
         val textPaint = android.graphics.Paint().apply {
             color = android.graphics.Color.WHITE
@@ -377,16 +380,11 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
             typeface = android.graphics.Typeface.MONOSPACE
         }
 
-        val intervalMs = when(scale) {
-            "7D" -> 2700 * 1000L; "24H" -> 360 * 1000L; "4H" -> 60 * 1000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
-        }
-        val alignMs = when(scale) {
-            "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
-        }
-        val firstTs = history.firstOrNull()?.ts ?: 0L
+        val firstTs = history[0].ts
         val baseTickTs = ((firstTs + alignMs - 1) / alignMs) * alignMs
 
-        history.forEachIndexed { index, p ->
+        for (index in history.indices) {
+            val p = history[index]
             val xPos = (totalPoints - history.size + index) * pointWidth
             
             if (!p.isGap) {
@@ -397,13 +395,11 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
                 drawRect(
                     color = pColor, 
                     topLeft = Offset(xPos, effectiveBaseY - (ribbonMaxHeight * hFactor)), 
-                    size = Size(maxOf(1f, pointWidth), ribbonMaxHeight * hFactor)
+                    size = Size(rectW, ribbonMaxHeight * hFactor)
                 )
 
-                // Issue #595: Clock-Drift Audit
                 if (isStrictMode && index > 0) {
                     val prev = history[index - 1]
-                    // If rt vs ts drift changes by more than 2 seconds, highlight it
                     val currentDrift = p.ts - p.rt
                     val prevDrift = prev.ts - prev.rt
                     if (kotlin.math.abs(currentDrift - prevDrift) > 2000L) {
@@ -415,22 +411,16 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
                     }
                 }
                 
-                // Chain GPS Overlay
                 if (p.hasGps && p.gpsIndex > 0.0) {
                     val dotRadius = (if (landscape) 1.2.dp.toPx() else 0.8.dp.toPx())
                     val baseHeight = if (landscape) 24.dp.toPx() else 14.dp.toPx()
                     val normalizedHeight = (p.gpsIndex.toFloat().coerceIn(0f, 1f) * baseHeight)
                     val yPos = effectiveBaseY - ribbonMaxHeight - (if (landscape) 4.dp.toPx() else 2.dp.toPx()) - normalizedHeight
-                    val currentPos = Offset(xPos + (maxOf(1f, pointWidth) / 2f), yPos)
+                    val currentPos = Offset(xPos + (rectW / 2f), yPos)
                     
                     lastGpsPos?.let { lastPos ->
                         if (currentPos.x - lastPos.x < pointWidth * 10) {
-                            drawLine(
-                                color = cyanColor, 
-                                start = lastPos, 
-                                end = currentPos, 
-                                strokeWidth = (if (landscape) 1.dp.toPx() else 0.5.dp.toPx())
-                            )
+                            drawLine(color = cyanColor, start = lastPos, end = currentPos, strokeWidth = (if (landscape) 1.dp.toPx() else 0.5.dp.toPx()))
                         }
                     }
                     drawCircle(color = cyanColor, radius = dotRadius, center = currentPos)
@@ -440,8 +430,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
                 lastGpsPos = null
             }
 
-            // Time Labels on Connection Ribbon
-            if (intervalMs > 0 && history.isNotEmpty() && p.ts >= baseTickTs) {
+            if (intervalMs > 0 && p.ts >= baseTickTs) {
                 val tickCount = (p.ts - baseTickTs) / intervalMs
                 val prevTickCount = if (index > 0) {
                     if (history[index - 1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / intervalMs else -1L
@@ -478,8 +467,6 @@ fun GlobalStatusBar(
     val isLocalOnline = telemetryState.connectivity.isLocalOnline
     val isRelayConnected = telemetryState.connectivity.isRelayConnected
     val lastIncomingActivity = telemetryState.connectivity.lastRemoteActivityTs
-    
-    // Rationale: isPeerActive uses receipt time already, but we align it with isTelemetryFresh.
     val isPeerActive = dashboardState.isTelemetryFresh
     
     val rtt by rttFlow.collectAsStateWithLifecycle()
@@ -498,13 +485,8 @@ fun GlobalStatusBar(
     val health = if (mode == "viewer") telemetryState.trackerHealth else telemetryState.localHealth
     val lastGpsTs = loc.timestamp
     
-    // Issue #044: Differentiate Local vs Tracker GPS Health for HUD top-level badges.
-    // Fixed: Now relies on dashboardState skew-immune logic.
     val isLocalGpsActive = if (mode == "tracker") dashboardState.isGpsFresh else (systemPulse - telemetryState.localLocation.timestamp < GPS_UI_FAIL_THRESHOLD_MS)
-
-    // Issue #049: Ensure Tracker health badge follows active context (local or remote).
     val isTrackerGpsActive = dashboardState.isGpsFresh
-
     val isDataHealthy = dashboardState.isTelemetryFresh && isLocalOnline && isRelayConnected
 
     val lastTelemetryTs = maxOf(loc.timestamp, loc.telemetryTs)
@@ -582,7 +564,6 @@ fun StatusBar(
         Column(modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 3.dp)) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // R960: Form "Local Capability" Block (INT, SRV, GPS)
                     StatusBadge("INT", isInternet, isBold = true)
                     StatusBadge("SRV", isRelay, isBold = true)
                     StatusBadge("GPS", isLocalGpsActive)
@@ -615,7 +596,6 @@ fun StatusBar(
                 }
                 Spacer(Modifier.width(8.dp))
                 
-                // Issue #044: State label reflects Tracker health.
                 val isMoving = trackerState == TrackerState.MOVING
                 val stateColor = if (!isTrackerGpsActive) Slate500 else BrandJd 
                 
@@ -630,7 +610,6 @@ fun StatusBar(
                 
                 Spacer(Modifier.weight(1f))
 
-                // Issue #044: Speed reflects Tracker health.
                 val speedTargetKph = if (isTrackerGpsActive && !speedMps.isNaN()) speedMps * 3.6f else 0f
                 val animatedSpeed by animateFloatAsState(targetValue = speedTargetKph, animationSpec = tween(1000), label = "SpeedAnim")
                 
