@@ -1,5 +1,6 @@
 package com.gps19.app
 
+import com.gps19.core.engine.LATENCY_THRESHOLD_JNI_MS
 import com.gps19.core.engine.LatencyMonitor
 import com.gps19.core.engine.TimeProvider
 import timber.log.Timber
@@ -8,21 +9,15 @@ import kotlin.concurrent.withLock
 
 /**
  * MbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * July.26.04:
+ * - Issue #589: Performance Audit. Synchronized JNI threshold with EngineConstants.
  * July.25.11:
  * - Issue #590: Refactored to use unified LatencyMonitor.
- * July.25.10:
- * - Issue #580b: Native Signal Latency Audit. Added execution time monitoring 
- *   for JNI calls to prevent tick loop jitter on budget hardware.
- * July.25.05:
- * - Issue #580: Hardening. Implemented ReentrantLock to prevent JNI signal 
- *   collisions during rapid FGS transitions.
  */
 object MbrainHardwareManager {
 
     private var isLibraryLoaded = false
     private val jniLock = ReentrantLock()
-    
-    private const val NATIVE_LATENCY_THRESHOLD_MS = 50L
 
     init {
         try {
@@ -45,9 +40,9 @@ object MbrainHardwareManager {
         return jniLock.withLock {
             LatencyMonitor.measure(
                 timeProvider = timeProvider,
-                thresholdMs = NATIVE_LATENCY_THRESHOLD_MS,
+                thresholdMs = LATENCY_THRESHOLD_JNI_MS,
                 onSpike = { duration ->
-                    Timber.w("FORENSIC ALERT: Native initMbrain latency spike detected (${duration}ms). Threshold: ${NATIVE_LATENCY_THRESHOLD_MS}ms")
+                    Timber.w("FORENSIC ALERT: Native initMbrain latency spike detected (${duration}ms). Threshold: ${LATENCY_THRESHOLD_JNI_MS}ms")
                 }
             ) {
                 try {
@@ -69,9 +64,9 @@ object MbrainHardwareManager {
         return jniLock.withLock {
             LatencyMonitor.measure(
                 timeProvider = timeProvider,
-                thresholdMs = NATIVE_LATENCY_THRESHOLD_MS,
+                thresholdMs = LATENCY_THRESHOLD_JNI_MS,
                 onSpike = { duration ->
-                    Timber.w("FORENSIC ALERT: Native punchHardware latency spike detected (${duration}ms). Threshold: ${NATIVE_LATENCY_THRESHOLD_MS}ms")
+                    Timber.w("FORENSIC ALERT: Native punchHardware latency spike detected (${duration}ms). Threshold: ${LATENCY_THRESHOLD_JNI_MS}ms")
                 }
             ) {
                 try {
@@ -92,9 +87,9 @@ object MbrainHardwareManager {
         return jniLock.withLock {
             LatencyMonitor.measure(
                 timeProvider = timeProvider,
-                thresholdMs = NATIVE_LATENCY_THRESHOLD_MS,
+                thresholdMs = LATENCY_THRESHOLD_JNI_MS,
                 onSpike = { duration ->
-                    Timber.w("FORENSIC ALERT: Native setPowerBudget latency spike detected (${duration}ms). Threshold: ${NATIVE_LATENCY_THRESHOLD_MS}ms")
+                    Timber.w("FORENSIC ALERT: Native setPowerBudget latency spike detected (${duration}ms). Threshold: ${LATENCY_THRESHOLD_JNI_MS}ms")
                 }
             ) {
                 try {

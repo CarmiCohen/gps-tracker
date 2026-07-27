@@ -18,12 +18,10 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * July.23.11:
- * - Issue #113: Throttled Foreground Service updates (5s) to prevent Main-thread 
- *   notification floods and ANRs during hardware recovery bursts.
- * - Added isSystemActive authority to suppress non-essential background noise.
- * July.23.07:
- * - Issue #120b: Startup I/O Stabilization. Staggered proactivePruning.
+ * July.26.04:
+ * - Issue #589: Performance Audit. Integrated reactive Watchdog monitoring.
+ * July.26.03:
+ * - Issue #586: Service Initialization Coordination.
  */
 abstract class BaseMonitorService : LifecycleService() {
 
@@ -54,7 +52,7 @@ abstract class BaseMonitorService : LifecycleService() {
     protected val cachedPkgName by lazy { packageName }
 
     protected var serviceStartRealtime = 0L // Monotonic
-    protected var serviceStartWall = 0L // Wall-clock (Issue #102)
+    protected var serviceStartWall = 0L // Wall-clock
     protected var lastServiceTickTs = 0L // Wall-clock
     protected var lastServiceTickRealtime = 0L // Monotonic
     protected var serviceTickCounter = 0
@@ -68,7 +66,6 @@ abstract class BaseMonitorService : LifecycleService() {
     
     protected val transientDropDetected = AtomicBoolean(false)
 
-    // Issue #113: FGS Throttling
     private var lastFgsUpdateRealtime = 0L
     private val FGS_UPDATE_THROTTLE_MS = 5000L
 
@@ -88,25 +85,33 @@ abstract class BaseMonitorService : LifecycleService() {
         serviceStartWall = timeProvider.currentTimeMillis()
         
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
+            // 1. Mandatory Immediacy: Foreground Service
             startServiceForeground()
             
-            // Sync with system active state
-            repository.isSystemActiveFlow.collectLatest { active ->
-                isSystemActive = active
-            }
-        }
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            delay(2000L)
-            repository.proactivePruning()
-            
-            systemMonitor.setWatchdogListener { set, skipped ->
-                lifecycleScope.launch(Dispatchers.IO) {
-                    logManager.logWatchdogPulse(set, skipped)
+            // 2. Active State Sync
+            launch {
+                repository.isSystemActiveFlow.collectLatest { active ->
+                    isSystemActive = active
                 }
             }
+            
+            // 3. Sub-class Initialization (Coordinated)
+            onServiceInitialize()
 
-            systemMonitor.acquireWakeLock()
+            // 4. Deferred Background Maintenance (Issue #120b)
+            launch(Dispatchers.IO) {
+                systemMonitor.acquireWakeLock()
+                
+                delay(LANDING_PAGE_PAUSE_MS) 
+                repository.proactivePruning()
+                
+                // Reactive Watchdog Monitoring
+                systemMonitor.systemMonitorEvents.collect { event ->
+                    if (event is SystemMonitorEvent.WatchdogScheduled) {
+                        logManager.logWatchdogPulse(event.success, event.skippedCount)
+                    }
+                }
+            }
         }
     }
 
@@ -114,6 +119,12 @@ abstract class BaseMonitorService : LifecycleService() {
     abstract fun updateForegroundServiceType()
     abstract suspend fun processTick(now: Long, nowRt: Long)
     abstract fun getRequiredTickInterval(): Long
+    
+    /**
+     * onServiceInitialize: Event-driven startup hook for subclasses.
+     * July.26.03: Replace arbitrary delay() calls with deterministic coordination.
+     */
+    protected abstract suspend fun onServiceInitialize()
 
     protected fun startTickLoop() {
         tickJob?.cancel()
@@ -142,10 +153,6 @@ abstract class BaseMonitorService : LifecycleService() {
         return (timeProvider.currentTimeMillis() - lastUiPulseTs < UI_PULSE_TIMEOUT_MS)
     }
 
-    /**
-     * safeStartForeground: Wrapped FGS start/update with internal throttling.
-     * July.23.11: Added hard 5s throttle to prevent system flood.
-     */
     protected fun safeStartForeground(id: Int, notification: Notification, type: Int = 0, force: Boolean = false) {
         val now = SystemClock.elapsedRealtime()
         if (!force && lastFgsUpdateRealtime != 0L && (now - lastFgsUpdateRealtime < FGS_UPDATE_THROTTLE_MS)) return

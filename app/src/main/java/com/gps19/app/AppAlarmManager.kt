@@ -3,6 +3,9 @@ package com.gps19.app
 import android.content.Context
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
@@ -12,13 +15,24 @@ import javax.inject.Singleton
 import kotlin.math.ceil
 
 /**
+ * AlarmEvent: Reactive event container for alarm state changes and logging.
+ */
+sealed class AlarmEvent {
+    data class LogEvent(
+        val type: String, val message: String, val important: Boolean, 
+        val extremeValue: Double?, val logId: String?, val durationMs: Long, 
+        val isSpecial: Boolean, val specialColor: Int?, 
+        val lat: Double, val lng: Double, val accuracy: Double, 
+        val maxAccuracy: Double, val snr: Double?, val vibe: Double?
+    ) : AlarmEvent()
+}
+
+/**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * July.23.11:
- * - Tracker Silence: Suppressed shouldPlaySiren in tracker mode to ensure 
- *   stealth and prevent un-stoppable alarms (no red screen in tracker mode).
- * July.23.03:
- * - Issue #527: Siren Persistence. Added restoreState and persistence logic. 
- *   Updated shouldPlaySiren to respect AudioSynthesizer cooldown.
+ * July.26.04:
+ * - Issue #589: Integrated LatencyMonitor spike reporting in evaluateAlarms.
+ * - Issue #545c: Flow Architecture Standardization. Replaced legacy Listener 
+ *   with a SharedFlow (alarmEvents) for reactive event dispatching.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -28,20 +42,8 @@ class AppAlarmManager @Inject constructor(
     private val notificationManager: AppNotificationManager,
     private val timeProvider: TimeProvider
 ) {
-    interface Listener {
-        fun onLogEvent(
-            type: String, message: String, important: Boolean, extremeValue: Double?, 
-            logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, 
-            lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, 
-            snr: Double?, vibe: Double?
-        )
-    }
-
-    private var listener: Listener? = null
-
-    fun setListener(listener: Listener) {
-        this.listener = listener
-    }
+    private val _alarmEvents = MutableSharedFlow<AlarmEvent>(extraBufferCapacity = 64)
+    val alarmEvents: SharedFlow<AlarmEvent> = _alarmEvents.asSharedFlow()
 
     private val activeAlarms = mutableMapOf<String, AlarmEvaluation>()
     private var lastAlarmsJson = "[]"
@@ -268,7 +270,28 @@ class AppAlarmManager @Inject constructor(
             capabilities = capabilities
         )
 
-        val report = MainAlarmLogic.detectViolations(evaluationState)
+        val report = MainAlarmLogic.detectViolations(
+            state = evaluationState,
+            timeProvider = timeProvider,
+            onSpike = { duration ->
+                _alarmEvents.tryEmit(AlarmEvent.LogEvent(
+                    type = ALERT_ID_PERFORMANCE_SPIKE,
+                    message = "$versionTag Performance Spike: detectViolations took ${duration}ms",
+                    important = false,
+                    extremeValue = duration.toDouble(),
+                    logId = null,
+                    durationMs = duration,
+                    isSpecial = true,
+                    specialColor = FORENSIC_PINK_COLOR,
+                    lat = trackerLat,
+                    lng = trackerLng,
+                    accuracy = trackerAccuracy,
+                    maxAccuracy = maxTrackerAccuracy,
+                    snr = snrSnapshot,
+                    vibe = vibeSnapshot
+                ))
+            }
+        )
         
         wasDistanceViolated = evaluationState.wasDistanceViolated
         distanceViolationCounter = evaluationState.distanceViolationCounter
@@ -296,7 +319,7 @@ class AppAlarmManager @Inject constructor(
                         eval.firstTriggerRt = nowRt
                         eval.isResolved = false
                         triggerOccurredInThisCycle = true
-                        listener?.onLogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
+                        _alarmEvents.tryEmit(AlarmEvent.LogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot))
                         
                         if (nowRt - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) {
                             lastSirenStopTs = 0L 
@@ -312,7 +335,7 @@ class AppAlarmManager @Inject constructor(
                 if (!eval.isResolved) {
                     eval.isResolved = true
                     val durationMs = if (eval.firstTriggerRt > 0) nowRt - eval.firstTriggerRt else now - eval.firstTriggerTs
-                    listener?.onLogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, durationMs, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
+                    _alarmEvents.tryEmit(AlarmEvent.LogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, durationMs, isSpecial, specialColor, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot))
                 }
                 newAlarms[type] = eval
             }

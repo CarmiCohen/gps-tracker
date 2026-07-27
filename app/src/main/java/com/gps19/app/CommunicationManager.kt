@@ -8,6 +8,9 @@ import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import org.json.JSONObject
 import timber.log.Timber
 import java.util.Arrays
@@ -16,13 +19,11 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * July.26.03:
+ * - Issue #545c: Flow Architecture Standardization. Replaced RemoteUpdateListener 
+ *   with a SharedFlow (signalingFlow) for reactive event dispatching.
  * July.25.08:
- * - Issue #560c: Socket-Level Pressure. Implemented Dual-Queue Priority 
- *   dispatching with inter-frame throttling for NORMAL priority messages to 
- *   prevent 64KB payloads from blocking pulses.
- * July.25.03:
- * - Issue #560: Pipeline Serialization Hardening. Updated emitBinary to 
- *   honor length parameter for pre-allocated buffer support.
+ * - Issue #560c: Socket-Level Pressure.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -53,7 +54,10 @@ class CommunicationManager @Inject constructor(
     private var lastRelayTrafficTs = timeProvider.elapsedRealtime()
 
     private var onConnectionLost: (() -> Unit)? = null
-    private var remoteUpdateListener: SignalingProvider.RemoteUpdateListener? = null
+
+    // Standardized Flow implementation
+    private val _signalingFlow = MutableSharedFlow<SignalingEvent>(extraBufferCapacity = 64)
+    override val signalingFlow: SharedFlow<SignalingEvent> = _signalingFlow.asSharedFlow()
 
     private val commExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped) return@CoroutineExceptionHandler
@@ -63,7 +67,6 @@ class CommunicationManager @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
     
-    // Issue #560c: Dual-Queue Dispatcher components
     private val normalPriorityQueue = Channel<SignalingCommand>(capacity = Channel.UNLIMITED)
     private var queueProcessorJob: Job? = null
     
@@ -90,15 +93,9 @@ class CommunicationManager @Inject constructor(
                     is SignalingCommand.EmitBinary -> socket?.emit(command.event, command.routingId, command.data)
                 }
 
-                // Issue #560c: Inter-frame delay to prevent socket buffer saturation 
-                // especially for 64KB payloads.
                 delay(50) 
             }
         }
-    }
-
-    override fun setRemoteUpdateListener(listener: SignalingProvider.RemoteUpdateListener?) {
-        this.remoteUpdateListener = listener
     }
 
     private fun isDefaultViewer(id: String) = id == SignalingConstants.DEFAULT_VIEWER_ID || id.isEmpty()
@@ -147,13 +144,11 @@ class CommunicationManager @Inject constructor(
             if (idChanged && oldId.isNotEmpty()) {
                 val transOld = SignalingConstants.getTransmissionId(oldId)
                 logToApp("Identity changed. Leaving $transOld", true)
-                // Identity management is HIGH priority - Bypass queue
                 socket?.emit("leave", transOld)
             }
             if (this.deviceId.isNotEmpty()) {
                 val transNew = SignalingConstants.getTransmissionId(this.deviceId)
                 logToApp("Joining room: $transNew (Force: $force)", false)
-                // Identity management is HIGH priority - Bypass queue
                 socket?.emit("join", createJoinPayload())
                 markTraffic()
             }
@@ -278,7 +273,7 @@ class CommunicationManager @Inject constructor(
                     isTrackerMode = isTrackerMode
             )) return
             
-            remoteUpdateListener?.onUpdate(data)
+            _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(data))
         } catch (e: Exception) {
             Log.e("GPS19", "location_relay parse error")
         }
@@ -287,7 +282,7 @@ class CommunicationManager @Inject constructor(
     private fun handleLocationRelayBinary(args: Array<Any>) {
         try {
             val data = args[0] as ByteArray
-            remoteUpdateListener?.onBinaryUpdate(data)
+            _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
         } catch (e: Exception) {
             Log.e("GPS19", "location_relay_bin direct dispatch failure")
         }
@@ -307,13 +302,11 @@ class CommunicationManager @Inject constructor(
             val entry = LogEntry.fromJSONObject(data)
             logRepository.addLog(entry)
 
-            remoteUpdateListener?.let { listener ->
-                val wrapped = JSONObject()
-                val keys = data.keys()
-                while(keys.hasNext()) { val k = keys.next(); wrapped.put(k, data.get(k)) }
-                wrapped.put("type", "remote_log")
-                listener.onUpdate(wrapped)
-            }
+            val wrapped = JSONObject()
+            val keys = data.keys()
+            while(keys.hasNext()) { val k = keys.next(); wrapped.put(k, data.get(k)) }
+            wrapped.put("type", "remote_log")
+            _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(wrapped))
         } catch (e: Exception) {
             Timber.e(e, "log_relay parse error")
         }
@@ -330,12 +323,12 @@ class CommunicationManager @Inject constructor(
                 if (SignalingConstants.isViewerMatch(incomingViewerId, viewerId)) return
             }
 
-            remoteUpdateListener?.onUpdate(JSONObject().apply {
+            _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply {
                 put("type", "viewer_pulse")
                 put("id", deviceId) 
                 put("viewer_id", incomingViewerId)
                 put("from_viewer", true)
-            })
+            }))
         } catch (e: Exception) {
             Timber.e(e, "viewer_status_relay parse error")
         }
@@ -357,16 +350,15 @@ class CommunicationManager @Inject constructor(
                     data.keys().forEach { incomingMap[it] = data.get(it) }
                     
                     SignalPayloadGenerator.createPongPayload(incomingMap as Map<String, Any>, deviceId, isTrackerMode)?.let { pongMap ->
-                        // Pongs are HIGH priority
                         emitMap("pong_cmd", pongMap, SignalingPriority.HIGH)
                     }
                     
-                    remoteUpdateListener?.onUpdate(JSONObject().apply {
+                    _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply {
                         put("type", SignalingConstants.getPulseType(isTrackerMode))
                         put("id", deviceId)
                         put("viewer_id", incomingViewerId)
                         put("from_viewer", isViewerPing)
-                    })
+                    }))
                 }
             }
         } catch (e: Exception) {
@@ -385,9 +377,9 @@ class CommunicationManager @Inject constructor(
                 val isMyPong = if (isTrackerMode) !isFromViewer else isFromViewer
 
                 if (isMyPong) {
-                    remoteUpdateListener?.onUpdate(JSONObject().apply { 
+                    _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply { 
                         put("type", "pong_activity"); put("id", deviceId); put("viewer_id", pongViewerId); put("from_viewer", isFromViewer) 
-                    })
+                    }))
                     val rtt = (timeProvider.currentTimeMillis() - data.optLong("ts")).toInt()
                     if (rtt > 0) {
                         rtts.add(rtt); if (rtts.size > 5) rtts.removeAt(0)
@@ -397,12 +389,12 @@ class CommunicationManager @Inject constructor(
                 } else {
                     if (isTrackerMode && !SignalingConstants.isViewerMatch(pongViewerId, viewerId) && !isDefaultViewer(viewerId)) return
 
-                    remoteUpdateListener?.onUpdate(JSONObject().apply {
+                    _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply {
                         put("type", SignalingConstants.getPulseType(isTrackerMode))
                         put("id", deviceId)
                         put("viewer_id", pongViewerId)
                         put("from_viewer", isFromViewer)
-                    })
+                    }))
                 }
             }
         } catch (e: Exception) {
@@ -448,10 +440,6 @@ class CommunicationManager @Inject constructor(
         }
     }
 
-    /**
-     * Issue #560: Honor length for zero-allocation buffer support.
-     * Issue #560c: Priority-aware binary emission with throttling.
-     */
     override fun emitBinary(event: String, routingId: String, data: ByteArray, length: Int, priority: SignalingPriority) {
         if (isStopped) return
         markTraffic()
@@ -472,7 +460,6 @@ class CommunicationManager @Inject constructor(
                 delay(100)
                 val mapToSend = pendingLocationMap
                 if (mapToSend != null && isConnected() && !isStopped) { 
-                    // Location updates are NORMAL priority - Queue them
                     normalPriorityQueue.trySend(SignalingCommand.Emit("location_update", JSONObject(mapToSend as Map<*, *>)))
                     pendingLocationMap = null
                 }

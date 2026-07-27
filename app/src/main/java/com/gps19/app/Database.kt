@@ -8,13 +8,13 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * July.26.04:
+ * - Issue #595: Forensic Playback Hardening. Added 'rt' (monotonic time) to 
+ *   HistoryEntity to support historical clock-drift auditing.
+ * - Incremented version to 60.
  * July.22.01:
  * - Issue #118: Forensic Parity. Added missing indices to PendingStatusEntity.
  * - Incremented version to 59.
- * July.21.00:
- * - Issue #105: Incremented version to 58 to resolve Room identity hash mismatch.
- * - Restored Sit Detection and Anchor Lock forensic fields across all entities.
- * - Issue #102: Temporal Forensic Integrity. Standardized 'lastValidFixRt'.
  */
 @Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
 data class LogEntity(
@@ -58,6 +58,7 @@ data class TrailEntity(
 data class HistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val ts: Long,
+    @ColumnInfo(defaultValue = "0") val rt: Long = 0L,
     val rtt: Int,
     val isConnected: Boolean,
     val isGap: Boolean,
@@ -212,7 +213,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 59, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 60, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -221,6 +222,13 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_59_60 = object : Migration(59, 60) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #595: Add 'rt' column to connection_history.
+                db.execSQL("ALTER TABLE connection_history ADD COLUMN rt INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         val MIGRATION_56_57 = object : Migration(56, 57) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #097: Re-harmonize all tables to resolve Identity Hash mismatch.
@@ -259,7 +267,6 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_57_58 = object : Migration(57, 58) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #105: Room identity hash mismatch resolution. 
-                // All schema changes already handled in harmonized MIGRATION_56_57.
             }
         }
         val MIGRATION_58_59 = object : Migration(58, 59) {

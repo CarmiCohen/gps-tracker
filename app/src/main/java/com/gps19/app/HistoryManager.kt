@@ -5,6 +5,9 @@ import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -15,13 +18,19 @@ import javax.inject.Singleton
 import kotlin.math.abs
 
 /**
+ * HistoryEvent: Reactive event container for history-related logs and triggers.
+ */
+sealed class HistoryEvent {
+    data class LogEvent(val message: String, val important: Boolean) : HistoryEvent()
+}
+
+/**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * July.26.01:
- * - Issue #592: Lifecycle Idempotency. Added isInitialized AtomicBoolean guard 
- *   to initialize() to prevent redundant state restoration and scope assignment.
- * July.25.02:
- * - Issue #570: Forensic Snapshot Pooling. Refactored backfill sequences to 
- *   eliminate intermediate object churn.
+ * July.26.04:
+ * - Issue #595: Forensic Playback Hardening. Updated mapToAppPoint to include 'rt' 
+ *   (monotonic time) for forensic clock-drift auditing in UI ribbons.
+ * - Issue #589: Performance Audit. Integrated LatencyMonitor into high-frequency 
+ *   ribbon processing and DB write paths to detect I/O contention.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -32,12 +41,10 @@ class HistoryManager @Inject constructor(
     private val sensorManager: AppSensorManager,
     private val locationProcessor: LocationProcessor
 ) {
-    interface Listener {
-        fun onLogEvent(message: String, important: Boolean)
-    }
+    private val _historyEvents = MutableSharedFlow<HistoryEvent>(extraBufferCapacity = 16)
+    val historyEvents: SharedFlow<HistoryEvent> = _historyEvents.asSharedFlow()
 
     private var scope: CoroutineScope? = null
-    private var listener: Listener? = null
     private val isInitialized = AtomicBoolean(false)
 
     private var lastProcessedHour = -1
@@ -53,10 +60,6 @@ class HistoryManager @Inject constructor(
     private var lastTimeTriggerTs = 0L
 
     private var lastSitDetectedRt = 0L
-
-    fun setListener(listener: Listener) {
-        this.listener = listener
-    }
 
     suspend fun initialize(scope: CoroutineScope) {
         if (isInitialized.getAndSet(true)) return
@@ -114,7 +117,7 @@ class HistoryManager @Inject constructor(
         
         if (now - lastAuditTs > 60000L) {
             if (backfillAuditCount > 0) {
-                listener?.onLogEvent("Forensic: 4M Continuity Audit - Backfilled $backfillAuditCount points in last 60s to maintain 1Hz resolution during idle.", false)
+                _historyEvents.tryEmit(HistoryEvent.LogEvent("Forensic: 4M Continuity Audit - Backfilled $backfillAuditCount points in last 60s to maintain 1Hz resolution during idle.", false))
                 backfillAuditCount = 0
             }
             lastAuditTs = now
@@ -211,8 +214,16 @@ class HistoryManager @Inject constructor(
     }
 
     private fun processResults(results: List<Pair<RibbonScale, EngineConnectionPoint>>) {
-        results.forEach { (scale, point) ->
-            repository.addHistoryPoint(scale.key, mapToAppPoint(point))
+        LatencyMonitor.measure(
+            timeProvider,
+            LATENCY_THRESHOLD_DB_WRITE_MS,
+            { duration ->
+                _historyEvents.tryEmit(HistoryEvent.LogEvent("Forensic Warning: processResults DB spike (${duration}ms)", false))
+            }
+        ) {
+            results.forEach { (scale, point) ->
+                repository.addHistoryPoint(scale.key, mapToAppPoint(point))
+            }
         }
     }
 
@@ -251,69 +262,85 @@ class HistoryManager @Inject constructor(
         currentMa: Int,
         locationPendingReason: LocationPendingReason
     ) {
-        val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
-        val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
-
-        val baseTemplate = EngineConnectionPoint(
-            ts = 0L,
-            rt = 0L,
-            rtt = rtt,
-            remoteSig = peerSignal,
-            isConnected = peerAvail,
-            hasGps = hasGps,
-            accuracy = accuracy,
-            maxAccuracy = maxAccuracy,
-            noiseIdx = noiseIdx,
-            luxIdx = luxIdx,
-            vibeIdx = vibeIdx,
-            proxIdx = proxIdx,
-            liftIdx = liftIdx,
-            snrIdx = snrIdx,
-            tiltIdx = tiltIdx,
-            baroIdx = baroIdx,
-            verticalVelocity = verticalVelocity,
-            sitVz = sitVz,
-            sitDz = sitDz,
-            sitBaro = sitBaro,
-            sitTilt = sitTilt,
-            sitShock = sitShock,
-            isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt),
-            isSitActive = isSitActive,
-            isBatterySteepDischarge = isBatterySteepDischarge,
-            isCoolingModeActive = isCoolingModeActive,
-            speed = speed,
-            bearing = bearing,
-            currentMa = currentMa,
-            locationPendingReason = locationPendingReason
-        )
-
-        val results = aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplate)
-        
-        val fourMPoints = ArrayList<ConnectionPoint>()
-        results.forEach { (scale, point) ->
-            val appPoint = mapToAppPoint(point)
-            if (scale == RibbonScale.FOUR_MIN) {
-                fourMPoints.add(appPoint)
-            } else {
-                repository.addHistoryPoint(scale.key, appPoint)
+        LatencyMonitor.measure(
+            timeProvider,
+            LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
+            { duration ->
+                _historyEvents.tryEmit(HistoryEvent.LogEvent("Forensic Warning: backfillAnalyticalGaps logic spike (${duration}ms)", false))
             }
-        }
-        
-        if (fourMPoints.isNotEmpty()) {
-            repository.addHistoryPoints("4M", fourMPoints)
-            backfillAuditCount += fourMPoints.size
-            hourlyBackfillTotal += fourMPoints.size
+        ) {
+            val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
+            val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
+
+            val baseTemplate = EngineConnectionPoint(
+                ts = 0L,
+                rt = 0L,
+                rtt = rtt,
+                remoteSig = peerSignal,
+                isConnected = peerAvail,
+                hasGps = hasGps,
+                accuracy = accuracy,
+                maxAccuracy = maxAccuracy,
+                noiseIdx = noiseIdx,
+                luxIdx = luxIdx,
+                vibeIdx = vibeIdx,
+                proxIdx = proxIdx,
+                liftIdx = liftIdx,
+                snrIdx = snrIdx,
+                tiltIdx = tiltIdx,
+                baroIdx = baroIdx,
+                verticalVelocity = verticalVelocity,
+                sitVz = sitVz,
+                sitDz = sitDz,
+                sitBaro = sitBaro,
+                sitTilt = sitTilt,
+                sitShock = sitShock,
+                isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt),
+                isSitActive = isSitActive,
+                isBatterySteepDischarge = isBatterySteepDischarge,
+                isCoolingModeActive = isCoolingModeActive,
+                speed = speed,
+                bearing = bearing,
+                currentMa = currentMa,
+                locationPendingReason = locationPendingReason
+            )
+
+            val results = aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplate)
+            
+            val fourMPoints = ArrayList<ConnectionPoint>()
+            results.forEach { (scale, point) ->
+                val appPoint = mapToAppPoint(point)
+                if (scale == RibbonScale.FOUR_MIN) {
+                    fourMPoints.add(appPoint)
+                } else {
+                    repository.addHistoryPoint(scale.key, appPoint)
+                }
+            }
+            
+            if (fourMPoints.isNotEmpty()) {
+                repository.addHistoryPoints("4M", fourMPoints)
+                backfillAuditCount += fourMPoints.size
+                hourlyBackfillTotal += fourMPoints.size
+            }
         }
     }
 
     private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
-        val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs, now) else emptySequence()
-        val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs, now) else emptySequence()
+        LatencyMonitor.measure(
+            timeProvider,
+            LATENCY_THRESHOLD_DB_WRITE_MS,
+            { duration ->
+                _historyEvents.tryEmit(HistoryEvent.LogEvent("Forensic Warning: fillRealGap cycle spike (${duration}ms)", false))
+            }
+        ) {
+            val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs, now) else emptySequence()
+            val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs, now) else emptySequence()
 
-        RibbonScale.entries.forEach { scale ->
-            val gapPoints = aggregator.fillRealGap(scale.key, scale.intervalSeconds, lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb())
-            if (gapPoints.isNotEmpty()) {
-                repository.addHistoryPoints(scale.key, gapPoints.map { mapToAppPoint(it) })
+            RibbonScale.entries.forEach { scale ->
+                val gapPoints = aggregator.fillRealGap(scale.key, scale.intervalSeconds, lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb())
+                if (gapPoints.isNotEmpty()) {
+                    repository.addHistoryPoints(scale.key, gapPoints.map { mapToAppPoint(it) })
+                }
             }
         }
     }
@@ -332,7 +359,7 @@ class HistoryManager @Inject constructor(
         if (delta > DRIFT_TOLERANCE_MS) {
             val jumpSec = delta / 1000
             val direction = if (currentDrift > clockDriftRef) "forward" else "backward"
-            listener?.onLogEvent("FORENSIC ALERT: System clock jump detected ($direction ${jumpSec}s). Monotonic uptime preserved.", true)
+            _historyEvents.tryEmit(HistoryEvent.LogEvent("FORENSIC ALERT: System clock jump detected ($direction ${jumpSec}s). Monotonic uptime preserved.", true))
             clockDriftRef = currentDrift
             scope?.launch { repository.saveLong(MainRepository.CLOCK_DRIFT_REF_KEY, currentDrift) }
         }
@@ -353,6 +380,7 @@ class HistoryManager @Inject constructor(
     private fun mapToAppPoint(p: EngineConnectionPoint): ConnectionPoint {
         return ConnectionPoint(
             ts = p.ts,
+            rt = p.rt,
             rtt = p.rtt,
             localSig = 10,
             remoteSig = p.remoteSig,
@@ -396,11 +424,11 @@ class HistoryManager @Inject constructor(
                     repository.saveIntSync("last_auto_save_hour", hour)
                     
                     if (hourlyBackfillTotal > 0) {
-                        listener?.onLogEvent("Forensic: Hourly Continuity Audit - Backfilled $hourlyBackfillTotal points to maintain 1Hz fidelity during power-save ticks.", false)
+                        _historyEvents.tryEmit(HistoryEvent.LogEvent("Forensic: Hourly Continuity Audit - Backfilled $hourlyBackfillTotal points to maintain 1Hz fidelity during power-save ticks.", false))
                         hourlyBackfillTotal = 0
                     }
 
-                    listener?.onLogEvent("Hourly auto-export", false)
+                    _historyEvents.tryEmit(HistoryEvent.LogEvent("Hourly auto-export", false))
                     scope?.launch(Dispatchers.IO) {
                         MainFileHelper.autoExportData(context, repository, timeProvider)
                     }
@@ -420,7 +448,7 @@ class HistoryManager @Inject constructor(
                     if (repository.getString("last_daily_cleanup_date", "") != todayDate) {
                         lastCleanupDate = todayDate
                         repository.saveStringSync("last_daily_cleanup_date", todayDate)
-                        listener?.onLogEvent("Periodic daily cleanup of trails", true)
+                        _historyEvents.tryEmit(HistoryEvent.LogEvent("Periodic daily cleanup of trails", true))
                         repository.clearTrails()
                     } else {
                         lastCleanupDate = todayDate
@@ -439,7 +467,7 @@ class HistoryManager @Inject constructor(
                     if (repository.getString("last_daily_archive_date", "") != todayDate) {
                         lastArchiveDate = todayDate
                         repository.saveStringSync("last_daily_archive_date", todayDate)
-                        listener?.onLogEvent("Periodic daily archiving of old files", true)
+                        _historyEvents.tryEmit(HistoryEvent.LogEvent("Periodic daily archiving of old files", true))
                         scope?.launch(Dispatchers.IO) {
                             MainFileHelper.performDailyArchiving(context, timeProvider)
                         }

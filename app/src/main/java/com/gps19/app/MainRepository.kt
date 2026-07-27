@@ -10,16 +10,19 @@ import org.osmdroid.util.GeoPoint
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
- * July.25.11:
- * - Issue #590: Unified Latency Monitoring. Integrated LatencyMonitor into DB 
- *   hot-paths (History, Trail, Violations) to detect I/O jitter.
- * July.23.03:
- * - Issue #527: Siren Persistence. Exposed lastAlarmsJsonFlow and saveAlarmsJson.
+ * July.26.04:
+ * - Issue #595: Forensic Playback Hardening. Updated history mapping to include 
+ *   'rt' (monotonic time) for strict forensic auditing.
+ * July.26.03:
+ * - Issue #585: Forensic I/O Optimization. Decoupled DB pruning from insertion 
+ *   hot-paths. Implemented asynchronous, throttled pruning for history, trails, 
+ *   and violations to prevent DB latency spikes on low-end hardware.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -49,6 +52,8 @@ class MainRepository @Inject constructor(
     private var trailWriteCount = 0
     private var violationWriteCount = 0
     private var historyWriteCount = 0
+    
+    private val isPruningActive = AtomicBoolean(false)
 
     companion object {
         const val APP_MODE_KEY = SettingsRepository.APP_MODE_KEY
@@ -107,7 +112,9 @@ class MainRepository @Inject constructor(
 
         private const val HISTORY_BATCH_WRITE_INTERVAL_MS = 5000L
         private const val HISTORY_BUFFER_MAX_SIZE = 100
-        private const val DB_PRUNE_THRESHOLD = 50
+        
+        private const val DB_PRUNE_THRESHOLD_HISTORY = 500
+        private const val DB_PRUNE_THRESHOLD_TRAIL = 100
         
         private const val DB_LATENCY_THRESHOLD_MS = 500L
     }
@@ -285,9 +292,9 @@ class MainRepository @Inject constructor(
                 ))
                 
                 trailWriteCount++
-                if (force || trailWriteCount >= DB_PRUNE_THRESHOLD) {
+                if (force || trailWriteCount >= DB_PRUNE_THRESHOLD_TRAIL) {
                     trailWriteCount = 0
-                    trailDao.pruneTrail(isViewer)
+                    triggerBackgroundPruning()
                 }
             }
         }
@@ -324,9 +331,9 @@ class MainRepository @Inject constructor(
                 violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
                 
                 violationWriteCount++
-                if (violationWriteCount >= DB_PRUNE_THRESHOLD) {
+                if (violationWriteCount >= DB_PRUNE_THRESHOLD_TRAIL) {
                     violationWriteCount = 0
-                    violationDao.prune()
+                    triggerBackgroundPruning()
                 }
             }
         }
@@ -335,7 +342,7 @@ class MainRepository @Inject constructor(
     fun getHistoryFlow(ribbonKey: String): Flow<List<ConnectionPoint>> = historyDao.getHistoryFlow(ribbonKey).map { l: List<HistoryEntity> -> 
         l.map { entity ->
             ConnectionPoint(
-                localId = UUID.randomUUID().toString(), ts = entity.ts, rtt = entity.rtt, localSig = 10, remoteSig = entity.remoteSig,
+                localId = UUID.randomUUID().toString(), ts = entity.ts, rt = entity.rt, rtt = entity.rtt, localSig = 10, remoteSig = entity.remoteSig,
                 isConnected = entity.isConnected, isGap = entity.isGap, gpsAccuracy = entity.accuracy, maxAccuracy = entity.maxAccuracy, isTick = entity.isTick, 
                 hasGps = entity.hasGps,
                 isBatterySteepDischarge = entity.isBatterySteepDischarge,
@@ -344,7 +351,6 @@ class MainRepository @Inject constructor(
                 currentMa = entity.currentMa,
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE },
                 
-                // Forensic Indices (July.22.01)
                 gpsIndex = entity.gpsIndex,
                 noiseIdx = entity.noiseIdx,
                 luxIdx = entity.luxIdx,
@@ -383,7 +389,7 @@ class MainRepository @Inject constructor(
 
         points.forEach { point ->
             historyBuffer.add(HistoryEntity(
-                ts = point.ts, rtt = point.rtt, isConnected = point.isConnected, isGap = point.isGap, 
+                ts = point.ts, rt = point.rt, rtt = point.rtt, isConnected = point.isConnected, isGap = point.isGap, 
                 hasGps = point.hasGps, isTick = point.isTick, ribbonKey = ribbonKey,
                 isBatterySteepDischarge = point.isBatterySteepDischarge,
                 remoteSig = point.remoteSig,
@@ -394,7 +400,6 @@ class MainRepository @Inject constructor(
                 accuracy = point.gpsAccuracy,
                 maxAccuracy = point.maxAccuracy,
                 
-                // Forensic Indices (July.22.01)
                 gpsIndex = point.gpsIndex,
                 noiseIdx = point.noiseIdx,
                 luxIdx = point.luxIdx,
@@ -439,15 +444,40 @@ class MainRepository @Inject constructor(
             ) {
                 database.withTransaction {
                     historyDao.insertAll(dbPoints)
-                    
                     historyWriteCount += dbPoints.size
-                    if (historyWriteCount >= DB_PRUNE_THRESHOLD) {
-                        historyWriteCount = 0
+                }
+                
+                if (historyWriteCount >= DB_PRUNE_THRESHOLD_HISTORY) {
+                    historyWriteCount = 0
+                    triggerBackgroundPruning()
+                }
+            }
+        }
+    }
+
+    private fun triggerBackgroundPruning() {
+        if (isPruningActive.getAndSet(true)) return
+        
+        scope.launch {
+            try {
+                LatencyMonitor.measure(
+                    timeProvider = timeProvider,
+                    thresholdMs = DB_LATENCY_THRESHOLD_MS * 4, 
+                    onSpike = { duration -> logLatencySpike("Background Pruning", duration) }
+                ) {
+                    database.withTransaction {
                         listOf("4M", "16M", "1H", "4H", "24H", "7D").forEach { key ->
                             historyDao.pruneHistory(key)
                         }
+                        trailDao.pruneTrail(false)
+                        trailDao.pruneTrail(true)
+                        violationDao.prune()
                     }
                 }
+            } catch (e: Exception) {
+                Timber.e(e, "Issue #585: Background pruning failed")
+            } finally {
+                isPruningActive.set(false)
             }
         }
     }
@@ -463,7 +493,7 @@ class MainRepository @Inject constructor(
             id = "SYSTEM",
             viewerId = "SYSTEM",
             isSpecial = true,
-            specialColor = 0xFFFFD700.toInt() // Gold for warnings
+            specialColor = 0xFFFFD700.toInt()
         ), initiallySynced = true)
     }
 

@@ -19,29 +19,45 @@ import android.os.Looper
 import android.view.Display
 import androidx.core.content.ContextCompat
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import timber.log.Timber
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.math.*
 
 /**
- * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * July.26.01:
- * - Issue #591: Lifecycle Idempotency. Added isStarted AtomicBoolean guard to 
- *   prevent redundant platform-level sensor and display listener registrations.
- * July.25.10:
- * - Issue #570b: Flyweight Thread Safety Audit. Moved sequence flyweights to method scope 
- *   and refactored consumeForensicSnapshot to return new instances, securing 
- *   asynchronous alarm evaluation boundaries.
+ * AppSensorEvent: Reactive event container for sensor hardware status.
  */
-class AppSensorManager(
-    private val context: Context,
-    private val scope: CoroutineScope,
+sealed class AppSensorEvent {
+    data class HardwareFailure(val reason: String) : AppSensorEvent()
+    data class LogEvent(val message: String, val important: Boolean) : AppSensorEvent()
+}
+
+/**
+ * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.26.04:
+ * - Issue #589: Performance Audit. Integrated LatencyMonitor into snapshot 
+ *   consumption and forensic sample retrieval paths.
+ * - Issue #545c: Service Reactive Migration. Replaced legacy hardware failure 
+ *   callback with a SharedFlow (sensorEvents) for reactive error handling.
+ */
+@Singleton
+class AppSensorManager @Inject constructor(
+    @ApplicationContext private val context: Context,
+    @ApplicationScope private val scope: CoroutineScope,
     private val timeProvider: TimeProvider,
     private val systemMonitor: SystemMonitor
 ) : SensorEventListener {
+
+    private val _sensorEvents = MutableSharedFlow<AppSensorEvent>(extraBufferCapacity = 8)
+    val sensorEvents: SharedFlow<AppSensorEvent> = _sensorEvents.asSharedFlow()
 
     private val sensorManager by lazy { context.getSystemService(Context.SENSOR_SERVICE) as AndroidSensorManager }
     private val displayManager by lazy { context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager }
@@ -210,8 +226,6 @@ class AppSensorManager(
     private var sessionStartRt = 0L
     val isWarming: Boolean get() = (timeProvider.elapsedRealtime() - sessionStartRt < SENSOR_WARMING_MS)
 
-    private var onHardwareFailure: ((String) -> Unit)? = null
-
     var currentVibrationIndex: Double = 0.0
         private set
     
@@ -372,10 +386,6 @@ class AppSensorManager(
         attemptStepDetectorRegistration()
     }
 
-    fun setHardwareFailureCallback(callback: (String) -> Unit) {
-        this.onHardwareFailure = callback
-    }
-
     fun setAcousticFastPath(floor: Double, spikeThreshold: Double, minDb: Double, onSpike: () -> Unit) {
         synchronized(this) {
             this.fastPathFloor = floor
@@ -460,7 +470,7 @@ class AppSensorManager(
                     var calcDebounceMs = baseDebounceMs
                     if (isStationary() && stationaryStartRt > 0) {
                         val hoursStationary = (nowRt - stationaryStartRt) / 3600000.0
-                        calcDebounceMs += (hoursStationary * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR).toLong()
+                        calcDebounceMs += (hoursStationary * PROXIMITY_STARY_SCALING_MS_PER_HOUR).toLong()
                     }
                     if (isHighLoad) calcDebounceMs = (calcDebounceMs * PROXIMITY_STRESS_SCALING_MULTIPLIER).toLong()
                     calcDebounceMs = calcDebounceMs.coerceAtMost(PROXIMITY_DEBOUNCE_MAX_MS)
@@ -521,7 +531,7 @@ class AppSensorManager(
                 val sampleRate = ACOUSTIC_SAMPLE_RATE
                 val bufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
                 if (bufferSize <= 0) {
-                    if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Invalid buffer size")
+                    if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Invalid buffer size"))
                     try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }
                     continue
                 }
@@ -536,18 +546,18 @@ class AppSensorManager(
                     }
                     if (!isMonitoring) break
                     if (audioRecord == null || audioRecord.state != AudioRecord.STATE_INITIALIZED) {
-                        if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Init failed")
+                        if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Init failed"))
                         try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }
                         continue
                     }
                     try { audioRecord.startRecording() } catch (e: IllegalStateException) {
-                        if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Mic occupied")
+                        if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Mic occupied"))
                         try { audioRecord.release() } catch (ex: Exception) {}
                         try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }
                         continue
                     }
                     if (audioRecord.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
-                        if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Contention")
+                        if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Contention"))
                         try { audioRecord.release() } catch (ex: Exception) {}
                         try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }
                         continue
@@ -592,12 +602,12 @@ class AppSensorManager(
                             }
                         } else if (read < 0) {
                             if (!isMonitoring) break
-                            onHardwareFailure?.invoke("AudioRecord: Hardware error"); break
+                            _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Hardware error")); break
                         }
                     }
                     try { audioRecord.stop() } catch (ex: Exception) {}
                 } catch (e: Exception) {
-                    if (isMonitoring) onHardwareFailure?.invoke("AudioRecord: Exception - ${e.message}")
+                    if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Exception - ${e.message}"))
                 } finally {
                     isAcousticRunning = false; try { audioRecord?.release() } catch (ex: Exception) {}
                     if (isMonitoring) try { Thread.sleep(ACOUSTIC_GENERIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { }
@@ -611,120 +621,144 @@ class AppSensorManager(
     fun isAcousticMonitoringEnabled(): Boolean = isMonitoring
 
     fun consumeForensicSnapshot(): ForensicSnapshot {
-        synchronized(this) {
-            val snapshot = ForensicSnapshot().apply {
-                vibration = currentVibrationIndex
-                heading = currentCompassHeading
-                baroAlt = absoluteAltitude
-                lux = currentLux
-                isNear = isProximityNear
-                tiltDegrees = currentTiltDegrees
-                acousticDb = currentAcousticDb
-                peakShock = internalPeakVibration
-                peakVerticalVelocity = internalPeakVerticalVelocity
-                peakVerticalVelocityTs = internalPeakVerticalVelocityTs
-                peakVerticalVelocityRt = internalPeakVerticalVelocityRt
-                plungeMatched = !isWarming && plungeMatched
-                peakVerticalDisplacement = internalPeakVerticalDisplacement
-                proximityIdx = this@AppSensorManager.proximityIdx
-                proximityCm = currentProximityCm
-                proximityDebounceMs = this@AppSensorManager.proximityDebounceMs
-                vibrationRollingSum = this@AppSensorManager.vibrationRollingSum
-                acousticPeak = internalPeakDb
-                acousticMin = if (internalMinDb >= 100.0) -1.0 else internalMinDb
+        return LatencyMonitor.measure(
+            timeProvider,
+            LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
+            { duration ->
+                _sensorEvents.tryEmit(AppSensorEvent.LogEvent("Forensic Warning: consumeForensicSnapshot spike (${duration}ms)", false))
             }
-            
-            internalPeakVibration = 0.0
-            internalPeakVerticalVelocity = 0.0
-            internalPeakVerticalVelocityTs = 0L
-            internalPeakVerticalVelocityRt = 0L
-            internalPeakVerticalDisplacement = 0.0
-            plungeMatched = false
-            internalPeakDb = 0.0
-            internalMinDb = 100.0
-            
-            return snapshot
+        ) {
+            synchronized(this) {
+                val snapshot = ForensicSnapshot().apply {
+                    vibration = currentVibrationIndex
+                    heading = currentCompassHeading
+                    baroAlt = absoluteAltitude
+                    lux = currentLux
+                    isNear = isProximityNear
+                    tiltDegrees = currentTiltDegrees
+                    acousticDb = currentAcousticDb
+                    peakShock = internalPeakVibration
+                    peakVerticalVelocity = internalPeakVerticalVelocity
+                    peakVerticalVelocityTs = internalPeakVerticalVelocityTs
+                    peakVerticalVelocityRt = internalPeakVerticalVelocityRt
+                    plungeMatched = !isWarming && plungeMatched
+                    peakVerticalDisplacement = internalPeakVerticalDisplacement
+                    proximityIdx = this@AppSensorManager.proximityIdx
+                    proximityCm = currentProximityCm
+                    proximityDebounceMs = this@AppSensorManager.proximityDebounceMs
+                    vibrationRollingSum = this@AppSensorManager.vibrationRollingSum
+                    acousticPeak = internalPeakDb
+                    acousticMin = if (internalMinDb >= 100.0) -1.0 else internalMinDb
+                }
+                
+                internalPeakVibration = 0.0
+                internalPeakVerticalVelocity = 0.0
+                internalPeakVerticalVelocityTs = 0L
+                internalPeakVerticalVelocityRt = 0L
+                internalPeakVerticalDisplacement = 0.0
+                plungeMatched = false
+                internalPeakDb = 0.0
+                internalMinDb = 100.0
+                
+                snapshot
+            }
         }
     }
 
     fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<EngineSensorSnapshot> = sequence {
-        val flyweight = EngineSensorSnapshot()
-        val c: Int
-        val startIdx: Int
-        synchronized(this@AppSensorManager) {
-            c = bufferCount
-            startIdx = (bufferIdx - c + 256) % 256
-        }
-        
-        for (i in 0 until c) {
-            val idx = (startIdx + i) % 256
-            val ts: Long
-            val rt: Long
-            val lux: Double
-            val vibe: Double
-            val proxIdx: Double
-            val tilt: Double
-            val lift: Double
-            val acoustic: Double
-            val sit: Boolean
-            
-            synchronized(this@AppSensorManager) {
-                ts = bufferTs[idx]
-                rt = bufferRt[idx]
-                lux = bufferLux[idx]
-                vibe = bufferVibe[idx]
-                proxIdx = bufferProxIdx[idx]
-                tilt = bufferTilt[idx]
-                lift = bufferLift[idx]
-                acoustic = bufferAcoustic[idx]
-                sit = bufferSit[idx]
+        LatencyMonitor.measure(
+            timeProvider,
+            LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
+            { duration ->
+                _sensorEvents.tryEmit(AppSensorEvent.LogEvent("Forensic Warning: getSensorSamples spike (${duration}ms)", false))
             }
-
-            if (ts in fromTs..toTs) {
-                flyweight.apply {
-                    this.ts = ts
-                    this.rt = rt
-                    this.lux = lux
-                    this.vibe = vibe
-                    this.proxIdx = proxIdx
-                    this.tilt = tilt
-                    this.lift = lift
-                    this.acoustic = acoustic
-                    this.isSitDetected = sit
+        ) {
+            val flyweight = EngineSensorSnapshot()
+            val c: Int
+            val startIdx: Int
+            synchronized(this@AppSensorManager) {
+                c = bufferCount
+                startIdx = (bufferIdx - c + 256) % 256
+            }
+            
+            for (i in 0 until c) {
+                val idx = (startIdx + i) % 256
+                val ts: Long
+                val rt: Long
+                val lux: Double
+                val vibe: Double
+                val proxIdx: Double
+                val tilt: Double
+                val lift: Double
+                val acoustic: Double
+                val sit: Boolean
+                
+                synchronized(this@AppSensorManager) {
+                    ts = bufferTs[idx]
+                    rt = bufferRt[idx]
+                    lux = bufferLux[idx]
+                    vibe = bufferVibe[idx]
+                    proxIdx = bufferProxIdx[idx]
+                    tilt = bufferTilt[idx]
+                    lift = bufferLift[idx]
+                    acoustic = bufferAcoustic[idx]
+                    sit = bufferSit[idx]
                 }
-                yield(flyweight)
+
+                if (ts in fromTs..toTs) {
+                    flyweight.apply {
+                        this.ts = ts
+                        this.rt = rt
+                        this.lux = lux
+                        this.vibe = vibe
+                        this.proxIdx = proxIdx
+                        this.tilt = tilt
+                        this.lift = lift
+                        this.acoustic = acoustic
+                        this.isSitDetected = sit
+                    }
+                    yield(flyweight)
+                }
             }
         }
     }
 
     fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
-        val flyweight = EngineSnrSample()
-        val c: Int
-        val startIdx: Int
-        synchronized(this@AppSensorManager) {
-            c = bufferCount
-            startIdx = (bufferIdx - c + 256) % 256
-        }
-
-        for (i in 0 until c) {
-            val idx = (startIdx + i) % 256
-            val ts: Long
-            val rt: Long
-            val acoustic: Double
-            
+        LatencyMonitor.measure(
+            timeProvider,
+            LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
+            { duration ->
+                _sensorEvents.tryEmit(AppSensorEvent.LogEvent("Forensic Warning: getAcousticSamples spike (${duration}ms)", false))
+            }
+        ) {
+            val flyweight = EngineSnrSample()
+            val c: Int
+            val startIdx: Int
             synchronized(this@AppSensorManager) {
-                ts = bufferTs[idx]
-                rt = bufferRt[idx]
-                acoustic = bufferAcoustic[idx]
+                c = bufferCount
+                startIdx = (bufferIdx - c + 256) % 256
             }
 
-            if (ts in fromTs..toTs) {
-                flyweight.apply {
-                    this.ts = ts
-                    this.rt = rt
-                    this.snr = acoustic
+            for (i in 0 until c) {
+                val idx = (startIdx + i) % 256
+                val ts: Long
+                val rt: Long
+                val acoustic: Double
+                
+                synchronized(this@AppSensorManager) {
+                    ts = bufferTs[idx]
+                    rt = bufferRt[idx]
+                    acoustic = bufferAcoustic[idx]
                 }
-                yield(flyweight)
+
+                if (ts in fromTs..toTs) {
+                    flyweight.apply {
+                        this.ts = ts
+                        this.rt = rt
+                        this.snr = acoustic
+                    }
+                    yield(flyweight)
+                }
             }
         }
     }

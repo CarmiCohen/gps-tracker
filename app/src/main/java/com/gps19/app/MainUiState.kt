@@ -6,6 +6,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * July.26.04:
+ * - Issue #595: Forensic Playback Hardening. Added isStrictMode to NavigationState 
+ *   to gate enhanced data integrity validation in ribbons.
  * July.24.08:
  * - Issue #547: State Decomposition. Extracted high-frequency fields into 
  *   TelemetryState to reduce heap churn and mitigate kernel memory overhead.
@@ -142,6 +145,7 @@ data class NavigationState(
     val isMapVisible: Boolean = false, val isLogVisible: Boolean = false, val isSettingsOpen: Boolean = false,
     val isPhoneSetupVisible: Boolean = false, val isDashboardExpanded: Boolean = true,
     val isRibbonsVisible: Boolean = false,
+    val isStrictMode: Boolean = false,
     val isGnssDetailVisible: Boolean = false,
     val isStopTrackingConfirmationVisible: Boolean = false,
     val isDiagnosticsVisible: Boolean = false,

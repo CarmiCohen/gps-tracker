@@ -1,15 +1,16 @@
 package com.gps19.core.engine
 
-import java.util.Locale
+import com.gps19.core.engine.PhysicsUtils.safeDouble
 import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * July.26.04:
+ * - Architecture Simplification (Issue #588): Refactored to use centralized PhysicsUtils 
+ *   and SentinelValidator baseline logic. Simplified sensor state updates.
  * July.23.03:
  * - Issue #529: Urban Accuracy Snap. Tracking lastValidAccuracy to suppress false 
  *   positive jumps during accuracy recovery transitions.
- * July.23.00:
- * - SIT Hardening (Issue #522): Refined forensic Sit-Detection heuristic.
  */
 class LocationSentinel {
 
@@ -86,8 +87,6 @@ class LocationSentinel {
     private var lastSnr: Double = 0.0
     private var lastSatsUsed: Int = 0
 
-    private fun safeD(v: Double): Double = if (v.isNaN() || v.isInfinite()) 0.0 else v
-
     fun loadForensicState(savedLastSitTs: Long, savedBaseline: Double) {
         this.lastSitTs = savedLastSitTs
         this.baselineSitTilt = savedBaseline
@@ -105,8 +104,8 @@ class LocationSentinel {
             val speed = d / dt
             estimatedSpeedMps = PhysicsUtils.smoothCoordinate(estimatedSpeedMps, speed, SPEED_EMA_ALPHA)
             
-            val bearing = atan2(lng - lastValidLng, lat - lastValidLat) * 180.0 / PI
-            estimatedBearing = PhysicsUtils.smoothBearing(estimatedBearing, (bearing + 360) % 360, BEARING_EMA_ALPHA)
+            val bearing = PhysicsUtils.calculateBearing(lastValidLat, lastValidLng, lat, lng)
+            estimatedBearing = PhysicsUtils.smoothBearing(estimatedBearing, bearing, BEARING_EMA_ALPHA)
             
             val prob = if (estimatedSpeedMps < STATIONARY_SPEED_THRESHOLD_MPS) 1.0 else 0.0
             stationaryProb = PhysicsUtils.smoothCoordinate(stationaryProb, prob, POSITION_EMA_ALPHA_STATIONARY)
@@ -140,7 +139,7 @@ class LocationSentinel {
         var baselineChanged = false
         
         this.lastCompassHeading = this.currentCompassHeading
-        this.currentVibrationIndex = safeD(vibration)
+        this.currentVibrationIndex = safeDouble(vibration)
         this.lastFastPathAcousticSpikeRt = acousticLockoutRt
         
         if (peakShock > this.peakVibrationShock && !peakShock.isNaN()) {
@@ -148,9 +147,9 @@ class LocationSentinel {
             this.peakVibrationShockRt = nowRt
         }
 
-        val currentTilt = safeD(tiltDegrees)
+        val currentTilt = safeDouble(tiltDegrees)
         val tiltDelta = if (baselineSitTilt >= 0.0) abs(currentTilt - baselineSitTilt) else 0.0
-        val baroDelta = if (baroBaseline > -999.0) abs(safeD(baroAlt) - baroBaseline) else 0.0
+        val baroDelta = if (baroBaseline > -999.0) abs(safeDouble(baroAlt) - baroBaseline) else 0.0
         
         if (nowRt > sitDetectionCooldownRt && !isMuzzled && !isWarming) {
             val isSpatialTriggered = (tiltDelta > TILT_THRESHOLD_DEGREES) || 
@@ -166,13 +165,13 @@ class LocationSentinel {
                     lastSitRt = nowRt
                     sitDetectionCooldownRt = nowRt + SIT_DUPLICATE_GUARD_MS
                     
-                    lastSitVz = safeD(peakVerticalVelocity)
+                    lastSitVz = safeDouble(peakVerticalVelocity)
                     lastSitVzTs = if (peakVerticalVelocityTs > 0) peakVerticalVelocityTs else nowTs
                     lastSitVzRt = if (peakVerticalVelocityRt > 0) peakVerticalVelocityRt else nowRt
-                    lastSitDz = safeD(peakVerticalDisplacement)
-                    lastSitBaro = safeD(baroDelta)
-                    lastSitTilt = safeD(tiltDelta)
-                    lastSitShock = safeD(peakShock)
+                    lastSitDz = safeDouble(peakVerticalDisplacement)
+                    lastSitBaro = safeDouble(baroDelta)
+                    lastSitTilt = safeDouble(tiltDelta)
+                    lastSitShock = safeDouble(peakShock)
                 }
             }
         }
@@ -190,52 +189,20 @@ class LocationSentinel {
             stationaryStartRt = 0L
         }
 
-        this.currentCompassHeading = safeD(heading)
-        this.currentBaroAlt = safeD(baroAlt)
-        this.currentLux = safeD(lux)
+        this.currentCompassHeading = safeDouble(heading)
+        this.currentBaroAlt = safeDouble(baroAlt)
+        this.currentLux = safeDouble(lux)
         this.isNear = isNear
         this.isPowerTamper = powerTamper
         this.currentTiltDegrees = currentTilt
-        this.currentAcousticDb = safeD(acousticDb)
+        this.currentAcousticDb = safeDouble(acousticDb)
 
-        if (luxBaseline < 0) {
-            if (!lux.isNaN()) luxBaseline = lux
-        } else {
-            if (!lux.isNaN()) {
-                val baseAlpha = if (lux < luxBaseline) {
-                    if (isStationary()) LUX_EMA_DOWN_SLOW else LUX_EMA_DOWN_FAST
-                } else {
-                    if (isStationary()) LUX_EMA_UP_SLOW else LUX_EMA_UP_FAST
-                }
-                val alpha = SentinelValidator.accelerateAlpha(baseAlpha, isWarming)
-                luxBaseline = (luxBaseline * (1.0 - alpha)) + (lux * alpha)
-            }
-        }
-        
-        if (baroBaseline < -999.0) {
-            if (!baroAlt.isNaN()) baroBaseline = baroAlt
-        } else {
-            if (!baroAlt.isNaN()) {
-                val alpha = SentinelValidator.accelerateAlpha(BARO_EMA_SLOW, isWarming)
-                baroBaseline = (baroBaseline * (1.0 - alpha)) + (baroAlt * alpha)
-            }
-        }
+        this.luxBaseline = SentinelValidator.updateLuxBaseline(this.luxBaseline, lux, isStationary(), isWarming)
+        this.baroBaseline = SentinelValidator.updateBaroBaseline(this.baroBaseline, baroAlt, isWarming)
 
         if (!isSirenActive) {
             val updateDb = if (acousticMinDb >= 0.0) acousticMinDb else if (acousticMinDb == -1.0 && acousticDb >= 0.0) acousticDb else -1.0
-            
-            if (updateDb >= 0.0 && !updateDb.isNaN()) {
-                if (acousticFloorDb < 0) {
-                    acousticFloorDb = max(updateDb, ACOUSTIC_FLOOR_MIN_DB)
-                } else if (updateDb < acousticFloorDb) {
-                    val alpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_DOWN_FAST, isWarming)
-                    acousticFloorDb = (acousticFloorDb * (1.0 - alpha)) + (updateDb * alpha) 
-                } else {
-                    val alpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_UP_FAST, isWarming)
-                    acousticFloorDb = (acousticFloorDb * (1.0 - alpha)) + (updateDb * alpha)
-                }
-                if (acousticFloorDb < ACOUSTIC_FLOOR_MIN_DB) acousticFloorDb = ACOUSTIC_FLOOR_MIN_DB
-            }
+            this.acousticFloorDb = SentinelValidator.updateAcousticFloor(this.acousticFloorDb, updateDb, isWarming)
             
             val contractionElapsedRt = nowRt - lastAcousticContractionRt
             if (contractionElapsedRt >= 500 || lastAcousticContractionRt == 0L) {

@@ -82,23 +82,6 @@ abstract class AppModule {
 
         @Provides
         @Singleton
-        fun provideGpsManager(@ApplicationContext context: Context, timeProvider: TimeProvider): GpsManager {
-            return GpsManager(context, timeProvider)
-        }
-
-        @Provides
-        @Singleton
-        fun provideAppSensorManager(
-            @ApplicationContext context: Context, 
-            @ApplicationScope scope: CoroutineScope,
-            timeProvider: TimeProvider,
-            systemMonitor: SystemMonitor
-        ): AppSensorManager {
-            return AppSensorManager(context, scope, timeProvider, systemMonitor)
-        }
-
-        @Provides
-        @Singleton
         fun provideLocationProcessor(timeProvider: TimeProvider): LocationProcessor {
             return LocationProcessor(timeProvider)
         }

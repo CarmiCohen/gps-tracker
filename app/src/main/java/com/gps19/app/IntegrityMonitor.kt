@@ -12,20 +12,31 @@ import android.os.PowerManager
 import android.os.StatFs
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * IntegrityEvent: Reactive event container for hardware health changes.
+ */
+sealed class IntegrityEvent {
+    data class ViolationSustained(val type: String) : IntegrityEvent()
+    data class ViolationResolved(val type: String) : IntegrityEvent()
+    data class LogEvent(val message: String, val important: Boolean) : IntegrityEvent()
+}
+
+/**
  * IntegrityMonitor: Tracks hardware and network health.
+ * July.26.03:
+ * - Issue #545c: Flow Architecture Standardization. Replaced legacy Listener 
+ *   with a SharedFlow (integrityEvents) for reactive status dispatching.
  * July.22.04:
  * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * July.21.00:
- * - Forensic Timing: Fully aligned with monotonic Rt pipeline.
- * - Issue #516: De-duplicate "Status" Logic. Using SystemHealthState.
- * - Issue #523: Thread Safety. Synchronized access to currentHealth.
- * - Issue #524: Power Reset. Added onViolationResolved to clear pending power alarms.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -33,13 +44,6 @@ class IntegrityMonitor @Inject constructor(
     private val repository: MainRepository,
     private val timeProvider: TimeProvider
 ) {
-    interface Listener {
-        fun onViolationSustained(type: String)
-        fun onViolationResolved(type: String)
-        fun onLogEvent(message: String, important: Boolean)
-    }
-
-    private var listener: Listener? = null
     private val healthLock = Any()
 
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -52,9 +56,8 @@ class IntegrityMonitor @Inject constructor(
     private var lastFullPollTs = 0L
     private val POLL_TTL_MS = 10_000L
 
-    fun setListener(listener: Listener) {
-        this.listener = listener
-    }
+    private val _integrityEvents = MutableSharedFlow<IntegrityEvent>(extraBufferCapacity = 32)
+    val integrityEvents: SharedFlow<IntegrityEvent> = _integrityEvents.asSharedFlow()
 
     private val sustainedViolations = mutableMapOf<String, Long>()
     private val batterySamples = ConcurrentLinkedQueue<Pair<Long, Int>>()
@@ -100,11 +103,11 @@ class IntegrityMonitor @Inject constructor(
             var isCooling = workingHealth.isCoolingModeActive
             if (!isCooling && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
                 isCooling = true
-                listener?.onLogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true)
-                listener?.onViolationSustained(ALERT_ID_TRACKER_TEMP)
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true))
+                _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_TRACKER_TEMP))
             } else if (isCooling && batteryTemp < MAX_SAFE_TEMPERATURE_RECOVERY) {
                 isCooling = false
-                listener?.onLogEvent("System Info: Thermal limit recovered (${batteryTemp}°C). Normal tracking resumed.", false)
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Thermal limit recovered (${batteryTemp}°C). Normal tracking resumed.", false))
             }
 
             _batteryLevel = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
@@ -139,9 +142,9 @@ class IntegrityMonitor @Inject constructor(
         val powerSave = powerManager.isPowerSaveMode
         if (powerSave != workingHealth.isPowerSaveMode) {
             if (powerSave) {
-                listener?.onLogEvent("SYSTEM WARNING: Power Save Mode active. Sensors and GPS may be throttled by OS.", true)
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM WARNING: Power Save Mode active. Sensors and GPS may be throttled by OS.", true))
             } else {
-                listener?.onLogEvent("System Info: Power Save Mode deactivated. Normal tracking resumed.", false)
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Power Save Mode deactivated. Normal tracking resumed.", false))
             }
         }
         
@@ -160,7 +163,7 @@ class IntegrityMonitor @Inject constructor(
                 
                 if (standbyBucket != -1) {
                     val isCritical = bucket >= UsageStatsManager.STANDBY_BUCKET_RARE
-                    listener?.onLogEvent("SYSTEM PRIORITY: Standby bucket changed to $bucketName. ${if(isCritical) "Background tracking may be severely limited." else ""}", isCritical)
+                    _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM PRIORITY: Standby bucket changed to $bucketName. ${if(isCritical) "Background tracking may be severely limited." else ""}", isCritical))
                 }
                 standbyBucket = bucket
             }
@@ -168,7 +171,7 @@ class IntegrityMonitor @Inject constructor(
 
         val newNet = getActiveNetworkInterface()
         if (newNet != workingHealth.netInterface) {
-            listener?.onLogEvent("Network switched to $newNet", false)
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Network switched to $newNet", false))
         }
 
         val storage = checkStorageIntegrity()
@@ -177,7 +180,7 @@ class IntegrityMonitor @Inject constructor(
         if (lastPowerDisconnectTs > 0 && !isPowerTamper) {
             if (checkViolationSustained(ALERT_ID_TRACKER_POWER, lastPowerDisconnectTs, POWER_DISCONNECT_DEBOUNCE_MS)) {
                 isPowerTamper = true
-                listener?.onLogEvent("Tracker power tamper confirmed (debounce met)", true)
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Tracker power tamper confirmed (debounce met)", true))
             }
         }
 
@@ -206,8 +209,8 @@ class IntegrityMonitor @Inject constructor(
         val isSteep = drop >= BATTERY_STEEP_DISCHARGE_THRESHOLD
         
         if (isSteep && !currentHealth.isBatterySteepDischarge) {
-            listener?.onLogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected ($drop% in ${(nowRt - earliest.first) / 60000}m). System shutdown likely imminent.", true)
-            listener?.onViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE)
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected ($drop% in ${(nowRt - earliest.first) / 60000}m). System shutdown likely imminent.", true))
+            _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE))
         }
         return isSteep
     }
@@ -226,18 +229,18 @@ class IntegrityMonitor @Inject constructor(
             
             if (critical != workingHealth.isStorageCritical) {
                 if (critical) {
-                    listener?.onLogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB). ALL non-essential logging HALTED to prevent corruption.", true)
-                    listener?.onViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL)
+                    _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB). ALL non-essential logging HALTED to prevent corruption.", true))
+                    _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL))
                 }
             }
 
             if (low != workingHealth.isStorageLow) {
                 if (low && !critical) {
-                    listener?.onLogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB). Throttling logs.", true)
-                    listener?.onViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW)
+                    _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB). Throttling logs.", true))
+                    _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW))
                 } else if (!low) {
                     critical = false
-                    listener?.onLogEvent("System Info: Storage space restored (${megabytesAvailable}MB).", false)
+                    _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Storage space restored (${megabytesAvailable}MB).", false))
                 }
             }
         } catch (e: Exception) {
@@ -272,7 +275,7 @@ class IntegrityMonitor @Inject constructor(
         if (!online) {
             val firstDetected = sustainedViolations.getOrPut(ALERT_ID_LOCAL_INTERNET) { now }
             if (now - firstDetected > INTERNET_LOSS_THRESHOLD_MS) {
-                listener?.onViolationSustained(ALERT_ID_LOCAL_INTERNET)
+                _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_LOCAL_INTERNET))
                 currentHealth = currentHealth.copy(localInternetLoss = true)
                 return false
             }
@@ -296,7 +299,7 @@ class IntegrityMonitor @Inject constructor(
 
     fun checkViolationSustained(type: String, startTs: Long, threshold: Long): Boolean {
         if (startTs > 0 && (timeProvider.elapsedRealtime() - startTs) > threshold) {
-            listener?.onViolationSustained(type)
+            _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(type))
             return true
         }
         return false
@@ -305,7 +308,7 @@ class IntegrityMonitor @Inject constructor(
     fun onPowerDisconnected() {
         if (!currentHealth.isPowerTamper && lastPowerDisconnectTs == 0L) {
             lastPowerDisconnectTs = timeProvider.elapsedRealtime()
-            listener?.onLogEvent("Tracker power unplugged, starting debounce...", false)
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Tracker power unplugged, starting debounce...", false))
         }
     }
 
@@ -313,14 +316,14 @@ class IntegrityMonitor @Inject constructor(
         lastPowerDisconnectTs = 0L
         if (currentHealth.isPowerTamper) {
             currentHealth = currentHealth.copy(isPowerTamper = false)
-            listener?.onViolationResolved(ALERT_ID_TRACKER_POWER)
-            listener?.onLogEvent("Tracker power restored", false)
+            _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_POWER))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Tracker power restored", false))
         }
     }
 
     fun clearPowerTamper() {
         currentHealth = currentHealth.copy(isPowerTamper = false)
-        listener?.onViolationResolved(ALERT_ID_TRACKER_POWER)
+        _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_POWER))
         lastPowerDisconnectTs = 0L
     }
 

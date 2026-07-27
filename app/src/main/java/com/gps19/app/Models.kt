@@ -10,12 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * July.26.04:
+ * - Issue #595: Forensic Playback Hardening. Added rt to ConnectionPoint and 
+ *   ToggleStrictMode to UiEvent.
  * July.25.08:
  * - Issue #560c: Signaling Pressure Audit. Updated TrackerStatus to 
  *   support isClockRegression in Protobuf serialization.
- * July.25.03:
- * - Issue #560: Pipeline Serialization Hardening. Added writeTo(Builder) to 
- *   TrackerStatus to support zero-allocation telemetry signaling via builder reuse.
  */
 
 @Serializable
@@ -77,7 +77,7 @@ data class AlertSettings(
 
 data class ConnectionPoint(
     val localId: String = UUID.randomUUID().toString(),
-    val ts: Long, val rtt: Int, val localSig: Int, val remoteSig: Int,
+    val ts: Long, val rt: Long, val rtt: Int, val localSig: Int, val remoteSig: Int,
     val isConnected: Boolean, val isGap: Boolean = false, 
     val gpsAccuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0,
@@ -529,6 +529,7 @@ sealed class UiEvent {
     data class ToggleSettings(val visible: Boolean) : UiEvent()
     data class TogglePhoneSetup(val visible: Boolean) : UiEvent()
     data class ToggleRibbons(val visible: Boolean) : UiEvent()
+    data class ToggleStrictMode(val visible: Boolean) : UiEvent()
     data class SetRedScreenVisible(val visible: Boolean) : UiEvent()
     data class SetDashboardExpanded(val expanded: Boolean) : UiEvent()
     data class SetUiVisible(val visible: Boolean) : UiEvent()

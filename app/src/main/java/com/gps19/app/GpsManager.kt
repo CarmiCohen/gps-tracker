@@ -18,18 +18,16 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
- * July.25.10:
- * - Issue #570b: Flyweight Thread Safety Audit. Moved snrFlyweight to method 
- *   scope in getSnrSamples to ensure safe concurrent iteration.
- * July.25.02:
- * - Issue #570: Forensic Snapshot Pooling. Refactored getSnrSamples to use 
- *   EngineSnrSample flyweight and zero-allocation primitive iteration.
- * - Issue #550: Refactored SNR history to primitive arrays (LongArray/DoubleArray) 
- *   to eliminate heap churn.
+ * July.26.03:
+ * - Issue #545c: Flow Architecture Standardization. Refactored to a unified 
+ *   SharedFlow architecture. Hardware callbacks are now registered only when 
+ *   there is at least one subscriber to either Location or GNSS details.
+ * - Issue #587: Redundant GNSS Registration Risk. Shared location and status.
  */
 @Singleton
 class GpsManager @Inject constructor(
     @ApplicationContext private val context: Context,
+    @ApplicationScope private val externalScope: CoroutineScope,
     private val timeProvider: TimeProvider
 ) {
 
@@ -43,15 +41,17 @@ class GpsManager @Inject constructor(
     var averageSnr = 0.0
         private set
 
-    // Issue #550 & #570: Primitive buffers for zero-churn forensics
+    // Primitive buffers for zero-churn forensics
     private val snrTsBuffer = LongArray(512)
     private val snrRtBuffer = LongArray(512)
     private val snrValBuffer = DoubleArray(512)
     private var snrBufferIdx = 0
     private var snrBufferCount = 0
 
-    private val _gnssDetailFlow = MutableStateFlow<GnssDetail?>(null)
-    val gnssDetailFlow: StateFlow<GnssDetail?> = _gnssDetailFlow.asStateFlow()
+    private sealed class GpsUpdate {
+        data class LocationUpdate(val location: Location) : GpsUpdate()
+        data class GnssUpdate(val detail: GnssDetail) : GpsUpdate()
+    }
 
     private val gnssStatusCallback = object : GnssStatus.Callback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
@@ -90,13 +90,81 @@ class GpsManager @Inject constructor(
                 if (snrBufferCount < 512) snrBufferCount++
             }
 
-            _gnssDetailFlow.value = GnssDetail(satellites = satList.sortedByDescending { it.cn0 })
+            _internalGpsFlow.tryEmit(GpsUpdate.GnssUpdate(GnssDetail(satellites = satList.sortedByDescending { it.cn0 })))
         }
     }
 
+    private val _internalGpsFlow = MutableSharedFlow<GpsUpdate>(replay = 1)
+
     /**
-     * Issue #570: Returns SNR samples via flyweight iteration.
-     * July.25.10: Flyweight scoped to sequence generator for thread safety.
+     * Standardized hardware observation flow.
+     * July.26.03: Manages platform lifecycle for all GPS/GNSS subscribers.
+     */
+    @SuppressLint("MissingPermission")
+    private val hardwareObservationFlow = callbackFlow<GpsUpdate> {
+        try {
+            locationManager.registerGnssStatusCallback(gnssStatusCallback, Handler(Looper.getMainLooper()))
+        } catch (e: Exception) {
+            Timber.e(e, "GPS: Failed to register GNSS callback")
+        }
+
+        fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
+            if (loc != null) {
+                trySend(GpsUpdate.LocationUpdate(loc))
+            }
+        }
+
+        val fusedCallback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                result.lastLocation?.let { trySend(GpsUpdate.LocationUpdate(it)) }
+            }
+        }
+
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, TICK_INTERVAL_MS)
+            .setMinUpdateIntervalMillis(TICK_INTERVAL_MS / 2)
+            .setMinUpdateDistanceMeters(0.0f)
+            .setWaitForAccurateLocation(false)
+            .build()
+
+        try {
+            fusedLocationClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper())
+        } catch (e: Exception) {
+            Timber.e(e, "CRITICAL: GPS Request failed")
+            close(e)
+        }
+
+        // Bridge internal status updates (like GNSS changes) to this flow
+        val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
+
+        awaitClose {
+            internalJob.cancel()
+            try {
+                fusedLocationClient.removeLocationUpdates(fusedCallback)
+                locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
+            } catch (e: Exception) {}
+        }
+    }.shareIn(
+        scope = externalScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        replay = 1
+    )
+
+    /**
+     * getLocationFlow: Public API for location updates.
+     */
+    fun getLocationFlow(): Flow<Location> = hardwareObservationFlow
+        .filterIsInstance<GpsUpdate.LocationUpdate>()
+        .map { it.location }
+
+    /**
+     * gnssDetailFlow: Public API for GNSS status updates.
+     */
+    val gnssDetailFlow: Flow<GnssDetail?> = hardwareObservationFlow
+        .filterIsInstance<GpsUpdate.GnssUpdate>()
+        .map { it.detail }
+
+    /**
+     * getSnrSamples: Returns SNR samples via flyweight iteration.
      */
     fun getSnrSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
         val flyweight = EngineSnrSample()
@@ -125,47 +193,6 @@ class GpsManager @Inject constructor(
                 flyweight.snr = snr
                 yield(flyweight)
             }
-        }
-    }
-
-    @SuppressLint("MissingPermission")
-    fun getLocationFlow(): Flow<Location> = callbackFlow {
-        try {
-            locationManager.registerGnssStatusCallback(gnssStatusCallback, Handler(Looper.getMainLooper()))
-        } catch (e: Exception) {
-            Timber.e(e, "GPS: Failed to register GNSS callback")
-        }
-
-        fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
-            if (loc != null) {
-                trySend(loc)
-            }
-        }
-
-        val fusedCallback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) {
-                result.lastLocation?.let { trySend(it) }
-            }
-        }
-
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, TICK_INTERVAL_MS)
-            .setMinUpdateIntervalMillis(TICK_INTERVAL_MS / 2)
-            .setMinUpdateDistanceMeters(0.0f)
-            .setWaitForAccurateLocation(false)
-            .build()
-
-        try {
-            fusedLocationClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper())
-        } catch (e: Exception) {
-            Timber.e(e, "CRITICAL: GPS Request failed")
-            close(e)
-        }
-
-        awaitClose {
-            try {
-                fusedLocationClient.removeLocationUpdates(fusedCallback)
-                locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
-            } catch (e: Exception) {}
         }
     }
 }

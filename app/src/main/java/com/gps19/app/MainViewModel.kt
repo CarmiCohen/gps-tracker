@@ -20,16 +20,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.26.04:
+ * - Issue #595: Forensic Playback Hardening. Added handler for ToggleStrictMode 
+ *   to enable enhanced data integrity validation in forensic ribbons.
  * July.26.00:
  * - Issue #565: Cold Start I/O Optimization. Coordinated proactivePruning with 
  *   INITIAL_RENDER_DELAY_MS to prevent I/O contention during the first pulse.
- * July.25.13:
- * - Issue #547: Kernel Performance Hardening. Integrated LatencyMonitor into 
- *   dashboardState computation to detect "silent jitter" on A15 hardware.
- * July.25.01:
- * - Issue #547: State Decomposition (Refinement). Migrated redScreenVisible into 
- *   TelemetryState for architectural consistency and zero-latency reactive surfacing.
- * - Build Fix: Resolved combine() type mismatch for dashboardState.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -308,6 +304,10 @@ class MainViewModel @Inject constructor(
                     else commitDraft()
                 }
                 updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
+            }
+            is UiEvent.ToggleStrictMode -> {
+                updateNavigation { it.copy(isStrictMode = event.visible) }
+                addPersistentLog("user", "USER ACTION: Forensic Strict Mode ${if (event.visible) "ENABLED" else "DISABLED"}", true)
             }
             is UiEvent.SetPendingMode -> updateNavigation { it.copy(pendingMode = event.mode) }
             is UiEvent.SetRedScreenVisible -> updateTelemetryState { it.copy(isRedScreenVisible = event.visible) }

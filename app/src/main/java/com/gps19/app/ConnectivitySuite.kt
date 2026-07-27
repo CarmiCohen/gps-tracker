@@ -12,8 +12,7 @@ import com.google.protobuf.CodedOutputStream
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import org.json.JSONObject
 import timber.log.Timber
 import java.net.HttpURLConnection
@@ -25,14 +24,20 @@ import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
+ * ConnectivityEvent: Reactive event container for peer and network lifecycle changes.
+ */
+sealed class ConnectivityEvent {
+    data class PeerPulse(val id: String) : ConnectivityEvent()
+}
+
+/**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
- * July.26.01:
- * - Issue #575: Network Handshake Latency. Zero-initialized lastReconnectTs 
- *   to allow immediate connection on startup, bypassing the 3s flapping guard.
- * July.25.12:
- * - Issue #545: Production Logging Leak (StackLog). Implemented idempotent 
- *   lifecycle management with isStarted check to prevent redundant 
- *   registerNetworkCallback calls that trigger platform diagnostic noise.
+ * July.26.04:
+ * - Issue #545c: Flow Architecture Standardization. Replaced legacy PeerListener 
+ *   with a SharedFlow (connectivityEvents) for reactive signaling.
+ * July.26.03:
+ * - Issue #545c: Flow Architecture Standardization. Migrated from legacy 
+ *   RemoteUpdateListener to reactive signalingFlow collection.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -48,14 +53,9 @@ class ConnectivitySuite @Inject constructor(
     private val offlineRepository: OfflineRepository,
     private val mainRepository: MainRepository,
     private val remoteStatusRepository: RemoteStatusRepository
-) : SignalingProvider.RemoteUpdateListener {
-
-    interface PeerListener {
-        fun onPeerPulse(id: String)
-    }
-
-    private var peerListener: PeerListener? = null
-    fun setPeerListener(listener: PeerListener) { this.peerListener = listener }
+) {
+    private val _connectivityEvents = MutableSharedFlow<ConnectivityEvent>(extraBufferCapacity = 16)
+    val connectivityEvents: SharedFlow<ConnectivityEvent> = _connectivityEvents.asSharedFlow()
 
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val isStarted = AtomicBoolean(false)
@@ -66,7 +66,7 @@ class ConnectivitySuite @Inject constructor(
     private var deviceId = ""
     private var viewerId = ""
     private var isTrackerMode = true
-    private var lastReconnectTs = 0L // Issue #575: Initialized to 0 to permit immediate startup connection
+    private var lastReconnectTs = 0L 
     private var lastForceJoinTs = 0L 
 
     private val statusBuilder = RealtimeStatus.newBuilder()
@@ -83,6 +83,7 @@ class ConnectivitySuite @Inject constructor(
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + suiteExceptionHandler)
     private var keepAliveJob: Job? = null
     private var syncJob: Job? = null
+    private var signalingJob: Job? = null
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
@@ -155,7 +156,6 @@ class ConnectivitySuite @Inject constructor(
             if (isStopped.get() || relayUrl.isEmpty()) return
             scope.launch {
                 val nowRt = timeProvider.elapsedRealtime()
-                // Issue #575: Allow immediate connection on first callback trigger (lastReconnectTs=0)
                 if (lastReconnectTs > 0L && nowRt - lastReconnectTs < 3000L) return@launch
                 if (signalingProvider.isConnected() || signalingProvider.isConnecting()) return@launch
                 if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) return@launch
@@ -174,7 +174,6 @@ class ConnectivitySuite @Inject constructor(
     }
 
     fun start(url: String, dId: String, vId: String, isTracker: Boolean) {
-        // Issue #545: Idempotent start. Prevent redundant network callback registrations
         if (isStarted.getAndSet(true)) {
             this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
             if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
@@ -189,7 +188,6 @@ class ConnectivitySuite @Inject constructor(
         }
         
         this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
-        // Issue #575: Do not set lastReconnectTs here to allow the NetworkCallback to fire immediately
         this.lastForceJoinTs = 0L
         
         try {
@@ -207,7 +205,7 @@ class ConnectivitySuite @Inject constructor(
             }
         }
 
-        signalingProvider.setRemoteUpdateListener(this)
+        startSignalingObservation()
 
         scope.launch {
             if (relayUrl.isNotEmpty() && SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
@@ -223,10 +221,23 @@ class ConnectivitySuite @Inject constructor(
         initializePeerState()
     }
 
+    private fun startSignalingObservation() {
+        signalingJob?.cancel()
+        signalingJob = scope.launch {
+            signalingProvider.signalingFlow.collect { event ->
+                when (event) {
+                    is SignalingEvent.JsonUpdate -> handleJsonUpdate(event.data)
+                    is SignalingEvent.BinaryUpdate -> handleBinaryUpdate(event.data)
+                }
+            }
+        }
+    }
+
     private fun restartLoops() {
         if (isStopped.get()) return
         startKeepAliveLoop()
         startSyncLoop()
+        startSignalingObservation()
     }
 
     private fun startKeepAliveLoop() {
@@ -468,7 +479,7 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
-    override fun onBinaryUpdate(data: ByteArray) {
+    private fun handleBinaryUpdate(data: ByteArray) {
         if (isTrackerMode || isStopped.get()) return
         try {
             val statusProto = RealtimeStatus.parseFrom(data)
@@ -486,7 +497,7 @@ class ConnectivitySuite @Inject constructor(
             val nowRt = timeProvider.elapsedRealtime()
             val peerId = statusProto.id
 
-            peerListener?.onPeerPulse(peerId)
+            _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt)
             remoteStatusRepository.setTrackerConnected(true)
             mainRepository.updateRemoteActivity(now)
@@ -579,7 +590,7 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
-    override fun onUpdate(data: JSONObject) {
+    private fun handleJsonUpdate(data: JSONObject) {
         val type = data.optString("type", "")
         if (type == "remote_log") {
             handleRemoteLog(LogEntry.fromJSONObject(data))
@@ -599,26 +610,30 @@ class ConnectivitySuite @Inject constructor(
                 isImportant = true
             ))
             Handler(Looper.getMainLooper()).post { Toast.makeText(context, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show() }
-            peerListener?.onPeerPulse(peerId); remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now)
+            _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
+            remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now)
             return
         }
 
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
             if ((isTrackerMode && fromViewer) || (!isTrackerMode && !fromViewer)) {
-                peerListener?.onPeerPulse(peerId); remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(!isTrackerMode); mainRepository.updateRemoteActivity(now)
+                _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
+                remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(!isTrackerMode); mainRepository.updateRemoteActivity(now)
             }
             return
         }
 
         if (isTrackerMode && fromViewer) {
-            peerListener?.onPeerPulse(peerId); remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now); return
+            _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
+            remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now); return
         }
 
         if (!isTrackerMode && !fromViewer) {
             val remoteTs = data.optLong("ts", 0L)
             if (!remoteStatusRepository.shouldProcessPacket(remoteTs)) return
 
-            peerListener?.onPeerPulse(peerId); remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(true); mainRepository.updateRemoteActivity(now)
+            _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
+            remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(true); mainRepository.updateRemoteActivity(now)
             remoteStatusRepository.setPeerSignal(data.optInt("signal", 0))
 
             remoteStatusRepository.updateStatusAtomic { current ->
@@ -756,9 +771,8 @@ class ConnectivitySuite @Inject constructor(
 
     fun stop() { 
         isStarted.set(false)
-        isStopped.set(true); keepAliveJob?.cancel(); syncJob?.cancel(); scope.cancel()
+        isStopped.set(true); keepAliveJob?.cancel(); syncJob?.cancel(); signalingJob?.cancel(); scope.cancel()
         try { connectivityManager.unregisterNetworkCallback(networkCallback) } catch (e: Exception) {}
-        signalingProvider.setRemoteUpdateListener(null)
         signalingProvider.disconnect() 
     }
 

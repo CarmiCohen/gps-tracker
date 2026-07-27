@@ -3,24 +3,19 @@ package com.gps19.app
 import com.gps19.core.engine.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import org.osmdroid.util.GeoPoint
-import timber.log.Timber
 import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * July.26.03:
+ * - Issue #545c: Flow Architecture Standardization. Migrated GPS Index 
+ *   observation to the standardized shared flow in GpsStatusManager, 
+ *   eliminating redundant ticker logic. Fixed duplicate data class and missing imports.
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor.
- * July.21.00:
- * - Issue #102: Temporal Forensic Integrity.
- * - Issue #516: De-duplicate "Status" Logic. Using SystemHealthState.
- * - ANR Hardening (#092): Offloaded history processing and integrity parsing to Dispatchers.Default.
- * - Maintained Hilt compatibility as per hardened Golden Master architecture.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -65,15 +60,10 @@ class StateSubscriptionUseCase @Inject constructor(
         _historyFlows.values.forEach { it.value = emptyList() }
     }
 
-    fun observeGpsIndex(): Flow<GpsIndexData> {
-        val nowFlow = flow {
-            while (true) {
-                emit(timeProvider.currentTimeMillis())
-                delay(TICK_INTERVAL_MS)
-            }
-        }
-        return gpsStatusManager.observeGpsIndex(nowFlow)
-    }
+    /**
+     * observeGpsIndex: Standardized pass-through to GpsStatusManager.
+     */
+    fun observeGpsIndex(): Flow<GpsIndexData> = gpsStatusManager.gpsIndexFlow
 
     fun observeInternetStatus(): Flow<Boolean> = systemStatusProvider.observeInternetStatus()
 
@@ -81,6 +71,7 @@ class StateSubscriptionUseCase @Inject constructor(
 
     fun observeGnssDetail(): Flow<GnssDetail?> = repository.gnssDetail
 
+    @Suppress("UNCHECKED_CAST")
     fun observeRepositorySettings(): Flow<SettingsUpdate> {
         return combine(
             repository.trackerIdFlow,
@@ -118,9 +109,6 @@ class StateSubscriptionUseCase @Inject constructor(
     }
 
     fun observeIntegrityUpdates(): Flow<IntegrityUpdate> = repository.systemHealth.map { health ->
-        // Note: Alarms are managed by AppAlarmManager and synchronized via LogManager/Repository
-        val alarms = emptyList<AlarmInfo>()
-
         IntegrityUpdate(
             health = health,
             isLocalOnline = health.isHardwareOnline,
@@ -128,7 +116,7 @@ class StateSubscriptionUseCase @Inject constructor(
             batteryTemp = health.batteryTemp,
             isCharging = health.isCharging,
             maxTemp = health.maxTemp,
-            activeAlarms = alarms,
+            activeAlarms = emptyList(),
             activeAlarmTypes = emptySet()
         )
     }.flowOn(Dispatchers.Default)

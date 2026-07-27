@@ -1,13 +1,11 @@
 package com.gps19.app
 
 import com.gps19.core.engine.SignalingConstants
+import kotlinx.coroutines.flow.SharedFlow
 import org.json.JSONObject
 
 /**
  * SignalingPriority: Classification for frame prioritization.
- * July.25.08:
- * - Issue #560c: Socket-Level Pressure. Introduced priority levels to ensure 
- *   high-frequency pulses (pings/commands) aren't blocked by 64KB telemetry frames.
  */
 enum class SignalingPriority {
     HIGH,   // Time-critical: Pings, Pongs, Commands, Identity (Join/Leave)
@@ -15,18 +13,21 @@ enum class SignalingPriority {
 }
 
 /**
+ * SignalingEvent: Reactive event container for incoming relay data.
+ * July.26.03:
+ * - Issue #545c: Flow Architecture Standardization. Replaced legacy listener 
+ *   with a unified sealed class for reactive stream consumption.
+ */
+sealed class SignalingEvent {
+    data class JsonUpdate(val data: JSONObject) : SignalingEvent()
+    data class BinaryUpdate(val data: ByteArray) : SignalingEvent()
+}
+
+/**
  * Interface for signaling implementations (Socket.io, MQTT, etc.)
- * July.25.08:
- * - Issue #560c: Added SignalingPriority support to all emit methods.
- * July.25.03:
- * - Issue #560: Pipeline Serialization Hardening. Added length parameter to 
- *   emitBinary to support pre-allocated buffer reuse.
  */
 interface SignalingProvider {
-    interface RemoteUpdateListener {
-        fun onUpdate(data: JSONObject)
-        fun onBinaryUpdate(data: ByteArray) 
-    }
+    val signalingFlow: SharedFlow<SignalingEvent>
 
     fun connect(url: String, deviceId: String, viewerId: String, isTracker: Boolean)
     fun disconnect()
@@ -40,5 +41,4 @@ interface SignalingProvider {
     fun emitBinary(event: String, routingId: String, data: ByteArray, length: Int = data.size, priority: SignalingPriority = SignalingPriority.NORMAL)
     fun getLastRelayTrafficTs(): Long
     fun setConnectionLostCallback(callback: () -> Unit)
-    fun setRemoteUpdateListener(listener: RemoteUpdateListener?)
 }

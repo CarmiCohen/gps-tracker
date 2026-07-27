@@ -6,35 +6,43 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import com.gps19.core.engine.*
-import com.gps19.core.engine.LocationProcessor
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
-import org.json.JSONObject
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * CommandEvent: Reactive event container for system and UI commands.
+ * July.26.03:
+ * - Issue #545c: Flow Architecture Standardization. Unified all command 
+ *   dispatches into a single SharedFlow stream.
+ */
+sealed class CommandEvent {
+    data class ViewerPulse(val id: String) : CommandEvent()
+    object WatchdogTrigger : CommandEvent()
+    object UiPulse : CommandEvent()
+    data class UiVisibilityChanged(val visible: Boolean) : CommandEvent()
+    data class TransientDrop(val drop: Boolean) : CommandEvent()
+    object ResetTimers : CommandEvent()
+    object SyncSensors : CommandEvent()
+    object TriggerForensicTest : CommandEvent()
+}
+
+/**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * July.26.03:
+ * - Issue #545c: Flow Architecture Standardization. Replaced legacy Listener 
+ *   with a SharedFlow (commandEvents) for reactive event dispatching.
  * July.26.02:
- * - Issue #545b: Lifecycle Idempotency. Added isRegistered and isObserving 
- *   AtomicBoolean guards to prevent redundant receiver registrations and 
- *   duplicate Flow collections during service restarts.
- * July.24.05:
- * - Fix: Updated UI command handling for renamed ExecuteTestAlarm/ExecuteForensicTest.
- * July.24.04:
- * - Issue #542: Stealth Enforcement. Added isTrackerMode check to TriggerTestAlarm.
+ * - Issue #545b: Lifecycle Idempotency.
  */
 @Singleton
 class CommandRouter @Inject constructor(
     @ApplicationContext private val context: Context,
+    @ApplicationScope private val externalScope: CoroutineScope,
     private val configManager: ConfigManager,
     private val logManager: LogManager,
     private val connectivitySuite: ConnectivitySuite,
@@ -46,24 +54,11 @@ class CommandRouter @Inject constructor(
     private val integrityMonitor: IntegrityMonitor,
     private val timeProvider: TimeProvider
 ) {
-    interface Listener {
-        fun onViewerPulse(id: String)
-        fun onWatchdogTrigger()
-        fun onUiPulse()
-        fun onUiVisibilityChanged(visible: Boolean)
-        fun onTransientDrop(drop: Boolean)
-        fun onResetTimers()
-        fun onSyncSensors()
-        fun onTriggerForensicTest()
-    }
-
-    private var listener: Listener? = null
     private val isRegistered = AtomicBoolean(false)
     private val isObserving = AtomicBoolean(false)
 
-    fun setListener(listener: Listener) {
-        this.listener = listener
-    }
+    private val _commandEvents = MutableSharedFlow<CommandEvent>(extraBufferCapacity = 16)
+    val commandEvents: SharedFlow<CommandEvent> = _commandEvents.asSharedFlow()
 
     private val routerExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException) return@CoroutineExceptionHandler
@@ -88,9 +83,11 @@ class CommandRouter @Inject constructor(
     private val legacyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                ACTION_ALARM_WAKEUP -> listener?.onWatchdogTrigger()
+                ACTION_ALARM_WAKEUP -> _commandEvents.tryEmit(CommandEvent.WatchdogTrigger)
                 ACTION_RELAY_STATUS -> {
-                    if (intent.getBooleanExtra("connected", false) == false) listener?.onTransientDrop(true)
+                    if (intent.getBooleanExtra("connected", false) == false) {
+                        _commandEvents.tryEmit(CommandEvent.TransientDrop(true))
+                    }
                 }
             }
         }
@@ -103,8 +100,8 @@ class CommandRouter @Inject constructor(
             .onEach { command ->
                 try {
                     when (command) {
-                        is UiCommand.SyncRequest -> listener?.onUiPulse()
-                        is UiCommand.UiVisibilityChanged -> listener?.onUiVisibilityChanged(command.visible)
+                        is UiCommand.SyncRequest -> _commandEvents.emit(CommandEvent.UiPulse)
+                        is UiCommand.UiVisibilityChanged -> _commandEvents.emit(CommandEvent.UiVisibilityChanged(command.visible))
                         is UiCommand.StopSiren -> {
                             repository.saveLongSync(MainRepository.LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
                             alarmManager.setPowerAlarmPending(false)
@@ -117,23 +114,23 @@ class CommandRouter @Inject constructor(
                         }
                         is UiCommand.ClearTrails -> repository.clearTrails()
                         is UiCommand.StatsReset -> {
-                            listener?.onResetTimers()
+                            _commandEvents.emit(CommandEvent.ResetTimers)
                             sessionManager.reset()
                             locationProcessor.resetStats()
                             connectivitySuite.resetPeerStats()
                         }
                         is UiCommand.SettingsUpdated -> {
-                            listener?.onSyncSensors()
+                            _commandEvents.emit(CommandEvent.SyncSensors)
                             connectivitySuite.connect(configManager.relayUrl)
                             connectivitySuite.updateIdentity(configManager.deviceId, configManager.viewerId, configManager.isTrackerMode)
                         }
                         is UiCommand.ZoomIn, is UiCommand.ZoomOut, is UiCommand.MapZoomIn, is UiCommand.MapZoomOut -> {}
                         is UiCommand.FullInitializationReset -> {
-                            listener?.onResetTimers()
+                            _commandEvents.emit(CommandEvent.ResetTimers)
                             sessionManager.reset()
                             locationProcessor.resetStats()
                             connectivitySuite.resetPeerStats()
-                            listener?.onSyncSensors()
+                            _commandEvents.emit(CommandEvent.SyncSensors)
                         }
                         is UiCommand.ExecuteTestAlarm -> {
                             if (configManager.isTrackerMode) {
@@ -165,7 +162,7 @@ class CommandRouter @Inject constructor(
                             }
                         }
                         is UiCommand.ExecuteForensicTest -> {
-                            listener?.onTriggerForensicTest()
+                            _commandEvents.emit(CommandEvent.TriggerForensicTest)
                         }
                     }
                 } catch (e: Exception) {

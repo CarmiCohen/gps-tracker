@@ -2,12 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.26.04:
+ * - Issue #589: Added Performance & Latency Thresholds for engine audit.
  * July.23.07:
  * - Issue #530: Refined Stationary Anchor with accuracy-weighted breakout and IMU damping.
- * July.23.06:
- * - Issue #530: Refined Stationary Anchor for 5m breakout sensitivity.
- * July.23.03:
- * - Issue #533: Added ANCHOR_AVERAGING_WINDOW_SIZE for stationary hardening.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -17,6 +15,12 @@ const val GRAVITY_EARTH = 9.80665
 // Global App Defaults (Inherited by Engine)
 const val DEFAULT_LAT = 32.7940
 const val DEFAULT_LNG = 34.9896
+
+// Performance & Latency Thresholds (Issue #589)
+const val LATENCY_THRESHOLD_GPS_PROCESS_MS = 50L
+const val LATENCY_THRESHOLD_SENSOR_PROCESS_MS = 20L
+const val LATENCY_THRESHOLD_DB_WRITE_MS = 500L
+const val LATENCY_THRESHOLD_JNI_MS = 50L
 
 // Physics & Motion Limits
 const val MAX_PHYSICAL_SPEED_MPS = 33.33 // 120 km/h
@@ -305,6 +309,7 @@ const val ALERT_ID_SYSTEM_STORAGE_LOW = "SYSTEM_STORAGE_LOW"
 const val ALERT_ID_SYSTEM_STORAGE_CRITICAL = "SYSTEM_STORAGE_CRITICAL"
 const val ALERT_ID_BATTERY_STEEP_DISCHARGE = "BATTERY_HEALTH"
 const val ALERT_ID_HARDWARE_CONFIGURATION = "HARDWARE_CONFIG_MISSING"
+const val ALERT_ID_PERFORMANCE_SPIKE = "PERFORMANCE_SPIKE"
 
 // Alert Titles (R747 Standardized)
 const val ALERT_TITLE_LOCAL_INTERNET = "This device: Internet Lost"
@@ -330,6 +335,7 @@ const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "System Storage Low"
 const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "System Storage Critical"
 const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "Critical Battery Health"
 const val ALERT_TITLE_HARDWARE_CONFIGURATION = "Hardware Config Incomplete"
+const val ALERT_TITLE_PERFORMANCE_SPIKE = "Performance Warning"
 
 // System Watchdog & Grace Periods
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L
@@ -373,3 +379,5 @@ const val DB_PRUNE_THRESHOLD = 50
 // UI Performance
 const val MARKER_POOL_PRUNE_THRESHOLD = 50
 const val LOG_MUZZLE_STARTUP_MS = 60000L
+
+const val FORENSIC_PINK_COLOR = 0xFFFF00FF.toInt()

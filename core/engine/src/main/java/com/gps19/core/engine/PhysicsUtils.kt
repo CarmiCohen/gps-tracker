@@ -4,13 +4,15 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: High-performance geospatial and kinematic calculations.
- * July.25.02:
- * - Issue #548: Added simplifyTrail for granular map trail thinning.
- * July.23.03:
- * - Issue #529: Urban Accuracy Snap. Added lastAccuracy to isVisualJump to 
- *   suppress false positives during accuracy recovery.
+ * July.26.04:
+ * - Architecture Simplification: Added safeDouble and calculateBearing utilities.
  */
 object PhysicsUtils {
+
+    /**
+     * Safely handles NaN or Infinite values, defaulting to 0.0.
+     */
+    fun safeDouble(v: Double): Double = if (v.isNaN() || v.isInfinite()) 0.0 else v
 
     /**
      * Calculates the distance between two points in meters using the Haversine formula.
@@ -26,9 +28,24 @@ object PhysicsUtils {
                 sin(dLng / 2) * sin(dLng / 2)
 
         val clampedA = a.coerceIn(0.0, 1.0)
-        val dist = 6371000.0 * 2 * atan2(sqrt(clampedA), sqrt(1.0 - clampedA))
+        val dist = EARTH_RADIUS_METERS * 2 * atan2(sqrt(clampedA), sqrt(1.0 - clampedA))
 
         return if (dist.isNaN()) 0.0 else dist
+    }
+    
+    /**
+     * Calculates the initial bearing (azimuth) between two points in degrees.
+     */
+    fun calculateBearing(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        if (lat1 == lat2 && lng1 == lng2) return 0.0
+        val phi1 = Math.toRadians(lat1)
+        val phi2 = Math.toRadians(lat2)
+        val deltaLambda = Math.toRadians(lng2 - lng1)
+        
+        val y = sin(deltaLambda) * cos(phi2)
+        val x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(deltaLambda)
+        
+        return (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
     }
 
     /**

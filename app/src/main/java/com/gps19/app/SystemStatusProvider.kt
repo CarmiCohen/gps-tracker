@@ -21,10 +21,7 @@ import com.gps19.core.engine.CapabilityStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
@@ -34,11 +31,11 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.26.03:
+ * - Issue #545c: Flow Architecture Standardization. Migrated internet and battery 
+ *   status flows to SharedFlow (shareIn) to prevent redundant platform registrations.
  * July.24.01:
- * - Issue #098: Hardened permission refresh logic. Added Mutex-protected synchronous 
- *   refresh for getPermissionState(forceRefresh = true) to prevent stale UI alerts.
- * July.21.00:
- * - ANR Hardening (#099): Uses AtomicReference and background refresh to prevent cold-start frame skips.
+ * - Issue #098: Hardened permission refresh logic.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -60,7 +57,8 @@ interface SystemStatusProvider {
 
 @Singleton
 class SystemStatusProviderImpl @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    @ApplicationScope private val externalScope: CoroutineScope
 ) : SystemStatusProvider {
 
     private val powerManager by lazy { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
@@ -104,7 +102,6 @@ class SystemStatusProviderImpl @Inject constructor(
         
         if (isStale || forceRefresh) {
             refreshMutex.withLock {
-                // Double-check staleness inside lock
                 if (SystemClock.elapsedRealtime() - lastFullRefreshTime > PERMISSION_TTL_MS || forceRefresh) {
                     try {
                         val current = cachedState.get()
@@ -150,7 +147,7 @@ class SystemStatusProviderImpl @Inject constructor(
         }
     }
 
-    override fun observeInternetStatus(): Flow<Boolean> = callbackFlow<Boolean> {
+    private val sharedInternetStatusFlow = callbackFlow<Boolean> {
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) { trySend(true) }
             override fun onLost(network: Network) { trySend(false) }
@@ -167,9 +164,17 @@ class SystemStatusProviderImpl @Inject constructor(
             trySend(false)
         }
         awaitClose { try { connectivityManager.unregisterNetworkCallback(callback) } catch(e: Exception) {} }
-    }.distinctUntilChanged().conflate()
+    }.distinctUntilChanged()
+     .conflate()
+     .shareIn(
+        scope = externalScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        replay = 1
+     )
 
-    override fun observeBatteryStatus(): Flow<BatteryStatus> = callbackFlow<BatteryStatus> {
+    override fun observeInternetStatus(): Flow<Boolean> = sharedInternetStatusFlow
+
+    private val sharedBatteryStatusFlow = callbackFlow<BatteryStatus> {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
@@ -190,7 +195,15 @@ class SystemStatusProviderImpl @Inject constructor(
             Timber.e(e, "Battery receiver registration failed")
         }
         awaitClose { try { context.unregisterReceiver(receiver) } catch(e: Exception) {} }
-    }.distinctUntilChanged().conflate()
+    }.distinctUntilChanged()
+     .conflate()
+     .shareIn(
+        scope = externalScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        replay = 1
+     )
+
+    override fun observeBatteryStatus(): Flow<BatteryStatus> = sharedBatteryStatusFlow
 }
 
 data class BatteryStatus(

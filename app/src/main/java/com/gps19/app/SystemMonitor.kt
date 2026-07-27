@@ -8,24 +8,36 @@ import android.os.Build
 import android.os.PowerManager
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * SystemMonitorEvent: Reactive event container for system-level triggers.
+ */
+sealed class SystemMonitorEvent {
+    data class WatchdogScheduled(val success: Boolean, val skippedCount: Int) : SystemMonitorEvent()
+}
+
+/**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * July.26.04:
+ * - Issue #545c: Service Reactive Migration. Replaced legacy watchdog listener 
+ *   with a SharedFlow (systemMonitorEvents) for reactive event dispatching.
  * July.22.04:
  * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * v9.5.0:
- * - Issue #503: Hilt Removal. Manual dependency injection.
  */
 @Singleton
 class SystemMonitor @Inject constructor(
     @ApplicationContext private val context: Context,
     private val timeProvider: TimeProvider
 ) {
-    private var onLogWatchdog: ((Boolean, Int) -> Unit)? = null
+    private val _systemMonitorEvents = MutableSharedFlow<SystemMonitorEvent>(extraBufferCapacity = 8)
+    val systemMonitorEvents: SharedFlow<SystemMonitorEvent> = _systemMonitorEvents.asSharedFlow()
 
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     private var wakeLock: PowerManager.WakeLock? = null
@@ -41,13 +53,8 @@ class SystemMonitor @Inject constructor(
     var jumpStateStartTs = 0L
     var gpsStallStartTs = 0L
 
-    fun setWatchdogListener(listener: (Boolean, Int) -> Unit) {
-        this.onLogWatchdog = listener
-    }
-
     /**
      * acquireWakeLock: Acquires or renews the partial wake lock.
-     * v9.3.25: Implements TTL throttling to prevent logcat noise.
      */
     fun acquireWakeLock(force: Boolean = false) {
         val now = timeProvider.elapsedRealtime()
@@ -127,7 +134,7 @@ class SystemMonitor @Inject constructor(
         lastScheduledWatchdogTs = now
         nextExpectedExpiryTs = triggerAt
         
-        onLogWatchdog?.invoke(true, skippedCounter)
+        _systemMonitorEvents.tryEmit(SystemMonitorEvent.WatchdogScheduled(true, skippedCounter))
         skippedCounter = 0
     }
 

@@ -43,6 +43,10 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * July.26.04:
+ * - Issue #595: Forensic Playback Hardening. Implemented "Strict Mode" for 
+ *   forensic reconstruction. Ribbons now perform real-time sequence validation 
+ *   and clock-drift auditing when isStrictMode is active.
  * July.25.01:
  * - Issue #547c: State Decomposition Refinement. Updated GlobalStatusBar to 
  *   consume isRedScreenVisible from TelemetryState for zero-latency surfacing.
@@ -72,6 +76,8 @@ fun RibbonsOverlay(viewModel: MainViewModel, onDismiss: () -> Unit) {
 @Composable
 fun AnalyticalRibbons(viewModel: MainViewModel) {
     var selectedScale by remember { mutableStateOf("4M") }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isStrictMode = uiState.navigation.isStrictMode
     
     val activeHistoryFlow = when(selectedScale) {
         "16M" -> viewModel.history16MFlow
@@ -106,28 +112,45 @@ fun AnalyticalRibbons(viewModel: MainViewModel) {
                     )
                 }
             }
+            
+            // Issue #595: Strict Mode Toggle
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable { viewModel.onEvent(UiEvent.ToggleStrictMode(!isStrictMode)) }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                color = if (isStrictMode) Color.Red.copy(alpha = 0.3f) else Color.Transparent
+            ) {
+                Text(
+                    text = "STRICT",
+                    color = if (isStrictMode) Color.White else Color.Gray.copy(alpha = 0.5f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
         }
 
         // Consolidated Connection & Health Ribbon
-        StatefulConnectionRibbon(activeHistoryFlow, selectedScale)
+        StatefulConnectionRibbon(activeHistoryFlow, selectedScale, isStrictMode)
         
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
 
         // Synchronized Sensor Stack
-        StatefulSensorRibbon(activeHistoryFlow, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), valueSelector = { it.snrIdx.toFloat() })
-        StatefulSensorRibbon(activeHistoryFlow, "NOI", selectedScale, lineColor = Amber500, valueSelector = { it.noiseIdx.toFloat() })
-        StatefulSensorRibbon(activeHistoryFlow, "LUX", selectedScale, lineColor = Color.White, valueSelector = { it.luxIdx.toFloat() })
-        StatefulSensorRibbon(activeHistoryFlow, "VIB", selectedScale, lineColor = Color.Magenta, valueSelector = { it.vibeIdx.toFloat() })
-        StatefulSensorRibbon(activeHistoryFlow, "PRX", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { it.proxIdx.toFloat() })
-        StatefulSensorRibbon(activeHistoryFlow, "LIF", selectedScale, lineColor = Color(0xFFFACC15), valueSelector = { it.liftIdx.toFloat() })
-        StatefulSensorRibbon(activeHistoryFlow, "BAT", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isBatterySteepDischarge) 1f else 0f })
-        StatefulSensorRibbon(activeHistoryFlow, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isCoolingModeActive) 1f else 0f })
-        StatefulSensorRibbon(activeHistoryFlow, "CUR", selectedScale, lineColor = Color(0xFFFB923C), valueSelector = { (kotlin.math.abs(it.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) })
-        StatefulSensorRibbon(activeHistoryFlow, "SIT", selectedScale, lineColor = BrandJd, renderType = RibbonRenderType.BAR, valueSelector = { if (it.isSitActive) 1f else 0f })
-        StatefulSensorRibbon(activeHistoryFlow, "TLT", selectedScale, lineColor = Color(0xFF818CF8), valueSelector = { it.tiltIdx.toFloat() })
-        StatefulSensorRibbon(activeHistoryFlow, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), valueSelector = { it.baroIdx.toFloat() })
-        StatefulSensorRibbon(activeHistoryFlow, "SVZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f) })
-        StatefulSensorRibbon(activeHistoryFlow, "SDZ", selectedScale, lineColor = Violet500, valueSelector = { (kotlin.math.abs(it.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f) })
+        StatefulSensorRibbon(activeHistoryFlow, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), isStrictMode = isStrictMode, valueSelector = { it.snrIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "NOI", selectedScale, lineColor = Amber500, isStrictMode = isStrictMode, valueSelector = { it.noiseIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "LUX", selectedScale, lineColor = Color.White, isStrictMode = isStrictMode, valueSelector = { it.luxIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "VIB", selectedScale, lineColor = Color.Magenta, isStrictMode = isStrictMode, valueSelector = { it.vibeIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "PRX", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = { it.proxIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "LIF", selectedScale, lineColor = Color(0xFFFACC15), isStrictMode = isStrictMode, valueSelector = { it.liftIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "BAT", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = { if (it.isBatterySteepDischarge) 1f else 0f })
+        StatefulSensorRibbon(activeHistoryFlow, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = { if (it.isCoolingModeActive) 1f else 0f })
+        StatefulSensorRibbon(activeHistoryFlow, "CUR", selectedScale, lineColor = Color(0xFFFB923C), isStrictMode = isStrictMode, valueSelector = { (kotlin.math.abs(it.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) })
+        StatefulSensorRibbon(activeHistoryFlow, "SIT", selectedScale, lineColor = BrandJd, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = { if (it.isSitActive) 1f else 0f })
+        StatefulSensorRibbon(activeHistoryFlow, "TLT", selectedScale, lineColor = Color(0xFF818CF8), isStrictMode = isStrictMode, valueSelector = { it.tiltIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), isStrictMode = isStrictMode, valueSelector = { it.baroIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "SVZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = { (kotlin.math.abs(it.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f) })
+        StatefulSensorRibbon(activeHistoryFlow, "SDZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = { (kotlin.math.abs(it.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f) })
     }
 }
 
@@ -138,6 +161,7 @@ fun ForensicRibbonContainer(
     height: androidx.compose.ui.unit.Dp,
     history: List<ConnectionPoint>,
     scale: String,
+    isStrictMode: Boolean = false,
     content: androidx.compose.ui.graphics.drawscope.DrawScope.(
         totalPoints: Float,
         pointWidth: Float,
@@ -177,9 +201,11 @@ fun ForensicRibbonContainer(
                     )
 
                     // Draw Scale Ticks
-                    val intervalMs = when(scale) {
-                        "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 1 * 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
+                    val intervalSeconds = when(scale) {
+                        "7D" -> 2700; "24H" -> 360; "4H" -> 60; "1H" -> 15; "16M" -> 4; "4M" -> 1; else -> 1
                     }
+                    val intervalMs = intervalSeconds * 1000L
+                    
                     val alignMs = when(scale) {
                         "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
                     }
@@ -213,6 +239,21 @@ fun ForensicRibbonContainer(
                                 size = Size(maxOf(1f, pointWidth), maxHeight + 2.dp.toPx())
                             )
                         }
+
+                        // Issue #595: Strict Mode Integrity Validations
+                        if (isStrictMode && index > 0) {
+                            val prev = history[index - 1]
+                            
+                            // 1. Sequence Continuity Validation (Hidden Gaps)
+                            val tsDelta = p.ts - prev.ts
+                            if (!p.isGap && !prev.isGap && tsDelta > intervalMs * 2) {
+                                drawRect(
+                                    color = Color.Red.copy(alpha = 0.4f),
+                                    topLeft = Offset(xPos - pointWidth, baseLineY - maxHeight),
+                                    size = Size(maxOf(1f, pointWidth), maxHeight)
+                                )
+                            }
+                        }
                     }
 
                     // Delegate Content Rendering
@@ -230,10 +271,11 @@ fun StatefulSensorRibbon(
     scale: String,
     lineColor: Color,
     renderType: RibbonRenderType = RibbonRenderType.LINE,
+    isStrictMode: Boolean = false,
     valueSelector: (ConnectionPoint) -> Float
 ) {
     val history by flow.collectAsStateWithLifecycle()
-    GenericSensorRibbon(history, title, scale, lineColor, renderType, valueSelector)
+    GenericSensorRibbon(history, title, scale, lineColor, renderType, isStrictMode, valueSelector)
 }
 
 @Composable
@@ -243,6 +285,7 @@ fun GenericSensorRibbon(
     scale: String,
     lineColor: Color, 
     renderType: RibbonRenderType = RibbonRenderType.LINE,
+    isStrictMode: Boolean = false,
     valueSelector: (ConnectionPoint) -> Float
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -253,7 +296,8 @@ fun GenericSensorRibbon(
         titleColor = lineColor,
         height = boxHeight,
         history = history,
-        scale = scale
+        scale = scale,
+        isStrictMode = isStrictMode
     ) { totalPoints, pointWidth, baseLineY, maxHeight, landscape ->
         var lastPos: Offset? = null
         history.forEachIndexed { index, p ->
@@ -298,14 +342,15 @@ fun GenericSensorRibbon(
 @Composable
 fun StatefulConnectionRibbon(
     flow: StateFlow<List<ConnectionPoint>>,
-    scale: String
+    scale: String,
+    isStrictMode: Boolean = false
 ) {
     val history by flow.collectAsStateWithLifecycle()
-    ConnectionQualityRibbon(history, scale)
+    ConnectionQualityRibbon(history, scale, isStrictMode)
 }
 
 @Composable
-fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String) {
+fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStrictMode: Boolean = false) {
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val dateFormatter = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -316,7 +361,8 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String) {
         titleColor = Color.Gray,
         height = boxHeight,
         history = history,
-        scale = scale
+        scale = scale,
+        isStrictMode = isStrictMode
     ) { totalPoints, pointWidth, connectionBaseY, _, landscape ->
         val ribbonMaxHeight = if (landscape) 16.dp.toPx() else 10.dp.toPx()
         // Connection baseline is slightly above the container's baseline to allow for labels
@@ -332,7 +378,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String) {
         }
 
         val intervalMs = when(scale) {
-            "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 1 * 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
+            "7D" -> 2700 * 1000L; "24H" -> 360 * 1000L; "4H" -> 60 * 1000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L
         }
         val alignMs = when(scale) {
             "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
@@ -353,6 +399,21 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String) {
                     topLeft = Offset(xPos, effectiveBaseY - (ribbonMaxHeight * hFactor)), 
                     size = Size(maxOf(1f, pointWidth), ribbonMaxHeight * hFactor)
                 )
+
+                // Issue #595: Clock-Drift Audit
+                if (isStrictMode && index > 0) {
+                    val prev = history[index - 1]
+                    // If rt vs ts drift changes by more than 2 seconds, highlight it
+                    val currentDrift = p.ts - p.rt
+                    val prevDrift = prev.ts - prev.rt
+                    if (kotlin.math.abs(currentDrift - prevDrift) > 2000L) {
+                        drawRect(
+                            color = Color.Yellow.copy(alpha = 0.5f),
+                            topLeft = Offset(xPos, effectiveBaseY - (ribbonMaxHeight * 1.5f)),
+                            size = Size(maxOf(2f, pointWidth), ribbonMaxHeight * 0.5f)
+                        )
+                    }
+                }
                 
                 // Chain GPS Overlay
                 if (p.hasGps && p.gpsIndex > 0.0) {

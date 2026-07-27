@@ -19,12 +19,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * July.26.01:
- * - Issue #575: Network Handshake Latency. Accelerated startup sequence by moving 
- *   ConnectivitySuite start earlier and reducing staggered delays to ensure 
- *   relay connection within the first telemetry window.
- * July.25.11:
- * - Issue #590: Updated MbrainHardwareManager calls to pass timeProvider.
+ * July.26.04:
+ * - Issue #595: Forensic Playback Hardening.
+ * - Issue #589: Performance Audit. Fixed type mismatch in forensic log routing and 
+ *   ensured exhaustive sensor event handling.
+ * - Issue #545c: Service Reactive Migration. Refactored to collect from standardized 
+ *   SharedFlow event streams.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -61,141 +61,220 @@ class TrackerService : BaseMonitorService() {
     private var lastFgsUpdateRt = 0L
     private val FGS_TYPE_UPDATE_THROTTLE_MS = 10_000L
 
-    private val localProcessorListener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, status: SentinelStatus, timestamp: Long, accuracy: Double, maxAccuracy: Double) {
-            repository.saveTrailPoint(lat, lng, isViewerTrail, status, timestamp, accuracy = accuracy, maxAccuracy = maxAccuracy)
-        }
-        override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Double, snr: Double?, vibe: Double?) {
-            val specialColor = if (isSpecial || message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
-            logManager.logServiceEvent(message, isImportant, isSpecial = isSpecial || message.contains("Merge-on-Stale"), specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy, snr = snr, vibe = vibe)
-        }
-        override fun onMaxAccuracyChanged(accuracy: Double) {
-            repository.saveDoubleSync(MainRepository.MAX_ACCURACY_KEY, accuracy)
-        }
-        override fun onChairBaselineChanged(baseline: Double) {
-            val proc = lastProcessedLocation
-            logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", baseline)}°",
-                lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-            lifecycleScope.launch { repository.saveDouble(MainRepository.CHAIR_BASELINE_TILT_KEY, baseline) }
-        }
-        override fun onGpsStallDetected(rt: Long) {
-            if (systemMonitor.gpsStallStartTs == 0L) systemMonitor.gpsStallStartTs = rt
-        }
-    }
-
-    override fun onCreate() {
-        super.onCreate()
-        
+    override suspend fun onServiceInitialize() {
         notificationManager.setTrackerMode(true)
         repository.saveLongSync(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
 
-        lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
-            configManager.deviceId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
-            configManager.viewerId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
-            configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
-            configManager.isTrackerMode = true
-            
-            refreshCapabilitiesInternal()
+        configManager.deviceId = repository.getString(MainRepository.TRACKER_ID_KEY, MainRepository.DEFAULT_TRACKER_ID)
+        configManager.viewerId = repository.getString(MainRepository.VIEWER_ID_KEY, MainRepository.DEFAULT_VIEWER_ID)
+        configManager.relayUrl = repository.getString(MainRepository.RELAY_URL_KEY, MainRepository.DEFAULT_RELAY_URL)
+        configManager.isTrackerMode = true
+        
+        refreshCapabilitiesInternal()
 
-            if (capabilities.isA15Device && MbrainHardwareManager.isAvailable()) {
-                val res = MbrainHardwareManager.initMbrain(timeProvider, configManager.deviceId, 0)
-                logManager.logServiceEvent("HARDWARE: libmbrainSDK initialized (Result: $res)", important = true)
-            }
+        if (capabilities.isA15Device && MbrainHardwareManager.isAvailable()) {
+            val res = MbrainHardwareManager.initMbrain(timeProvider, configManager.deviceId, 0)
+            logManager.logServiceEvent("HARDWARE: libmbrainSDK initialized (Result: $res)", important = true)
+        }
 
-            alarmManager.setListener(object : AppAlarmManager.Listener {
-                override fun onLogEvent(type: String, message: String, important: Boolean, extremeValue: Double?, logId: String?, durationMs: Long, isSpecial: Boolean, specialColor: Int?, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double, snr: Double?, vibe: Double?) {
-                    logManager.submitToLogSink(message, type, important, extremeValue, logId, durationMs, isSpecial, specialColor, lat, lng, accuracy, maxAccuracy, snr, vibe)
-                }
-            })
-            
-            integrityMonitor.setListener(object : IntegrityMonitor.Listener {
-                override fun onViolationSustained(type: String) { if (type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(true) }
-                override fun onViolationResolved(type: String) { if (type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(false) }
-                override fun onLogEvent(message: String, important: Boolean) {
-                    val isSpecial = message.contains("tamper", ignoreCase = true) || message.contains("confirmed", ignoreCase = true) || message.contains("EMERGENCY", ignoreCase = true) || message.contains("PRIORITY", ignoreCase = true) || message.contains("BUCKET", ignoreCase = true)
-                    logManager.logServiceEvent(message, important, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
-                }
-            })
-            
-            locationProcessor.setListener(localProcessorListener)
+        // Reactive Event Subscription
+        observeAlarmEvents()
+        observeIntegrityEvents()
+        observeProcessorEvents()
+        observeConnectivityEvents()
+        observeHistoryEvents()
+        observeSensorEvents()
+        observeCommandEvents()
 
-            // Issue #575: Start connectivity immediately after listener setup to prioritize handshake
-            connectivitySuite.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
-            
-            connectivitySuite.setPeerListener(object : ConnectivitySuite.PeerListener {
-                override fun onPeerPulse(id: String) { handleViewerPulse(id) }
-            })
+        connectivitySuite.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
+        
+        // Ensure state is restored before starting high-frequency collectors
+        val savedMaxAcc = repository.getDouble(MainRepository.MAX_ACCURACY_KEY, 0.0)
+        val savedLastSitTs = repository.getLong(MainRepository.LAST_SIT_TS_KEY, 0L)
+        val savedBaseline = repository.getDouble(MainRepository.CHAIR_BASELINE_TILT_KEY, -1000.0)
+        val trackerState = repository.loadTrackerState()
+        val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
+        val maxDist = repository.getDouble(MainRepository.MAX_DISTANCE_STORAGE_KEY, 60.0)
+        locationProcessor.loadState(savedMaxAcc, savedLastSitTs, savedBaseline, trackerState, homePoints, maxDist)
 
-            // Brief delay for state restoration and sensor warming
-            delay(500)
+        val savedAlarms = repository.getLastAlarmsJson()
+        alarmManager.restoreState(savedAlarms)
 
-            val savedMaxAcc = repository.getDouble(MainRepository.MAX_ACCURACY_KEY, 0.0)
-            val savedLastSitTs = repository.getLong(MainRepository.LAST_SIT_TS_KEY, 0L)
-            val savedBaseline = repository.getDouble(MainRepository.CHAIR_BASELINE_TILT_KEY, -1000.0)
-            val trackerState = repository.loadTrackerState()
-            val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
-            val maxDist = repository.getDouble(MainRepository.MAX_DISTANCE_STORAGE_KEY, 60.0)
-            locationProcessor.loadState(savedMaxAcc, savedLastSitTs, savedBaseline, trackerState, homePoints, maxDist)
+        historyManager.initialize(lifecycleScope)
+        appSensorManager.start()
 
-            val savedAlarms = repository.getLastAlarmsJson()
-            alarmManager.restoreState(savedAlarms)
+        commandRouter.register()
+        commandRouter.startObservingCommands(lifecycleScope)
 
-            appSensorManager.setHardwareFailureCallback { reason ->
-                val proc = lastProcessedLocation
-                logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - $reason", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-            }
+        gpsCollectionJob = lifecycleScope.launch { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
+        gnssDetailJob = lifecycleScope.launch { gpsManager.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
 
-            historyManager.setListener(object : HistoryManager.Listener { override fun onLogEvent(message: String, important: Boolean) { logManager.logServiceEvent(message, important) } })
-            historyManager.initialize(lifecycleScope)
+        settingsJob = lifecycleScope.launch {
+            launch { repository.alertSettingsFlow.collectLatest { settings -> alarmManager.updateSettings(settings) } }
+            launch { repository.homePointsFlow.collectLatest { points -> locationProcessor.setHomePoints(points.map { EngineGeoPoint(it.latitude, it.longitude) }) } }
+            launch { repository.maxDistanceFlow.collectLatest { dist -> locationProcessor.setMaxDistanceAuthority(dist) } }
+        }
 
-            appSensorManager.start()
+        val recoveredTs = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        val recoveredDrift = repository.getLong(MainRepository.CLOCK_DRIFT_REF_KEY, 0L)
+        
+        lastServiceTickTs = recoveredTs
+        lastServiceTickRealtime = if (recoveredDrift != 0L) recoveredTs - recoveredDrift else timeProvider.elapsedRealtime()
+        locationProcessor.setLastValidFixRt(timeProvider.elapsedRealtime()) 
+        
+        serviceStartRealtime = timeProvider.elapsedRealtime()
+        serviceStartWall = timeProvider.currentTimeMillis()
 
-            commandRouter.setListener(object : CommandRouter.Listener {
-                override fun onViewerPulse(id: String) = handleViewerPulse(id)
-                override fun onWatchdogTrigger() { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
-                override fun onUiPulse() { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }
-                override fun onUiVisibilityChanged(visible: Boolean) { onUiVisibilityChangedInternal(visible) }
-                override fun onTransientDrop(drop: Boolean) { transientDropDetected.set(drop) }
-                override fun onResetTimers() { resetServiceTimers() }
-                override fun onSyncSensors() { lifecycleScope.launch(Dispatchers.Default) { refreshCapabilitiesInternal(); appSensorManager.start() } }
-                override fun onTriggerForensicTest() {
-                    lifecycleScope.launch {
-                        val proc = lastProcessedLocation
-                        logManager.logServiceEvent("FORENSIC TEST: Manually injecting Jammer/Stall markers", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                        systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
-                        systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L
+        setupPhysicalFastPaths()
+        startTickLoop()
+        
+        withContext(Dispatchers.Main) { updateForegroundServiceType() }
+        logManager.logServiceEvent("Tracker Engine Online (Coordinated)", important = true)
+    }
+
+    private fun observeAlarmEvents() {
+        lifecycleScope.launch {
+            alarmManager.alarmEvents.collect { event ->
+                when (event) {
+                    is AlarmEvent.LogEvent -> {
+                        logManager.submitToLogSink(
+                            message = event.message,
+                            type = event.type,
+                            important = event.important,
+                            extremeValue = event.extremeValue,
+                            localId = event.logId,
+                            durationMs = event.durationMs,
+                            isSpecial = event.isSpecial,
+                            specialColor = event.specialColor,
+                            lat = event.lat,
+                            lng = event.lng,
+                            accuracy = event.accuracy,
+                            maxAccuracy = event.maxAccuracy,
+                            snr = event.snr,
+                            vibe = event.vibe
+                        )
                     }
                 }
-            })
-            commandRouter.register()
-            commandRouter.startObservingCommands(lifecycleScope)
-
-            // Accelerated GPS start
-            delay(500)
-            gpsCollectionJob = lifecycleScope.launch { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
-            gnssDetailJob = lifecycleScope.launch { gpsManager.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
-
-            settingsJob = lifecycleScope.launch {
-                launch { repository.alertSettingsFlow.collect { settings -> alarmManager.updateSettings(settings) } }
-                launch { repository.homePointsFlow.collect { points -> locationProcessor.setHomePoints(points.map { EngineGeoPoint(it.latitude, it.longitude) }) } }
-                launch { repository.maxDistanceFlow.collect { dist -> locationProcessor.setMaxDistanceAuthority(dist) } }
             }
+        }
+    }
 
-            val recoveredTs = repository.getLong(MainRepository.LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
-            val recoveredDrift = repository.getLong(MainRepository.CLOCK_DRIFT_REF_KEY, 0L)
-            
-            lastServiceTickTs = recoveredTs
-            lastServiceTickRealtime = if (recoveredDrift != 0L) recoveredTs - recoveredDrift else timeProvider.elapsedRealtime()
-            locationProcessor.setLastValidFixRt(timeProvider.elapsedRealtime()) 
-            
-            serviceStartRealtime = timeProvider.elapsedRealtime()
-            serviceStartWall = timeProvider.currentTimeMillis()
+    private fun observeIntegrityEvents() {
+        lifecycleScope.launch {
+            integrityMonitor.integrityEvents.collect { event ->
+                when (event) {
+                    is IntegrityEvent.ViolationSustained -> if (event.type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(true)
+                    is IntegrityEvent.ViolationResolved -> if (event.type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(false)
+                    is IntegrityEvent.LogEvent -> {
+                        val isSpecial = event.message.contains("tamper", ignoreCase = true) || 
+                                       event.message.contains("confirmed", ignoreCase = true) || 
+                                       event.message.contains("EMERGENCY", ignoreCase = true) || 
+                                       event.message.contains("PRIORITY", ignoreCase = true) || 
+                                       event.message.contains("BUCKET", ignoreCase = true)
+                        logManager.logServiceEvent(event.message, event.important, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
+                    }
+                }
+            }
+        }
+    }
 
-            setupPhysicalFastPaths()
-            startTickLoop()
-            
-            withContext(Dispatchers.Main) { updateForegroundServiceType() }
-            logManager.logServiceEvent("Tracker Engine Online (Accelerated)", important = true)
+    private fun observeProcessorEvents() {
+        lifecycleScope.launch {
+            locationProcessor.processorEvents.collect { event ->
+                when (event) {
+                    is ProcessorEvent.TrailPointSaved -> {
+                        repository.saveTrailPoint(event.lat, event.lng, event.isViewerTrail, event.status, event.timestamp, accuracy = event.accuracy, maxAccuracy = event.maxAccuracy)
+                    }
+                    is ProcessorEvent.LogAdded -> {
+                        val isMergeStale = event.message.contains("Merge-on-Stale")
+                        val specialColor = if (event.isSpecial || isMergeStale) FORENSIC_PINK_COLOR else null
+                        logManager.submitToLogSink(
+                            message = event.message,
+                            type = event.type,
+                            important = event.isImportant,
+                            isSpecial = event.isSpecial || isMergeStale,
+                            specialColor = specialColor,
+                            lat = event.lat,
+                            lng = event.lng,
+                            accuracy = event.accuracy,
+                            snr = event.snr,
+                            vibe = event.vibe
+                        )
+                    }
+                    is ProcessorEvent.MaxAccuracyChanged -> {
+                        repository.saveDoubleSync(MainRepository.MAX_ACCURACY_KEY, event.accuracy)
+                    }
+                    is ProcessorEvent.ChairBaselineChanged -> {
+                        val proc = lastProcessedLocation
+                        logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", event.baseline)}°",
+                            lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                        lifecycleScope.launch { repository.saveDouble(MainRepository.CHAIR_BASELINE_TILT_KEY, event.baseline) }
+                    }
+                    is ProcessorEvent.GpsStallDetected -> {
+                        if (systemMonitor.gpsStallStartTs == 0L) systemMonitor.gpsStallStartTs = event.rt
+                    }
+                }
+            }
+        }
+    }
+
+    private fun observeConnectivityEvents() {
+        lifecycleScope.launch {
+            connectivitySuite.connectivityEvents.collect { event ->
+                when (event) {
+                    is ConnectivityEvent.PeerPulse -> handleViewerPulse(event.id)
+                }
+            }
+        }
+    }
+
+    private fun observeHistoryEvents() {
+        lifecycleScope.launch {
+            historyManager.historyEvents.collect { event ->
+                when (event) {
+                    is HistoryEvent.LogEvent -> logManager.logServiceEvent(event.message, event.important)
+                }
+            }
+        }
+    }
+
+    private fun observeSensorEvents() {
+        lifecycleScope.launch {
+            appSensorManager.sensorEvents.collect { event ->
+                when (event) {
+                    is AppSensorEvent.HardwareFailure -> {
+                        val proc = lastProcessedLocation
+                        logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                    }
+                    is AppSensorEvent.LogEvent -> {
+                        logManager.logServiceEvent(event.message, event.important)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun observeCommandEvents() {
+        lifecycleScope.launch {
+            commandRouter.commandEvents.collect { event ->
+                when (event) {
+                    is CommandEvent.ViewerPulse -> handleViewerPulse(event.id)
+                    is CommandEvent.WatchdogTrigger -> { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
+                    is CommandEvent.UiPulse -> { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }
+                    is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
+                    is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
+                    is CommandEvent.ResetTimers -> resetServiceTimers()
+                    is CommandEvent.SyncSensors -> { lifecycleScope.launch(Dispatchers.Default) { refreshCapabilitiesInternal(); appSensorManager.start() } }
+                    is CommandEvent.TriggerForensicTest -> {
+                        lifecycleScope.launch {
+                            val proc = lastProcessedLocation
+                            logManager.logServiceEvent("FORENSIC TEST: Manually injecting Jammer/Stall markers", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                            systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
+                            systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -361,7 +440,7 @@ class TrackerService : BaseMonitorService() {
         if (nowRt - lastPowerSaveCheckRt > 5000L) {
             val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(isStationary = appSensorManager.isStationary(), isGpsStalled = lastProcessedLocation?.isStalled ?: true, hasUnresolvedAlarms = alarmManager.hasUnresolvedAlarms(), isUiVisible = isUiVisible())
             if (shouldBePowerSave != isPowerSaveActive) {
-                isPowerSaveActive = shouldBePowerSave; appSensorManager.setPowerSaveMode(shouldBePowerSave); logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISENGAGED"}", false)
+                isPowerSaveActive = shouldBePowerSave; appSensorManager.setPowerSaveMode(shouldBePowerSave); logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISABLED"}", false)
                 withContext(Dispatchers.Main) { updateForegroundServiceType() }
             }
             lastPowerSaveCheckRt = nowRt
@@ -430,7 +509,6 @@ class TrackerService : BaseMonitorService() {
 
     override fun onDestroy() {
         gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel()
-        commandRouter.unregister(); appSensorManager.stop(); connectivitySuite.stop()
         super.onDestroy()
     }
 }
