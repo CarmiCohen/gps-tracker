@@ -3,6 +3,7 @@ package com.gps19.app
 import android.content.Context
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -29,6 +30,9 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * July.28.22:
+ * - Issue #617: Global SharedFlow Audit. Hardened _alarmEvents with 
+ *   BufferOverflow.DROP_OLDEST to prevent health evaluation suspension (R617).
  * July.26.04:
  * - Issue #589: Integrated LatencyMonitor spike reporting in evaluateAlarms.
  * - Issue #545c: Flow Architecture Standardization. Replaced legacy Listener 
@@ -42,7 +46,10 @@ class AppAlarmManager @Inject constructor(
     private val notificationManager: AppNotificationManager,
     private val timeProvider: TimeProvider
 ) {
-    private val _alarmEvents = MutableSharedFlow<AlarmEvent>(extraBufferCapacity = 64)
+    private val _alarmEvents = MutableSharedFlow<AlarmEvent>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val alarmEvents: SharedFlow<AlarmEvent> = _alarmEvents.asSharedFlow()
 
     private val activeAlarms = mutableMapOf<String, AlarmEvaluation>()

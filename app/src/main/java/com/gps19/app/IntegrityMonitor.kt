@@ -8,6 +8,7 @@ import android.os.Build
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -25,12 +26,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * July.28.22:
+ * - Issue #617: Global SharedFlow Audit. Hardened _integrityEvents with 
+ *   BufferOverflow.DROP_OLDEST to ensure non-blocking health telemetry (R617).
  * July.28.18:
  * - Issue #613: Forensic: Location Refresh Reactivity. Migrated location 
  *   pending and stall monitoring to observe reactive GpsManager flows.
- * July.28.17:
- * - Issue #612: Structural: Standby & Power-Save Reactivity. Converted Power Save 
- *   Mode and Standby Bucket monitoring to reactive flows via SystemStatusProvider.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -46,7 +47,10 @@ class IntegrityMonitor @Inject constructor(
     private var lastFullPollTs = 0L
     private val POLL_TTL_MS = 10_000L
 
-    private val _integrityEvents = MutableSharedFlow<IntegrityEvent>(extraBufferCapacity = 32)
+    private val _integrityEvents = MutableSharedFlow<IntegrityEvent>(
+        extraBufferCapacity = 32,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val integrityEvents: SharedFlow<IntegrityEvent> = _integrityEvents.asSharedFlow()
 
     private val sustainedViolations = mutableMapOf<String, Long>()

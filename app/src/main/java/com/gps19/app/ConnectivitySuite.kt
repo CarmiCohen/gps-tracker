@@ -12,6 +12,7 @@ import com.google.protobuf.CodedOutputStream
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
 import org.json.JSONObject
 import timber.log.Timber
@@ -32,11 +33,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.28.22:
+ * - Issue #617: Global SharedFlow Audit. Hardened _connectivityEvents with 
+ *   BufferOverflow.DROP_OLDEST to ensure non-blocking peer signaling (R617).
  * July.27.07:
  * - Issue #602: SIT Timestamp Parity Logic. Integrated sitVzTs/Rt into 
  *   pushCurrentStatus and status extraction to restore full forensic parity.
- * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Integrated kineticEnergy.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -53,7 +55,10 @@ class ConnectivitySuite @Inject constructor(
     private val mainRepository: MainRepository,
     private val remoteStatusRepository: RemoteStatusRepository
 ) {
-    private val _connectivityEvents = MutableSharedFlow<ConnectivityEvent>(extraBufferCapacity = 16)
+    private val _connectivityEvents = MutableSharedFlow<ConnectivityEvent>(
+        extraBufferCapacity = 16,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val connectivityEvents: SharedFlow<ConnectivityEvent> = _connectivityEvents.asSharedFlow()
 
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager

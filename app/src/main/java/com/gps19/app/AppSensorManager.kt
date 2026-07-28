@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -42,12 +43,12 @@ sealed class AppSensorEvent {
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.28.22:
+ * - Issue #617: Global SharedFlow Audit. Hardened _sensorEvents with 
+ *   BufferOverflow.DROP_OLDEST to ensure non-blocking sensor telemetry.
  * July.27.06:
  * - Issue #601: Kinetic Energy Anomaly Detection. Implemented HPF-based energy 
  *   analysis to distinguish sustained motion from impulse shocks.
- * July.26.04:
- * - Issue #589: Performance Audit. Integrated LatencyMonitor into snapshot 
- *   consumption and forensic sample retrieval paths.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -57,7 +58,10 @@ class AppSensorManager @Inject constructor(
     private val systemMonitor: SystemMonitor
 ) : SensorEventListener {
 
-    private val _sensorEvents = MutableSharedFlow<AppSensorEvent>(extraBufferCapacity = 8)
+    private val _sensorEvents = MutableSharedFlow<AppSensorEvent>(
+        extraBufferCapacity = 8,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val sensorEvents: SharedFlow<AppSensorEvent> = _sensorEvents.asSharedFlow()
 
     private val sensorManager by lazy { context.getSystemService(Context.SENSOR_SERVICE) as AndroidSensorManager }

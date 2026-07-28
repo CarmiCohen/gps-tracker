@@ -1,45 +1,56 @@
-# Handover (July.28.2218) - Repository Event Pipeline Hardening [READY]
+# Handover (July.28.2233) - Global SharedFlow Audit [READY]
 
 ## 🎯 Completed Objective
-Cycle **July.28.2218** achieved **452 Resolved Issues** (Cumulative).
-1.  **[Issue #616] [Category: Structural] Repository Event Pipeline Hardening**:
-    - **Audit**: Verified that `SettingsRepository` utilizes native `DataStore` flows, which are safe from the targeted suspension risk.
-    - **Remediation**: Hardened `MainRepository.kt` by updating `_uiCommands` and `_liveHistoryFlow` to use `BufferOverflow.DROP_OLDEST`.
-    - **Impact**: Eliminates the risk of collector-side suspension (e.g., from UI or slow I/O) blocking the repository's emission pipeline.
-    - **Authority**: Added **R616** (Repository Event Pipeline Hardening) to `SOT_MASTER_REQUIREMENTS.md`.
+Cycle **July.28.2233** achieved **453 Resolved Issues** (Cumulative).
+1.  **[Issue #617] [Category: Structural] Global SharedFlow Audit**:
+    - **Audit**: Conducted a project-wide search for `MutableSharedFlow` instances.
+    - **Remediation**: Hardened 10 critical components (`AppSensorManager`, `CommunicationManager`, `HistoryManager`, `AppAlarmManager`, `SystemMonitor`, `LocationProcessor`, `ConnectivitySuite`, `IntegrityMonitor`, `CommandRouter`, and `GpsManager`) with `BufferOverflow.DROP_OLDEST`.
+    - **Impact**: Guarantees that the core logic and hardware callback threads are never suspended by slow UI observers or heavy forensic logging.
+    - **Authority**: Added **R617** (Global SharedFlow Overflow Strategy) to `SOT_MASTER_REQUIREMENTS.md`.
 
 ## 📊 Status Tracker
+- **[Issue #617] Global SharedFlow Audit**: 🟢 Resolved.
 - **[Issue #616] Repository Event Pipeline Hardening**: 🟢 Resolved.
-- **[Issue #615] Stability Audit Metric Expansion**: 🟢 Resolved.
-- **[Issue #614] GNSS Callback Overhead Monitoring**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
 - **Build Status**: 🟢 SUCCESS (Verified via `:app:assembleDebug`).
-- **Version**: **July.28.2218**.
-- **Requirement Parity**: Added **R616**.
+- **Version**: **July.28.2233**.
+- **Requirement Parity**: Added **R617**.
 
-### 🧬 Forensic Inventory (Update)
-| Component | Hook / Method | Action |
+### 🧬 Forensic Change Log
+| File | Change Type | Purpose |
 | :--- | :--- | :--- |
-| **MainRepository** | `_uiCommands` | Updated to `BufferOverflow.DROP_OLDEST`. |
-| **MainRepository** | `_liveHistoryFlow` | Updated to `BufferOverflow.DROP_OLDEST`. |
+| `app/src/main/java/com/gps19/app/AppSensorManager.kt` | Hardening | Applied `DROP_OLDEST` to `_sensorEvents`. |
+| `app/src/main/java/com/gps19/app/CommunicationManager.kt` | Hardening | Applied `DROP_OLDEST` to `_signalingFlow`. |
+| `app/src/main/java/com/gps19/app/HistoryManager.kt` | Hardening | Applied `DROP_OLDEST` to `_historyEvents`. |
+| `app/src/main/java/com/gps19/app/AppAlarmManager.kt` | Hardening | Applied `DROP_OLDEST` to `_alarmEvents`. |
+| `app/src/main/java/com/gps19/app/SystemMonitor.kt` | Hardening | Applied `DROP_OLDEST` to `_systemMonitorEvents`. |
+| `core/engine/src/main/java/com/gps19/core/engine/LocationProcessor.kt` | Hardening | Applied `DROP_OLDEST` to `_processorEvents`. |
+| `app/src/main/java/com/gps19/app/ConnectivitySuite.kt` | Hardening | Applied `DROP_OLDEST` to `_connectivityEvents`. |
+| `app/src/main/java/com/gps19/app/IntegrityMonitor.kt` | Hardening | Applied `DROP_OLDEST` to `_integrityEvents`. |
+| `app/src/main/java/com/gps19/app/CommandRouter.kt` | Hardening | Applied `DROP_OLDEST` to `_commandEvents`. |
+| `app/src/main/java/com/gps19/app/GpsManager.kt` | Hardening | Applied `DROP_OLDEST` to `_internalGpsFlow`. |
+| `STATUS/SOT_MASTER_REQUIREMENTS.md` | Authority Update | Added **R617** specifying global overflow policy. |
+| `issues.md` | Documentation | Resolved #617; Total count 453. |
+| `app/build.gradle` | Versioning | Updated `versionName` to `July.28.2233`. |
 
 ## 💡 Simplification Ideas
-- **Centralized Pipeline Factory**: Consider a utility function for creating "Standard Event Flows" to ensure consistent buffer capacities and overflow strategies across all managers and repositories.
+- **Event Bus Consolidation**: Now that all flows are standardized, consider moving towards a centralized "SystemEventBus" for non-kinematic logging to reduce the number of individual `MutableSharedFlow` declarations in manager classes.
+- **Buffer Capacity Audit**: Evaluate if specific flows (e.g., `_signalingFlow` at 64) can be reduced for memory efficiency on ultra-low-end devices without losing critical packets.
 
 ## ⚠️ Newly Identified Risks & Concerns
-- **[Concern #616-C1] Target Discrepancy**: The objective specified `SettingsRepository`, but the relevant `MutableSharedFlow` pipelines were found and hardened in `MainRepository.kt`.
+- **[Concern #616-C1] Target Discrepancy**: Requirement R616 was applied to `MainRepository` instead of `SettingsRepository` (which is flow-safe). Resolved by R616 and R617.
 
 ## 🚀 Release commands
 ```bash
 git add .
-git commit -m "Release July.28.2218: Structural - Repository Event Pipeline Hardening (#616)"
-git tag -a July.28.2218 -m "Hardened repository event pipelines with DROP_OLDEST to prevent collector-side suspension"
+git commit -m "Release July.28.2233: Structural - Global SharedFlow Audit (#617)"
+git tag -a July.28.2233 -m "Project-wide hardening of SharedFlow pipelines with DROP_OLDEST to ensure non-blocking system integrity."
 git push origin main --tags
 ```
 
 ## 🎯 Next Objective
-- **[Issue #617] [Sprint: July.28.23] [Priority: High] Structural: Global SharedFlow Audit**.
-    - **Scope**: Perform a global audit of all remaining `MutableSharedFlow` instances identified in `July.28.22` (CommunicationManager, AppAlarmManager, etc.) to enforce consistent `DROP_OLDEST` strategies and verify buffer capacities against peak signaling loads.
+- **[Issue #618] [Sprint: July.28.24] [Priority: Medium] Forensic: UI State Collection Audit**.
+    - **Scope**: Audit all `collectAsStateWithLifecycle` and `collect` calls in the UI layer to ensure they utilize `Dispatchers.Main.immediate` and verify that high-frequency updates are properly sampled to maintain 60FPS on budget hardware.
 
 **Status**: READY FOR NEW FRESH CHAT.

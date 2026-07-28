@@ -10,6 +10,7 @@ import com.google.android.gms.location.*
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
@@ -19,18 +20,13 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * July.28.22:
+ * - Issue #617: Global SharedFlow Audit. Hardened _internalGpsFlow with 
+ *   BufferOverflow.DROP_OLDEST to ensure non-blocking hardware callbacks (R617).
  * July.28.21:
  * - Issue #615: Forensic: Stability Audit Metric Expansion. Implemented 
  *   GNSS callback jitter tracking to detect hardware-level timing 
  *   inconsistencies. maxGnssJitterMs is exposed for forensic auditing.
- * July.28.20:
- * - Issue #614: Structural: GNSS Callback Overhead Monitoring. Implemented 
- *   sampling for high-frequency GNSS status callbacks to prevent Main Thread 
- *   starvation on budget hardware. Scalars are updated live, but detailed 
- *   flow emissions are throttled by GNSS_SAMPLING_INTERVAL_MS.
- * July.28.18:
- * - Issue #613: Forensic: Location Refresh Reactivity. Added reactive 
- *   locationStatusFlow to monitor pending fixes and stalls without polling.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -147,7 +143,10 @@ class GpsManager @Inject constructor(
         }
     }
 
-    private val _internalGpsFlow = MutableSharedFlow<GpsUpdate>(replay = 1)
+    private val _internalGpsFlow = MutableSharedFlow<GpsUpdate>(
+        replay = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
 
     init {
         // Heartbeat for status flow to catch timeouts even when no hardware callbacks arrive

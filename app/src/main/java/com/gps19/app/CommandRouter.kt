@@ -8,6 +8,7 @@ import android.os.Build
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
@@ -16,6 +17,9 @@ import javax.inject.Singleton
 
 /**
  * CommandEvent: Reactive event container for system and UI commands.
+ * July.28.22:
+ * - Issue #617: Global SharedFlow Audit. Hardened _commandEvents with 
+ *   BufferOverflow.DROP_OLDEST to ensure non-blocking command routing (R617).
  * July.26.03:
  * - Issue #545c: Flow Architecture Standardization. Unified all command 
  *   dispatches into a single SharedFlow stream.
@@ -57,7 +61,10 @@ class CommandRouter @Inject constructor(
     private val isRegistered = AtomicBoolean(false)
     private val isObserving = AtomicBoolean(false)
 
-    private val _commandEvents = MutableSharedFlow<CommandEvent>(extraBufferCapacity = 16)
+    private val _commandEvents = MutableSharedFlow<CommandEvent>(
+        extraBufferCapacity = 16,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val commandEvents: SharedFlow<CommandEvent> = _commandEvents.asSharedFlow()
 
     private val routerExceptionHandler = CoroutineExceptionHandler { _, throwable ->

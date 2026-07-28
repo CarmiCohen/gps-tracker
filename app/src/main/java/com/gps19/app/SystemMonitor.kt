@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.PowerManager
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -25,18 +26,22 @@ sealed class SystemMonitorEvent {
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * July.28.22:
+ * - Issue #617: Global SharedFlow Audit. Hardened _systemMonitorEvents with 
+ *   BufferOverflow.DROP_OLDEST to ensure non-blocking resource management (R617).
  * July.26.04:
  * - Issue #545c: Service Reactive Migration. Replaced legacy watchdog listener 
  *   with a SharedFlow (systemMonitorEvents) for reactive event dispatching.
- * July.22.04:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
  */
 @Singleton
 class SystemMonitor @Inject constructor(
     @ApplicationContext private val context: Context,
     private val timeProvider: TimeProvider
 ) {
-    private val _systemMonitorEvents = MutableSharedFlow<SystemMonitorEvent>(extraBufferCapacity = 8)
+    private val _systemMonitorEvents = MutableSharedFlow<SystemMonitorEvent>(
+        extraBufferCapacity = 8,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val systemMonitorEvents: SharedFlow<SystemMonitorEvent> = _systemMonitorEvents.asSharedFlow()
 
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager

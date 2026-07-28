@@ -5,6 +5,7 @@ import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -26,11 +27,12 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * July.28.22:
+ * - Issue #617: Global SharedFlow Audit. Hardened _historyEvents with 
+ *   BufferOverflow.DROP_OLDEST to ensure non-blocking telemetry recording (R617).
  * July.27.07:
  * - Issue #602: SIT Timestamp Parity Logic. Integrated sitVzTs/Rt into 
  *   updateRibbons and mapping to restore full forensic parity.
- * July.27.00:
- * - Architecture Audit: Updated to use centralized PreferenceKeys.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -41,7 +43,10 @@ class HistoryManager @Inject constructor(
     private val sensorManager: AppSensorManager,
     private val locationProcessor: LocationProcessor
 ) {
-    private val _historyEvents = MutableSharedFlow<HistoryEvent>(extraBufferCapacity = 16)
+    private val _historyEvents = MutableSharedFlow<HistoryEvent>(
+        extraBufferCapacity = 16,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val historyEvents: SharedFlow<HistoryEvent> = _historyEvents.asSharedFlow()
 
     private var scope: CoroutineScope? = null

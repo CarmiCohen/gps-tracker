@@ -7,6 +7,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -19,6 +20,9 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * July.28.22:
+ * - Issue #617: Global SharedFlow Audit. Hardened _signalingFlow with 
+ *   BufferOverflow.DROP_OLDEST to prevent socket thread suspension (R617).
  * July.26.03:
  * - Issue #545c: Flow Architecture Standardization. Replaced RemoteUpdateListener 
  *   with a SharedFlow (signalingFlow) for reactive event dispatching.
@@ -58,7 +62,10 @@ class CommunicationManager @Inject constructor(
     private var onConnectionLost: (() -> Unit)? = null
 
     // Standardized Flow implementation
-    private val _signalingFlow = MutableSharedFlow<SignalingEvent>(extraBufferCapacity = 64)
+    private val _signalingFlow = MutableSharedFlow<SignalingEvent>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     override val signalingFlow: SharedFlow<SignalingEvent> = _signalingFlow.asSharedFlow()
 
     private val commExceptionHandler = CoroutineExceptionHandler { _, throwable ->

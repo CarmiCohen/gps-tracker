@@ -1,6 +1,7 @@
 package com.gps19.core.engine
 
 import java.util.Locale
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -19,16 +20,20 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * July.28.22:
+ * - Issue #617: Global SharedFlow Audit. Hardened _processorEvents with 
+ *   BufferOverflow.DROP_OLDEST to ensure non-blocking location processing (R617).
  * July.27.06:
  * - Issue #601: Kinetic Energy Anomaly Detection. Integrated kineticEnergy 
  *   flow from sensors to LocationSentinel.
- * July.26.04:
- * - Issue #589: Integrated LatencyMonitor for GPS and Sensor processing cycles.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
 ) {
-    private val _processorEvents = MutableSharedFlow<ProcessorEvent>(extraBufferCapacity = 64)
+    private val _processorEvents = MutableSharedFlow<ProcessorEvent>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val processorEvents: SharedFlow<ProcessorEvent> = _processorEvents.asSharedFlow()
 
     val sentinel = LocationSentinel()
