@@ -19,6 +19,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.28.21:
+ * - Issue #615: Forensic: Stability Audit Metric Expansion. Extended 
+ *   StabilityAudit to track GNSS callback jitter and report hardware-level 
+ *   timing inconsistencies in forensic logs.
  * July.28.18:
  * - Issue #613: Forensic: Location Refresh Reactivity. Refactored tick loop 
  *   to utilize reactive location-pending health state and enabled status 
@@ -328,6 +332,7 @@ class TrackerService : BaseMonitorService() {
         lastHardwareRecoveryTs = 0L
         stabilityAuditFixCount = 0
         stabilityAuditViolationCount = 0
+        gpsManager.resetGnssJitter()
         logManager.logServiceEvent("Session Terminated", false)
     }
 
@@ -413,13 +418,22 @@ class TrackerService : BaseMonitorService() {
         }
 
         if (nowRt - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
-            if (stabilityAuditFixCount > 0) {
-                val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
-                if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
+            val maxJitter = gpsManager.maxGnssJitterMs
+            if (stabilityAuditFixCount > 0 || maxJitter > 0) {
+                val reliability = if (stabilityAuditFixCount > 0) 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount else 100.0
+                val jitterViolation = maxJitter > GNSS_JITTER_THRESHOLD_MS
+                val reliabilityViolation = reliability < GPS_STABILITY_RELIABILITY_THRESHOLD
+                
+                if (reliabilityViolation || jitterViolation) {
                     val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY AUDIT (T): Reliability ${reliability.roundToOneDecimal()}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
+                    val msg = StringBuilder("STABILITY AUDIT (T): ")
+                    if (reliabilityViolation) msg.append("Reliability ${reliability.roundToOneDecimal()}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes). ")
+                    if (jitterViolation) msg.append("GNSS Jitter: ${maxJitter}ms (Hardware Instability).")
+                    
+                    logManager.logServiceEvent(msg.toString().trim(), important = true, isSpecial = jitterViolation, specialColor = if (jitterViolation) FORENSIC_PINK_COLOR else null, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
                 }
                 stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
+                gpsManager.resetGnssJitter()
             }
             lastStabilityAuditTs = nowRt
         }

@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.28.21:
+ * - Issue #615: Forensic: Stability Audit Metric Expansion. Added 
+ *   GNSS_EXPECTED_INTERVAL_MS and GNSS_JITTER_THRESHOLD_MS.
  * July.28.20:
  * - Issue #614: Structural: GNSS Callback Overhead Monitoring. Added 
  *   GNSS_SAMPLING_INTERVAL_MS to throttle high-frequency hardware chatter.
@@ -304,6 +307,8 @@ const val MAX_HISTORY_POINTS_PER_RIBBONS = 240
 const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
+const val GNSS_EXPECTED_INTERVAL_MS = 1000L
+const val GNSS_JITTER_THRESHOLD_MS = 500L
 
 // Unified UI Staleness Threshold
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 35000L

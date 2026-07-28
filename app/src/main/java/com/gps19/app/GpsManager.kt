@@ -15,9 +15,14 @@ import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * July.28.21:
+ * - Issue #615: Forensic: Stability Audit Metric Expansion. Implemented 
+ *   GNSS callback jitter tracking to detect hardware-level timing 
+ *   inconsistencies. maxGnssJitterMs is exposed for forensic auditing.
  * July.28.20:
  * - Issue #614: Structural: GNSS Callback Overhead Monitoring. Implemented 
  *   sampling for high-frequency GNSS status callbacks to prevent Main Thread 
@@ -26,11 +31,6 @@ import javax.inject.Singleton
  * July.28.18:
  * - Issue #613: Forensic: Location Refresh Reactivity. Added reactive 
  *   locationStatusFlow to monitor pending fixes and stalls without polling.
- * July.27.12:
- * - A15 Hardening: Migrated all hardware callbacks to a dedicated HandlerThread 
- *   to ensure GNSS status chatter does not block the Main Looper.
- * July.26.03:
- * - Issue #545c: Flow Architecture Standardization.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -55,6 +55,14 @@ class GpsManager @Inject constructor(
 
     private var lastFixRt = 0L
     private var lastGnssEmitRt = 0L
+    private var lastGnssStatusRt = 0L
+    
+    var maxGnssJitterMs = 0L
+        private set
+
+    fun resetGnssJitter() {
+        maxGnssJitterMs = 0L
+    }
 
     data class LocationStatus(
         val isPending: Boolean = false,
@@ -80,6 +88,13 @@ class GpsManager @Inject constructor(
         override fun onSatelliteStatusChanged(status: GnssStatus) {
             val nowRt = timeProvider.elapsedRealtime()
             
+            if (lastGnssStatusRt > 0) {
+                val interval = nowRt - lastGnssStatusRt
+                val jitter = abs(interval - GNSS_EXPECTED_INTERVAL_MS)
+                if (jitter > maxGnssJitterMs) maxGnssJitterMs = jitter
+            }
+            lastGnssStatusRt = nowRt
+
             // Basic status updates are lightweight and needed for real-time health checks
             satellitesInView = status.satelliteCount
             var used = 0

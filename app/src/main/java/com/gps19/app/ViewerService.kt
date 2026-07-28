@@ -16,15 +16,13 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.28.21:
+ * - Issue #615: Forensic: Stability Audit Metric Expansion. Extended 
+ *   StabilityAudit to track GNSS callback jitter and report hardware-level 
+ *   timing inconsistencies in forensic logs.
  * July.28.15:
  * - Issue #610: Forensic Heartbeat Decoupling. Moved notification updates to 
  *   the dedicated low-frequency heartbeat loop.
- * July.28.14:
- * - Issue #609: Structural Centralization. Removed redundant manual health 
- *   propagation as IntegrityMonitor now manages its own source of truth.
- * July.27.13:
- * - Issue #608: Startup Notification Flicker. Enhanced startServiceForeground() 
- *   to build a rich notification immediately using early health state.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -267,6 +265,7 @@ class ViewerService : BaseMonitorService() {
         val proc = lastProcessedLocation
         serviceStartRealtime = timeProvider.elapsedRealtime(); serviceStartWall = timeProvider.currentTimeMillis()
         alarmManager.resetEvaluation(); sessionManager.reset(); integrityMonitor.resetStats(); forensicUseCase.resetLatches(); stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
+        gpsManager.resetGnssJitter()
         logManager.logServiceEvent("Session Terminated", false, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
     }
 
@@ -320,13 +319,22 @@ class ViewerService : BaseMonitorService() {
         if (timeProvider.elapsedRealtime() > 0) systemMonitor.renewWakeLock()
 
         if (nowRt - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
-            if (stabilityAuditFixCount > 0) {
-                val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
-                if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
+            val maxJitter = gpsManager.maxGnssJitterMs
+            if (stabilityAuditFixCount > 0 || maxJitter > 0) {
+                val reliability = if (stabilityAuditFixCount > 0) 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount else 100.0
+                val jitterViolation = maxJitter > GNSS_JITTER_THRESHOLD_MS
+                val reliabilityViolation = reliability < GPS_STABILITY_RELIABILITY_THRESHOLD
+                
+                if (reliabilityViolation || jitterViolation) {
                     val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY AUDIT (V): Reliability ${String.format(Locale.getDefault(), "%.1f", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                    val msg = StringBuilder("STABILITY AUDIT (V): ")
+                    if (reliabilityViolation) msg.append("Reliability ${String.format(Locale.getDefault(), "%.1f", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes). ")
+                    if (jitterViolation) msg.append("GNSS Jitter: ${maxJitter}ms (Hardware Instability).")
+                    
+                    logManager.logServiceEvent(msg.toString().trim(), important = true, isSpecial = jitterViolation, specialColor = if (jitterViolation) FORENSIC_PINK_COLOR else null, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                 }
                 stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
+                gpsManager.resetGnssJitter()
             }
             lastStabilityAuditTs = nowRt
         }
