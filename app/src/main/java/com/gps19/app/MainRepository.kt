@@ -16,10 +16,11 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * July.27.05:
+ * - Issue #600: Forensic Playback Latency Audit. Updated eventLogsFlow to support 
+ *   dynamic retrieval limits.
  * July.27.00:
  * - Architecture Audit: Centralized PreferenceKeys and removed redundant aliases.
- * July.26.04:
- * - Issue #595: Forensic Playback Hardening.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -71,7 +72,7 @@ class MainRepository @Inject constructor(
     val lastRemoteActivityTs = telemetry.lastRemoteActivityTs
     val gnssDetail = telemetry.gnssDetail
 
-    val eventLogsFlow: Flow<List<LogEntry>> = logRepository.eventLogsFlow
+    fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logRepository.eventLogsFlow(limit)
 
     val trackerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(false).map { entities -> 
         entities.map { TrailPoint(it.lat, it.lng, it.timestamp, SentinelStatus.valueOf(it.status), it.accuracy, it.maxAccuracy) } 
@@ -207,7 +208,7 @@ class MainRepository @Inject constructor(
     }
 
     fun clearLogs() { logRepository.clearLogs() }
-    suspend fun loadAllLogsStatic(): List<LogEntry> = logRepository.loadAllLogsStatic()
+    suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = logRepository.loadAllLogsStatic(limit)
 
     suspend fun proactivePruning() = logRepository.proactivePruning()
 
@@ -354,8 +355,6 @@ class MainRepository @Inject constructor(
                 baroIdx = point.baroIdx,
                 isSitDetected = point.isSitDetected,
                 isSitActive = point.isSitActive,
-                sitVz = point.sitVz,
-                sitDz = point.sitDz,
                 sitBaro = point.sitBaro,
                 sitTilt = point.sitTilt,
                 sitShock = point.sitShock

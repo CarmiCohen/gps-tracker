@@ -2,10 +2,11 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.27.05:
+ * - Issue #600: Forensic Playback Latency Audit. Added dynamic log limits
+ *   and retrieval latency thresholds to support strict forensic lookups.
  * July.26.04:
  * - Issue #589: Added Performance & Latency Thresholds for engine audit.
- * July.23.07:
- * - Issue #530: Refined Stationary Anchor with accuracy-weighted breakout and IMU damping.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -16,12 +17,15 @@ const val GRAVITY_EARTH = 9.80665
 const val DEFAULT_LAT = 32.7940
 const val DEFAULT_LNG = 34.9896
 
-// Performance & Latency Thresholds (Issue #589)
+// Performance & Latency Thresholds (Issue #589, #600)
 const val LATENCY_THRESHOLD_GPS_PROCESS_MS = 50L
 const val LATENCY_THRESHOLD_SENSOR_PROCESS_MS = 20L
 const val LATENCY_THRESHOLD_DB_WRITE_MS = 500L
 const val LATENCY_THRESHOLD_JNI_MS = 50L
 const val LOG_LATENCY_THRESHOLD_MS = 500L
+const val LOG_RETRIEVAL_THRESHOLD_MS = 200L
+const val LOG_LIMIT_STANDARD = 1000
+const val LOG_LIMIT_STRICT = 5000
 
 // Physics & Motion Limits
 const val MAX_PHYSICAL_SPEED_MPS = 33.33 // 120 km/h

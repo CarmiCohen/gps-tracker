@@ -20,8 +20,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * July.27.00:
- * - Architecture Audit: Updated to use centralized PreferenceKeys and fixed build errors.
+ * July.27.05:
+ * - Issue #600: Forensic Playback Latency Audit. Dynamically adjust log limit 
+ *   based on STRICT mode and monitor retrieval latency.
  * July.26.04:
  * - Issue #595: Forensic Playback Hardening.
  */
@@ -130,9 +131,22 @@ class MainViewModel @Inject constructor(
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
 
-    val eventLogsFlow: StateFlow<List<LogEntry>> = _uiState.map { it.appMode }.distinctUntilChanged()
-        .flatMapLatest { mode -> if (mode != null) repository.eventLogsFlow else flowOf(emptyList()) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    /**
+     * Issue #600: Dynamic Log Pipeline.
+     * The log limit expands from 1000 to 5000 when STRICT mode is active, enabling 
+     * deeper forensic lookups without manual backfills.
+     */
+    val eventLogsFlow: StateFlow<List<LogEntry>> = combine(
+        _uiState.map { it.appMode }.distinctUntilChanged(),
+        _uiState.map { it.navigation.isStrictMode }.distinctUntilChanged()
+    ) { mode, isStrict -> mode to isStrict }
+    .flatMapLatest { (mode, isStrict) -> 
+        if (mode != null) {
+            val limit = if (isStrict) LOG_LIMIT_STRICT else LOG_LIMIT_STANDARD
+            repository.eventLogsFlow(limit)
+        } else flowOf(emptyList()) 
+    }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val trackerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
         .flatMapLatest { mode -> if (mode != null) repository.trackerTrailFlow else flowOf(emptyList()) }

@@ -8,13 +8,12 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * July.27.05:
+ * - Issue #600: Forensic Playback Latency Audit. Updated LogDao to support 
+ *   dynamic limits for historical lookups.
  * July.26.04:
  * - Issue #595: Forensic Playback Hardening. Added 'rt' (monotonic time) to 
  *   HistoryEntity to support historical clock-drift auditing.
- * - Incremented version to 60.
- * July.22.01:
- * - Issue #118: Forensic Parity. Added missing indices to PendingStatusEntity.
- * - Incremented version to 59.
  */
 @Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
 data class LogEntity(
@@ -154,8 +153,8 @@ abstract class LogDao {
     @Query("SELECT * FROM logs WHERE localId = :localId") abstract suspend fun getLogByLocalId(localId: String): LogEntity?
     @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1") abstract suspend fun getLastLog(): LogEntity?
     @Query("SELECT * FROM logs WHERE type = :type AND role = :role AND deviceId = :deviceId ORDER BY timestamp DESC LIMIT 1") abstract suspend fun getLastLogByMetadata(type: String, role: String, deviceId: String): LogEntity?
-    @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1000") abstract fun getAllLogs(): Flow<List<LogEntity>>
-    @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1000") abstract suspend fun getAllLogsStatic(): List<LogEntity>
+    @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT :limit") abstract fun getAllLogs(limit: Int): Flow<List<LogEntity>>
+    @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT :limit") abstract suspend fun getAllLogsStatic(limit: Int): List<LogEntity>
     @Query("SELECT * FROM logs WHERE synced = 0 ORDER BY timestamp ASC LIMIT :limit") abstract suspend fun getUnsyncedLogs(limit: Int): List<LogEntity>
     @Query("UPDATE logs SET synced = 1 WHERE localId IN (:localIds)") abstract suspend fun markLogsAsSynced(localIds: List<String>)
     @Query("DELETE FROM logs") abstract suspend fun clearAll()

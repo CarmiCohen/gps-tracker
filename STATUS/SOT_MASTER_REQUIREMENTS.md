@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.27.04 (UI Performance Hardened)
+# System Source of Truth (SoT) - July.27.05 (Forensic Latency Audited)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -27,6 +27,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Signaling Validation (R596b)**: The system MUST provide a diagnostic trigger to simulate heavy signaling load (e.g., 100-log burst) to validate that HIGH priority telemetry remains responsive during forensic data surges. (Issue #596, July.27.03)
 *   **UI Component De-coupling (R598)**: High-frequency data streams (e.g., event logs) MUST be collected locally within their UI components using lifecycle-aware collectors. Top-level screen Composables MUST NOT collect these flows to prevent global re-composition jitter during signaling stress. (Issue #598, July.27.04)
 *   **Ribbon Rendering Optimization (R598b)**: Analytical ribbons and heavy forensic visualizations MUST cache static drawing parameters and utilize optimized O(N) draw loops to minimize Main-thread contention. (Issue #598, July.27.04)
+*   **Forensic Retrieval Auditing (R600)**: Log retrieval flows MUST utilize context-aware buffering (STRICT mode expansion) and be monitored via `LatencyMonitor` with a 200ms threshold to ensure historical lookups do not contend with real-time telemetry writes. (Issue #600, July.27.05)
 
 ### 2. Architectural Integrity & Centralization
 *   **Consolidated Constants (R597)**: All engine-specific thresholds, tuning parameters, and system-wide default values MUST be centralized in `core:engine:EngineConstants.kt`. (Issue #597, July.27.00)
@@ -49,5 +50,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.27.04.
+*   **Current Release**: July.27.05.
 *   **Source of Truth**: app/build.gradle versionName.

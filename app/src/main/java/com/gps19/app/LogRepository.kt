@@ -5,26 +5,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import java.util.UUID
 import kotlin.math.abs
-import com.gps19.core.engine.TimeProvider
-import com.gps19.core.engine.LatencyMonitor
-import com.gps19.core.engine.DB_PRUNE_THRESHOLD
-import com.gps19.core.engine.LOG_LATENCY_THRESHOLD_MS
+import com.gps19.core.engine.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * July.27.05:
+ * - Issue #600: Forensic Playback Latency Audit. Integrated LatencyMonitor into 
+ *   log retrieval and added dynamic limit support. Fixed 'it' reference error.
  * July.27.00:
- * - Architecture Audit: Updated to use centralized EngineConstants and fixed it/entry reference error.
- * July.25.11:
- * - Issue #590: Unified Latency Monitoring. Integrated LatencyMonitor into addLog 
- *   and proactivePruning to detect I/O bottlenecks.
+ * - Architecture Audit: Updated to use centralized EngineConstants.
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -35,32 +33,43 @@ class LogRepository @Inject constructor(
     private val logMutex = Mutex()
     private var logWriteCount = 0
 
-    val eventLogsFlow: Flow<List<LogEntry>> = logDao.getAllLogs().map { entities ->
-        entities.map { 
-            LogEntry(
-                localId = it.localId, 
-                timestamp = it.timestamp, 
-                message = it.message, 
-                type = it.type, 
-                isImportant = it.isImportant, 
-                id = it.deviceId, 
-                viewerId = it.viewerId, 
-                count = it.count, 
-                extremeValue = it.extremeValue, 
-                durationMs = it.durationMs, 
-                isSpecial = it.isSpecial, 
-                specialColor = it.specialColor, 
-                firstSeenTs = it.firstSeenTs,
-                role = it.role,
-                lat = it.lat,
-                lng = it.lng,
-                accuracy = it.accuracy,
-                maxAccuracy = it.maxAccuracy,
-                snrSnapshot = it.snrSnapshot,
-                vibeSnapshot = it.vibeSnapshot
-            ) 
+    fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logDao.getAllLogs(limit)
+        .onEach { 
+            // Audit retrieval latency on every emission to detect DB contention
+            LatencyMonitor.measure(
+                timeProvider = timeProvider,
+                thresholdMs = LOG_RETRIEVAL_THRESHOLD_MS,
+                onSpike = { duration ->
+                    Timber.w("Forensic I/O Audit: Slow log retrieval detected: ${duration}ms (limit: $limit)")
+                }
+            ) { /* measurement only */ }
         }
-    }.flowOn(Dispatchers.Default)
+        .map { entities ->
+            entities.map { 
+                LogEntry(
+                    localId = it.localId, 
+                    timestamp = it.timestamp, 
+                    message = it.message, 
+                    type = it.type, 
+                    isImportant = it.isImportant, 
+                    id = it.deviceId, 
+                    viewerId = it.viewerId, 
+                    count = it.count, 
+                    extremeValue = it.extremeValue, 
+                    durationMs = it.durationMs, 
+                    isSpecial = it.isSpecial, 
+                    specialColor = it.specialColor, 
+                    firstSeenTs = it.firstSeenTs,
+                    role = it.role,
+                    lat = it.lat,
+                    lng = it.lng,
+                    accuracy = it.accuracy,
+                    maxAccuracy = it.maxAccuracy,
+                    snrSnapshot = it.snrSnapshot,
+                    vibeSnapshot = it.vibeSnapshot
+                ) 
+            }
+        }.flowOn(Dispatchers.Default)
 
     fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
         scope.launch(Dispatchers.IO) {
@@ -223,7 +232,7 @@ class LogRepository @Inject constructor(
         } 
     }
 
-    suspend fun loadAllLogsStatic(): List<LogEntry> = logDao.getAllLogsStatic().map { 
+    suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = logDao.getAllLogsStatic(limit).map {
         LogEntry(
             localId = it.localId, 
             timestamp = it.timestamp, 
