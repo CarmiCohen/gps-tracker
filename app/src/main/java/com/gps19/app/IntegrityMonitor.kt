@@ -5,7 +5,6 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
-import android.os.PowerManager
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -26,12 +25,13 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * July.28.17:
+ * - Issue #612: Structural: Standby & Power-Save Reactivity. Converted Power Save 
+ *   Mode and Standby Bucket monitoring to reactive flows via SystemStatusProvider.
+ *   Removed redundant polling from logic loop.
  * July.28.16:
  * - Issue #611: Forensic: Disk Space Reactivity. Converted storage monitoring 
  *   to a reactive flow via SystemStatusProvider. Removed redundant polling.
- * July.28.14:
- * - Issue #609: Structural Centralization. Refactored to provide a reactive 
- *   StateFlow as the single source of truth for local health.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -41,11 +41,7 @@ class IntegrityMonitor @Inject constructor(
     private val systemStatusProvider: SystemStatusProvider,
     @ApplicationScope private val scope: CoroutineScope
 ) {
-    private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    private val usageStatsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-    } else null
 
     private var lastFullPollTs = 0L
     private val POLL_TTL_MS = 10_000L
@@ -83,6 +79,12 @@ class IntegrityMonitor @Inject constructor(
         scope.launch {
             systemStatusProvider.observeStorageStatus()
                 .onEach { status -> handleStorageUpdate(status) }
+                .collect()
+        }
+
+        scope.launch {
+            systemStatusProvider.observePowerStatus()
+                .onEach { status -> handlePowerUpdate(status) }
                 .collect()
         }
     }
@@ -172,13 +174,11 @@ class IntegrityMonitor @Inject constructor(
         ) }
     }
 
-    fun pollSystemStatus(nowWall: Long, nowRt: Long) {
-        val delta = nowRt - lastFullPollTs
-        if (delta < POLL_TTL_MS && lastFullPollTs != 0L) return
-        lastFullPollTs = nowRt
-
+    private fun handlePowerUpdate(status: PowerStatus) {
         val workingHealth = currentHealth
-        val powerSave = powerManager.isPowerSaveMode
+        val powerSave = status.isPowerSaveMode
+        val bucket = status.standbyBucket
+
         if (powerSave != workingHealth.isPowerSaveMode) {
             if (powerSave) {
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM WARNING: Power Save Mode active. Sensors and GPS may be throttled by OS.", true))
@@ -186,11 +186,9 @@ class IntegrityMonitor @Inject constructor(
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Power Save Mode deactivated. Normal tracking resumed.", false))
             }
         }
-        
-        var standbyBucket = workingHealth.standbyBucket
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && usageStatsManager != null) {
-            val bucket = usageStatsManager.appStandbyBucket
-            if (bucket != standbyBucket) {
+
+        if (bucket != workingHealth.standbyBucket) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val bucketName = when (bucket) {
                     UsageStatsManager.STANDBY_BUCKET_ACTIVE -> "ACTIVE"
                     UsageStatsManager.STANDBY_BUCKET_WORKING_SET -> "WORKING_SET"
@@ -200,14 +198,26 @@ class IntegrityMonitor @Inject constructor(
                     else -> "UNKNOWN ($bucket)"
                 }
                 
-                if (standbyBucket != -1) {
+                if (workingHealth.standbyBucket != -1) {
                     val isCritical = bucket >= UsageStatsManager.STANDBY_BUCKET_RARE
                     _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM PRIORITY: Standby bucket changed to $bucketName. ${if(isCritical) "Background tracking may be severely limited." else ""}", isCritical))
                 }
-                standbyBucket = bucket
             }
         }
 
+        updateHealth { it.copy(
+            isPowerSaveMode = powerSave,
+            standbyBucket = bucket
+        ) }
+    }
+
+    fun pollSystemStatus(nowWall: Long, nowRt: Long) {
+        val delta = nowRt - lastFullPollTs
+        if (delta < POLL_TTL_MS && lastFullPollTs != 0L) return
+        lastFullPollTs = nowRt
+
+        val workingHealth = currentHealth
+        
         val newNet = getActiveNetworkInterface()
         if (newNet != workingHealth.netInterface) {
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Network switched to $newNet", false))
@@ -222,8 +232,6 @@ class IntegrityMonitor @Inject constructor(
         }
 
         updateHealth { it.copy(
-            isPowerSaveMode = powerSave,
-            standbyBucket = standbyBucket,
             netInterface = newNet,
             isPowerTamper = isPowerTamper
         ) }

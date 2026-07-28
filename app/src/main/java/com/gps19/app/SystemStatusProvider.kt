@@ -2,6 +2,7 @@ package com.gps19.app
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -34,12 +35,12 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.28.17:
+ * - Issue #612: Structural: Standby & Power-Save Reactivity. Added observePowerStatus() 
+ *   to reactive observation of Power Save Mode and Standby Buckets.
  * July.28.16:
  * - Issue #611: Forensic: Disk Space Reactivity. Added observeStorageStatus() 
  *   to provide reactive flow for internal storage health.
- * July.26.03:
- * - Issue #545c: Flow Architecture Standardization. Migrated internet and battery 
- *   status flows to SharedFlow (shareIn) to prevent redundant platform registrations.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -58,7 +59,10 @@ interface SystemStatusProvider {
     fun observeInternetStatus(): Flow<Boolean>
     fun observeBatteryStatus(): Flow<BatteryStatus>
     fun observeStorageStatus(): Flow<StorageStatus>
+    fun observePowerStatus(): Flow<PowerStatus>
+    
     fun getStorageStatus(): StorageStatus
+    fun getPowerStatus(): PowerStatus
 }
 
 @Singleton
@@ -71,6 +75,11 @@ class SystemStatusProviderImpl @Inject constructor(
     private val connectivityManager by lazy { context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager }
     private val alarmManager by lazy { context.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
     private val batteryManager by lazy { context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager }
+    private val usageStatsManager by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        } else null
+    }
     
     private val cachedPackageName = context.packageName
     
@@ -85,6 +94,7 @@ class SystemStatusProviderImpl @Inject constructor(
     
     private val PERMISSION_TTL_MS = 15_000L
     private val STORAGE_POLL_INTERVAL_MS = 60_000L
+    private val POWER_POLL_INTERVAL_MS = 60_000L
 
     override suspend fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
     override suspend fun isAutoStartGranted(): Boolean = getPermissionState().isAutoStartGranted
@@ -241,6 +251,50 @@ class SystemStatusProviderImpl @Inject constructor(
             StorageStatus(0, isLow = true, isCritical = true)
         }
     }
+
+    private val sharedPowerStatusFlow = callbackFlow<PowerStatus> {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                trySend(getPowerStatus())
+            }
+        }
+        try {
+            context.registerReceiver(receiver, IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED))
+        } catch (e: Exception) {
+            Timber.e(e, "Power save receiver registration failed")
+        }
+
+        // Periodic poll for Standby Bucket (no broadcast available)
+        val pollJob = launch {
+            while (isActive) {
+                trySend(getPowerStatus())
+                delay(POWER_POLL_INTERVAL_MS)
+            }
+        }
+
+        trySend(getPowerStatus())
+        
+        awaitClose { 
+            try { context.unregisterReceiver(receiver) } catch(e: Exception) {}
+            pollJob.cancel()
+        }
+    }.distinctUntilChanged()
+     .conflate()
+     .shareIn(
+        scope = externalScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        replay = 1
+     )
+
+    override fun observePowerStatus(): Flow<PowerStatus> = sharedPowerStatusFlow
+
+    override fun getPowerStatus(): PowerStatus {
+        val powerSave = try { powerManager.isPowerSaveMode } catch (e: Exception) { false }
+        val standbyBucket = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try { usageStatsManager?.appStandbyBucket ?: -1 } catch (e: Exception) { -1 }
+        } else -1
+        return PowerStatus(powerSave, standbyBucket)
+    }
 }
 
 data class BatteryStatus(
@@ -254,4 +308,9 @@ data class StorageStatus(
     val availableMb: Long,
     val isLow: Boolean,
     val isCritical: Boolean
+)
+
+data class PowerStatus(
+    val isPowerSaveMode: Boolean,
+    val standbyBucket: Int
 )

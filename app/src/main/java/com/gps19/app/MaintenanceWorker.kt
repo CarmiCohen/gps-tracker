@@ -2,8 +2,6 @@ package com.gps19.app
 
 import android.content.Context
 import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.work.*
@@ -16,10 +14,10 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * July.28.17:
+ * - Structural: Standardized network health check via SystemStatusProvider.
  * July.28.16:
  * - Issue #611: Centralized storage health check via SystemStatusProvider.
- * July.27.00:
- * - Architecture Audit: Updated to use centralized PreferenceKeys and EngineConstants.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -66,7 +64,7 @@ class MaintenanceWorker @AssistedInject constructor(
         val silenceDurationMs = now - lastTick
         val appUptimeMs = now - appStartTime
         
-        val isNetworkAlive = isNetworkAvailable(applicationContext)
+        val isNetworkAlive = systemStatusProvider.isLocalOnline()
         val networkStatus = if (isNetworkAlive) "ALIVE" else "DEAD"
 
         Log.d("GPS19", "MAINTENANCE: Periodic check. Mode: $savedMode, Active: $isSystemActive, Silence: ${silenceDurationMs/1000}s, Uptime: ${appUptimeMs/1000}s, Net: $networkStatus")
@@ -143,12 +141,5 @@ class MaintenanceWorker @AssistedInject constructor(
         }
 
         return Result.success()
-    }
-
-    private fun isNetworkAvailable(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 }
