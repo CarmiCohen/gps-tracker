@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.27.11:
+ * - A15 Hardening: Raised I/O latency audit thresholds for budget hardware 
+ *   to prevent recursive forensic log bursts during cold-start.
  * July.27.07:
  * - Issue #603: Analytical Ribbon Optimization. Added RIBBON_KINETIC_ENERGY_SCALE.
  * July.27.06:
@@ -23,12 +26,13 @@ const val DEFAULT_LAT = 32.7940
 const val DEFAULT_LNG = 34.9896
 
 // Performance & Latency Thresholds (Issue #589, #600)
-const val LATENCY_THRESHOLD_GPS_PROCESS_MS = 50L
-const val LATENCY_THRESHOLD_SENSOR_PROCESS_MS = 20L
-const val LATENCY_THRESHOLD_DB_WRITE_MS = 500L
-const val LATENCY_THRESHOLD_JNI_MS = 50L
-const val LOG_LATENCY_THRESHOLD_MS = 500L
-const val LOG_RETRIEVAL_THRESHOLD_MS = 200L
+// July.27.11: Raised for A15 Hardening
+const val LATENCY_THRESHOLD_GPS_PROCESS_MS = 100L
+const val LATENCY_THRESHOLD_SENSOR_PROCESS_MS = 50L
+const val LATENCY_THRESHOLD_DB_WRITE_MS = 1000L
+const val LATENCY_THRESHOLD_JNI_MS = 100L
+const val LOG_LATENCY_THRESHOLD_MS = 1000L
+const val LOG_RETRIEVAL_THRESHOLD_MS = 500L
 const val LOG_LIMIT_STANDARD = 1000
 const val LOG_LIMIT_STRICT = 5000
 

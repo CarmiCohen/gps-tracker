@@ -18,11 +18,11 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * July.27.12:
+ * - A15 Hardening: Migrated all hardware callbacks to a dedicated HandlerThread 
+ *   to ensure GNSS status chatter does not block the Main Looper.
  * July.26.03:
- * - Issue #545c: Flow Architecture Standardization. Refactored to a unified 
- *   SharedFlow architecture. Hardware callbacks are now registered only when 
- *   there is at least one subscriber to either Location or GNSS details.
- * - Issue #587: Redundant GNSS Registration Risk. Shared location and status.
+ * - Issue #545c: Flow Architecture Standardization.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -34,6 +34,10 @@ class GpsManager @Inject constructor(
     private val locationManager by lazy { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
     
+    // Dedicated thread for high-frequency hardware callbacks to prevent ANR on A15
+    private val gpsThread = HandlerThread("GpsHardwareThread").apply { start() }
+    private val gpsHandler = Handler(gpsThread.looper)
+
     var satellitesInView = 0
         private set
     var satellitesUsed = 0
@@ -41,7 +45,6 @@ class GpsManager @Inject constructor(
     var averageSnr = 0.0
         private set
 
-    // Primitive buffers for zero-churn forensics
     private val snrTsBuffer = LongArray(512)
     private val snrRtBuffer = LongArray(512)
     private val snrValBuffer = DoubleArray(512)
@@ -96,14 +99,10 @@ class GpsManager @Inject constructor(
 
     private val _internalGpsFlow = MutableSharedFlow<GpsUpdate>(replay = 1)
 
-    /**
-     * Standardized hardware observation flow.
-     * July.26.03: Manages platform lifecycle for all GPS/GNSS subscribers.
-     */
     @SuppressLint("MissingPermission")
     private val hardwareObservationFlow = callbackFlow<GpsUpdate> {
         try {
-            locationManager.registerGnssStatusCallback(gnssStatusCallback, Handler(Looper.getMainLooper()))
+            locationManager.registerGnssStatusCallback(gnssStatusCallback, gpsHandler)
         } catch (e: Exception) {
             Timber.e(e, "GPS: Failed to register GNSS callback")
         }
@@ -127,13 +126,12 @@ class GpsManager @Inject constructor(
             .build()
 
         try {
-            fusedLocationClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper())
+            fusedLocationClient.requestLocationUpdates(request, fusedCallback, gpsThread.looper)
         } catch (e: Exception) {
             Timber.e(e, "CRITICAL: GPS Request failed")
             close(e)
         }
 
-        // Bridge internal status updates (like GNSS changes) to this flow
         val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
 
         awaitClose {
@@ -149,23 +147,14 @@ class GpsManager @Inject constructor(
         replay = 1
     )
 
-    /**
-     * getLocationFlow: Public API for location updates.
-     */
     fun getLocationFlow(): Flow<Location> = hardwareObservationFlow
         .filterIsInstance<GpsUpdate.LocationUpdate>()
         .map { it.location }
 
-    /**
-     * gnssDetailFlow: Public API for GNSS status updates.
-     */
     val gnssDetailFlow: Flow<GnssDetail?> = hardwareObservationFlow
         .filterIsInstance<GpsUpdate.GnssUpdate>()
         .map { it.detail }
 
-    /**
-     * getSnrSamples: Returns SNR samples via flyweight iteration.
-     */
     fun getSnrSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
         val flyweight = EngineSnrSample()
         val c: Int

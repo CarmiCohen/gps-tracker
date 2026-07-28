@@ -18,10 +18,10 @@ import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
- * July.24.04:
- * - Stealth Enforcement: Added isTrackerMode check to createNotificationChannels 
- *   and updateAlarmNotification. Critical Alarms are forced to IMPORTANCE_LOW 
- *   in Tracker Mode to prevent audible leaks.
+ * July.27.12:
+ * - Issue #607: Foreground Service Startup Race Condition. Added init block to 
+ *   ensure notification channels are created immediately upon injection, 
+ *   preventing "Bad notification" crashes during service cold-starts.
  */
 @Singleton
 class AppNotificationManager @Inject constructor(
@@ -35,6 +35,10 @@ class AppNotificationManager @Inject constructor(
     
     private val cachedPkgName = context.packageName
     private var isTrackerMode = false
+
+    init {
+        createNotificationChannels()
+    }
 
     fun setTrackerMode(active: Boolean) {
         if (this.isTrackerMode != active) {

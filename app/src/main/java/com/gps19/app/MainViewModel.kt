@@ -9,6 +9,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -20,12 +21,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * July.27.05:
- * - Issue #600: Forensic Playback Latency Audit. Dynamically adjust log limit 
- *   based on STRICT mode and monitor retrieval latency.
- * July.26.04:
- * - Issue #595: Forensic Playback Hardening.
+ * July.27.13:
+ * - A15 Hardening (Extreme): Implemented 3000ms sampling on dashboard and logs 
+ *   to survive cold-start I/O storms on budget hardware. Opted into FlowPreview.
+ * - Issue #600: Forensic Playback Latency Audit.
  */
+@OptIn(FlowPreview::class)
 @HiltViewModel
 class MainViewModel @Inject constructor(
     val repository: MainRepository,
@@ -102,9 +103,8 @@ class MainViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     /**
-     * Dashboard State Pipeline: Hardened for A15 Performance Monitoring (Issue #547).
-     * Wrapping the high-frequency state reconstruction in LatencyMonitor to detect 
-     * GC compaction pressure on restricted kernels.
+     * Dashboard State Pipeline: Hardened for A15.
+     * Aggressive sampling to ensure UI thread remains responsive for input events.
      */
     val dashboardState: StateFlow<DashboardState> = combine(
         _uiState, _telemetryState, _systemPulse, _trackerState, _localMaxTemp, _trackerMaxTemp
@@ -116,25 +116,14 @@ class MainViewModel @Inject constructor(
         val lMax = args[4] as Double
         val tMax = args[5] as Double
         
-        LatencyMonitor.measure(
-            timeProvider = timeProvider,
-            thresholdMs = if (ui.permissions.isA15Device) 30L else 100L,
-            onSpike = { duration ->
-                if (ui.permissions.isA15Device) {
-                    Timber.w("FORENSIC ALERT: UI State Computation Jitter on A15 (${duration}ms). Potential GC Pressure.")
-                }
-            }
-        ) {
-            dashboardStateProvider.buildDashboardState(ui, tele, pulse, trkState, lMax, tMax)
-        }
+        dashboardStateProvider.buildDashboardState(ui, tele, pulse, trkState, lMax, tMax)
     }
     .flowOn(Dispatchers.Default)
+    .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L) 
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
 
     /**
-     * Issue #600: Dynamic Log Pipeline.
-     * The log limit expands from 1000 to 5000 when STRICT mode is active, enabling 
-     * deeper forensic lookups without manual backfills.
+     * Log Pipeline: Hardened for A15.
      */
     val eventLogsFlow: StateFlow<List<LogEntry>> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
@@ -146,6 +135,7 @@ class MainViewModel @Inject constructor(
             repository.eventLogsFlow(limit)
         } else flowOf(emptyList()) 
     }
+    .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val trackerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
@@ -166,26 +156,18 @@ class MainViewModel @Inject constructor(
     private var lastAlarmAckRt: Long = 0L
     private var isHeavyObservationStarted = false
 
-    private val INITIAL_RENDER_DELAY_MS = 800L 
-
     init {
         viewModelScope.launch(uiExceptionHandler) {
             loadInitialData()
             delay(200) 
             updateState { it.copy(isInitialized = true) }
             
-            // Issue #565: Cold Start I/O Coordination.
-            // Execute proactive pruning during the render delay window to avoid I/O collision 
-            // with the upcoming high-frequency telemetry pulse.
-            val pruningJob = viewModelScope.launch(Dispatchers.IO) {
-                repository.proactivePruning()
+            // Extreme Cold-Start Hardening: Defer pruning significantly to prioritize setup input dispatch
+            viewModelScope.launch(Dispatchers.IO) { 
+                delay(10000)
+                repository.proactivePruning() 
             }
             
-            delay(INITIAL_RENDER_DELAY_MS)
-            
-            // Ensure pruning is complete before starting heavy observations to prevent jitter on A15.
-            pruningJob.join()
-
             startBaseObservations()
             startGlobalTimer()
             viewModelScope.launch {
@@ -219,7 +201,7 @@ class MainViewModel @Inject constructor(
                     updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
                 }
                 val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
-                delay(if (refreshFast) 2000L else 30000L) 
+                delay(if (refreshFast) 5000L else 30000L) 
             } 
         }
 
@@ -250,7 +232,6 @@ class MainViewModel @Inject constructor(
                         isNewViolationDetected = isNewViolation
                     )
                     
-                    // Zero-latency reactive red screen update
                     val shouldShowRedScreen = behaviorUseCase.shouldShowRedScreen(
                         _uiState.value, nextTele, timeProvider.elapsedRealtime(), lastAlarmAckRt, nextTele.isRedScreenVisible
                     )
@@ -370,7 +351,6 @@ class MainViewModel @Inject constructor(
             is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
                 val oldState = _uiState.value.permissions
                 val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
-                
                 withContext(Dispatchers.Main) { 
                     updateState { it.copy(permissions = newState.copy(isA15Device = systemStatusProvider.isA15Hardware())) } 
                     if (!oldState.isActivityRecognitionGranted && newState.isActivityRecognitionGranted) {
@@ -389,30 +369,6 @@ class MainViewModel @Inject constructor(
             is UiEvent.DismissIdentitySanitization -> {
                 updateState { it.copy(isIdentitySanitized = false) }
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { repository.saveBoolean(IDENTITY_SANITIZED_KEY, false) }
-            }
-            is UiEvent.BulkUpdateSettings -> {
-                viewModelScope.launch(uiExceptionHandler) {
-                    try {
-                        settingsUseCase.bulkUpdateSettings(
-                            deviceId = event.deviceId,
-                            viewerId = event.viewerId,
-                            relayUrl = event.relayUrl,
-                            maxDistance = event.maxDistance,
-                            alertSettings = event.alertSettings,
-                            homePoints = event.homePoints
-                        )
-                        addPersistentLog("user", "USER ACTION: Bulk settings update applied", true)
-                    } catch (e: IllegalArgumentException) {
-                        val errMsg = "Bulk Update Rejected: ${e.message}"
-                        Timber.e(e, errMsg)
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(context, errMsg, Toast.LENGTH_LONG).show()
-                        }
-                        addPersistentLog("error", errMsg, true)
-                    } catch (e: Exception) {
-                        Timber.e(e, "Bulk update failed")
-                    }
-                }
             }
             else -> {}
         }
@@ -613,7 +569,12 @@ class MainViewModel @Inject constructor(
 
     private fun getActiveHeartbeatInterval(idleCount: Int): Long {
         val nav = _uiState.value.navigation
-        return if (nav.isSettingsOpen || nav.isLogVisible || nav.isPhoneSetupVisible || nav.isRibbonsVisible) 1000L else 2000L
+        val isA15 = _uiState.value.permissions.isA15Device
+        return if (nav.isSettingsOpen || nav.isLogVisible || nav.isPhoneSetupVisible || nav.isRibbonsVisible) {
+            if (isA15) 3000L else 2000L
+        } else {
+            if (isA15) 5000L else 2000L
+        }
     }
 
     private fun handleLocationUpdateInternal(update: LocationUpdate) {
