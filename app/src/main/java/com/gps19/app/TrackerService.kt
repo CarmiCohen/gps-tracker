@@ -19,12 +19,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.28.14:
+ * - Issue #609: Structural Centralization. Removed redundant manual health 
+ *   propagation as IntegrityMonitor now manages its own source of truth.
  * July.27.13:
  * - Issue #608: Startup Notification Flicker. Enhanced startServiceForeground() 
  *   to build a rich notification immediately using early health state.
- * July.27.12:
- * - Issue #607: Foreground Service Startup Race Condition. Implemented 
- *   onServicePreInit() for early notification configuration.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -395,8 +395,9 @@ class TrackerService : BaseMonitorService() {
     override suspend fun processTick(now: Long, nowRt: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRt)
         integrityMonitor.checkInternetIntegrity(nowRt)
+        
         val health = integrityMonitor.currentHealth
-        repository.updateHealth(health)
+        // Issue #609: Redundant manual propagation removed. IntegrityMonitor now handles repository sync.
 
         appSensorManager.setHighLoad(health.isCoolingModeActive)
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()

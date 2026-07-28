@@ -16,12 +16,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.28.14:
+ * - Issue #609: Structural Centralization. Removed redundant manual health 
+ *   propagation as IntegrityMonitor now manages its own source of truth.
  * July.27.13:
  * - Issue #608: Startup Notification Flicker. Enhanced startServiceForeground() 
  *   to build a rich notification immediately using early health state.
- * July.27.12:
- * - Issue #607: Foreground Service Startup Race Condition. Implemented 
- *   onServicePreInit() for early notification configuration.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -310,7 +310,8 @@ class ViewerService : BaseMonitorService() {
 
     override suspend fun processTick(now: Long, nowRt: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRt)
-        val health = integrityMonitor.currentHealth; repository.updateHealth(health)
+        val health = integrityMonitor.currentHealth
+        // Issue #609: Redundant manual propagation removed. IntegrityMonitor now handles repository sync.
 
         if (timeProvider.elapsedRealtime() > 0) systemMonitor.renewWakeLock()
 
