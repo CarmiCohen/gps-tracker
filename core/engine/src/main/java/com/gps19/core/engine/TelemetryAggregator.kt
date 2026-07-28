@@ -4,12 +4,11 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * July.27.07:
+ * - Issue #602: SIT Timestamp Parity Logic. Integrated sitVz, sitVzTs, and sitVzRt 
+ *   into aggregation to ensure peak vertical velocity forensic parity.
  * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy aggregation 
- *   to forensic ribbons for motion analysis.
- * July.25.10:
- * - Issue #570b: Flyweight Thread Safety Audit. Moved fillPointFlyweight to 
- *   method scope in backfillGaps to ensure thread safety across concurrent callers.
+ * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy aggregation.
  */
 class TelemetryAggregator {
 
@@ -59,6 +58,9 @@ class TelemetryAggregator {
         var baroIdx: Double = 0.0
         var isSitDetected: Boolean = false
         var isSitActive: Boolean = false
+        var sitVz: Double = 0.0
+        var sitVzTs: Long = 0L
+        var sitVzRt: Long = 0L
         var kineticEnergy: Double = 0.0
 
         fun reset(point: EngineConnectionPoint) {
@@ -85,6 +87,9 @@ class TelemetryAggregator {
             baroIdx = point.baroIdx
             isSitDetected = point.isSitDetected
             isSitActive = point.isSitActive
+            sitVz = point.sitVz
+            sitVzTs = point.sitVzTs
+            sitVzRt = point.sitVzRt
             kineticEnergy = point.kineticEnergy
         }
 
@@ -112,6 +117,13 @@ class TelemetryAggregator {
             baroIdx = max(baroIdx, cur.baroIdx)
             isSitDetected = isSitDetected || cur.isSitDetected
             isSitActive = isSitActive || cur.isSitActive
+            
+            if (abs(cur.sitVz) > abs(sitVz)) {
+                sitVz = cur.sitVz
+                sitVzTs = cur.sitVzTs
+                sitVzRt = cur.sitVzRt
+            }
+            
             kineticEnergy = max(kineticEnergy, cur.kineticEnergy)
         }
 
@@ -141,6 +153,9 @@ class TelemetryAggregator {
                 this.baroIdx = this@MutableAggregationPoint.baroIdx
                 this.isSitDetected = this@MutableAggregationPoint.isSitDetected
                 this.isSitActive = this@MutableAggregationPoint.isSitActive
+                this.sitVz = this@MutableAggregationPoint.sitVz
+                this.sitVzTs = this@MutableAggregationPoint.sitVzTs
+                this.sitVzRt = this@MutableAggregationPoint.sitVzRt
                 this.kineticEnergy = this@MutableAggregationPoint.kineticEnergy
                 this.isTick = isTick
             }
@@ -228,6 +243,8 @@ class TelemetryAggregator {
             val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: baseTemplate.tiltIdx
             val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.baroIdx
             val resolvedSit = snapshot?.isSitDetected ?: false
+            val resolvedSitVzTs = snapshot?.sitVzTs ?: baseTemplate.sitVzTs
+            val resolvedSitVzRt = snapshot?.sitVzRt ?: baseTemplate.sitVzRt
             val resolvedKinetic = snapshot?.kineticEnergy ?: baseTemplate.kineticEnergy
 
             fillPointFlyweight.apply {
@@ -244,6 +261,8 @@ class TelemetryAggregator {
                 tiltIdx = resolvedTilt
                 baroIdx = resolvedBaro
                 isSitDetected = resolvedSit
+                sitVzTs = resolvedSitVzTs
+                sitVzRt = resolvedSitVzRt
                 kineticEnergy = resolvedKinetic
             }
 
@@ -311,6 +330,8 @@ class TelemetryAggregator {
             val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: 0.0
             val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
             val resolvedSit = snapshot?.isSitDetected ?: false
+            val resolvedSitVzTs = snapshot?.sitVzTs ?: 0L
+            val resolvedSitVzRt = snapshot?.sitVzRt ?: 0L
             val resolvedKinetic = snapshot?.kineticEnergy ?: 0.0
 
             gapPoints.add(EngineConnectionPoint(
@@ -329,6 +350,8 @@ class TelemetryAggregator {
                 tiltIdx = resolvedTilt,
                 baroIdx = resolvedBaro,
                 isSitDetected = resolvedSit,
+                sitVzTs = resolvedSitVzTs,
+                sitVzRt = resolvedSitVzRt,
                 kineticEnergy = resolvedKinetic,
                 isTick = isScaleTick(getScaleByKey(ribbonKey), totalSeconds),
                 currentMa = 0,

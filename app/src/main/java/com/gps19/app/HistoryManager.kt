@@ -26,10 +26,11 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * July.27.07:
+ * - Issue #602: SIT Timestamp Parity Logic. Integrated sitVzTs/Rt into 
+ *   updateRibbons and mapping to restore full forensic parity.
  * July.27.00:
  * - Architecture Audit: Updated to use centralized PreferenceKeys.
- * July.26.04:
- * - Issue #595: Forensic Playback Hardening.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -97,6 +98,8 @@ class HistoryManager @Inject constructor(
         baroIdx: Double = 0.0,
         verticalVelocity: Double = 0.0,
         sitVz: Double = 0.0,
+        sitVzTs: Long = 0L,
+        sitVzRt: Long = 0L,
         sitDz: Double = 0.0,
         sitBaro: Double = 0.0,
         sitTilt: Double = 0.0,
@@ -108,7 +111,8 @@ class HistoryManager @Inject constructor(
         isSitDetected: Boolean = false,
         isSitActive: Boolean = false,
         currentMa: Int = 0,
-        locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+        locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+        kineticEnergy: Double = 0.0
     ) {
         detectClockTampering(now)
 
@@ -147,6 +151,8 @@ class HistoryManager @Inject constructor(
                 baroIdx = baroIdx,
                 verticalVelocity = verticalVelocity,
                 sitVz = sitVz,
+                sitVzTs = sitVzTs,
+                sitVzRt = sitVzRt,
                 sitDz = sitDz,
                 sitBaro = sitBaro,
                 sitTilt = sitTilt,
@@ -158,7 +164,8 @@ class HistoryManager @Inject constructor(
                 isSitDetected = isSitDetected,
                 isSitActive = isSitActive,
                 currentMa = currentMa,
-                locationPendingReason = locationPendingReason
+                locationPendingReason = locationPendingReason,
+                kineticEnergy = kineticEnergy
             )
         }
 
@@ -185,6 +192,8 @@ class HistoryManager @Inject constructor(
             isSitActive = isSitActive,
             verticalVelocity = verticalVelocity,
             sitVz = sitVz,
+            sitVzTs = sitVzTs,
+            sitVzRt = sitVzRt,
             sitDz = sitDz,
             sitBaro = sitBaro,
             sitTilt = sitTilt,
@@ -195,7 +204,8 @@ class HistoryManager @Inject constructor(
             bearing = bearing,
             isTick = false,
             currentMa = currentMa,
-            locationPendingReason = locationPendingReason
+            locationPendingReason = locationPendingReason,
+            kineticEnergy = kineticEnergy
         )
 
         processResults(aggregator.processPoint(currentPoint))
@@ -248,6 +258,8 @@ class HistoryManager @Inject constructor(
         baroIdx: Double,
         verticalVelocity: Double,
         sitVz: Double,
+        sitVzTs: Long,
+        sitVzRt: Long,
         sitDz: Double,
         sitBaro: Double,
         sitTilt: Double,
@@ -259,7 +271,8 @@ class HistoryManager @Inject constructor(
         isSitDetected: Boolean,
         isSitActive: Boolean,
         currentMa: Int,
-        locationPendingReason: LocationPendingReason
+        locationPendingReason: LocationPendingReason,
+        kineticEnergy: Double
     ) {
         LatencyMonitor.measure(
             timeProvider,
@@ -290,6 +303,8 @@ class HistoryManager @Inject constructor(
                 baroIdx = baroIdx,
                 verticalVelocity = verticalVelocity,
                 sitVz = sitVz,
+                sitVzTs = sitVzTs,
+                sitVzRt = sitVzRt,
                 sitDz = sitDz,
                 sitBaro = sitBaro,
                 sitTilt = sitTilt,
@@ -301,7 +316,8 @@ class HistoryManager @Inject constructor(
                 speed = speed,
                 bearing = bearing,
                 currentMa = currentMa,
-                locationPendingReason = locationPendingReason
+                locationPendingReason = locationPendingReason,
+                kineticEnergy = kineticEnergy
             )
 
             val results = aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplate)
@@ -407,10 +423,13 @@ class HistoryManager @Inject constructor(
             isSitDetected = p.isSitDetected,
             isSitActive = p.isSitActive,
             sitVz = p.sitVz,
+            sitVzTs = p.sitVzTs,
+            sitVzRt = p.sitVzRt,
             sitDz = p.sitDz,
             sitBaro = p.sitBaro,
             sitTilt = p.sitTilt,
-            sitShock = p.sitShock
+            sitShock = p.sitShock,
+            kineticEnergy = p.kineticEnergy
         )
     }
 

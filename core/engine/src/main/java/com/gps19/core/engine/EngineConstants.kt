@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.27.07:
+ * - Issue #603: Analytical Ribbon Optimization. Added RIBBON_KINETIC_ENERGY_SCALE.
  * July.27.06:
  * - Issue #601: Kinetic Energy Anomaly Detection. Added HPF and Energy EMA 
  *   parameters to distinguish between sustained motion and impulse events.
@@ -264,6 +266,7 @@ const val GPS_INDEX_SATS_TARGET = 12
 const val RIBBON_NOISE_SCALE_DB = 40.0
 const val RIBBON_LUX_LOG_SCALE = 5.0
 const val RIBBON_VIBRATION_SCALE_G = 2.0
+const val RIBBON_KINETIC_ENERGY_SCALE = 2.0
 const val RIBBON_LIFT_SCALE_METERS = 5.0
 const val RIBBON_SNR_SCALE_DB = 45.0
 const val RIBBON_CURRENT_SCALE_MA = 1000.0

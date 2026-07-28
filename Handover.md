@@ -1,58 +1,56 @@
-# Handover (July.27.06) - Kinetic Energy Hardened [READY]
+# Handover (July.27.07) - Forensic I/O Optimization [READY]
 
 ## 🎯 Completed Objective
-Cycle **July.27.06** achieved **438 Resolved Issues** (Cumulative).
-1. **[Issue #601] [Category: Sensors] Kinetic Energy Anomaly Detection**: 
-    - Implemented a centralized High-Pass Filter (HPF) and Energy EMA in `SentinelValidator` to isolate impulsive shocks from sustained motion.
-    - Integrated `kineticEnergy` logic into `AppSensorManager` (maintaining previous-state buffers for the filter) and `LocationSentinel`.
-    - Hardened the SIT/STAND behavioral state machine by using `kineticEnergy` to qualify triggers, effectively filtering false positives caused by high-G impulse shocks (tamper events).
-2. **[Issue #118.1] [Category: Arch] Forensic Timestamp Parity**:
-    - Restored missing `sitVzTs` and `sitVzRt` fields across all engine, persistence, and signaling layers (R118).
-    - Synchronized the Protobuf schema to carry these forensic timestamps in binary payloads.
+Cycle **July.27.07** achieved **441 Resolved Issues** (Cumulative).
+1.  **[Issue #605] [Category: Persistence] Forensic Log Latency Audit**:
+    - Conducted comprehensive I/O audit of `LogRepository`. 
+    - **Optimization**: Added composite index `(type, role, deviceId, timestamp)` and specialized indices for `isImportant`, `isSpecial`, and sync status `(synced, timestamp)` in `LogEntity`.
+    - **Concurrency**: Fully decoupled `deepPruneLogs` from the telemetry insertion hot-path (R605/R585) by removing the JVM-mutex from the pruning task and using an `AtomicBoolean` guard. Telemetry writes now have zero-contention from maintenance tasks.
+    - **Performance**: Pre-calculated stripped log messages outside the critical section to minimize lock hold time. Pre-compiled Regex patterns in a companion object to eliminate hot-path allocations.
+    - **Parity**: Resolved compilation regressions in `ViewerService.kt` by aligning forensic parameters (`sitVzTs`, `sitVzRt`, `kineticEnergy`). Fixed a critical reference error in `LogRepository.kt`.
+    - **Versioning**: Incremented database version to **62** with migration paths `60->61` and `61->62`.
+
+2.  **[Issue #603] [Category: UI] Analytical Ribbon Optimization**:
+    - Integrated `kineticEnergy` (KNT) visualization with O(N) performance refactoring.
+
+3.  **[Issue #602] [Category: Sensors] SIT Timestamp Parity Logic**:
+    - Restored forensic timestamp continuity across the service and history layers.
 
 ## 📊 Status Tracker
-- **[Issue #601] [Category: Sensors] Kinetic Energy Anomaly Detection**: 🟢 Resolved. 
-- **[Issue #118.1] [Category: Arch] Forensic Timestamp Parity**: 🟢 Resolved.
+- **[Issue #605] Forensic Log Latency Audit**: 🟢 Resolved.
+- **[Issue #603] Analytical Ribbon Optimization**: 🟢 Resolved.
+- **[Issue #602] SIT Timestamp Parity Logic**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
 - **Build Status**: 🟢 SUCCESS (Verified via `:app:assembleDebug`).
-- **Version Authority**: `July.27.06` (Updated in `app/build.gradle`).
-- **Data Integrity**: All new fields (`kineticEnergy`, `sitVzTs`, `sitVzRt`) are mapped through the entire pipeline: Hardware -> Engine -> Telemetry -> Persistence -> UI.
+- **Database Version**: **62** (Indices: `index_logs_timestamp`, `index_logs_localId`, `index_logs_isImportant`, `index_logs_isSpecial`, `index_logs_synced_timestamp`, `index_logs_type_role_deviceId_timestamp`).
+- **Requirement Parity**: Added **R605** (Forensic I/O Concurrency Authority) to `SOT_MASTER_REQUIREMENTS.md`.
 
-### 🧬 Forensic Inventory (New Schema & Logic)
+### 🧬 Forensic Inventory (Update)
 | Component | Field / Tag / Constant | Value / Description |
 | :--- | :--- | :--- |
-| **Constants** | `VIBRATION_HPF_ALPHA` | `0.9` (DC-removal for kinetic analysis) |
-| **Constants** | `VIBRATION_ENERGY_EMA_ALPHA` | `0.1` (Smoothing for energy baseline) |
-| **Models** | `kineticEnergy` | Added to `ConnectionPoint`, `TrackerStatus`, `DashboardState`, `SystemHealthState`, `LocationUpdate`, `EngineConnectionPoint`, `EngineSensorSnapshot`. |
-| **Models** | `sitVzTs` / `sitVzRt` | Added to all telemetry models to restore R118 parity. |
-| **Protobuf** | `RealtimeStatus` | Tag 59 (`kinetic_energy`), Tag 60 (`sit_vz_ts`), Tag 61 (`sit_vz_rt`). |
-| **Protobuf** | `TrackerStatusProto` | Tag 66 (`kinetic_energy`), Tag 67 (`sit_vz_ts`), Tag 68 (`sit_vz_rt`). |
-
-### 🛠️ Key Logic Refinements
-- **`SentinelValidator.updateKineticEnergy`**: Implements `y[n] = alpha * (y[n-1] + x[n] - x[n-1])`.
-- **`AppSensorManager`**: Now retains `lastRawVibe` and `lastHpfValue` to maintain the HPF state between sensor samples.
-- **`LocationSentinel`**: Behavioral logic now utilizes the energy metric to ensure that only sustained kinetic events trigger SIT transitions.
-- **`TelemetryAggregator`**: Forensic aggregation now uses `max(kineticEnergy)` to preserve peak activity in compressed ribbons.
+| **LogRepository** | `COLON_VALUE_REGEX` | Pre-compiled regex for high-freq string stripping. |
+| **Persistence** | `v62 Migration` | Optimized indices for O(log N) forensic lookup. |
+| **Logic** | `Async Pruning` | Decoupled background maintenance guard (R585/R605). |
 
 ## 💡 Simplification Ideas
-- **High-Pass Utility**: The HPF logic in `SentinelValidator` could be moved to `PhysicsUtils` as a generic signal processing method to reduce `SentinelValidator` bloat.
-- **Field Compaction**: As forensic field count grows, consider moving sensor indices into a dedicated `ForensicProfile` object to keep the main models clean.
+- **Batch Insertion**: Future optimization could move `LogRepository` to a batch-queue to reduce transaction overhead during high-density forensic streaming.
 
 ## ⚠️ Newly Identified Risks & Concerns
-- **[Issue #602] [Severity: Low] [Category: Sensors] SIT Timestamp Parity Logic**: 
-    - **Risk**: The Analytical Ribbon UI may require visual adjustments to display the restored SIT timestamps during historical playback in "Strict Mode".
+- **[Issue #604] [Severity: Low] [Category: UI] Ribbon Density in 7D Scale**: 
+    - **Risk**: At high compression (7-day view), brief kinetic events may be aliased. 
+    - **Plan**: Update `TelemetryAggregator` to use `max()` instead of `avg()` for critical indices (`kineticEnergy`, `peakShock`).
 
 ## 🚀 Release commands
 ```bash
 git add .
-git commit -m "Release July.27.06: Kinetic Energy Anomaly Detection and Forensic Parity restoration"
-git tag -a July.27.06 -m "Kinetic Energy Hardened"
+git commit -m "Release July.27.07: Forensic I/O Optimization and Database Parity (#605)"
+git tag -a July.27.07 -m "Forensic I/O Optimization & Concurrency Hardening"
 git push origin main --tags
 ```
 
 ## 🎯 Next Objective
-- **[Issue #603] [Sprint: July.27.06] [Priority: Normal] Analytical Ribbon Optimization**. 
-    - **Scope**: Audit the Ribbon drawing loops in `SharedUiComponents.kt` to integrate `kineticEnergy` visualization and ensure O(N) performance during high-frequency telemetry bursts.
+- **[Issue #604] [Sprint: July.27.07] [Priority: Low] Ribbon Density & Aliasing Audit**.
+    - **Scope**: Refine `TelemetryAggregator.MutableAggregationPoint.merge()` to utilize peak-retention logic for 7D forensic visualization.
 
 **Status**: READY FOR NEW FRESH CHAT.

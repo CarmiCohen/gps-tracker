@@ -32,12 +32,11 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.27.07:
+ * - Issue #602: SIT Timestamp Parity Logic. Integrated sitVzTs/Rt into 
+ *   pushCurrentStatus and status extraction to restore full forensic parity.
  * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Integrated kineticEnergy 
- *   into signaling pipeline and status extraction.
- * July.27.00:
- * - Issue #596: Signaling Reliability Audit. Promoted telemetry (location_update_bin) 
- *   to HIGH priority to bypass throttled forensic log queue.
+ * - Issue #601: Kinetic Energy Anomaly Detection. Integrated kineticEnergy.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -433,7 +432,7 @@ class ConnectivitySuite @Inject constructor(
         isTamperDetected: Boolean, isPowerTamper: Boolean,
         isSitDetected: Boolean, isSitActive: Boolean, lastSitTs: Long,
         receiptRt: Long, violationUptimeMs: Long, violationPercentage: Double,
-        verticalVelocity: Double, sitVz: Double, sitDz: Double, sitBaro: Double, sitTilt: Double, sitShock: Double,
+        verticalVelocity: Double, sitVz: Double, sitVzTs: Long, sitVzRt: Long, sitDz: Double, sitBaro: Double, sitTilt: Double, sitShock: Double,
         isClockRegression: Boolean, isLocationPending: Boolean, locationPendingReason: LocationPendingReason,
         lastValidFixRt: Long, gnssDetail: GnssDetail?,
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
@@ -476,7 +475,7 @@ class ConnectivitySuite @Inject constructor(
             snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, liftIdx = liftIdx,
             tiltIdx = tiltIdx, baroIdx = baroIdx,
             micPending = micPending, isSitDetected = isSitDetected, isSitActive = isSitActive, lastSitTs = lastSitTs,
-            verticalVelocity = verticalVelocity, sitVz = sitVz, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
+            verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs, sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
             kineticEnergy = kineticEnergy
         )
         sendTelemetry(trackerStatus)
@@ -558,7 +557,8 @@ class ConnectivitySuite @Inject constructor(
                     tiltIdx = statusProto.tiltIdx, baroIdx = statusProto.baroIdx,
                     isSitDetected = statusProto.isSitDetected, lastSitTs = statusProto.lastSitTs,
                     verticalVelocity = statusProto.verticalVelocity,
-                    sitVz = statusProto.sitVz, sitDz = statusProto.sitDz,
+                    sitVz = statusProto.sitVz, sitVzTs = statusProto.sitVzTs, sitVzRt = statusProto.sitVzRt,
+                    sitDz = statusProto.sitDz,
                     sitBaro = statusProto.sitBaro, sitTilt = statusProto.sitTilt, sitShock = statusProto.sitShock,
                     isSitActive = statusProto.isSitActive,
                     uptimeMs = statusProto.uptimeMs,
@@ -590,7 +590,7 @@ class ConnectivitySuite @Inject constructor(
                         snrIdx = updatedStatus.snrIdx, noiseIdx = updatedStatus.noiseIdx, luxIdx = updatedStatus.luxIdx, vibeIdx = updatedStatus.vibeIdx, liftIdx = updatedStatus.liftIdx,
                         tiltIdx = updatedStatus.tiltIdx, baroIdx = updatedStatus.baroIdx,
                         isSitDetected = updatedStatus.isSitDetected, lastSitTs = updatedStatus.lastSitTs,
-                        verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitDz = updatedStatus.sitDz,
+                        verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitVzTs = updatedStatus.sitVzTs, sitVzRt = updatedStatus.sitVzRt, sitDz = updatedStatus.sitDz,
                         sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock,
                         kineticEnergy = updatedStatus.kineticEnergy
                     ))
@@ -759,7 +759,7 @@ class ConnectivitySuite @Inject constructor(
                         snrIdx = updatedStatus.snrIdx, noiseIdx = updatedStatus.noiseIdx, luxIdx = updatedStatus.luxIdx, vibeIdx = updatedStatus.vibeIdx, liftIdx = updatedStatus.liftIdx,
                         tiltIdx = updatedStatus.tiltIdx, baroIdx = updatedStatus.baroIdx,
                         isSitDetected = updatedStatus.isSitDetected, lastSitTs = updatedStatus.lastSitTs,
-                        verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitDz = updatedStatus.sitDz,
+                        verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitVzTs = updatedStatus.sitVzTs, sitVzRt = updatedStatus.sitVzRt, sitDz = updatedStatus.sitDz,
                         sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock,
                         kineticEnergy = updatedStatus.kineticEnergy
                     ))

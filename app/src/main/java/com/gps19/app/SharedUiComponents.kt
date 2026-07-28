@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -43,11 +44,11 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * July.27.04:
- * - Issue #598: UI Performance under Signaling Stress. Optimized Ribbon rendering 
- *   by caching static drawing parameters and reducing O(N) overhead in draw blocks.
- * July.26.04:
- * - Issue #595: Forensic Playback Hardening.
+ * July.27.07:
+ * - Issue #602: SIT Timestamp Parity Logic. Integrated sitVzTs/Rt drift 
+ *   visualization into Analytical Ribbons under Strict Mode.
+ * - Issue #603: Analytical Ribbon Optimization. Integrated KNT (Kinetic Energy) 
+ *   ribbon and consolidated drawing loops for O(N) performance parity.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -133,6 +134,7 @@ fun AnalyticalRibbons(viewModel: MainViewModel) {
 
         StatefulSensorRibbon(activeHistoryFlow, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), isStrictMode = isStrictMode, valueSelector = { it.snrIdx.toFloat() })
         StatefulSensorRibbon(activeHistoryFlow, "NOI", selectedScale, lineColor = Amber500, isStrictMode = isStrictMode, valueSelector = { it.noiseIdx.toFloat() })
+        StatefulSensorRibbon(activeHistoryFlow, "KNT", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = { (it.kineticEnergy.toFloat() / RIBBON_KINETIC_ENERGY_SCALE.toFloat()).coerceIn(0f, 1f) })
         StatefulSensorRibbon(activeHistoryFlow, "LUX", selectedScale, lineColor = Color.White, isStrictMode = isStrictMode, valueSelector = { it.luxIdx.toFloat() })
         StatefulSensorRibbon(activeHistoryFlow, "VIB", selectedScale, lineColor = Color.Magenta, isStrictMode = isStrictMode, valueSelector = { it.vibeIdx.toFloat() })
         StatefulSensorRibbon(activeHistoryFlow, "PRX", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = { it.proxIdx.toFloat() })
@@ -143,7 +145,7 @@ fun AnalyticalRibbons(viewModel: MainViewModel) {
         StatefulSensorRibbon(activeHistoryFlow, "SIT", selectedScale, lineColor = BrandJd, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = { if (it.isSitActive) 1f else 0f })
         StatefulSensorRibbon(activeHistoryFlow, "TLT", selectedScale, lineColor = Color(0xFF818CF8), isStrictMode = isStrictMode, valueSelector = { it.tiltIdx.toFloat() })
         StatefulSensorRibbon(activeHistoryFlow, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), isStrictMode = isStrictMode, valueSelector = { it.baroIdx.toFloat() })
-        StatefulSensorRibbon(activeHistoryFlow, "SVZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = { (kotlin.math.abs(it.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f) })
+        StatefulSensorRibbon(activeHistoryFlow, "SVZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = { (kotlin.math.abs(it.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f) }, driftSelector = { if (it.sitVzTs > 0) kotlin.math.abs(it.ts - it.sitVzTs) else 0L })
         StatefulSensorRibbon(activeHistoryFlow, "SDZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = { (kotlin.math.abs(it.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f) })
     }
 }
@@ -204,46 +206,52 @@ fun ForensicRibbonContainer(
                         strokeWidth = 0.5.dp.toPx()
                     )
 
-                    if (history.isEmpty()) return@onDrawWithContent
-
-                    val firstTs = history[0].ts
-                    val baseTickTs = ((firstTs + tickAlignMs - 1) / tickAlignMs) * tickAlignMs
-
-                    for (index in history.indices) {
-                        val p = history[index]
-                        val xPos = (totalPoints - history.size + index) * pointWidth
+                    if (history.isNotEmpty()) {
+                        val firstTs = history[0].ts
+                        val baseTickTs = ((firstTs + tickAlignMs - 1) / tickAlignMs) * tickAlignMs
+                        val startOffset = totalPoints - history.size
                         
-                        if (p.ts >= baseTickTs) {
-                            val tickCount = (p.ts - baseTickTs) / tickIntervalMs
-                            val prevTickCount = if (index > 0) {
-                                if (history[index - 1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / tickIntervalMs else -1L
-                            } else -2L
-                            
-                            if (tickCount >= 0 && tickCount > prevTickCount) {
-                                drawLine(
-                                    color = Color.White.copy(alpha = 0.2f),
-                                    start = Offset(xPos, baseLineY - maxHeight),
-                                    end = Offset(xPos, baseLineY + 2.dp.toPx()),
-                                    strokeWidth = 1.dp.toPx()
-                                )
-                            }
-                        }
+                        val tickStroke = 1.dp.toPx()
+                        val gapColor = Color.Black
+                        val strictGapColor = Color.Red.copy(alpha = 0.4f)
+                        val tickColor = Color.White.copy(alpha = 0.2f)
 
-                        if (p.isGap) {
-                            drawRect(
-                                color = Color.Black,
-                                topLeft = Offset(xPos, baseLineY - maxHeight),
-                                size = Size(maxOf(1f, pointWidth), maxHeight + 2.dp.toPx())
-                            )
-                        } else if (isStrictMode && index > 0) {
-                            val prev = history[index - 1]
-                            val tsDelta = p.ts - prev.ts
-                            if (!prev.isGap && tsDelta > tickIntervalMs * 2) {
+                        for (index in history.indices) {
+                            val p = history[index]
+                            val xPos = (startOffset + index) * pointWidth
+                            
+                            if (p.ts >= baseTickTs) {
+                                val tickCount = (p.ts - baseTickTs) / tickIntervalMs
+                                val prevTickCount = if (index > 0) {
+                                    if (history[index - 1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / tickIntervalMs else -1L
+                                } else -2L
+                                
+                                if (tickCount >= 0 && tickCount > prevTickCount) {
+                                    drawLine(
+                                        color = tickColor,
+                                        start = Offset(xPos, baseLineY - maxHeight),
+                                        end = Offset(xPos, baseLineY + 2.dp.toPx()),
+                                        strokeWidth = tickStroke
+                                    )
+                                }
+                            }
+
+                            if (p.isGap) {
                                 drawRect(
-                                    color = Color.Red.copy(alpha = 0.4f),
-                                    topLeft = Offset(xPos - pointWidth, baseLineY - maxHeight),
-                                    size = Size(maxOf(1f, pointWidth), maxHeight)
+                                    color = gapColor,
+                                    topLeft = Offset(xPos, baseLineY - maxHeight),
+                                    size = Size(maxOf(1f, pointWidth), maxHeight + 2.dp.toPx())
                                 )
+                            } else if (isStrictMode && index > 0) {
+                                val prev = history[index - 1]
+                                val tsDelta = p.ts - prev.ts
+                                if (!prev.isGap && tsDelta > tickIntervalMs * 2) {
+                                    drawRect(
+                                        color = strictGapColor,
+                                        topLeft = Offset(xPos - pointWidth, baseLineY - maxHeight),
+                                        size = Size(maxOf(1f, pointWidth), maxHeight)
+                                    )
+                                }
                             }
                         }
                     }
@@ -262,10 +270,11 @@ fun StatefulSensorRibbon(
     lineColor: Color,
     renderType: RibbonRenderType = RibbonRenderType.LINE,
     isStrictMode: Boolean = false,
-    valueSelector: (ConnectionPoint) -> Float
+    valueSelector: (ConnectionPoint) -> Float,
+    driftSelector: ((ConnectionPoint) -> Long)? = null
 ) {
     val history by flow.collectAsStateWithLifecycle()
-    GenericSensorRibbon(history, title, scale, lineColor, renderType, isStrictMode, valueSelector)
+    GenericSensorRibbon(history, title, scale, lineColor, renderType, isStrictMode, valueSelector, driftSelector)
 }
 
 @Composable
@@ -276,7 +285,8 @@ fun GenericSensorRibbon(
     lineColor: Color, 
     renderType: RibbonRenderType = RibbonRenderType.LINE,
     isStrictMode: Boolean = false,
-    valueSelector: (ConnectionPoint) -> Float
+    valueSelector: (ConnectionPoint) -> Float,
+    driftSelector: ((ConnectionPoint) -> Long)? = null
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val boxHeight = if (isLandscape) 40.dp else 24.dp
@@ -294,8 +304,11 @@ fun GenericSensorRibbon(
         var lastPos: Offset? = null
         val gapLimitWidth = pointWidth * 10
         val strokeW = if (landscape) 1.5.dp.toPx() else 1.dp.toPx()
-        val circleR = if (landscape) 1.5.dp.toPx() else 1.dp.toPx()
+        val circleR = if (landscape) 1.2.dp.toPx() else 0.8.dp.toPx()
         val rectW = maxOf(1f, pointWidth)
+        val startOffset = totalPoints - history.size
+        val barColor = lineColor.copy(alpha = 0.6f)
+        val driftColor = Color.Yellow.copy(alpha = 0.5f)
 
         for (index in history.indices) {
             val p = history[index]
@@ -304,12 +317,25 @@ fun GenericSensorRibbon(
                 continue
             }
 
-            val xPos = (totalPoints - history.size + index) * pointWidth
+            val xPos = (startOffset + index) * pointWidth
             val value = valueSelector(p).coerceIn(0f, 1f)
             
+            if (isStrictMode && driftSelector != null) {
+                val drift = driftSelector(p)
+                if (drift > 2000L) {
+                    drawRect(
+                        color = driftColor,
+                        topLeft = Offset(xPos, baseLineY - maxHeight),
+                        size = Size(maxOf(2f, pointWidth), maxHeight * 0.1f)
+                    )
+                }
+            }
+
             if (renderType == RibbonRenderType.BAR) {
-                val barHeight = value * maxHeight
-                drawRect(lineColor.copy(alpha = 0.6f), Offset(xPos, baseLineY - barHeight), Size(rectW, barHeight))
+                if (value > 0.01f) {
+                    val barHeight = value * maxHeight
+                    drawRect(barColor, Offset(xPos, baseLineY - barHeight), Size(rectW, barHeight))
+                }
             } else {
                 val yPos = baseLineY - (value * maxHeight)
                 val currentPos = Offset(xPos + (rectW / 2f), yPos)
@@ -357,6 +383,18 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
         }
     }
 
+    val density = LocalDensity.current
+    val textPaint = remember(isLandscape, density) {
+        android.graphics.Paint().apply {
+            color = android.graphics.Color.WHITE
+            with(density) {
+                textSize = (if (isLandscape) 10.sp.toPx() else 7.sp.toPx())
+            }
+            textAlign = android.graphics.Paint.Align.CENTER
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+    }
+
     ForensicRibbonContainer(
         title = scale,
         titleColor = Color.Gray,
@@ -372,20 +410,14 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
         var lastGpsPos: Offset? = null
         val cyanColor = Color(0xFF00FFFF)
         val rectW = maxOf(1f, pointWidth)
-
-        val textPaint = android.graphics.Paint().apply {
-            color = android.graphics.Color.WHITE
-            textSize = (if (landscape) 10.sp.toPx() else 7.sp.toPx())
-            textAlign = android.graphics.Paint.Align.CENTER
-            typeface = android.graphics.Typeface.MONOSPACE
-        }
+        val startOffset = totalPoints - history.size
 
         val firstTs = history[0].ts
         val baseTickTs = ((firstTs + alignMs - 1) / alignMs) * alignMs
 
         for (index in history.indices) {
             val p = history[index]
-            val xPos = (totalPoints - history.size + index) * pointWidth
+            val xPos = (startOffset + index) * pointWidth
             
             if (!p.isGap) {
                 val pColor = if (p.isConnected) BrandJd else Rose500
@@ -671,6 +703,8 @@ fun StatusRowData(
         label = "HandshakeAlpha"
     )
 
+    val animatedBattery by animateIntAsState(targetValue = battery, animationSpec = tween(1500), label = "BatteryAnim")
+
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = horizontalPadding), verticalAlignment = Alignment.CenterVertically) {
         Row(modifier = Modifier.width(210.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(modifier = Modifier.width(48.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -694,7 +728,6 @@ fun StatusRowData(
                     modifier = Modifier.padding(horizontal = 2.dp)
                 )
             } else {
-                val animatedBattery by animateIntAsState(targetValue = battery, animationSpec = tween(1500), label = "BatteryAnim")
                 Row(modifier = Modifier.width(54.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.width(10.dp), contentAlignment = Alignment.Center) { if (isCharging) Icon(Icons.Default.Bolt, null, tint = if(!isConnStale && isTelemetryFresh) Amber500 else Slate500, modifier = Modifier.size(10.dp)) }
                     Icon(if (isCharging) Icons.Default.BatteryChargingFull else Icons.Default.BatteryFull, null, tint = if (isConnStale || !isTelemetryFresh) Slate500 else if (battery in 0..19) Rose500 else telemetryColor, modifier = Modifier.size(10.dp))

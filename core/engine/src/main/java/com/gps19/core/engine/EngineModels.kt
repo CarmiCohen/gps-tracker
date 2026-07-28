@@ -4,15 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * July.27.07:
+ * - Issue #602: SIT Timestamp Parity Logic. Added sitVzTs and sitVzRt to 
+ *   EngineConnectionPoint and EngineSensorSnapshot for R118 parity.
  * July.27.06:
  * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy field 
  *   to forensic and telemetry models for motion analysis.
- * July.25.02:
- * - Issue #570: Forensic Snapshot Pooling. Refactored EngineConnectionPoint to 
- *   a mutable class to eliminate heap churn during forensic backfilling.
- * July.25.03:
- * - Issue #570: Forensic Snapshot Pooling. Refactored EngineSensorSnapshot and 
- *   EngineSnrSample to mutable classes to eliminate forensic backfill churn.
  */
 
 @Serializable
@@ -97,6 +94,8 @@ class EngineConnectionPoint(
     var isSitActive: Boolean = false,
     var verticalVelocity: Double = 0.0,
     var sitVz: Double = 0.0,
+    var sitVzTs: Long = 0L,
+    var sitVzRt: Long = 0L,
     var sitDz: Double = 0.0,
     var sitBaro: Double = 0.0,
     var sitTilt: Double = 0.0,
@@ -133,6 +132,8 @@ class EngineConnectionPoint(
         this.isSitActive = other.isSitActive
         this.verticalVelocity = other.verticalVelocity
         this.sitVz = other.sitVz
+        this.sitVzTs = other.sitVzTs
+        this.sitVzRt = other.sitVzRt
         this.sitDz = other.sitDz
         this.sitBaro = other.sitBaro
         this.sitTilt = other.sitTilt
@@ -172,6 +173,8 @@ class EngineSensorSnapshot(
     var lift: Double = 0.0,
     var tilt: Double = 0.0,
     var isSitDetected: Boolean = false,
+    var sitVzTs: Long = 0L,
+    var sitVzRt: Long = 0L,
     var kineticEnergy: Double = 0.0
 ) {
     fun copyFrom(other: EngineSensorSnapshot) {
@@ -184,6 +187,8 @@ class EngineSensorSnapshot(
         this.lift = other.lift
         this.tilt = other.tilt
         this.isSitDetected = other.isSitDetected
+        this.sitVzTs = other.sitVzTs
+        this.sitVzRt = other.sitVzRt
         this.kineticEnergy = other.kineticEnergy
     }
 }

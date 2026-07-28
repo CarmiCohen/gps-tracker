@@ -8,14 +8,24 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * July.27.07:
+ * - Issue #605: Forensic Log Latency Audit. Optimized indices for pruning (isImportant, isSpecial) 
+ *   and sync (synced, timestamp). Incremented version to 62.
  * July.27.05:
  * - Issue #600: Forensic Playback Latency Audit. Updated LogDao to support 
  *   dynamic limits for historical lookups.
- * July.26.04:
- * - Issue #595: Forensic Playback Hardening. Added 'rt' (monotonic time) to 
- *   HistoryEntity to support historical clock-drift auditing.
  */
-@Entity(tableName = "logs", indices = [Index(value = ["timestamp"]), Index(value = ["localId"])])
+@Entity(
+    tableName = "logs", 
+    indices = [
+        Index(value = ["timestamp"]), 
+        Index(value = ["localId"]),
+        Index(value = ["isImportant"]),
+        Index(value = ["isSpecial"]),
+        Index(value = ["synced", "timestamp"]), // Optimized for telemetry sync
+        Index(value = ["type", "role", "deviceId", "timestamp"]) // Optimized for deduplication
+    ]
+)
 data class LogEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val localId: String,
@@ -212,7 +222,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 60, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 62, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -221,6 +231,24 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_61_62 = object : Migration(61, 62) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #605: Optimize log maintenance and sync queries.
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_isImportant ON logs (isImportant)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_isSpecial ON logs (isSpecial)")
+                db.execSQL("DROP INDEX IF EXISTS index_logs_synced")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_synced_timestamp ON logs (synced, timestamp)")
+            }
+        }
+
+        val MIGRATION_60_61 = object : Migration(60, 61) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #605: Add initial indices for log deduplication and sync performance.
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_synced ON logs (synced)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_role_deviceId_timestamp ON logs (type, role, deviceId, timestamp)")
+            }
+        }
+
         val MIGRATION_59_60 = object : Migration(59, 60) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #595: Add 'rt' column to connection_history.
