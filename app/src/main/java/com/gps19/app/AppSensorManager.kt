@@ -42,11 +42,12 @@ sealed class AppSensorEvent {
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Implemented HPF-based energy 
+ *   analysis to distinguish sustained motion from impulse shocks.
  * July.26.04:
  * - Issue #589: Performance Audit. Integrated LatencyMonitor into snapshot 
  *   consumption and forensic sample retrieval paths.
- * - Issue #545c: Service Reactive Migration. Replaced legacy hardware failure 
- *   callback with a SharedFlow (sensorEvents) for reactive error handling.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -148,6 +149,11 @@ class AppSensorManager @Inject constructor(
     private var internalPeakVerticalVelocityRt: Long = 0L
     private var internalPeakVerticalDisplacement: Double = 0.0
     
+    // Issue #601: Kinetic Energy State
+    private var lastRawVibe = 0.0
+    private var lastHpfValue = 0.0
+    private var currentKineticEnergy = 0.0
+
     @Volatile
     private var isMonitoring = false
     @Volatile
@@ -183,6 +189,7 @@ class AppSensorManager @Inject constructor(
         var vibrationRollingSum: Double = 0.0
         var acousticPeak: Double = 0.0
         var acousticMin: Double = 0.0
+        var kineticEnergy: Double = 0.0
     }
 
     // Issue #550: Primitive buffers for zero-churn forensics
@@ -195,6 +202,7 @@ class AppSensorManager @Inject constructor(
     private val bufferLift = DoubleArray(256)
     private val bufferAcoustic = DoubleArray(256)
     private val bufferSit = BooleanArray(256)
+    private val bufferKinetic = DoubleArray(256)
     private var bufferIdx = 0
     private var bufferCount = 0
 
@@ -207,6 +215,7 @@ class AppSensorManager @Inject constructor(
     private var secPeakLift = 0.0
     private var secPeakDb = 0.0
     private var secSitDetected = false
+    private var secPeakKinetic = 0.0
     
     private var fastPathFloor: Double = -1.0
     private var fastPathSpikeThreshold: Double = ACOUSTIC_THRESHOLD_DB_JUMP
@@ -513,12 +522,13 @@ class AppSensorManager @Inject constructor(
                 bufferLift[bufferIdx] = secPeakLift
                 bufferAcoustic[bufferIdx] = secPeakDb
                 bufferSit[bufferIdx] = sitForForensics
+                bufferKinetic[bufferIdx] = secPeakKinetic
                 
                 bufferIdx = (bufferIdx + 1) % 256
                 if (bufferCount < 256) bufferCount++
             }
             lastBufferRecordRt = nowRt
-            secPeakLux = currentLux; secPeakVibe = currentVibrationIndex; secMinProxIdx = proximityIdx; secPeakTilt = currentTiltDegrees; secPeakLift = abs(relativeAltitude); secPeakDb = currentAcousticDb
+            secPeakLux = currentLux; secPeakVibe = currentVibrationIndex; secMinProxIdx = proximityIdx; secPeakTilt = currentTiltDegrees; secPeakLift = abs(relativeAltitude); secPeakDb = currentAcousticDb; secPeakKinetic = currentKineticEnergy
         }
     }
 
@@ -649,6 +659,7 @@ class AppSensorManager @Inject constructor(
                     vibrationRollingSum = this@AppSensorManager.vibrationRollingSum
                     acousticPeak = internalPeakDb
                     acousticMin = if (internalMinDb >= 100.0) -1.0 else internalMinDb
+                    kineticEnergy = this@AppSensorManager.currentKineticEnergy
                 }
                 
                 internalPeakVibration = 0.0
@@ -692,6 +703,7 @@ class AppSensorManager @Inject constructor(
                 val lift: Double
                 val acoustic: Double
                 val sit: Boolean
+                val kinetic: Double
                 
                 synchronized(this@AppSensorManager) {
                     ts = bufferTs[idx]
@@ -703,6 +715,7 @@ class AppSensorManager @Inject constructor(
                     lift = bufferLift[idx]
                     acoustic = bufferAcoustic[idx]
                     sit = bufferSit[idx]
+                    kinetic = bufferKinetic[idx]
                 }
 
                 if (ts in fromTs..toTs) {
@@ -716,6 +729,7 @@ class AppSensorManager @Inject constructor(
                         this.lift = lift
                         this.acoustic = acoustic
                         this.isSitDetected = sit
+                        this.kineticEnergy = kinetic
                     }
                     yield(flyweight)
                 }
@@ -772,6 +786,12 @@ class AppSensorManager @Inject constructor(
         synchronized(this) { 
             if (delta > internalPeakVibration) internalPeakVibration = delta
             adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta, isWarming) 
+            
+            // Issue #601: Kinetic Energy Anomaly Detection
+            val energyResult = SentinelValidator.updateKineticEnergy(currentKineticEnergy, delta, lastRawVibe, lastHpfValue)
+            currentKineticEnergy = energyResult.first
+            lastHpfValue = energyResult.second
+            lastRawVibe = delta
         }
         
         lastAccelX = x; lastAccelY = y; lastAccelZ = z
@@ -783,6 +803,7 @@ class AppSensorManager @Inject constructor(
         
         currentVibrationIndex = if (vibrationBufferCount > 0) vibrationRollingSum / vibrationBufferCount else 0.0
         if (currentVibrationIndex > secPeakVibe) secPeakVibe = currentVibrationIndex
+        if (currentKineticEnergy > secPeakKinetic) secPeakKinetic = currentKineticEnergy
         
         val nowRt = timeProvider.elapsedRealtime()
         if (plungePhase == 2) { 
@@ -900,6 +921,6 @@ class AppSensorManager @Inject constructor(
         } 
     }
     fun isStationary(): Boolean = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
-    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); synchronized(this) { bufferIdx = 0; bufferCount = 0 } }
+    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = AndroidSensorManager.getAltitude(AndroidSensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; synchronized(this) { bufferIdx = 0; bufferCount = 0 } }
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 }

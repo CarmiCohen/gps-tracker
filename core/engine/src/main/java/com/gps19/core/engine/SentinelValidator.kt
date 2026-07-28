@@ -5,12 +5,12 @@ import kotlin.math.max
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Added updateKineticEnergy 
+ *   to distinguish sustained motion from impulse events using HPF.
  * July.26.04:
  * - Architecture Simplification (Issue #588): Centralized EMA baseline update logic 
  *   to reduce code churn in LocationSentinel. Fixed accelerAlpha typo.
- * v9.3.20:
- * - R405: Samsung A15 Hardening. Removed device-specific isA15 branching. 
- *   Simplified acoustic validation to a single standard.
  */
 object SentinelValidator {
 
@@ -75,6 +75,28 @@ object SentinelValidator {
         } else {
             currentFloor
         }
+    }
+
+    /**
+     * Issue #601: High-Pass Filter for Kinetic Energy.
+     * Separates the "impulse" (tamper) from the "sustained" (motion) signal.
+     */
+    fun updateKineticEnergy(
+        currentEnergy: Double, 
+        currentRawVibe: Double, 
+        lastRawVibe: Double, 
+        lastHpfValue: Double
+    ): Pair<Double, Double> {
+        // High-Pass Filter: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
+        val alphaHpf = VIBRATION_HPF_ALPHA
+        val hpfValue = alphaHpf * (lastHpfValue + currentRawVibe - lastRawVibe)
+        
+        // Rectify and Smooth (EMA) to get "Energy"
+        val instantEnergy = abs(hpfValue)
+        val alphaEnergy = VIBRATION_ENERGY_EMA_ALPHA
+        val nextEnergy = (currentEnergy * (1.0 - alphaEnergy)) + (instantEnergy * alphaEnergy)
+        
+        return Pair(nextEnergy, hpfValue)
     }
 
     /**

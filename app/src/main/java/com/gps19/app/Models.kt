@@ -10,12 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy field.
+ * - Forensic Parity (R118): Added sitVzTs and sitVzRt to ConnectionPoint and TrackerStatus.
  * July.26.04:
  * - Issue #595: Forensic Playback Hardening. Added rt to ConnectionPoint and 
  *   ToggleStrictMode to UiEvent.
- * July.25.08:
- * - Issue #560c: Signaling Pressure Audit. Updated TrackerStatus to 
- *   support isClockRegression in Protobuf serialization.
  */
 
 @Serializable
@@ -102,10 +102,13 @@ data class ConnectionPoint(
     val isSitDetected: Boolean = false,
     val isSitActive: Boolean = false,
     val sitVz: Double = 0.0,
+    val sitVzTs: Long = 0L,
+    val sitVzRt: Long = 0L,
     val sitDz: Double = 0.0,
     val sitBaro: Double = 0.0,
     val sitTilt: Double = 0.0,
-    val sitShock: Double = 0.0
+    val sitShock: Double = 0.0,
+    val kineticEnergy: Double = 0.0
 )
 
 data class ViolationPoint(
@@ -268,7 +271,10 @@ data class TrackerStatus(
     val isSitActive: Boolean = false,
     val lastSitTs: Long = 0L,
     val verticalVelocity: Double = 0.0,
-    val sitVz: Double = 0.0, val sitDz: Double = 0.0,
+    val sitVz: Double = 0.0,
+    val sitVzTs: Long = 0L,
+    val sitVzRt: Long = 0L,
+    val sitDz: Double = 0.0,
     val sitBaro: Double = 0.0,
     val sitTilt: Double = 0.0,
     val sitShock: Double = 0.0,
@@ -277,7 +283,8 @@ data class TrackerStatus(
     val isSuspicious: Boolean = false,
     val tiltIdx: Double = 0.0,
     val baroIdx: Double = 0.0,
-    val micPending: Boolean = false
+    val micPending: Boolean = false,
+    val kineticEnergy: Double = 0.0
 ) : SpatialAnchor {
 
     fun toMap(fromViewer: Boolean): Map<String, Any?> {
@@ -313,8 +320,10 @@ data class TrackerStatus(
             put("snr_idx", snrIdx); put("noise_idx", noiseIdx); put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)
             put("tilt_idx", tiltIdx); put("baro_idx", baroIdx)
             put("is_sit_active", isSitActive)
-            put("sit_vz", sitVz); put("sit_dz", sitDz); put("sit_baro", sitBaro); put("sit_tilt", sitTilt); put("sit_shock", sitShock)
+            put("sit_vz", sitVz); put("sit_vz_ts", sitVzTs); put("sit_vz_rt", sitVzRt)
+            put("sit_dz", sitDz); put("sit_baro", sitBaro); put("sit_tilt", sitTilt); put("sit_shock", sitShock)
             put("vertical_velocity", verticalVelocity)
+            put("kinetic_energy", kineticEnergy)
         }
     }
 
@@ -369,6 +378,8 @@ data class TrackerStatus(
             .setIsSitActive(isSitActive)
             .setLastSitTs(lastSitTs)
             .setSitVz(sitVz)
+            .setSitVzTs(sitVzTs)
+            .setSitVzRt(sitVzRt)
             .setSitDz(sitDz)
             .setSitBaro(sitBaro)
             .setSitTilt(sitTilt)
@@ -381,6 +392,7 @@ data class TrackerStatus(
             .setSentinelStatus(status.name)
             .setLastValidFixRt(lastValidFixRt)
             .setIsClockRegression(isClockRegression)
+            .setKineticEnergy(kineticEnergy)
     }
 
     fun toProto(fromViewer: Boolean): RealtimeStatus {
@@ -492,6 +504,7 @@ data class DashboardState(
     val proximityCm: String = "--", 
     val proximityDebounce: String = "--",
     val rollingVibration: String = "--",
+    val kineticEnergy: String = "--",
     val gpsSpeed: String = "--",     
     val isTamperDetected: Boolean = false,
     val peakShock: String = "--",

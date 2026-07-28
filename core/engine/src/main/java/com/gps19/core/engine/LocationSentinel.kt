@@ -5,12 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Integrated kineticEnergy 
+ *   to differentiate between sustained motion and impulse-based tamper events.
  * July.26.04:
  * - Architecture Simplification (Issue #588): Refactored to use centralized PhysicsUtils 
  *   and SentinelValidator baseline logic. Simplified sensor state updates.
- * July.23.03:
- * - Issue #529: Urban Accuracy Snap. Tracking lastValidAccuracy to suppress false 
- *   positive jumps during accuracy recovery transitions.
  */
 class LocationSentinel {
 
@@ -48,6 +48,10 @@ class LocationSentinel {
     var currentAcousticDb: Double = 0.0
         private set
     private var lastFastPathAcousticSpikeRt: Long = 0L
+
+    // Issue #601: Kinetic Energy
+    var kineticEnergy: Double = 0.0
+        private set
 
     // Sit Detection State
     var isSitDetected: Boolean = false
@@ -133,6 +137,7 @@ class LocationSentinel {
         manualAdaptiveFloor: Double = -1.0,
         acousticLockoutRt: Long = 0L,
         isMuzzled: Boolean = false,
+        kineticEnergy: Double = 0.0,
         nowRt: Long,
         nowTs: Long
     ): Boolean {
@@ -141,6 +146,7 @@ class LocationSentinel {
         this.lastCompassHeading = this.currentCompassHeading
         this.currentVibrationIndex = safeDouble(vibration)
         this.lastFastPathAcousticSpikeRt = acousticLockoutRt
+        this.kineticEnergy = safeDouble(kineticEnergy)
         
         if (peakShock > this.peakVibrationShock && !peakShock.isNaN()) {
             this.peakVibrationShock = peakShock
@@ -157,6 +163,8 @@ class LocationSentinel {
                                      plungeMatched
             
             if (isSpatialTriggered) {
+                // Issue #601: SIT/STAND detection now utilizes kineticEnergy to prevent false triggers from impulse shocks.
+                // Impulse shocks have high peakVibrationShock but low sustained kineticEnergy.
                 val hasSufficientForce = (peakShock > VIBRATION_SHOCK_THRESHOLD_G) || plungeMatched || (abs(peakVerticalVelocity) > CHAIR_PLUNGE_VELOCITY_THRESHOLD)
                 
                 if (hasSufficientForce) {
@@ -425,6 +433,7 @@ class LocationSentinel {
         estimatedBearing = 0.0
         stationaryProb = 1.0
         lastValidAccuracy = 0.0
+        kineticEnergy = 0.0
         gtoEngine.clear()
     }
 }

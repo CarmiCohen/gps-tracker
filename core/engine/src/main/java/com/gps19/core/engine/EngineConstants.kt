@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Added HPF and Energy EMA 
+ *   parameters to distinguish between sustained motion and impulse events.
  * July.27.05:
  * - Issue #600: Forensic Playback Latency Audit. Added dynamic log limits
  *   and retrieval latency thresholds to support strict forensic lookups.
@@ -113,6 +116,10 @@ const val PASSIVE_ZEROING_STATIONARY_MS = 300000L
 const val ROTATION_INIT_STATIONARY_MS = 3000L
 const val BARO_ZEROING_INTERVAL_MS = 300000L 
 const val SPIKE_DEBOUNCE_MS = 5000L
+
+// Issue #601: Kinetic Energy Anomaly Detection
+const val VIBRATION_HPF_ALPHA = 0.9 // DC-removal for Kinetic Energy
+const val VIBRATION_ENERGY_EMA_ALPHA = 0.1 // Kinetic Energy smoothing
 
 // Sitting Detection: Chair Plunge (R999b)
 const val CHAIR_PLUNGE_PHASE_TIMEOUT_MS = 5000L

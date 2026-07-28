@@ -5,13 +5,11 @@ import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy mapping 
+ *   to maintain forensic parity across telemetry streams.
  * July.22.01:
  * - Forensic Parity: Added mapping for tiltIdx, baroIdx, noiseIdx, luxIdx, vibeIdx, and liftIdx.
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor.
- * July.21.00:
- * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamps to 'Rt'.
- * - Issue #516: De-duplicate "Status" Logic. Using SystemHealthState for all health/sensor metadata.
  */
 class TelemetryUseCase @Inject constructor(
     private val timeProvider: TimeProvider
@@ -113,7 +111,8 @@ class TelemetryUseCase @Inject constructor(
             sitDz = update.sitDz ?: current.sitDz,
             sitBaro = update.sitBaro ?: current.sitBaro,
             sitTilt = update.sitTilt ?: current.sitTilt,
-            sitShock = update.sitShock ?: current.sitShock
+            sitShock = update.sitShock ?: current.sitShock,
+            kineticEnergy = update.kineticEnergy
         )
     }
 
@@ -181,7 +180,8 @@ class TelemetryUseCase @Inject constructor(
             sitDz = status.sitDz,
             sitBaro = status.sitBaro,
             sitTilt = status.sitTilt,
-            sitShock = status.sitShock
+            sitShock = status.sitShock,
+            kineticEnergy = status.kineticEnergy
         )
     }
 

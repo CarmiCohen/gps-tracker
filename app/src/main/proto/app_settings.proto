@@ -167,6 +167,13 @@ message RealtimeStatus {
 
     // Issue #560c: Signaling Pressure Audit - Carry regression flag in binary payloads
     bool is_clock_regression = 58;
+
+    // Issue #601: Kinetic Energy Anomaly Detection
+    double kinetic_energy = 59;
+
+    // Forensic Parity (R118): Added missing SIT timestamps
+    int64 sit_vz_ts = 60;
+    int64 sit_vz_rt = 61;
 }
 
 message GeoPointProto {
@@ -264,4 +271,11 @@ message TrackerStatusProto {
     reserved 63;
     string tracker_state = 64;
     optional string status = 65;
+
+    // Issue #601: Kinetic Energy Anomaly Detection
+    double kinetic_energy = 66;
+
+    // Forensic Parity (R118): Added missing SIT timestamps
+    int64 sit_vz_ts = 67;
+    int64 sit_vz_rt = 68;
 }

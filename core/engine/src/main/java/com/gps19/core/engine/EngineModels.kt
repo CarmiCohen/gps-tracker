@@ -4,14 +4,15 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy field 
+ *   to forensic and telemetry models for motion analysis.
  * July.25.02:
  * - Issue #570: Forensic Snapshot Pooling. Refactored EngineConnectionPoint to 
  *   a mutable class to eliminate heap churn during forensic backfilling.
  * July.25.03:
  * - Issue #570: Forensic Snapshot Pooling. Refactored EngineSensorSnapshot and 
  *   EngineSnrSample to mutable classes to eliminate forensic backfill churn.
- * July.23.07:
- * - Issue #113: Hardened HardwareCapabilities for Samsung A15 stabilization.
  */
 
 @Serializable
@@ -99,7 +100,8 @@ class EngineConnectionPoint(
     var sitDz: Double = 0.0,
     var sitBaro: Double = 0.0,
     var sitTilt: Double = 0.0,
-    var sitShock: Double = 0.0
+    var sitShock: Double = 0.0,
+    var kineticEnergy: Double = 0.0
 ) {
     fun copyFrom(other: EngineConnectionPoint) {
         this.ts = other.ts
@@ -135,6 +137,7 @@ class EngineConnectionPoint(
         this.sitBaro = other.sitBaro
         this.sitTilt = other.sitTilt
         this.sitShock = other.sitShock
+        this.kineticEnergy = other.kineticEnergy
     }
 }
 
@@ -168,7 +171,8 @@ class EngineSensorSnapshot(
     var proxIdx: Double = 1.0,
     var lift: Double = 0.0,
     var tilt: Double = 0.0,
-    var isSitDetected: Boolean = false
+    var isSitDetected: Boolean = false,
+    var kineticEnergy: Double = 0.0
 ) {
     fun copyFrom(other: EngineSensorSnapshot) {
         this.ts = other.ts
@@ -180,6 +184,7 @@ class EngineSensorSnapshot(
         this.lift = other.lift
         this.tilt = other.tilt
         this.isSitDetected = other.isSitDetected
+        this.kineticEnergy = other.kineticEnergy
     }
 }
 

@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.27.05 (Forensic Latency Audited)
+# System Source of Truth (SoT) - July.27.06 (Kinetic Energy Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -28,6 +28,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **UI Component De-coupling (R598)**: High-frequency data streams (e.g., event logs) MUST be collected locally within their UI components using lifecycle-aware collectors. Top-level screen Composables MUST NOT collect these flows to prevent global re-composition jitter during signaling stress. (Issue #598, July.27.04)
 *   **Ribbon Rendering Optimization (R598b)**: Analytical ribbons and heavy forensic visualizations MUST cache static drawing parameters and utilize optimized O(N) draw loops to minimize Main-thread contention. (Issue #598, July.27.04)
 *   **Forensic Retrieval Auditing (R600)**: Log retrieval flows MUST utilize context-aware buffering (STRICT mode expansion) and be monitored via `LatencyMonitor` with a 200ms threshold to ensure historical lookups do not contend with real-time telemetry writes. (Issue #600, July.27.05)
+*   **Kinetic Energy Anomaly Detection (R601)**: The Vibration sensor MUST utilize a centralized High-Pass Filter (HPF) and Energy EMA to distinguish between impulse shocks and sustained motion. SIT/STAND detection MUST prioritize `kineticEnergy` stability to prevent false triggers from tamper events. (Issue #601, July.27.06)
 
 ### 2. Architectural Integrity & Centralization
 *   **Consolidated Constants (R597)**: All engine-specific thresholds, tuning parameters, and system-wide default values MUST be centralized in `core:engine:EngineConstants.kt`. (Issue #597, July.27.00)
@@ -35,7 +36,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 
 ### 3. Temporal & Forensic Integrity
 *   **Temporal Forensic Integrity (R102)**: Logic MUST use monotonic `rt` for calculations, while forensic logs use wall-clock `ts`. (Issue #102)
-*   **Forensic Parity Authority (R118)**: Strict field parity MUST be maintained across engine, persistence, telemetry, and UI layers. (Issue #118, #122, #525)
+*   **Forensic Parity Authority (R118)**: Strict field parity MUST be maintained across engine, persistence, telemetry, and UI layers. (Issue #118, #122, #525, #601)
 *   **Strict Forensic Reconstruction (R595)**: The Analytical Ribbon UI MUST provide a "Strict Mode" that validates packet sequence continuity and clock-drift corrections. Hidden gaps and drift anomalies MUST be visually highlighted to ensure data integrity during historical playback. (Issue #595, July.26.04)
 *   **Direct Binary Flow (R541)**: Telemetry MUST prioritize the raw Protobuf binary path. (Issue #541, July.24.05)
 
@@ -50,5 +51,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.27.05.
+*   **Current Release**: July.27.06.
 *   **Source of Truth**: app/build.gradle versionName.

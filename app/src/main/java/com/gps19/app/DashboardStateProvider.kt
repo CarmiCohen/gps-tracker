@@ -7,11 +7,11 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard states.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy formatting 
+ *   to DashboardState for forensic motion analysis.
  * July.25.03:
  * - Issue #560: Alignment with DashboardState field renaming (trackerCurrentMa).
- * July.24.08:
- * - Issue #547: State Decomposition. Updated buildDashboardState to accept 
- *   TelemetryState separately to reduce heap churn.
  */
 interface DashboardStateProvider {
     fun buildDashboardState(
@@ -118,6 +118,7 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             proximityCm = sensorVal(if (health.proximityCm >= 0) "${health.proximityCm.toInt()}cm" else "--"),
             proximityDebounce = forensicVal("${health.proximityDebounceMs}ms"),
             rollingVibration = forensicVal("%.3fG".format(Locale.getDefault(), health.vibrationRollingSum)),
+            kineticEnergy = forensicVal("%.3fG".format(Locale.getDefault(), health.kineticEnergy)),
             gpsSpeed = gpsVal("%.1fkm/h".format(Locale.getDefault(), loc.speed * 3.6)),
             trackerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), trackerMaxTemp)),
             viewerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), localMaxTemp)),

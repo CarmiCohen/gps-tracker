@@ -32,10 +32,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Integrated kineticEnergy 
+ *   into signaling pipeline and status extraction.
  * July.27.00:
  * - Issue #596: Signaling Reliability Audit. Promoted telemetry (location_update_bin) 
  *   to HIGH priority to bypass throttled forensic log queue.
- * - Architecture Audit: Updated to use centralized PreferenceKeys and fixed build errors.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -148,6 +150,7 @@ class ConnectivitySuite @Inject constructor(
     val trackerLastDiscTs get() = trackerStatus.lastDiscTs
     var trackerGpsStallStartTs = 0L 
     val trackerDistToHome get() = trackerStatus.sitDz 
+    val trackerKineticEnergy get() = trackerStatus.kineticEnergy
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -354,7 +357,8 @@ class ConnectivitySuite @Inject constructor(
                 isCoolingModeActive = entity.isCoolingModeActive, battery = entity.battery, temp = entity.temp, isCharging = entity.isCharging,
                 trackerState = try { TrackerState.valueOf(entity.trackerState) } catch(e: Exception) { TrackerState.UNKNOWN },
                 isStorageLow = entity.isStorageLow, isStorageCritical = entity.isStorageCritical,
-                isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface
+                isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface,
+                kineticEnergy = 0.0
             )
             // Issue #596: Flushed updates use NORMAL to avoid blocking live traffic.
             if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) offlineRepository.deletePendingStatusUpdate(entity.id)
@@ -389,6 +393,9 @@ class ConnectivitySuite @Inject constructor(
         if (!isConnected()) return false
         if (isTrackerMode) {
             status.writeTo(statusBuilder, false)
+            // Issue #601: Carry kinetic energy in binary payloads
+            statusBuilder.setKineticEnergy(status.kineticEnergy)
+            
             val message = statusBuilder.buildPartial()
             val size = message.serializedSize
             
@@ -444,7 +451,8 @@ class ConnectivitySuite @Inject constructor(
         vibeIdx: Double = 0.0,
         liftIdx: Double = 0.0,
         tiltIdx: Double = 0.0,
-        baroIdx: Double = 0.0
+        baroIdx: Double = 0.0,
+        kineticEnergy: Double = 0.0
     ) {
         val trackerStatus = TrackerStatus(
             deviceId = deviceId, viewerId = viewerId, ts = timeProvider.currentTimeMillis(),
@@ -468,7 +476,8 @@ class ConnectivitySuite @Inject constructor(
             snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, liftIdx = liftIdx,
             tiltIdx = tiltIdx, baroIdx = baroIdx,
             micPending = micPending, isSitDetected = isSitDetected, isSitActive = isSitActive, lastSitTs = lastSitTs,
-            verticalVelocity = verticalVelocity, sitVz = sitVz, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock
+            verticalVelocity = verticalVelocity, sitVz = sitVz, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
+            kineticEnergy = kineticEnergy
         )
         sendTelemetry(trackerStatus)
     }
@@ -520,6 +529,7 @@ class ConnectivitySuite @Inject constructor(
                     providedJumpTier = statusProto.jumpTier, providedIsJammer = statusProto.isJammer, 
                     providedIsStalled = statusProto.isStalled,
                     providedIsTamper = statusProto.isTamperDetected || statusProto.isLocationPending,
+                    providedKineticEnergy = statusProto.kineticEnergy,
                     nowWall = now, nowRt = nowRt
                 )
                 
@@ -563,7 +573,8 @@ class ConnectivitySuite @Inject constructor(
                     isJammer = statusProto.isJammer,
                     isStalled = statusProto.isStalled,
                     isTamperDetected = statusProto.isTamperDetected,
-                    jumpTier = statusProto.jumpTier
+                    jumpTier = statusProto.jumpTier,
+                    kineticEnergy = statusProto.kineticEnergy
                 )
 
                 scope.launch {
@@ -580,7 +591,8 @@ class ConnectivitySuite @Inject constructor(
                         tiltIdx = updatedStatus.tiltIdx, baroIdx = updatedStatus.baroIdx,
                         isSitDetected = updatedStatus.isSitDetected, lastSitTs = updatedStatus.lastSitTs,
                         verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitDz = updatedStatus.sitDz,
-                        sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock
+                        sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock,
+                        kineticEnergy = updatedStatus.kineticEnergy
                     ))
                 }
                 updatedStatus
@@ -672,6 +684,7 @@ class ConnectivitySuite @Inject constructor(
                         satsUsed = data.optInt("sats_used", current.satsUsed), isViewerTrail = false, lastGpsTs = current.gpsTs,
                         providedMaxAccuracy = data.optDouble("max_accuracy", 0.0), providedJumpTier = data.optInt("jump_tier", 0), providedIsJammer = data.optBoolean("is_jammer", false),
                         providedIsStalled = data.optBoolean("is_stalled", false), providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending || trackerStatus == SentinelStatus.TAMPER,
+                        providedKineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy),
                         nowWall = now, nowRt = nowRt
                     )
                     isClockReg = processed.isClockRegression
@@ -691,7 +704,7 @@ class ConnectivitySuite @Inject constructor(
                     baroAlt = data.optDouble("baro_alt", current.baroAlt), lux = data.optDouble("lux", current.lux), isNear = data.optBoolean("is_near", current.isNear),
                     powerTamper = isTrackerPowerTamper, tiltDegrees = data.optDouble("tilt_degrees", current.tiltDegrees), 
                     acousticDb = data.optDouble("acoustic_db", current.acousticDb), peakShock = data.optDouble("peak_vibration_shock", current.peakVibrationShock),
-                    acousticMinDb = -1.0, nowRt = nowRt, nowTs = now
+                    acousticMinDb = -1.0, kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy), nowRt = nowRt, nowTs = now
                 )
 
                 if (data.optBoolean("is_stalled", false) && trackerGpsStallStartTs == 0L) trackerGpsStallStartTs = nowRt else if (!data.optBoolean("is_stalled", false)) trackerGpsStallStartTs = 0L
@@ -727,8 +740,10 @@ class ConnectivitySuite @Inject constructor(
                     isSitDetected = data.optBoolean("is_sit_detected", current.isSitDetected), lastSitTs = data.optLong("last_sit_ts", current.lastSitTs),
                     isSuspicious = data.optBoolean("is_suspicious", current.isSuspicious), isAnchorLocked = data.optBoolean("is_anchor_locked", current.isAnchorLocked),
                     verticalVelocity = data.optDouble("vertical_velocity", current.verticalVelocity),
-                    sitVz = data.optDouble("sit_vz", current.sitVz), sitDz = data.optDouble("sit_dz", current.sitDz),
-                    sitBaro = data.optDouble("sit_baro", current.sitBaro), sitTilt = data.optDouble("sit_tilt", current.sitTilt), sitShock = data.optDouble("sit_shock", current.sitShock)
+                    sitVz = data.optDouble("sit_vz", current.sitVz), sitVzTs = data.optLong("sit_vz_ts", 0L), sitVzRt = data.optLong("sit_vz_rt", 0L),
+                    sitDz = data.optDouble("sit_dz", current.sitDz),
+                    sitBaro = data.optDouble("sit_baro", current.sitBaro), sitTilt = data.optDouble("sit_tilt", current.sitTilt), sitShock = data.optDouble("sit_shock", current.sitShock),
+                    kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy)
                 )
 
                 scope.launch {
@@ -745,7 +760,8 @@ class ConnectivitySuite @Inject constructor(
                         tiltIdx = updatedStatus.tiltIdx, baroIdx = updatedStatus.baroIdx,
                         isSitDetected = updatedStatus.isSitDetected, lastSitTs = updatedStatus.lastSitTs,
                         verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitDz = updatedStatus.sitDz,
-                        sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock
+                        sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock,
+                        kineticEnergy = updatedStatus.kineticEnergy
                     ))
                 }
                 updatedStatus

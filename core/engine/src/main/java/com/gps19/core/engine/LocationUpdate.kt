@@ -4,11 +4,11 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy field.
+ * - Forensic Parity (R118): Added sitVzTs and sitVzRt to maintain parity with LocationSentinel.
  * July.22.01:
  * - Forensic Parity: Added missing indices (noiseIdx, luxIdx, vibeIdx, liftIdx).
- * July.21.00:
- * - Forensic Hardening: Added missing sit-detection and forensic index fields.
- * - Issue #102: Temporal Forensic Integrity. Standardized 'rt' and 'ts'.
  */
 @Serializable
 data class LocationUpdate(
@@ -78,8 +78,11 @@ data class LocationUpdate(
     val lastSitTs: Long = 0L,
     val verticalVelocity: Double = 0.0,
     val sitVz: Double = 0.0,
+    val sitVzTs: Long = 0L,
+    val sitVzRt: Long = 0L,
     val sitDz: Double = 0.0,
     val sitBaro: Double = 0.0,
     val sitTilt: Double = 0.0,
-    val sitShock: Double = 0.0
+    val sitShock: Double = 0.0,
+    val kineticEnergy: Double = 0.0
 )

@@ -4,13 +4,12 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy aggregation 
+ *   to forensic ribbons for motion analysis.
  * July.25.10:
  * - Issue #570b: Flyweight Thread Safety Audit. Moved fillPointFlyweight to 
  *   method scope in backfillGaps to ensure thread safety across concurrent callers.
- * July.25.02:
- * - Issue #570: Forensic Snapshot Pooling. Refactored backfillGaps and 
- *   fillRealGap to use a reusable flyweight EngineConnectionPoint, achieving 
- *   zero-churn during forensic reconstruction.
  */
 class TelemetryAggregator {
 
@@ -60,6 +59,7 @@ class TelemetryAggregator {
         var baroIdx: Double = 0.0
         var isSitDetected: Boolean = false
         var isSitActive: Boolean = false
+        var kineticEnergy: Double = 0.0
 
         fun reset(point: EngineConnectionPoint) {
             rtt = point.rtt
@@ -85,6 +85,7 @@ class TelemetryAggregator {
             baroIdx = point.baroIdx
             isSitDetected = point.isSitDetected
             isSitActive = point.isSitActive
+            kineticEnergy = point.kineticEnergy
         }
 
         fun merge(cur: EngineConnectionPoint) {
@@ -111,6 +112,7 @@ class TelemetryAggregator {
             baroIdx = max(baroIdx, cur.baroIdx)
             isSitDetected = isSitDetected || cur.isSitDetected
             isSitActive = isSitActive || cur.isSitActive
+            kineticEnergy = max(kineticEnergy, cur.kineticEnergy)
         }
 
         fun toImmutable(base: EngineConnectionPoint, isTick: Boolean): EngineConnectionPoint {
@@ -139,6 +141,7 @@ class TelemetryAggregator {
                 this.baroIdx = this@MutableAggregationPoint.baroIdx
                 this.isSitDetected = this@MutableAggregationPoint.isSitDetected
                 this.isSitActive = this@MutableAggregationPoint.isSitActive
+                this.kineticEnergy = this@MutableAggregationPoint.kineticEnergy
                 this.isTick = isTick
             }
         }
@@ -225,6 +228,7 @@ class TelemetryAggregator {
             val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: baseTemplate.tiltIdx
             val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.baroIdx
             val resolvedSit = snapshot?.isSitDetected ?: false
+            val resolvedKinetic = snapshot?.kineticEnergy ?: baseTemplate.kineticEnergy
 
             fillPointFlyweight.apply {
                 copyFrom(baseTemplate)
@@ -240,6 +244,7 @@ class TelemetryAggregator {
                 tiltIdx = resolvedTilt
                 baroIdx = resolvedBaro
                 isSitDetected = resolvedSit
+                kineticEnergy = resolvedKinetic
             }
 
             results.addAll(processPoint(fillPointFlyweight))
@@ -306,6 +311,7 @@ class TelemetryAggregator {
             val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: 0.0
             val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
             val resolvedSit = snapshot?.isSitDetected ?: false
+            val resolvedKinetic = snapshot?.kineticEnergy ?: 0.0
 
             gapPoints.add(EngineConnectionPoint(
                 ts = currentRt + rtToTsOffset,
@@ -323,6 +329,7 @@ class TelemetryAggregator {
                 tiltIdx = resolvedTilt,
                 baroIdx = resolvedBaro,
                 isSitDetected = resolvedSit,
+                kineticEnergy = resolvedKinetic,
                 isTick = isScaleTick(getScaleByKey(ribbonKey), totalSeconds),
                 currentMa = 0,
                 locationPendingReason = LocationPendingReason.NONE

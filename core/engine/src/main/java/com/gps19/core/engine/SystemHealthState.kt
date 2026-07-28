@@ -4,12 +4,11 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * July.27.06:
+ * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy field 
+ *   to maintain forensic parity with sensor processing.
  * July.22.01:
  * - Forensic Parity: Added missing indices (noiseIdx, luxIdx, vibeIdx, liftIdx, tiltIdx, baroIdx).
- * July.20.07:
- * - Renamed lastValidFixRealtime to lastValidFixRt (Issue #102).
- * - Added Forensic Sit Detection fields.
- * - Added snrIdx for GNSS health tracking.
  */
 @Serializable
 data class SystemHealthState(
@@ -77,6 +76,7 @@ data class SystemHealthState(
     val proximityCm: Double = -1.0,
     val proximityDebounceMs: Long = 0L,
     val vibrationRollingSum: Double = 0.0,
+    val kineticEnergy: Double = 0.0,
 
     // Forensic Sit Detection (Issue #102/R990)
     val isSitDetected: Boolean = false,
