@@ -21,10 +21,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.28.23:
+ * - Issue #618: Forensic UI State Collection Audit. Migrated all UI-bound 
+ *   observations and collectors to Dispatchers.Main.immediate to eliminate 
+ *   dispatch latency and micro-stuttering on A15 hardware.
  * July.27.13:
- * - A15 Hardening (Extreme): Implemented 3000ms sampling on dashboard and logs 
- *   to survive cold-start I/O storms on budget hardware. Opted into FlowPreview.
- * - Issue #600: Forensic Playback Latency Audit.
+ * - A15 Hardening (Extreme): Implemented 3000ms sampling on dashboard and logs.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -104,7 +106,6 @@ class MainViewModel @Inject constructor(
 
     /**
      * Dashboard State Pipeline: Hardened for A15.
-     * Aggressive sampling to ensure UI thread remains responsive for input events.
      */
     val dashboardState: StateFlow<DashboardState> = combine(
         _uiState, _telemetryState, _systemPulse, _trackerState, _localMaxTemp, _trackerMaxTemp
@@ -157,12 +158,11 @@ class MainViewModel @Inject constructor(
     private var isHeavyObservationStarted = false
 
     init {
-        viewModelScope.launch(uiExceptionHandler) {
+        viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
             loadInitialData()
             delay(200) 
             updateState { it.copy(isInitialized = true) }
             
-            // Extreme Cold-Start Hardening: Defer pruning significantly to prioritize setup input dispatch
             viewModelScope.launch(Dispatchers.IO) { 
                 delay(10000)
                 repository.proactivePruning() 
@@ -170,7 +170,7 @@ class MainViewModel @Inject constructor(
             
             startBaseObservations()
             startGlobalTimer()
-            viewModelScope.launch {
+            viewModelScope.launch(Dispatchers.Main.immediate) {
                 _uiState.filter { it.appMode != null }.first()
                 startHeavyObservations()
             }
@@ -187,17 +187,20 @@ class MainViewModel @Inject constructor(
                     appMode = update.appMode, isSystemActive = update.isSystemActive,
                     permissions = it.permissions.copy(isManualOverride = update.isXiaomiManualOverride)
                 )}
-            }.launchIn(viewModelScope)
+            }
+            .flowOn(Dispatchers.Main.immediate)
+            .launchIn(viewModelScope)
 
         stateSubscriptionUseCase.observeInternetStatus()
             .onEach { online -> updateTelemetryState { it.copy(connectivity = it.connectivity.copy(isLocalOnline = online)) } }
+            .flowOn(Dispatchers.Main.immediate)
             .launchIn(viewModelScope)
         
         viewModelScope.launch(Dispatchers.IO) { 
             while(true) { 
                 val newState = systemStatusProvider.getPermissionState()
                 val isA15 = systemStatusProvider.isA15Hardware()
-                withContext(Dispatchers.Main) { 
+                withContext(Dispatchers.Main.immediate) { 
                     updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
                 }
                 val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
@@ -205,7 +208,10 @@ class MainViewModel @Inject constructor(
             } 
         }
 
-        repository.identitySanitizedFlow.onEach { sanitized -> updateState { it.copy(isIdentitySanitized = sanitized) } }.launchIn(viewModelScope)
+        repository.identitySanitizedFlow
+            .onEach { sanitized -> updateState { it.copy(isIdentitySanitized = sanitized) } }
+            .flowOn(Dispatchers.Main.immediate)
+            .launchIn(viewModelScope)
     }
 
     private fun startHeavyObservations() {
@@ -217,7 +223,9 @@ class MainViewModel @Inject constructor(
             .onEach { update ->
                 _rtt.value = update.lastRtt
                 updateTelemetryState { current -> current.copy(connectivity = current.connectivity.copy(isRelayConnected = update.isRelayConnected, lastRemoteActivityTs = update.lastRemoteActivityTs))}
-            }.launchIn(viewModelScope)
+            }
+            .flowOn(Dispatchers.Main.immediate)
+            .launchIn(viewModelScope)
 
         stateSubscriptionUseCase.observeIntegrityUpdates()
             .distinctUntilChanged()
@@ -240,7 +248,9 @@ class MainViewModel @Inject constructor(
                 lastKnownAlarmTypes = update.activeAlarmTypes
                 _localMaxTemp.value = update.maxTemp
                 if (_uiState.value.appMode == "tracker") _trackerMaxTemp.value = update.maxTemp
-            }.launchIn(viewModelScope)
+            }
+            .flowOn(Dispatchers.Main.immediate)
+            .launchIn(viewModelScope)
 
         stateSubscriptionUseCase.observeBatteryStatus().onEach { status -> 
             updateTelemetryState { current -> current.copy(
@@ -248,14 +258,16 @@ class MainViewModel @Inject constructor(
                 trackerBattery = if (_uiState.value.appMode == "tracker") current.trackerBattery.copy(level = status.level, temp = status.temp, isCharging = status.isCharging, isChargingStable = status.isCharging) else current.trackerBattery
             ) } 
             _currentMa.value = status.currentMa
-        }.launchIn(viewModelScope)
+        }
+        .flowOn(Dispatchers.Main.immediate)
+        .launchIn(viewModelScope)
 
-        stateSubscriptionUseCase.observeGnssDetail().distinctUntilChanged().onEach { _gnssDetail.value = it }.launchIn(viewModelScope)
-        stateSubscriptionUseCase.observeGpsIndex().distinctUntilChanged().onEach { _gpsIndexData.value = it }.launchIn(viewModelScope)
+        stateSubscriptionUseCase.observeGnssDetail().distinctUntilChanged().onEach { _gnssDetail.value = it }.flowOn(Dispatchers.Main.immediate).launchIn(viewModelScope)
+        stateSubscriptionUseCase.observeGpsIndex().distinctUntilChanged().onEach { _gpsIndexData.value = it }.flowOn(Dispatchers.Main.immediate).launchIn(viewModelScope)
 
-        viewModelScope.launch { repository.localLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
-        viewModelScope.launch { repository.trackerLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
-        viewModelScope.launch { repository.connectedViewers.collect { viewers -> updateTelemetryState { it.copy(connectivity = it.connectivity.copy(connectedViewers = viewers)) } } }
+        viewModelScope.launch(Dispatchers.Main.immediate) { repository.localLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
+        viewModelScope.launch(Dispatchers.Main.immediate) { repository.trackerLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
+        viewModelScope.launch(Dispatchers.Main.immediate) { repository.connectedViewers.collect { viewers -> updateTelemetryState { it.copy(connectivity = it.connectivity.copy(connectedViewers = viewers)) } } }
 
         remoteStatusRepository.remoteStatus.onEach { status ->
             if (_uiState.value.appMode == "viewer") {
@@ -281,7 +293,9 @@ class MainViewModel @Inject constructor(
                     )
                 }
             }
-        }.launchIn(viewModelScope)
+        }
+        .flowOn(Dispatchers.Main.immediate)
+        .launchIn(viewModelScope)
 
         stateSubscriptionUseCase.startHistoryObservations(viewModelScope)
     }
@@ -351,7 +365,7 @@ class MainViewModel @Inject constructor(
             is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
                 val oldState = _uiState.value.permissions
                 val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
-                withContext(Dispatchers.Main) { 
+                withContext(Dispatchers.Main.immediate) { 
                     updateState { it.copy(permissions = newState.copy(isA15Device = systemStatusProvider.isA15Hardware())) } 
                     if (!oldState.isActivityRecognitionGranted && newState.isActivityRecognitionGranted) {
                         Timber.i("Issue #098: ACTIVITY_RECOGNITION granted. Triggering reactive sensor sync.")
@@ -417,7 +431,7 @@ class MainViewModel @Inject constructor(
             val result = settingsUseCase.commitDraft()
             
             if (result.error != null) {
-                withContext(Dispatchers.Main) {
+                withContext(Dispatchers.Main.immediate) {
                     Toast.makeText(context, "Commit Failed: ${result.error}", Toast.LENGTH_LONG).show()
                 }
                 addPersistentLog("error", "Settings Commit Failed: ${result.error}", true)
@@ -532,7 +546,7 @@ class MainViewModel @Inject constructor(
     private fun updateNavigation(update: (NavigationState) -> NavigationState) { updateState { it.copy(navigation = update(it.navigation)) } }
 
     private fun startGlobalTimer() {
-        viewModelScope.launch(Dispatchers.Main + uiExceptionHandler) {
+        viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
             while (true) {
                 val stateSnapshot = _uiState.value
                 val teleSnapshot = _telemetryState.value
@@ -550,7 +564,7 @@ class MainViewModel @Inject constructor(
                         val newState = behaviorUseCase.computeTrackerState(currentUi, currentTele, now)
                         val shouldShowRedScreen = behaviorUseCase.shouldShowRedScreen(currentUi, currentTele, nowRt, lastAlarmAckRt, currentTele.isRedScreenVisible)
                         
-                        withContext(Dispatchers.Main) {
+                        withContext(Dispatchers.Main.immediate) {
                             if (newState != _trackerState.value && newState != TrackerState.UNKNOWN) {
                                 addPersistentLog("event", "Tracker is $newState", true)
                             }
@@ -627,7 +641,7 @@ class MainViewModel @Inject constructor(
     private fun loadInitialData() {
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             val initial = settingsUseCase.loadAllSettings()
-            withContext(Dispatchers.Main) {
+            withContext(Dispatchers.Main.immediate) {
                 appStartTime = initial.appStartTime
                 updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, isSystemActive = initial.isSystemActive, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings, isIdentitySanitized = initial.identitySanitized) }
                 _localMaxTemp.value = initial.maxTemp; if (initial.appMode == "tracker") _trackerMaxTemp.value = initial.maxTemp
@@ -652,7 +666,7 @@ class MainViewModel @Inject constructor(
     fun addPersistentLog(type: String, message: String, isImportant: Boolean = false, isSpecial: Boolean = false, specialColor: Int? = null) { logManager.submitToLogSink(message = message, type = type, important = isImportant, isSpecial = isSpecial, specialColor = specialColor) }
 
     fun fullInitialization(context: Context) {
-        viewModelScope.launch(uiExceptionHandler) {
+        viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
             appStartTime = settingsUseCase.fullInitialization(context)
             remoteStatusRepository.reset()
             updateState { state -> state.copy(appStartTime = appStartTime, geofenceMode = GeofenceMode.IDLE, draftSettings = DraftSettings(), isIdentitySanitized = false) }

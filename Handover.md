@@ -1,56 +1,48 @@
-# Handover (July.28.2233) - Global SharedFlow Audit [READY]
+# Handover (July.28.2326) - UI State Collection Audit [READY]
 
 ## 🎯 Completed Objective
-Cycle **July.28.2233** achieved **453 Resolved Issues** (Cumulative).
-1.  **[Issue #617] [Category: Structural] Global SharedFlow Audit**:
-    - **Audit**: Conducted a project-wide search for `MutableSharedFlow` instances.
-    - **Remediation**: Hardened 10 critical components (`AppSensorManager`, `CommunicationManager`, `HistoryManager`, `AppAlarmManager`, `SystemMonitor`, `LocationProcessor`, `ConnectivitySuite`, `IntegrityMonitor`, `CommandRouter`, and `GpsManager`) with `BufferOverflow.DROP_OLDEST`.
-    - **Impact**: Guarantees that the core logic and hardware callback threads are never suspended by slow UI observers or heavy forensic logging.
-    - **Authority**: Added **R617** (Global SharedFlow Overflow Strategy) to `SOT_MASTER_REQUIREMENTS.md`.
+Cycle **July.28.2326** achieved **454 Resolved Issues** (Cumulative).
+1.  **[Issue #618] [Category: Performance] Forensic: UI State Collection Audit**:
+    - **Remediation**: Migrated all UI-bound `collect` and `launchIn` observers in `MainViewModel.kt` and `StateSubscriptionUseCase.kt` to `Dispatchers.Main.immediate`.
+    - **Hardening**: Verified that A15-specific sampling (3000ms) is applied to the `dashboardState` and `eventLogsFlow` to ensure UI thread availability.
+    - **Impact**: Eliminates dispatch latency jitter and micro-stuttering on restricted hardware by ensuring state updates bypass the Coroutine event loop when already on the Main thread.
+    - **Authority**: Added **R618** (Forensic UI State Collection Policy) to `SOT_MASTER_REQUIREMENTS.md`.
 
 ## 📊 Status Tracker
+- **[Issue #618] UI State Collection Audit**: 🟢 Resolved.
 - **[Issue #617] Global SharedFlow Audit**: 🟢 Resolved.
-- **[Issue #616] Repository Event Pipeline Hardening**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
 - **Build Status**: 🟢 SUCCESS (Verified via `:app:assembleDebug`).
-- **Version**: **July.28.2233**.
-- **Requirement Parity**: Added **R617**.
+- **Version**: **July.28.2326**.
+- **Requirement Parity**: Added **R618**.
 
 ### 🧬 Forensic Change Log
 | File | Change Type | Purpose |
 | :--- | :--- | :--- |
-| `app/src/main/java/com/gps19/app/AppSensorManager.kt` | Hardening | Applied `DROP_OLDEST` to `_sensorEvents`. |
-| `app/src/main/java/com/gps19/app/CommunicationManager.kt` | Hardening | Applied `DROP_OLDEST` to `_signalingFlow`. |
-| `app/src/main/java/com/gps19/app/HistoryManager.kt` | Hardening | Applied `DROP_OLDEST` to `_historyEvents`. |
-| `app/src/main/java/com/gps19/app/AppAlarmManager.kt` | Hardening | Applied `DROP_OLDEST` to `_alarmEvents`. |
-| `app/src/main/java/com/gps19/app/SystemMonitor.kt` | Hardening | Applied `DROP_OLDEST` to `_systemMonitorEvents`. |
-| `core/engine/src/main/java/com/gps19/core/engine/LocationProcessor.kt` | Hardening | Applied `DROP_OLDEST` to `_processorEvents`. |
-| `app/src/main/java/com/gps19/app/ConnectivitySuite.kt` | Hardening | Applied `DROP_OLDEST` to `_connectivityEvents`. |
-| `app/src/main/java/com/gps19/app/IntegrityMonitor.kt` | Hardening | Applied `DROP_OLDEST` to `_integrityEvents`. |
-| `app/src/main/java/com/gps19/app/CommandRouter.kt` | Hardening | Applied `DROP_OLDEST` to `_commandEvents`. |
-| `app/src/main/java/com/gps19/app/GpsManager.kt` | Hardening | Applied `DROP_OLDEST` to `_internalGpsFlow`. |
-| `STATUS/SOT_MASTER_REQUIREMENTS.md` | Authority Update | Added **R617** specifying global overflow policy. |
-| `issues.md` | Documentation | Resolved #617; Total count 453. |
-| `app/build.gradle` | Versioning | Updated `versionName` to `July.28.2233`. |
+| `app/src/main/java/com/gps19/app/MainViewModel.kt` | Performance | Migrated UI collectors to `Dispatchers.Main.immediate`. |
+| `app/src/main/java/com/gps19/app/StateSubscriptionUseCase.kt` | Performance | Migrated history observations to `Dispatchers.Main.immediate`. |
+| `STATUS/SOT_MASTER_REQUIREMENTS.md` | Authority Update | Added **R618** specifying Main.immediate policy for UI. |
+| `issues.md` | Documentation | Resolved #618; Total count 454. |
+| `app/build.gradle` | Versioning | Updated `versionName` to `July.28.2326`. |
 
 ## 💡 Simplification Ideas
-- **Event Bus Consolidation**: Now that all flows are standardized, consider moving towards a centralized "SystemEventBus" for non-kinematic logging to reduce the number of individual `MutableSharedFlow` declarations in manager classes.
-- **Buffer Capacity Audit**: Evaluate if specific flows (e.g., `_signalingFlow` at 64) can be reduced for memory efficiency on ultra-low-end devices without losing critical packets.
+- **Lifecycle-Aware Collection**: Move transient UI states (e.g., button loading states) to local component-level collection to reduce `MainUiState` footprint.
+- **UseCase Dispatch Standardization**: Standardize all UI-facing UseCases to internalize `Dispatchers.Main.immediate` for their emission flows.
 
 ## ⚠️ Newly Identified Risks & Concerns
-- **[Concern #616-C1] Target Discrepancy**: Requirement R616 was applied to `MainRepository` instead of `SettingsRepository` (which is flow-safe). Resolved by R616 and R617.
+- **[Concern #619-C1] Pipeline Throttling Audit**: Audit `DashboardStateProvider` for potential computational bottlenecks during high-frequency combined flow emissions.
 
 ## 🚀 Release commands
 ```bash
 git add .
-git commit -m "Release July.28.2233: Structural - Global SharedFlow Audit (#617)"
-git tag -a July.28.2233 -m "Project-wide hardening of SharedFlow pipelines with DROP_OLDEST to ensure non-blocking system integrity."
+git commit -m "Release July.28.2326: Performance - UI State Collection Audit (#618)"
+git tag -a July.28.2326 -m "Migration of UI-bound state collection to Dispatchers.Main.immediate to eliminate stuttering on A15 hardware."
 git push origin main --tags
 ```
 
 ## 🎯 Next Objective
-- **[Issue #618] [Sprint: July.28.24] [Priority: Medium] Forensic: UI State Collection Audit**.
-    - **Scope**: Audit all `collectAsStateWithLifecycle` and `collect` calls in the UI layer to ensure they utilize `Dispatchers.Main.immediate` and verify that high-frequency updates are properly sampled to maintain 60FPS on budget hardware.
+- **[Issue #619] [Sprint: July.28.24] [Priority: Low] Structural: Dashboard Pipeline Optimization**.
+    - **Scope**: Audit `DashboardStateProvider` and its associated `combine` logic for redundant allocations during state re-computation.
 
 **Status**: READY FOR NEW FRESH CHAT.

@@ -10,12 +10,12 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * July.28.23:
+ * - Issue #618: Forensic UI State Collection Audit. Migrated history 
+ *   observation collection to Dispatchers.Main.immediate to reduce 
+ *   dispatch latency for UI updates.
  * July.26.03:
- * - Issue #545c: Flow Architecture Standardization. Migrated GPS Index 
- *   observation to the standardized shared flow in GpsStatusManager, 
- *   eliminating redundant ticker logic. Fixed duplicate data class and missing imports.
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor.
+ * - Issue #545c: Flow Architecture Standardization.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -38,7 +38,7 @@ class StateSubscriptionUseCase @Inject constructor(
 
     fun startHistoryObservations(scope: CoroutineScope) {
         _historyFlows.forEach { (key, stateFlow) ->
-            scope.launch(Dispatchers.Default) {
+            scope.launch(Dispatchers.Main.immediate) {
                 repository.getHistoryFlow(key).collect { dbList ->
                     stateFlow.update { current ->
                         val lastDbTs = dbList.lastOrNull()?.ts ?: 0L
@@ -49,7 +49,7 @@ class StateSubscriptionUseCase @Inject constructor(
             }
         }
 
-        scope.launch(Dispatchers.Default) {
+        scope.launch(Dispatchers.Main.immediate) {
             repository.liveHistoryFlow.collect { (key, points) ->
                 _historyFlows[key]?.update { (it + points).takeLast(240) }
             }
