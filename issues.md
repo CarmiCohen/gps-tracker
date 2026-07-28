@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.27.12)
+# Project Issues & Hardening Tracking (July.27.13)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,13 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 444 |
+| **Resolved (Total)** | 🟢 Progress | 445 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #608] [Severity: Low] [Category: UX] Startup Notification Flicker**.
-    - **Concern**: Moving `startForeground` to `onCreate` ensures stability but may cause a brief "Default" notification title to flicker before the subclass-specific message is processed in the next Main loop cycle. This is purely cosmetic but worth noting for visual polish.
+*   *(No active risks identified)*
 
 ---
 
@@ -21,6 +20,11 @@ This document tracks active issues, technical debt, and pending implementation t
 *   *(No active critical blocking issues)*
 
 ---
+
+## 🟢 Recently Resolved Issues (July.27.13)
+*   **[Issue #608] [Severity: Low] [Category: UX] Startup Notification Flicker**.
+    - **Resolution**: Eliminated the visual flicker where the foreground service would briefly display a default title ("Tracking system active") before rich telemetry was available. Enhanced `AppNotificationManager` with `getPulseMessage()` and updated `TrackerService`/`ViewerService` to perform a synchronous health check during `startForeground()`, ensuring the initial notification contains rich metadata (Battery, Security Status) immediately.
+    - **Validation**: Verified that services now boot with full status strings. Added **R608** to `SOT_MASTER_REQUIREMENTS.md`.
 
 ## 🟢 Recently Resolved Issues (July.27.12)
 *   **[Issue #607] [Severity: Critical] [Category: Stability] Foreground Service Startup Race Condition (Bad Notification)**.

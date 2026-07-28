@@ -18,10 +18,12 @@ import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
+ * July.27.13:
+ * - Issue #608: Startup Notification Flicker. Added getPulseMessage() to allow 
+ *   services to build rich notifications during startForeground() initialization.
  * July.27.12:
  * - Issue #607: Foreground Service Startup Race Condition. Added init block to 
- *   ensure notification channels are created immediately upon injection, 
- *   preventing "Bad notification" crashes during service cold-starts.
+ *   ensure notification channels are created immediately upon injection.
  */
 @Singleton
 class AppNotificationManager @Inject constructor(
@@ -88,11 +90,14 @@ class AppNotificationManager @Inject constructor(
             .build()
     }
 
-    fun updatePulse(sats: Int, battery: Int, isSecure: Boolean, isPowerSave: Boolean) {
+    fun getPulseMessage(sats: Int, battery: Int, isSecure: Boolean, isPowerSave: Boolean): String {
         val status = if (isSecure) "SECURE" else "VIOLATION"
         val powerSaveTag = if (isPowerSave) " [LOW POWER]" else ""
-        val msg = String.format(Locale.getDefault(), "Status: %s | Sats: %d | Batt: %d%%%s", status, sats, battery, powerSaveTag)
-        
+        return String.format(Locale.getDefault(), "Status: %s | Sats: %d | Batt: %d%%%s", status, sats, battery, powerSaveTag)
+    }
+
+    fun updatePulse(sats: Int, battery: Int, isSecure: Boolean, isPowerSave: Boolean) {
+        val msg = getPulseMessage(sats, battery, isSecure, isPowerSave)
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(notificationId, buildForegroundNotification(msg))
     }

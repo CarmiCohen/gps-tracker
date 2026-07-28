@@ -16,12 +16,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.27.13:
+ * - Issue #608: Startup Notification Flicker. Enhanced startServiceForeground() 
+ *   to build a rich notification immediately using early health state.
  * July.27.12:
  * - Issue #607: Foreground Service Startup Race Condition. Implemented 
- *   onServicePreInit() for early notification configuration. Removed redundant 
- *   FGS throttle logic and initialization calls (leftovers).
- * July.27.07:
- * - Issue #605: Forensic Log Latency Audit.
+ *   onServicePreInit() for early notification configuration.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -274,7 +274,15 @@ class ViewerService : BaseMonitorService() {
     @SuppressLint("InlinedApi")
     override fun startServiceForeground() {
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
-        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification("Monitoring system active."), type, force = true)
+        val health = integrityMonitor.currentHealth
+        val battery = if (health.batteryLevel > 0) health.batteryLevel else integrityMonitor.getBatteryLevel()
+        val msg = notificationManager.getPulseMessage(
+            sats = 0,
+            battery = battery,
+            isSecure = !alarmManager.hasUnresolvedAlarms(),
+            isPowerSave = health.isPowerSaveMode
+        )
+        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type, force = true)
     }
 
     @SuppressLint("InlinedApi")
@@ -285,7 +293,14 @@ class ViewerService : BaseMonitorService() {
                 try {
                     delay(200)
                     val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-                    safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification("Monitoring system active."), type)
+                    val health = integrityMonitor.currentHealth
+                    val msg = notificationManager.getPulseMessage(
+                        sats = gpsManager.satellitesUsed,
+                        battery = health.batteryLevel,
+                        isSecure = !alarmManager.hasUnresolvedAlarms(),
+                        isPowerSave = health.isPowerSaveMode
+                    )
+                    safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
                 } catch (e: Exception) { if (e !is CancellationException) Timber.e(e, "Failed to update FGS type") }
             }
         }

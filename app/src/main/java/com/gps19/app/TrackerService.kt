@@ -19,12 +19,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.27.13:
+ * - Issue #608: Startup Notification Flicker. Enhanced startServiceForeground() 
+ *   to build a rich notification immediately using early health state.
  * July.27.12:
  * - Issue #607: Foreground Service Startup Race Condition. Implemented 
- *   onServicePreInit() for early notification configuration. Removed redundant 
- *   FGS throttle logic and initialization calls (leftovers).
- * July.27.07:
- * - Issue #602: SIT Timestamp Parity Logic.
+ *   onServicePreInit() for early notification configuration.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -344,7 +344,15 @@ class TrackerService : BaseMonitorService() {
 
     override fun startServiceForeground() {
         val type = getAvailableForegroundServiceType()
-        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification("Tracking system active."), type, force = true)
+        val health = integrityMonitor.currentHealth
+        val battery = if (health.batteryLevel > 0) health.batteryLevel else integrityMonitor.getBatteryLevel()
+        val msg = notificationManager.getPulseMessage(
+            sats = 0,
+            battery = battery,
+            isSecure = !alarmManager.hasUnresolvedAlarms(),
+            isPowerSave = health.isPowerSaveMode
+        )
+        safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type, force = true)
     }
 
     override fun updateForegroundServiceType() {
@@ -353,7 +361,13 @@ class TrackerService : BaseMonitorService() {
             fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main) {
                 delay(200)
                 val type = getAvailableForegroundServiceType()
-                val msg = if ((type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE) != 0) "Acoustic monitoring active." else "Tracking system active."
+                val health = integrityMonitor.currentHealth
+                val msg = notificationManager.getPulseMessage(
+                    sats = gpsManager.satellitesUsed,
+                    battery = health.batteryLevel,
+                    isSecure = !alarmManager.hasUnresolvedAlarms(),
+                    isPowerSave = isPowerSaveActive || health.isPowerSaveMode
+                )
                 safeStartForeground(notificationManager.getNotificationId(), notificationManager.buildForegroundNotification(msg), type)
             }
         }
