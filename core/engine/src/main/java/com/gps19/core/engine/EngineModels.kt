@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * July.27.08:
+ * - Issue #604: Ribbon Density & Aliasing Audit. Added sitShock to EngineSensorSnapshot 
+ *   for forensic parity during backfills.
  * July.27.07:
  * - Issue #602: SIT Timestamp Parity Logic. Added sitVzTs and sitVzRt to 
  *   EngineConnectionPoint and EngineSensorSnapshot for R118 parity.
@@ -175,6 +178,7 @@ class EngineSensorSnapshot(
     var isSitDetected: Boolean = false,
     var sitVzTs: Long = 0L,
     var sitVzRt: Long = 0L,
+    var sitShock: Double = 0.0,
     var kineticEnergy: Double = 0.0
 ) {
     fun copyFrom(other: EngineSensorSnapshot) {
@@ -189,6 +193,7 @@ class EngineSensorSnapshot(
         this.isSitDetected = other.isSitDetected
         this.sitVzTs = other.sitVzTs
         this.sitVzRt = other.sitVzRt
+        this.sitShock = other.sitShock
         this.kineticEnergy = other.kineticEnergy
     }
 }

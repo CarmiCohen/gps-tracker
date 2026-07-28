@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (July.27.07)
+# Project Issues & Hardening Tracking (July.27.08)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,14 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 441 |
+| **Resolved (Total)** | 🟢 Progress | 442 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #604] [Severity: Low] [Category: UI] Ribbon Density in 7D Scale**.
-    - **Risk**: At the 7-day scale, 240 points may result in significant data aliasing if high-frequency kinetic bursts occur between samples.
-    - **Concern**: Forensic interpretation might miss brief tamper events at high compression.
+*   *(No active forensic aliasing risks identified)*
 
 ---
 
@@ -22,6 +20,11 @@ This document tracks active issues, technical debt, and pending implementation t
 *   *(No active critical engine issues)*
 
 ---
+
+## 🟢 Recently Resolved Issues (July.27.08)
+*   **[Issue #604] [Severity: Low] [Category: UI] Ribbon Density & Aliasing Audit**.
+    - **Resolution**: Refined `TelemetryAggregator.MutableAggregationPoint.merge()` to utilize peak-retention logic (`max()`) for `kineticEnergy` and `sitShock` forensic indices. This ensures that brief, high-intensity events (e.g., tamper or impulse shocks) are preserved and visible in the Analytical Ribbon even at high compression scales (such as the 7-day view). Updated `EngineSensorSnapshot` to include `sitShock` for parity during gap backfills.
+    - **Validation**: Verified peak retention in `TelemetryAggregator` logic. `:app:assembleDebug` success.
 
 ## 🟢 Recently Resolved Issues (July.27.07)
 *   **[Issue #605] [Severity: Med] [Category: Persistence] Forensic Log Latency Audit**.

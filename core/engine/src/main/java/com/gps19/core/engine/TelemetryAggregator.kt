@@ -4,11 +4,12 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * July.27.08:
+ * - Issue #604: Ribbon Density & Aliasing Audit. Updated merge() to use peak-retention 
+ *   (max) for kineticEnergy and sitShock to preserve forensic visibility at 7D scale.
  * July.27.07:
  * - Issue #602: SIT Timestamp Parity Logic. Integrated sitVz, sitVzTs, and sitVzRt 
  *   into aggregation to ensure peak vertical velocity forensic parity.
- * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy aggregation.
  */
 class TelemetryAggregator {
 
@@ -61,6 +62,7 @@ class TelemetryAggregator {
         var sitVz: Double = 0.0
         var sitVzTs: Long = 0L
         var sitVzRt: Long = 0L
+        var sitShock: Double = 0.0
         var kineticEnergy: Double = 0.0
 
         fun reset(point: EngineConnectionPoint) {
@@ -90,6 +92,7 @@ class TelemetryAggregator {
             sitVz = point.sitVz
             sitVzTs = point.sitVzTs
             sitVzRt = point.sitVzRt
+            sitShock = point.sitShock
             kineticEnergy = point.kineticEnergy
         }
 
@@ -124,6 +127,8 @@ class TelemetryAggregator {
                 sitVzRt = cur.sitVzRt
             }
             
+            // Issue #604: Peak retention for forensic indices
+            sitShock = max(sitShock, cur.sitShock)
             kineticEnergy = max(kineticEnergy, cur.kineticEnergy)
         }
 
@@ -156,6 +161,7 @@ class TelemetryAggregator {
                 this.sitVz = this@MutableAggregationPoint.sitVz
                 this.sitVzTs = this@MutableAggregationPoint.sitVzTs
                 this.sitVzRt = this@MutableAggregationPoint.sitVzRt
+                this.sitShock = this@MutableAggregationPoint.sitShock
                 this.kineticEnergy = this@MutableAggregationPoint.kineticEnergy
                 this.isTick = isTick
             }
@@ -192,10 +198,6 @@ class TelemetryAggregator {
         return results
     }
 
-    /**
-     * Issue #570: Refactored to eliminate copy() and achieve zero-churn backfill.
-     * July.25.10: Flyweight scoped to method for thread safety.
-     */
     fun backfillGaps(
         lastTickRt: Long,
         nowRt: Long,
@@ -245,6 +247,7 @@ class TelemetryAggregator {
             val resolvedSit = snapshot?.isSitDetected ?: false
             val resolvedSitVzTs = snapshot?.sitVzTs ?: baseTemplate.sitVzTs
             val resolvedSitVzRt = snapshot?.sitVzRt ?: baseTemplate.sitVzRt
+            val resolvedShock = snapshot?.sitShock ?: baseTemplate.sitShock
             val resolvedKinetic = snapshot?.kineticEnergy ?: baseTemplate.kineticEnergy
 
             fillPointFlyweight.apply {
@@ -263,6 +266,7 @@ class TelemetryAggregator {
                 isSitDetected = resolvedSit
                 sitVzTs = resolvedSitVzTs
                 sitVzRt = resolvedSitVzRt
+                sitShock = resolvedShock
                 kineticEnergy = resolvedKinetic
             }
 
@@ -274,9 +278,6 @@ class TelemetryAggregator {
         return results
     }
 
-    /**
-     * Issue #570: Refactored to achieve zero-churn gap filling.
-     */
     fun fillRealGap(
         ribbonKey: String,
         intervalSeconds: Int,
@@ -332,6 +333,7 @@ class TelemetryAggregator {
             val resolvedSit = snapshot?.isSitDetected ?: false
             val resolvedSitVzTs = snapshot?.sitVzTs ?: 0L
             val resolvedSitVzRt = snapshot?.sitVzRt ?: 0L
+            val resolvedShock = snapshot?.sitShock ?: 0.0
             val resolvedKinetic = snapshot?.kineticEnergy ?: 0.0
 
             gapPoints.add(EngineConnectionPoint(
@@ -352,6 +354,7 @@ class TelemetryAggregator {
                 isSitDetected = resolvedSit,
                 sitVzTs = resolvedSitVzTs,
                 sitVzRt = resolvedSitVzRt,
+                sitShock = resolvedShock,
                 kineticEnergy = resolvedKinetic,
                 isTick = isScaleTick(getScaleByKey(ribbonKey), totalSeconds),
                 currentMa = 0,
