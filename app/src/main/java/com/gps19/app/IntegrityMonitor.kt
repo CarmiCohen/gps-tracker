@@ -6,7 +6,6 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.PowerManager
-import android.os.StatFs
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -27,12 +26,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * July.28.16:
+ * - Issue #611: Forensic: Disk Space Reactivity. Converted storage monitoring 
+ *   to a reactive flow via SystemStatusProvider. Removed redundant polling.
  * July.28.14:
  * - Issue #609: Structural Centralization. Refactored to provide a reactive 
- *   StateFlow as the single source of truth for local health. Integrated 
- *   SystemStatusProvider for OS-level event tracking.
- * July.27.00:
- * - Architecture Audit: Updated to use centralized PreferenceKeys.
+ *   StateFlow as the single source of truth for local health.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -78,6 +77,12 @@ class IntegrityMonitor @Inject constructor(
         scope.launch {
             systemStatusProvider.observeBatteryStatus()
                 .onEach { status -> handleBatteryUpdate(status) }
+                .collect()
+        }
+
+        scope.launch {
+            systemStatusProvider.observeStorageStatus()
+                .onEach { status -> handleStorageUpdate(status) }
                 .collect()
         }
     }
@@ -139,6 +144,34 @@ class IntegrityMonitor @Inject constructor(
         ) }
     }
 
+    private fun handleStorageUpdate(status: StorageStatus) {
+        val workingHealth = currentHealth
+        val megabytesAvailable = status.availableMb
+        val critical = status.isCritical
+        val low = status.isLow
+        
+        if (critical != workingHealth.isStorageCritical) {
+            if (critical) {
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB). ALL non-essential logging HALTED to prevent corruption.", true))
+                _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL))
+            }
+        }
+
+        if (low != workingHealth.isStorageLow) {
+            if (low && !critical) {
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB). Throttling logs.", true))
+                _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW))
+            } else if (!low) {
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Storage space restored (${megabytesAvailable}MB).", false))
+            }
+        }
+
+        updateHealth { it.copy(
+            isStorageLow = low,
+            isStorageCritical = critical
+        ) }
+    }
+
     fun pollSystemStatus(nowWall: Long, nowRt: Long) {
         val delta = nowRt - lastFullPollTs
         if (delta < POLL_TTL_MS && lastFullPollTs != 0L) return
@@ -180,8 +213,6 @@ class IntegrityMonitor @Inject constructor(
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Network switched to $newNet", false))
         }
 
-        val storage = checkStorageIntegrity()
-
         var isPowerTamper = workingHealth.isPowerTamper
         if (lastPowerDisconnectTs > 0 && !isPowerTamper) {
             if (checkViolationSustained(ALERT_ID_TRACKER_POWER, lastPowerDisconnectTs, POWER_DISCONNECT_DEBOUNCE_MS)) {
@@ -194,8 +225,6 @@ class IntegrityMonitor @Inject constructor(
             isPowerSaveMode = powerSave,
             standbyBucket = standbyBucket,
             netInterface = newNet,
-            isStorageLow = storage.first,
-            isStorageCritical = storage.second,
             isPowerTamper = isPowerTamper
         ) }
     }
@@ -218,40 +247,6 @@ class IntegrityMonitor @Inject constructor(
             _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE))
         }
         return isSteep
-    }
-
-    private fun checkStorageIntegrity(): Pair<Boolean, Boolean> {
-        val workingHealth = currentHealth
-        var low = workingHealth.isStorageLow
-        var critical = workingHealth.isStorageCritical
-        try {
-            val stat = StatFs(context.filesDir.path)
-            val bytesAvailable = stat.availableBlocksLong * stat.blockSizeLong
-            val megabytesAvailable = bytesAvailable / (1024 * 1024)
-            
-            critical = megabytesAvailable < SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB
-            low = megabytesAvailable < SYSTEM_STORAGE_LOW_THRESHOLD_MB
-            
-            if (critical != workingHealth.isStorageCritical) {
-                if (critical) {
-                    _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB). ALL non-essential logging HALTED to prevent corruption.", true))
-                    _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL))
-                }
-            }
-
-            if (low != workingHealth.isStorageLow) {
-                if (low && !critical) {
-                    _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB). Throttling logs.", true))
-                    _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW))
-                } else if (!low) {
-                    critical = false
-                    _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Storage space restored (${megabytesAvailable}MB).", false))
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to check storage integrity")
-        }
-        return low to critical
     }
 
     fun setMaxTemperature(temp: Double) {

@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.28.15 (Heartbeat Decoupling)
+# System Source of Truth (SoT) - July.28.16 (Disk Space Reactivity)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -9,6 +9,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Startup Notification Content Authority (R608)**: To prevent visual flickering, Services MUST provide role-specific and health-aware notification metadata (Battery level, Security status) immediately during the initial `startForeground()` call. (Issue #608, July.27.13)
 *   **Centralized Health Snapshot Authority (R609)**: `IntegrityMonitor` is the single source of truth for local system health. It MUST reactively observe OS-level events (Battery, Network) and provide a unified `StateFlow<SystemHealthState>`. Manual health propagation in service ticks is FORBIDDEN. (Issue #609, July.28.14)
 *   **Forensic Heartbeat Decoupling (R610)**: Low-frequency system updates (Notification Pulse, UI Heartbeats) MUST be decoupled from high-frequency logic ticks. A dedicated heartbeat loop MUST be used for non-kinematic tasks to prevent logic-loop jitter. (Issue #610, July.28.15)
+*   **Forensic Disk Space Reactivity (R611)**: Internal storage monitoring MUST be reactive. `SystemStatusProvider` MUST provide a reactive flow for storage health. `IntegrityMonitor` MUST observe this flow to trigger storage alerts immediately. Polling within logic ticks is FORBIDDEN. (Issue #611, July.28.16)
 *   **Deferred Flow Collection (R542)**: Heavy Room-backed flows (logs, trails, violations) MUST be collected only within their respective screen routes (Tracker/Viewer). (Issue #542, July.24.07)
 *   **UI State Decomposition (R547)**: The application UI MUST decompose monolithic state objects into persistent and transient streams to minimize heap churn. (Issue #547, July.24.08)
 *   **Zero-Churn Engine Windows (R547b)**: High-frequency kinematic windows MUST utilize circular primitive buffers to eliminate GC pressure. (Issue #547b, July.25.07)
@@ -58,5 +59,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.28.15.
+*   **Current Release**: July.28.16.
 *   **Source of Truth**: app/build.gradle versionName.

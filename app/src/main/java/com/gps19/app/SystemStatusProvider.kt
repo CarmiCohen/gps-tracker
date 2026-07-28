@@ -14,10 +14,13 @@ import android.net.NetworkRequest
 import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
+import android.os.StatFs
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.gps19.core.engine.CapabilityStatus
+import com.gps19.core.engine.SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB
+import com.gps19.core.engine.SYSTEM_STORAGE_LOW_THRESHOLD_MB
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
@@ -31,11 +34,12 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.28.16:
+ * - Issue #611: Forensic: Disk Space Reactivity. Added observeStorageStatus() 
+ *   to provide reactive flow for internal storage health.
  * July.26.03:
  * - Issue #545c: Flow Architecture Standardization. Migrated internet and battery 
  *   status flows to SharedFlow (shareIn) to prevent redundant platform registrations.
- * July.24.01:
- * - Issue #098: Hardened permission refresh logic.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -53,6 +57,8 @@ interface SystemStatusProvider {
     
     fun observeInternetStatus(): Flow<Boolean>
     fun observeBatteryStatus(): Flow<BatteryStatus>
+    fun observeStorageStatus(): Flow<StorageStatus>
+    fun getStorageStatus(): StorageStatus
 }
 
 @Singleton
@@ -78,6 +84,7 @@ class SystemStatusProviderImpl @Inject constructor(
     private val isA15 by lazy { isA15Device() }
     
     private val PERMISSION_TTL_MS = 15_000L
+    private val STORAGE_POLL_INTERVAL_MS = 60_000L
 
     override suspend fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
     override suspend fun isAutoStartGranted(): Boolean = getPermissionState().isAutoStartGranted
@@ -204,6 +211,36 @@ class SystemStatusProviderImpl @Inject constructor(
      )
 
     override fun observeBatteryStatus(): Flow<BatteryStatus> = sharedBatteryStatusFlow
+
+    private val sharedStorageStatusFlow = flow {
+        while (true) {
+            emit(getStorageStatus())
+            delay(STORAGE_POLL_INTERVAL_MS)
+        }
+    }.distinctUntilChanged()
+     .shareIn(
+         scope = externalScope,
+         started = SharingStarted.WhileSubscribed(5000),
+         replay = 1
+     )
+
+    override fun observeStorageStatus(): Flow<StorageStatus> = sharedStorageStatusFlow
+
+    override fun getStorageStatus(): StorageStatus {
+        return try {
+            val stat = StatFs(context.filesDir.path)
+            val bytesAvailable = stat.availableBlocksLong * stat.blockSizeLong
+            val megabytesAvailable = bytesAvailable / (1024 * 1024)
+            StorageStatus(
+                availableMb = megabytesAvailable,
+                isLow = megabytesAvailable < SYSTEM_STORAGE_LOW_THRESHOLD_MB,
+                isCritical = megabytesAvailable < SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to calculate storage status")
+            StorageStatus(0, isLow = true, isCritical = true)
+        }
+    }
 }
 
 data class BatteryStatus(
@@ -211,4 +248,10 @@ data class BatteryStatus(
     val temp: Double,
     val isCharging: Boolean,
     val currentMa: Int = 0
+)
+
+data class StorageStatus(
+    val availableMb: Long,
+    val isLow: Boolean,
+    val isCritical: Boolean
 )

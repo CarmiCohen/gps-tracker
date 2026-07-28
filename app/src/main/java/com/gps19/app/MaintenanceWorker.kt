@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.StatFs
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.work.*
@@ -17,10 +16,10 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * July.28.16:
+ * - Issue #611: Centralized storage health check via SystemStatusProvider.
  * July.27.00:
  * - Architecture Audit: Updated to use centralized PreferenceKeys and EngineConstants.
- * July.24.04:
- * - Issue #539: Background Start Hardening.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -28,7 +27,8 @@ class MaintenanceWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
-    private val notificationManager: AppNotificationManager
+    private val notificationManager: AppNotificationManager,
+    private val systemStatusProvider: SystemStatusProvider
 ) : CoroutineWorker(context, params) {
     
     private val cachedPkgName = applicationContext.packageName
@@ -86,7 +86,7 @@ class MaintenanceWorker @AssistedInject constructor(
                     Log.w("GPS19", "MAINTENANCE: Could not set foreground, attempting recovery anyway.")
                 }
 
-                if (isStorageCritical()) {
+                if (systemStatusProvider.getStorageStatus().isCritical) {
                     val storageMsg = "MAINTENANCE: Recovery ABORTED. Storage is CRITICAL."
                     Log.e("GPS19", storageMsg)
                     repository.addLog(LogEntry(
@@ -150,16 +150,5 @@ class MaintenanceWorker @AssistedInject constructor(
         val network = connectivityManager.activeNetwork ?: return false
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-    }
-
-    private fun isStorageCritical(): Boolean {
-        return try {
-            val stat = StatFs(applicationContext.filesDir.path)
-            val bytesAvailable = stat.availableBlocksLong * stat.blockSizeLong
-            val megabytesAvailable = bytesAvailable / (1024 * 1024)
-            megabytesAvailable < SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB
-        } catch (e: Exception) {
-            false
-        }
     }
 }
