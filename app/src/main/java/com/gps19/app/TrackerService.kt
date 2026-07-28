@@ -22,7 +22,8 @@ import kotlin.math.*
  * July.28.18:
  * - Issue #613: Forensic: Location Refresh Reactivity. Refactored tick loop 
  *   to utilize reactive location-pending health state and enabled status 
- *   broadcasts during pending fix intervals.
+ *   broadcasts during pending fix intervals. Restored full forensic logging 
+ *   parity for stability audits and hardware recovery.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -164,7 +165,12 @@ class TrackerService : BaseMonitorService() {
                     is IntegrityEvent.ViolationSustained -> if (event.type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(true)
                     is IntegrityEvent.ViolationResolved -> if (event.type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(false)
                     is IntegrityEvent.LogEvent -> {
-                        logManager.logServiceEvent(event.message, event.important)
+                        val isSpecial = event.message.contains("tamper", ignoreCase = true) || 
+                                       event.message.contains("confirmed", ignoreCase = true) || 
+                                       event.message.contains("EMERGENCY", ignoreCase = true) || 
+                                       event.message.contains("PRIORITY", ignoreCase = true) || 
+                                       event.message.contains("BUCKET", ignoreCase = true)
+                        logManager.logServiceEvent(event.message, event.important, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
                     }
                 }
             }
@@ -179,11 +185,14 @@ class TrackerService : BaseMonitorService() {
                         repository.saveTrailPoint(event.lat, event.lng, event.isViewerTrail, event.status, event.timestamp, accuracy = event.accuracy, maxAccuracy = event.maxAccuracy)
                     }
                     is ProcessorEvent.LogAdded -> {
+                        val isMergeStale = event.message.contains("Merge-on-Stale")
+                        val specialColor = if (event.isSpecial || isMergeStale) FORENSIC_PINK_COLOR else null
                         logManager.submitToLogSink(
                             message = event.message,
                             type = event.type,
                             important = event.isImportant,
-                            isSpecial = event.isSpecial,
+                            isSpecial = event.isSpecial || isMergeStale,
+                            specialColor = specialColor,
                             lat = event.lat,
                             lng = event.lng,
                             accuracy = event.accuracy,
@@ -195,6 +204,9 @@ class TrackerService : BaseMonitorService() {
                         repository.saveDoubleSync(MAX_ACCURACY_KEY, event.accuracy)
                     }
                     is ProcessorEvent.ChairBaselineChanged -> {
+                        val proc = lastProcessedLocation
+                        logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°",
+                            lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                         lifecycleScope.launch { repository.saveDouble(CHAIR_BASELINE_TILT_KEY, event.baseline) }
                     }
                     else -> {}
@@ -228,7 +240,8 @@ class TrackerService : BaseMonitorService() {
             appSensorManager.sensorEvents.collect { event ->
                 when (event) {
                     is AppSensorEvent.HardwareFailure -> {
-                        logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", important = true)
+                        val proc = lastProcessedLocation
+                        logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
                     is AppSensorEvent.LogEvent -> {
                         logManager.logServiceEvent(event.message, event.important)
@@ -251,9 +264,15 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.SyncSensors -> { lifecycleScope.launch(Dispatchers.Default) { refreshCapabilitiesInternal(); appSensorManager.start() } }
                     is CommandEvent.TriggerForensicTest -> {
                         lifecycleScope.launch {
-                            repeat(10) { i ->
+                            val proc = lastProcessedLocation
+                            logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                            
+                            repeat(100) { i ->
                                 logManager.logServiceEvent("STRESS TEST: Forensic Log #$i", important = false)
                             }
+
+                            systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
+                            systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L
                         }
                     }
                 }
@@ -386,6 +405,8 @@ class TrackerService : BaseMonitorService() {
             val tickGap = nowRt - lastServiceTickRealtime
             if (tickGap > HARDWARE_SUPPRESSION_THRESHOLD_MS && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
                 lastHardwareRecoveryTs = nowRt
+                val proc = lastProcessedLocation
+                logManager.logServiceEvent("HEURISTIC RECOVERY: Heartbeat gap detected (${tickGap}ms). Reviving connection.", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                 systemMonitor.acquireWakeLock()
                 connectivitySuite.connect(configManager.relayUrl)
             }
@@ -395,7 +416,8 @@ class TrackerService : BaseMonitorService() {
             if (stabilityAuditFixCount > 0) {
                 val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
                 if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
-                    logManager.logServiceEvent("STABILITY AUDIT: Reliability ${reliability.roundToOneDecimal()}%", important = true)
+                    val proc = lastProcessedLocation
+                    logManager.logServiceEvent("STABILITY AUDIT (T): Reliability ${reliability.roundToOneDecimal()}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
                 }
                 stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
             }
@@ -482,6 +504,8 @@ class TrackerService : BaseMonitorService() {
                 stabilityAuditFixCount++
                 if (gap > TICK_INTERVAL_MS + GPS_STABILITY_GAP_THRESHOLD_MS) {
                     stabilityAuditViolationCount++
+                    val proc = lastProcessedLocation
+                    logManager.logServiceEvent("STABILITY GAP (T): ${gap}ms detected during logic pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
                 }
             }
         }
