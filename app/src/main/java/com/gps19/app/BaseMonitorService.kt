@@ -18,6 +18,10 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * July.28.15:
+ * - Issue #610: Forensic Heartbeat Decoupling. Introduced a dedicated, 
+ *   low-frequency heartbeat loop for notification updates to reduce pressure 
+ *   on the high-frequency tick loop. Removed obsolete lastNotificationUpdateTs.
  * July.27.12:
  * - Issue #607: Foreground Service Startup Race Condition. Moved startForeground 
  *   to onCreate() (Main thread) and added onServicePreInit() for early configuration.
@@ -57,12 +61,12 @@ abstract class BaseMonitorService : LifecycleService() {
     protected var lastServiceTickTs = 0L // Wall-clock
     protected var lastServiceTickRealtime = 0L // Monotonic
     protected var serviceTickCounter = 0
-    protected var lastNotificationUpdateTs = 0L
     
     protected val isUiForeground = AtomicBoolean(false)
     protected var lastUiPulseTs = 0L
     
     protected var tickJob: Job? = null
+    protected var heartbeatJob: Job? = null
     protected var fgsUpdateJob: Job? = null
     
     protected val transientDropDetected = AtomicBoolean(false)
@@ -123,6 +127,11 @@ abstract class BaseMonitorService : LifecycleService() {
     abstract fun getRequiredTickInterval(): Long
 
     /**
+     * onHeartbeat: Low-frequency (30s) hook for UI/Notification updates.
+     */
+    protected abstract suspend fun onHeartbeat(now: Long, nowRt: Long)
+
+    /**
      * onServicePreInit: Synchronous startup hook for immediate configuration (e.g. notifications).
      */
     protected abstract fun onServicePreInit()
@@ -149,6 +158,20 @@ abstract class BaseMonitorService : LifecycleService() {
                 val remaining = max(50L, interval - elapsed)
                 delay(remaining) 
             } 
+        }
+    }
+
+    protected fun startHeartbeatLoop() {
+        heartbeatJob?.cancel()
+        heartbeatJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
+            while (isActive) {
+                val now = timeProvider.currentTimeMillis()
+                val nowRt = timeProvider.elapsedRealtime()
+                
+                onHeartbeat(now, nowRt)
+                
+                delay(NOTIFICATION_THROTTLE_MS)
+            }
         }
     }
 
@@ -186,6 +209,7 @@ abstract class BaseMonitorService : LifecycleService() {
 
     override fun onDestroy() {
         tickJob?.cancel()
+        heartbeatJob?.cancel()
         fgsUpdateJob?.cancel()
         
         runBlocking {

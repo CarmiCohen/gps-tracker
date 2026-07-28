@@ -1,37 +1,35 @@
-# Project Issues & Hardening Tracking (July.28.14)
+# Project Issues & Hardening Tracking (July.28.15)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 1 |
+| **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 445 |
+| **Resolved (Total)** | 🟢 Progress | 446 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #609] [Severity: Med] [Category: Architecture] Health State Fragmentation**.
-    - **Concern**: System health data is currently manually pulled from `IntegrityMonitor` and pushed to `TelemetryRepository` during service ticks. This creates multiple points of failure and makes the "Snapshot" inconsistent if ticks are delayed or suppressed by OS power management.
+*   *(None at this stage)*
 
 ---
 
 ## 🔴 Open Issues
-*   **[Issue #609] [Severity: Med] [Category: Structural] Centralized Health Snapshot**.
-    - **Objective**: Refactor `IntegrityMonitor` to provide a unified health snapshot as a single source of truth. Ensure services and UI consume a consistent state without manual propagation overhead.
+*   *(None at this stage)*
 
 ---
 
-## 🟢 Recently Resolved Issues (July.27.13)
-*   **[Issue #608] [Severity: Low] [Category: UX] Startup Notification Flicker**.
-    - **Resolution**: Eliminated the visual flicker where the foreground service would briefly display a default title ("Tracking system active") before rich telemetry was available. Enhanced `AppNotificationManager` with `getPulseMessage()` and updated `TrackerService`/`ViewerService` to perform a synchronous health check during `startForeground()`, ensuring the initial notification contains rich metadata (Battery, Security Status) immediately.
-    - **Validation**: Verified that services now boot with full status strings. Added **R608** to `SOT_MASTER_REQUIREMENTS.md`.
+## 🟢 Recently Resolved Issues (July.28.15)
+*   **[Issue #610] [Severity: Low] [Category: Structural] Forensic Heartbeat Decoupling**.
+    - **Resolution**: Decoupled low-frequency foreground notification updates from the high-frequency logic tick loop. Introduced a dedicated heartbeat loop in `BaseMonitorService` running at 30s intervals. This eliminates unnecessary conditional branching in the 2s kinematic loop and ensures stable UI pulses even under high sensor load.
+    - **Validation**: Verified build success and requirement alignment (**R610**).
 
-## 🟢 Recently Resolved Issues (July.27.12)
-*   **[Issue #607] [Severity: Critical] [Category: Stability] Foreground Service Startup Race Condition (Bad Notification)**.
-    - **Resolution**: Eliminated the race condition where `BaseMonitorService` attempted to start in the foreground before the notification channel was initialized. Introduced a synchronous `onServicePreInit()` hook in the base class, allowing subclasses to configure the `NotificationManager` (setting Tracker/Viewer roles) before `startForeground()` is invoked on the Main thread in `onCreate()`.
-    - **Validation**: Verified that `TrackerService` and `ViewerService` correctly initialize their respective notification modes synchronously.
+## 🟢 Recently Resolved Issues (July.28.14)
+*   **[Issue #609] [Severity: Med] [Category: Structural] Centralized Health Snapshot**.
+    - **Resolution**: Refactored `IntegrityMonitor` to provide a unified `StateFlow<SystemHealthState>` as the single source of truth for local health. Eliminated manual health propagation in services.
+    - **Validation**: Verified reactive updates for battery and network status. Added **R609**.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*

@@ -16,6 +16,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.28.15:
+ * - Issue #610: Forensic Heartbeat Decoupling. Moved notification updates to 
+ *   the dedicated low-frequency heartbeat loop.
  * July.28.14:
  * - Issue #609: Structural Centralization. Removed redundant manual health 
  *   propagation as IntegrityMonitor now manages its own source of truth.
@@ -106,6 +109,7 @@ class ViewerService : BaseMonitorService() {
         serviceStartWall = timeProvider.currentTimeMillis()
 
         startTickLoop()
+        startHeartbeatLoop()
         logManager.logServiceEvent("Viewer Engine Online (Coordinated)", important = true)
     }
 
@@ -364,12 +368,20 @@ class ViewerService : BaseMonitorService() {
 
         evaluateAlarmsInternal(now, nowRt, isSignalLoss, isTrackerJammerSuspicion, isTrackerStalled, isTrackerGap, isTrackerActive)
 
-        if (isSystemActive && (now - lastNotificationUpdateTs >= NOTIFICATION_THROTTLE_MS)) {
-            lastNotificationUpdateTs = now; notificationManager.updatePulse(sats = gpsManager.satellitesUsed, battery = health.batteryLevel, isSecure = !alarmManager.hasUnresolvedAlarms(), isPowerSave = health.isPowerSaveMode)
-        }
-
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, now)
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt; serviceTickCounter++
+    }
+
+    override suspend fun onHeartbeat(now: Long, nowRt: Long) {
+        if (isSystemActive) {
+            val health = integrityMonitor.currentHealth
+            notificationManager.updatePulse(
+                sats = gpsManager.satellitesUsed, 
+                battery = health.batteryLevel, 
+                isSecure = !alarmManager.hasUnresolvedAlarms(), 
+                isPowerSave = health.isPowerSaveMode
+            )
+        }
     }
 
     private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSignalLoss: Boolean, isTrackerJammerSuspicion: Boolean, isTrackerStalled: Boolean, isTrackerGap: Boolean, isTrackerConnected: Boolean) {

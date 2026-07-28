@@ -19,6 +19,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.28.15:
+ * - Issue #610: Forensic Heartbeat Decoupling. Moved notification updates to 
+ *   the dedicated low-frequency heartbeat loop.
  * July.28.14:
  * - Issue #609: Structural Centralization. Removed redundant manual health 
  *   propagation as IntegrityMonitor now manages its own source of truth.
@@ -130,6 +133,7 @@ class TrackerService : BaseMonitorService() {
 
         setupPhysicalFastPaths()
         startTickLoop()
+        startHeartbeatLoop()
         
         logManager.logServiceEvent("Tracker Engine Online (Coordinated)", important = true)
     }
@@ -485,14 +489,21 @@ class TrackerService : BaseMonitorService() {
             )
         }
 
-        if (isSystemActive && (now - lastNotificationUpdateTs >= NOTIFICATION_THROTTLE_MS)) {
-            lastNotificationUpdateTs = now
-            notificationManager.updatePulse(sats = gpsManager.satellitesUsed, battery = health.batteryLevel, isSecure = !alarmManager.hasUnresolvedAlarms(), isPowerSave = isPowerSaveActive || health.isPowerSaveMode)
-        }
-
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, now)
         serviceTickCounter++
+    }
+
+    override suspend fun onHeartbeat(now: Long, nowRt: Long) {
+        if (isSystemActive) {
+            val health = integrityMonitor.currentHealth
+            notificationManager.updatePulse(
+                sats = gpsManager.satellitesUsed, 
+                battery = health.batteryLevel, 
+                isSecure = !alarmManager.hasUnresolvedAlarms(), 
+                isPowerSave = isPowerSaveActive || health.isPowerSaveMode
+            )
+        }
     }
 
     private fun onLocationChanged(location: Location) {
