@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.28.20:
+ * - Issue #614: Structural: GNSS Callback Overhead Monitoring. Added 
+ *   GNSS_SAMPLING_INTERVAL_MS to throttle high-frequency hardware chatter.
  * July.27.11:
  * - A15 Hardening: Raised I/O latency audit thresholds for budget hardware 
  *   to prevent recursive forensic log bursts during cold-start.
@@ -235,6 +238,7 @@ const val THROTTLE_TILT_LIMIT = 5.0
 const val THROTTLE_ACOUSTIC_LIMIT = 15.0
 const val THROTTLE_COMPASS_LIMIT = 5.0
 const val THROTTLE_BARO_LIMIT = 0.5
+const val GNSS_SAMPLING_INTERVAL_MS = 2000L
 
 // System Thresholds (Core Logic)
 const val TRACKER_SIGNAL_LOSS_THRESHOLD_MS = 180000L

@@ -1,10 +1,11 @@
-# System Source of Truth (SoT) - July.28.18 (Location Refresh Reactivity)
+# System Source of Truth (SoT) - July.28.20 (GNSS Callback Conflation)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Budget Hardware Hardening (R606)**: On restricted hardware (e.g., Samsung A15), high-frequency platform callbacks (GPS/GNSS) MUST be offloaded to dedicated HandlerThreads. UI state re-computation MUST be sampled (min 3000ms) and conflated to prevent Main Thread starvation during cold-start I/O storms. (Issue #606, July.27.11)
+*   **GNSS Callback Conflation Authority (R614)**: High-frequency GNSS hardware callbacks MUST be sampled to prevent downstream flow processing overhead. While scalar metrics (Sats in view, SNR) and forensic buffers MUST be updated per-event to ensure real-time health accuracy, the emission of detailed satellite lists (GnssDetail) MUST be throttled to `GNSS_SAMPLING_INTERVAL_MS` (2000ms). (Issue #614, July.28.20)
 *   **Foreground Service Startup Sync (R607)**: Foreground services MUST establish notification channels and role-specific configurations (Tracker/Viewer) synchronously on the Main thread within `onCreate()` BEFORE invoking `startForeground()`. This prevents "Bad notification" crashes on Android 14+ devices. (Issue #607, July.27.12)
 *   **Startup Notification Content Authority (R608)**: To prevent visual flickering, Services MUST provide role-specific and health-aware notification metadata (Battery level, Security status) immediately during the initial `startForeground()` call. (Issue #608, July.27.13)
 *   **Centralized Health Snapshot Authority (R609)**: `IntegrityMonitor` is the single source of truth for local system health. It MUST reactively observe OS-level events (Battery, Network) and provide a unified `StateFlow<SystemHealthState>`. Manual health propagation in service ticks is FORBIDDEN. (Issue #609, July.28.14)
@@ -61,5 +62,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.28.18.
+*   **Current Release**: July.28.20.
 *   **Source of Truth**: app/build.gradle versionName.

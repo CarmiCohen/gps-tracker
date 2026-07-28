@@ -18,6 +18,11 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * July.28.20:
+ * - Issue #614: Structural: GNSS Callback Overhead Monitoring. Implemented 
+ *   sampling for high-frequency GNSS status callbacks to prevent Main Thread 
+ *   starvation on budget hardware. Scalars are updated live, but detailed 
+ *   flow emissions are throttled by GNSS_SAMPLING_INTERVAL_MS.
  * July.28.18:
  * - Issue #613: Forensic: Location Refresh Reactivity. Added reactive 
  *   locationStatusFlow to monitor pending fixes and stalls without polling.
@@ -49,6 +54,7 @@ class GpsManager @Inject constructor(
         private set
 
     private var lastFixRt = 0L
+    private var lastGnssEmitRt = 0L
 
     data class LocationStatus(
         val isPending: Boolean = false,
@@ -72,33 +78,28 @@ class GpsManager @Inject constructor(
 
     private val gnssStatusCallback = object : GnssStatus.Callback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
+            val nowRt = timeProvider.elapsedRealtime()
+            
+            // Basic status updates are lightweight and needed for real-time health checks
             satellitesInView = status.satelliteCount
             var used = 0
             var snrSum = 0.0
             var snrCount = 0
-            val satList = mutableListOf<SatelliteInfo>()
 
             for (i in 0 until status.satelliteCount) {
-                val usedInFix = status.usedInFix(i)
-                if (usedInFix) used++
+                if (status.usedInFix(i)) used++
                 val snr = status.getCn0DbHz(i).toDouble()
                 if (snr > 0.0) {
                     snrSum += snr
                     snrCount++
                 }
-                satList.add(SatelliteInfo(
-                    svid = status.getSvid(i),
-                    cn0 = snr,
-                    usedInFix = usedInFix,
-                    constellation = status.getConstellationType(i)
-                ))
             }
+            
             satellitesUsed = used
             val avg = if (snrCount > 0) snrSum / snrCount else 0.0
             averageSnr = avg
             
             val now = timeProvider.currentTimeMillis()
-            val nowRt = timeProvider.elapsedRealtime()
             synchronized(snrTsBuffer) {
                 snrTsBuffer[snrBufferIdx] = now
                 snrRtBuffer[snrBufferIdx] = nowRt
@@ -107,7 +108,26 @@ class GpsManager @Inject constructor(
                 if (snrBufferCount < 512) snrBufferCount++
             }
 
-            _internalGpsFlow.tryEmit(GpsUpdate.GnssUpdate(GnssDetail(satellites = satList.sortedByDescending { it.cn0 })))
+            // Issue #614: Throttle high-frequency hardware chatter to prevent downstream 
+            // flow processing overhead on budget hardware.
+            if (nowRt - lastGnssEmitRt >= GNSS_SAMPLING_INTERVAL_MS) {
+                lastGnssEmitRt = nowRt
+                
+                val satList = mutableListOf<SatelliteInfo>()
+                for (i in 0 until status.satelliteCount) {
+                    satList.add(SatelliteInfo(
+                        svid = status.getSvid(i),
+                        cn0 = status.getCn0DbHz(i).toDouble(),
+                        usedInFix = status.usedInFix(i),
+                        constellation = status.getConstellationType(i)
+                    ))
+                }
+                
+                _internalGpsFlow.tryEmit(GpsUpdate.GnssUpdate(
+                    GnssDetail(satellites = satList.sortedByDescending { it.cn0 })
+                ))
+            }
+
             updateLocationStatus()
         }
     }
