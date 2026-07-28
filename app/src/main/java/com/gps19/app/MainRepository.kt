@@ -5,6 +5,7 @@ import androidx.room.withTransaction
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
 import org.osmdroid.util.GeoPoint
 import timber.log.Timber
@@ -16,11 +17,13 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * July.28.22:
+ * - Issue #616: Repository Event Pipeline Hardening. Updated _uiCommands and 
+ *   _liveHistoryFlow to utilize BufferOverflow.DROP_OLDEST. This prevents 
+ *   collector-side suspension in high-load scenarios (R616).
  * July.27.05:
  * - Issue #600: Forensic Playback Latency Audit. Updated eventLogsFlow to support 
  *   dynamic retrieval limits.
- * July.27.00:
- * - Architecture Audit: Centralized PreferenceKeys and removed redundant aliases.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -86,7 +89,10 @@ class MainRepository @Inject constructor(
         entities.map { ViolationPoint(point = GeoPoint(it.lat, it.lng), type = it.type, ts = it.ts, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy) } 
     }.flowOn(Dispatchers.Default)
 
-    private val _uiCommands = MutableSharedFlow<UiCommand>(extraBufferCapacity = 10)
+    private val _uiCommands = MutableSharedFlow<UiCommand>(
+        extraBufferCapacity = 10,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val uiCommands: SharedFlow<UiCommand> = _uiCommands.asSharedFlow()
 
     fun sendCommand(command: UiCommand) { scope.launch { _uiCommands.emit(command) } }
@@ -318,7 +324,10 @@ class MainRepository @Inject constructor(
     private var lastBatchWriteRealtime = 0L
     private val historyBuffer = ConcurrentLinkedQueue<HistoryEntity>()
 
-    private val _liveHistoryFlow = MutableSharedFlow<Pair<String, List<ConnectionPoint>>>(extraBufferCapacity = 64)
+    private val _liveHistoryFlow = MutableSharedFlow<Pair<String, List<ConnectionPoint>>>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val liveHistoryFlow = _liveHistoryFlow.asSharedFlow()
 
     fun addHistoryPoint(ribbonKey: String, point: ConnectionPoint) {

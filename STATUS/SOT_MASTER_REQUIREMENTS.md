@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.28.21 (Stability Audit Expansion)
+# System Source of Truth (SoT) - July.28.22 (Repository Event Pipeline Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -7,6 +7,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Budget Hardware Hardening (R606)**: On restricted hardware (e.g., Samsung A15), high-frequency platform callbacks (GPS/GNSS) MUST be offloaded to dedicated HandlerThreads. UI state re-computation MUST be sampled (min 3000ms) and conflated to prevent Main Thread starvation during cold-start I/O storms. (Issue #606, July.27.11)
 *   **GNSS Callback Conflation Authority (R614)**: High-frequency GNSS hardware callbacks MUST be sampled to prevent downstream flow processing overhead. While scalar metrics (Sats in view, SNR) and forensic buffers MUST be updated per-event to ensure real-time health accuracy, the emission of detailed satellite lists (GnssDetail) MUST be throttled to `GNSS_SAMPLING_INTERVAL_MS` (2000ms). (Issue #614, July.28.20)
 *   **Hardware Timing Audit Authority (R615)**: The system MUST monitor GNSS callback timing for hardware-level instability. Observed jitter (deviation from `GNSS_EXPECTED_INTERVAL_MS`) exceeding `GNSS_JITTER_THRESHOLD_MS` (500ms) MUST be flagged in forensic stability audits as "Hardware Instability" with the maximum observed jitter recorded. (Issue #615, July.28.21)
+*   **Repository Event Pipeline Hardening (R616)**: All `MutableSharedFlow` pipelines within the Repository layer MUST utilize `BufferOverflow.DROP_OLDEST` to prevent collector-side suspension. This ensures that high-frequency telemetry (e.g., live history) and critical UI commands are never blocked by slow or back-pressured consumers. (Issue #616, July.28.22)
 *   **Foreground Service Startup Sync (R607)**: Foreground services MUST establish notification channels and role-specific configurations (Tracker/Viewer) synchronously on the Main thread within `onCreate()` BEFORE invoking `startForeground()`. This prevents "Bad notification" crashes on Android 14+ devices. (Issue #607, July.27.12)
 *   **Startup Notification Content Authority (R608)**: To prevent visual flickering, Services MUST provide role-specific and health-aware notification metadata (Battery level, Security status) immediately during the initial `startForeground()` call. (Issue #608, July.27.13)
 *   **Centralized Health Snapshot Authority (R609)**: `IntegrityMonitor` is the single source of truth for local system health. It MUST reactively observe OS-level events (Battery, Network) and provide a unified `StateFlow<SystemHealthState>`. Manual health propagation in service ticks is FORBIDDEN. (Issue #609, July.28.14)
@@ -63,5 +64,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.28.21.
+*   **Current Release**: July.28.2218.
 *   **Source of Truth**: app/build.gradle versionName.
