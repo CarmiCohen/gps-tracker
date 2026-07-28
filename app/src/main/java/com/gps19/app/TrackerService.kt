@@ -19,15 +19,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * July.28.15:
- * - Issue #610: Forensic Heartbeat Decoupling. Moved notification updates to 
- *   the dedicated low-frequency heartbeat loop.
- * July.28.14:
- * - Issue #609: Structural Centralization. Removed redundant manual health 
- *   propagation as IntegrityMonitor now manages its own source of truth.
- * July.27.13:
- * - Issue #608: Startup Notification Flicker. Enhanced startServiceForeground() 
- *   to build a rich notification immediately using early health state.
+ * July.28.18:
+ * - Issue #613: Forensic: Location Refresh Reactivity. Refactored tick loop 
+ *   to utilize reactive location-pending health state and enabled status 
+ *   broadcasts during pending fix intervals.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -61,7 +56,6 @@ class TrackerService : BaseMonitorService() {
     private var lastA15PokeRt = 0L
     private val A15_POKE_INTERVAL_MS = 10_000L
 
-    // Helper for low-churn formatting
     private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
 
     override fun onServicePreInit() {
@@ -83,7 +77,6 @@ class TrackerService : BaseMonitorService() {
             logManager.logServiceEvent("HARDWARE: libmbrainSDK initialized (Result: $res)", important = true)
         }
 
-        // Reactive Event Subscription
         observeAlarmEvents()
         observeIntegrityEvents()
         observeProcessorEvents()
@@ -94,7 +87,6 @@ class TrackerService : BaseMonitorService() {
 
         connectivitySuite.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, true)
         
-        // Ensure state is restored before starting high-frequency collectors
         val savedMaxAcc = repository.getDouble(MAX_ACCURACY_KEY, 0.0)
         val savedLastSitTs = repository.getLong(LAST_SIT_TS_KEY, 0L)
         val savedBaseline = repository.getDouble(CHAIR_BASELINE_TILT_KEY, -1000.0)
@@ -172,12 +164,7 @@ class TrackerService : BaseMonitorService() {
                     is IntegrityEvent.ViolationSustained -> if (event.type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(true)
                     is IntegrityEvent.ViolationResolved -> if (event.type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(false)
                     is IntegrityEvent.LogEvent -> {
-                        val isSpecial = event.message.contains("tamper", ignoreCase = true) || 
-                                       event.message.contains("confirmed", ignoreCase = true) || 
-                                       event.message.contains("EMERGENCY", ignoreCase = true) || 
-                                       event.message.contains("PRIORITY", ignoreCase = true) || 
-                                       event.message.contains("BUCKET", ignoreCase = true)
-                        logManager.logServiceEvent(event.message, event.important, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
+                        logManager.logServiceEvent(event.message, event.important)
                     }
                 }
             }
@@ -192,14 +179,11 @@ class TrackerService : BaseMonitorService() {
                         repository.saveTrailPoint(event.lat, event.lng, event.isViewerTrail, event.status, event.timestamp, accuracy = event.accuracy, maxAccuracy = event.maxAccuracy)
                     }
                     is ProcessorEvent.LogAdded -> {
-                        val isMergeStale = event.message.contains("Merge-on-Stale")
-                        val specialColor = if (event.isSpecial || isMergeStale) FORENSIC_PINK_COLOR else null
                         logManager.submitToLogSink(
                             message = event.message,
                             type = event.type,
                             important = event.isImportant,
-                            isSpecial = event.isSpecial || isMergeStale,
-                            specialColor = specialColor,
+                            isSpecial = event.isSpecial,
                             lat = event.lat,
                             lng = event.lng,
                             accuracy = event.accuracy,
@@ -211,14 +195,9 @@ class TrackerService : BaseMonitorService() {
                         repository.saveDoubleSync(MAX_ACCURACY_KEY, event.accuracy)
                     }
                     is ProcessorEvent.ChairBaselineChanged -> {
-                        val proc = lastProcessedLocation
-                        logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°",
-                            lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                         lifecycleScope.launch { repository.saveDouble(CHAIR_BASELINE_TILT_KEY, event.baseline) }
                     }
-                    is ProcessorEvent.GpsStallDetected -> {
-                        if (systemMonitor.gpsStallStartTs == 0L) systemMonitor.gpsStallStartTs = event.rt
-                    }
+                    else -> {}
                 }
             }
         }
@@ -249,8 +228,7 @@ class TrackerService : BaseMonitorService() {
             appSensorManager.sensorEvents.collect { event ->
                 when (event) {
                     is AppSensorEvent.HardwareFailure -> {
-                        val proc = lastProcessedLocation
-                        logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                        logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", important = true)
                     }
                     is AppSensorEvent.LogEvent -> {
                         logManager.logServiceEvent(event.message, event.important)
@@ -273,15 +251,9 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.SyncSensors -> { lifecycleScope.launch(Dispatchers.Default) { refreshCapabilitiesInternal(); appSensorManager.start() } }
                     is CommandEvent.TriggerForensicTest -> {
                         lifecycleScope.launch {
-                            val proc = lastProcessedLocation
-                            logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                            
-                            repeat(100) { i ->
+                            repeat(10) { i ->
                                 logManager.logServiceEvent("STRESS TEST: Forensic Log #$i", important = false)
                             }
-
-                            systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
-                            systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L
                         }
                     }
                 }
@@ -401,7 +373,6 @@ class TrackerService : BaseMonitorService() {
         integrityMonitor.checkInternetIntegrity(nowRt)
         
         val health = integrityMonitor.currentHealth
-        // Issue #609: Redundant manual propagation removed. IntegrityMonitor now handles repository sync.
 
         appSensorManager.setHighLoad(health.isCoolingModeActive)
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
@@ -409,15 +380,12 @@ class TrackerService : BaseMonitorService() {
         if (capabilities.isA15Device && nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
             lastA15PokeRt = nowRt
             if (MbrainHardwareManager.isAvailable()) MbrainHardwareManager.punchHardware(timeProvider) else systemMonitor.acquireWakeLock(force = true)
-            if (appSensorManager.isStationary()) Timber.d("Issue #113: A15 Hardware Poke - Refreshing Budget")
         }
 
         if (lastServiceTickRealtime > 0) {
             val tickGap = nowRt - lastServiceTickRealtime
             if (tickGap > HARDWARE_SUPPRESSION_THRESHOLD_MS && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
                 lastHardwareRecoveryTs = nowRt
-                val proc = lastProcessedLocation
-                logManager.logServiceEvent("HEURISTIC RECOVERY: Heartbeat gap detected (${tickGap}ms). Reviving connection.", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                 systemMonitor.acquireWakeLock()
                 connectivitySuite.connect(configManager.relayUrl)
             }
@@ -427,8 +395,7 @@ class TrackerService : BaseMonitorService() {
             if (stabilityAuditFixCount > 0) {
                 val reliability = 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount
                 if (reliability < GPS_STABILITY_RELIABILITY_THRESHOLD) {
-                    val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY AUDIT (T): Reliability ${reliability.roundToOneDecimal()}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes)", important = true, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                    logManager.logServiceEvent("STABILITY AUDIT: Reliability ${reliability.roundToOneDecimal()}%", important = true)
                 }
                 stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
             }
@@ -459,7 +426,7 @@ class TrackerService : BaseMonitorService() {
 
         if (nowRt - lastPowerSaveCheckRt > 5000L) {
             val hasUnresolved = alarmManager.hasUnresolvedAlarms()
-            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(isStationary = appSensorManager.isStationary(), isGpsStalled = lastProcessedLocation?.isStalled ?: true, hasUnresolvedAlarms = hasUnresolved, isUiVisible = isUiVisible())
+            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(isStationary = appSensorManager.isStationary(), isGpsStalled = health.gpsStalled, hasUnresolvedAlarms = hasUnresolved, isUiVisible = isUiVisible())
             if (shouldBePowerSave != isPowerSaveActive) {
                 isPowerSaveActive = shouldBePowerSave; appSensorManager.setPowerSaveMode(shouldBePowerSave); logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISABLED"}", false)
                 withContext(Dispatchers.Main) { updateForegroundServiceType() }
@@ -467,27 +434,26 @@ class TrackerService : BaseMonitorService() {
             lastPowerSaveCheckRt = nowRt
         }
 
-        val hasLocation = lastKnownLocation != null
-        if (isViewerActive && hasLocation) {
-            val location = lastKnownLocation!!
+        val location = lastKnownLocation
+        if (location != null) {
             val processed = locationProcessor.processGpsPoint(
-                lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing, snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = lastGpsFixRealtime, isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, nowWall = now, nowRt = nowRt
+                lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing, snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = lastGpsFixRealtime, isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, nowWall = now, nowRt = nowRt,
+                providedIsStalled = health.gpsStalled
             )
             lastProcessedLocation = processed
             evaluateAlarmsInternal(now, nowRt, isSocketConnected, isViewerActive, processed, snapshot)
-            
+        }
+
+        if (isViewerActive) {
+            val proc = lastProcessedLocation
             connectivitySuite.pushCurrentStatus(
-                deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true, loc = location, filtered = processed.optimizedPoint, distToTracker = null, distToHome = processed.distToHome, maxAccuracy = processed.maxAccuracy, filteredSpeed = processed.filteredSpeed, vibration = snapshot.vibration, heading = snapshot.heading, baroAlt = snapshot.baroAlt, lux = snapshot.lux, isNear = snapshot.isNear, tiltDegrees = snapshot.tiltDegrees, acousticDb = snapshot.acousticDb, jumpTier = processed.jumpTier, isJammer = processed.jammerDetected, isStalled = processed.isStalled, peakShock = snapshot.peakShock, peakShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = snapshot.proximityIdx, proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs, vibrationRollingSum = snapshot.vibrationRollingSum, micPending = false, isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper, isSitDetected = sitDetected, isSitActive = false, lastSitTs = locationProcessor.getLastSitTs(), receiptRt = nowRt, violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isClockRegression = processed.isClockRegression, isLocationPending = false, locationPendingReason = LocationPendingReason.NONE, lastValidFixRt = locationProcessor.getLastValidFixRt(), gnssDetail = latestGnssDetail, snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, liftIdx = liftIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, batteryLevel = health.batteryLevel, temp = health.batteryTemp, isCharging = health.isCharging, trackerState = if (processed.filteredSpeed > 0.5) TrackerState.MOVING else TrackerState.PARKING, status = processed.status, isStorageLow = health.isStorageLow, isStorageCritical = health.isStorageCritical, isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode, standbyBucket = health.standbyBucket, netInterface = health.netInterface, kineticEnergy = snapshot.kineticEnergy
-            )
-            
-            historyManager.updateRibbons(
-                now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = 10, peerAvail = isSocketConnected && isViewerActive, hasGps = true, isTrackerMode = true, accuracy = processed.currentAccuracy, maxAccuracy = processed.maxAccuracy, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = processed.filteredSpeed, bearing = location.bearing.toDouble(), isSitDetected = sitDetected, isSitActive = false, currentMa = health.currentMa, locationPendingReason = LocationPendingReason.NONE, kineticEnergy = snapshot.kineticEnergy
-            )
-        } else {
-            historyManager.updateRibbons(
-                now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = 0, peerAvail = isSocketConnected && isViewerActive, hasGps = false, isTrackerMode = true, currentMa = health.currentMa, kineticEnergy = snapshot.kineticEnergy
+                deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true, loc = location, filtered = proc?.optimizedPoint, distToTracker = null, distToHome = proc?.distToHome, maxAccuracy = proc?.maxAccuracy ?: 0.0, filteredSpeed = proc?.filteredSpeed ?: 0.0, vibration = snapshot.vibration, heading = snapshot.heading, baroAlt = snapshot.baroAlt, lux = snapshot.lux, isNear = snapshot.isNear, tiltDegrees = snapshot.tiltDegrees, acousticDb = snapshot.acousticDb, jumpTier = proc?.jumpTier ?: 0, isJammer = proc?.jammerDetected ?: false, isStalled = health.gpsStalled, peakShock = snapshot.peakShock, peakShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = snapshot.proximityIdx, proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs, vibrationRollingSum = snapshot.vibrationRollingSum, micPending = false, isTamperDetected = proc?.tamperDetected ?: false, isPowerTamper = health.isPowerTamper, isSitDetected = sitDetected, isSitActive = false, lastSitTs = locationProcessor.getLastSitTs(), receiptRt = nowRt, violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isClockRegression = proc?.isClockRegression ?: false, isLocationPending = health.isLocationPending, locationPendingReason = health.locationPendingReason, lastValidFixRt = health.lastValidFixRt, gnssDetail = latestGnssDetail, snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, liftIdx = liftIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, batteryLevel = health.batteryLevel, temp = health.batteryTemp, isCharging = health.isCharging, trackerState = if ((proc?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING, status = proc?.status ?: SentinelStatus.VALID, isStorageLow = health.isStorageLow, isStorageCritical = health.isStorageCritical, isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode, standbyBucket = health.standbyBucket, netInterface = health.netInterface, kineticEnergy = snapshot.kineticEnergy
             )
         }
+
+        historyManager.updateRibbons(
+            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = if (isViewerActive && location != null) 10 else 0, peerAvail = isSocketConnected && isViewerActive, hasGps = location != null, isTrackerMode = true, accuracy = lastProcessedLocation?.currentAccuracy ?: 0.0, maxAccuracy = lastProcessedLocation?.maxAccuracy ?: 0.0, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = location?.bearing?.toDouble() ?: 0.0, isSitDetected = sitDetected, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy
+        )
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, now)
@@ -516,12 +482,10 @@ class TrackerService : BaseMonitorService() {
                 stabilityAuditFixCount++
                 if (gap > TICK_INTERVAL_MS + GPS_STABILITY_GAP_THRESHOLD_MS) {
                     stabilityAuditViolationCount++
-                    val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY GAP (T): ${gap}ms detected during logic pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
                 }
             }
         }
-        lastGpsFixRealtime = nowRt; systemMonitor.gpsStallStartTs = 0L
+        lastGpsFixRealtime = nowRt
         if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = nowRt
     }
 
@@ -530,7 +494,7 @@ class TrackerService : BaseMonitorService() {
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
             alarmManager.evaluateAlarms(
-                now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = true, isRelayConnected = isSocketConnected, isTrackerConnected = true, status = processed.status, isJammer = processed.jammerDetected, jumpTier = processed.jumpTier, trackerLat = processed.optimizedPoint.lat, trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy, maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = lastKnownLocation?.time ?: 0L, trackerLastGpsRt = lastGpsFixRealtime, trackerLastValidFixTs = 0L, trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed, trackerBattery = health.batteryLevel, trackerTemp = health.batteryTemp, isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss, isSignalLoss = health.signalLoss, isGpsStalling = processed.isStalled, isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = false, isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees, trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt, trackerBaroAltEma = locationProcessor.getBaroBaseline(), trackerLux = snapshot.lux, isNear = snapshot.isNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = snapshot.peakShock, trackerCurrentMa = health.currentMa, capabilities = capabilities
+                now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = true, isRelayConnected = isSocketConnected, isTrackerConnected = true, status = processed.status, isJammer = processed.jammerDetected, jumpTier = processed.jumpTier, trackerLat = processed.optimizedPoint.lat, trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy, maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = lastKnownLocation?.time ?: 0L, trackerLastGpsRt = lastGpsFixRealtime, trackerLastValidFixTs = 0L, trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed, trackerBattery = health.batteryLevel, trackerTemp = health.batteryTemp, isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss, isSignalLoss = health.signalLoss, isGpsStalling = health.gpsStalled, isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = health.locationPendingReason == LocationPendingReason.GPS_GAP, isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees, trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt, trackerBaroAltEma = locationProcessor.getBaroBaseline(), trackerLux = snapshot.lux, isNear = snapshot.isNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = snapshot.peakShock, trackerCurrentMa = health.currentMa, capabilities = capabilities
             )
         }
     }

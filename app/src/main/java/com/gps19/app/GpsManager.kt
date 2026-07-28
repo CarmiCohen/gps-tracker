@@ -18,6 +18,9 @@ import javax.inject.Singleton
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * July.28.18:
+ * - Issue #613: Forensic: Location Refresh Reactivity. Added reactive 
+ *   locationStatusFlow to monitor pending fixes and stalls without polling.
  * July.27.12:
  * - A15 Hardening: Migrated all hardware callbacks to a dedicated HandlerThread 
  *   to ensure GNSS status chatter does not block the Main Looper.
@@ -44,6 +47,17 @@ class GpsManager @Inject constructor(
         private set
     var averageSnr = 0.0
         private set
+
+    private var lastFixRt = 0L
+
+    data class LocationStatus(
+        val isPending: Boolean = false,
+        val reason: LocationPendingReason = LocationPendingReason.NONE,
+        val lastFixRt: Long = 0L
+    )
+
+    private val _locationStatus = MutableStateFlow(LocationStatus())
+    val locationStatusFlow: StateFlow<LocationStatus> = _locationStatus.asStateFlow()
 
     private val snrTsBuffer = LongArray(512)
     private val snrRtBuffer = LongArray(512)
@@ -94,10 +108,40 @@ class GpsManager @Inject constructor(
             }
 
             _internalGpsFlow.tryEmit(GpsUpdate.GnssUpdate(GnssDetail(satellites = satList.sortedByDescending { it.cn0 })))
+            updateLocationStatus()
         }
     }
 
     private val _internalGpsFlow = MutableSharedFlow<GpsUpdate>(replay = 1)
+
+    init {
+        // Heartbeat for status flow to catch timeouts even when no hardware callbacks arrive
+        externalScope.launch {
+            while (isActive) {
+                updateLocationStatus()
+                delay(5000L)
+            }
+        }
+    }
+
+    private fun updateLocationStatus() {
+        val nowRt = timeProvider.elapsedRealtime()
+        val delta = if (lastFixRt > 0) nowRt - lastFixRt else nowRt // Treat uptime as initial delta
+        
+        var isPending = false
+        var reason = LocationPendingReason.NONE
+        
+        if (delta > GPS_GAP_THRESHOLD_MS) {
+            isPending = true
+            reason = when {
+                satellitesInView == 0 -> LocationPendingReason.SIGNAL_LOSS
+                satellitesInView >= 4 && satellitesUsed < 4 -> LocationPendingReason.GPS_STALL
+                else -> LocationPendingReason.GPS_GAP
+            }
+        }
+        
+        _locationStatus.update { it.copy(isPending = isPending, reason = reason, lastFixRt = lastFixRt) }
+    }
 
     @SuppressLint("MissingPermission")
     private val hardwareObservationFlow = callbackFlow<GpsUpdate> {
@@ -109,13 +153,19 @@ class GpsManager @Inject constructor(
 
         fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
             if (loc != null) {
+                lastFixRt = timeProvider.elapsedRealtime()
                 trySend(GpsUpdate.LocationUpdate(loc))
+                updateLocationStatus()
             }
         }
 
         val fusedCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                result.lastLocation?.let { trySend(GpsUpdate.LocationUpdate(it)) }
+                result.lastLocation?.let { 
+                    lastFixRt = timeProvider.elapsedRealtime()
+                    trySend(GpsUpdate.LocationUpdate(it))
+                    updateLocationStatus()
+                }
             }
         }
 

@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.28.17 (Standby & Power-Save Reactivity)
+# System Source of Truth (SoT) - July.28.18 (Location Refresh Reactivity)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -11,6 +11,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Forensic Heartbeat Decoupling (R610)**: Low-frequency system updates (Notification Pulse, UI Heartbeats) MUST be decoupled from high-frequency logic ticks. A dedicated heartbeat loop MUST be used for non-kinematic tasks to prevent logic-loop jitter. (Issue #610, July.28.15)
 *   **Forensic Disk Space Reactivity (R611)**: Internal storage monitoring MUST be reactive. `SystemStatusProvider` MUST provide a reactive flow for storage health. `IntegrityMonitor` MUST observe this flow to trigger storage alerts immediately. Polling within logic ticks is FORBIDDEN. (Issue #611, July.28.16)
 *   **Standby & Power-Save Reactivity (R612)**: Power Save Mode and App Standby Bucket monitoring MUST be reactive. `SystemStatusProvider` MUST provide a reactive flow for power status. `IntegrityMonitor` MUST observe this flow. Polling OS power states within high-frequency logic ticks is FORBIDDEN. (Issue #612, July.28.17)
+*   **Location Refresh Reactivity Authority (R613)**: The system MUST maintain a reactive Flow for location-pending status (stalls, gaps, or initial discovery) within `GpsManager`, which is observed by `IntegrityMonitor` to update the central `SystemHealthState`. This ensures that UI and signaling components receive real-time updates on GPS health without manual polling or logic-loop dependencies. (Issue #613, July.28.18)
 *   **Deferred Flow Collection (R542)**: Heavy Room-backed flows (logs, trails, violations) MUST be collected only within their respective screen routes (Tracker/Viewer). (Issue #542, July.24.07)
 *   **UI State Decomposition (R547)**: The application UI MUST decompose monolithic state objects into persistent and transient streams to minimize heap churn. (Issue #547, July.24.08)
 *   **Zero-Churn Engine Windows (R547b)**: High-frequency kinematic windows MUST utilize circular primitive buffers to eliminate GC pressure. (Issue #547b, July.25.07)
@@ -60,5 +61,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.28.17.
+*   **Current Release**: July.28.18.
 *   **Source of Truth**: app/build.gradle versionName.
