@@ -16,11 +16,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.27.12:
+ * - Issue #607: Foreground Service Startup Race Condition. Implemented 
+ *   onServicePreInit() for early notification configuration. Removed redundant 
+ *   FGS throttle logic and initialization calls (leftovers).
  * July.27.07:
- * - Issue #605: Forensic Log Latency Audit. Resolved compilation errors in updateRibbons 
- *   and evaluateAlarms (duplicate arguments and unresolved references).
- * July.27.00:
- * - Architecture Audit: Restored from corrupted write. Corrected syntax and parameter alignment.
+ * - Issue #605: Forensic Log Latency Audit.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -43,10 +44,11 @@ class ViewerService : BaseMonitorService() {
     private var stabilityAuditViolationCount = 0
     private var lastStabilityAuditTs = 0L
     
-    private var lastFgsUpdateRt = 0L
-    private val FGS_TYPE_UPDATE_THROTTLE_MS = 10_000L
-
     private var capabilities = HardwareCapabilities()
+
+    override fun onServicePreInit() {
+        notificationManager.setTrackerMode(false)
+    }
 
     override suspend fun onServiceInitialize() {
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
@@ -104,7 +106,6 @@ class ViewerService : BaseMonitorService() {
         serviceStartWall = timeProvider.currentTimeMillis()
 
         startTickLoop()
-        withContext(Dispatchers.Main) { updateForegroundServiceType() }
         logManager.logServiceEvent("Viewer Engine Online (Coordinated)", important = true)
     }
 
@@ -279,12 +280,6 @@ class ViewerService : BaseMonitorService() {
     @SuppressLint("InlinedApi")
     override fun updateForegroundServiceType() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val nowRt = timeProvider.elapsedRealtime()
-            val startupWindowActive = nowRt - serviceStartRealtime < 10_000L
-            if (startupWindowActive && lastFgsUpdateRt != 0L) return 
-            if (nowRt - lastFgsUpdateRt < FGS_TYPE_UPDATE_THROTTLE_MS) return
-            
-            lastFgsUpdateRt = nowRt
             fgsUpdateJob?.cancel()
             fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main) {
                 try {

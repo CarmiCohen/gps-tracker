@@ -1,50 +1,45 @@
-# Handover (July.27.11) - Budget Hardware Stability Hardening [READY]
+# Handover (July.27.12) - Foreground Service Startup Hardening [READY]
 
 ## 🎯 Completed Objective
-Cycle **July.27.11** achieved **443 Resolved Issues** (Cumulative).
-1.  **[Issue #606] [Category: Performance] Budget Hardware Stability Hardening (Samsung A15)**:
-    - **Remediation**: Resolved persistent cold-start ANR on restricted hardware by decoupling high-frequency platform telemetry from the Main Looper.
-    - **Main-Thread Offloading**: Migrated GPS and GNSS status callbacks to a dedicated `HandlerThread` in `GpsManager`.
-    - **UI Throttling**: Implemented aggressive 3-second state sampling in `MainViewModel` using `Flow.sample()` for A15 devices, ensuring input dispatch remains responsive.
-    - **I/O Storm Mitigation**: Deferred cold-start database maintenance (`proactivePruning`) by 10 seconds to eliminate contention during setup overlay rendering.
-    - **Audit Hardening**: Raised performance audit thresholds in `EngineConstants` to prevent recursive "Slow I/O" log bursts on struggling devices.
-    - **Requirement**: Added **R606** (Budget Hardware Hardening) to `SOT_MASTER_REQUIREMENTS.md`.
+Cycle **July.27.12** achieved **444 Resolved Issues** (Cumulative).
+1.  **[Issue #607] [Category: Stability] Foreground Service Startup Race Condition (Bad Notification)**:
+    - **Remediation**: Resolved a critical race condition where `BaseMonitorService` called `startForeground` before subclasses initialized the notification channel.
+    - **Synchronous Initialization**: Introduced `onServicePreInit()` hook to ensure role configuration (Tracker vs Viewer) and channel creation happen synchronously on the Main thread within `onCreate()`.
+    - **Requirement**: Added **R607** (Foreground Service Startup Sync) to `SOT_MASTER_REQUIREMENTS.md`.
 
 ## 📊 Status Tracker
+- **[Issue #607] Foreground Service Startup Race Condition**: 🟢 Resolved.
 - **[Issue #606] Budget Hardware Stability Hardening**: 🟢 Resolved.
 - **[Issue #604] Ribbon Density & Aliasing Audit**: 🟢 Resolved.
-- **[Issue #605] Forensic Log Latency Audit**: 🟢 Resolved.
-- **[Issue #603] Analytical Ribbon Optimization**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
 - **Build Status**: 🟢 SUCCESS (Verified via `:app:assembleDebug`).
-- **Version**: **July.27.11**.
-- **Requirement Parity**: Added **R606** (Budget Hardware Hardening).
+- **Version**: **July.27.12**.
+- **Requirement Parity**: Added **R607** (Foreground Service Startup Sync).
 
 ### 🧬 Forensic Inventory (Update)
-| Component | Field / Tag / Constant | Value / Description |
+| Component | Hook / Method | Action |
 | :--- | :--- | :--- |
-| **GpsManager** | `gpsThread` | Dedicated HandlerThread for hardware callbacks. |
-| **MainViewModel** | `.sample(3000L)` | Aggressive A15-aware UI throttling. |
-| **EngineConstants** | `LATENCY_THRESHOLD_DB_WRITE_MS` | Raised to 1000ms (A15 Hardening). |
+| **BaseMonitorService** | `onServicePreInit()` | New synchronous hook for immediate configuration. |
+| **BaseMonitorService** | `onCreate()` | `startForeground()` now strictly follows `onServicePreInit()`. |
 
 ## 💡 Simplification Ideas
-- **Hardware-Tier Profiles**: Instead of checking `isA15Device` in multiple places, consider a `HardwareTier` enum (LOW, MED, HIGH) determined at startup. This tier could globally drive sampling rates, polling intervals, and latency thresholds via a unified `HardwareProfile` object.
+- **Unified Notification State**: Currently, `AppNotificationManager` requires manual `setTrackerMode` calls. Consider making it reactively observe a `ServiceRole` StateFlow to automatically update channels and notification content, further decoupling UI logic from service lifecycle.
 
 ## ⚠️ Newly Identified Risks & Concerns
-- **[Issue #607] [Severity: Med] [Category: UI] Sample-Induced Handshake Latency**.
-    - **Concern**: Aggressive 3s sampling on A15 may cause the status bar checkmarks (INT/SRV) to appear "jumpy" or lagged during manual setup steps. This is an acceptable trade-off for responsiveness but may require visual smoothing in future cycles.
+- **[Issue #608] [Severity: Low] [Category: UX] Startup Notification Flicker**.
+    - **Concern**: Brief display of default notification title before subclass updates. Acceptable trade-off for crash prevention.
 
 ## 🚀 Release commands
 ```bash
 git add .
-git commit -m "Release July.27.11: Budget Hardware Stability Hardening (#606)"
-git tag -a July.27.11 -m "Samsung A15 Hardening - ANR Remediation"
+git commit -m "Release July.27.12: Foreground Service Startup Hardening (#607)"
+git tag -a July.27.12 -m "Fixed race condition in startForeground initialization"
 git push origin main --tags
 ```
 
 ## 🎯 Next Objective
-- **[Issue #607] [Sprint: July.28.xx] [Priority: Low] UI Handshake Smoothing**.
-    - **Scope**: Evaluate if status-only flows should bypass sampling to maintain "snappy" UI feedback while keeping heavy recomputations throttled.
+- **[Issue #608] [Sprint: July.28.xx] [Priority: Low] UX: Startup Notification Flicker**.
+    - **Scope**: Evaluate methods to provide subclass-specific notification metadata to `BaseMonitorService` before `onCreate` completes.
 
 **Status**: READY FOR NEW FRESH CHAT.

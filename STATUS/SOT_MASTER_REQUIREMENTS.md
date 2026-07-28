@@ -1,10 +1,11 @@
-# System Source of Truth (SoT) - July.27.11 (A15 Hardened)
+# System Source of Truth (SoT) - July.27.12 (Startup Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Budget Hardware Hardening (R606)**: On restricted hardware (e.g., Samsung A15), high-frequency platform callbacks (GPS/GNSS) MUST be offloaded to dedicated HandlerThreads. UI state re-computation MUST be sampled (min 3000ms) and conflated to prevent Main Thread starvation during cold-start I/O storms. (Issue #606, July.27.11)
+*   **Foreground Service Startup Sync (R607)**: Foreground services MUST establish notification channels and role-specific configurations (Tracker/Viewer) synchronously on the Main thread within `onCreate()` BEFORE invoking `startForeground()`. This prevents "Bad notification" crashes on Android 14+ devices. (Issue #607, July.27.12)
 *   **Deferred Flow Collection (R542)**: Heavy Room-backed flows (logs, trails, violations) MUST be collected only within their respective screen routes (Tracker/Viewer). (Issue #542, July.24.07)
 *   **UI State Decomposition (R547)**: The application UI MUST decompose monolithic state objects into persistent and transient streams to minimize heap churn. (Issue #547, July.24.08)
 *   **Zero-Churn Engine Windows (R547b)**: High-frequency kinematic windows MUST utilize circular primitive buffers to eliminate GC pressure. (Issue #547b, July.25.07)
@@ -54,5 +55,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.27.11.
+*   **Current Release**: July.27.12.
 *   **Source of Truth**: app/build.gradle versionName.

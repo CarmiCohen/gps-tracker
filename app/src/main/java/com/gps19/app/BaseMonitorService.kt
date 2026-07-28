@@ -18,10 +18,11 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * July.27.12:
+ * - Issue #607: Foreground Service Startup Race Condition. Moved startForeground 
+ *   to onCreate() (Main thread) and added onServicePreInit() for early configuration.
  * July.26.04:
  * - Issue #589: Performance Audit. Integrated reactive Watchdog monitoring.
- * July.26.03:
- * - Issue #586: Service Initialization Coordination.
  */
 abstract class BaseMonitorService : LifecycleService() {
 
@@ -84,10 +85,11 @@ abstract class BaseMonitorService : LifecycleService() {
         serviceStartRealtime = timeProvider.elapsedRealtime()
         serviceStartWall = timeProvider.currentTimeMillis()
         
+        // Issue #607: Ensure notification channels and role configuration are set BEFORE startForeground.
+        onServicePreInit()
+        startServiceForeground()
+        
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
-            // 1. Mandatory Immediacy: Foreground Service
-            startServiceForeground()
-            
             // 2. Active State Sync
             launch {
                 repository.isSystemActiveFlow.collectLatest { active ->
@@ -119,6 +121,11 @@ abstract class BaseMonitorService : LifecycleService() {
     abstract fun updateForegroundServiceType()
     abstract suspend fun processTick(now: Long, nowRt: Long)
     abstract fun getRequiredTickInterval(): Long
+
+    /**
+     * onServicePreInit: Synchronous startup hook for immediate configuration (e.g. notifications).
+     */
+    protected abstract fun onServicePreInit()
     
     /**
      * onServiceInitialize: Event-driven startup hook for subclasses.

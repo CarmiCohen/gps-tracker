@@ -19,12 +19,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.27.12:
+ * - Issue #607: Foreground Service Startup Race Condition. Implemented 
+ *   onServicePreInit() for early notification configuration. Removed redundant 
+ *   FGS throttle logic and initialization calls (leftovers).
  * July.27.07:
- * - Issue #602: SIT Timestamp Parity Logic. Propagating peakVerticalVelocityTs/Rt 
- *   to HistoryManager to ensure forensic ribbon parity. Resolved compilation errors 
- *   (duplicate branch, syntax typos).
- * July.27.03:
- * - Issue #596: Enhanced TriggerForensicTest with 100-log burst for signaling validation.
+ * - Issue #602: SIT Timestamp Parity Logic.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -58,14 +58,14 @@ class TrackerService : BaseMonitorService() {
     private var lastA15PokeRt = 0L
     private val A15_POKE_INTERVAL_MS = 10_000L
 
-    private var lastFgsUpdateRt = 0L
-    private val FGS_TYPE_UPDATE_THROTTLE_MS = 10_000L
-
     // Helper for low-churn formatting
     private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
 
-    override suspend fun onServiceInitialize() {
+    override fun onServicePreInit() {
         notificationManager.setTrackerMode(true)
+    }
+
+    override suspend fun onServiceInitialize() {
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
 
         configManager.deviceId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
@@ -131,7 +131,6 @@ class TrackerService : BaseMonitorService() {
         setupPhysicalFastPaths()
         startTickLoop()
         
-        withContext(Dispatchers.Main) { updateForegroundServiceType() }
         logManager.logServiceEvent("Tracker Engine Online (Coordinated)", important = true)
     }
 
@@ -350,12 +349,6 @@ class TrackerService : BaseMonitorService() {
 
     override fun updateForegroundServiceType() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val nowRt = timeProvider.elapsedRealtime()
-            val startupWindowActive = nowRt - serviceStartRealtime < 10_000L
-            if (startupWindowActive && lastFgsUpdateRt != 0L) return
-            if (nowRt - lastFgsUpdateRt < FGS_TYPE_UPDATE_THROTTLE_MS) return
-
-            lastFgsUpdateRt = nowRt
             fgsUpdateJob?.cancel()
             fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main) {
                 delay(200)
