@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * July.30.23:
+ * - Issue #624: Forensic: System Integrity Periodic Check. Added 
+ *   lastIntegrityHeartbeatRt to track background monitor vitality.
  * July.29.00:
  * - Issue #622: Forensic: Location Refresh Reactivity Hardening. Added 
  *   lastLocationPendingDurationMs for precise gap audit.
@@ -60,6 +63,7 @@ data class SystemHealthState(
     val sessionConnectedMs: Long = 0L,
     val violationUptimeMs: Long = 0L,
     val violationPercentage: Double = 0.0,
+    val lastIntegrityHeartbeatRt: Long = 0L,
 
     // Sensor Metadata
     val vibration: Double = 0.0,

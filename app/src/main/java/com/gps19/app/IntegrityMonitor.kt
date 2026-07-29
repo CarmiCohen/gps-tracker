@@ -26,6 +26,9 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * July.30.23:
+ * - Issue #624: Forensic: System Integrity Periodic Check. Implemented background 
+ *   heartbeat and reactive flow vitality auditing (R624).
  * July.29.00:
  * - Issue #622: Forensic: Location Refresh Reactivity Hardening. Enhanced 
  *   location recovery logs with precise duration and recovery confirmation.
@@ -58,6 +61,13 @@ class IntegrityMonitor @Inject constructor(
     private var lastBatteryCheckTs = 0L
     private var lastPowerDisconnectTs = 0L
 
+    // Vitality Tracking
+    private var lastInternetUpdateRt = 0L
+    private var lastBatteryUpdateRt = 0L
+    private var lastStorageUpdateRt = 0L
+    private var lastPowerUpdateRt = 0L
+    private var lastLocationStatusUpdateRt = 0L
+
     private val _health = MutableStateFlow(SystemHealthState())
     val healthFlow: StateFlow<SystemHealthState> = _health.asStateFlow()
 
@@ -70,33 +80,83 @@ class IntegrityMonitor @Inject constructor(
         // Observe reactive OS status
         scope.launch {
             systemStatusProvider.observeInternetStatus()
-                .onEach { online -> updateHealth { it.copy(isHardwareOnline = online) } }
+                .onEach { online -> 
+                    lastInternetUpdateRt = timeProvider.elapsedRealtime()
+                    updateHealth { it.copy(isHardwareOnline = online) } 
+                }
                 .collect()
         }
 
         scope.launch {
             systemStatusProvider.observeBatteryStatus()
-                .onEach { status -> handleBatteryUpdate(status) }
+                .onEach { status -> 
+                    lastBatteryUpdateRt = timeProvider.elapsedRealtime()
+                    handleBatteryUpdate(status) 
+                }
                 .collect()
         }
 
         scope.launch {
             systemStatusProvider.observeStorageStatus()
-                .onEach { status -> handleStorageUpdate(status) }
+                .onEach { status -> 
+                    lastStorageUpdateRt = timeProvider.elapsedRealtime()
+                    handleStorageUpdate(status) 
+                }
                 .collect()
         }
 
         scope.launch {
             systemStatusProvider.observePowerStatus()
-                .onEach { status -> handlePowerUpdate(status) }
+                .onEach { status -> 
+                    lastPowerUpdateRt = timeProvider.elapsedRealtime()
+                    handlePowerUpdate(status) 
+                }
                 .collect()
         }
 
         scope.launch {
             gpsManager.locationStatusFlow
-                .onEach { status -> handleLocationStatusUpdate(status) }
+                .onEach { status -> 
+                    lastLocationStatusUpdateRt = timeProvider.elapsedRealtime()
+                    handleLocationStatusUpdate(status) 
+                }
                 .collect()
         }
+
+        startHeartbeat()
+    }
+
+    private fun startHeartbeat() {
+        scope.launch {
+            // Initial grace period to allow flows to stabilize
+            delay(BOOTSTRAP_PHASE_MS)
+            while (isActive) {
+                performIntegrityHeartbeat()
+                delay(INTEGRITY_HEARTBEAT_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun performIntegrityHeartbeat() {
+        val nowRt = timeProvider.elapsedRealtime()
+        
+        // Audit flow vitality: Storage and Power are polled at 60s, Location at 2s.
+        // We warn if a flow has been silent for 3x its expected interval.
+        val storageStalled = lastStorageUpdateRt > 0 && (nowRt - lastStorageUpdateRt) > INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
+        val powerStalled = lastPowerUpdateRt > 0 && (nowRt - lastPowerUpdateRt) > INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
+        val locationStalled = lastLocationStatusUpdateRt > 0 && (nowRt - lastLocationStatusUpdateRt) > 30000L
+
+        if (storageStalled || powerStalled || locationStalled) {
+            val stalls = mutableListOf<String>()
+            if (storageStalled) stalls.add("Storage")
+            if (powerStalled) stalls.add("Power")
+            if (locationStalled) stalls.add("Location")
+            
+            val msg = "INTEGRITY WARNING: Reactive flow stall detected (${stalls.joinToString(", ")}). Monitoring vitality compromised."
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
+        }
+
+        updateHealth { it.copy(lastIntegrityHeartbeatRt = nowRt) }
     }
 
     private fun updateHealth(transform: (SystemHealthState) -> SystemHealthState) {

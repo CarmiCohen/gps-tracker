@@ -1,39 +1,34 @@
-# Handover (July.29.22) - Latency Monitor Metric Cleanup [COMPLETED]
+# Handover (July.30.23) - System Integrity Periodic Check [COMPLETED]
 
 ## 🎯 Current Objective
-Finalized **[Issue #623] Structural: Latency Monitor Metric Cleanup**. Successfully migrated all call sites to the new `measureAndAudit` API, standardizing forensic performance and I/O auditing across the entire application.
+Finalized **[Issue #624] Forensic: System Integrity Periodic Check**. Implemented a background heartbeat mechanism within `IntegrityMonitor` to audit the vitality of critical reactive flows (Internet, Battery, Storage, Power, Location Status), ensuring the monitoring engine itself remains active and reliable.
 
 ## 📊 Status Tracker
-- **[Issue #623] Latency Monitor Metric Cleanup**: 🟢 Resolved (Steps 1-3 Completed).
+- **[Issue #624] System Integrity Periodic Check**: 🟢 Resolved.
+- **[Issue #623] Latency Monitor Metric Cleanup**: 🟢 Resolved.
 - **[Issue #622] Location Refresh Reactivity Hardening**: 🟢 Resolved.
-- **[Issue #621] UseCase Internalization Audit**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
-- **Build Status**: 🟢 **READY FOR RELEASE**.
-- **Target Version**: **July.29.22**.
-- **Requirement Parity**: **R623** (Unified Forensic Audit Naming) is fully operational and documented in SoT.
+- **Build Status**: 🟢 **READY FOR RELEASE** (Clean build verified).
+- **Target Version**: **July.30.23**.
+- **Requirement Parity**: **R624** (System Integrity Periodic Heartbeat) is fully operational and documented in SoT.
 
 ### 🛠️ Forensic Progress Log
-1.  **Standardized Metric Framework**: Implemented `AuditType` (PERFORMANCE vs IO) in `LatencyMonitor.kt` to enforce consistent naming prefixes.
-2.  **API Migration**: Migrated 100% of latency measurement call sites to `measureAndAudit`. This includes:
-    - **LocationProcessor**: `updateSensorData`, `processGpsPoint`.
-    - **LogRepository**: All database retrieval and write operations.
-    - **MainRepository**: Trail writes, violation writes, and history batch flushing.
-    - **AppSensorManager**: Forensic snapshots and sampling sequences.
-    - **HistoryManager**: Ribbon aggregation and gap-filling logic.
-    - **MbrainHardwareManager**: All native JNI hardware optimization calls.
-3.  **Codebase Sanitization**: Eliminated redundant string literals and threshold-checking boilerplate. The `LatencyMonitor` now handles message formatting internally (e.g., "Forensic Performance Audit: [Op] spike (120ms > 100ms)").
-4.  **Integrity Check**: Rebuilt the app and performed a global search to ensure no legacy `measure` calls persist.
+1.  **Metric Expansion**: Added `lastIntegrityHeartbeatRt` to `SystemHealthState` and `INTEGRITY_HEARTBEAT_INTERVAL_MS` to `EngineConstants.kt`.
+2.  **Vitality Tracking**: Updated `IntegrityMonitor` to track the precise `elapsedRealtime` of the last update for Internet, Battery, Storage, Power, and Location reactive flows.
+3.  **Heartbeat Implementation**: Launched a background coroutine in `IntegrityMonitor` that audits flow vitality every 60 seconds.
+4.  **Stall Detection**: Implemented logic to detect "silent" flows. If a flow (e.g., Storage/Power) stops updating for more than 3x its expected interval, a high-importance forensic integrity warning is emitted.
+5.  **Location Vitality**: Specifically hardened location status monitoring with a 30s stall threshold, ensuring that hardware GPS/GNSS callback failures are detected even if no new location fixes arrive.
 
 ## 🚀 Release commands
 ```bash
 git add .
-git commit -m "Release July.29.22: Structural - Latency Monitor Metric Cleanup Finalized (#623)"
-git tag -a July.29.22 -m "Standardized forensic spike reporting and migrated all call sites to measureAndAudit API."
+git commit -m "Release July.30.23: Forensic - System Integrity Periodic Check Finalized (#624)"
+git tag -a July.30.23 -m "Implemented background heartbeat and reactive flow vitality auditing in IntegrityMonitor."
 git push origin main --tags
 ```
 
 ## 🎯 Next Objective
-- **[Issue #624] [Sprint: July.30.24] [Priority: Med] Forensic: System Integrity Periodic Check - Implement background heartbeat to verify flow connectivity.**
+- **[Issue #625] [Sprint: July.31.23] [Priority: Med] Structural: Mbrain JNI Reliability Audit - Harden native hardware bridge against signal interrupts.**
 
-**Status**: ISSUE #623 RESOLVED. READY FOR FRESH CHAT.
+**Status**: ISSUE #624 RESOLVED. READY FOR FRESH CHAT.

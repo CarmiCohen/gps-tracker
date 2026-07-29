@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.30.23:
+ * - Issue #624: Forensic: System Integrity Periodic Check. Added 
+ *   INTEGRITY_HEARTBEAT_INTERVAL_MS for flow connectivity monitoring.
  * July.29.01:
  * - Issue #623: Structural: Latency Monitor Metric Cleanup. Added 
  *   LATENCY_THRESHOLD_ALARM_LOGIC_MS for dedicated watchdog monitoring.
@@ -11,12 +14,6 @@ package com.gps19.core.engine
  * July.28.21:
  * - Issue #615: Forensic: Stability Audit Metric Expansion. Added 
  *   GNSS_EXPECTED_INTERVAL_MS and GNSS_JITTER_THRESHOLD_MS.
- * July.28.20:
- * - Issue #614: Structural: GNSS Callback Overhead Monitoring. Added 
- *   GNSS_SAMPLING_INTERVAL_MS to throttle high-frequency hardware chatter.
- * July.27.11:
- * - A15 Hardening: Raised I/O latency audit thresholds for budget hardware 
- *   to prevent recursive forensic log bursts during cold-start.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -377,6 +374,7 @@ const val SIREN_AUTO_STOP_MS = 30000L
 const val SIREN_RESUME_COOLDOWN_MS = 15000L
 const val ALARM_OVERLAY_THROTTLE_MS = 30000L
 const val HEARTBEAT_INTERVAL_MS = 3600000L
+const val INTEGRITY_HEARTBEAT_INTERVAL_MS = 60000L
 
 // UI Health & Visibility
 const val WATCH_DOG_UI_GRACE_MS = 15000L 

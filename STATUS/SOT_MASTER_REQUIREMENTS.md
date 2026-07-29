@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.29.22 (Latency Monitor Metric Cleanup)
+# System Source of Truth (SoT) - July.30.23 (System Integrity Periodic Check)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -6,6 +6,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Budget Hardware Hardening (R606)**: On restricted hardware (e.g., Samsung A15), high-frequency platform callbacks (GPS/GNSS) MUST be offloaded to dedicated HandlerThreads. (Issue #606, July.27.11)
 *   **Unified Forensic Audit Naming (R623)**: Latency and I/O spike logs MUST follow a standardized naming convention: "Forensic Performance Audit: [Operation] spike ([duration]ms)" for CPU-bound tasks and "Forensic I/O Audit: [Operation] spike ([duration]ms)" for database/disk tasks. All call sites MUST utilize unified thresholds from `EngineConstants.kt`. (Issue #623, July.29.22)
+*   **System Integrity Periodic Heartbeat (R624)**: `IntegrityMonitor` MUST maintain a background heartbeat to verify the vitality of reactive flows (Internet, Battery, Storage, Power, Location). If a flow remains silent beyond 3x its expected interval, a forensic integrity warning MUST be emitted. (Issue #624, July.30.23)
 *   **GNSS Callback Conflation Authority (R614)**: High-frequency GNSS hardware callbacks MUST be sampled to prevent downstream flow processing overhead. (Issue #614, July.28.20)
 *   **Hardware Timing Audit Authority (R615)**: The system MUST monitor GNSS callback timing for hardware-level instability. (Issue #615, July.28.21)
 *   **Repository Event Pipeline Hardening (R616)**: All `MutableSharedFlow` pipelines within the Repository layer MUST utilize `BufferOverflow.DROP_OLDEST`. (Issue #616, July.28.22)
@@ -71,5 +72,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.29.22.
+*   **Current Release**: July.30.23.
 *   **Source of Truth**: app/build.gradle versionName.
