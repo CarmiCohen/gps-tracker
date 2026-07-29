@@ -9,10 +9,11 @@ import kotlin.concurrent.withLock
 
 /**
  * MbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * July.29.01:
+ * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
+ *   reporting strings for forensic auditing.
  * July.26.04:
- * - Issue #589: Performance Audit. Synchronized JNI threshold with EngineConstants.
- * July.25.11:
- * - Issue #590: Refactored to use unified LatencyMonitor.
+ * - Issue #589: Performance Audit.
  */
 object MbrainHardwareManager {
 
@@ -31,10 +32,6 @@ object MbrainHardwareManager {
         }
     }
 
-    /**
-     * Initializes the Mbrain engine with vendor-specific parameters.
-     * Thread-safe wrapper for native init.
-     */
     fun initMbrain(timeProvider: TimeProvider, deviceId: String, flags: Int): Int {
         if (!isLibraryLoaded) return -1
         return jniLock.withLock {
@@ -42,7 +39,7 @@ object MbrainHardwareManager {
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_JNI_MS,
                 onSpike = { duration ->
-                    Timber.w("FORENSIC ALERT: Native initMbrain latency spike detected (${duration}ms). Threshold: ${LATENCY_THRESHOLD_JNI_MS}ms")
+                    Timber.w("Forensic Performance Audit: Native initMbrain spike (${duration}ms)")
                 }
             ) {
                 try {
@@ -55,10 +52,6 @@ object MbrainHardwareManager {
         }
     }
 
-    /**
-     * Triggers a hardware-level "poke" to prevent aggressive CPU idling.
-     * Synchronized to prevent overlapping pokes during FGS type re-evaluations.
-     */
     fun punchHardware(timeProvider: TimeProvider): Int {
         if (!isLibraryLoaded) return -1
         return jniLock.withLock {
@@ -66,7 +59,7 @@ object MbrainHardwareManager {
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_JNI_MS,
                 onSpike = { duration ->
-                    Timber.w("FORENSIC ALERT: Native punchHardware latency spike detected (${duration}ms). Threshold: ${LATENCY_THRESHOLD_JNI_MS}ms")
+                    Timber.w("Forensic Performance Audit: Native punchHardware spike (${duration}ms)")
                 }
             ) {
                 try {
@@ -79,9 +72,6 @@ object MbrainHardwareManager {
         }
     }
 
-    /**
-     * Sets the power budget for the radio/GNSS stack.
-     */
     fun setPowerBudget(timeProvider: TimeProvider, budgetLevel: Int): Int {
         if (!isLibraryLoaded) return -1
         return jniLock.withLock {
@@ -89,7 +79,7 @@ object MbrainHardwareManager {
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_JNI_MS,
                 onSpike = { duration ->
-                    Timber.w("FORENSIC ALERT: Native setPowerBudget latency spike detected (${duration}ms). Threshold: ${LATENCY_THRESHOLD_JNI_MS}ms")
+                    Timber.w("Forensic Performance Audit: Native setPowerBudget spike (${duration}ms)")
                 }
             ) {
                 try {
@@ -104,12 +94,7 @@ object MbrainHardwareManager {
 
     fun isAvailable(): Boolean = isLibraryLoaded
 
-    @JvmStatic
-    private external fun nativeInitMbrain(deviceId: String, flags: Int): Int
-    
-    @JvmStatic
-    private external fun nativePunchHardware(): Int
-    
-    @JvmStatic
-    private external fun nativeSetPowerBudget(budgetLevel: Int): Int
+    @JvmStatic private external fun nativeInitMbrain(deviceId: String, flags: Int): Int
+    @JvmStatic private external fun nativePunchHardware(): Int
+    @JvmStatic private external fun nativeSetPowerBudget(budgetLevel: Int): Int
 }

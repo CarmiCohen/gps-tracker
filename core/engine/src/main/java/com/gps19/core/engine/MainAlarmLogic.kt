@@ -5,9 +5,9 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
- * July.26.04:
- * - Issue #589: Performance Audit. Wrapped detectViolations with LatencyMonitor 
- *   to track logic execution duration.
+ * July.29.01:
+ * - Issue #623: Performance Audit. Updated detectViolations to use 
+ *   dedicated LATENCY_THRESHOLD_ALARM_LOGIC_MS.
  * July.21.00:
  * - Issue #102: Temporal Forensic Integrity.
  */
@@ -21,7 +21,7 @@ object MainAlarmLogic {
     ): SystemHealthReport {
         return LatencyMonitor.measure(
             timeProvider,
-            LATENCY_THRESHOLD_SENSOR_PROCESS_MS, // Using sensor threshold for logic cycle
+            LATENCY_THRESHOLD_ALARM_LOGIC_MS,
             onSpike
         ) {
             val nowRt = state.nowRt

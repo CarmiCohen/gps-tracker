@@ -1,33 +1,32 @@
-# Handover (July.29.00) - Location Refresh Reactivity Hardening [COMPLETED]
+# Handover (July.29.01) - Latency Monitor Metric Cleanup [STEP 1 COMPLETED]
 
 ## 🎯 Current Objective
-Completed **[Issue #622] Forensic: Location Refresh Reactivity Hardening**. Hardened the GPS recovery pipeline to prevent UI flickering and provided high-precision gap duration tracking for forensic audits.
+Completed **Step 1** of **[Issue #623] Structural: Latency Monitor Metric Cleanup**. Standardized all latency and I/O spike reporting across the core engine and app managers to follow the "Forensic Audit" pattern.
 
 ## 📊 Status Tracker
-- **[Issue #622] Location Refresh Reactivity Hardening**: 🟢 Resolved (Debounced recovery, forensic duration tracking).
+- **[Issue #623] Latency Monitor Metric Cleanup**: 🟡 In Progress (Step 1: Call-site standardization completed).
+- **[Issue #622] Location Refresh Reactivity Hardening**: 🟢 Resolved.
 - **[Issue #621] UseCase Internalization Audit**: 🟢 Resolved.
-- **[Issue #620] State Partitioning Audit**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
 - **Build Status**: 🟢 **READY FOR REBUILD**.
-- **Target Version**: **July.29.00**.
-- **Requirement Parity**: **R622** (Location Refresh Reactivity Hardening Authority) is fully implemented.
+- **Target Version**: **July.29.01**.
+- **Requirement Parity**: **R623** (Unified Forensic Audit Naming) is integrated into SoT.
 
 ### 🛠️ Forensic Progress Log
-1.  **Recovery Debouncing**: Implemented `LOCATION_RECOVERY_DEBOUNCE_MS` in `GpsManager` to filter out transient/unstable GPS fixes.
-2.  **Forensic Precision**: Added `lastLocationPendingDurationMs` to `SystemHealthState` and `LocationStatus`.
-3.  **Log Enhancement**: Updated `IntegrityMonitor` to report the exact duration of signal gaps (e.g., "Location fix restored after 12.5s gap").
-4.  **Requirement Documentation**: Integrated R622 into the Source of Truth.
+1.  **Threshold Standardization**: Added dedicated `LATENCY_THRESHOLD_ALARM_LOGIC_MS` to `EngineConstants.kt`.
+2.  **Audit Message Uniformity**: Refactored `LocationProcessor`, `LogRepository`, `MainRepository`, `AppSensorManager`, `HistoryManager`, and `MbrainHardwareManager` to use consistent forensic log prefixes.
+3.  **Cleanup**: Removed legacy issue markers and redundant mapping logic in `LogRepository.kt`, adhering to simplicity guidelines.
 
 ## 🚀 Release commands
 ```bash
 git add .
-git commit -m "Release July.29.00: Forensic - Location Refresh Reactivity Hardening (#622)"
-git tag -a July.29.00 -m "Implemented debounced GPS recovery and precise gap duration tracking."
+git commit -m "Release July.29.01: Structural - Latency Monitor Cleanup Step 1 (#623)"
+git tag -a July.29.01 -m "Standardized forensic audit strings and hardened latency thresholds."
 git push origin main --tags
 ```
 
 ## 🎯 Next Objective
-- **[Issue #623] [Sprint: July.29.24] [Priority: Low] Structural: Latency Monitor Metric Cleanup**.
+- **[Issue #623] [Sprint: July.29.24] [Priority: Low] Structural: Latency Monitor Metric Cleanup - Step 2: Implement measureAndAudit helper in LatencyMonitor.kt**.
 
-**Status**: COMPLETED. READY FOR FRESH CHAT.
+**Status**: COMPLETED STEP 1. READY FOR FRESH CHAT.

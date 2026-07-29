@@ -17,13 +17,11 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * July.29.01:
+ * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
+ *   reporting log messages.
  * July.28.22:
- * - Issue #616: Repository Event Pipeline Hardening. Updated _uiCommands and 
- *   _liveHistoryFlow to utilize BufferOverflow.DROP_OLDEST. This prevents 
- *   collector-side suspension in high-load scenarios (R616).
- * July.27.05:
- * - Issue #600: Forensic Playback Latency Audit. Updated eventLogsFlow to support 
- *   dynamic retrieval limits.
+ * - Issue #616: Repository Event Pipeline Hardening.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -434,7 +432,7 @@ class MainRepository @Inject constructor(
     }
 
     private fun logLatencySpike(tag: String, duration: Long) {
-        Timber.w("Database I/O Audit: Slow $tag detected: ${duration}ms")
+        Timber.w("Forensic I/O Audit: Slow $tag detected (${duration}ms)")
         addLog(LogEntry(
             localId = UUID.randomUUID().toString(),
             timestamp = timeProvider.currentTimeMillis(),
@@ -444,7 +442,7 @@ class MainRepository @Inject constructor(
             id = "SYSTEM",
             viewerId = "SYSTEM",
             isSpecial = true,
-            specialColor = 0xFFFFD700.toInt()
+            specialColor = FORENSIC_PINK_COLOR
         ), initiallySynced = true)
     }
 

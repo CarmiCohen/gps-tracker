@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.29.01:
+ * - Issue #623: Structural: Latency Monitor Metric Cleanup. Added 
+ *   LATENCY_THRESHOLD_ALARM_LOGIC_MS for dedicated watchdog monitoring.
  * July.29.00:
  * - Issue #622: Forensic: Location Refresh Reactivity Hardening. Added 
  *   LOCATION_RECOVERY_DEBOUNCE_MS and updated GPS gap constants.
@@ -28,6 +31,7 @@ const val DEFAULT_LNG = 34.9896
 // July.27.11: Raised for A15 Hardening
 const val LATENCY_THRESHOLD_GPS_PROCESS_MS = 100L
 const val LATENCY_THRESHOLD_SENSOR_PROCESS_MS = 50L
+const val LATENCY_THRESHOLD_ALARM_LOGIC_MS = 100L
 const val LATENCY_THRESHOLD_DB_WRITE_MS = 1000L
 const val LATENCY_THRESHOLD_JNI_MS = 100L
 const val LOG_LATENCY_THRESHOLD_MS = 1000L

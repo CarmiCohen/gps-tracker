@@ -20,12 +20,12 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * July.29.01:
+ * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
+ *   reporting strings.
  * July.28.22:
  * - Issue #617: Global SharedFlow Audit. Hardened _processorEvents with 
  *   BufferOverflow.DROP_OLDEST to ensure non-blocking location processing (R617).
- * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Integrated kineticEnergy 
- *   flow from sensors to LocationSentinel.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -171,7 +171,7 @@ class LocationProcessor(
             timeProvider,
             LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
             { duration ->
-                _processorEvents.tryEmit(ProcessorEvent.LogAdded("Forensic Warning: updateSensorData cycle spike (${duration}ms)", "system", false, true, 0.0, 0.0, 0.0, null, vibration))
+                _processorEvents.tryEmit(ProcessorEvent.LogAdded("Forensic Performance Audit: updateSensorData spike (${duration}ms)", "system", false, true, 0.0, 0.0, 0.0, null, vibration))
             }
         ) {
             val baselineChanged = sentinel.updateSensorState(
@@ -269,7 +269,7 @@ class LocationProcessor(
             timeProvider,
             LATENCY_THRESHOLD_GPS_PROCESS_MS,
             { duration ->
-                _processorEvents.tryEmit(ProcessorEvent.LogAdded("Forensic Warning: processGpsPoint cycle spike (${duration}ms)", "system", false, true, lat, lng, accuracy, snr, sentinel.currentVibrationIndex))
+                _processorEvents.tryEmit(ProcessorEvent.LogAdded("Forensic Performance Audit: processGpsPoint spike (${duration}ms)", "system", false, true, lat, lng, accuracy, snr, sentinel.currentVibrationIndex))
             }
         ) {
             val effectiveTs = if (gpsTs > 0) gpsTs else nowWall

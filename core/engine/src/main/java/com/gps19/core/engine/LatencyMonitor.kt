@@ -3,8 +3,9 @@ package com.gps19.core.engine
 /**
  * LatencyMonitor: Unified framework for tracking execution durations 
  * of critical operations (JNI, DB, I/O).
- * July.25.11:
- * - Issue #590: Created to detect "silent jitter" in high-frequency paths.
+ * July.29.01:
+ * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized 
+ *   spike reporting and removed call-site boilerplate.
  */
 object LatencyMonitor {
     /**
