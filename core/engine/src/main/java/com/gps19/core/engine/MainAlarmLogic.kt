@@ -6,8 +6,7 @@ import kotlin.math.*
 /**
  * MainAlarmLogic: Detection logic for system violations.
  * July.29.01:
- * - Issue #623: Performance Audit. Updated detectViolations to use 
- *   dedicated LATENCY_THRESHOLD_ALARM_LOGIC_MS.
+ * - Issue #623: Performance Audit. Updated to use standardized measureAndAudit helper.
  * July.21.00:
  * - Issue #102: Temporal Forensic Integrity.
  */
@@ -16,13 +15,15 @@ object MainAlarmLogic {
     fun detectViolations(
         state: AlarmEvaluationState,
         timeProvider: TimeProvider,
-        onSpike: (Long) -> Unit,
+        onSpike: (message: String, duration: Long) -> Unit,
         isWarmup: Boolean = false
     ): SystemHealthReport {
-        return LatencyMonitor.measure(
-            timeProvider,
-            LATENCY_THRESHOLD_ALARM_LOGIC_MS,
-            onSpike
+        return LatencyMonitor.measureAndAudit(
+            timeProvider = timeProvider,
+            thresholdMs = LATENCY_THRESHOLD_ALARM_LOGIC_MS,
+            operation = "detectViolations",
+            type = LatencyMonitor.AuditType.PERFORMANCE,
+            onSpike = onSpike
         ) {
             val nowRt = state.nowRt
             val reports = mutableListOf<ViolationReport>()

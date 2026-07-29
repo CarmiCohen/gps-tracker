@@ -21,7 +21,7 @@ import javax.inject.Singleton
  * LogRepository: Dedicated repository for application logs.
  * July.29.01:
  * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized 
- *   forensic audit log messages.
+ *   forensic audit log messages and migrated to measureAndAudit API.
  * July.27.07:
  * - Issue #605: Forensic Log Latency Audit. Fixed critical 'it' reference error.
  */
@@ -45,12 +45,12 @@ class LogRepository @Inject constructor(
 
     fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logDao.getAllLogs(limit)
         .onEach { 
-            LatencyMonitor.measure(
+            LatencyMonitor.measureAndAudit(
                 timeProvider = timeProvider,
                 thresholdMs = LOG_RETRIEVAL_THRESHOLD_MS,
-                onSpike = { duration ->
-                    Timber.w("Forensic I/O Audit: Log retrieval spike (${duration}ms) [limit: $limit]")
-                }
+                operation = "Log retrieval [limit: $limit]",
+                type = LatencyMonitor.AuditType.IO,
+                onSpike = { message, _ -> Timber.w(message) }
             ) { /* measurement only */ }
         }
         .map { entities ->
@@ -71,12 +71,12 @@ class LogRepository @Inject constructor(
         
         scope.launch(Dispatchers.IO) {
             logMutex.withLock {
-                LatencyMonitor.measure(
+                LatencyMonitor.measureAndAudit(
                     timeProvider = timeProvider,
                     thresholdMs = LOG_LATENCY_THRESHOLD_MS,
-                    onSpike = { duration -> 
-                        Timber.w("Forensic I/O Audit: Log write spike (${duration}ms) [type: ${entry.type}]")
-                    }
+                    operation = "Log write [type: ${entry.type}]",
+                    type = LatencyMonitor.AuditType.IO,
+                    onSpike = { message, _ -> Timber.w(message) }
                 ) {
                     try {
                         val existing = if (entry.localId.isNotBlank()) logDao.getLogByLocalId(entry.localId) else null
@@ -89,7 +89,7 @@ class LogRepository @Inject constructor(
                                 lat = entry.lat, lng = entry.lng, accuracy = entry.accuracy,
                                 maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot
                             ))
-                            return@measure
+                            return@measureAndAudit
                         }
 
                         val last = logDao.getLastLogByMetadata(entry.type, entry.role, entry.id)
@@ -108,7 +108,7 @@ class LogRepository @Inject constructor(
                                     lat = entry.lat, lng = entry.lng, accuracy = entry.accuracy,
                                     maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot
                                 ))
-                                return@measure
+                                return@measureAndAudit
                             }
                         }
                         
@@ -146,12 +146,12 @@ class LogRepository @Inject constructor(
     }
 
     suspend fun proactivePruning() {
-        LatencyMonitor.measure(
+        LatencyMonitor.measureAndAudit(
             timeProvider = timeProvider,
             thresholdMs = LOG_LATENCY_THRESHOLD_MS,
-            onSpike = { duration -> 
-                Timber.w("Forensic I/O Audit: Proactive pruning spike (${duration}ms)")
-            }
+            operation = "Proactive pruning",
+            type = LatencyMonitor.AuditType.IO,
+            onSpike = { message, _ -> Timber.w(message) }
         ) {
             try {
                 val count = logDao.getCount()
@@ -165,12 +165,12 @@ class LogRepository @Inject constructor(
         }
     }
 
-    suspend fun getUnsyncedLogs(limit: Int): List<LogEntry> = LatencyMonitor.measure(
+    suspend fun getUnsyncedLogs(limit: Int): List<LogEntry> = LatencyMonitor.measureAndAudit(
         timeProvider = timeProvider,
         thresholdMs = LOG_RETRIEVAL_THRESHOLD_MS,
-        onSpike = { duration ->
-            Timber.w("Forensic I/O Audit: Unsynced log retrieval spike (${duration}ms) [limit: $limit]")
-        }
+        operation = "Unsynced log retrieval [limit: $limit]",
+        type = LatencyMonitor.AuditType.IO,
+        onSpike = { message, _ -> Timber.w(message) }
     ) {
         logDao.getUnsyncedLogs(limit).map {
             LogEntry(
@@ -184,12 +184,12 @@ class LogRepository @Inject constructor(
         }
     }
 
-    suspend fun markLogsAsSynced(localIds: List<String>) = LatencyMonitor.measure(
+    suspend fun markLogsAsSynced(localIds: List<String>) = LatencyMonitor.measureAndAudit(
         timeProvider = timeProvider,
         thresholdMs = LOG_LATENCY_THRESHOLD_MS,
-        onSpike = { duration ->
-            Timber.w("Forensic I/O Audit: Sync status update spike (${duration}ms) [count: ${localIds.size}]")
-        }
+        operation = "Sync status update [count: ${localIds.size}]",
+        type = LatencyMonitor.AuditType.IO,
+        onSpike = { message, _ -> Timber.w(message) }
     ) {
         logDao.markLogsAsSynced(localIds)
     }
@@ -210,12 +210,12 @@ class LogRepository @Inject constructor(
         } 
     }
 
-    suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = LatencyMonitor.measure(
+    suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = LatencyMonitor.measureAndAudit(
         timeProvider = timeProvider,
         thresholdMs = LOG_RETRIEVAL_THRESHOLD_MS,
-        onSpike = { duration ->
-            Timber.w("Forensic I/O Audit: Static log retrieval spike (${duration}ms) [limit: $limit]")
-        }
+        operation = "Static log retrieval [limit: $limit]",
+        type = LatencyMonitor.AuditType.IO,
+        onSpike = { message, _ -> Timber.w(message) }
     ) {
         logDao.getAllLogsStatic(limit).map {
             LogEntry(

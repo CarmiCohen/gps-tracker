@@ -19,7 +19,7 @@ import javax.inject.Singleton
  * MainRepository: Centralized data hub for the application.
  * July.29.01:
  * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
- *   reporting log messages.
+ *   reporting and migrated to measureAndAudit API.
  * July.28.22:
  * - Issue #616: Repository Event Pipeline Hardening.
  */
@@ -226,10 +226,12 @@ class MainRepository @Inject constructor(
         )) return
 
         scope.launch {
-            LatencyMonitor.measure(
+            LatencyMonitor.measureAndAudit(
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
-                onSpike = { duration -> logLatencySpike("Trail Write", duration) }
+                operation = "Trail Write",
+                type = LatencyMonitor.AuditType.IO,
+                onSpike = { message, _ -> logLatencySpike(message) }
             ) {
                 val wallTs = timestamp ?: timeProvider.currentTimeMillis()
                 trailDao.insert(TrailEntity(
@@ -271,10 +273,12 @@ class MainRepository @Inject constructor(
 
         val wallTs = timestamp ?: timeProvider.currentTimeMillis()
         scope.launch { 
-            LatencyMonitor.measure(
+            LatencyMonitor.measureAndAudit(
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
-                onSpike = { duration -> logLatencySpike("Violation Write", duration) }
+                operation = "Violation Write",
+                type = LatencyMonitor.AuditType.IO,
+                onSpike = { message, _ -> logLatencySpike(message) }
             ) {
                 violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
                 
@@ -386,10 +390,12 @@ class MainRepository @Inject constructor(
         
         if (dbPoints.isNotEmpty()) {
             lastBatchWriteRealtime = nowRt
-            LatencyMonitor.measure(
+            LatencyMonitor.measureAndAudit(
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
-                onSpike = { duration -> logLatencySpike("History Batch Write (${dbPoints.size} pts)", duration) }
+                operation = "History Batch Write (${dbPoints.size} pts)",
+                type = LatencyMonitor.AuditType.IO,
+                onSpike = { message, _ -> logLatencySpike(message) }
             ) {
                 database.withTransaction {
                     historyDao.insertAll(dbPoints)
@@ -409,10 +415,12 @@ class MainRepository @Inject constructor(
         
         scope.launch {
             try {
-                LatencyMonitor.measure(
+                LatencyMonitor.measureAndAudit(
                     timeProvider = timeProvider,
                     thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS * 4,
-                    onSpike = { duration -> logLatencySpike("Background Pruning", duration) }
+                    operation = "Background Pruning",
+                    type = LatencyMonitor.AuditType.IO,
+                    onSpike = { message, _ -> logLatencySpike(message) }
                 ) {
                     database.withTransaction {
                         listOf("4M", "16M", "1H", "4H", "24H", "7D").forEach { key ->
@@ -431,12 +439,12 @@ class MainRepository @Inject constructor(
         }
     }
 
-    private fun logLatencySpike(tag: String, duration: Long) {
-        Timber.w("Forensic I/O Audit: Slow $tag detected (${duration}ms)")
+    private fun logLatencySpike(message: String) {
+        Timber.w(message)
         addLog(LogEntry(
             localId = UUID.randomUUID().toString(),
             timestamp = timeProvider.currentTimeMillis(),
-            message = "Forensic I/O Audit: Slow $tag (${duration}ms)",
+            message = message,
             type = "SYSTEM",
             isImportant = false,
             id = "SYSTEM",

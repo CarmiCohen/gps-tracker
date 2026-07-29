@@ -44,7 +44,7 @@ sealed class AppSensorEvent {
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
  * July.29.01:
  * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
- *   reporting and removed call-site leftovers.
+ *   reporting and migrated to measureAndAudit API.
  * July.28.22:
  * - Issue #617: Global SharedFlow Audit. Hardened _sensorEvents.
  */
@@ -440,9 +440,11 @@ class AppSensorManager @Inject constructor(
     fun isAcousticMonitoringEnabled() = isMonitoring
 
     fun consumeForensicSnapshot(): ForensicSnapshot {
-        return LatencyMonitor.measure(
+        return LatencyMonitor.measureAndAudit(
             timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
-            { duration -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent("Forensic Performance Audit: consumeForensicSnapshot spike (${duration}ms)", false)) }
+            "consumeForensicSnapshot",
+            LatencyMonitor.AuditType.PERFORMANCE,
+            { message, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(message, false)) }
         ) {
             synchronized(this) {
                 val snapshot = ForensicSnapshot().apply {
@@ -462,9 +464,11 @@ class AppSensorManager @Inject constructor(
     }
 
     fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<EngineSensorSnapshot> = sequence {
-        LatencyMonitor.measure(
+        LatencyMonitor.measureAndAudit(
             timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
-            { duration -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent("Forensic Performance Audit: getSensorSamples spike (${duration}ms)", false)) }
+            "getSensorSamples",
+            LatencyMonitor.AuditType.PERFORMANCE,
+            { message, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(message, false)) }
         ) {
             val flyweight = EngineSensorSnapshot(); val c: Int; val startIdx: Int
             synchronized(this@AppSensorManager) { c = bufferCount; startIdx = (bufferIdx - c + 256) % 256 }
@@ -480,9 +484,11 @@ class AppSensorManager @Inject constructor(
     }
 
     fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
-        LatencyMonitor.measure(
+        LatencyMonitor.measureAndAudit(
             timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
-            { duration -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent("Forensic Performance Audit: getAcousticSamples spike (${duration}ms)", false)) }
+            "getAcousticSamples",
+            LatencyMonitor.AuditType.PERFORMANCE,
+            { message, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(message, false)) }
         ) {
             val flyweight = EngineSnrSample(); val c: Int; val startIdx: Int
             synchronized(this@AppSensorManager) { c = bufferCount; startIdx = (bufferIdx - c + 256) % 256 }

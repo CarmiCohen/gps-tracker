@@ -11,7 +11,7 @@ import kotlin.concurrent.withLock
  * MbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
  * July.29.01:
  * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
- *   reporting strings for forensic auditing.
+ *   reporting strings and migrated to measureAndAudit API.
  * July.26.04:
  * - Issue #589: Performance Audit.
  */
@@ -35,12 +35,12 @@ object MbrainHardwareManager {
     fun initMbrain(timeProvider: TimeProvider, deviceId: String, flags: Int): Int {
         if (!isLibraryLoaded) return -1
         return jniLock.withLock {
-            LatencyMonitor.measure(
+            LatencyMonitor.measureAndAudit(
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_JNI_MS,
-                onSpike = { duration ->
-                    Timber.w("Forensic Performance Audit: Native initMbrain spike (${duration}ms)")
-                }
+                operation = "Native initMbrain",
+                type = LatencyMonitor.AuditType.PERFORMANCE,
+                onSpike = { message, _ -> Timber.w(message) }
             ) {
                 try {
                     nativeInitMbrain(deviceId, flags)
@@ -55,12 +55,12 @@ object MbrainHardwareManager {
     fun punchHardware(timeProvider: TimeProvider): Int {
         if (!isLibraryLoaded) return -1
         return jniLock.withLock {
-            LatencyMonitor.measure(
+            LatencyMonitor.measureAndAudit(
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_JNI_MS,
-                onSpike = { duration ->
-                    Timber.w("Forensic Performance Audit: Native punchHardware spike (${duration}ms)")
-                }
+                operation = "Native punchHardware",
+                type = LatencyMonitor.AuditType.PERFORMANCE,
+                onSpike = { message, _ -> Timber.w(message) }
             ) {
                 try {
                     nativePunchHardware()
@@ -75,12 +75,12 @@ object MbrainHardwareManager {
     fun setPowerBudget(timeProvider: TimeProvider, budgetLevel: Int): Int {
         if (!isLibraryLoaded) return -1
         return jniLock.withLock {
-            LatencyMonitor.measure(
+            LatencyMonitor.measureAndAudit(
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_JNI_MS,
-                onSpike = { duration ->
-                    Timber.w("Forensic Performance Audit: Native setPowerBudget spike (${duration}ms)")
-                }
+                operation = "Native setPowerBudget",
+                type = LatencyMonitor.AuditType.PERFORMANCE,
+                onSpike = { message, _ -> Timber.w(message) }
             ) {
                 try {
                     nativeSetPowerBudget(budgetLevel)

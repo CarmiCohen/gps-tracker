@@ -29,7 +29,7 @@ sealed class HistoryEvent {
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
  * July.29.01:
  * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
- *   reporting and removed legacy call-site leftovers.
+ *   reporting and migrated to measureAndAudit API.
  * July.28.22:
  * - Issue #617: Global SharedFlow Audit. Hardened _historyEvents.
  */
@@ -142,9 +142,11 @@ class HistoryManager @Inject constructor(
     }
 
     private fun processResults(results: List<Pair<RibbonScale, EngineConnectionPoint>>) {
-        LatencyMonitor.measure(
+        LatencyMonitor.measureAndAudit(
             timeProvider, LATENCY_THRESHOLD_DB_WRITE_MS,
-            { duration -> _historyEvents.tryEmit(HistoryEvent.LogEvent("Forensic I/O Audit: processResults spike (${duration}ms)", false)) }
+            "processResults",
+            LatencyMonitor.AuditType.IO,
+            { message, _ -> _historyEvents.tryEmit(HistoryEvent.LogEvent(message, false)) }
         ) {
             results.forEach { (scale, point) -> 
                 repository.addHistoryPoint(scale.key, mapToAppPoint(point)) 
@@ -164,9 +166,11 @@ class HistoryManager @Inject constructor(
         isSitDetected: Boolean, isSitActive: Boolean, currentMa: Int,
         locationPendingReason: LocationPendingReason, kineticEnergy: Double
     ) {
-        LatencyMonitor.measure(
+        LatencyMonitor.measureAndAudit(
             timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
-            { duration -> _historyEvents.tryEmit(HistoryEvent.LogEvent("Forensic Performance Audit: backfillAnalyticalGaps spike (${duration}ms)", false)) }
+            "backfillAnalyticalGaps",
+            LatencyMonitor.AuditType.PERFORMANCE,
+            { message, _ -> _historyEvents.tryEmit(HistoryEvent.LogEvent(message, false)) }
         ) {
             val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
             val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
@@ -203,9 +207,11 @@ class HistoryManager @Inject constructor(
     }
 
     private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
-        LatencyMonitor.measure(
+        LatencyMonitor.measureAndAudit(
             timeProvider, LATENCY_THRESHOLD_DB_WRITE_MS,
-            { duration -> _historyEvents.tryEmit(HistoryEvent.LogEvent("Forensic I/O Audit: fillRealGap spike (${duration}ms)", false)) }
+            "fillRealGap",
+            LatencyMonitor.AuditType.IO,
+            { message, _ -> _historyEvents.tryEmit(HistoryEvent.LogEvent(message, false)) }
         ) {
             val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs, now) else emptySequence()
             val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs, now) else emptySequence()

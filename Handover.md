@@ -1,32 +1,39 @@
-# Handover (July.29.01) - Latency Monitor Metric Cleanup [STEP 1 COMPLETED]
+# Handover (July.29.22) - Latency Monitor Metric Cleanup [COMPLETED]
 
 ## 🎯 Current Objective
-Completed **Step 1** of **[Issue #623] Structural: Latency Monitor Metric Cleanup**. Standardized all latency and I/O spike reporting across the core engine and app managers to follow the "Forensic Audit" pattern.
+Finalized **[Issue #623] Structural: Latency Monitor Metric Cleanup**. Successfully migrated all call sites to the new `measureAndAudit` API, standardizing forensic performance and I/O auditing across the entire application.
 
 ## 📊 Status Tracker
-- **[Issue #623] Latency Monitor Metric Cleanup**: 🟡 In Progress (Step 1: Call-site standardization completed).
+- **[Issue #623] Latency Monitor Metric Cleanup**: 🟢 Resolved (Steps 1-3 Completed).
 - **[Issue #622] Location Refresh Reactivity Hardening**: 🟢 Resolved.
 - **[Issue #621] UseCase Internalization Audit**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
-- **Build Status**: 🟢 **READY FOR REBUILD**.
-- **Target Version**: **July.29.01**.
-- **Requirement Parity**: **R623** (Unified Forensic Audit Naming) is integrated into SoT.
+- **Build Status**: 🟢 **READY FOR RELEASE**.
+- **Target Version**: **July.29.22**.
+- **Requirement Parity**: **R623** (Unified Forensic Audit Naming) is fully operational and documented in SoT.
 
 ### 🛠️ Forensic Progress Log
-1.  **Threshold Standardization**: Added dedicated `LATENCY_THRESHOLD_ALARM_LOGIC_MS` to `EngineConstants.kt`.
-2.  **Audit Message Uniformity**: Refactored `LocationProcessor`, `LogRepository`, `MainRepository`, `AppSensorManager`, `HistoryManager`, and `MbrainHardwareManager` to use consistent forensic log prefixes.
-3.  **Cleanup**: Removed legacy issue markers and redundant mapping logic in `LogRepository.kt`, adhering to simplicity guidelines.
+1.  **Standardized Metric Framework**: Implemented `AuditType` (PERFORMANCE vs IO) in `LatencyMonitor.kt` to enforce consistent naming prefixes.
+2.  **API Migration**: Migrated 100% of latency measurement call sites to `measureAndAudit`. This includes:
+    - **LocationProcessor**: `updateSensorData`, `processGpsPoint`.
+    - **LogRepository**: All database retrieval and write operations.
+    - **MainRepository**: Trail writes, violation writes, and history batch flushing.
+    - **AppSensorManager**: Forensic snapshots and sampling sequences.
+    - **HistoryManager**: Ribbon aggregation and gap-filling logic.
+    - **MbrainHardwareManager**: All native JNI hardware optimization calls.
+3.  **Codebase Sanitization**: Eliminated redundant string literals and threshold-checking boilerplate. The `LatencyMonitor` now handles message formatting internally (e.g., "Forensic Performance Audit: [Op] spike (120ms > 100ms)").
+4.  **Integrity Check**: Rebuilt the app and performed a global search to ensure no legacy `measure` calls persist.
 
 ## 🚀 Release commands
 ```bash
 git add .
-git commit -m "Release July.29.01: Structural - Latency Monitor Cleanup Step 1 (#623)"
-git tag -a July.29.01 -m "Standardized forensic audit strings and hardened latency thresholds."
+git commit -m "Release July.29.22: Structural - Latency Monitor Metric Cleanup Finalized (#623)"
+git tag -a July.29.22 -m "Standardized forensic spike reporting and migrated all call sites to measureAndAudit API."
 git push origin main --tags
 ```
 
 ## 🎯 Next Objective
-- **[Issue #623] [Sprint: July.29.24] [Priority: Low] Structural: Latency Monitor Metric Cleanup - Step 2: Implement measureAndAudit helper in LatencyMonitor.kt**.
+- **[Issue #624] [Sprint: July.30.24] [Priority: Med] Forensic: System Integrity Periodic Check - Implement background heartbeat to verify flow connectivity.**
 
-**Status**: COMPLETED STEP 1. READY FOR FRESH CHAT.
+**Status**: ISSUE #623 RESOLVED. READY FOR FRESH CHAT.
