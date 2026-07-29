@@ -20,7 +20,7 @@ import kotlin.math.ceil
  */
 sealed class AlarmEvent {
     data class LogEvent(
-        val type: String, val message: String, val important: Boolean, 
+        val type: String, val message: String, val isImportant: Boolean, 
         val extremeValue: Double?, val logId: String?, val durationMs: Long, 
         val isSpecial: Boolean, val specialColor: Int?, 
         val lat: Double, val lng: Double, val accuracy: Double, 
@@ -284,7 +284,7 @@ class AppAlarmManager @Inject constructor(
                 _alarmEvents.tryEmit(AlarmEvent.LogEvent(
                     type = ALERT_ID_PERFORMANCE_SPIKE,
                     message = "$versionTag Performance Spike: detectViolations took ${duration}ms",
-                    important = false,
+                    isImportant = false,
                     extremeValue = duration.toDouble(),
                     logId = null,
                     durationMs = duration,

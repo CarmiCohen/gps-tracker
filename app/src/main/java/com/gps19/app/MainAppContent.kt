@@ -44,9 +44,9 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * July.27.04:
- * - Issue #598: UI Performance under Signaling Stress. Passed eventLogsFlow 
- *   directly to Tracker/Viewer screens to support de-coupled log collection.
+ * July.28.24:
+ * - Issue #620: State Partitioning Audit. Migrated from TelemetryState to 
+ *   partitioned KinematicState and DiagnosticState to reduce UI re-computation churn.
  */
 @Composable
 fun MainAppContent(
@@ -62,7 +62,8 @@ fun MainAppContent(
     onStopTracking: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val telemetryState by viewModel.telemetryState.collectAsStateWithLifecycle()
+    val kinematicState by viewModel.kinematicState.collectAsStateWithLifecycle()
+    val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
     val systemPulse by viewModel.systemPulse.collectAsStateWithLifecycle()
     val systemPulseRt by viewModel.systemPulseRt.collectAsStateWithLifecycle()
     
@@ -272,7 +273,7 @@ fun MainAppContent(
                 .safeDrawingPadding(),
             color = MaterialTheme.colorScheme.background
         ) {
-            BackHandler(enabled = telemetryState.isRedScreenVisible && uiState.appMode != null) {
+            BackHandler(enabled = diagnosticState.isRedScreenVisible && uiState.appMode != null) {
                 viewModel.onEvent(UiEvent.DismissAlarms)
             }
 
@@ -312,7 +313,7 @@ fun MainAppContent(
                             }
                         }
                         TrackerScreen(
-                            uiState = uiState, telemetryState = telemetryState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
+                            uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
                             systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
@@ -342,7 +343,7 @@ fun MainAppContent(
                             }
                         }
                         ViewerScreen(
-                            uiState = uiState, telemetryState = telemetryState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
+                            uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
                             systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                             onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                             onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) },
@@ -386,15 +387,15 @@ fun MainAppContent(
                     )
                 }
 
-                if (telemetryState.isRedScreenVisible && uiState.appMode != null) {
+                if (diagnosticState.isRedScreenVisible && uiState.appMode != null) {
                     AlarmOverlay(
-                        alarms = telemetryState.activeAlarms, isMuted = telemetryState.isAlarmSilenced,
-                        isLocationPending = telemetryState.trackerHealth.isLocationPending,
+                        alarms = diagnosticState.activeAlarms, isMuted = diagnosticState.isAlarmSilenced,
+                        isLocationPending = kinematicState.trackerHealth.isLocationPending,
                         backgroundStatus = uiState.permissions.backgroundStatus,
                         hasBackgroundRestriction = uiState.permissions.hasBackgroundRestriction,
                         onHardwarePermissionClick = { onRequestHardwarePermission() },
                         onMute = { 
-                            val currentCauses = telemetryState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { context.getString(R.string.status_muted) }
+                            val currentCauses = diagnosticState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { context.getString(R.string.status_muted) }
                             viewModel.onEvent(UiEvent.StopSiren(currentCauses))
                         },
                         onClose = { viewModel.onEvent(UiEvent.DismissAlarms) },

@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.28.2326 (UI State Collection Audit)
+# System Source of Truth (SoT) - July.29.00 (Location Refresh Reactivity Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -10,6 +10,10 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Repository Event Pipeline Hardening (R616)**: All `MutableSharedFlow` pipelines within the Repository layer MUST utilize `BufferOverflow.DROP_OLDEST` to prevent collector-side suspension. This ensures that high-frequency telemetry (e.g., live history) and critical UI commands are never blocked by slow or back-pressured consumers. (Issue #616, July.28.22)
 *   **Global SharedFlow Overflow Strategy (R617)**: All reactive event pipelines using `MutableSharedFlow` across all managers and processors MUST enforce `BufferOverflow.DROP_OLDEST`. This prevents high-frequency hardware or network callbacks from being suspended by slow consumers, ensuring system-wide non-blocking telemetry and command routing. (Issue #617, July.28.2233)
 *   **Forensic UI State Collection Policy (R618)**: To eliminate dispatch latency and micro-stuttering on budget hardware (A15), all UI-bound `StateFlow` and `Flow` collections within the ViewModel and UI-centric UseCases MUST utilize `Dispatchers.Main.immediate`. This ensures that updates are processed immediately if already on the Main thread, bypassing the event loop when possible. (Issue #618, July.28.2326)
+*   **Dashboard Pipeline Efficiency Policy (R619)**: The UI Dashboard state pipeline MUST be optimized for minimum computational overhead and zero allocation churn. The `combine` logic in the ViewModel MUST utilize narrowed `distinctUntilChanged` mappings to prevent redundant triggers from unrelated UI state changes. Mathematical aggregations (e.g., SNR averages) MUST avoid intermediate collection allocations (lists/maps) in the hot-path. (Issue #619, July.28.24)
+*   **State Partitioning Policy (R620)**: Telemetry data MUST be partitioned into high-frequency `KinematicState` (location, motion, sensor health) and low-frequency `DiagnosticState` (battery, connectivity stats, system metadata). UI components and UseCases MUST observe the specific partition required for their logic to prevent "invalidation storms" where low-frequency scalar updates trigger unnecessary re-computations of complex kinematic UI elements (e.g., maps, analytical ribbons). (Issue #620, July.28.24)
+*   **UseCase Flow Internalization Policy (R621)**: UI-facing UseCases MUST internalize common flow transformation logic, such as `distinctUntilChanged()`, to provide clean, filtered data streams to the ViewModel. This reduces ViewModel boilerplate, ensures consistent emission behavior across different consumers, and prevents redundant UI re-compositions caused by duplicate state emissions. (Issue #621, July.28.24)
+*   **Location Refresh Reactivity Hardening Authority (R622)**: To prevent UI flickering and ensure forensic reliability, the transition from "Location Pending" to "OK" MUST be debounced by `LOCATION_RECOVERY_DEBOUNCE_MS` (3000ms). The system MUST capture and expose the precise duration of GPS gaps (`lastLocationPendingDurationMs`) for forensic logging, ensuring that every recovery event provides detailed timing data regarding the preceding signal loss or stall. (Issue #622, July.29.00)
 *   **Foreground Service Startup Sync (R607)**: Foreground services MUST establish notification channels and role-specific configurations (Tracker/Viewer) synchronously on the Main thread within `onCreate()` BEFORE invoking `startForeground()`. This prevents "Bad notification" crashes on Android 14+ devices. (Issue #607, July.27.12)
 *   **Startup Notification Content Authority (R608)**: To prevent visual flickering, Services MUST provide role-specific and health-aware notification metadata (Battery level, Security status) immediately during the initial `startForeground()` call. (Issue #608, July.27.13)
 *   **Centralized Health Snapshot Authority (R609)**: `IntegrityMonitor` is the single source of truth for local system health. It MUST reactively observe OS-level events (Battery, Network) and provide a unified `StateFlow<SystemHealthState>`. Manual health propagation in service ticks is FORBIDDEN. (Issue #609, July.28.14)
@@ -66,5 +70,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.28.2326.
+*   **Current Release**: July.29.00.
 *   **Source of Truth**: app/build.gradle versionName.

@@ -5,40 +5,45 @@ import javax.inject.Inject
 
 /**
  * BehaviorUseCase: Logic for determining high-level behavioral states and UI visibility gates.
- * July.24.08:
- * - Issue #547: State Decomposition. Refactored to accept TelemetryState 
- *   to reduce heap churn and mitigate kernel performance issues.
+ * July.28.24:
+ * - Issue #620: State Partitioning Audit. Refactored to accept partitioned 
+ *   KinematicState and DiagnosticState to isolation high-frequency motion from 
+ *   scalar diagnostics, reducing re-computation churn.
  */
 class BehaviorUseCase @Inject constructor() {
 
-    fun computeTrackerState(
+    /**
+     * computeTrackerStateDecomposed: Determines the tracker state using partitioned data.
+     * KinematicState provides motion authority; DiagnosticState provides connectivity context.
+     */
+    fun computeTrackerStateDecomposed(
         uiState: MainUiState,
-        telemetryState: TelemetryState,
+        kinematicState: KinematicState,
+        diagnosticState: DiagnosticState,
         systemTimePulse: Long
     ): TrackerState {
         val appMode = uiState.appMode ?: return TrackerState.UNKNOWN
         
-        // Issue #046 Fix: If we are a Viewer, the Tracker is the authority on its own state.
         if (appMode == "viewer") {
-            return telemetryState.trackerLocation.trackerState
+            return kinematicState.trackerLocation.trackerState
         }
 
         val isConnected = if (appMode == "tracker") {
-            telemetryState.connectivity.isRelayConnected
+            diagnosticState.connectivity.isRelayConnected
         } else {
-            telemetryState.connectivity.isTrackerConnected
+            diagnosticState.connectivity.isTrackerConnected
         }
 
         val effectiveLocation = if (appMode == "tracker") {
-            telemetryState.localLocation
+            kinematicState.localLocation
         } else {
-            telemetryState.trackerLocation
+            kinematicState.trackerLocation
         }
 
         val effectiveHealth = if (appMode == "tracker") {
-            telemetryState.localHealth
+            kinematicState.localHealth
         } else {
-            telemetryState.trackerHealth
+            kinematicState.trackerHealth
         }
 
         return TrackerStateManager.updateState(
@@ -51,23 +56,25 @@ class BehaviorUseCase @Inject constructor() {
         )
     }
 
-    fun shouldShowRedScreen(
+    /**
+     * shouldShowRedScreenDecomposed: Gates the red alert screen using partitioned data.
+     */
+    fun shouldShowRedScreenDecomposed(
         uiState: MainUiState,
-        telemetryState: TelemetryState,
+        kinematicState: KinematicState,
+        diagnosticState: DiagnosticState,
         nowRt: Long,
         lastAckRt: Long,
         currentVisible: Boolean
     ): Boolean {
-        // R872: No visual alerts (red screen) in tracker mode.
         if (uiState.appMode == "tracker") return false
 
-        val hasAlertToDisplay = telemetryState.activeAlarms.any { !it.isResolved }
+        val hasAlertToDisplay = diagnosticState.activeAlarms.any { !it.isResolved }
         if (!hasAlertToDisplay) return false
 
-        // Use monotonic time for lockout to survive system clock jumps
         val lockoutActive = (nowRt - lastAckRt < ALARM_OVERLAY_THROTTLE_MS)
         
-        return if (!lockoutActive || telemetryState.isNewViolationDetected) {
+        return if (!lockoutActive || diagnosticState.isNewViolationDetected) {
             true
         } else {
             currentVisible

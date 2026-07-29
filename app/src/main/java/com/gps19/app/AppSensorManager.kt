@@ -38,7 +38,7 @@ import kotlin.math.*
  */
 sealed class AppSensorEvent {
     data class HardwareFailure(val reason: String) : AppSensorEvent()
-    data class LogEvent(val message: String, val important: Boolean) : AppSensorEvent()
+    data class LogEvent(val message: String, val isImportant: Boolean) : AppSensorEvent()
 }
 
 /**
@@ -48,7 +48,7 @@ sealed class AppSensorEvent {
  *   BufferOverflow.DROP_OLDEST to ensure non-blocking sensor telemetry.
  * July.27.06:
  * - Issue #601: Kinetic Energy Anomaly Detection. Implemented HPF-based energy 
- *   analysis to distinguish sustained motion from impulse shocks.
+ *   analysis to distinguish sustained motion from impulse events.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -483,7 +483,7 @@ class AppSensorManager @Inject constructor(
                     var calcDebounceMs = baseDebounceMs
                     if (isStationary() && stationaryStartRt > 0) {
                         val hoursStationary = (nowRt - stationaryStartRt) / 3600000.0
-                        calcDebounceMs += (hoursStationary * PROXIMITY_STARY_SCALING_MS_PER_HOUR).toLong()
+                        calcDebounceMs += (hoursStationary * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR).toLong()
                     }
                     if (isHighLoad) calcDebounceMs = (calcDebounceMs * PROXIMITY_STRESS_SCALING_MULTIPLIER).toLong()
                     calcDebounceMs = calcDebounceMs.coerceAtMost(PROXIMITY_DEBOUNCE_MAX_MS)

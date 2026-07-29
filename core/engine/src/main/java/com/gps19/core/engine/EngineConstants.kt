@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.29.00:
+ * - Issue #622: Forensic: Location Refresh Reactivity Hardening. Added 
+ *   LOCATION_RECOVERY_DEBOUNCE_MS and updated GPS gap constants.
  * July.28.21:
  * - Issue #615: Forensic: Stability Audit Metric Expansion. Added 
  *   GNSS_EXPECTED_INTERVAL_MS and GNSS_JITTER_THRESHOLD_MS.
@@ -11,16 +14,6 @@ package com.gps19.core.engine
  * July.27.11:
  * - A15 Hardening: Raised I/O latency audit thresholds for budget hardware 
  *   to prevent recursive forensic log bursts during cold-start.
- * July.27.07:
- * - Issue #603: Analytical Ribbon Optimization. Added RIBBON_KINETIC_ENERGY_SCALE.
- * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Added HPF and Energy EMA 
- *   parameters to distinguish between sustained motion and impulse events.
- * July.27.05:
- * - Issue #600: Forensic Playback Latency Audit. Added dynamic log limits
- *   and retrieval latency thresholds to support strict forensic lookups.
- * July.26.04:
- * - Issue #589: Added Performance & Latency Thresholds for engine audit.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -180,6 +173,7 @@ const val MOVING_HOLD_DURATION_MS = 60000L
 const val GPS_GAP_THRESHOLD_MS = 60000L
 const val GPS_STALL_THRESHOLD_MS = 60000L
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
+const val LOCATION_RECOVERY_DEBOUNCE_MS = 3000L
 
 // Adaptive Polling Strategy (R406a)
 const val TICK_INTERVAL_MS = 2000L

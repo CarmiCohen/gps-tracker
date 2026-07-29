@@ -17,7 +17,7 @@ class AlertUseCase @Inject constructor(
         val now = timeProvider.currentTimeMillis()
         repository.saveLong(LAST_ALARM_ACK_TS_KEY, now)
         repository.sendCommand(UiCommand.StopSiren("User Dismissed"))
-        logManager.submitToLogSink("USER ACTION: Alerts acknowledged", "user", important = true)
+        logManager.submitToLogSink("USER ACTION: Alerts acknowledged", "user", isImportant = true)
         return now
     }
 
@@ -25,7 +25,7 @@ class AlertUseCase @Inject constructor(
         val now = timeProvider.currentTimeMillis()
         repository.saveLong(LAST_ALARM_ACK_TS_KEY, now)
         repository.sendCommand(UiCommand.StopSiren(causes))
-        logManager.submitToLogSink("USER ACTION: Siren stopped ${causes ?: ""}", "user", important = true)
+        logManager.submitToLogSink("USER ACTION: Siren stopped ${causes ?: ""}", "user", isImportant = true)
         return now
     }
 }

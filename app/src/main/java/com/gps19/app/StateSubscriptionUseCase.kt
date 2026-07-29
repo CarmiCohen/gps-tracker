@@ -10,12 +10,14 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * July.28.24:
+ * - Issue #621: UseCase Internalization Audit. Internalized distinctUntilChanged() 
+ *   operators where appropriate to reduce ViewModel boilerplate and standardize 
+ *   flow emission behavior. Removed redundant calls on StateFlows.
  * July.28.23:
  * - Issue #618: Forensic UI State Collection Audit. Migrated history 
  *   observation collection to Dispatchers.Main.immediate to reduce 
  *   dispatch latency for UI updates.
- * July.26.03:
- * - Issue #545c: Flow Architecture Standardization.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -61,14 +63,23 @@ class StateSubscriptionUseCase @Inject constructor(
     }
 
     /**
-     * observeGpsIndex: Standardized pass-through to GpsStatusManager.
+     * observeGpsIndex: GpsStatusManager already applies distinctUntilChanged().
      */
     fun observeGpsIndex(): Flow<GpsIndexData> = gpsStatusManager.gpsIndexFlow
 
+    /**
+     * observeInternetStatus: SystemStatusProvider already applies distinctUntilChanged().
+     */
     fun observeInternetStatus(): Flow<Boolean> = systemStatusProvider.observeInternetStatus()
 
+    /**
+     * observeBatteryStatus: SystemStatusProvider already applies distinctUntilChanged().
+     */
     fun observeBatteryStatus(): Flow<BatteryStatus> = systemStatusProvider.observeBatteryStatus()
 
+    /**
+     * observeGnssDetail: Returns StateFlow (implicitly distinctUntilChanged).
+     */
     fun observeGnssDetail(): Flow<GnssDetail?> = repository.gnssDetail
 
     @Suppress("UNCHECKED_CAST")
@@ -95,7 +106,9 @@ class StateSubscriptionUseCase @Inject constructor(
                 appMode = args[7] as String?,
                 isSystemActive = args[8] as Boolean
             )
-        }.flowOn(Dispatchers.Default)
+        }
+        .distinctUntilChanged() // Internalized transformation for combine result
+        .flowOn(Dispatchers.Default)
     }
 
     fun observeConnectivityBasics(): Flow<ConnectivityUpdate> {
@@ -105,7 +118,9 @@ class StateSubscriptionUseCase @Inject constructor(
             repository.lastRemoteActivityTs
         ) { connected, rtt, remoteTs ->
             ConnectivityUpdate(connected, rtt, remoteTs)
-        }.flowOn(Dispatchers.Default)
+        }
+        .distinctUntilChanged() // Internalized transformation for combine result
+        .flowOn(Dispatchers.Default)
     }
 
     fun observeIntegrityUpdates(): Flow<IntegrityUpdate> = repository.systemHealth.map { health ->
@@ -119,7 +134,9 @@ class StateSubscriptionUseCase @Inject constructor(
             activeAlarms = emptyList(),
             activeAlarmTypes = emptySet()
         )
-    }.flowOn(Dispatchers.Default)
+    }
+    .distinctUntilChanged() // Internalized transformation for map result
+    .flowOn(Dispatchers.Default)
 
     data class IntegrityUpdate(
         val health: SystemHealthState,

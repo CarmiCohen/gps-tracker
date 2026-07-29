@@ -11,11 +11,11 @@ import javax.inject.Singleton
 
 /**
  * ConfigManager: Manages identity and core configuration settings.
+ * July.28.24:
+ * - Issue #618: Forensic UI State Collection Audit. Migrated to 
+ *   Dispatchers.Main.immediate to eliminate configuration sync latency (R618).
  * July.24.04:
- * - Issue #540: Identity Sync Bug. Corrected viewerIdFlow collector to update 
- *   viewerId instead of deviceId, preventing identity cross-contamination.
- * July.22.01:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
+ * - Issue #540: Identity Sync Bug.
  */
 @Singleton
 class ConfigManager @Inject constructor(
@@ -27,7 +27,7 @@ class ConfigManager @Inject constructor(
     var viewerId: String = ""
     var relayUrl: String = DEFAULT_RELAY_URL
 
-    private val scope = CoroutineScope(Dispatchers.Main)
+    private val scope = CoroutineScope(Dispatchers.Main.immediate)
 
     init {
         observeSettings()

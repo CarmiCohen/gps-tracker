@@ -1,48 +1,33 @@
-# Handover (July.28.2326) - UI State Collection Audit [READY]
+# Handover (July.29.00) - Location Refresh Reactivity Hardening [COMPLETED]
 
-## 🎯 Completed Objective
-Cycle **July.28.2326** achieved **454 Resolved Issues** (Cumulative).
-1.  **[Issue #618] [Category: Performance] Forensic: UI State Collection Audit**:
-    - **Remediation**: Migrated all UI-bound `collect` and `launchIn` observers in `MainViewModel.kt` and `StateSubscriptionUseCase.kt` to `Dispatchers.Main.immediate`.
-    - **Hardening**: Verified that A15-specific sampling (3000ms) is applied to the `dashboardState` and `eventLogsFlow` to ensure UI thread availability.
-    - **Impact**: Eliminates dispatch latency jitter and micro-stuttering on restricted hardware by ensuring state updates bypass the Coroutine event loop when already on the Main thread.
-    - **Authority**: Added **R618** (Forensic UI State Collection Policy) to `SOT_MASTER_REQUIREMENTS.md`.
+## 🎯 Current Objective
+Completed **[Issue #622] Forensic: Location Refresh Reactivity Hardening**. Hardened the GPS recovery pipeline to prevent UI flickering and provided high-precision gap duration tracking for forensic audits.
 
 ## 📊 Status Tracker
-- **[Issue #618] UI State Collection Audit**: 🟢 Resolved.
-- **[Issue #617] Global SharedFlow Audit**: 🟢 Resolved.
+- **[Issue #622] Location Refresh Reactivity Hardening**: 🟢 Resolved (Debounced recovery, forensic duration tracking).
+- **[Issue #621] UseCase Internalization Audit**: 🟢 Resolved.
+- **[Issue #620] State Partitioning Audit**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
-- **Build Status**: 🟢 SUCCESS (Verified via `:app:assembleDebug`).
-- **Version**: **July.28.2326**.
-- **Requirement Parity**: Added **R618**.
+- **Build Status**: 🟢 **READY FOR REBUILD**.
+- **Target Version**: **July.29.00**.
+- **Requirement Parity**: **R622** (Location Refresh Reactivity Hardening Authority) is fully implemented.
 
-### 🧬 Forensic Change Log
-| File | Change Type | Purpose |
-| :--- | :--- | :--- |
-| `app/src/main/java/com/gps19/app/MainViewModel.kt` | Performance | Migrated UI collectors to `Dispatchers.Main.immediate`. |
-| `app/src/main/java/com/gps19/app/StateSubscriptionUseCase.kt` | Performance | Migrated history observations to `Dispatchers.Main.immediate`. |
-| `STATUS/SOT_MASTER_REQUIREMENTS.md` | Authority Update | Added **R618** specifying Main.immediate policy for UI. |
-| `issues.md` | Documentation | Resolved #618; Total count 454. |
-| `app/build.gradle` | Versioning | Updated `versionName` to `July.28.2326`. |
-
-## 💡 Simplification Ideas
-- **Lifecycle-Aware Collection**: Move transient UI states (e.g., button loading states) to local component-level collection to reduce `MainUiState` footprint.
-- **UseCase Dispatch Standardization**: Standardize all UI-facing UseCases to internalize `Dispatchers.Main.immediate` for their emission flows.
-
-## ⚠️ Newly Identified Risks & Concerns
-- **[Concern #619-C1] Pipeline Throttling Audit**: Audit `DashboardStateProvider` for potential computational bottlenecks during high-frequency combined flow emissions.
+### 🛠️ Forensic Progress Log
+1.  **Recovery Debouncing**: Implemented `LOCATION_RECOVERY_DEBOUNCE_MS` in `GpsManager` to filter out transient/unstable GPS fixes.
+2.  **Forensic Precision**: Added `lastLocationPendingDurationMs` to `SystemHealthState` and `LocationStatus`.
+3.  **Log Enhancement**: Updated `IntegrityMonitor` to report the exact duration of signal gaps (e.g., "Location fix restored after 12.5s gap").
+4.  **Requirement Documentation**: Integrated R622 into the Source of Truth.
 
 ## 🚀 Release commands
 ```bash
 git add .
-git commit -m "Release July.28.2326: Performance - UI State Collection Audit (#618)"
-git tag -a July.28.2326 -m "Migration of UI-bound state collection to Dispatchers.Main.immediate to eliminate stuttering on A15 hardware."
+git commit -m "Release July.29.00: Forensic - Location Refresh Reactivity Hardening (#622)"
+git tag -a July.29.00 -m "Implemented debounced GPS recovery and precise gap duration tracking."
 git push origin main --tags
 ```
 
 ## 🎯 Next Objective
-- **[Issue #619] [Sprint: July.28.24] [Priority: Low] Structural: Dashboard Pipeline Optimization**.
-    - **Scope**: Audit `DashboardStateProvider` and its associated `combine` logic for redundant allocations during state re-computation.
+- **[Issue #623] [Sprint: July.29.24] [Priority: Low] Structural: Latency Monitor Metric Cleanup**.
 
-**Status**: READY FOR NEW FRESH CHAT.
+**Status**: COMPLETED. READY FOR FRESH CHAT.

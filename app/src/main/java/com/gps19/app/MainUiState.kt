@@ -6,12 +6,11 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * July.28.24:
+ * - Issue #620: State Partitioning Audit. Decomposed TelemetryState into 
+ *   KinematicState and DiagnosticState to refine observation granularity.
  * July.26.04:
- * - Issue #595: Forensic Playback Hardening. Added isStrictMode to NavigationState 
- *   to gate enhanced data integrity validation in ribbons.
- * July.24.08:
- * - Issue #547: State Decomposition. Extracted high-frequency fields into 
- *   TelemetryState to reduce heap churn and mitigate kernel memory overhead.
+ * - Issue #595: Forensic Playback Hardening.
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -81,23 +80,34 @@ data class MainUiState(
 }
 
 /**
- * TelemetryState: High-frequency transient state.
- * Decomposed from MainUiState to minimize allocation overhead during rapid updates.
+ * KinematicState: High-frequency transient state focused on motion, position, and sensor data.
+ * Issue #620: Partitioned from TelemetryState to minimize trigger churn for static components.
  */
-data class TelemetryState(
+data class KinematicState(
     val localLocation: LocationState = LocationState(),
+    val trackerLocation: LocationState = LocationState(),
+    val localHealth: SystemHealthState = SystemHealthState(),
+    val trackerHealth: SystemHealthState = SystemHealthState(),
+    val distanceTrackerToHome: Double? = null,
+    val distanceTrackerToViewer: Double? = null,
+    val distanceViewerToHome: Double? = null,
+    val distanceViewerToTracker: Double? = null
+)
+
+/**
+ * DiagnosticState: Low-frequency scalar state focused on connectivity, battery, and system status.
+ * Issue #620: Partitioned from TelemetryState to reduce re-computation overhead.
+ */
+data class DiagnosticState(
     val battery: BatteryState = BatteryState(),
     val stats: StatsState = StatsState(),
     val viewerSatsView: Int = 0,
     val viewerSatsUsed: Int = 0,
-    val trackerLocation: LocationState = LocationState(),
     val trackerStats: StatsState = StatsState(),
     val trackerBattery: BatteryState = BatteryState(),
     val trackerSatsView: Int = 0,
     val trackerSatsUsed: Int = 0,
     val connectivity: ConnectivityState = ConnectivityState(),
-    val localHealth: SystemHealthState = SystemHealthState(),
-    val trackerHealth: SystemHealthState = SystemHealthState(),
     val activeAlarms: List<AlarmInfo> = emptyList(),
     val isNewViolationDetected: Boolean = false,
     val powerAlarmPending: Boolean = false,
@@ -105,11 +115,7 @@ data class TelemetryState(
     val isSirenPlaying: Boolean = false,
     val isRedScreenVisible: Boolean = false,
     val maxTrackerAccuracy: Double = 0.0,
-    val maxViewerAccuracy: Double = 0.0,
-    val distanceTrackerToHome: Double? = null,
-    val distanceTrackerToViewer: Double? = null,
-    val distanceViewerToHome: Double? = null,
-    val distanceViewerToTracker: Double? = null
+    val maxViewerAccuracy: Double = 0.0
 )
 
 enum class MapFollowMode { TRACKER, VIEWER, AUTO }

@@ -20,13 +20,12 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * July.29.00:
+ * - Issue #622: Forensic: Location Refresh Reactivity Hardening. Implemented 
+ *   debounced recovery logic and forensic gap duration tracking (R613).
  * July.28.22:
  * - Issue #617: Global SharedFlow Audit. Hardened _internalGpsFlow with 
  *   BufferOverflow.DROP_OLDEST to ensure non-blocking hardware callbacks (R617).
- * July.28.21:
- * - Issue #615: Forensic: Stability Audit Metric Expansion. Implemented 
- *   GNSS callback jitter tracking to detect hardware-level timing 
- *   inconsistencies. maxGnssJitterMs is exposed for forensic auditing.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -53,6 +52,9 @@ class GpsManager @Inject constructor(
     private var lastGnssEmitRt = 0L
     private var lastGnssStatusRt = 0L
     
+    private var pendingEnterRt = 0L
+    private var lastGapReason = LocationPendingReason.NONE
+    
     var maxGnssJitterMs = 0L
         private set
 
@@ -63,7 +65,9 @@ class GpsManager @Inject constructor(
     data class LocationStatus(
         val isPending: Boolean = false,
         val reason: LocationPendingReason = LocationPendingReason.NONE,
-        val lastFixRt: Long = 0L
+        val lastFixRt: Long = 0L,
+        val lastPendingDurationMs: Long = 0L,
+        val recoveryConfirmed: Boolean = false
     )
 
     private val _locationStatus = MutableStateFlow(LocationStatus())
@@ -91,7 +95,6 @@ class GpsManager @Inject constructor(
             }
             lastGnssStatusRt = nowRt
 
-            // Basic status updates are lightweight and needed for real-time health checks
             satellitesInView = status.satelliteCount
             var used = 0
             var snrSum = 0.0
@@ -119,8 +122,6 @@ class GpsManager @Inject constructor(
                 if (snrBufferCount < 512) snrBufferCount++
             }
 
-            // Issue #614: Throttle high-frequency hardware chatter to prevent downstream 
-            // flow processing overhead on budget hardware.
             if (nowRt - lastGnssEmitRt >= GNSS_SAMPLING_INTERVAL_MS) {
                 lastGnssEmitRt = nowRt
                 
@@ -153,28 +154,66 @@ class GpsManager @Inject constructor(
         externalScope.launch {
             while (isActive) {
                 updateLocationStatus()
-                delay(5000L)
+                delay(2000L) // Faster pulse for recovery reactivity
             }
         }
     }
 
     private fun updateLocationStatus() {
         val nowRt = timeProvider.elapsedRealtime()
-        val delta = if (lastFixRt > 0) nowRt - lastFixRt else nowRt // Treat uptime as initial delta
+        val deltaSinceFix = if (lastFixRt > 0) nowRt - lastFixRt else nowRt
         
-        var isPending = false
-        var reason = LocationPendingReason.NONE
-        
-        if (delta > GPS_GAP_THRESHOLD_MS) {
-            isPending = true
-            reason = when {
-                satellitesInView == 0 -> LocationPendingReason.SIGNAL_LOSS
-                satellitesInView >= 4 && satellitesUsed < 4 -> LocationPendingReason.GPS_STALL
-                else -> LocationPendingReason.GPS_GAP
+        _locationStatus.update { current ->
+            var nextPending = current.isPending
+            var nextReason = current.reason
+            var recoveryConfirmed = current.recoveryConfirmed
+            var lastPendingDuration = current.lastPendingDurationMs
+
+            // Gap Detection
+            if (deltaSinceFix > GPS_GAP_THRESHOLD_MS) {
+                if (!nextPending) {
+                    pendingEnterRt = nowRt
+                    nextPending = true
+                    recoveryConfirmed = false
+                }
+                nextReason = when {
+                    satellitesInView == 0 -> LocationPendingReason.SIGNAL_LOSS
+                    satellitesInView >= 4 && satellitesUsed < 4 -> LocationPendingReason.GPS_STALL
+                    else -> LocationPendingReason.GPS_GAP
+                }
+                lastGapReason = nextReason
+            } 
+            // Recovery Logic with Debounce (Issue #622)
+            else if (nextPending) {
+                // We have a fix (deltaSinceFix <= threshold), but we wait for stabilization
+                val recoveryDelta = nowRt - lastFixRt
+                if (recoveryDelta < LOCATION_RECOVERY_DEBOUNCE_MS) {
+                    // Fix is very fresh, check if it's stable or we just started recovering
+                    if (nowRt - pendingEnterRt > 0) {
+                        lastPendingDuration = nowRt - pendingEnterRt
+                    }
+                    // We don't clear isPending yet to prevent flickering if fix is lost immediately
+                    // But we can mark it as "recovery in progress" implicitly by nextPending remaining true
+                    // until the next heartbeat or fix update confirms stability.
+                    // Actually, for UI flickering, we want to stay in "Pending" until it's really back.
+                } else {
+                    // Recovery confirmed
+                    nextPending = false
+                    nextReason = LocationPendingReason.NONE
+                    recoveryConfirmed = true
+                }
+            } else {
+                recoveryConfirmed = false
             }
+
+            current.copy(
+                isPending = nextPending,
+                reason = nextReason,
+                lastFixRt = lastFixRt,
+                lastPendingDurationMs = lastPendingDuration,
+                recoveryConfirmed = recoveryConfirmed
+            )
         }
-        
-        _locationStatus.update { it.copy(isPending = isPending, reason = reason, lastFixRt = lastFixRt) }
     }
 
     @SuppressLint("MissingPermission")

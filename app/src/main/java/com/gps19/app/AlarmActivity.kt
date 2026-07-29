@@ -23,9 +23,9 @@ import kotlinx.coroutines.flow.onEach
 
 /**
  * AlarmActivity: Full-screen alarm overlay that bypasses the lock screen.
- * July.25.00:
- * - Issue #547: State Decomposition. Refactored to consume transient alarm 
- *   state from telemetryState for zero-latency surfacing.
+ * July.28.24:
+ * - Issue #620: State Partitioning Audit. Migrated to partitioned KinematicState 
+ *   and DiagnosticState for architectural consistency.
  */
 @AndroidEntryPoint
 class AlarmActivity : ComponentActivity() {
@@ -54,7 +54,6 @@ class AlarmActivity : ComponentActivity() {
 
         viewModel.onEvent(UiEvent.SetRedScreenVisible(true))
 
-        // Issue 38: Observe UI Commands for StopSiren to ensure UI consistency
         viewModel.repository.uiCommands
             .onEach { command ->
                 if (command is UiCommand.StopSiren) {
@@ -65,26 +64,25 @@ class AlarmActivity : ComponentActivity() {
 
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-            val telemetryState by viewModel.telemetryState.collectAsStateWithLifecycle()
+            val kinematicState by viewModel.kinematicState.collectAsStateWithLifecycle()
+            val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
 
             GpsTrackerTheme(appMode = uiState.appMode) {
-                // R800: Unified Back Navigation. System Back button handles exit/dismissal.
                 BackHandler {
                     viewModel.onEvent(UiEvent.DismissAlarms)
                     finish()
                 }
 
-                // Background is handled by AlarmOverlay bgColor
                 Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
                     AlarmOverlay(
-                        alarms = telemetryState.activeAlarms,
-                        isMuted = telemetryState.isAlarmSilenced,
-                        isLocationPending = telemetryState.trackerHealth.isLocationPending,
+                        alarms = diagnosticState.activeAlarms,
+                        isMuted = diagnosticState.isAlarmSilenced,
+                        isLocationPending = kinematicState.trackerHealth.isLocationPending,
                         backgroundStatus = uiState.permissions.backgroundStatus,
                         hasBackgroundRestriction = uiState.permissions.hasBackgroundRestriction,
                         onHardwarePermissionClick = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onMute = {
-                            val currentCauses = telemetryState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
+                            val currentCauses = diagnosticState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
                             viewModel.onEvent(UiEvent.StopSiren(currentCauses))
                         },
                         onClose = {
@@ -94,11 +92,9 @@ class AlarmActivity : ComponentActivity() {
                         onGoToMap = {
                             viewModel.onEvent(UiEvent.DismissAlarms)
                             
-                            // Stop siren if it's still playing
-                            val currentCauses = telemetryState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Map Navigation" }
+                            val currentCauses = diagnosticState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Map Navigation" }
                             viewModel.onEvent(UiEvent.StopSiren(currentCauses))
                             
-                            // Bring MainActivity to front and show map
                             val intent = Intent(this, MainActivity::class.java).apply {
                                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                                 action = ACTION_NAVIGATE_TO_MAP

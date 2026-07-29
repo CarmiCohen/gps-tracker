@@ -4,11 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * July.29.00:
+ * - Issue #622: Forensic: Location Refresh Reactivity Hardening. Added 
+ *   lastLocationPendingDurationMs for precise gap audit.
  * July.27.06:
  * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy field 
  *   to maintain forensic parity with sensor processing.
- * July.22.01:
- * - Forensic Parity: Added missing indices (noiseIdx, luxIdx, vibeIdx, liftIdx, tiltIdx, baroIdx).
  */
 @Serializable
 data class SystemHealthState(
@@ -31,6 +32,7 @@ data class SystemHealthState(
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val lastValidFixRt: Long = 0L,
+    val lastLocationPendingDurationMs: Long = 0L,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",

@@ -37,15 +37,16 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * July.24.08:
- * - Issue #544 Cleanup: Extracted imperative overlay management to MapOverlayManager.
- * - Issue #547: State Decomposition. Consumes TelemetryState for high-frequency updates.
+ * July.28.24:
+ * - Issue #620: State Partitioning Audit. Migrated to partitioned KinematicState 
+ *   and DiagnosticState to isolate map-driving location updates from scalar diagnostics.
  */
 
 @Composable
 fun AppMapContainer(
     uiState: MainUiState,
-    telemetryState: TelemetryState,
+    kinematicState: KinematicState,
+    diagnosticState: DiagnosticState,
     systemPulse: Long,
     systemPulseRt: Long,
     onEvent: (UiEvent) -> Unit,
@@ -63,8 +64,8 @@ fun AppMapContainer(
     val now = systemPulse
     
     val isTrackerMode = uiState.appMode == "tracker"
-    val trackerLoc = if (isTrackerMode) telemetryState.localLocation else telemetryState.trackerLocation
-    val viewerLoc = if (isTrackerMode) telemetryState.trackerLocation else telemetryState.localLocation
+    val trackerLoc = if (isTrackerMode) kinematicState.localLocation else kinematicState.trackerLocation
+    val viewerLoc = if (isTrackerMode) kinematicState.trackerLocation else kinematicState.localLocation
 
     // Freshness Logic
     fun calculateFreshness(loc: LocationState): Boolean {
@@ -77,7 +78,7 @@ fun AppMapContainer(
     val isTrackerFresh = calculateFreshness(trackerLoc)
     val isViewerFresh = calculateFreshness(viewerLoc)
 
-    val initialCenter = remember(telemetryState.trackerLocation.lat, telemetryState.localLocation.lat) {
+    val initialCenter = remember(kinematicState.trackerLocation.lat, kinematicState.localLocation.lat) {
         when {
             PhysicsUtils.isValidLocation(trackerLoc.lat, trackerLoc.lng) -> GeoPoint(trackerLoc.lat, trackerLoc.lng)
             PhysicsUtils.isValidLocation(viewerLoc.lat, viewerLoc.lng) -> GeoPoint(viewerLoc.lat, viewerLoc.lng)
@@ -90,7 +91,8 @@ fun AppMapContainer(
     Box(modifier = Modifier.fillMaxSize()) {
         OsmMap(
             uiState = uiState,
-            telemetryState = telemetryState,
+            kinematicState = kinematicState,
+            diagnosticState = diagnosticState,
             trail = trail,
             viewerTrail = viewerTrail,
             violations = violations,
@@ -127,7 +129,7 @@ fun AppMapContainer(
             }
         }
 
-        val trackerHealth = if (isTrackerMode) telemetryState.localHealth else telemetryState.trackerHealth
+        val trackerHealth = if (isTrackerMode) kinematicState.localHealth else kinematicState.trackerHealth
         if (trackerHealth.isLocationPending && trackerHealth.locationPendingReason != LocationPendingReason.NONE) {
             Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp).background(Amber500.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                 Text(text = "UNCERTAINTY: ${trackerHealth.locationPendingReason.name.replace("_", " ")}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
@@ -147,7 +149,8 @@ fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifi
 @Composable
 fun OsmMap(
     uiState: MainUiState,
-    telemetryState: TelemetryState,
+    kinematicState: KinematicState,
+    diagnosticState: DiagnosticState,
     trail: List<TrailPoint>,
     viewerTrail: List<TrailPoint>,
     home: List<GeoPoint> = uiState.homePoints,
@@ -166,11 +169,11 @@ fun OsmMap(
     val density = context.resources.displayMetrics.density
     
     val isTrackerMode = uiState.appMode == "tracker"
-    val trackerLoc = if (isTrackerMode) telemetryState.localLocation else telemetryState.trackerLocation
-    val viewerLoc = if (isTrackerMode) telemetryState.trackerLocation else telemetryState.localLocation
+    val trackerLoc = if (isTrackerMode) kinematicState.localLocation else kinematicState.trackerLocation
+    val viewerLoc = if (isTrackerMode) kinematicState.trackerLocation else kinematicState.localLocation
     
-    val trackerHealth = if (isTrackerMode) telemetryState.localHealth else telemetryState.trackerHealth
-    val viewerHealth = if (isTrackerMode) telemetryState.trackerHealth else telemetryState.localHealth
+    val trackerHealth = if (isTrackerMode) kinematicState.localHealth else kinematicState.trackerHealth
+    val viewerHealth = if (isTrackerMode) kinematicState.trackerHealth else kinematicState.localHealth
 
     val overlayManager = remember(mapViewRef.value) {
         mapViewRef.value?.let { MapOverlayManager(context, it, density) }

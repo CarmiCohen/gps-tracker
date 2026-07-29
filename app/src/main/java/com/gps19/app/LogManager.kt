@@ -9,6 +9,8 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * July.28.24:
+ * - Issue #621: Alignment of isImportant naming for Boolean consistency.
  * July.27.00:
  * - Issue #596: Signaling Reliability Audit. Promoted Important/Special logs to HIGH 
  *   priority to ensure Alarms and Tamper events bypass forensic log throttling.
@@ -36,7 +38,7 @@ class LogManager @Inject constructor(
     fun submitToLogSink(
         message: String, 
         type: String, 
-        important: Boolean = true, 
+        isImportant: Boolean = true, 
         extremeValue: Double? = null, 
         localId: String? = null,
         durationMs: Long = 0L,
@@ -61,9 +63,9 @@ class LogManager @Inject constructor(
             val isSuppressedByStorage = health.isStorageCritical && !isSpecial
             if (isSuppressedByStorage) return
 
-            if (health.isStorageLow && !important && !isSpecial) return
+            if (health.isStorageLow && !isImportant && !isSpecial) return
 
-            if (type == "system" && !important && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
+            if (type == "system" && !isImportant && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
                 return
             }
 
@@ -108,7 +110,7 @@ class LogManager @Inject constructor(
                 timestamp = now,
                 message = message,
                 type = type,
-                isImportant = important,
+                isImportant = isImportant,
                 id = configManager.deviceId,
                 viewerId = configManager.viewerId,
                 extremeValue = extremeValue,
@@ -135,7 +137,7 @@ class LogManager @Inject constructor(
             if (isConnected) {
                 // Issue #596: Critical logs (Alarms, confirmed Tampers) use HIGH priority 
                 // to bypass the forensic log throttled queue.
-                val priority = if (important || isSpecial) SignalingPriority.HIGH else SignalingPriority.NORMAL
+                val priority = if (isImportant || isSpecial) SignalingPriority.HIGH else SignalingPriority.NORMAL
                 suite.emit("log_update", data, priority)
             }
             
@@ -147,7 +149,7 @@ class LogManager @Inject constructor(
 
     fun logServiceEvent(
         m: String, 
-        important: Boolean = true, 
+        isImportant: Boolean = true, 
         isSpecial: Boolean = false, 
         specialColor: Int? = null,
         lat: Double = 0.0,
@@ -157,12 +159,12 @@ class LogManager @Inject constructor(
         snr: Double? = null,
         vibe: Double? = null
     ) {
-        submitToLogSink(m, "system", important, isSpecial = isSpecial, specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy, maxAccuracy = maxAccuracy, snr = snr, vibe = vibe)
+        submitToLogSink(m, "system", isImportant = isImportant, isSpecial = isSpecial, specialColor = specialColor, lat = lat, lng = lng, accuracy = accuracy, maxAccuracy = maxAccuracy, snr = snr, vibe = vibe)
     }
 
     fun logWatchdogPulse(set: Boolean, skipped: Int) {
         if (set) {
-            submitToLogSink("Watchdog: Alarm set (skipped=$skipped)", "watchdog_stats", important = false)
+            submitToLogSink("Watchdog: Alarm set (skipped=$skipped)", "watchdog_stats", isImportant = false)
         }
     }
 

@@ -16,13 +16,10 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * July.28.21:
- * - Issue #615: Forensic: Stability Audit Metric Expansion. Extended 
- *   StabilityAudit to track GNSS callback jitter and report hardware-level 
- *   timing inconsistencies in forensic logs.
- * July.28.15:
- * - Issue #610: Forensic Heartbeat Decoupling. Moved notification updates to 
- *   the dedicated low-frequency heartbeat loop.
+ * July.28.24:
+ * - Issue #621: Fixed regressions from isImportant naming alignment and kinematicState partitioning.
+ * - Issue #618: Forensic UI State Collection Audit. Migrated Main dispatchers 
+ *   to Dispatchers.Main.immediate for notification consistency (R618).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -108,7 +105,7 @@ class ViewerService : BaseMonitorService() {
 
         startTickLoop()
         startHeartbeatLoop()
-        logManager.logServiceEvent("Viewer Engine Online (Coordinated)", important = true)
+        logManager.logServiceEvent("Viewer Engine Online (Coordinated)", isImportant = true)
     }
 
     private fun observeAlarmEvents() {
@@ -116,7 +113,7 @@ class ViewerService : BaseMonitorService() {
             alarmManager.alarmEvents.collectLatest { event ->
                 when (event) {
                     is AlarmEvent.LogEvent -> {
-                        logManager.submitToLogSink(event.message, event.type, event.important, event.extremeValue, event.logId, event.durationMs, event.isSpecial, event.specialColor, event.lat, event.lng, event.accuracy, event.maxAccuracy, event.snr, event.vibe)
+                        logManager.submitToLogSink(event.message, event.type, isImportant = event.isImportant, extremeValue = event.extremeValue, localId = event.logId, durationMs = event.durationMs, isSpecial = event.isSpecial, specialColor = event.specialColor, lat = event.lat, lng = event.lng, accuracy = event.accuracy, maxAccuracy = event.maxAccuracy, snr = event.snr, vibe = event.vibe)
                     }
                 }
             }
@@ -127,7 +124,7 @@ class ViewerService : BaseMonitorService() {
         lifecycleScope.launch {
             integrityMonitor.integrityEvents.collectLatest { event ->
                 when (event) {
-                    is IntegrityEvent.LogEvent -> logManager.logServiceEvent(event.message, event.important)
+                    is IntegrityEvent.LogEvent -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
                     else -> {} 
                 }
             }
@@ -143,7 +140,7 @@ class ViewerService : BaseMonitorService() {
                     }
                     is ProcessorEvent.LogAdded -> {
                         val specialColor = if (event.isSpecial || event.message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
-                        logManager.logServiceEvent(event.message, event.isImportant, isSpecial = event.isSpecial || event.message.contains("Merge-on-Stale"), specialColor = specialColor, lat = event.lat, lng = event.lng, accuracy = event.accuracy, snr = event.snr, vibe = event.vibe)
+                        logManager.logServiceEvent(event.message, isImportant = event.isImportant, isSpecial = event.isSpecial || event.message.contains("Merge-on-Stale"), specialColor = specialColor, lat = event.lat, lng = event.lng, accuracy = event.accuracy, snr = event.snr, vibe = event.vibe)
                     }
                     is ProcessorEvent.MaxAccuracyChanged -> {
                         repository.saveDoubleSync(MAX_ACCURACY_KEY, event.accuracy)
@@ -173,7 +170,7 @@ class ViewerService : BaseMonitorService() {
         lifecycleScope.launch {
             historyManager.historyEvents.collectLatest { event ->
                 when (event) {
-                    is HistoryEvent.LogEvent -> logManager.logServiceEvent(event.message, event.important)
+                    is HistoryEvent.LogEvent -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
                 }
             }
         }
@@ -223,7 +220,7 @@ class ViewerService : BaseMonitorService() {
                 if (gap > TICK_INTERVAL_MS + GPS_STABILITY_GAP_THRESHOLD_MS) {
                     stabilityAuditViolationCount++
                     val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY GAP (V): ${gap}ms detected during logic pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
+                    logManager.logServiceEvent("STABILITY GAP (V): ${gap}ms detected during logic pulse.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
                 }
             }
         }
@@ -266,7 +263,7 @@ class ViewerService : BaseMonitorService() {
         serviceStartRealtime = timeProvider.elapsedRealtime(); serviceStartWall = timeProvider.currentTimeMillis()
         alarmManager.resetEvaluation(); sessionManager.reset(); integrityMonitor.resetStats(); forensicUseCase.resetLatches(); stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
         gpsManager.resetGnssJitter()
-        logManager.logServiceEvent("Session Terminated", false, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+        logManager.logServiceEvent("Session Terminated", isImportant = false, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
     }
 
     private fun onUiVisibilityChangedInternal(visible: Boolean) {
@@ -292,7 +289,7 @@ class ViewerService : BaseMonitorService() {
     override fun updateForegroundServiceType() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             fgsUpdateJob?.cancel()
-            fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main) {
+            fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main.immediate) {
                 try {
                     delay(200)
                     val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
@@ -331,7 +328,7 @@ class ViewerService : BaseMonitorService() {
                     if (reliabilityViolation) msg.append("Reliability ${String.format(Locale.getDefault(), "%.1f", reliability)}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes). ")
                     if (jitterViolation) msg.append("GNSS Jitter: ${maxJitter}ms (Hardware Instability).")
                     
-                    logManager.logServiceEvent(msg.toString().trim(), important = true, isSpecial = jitterViolation, specialColor = if (jitterViolation) FORENSIC_PINK_COLOR else null, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                    logManager.logServiceEvent(msg.toString().trim(), isImportant = true, isSpecial = jitterViolation, specialColor = if (jitterViolation) FORENSIC_PINK_COLOR else null, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                 }
                 stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
                 gpsManager.resetGnssJitter()
@@ -392,12 +389,12 @@ class ViewerService : BaseMonitorService() {
         }
     }
 
-    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSignalLoss: Boolean, isTrackerJammerSuspicion: Boolean, isTrackerStalled: Boolean, isTrackerGap: Boolean, isTrackerConnected: Boolean) {
+    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSignalLoss: Boolean, isTrackerJammerSuspicion: Boolean, isTrackerStalled: Boolean, isTrackerGap: Boolean, isTrackerActive: Boolean) {
         val isSocketConnected = connectivitySuite.isConnected(); val localHealth = integrityMonitor.currentHealth
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
             alarmManager.evaluateAlarms(
-                now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = false, isRelayConnected = isSocketConnected, isTrackerConnected = isTrackerConnected, status = connectivitySuite.trackerStatus.status, isJammer = isTrackerJammerSuspicion, jumpTier = connectivitySuite.trackerJumpTier, trackerLat = connectivitySuite.trackerLat, trackerLng = connectivitySuite.trackerLng, trackerAccuracy = connectivitySuite.trackerAccuracy, maxTrackerAccuracy = connectivitySuite.trackerMaxAccuracy, trackerLastGpsTs = connectivitySuite.trackerLastGpsTs, trackerLastGpsRt = 0L, trackerLastValidFixTs = 0L, trackerLastValidFixRt = connectivitySuite.trackerLastValidFixRt, trackerSpeed = connectivitySuite.trackerSpeed, trackerBattery = connectivitySuite.trackerBattery, trackerTemp = connectivitySuite.trackerTemp, isHardwareOnline = localHealth.isHardwareOnline, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()), isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(), distToHomeAuthority = connectivitySuite.trackerDistToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = isTrackerGap, isTamperDetected = connectivitySuite.isTrackerTamperDetected, isPowerTamper = connectivitySuite.isTrackerPowerTamper, trackerTiltDegrees = connectivitySuite.trackerTiltDegrees, trackerAcousticDb = connectivitySuite.trackerAcousticDb, trackerBaroAlt = connectivitySuite.trackerBaroAlt, trackerBaroAltEma = 0.0, trackerLux = connectivitySuite.trackerLux, isNear = connectivitySuite.isTrackerNear, luxBaseline = connectivitySuite.trackerLuxBaseline, acousticFloorDb = connectivitySuite.trackerAcousticFloorDb, adaptiveVibrationFloor = connectivitySuite.trackerAdaptiveVibrationFloor, peakVibrationShock = connectivitySuite.trackerPeakVibrationShock, trackerCurrentMa = connectivitySuite.trackerCurrentMa, isPowerSaveMode = connectivitySuite.isTrackerPowerSaveMode, standbyBucket = connectivitySuite.trackerStandbyBucket, netInterface = connectivitySuite.trackerNetInterface, isStorageLow = connectivitySuite.isTrackerStorageLow, isStorageCritical = connectivitySuite.isTrackerStorageCritical, isBatterySteepDischarge = connectivitySuite.isTrackerBatterySteepDischarge, isCoolingModeActive = connectivitySuite.isTrackerCoolingModeActive, discoveryPhase = null, capabilities = capabilities, isLocationPending = connectivitySuite.isTrackerLocationPending, locationPendingReason = connectivitySuite.trackerLocationPendingReason, snrSnapshot = gpsManager.averageSnr, vibeSnapshot = 0.0
+                now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = false, isRelayConnected = isSocketConnected, isTrackerConnected = isTrackerActive, status = connectivitySuite.trackerStatus.status, isJammer = isTrackerJammerSuspicion, jumpTier = connectivitySuite.trackerJumpTier, trackerLat = connectivitySuite.trackerLat, trackerLng = connectivitySuite.trackerLng, trackerAccuracy = connectivitySuite.trackerAccuracy, maxTrackerAccuracy = connectivitySuite.trackerMaxAccuracy, trackerLastGpsTs = connectivitySuite.trackerLastGpsTs, trackerLastGpsRt = 0L, trackerLastValidFixTs = 0L, trackerLastValidFixRt = connectivitySuite.trackerLastValidFixRt, trackerSpeed = connectivitySuite.trackerSpeed, trackerBattery = connectivitySuite.trackerBattery, trackerTemp = connectivitySuite.trackerTemp, isHardwareOnline = localHealth.isHardwareOnline, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()), isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(), distToHomeAuthority = connectivitySuite.trackerDistToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = isTrackerGap, isTamperDetected = connectivitySuite.isTrackerTamperDetected, isPowerTamper = connectivitySuite.isTrackerPowerTamper, trackerTiltDegrees = connectivitySuite.trackerTiltDegrees, trackerAcousticDb = connectivitySuite.trackerAcousticDb, trackerBaroAlt = connectivitySuite.trackerBaroAlt, trackerBaroAltEma = 0.0, trackerLux = connectivitySuite.trackerLux, isNear = connectivitySuite.isTrackerNear, luxBaseline = connectivitySuite.trackerLuxBaseline, acousticFloorDb = connectivitySuite.trackerAcousticFloorDb, adaptiveVibrationFloor = connectivitySuite.trackerAdaptiveVibrationFloor, peakVibrationShock = connectivitySuite.trackerPeakVibrationShock, trackerCurrentMa = connectivitySuite.trackerCurrentMa, isPowerSaveMode = connectivitySuite.isTrackerPowerSaveMode, standbyBucket = connectivitySuite.trackerStandbyBucket, netInterface = connectivitySuite.trackerNetInterface, isStorageLow = connectivitySuite.isTrackerStorageLow, isStorageCritical = connectivitySuite.isTrackerStorageCritical, isBatterySteepDischarge = connectivitySuite.isTrackerBatterySteepDischarge, isCoolingModeActive = connectivitySuite.isTrackerCoolingModeActive, discoveryPhase = null, capabilities = capabilities, isLocationPending = connectivitySuite.isTrackerLocationPending, locationPendingReason = connectivitySuite.trackerLocationPendingReason, snrSnapshot = gpsManager.averageSnr, vibeSnapshot = 0.0
             )
         }
     }

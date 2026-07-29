@@ -24,17 +24,18 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * July.28.24:
+ * - Issue #620: State Partitioning Audit. Decomposed TelemetryState consumption 
+ *   into KinematicState and DiagnosticState to refine UI re-computation.
  * July.25.03:
- * - Issue #560: Alignment with DashboardState field renaming (trackerCurrentMa).
- * July.24.08:
- * - Issue #547: State Decomposition. Refactored components to consume 
- *   TelemetryState separately from MainUiState to reduce heap churn.
+ * - Issue #560: Alignment with DashboardState field renaming.
  */
 
 @Composable
 fun MainDashboardGrid(
     uiState: MainUiState,
-    telemetryState: TelemetryState,
+    kinematicState: KinematicState,
+    diagnosticState: DiagnosticState,
     dashboard: DashboardState,
     systemPulse: Long,
     gpsIndexDataFlow: StateFlow<GpsIndexData>,
@@ -50,7 +51,7 @@ fun MainDashboardGrid(
     val telemetryColor = if (d.isTelemetryFresh) Color.White else Slate500
     val masterColor = if (d.isLinkFresh) Color.White else Slate500
 
-    val conn = telemetryState.connectivity
+    val conn = diagnosticState.connectivity
     val isRemoteActive = conn.lastRemoteActivityTs > 0 && (systemPulse - conn.lastRemoteActivityTs < TELEMETRY_UI_STALE_THRESHOLD_MS)
     val isConnStale = isViewer && !isRemoteActive
     val relayColor = if (conn.isRelayConnected && !isConnStale) Color.White else Slate500
@@ -67,15 +68,11 @@ fun MainDashboardGrid(
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
             Spacer(Modifier.height(4.dp))
 
-            SystemHealthSection(d, uiState, telemetryState, isConnStale, relayColor, masterColor, rttValue)
-            
+            SystemHealthSection(d, uiState, diagnosticState, isConnStale, relayColor, masterColor, rttValue)
             SectionDivider()
-
-            PositionSection(d, uiState, telemetryState, gpsIdx, gpsColor, onShowGnssDetail)
-
+            PositionSection(d, uiState, diagnosticState, gpsIdx, gpsColor, onShowGnssDetail)
             SectionDivider()
-
-            ForensicSection(d, telemetryColor, isViewer, uiState, telemetryState)
+            ForensicSection(d, telemetryColor, isViewer, diagnosticState)
         }
     }
 }
@@ -123,7 +120,7 @@ private fun DashboardHeader(d: DashboardState) {
 }
 
 @Composable
-private fun SystemHealthSection(d: DashboardState, uiState: MainUiState, telemetryState: TelemetryState, isConnStale: Boolean, relayColor: Color, masterColor: Color, rttValue: Int) {
+private fun SystemHealthSection(d: DashboardState, uiState: MainUiState, diagnosticState: DiagnosticState, isConnStale: Boolean, relayColor: Color, masterColor: Color, rttValue: Int) {
     InfoRow(leftVal = d.maxDrop, leftLabel = stringResource(R.string.label_max_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = d.lastSeen, rightLabel = stringResource(R.string.label_last_seen), rightColor = relayColor)
     InfoRow(leftVal = d.totalDrop, leftLabel = stringResource(R.string.label_total_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = d.totalUptime, rightLabel = stringResource(R.string.label_app_bruto), rightColor = masterColor)
     
@@ -154,7 +151,7 @@ private fun SystemHealthSection(d: DashboardState, uiState: MainUiState, telemet
 }
 
 @Composable
-private fun PositionSection(d: DashboardState, uiState: MainUiState, telemetryState: TelemetryState, gpsIdx: GpsIndexData, gpsColor: Color, onShowGnssDetail: () -> Unit) {
+private fun PositionSection(d: DashboardState, uiState: MainUiState, diagnosticState: DiagnosticState, gpsIdx: GpsIndexData, gpsColor: Color, onShowGnssDetail: () -> Unit) {
     val isViewer = uiState.appMode == "viewer"
     InfoRow(leftVal = d.distToHome, leftLabel = "Dist Home", leftColor = gpsColor, rightVal = d.distToViewer, rightLabel = "Dist Other", rightColor = gpsColor)
     InfoRow(leftVal = d.lat, leftLabel = "Lat", leftColor = gpsColor, rightVal = d.lng, rightLabel = "Long", rightColor = gpsColor)
@@ -164,14 +161,14 @@ private fun PositionSection(d: DashboardState, uiState: MainUiState, telemetrySt
     
     val trkAccDisplay = "${d.trackerAccuracy} (${d.trackerMaxAcc})"
     val vwrAccDisplay = if (isViewer) "${d.viewerAccuracy} (${d.viewerMaxAcc})" else ""
-    InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !telemetryState.connectivity.isLocalOnline) Slate500 else ViewerCyan, rightVal = trkAccDisplay, rightLabel = "Tr Accuracy", rightColor = gpsColor)
+    InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !diagnosticState.connectivity.isLocalOnline) Slate500 else ViewerCyan, rightVal = trkAccDisplay, rightLabel = "Tr Accuracy", rightColor = gpsColor)
     
     InfoRow(leftVal = d.satsIndex, leftLabel = "Satellites Index", leftColor = if(!d.isGpsFresh) Slate500 else if(d.isSatsIndexWarning) Rose500 else Color.White, rightVal = "%.2f".format(Locale.getDefault(), gpsIdx.ageIndex), rightLabel = "Age Index", rightColor = if(!d.isGpsFresh) Slate500 else Amber500)
     InfoRow(leftVal = "%.2f".format(Locale.getDefault(), gpsIdx.accIndex), leftLabel = "Acc Index", leftColor = if(!d.isGpsFresh) Slate500 else Color.White, rightVal = d.snr, rightLabel = "Avg SNR", rightColor = if(!d.isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = onShowGnssDetail)
 }
 
 @Composable
-private fun ForensicSection(d: DashboardState, telemetryColor: Color, isViewer: Boolean, uiState: MainUiState, telemetryState: TelemetryState) {
+private fun ForensicSection(d: DashboardState, telemetryColor: Color, isViewer: Boolean, diagnosticState: DiagnosticState) {
     val staleColor = Slate500
     val tFresh = d.isTelemetryFresh
     
@@ -182,7 +179,7 @@ private fun ForensicSection(d: DashboardState, telemetryColor: Color, isViewer: 
     InfoRow(leftVal = d.proximity, leftLabel = "Proximity", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = d.proximityCm, rightLabel = "Raw Prox", rightColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR))
     InfoRow(leftVal = d.proximityDebounce, leftLabel = "Prox Debounce", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = d.rollingVibration, rightLabel = "Rolling Vibe", rightColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR))
 
-    InfoRow(leftVal = d.trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = if (isViewer) d.viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !telemetryState.connectivity.isLocalOnline) staleColor else ViewerCyan)
+    InfoRow(leftVal = d.trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = if (isViewer) d.viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !diagnosticState.connectivity.isLocalOnline) staleColor else ViewerCyan)
 
     SectionDivider()
 
@@ -239,25 +236,27 @@ private fun InfoRow(
 @Composable
 fun TelemetryBox(
     uiState: MainUiState, 
-    telemetryState: TelemetryState,
+    kinematicState: KinematicState,
+    diagnosticState: DiagnosticState,
     dashboard: DashboardState, 
     systemPulse: Long, 
     gpsIndexDataFlow: StateFlow<GpsIndexData>,
     rttFlow: StateFlow<Int>,
     onShowGnssDetail: () -> Unit = {}
-) { MainDashboardGrid(uiState, telemetryState, dashboard, systemPulse, gpsIndexDataFlow, rttFlow, onShowGnssDetail) }
+) { MainDashboardGrid(uiState, kinematicState, diagnosticState, dashboard, systemPulse, gpsIndexDataFlow, rttFlow, onShowGnssDetail) }
 
 @Composable
 fun DebugTable(
     uiState: MainUiState, 
-    telemetryState: TelemetryState,
+    kinematicState: KinematicState,
+    diagnosticState: DiagnosticState,
     dashboard: DashboardState, 
     systemPulse: Long,
     rttFlow: StateFlow<Int>,
     currentMaFlow: StateFlow<Int>
 ) {
     val d = dashboard
-    val loc = if (uiState.appMode == "viewer") telemetryState.trackerLocation else telemetryState.localLocation
+    val loc = if (uiState.appMode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
     val gpsAgeMs = if (loc.timestamp > 0) systemPulse - loc.timestamp else -1L
     val gpsAgeSec = if (gpsAgeMs >= 0) gpsAgeMs / 1000 else -1L
 

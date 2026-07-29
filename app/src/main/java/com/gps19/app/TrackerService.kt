@@ -19,15 +19,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * July.28.21:
- * - Issue #615: Forensic: Stability Audit Metric Expansion. Extended 
- *   StabilityAudit to track GNSS callback jitter and report hardware-level 
- *   timing inconsistencies in forensic logs.
- * July.28.18:
- * - Issue #613: Forensic: Location Refresh Reactivity. Refactored tick loop 
- *   to utilize reactive location-pending health state and enabled status 
- *   broadcasts during pending fix intervals. Restored full forensic logging 
- *   parity for stability audits and hardware recovery.
+ * July.28.24:
+ * - Issue #621: Fixed regressions from isImportant naming alignment and kinematicState partitioning.
+ * - Issue #618: Forensic UI State Collection Audit. Migrated Main dispatchers 
+ *   to Dispatchers.Main.immediate to reduce notification update latency (R618).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -79,7 +74,7 @@ class TrackerService : BaseMonitorService() {
 
         if (capabilities.isA15Device && MbrainHardwareManager.isAvailable()) {
             val res = MbrainHardwareManager.initMbrain(timeProvider, configManager.deviceId, 0)
-            logManager.logServiceEvent("HARDWARE: libmbrainSDK initialized (Result: $res)", important = true)
+            logManager.logServiceEvent("HARDWARE: libmbrainSDK initialized (Result: $res)", isImportant = true)
         }
 
         observeAlarmEvents()
@@ -132,7 +127,7 @@ class TrackerService : BaseMonitorService() {
         startTickLoop()
         startHeartbeatLoop()
         
-        logManager.logServiceEvent("Tracker Engine Online (Coordinated)", important = true)
+        logManager.logServiceEvent("Tracker Engine Online (Coordinated)", isImportant = true)
     }
 
     private fun observeAlarmEvents() {
@@ -143,7 +138,7 @@ class TrackerService : BaseMonitorService() {
                         logManager.submitToLogSink(
                             message = event.message,
                             type = event.type,
-                            important = event.important,
+                            isImportant = event.isImportant,
                             extremeValue = event.extremeValue,
                             localId = event.logId,
                             durationMs = event.durationMs,
@@ -174,7 +169,7 @@ class TrackerService : BaseMonitorService() {
                                        event.message.contains("EMERGENCY", ignoreCase = true) || 
                                        event.message.contains("PRIORITY", ignoreCase = true) || 
                                        event.message.contains("BUCKET", ignoreCase = true)
-                        logManager.logServiceEvent(event.message, event.important, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
+                        logManager.logServiceEvent(event.message, isImportant = event.isImportant, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
                     }
                 }
             }
@@ -194,7 +189,7 @@ class TrackerService : BaseMonitorService() {
                         logManager.submitToLogSink(
                             message = event.message,
                             type = event.type,
-                            important = event.isImportant,
+                            isImportant = event.isImportant,
                             isSpecial = event.isSpecial || isMergeStale,
                             specialColor = specialColor,
                             lat = event.lat,
@@ -233,7 +228,7 @@ class TrackerService : BaseMonitorService() {
         lifecycleScope.launch {
             historyManager.historyEvents.collect { event ->
                 when (event) {
-                    is HistoryEvent.LogEvent -> logManager.logServiceEvent(event.message, event.important)
+                    is HistoryEvent.LogEvent -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
                 }
             }
         }
@@ -245,10 +240,10 @@ class TrackerService : BaseMonitorService() {
                 when (event) {
                     is AppSensorEvent.HardwareFailure -> {
                         val proc = lastProcessedLocation
-                        logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                        logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
                     is AppSensorEvent.LogEvent -> {
-                        logManager.logServiceEvent(event.message, event.important)
+                        logManager.logServiceEvent(event.message, isImportant = event.isImportant)
                     }
                 }
             }
@@ -269,10 +264,10 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.TriggerForensicTest -> {
                         lifecycleScope.launch {
                             val proc = lastProcessedLocation
-                            logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                            logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                             
                             repeat(100) { i ->
-                                logManager.logServiceEvent("STRESS TEST: Forensic Log #$i", important = false)
+                                logManager.logServiceEvent("STRESS TEST: Forensic Log #$i", isImportant = false)
                             }
 
                             systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
@@ -300,7 +295,7 @@ class TrackerService : BaseMonitorService() {
         appSensorManager.setAcousticFastPath(
             floor = locationProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0,
             onSpike = {
-                logManager.logServiceEvent("Acoustic Spike Detected (FastPath)", false)
+                logManager.logServiceEvent("Acoustic Spike Detected (FastPath)", isImportant = false)
                 lastFastPathAcousticSpikeTs = timeProvider.elapsedRealtime()
             }
         )
@@ -333,7 +328,7 @@ class TrackerService : BaseMonitorService() {
         stabilityAuditFixCount = 0
         stabilityAuditViolationCount = 0
         gpsManager.resetGnssJitter()
-        logManager.logServiceEvent("Session Terminated", false)
+        logManager.logServiceEvent("Session Terminated", isImportant = false)
     }
 
     private fun onUiVisibilityChangedInternal(visible: Boolean) {
@@ -358,7 +353,7 @@ class TrackerService : BaseMonitorService() {
     override fun updateForegroundServiceType() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             fgsUpdateJob?.cancel()
-            fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main) {
+            fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main.immediate) {
                 delay(200)
                 val type = getAvailableForegroundServiceType()
                 val health = integrityMonitor.currentHealth
@@ -411,7 +406,7 @@ class TrackerService : BaseMonitorService() {
             if (tickGap > HARDWARE_SUPPRESSION_THRESHOLD_MS && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
                 lastHardwareRecoveryTs = nowRt
                 val proc = lastProcessedLocation
-                logManager.logServiceEvent("HEURISTIC RECOVERY: Heartbeat gap detected (${tickGap}ms). Reviving connection.", true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                logManager.logServiceEvent("HEURISTIC RECOVERY: Heartbeat gap detected (${tickGap}ms). Reviving connection.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                 systemMonitor.acquireWakeLock()
                 connectivitySuite.connect(configManager.relayUrl)
             }
@@ -430,7 +425,7 @@ class TrackerService : BaseMonitorService() {
                     if (reliabilityViolation) msg.append("Reliability ${reliability.roundToOneDecimal()}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes). ")
                     if (jitterViolation) msg.append("GNSS Jitter: ${maxJitter}ms (Hardware Instability).")
                     
-                    logManager.logServiceEvent(msg.toString().trim(), important = true, isSpecial = jitterViolation, specialColor = if (jitterViolation) FORENSIC_PINK_COLOR else null, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
+                    logManager.logServiceEvent(msg.toString().trim(), isImportant = true, isSpecial = jitterViolation, specialColor = if (jitterViolation) FORENSIC_PINK_COLOR else null, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
                 }
                 stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
                 gpsManager.resetGnssJitter()
@@ -464,8 +459,8 @@ class TrackerService : BaseMonitorService() {
             val hasUnresolved = alarmManager.hasUnresolvedAlarms()
             val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(isStationary = appSensorManager.isStationary(), isGpsStalled = health.gpsStalled, hasUnresolvedAlarms = hasUnresolved, isUiVisible = isUiVisible())
             if (shouldBePowerSave != isPowerSaveActive) {
-                isPowerSaveActive = shouldBePowerSave; appSensorManager.setPowerSaveMode(shouldBePowerSave); logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISABLED"}", false)
-                withContext(Dispatchers.Main) { updateForegroundServiceType() }
+                isPowerSaveActive = shouldBePowerSave; appSensorManager.setPowerSaveMode(shouldBePowerSave); logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISABLED"}", isImportant = false)
+                withContext(Dispatchers.Main.immediate) { updateForegroundServiceType() }
             }
             lastPowerSaveCheckRt = nowRt
         }
@@ -519,7 +514,7 @@ class TrackerService : BaseMonitorService() {
                 if (gap > TICK_INTERVAL_MS + GPS_STABILITY_GAP_THRESHOLD_MS) {
                     stabilityAuditViolationCount++
                     val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY GAP (T): ${gap}ms detected during logic pulse.", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
+                    logManager.logServiceEvent("STABILITY GAP (T): ${gap}ms detected during logic pulse.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
                 }
             }
         }

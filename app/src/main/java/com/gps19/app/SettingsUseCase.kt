@@ -133,17 +133,17 @@ class SettingsUseCase @Inject constructor(
     }
 
     suspend fun updateDeviceId(id: String) {
-        logManager.submitToLogSink("USER ACTION: Tracker ID changed to: $id", "user", important = true)
+        logManager.submitToLogSink("USER ACTION: Tracker ID changed to: $id", "user", isImportant = true)
         repository.saveString(TRACKER_ID_KEY, id)
     }
 
     suspend fun updateViewerId(id: String) {
-        logManager.submitToLogSink("USER ACTION: Viewer ID changed to: $id", "user", important = true)
+        logManager.submitToLogSink("USER ACTION: Viewer ID changed to: $id", "user", isImportant = true)
         repository.saveString(VIEWER_ID_KEY, id)
     }
 
     suspend fun updateRelayUrl(url: String) {
-        logManager.submitToLogSink("USER ACTION: Relay URL changed to: $url", "user", important = true)
+        logManager.submitToLogSink("USER ACTION: Relay URL changed to: $url", "user", isImportant = true)
         repository.saveString(RELAY_URL_KEY, url)
     }
 

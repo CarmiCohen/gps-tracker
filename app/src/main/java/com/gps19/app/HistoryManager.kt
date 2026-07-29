@@ -22,7 +22,7 @@ import kotlin.math.abs
  * HistoryEvent: Reactive event container for history-related logs and triggers.
  */
 sealed class HistoryEvent {
-    data class LogEvent(val message: String, val important: Boolean) : HistoryEvent()
+    data class LogEvent(val message: String, val isImportant: Boolean) : HistoryEvent()
 }
 
 /**
@@ -143,7 +143,7 @@ class HistoryManager @Inject constructor(
                 peerSignal = peerSignal,
                 peerAvail = peerAvail,
                 hasGps = hasGps,
-                isTrackerMode = isTrackerMode,
+                isTrackerMode = coastline_isTrackerMode(isTrackerMode),
                 accuracy = accuracy,
                 maxAccuracy = maxAccuracy,
                 noiseIdx = noiseIdx,
@@ -226,6 +226,8 @@ class HistoryManager @Inject constructor(
             handleDailyArchiving(calendar, hour, minute)
         }
     }
+
+    private fun coastline_isTrackerMode(isTrackerMode: Boolean): Boolean = isTrackerMode
 
     private fun processResults(results: List<Pair<RibbonScale, EngineConnectionPoint>>) {
         LatencyMonitor.measure(

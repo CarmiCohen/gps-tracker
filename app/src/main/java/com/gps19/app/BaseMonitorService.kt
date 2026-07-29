@@ -79,7 +79,7 @@ abstract class BaseMonitorService : LifecycleService() {
 
     protected val serviceExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException) return@CoroutineExceptionHandler
-        logManager.logServiceEvent("CRITICAL: Coroutine failure in Service: ${throwable.message}", important = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+        logManager.logServiceEvent("CRITICAL: Coroutine failure in Service: ${throwable.message}", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
         stopSelf() 
     }
 

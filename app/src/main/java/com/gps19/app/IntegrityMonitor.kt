@@ -21,17 +21,17 @@ import javax.inject.Singleton
 sealed class IntegrityEvent {
     data class ViolationSustained(val type: String) : IntegrityEvent()
     data class ViolationResolved(val type: String) : IntegrityEvent()
-    data class LogEvent(val message: String, val important: Boolean) : IntegrityEvent()
+    data class LogEvent(val message: String, val isImportant: Boolean) : IntegrityEvent()
 }
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * July.29.00:
+ * - Issue #622: Forensic: Location Refresh Reactivity Hardening. Enhanced 
+ *   location recovery logs with precise duration and recovery confirmation.
  * July.28.22:
  * - Issue #617: Global SharedFlow Audit. Hardened _integrityEvents with 
  *   BufferOverflow.DROP_OLDEST to ensure non-blocking health telemetry (R617).
- * July.28.18:
- * - Issue #613: Forensic: Location Refresh Reactivity. Migrated location 
- *   pending and stall monitoring to observe reactive GpsManager flows.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -112,12 +112,15 @@ class IntegrityMonitor @Inject constructor(
     private fun handleLocationStatusUpdate(status: GpsManager.LocationStatus) {
         val workingHealth = currentHealth
         
-        if (status.isPending != workingHealth.isLocationPending) {
-            if (status.isPending) {
-                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Location fix pending: ${status.reason.name.replace("_", " ")}", false))
-            } else if (workingHealth.isLocationPending) {
-                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Location fix restored", false))
-            }
+        // Transition: OK -> Pending
+        if (status.isPending && !workingHealth.isLocationPending) {
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Location fix pending: ${status.reason.name.replace("_", " ")}", false))
+        } 
+        // Transition: Pending -> OK (Recovery)
+        else if (!status.isPending && workingHealth.isLocationPending && status.recoveryConfirmed) {
+            val durationSec = status.lastPendingDurationMs / 1000.0
+            val reasonStr = workingHealth.locationPendingReason.name.replace("_", " ")
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Location fix restored after ${"%.1f".format(durationSec)}s gap ($reasonStr resolved)", false))
         }
 
         val isStalled = status.reason == LocationPendingReason.GPS_STALL
@@ -129,6 +132,7 @@ class IntegrityMonitor @Inject constructor(
             isLocationPending = status.isPending,
             locationPendingReason = status.reason,
             lastValidFixRt = status.lastFixRt,
+            lastLocationPendingDurationMs = status.lastPendingDurationMs,
             gpsStalled = isStalled
         ) }
     }
@@ -234,7 +238,8 @@ class IntegrityMonitor @Inject constructor(
                 
                 if (workingHealth.standbyBucket != -1) {
                     val isCritical = bucket >= UsageStatsManager.STANDBY_BUCKET_RARE
-                    _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM PRIORITY: Standby bucket changed to $bucketName. ${if(isCritical) "Background tracking may be severely limited." else ""}", isCritical))
+                    val msg = "SYSTEM PRIORITY: Standby bucket changed to $bucketName. ${if (isCritical) "Background tracking may be severely limited." else ""}"
+                    _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, isCritical))
                 }
             }
         }
