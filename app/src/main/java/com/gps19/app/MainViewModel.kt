@@ -23,21 +23,16 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.30.36:
+ * - Issue #635 & #636: Phone Setup: Permission Status Stalling. Enhanced polling 
+ *   reactivity (3s interval) and implemented "Robust Refresh" in RefreshPermissionStatus 
+ *   to overcome OS-level status propagation latency on budget hardware (Samsung A15).
  * July.30.31:
  * - Issue #634: Foreground Service Start Hardening. Added SetRecoveryPending handler 
  *   to gracefully manage OS-level foreground start restrictions.
  * July.30.29:
  * - Issue #631: Forensic UI: Service Blackout Trends. Fixed reactive binding missing 
  *   in startHeavyObservations for cumulativeRecoveryBlackoutMs and recoveryCount.
- * July.30.28:
- * - Issue #630: Forensic Recovery Log Aggregation. Added cumulative stats aggregation 
- *   and average blackout duration logging in TriggerRecovery.
- * July.30.27:
- * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs handling 
- *   and "Service Blackout Duration" logging in TriggerRecovery.
- * July.30.26:
- * - Issue #626: Foreground Service Start Hardening. Added isRecoveryPending observation 
- *   and TriggerRecovery event handler.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -217,13 +212,14 @@ class MainViewModel @Inject constructor(
         
         viewModelScope.launch(Dispatchers.IO) { 
             while(true) { 
-                val newState = systemStatusProvider.getPermissionState()
+                val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
+                // Issue #635: Bypassing cache via forceRefresh when setup is visible to ensure reactivity.
+                val newState = systemStatusProvider.getPermissionState(forceRefresh = refreshFast)
                 val isA15 = systemStatusProvider.isA15Hardware()
                 withContext(Dispatchers.Main.immediate) { 
                     updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
                 }
-                val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
-                delay(if (refreshFast) 5000L else 30000L) 
+                delay(if (refreshFast) 3000L else 30000L) 
             } 
         }
 
@@ -401,14 +397,20 @@ class MainViewModel @Inject constructor(
             is UiEvent.SetLogFilterShowRecovered -> viewModelScope.launch(Dispatchers.Main.immediate) { repository.updateLogFilters(recovered = event.show) }
             is UiEvent.ToggleGnssDetail -> updateNavigation { it.copy(isGnssDetailVisible = event.visible) }
             is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
-                val oldState = _uiState.value.permissions
-                val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
-                withContext(Dispatchers.Main.immediate) { 
-                    updateState { it.copy(permissions = newState.copy(isA15Device = systemStatusProvider.isA15Hardware())) } 
-                    if (!oldState.isActivityRecognitionGranted && newState.isActivityRecognitionGranted) {
-                        Timber.i("Issue #098: ACTIVITY_RECOGNITION granted. Triggering reactive sensor sync.")
-                        repository.sendCommand(UiCommand.SettingsUpdated)
+                // Issue #635: Robust refresh for budget hardware. OS status updates can be lazy.
+                // We perform an immediate check and a second check after a short delay.
+                repeat(2) { attempt ->
+                    val oldState = _uiState.value.permissions
+                    val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
+                    val isA15 = systemStatusProvider.isA15Hardware()
+                    withContext(Dispatchers.Main.immediate) { 
+                        updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
+                        if (!oldState.isActivityRecognitionGranted && newState.isActivityRecognitionGranted) {
+                            Timber.i("Issue #098: ACTIVITY_RECOGNITION granted. Triggering reactive sensor sync.")
+                            repository.sendCommand(UiCommand.SettingsUpdated)
+                        }
                     }
+                    if (attempt == 0) delay(1200) // Give OS time to propagate settings change
                 }
             }
             is UiEvent.RequestTestAlarm -> { addPersistentLog("user", "USER ACTION: Test alarm triggered", isImportant = true); repository.sendCommand(UiCommand.ExecuteTestAlarm) }

@@ -35,6 +35,9 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.30.36:
+ * - Issue #635 & #636: Permission Status Stalling. Reduced PERMISSION_TTL_MS to 2000ms 
+ *   to ensure reactive UI updates when returning from system settings on budget hardware.
  * July.30.31:
  * - Issue #637: Efficiency: Log Spam: getPackageName(). Implemented short-term caching 
  *   for isLocalOnline() to prevent repetitive IPC calls that trigger Samsung Kumiho 
@@ -94,7 +97,8 @@ class SystemStatusProviderImpl @Inject constructor(
     private val isS21FE by lazy { isS21FEDevice() }
     private val isA15 by lazy { isA15Device() }
     
-    private val PERMISSION_TTL_MS = 15_000L
+    // Issue #636: Reduced from 15s to 2s to eliminate perceived latency in Setup screen.
+    private val PERMISSION_TTL_MS = 2000L
     private val STORAGE_POLL_INTERVAL_MS = 60_000L
     private val POWER_POLL_INTERVAL_MS = 60_000L
     
@@ -136,7 +140,9 @@ class SystemStatusProviderImpl @Inject constructor(
         
         if (isStale || forceRefresh) {
             refreshMutex.withLock {
-                if (SystemClock.elapsedRealtime() - lastFullRefreshTime > PERMISSION_TTL_MS || forceRefresh) {
+                // Re-check inside lock to prevent redundant IPC
+                val currentNow = SystemClock.elapsedRealtime()
+                if (currentNow - lastFullRefreshTime > PERMISSION_TTL_MS || forceRefresh) {
                     try {
                         val current = cachedState.get()
                         val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
@@ -163,7 +169,7 @@ class SystemStatusProviderImpl @Inject constructor(
                             isA15Device = isA15
                         )
                         cachedState.set(newState)
-                        lastFullRefreshTime = SystemClock.elapsedRealtime()
+                        lastFullRefreshTime = currentNow
                     } catch (e: Exception) {
                         Timber.e(e, "Permission check failed during refresh")
                     }

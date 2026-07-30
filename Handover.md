@@ -1,37 +1,33 @@
-# Handover (July.30.35) - Stability Baseline [ACTIVE]
+# Handover (July.30.36) - Stability Baseline [ACTIVE]
 
 ## 🎯 Current Objective
-Resolved Issue #640: Eliminated Tracker Mode ANR on budget hardware (Samsung A15) by implementing aggressive throttling and decoupled processing in the map overlay system, adhering to **R-HARDWARE-01**.
+Resolved **[Issue #635]** and **[Issue #636]**: Optimized permission status reactivity on budget hardware (Samsung A15) by reducing cache TTL and implementing a "Robust Refresh" strategy (delayed double-check) to overcome OS-level status propagation latency.
 
 ## 🆕 New Architectural Requirement
-- **R-HARDWARE-01**: The Tracking Engine and UI shall be optimized for a "Budget Baseline" (Samsung A15 / Octa-core 2.2GHz / 4GB RAM). High-end hardware capabilities shall be bypassed in favor of cross-device stability, aggressive IPC caching, and main-thread silence.
+- **R-HARDWARE-01**: Optimized for budget baseline (Samsung A15).
+- **R635/636 (Permission Reactivity)**: The system shall utilize a 2000ms TTL for permission states and a robust double-check refresh (1200ms delay) during active setup to ensure UI accuracy.
 
 ## 📊 Status Tracker
-- **[Issue #640] Tracker Mode ANR (Regression)**: 🟢 Resolved. Implemented 1000ms throttling for trails/violations and 2.0m drift threshold for accuracy circles.
+- **[Issue #635] Permission Status Stalling**: 🟢 Resolved. Added 1200ms delayed double-check in `RefreshPermissionStatus`.
+- **[Issue #636] Permission Cache Latency**: 🟢 Resolved. Reduced `PERMISSION_TTL_MS` to 2s.
+- **[Issue #640] Tracker Mode ANR (Regression)**: 🟢 Resolved.
 - **[Issue #637] Log Spam: getPackageName()**: 🟢 Resolved.
-- **[Issue #639] Tracker Mode ANR on Startup**: 🟢 Resolved.
-- **[Issue #638] Incorrect Permission Defaults**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.35).
-- **ANR Remediation (Issue #640)**:
-    - **Optimization**: Modified `MapOverlayManager.kt` and `MapComponents.kt`.
+- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.36).
+- **Permission Reactivity**:
+    - **Optimization**: Modified `SystemStatusProviderImpl.kt` and `MainViewModel.kt`.
     - **Logic**: 
-        1. Throttled trail and violation folder updates to a 1000ms minimum interval using `systemPulseRt`.
-        2. Decoupled tracker and viewer trail processing so one doesn't trigger the other's re-render.
-        3. Increased drift recalculation threshold for "Location Pending" accuracy circles to 2.0m (up from 1.0m) and added 1000ms gating.
-    - **Impact**: Significant reduction in main-thread contention on Samsung A15. The UI remains responsive even during high-frequency telemetry pulses and complex trail renderings.
+        1. Bypassed permission cache in `MainViewModel` polling when setup/diagnostics are visible.
+        2. Implemented `repeat(2) { ... delay(1200) }` in `RefreshPermissionStatus` handler to capture lazy OS updates.
+    - **Impact**: Permission indicators (Exact Alarms, Battery Mode) now update reliably and reactively on Samsung A15.
 - **Requirement Alignment**: 
-    - **R-HARDWARE-01**: Map logic now favors execution stability over real-time fluid rendering on low-end CPUs.
+    - **R635/636**: Documentation updated in `SOT_MASTER_REQUIREMENTS.md`.
 
 ### 🛠️ Technical Debt & Identified Risks
-- **[Issue #635] Phone Setup Status Stalling**: "Exact Alarms" detection latency on A15.
-- **[Issue #636] Permission Cache Latency**: 15s TTL causes UI refresh lag.
-
-## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #641] [Severity: Low] Map Invalidation Overhead**. Continuous `view.invalidate()` in `MapComponents.kt` still consumes 3-5% CPU even when no overlays change. Throttling the invalidation itself might be the next step.
+- **[Issue #641] [Severity: Low] Map Invalidation Overhead**: Continuous `view.invalidate()` in `MapComponents.kt` consumes 3-5% CPU even when idle.
 
 ## 🎯 Next Objective
-- **[Issue #635] Phone Setup Investigation**: Debug the stalling permission detection on Samsung A15.
+- **[Issue #641] Map Invalidation Optimization**: Implement state-aware invalidation in `MapComponents.kt` to further satisfy **R-HARDWARE-01**.
 
-**Status**: MODIFIED `MapOverlayManager.kt`, `MapComponents.kt`. VERSION INCREMENTED to July.30.35. READY FOR HANDOVER.
+**Status**: MODIFIED `SystemStatusProviderImpl.kt`, `MainViewModel.kt`, `build.gradle`. VERSION July.30.36. READY FOR HANDOVER.
