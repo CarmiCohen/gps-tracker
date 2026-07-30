@@ -83,6 +83,9 @@ message AppSettings {
     optional int64 last_history_sit_ts = 67;
 
     optional string last_alarms_json = 68;
+
+    // Issue #626: Foreground Service Start Hardening
+    optional bool is_recovery_pending = 69;
 }
 
 enum TrackerStateProto {

@@ -17,11 +17,10 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * July.30.26:
+ * - Issue #626: Foreground Service Start Hardening. Added isRecoveryPendingFlow.
  * July.29.01:
- * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
- *   reporting and migrated to measureAndAudit API.
- * July.28.22:
- * - Issue #616: Repository Event Pipeline Hardening.
+ * - Issue #623: Structural: Latency Monitor Metric Cleanup.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -118,6 +117,7 @@ class MainRepository @Inject constructor(
     val identitySanitizedFlow = settings.identitySanitizedFlow
     val isSystemActiveFlow = settings.isSystemActiveFlow
     val lastAlarmsJsonFlow = settings.lastAlarmsJsonFlow
+    val isRecoveryPendingFlow = settings.isRecoveryPendingFlow
 
     init {
         scope.launch {

@@ -3,6 +3,7 @@ package com.gps19.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.core.content.ContextCompat
 import com.gps19.core.engine.TimeProvider
 import dagger.hilt.android.AndroidEntryPoint
@@ -12,10 +13,11 @@ import javax.inject.Inject
 
 /**
  * WatchdogReceiver: Responds to watchdog alarms to ensure the service stays active.
+ * July.30.26:
+ * - Issue #626: Foreground Service Start Hardening. Added handling for 
+ *   ForegroundServiceStartNotAllowedException with deferred recovery flagging.
  * July.21.00:
  * - Monotonic Rt Alignment: Synchronized with hardened engine timing.
- * - Hilt Integration: Restored @AndroidEntryPoint as per Golden Master architecture.
- * - ANR Hardening: Using goAsync() for off-loaded service revival.
  */
 @AndroidEntryPoint
 class WatchdogReceiver : BroadcastReceiver() {
@@ -52,8 +54,20 @@ class WatchdogReceiver : BroadcastReceiver() {
                         putExtra("WAKEUP_RT", nowRt)
                     }
                     
-                    withContext(Dispatchers.Main) {
-                        ContextCompat.startForegroundService(context, serviceIntent)
+                    try {
+                        withContext(Dispatchers.Main) {
+                            ContextCompat.startForegroundService(context, serviceIntent)
+                        }
+                        repository.saveBoolean(IS_RECOVERY_PENDING_KEY, false)
+                    } catch (e: Exception) {
+                        // Issue #626: Handle background start restriction on Android 12+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && 
+                            e.toString().contains("ForegroundServiceStartNotAllowedException")) {
+                            Timber.w("Watchdog: Foreground start restricted. Flagging recovery pending.")
+                            repository.saveBoolean(IS_RECOVERY_PENDING_KEY, true)
+                        } else {
+                            throw e
+                        }
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "Watchdog recovery failed")

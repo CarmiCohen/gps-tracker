@@ -10,12 +10,10 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * July.30.26:
+ * - Issue #626: Foreground Service Start Hardening. Added TriggerRecovery to UiEvent.
  * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy field.
- * - Forensic Parity (R118): Added sitVzTs and sitVzRt to ConnectionPoint and TrackerStatus.
- * July.26.04:
- * - Issue #595: Forensic Playback Hardening. Added rt to ConnectionPoint and 
- *   ToggleStrictMode to UiEvent.
+ * - Issue #601: Kinetic Energy Anomaly Detection.
  */
 
 @Serializable
@@ -331,10 +329,6 @@ data class TrackerStatus(
         return JSONObject(toMap(fromViewer) as Map<*, *>)
     }
 
-    /**
-     * Refactored: Reuses a builder to avoid allocation churn.
-     * Issue #560c: Populate isClockRegression.
-     */
     fun writeTo(builder: RealtimeStatus.Builder, fromViewer: Boolean) {
         builder.clear()
             .setId(SignalingConstants.getTransmissionId(deviceId))
@@ -611,6 +605,9 @@ sealed class UiEvent {
     object ToggleXiaomiManualOverride : UiEvent()
     object DismissIdentitySanitization : UiEvent()
     data class NavigateToDiagnostics(val visible: Boolean) : UiEvent()
+    
+    // Issue #626: Foreground Service Start Hardening
+    object TriggerRecovery : UiEvent()
 }
 
 sealed class UiCommand {

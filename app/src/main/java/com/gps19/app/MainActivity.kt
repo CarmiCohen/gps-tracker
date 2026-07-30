@@ -18,13 +18,11 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * July.30.26:
+ * - Issue #626: Foreground Service Start Hardening. Added automated recovery 
+ *   trigger in onResume when isRecoveryPending is detected.
  * July.30.23:
- * - Issue #626: Foreground Service Hardening. Wrapped service start in try-catch to handle 
- *   ForegroundServiceStartNotAllowedException on A15/Android 14+.
- * July.20.07:
- * - Release hardening and monitoring.
- * July.19.01:
- * - Issue #099: ANR Hardening. Offloaded hardware property checks to ViewModel.
+ * - Issue #626: Foreground Service Hardening. Wrapped service start in try-catch.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -53,7 +51,6 @@ class MainActivity : ComponentActivity() {
                         ContextCompat.startForegroundService(this, intent)
                     } catch (e: Exception) {
                         Timber.e(e, "Issue #626: Foreground service start failed for mode $mode")
-                        // Exception is documented and handled via UI state monitoring
                     }
                 },
                 onCleanupAndExit = {
@@ -137,6 +134,12 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
         
+        // Issue #626: Automated recovery trigger for restricted background starts
+        if (viewModel.uiState.value.isRecoveryPending) {
+            Timber.i("Issue #626: Resuming deferred service recovery in onResume")
+            viewModel.onEvent(UiEvent.TriggerRecovery)
+        }
+
         // R405: Samsung A15 detected without battery exemption. Prompting user.
         val state = viewModel.uiState.value
         if (state.permissions.isA15Device && !state.permissions.isBatteryWhitelisted && !state.navigation.isPhoneSetupVisible) {

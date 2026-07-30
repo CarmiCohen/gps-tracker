@@ -30,7 +30,7 @@ android {
         targetSdk = 35
         
         versionCode = getGitVersionCode()
-        versionName = "July.30.25"
+        versionName = "July.30.26"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -65,6 +65,10 @@ android {
         kotlinCompilerExtensionVersion = '1.5.11'
     }
     packaging {
+        jniLibs {
+            // Issue #628: Ensure native libraries are stored uncompressed and aligned to 16KB
+            useLegacyPackaging = true
+        }
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }

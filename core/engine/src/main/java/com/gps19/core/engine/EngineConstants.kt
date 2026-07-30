@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.30.25:
+ * - Issue #625: Structural: Mbrain JNI Reliability Audit. Added JNI_RET_EINTR.
  * July.30.23:
  * - Issue #624: Forensic: System Integrity Periodic Check. Added 
  *   INTEGRITY_HEARTBEAT_INTERVAL_MS for flow connectivity monitoring.
@@ -35,6 +37,9 @@ const val LOG_LATENCY_THRESHOLD_MS = 1000L
 const val LOG_RETRIEVAL_THRESHOLD_MS = 500L
 const val LOG_LIMIT_STANDARD = 1000
 const val LOG_LIMIT_STRICT = 5000
+
+// Native Bridge Constants
+const val JNI_RET_EINTR = -4
 
 // Physics & Motion Limits
 const val MAX_PHYSICAL_SPEED_MPS = 33.33 // 120 km/h
@@ -373,7 +378,7 @@ const val POWER_DISCONNECT_DEBOUNCE_MS = 3000L
 const val SIREN_AUTO_STOP_MS = 30000L
 const val SIREN_RESUME_COOLDOWN_MS = 15000L
 const val ALARM_OVERLAY_THROTTLE_MS = 30000L
-const val HEARTBEAT_INTERVAL_MS = 3600000L
+const val HEARTBEAT_INTERVAL_MS = 360000L
 const val INTEGRITY_HEARTBEAT_INTERVAL_MS = 60000L
 
 // UI Health & Visibility

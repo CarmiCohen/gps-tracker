@@ -1,7 +1,9 @@
 package com.gps19.app
 
 import android.content.Context
+import android.content.Intent
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gps19.core.engine.*
@@ -21,11 +23,11 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.30.26:
+ * - Issue #626: Foreground Service Start Hardening. Added isRecoveryPending observation 
+ *   and TriggerRecovery event handler.
  * July.28.24:
- * - Issue #621: UseCase Internalization Audit. Internalized distinctUntilChanged() 
- *   within StateSubscriptionUseCase and removed redundant operators from ViewModel.
- * - Issue #620: State Partitioning Audit. Decomposed TelemetryState into 
- *   KinematicState and DiagnosticState.
+ * - Issue #621: UseCase Internalization Audit.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -108,10 +110,6 @@ class MainViewModel @Inject constructor(
     .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    /**
-     * Dashboard State Pipeline.
-     * Issue #619 & #620: Partitioned dependencies.
-     */
     val dashboardState: StateFlow<DashboardState> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
         _kinematicState,
@@ -135,9 +133,6 @@ class MainViewModel @Inject constructor(
     .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L) 
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
 
-    /**
-     * Log Pipeline: Hardened for A15.
-     */
     val eventLogsFlow: StateFlow<List<LogEntry>> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
         _uiState.map { it.navigation.isStrictMode }.distinctUntilChanged()
@@ -224,6 +219,11 @@ class MainViewModel @Inject constructor(
 
         repository.identitySanitizedFlow
             .onEach { sanitized -> updateState { it.copy(isIdentitySanitized = sanitized) } }
+            .flowOn(Dispatchers.Main.immediate)
+            .launchIn(viewModelScope)
+
+        repository.isRecoveryPendingFlow
+            .onEach { pending -> updateState { it.copy(isRecoveryPending = pending) } }
             .flowOn(Dispatchers.Main.immediate)
             .launchIn(viewModelScope)
     }
@@ -404,6 +404,25 @@ class MainViewModel @Inject constructor(
             is UiEvent.DismissIdentitySanitization -> {
                 updateState { it.copy(isIdentitySanitized = false) }
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { repository.saveBoolean(IDENTITY_SANITIZED_KEY, false) }
+            }
+            is UiEvent.TriggerRecovery -> {
+                viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
+                    val appMode = _uiState.value.appMode
+                    val isSystemActive = _uiState.value.isSystemActive
+                    if (appMode != null && isSystemActive) {
+                        Timber.i("Issue #626: Triggering deferred service recovery for mode $appMode")
+                        val serviceClass = if (appMode == "tracker") TrackerService::class.java else ViewerService::class.java
+                        val intent = Intent(context, serviceClass)
+                        try {
+                            ContextCompat.startForegroundService(context, intent)
+                            repository.saveBoolean(IS_RECOVERY_PENDING_KEY, false)
+                            addPersistentLog("system", "SYSTEM: Deferred recovery successful ($appMode)", isImportant = true)
+                        } catch (e: Exception) {
+                            Timber.e(e, "Issue #626: Deferred recovery failed")
+                            addPersistentLog("error", "RECOVERY ERROR: ${e.localizedMessage}", isImportant = true)
+                        }
+                    }
+                }
             }
             else -> {}
         }

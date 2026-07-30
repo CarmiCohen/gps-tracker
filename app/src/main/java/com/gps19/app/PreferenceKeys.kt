@@ -58,3 +58,6 @@ const val CHAIR_BASELINE_TILT_KEY = "chair_baseline_tilt"
 const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
 
 const val LAST_ALARMS_JSON_KEY = "last_alarms_json"
+
+// Issue #626: Foreground Service Start Hardening
+const val IS_RECOVERY_PENDING_KEY = "is_recovery_pending"

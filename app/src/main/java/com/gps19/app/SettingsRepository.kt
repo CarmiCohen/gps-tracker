@@ -46,10 +46,10 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * July.30.26:
+ * - Issue #626: Foreground Service Start Hardening. Added IS_RECOVERY_PENDING_KEY support.
  * July.27.00:
  * - Architecture Audit: Centralized PreferenceKeys into PreferenceKeys.kt.
- * July.23.03:
- * - Issue #527: Siren Persistence. Added LAST_ALARMS_JSON_KEY.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -104,6 +104,7 @@ class SettingsRepository @Inject constructor(
     val identitySanitizedFlow: Flow<Boolean> = dataStore.data.map { it.identitySanitized }
     val isSystemActiveFlow: Flow<Boolean> = dataStore.data.map { it.isSystemActive }
     val lastAlarmsJsonFlow: Flow<String> = dataStore.data.map { it.lastAlarmsJson }
+    val isRecoveryPendingFlow: Flow<Boolean> = dataStore.data.map { it.isRecoveryPending }
 
     suspend fun getSettingsSnapshot(): AppSettings = dataStore.data.first()
 
@@ -178,6 +179,7 @@ class SettingsRepository @Inject constructor(
                 IS_XIAOMI_MANUAL_OVERRIDE_KEY -> builder.setIsXiaomiManualOverride(value)
                 IDENTITY_SANITIZED_KEY -> builder.setIdentitySanitized(value)
                 IS_SYSTEM_ACTIVE_KEY -> builder.setIsSystemActive(value)
+                IS_RECOVERY_PENDING_KEY -> builder.setIsRecoveryPending(value)
             }
             builder.build()
         }
@@ -260,6 +262,7 @@ class SettingsRepository @Inject constructor(
             IS_XIAOMI_MANUAL_OVERRIDE_KEY -> settings.isXiaomiManualOverride
             IDENTITY_SANITIZED_KEY -> settings.identitySanitized
             IS_SYSTEM_ACTIVE_KEY -> settings.isSystemActive
+            IS_RECOVERY_PENDING_KEY -> settings.isRecoveryPending
             else -> default
         }
     }

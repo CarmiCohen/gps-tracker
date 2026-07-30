@@ -2,6 +2,7 @@ package com.gps19.app
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.work.*
@@ -14,10 +15,11 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * July.30.26:
+ * - Issue #626: Foreground Service Start Hardening. Added handling for 
+ *   ForegroundServiceStartNotAllowedException with deferred recovery flagging.
  * July.28.17:
  * - Structural: Standardized network health check via SystemStatusProvider.
- * July.28.16:
- * - Issue #611: Centralized storage health check via SystemStatusProvider.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -120,7 +122,16 @@ class MaintenanceWorker @AssistedInject constructor(
                 try {
                     ContextCompat.startForegroundService(applicationContext, serviceIntent)
                     Log.i("GPS19", "MAINTENANCE: Recovery intent sent successfully")
+                    repository.saveBoolean(IS_RECOVERY_PENDING_KEY, false)
                 } catch (e: Exception) {
+                    // Issue #626: Handle background start restriction on Android 12+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && 
+                        e.toString().contains("ForegroundServiceStartNotAllowedException")) {
+                        Log.w("GPS19", "MAINTENANCE: Foreground start restricted. Flagging recovery pending.")
+                        repository.saveBoolean(IS_RECOVERY_PENDING_KEY, true)
+                        return Result.success()
+                    }
+
                     val errorMsg = "MAINTENANCE: Recovery FAILED: ${e.message}"
                     Log.e("GPS19", errorMsg)
                     repository.addLog(LogEntry(

@@ -6,11 +6,10 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * July.30.26:
+ * - Issue #626: Foreground Service Start Hardening. Added isRecoveryPending.
  * July.28.24:
- * - Issue #620: State Partitioning Audit. Decomposed TelemetryState into 
- *   KinematicState and DiagnosticState to refine observation granularity.
- * July.26.04:
- * - Issue #595: Forensic Playback Hardening.
+ * - Issue #620: State Partitioning Audit.
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -18,7 +17,7 @@ data class MainUiState(
     val isSystemActive: Boolean = false,
     val deviceId: String = MainRepository.DEFAULT_TRACKER_ID,
     val viewerId: String = MainRepository.DEFAULT_VIEWER_ID,
-    val relayUrl: String = DEFAULT_RELAY_URL,
+    val relayUrl: String = SettingsRepository.DEFAULT_RELAY_URL,
     val alertSettings: AlertSettings = AlertSettings(),
     val lastAlarmAckTs: Long = 0L,
     val selectedSirenType: String = "Siren",
@@ -39,7 +38,8 @@ data class MainUiState(
     val isMapLocked: Boolean = true,
     val mapFollowMode: MapFollowMode = MapFollowMode.AUTO,
     val draftSettings: DraftSettings = DraftSettings(),
-    val isIdentitySanitized: Boolean = false
+    val isIdentitySanitized: Boolean = false,
+    val isRecoveryPending: Boolean = false
 ) {
     val isSystemReady: Boolean
         get() = permissions.isBatteryWhitelisted && 
@@ -81,7 +81,6 @@ data class MainUiState(
 
 /**
  * KinematicState: High-frequency transient state focused on motion, position, and sensor data.
- * Issue #620: Partitioned from TelemetryState to minimize trigger churn for static components.
  */
 data class KinematicState(
     val localLocation: LocationState = LocationState(),
@@ -96,7 +95,6 @@ data class KinematicState(
 
 /**
  * DiagnosticState: Low-frequency scalar state focused on connectivity, battery, and system status.
- * Issue #620: Partitioned from TelemetryState to reduce re-computation overhead.
  */
 data class DiagnosticState(
     val battery: BatteryState = BatteryState(),
