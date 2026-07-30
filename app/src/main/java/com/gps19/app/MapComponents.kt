@@ -37,9 +37,11 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * July.30.32:
+ * - Issue #640: Tracker Mode ANR. Integrated throttled overlay updates 
+ *   to support R-HARDWARE-01 Budget Baseline.
  * July.28.24:
- * - Issue #620: State Partitioning Audit. Migrated to partitioned KinematicState 
- *   and DiagnosticState to isolate map-driving location updates from scalar diagnostics.
+ * - Issue #620: State Partitioning Audit.
  */
 
 @Composable
@@ -120,7 +122,7 @@ fun AppMapContainer(
                         isTrackerMode = isTrackerMode, 
                         trackerValid = PhysicsUtils.isValidLocation(trackerLoc.lat, trackerLoc.lng), 
                         viewerValid = PhysicsUtils.isValidLocation(viewerLoc.lat, viewerLoc.lng),
-                        showFence = uiState.isFenceVisible, onToggleFence = { onEvent(UiEvent.SetFenceVisible(!uiState.isFenceVisible)) }, geofenceMode = uiState.geofenceMode, onSetGeofenceMode = { onEvent(UiEvent.SetGeofenceMode(it)) },
+                        showFence = uiState.isFenceVisible, onToggleFence = { onEvent(UiEvent.SetFenceVisible(!uiState.isFenceVisible)) }, geofenceMode = uiState.geofenceMode, onSetGeofenceMode = { onSetGeofenceMode -> onEvent(UiEvent.SetGeofenceMode(onSetGeofenceMode)) },
                         showViolations = uiState.isViolationsVisible, onToggleViolations = { onEvent(UiEvent.SetViolationsVisible(!uiState.isViolationsVisible)) },
                         showGeofenceViolations = uiState.isGeofenceViolationsVisible, onToggleGeofenceViolations = { onEvent(UiEvent.SetGeofenceViolationsVisible(!uiState.isGeofenceViolationsVisible)) },
                         onClear = onClearTrails, onSave = onSaveTrail, onLoad = onLoadTrail, onCenterTracker = { onEvent(UiEvent.CenterTracker) }, onCenterViewer = { onEvent(UiEvent.CenterViewer) }, onZoomIn = { onEvent(UiEvent.MapZoomIn) }, onZoomOut = { onEvent(UiEvent.MapZoomOut) }
@@ -287,8 +289,8 @@ fun OsmMap(
     }, update = { view ->
         overlayManager?.let { om ->
             om.updateHomePoints(home, uiState.isFenceVisible, uiState.maxDistance, isTrackerMode, uiState.geofenceMode, onTap, onRemoveMarker)
-            om.updateTrails(trail, viewerTrail)
-            om.updateViolations(violations, uiState.isViolationsVisible, uiState.isGeofenceViolationsVisible)
+            om.updateTrails(trail, viewerTrail, systemPulseRt)
+            om.updateViolations(violations, uiState.isViolationsVisible, uiState.isGeofenceViolationsVisible, systemPulseRt)
             om.updateCurrentPositions(
                 trackerValid = smoothedTrackerPos.value != null,
                 trackerPos = smoothedTrackerPos.value,

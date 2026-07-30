@@ -1,21 +1,21 @@
-# Project History & Versioning (July.25.03)
+# Project History & Versioning (July.30.35)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
 
-## July.25.03 (Pipeline Hardening)
-- **Pipeline Serialization Hardening (#560)**: Implemented zero-churn signaling by refactoring `TrackerStatus` for builder reuse and utilizing a pre-allocated 4KB `ByteArray` buffer with `CodedOutputStream` in `ConnectivitySuite.kt`.
-- **Signaling Layer Optimization**: Enhanced `SignalingProvider` and `CommunicationManager` to support length-aware binary emission, eliminating redundant array allocations during high-frequency telemetry pulses.
-- **Dashboard State Alignment**: Propagated the `currentMa` -> `trackerCurrentMa` renaming across the UI and provider layers to maintain naming authority and consistency with the state decomposition model.
+## July.30.35 (Stability Baseline)
+- **Tracker Mode ANR Remediation (#640)**: Implemented aggressive 1000ms throttling and decoupled overlay processing in `MapOverlayManager.kt` to satisfy **R-HARDWARE-01 (Budget Baseline)**.
+- **Accuracy Circle Optimization**: Increased drift recalculation threshold to 2.0m and enforced 1s gating to reduce main-thread CPU load on Samsung A15 devices.
+- **Version Alignment**: Standardized versioning to July.30.35 across `build.gradle` and all SOT documentation.
 
-## July.25.02 (Forensic Zero-Churn)
-- **Forensic Primitive Buffering (#550)**: Refactored `GpsManager` and `AppSensorManager` to use primitive circular arrays (`LongArray`, `DoubleArray`, `BooleanArray`) for high-frequency telemetry history. 
-- **Sequence-Based Backfilling**: Optimized forensic retrieval to use sequences, bypassing intermediate list allocations and eliminating heap churn during active tracking.
-- **Map Trail Thinning (#548)**: Integrated radial distance pruning (1.0m threshold) to prevent memory bloat during long-duration sessions.
+## July.30.34 (Maintenance Release)
+- **ANR Remediation Initial Implementation (#640)**: Baseline throttling and decoupling logic.
 
-## July.25.01 (Zero-Latency Siren)
-- **Reactive Siren Surfacing (#547c)**: Integrated alarm visibility gates directly into the `TelemetryState` stream for immediate UI response.
+## July.30.32 (Maintenance)
+- **Log Spam Remediation (#637)**: Implemented 2000ms short-term status cache for `isLocalOnline()` in `SystemStatusProviderImpl.kt`.
+- **Startup ANR Hardening (#639)**: Implemented granular change detection and polygon caching in `MapOverlayManager.kt`.
+- **Permission Logic Fix (#638)**: Corrected `PermissionState` defaults in `MainUiState.kt`.
 
-## July.25.00 (State Decomposition)
-- **UI State Decomposition (#547)**: Decomposed monolithic UI state to mitigate kernel-level memory moving overhead on Android 15.
+## July.30.31 (Stability)
+- **Foreground Service Start Hardening (#634)**: Implemented catch blocks for `ForegroundServiceStartNotAllowedException` in `MainActivity`.
 
 ... [See historical logs for full records]

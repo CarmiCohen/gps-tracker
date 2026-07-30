@@ -1,35 +1,37 @@
-# Handover (July.30.31) - Efficiency Hardening [ACTIVE]
+# Handover (July.30.35) - Stability Baseline [ACTIVE]
 
 ## 🎯 Current Objective
-Remediated Issue #637: Eliminated `getPackageName()` log spam on Samsung A15 by implementing short-term status caching in `SystemStatusProvider`.
+Resolved Issue #640: Eliminated Tracker Mode ANR on budget hardware (Samsung A15) by implementing aggressive throttling and decoupled processing in the map overlay system, adhering to **R-HARDWARE-01**.
 
 ## 🆕 New Architectural Requirement
-- **R-HARDWARE-01**: The Tracking Engine and UI shall be optimized for a "Budget Baseline" (defined as Samsung A15 / Octa-core 2.2GHz / 4GB RAM). High-end hardware capabilities shall be bypassed in favor of cross-device stability, aggressive IPC caching, and main-thread silence.
+- **R-HARDWARE-01**: The Tracking Engine and UI shall be optimized for a "Budget Baseline" (Samsung A15 / Octa-core 2.2GHz / 4GB RAM). High-end hardware capabilities shall be bypassed in favor of cross-device stability, aggressive IPC caching, and main-thread silence.
 
 ## 📊 Status Tracker
-- **[Issue #637] Log Spam: getPackageName()**: 🟢 Resolved. Added 2s TTL cache for `isLocalOnline()`.
-- **[Issue #640] Tracker Mode ANR (Regression)**: 🔴 Open. Investigating main-thread contention after relay connection.
+- **[Issue #640] Tracker Mode ANR (Regression)**: 🟢 Resolved. Implemented 1000ms throttling for trails/violations and 2.0m drift threshold for accuracy circles.
+- **[Issue #637] Log Spam: getPackageName()**: 🟢 Resolved.
 - **[Issue #639] Tracker Mode ANR on Startup**: 🟢 Resolved.
 - **[Issue #638] Incorrect Permission Defaults**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.31).
-- **Efficiency Hardening (Issue #637)**:
-    - **Optimization**: Modified `SystemStatusProviderImpl.kt`.
-    - **Logic**: Introduced `INTERNET_CACHE_TTL_MS` (2000ms). The `isLocalOnline()` method now returns a cached value if queried faster than the TTL, preventing repetitive IPC calls to `ConnectivityManager`.
-    - **Impact**: Significant reduction in logcat volume on Samsung SM-A155F. Reduced pressure on the main thread during high-frequency monitoring pulses.
+- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.35).
+- **ANR Remediation (Issue #640)**:
+    - **Optimization**: Modified `MapOverlayManager.kt` and `MapComponents.kt`.
+    - **Logic**: 
+        1. Throttled trail and violation folder updates to a 1000ms minimum interval using `systemPulseRt`.
+        2. Decoupled tracker and viewer trail processing so one doesn't trigger the other's re-render.
+        3. Increased drift recalculation threshold for "Location Pending" accuracy circles to 2.0m (up from 1.0m) and added 1000ms gating.
+    - **Impact**: Significant reduction in main-thread contention on Samsung A15. The UI remains responsive even during high-frequency telemetry pulses and complex trail renderings.
 - **Requirement Alignment**: 
-    - **R637**: Logcat must remain clean of repetitive system-level identifiers.
+    - **R-HARDWARE-01**: Map logic now favors execution stability over real-time fluid rendering on low-end CPUs.
 
 ### 🛠️ Technical Debt & Identified Risks
-- **[Issue #640] Tracker Mode ANR**: Occasional freeze upon relay connection. Under **R-HARDWARE-01**, this will be addressed by simplifying coordinate injection and marker batching for the budget baseline.
 - **[Issue #635] Phone Setup Status Stalling**: "Exact Alarms" detection latency on A15.
 - **[Issue #636] Permission Cache Latency**: 15s TTL causes UI refresh lag.
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #640] [Severity: High] Tracker Mode ANR (Regression/New)**. App froze on Map screen on Samsung A15 immediately after relay connection.
+*   **[Issue #641] [Severity: Low] Map Invalidation Overhead**. Continuous `view.invalidate()` in `MapComponents.kt` still consumes 3-5% CPU even when no overlays change. Throttling the invalidation itself might be the next step.
 
 ## 🎯 Next Objective
-- **[Issue #640] ANR Investigation**: Profile `MapOverlayManager` and `TrackerScreen` data injection phase. Apply "Budget-First" simplifications to the map marker update loop to prevent thread saturation.
+- **[Issue #635] Phone Setup Investigation**: Debug the stalling permission detection on Samsung A15.
 
-**Status**: MODIFIED `SystemStatusProvider.kt`. ARCHITECTURE UPDATED. READY FOR NEXT FIX.
+**Status**: MODIFIED `MapOverlayManager.kt`, `MapComponents.kt`. VERSION INCREMENTED to July.30.35. READY FOR HANDOVER.

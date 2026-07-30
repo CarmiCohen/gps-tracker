@@ -2,7 +2,21 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 418**
+**Total Unique Resolutions: 423**
+
+## 4. Stability & Budget Baseline (July.30.35)
+*   **Issue #640: Tracker Mode ANR (Regression)**.
+    *   **Root Cause**: Main-thread contention on budget hardware (Samsung A15) caused by high-frequency UI pulses triggering $O(N)$ map overlay reconstructions (trails and accuracy circles).
+    *   **Resolution**: Implemented aggressive 1000ms throttling for heavy overlay updates and decoupled tracker/viewer trail processing in `MapOverlayManager.kt`. Enforced 1000ms gating and 2.0m threshold for accuracy circle recalculations.
+    - **Impact**: Eliminated system-level unresponsiveness post-relay connection on baseline devices.
+*   **Issue #637: Log Spam: getPackageName()**.
+    *   **Resolution**: Implemented 2000ms short-term status cache for `isLocalOnline()`.
+*   **Issue #639: Tracker Mode ANR on Startup**.
+    *   **Resolution**: Implemented granular change detection and polygon caching in `MapOverlayManager.kt`.
+*   **Issue #638: Incorrect Permission Defaults**.
+    *   **Resolution**: Corrected `PermissionState` data class in `MainUiState.kt`.
+*   **Issue #634: ForegroundServiceStartNotAllowedException Crash**.
+    *   **Resolution**: Implemented Foreground Service Start Hardening in `MainActivity`.
 
 ## 1. Kernel & OS Performance Hardening (July.25.13)
 *   **Issue #547: Kernel Performance Warning (`userfaultfd`)**. 

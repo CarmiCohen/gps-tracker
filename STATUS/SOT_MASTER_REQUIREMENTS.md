@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - July.30.31 (Performance Hardening)
+# System Source of Truth (SoT) - July.30.35 (Stability Baseline)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Budget Baseline Optimization (R-HARDWARE-01)**: The Tracking Engine and UI MUST be optimized for a "Budget Baseline" (Samsung A15 / Octa-core 2.2GHz / 4GB RAM). High-end hardware capabilities SHALL be bypassed in favor of cross-device stability, aggressive IPC caching, and main-thread silence. Map overlays MUST implement throttling (e.g., 1000ms) for heavy recalculations like trail processing and accuracy circle drift. (Issue #640, July.30.35)
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Startup ANR Optimization (R627)**: Native library loading and vendor-specific hardware initialization (e.g., `libmbrainSDK`) MUST be offloaded to background coroutines (`Dispatchers.IO`) to prevent cold-start stalls and "App Not Responding" dialogs on budget hardware. (Issue #627, July.30.25)
 *   **Budget Hardware Hardening (R606)**: On restricted hardware (e.g., Samsung A15), high-frequency platform callbacks (GPS/GNSS) MUST be offloaded to dedicated HandlerThreads. (Issue #606, July.27.11)
@@ -83,5 +84,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.30.31.
+*   **Current Release**: July.30.35.
 *   **Source of Truth**: app/build.gradle versionName.
