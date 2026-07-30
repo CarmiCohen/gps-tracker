@@ -20,12 +20,12 @@ import kotlin.math.log10
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * July.30.40:
+ * - Issue #641: Optimized invalidation. Methods now return Boolean to signal 
+ *   required view.invalidate(), reducing idle CPU consumption.
  * July.30.34:
  * - Issue #640: Refined accuracy circle throttling to include position changes 
  *   for R-HARDWARE-01 Budget Baseline. Ensures O(N) pointsAsCircle is strictly gated.
- * July.30.32:
- * - Issue #640: Tracker Mode ANR (Regression). Implemented aggressive throttling 
- *   and decoupled updates for Budget Baseline (R-HARDWARE-01).
  */
 class MapOverlayManager(
     private val context: Context,
@@ -68,6 +68,9 @@ class MapOverlayManager(
     // State Caches
     private var lastHomeRendered: List<GeoPoint>? = null
     private var lastFenceState: Boolean? = null
+    private var lastIsTrackerMode: Boolean? = null
+    private var lastGeofenceMode: GeofenceMode? = null
+    
     private var lastTrailSize = -1
     private var lastViewerTrailSize = -1
     private var lastViolationsSize = -1
@@ -75,8 +78,11 @@ class MapOverlayManager(
     
     private var lastTrackerPos: GeoPoint? = null
     private var lastTrackerDrift: Double = -1.0
+    private var lastTrackerFresh: Boolean? = null
+    
     private var lastViewerPos: GeoPoint? = null
     private var lastViewerDrift: Double = -1.0
+    private var lastViewerFresh: Boolean? = null
 
     // Budget Baseline (R-HARDWARE-01) Throttling
     private var lastTrailUpdateTs = 0L
@@ -103,8 +109,9 @@ class MapOverlayManager(
         geofenceMode: GeofenceMode,
         onTap: (GeoPoint) -> Unit,
         onRemoveMarker: (Int) -> Unit
-    ) {
-        if (lastHomeRendered == home && lastFenceState == isFenceVisible) return
+    ): Boolean {
+        if (lastHomeRendered == home && lastFenceState == isFenceVisible && 
+            lastIsTrackerMode == isTrackerMode && lastGeofenceMode == geofenceMode) return false
 
         fenceFolder.items.clear()
         homeMarkersFolder.items.clear()
@@ -137,12 +144,13 @@ class MapOverlayManager(
         }
         lastHomeRendered = home.toList()
         lastFenceState = isFenceVisible
+        lastIsTrackerMode = isTrackerMode
+        lastGeofenceMode = geofenceMode
+        return true
     }
 
-    /**
-     * Issue #640: Decoupled and throttled trail updates to prevent Main-thread blockage.
-     */
-    fun updateTrails(trail: List<TrailPoint>, viewerTrail: List<TrailPoint>, systemPulseRt: Long) {
+    fun updateTrails(trail: List<TrailPoint>, viewerTrail: List<TrailPoint>, systemPulseRt: Long): Boolean {
+        var changed = false
         val canUpdateTracker = (systemPulseRt - lastTrailUpdateTs) > BUDGET_THROTTLE_MS || lastTrailSize == -1
         val canUpdateViewer = (systemPulseRt - lastViewerTrailUpdateTs) > BUDGET_THROTTLE_MS || lastViewerTrailSize == -1
 
@@ -152,6 +160,7 @@ class MapOverlayManager(
             lastTrailSize = trail.size
             lastTrailUpdateTs = systemPulseRt
             while(trackerPolylinePool.size > maxOf(trSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)) trackerPolylinePool.removeAt(trackerPolylinePool.size - 1)
+            changed = true
         }
         
         if (canUpdateViewer && lastViewerTrailSize != viewerTrail.size) {
@@ -160,13 +169,15 @@ class MapOverlayManager(
             lastViewerTrailSize = viewerTrail.size
             lastViewerTrailUpdateTs = systemPulseRt
             while(viewerPolylinePool.size > maxOf(viSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)) viewerPolylinePool.removeAt(viewerPolylinePool.size - 1)
+            changed = true
         }
+        return changed
     }
 
-    fun updateViolations(violations: List<ViolationPoint>, isViolationsVisible: Boolean, isGeofenceViolationsVisible: Boolean, systemPulseRt: Long) {
+    fun updateViolations(violations: List<ViolationPoint>, isViolationsVisible: Boolean, isGeofenceViolationsVisible: Boolean, systemPulseRt: Long): Boolean {
         val visibilityPair = Pair(isViolationsVisible, isGeofenceViolationsVisible)
-        if (lastViolationsSize == violations.size && lastViolationVisibility == visibilityPair) return
-        if ((systemPulseRt - lastViolationUpdateTs) < BUDGET_THROTTLE_MS && lastViolationsSize != -1) return
+        if (lastViolationsSize == violations.size && lastViolationVisibility == visibilityPair) return false
+        if ((systemPulseRt - lastViolationUpdateTs) < BUDGET_THROTTLE_MS && lastViolationsSize != -1) return false
 
         violationMarkersFolder.items.clear()
         violationAccuracyFolder.items.clear()
@@ -200,6 +211,7 @@ class MapOverlayManager(
         lastViolationsSize = violations.size
         lastViolationVisibility = visibilityPair
         lastViolationUpdateTs = systemPulseRt
+        return true
     }
 
     fun updateCurrentPositions(
@@ -220,7 +232,8 @@ class MapOverlayManager(
         isViewerPending: Boolean,
         viewerLastValidFixRt: Long,
         systemPulseRt: Long
-    ) {
+    ): Boolean {
+        var changed = false
         val canUpdateDrift = (systemPulseRt - lastDriftUpdateTs) >= BUDGET_THROTTLE_MS
 
         if (trackerValid && trackerPos != null) {
@@ -230,7 +243,6 @@ class MapOverlayManager(
                     baseAcc + (if (trackerSpeed > 1.0) trackerSpeed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRt - trackerLastValidFixRt) / 1000.0)
                 } else baseAcc
                 
-                // Issue #640: Throttled position and drift changes for Budget Baseline (R-HARDWARE-01).
                 val posChanged = trackerPos != lastTrackerPos
                 val driftSignificant = abs(drift - lastTrackerDrift) > 2.0
                 
@@ -242,16 +254,32 @@ class MapOverlayManager(
                     lastTrackerPos = trackerPos
                     lastTrackerDrift = drift
                     lastDriftUpdateTs = systemPulseRt
+                    changed = true
                 } else if (!accuracyCirclesFolder.items.contains(trackerCircle)) {
                      accuracyCirclesFolder.add(trackerCircle)
+                     changed = true
                 }
             }
-            trackerMarker.position = trackerPos
-            trackerMarker.icon = if (isTrackerFresh) trackerIconFresh else trackerIconStale
-            if (!mapView.overlays.contains(trackerMarker)) mapView.overlays.add(trackerMarker) 
-        } else {
+            
+            if (trackerMarker.position != trackerPos) {
+                trackerMarker.position = trackerPos
+                changed = true
+            }
+            if (lastTrackerFresh != isTrackerFresh) {
+                trackerMarker.icon = if (isTrackerFresh) trackerIconFresh else trackerIconStale
+                lastTrackerFresh = isTrackerFresh
+                changed = true
+            }
+            if (!mapView.overlays.contains(trackerMarker)) {
+                mapView.overlays.add(trackerMarker)
+                changed = true
+            }
+        } else if (mapView.overlays.contains(trackerMarker) || accuracyCirclesFolder.items.contains(trackerCircle)) {
             accuracyCirclesFolder.items.remove(trackerCircle)
             mapView.overlays.remove(trackerMarker)
+            lastTrackerPos = null
+            lastTrackerFresh = null
+            changed = true
         }
 
         if (viewerValid && viewerPos != null) {
@@ -272,17 +300,34 @@ class MapOverlayManager(
                     lastViewerPos = viewerPos
                     lastViewerDrift = drift
                     lastDriftUpdateTs = systemPulseRt
+                    changed = true
                 } else if (!accuracyCirclesFolder.items.contains(viewerCircle)) {
                     accuracyCirclesFolder.add(viewerCircle)
+                    changed = true
                 }
             }
-            viewerMarker.position = viewerPos
-            viewerMarker.icon = if (isViewerFresh) viewerIconFresh else viewerIconStale
-            if (!mapView.overlays.contains(viewerMarker)) mapView.overlays.add(viewerMarker) 
-        } else {
+            
+            if (viewerMarker.position != viewerPos) {
+                viewerMarker.position = viewerPos
+                changed = true
+            }
+            if (lastViewerFresh != isViewerFresh) {
+                viewerMarker.icon = if (isViewerFresh) viewerIconFresh else viewerIconStale
+                lastViewerFresh = isViewerFresh
+                changed = true
+            }
+            if (!mapView.overlays.contains(viewerMarker)) {
+                mapView.overlays.add(viewerMarker)
+                changed = true
+            }
+        } else if (mapView.overlays.contains(viewerMarker) || accuracyCirclesFolder.items.contains(viewerCircle)) {
             accuracyCirclesFolder.items.remove(viewerCircle)
             mapView.overlays.remove(viewerMarker)
+            lastViewerPos = null
+            lastViewerFresh = null
+            changed = true
         }
+        return changed
     }
 
     private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, color: Int, pool: MutableList<Polyline>): Int {
@@ -296,7 +341,6 @@ class MapOverlayManager(
                 if (pt.status != SentinelStatus.VALID) { startIdx = currentIdx; break }
             }
             if (segmentPoints.size > 1) {
-                // Issue #548: Radial thinning (1.0m) to reduce redundant polyline points
                 val simplified = PhysicsUtils.simplifyTrail(segmentPoints, 1.0, { it.lat }, { it.lng })
                 
                 if (simplified.size > 1) {

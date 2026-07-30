@@ -37,11 +37,12 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * July.30.40:
+ * - Issue #641: Optimized invalidation. Implemented state-aware invalidation 
+ *   to reduce CPU overhead during idle or redundant states (R-HARDWARE-01).
  * July.30.32:
  * - Issue #640: Tracker Mode ANR. Integrated throttled overlay updates 
  *   to support R-HARDWARE-01 Budget Baseline.
- * July.28.24:
- * - Issue #620: State Partitioning Audit.
  */
 
 @Composable
@@ -105,7 +106,7 @@ fun AppMapContainer(
             initialCenter = initialCenter,
             systemPulse = now,
             systemPulseRt = systemPulseRt,
-            onLockChange = { onEvent(UiEvent.SetMapLocked(it)) },
+            onLockChange = { onLockChange -> onEvent(UiEvent.SetMapLocked(onLockChange)) },
             mapViewRef = mapViewRef
         )
 
@@ -288,10 +289,10 @@ fun OsmMap(
         } 
     }, update = { view ->
         overlayManager?.let { om ->
-            om.updateHomePoints(home, uiState.isFenceVisible, uiState.maxDistance, isTrackerMode, uiState.geofenceMode, onTap, onRemoveMarker)
-            om.updateTrails(trail, viewerTrail, systemPulseRt)
-            om.updateViolations(violations, uiState.isViolationsVisible, uiState.isGeofenceViolationsVisible, systemPulseRt)
-            om.updateCurrentPositions(
+            val h = om.updateHomePoints(home, uiState.isFenceVisible, uiState.maxDistance, isTrackerMode, uiState.geofenceMode, onTap, onRemoveMarker)
+            val t = om.updateTrails(trail, viewerTrail, systemPulseRt)
+            val v = om.updateViolations(violations, uiState.isViolationsVisible, uiState.isGeofenceViolationsVisible, systemPulseRt)
+            val p = om.updateCurrentPositions(
                 trackerValid = smoothedTrackerPos.value != null,
                 trackerPos = smoothedTrackerPos.value,
                 isTrackerFresh = isTrackerFresh,
@@ -310,8 +311,11 @@ fun OsmMap(
                 viewerLastValidFixRt = viewerHealth.lastValidFixRt,
                 systemPulseRt = systemPulseRt
             )
+            // Issue #641: Conditionally invalidate only if overlays actually changed.
+            if (h || t || v || p) {
+                view.invalidate()
+            }
         }
-        view.invalidate()
     }, onRelease = { view -> view.onDetach(); view.tileProvider.tileCache.clear(); view.tileProvider.detach() }, modifier = Modifier.fillMaxSize())
 }
 
