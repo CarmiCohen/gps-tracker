@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 3 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 472 |
+| **Resolved (Total)** | 🟢 Progress | 473 |
 
 ---
 
@@ -26,20 +26,22 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🟢 Recently Resolved Issues (July.30.31)
+*   **[Issue #639] [Severity: High] [Category: Performance] Tracker Mode ANR on Startup**.
+    - **Resolution**: Implemented granular change detection and polygon caching in `MapOverlayManager.kt`. Added a 1.0m movement/drift threshold for accuracy circle reconstructions. Switched to $O(1)$ size-based guards for trail and violation overlay updates to prevent Main-thread blockage during the initial map render pulse.
+    - **Impact**: Eliminated system-level unresponsiveness (ANR) when entering Tracker Mode on Samsung A15.
+    - **Validation**: Verified through code audit and manual UI transition testing.
+
 *   **[Issue #638] [Severity: High] [Category: UI/Logic] Incorrect Permission Defaults**.
-    - **Resolution**: Corrected `PermissionState` data class in `MainUiState.kt` to default `isBackgroundLocationGranted`, `isActivityRecognitionGranted`, and `isPostNotificationsGranted` to `false`.
-    - **Impact**: Ensures the Phone Setup UI accurately reflects the system state upon initialization, preventing false-positive "Completed" indicators during onboarding.
-    - **Validation**: Verified in UI; warnings now appear correctly before permissions are verified.
+    - **Resolution**: Corrected `PermissionState` data class in `MainUiState.kt` to default critical permissions to `false`.
+    - **Impact**: Ensures accurate Phone Setup UI status upon initialization.
 
 *   **[Issue #634] [Severity: High] [Category: Stability] ForegroundServiceStartNotAllowedException Crash**.
-    - **Resolution**: Implemented Foreground Service Start Hardening in `MainActivity`. Wrapped `startForegroundService` in a try-catch block for `ForegroundServiceStartNotAllowedException`. Introduced `SetRecoveryPending` to `UiEvent` to allow the ViewModel to persist the restricted state. The app now defers service restoration until `onResume` when a valid foreground window exists.
-    - **Impact**: Eliminates startup crashes on Samsung A15 devices during automatic session restoration when background start restrictions are enforced by the OS.
-    - **Validation**: Verified build success and event flow alignment.
+    - **Resolution**: Implemented Foreground Service Start Hardening in `MainActivity`.
+    - **Impact**: Eliminates startup crashes on Samsung A15 during automatic restoration.
 
 *   **[Issue #632] [Severity: Med] [Category: UI/Forensic] Analytical Ribbons: Recovery Markers**.
-    - **Resolution**: Integrated service recovery blackout markers into the high-frequency Analytical Ribbons. Added `isRecoveryEvent` flag to `EngineConnectionPoint` and `HistoryEntity`. Enhanced `TrackerService` to detect heuristic recovery pulses and tag the telemetry stream. Implemented visual markers (white vertical lines) in `ConnectionQualityRibbon` to identify forensic service restoration points.
-    - **Impact**: Provides users with visual confirmation of when the system recovered from a service gap, improving the auditability of the black-box tracking mechanism.
-    - **Database**: Incremented schema version to 63 with migration for `connection_history`.
+    - **Resolution**: Integrated service recovery blackout markers into high-frequency Analytical Ribbons.
+    - **Impact**: Provides visual confirmation of forensic service restoration points.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.31-H)*

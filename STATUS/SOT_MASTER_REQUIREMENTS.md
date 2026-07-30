@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.30.31 (Foreground Service Hardening)
+# System Source of Truth (SoT) - July.30.31 (Performance Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -6,6 +6,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Startup ANR Optimization (R627)**: Native library loading and vendor-specific hardware initialization (e.g., `libmbrainSDK`) MUST be offloaded to background coroutines (`Dispatchers.IO`) to prevent cold-start stalls and "App Not Responding" dialogs on budget hardware. (Issue #627, July.30.25)
 *   **Budget Hardware Hardening (R606)**: On restricted hardware (e.g., Samsung A15), high-frequency platform callbacks (GPS/GNSS) MUST be offloaded to dedicated HandlerThreads. (Issue #606, July.27.11)
+*   **Map Overlay Performance Hardening (R639)**: Map overlays (Trails, Accuracy Circles, Violations) MUST implement granular change detection and movement/drift thresholds (e.g., 1.0m) to avoid redundant Main-thread calculations and polygon reconstructions during high-frequency UI updates. (Issue #639, July.30.31)
 *   **Unified Forensic Audit Naming (R623)**: Latency and I/O spike logs MUST follow a standardized naming convention: "Forensic Performance Audit: [Operation] spike ([duration]ms)" for CPU-bound tasks and "Forensic I/O Audit: [Operation] spike ([duration]ms)" for database/disk tasks. All call sites MUST utilize unified thresholds from `EngineConstants.kt`. (Issue #623, July.29.22)
 *   **System Integrity Periodic Heartbeat (R624)**: `IntegrityMonitor` MUST maintain a background heartbeat to verify the vitality of reactive flows (Internet, Battery, Storage, Power, Location). If a flow remains silent beyond 3x its expected interval, a forensic integrity warning MUST be emitted. (Issue #624, July.30.23)
 *   **JNI Reliability Audit (R625)**: Native JNI bridge implementations MUST include robust error handling and retry mechanisms for interrupted system calls (`EINTR`). Calls specifically returning `JNI_RET_EINTR` (-4) MUST be retried up to 3 times before failing to ensure hardware interaction stability. (Issue #625, July.30.25)
