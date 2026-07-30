@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 481 |
+| **Resolved (Total)** | 🟢 Progress | 484 |
 
 ---
 
@@ -22,15 +22,18 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🟢 Recently Resolved Issues (July.30.41)
+*   **[Issue #646] [Severity: Low] [Category: Efficiency] Persistent Log Spam: Overlay & Permission Checks**.
+    *   **Resolution**: Extended `HARDWARE_IPC_THROTTLE_MS` (5000ms) to all permission and overlay checks in `SystemStatusProviderImpl.kt`.
+    *   **Impact**: Silenced remaining Samsung Kumiho auditing noise during Setup/Diagnostics screen polling.
+*   **[Issue #647] [Severity: Low] [Category: Performance] Excessive Hardware Punch Frequency**.
+    *   **Resolution**: Increased `A15_POKE_INTERVAL_MS` to 60s in `TrackerService.kt`.
+    *   **Impact**: Reduced JNI overhead and Logcat noise on Samsung A15 hardware.
+*   **[Issue #645] [Severity: Low] [Category: Efficiency] Persistent Log Spam: getPackageName()**.
+    *   **Resolution**: Implemented a 5000ms hardware IPC throttle in `SystemStatusProviderImpl.kt` specifically for `isIgnoringBatteryOptimizations()`.
 *   **[Issue #643] [Severity: High] [Category: Stability] Foreground Service Start Crash (Regression)**.
-    *   **Resolution**: Implemented lifecycle-aware guards in `MainActivity.kt`. Service start is now deferred via `isRecoveryPending` if the activity is not in the `RESUMED` state. The catch block was expanded to `Throwable` to handle unexpected OS-level state exceptions.
-    *   **Impact**: Eliminated fatal cold-start crashes on Samsung A15.
+    *   **Resolution**: Implemented lifecycle-aware guards in `MainActivity.kt`.
 *   **[Issue #644] [Severity: Low] [Category: Consistency] Version Inconsistency**.
-    *   **Resolution**: Aligned `app/build.gradle` `versionName` to `July.30.41`.
 *   **[Issue #641] [Severity: Low] [Category: Performance] Map Invalidation Overhead**.
-    *   **Resolution**: Implemented state-aware invalidation in `MapOverlayManager` and `MapComponents`.
-*   **[Issue #635] [Severity: Med] [Category: UI/UX] Phone Setup: Permission Status Stalling**.
-*   **[Issue #636] [Severity: Low] [Category: Technical Debt] Permission Cache Latency**.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.41-B)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.41-D)*

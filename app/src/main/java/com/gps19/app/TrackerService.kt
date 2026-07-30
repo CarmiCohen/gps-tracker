@@ -19,11 +19,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.30.41:
+ * - Issue #647: Performance: Excessive Hardware Punch Frequency. Increased 
+ *   A15_POKE_INTERVAL_MS to 60s to reduce Logcat noise and system overhead.
  * July.30.31:
- * - Issue #632: Analytical Ribbons: Recovery Markers. Integrated isRecoveryEvent 
- *   into history updates to flag forensic service restoration.
- * July.30.25:
- * - Issue #627: Performance: Startup ANR Optimization.
+ * - Issue #632: Analytical Ribbons: Recovery Markers.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -55,7 +55,8 @@ class TrackerService : BaseMonitorService() {
     private var lastPowerSaveCheckRt = 0L
 
     private var lastA15PokeRt = 0L
-    private val A15_POKE_INTERVAL_MS = 10_000L
+    // Issue #647: Increased to 60s to reduce Logcat noise and system overhead on Samsung A15.
+    private val A15_POKE_INTERVAL_MS = 60_000L
 
     private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
 
@@ -73,7 +74,6 @@ class TrackerService : BaseMonitorService() {
         
         refreshCapabilitiesInternal()
 
-        // Issue #627: Offload library loading and hardware init to Dispatchers.IO
         if (capabilities.isA15Device) {
             withContext(Dispatchers.IO) {
                 MbrainHardwareManager.loadLibrary()

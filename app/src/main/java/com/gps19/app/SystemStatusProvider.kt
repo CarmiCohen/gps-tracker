@@ -35,16 +35,15 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.30.41:
+ * - Issue #646: Efficiency: Persistent Log Spam: Overlay & Permission Checks. Extended 
+ *   HARDWARE_IPC_THROTTLE_MS to all permission/overlay checks to silence Samsung Kumiho 
+ *   logcat spam during high-frequency UI refreshes.
+ * - Issue #645: Efficiency: Log Spam: getPackageName(). Implemented HARDWARE_IPC_THROTTLE_MS 
+ *   (5000ms) for battery optimization checks to silence Samsung Kumiho auditing logs.
  * July.30.36:
  * - Issue #635 & #636: Permission Status Stalling. Reduced PERMISSION_TTL_MS to 2000ms 
- *   to ensure reactive UI updates when returning from system settings on budget hardware.
- * July.30.31:
- * - Issue #637: Efficiency: Log Spam: getPackageName(). Implemented short-term caching 
- *   for isLocalOnline() to prevent repetitive IPC calls that trigger Samsung Kumiho 
- *   auditing logs in high-frequency monitoring loops.
- * July.28.17:
- * - Issue #612: Structural: Standby & Power-Save Reactivity. Added observePowerStatus() 
- *   to reactive observation of Power Save Mode and Standby Buckets.
+ *   to ensure reactive UI updates.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -97,15 +96,17 @@ class SystemStatusProviderImpl @Inject constructor(
     private val isS21FE by lazy { isS21FEDevice() }
     private val isA15 by lazy { isA15Device() }
     
-    // Issue #636: Reduced from 15s to 2s to eliminate perceived latency in Setup screen.
     private val PERMISSION_TTL_MS = 2000L
     private val STORAGE_POLL_INTERVAL_MS = 60_000L
     private val POWER_POLL_INTERVAL_MS = 60_000L
     
-    // Issue #637: Short-term cache to prevent Samsung Kumiho log spam (2s TTL)
     private var lastInternetCheckRt = 0L
     private var cachedInternetStatus = false
     private val INTERNET_CACHE_TTL_MS = 2000L
+
+    private var lastHardwareCheckRt = 0L
+    private var cachedBatteryWhitelisted = false
+    private val HARDWARE_IPC_THROTTLE_MS = 5000L
 
     override suspend fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
     override suspend fun isAutoStartGranted(): Boolean = getPermissionState().isAutoStartGranted
@@ -140,24 +141,41 @@ class SystemStatusProviderImpl @Inject constructor(
         
         if (isStale || forceRefresh) {
             refreshMutex.withLock {
-                // Re-check inside lock to prevent redundant IPC
                 val currentNow = SystemClock.elapsedRealtime()
                 if (currentNow - lastFullRefreshTime > PERMISSION_TTL_MS || forceRefresh) {
                     try {
                         val current = cachedState.get()
-                        val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
+                        
+                        // Issue #646: Extend IPC throttle to all permission/overlay checks to silence Samsung Kumiho logcat spam.
+                        val useCache = currentNow - lastHardwareCheckRt <= HARDWARE_IPC_THROTTLE_MS && lastHardwareCheckRt != 0L
+                        
+                        val batteryWhitelisted = if (useCache) cachedBatteryWhitelisted else {
+                            val status = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
+                            cachedBatteryWhitelisted = status
+                            status
+                        }
+
+                        val overlayGranted = if (useCache) current.isOverlayGranted else Settings.canDrawOverlays(context)
+                        val micGranted = if (useCache) current.isMicrophoneGranted else ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                        val alarmGranted = if (useCache) current.isExactAlarmGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true)
+                        val notifyGranted = if (useCache) current.isPostNotificationsGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true)
+                        val bgLocGranted = if (useCache) current.isBackgroundLocationGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true)
+                        val actRecogGranted = if (useCache) current.isActivityRecognitionGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true)
+
+                        if (!useCache) lastHardwareCheckRt = currentNow
+
                         val xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
                         val xiaomiAutostart = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
 
                         val newState = PermissionState(
                             isBatteryWhitelisted = batteryWhitelisted,
                             isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, cachedPackageName) else batteryWhitelisted,
-                            isOverlayGranted = Settings.canDrawOverlays(context),
-                            isMicrophoneGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
-                            isExactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true,
-                            isPostNotificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true,
-                            isBackgroundLocationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true,
-                            isActivityRecognitionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true,
+                            isOverlayGranted = overlayGranted,
+                            isMicrophoneGranted = micGranted,
+                            isExactAlarmGranted = alarmGranted,
+                            isPostNotificationsGranted = notifyGranted,
+                            isBackgroundLocationGranted = bgLocGranted,
+                            isActivityRecognitionGranted = actRecogGranted,
                             
                             hasBackgroundRestriction = isXiaomi,
                             backgroundStatus = toCapabilityStatus(xiaomiStatus),
@@ -287,7 +305,6 @@ class SystemStatusProviderImpl @Inject constructor(
             Timber.e(e, "Power save receiver registration failed")
         }
 
-        // Periodic poll for Standby Bucket (no broadcast available)
         val pollJob = launch {
             while (isActive) {
                 trySend(getPowerStatus())

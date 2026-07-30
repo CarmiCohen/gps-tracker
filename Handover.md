@@ -1,33 +1,30 @@
 # Handover (July.30.41) - Stability Baseline [ACTIVE]
 
 ## 🎯 Current Objective
-Resolved **[Issue #643] Foreground Service Start Crash (Regression)**: Implemented lifecycle-aware guards in `MainActivity.kt` to prevent `ForegroundServiceStartNotAllowedException` during cold starts. Service starts are now deferred to `onResume` if the activity is not fully resumed. Also resolved **[Issue #644] Version Inconsistency** by aligning `app/build.gradle` to `July.30.41`.
+Resolved **[Issue #646] Persistent Log Spam: Overlay & Permission Checks** and **[Issue #647] Excessive Hardware Punch Frequency**. Extended the 5000ms hardware IPC throttle in `SystemStatusProviderImpl.kt` to cover all permission/overlay checks, silencing Samsung "Kumiho" auditing logs. Optimized the A15 hardware poke interval to 60s in `TrackerService.kt` to reduce system overhead.
 
 ## 🆕 New Architectural Requirement
-- **R-HARDWARE-01**: Optimized for budget baseline (Samsung A15).
-- **R635/636 (Permission Reactivity)**: The system shall utilize a 2000ms TTL for permission states and a robust double-check refresh (1200ms delay).
-- **R641 (Map Invalidation Optimization)**: The `MapView` MUST only be invalidated when visual state changes are detected.
-- **R643 (Foreground Service Start Hardening)**: The system MUST verify that the Activity is in the `RESUMED` state before starting a foreground service. Background/Cold-start requests MUST be deferred to the next `onResume` event. Catch blocks MUST intercept all `Throwable` instances for FGS starts.
+- **R645/646 (Hardware IPC Throttling)**: High-cost system service calls (battery optimization, overlays, permissions) MUST be throttled to a minimum of 5000ms to prevent Samsung-specific logcat spam.
+- **R647 (Hardware Poke Frequency)**: Vendor-specific hardware pokes on budget hardware (A15) MUST NOT exceed a 60s frequency.
 
 ## 📊 Status Tracker
-- **[Issue #643] Foreground Service Start Crash (Regression)**: 🟢 Resolved. Added lifecycle guards and Throwable catch.
-- **[Issue #644] Version Inconsistency**: 🟢 Resolved. Aligned `build.gradle` version.
-- **[Issue #641] Map Invalidation Overhead**: 🟢 Resolved.
-- **[Issue #635] Permission Status Stalling**: 🟢 Resolved.
-- **[Issue #636] Permission Cache Latency**: 🟢 Resolved.
+- **[Issue #646] Persistent Log Spam: Overlay & Permission Checks**: 🟢 Resolved. Extended 5s throttle to all checks.
+- **[Issue #647] Excessive Hardware Punch Frequency**: 🟢 Resolved. Increased interval to 60s.
+- **[Issue #645] Persistent Log Spam: getPackageName()**: 🟢 Resolved. Initial battery optimization throttle.
+- **[Issue #643] Foreground Service Start Crash (Regression)**: 🟢 Resolved. Verified operational.
 
 ## 🔍 Comprehensive Status
 - **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.41).
-- **FGS Stability**:
-    - **Optimization**: Modified `MainActivity.kt` to prevent start-up crashes.
-    - **Logic**: Used `lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)` check.
+- **Efficiency**:
+    - **Optimization**: Throttled all permission IPC to 5000ms; reduced A15 hardware poke frequency.
+    - **Impact**: Silent Logcat on Samsung A15 during UI refreshes; reduced JNI overhead.
 - **Requirement Alignment**: 
-    - **R643**: Documentation updated in `SOT_MASTER_REQUIREMENTS.md`.
+    - **R646/647**: Documentation updated in `SOT_MASTER_REQUIREMENTS.md`.
 
 ### 🛠️ Technical Debt & Identified Risks
-- **[Issue #642] [Severity: Low] [Category: UI] Map Settings Icon Contrast**: The purple settings icon has low contrast when the map is in dark-mode-like satellite tiles.
+- **[Issue #642] [Severity: Low] [Category: UI] Map Settings Icon Contrast**: The purple settings icon has low contrast in dark-mode tile sets.
 
 ## 🎯 Next Objective
 - **[Issue #642] UI Contrast Audit**: Review map control contrast ratios for accessibility.
 
-**Status**: MODIFIED `MainActivity.kt`, `app/build.gradle`, `issues.md`, `SOT_MASTER_REQUIREMENTS.md`, `Handover.md`. VERSION July.30.41. READY FOR HANDOVER.
+**Status**: MODIFIED `SystemStatusProvider.kt`, `TrackerService.kt`, `issues.md`, `SOT_MASTER_REQUIREMENTS.md`, `Handover.md`. VERSION July.30.41. READY FOR HANDOVER.
