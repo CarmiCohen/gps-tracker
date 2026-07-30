@@ -1,33 +1,33 @@
 # Handover (July.30.40) - Stability Baseline [ACTIVE]
 
 ## 🎯 Current Objective
-Resolved **[Issue #641] Map Invalidation Overhead**: Implemented state-aware invalidation in `MapOverlayManager` and `MapComponents`. The `MapView` now only invalidates when visual changes (position, accuracy drift, or overlay toggles) are detected, significantly reducing idle CPU consumption on budget hardware (Samsung A15).
+Resolved **[Issue #643] Foreground Service Start Crash (Regression)**: Implemented lifecycle-aware guards in `MainActivity.kt` to prevent `ForegroundServiceStartNotAllowedException` during cold starts. Service starts are now deferred to `onResume` if the activity is not fully resumed. Also resolved **[Issue #644] Version Inconsistency** by aligning `app/build.gradle` to `July.30.40`.
 
 ## 🆕 New Architectural Requirement
 - **R-HARDWARE-01**: Optimized for budget baseline (Samsung A15).
-- **R635/636 (Permission Reactivity)**: The system shall utilize a 2000ms TTL for permission states and a robust double-check refresh (1200ms delay) during active setup to ensure UI accuracy.
-- **R641 (Map Invalidation Optimization)**: The `MapView` MUST only be invalidated when visual state changes are detected. Continuous or unconditional invalidation is prohibited to maintain the R-HARDWARE-01 CPU budget.
+- **R635/636 (Permission Reactivity)**: The system shall utilize a 2000ms TTL for permission states and a robust double-check refresh (1200ms delay).
+- **R641 (Map Invalidation Optimization)**: The `MapView` MUST only be invalidated when visual state changes are detected.
+- **R643 (Foreground Service Start Hardening)**: The system MUST verify that the Activity is in the `RESUMED` state before starting a foreground service. Background/Cold-start requests MUST be deferred to the next `onResume` event. Catch blocks MUST intercept all `Throwable` instances for FGS starts.
 
 ## 📊 Status Tracker
-- **[Issue #641] Map Invalidation Overhead**: 🟢 Resolved. Implemented conditional `view.invalidate()`.
-- **[Issue #635] Permission Status Stalling**: 🟢 Resolved. Added 1200ms delayed double-check in `RefreshPermissionStatus`.
-- **[Issue #636] Permission Cache Latency**: 🟢 Resolved. Reduced `PERMISSION_TTL_MS` to 2s.
-- **[Issue #640] Tracker Mode ANR (Regression)**: 🟢 Resolved.
-- **[Issue #637] Log Spam: getPackageName()**: 🟢 Resolved.
+- **[Issue #643] Foreground Service Start Crash (Regression)**: 🟢 Resolved. Added lifecycle guards and Throwable catch.
+- **[Issue #644] Version Inconsistency**: 🟢 Resolved. Aligned `build.gradle` version.
+- **[Issue #641] Map Invalidation Overhead**: 🟢 Resolved.
+- **[Issue #635] Permission Status Stalling**: 🟢 Resolved.
+- **[Issue #636] Permission Cache Latency**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Status
 - **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.40).
-- **Map Performance**:
-    - **Optimization**: Modified `MapOverlayManager.kt` and `MapComponents.kt`.
-    - **Logic**: Used state tracking for positions and accuracy circles to return update signals.
-    - **Impact**: Idle CPU usage reduced by 3-5% on Samsung A15.
+- **FGS Stability**:
+    - **Optimization**: Modified `MainActivity.kt` to prevent start-up crashes.
+    - **Logic**: Used `lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)` check.
 - **Requirement Alignment**: 
-    - **R641**: Documentation updated in `SOT_MASTER_REQUIREMENTS.md`.
+    - **R643**: Documentation updated in `SOT_MASTER_REQUIREMENTS.md`.
 
 ### 🛠️ Technical Debt & Identified Risks
-- **[Issue #642] [Severity: Low] [Category: UI] Map Settings Icon Contrast**: The purple settings icon has low contrast when the map is in dark-mode-like satellite tiles (if implemented in future).
+- **[Issue #642] [Severity: Low] [Category: UI] Map Settings Icon Contrast**: The purple settings icon has low contrast when the map is in dark-mode-like satellite tiles.
 
 ## 🎯 Next Objective
 - **[Issue #642] UI Contrast Audit**: Review map control contrast ratios for accessibility.
 
-**Status**: MODIFIED `MapOverlayManager.kt`, `MapComponents.kt`, `issues.md`, `SOT_MASTER_REQUIREMENTS.md`. VERSION July.30.40. READY FOR HANDOVER.
+**Status**: MODIFIED `MainActivity.kt`, `app/build.gradle`, `issues.md`, `SOT_MASTER_REQUIREMENTS.md`, `Handover.md`. VERSION July.30.40. READY FOR HANDOVER.

@@ -13,19 +13,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * July.30.40:
+ * - Issue #643: Foreground Service Start Hardening. Defensive check for RESUMED 
+ *   state and Throwable catch to prevent fatal FGS start crashes on cold start.
  * July.30.31:
  * - Issue #634: Foreground Service Start Hardening. Updated onStartService to 
  *   set recovery pending state upon OS-level start restrictions.
- * July.30.26:
- * - Issue #626: Foreground Service Start Hardening. Added automated recovery 
- *   trigger in onResume when isRecoveryPending is detected.
- * July.30.23:
- * - Issue #626: Foreground Service Hardening. Wrapped service start in try-catch.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -48,12 +47,18 @@ class MainActivity : ComponentActivity() {
                 activity = this,
                 viewModel = viewModel,
                 onStartService = { mode ->
-                    try {
-                        val serviceClass = if (mode == "tracker") TrackerService::class.java else ViewerService::class.java
-                        val intent = Intent(this, serviceClass)
-                        ContextCompat.startForegroundService(this, intent)
-                    } catch (e: Exception) {
-                        Timber.e(e, "Issue #634: Foreground service start failed for mode $mode. Marking as pending.")
+                    // Issue #643: Prevent start if not in foreground to avoid OS-level restriction crash
+                    if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                        try {
+                            val serviceClass = if (mode == "tracker") TrackerService::class.java else ViewerService::class.java
+                            val intent = Intent(this, serviceClass)
+                            ContextCompat.startForegroundService(this, intent)
+                        } catch (e: Throwable) {
+                            Timber.e(e, "Issue #643: Foreground service start failed for mode $mode. Marking as pending.")
+                            viewModel.onEvent(UiEvent.SetRecoveryPending(true))
+                        }
+                    } else {
+                        Timber.w("Issue #643: Deferred service start for $mode (Activity not RESUMED)")
                         viewModel.onEvent(UiEvent.SetRecoveryPending(true))
                     }
                 },
