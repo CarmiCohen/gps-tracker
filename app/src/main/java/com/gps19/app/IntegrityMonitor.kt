@@ -26,15 +26,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * July.30.42:
+ * - Issue #648: Performance: Persistent "Kumiho" Log Spam & UI Jank. Added 
+ *   lastInternetCheckRt throttle (5s) to checkInternetIntegrity() to prevent 
+ *   redundant calls and align with SystemStatusProvider IPC throttling.
  * July.30.23:
- * - Issue #624: Forensic: System Integrity Periodic Check. Implemented background 
- *   heartbeat and reactive flow vitality auditing (R624).
- * July.29.00:
- * - Issue #622: Forensic: Location Refresh Reactivity Hardening. Enhanced 
- *   location recovery logs with precise duration and recovery confirmation.
- * July.28.22:
- * - Issue #617: Global SharedFlow Audit. Hardened _integrityEvents with 
- *   BufferOverflow.DROP_OLDEST to ensure non-blocking health telemetry (R617).
+ * - Issue #624: Forensic: System Integrity Periodic Check.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -67,6 +64,9 @@ class IntegrityMonitor @Inject constructor(
     private var lastStorageUpdateRt = 0L
     private var lastPowerUpdateRt = 0L
     private var lastLocationStatusUpdateRt = 0L
+
+    private var lastInternetCheckRt = 0L
+    private val INTERNET_CHECK_TTL_MS = 5000L
 
     private val _health = MutableStateFlow(SystemHealthState())
     val healthFlow: StateFlow<SystemHealthState> = _health.asStateFlow()
@@ -363,7 +363,7 @@ class IntegrityMonitor @Inject constructor(
 
     fun getActiveNetworkInterface(): String {
         val activeNetwork = connectivityManager.activeNetwork ?: return "OFFLINE"
-        val caps = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return "NONE"
+        val caps = try { connectivityManager.getNetworkCapabilities(activeNetwork) } catch(e: Exception) { null } ?: return "NONE"
         return when {
             caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WIFI"
             caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "MOBILE"
@@ -377,6 +377,12 @@ class IntegrityMonitor @Inject constructor(
     }
 
     fun checkInternetIntegrity(now: Long): Boolean {
+        val nowRt = timeProvider.elapsedRealtime()
+        if (nowRt - lastInternetCheckRt < INTERNET_CHECK_TTL_MS && lastInternetCheckRt != 0L) {
+            return !currentHealth.localInternetLoss
+        }
+        lastInternetCheckRt = nowRt
+
         val online = isInternetHardwarePresent()
         if (!online) {
             val firstDetected = sustainedViolations.getOrPut(ALERT_ID_LOCAL_INTERNET) { now }
@@ -439,6 +445,7 @@ class IntegrityMonitor @Inject constructor(
         lastPowerDisconnectTs = 0L
         batterySamples.clear()
         lastFullPollTs = 0L
+        lastInternetCheckRt = 0L
     }
 
     fun getBatteryLevel(): Int = currentHealth.batteryLevel

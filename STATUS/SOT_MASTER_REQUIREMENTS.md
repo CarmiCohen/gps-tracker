@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.30.41 (Stability Baseline)
+# System Source of Truth (SoT) - July.30.42 (Stability Baseline)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -7,7 +7,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Permission Reactivity Authority (R635/636)**: The `SystemStatusProvider` MUST maintain a low-latency cache TTL (e.g., 2000ms) for permission states to ensure reactive UI updates. During active setup or diagnostics, the system MUST utilize a "Robust Refresh" strategy, performing an immediate check followed by a delayed double-check (1200ms) to account for OS-level propagation latency on budget hardware (Samsung A15). (Issue #635, #636, July.30.36)
 *   **Map Invalidation Optimization (R641)**: The `MapView` MUST only be invalidated when visual state changes (position, accuracy drift, or overlay visibility) are detected. Continuous or unconditional invalidation on the Main thread is prohibited to maintain the R-HARDWARE-01 CPU budget. (Issue #641, July.30.40)
 *   **Foreground Service Start Hardening (R643)**: On Android 12+ (API 31+), the system MUST verify that the Activity is in the `RESUMED` state before attempting to start a foreground service to prevent `ForegroundServiceStartNotAllowedException`. Start requests occurring while the activity is not resumed MUST be marked as pending and deferred to the next `onResume` event via the `isRecoveryPending` mechanism. Catch blocks for foreground starts MUST intercept all `Throwable` instances to prevent fatal crashes during OS-level state transitions. (Issue #643, July.30.40)
-*   **Hardware IPC Throttling (R645/646)**: High-cost system service calls (battery optimization checks, `Settings.canDrawOverlays`, and `checkSelfPermission`) MUST be throttled to a minimum of 5000ms inside `SystemStatusProvider`, even if a `forceRefresh` is requested by the UI. This is mandatory to silence system-level log spam (`getPackageName`) triggered by Samsung Kumiho auditing on budget hardware. (Issue #645, #646, July.30.41)
+*   **Hardware IPC Throttling (R645/646/648)**: High-cost system service calls (battery optimization checks, `Settings.canDrawOverlays`, `checkSelfPermission`, and `ConnectivityManager.getNetworkCapabilities`) MUST be throttled to a minimum of 5000ms inside `SystemStatusProvider`, even if a `forceRefresh` is requested by the UI. This is mandatory to silence system-level log spam (`getPackageName`) triggered by Samsung Kumiho auditing on budget hardware. (Issue #645, #646, #648, July.30.42)
 *   **Hardware Poke Frequency Authority (R647)**: On restricted hardware (Samsung A15), vendor-specific hardware pokes (e.g., `MbrainHardwareManager.punchHardware`) MUST NOT exceed a frequency of once per 60 seconds to minimize JNI overhead and Logcat noise during background monitoring. (Issue #647, July.30.41)
 *   **Main-Thread Purity (R526)**: The Application's Main thread MUST NOT be blocked by heavy initialization (Database, Hardware Managers) during cold start. (Issue #526)
 *   **Startup ANR Optimization (R627)**: Native library loading and vendor-specific hardware initialization (e.g., `libmbrainSDK`) MUST be offloaded to background coroutines (`Dispatchers.IO`) to prevent cold-start stalls and "App Not Responding" dialogs on budget hardware. (Issue #627, July.30.25)
@@ -89,5 +89,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.30.41.
+*   **Current Release**: July.30.42.
 *   **Source of Truth**: app/build.gradle versionName.

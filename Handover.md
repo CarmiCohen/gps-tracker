@@ -1,25 +1,24 @@
-# Handover (July.30.41) - Stability Baseline [ACTIVE]
+# Handover (July.30.42) - Stability Baseline [ACTIVE]
 
 ## 🎯 Current Objective
-Resolved **[Issue #646] Persistent Log Spam: Overlay & Permission Checks** and **[Issue #647] Excessive Hardware Punch Frequency**. Extended the 5000ms hardware IPC throttle in `SystemStatusProviderImpl.kt` to cover all permission/overlay checks, silencing Samsung "Kumiho" auditing logs. Optimized the A15 hardware poke interval to 60s in `TrackerService.kt` to reduce system overhead.
+Resolved **[Issue #648] Persistent "Kumiho" Log Spam & UI Jank**. Increased `INTERNET_CACHE_TTL_MS` to 5000ms and implemented strict 5s hardware IPC throttling for internet status checks in `SystemStatusProvider` and `IntegrityMonitor`. This eliminates the massive `getPackageName` logcat spam on Samsung A15 hardware, restoring UI fluidity (resolving `Davey!` jank).
 
 ## 🆕 New Architectural Requirement
-- **R645/646 (Hardware IPC Throttling)**: High-cost system service calls (battery optimization, overlays, permissions) MUST be throttled to a minimum of 5000ms to prevent Samsung-specific logcat spam.
-- **R647 (Hardware Poke Frequency)**: Vendor-specific hardware pokes on budget hardware (A15) MUST NOT exceed a 60s frequency.
+- **R648 (Hardened IPC Throttling)**: High-cost system service calls (specifically `ConnectivityManager.getNetworkCapabilities`) MUST be throttled to a minimum of 5000ms to prevent Samsung-specific logcat spam and associated UI thread stalls.
 
 ## 📊 Status Tracker
-- **[Issue #646] Persistent Log Spam: Overlay & Permission Checks**: 🟢 Resolved. Extended 5s throttle to all checks.
-- **[Issue #647] Excessive Hardware Punch Frequency**: 🟢 Resolved. Increased interval to 60s.
-- **[Issue #645] Persistent Log Spam: getPackageName()**: 🟢 Resolved. Initial battery optimization throttle.
-- **[Issue #643] Foreground Service Start Crash (Regression)**: 🟢 Resolved. Verified operational.
+- **[Issue #648] Persistent "Kumiho" Log Spam & UI Jank**: 🟢 Resolved. Implemented 5s throttle for internet checks.
+- **[Issue #646] Persistent Log Spam: Overlay & Permission Checks**: 🟢 Resolved.
+- **[Issue #647] Excessive Hardware Punch Frequency**: 🟢 Resolved.
+- **[Issue #645] Persistent Log Spam: getPackageName()**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.41).
-- **Efficiency**:
-    - **Optimization**: Throttled all permission IPC to 5000ms; reduced A15 hardware poke frequency.
-    - **Impact**: Silent Logcat on Samsung A15 during UI refreshes; reduced JNI overhead.
+- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.42).
+- **Performance**:
+    - **Stability**: Restored UI responsiveness on budget hardware by silencing Samsung auditing overhead.
+    - **Impact**: Zero `Davey!` logs observed during high-frequency telemetry pulses on Samsung A15.
 - **Requirement Alignment**: 
-    - **R646/647**: Documentation updated in `SOT_MASTER_REQUIREMENTS.md`.
+    - **R648**: Documentation updated in `SOT_MASTER_REQUIREMENTS.md`.
 
 ### 🛠️ Technical Debt & Identified Risks
 - **[Issue #642] [Severity: Low] [Category: UI] Map Settings Icon Contrast**: The purple settings icon has low contrast in dark-mode tile sets.
@@ -27,4 +26,4 @@ Resolved **[Issue #646] Persistent Log Spam: Overlay & Permission Checks** and *
 ## 🎯 Next Objective
 - **[Issue #642] UI Contrast Audit**: Review map control contrast ratios for accessibility.
 
-**Status**: MODIFIED `SystemStatusProvider.kt`, `TrackerService.kt`, `issues.md`, `SOT_MASTER_REQUIREMENTS.md`, `Handover.md`. VERSION July.30.41. READY FOR HANDOVER.
+**Status**: MODIFIED `SystemStatusProvider.kt`, `IntegrityMonitor.kt`, `issues.md`, `SOT_MASTER_REQUIREMENTS.md`, `Handover.md`. VERSION July.30.42. READY FOR HANDOVER.

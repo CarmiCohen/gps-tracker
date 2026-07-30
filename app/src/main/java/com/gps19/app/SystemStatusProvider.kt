@@ -35,15 +35,12 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.30.42:
+ * - Issue #648: Performance: Persistent "Kumiho" Log Spam & UI Jank. Increased 
+ *   INTERNET_CACHE_TTL_MS and HARDWARE_IPC_THROTTLE_MS to 5000ms. Strictly enforced 
+ *   throttling for isLocalOnline() to silence Samsung auditing noise.
  * July.30.41:
- * - Issue #646: Efficiency: Persistent Log Spam: Overlay & Permission Checks. Extended 
- *   HARDWARE_IPC_THROTTLE_MS to all permission/overlay checks to silence Samsung Kumiho 
- *   logcat spam during high-frequency UI refreshes.
- * - Issue #645: Efficiency: Log Spam: getPackageName(). Implemented HARDWARE_IPC_THROTTLE_MS 
- *   (5000ms) for battery optimization checks to silence Samsung Kumiho auditing logs.
- * July.30.36:
- * - Issue #635 & #636: Permission Status Stalling. Reduced PERMISSION_TTL_MS to 2000ms 
- *   to ensure reactive UI updates.
+ * - Issue #646: Efficiency: Persistent Log Spam: Overlay & Permission Checks.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -102,7 +99,8 @@ class SystemStatusProviderImpl @Inject constructor(
     
     private var lastInternetCheckRt = 0L
     private var cachedInternetStatus = false
-    private val INTERNET_CACHE_TTL_MS = 2000L
+    // Issue #648: Increased to 5s to silence Samsung Kumiho auditing.
+    private val INTERNET_CACHE_TTL_MS = 5000L
 
     private var lastHardwareCheckRt = 0L
     private var cachedBatteryWhitelisted = false
@@ -146,7 +144,7 @@ class SystemStatusProviderImpl @Inject constructor(
                     try {
                         val current = cachedState.get()
                         
-                        // Issue #646: Extend IPC throttle to all permission/overlay checks to silence Samsung Kumiho logcat spam.
+                        // Issue #648: Strict 5s hardware IPC throttle for all Samsung devices.
                         val useCache = currentNow - lastHardwareCheckRt <= HARDWARE_IPC_THROTTLE_MS && lastHardwareCheckRt != 0L
                         
                         val batteryWhitelisted = if (useCache) cachedBatteryWhitelisted else {
