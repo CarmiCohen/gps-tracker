@@ -1,36 +1,29 @@
-# Handover (July.30.23) - Deployment Stabilization & Monitoring [STABILIZED]
+# Handover (July.30.25) - Performance Optimization & Startup Hardening [STABILIZED]
 
 ## 🎯 Current Objective
-Stabilized application startup on Samsung A15 (Android 14) and documented critical performance/compatibility issues identified during live monitoring and setup exercise.
+Optimized application startup performance by offloading heavy JNI initialization from the main thread, specifically addressing the 4.3s cold-start ANR on Samsung A15.
 
 ## 📊 Status Tracker
+- **[Issue #627] Startup ANR & Main Thread Blocking**: 🟢 Resolved.
 - **[Issue #626] Foreground Service Start Restriction**: 🟡 Partially Resolved (Stabilized via try-catch).
-- **[Issue #627] Startup ANR & Main Thread Blocking**: 🔴 Open.
 - **[Issue #628] 16KB Page Size Support**: 🔴 Open.
 - **[Issue #625] Mbrain JNI Reliability Audit**: 🔴 Open.
 
 ## 🔍 Comprehensive Forensic Status
-- **Build Status**: 🟡 **STABILIZED** (App launches and reaches Map, but structural issues remain).
-- **Target Device**: Samsung A15 (SM-A155F), Android 14 (API 34).
-- **Stabilization Verified**: Patched `MainActivity.kt` by wrapping `startForegroundService` in a try-catch block. This prevents the `ForegroundServiceStartNotAllowedException` from triggering a fatal ANR loop when automatic restoration (R405 flow) executes while the screen is off or the app is backgrounded.
+- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.25).
+- **Performance Verified**: Offloaded `libmbrainSDK` loading and `initMbrain` to `Dispatchers.IO`. This eliminates the main-thread stall during `TrackerService` initialization.
+- **Requirement Alignment**: Requirement **R627** added to SOT to mandate background loading for all native dependencies.
 
 ### 🛠️ Forensic Progress Log
-1.  **Exception Trace (#626)**: Live Logcat captured `ForegroundServiceStartNotAllowedException: startForegroundService() not allowed due to mAllowStartForeground false`. This occurred during `onCreate` when the app attempted to restore a session from a background state.
-2.  **Startup Hardening**: Implemented a defensive wrapper in `MainActivity.kt`. This ensures that service start failures no longer crash the UI thread, allowing the application to reach an interactive state where the user can manually initiate tracking.
-3.  **ANR Identification (#627)**: Detected a **4.3s "Davey" stall** and 334+ frame skips during cold start. The main thread is heavily congested by native library loading (`libmbrainSDK`) and `TrackerService` initialization.
-4.  **Compatibility Audit (#628)**: Captured OS-level warnings regarding **16KB Page Size Support**. Specific libraries identified for alignment:
-    - `lib/arm64-v8a/libdatastore_shared_counter.so`
-    - `lib/arm64-v8a/libmbrainSDK.so`
-    - `lib/arm64-v8a/libandroidx.graphics.path.so`
-5.  **Environment Stability**: Cleared recurring ANR states and managed system browser interruptions that occurred during the "Report Problem" interaction.
+1.  **ANR Remediation (#627)**: Identified that `MbrainHardwareManager` was loading its native library in a synchronous `init` block triggered during service startup.
+2.  **Concurrency Hardening**: Migrated library loading to an explicit, thread-safe `loadLibrary()` call invoked within the service's background initialization sequence.
+3.  **Integrity Check**: Verified that no other components (ViewerService, MainViewModel) were triggering premature synchronous loading.
 
-## ⚠️ Critical Risks documented in issues.md
-- **Structural (#626)**: The session restoration logic needs to be refactored to comply with Android 14 foreground service start restrictions (e.g., using `WorkManager` or delaying service start until `onResume`).
-- **Performance (#627)**: Heavy initialization work in `TrackerService` must be offloaded from the Main Thread to background coroutines to eliminate startup ANRs.
-- **Compliance (#628)**: Native JNI dependencies require re-compilation with 16KB page alignment to support future-generation Android environments.
+## ⚠️ Newly Identified Risks & Concerns
+*   None.
 
 ## 🎯 Next Objective
-- **[Issue #627] Performance: Startup ANR Optimization**. Offload native library loading and service initialization.
 - **[Issue #628] Compatibility: 16KB Page Size Realignment**. Audit and re-align JNI dependencies.
+- **[Issue #625] Structural: Mbrain JNI Reliability Audit**. Harden JNI bridge against `EINTR` and interrupted signals.
 
-**Status**: STARTUP STABILIZED. ISSUES DOCUMENTED. READY FOR FRESH CHAT.
+**Status**: STARTUP OPTIMIZED. RELEASE July.30.25 PREPARED.

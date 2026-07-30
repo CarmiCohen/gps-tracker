@@ -19,10 +19,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.30.25:
+ * - Issue #627: Performance: Startup ANR Optimization. Offloaded native library 
+ *   loading and initMbrain to Dispatchers.IO.
  * July.28.24:
  * - Issue #621: Fixed regressions from isImportant naming alignment and kinematicState partitioning.
- * - Issue #618: Forensic UI State Collection Audit. Migrated Main dispatchers 
- *   to Dispatchers.Main.immediate to reduce notification update latency (R618).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -72,9 +73,15 @@ class TrackerService : BaseMonitorService() {
         
         refreshCapabilitiesInternal()
 
-        if (capabilities.isA15Device && MbrainHardwareManager.isAvailable()) {
-            val res = MbrainHardwareManager.initMbrain(timeProvider, configManager.deviceId, 0)
-            logManager.logServiceEvent("HARDWARE: libmbrainSDK initialized (Result: $res)", isImportant = true)
+        // Issue #627: Offload library loading and hardware init to Dispatchers.IO
+        if (capabilities.isA15Device) {
+            withContext(Dispatchers.IO) {
+                MbrainHardwareManager.loadLibrary()
+                if (MbrainHardwareManager.isAvailable()) {
+                    val res = MbrainHardwareManager.initMbrain(timeProvider, configManager.deviceId, 0)
+                    logManager.logServiceEvent("HARDWARE: libmbrainSDK initialized (Result: $res)", isImportant = true)
+                }
+            }
         }
 
         observeAlarmEvents()

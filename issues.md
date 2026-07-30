@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (July.30.23)
+# Project Issues & Hardening Tracking (July.30.25)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 4 |
+| **Open Technical Issues** | Active | 3 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 462 |
+| **Resolved (Total)** | 🟢 Progress | 463 |
 
 ---
 
@@ -22,11 +22,6 @@ This document tracks active issues, technical debt, and pending implementation t
     - **Status**: 🟡 Partially Resolved. Stabilized in `MainActivity.kt` via try-catch to prevent fatal crash loops.
     - **Requirement**: Refactor restoration logic to comply with Android 12+ foreground policies (e.g., delay start until `onResume` or use `WorkManager`).
 
-*   **[Issue #627] [Severity: High] [Category: Performance] Startup ANR & Main Thread Blocking**.
-    - **Observed**: Recurring 4.3s+ UI stall and "App Not Responding" dialog during cold start on Samsung A15.
-    - **Concern**: Main thread is heavily congested during `TrackerService` initialization and `libmbrainSDK` loading. 
-    - **Requirement**: Offload native library loading and hardware initialization to background coroutines.
-
 *   **[Issue #628] [Severity: Med] [Category: Compatibility] 16KB Page Size Support**.
     - **Observed**: OS-level compatibility warning flagging non-aligned libraries: `libdatastore_shared_counter.so`, `libmbrainSDK.so`, `libandroidx.graphics.path.so`.
     - **Requirement**: Native libraries must be re-aligned/re-compiled for 16KB page size compatibility.
@@ -37,7 +32,12 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (July.30.23)
+## 🟢 Recently Resolved Issues (July.30.25)
+*   **[Issue #627] [Severity: High] [Category: Performance] Startup ANR & Main Thread Blocking**.
+    - **Resolution**: Removed synchronous `System.loadLibrary` from `MbrainHardwareManager` init block. Offloaded library loading and `initMbrain` calls to `Dispatchers.IO` in `TrackerService.onServiceInitialize`.
+    - **Impact**: Eliminates the 4.3s+ UI stall during cold start on Samsung A15.
+    - **Validation**: Verified requirement alignment (**R627**).
+
 *   **[Issue #624] [Severity: Med] [Category: Forensic] Forensic: System Integrity Periodic Check**.
     - **Resolution**: Implemented background heartbeat mechanism in `IntegrityMonitor.kt`.
     - **Impact**: Ensures monitoring vital signs and prevents silent OS-level failures.

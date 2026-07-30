@@ -9,26 +9,34 @@ import kotlin.concurrent.withLock
 
 /**
  * MbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * July.30.25:
+ * - Issue #627: Performance: Startup ANR Optimization. Offloaded native library 
+ *   loading to background coroutines via explicit loadLibrary() call. Removed init block.
  * July.29.01:
- * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
- *   reporting strings and migrated to measureAndAudit API.
- * July.26.04:
- * - Issue #589: Performance Audit.
+ * - Issue #623: Structural: Latency Monitor Metric Cleanup.
  */
 object MbrainHardwareManager {
 
     private var isLibraryLoaded = false
     private val jniLock = ReentrantLock()
 
-    init {
-        try {
-            System.loadLibrary("mbrainSDK")
-            isLibraryLoaded = true
-            Timber.i("libmbrainSDK loaded successfully")
-        } catch (e: UnsatisfiedLinkError) {
-            Timber.e("libmbrainSDK load failed: ${e.message}")
-        } catch (e: Exception) {
-            Timber.e("Unexpected error loading libmbrainSDK: ${e.message}")
+    /**
+     * loadLibrary: Explicitly load the native SDK.
+     * Should be called from a background thread (e.g. Dispatchers.IO) to avoid startup ANRs.
+     */
+    fun loadLibrary() {
+        if (isLibraryLoaded) return
+        jniLock.withLock {
+            if (isLibraryLoaded) return
+            try {
+                System.loadLibrary("mbrainSDK")
+                isLibraryLoaded = true
+                Timber.i("libmbrainSDK loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Timber.e("libmbrainSDK load failed: ${e.message}")
+            } catch (e: Exception) {
+                Timber.e("Unexpected error loading libmbrainSDK: ${e.message}")
+            }
         }
     }
 
