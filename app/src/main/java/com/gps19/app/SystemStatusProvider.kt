@@ -36,10 +36,11 @@ import javax.inject.Singleton
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
  * July.30.45:
+ * - Issue #655: Performance Hardening (Fix). Implemented FORCED_REFRESH_COOLDOWN_MS (2s) 
+ *   to prevent IPC bursts during reactive setup phases. Eliminated getPackageName spam 
+ *   on Samsung A15 by ensuring forceRefresh respects a hardware-level throttle.
  * - Issue #654: Performance Hardening. Centralized ACCESS_FINE_LOCATION and 
  *   NetworkInterface checks into throttled IPC audit to eliminate main-thread stalls.
- * July.30.44:
- * - Issue #651 & #652: Performance Hardening.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -96,6 +97,7 @@ class SystemStatusProviderImpl @Inject constructor(
     private val isA15 by lazy { isA15Device() }
     
     private val PERMISSION_TTL_MS = 2000L
+    private val FORCED_REFRESH_COOLDOWN_MS = 2000L
     private val STORAGE_POLL_INTERVAL_MS = 60_000L
     private val POWER_POLL_INTERVAL_MS = 60_000L
     
@@ -155,13 +157,25 @@ class SystemStatusProviderImpl @Inject constructor(
         val now = SystemClock.elapsedRealtime()
         val isStale = now - lastFullRefreshTime > PERMISSION_TTL_MS
         
-        if (isStale || forceRefresh) {
+        // Issue #655: Hardware refresh cooldown. Even for "forced" refreshes, 
+        // we enforce a minimum interval of 2 seconds to prevent manufacturer IPC auditing stalls.
+        val shouldExecute = when {
+            forceRefresh -> (now - lastHardwareCheckRt >= FORCED_REFRESH_COOLDOWN_MS) || lastHardwareCheckRt == 0L
+            else -> isStale
+        }
+
+        if (shouldExecute) {
             refreshMutex.withLock {
                 val currentNow = SystemClock.elapsedRealtime()
-                if (currentNow - lastFullRefreshTime > PERMISSION_TTL_MS || forceRefresh) {
+                val doubleCheckExecute = when {
+                    forceRefresh -> (currentNow - lastHardwareCheckRt >= FORCED_REFRESH_COOLDOWN_MS) || lastHardwareCheckRt == 0L
+                    else -> (currentNow - lastFullRefreshTime > PERMISSION_TTL_MS)
+                }
+
+                if (doubleCheckExecute) {
                     try {
                         val current = cachedState.get()
-                        val useCache = currentNow - lastHardwareCheckRt <= HARDWARE_IPC_THROTTLE_MS && lastHardwareCheckRt != 0L
+                        val useCache = currentNow - lastHardwareCheckRt <= HARDWARE_IPC_THROTTLE_MS && lastHardwareCheckRt != 0L && !forceRefresh
                         
                         val newState = if (useCache) {
                             current

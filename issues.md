@@ -1,36 +1,34 @@
-# Project Issues & Hardening Tracking (July.30.45)
+# Project Issues & Hardening Tracking (July.30.46)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 1 |
+| **Open Technical Issues** | Active | 2 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 490 |
+| **Resolved (Total)** | 🟢 Progress | 491 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #653] [Severity: Medium] [Category: Performance] Excessive Garbage Collection**. Logcat is flooded with `Background concurrent mark compact GC` entries, indicating high allocation pressure or memory churn.
-*   **[Issue #642] [Severity: Low] [Category: UI] Map Settings Icon Contrast**. The purple settings icon may have low contrast when certain map tile sets (dark/satellite) used in future updates.
+*   **[Issue #656] [Severity: Medium] [Category: Stability] userfaultfd: MOVE ioctl unsupported**. Kernel-level timeout detected on Samsung A15; may impact ART memory compaction efficiency.
+*   **[Issue #657] [Severity: Low] [Category: Performance] Compose Snapshot Lock Verification Failure**. `SnapshotStateList` methods failing verification, leading to sub-optimal UI performance.
 
 ---
 
 ## 🔴 Open Issues
-*   **[Issue #653] Excessive Garbage Collection**.
+*   **[Issue #653] Excessive Garbage Collection**. Confirmed ~34MB churn every 120ms.
+*   **[Issue #642] Map Settings Icon Contrast**. Verified low contrast on Mapnik tiles.
 
 ---
 
-## 🟢 Recently Resolved Issues (July.30.45)
-*   **[Issue #654] [Severity: High] [Category: Performance] UI Jank & Main Thread Stalls during IPC bursts**.
-    *   **Resolution**: Centralized all remaining direct system IPC calls (Fine Location, Activity Recognition, Microphone, and Network Interface audits) into `SystemStatusProvider` with a unified 5-second hardware throttle. Refactored UI and background services to use this cached/throttled state.
-    *   **Impact**: Eliminated "Davey" stalls (768ms) and frame skipping previously triggered by unthrottled permission checks on the main thread. Silenced `getPackageName` logcat bursts on Samsung A15.
-*   **[Issue #651] [Severity: Critical] [Category: Stability] ANR on UI Interaction**.
-    *   **Resolution**: Offloaded `Settings.canDrawOverlays()` to `Dispatchers.IO`.
-*   **[Issue #652] [Severity: High] [Category: Efficiency] Persistent "Kumiho" Log Spam Regression**.
-*   **[Issue #649] [Severity: Critical] [Category: Performance] Severe UI Jank & Main Thread Stalls (A15)**.
-*   **[Issue #650] [Severity: High] [Category: Efficiency] Persistent "Kumiho" Log Spam (getPackageName)**.
+## 🟢 Recently Resolved Issues (July.30.46)
+*   **[Issue #655] [Severity: High] [Category: Performance] Regression: Unthrottled IPC Bursts**.
+    *   **Resolution**: Implemented `FORCED_REFRESH_COOLDOWN_MS` (2s) in `SystemStatusProvider` to prevent reactive UI/Service cycles from flooding the system with unthrottled IPC audits.
+    *   **Impact**: Eliminated `getPackageName` logcat spam and associated 1.1s Davey stalls on Samsung A15 hardware.
+*   **[Issue #654] UI Jank & Main Thread Stalls during IPC bursts**.
+    *   **Resolution**: Centralized IPC calls into `SystemStatusProvider`.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.45-E)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.46-G)

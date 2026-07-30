@@ -1,27 +1,23 @@
-# Handover (July.30.45) - Performance Hardening [COMPLETED]
+# Handover (July.30.46) - Performance Hardening [READY]
 
 ## 🎯 Current Objective
-Resolved **[Issue #654] UI Jank & Main Thread Stalls during IPC bursts**. Centralized all remaining direct system IPC calls (Fine Location, Activity Recognition, Microphone, and Network Interface audits) into `SystemStatusProvider` with a unified 5-second hardware throttle. This ensures compliance with **R650** and prevents performance degradation on budget hardware (Samsung A15).
+Ready for **[Issue #653] Excessive Garbage Collection**. Previous task resolved **[Issue #655] Regression: Unthrottled IPC Bursts** by implementing a hardware-level refresh cooldown (`FORCED_REFRESH_COOLDOWN_MS = 2000L`) in `SystemStatusProvider`. This eliminated `getPackageName` logcat spam and 1.1s Davey stalls on Samsung A15 hardware.
 
 ## 🆕 New Architectural Requirement
-- **R650 (Atomic IPC Throttling)**: All system service calls prone to manufacturer auditing (e.g. `ConnectivityManager`, `PowerManager`, `Settings.canDrawOverlays`, `checkSelfPermission`) MUST be wrapped in a `Mutex`, offloaded to `Dispatchers.IO`, and executed via `suspend` functions to ensure atomicity of cache updates and prevent main-thread blocking.
+- **R651 (Hardware Cooldown Authority)**: Even for "forced" refreshes of hardware state (e.g., during active setup), the system MUST enforce a minimum hardware-level cooldown period (default 2000ms) within `SystemStatusProvider` to prevent IPC bursts and manufacturer-level auditing stalls.
 
 ## 📊 Status Tracker
-- **[Issue #654] UI Jank during IPC bursts**: 🟢 Resolved. Refactored all direct IPC calls to use centralized throttled state.
-- **[Issue #651] ANR on UI Interaction**: 🟢 Resolved. Offloaded `canDrawOverlays` to IO.
-- **[Issue #652] Persistent "Kumiho" Log Spam Regression**: 🟢 Resolved. Unified 5s throttle for all permission checks.
-- **[Issue #653] Excessive Garbage Collection**: 🔴 Open. Requires memory profiling to address allocation pressure.
+- **[Issue #655] Regression: Unthrottled IPC Bursts**: 🟢 Resolved. Added 2s cooldown to `getPermissionState`.
+- **[Issue #654] UI Jank during IPC bursts**: 🟢 Resolved.
+- **[Issue #653] Excessive Garbage Collection**: 🔴 Open. Churn observed at ~34MB/120ms. Next focus.
+- **[Issue #656] userfaultfd unsupported**: 🔍 Tracked. Monitoring kernel behavior on A15.
 
 ## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.45).
+- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.46).
 - **Performance**:
-    - **UI Fluidity**: Resolved 768ms Davey stalls and frame skipping by removing all direct `checkSelfPermission` calls from the composition phase and background service tickers.
-    - **Log Hygiene**: Eliminated `getPackageName` logcat bursts previously triggered by unthrottled audits in `MainAppContent`, `AppSensorManager`, and `IntegrityMonitor`.
+    - **IPC Hygiene**: Eliminated `getPackageName` logcat bursts on Samsung A15.
+    - **Memory**: High allocation pressure persists ([Issue #653]).
 - **Requirement Alignment**: 
-    - **R650**: Fully implemented across UI, Sensors, and Monitoring layers.
+    - **R650/R651**: Fully implemented in `SystemStatusProvider`.
 
-### 🛠️ Technical Debt & Identified Risks
-- **[Issue #653] [Severity: Medium] Excessive Garbage Collection**: Continuous background GC remains; suggests high churn in sensor processing or telemetry serialization.
-- **[Issue #642] [Severity: Low] [Category: UI] Map Settings Icon Contrast**: Pending review.
-
-**Status**: MODIFIED `MainUiState.kt`, `SystemStatusProvider.kt`, `MainAppContent.kt`, `AppSensorManager.kt`, `IntegrityMonitor.kt`, `EngineModels.kt`, `TrackerService.kt`, `ViewerService.kt`. VERSION July.30.45. READY FOR PRODUCTION TEST.
+**Status**: IPC logic hardened. VERSION July.30.46. READY FOR NEW CHAT.
