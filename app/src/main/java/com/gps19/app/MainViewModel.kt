@@ -23,6 +23,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.30.29:
+ * - Issue #631: Forensic UI: Service Blackout Trends. Fixed reactive binding missing 
+ *   in startHeavyObservations for cumulativeRecoveryBlackoutMs and recoveryCount.
  * July.30.28:
  * - Issue #630: Forensic Recovery Log Aggregation. Added cumulative stats aggregation 
  *   and average blackout duration logging in TriggerRecovery.
@@ -239,7 +242,13 @@ class MainViewModel @Inject constructor(
         stateSubscriptionUseCase.observeConnectivityBasics()
             .onEach { update ->
                 _rtt.value = update.lastRtt
-                updateDiagnosticState { current -> current.copy(connectivity = current.connectivity.copy(isRelayConnected = update.isRelayConnected, lastRemoteActivityTs = update.lastRemoteActivityTs))}
+                updateDiagnosticState { current -> 
+                    current.copy(
+                        connectivity = current.connectivity.copy(isRelayConnected = update.isRelayConnected, lastRemoteActivityTs = update.lastRemoteActivityTs),
+                        cumulativeRecoveryBlackoutMs = update.cumulativeRecoveryBlackoutMs,
+                        recoveryCount = update.recoveryCount
+                    )
+                }
             }
             .flowOn(Dispatchers.Main.immediate)
             .launchIn(viewModelScope)

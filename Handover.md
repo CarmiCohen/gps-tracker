@@ -1,40 +1,32 @@
-# Handover (July.30.29) - Forensic UI: Service Blackout Trends [STABILIZED]
+# Handover (July.30.30) - Forensic UI Verification & Binding Fix [STABILIZED]
 
 ## 🎯 Current Objective
-Implemented visualization for "Service Blackout Duration" trends within the Diagnostics UI to monitor recovery performance (Issue #631).
+Performed verification review of Issue #631. Identified and fixed a missing reactive binding in `MainViewModel` for recovery statistics.
 
 ## 📊 Status Tracker
-- **[Issue #631] Forensic UI: Service Blackout Trends**: 🟢 Resolved.
+- **[Issue #631] Forensic UI: Service Blackout Trends**: 🟢 Resolved & Verified.
 - **[Issue #630] Forensic Recovery Log Aggregation**: 🟢 Resolved.
 - **[Issue #629] Deferred Recovery Latency Audit**: 🟢 Resolved.
 - **[Issue #626] Foreground Service Start Restriction**: 🟢 Resolved.
-- **[Issue #627] Startup ANR & Main Thread Blocking**: 🟢 Resolved.
-- **[Issue #625] Mbrain JNI Reliability Audit**: 🟢 Resolved.
-- **[Issue #628] 16KB Page Size Support**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
-- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.29).
-- **UI Visualization Implementation**:
-    - **Diagnostics Screen**: Integrated a new **"Forensic Recovery Audit"** section in `DiagnosticsScreen.kt`.
-    - **Metrics Displayed**: 
-        - **Total Recovery Events**: Scalar count of all deferred service starts.
-        - **Average Blackout Duration**: Calculated running average (formatted in ms), with zero-count safety logic.
-    - **UX Polish**: Added a visual threshold; durations exceeding 30s are highlighted in red to signal aggressive OS interference.
-- **Pipeline Stabilization**:
-    - Verified reactive binding from `SettingsRepository` -> `StateSubscriptionUseCase` -> `MainViewModel` -> `DiagnosticState` -> UI.
-    - Resolved syntax regressions in `MainRepository` and `MainUiState`.
+- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.30).
+- **Bug Fix (Issue #631)**: 
+    - Resolved a defect where `cumulativeRecoveryBlackoutMs` and `recoveryCount` were observed in `MainViewModel` but not assigned to the `DiagnosticState`. 
+    - Binding is now confirmed functional: `SettingsRepository` -> `StateSubscriptionUseCase` -> `MainViewModel` -> `DiagnosticsScreen`.
+- **UI Implementation**: Verified the "Forensic Recovery Audit" section correctly displays events and average blackout duration with the >30s warning logic.
 - **Requirement Alignment**: 
-    - **R631**: Forensic recovery trend visualization Authority.
+    - **R631**: Forensic recovery trend visualization Authority. Confirmed.
 
 ### 🛠️ Forensic Progress Log
-1.  **UI Binding**: Linked low-frequency forensic flows to the Diagnostics screen.
-2.  **Health Auditing**: Added "Average Blackout" as a key performance indicator for background resilience.
-3.  **Documentation**: Synchronized all tracking files to version July.30.29.
+1.  **Verification Audit**: Full-stack review of recovery stats propagation.
+2.  **Reactive Remediation**: Fixed pipeline break in `MainViewModel.startHeavyObservations`.
+3.  **Documentation Sync**: Updated `issues.md`, `Handover.md`, and `SOT_MASTER_REQUIREMENTS.md`.
 
 ## ⚠️ Newly Identified Risks & Concerns
 *   None.
 
 ## 🎯 Next Objective
-- **[Issue #632] Analytical Ribbons**: Integrate recovery blackout markers into the high-frequency Analytical Ribbons to correlate service blackouts with GPS/Sensor gaps.
+- **[Issue #632] Analytical Ribbons**: Integrate recovery blackout markers into the high-frequency Analytical Ribbons.
 
 **Status**: COMPLETED. READY FOR NEW CHAT.

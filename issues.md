@@ -24,9 +24,10 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ## 🟢 Recently Resolved Issues (July.30.29)
 *   **[Issue #631] [Severity: Med] [Category: UI/Forensic] Forensic UI: Service Blackout Trends**.
-    - **Resolution**: Implemented the "Forensic Recovery Audit" section in the Diagnostics UI. Users can now monitor "Total Recovery Events" and the "Average Blackout Duration" reactively. Corrected syntax regressions in `MainRepository` and `MainUiState`.
+    - **Resolution**: Implemented the "Forensic Recovery Audit" section in the Diagnostics UI. Users can now monitor "Total Recovery Events" and the "Average Blackout Duration" reactively. 
+    - **Fix (July.30.30)**: Corrected a defect in `MainViewModel` where cumulative recovery stats were not bound to the `DiagnosticState` pipeline, preventing UI updates.
     - **Impact**: Provides users and developers with direct visibility into the effectiveness of the deferred recovery mechanism on Samsung A15/Android 14 devices.
-    - **Validation**: Verified build success and UI reactive binding.
+    - **Validation**: Verified build success and UI reactive binding in `DiagnosticsScreen`.
 
 ---
 
