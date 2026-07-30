@@ -19,11 +19,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.30.43:
+ * - Issue #649 & #650: Performance Hardening. Updated processTick to await 
+ *   hardened suspend checkInternetIntegrity().
  * July.30.41:
- * - Issue #647: Performance: Excessive Hardware Punch Frequency. Increased 
- *   A15_POKE_INTERVAL_MS to 60s to reduce Logcat noise and system overhead.
- * July.30.31:
- * - Issue #632: Analytical Ribbons: Recovery Markers.
+ * - Issue #647: Performance: Excessive Hardware Punch Frequency.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -396,6 +396,7 @@ class TrackerService : BaseMonitorService() {
 
     override suspend fun processTick(now: Long, nowRt: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRt)
+        // Issue #649 & #650: Awaiting hardened suspend check to prevent main thread stalls.
         integrityMonitor.checkInternetIntegrity(nowRt)
         
         val health = integrityMonitor.currentHealth

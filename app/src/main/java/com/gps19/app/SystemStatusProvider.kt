@@ -35,12 +35,11 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.30.43:
+ * - Issue #649 & #650: Hardened isLocalOnline() with Mutex and suspend execution. 
+ *   Prevents concurrent IPC races that trigger Samsung "Kumiho" log spam and UI jank.
  * July.30.42:
- * - Issue #648: Performance: Persistent "Kumiho" Log Spam & UI Jank. Increased 
- *   INTERNET_CACHE_TTL_MS and HARDWARE_IPC_THROTTLE_MS to 5000ms. Strictly enforced 
- *   throttling for isLocalOnline() to silence Samsung auditing noise.
- * July.30.41:
- * - Issue #646: Efficiency: Persistent Log Spam: Overlay & Permission Checks.
+ * - Issue #648: Performance: Persistent "Kumiho" Log Spam & UI Jank.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -52,7 +51,7 @@ interface SystemStatusProvider {
     suspend fun isBackgroundLocationGranted(): Boolean
     suspend fun isBackgroundLocationState(): Boolean
     suspend fun isActivityRecognitionGranted(): Boolean
-    fun isLocalOnline(): Boolean
+    suspend fun isLocalOnline(): Boolean
     fun isA15Hardware(): Boolean
     
     suspend fun getPermissionState(forceRefresh: Boolean = false): PermissionState
@@ -87,6 +86,7 @@ class SystemStatusProviderImpl @Inject constructor(
     private var lastFullRefreshTime: Long = 0
     private val cachedState = AtomicReference<PermissionState>(PermissionState())
     private val refreshMutex = Mutex()
+    private val internetMutex = Mutex()
     
     private val isXiaomi by lazy { isXiaomiDevice() }
     private val isSamsung by lazy { isSamsungDevice() }
@@ -99,7 +99,7 @@ class SystemStatusProviderImpl @Inject constructor(
     
     private var lastInternetCheckRt = 0L
     private var cachedInternetStatus = false
-    // Issue #648: Increased to 5s to silence Samsung Kumiho auditing.
+    // Issue #648/650: Strictly enforced 5s throttle for Samsung Kumiho auditing.
     private val INTERNET_CACHE_TTL_MS = 5000L
 
     private var lastHardwareCheckRt = 0L
@@ -117,14 +117,16 @@ class SystemStatusProviderImpl @Inject constructor(
     override suspend fun isActivityRecognitionGranted(): Boolean = getPermissionState().isActivityRecognitionGranted
     override fun isA15Hardware(): Boolean = isA15
 
-    override fun isLocalOnline(): Boolean {
+    override suspend fun isLocalOnline(): Boolean = internetMutex.withLock {
         val now = SystemClock.elapsedRealtime()
         if (now - lastInternetCheckRt < INTERNET_CACHE_TTL_MS && lastInternetCheckRt != 0L) {
             return cachedInternetStatus
         }
 
         val caps = try {
-            connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+            withContext(Dispatchers.IO) {
+                connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+            }
         } catch (e: Exception) { null }
         
         val status = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
@@ -148,14 +150,16 @@ class SystemStatusProviderImpl @Inject constructor(
                         val useCache = currentNow - lastHardwareCheckRt <= HARDWARE_IPC_THROTTLE_MS && lastHardwareCheckRt != 0L
                         
                         val batteryWhitelisted = if (useCache) cachedBatteryWhitelisted else {
-                            val status = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
-                            cachedBatteryWhitelisted = status
-                            status
+                            withContext(Dispatchers.IO) {
+                                val status = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
+                                cachedBatteryWhitelisted = status
+                                status
+                            }
                         }
 
-                        val overlayGranted = if (useCache) current.isOverlayGranted else Settings.canDrawOverlays(context)
+                        val overlayGranted = if (useCache) current.isOverlayGranted else withContext(Dispatchers.Main) { Settings.canDrawOverlays(context) }
                         val micGranted = if (useCache) current.isMicrophoneGranted else ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                        val alarmGranted = if (useCache) current.isExactAlarmGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true)
+                        val alarmGranted = if (useCache) current.isExactAlarmGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) withContext(Dispatchers.IO) { alarmManager.canScheduleExactAlarms() } else true)
                         val notifyGranted = if (useCache) current.isPostNotificationsGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true)
                         val bgLocGranted = if (useCache) current.isBackgroundLocationGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true)
                         val actRecogGranted = if (useCache) current.isActivityRecognitionGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true)
@@ -214,7 +218,9 @@ class SystemStatusProviderImpl @Inject constructor(
         val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
         try {
             connectivityManager.registerNetworkCallback(request, callback)
-            trySend(isLocalOnline())
+            launch {
+                trySend(isLocalOnline())
+            }
         } catch (e: Exception) {
             Timber.e(e, "Connectivity callback registration failed")
             trySend(false)

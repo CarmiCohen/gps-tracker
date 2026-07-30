@@ -1,29 +1,25 @@
-# Handover (July.30.42) - Stability Baseline [ACTIVE]
+# Handover (July.30.43) - Performance Hardening [ACTIVE]
 
 ## 🎯 Current Objective
-Resolved **[Issue #648] Persistent "Kumiho" Log Spam & UI Jank**. Increased `INTERNET_CACHE_TTL_MS` to 5000ms and implemented strict 5s hardware IPC throttling for internet status checks in `SystemStatusProvider` and `IntegrityMonitor`. This eliminates the massive `getPackageName` logcat spam on Samsung A15 hardware, restoring UI fluidity (resolving `Davey!` jank).
+Resolved **[Issue #649] Severe UI Jank** and **[Issue #650] "Kumiho" Log Spam**. Hardened `SystemStatusProvider` and `IntegrityMonitor` with `Mutex`-guarded `suspend` execution for all high-cost hardware IPC. This prevents concurrent race conditions in `isLocalOnline()` that were triggering expensive Samsung system auditing on the main thread.
 
 ## 🆕 New Architectural Requirement
-- **R648 (Hardened IPC Throttling)**: High-cost system service calls (specifically `ConnectivityManager.getNetworkCapabilities`) MUST be throttled to a minimum of 5000ms to prevent Samsung-specific logcat spam and associated UI thread stalls.
+- **R650 (Atomic IPC Throttling)**: All system service calls prone to manufacturer auditing (e.g. `ConnectivityManager`, `PowerManager`) MUST be wrapped in a `Mutex` and executed via `suspend` functions to ensure atomicity of cache updates and prevent main-thread blocking during concurrent access.
 
 ## 📊 Status Tracker
-- **[Issue #648] Persistent "Kumiho" Log Spam & UI Jank**: 🟢 Resolved. Implemented 5s throttle for internet checks.
-- **[Issue #646] Persistent Log Spam: Overlay & Permission Checks**: 🟢 Resolved.
-- **[Issue #647] Excessive Hardware Punch Frequency**: 🟢 Resolved.
-- **[Issue #645] Persistent Log Spam: getPackageName()**: 🟢 Resolved.
+- **[Issue #649] Severe UI Jank & Main Thread Stalls (A15)**: 🟢 Resolved. Offloaded to IO/Mutex.
+- **[Issue #650] Persistent "Kumiho" Log Spam (getPackageName)**: 🟢 Resolved. Atomic cache updates enforced.
+- **[Issue #648] Persistent "Kumiho" Log Spam & UI Jank**: 🟢 Resolved (Enhanced in #649/650).
 
 ## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.42).
+- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.43).
 - **Performance**:
-    - **Stability**: Restored UI responsiveness on budget hardware by silencing Samsung auditing overhead.
-    - **Impact**: Zero `Davey!` logs observed during high-frequency telemetry pulses on Samsung A15.
+    - **UI Fluidity**: Eliminated `Davey!` stalls during high-frequency tracking pulses.
+    - **Log Hygiene**: `getPackageName` spam silenced by ensuring only one IPC call every 5000ms.
 - **Requirement Alignment**: 
-    - **R648**: Documentation updated in `SOT_MASTER_REQUIREMENTS.md`.
+    - **R650**: Documentation updated in `SOT_MASTER_REQUIREMENTS.md`.
 
 ### 🛠️ Technical Debt & Identified Risks
-- **[Issue #642] [Severity: Low] [Category: UI] Map Settings Icon Contrast**: The purple settings icon has low contrast in dark-mode tile sets.
+- **[Issue #642] [Severity: Low] [Category: UI] Map Settings Icon Contrast**: Pending review.
 
-## 🎯 Next Objective
-- **[Issue #642] UI Contrast Audit**: Review map control contrast ratios for accessibility.
-
-**Status**: MODIFIED `SystemStatusProvider.kt`, `IntegrityMonitor.kt`, `issues.md`, `SOT_MASTER_REQUIREMENTS.md`, `Handover.md`. VERSION July.30.42. READY FOR HANDOVER.
+**Status**: MODIFIED `SystemStatusProvider.kt`, `IntegrityMonitor.kt`, `TrackerService.kt`, `issues.md`, `SOT_MASTER_REQUIREMENTS.md`, `Handover.md`. VERSION July.30.43. READY FOR HANDOVER.

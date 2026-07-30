@@ -26,12 +26,11 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * July.30.43:
+ * - Issue #649 & #650: Hardened checkInternetIntegrity with suspend execution to 
+ *   align with SystemStatusProvider Mutex throttling. Prevents main thread stalls.
  * July.30.42:
- * - Issue #648: Performance: Persistent "Kumiho" Log Spam & UI Jank. Added 
- *   lastInternetCheckRt throttle (5s) to checkInternetIntegrity() to prevent 
- *   redundant calls and align with SystemStatusProvider IPC throttling.
- * July.30.23:
- * - Issue #624: Forensic: System Integrity Periodic Check.
+ * - Issue #648: Performance: Persistent "Kumiho" Log Spam & UI Jank.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -372,11 +371,11 @@ class IntegrityMonitor @Inject constructor(
         }
     }
 
-    fun isInternetHardwarePresent(): Boolean {
+    suspend fun isInternetHardwarePresent(): Boolean {
         return systemStatusProvider.isLocalOnline()
     }
 
-    fun checkInternetIntegrity(now: Long): Boolean {
+    suspend fun checkInternetIntegrity(now: Long): Boolean {
         val nowRt = timeProvider.elapsedRealtime()
         if (nowRt - lastInternetCheckRt < INTERNET_CHECK_TTL_MS && lastInternetCheckRt != 0L) {
             return !currentHealth.localInternetLoss
