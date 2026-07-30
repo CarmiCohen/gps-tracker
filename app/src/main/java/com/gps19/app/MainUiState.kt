@@ -6,16 +6,13 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * July.30.45:
+ * - Issue #654: Performance Hardening. Added isFineLocationGranted to PermissionState 
+ *   to support centralized, throttled permission auditing.
  * July.30.31:
  * - Issue #638: Corrected permission defaults. isBackgroundLocationGranted, 
  *   isActivityRecognitionGranted, and isPostNotificationsGranted now default 
  *   to false to ensure valid setup verification.
- * July.30.29:
- * - Issue #631: Forensic UI: Service Blackout Trends. Added recovery stats to DiagnosticState.
- * July.30.26:
- * - Issue #626: Foreground Service Start Hardening. Added isRecoveryPending.
- * July.28.24:
- * - Issue #620: State Partitioning Audit.
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -48,7 +45,8 @@ data class MainUiState(
     val isRecoveryPending: Boolean = false
 ) {
     val isSystemReady: Boolean
-        get() = permissions.isBatteryWhitelisted && 
+        get() = permissions.isFineLocationGranted &&
+                permissions.isBatteryWhitelisted && 
                 permissions.isAutoStartGranted &&
                 permissions.isExactAlarmGranted && 
                 permissions.isOverlayGranted &&
@@ -65,6 +63,7 @@ data class MainUiState(
     val systemIssuesCount: Int
         get() {
             var count = 0
+            if (!permissions.isFineLocationGranted) count++
             if (!permissions.isBatteryWhitelisted) count++
             if (!permissions.isAutoStartGranted) count++
             if (!permissions.isExactAlarmGranted) count++
@@ -135,6 +134,7 @@ data class DraftSettings(
 )
 
 data class PermissionState(
+    val isFineLocationGranted: Boolean = false,
     val isBatteryWhitelisted: Boolean = false, 
     val isAutoStartGranted: Boolean = false,
     val isOverlayGranted: Boolean = false,

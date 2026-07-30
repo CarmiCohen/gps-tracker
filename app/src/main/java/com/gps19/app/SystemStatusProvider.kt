@@ -35,12 +35,11 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.30.45:
+ * - Issue #654: Performance Hardening. Centralized ACCESS_FINE_LOCATION and 
+ *   NetworkInterface checks into throttled IPC audit to eliminate main-thread stalls.
  * July.30.44:
- * - Issue #651 & #652: Performance Hardening. Offloaded Settings.canDrawOverlays to 
- *   Dispatchers.IO to prevent main-thread stalls (ANRs). Unified hardware IPC 
- *   throttling (5s) for ALL permission checks to eliminate "Kumiho" log spam.
- * July.30.43:
- * - Issue #649 & #650: Hardened isLocalOnline() with Mutex and suspend execution.
+ * - Issue #651 & #652: Performance Hardening.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -52,7 +51,9 @@ interface SystemStatusProvider {
     suspend fun isBackgroundLocationGranted(): Boolean
     suspend fun isBackgroundLocationState(): Boolean
     suspend fun isActivityRecognitionGranted(): Boolean
+    suspend fun isFineLocationGranted(): Boolean
     suspend fun isLocalOnline(): Boolean
+    suspend fun getNetworkInterface(): String
     fun isA15Hardware(): Boolean
     
     suspend fun getPermissionState(forceRefresh: Boolean = false): PermissionState
@@ -100,6 +101,7 @@ class SystemStatusProviderImpl @Inject constructor(
     
     private var lastInternetCheckRt = 0L
     private var cachedInternetStatus = false
+    private var cachedNetworkInterface = "UNKNOWN"
     private val INTERNET_CACHE_TTL_MS = 5000L
 
     private var lastHardwareCheckRt = 0L
@@ -114,6 +116,7 @@ class SystemStatusProviderImpl @Inject constructor(
     override suspend fun isBackgroundLocationGranted(): Boolean = getPermissionState().isBackgroundLocationGranted
     override suspend fun isBackgroundLocationState(): Boolean = isBackgroundLocationGranted()
     override suspend fun isActivityRecognitionGranted(): Boolean = getPermissionState().isActivityRecognitionGranted
+    override suspend fun isFineLocationGranted(): Boolean = getPermissionState().isFineLocationGranted
     override fun isA15Hardware(): Boolean = isA15
 
     override suspend fun isLocalOnline(): Boolean = internetMutex.withLock {
@@ -129,9 +132,23 @@ class SystemStatusProviderImpl @Inject constructor(
         } catch (e: Exception) { null }
         
         val status = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        val netInterface = when {
+            caps == null -> "OFFLINE"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WIFI"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "MOBILE"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ETHERNET"
+            else -> "OTHER"
+        }
+        
         cachedInternetStatus = status
+        cachedNetworkInterface = netInterface
         lastInternetCheckRt = now
         return status
+    }
+
+    override suspend fun getNetworkInterface(): String {
+        isLocalOnline() // Refresh if needed
+        return cachedNetworkInterface
     }
 
     override suspend fun getPermissionState(forceRefresh: Boolean): PermissionState {
@@ -144,14 +161,13 @@ class SystemStatusProviderImpl @Inject constructor(
                 if (currentNow - lastFullRefreshTime > PERMISSION_TTL_MS || forceRefresh) {
                     try {
                         val current = cachedState.get()
-                        
-                        // Issue #648/652: Strict 5s hardware IPC throttle for all checks on Samsung devices.
                         val useCache = currentNow - lastHardwareCheckRt <= HARDWARE_IPC_THROTTLE_MS && lastHardwareCheckRt != 0L
                         
                         val newState = if (useCache) {
                             current
                         } else {
                             withContext(Dispatchers.IO) {
+                                val fineLocGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                                 val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
                                 val overlayGranted = Settings.canDrawOverlays(context)
                                 val micGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -166,6 +182,7 @@ class SystemStatusProviderImpl @Inject constructor(
                                 lastHardwareCheckRt = currentNow
                                 
                                 PermissionState(
+                                    isFineLocationGranted = fineLocGranted,
                                     isBatteryWhitelisted = batteryWhitelisted,
                                     isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, cachedPackageName) else batteryWhitelisted,
                                     isOverlayGranted = overlayGranted,

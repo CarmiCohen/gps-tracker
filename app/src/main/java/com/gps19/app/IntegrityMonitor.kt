@@ -26,11 +26,11 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * July.30.45:
+ * - Issue #654: Performance Hardening. Refactored network audits to use 
+ *   SystemStatusProvider (throttled IPC) to prevent main-thread stalls (R650).
  * July.30.43:
- * - Issue #649 & #650: Hardened checkInternetIntegrity with suspend execution to 
- *   align with SystemStatusProvider Mutex throttling. Prevents main thread stalls.
- * July.30.42:
- * - Issue #648: Performance: Persistent "Kumiho" Log Spam & UI Jank.
+ * - Issue #649 & #650: Hardened checkInternetIntegrity.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -41,8 +41,6 @@ class IntegrityMonitor @Inject constructor(
     private val gpsManager: GpsManager,
     @ApplicationScope private val scope: CoroutineScope
 ) {
-    private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-
     private var lastFullPollTs = 0L
     private val POLL_TTL_MS = 10_000L
 
@@ -70,13 +68,9 @@ class IntegrityMonitor @Inject constructor(
     private val _health = MutableStateFlow(SystemHealthState())
     val healthFlow: StateFlow<SystemHealthState> = _health.asStateFlow()
 
-    /**
-     * The single source of truth for health data - thread safe access via StateFlow.
-     */
     val currentHealth: SystemHealthState get() = _health.value
 
     init {
-        // Observe reactive OS status
         scope.launch {
             systemStatusProvider.observeInternetStatus()
                 .onEach { online -> 
@@ -127,7 +121,6 @@ class IntegrityMonitor @Inject constructor(
 
     private fun startHeartbeat() {
         scope.launch {
-            // Initial grace period to allow flows to stabilize
             delay(BOOTSTRAP_PHASE_MS)
             while (isActive) {
                 performIntegrityHeartbeat()
@@ -138,9 +131,6 @@ class IntegrityMonitor @Inject constructor(
 
     private fun performIntegrityHeartbeat() {
         val nowRt = timeProvider.elapsedRealtime()
-        
-        // Audit flow vitality: Storage and Power are polled at 60s, Location at 2s.
-        // We warn if a flow has been silent for 3x its expected interval.
         val storageStalled = lastStorageUpdateRt > 0 && (nowRt - lastStorageUpdateRt) > INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
         val powerStalled = lastPowerUpdateRt > 0 && (nowRt - lastPowerUpdateRt) > INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
         val locationStalled = lastLocationStatusUpdateRt > 0 && (nowRt - lastLocationStatusUpdateRt) > 30000L
@@ -170,12 +160,9 @@ class IntegrityMonitor @Inject constructor(
 
     private fun handleLocationStatusUpdate(status: GpsManager.LocationStatus) {
         val workingHealth = currentHealth
-        
-        // Transition: OK -> Pending
         if (status.isPending && !workingHealth.isLocationPending) {
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Location fix pending: ${status.reason.name.replace("_", " ")}", false))
         } 
-        // Transition: Pending -> OK (Recovery)
         else if (!status.isPending && workingHealth.isLocationPending && status.recoveryConfirmed) {
             val durationSec = status.lastPendingDurationMs / 1000.0
             val reasonStr = workingHealth.locationPendingReason.name.replace("_", " ")
@@ -309,14 +296,15 @@ class IntegrityMonitor @Inject constructor(
         ) }
     }
 
-    fun pollSystemStatus(nowWall: Long, nowRt: Long) {
+    suspend fun pollSystemStatus(nowWall: Long, nowRt: Long) {
         val delta = nowRt - lastFullPollTs
         if (delta < POLL_TTL_MS && lastFullPollTs != 0L) return
         lastFullPollTs = nowRt
 
         val workingHealth = currentHealth
         
-        val newNet = getActiveNetworkInterface()
+        // Issue #654: Use SystemStatusProvider's throttled audit.
+        val newNet = systemStatusProvider.getNetworkInterface()
         if (newNet != workingHealth.netInterface) {
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Network switched to $newNet", false))
         }
@@ -358,17 +346,6 @@ class IntegrityMonitor @Inject constructor(
 
     fun setMaxTemperature(temp: Double) {
         updateHealth { it.copy(maxTemp = temp) }
-    }
-
-    fun getActiveNetworkInterface(): String {
-        val activeNetwork = connectivityManager.activeNetwork ?: return "OFFLINE"
-        val caps = try { connectivityManager.getNetworkCapabilities(activeNetwork) } catch(e: Exception) { null } ?: return "NONE"
-        return when {
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WIFI"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "MOBILE"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ETHERNET"
-            else -> "OTHER"
-        }
     }
 
     suspend fun isInternetHardwarePresent(): Boolean {

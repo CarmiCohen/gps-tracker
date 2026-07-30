@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -42,18 +43,19 @@ sealed class AppSensorEvent {
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * July.29.01:
- * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
- *   reporting and migrated to measureAndAudit API.
- * July.28.22:
- * - Issue #617: Global SharedFlow Audit. Hardened _sensorEvents.
+ * July.30.45:
+ * - Issue #654: Performance Hardening. Refactored activity recognition check 
+ *   to use SystemStatusProvider (centralized throttled state) to eliminate 
+ *   unthrottled IPC calls (R650 compliance). Fixed asCoroutineDispatcher 
+ *   receiver type mismatch.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
     @ApplicationContext private val context: Context,
     @ApplicationScope private val scope: CoroutineScope,
     private val timeProvider: TimeProvider,
-    private val systemMonitor: SystemMonitor
+    private val systemMonitor: SystemMonitor,
+    private val systemStatusProvider: SystemStatusProvider
 ) : SensorEventListener {
 
     private val _sensorEvents = MutableSharedFlow<AppSensorEvent>(
@@ -259,13 +261,19 @@ class AppSensorManager @Inject constructor(
 
     private fun attemptStepDetectorRegistration() {
         val detector = stepDetector ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
-            isStepDetectorRegistered = false
-            return
+        
+        // Issue #654: Use SystemStatusProvider's throttled audit to prevent IPC bursts.
+        scope.launch(Dispatchers.IO) {
+            val isGranted = systemStatusProvider.isActivityRecognitionGranted()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isGranted) {
+                isStepDetectorRegistered = false
+                return@launch
+            }
+            withContext(sensorHandler?.asCoroutineDispatcher("AppSensorThread") ?: Dispatchers.Main) {
+                sensorManager.unregisterListener(this@AppSensorManager, detector)
+                isStepDetectorRegistered = sensorManager.registerListener(this@AppSensorManager, detector, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler)
+            }
         }
-        sensorManager.unregisterListener(this, detector)
-        isStepDetectorRegistered = sensorManager.registerListener(this, detector, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) 
     }
 
     private fun attemptStepRegistration() = attemptStepDetectorRegistration()

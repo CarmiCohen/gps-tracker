@@ -19,11 +19,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.30.45:
+ * - Issue #654: Performance Hardening. Refactored all remaining direct IPC 
+ *   calls (microphone check, network audits) to use throttled SystemStatusProvider 
+ *   state (R650 compliance).
  * July.30.43:
- * - Issue #649 & #650: Performance Hardening. Updated processTick to await 
- *   hardened suspend checkInternetIntegrity().
- * July.30.41:
- * - Issue #647: Performance: Excessive Hardware Punch Frequency.
+ * - Issue #649 & #650: Hardened processTick.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -55,7 +56,6 @@ class TrackerService : BaseMonitorService() {
     private var lastPowerSaveCheckRt = 0L
 
     private var lastA15PokeRt = 0L
-    // Issue #647: Increased to 60s to reduce Logcat noise and system overhead on Samsung A15.
     private val A15_POKE_INTERVAL_MS = 60_000L
 
     private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
@@ -294,7 +294,8 @@ class TrackerService : BaseMonitorService() {
             autostartStatus = perms.autostartStatus,
             requiresWakeLockRenewal = perms.requiresWakeLockRenewal,
             isManualOverrideActive = perms.isManualOverride,
-            isA15Device = perms.isA15Device
+            isA15Device = perms.isA15Device,
+            isMicrophoneGranted = perms.isMicrophoneGranted
         )
     }
 
@@ -384,7 +385,8 @@ class TrackerService : BaseMonitorService() {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val isMicEnabled = appSensorManager.isAcousticMonitoringEnabled()
-            val hasPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            // Issue #654: Use cached throttled permission to avoid IPC burst in ticker.
+            val hasPermission = capabilities.isMicrophoneGranted
             if (hasPermission && (isMicEnabled || isRecentUiPulse())) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE 
             }
@@ -396,7 +398,6 @@ class TrackerService : BaseMonitorService() {
 
     override suspend fun processTick(now: Long, nowRt: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRt)
-        // Issue #649 & #650: Awaiting hardened suspend check to prevent main thread stalls.
         integrityMonitor.checkInternetIntegrity(nowRt)
         
         val health = integrityMonitor.currentHealth

@@ -44,9 +44,10 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * July.28.24:
- * - Issue #620: State Partitioning Audit. Migrated from TelemetryState to 
- *   partitioned KinematicState and DiagnosticState to reduce UI re-computation churn.
+ * July.30.45:
+ * - Issue #654: Performance Hardening. Refactored all permission checks to use 
+ *   uiState.permissions (centralized throttled state) to eliminate unthrottled 
+ *   main-thread IPC bursts (R650 compliance).
  */
 @Composable
 fun MainAppContent(
@@ -116,8 +117,7 @@ fun MainAppContent(
         val allGranted = permissions.entries.all { it.value }
         if (allGranted) {
             uiState.navigation.pendingMode?.let { mode ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
-                    ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !uiState.permissions.isBackgroundLocationGranted) {
                     showBackgroundDisclosure = true
                 } else {
                     proceedToMode(mode)
@@ -150,11 +150,11 @@ fun MainAppContent(
     }
 
     fun hasRequiredPermissions(mode: String): Boolean {
-        val fineLocation = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val audio = if (mode == "tracker") ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED else true
-        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true
+        val fineLocation = uiState.permissions.isFineLocationGranted
+        val audio = if (mode == "tracker") uiState.permissions.isMicrophoneGranted else true
+        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) uiState.permissions.isPostNotificationsGranted else true
         val activityRec = if (mode == "tracker" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ContextCompat.checkSelfPermission(activity, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+            uiState.permissions.isActivityRecognitionGranted
         } else true
         return fineLocation && audio && notification && activityRec
     }
@@ -283,7 +283,7 @@ fun MainAppContent(
                         BackHandler { onCleanupAndExit() }
                         LandingScreen { mode -> 
                             if (hasRequiredPermissions(mode)) { 
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !uiState.permissions.isBackgroundLocationGranted) {
                                     viewModel.onEvent(UiEvent.SetPendingMode(mode))
                                     showBackgroundDisclosure = true
                                 } else {

@@ -4,18 +4,11 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * July.30.45:
+ * - Issue #654: Performance Hardening. Added isMicrophoneGranted to HardwareCapabilities 
+ *   to support centralized throttled auditing of hardware-bound permissions (R650).
  * July.30.31:
- * - Issue #632: Analytical Ribbons: Recovery Markers. Added isRecoveryEvent to 
- *   EngineConnectionPoint for forensic blackout visibility.
- * July.27.08:
- * - Issue #604: Ribbon Density & Aliasing Audit. Added sitShock to EngineSensorSnapshot 
- *   for forensic parity during backfills.
- * July.27.07:
- * - Issue #602: SIT Timestamp Parity Logic. Added sitVzTs and sitVzRt to 
- *   EngineConnectionPoint and EngineSensorSnapshot for R118 parity.
- * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy field 
- *   to forensic and telemetry models for motion analysis.
+ * - Issue #632: Analytical Ribbons: Recovery Markers.
  */
 
 @Serializable
@@ -52,7 +45,8 @@ data class HardwareCapabilities(
     val requiresWakeLockRenewal: Boolean = false,
     val requiresExtraTopPadding: Boolean = false,
     val isManualOverrideActive: Boolean = false,
-    val isA15Device: Boolean = false
+    val isA15Device: Boolean = false,
+    val isMicrophoneGranted: Boolean = false
 )
 
 enum class LocationPendingReason {
