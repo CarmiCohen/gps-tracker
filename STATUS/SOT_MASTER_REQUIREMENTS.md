@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.30.40 (Stability Baseline)
+# System Source of Truth (SoT) - July.30.41 (Stability Baseline)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -87,5 +87,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.30.40.
+*   **Current Release**: July.30.41.
 *   **Source of Truth**: app/build.gradle versionName.
