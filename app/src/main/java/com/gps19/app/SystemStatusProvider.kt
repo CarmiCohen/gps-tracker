@@ -35,11 +35,12 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.30.44:
+ * - Issue #651 & #652: Performance Hardening. Offloaded Settings.canDrawOverlays to 
+ *   Dispatchers.IO to prevent main-thread stalls (ANRs). Unified hardware IPC 
+ *   throttling (5s) for ALL permission checks to eliminate "Kumiho" log spam.
  * July.30.43:
- * - Issue #649 & #650: Hardened isLocalOnline() with Mutex and suspend execution. 
- *   Prevents concurrent IPC races that trigger Samsung "Kumiho" log spam and UI jank.
- * July.30.42:
- * - Issue #648: Performance: Persistent "Kumiho" Log Spam & UI Jank.
+ * - Issue #649 & #650: Hardened isLocalOnline() with Mutex and suspend execution.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -99,11 +100,9 @@ class SystemStatusProviderImpl @Inject constructor(
     
     private var lastInternetCheckRt = 0L
     private var cachedInternetStatus = false
-    // Issue #648/650: Strictly enforced 5s throttle for Samsung Kumiho auditing.
     private val INTERNET_CACHE_TTL_MS = 5000L
 
     private var lastHardwareCheckRt = 0L
-    private var cachedBatteryWhitelisted = false
     private val HARDWARE_IPC_THROTTLE_MS = 5000L
 
     override suspend fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
@@ -146,48 +145,48 @@ class SystemStatusProviderImpl @Inject constructor(
                     try {
                         val current = cachedState.get()
                         
-                        // Issue #648: Strict 5s hardware IPC throttle for all Samsung devices.
+                        // Issue #648/652: Strict 5s hardware IPC throttle for all checks on Samsung devices.
                         val useCache = currentNow - lastHardwareCheckRt <= HARDWARE_IPC_THROTTLE_MS && lastHardwareCheckRt != 0L
                         
-                        val batteryWhitelisted = if (useCache) cachedBatteryWhitelisted else {
+                        val newState = if (useCache) {
+                            current
+                        } else {
                             withContext(Dispatchers.IO) {
-                                val status = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
-                                cachedBatteryWhitelisted = status
-                                status
+                                val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
+                                val overlayGranted = Settings.canDrawOverlays(context)
+                                val micGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                                val alarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true
+                                val notifyGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true
+                                val bgLocGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true
+                                val actRecogGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true
+
+                                val xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
+                                val xiaomiAutostart = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
+
+                                lastHardwareCheckRt = currentNow
+                                
+                                PermissionState(
+                                    isBatteryWhitelisted = batteryWhitelisted,
+                                    isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, cachedPackageName) else batteryWhitelisted,
+                                    isOverlayGranted = overlayGranted,
+                                    isMicrophoneGranted = micGranted,
+                                    isExactAlarmGranted = alarmGranted,
+                                    isPostNotificationsGranted = notifyGranted,
+                                    isBackgroundLocationGranted = bgLocGranted,
+                                    isActivityRecognitionGranted = actRecogGranted,
+                                    
+                                    hasBackgroundRestriction = isXiaomi,
+                                    backgroundStatus = toCapabilityStatus(xiaomiStatus),
+                                    autostartStatus = toCapabilityStatus(xiaomiAutostart),
+                                    isManualOverride = current.isManualOverride,
+                                    requiresWakeLockRenewal = isSamsung,
+                                    requiresExtraTopPadding = isXiaomi,
+                                    requiresAdaptationMuzzle = isS21FE,
+                                    isA15Device = isA15
+                                )
                             }
                         }
 
-                        val overlayGranted = if (useCache) current.isOverlayGranted else withContext(Dispatchers.Main) { Settings.canDrawOverlays(context) }
-                        val micGranted = if (useCache) current.isMicrophoneGranted else ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                        val alarmGranted = if (useCache) current.isExactAlarmGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) withContext(Dispatchers.IO) { alarmManager.canScheduleExactAlarms() } else true)
-                        val notifyGranted = if (useCache) current.isPostNotificationsGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true)
-                        val bgLocGranted = if (useCache) current.isBackgroundLocationGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true)
-                        val actRecogGranted = if (useCache) current.isActivityRecognitionGranted else (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true)
-
-                        if (!useCache) lastHardwareCheckRt = currentNow
-
-                        val xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
-                        val xiaomiAutostart = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
-
-                        val newState = PermissionState(
-                            isBatteryWhitelisted = batteryWhitelisted,
-                            isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, cachedPackageName) else batteryWhitelisted,
-                            isOverlayGranted = overlayGranted,
-                            isMicrophoneGranted = micGranted,
-                            isExactAlarmGranted = alarmGranted,
-                            isPostNotificationsGranted = notifyGranted,
-                            isBackgroundLocationGranted = bgLocGranted,
-                            isActivityRecognitionGranted = actRecogGranted,
-                            
-                            hasBackgroundRestriction = isXiaomi,
-                            backgroundStatus = toCapabilityStatus(xiaomiStatus),
-                            autostartStatus = toCapabilityStatus(xiaomiAutostart),
-                            isManualOverride = current.isManualOverride,
-                            requiresWakeLockRenewal = isSamsung,
-                            requiresExtraTopPadding = isXiaomi,
-                            requiresAdaptationMuzzle = isS21FE,
-                            isA15Device = isA15
-                        )
                         cachedState.set(newState)
                         lastFullRefreshTime = currentNow
                     } catch (e: Exception) {
