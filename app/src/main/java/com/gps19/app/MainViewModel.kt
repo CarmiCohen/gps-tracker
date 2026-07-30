@@ -23,11 +23,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.30.27:
+ * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs handling 
+ *   and "Service Blackout Duration" logging in TriggerRecovery.
  * July.30.26:
  * - Issue #626: Foreground Service Start Hardening. Added isRecoveryPending observation 
  *   and TriggerRecovery event handler.
- * July.28.24:
- * - Issue #621: UseCase Internalization Audit.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -414,9 +415,19 @@ class MainViewModel @Inject constructor(
                         val serviceClass = if (appMode == "tracker") TrackerService::class.java else ViewerService::class.java
                         val intent = Intent(context, serviceClass)
                         try {
+                            val blockedTs = repository.getLong(RECOVERY_BLOCKED_TS_KEY, 0L)
                             ContextCompat.startForegroundService(context, intent)
+                            
+                            val now = timeProvider.currentTimeMillis()
                             repository.saveBoolean(IS_RECOVERY_PENDING_KEY, false)
-                            addPersistentLog("system", "SYSTEM: Deferred recovery successful ($appMode)", isImportant = true)
+                            repository.saveLong(RECOVERY_BLOCKED_TS_KEY, 0L)
+
+                            if (blockedTs > 0) {
+                                val latency = now - blockedTs
+                                addPersistentLog("system", "Forensic Performance Audit: Deferred service recovery blackout (${latency}ms)", isImportant = true)
+                            } else {
+                                addPersistentLog("system", "SYSTEM: Deferred recovery successful ($appMode)", isImportant = true)
+                            }
                         } catch (e: Exception) {
                             Timber.e(e, "Issue #626: Deferred recovery failed")
                             addPersistentLog("error", "RECOVERY ERROR: ${e.localizedMessage}", isImportant = true)

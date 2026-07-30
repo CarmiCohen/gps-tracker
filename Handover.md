@@ -1,33 +1,34 @@
-# Handover (July.30.26) - Foreground Service Start Hardening [STABILIZED]
+# Handover (July.30.27) - Deferred Recovery Latency Audit [STABILIZED]
 
 ## 🎯 Current Objective
-Refactored service restoration logic to comply with Android 12+ background start restrictions (Issue #626).
+Implemented forensic latency auditing for the deferred service recovery mechanism to monitor performance on restricted hardware (Issue #629).
 
 ## 📊 Status Tracker
+- **[Issue #629] Deferred Recovery Latency Audit**: 🟢 Resolved.
+- **[Issue #626] Foreground Service Start Restriction**: 🟢 Resolved.
 - **[Issue #627] Startup ANR & Main Thread Blocking**: 🟢 Resolved.
 - **[Issue #625] Mbrain JNI Reliability Audit**: 🟢 Resolved.
 - **[Issue #628] 16KB Page Size Support**: 🟢 Resolved.
-- **[Issue #626] Foreground Service Start Restriction**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
-- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.26).
-- **Hardening**: Implemented a deferred recovery mechanism. If a background start is restricted by the OS, the app flags an `isRecoveryPending` state. Restoration is then reactively triggered in `MainActivity.onResume` once the app enters a permitted foreground state.
+- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.27).
+- **Latency Audit**: The system now captures `recovery_blocked_ts` when background starts are restricted. Upon foreground restoration, it logs a "Forensic Performance Audit: Deferred service recovery blackout ([duration]ms)" entry.
 - **Architecture**: 
-    - Added `is_recovery_pending` to DataStore (Protobuf).
-    - Hardened `WatchdogReceiver` and `MaintenanceWorker` with `ForegroundServiceStartNotAllowedException` handling.
-    - Integrated `TriggerRecovery` event in `MainViewModel` and `MainActivity`.
+    - Added `recovery_blocked_ts` to DataStore (Protobuf).
+    - Hardened `WatchdogReceiver` and `MaintenanceWorker` with timestamp recording.
+    - Integrated latency calculation in `MainViewModel.TriggerRecovery`.
 - **Requirement Alignment**: 
-    - **R626**: Deferred service restoration for Android 12+ compatibility.
+    - **R629**: Automated latency auditing for deferred recovery.
 
 ### 🛠️ Forensic Progress Log
-1.  **Schema Update**: Added `is_recovery_pending` to track blocked background starts.
-2.  **Receiver/Worker Hardening**: Implemented try-catch blocks to detect OS-level background start restrictions and flag for deferred recovery.
-3.  **UI Resumption**: Integrated automated recovery logic in `MainActivity.onResume` to ensure tracking continuity without fatal crashes.
+1.  **Schema Update**: Added `recovery_blocked_ts` to track exact restriction timing.
+2.  **Background Recording**: Updated `WatchdogReceiver` and `MaintenanceWorker` to persist the blockage timestamp.
+3.  **Forensic Auditing**: Integrated real-time blackout duration calculation and logging in `MainViewModel`.
 
 ## ⚠️ Newly Identified Risks & Concerns
 *   None.
 
 ## 🎯 Next Objective
-- **[Issue #TBD] Monitoring**: Observe field performance of the deferred recovery mechanism on Samsung A15 devices.
+- **[Issue #TBD] Analytics**: Aggregate forensic recovery logs to determine the average "Service Blackout Duration" across the A15 device fleet.
 
-**Status**: FOREGROUND SERVICE START HARDENED & STABILIZED. RELEASE July.30.26 READY.
+**Status**: DEFERRED RECOVERY AUDITED & STABILIZED. RELEASE July.30.27 READY.

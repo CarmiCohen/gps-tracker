@@ -86,6 +86,9 @@ message AppSettings {
 
     // Issue #626: Foreground Service Start Hardening
     optional bool is_recovery_pending = 69;
+
+    // Issue #629: Deferred Recovery Latency Audit
+    optional int64 recovery_blocked_ts = 70;
 }
 
 enum TrackerStateProto {

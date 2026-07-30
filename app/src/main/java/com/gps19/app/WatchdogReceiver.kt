@@ -13,11 +13,11 @@ import javax.inject.Inject
 
 /**
  * WatchdogReceiver: Responds to watchdog alarms to ensure the service stays active.
+ * July.30.27:
+ * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs recording.
  * July.30.26:
  * - Issue #626: Foreground Service Start Hardening. Added handling for 
  *   ForegroundServiceStartNotAllowedException with deferred recovery flagging.
- * July.21.00:
- * - Monotonic Rt Alignment: Synchronized with hardened engine timing.
  */
 @AndroidEntryPoint
 class WatchdogReceiver : BroadcastReceiver() {
@@ -34,13 +34,14 @@ class WatchdogReceiver : BroadcastReceiver() {
         if (action == ACTION_ALARM_WAKEUP) {
             val pendingResult = goAsync()
             val nowRt = timeProvider.elapsedRealtime()
+            val nowTs = timeProvider.currentTimeMillis()
             
             scope.launch {
                 try {
                     val appMode = repository.getAppMode() ?: "tracker"
 
                     repository.addLog(LogEntry(
-                        timestamp = timeProvider.currentTimeMillis(),
+                        timestamp = nowTs,
                         message = "SYSTEM RECOVERY: Watchdog triggered service restart ($appMode) at Rt=$nowRt.",
                         type = "system",
                         isImportant = true,
@@ -65,6 +66,8 @@ class WatchdogReceiver : BroadcastReceiver() {
                             e.toString().contains("ForegroundServiceStartNotAllowedException")) {
                             Timber.w("Watchdog: Foreground start restricted. Flagging recovery pending.")
                             repository.saveBoolean(IS_RECOVERY_PENDING_KEY, true)
+                            // Issue #629: Forensic Latency Audit
+                            repository.saveLong(RECOVERY_BLOCKED_TS_KEY, nowTs)
                         } else {
                             throw e
                         }

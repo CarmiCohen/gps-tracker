@@ -15,11 +15,11 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * July.30.27:
+ * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs recording.
  * July.30.26:
  * - Issue #626: Foreground Service Start Hardening. Added handling for 
  *   ForegroundServiceStartNotAllowedException with deferred recovery flagging.
- * July.28.17:
- * - Structural: Standardized network health check via SystemStatusProvider.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -129,6 +129,8 @@ class MaintenanceWorker @AssistedInject constructor(
                         e.toString().contains("ForegroundServiceStartNotAllowedException")) {
                         Log.w("GPS19", "MAINTENANCE: Foreground start restricted. Flagging recovery pending.")
                         repository.saveBoolean(IS_RECOVERY_PENDING_KEY, true)
+                        // Issue #629: Forensic Latency Audit
+                        repository.saveLong(RECOVERY_BLOCKED_TS_KEY, now)
                         return Result.success()
                     }
 

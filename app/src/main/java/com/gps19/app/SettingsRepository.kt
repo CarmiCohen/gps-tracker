@@ -46,6 +46,8 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * July.30.27:
+ * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs support.
  * July.30.26:
  * - Issue #626: Foreground Service Start Hardening. Added IS_RECOVERY_PENDING_KEY support.
  * July.27.00:
@@ -105,6 +107,7 @@ class SettingsRepository @Inject constructor(
     val isSystemActiveFlow: Flow<Boolean> = dataStore.data.map { it.isSystemActive }
     val lastAlarmsJsonFlow: Flow<String> = dataStore.data.map { it.lastAlarmsJson }
     val isRecoveryPendingFlow: Flow<Boolean> = dataStore.data.map { it.isRecoveryPending }
+    val recoveryBlockedTsFlow: Flow<Long> = dataStore.data.map { it.recoveryBlockedTs }
 
     suspend fun getSettingsSnapshot(): AppSettings = dataStore.data.first()
 
@@ -149,6 +152,7 @@ class SettingsRepository @Inject constructor(
                 CLOCK_DRIFT_REF_KEY -> builder.setClockDriftRef(value)
                 LAST_SIT_TS_KEY -> builder.setLastSitTs(value)
                 LAST_HISTORY_SIT_TS_KEY -> builder.setLastHistorySitTs(value)
+                RECOVERY_BLOCKED_TS_KEY -> builder.setRecoveryBlockedTs(value)
             }
             builder.build()
         }
@@ -234,6 +238,7 @@ class SettingsRepository @Inject constructor(
             CLOCK_DRIFT_REF_KEY -> if (settings.hasClockDriftRef()) settings.clockDriftRef else 0L
             LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else 0L
             LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else 0L
+            RECOVERY_BLOCKED_TS_KEY -> settings.recoveryBlockedTs
             else -> 0L
         }
         return if (value == 0L) default else value

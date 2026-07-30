@@ -61,3 +61,6 @@ const val LAST_ALARMS_JSON_KEY = "last_alarms_json"
 
 // Issue #626: Foreground Service Start Hardening
 const val IS_RECOVERY_PENDING_KEY = "is_recovery_pending"
+
+// Issue #629: Deferred Recovery Latency Audit
+const val RECOVERY_BLOCKED_TS_KEY = "recovery_blocked_ts"
