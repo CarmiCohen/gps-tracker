@@ -6,6 +6,10 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * July.30.31:
+ * - Issue #638: Corrected permission defaults. isBackgroundLocationGranted, 
+ *   isActivityRecognitionGranted, and isPostNotificationsGranted now default 
+ *   to false to ensure valid setup verification.
  * July.30.29:
  * - Issue #631: Forensic UI: Service Blackout Trends. Added recovery stats to DiagnosticState.
  * July.30.26:
@@ -136,9 +140,9 @@ data class PermissionState(
     val isOverlayGranted: Boolean = false,
     val isMicrophoneGranted: Boolean = false,
     val isExactAlarmGranted: Boolean = false,
-    val isPostNotificationsGranted: Boolean = true,
-    val isBackgroundLocationGranted: Boolean = true,
-    val isActivityRecognitionGranted: Boolean = true,
+    val isPostNotificationsGranted: Boolean = false,
+    val isBackgroundLocationGranted: Boolean = false,
+    val isActivityRecognitionGranted: Boolean = false,
     val hasBackgroundRestriction: Boolean = false,
     val backgroundStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
     val autostartStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,

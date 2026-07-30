@@ -5,25 +5,32 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 2 |
+| **Open Technical Issues** | Active | 3 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 471 |
+| **Resolved (Total)** | 🟢 Progress | 472 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
+*   **[Issue #637] [Severity: Low] [Category: Efficiency] Log Spam: getPackageName()**. Repetitive system calls to `getPackageName()` are saturating the logs, potentially impacting performance on Samsung A15.
 *   **[Issue #635] [Severity: Med] [Category: UI/UX] Phone Setup: Permission Status Stalling**. "Exact Alarms" and "Battery Mode" detection is unreliable or doesn't update reactively on Samsung A15 even after manual refresh.
 *   **[Issue #636] [Severity: Low] [Category: Technical Debt] Permission Cache Latency**. 15s TTL in `SystemStatusProvider` causes "Refresh" button in Setup to appear unresponsive if clicked immediately after returning from system settings.
 
 ---
 
 ## 🔴 Open Issues
+*   **[Issue #637] Log Spam: getPackageName()**.
 *   **[Issue #635] Phone Setup: Permission Status Stalling**.
 *   **[Issue #636] Permission Cache Latency**.
 
 ---
 
 ## 🟢 Recently Resolved Issues (July.30.31)
+*   **[Issue #638] [Severity: High] [Category: UI/Logic] Incorrect Permission Defaults**.
+    - **Resolution**: Corrected `PermissionState` data class in `MainUiState.kt` to default `isBackgroundLocationGranted`, `isActivityRecognitionGranted`, and `isPostNotificationsGranted` to `false`.
+    - **Impact**: Ensures the Phone Setup UI accurately reflects the system state upon initialization, preventing false-positive "Completed" indicators during onboarding.
+    - **Validation**: Verified in UI; warnings now appear correctly before permissions are verified.
+
 *   **[Issue #634] [Severity: High] [Category: Stability] ForegroundServiceStartNotAllowedException Crash**.
     - **Resolution**: Implemented Foreground Service Start Hardening in `MainActivity`. Wrapped `startForegroundService` in a try-catch block for `ForegroundServiceStartNotAllowedException`. Introduced `SetRecoveryPending` to `UiEvent` to allow the ViewModel to persist the restricted state. The app now defers service restoration until `onResume` when a valid foreground window exists.
     - **Impact**: Eliminates startup crashes on Samsung A15 devices during automatic session restoration when background start restrictions are enforced by the OS.
@@ -35,4 +42,4 @@ This document tracks active issues, technical debt, and pending implementation t
     - **Database**: Incremented schema version to 63 with migration for `connection_history`.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.31-G)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.31-H)*
