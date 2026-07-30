@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * July.30.31:
+ * - Issue #632: Analytical Ribbons: Recovery Markers. Added isRecoveryEvent to 
+ *   ConnectionPoint for forensic blackout visibility in UI.
  * July.30.26:
  * - Issue #626: Foreground Service Start Hardening. Added TriggerRecovery to UiEvent.
  * July.27.06:
@@ -77,6 +80,7 @@ data class ConnectionPoint(
     val localId: String = UUID.randomUUID().toString(),
     val ts: Long, val rt: Long, val rtt: Int, val localSig: Int, val remoteSig: Int,
     val isConnected: Boolean, val isGap: Boolean = false, 
+    val isRecoveryEvent: Boolean = false,
     val gpsAccuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0,
     val isTick: Boolean = false, val hasGps: Boolean = false,

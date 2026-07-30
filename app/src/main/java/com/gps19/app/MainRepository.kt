@@ -17,12 +17,11 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * July.30.31:
+ * - Issue #632: Analytical Ribbons: Recovery Markers. Mapped isRecoveryEvent 
+ *   between ConnectionPoint and HistoryEntity.
  * July.30.29:
  * - Issue #631: Forensic UI: Service Blackout Trends. Exposed recovery stats flows.
- * July.30.28:
- * - Issue #630: Forensic Recovery Log Aggregation. Added incrementRecoveryStats and getSettingsSnapshot.
- * July.30.26:
- * - Issue #626: Foreground Service Start Hardening. Added isRecoveryPendingFlow.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -299,7 +298,8 @@ class MainRepository @Inject constructor(
         l.map { entity ->
             ConnectionPoint(
                 localId = UUID.randomUUID().toString(), ts = entity.ts, rt = entity.rt, rtt = entity.rtt, localSig = 10, remoteSig = entity.remoteSig,
-                isConnected = entity.isConnected, isGap = entity.isGap, gpsAccuracy = entity.accuracy, maxAccuracy = entity.maxAccuracy, isTick = entity.isTick, 
+                isConnected = entity.isConnected, isGap = entity.isGap, isRecoveryEvent = entity.isRecoveryEvent,
+                gpsAccuracy = entity.accuracy, maxAccuracy = entity.maxAccuracy, isTick = entity.isTick, 
                 hasGps = entity.hasGps,
                 isBatterySteepDischarge = entity.isBatterySteepDischarge,
                 isCoolingModeActive = entity.isCoolingModeActive,
@@ -349,6 +349,7 @@ class MainRepository @Inject constructor(
         points.forEach { point ->
             historyBuffer.add(HistoryEntity(
                 ts = point.ts, rt = point.rt, rtt = point.rtt, isConnected = point.isConnected, isGap = point.isGap, 
+                isRecoveryEvent = point.isRecoveryEvent,
                 hasGps = point.hasGps, isTick = point.isTick, ribbonKey = ribbonKey,
                 isBatterySteepDischarge = point.isBatterySteepDischarge,
                 remoteSig = point.remoteSig,

@@ -1,32 +1,34 @@
-# Handover (July.30.30) - Forensic UI Verification & Binding Fix [STABILIZED]
+# Handover (July.30.31) - Forensic Ribbon Recovery Markers [STABILIZED]
 
 ## 🎯 Current Objective
-Performed verification review of Issue #631. Identified and fixed a missing reactive binding in `MainViewModel` for recovery statistics.
+Implemented Issue #632: Integrated service recovery blackout markers into the high-frequency Analytical Ribbons for improved forensic auditability.
 
 ## 📊 Status Tracker
+- **[Issue #632] Analytical Ribbons: Recovery Markers**: 🟢 Resolved.
 - **[Issue #631] Forensic UI: Service Blackout Trends**: 🟢 Resolved & Verified.
 - **[Issue #630] Forensic Recovery Log Aggregation**: 🟢 Resolved.
 - **[Issue #629] Deferred Recovery Latency Audit**: 🟢 Resolved.
-- **[Issue #626] Foreground Service Start Restriction**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
-- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.30).
-- **Bug Fix (Issue #631)**: 
-    - Resolved a defect where `cumulativeRecoveryBlackoutMs` and `recoveryCount` were observed in `MainViewModel` but not assigned to the `DiagnosticState`. 
-    - Binding is now confirmed functional: `SettingsRepository` -> `StateSubscriptionUseCase` -> `MainViewModel` -> `DiagnosticsScreen`.
-- **UI Implementation**: Verified the "Forensic Recovery Audit" section correctly displays events and average blackout duration with the >30s warning logic.
+- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.31).
+- **Forensic Pipeline Update (Issue #632)**:
+    - **Engine Layer**: Added `isRecoveryEvent` to `EngineConnectionPoint` and updated `TelemetryAggregator` to preserve these markers during aggregation.
+    - **Persistence Layer**: Incremented database version to 63. Added `isRecoveryEvent` column to `HistoryEntity` with Room migration.
+    - **Service Layer**: Both `TrackerService` and `ViewerService` now detect heuristic recovery pulses and tag the history stream.
+    - **UI Layer**: `ConnectionQualityRibbon` now renders white vertical markers at recovery points, allowing visual correlation with telemetry gaps.
 - **Requirement Alignment**: 
-    - **R631**: Forensic recovery trend visualization Authority. Confirmed.
+    - **R632**: Forensic recovery marker visualization. Confirmed.
 
 ### 🛠️ Forensic Progress Log
-1.  **Verification Audit**: Full-stack review of recovery stats propagation.
-2.  **Reactive Remediation**: Fixed pipeline break in `MainViewModel.startHeavyObservations`.
-3.  **Documentation Sync**: Updated `issues.md`, `Handover.md`, and `SOT_MASTER_REQUIREMENTS.md`.
+1.  **Model Extension**: Added recovery flags to core engine and app data structures.
+2.  **Persistence Migration**: Implemented DB schema evolution for forensic history.
+3.  **Heuristic Integration**: Bound recovery detection to the telemetry reporting loop.
+4.  **UI Implementation**: Specialized rendering logic for recovery events in sparklines.
 
 ## ⚠️ Newly Identified Risks & Concerns
 *   None.
 
 ## 🎯 Next Objective
-- **[Issue #632] Analytical Ribbons**: Integrate recovery blackout markers into the high-frequency Analytical Ribbons.
+- **[Issue #633] Diagnostic Export expansion**: Include recovery statistics and ribbon samples in the forensic diagnostic export.
 
 **Status**: COMPLETED. READY FOR NEW CHAT.

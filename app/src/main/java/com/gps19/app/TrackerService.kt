@@ -19,11 +19,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.30.31:
+ * - Issue #632: Analytical Ribbons: Recovery Markers. Integrated isRecoveryEvent 
+ *   into history updates to flag forensic service restoration.
  * July.30.25:
- * - Issue #627: Performance: Startup ANR Optimization. Offloaded native library 
- *   loading and initMbrain to Dispatchers.IO.
- * July.28.24:
- * - Issue #621: Fixed regressions from isImportant naming alignment and kinematicState partitioning.
+ * - Issue #627: Performance: Startup ANR Optimization.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -408,10 +408,12 @@ class TrackerService : BaseMonitorService() {
             if (MbrainHardwareManager.isAvailable()) MbrainHardwareManager.punchHardware(timeProvider) else systemMonitor.acquireWakeLock(force = true)
         }
 
+        var recoveryFlagged = false
         if (lastServiceTickRealtime > 0) {
             val tickGap = nowRt - lastServiceTickRealtime
             if (tickGap > HARDWARE_SUPPRESSION_THRESHOLD_MS && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
                 lastHardwareRecoveryTs = nowRt
+                recoveryFlagged = true
                 val proc = lastProcessedLocation
                 logManager.logServiceEvent("HEURISTIC RECOVERY: Heartbeat gap detected (${tickGap}ms). Reviving connection.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                 systemMonitor.acquireWakeLock()
@@ -490,7 +492,7 @@ class TrackerService : BaseMonitorService() {
         }
 
         historyManager.updateRibbons(
-            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = if (isViewerActive && location != null) 10 else 0, peerAvail = isSocketConnected && isViewerActive, hasGps = location != null, isTrackerMode = true, accuracy = lastProcessedLocation?.currentAccuracy ?: 0.0, maxAccuracy = lastProcessedLocation?.maxAccuracy ?: 0.0, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = location?.bearing?.toDouble() ?: 0.0, isSitDetected = sitDetected, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy
+            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = if (isViewerActive && location != null) 10 else 0, peerAvail = isSocketConnected && isViewerActive, hasGps = location != null, isTrackerMode = true, accuracy = lastProcessedLocation?.currentAccuracy ?: 0.0, maxAccuracy = lastProcessedLocation?.maxAccuracy ?: 0.0, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = location?.bearing?.toDouble() ?: 0.0, isSitDetected = sitDetected, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = recoveryFlagged
         )
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt

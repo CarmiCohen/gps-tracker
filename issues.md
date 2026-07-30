@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (July.30.30)
+# Project Issues & Hardening Tracking (July.30.31)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 1 |
+| **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 469 |
+| **Resolved (Total)** | 🟢 Progress | 470 |
 
 ---
 
@@ -17,8 +17,15 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🔴 Open Issues
+*   None.
+
+---
+
+## 🟢 Recently Resolved Issues (July.30.31)
 *   **[Issue #632] [Severity: Med] [Category: UI/Forensic] Analytical Ribbons: Recovery Markers**.
-    - **Description**: Integrate service blackout markers into the high-frequency Analytical Ribbons. This will allow users to visually correlate service recovery events with gaps in telemetry data.
+    - **Resolution**: Integrated service recovery blackout markers into the high-frequency Analytical Ribbons. Added `isRecoveryEvent` flag to `EngineConnectionPoint` and `HistoryEntity`. Enhanced `TrackerService` to detect heuristic recovery pulses and tag the telemetry stream. Implemented visual markers (white vertical lines) in `ConnectionQualityRibbon` to identify forensic service restoration points.
+    - **Impact**: Provides users with visual confirmation of when the system recovered from a service gap, improving the auditability of the black-box tracking mechanism.
+    - **Database**: Incremented schema version to 63 with migration for `connection_history`.
 
 ---
 

@@ -8,12 +8,12 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * July.30.31:
+ * - Issue #632: Analytical Ribbons: Recovery Markers. Added isRecoveryEvent 
+ *   to HistoryEntity and incremented version to 63.
  * July.27.07:
  * - Issue #605: Forensic Log Latency Audit. Optimized indices for pruning (isImportant, isSpecial) 
  *   and sync (synced, timestamp). Incremented version to 62.
- * July.27.05:
- * - Issue #600: Forensic Playback Latency Audit. Updated LogDao to support 
- *   dynamic limits for historical lookups.
  */
 @Entity(
     tableName = "logs", 
@@ -71,6 +71,7 @@ data class HistoryEntity(
     val rtt: Int,
     val isConnected: Boolean,
     val isGap: Boolean,
+    @ColumnInfo(defaultValue = "0") val isRecoveryEvent: Boolean = false,
     val hasGps: Boolean,
     val isTick: Boolean,
     val ribbonKey: String,
@@ -222,7 +223,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 62, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 63, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -231,6 +232,13 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_62_63 = object : Migration(62, 63) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #632: Add isRecoveryEvent to connection_history.
+                db.execSQL("ALTER TABLE connection_history ADD COLUMN isRecoveryEvent INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         val MIGRATION_61_62 = object : Migration(61, 62) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #605: Optimize log maintenance and sync queries.

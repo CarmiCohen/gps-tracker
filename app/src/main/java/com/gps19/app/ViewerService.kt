@@ -16,10 +16,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.30.31:
+ * - Issue #632: Analytical Ribbons: Recovery Markers. Integrated isRecoveryEvent 
+ *   into history updates to flag forensic service restoration.
  * July.28.24:
  * - Issue #621: Fixed regressions from isImportant naming alignment and kinematicState partitioning.
- * - Issue #618: Forensic UI State Collection Audit. Migrated Main dispatchers 
- *   to Dispatchers.Main.immediate for notification consistency (R618).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -42,6 +43,7 @@ class ViewerService : BaseMonitorService() {
     private var stabilityAuditViolationCount = 0
     private var lastStabilityAuditTs = 0L
     
+    private var lastHardwareRecoveryTs = 0L
     private var capabilities = HardwareCapabilities()
 
     override fun onServicePreInit() {
@@ -263,6 +265,7 @@ class ViewerService : BaseMonitorService() {
         serviceStartRealtime = timeProvider.elapsedRealtime(); serviceStartWall = timeProvider.currentTimeMillis()
         alarmManager.resetEvaluation(); sessionManager.reset(); integrityMonitor.resetStats(); forensicUseCase.resetLatches(); stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
         gpsManager.resetGnssJitter()
+        lastHardwareRecoveryTs = 0L
         logManager.logServiceEvent("Session Terminated", isImportant = false, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
     }
 
@@ -314,6 +317,19 @@ class ViewerService : BaseMonitorService() {
         // Issue #609: Redundant manual propagation removed. IntegrityMonitor now handles repository sync.
 
         if (timeProvider.elapsedRealtime() > 0) systemMonitor.renewWakeLock()
+
+        var recoveryFlagged = false
+        if (lastServiceTickRealtime > 0) {
+            val tickGap = nowRt - lastServiceTickRealtime
+            if (tickGap > HARDWARE_SUPPRESSION_THRESHOLD_MS && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
+                lastHardwareRecoveryTs = nowRt
+                recoveryFlagged = true
+                val proc = lastProcessedLocation
+                logManager.logServiceEvent("HEURISTIC RECOVERY (V): Heartbeat gap detected (${tickGap}ms). Reviving connection.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                systemMonitor.acquireWakeLock()
+                connectivitySuite.connect(configManager.relayUrl)
+            }
+        }
 
         if (nowRt - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
             val maxJitter = gpsManager.maxGnssJitterMs
@@ -368,7 +384,7 @@ class ViewerService : BaseMonitorService() {
         )
 
         historyManager.updateRibbons(
-            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = 10, peerAvail = isSocketConnected && isTrackerActive, hasGps = (proc?.timestamp ?: 0L) > 0, isTrackerMode = false, accuracy = proc?.currentAccuracy ?: locationProcessor.getLastProcessedAccuracy(), maxAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), noiseIdx = (proc?.maxAccuracy ?: 0.0).coerceIn(0.0, 1.0), luxIdx = 0.0, vibeIdx = 0.0, proxIdx = 1.0, liftIdx = 0.0, snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0), tiltIdx = 0.0, baroIdx = 0.0, verticalVelocity = 0.0, sitVz = 0.0, sitVzTs = 0L, sitVzRt = 0L, sitDz = 0.0, sitBaro = 0.0, sitTilt = 0.0, sitShock = 0.0, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = proc?.filteredSpeed ?: 0.0, bearing = lastGpsBearing, isSitDetected = false, isSitActive = false, currentMa = health.currentMa, locationPendingReason = LocationPendingReason.NONE, kineticEnergy = 0.0
+            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = 10, peerAvail = isSocketConnected && isTrackerActive, hasGps = (proc?.timestamp ?: 0L) > 0, isTrackerMode = false, accuracy = proc?.currentAccuracy ?: locationProcessor.getLastProcessedAccuracy(), maxAccuracy = proc?.maxAccuracy ?: locationProcessor.getMaxTrackerAccuracy(), noiseIdx = (proc?.maxAccuracy ?: 0.0).coerceIn(0.0, 1.0), luxIdx = 0.0, vibeIdx = 0.0, proxIdx = 1.0, liftIdx = 0.0, snrIdx = (gpsManager.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0), tiltIdx = 0.0, baroIdx = 0.0, verticalVelocity = 0.0, sitVz = 0.0, sitVzTs = 0L, sitVzRt = 0L, sitDz = 0.0, sitBaro = 0.0, sitTilt = 0.0, sitShock = 0.0, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = proc?.filteredSpeed ?: 0.0, bearing = lastGpsBearing, isSitDetected = false, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = 0.0, isRecoveryEvent = recoveryFlagged
         )
 
         evaluateAlarmsInternal(now, nowRt, isSignalLoss, isTrackerJammerSuspicion, isTrackerStalled, isTrackerGap, isTrackerActive)

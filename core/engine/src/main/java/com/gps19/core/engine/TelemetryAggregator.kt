@@ -4,6 +4,9 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * July.30.31:
+ * - Issue #632: Analytical Ribbons: Recovery Markers. Integrated isRecoveryEvent 
+ *   into aggregation to ensure forensic visibility of service restoration.
  * July.27.08:
  * - Issue #604: Ribbon Density & Aliasing Audit. Updated merge() to use peak-retention 
  *   (max) for kineticEnergy and sitShock to preserve forensic visibility at 7D scale.
@@ -40,6 +43,7 @@ class TelemetryAggregator {
         var remoteSig: Int = 0
         var isConnected: Boolean = true
         var hasGps: Boolean = false
+        var isRecoveryEvent: Boolean = false
         var accuracy: Double = 0.0
         var maxAccuracy: Double = 0.0
         var isBatterySteepDischarge: Boolean = false
@@ -70,6 +74,7 @@ class TelemetryAggregator {
             remoteSig = point.remoteSig
             isConnected = point.isConnected
             hasGps = point.hasGps
+            isRecoveryEvent = point.isRecoveryEvent
             accuracy = point.accuracy
             maxAccuracy = point.maxAccuracy
             isBatterySteepDischarge = point.isBatterySteepDischarge
@@ -101,6 +106,7 @@ class TelemetryAggregator {
             remoteSig = min(remoteSig, cur.remoteSig)
             isConnected = isConnected && cur.isConnected
             hasGps = hasGps && cur.hasGps
+            isRecoveryEvent = isRecoveryEvent || cur.isRecoveryEvent
             accuracy = max(accuracy, cur.accuracy)
             maxAccuracy = max(maxAccuracy, cur.maxAccuracy)
             isBatterySteepDischarge = isBatterySteepDischarge || cur.isBatterySteepDischarge
@@ -139,6 +145,7 @@ class TelemetryAggregator {
                 this.remoteSig = this@MutableAggregationPoint.remoteSig
                 this.isConnected = this@MutableAggregationPoint.isConnected
                 this.hasGps = this@MutableAggregationPoint.hasGps
+                this.isRecoveryEvent = this@MutableAggregationPoint.isRecoveryEvent
                 this.accuracy = this@MutableAggregationPoint.accuracy
                 this.maxAccuracy = this@MutableAggregationPoint.maxAccuracy
                 this.isBatterySteepDischarge = this@MutableAggregationPoint.isBatterySteepDischarge
@@ -255,6 +262,7 @@ class TelemetryAggregator {
                 ts = fillTs
                 rt = fillRt
                 isGap = false
+                isRecoveryEvent = false // Gaps are not recovery events by definition
                 snrIdx = resolvedSnr
                 noiseIdx = resolvedNoise
                 luxIdx = resolvedLux
@@ -343,6 +351,7 @@ class TelemetryAggregator {
                 remoteSig = 0,
                 isConnected = false,
                 isGap = true,
+                isRecoveryEvent = false,
                 snrIdx = resolvedSnr,
                 noiseIdx = resolvedNoise,
                 luxIdx = resolvedLux,

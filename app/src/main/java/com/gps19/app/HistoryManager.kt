@@ -27,11 +27,11 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * July.30.31:
+ * - Issue #632: Analytical Ribbons: Recovery Markers. Integrated isRecoveryEvent 
+ *   into updateRibbons and forensic backfills.
  * July.29.01:
- * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
- *   reporting and migrated to measureAndAudit API.
- * July.28.22:
- * - Issue #617: Global SharedFlow Audit. Hardened _historyEvents.
+ * - Issue #623: Structural: Latency Monitor Metric Cleanup.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -90,7 +90,8 @@ class HistoryManager @Inject constructor(
         speed: Double = 0.0, bearing: Double = 0.0, isSitDetected: Boolean = false,
         isSitActive: Boolean = false, currentMa: Int = 0,
         locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-        kineticEnergy: Double = 0.0
+        kineticEnergy: Double = 0.0,
+        isRecoveryEvent: Boolean = false
     ) {
         detectClockTampering(now)
         val deltaRt = if (lastTickRt > 0) nowRt - lastTickRt else 0L
@@ -111,12 +112,13 @@ class HistoryManager @Inject constructor(
                 accuracy, maxAccuracy, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, tiltIdx, baroIdx,
                 verticalVelocity, sitVz, sitVzTs, sitVzRt, sitDz, sitBaro, sitTilt, sitShock,
                 isBatterySteepDischarge, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive,
-                currentMa, locationPendingReason, kineticEnergy
+                currentMa, locationPendingReason, kineticEnergy, isRecoveryEvent
             )
         }
 
         val currentPoint = EngineConnectionPoint(
             ts = now, rt = nowRt, rtt = rtt, remoteSig = peerSignal, isConnected = peerAvail, isGap = false,
+            isRecoveryEvent = isRecoveryEvent,
             hasGps = hasGps, accuracy = accuracy, maxAccuracy = maxAccuracy, gpsIndex = 0.0,
             noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, proxIdx = proxIdx,
             liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx, baroIdx = baroIdx,
@@ -164,7 +166,8 @@ class HistoryManager @Inject constructor(
         sitTilt: Double, sitShock: Double, isBatterySteepDischarge: Boolean,
         isCoolingModeActive: Boolean, speed: Double, bearing: Double,
         isSitDetected: Boolean, isSitActive: Boolean, currentMa: Int,
-        locationPendingReason: LocationPendingReason, kineticEnergy: Double
+        locationPendingReason: LocationPendingReason, kineticEnergy: Double,
+        isRecoveryEvent: Boolean
     ) {
         LatencyMonitor.measureAndAudit(
             timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
@@ -177,6 +180,7 @@ class HistoryManager @Inject constructor(
             
             val baseTemplate = EngineConnectionPoint(
                 ts = 0L, rt = 0L, rtt = rtt, remoteSig = peerSignal, isConnected = peerAvail, hasGps = hasGps,
+                isRecoveryEvent = isRecoveryEvent,
                 accuracy = accuracy, maxAccuracy = maxAccuracy, noiseIdx = noiseIdx, luxIdx = luxIdx,
                 vibeIdx = vibeIdx, proxIdx = proxIdx, liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx,
                 baroIdx = baroIdx, verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs,
@@ -252,7 +256,7 @@ class HistoryManager @Inject constructor(
 
     private fun mapToAppPoint(p: EngineConnectionPoint) = ConnectionPoint(
         ts = p.ts, rt = p.rt, rtt = p.rtt, localSig = 10, remoteSig = p.remoteSig, isConnected = p.isConnected,
-        isGap = p.isGap, hasGps = p.hasGps, isTick = p.isTick, gpsAccuracy = p.accuracy, maxAccuracy = p.maxAccuracy,
+        isGap = p.isGap, isRecoveryEvent = p.isRecoveryEvent, hasGps = p.hasGps, isTick = p.isTick, gpsAccuracy = p.accuracy, maxAccuracy = p.maxAccuracy,
         isBatterySteepDischarge = p.isBatterySteepDischarge, isCoolingModeActive = p.isCoolingModeActive,
         speed = p.speed, bearing = p.bearing, currentMa = p.currentMa, locationPendingReason = p.locationPendingReason,
         gpsIndex = p.gpsIndex, noiseIdx = p.noiseIdx, luxIdx = p.luxIdx, vibeIdx = p.vibeIdx, proxIdx = p.proxIdx,

@@ -44,9 +44,11 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * July.30.31:
+ * - Issue #632: Analytical Ribbons: Recovery Markers. Integrated isRecoveryEvent 
+ *   visualization into ConnectionQualityRibbon as forensic markers.
  * July.28.24:
- * - Issue #620: State Partitioning Audit. Migrated GlobalStatusBar to partitioned 
- *   KinematicState and DiagnosticState to reduce UI trigger churn.
+ * - Issue #620: State Partitioning Audit.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -400,7 +402,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
         history = history,
         scale = scale,
         isStrictMode = isStrictMode
-    ) { totalPoints, pointWidth, connectionBaseY, _, landscape ->
+    ) { totalPoints, pointWidth, connectionBaseY, maxHeight, landscape ->
         if (history.isEmpty()) return@ForensicRibbonContainer
 
         val ribbonMaxHeight = if (landscape) 16.dp.toPx() else 10.dp.toPx()
@@ -441,6 +443,15 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
                     }
                 }
                 
+                // Issue #632: Forensic Recovery Marker
+                if (p.isRecoveryEvent) {
+                    drawRect(
+                        color = Color.White.copy(alpha = 0.8f),
+                        topLeft = Offset(xPos - (rectW * 0.5f), effectiveBaseY - maxHeight),
+                        size = Size(maxOf(2f, rectW), maxHeight + 4.dp.toPx())
+                    )
+                }
+
                 if (p.hasGps && p.gpsIndex > 0.0) {
                     val dotRadius = (if (landscape) 1.2.dp.toPx() else 0.8.dp.toPx())
                     val baseHeight = if (landscape) 24.dp.toPx() else 14.dp.toPx()

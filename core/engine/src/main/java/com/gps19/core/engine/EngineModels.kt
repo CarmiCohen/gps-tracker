@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * July.30.31:
+ * - Issue #632: Analytical Ribbons: Recovery Markers. Added isRecoveryEvent to 
+ *   EngineConnectionPoint for forensic blackout visibility.
  * July.27.08:
  * - Issue #604: Ribbon Density & Aliasing Audit. Added sitShock to EngineSensorSnapshot 
  *   for forensic parity during backfills.
@@ -72,6 +75,7 @@ class EngineConnectionPoint(
     var remoteSig: Int = 0,
     var isConnected: Boolean = false,
     var isGap: Boolean = false,
+    var isRecoveryEvent: Boolean = false,
     var hasGps: Boolean = false,
     var accuracy: Double = 0.0,
     var maxAccuracy: Double = 0.0,
@@ -112,6 +116,7 @@ class EngineConnectionPoint(
         this.remoteSig = other.remoteSig
         this.isConnected = other.isConnected
         this.isGap = other.isGap
+        this.isRecoveryEvent = other.isRecoveryEvent
         this.hasGps = other.hasGps
         this.accuracy = other.accuracy
         this.maxAccuracy = other.maxAccuracy
