@@ -35,12 +35,13 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.30.31:
+ * - Issue #637: Efficiency: Log Spam: getPackageName(). Implemented short-term caching 
+ *   for isLocalOnline() to prevent repetitive IPC calls that trigger Samsung Kumiho 
+ *   auditing logs in high-frequency monitoring loops.
  * July.28.17:
  * - Issue #612: Structural: Standby & Power-Save Reactivity. Added observePowerStatus() 
  *   to reactive observation of Power Save Mode and Standby Buckets.
- * July.28.16:
- * - Issue #611: Forensic: Disk Space Reactivity. Added observeStorageStatus() 
- *   to provide reactive flow for internal storage health.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -50,6 +51,7 @@ interface SystemStatusProvider {
     suspend fun isExactAlarmGranted(): Boolean
     suspend fun isPostNotificationsGranted(): Boolean
     suspend fun isBackgroundLocationGranted(): Boolean
+    suspend fun isBackgroundLocationState(): Boolean
     suspend fun isActivityRecognitionGranted(): Boolean
     fun isLocalOnline(): Boolean
     fun isA15Hardware(): Boolean
@@ -95,6 +97,11 @@ class SystemStatusProviderImpl @Inject constructor(
     private val PERMISSION_TTL_MS = 15_000L
     private val STORAGE_POLL_INTERVAL_MS = 60_000L
     private val POWER_POLL_INTERVAL_MS = 60_000L
+    
+    // Issue #637: Short-term cache to prevent Samsung Kumiho log spam (2s TTL)
+    private var lastInternetCheckRt = 0L
+    private var cachedInternetStatus = false
+    private val INTERNET_CACHE_TTL_MS = 2000L
 
     override suspend fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
     override suspend fun isAutoStartGranted(): Boolean = getPermissionState().isAutoStartGranted
@@ -103,14 +110,24 @@ class SystemStatusProviderImpl @Inject constructor(
     override suspend fun isExactAlarmGranted(): Boolean = getPermissionState().isExactAlarmGranted
     override suspend fun isPostNotificationsGranted(): Boolean = getPermissionState().isPostNotificationsGranted
     override suspend fun isBackgroundLocationGranted(): Boolean = getPermissionState().isBackgroundLocationGranted
+    override suspend fun isBackgroundLocationState(): Boolean = isBackgroundLocationGranted()
     override suspend fun isActivityRecognitionGranted(): Boolean = getPermissionState().isActivityRecognitionGranted
     override fun isA15Hardware(): Boolean = isA15
 
     override fun isLocalOnline(): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastInternetCheckRt < INTERNET_CACHE_TTL_MS && lastInternetCheckRt != 0L) {
+            return cachedInternetStatus
+        }
+
         val caps = try {
             connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
         } catch (e: Exception) { null }
-        return caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        
+        val status = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        cachedInternetStatus = status
+        lastInternetCheckRt = now
+        return status
     }
 
     override suspend fun getPermissionState(forceRefresh: Boolean): PermissionState {
