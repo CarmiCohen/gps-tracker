@@ -1,34 +1,36 @@
-# Handover (July.30.23) - System Integrity Periodic Check [COMPLETED]
+# Handover (July.30.23) - Deployment Stabilization & Monitoring [STABILIZED]
 
 ## 🎯 Current Objective
-Finalized **[Issue #624] Forensic: System Integrity Periodic Check**. Implemented a background heartbeat mechanism within `IntegrityMonitor` to audit the vitality of critical reactive flows (Internet, Battery, Storage, Power, Location Status), ensuring the monitoring engine itself remains active and reliable.
+Stabilized application startup on Samsung A15 (Android 14) and documented critical performance/compatibility issues identified during live monitoring and setup exercise.
 
 ## 📊 Status Tracker
-- **[Issue #624] System Integrity Periodic Check**: 🟢 Resolved.
-- **[Issue #623] Latency Monitor Metric Cleanup**: 🟢 Resolved.
-- **[Issue #622] Location Refresh Reactivity Hardening**: 🟢 Resolved.
+- **[Issue #626] Foreground Service Start Restriction**: 🟡 Partially Resolved (Stabilized via try-catch).
+- **[Issue #627] Startup ANR & Main Thread Blocking**: 🔴 Open.
+- **[Issue #628] 16KB Page Size Support**: 🔴 Open.
+- **[Issue #625] Mbrain JNI Reliability Audit**: 🔴 Open.
 
 ## 🔍 Comprehensive Forensic Status
-- **Build Status**: 🟢 **READY FOR RELEASE** (Clean build verified).
-- **Target Version**: **July.30.23**.
-- **Requirement Parity**: **R624** (System Integrity Periodic Heartbeat) is fully operational and documented in SoT.
+- **Build Status**: 🟡 **STABILIZED** (App launches and reaches Map, but structural issues remain).
+- **Target Device**: Samsung A15 (SM-A155F), Android 14 (API 34).
+- **Stabilization Verified**: Patched `MainActivity.kt` by wrapping `startForegroundService` in a try-catch block. This prevents the `ForegroundServiceStartNotAllowedException` from triggering a fatal ANR loop when automatic restoration (R405 flow) executes while the screen is off or the app is backgrounded.
 
 ### 🛠️ Forensic Progress Log
-1.  **Metric Expansion**: Added `lastIntegrityHeartbeatRt` to `SystemHealthState` and `INTEGRITY_HEARTBEAT_INTERVAL_MS` to `EngineConstants.kt`.
-2.  **Vitality Tracking**: Updated `IntegrityMonitor` to track the precise `elapsedRealtime` of the last update for Internet, Battery, Storage, Power, and Location reactive flows.
-3.  **Heartbeat Implementation**: Launched a background coroutine in `IntegrityMonitor` that audits flow vitality every 60 seconds.
-4.  **Stall Detection**: Implemented logic to detect "silent" flows. If a flow (e.g., Storage/Power) stops updating for more than 3x its expected interval, a high-importance forensic integrity warning is emitted.
-5.  **Location Vitality**: Specifically hardened location status monitoring with a 30s stall threshold, ensuring that hardware GPS/GNSS callback failures are detected even if no new location fixes arrive.
+1.  **Exception Trace (#626)**: Live Logcat captured `ForegroundServiceStartNotAllowedException: startForegroundService() not allowed due to mAllowStartForeground false`. This occurred during `onCreate` when the app attempted to restore a session from a background state.
+2.  **Startup Hardening**: Implemented a defensive wrapper in `MainActivity.kt`. This ensures that service start failures no longer crash the UI thread, allowing the application to reach an interactive state where the user can manually initiate tracking.
+3.  **ANR Identification (#627)**: Detected a **4.3s "Davey" stall** and 334+ frame skips during cold start. The main thread is heavily congested by native library loading (`libmbrainSDK`) and `TrackerService` initialization.
+4.  **Compatibility Audit (#628)**: Captured OS-level warnings regarding **16KB Page Size Support**. Specific libraries identified for alignment:
+    - `lib/arm64-v8a/libdatastore_shared_counter.so`
+    - `lib/arm64-v8a/libmbrainSDK.so`
+    - `lib/arm64-v8a/libandroidx.graphics.path.so`
+5.  **Environment Stability**: Cleared recurring ANR states and managed system browser interruptions that occurred during the "Report Problem" interaction.
 
-## 🚀 Release commands
-```bash
-git add .
-git commit -m "Release July.30.23: Forensic - System Integrity Periodic Check Finalized (#624)"
-git tag -a July.30.23 -m "Implemented background heartbeat and reactive flow vitality auditing in IntegrityMonitor."
-git push origin main --tags
-```
+## ⚠️ Critical Risks documented in issues.md
+- **Structural (#626)**: The session restoration logic needs to be refactored to comply with Android 14 foreground service start restrictions (e.g., using `WorkManager` or delaying service start until `onResume`).
+- **Performance (#627)**: Heavy initialization work in `TrackerService` must be offloaded from the Main Thread to background coroutines to eliminate startup ANRs.
+- **Compliance (#628)**: Native JNI dependencies require re-compilation with 16KB page alignment to support future-generation Android environments.
 
 ## 🎯 Next Objective
-- **[Issue #625] [Sprint: July.31.23] [Priority: Med] Structural: Mbrain JNI Reliability Audit - Harden native hardware bridge against signal interrupts.**
+- **[Issue #627] Performance: Startup ANR Optimization**. Offload native library loading and service initialization.
+- **[Issue #628] Compatibility: 16KB Page Size Realignment**. Audit and re-align JNI dependencies.
 
-**Status**: ISSUE #624 RESOLVED. READY FOR FRESH CHAT.
+**Status**: STARTUP STABILIZED. ISSUES DOCUMENTED. READY FOR FRESH CHAT.

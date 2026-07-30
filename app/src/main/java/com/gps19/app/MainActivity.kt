@@ -18,6 +18,9 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * July.30.23:
+ * - Issue #626: Foreground Service Hardening. Wrapped service start in try-catch to handle 
+ *   ForegroundServiceStartNotAllowedException on A15/Android 14+.
  * July.20.07:
  * - Release hardening and monitoring.
  * July.19.01:
@@ -44,9 +47,14 @@ class MainActivity : ComponentActivity() {
                 activity = this,
                 viewModel = viewModel,
                 onStartService = { mode ->
-                    val serviceClass = if (mode == "tracker") TrackerService::class.java else ViewerService::class.java
-                    val intent = Intent(this, serviceClass)
-                    ContextCompat.startForegroundService(this, intent)
+                    try {
+                        val serviceClass = if (mode == "tracker") TrackerService::class.java else ViewerService::class.java
+                        val intent = Intent(this, serviceClass)
+                        ContextCompat.startForegroundService(this, intent)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Issue #626: Foreground service start failed for mode $mode")
+                        // Exception is documented and handled via UI state monitoring
+                    }
                 },
                 onCleanupAndExit = {
                     stopService(Intent(this, TrackerService::class.java))
