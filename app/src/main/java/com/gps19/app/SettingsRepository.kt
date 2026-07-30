@@ -46,6 +46,8 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * July.30.28:
+ * - Issue #630: Forensic Recovery Log Aggregation. Added cumulative recovery stats support.
  * July.30.27:
  * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs support.
  * July.30.26:
@@ -153,6 +155,7 @@ class SettingsRepository @Inject constructor(
                 LAST_SIT_TS_KEY -> builder.setLastSitTs(value)
                 LAST_HISTORY_SIT_TS_KEY -> builder.setLastHistorySitTs(value)
                 RECOVERY_BLOCKED_TS_KEY -> builder.setRecoveryBlockedTs(value)
+                CUMULATIVE_RECOVERY_BLACKOUT_MS_KEY -> builder.setCumulativeRecoveryBlackoutMs(value)
             }
             builder.build()
         }
@@ -195,6 +198,7 @@ class SettingsRepository @Inject constructor(
             when (keyName) {
                 LAST_AUTO_SAVE_HOUR_KEY -> builder.setLastAutoSaveHour(value)
                 LAST_VERSION_CODE_KEY -> builder.setLastVersionCode(value)
+                RECOVERY_COUNT_KEY -> builder.setRecoveryCount(value)
             }
             builder.build()
         }
@@ -239,6 +243,7 @@ class SettingsRepository @Inject constructor(
             LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else 0L
             LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else 0L
             RECOVERY_BLOCKED_TS_KEY -> settings.recoveryBlockedTs
+            CUMULATIVE_RECOVERY_BLACKOUT_MS_KEY -> settings.cumulativeRecoveryBlackoutMs
             else -> 0L
         }
         return if (value == 0L) default else value
@@ -277,6 +282,7 @@ class SettingsRepository @Inject constructor(
         val value = when (keyName) {
             LAST_AUTO_SAVE_HOUR_KEY -> settings.lastAutoSaveHour
             LAST_VERSION_CODE_KEY -> settings.lastVersionCode
+            RECOVERY_COUNT_KEY -> settings.recoveryCount
             else -> -1
         }
         return if (value == -1) default else value
@@ -512,6 +518,19 @@ class SettingsRepository @Inject constructor(
                 .setMaxDropTs(0L)
                 .setLastGpsTs(0L)
                 .setViolationUptimeMs(0L)
+                .build()
+        }
+    }
+
+    /**
+     * Issue #630: Forensic Recovery Log Aggregation.
+     * Atomically updates recovery stats.
+     */
+    suspend fun incrementRecoveryStats(blackoutMs: Long) {
+        dataStore.updateData { current ->
+            current.toBuilder()
+                .setCumulativeRecoveryBlackoutMs(current.cumulativeRecoveryBlackoutMs + blackoutMs)
+                .setRecoveryCount(current.recoveryCount + 1)
                 .build()
         }
     }

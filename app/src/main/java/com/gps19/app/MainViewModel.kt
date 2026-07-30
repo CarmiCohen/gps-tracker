@@ -23,6 +23,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.30.28:
+ * - Issue #630: Forensic Recovery Log Aggregation. Added cumulative stats aggregation 
+ *   and average blackout duration logging in TriggerRecovery.
  * July.30.27:
  * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs handling 
  *   and "Service Blackout Duration" logging in TriggerRecovery.
@@ -424,7 +427,11 @@ class MainViewModel @Inject constructor(
 
                             if (blockedTs > 0) {
                                 val latency = now - blockedTs
-                                addPersistentLog("system", "Forensic Performance Audit: Deferred service recovery blackout (${latency}ms)", isImportant = true)
+                                // Issue #630: Aggregate forensic recovery stats
+                                repository.incrementRecoveryStats(latency)
+                                val snapshot = repository.getSettingsSnapshot()
+                                val avg = if (snapshot.recoveryCount > 0) snapshot.cumulativeRecoveryBlackoutMs / snapshot.recoveryCount else 0L
+                                addPersistentLog("system", "Forensic Performance Audit: Deferred service recovery blackout (${latency}ms) [Avg: ${avg}ms]", isImportant = true)
                             } else {
                                 addPersistentLog("system", "SYSTEM: Deferred recovery successful ($appMode)", isImportant = true)
                             }

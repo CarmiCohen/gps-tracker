@@ -89,6 +89,10 @@ message AppSettings {
 
     // Issue #629: Deferred Recovery Latency Audit
     optional int64 recovery_blocked_ts = 70;
+
+    // Issue #630: Forensic Recovery Log Aggregation
+    optional int64 cumulative_recovery_blackout_ms = 71;
+    optional int32 recovery_count = 72;
 }
 
 enum TrackerStateProto {

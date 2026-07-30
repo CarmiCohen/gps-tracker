@@ -1,9 +1,10 @@
-# Handover (July.30.27) - Deferred Recovery Latency Audit [STABILIZED]
+# Handover (July.30.28) - Forensic Recovery Log Aggregation [STABILIZED]
 
 ## 🎯 Current Objective
-Implemented forensic latency auditing for the deferred service recovery mechanism to monitor performance on restricted hardware (Issue #629).
+Implemented forensic recovery log aggregation to track cumulative service blackout duration and calculate running averages for recovery performance monitoring (Issue #630).
 
 ## 📊 Status Tracker
+- **[Issue #630] Forensic Recovery Log Aggregation**: 🟢 Resolved.
 - **[Issue #629] Deferred Recovery Latency Audit**: 🟢 Resolved.
 - **[Issue #626] Foreground Service Start Restriction**: 🟢 Resolved.
 - **[Issue #627] Startup ANR & Main Thread Blocking**: 🟢 Resolved.
@@ -11,24 +12,24 @@ Implemented forensic latency auditing for the deferred service recovery mechanis
 - **[Issue #628] 16KB Page Size Support**: 🟢 Resolved.
 
 ## 🔍 Comprehensive Forensic Status
-- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.27).
-- **Latency Audit**: The system now captures `recovery_blocked_ts` when background starts are restricted. Upon foreground restoration, it logs a "Forensic Performance Audit: Deferred service recovery blackout ([duration]ms)" entry.
-- **Architecture**: 
-    - Added `recovery_blocked_ts` to DataStore (Protobuf).
-    - Hardened `WatchdogReceiver` and `MaintenanceWorker` with timestamp recording.
-    - Integrated latency calculation in `MainViewModel.TriggerRecovery`.
-- **Requirement Alignment**: 
-    - **R629**: Automated latency auditing for deferred recovery.
+- **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.28).
+- **Aggregation Logic**: The system now persists `cumulative_recovery_blackout_ms` and `recovery_count`. Upon every foreground restoration, it calculates and logs: "Forensic Performance Audit: Deferred service recovery blackout ([latency]ms) [Avg: [avg]ms]".
+- **Architecture**:
+    - Expanded `AppSettings` Protobuf schema with aggregation fields.
+    - Implemented atomic `incrementRecoveryStats` in `SettingsRepository`.
+    - Integrated stats collection and average calculation in `MainViewModel.TriggerRecovery`.
+- **Requirement Alignment**:
+    - **R630**: Forensic recovery log aggregation authority.
 
 ### 🛠️ Forensic Progress Log
-1.  **Schema Update**: Added `recovery_blocked_ts` to track exact restriction timing.
-2.  **Background Recording**: Updated `WatchdogReceiver` and `MaintenanceWorker` to persist the blockage timestamp.
-3.  **Forensic Auditing**: Integrated real-time blackout duration calculation and logging in `MainViewModel`.
+1.  **Schema Expansion**: Added cumulative metrics to `app_settings.proto`.
+2.  **Atomic Persistence**: Hardened `SettingsRepository` with thread-safe stat increments.
+3.  **Log Enrichment**: Updated UI-triggered recovery to include fleet-wide average latency in forensic logs.
 
 ## ⚠️ Newly Identified Risks & Concerns
 *   None.
 
 ## 🎯 Next Objective
-- **[Issue #TBD] Analytics**: Aggregate forensic recovery logs to determine the average "Service Blackout Duration" across the A15 device fleet.
+- **[Issue #TBD] Forensic UI**: Visualize the "Service Blackout Duration" trends within the Diagnostics/Ribbons UI to allow users to see recovery performance over time.
 
-**Status**: DEFERRED RECOVERY AUDITED & STABILIZED. RELEASE July.30.27 READY.
+**Status**: FORENSIC AGGREGATION COMPLETE. RELEASE July.30.28 READY.

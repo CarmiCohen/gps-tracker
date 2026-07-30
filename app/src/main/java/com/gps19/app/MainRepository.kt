@@ -17,6 +17,8 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * July.30.28:
+ * - Issue #630: Forensic Recovery Log Aggregation. Added incrementRecoveryStats and getSettingsSnapshot.
  * July.30.26:
  * - Issue #626: Foreground Service Start Hardening. Added isRecoveryPendingFlow.
  * July.29.01:
@@ -478,4 +480,7 @@ class MainRepository @Inject constructor(
         details?.let { _logFilterDetails.value = it } 
         recovered?.let { _logFilterRecovered.value = it }
     }
+
+    suspend fun incrementRecoveryStats(blackoutMs: Long) = settings.incrementRecoveryStats(blackoutMs)
+    suspend fun getSettingsSnapshot() = settings.getSettingsSnapshot()
 }

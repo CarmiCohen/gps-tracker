@@ -64,3 +64,7 @@ const val IS_RECOVERY_PENDING_KEY = "is_recovery_pending"
 
 // Issue #629: Deferred Recovery Latency Audit
 const val RECOVERY_BLOCKED_TS_KEY = "recovery_blocked_ts"
+
+// Issue #630: Forensic Recovery Log Aggregation
+const val CUMULATIVE_RECOVERY_BLACKOUT_MS_KEY = "cumulative_recovery_blackout_ms"
+const val RECOVERY_COUNT_KEY = "recovery_count"

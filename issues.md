@@ -1,11 +1,11 @@
-# Project Issues & Hardening Tracking (July.30.27)
+# Project Issues & Hardening Tracking (July.30.28)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 0 |
+| **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
 | **Resolved (Total)** | 🟢 Progress | 467 |
 
@@ -17,7 +17,8 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🔴 Open Issues
-*   None.
+*   **[Issue #630] [Severity: Med] [Category: Analytics] Forensic Recovery Log Aggregation**.
+    - **Description**: Aggregate forensic recovery logs to determine the average "Service Blackout Duration" across the A15 device fleet. This requires a mechanism to track cumulative blackout data for forensic reporting.
 
 ---
 
