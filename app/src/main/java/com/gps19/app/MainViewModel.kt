@@ -23,6 +23,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.30.31:
+ * - Issue #634: Foreground Service Start Hardening. Added SetRecoveryPending handler 
+ *   to gracefully manage OS-level foreground start restrictions.
  * July.30.29:
  * - Issue #631: Forensic UI: Service Blackout Trends. Fixed reactive binding missing 
  *   in startHeavyObservations for cumulativeRecoveryBlackoutMs and recoveryCount.
@@ -396,6 +399,7 @@ class MainViewModel @Inject constructor(
             is UiEvent.CommitSettings -> handleDraftEvent(event)
             is UiEvent.SetLogFilterShowDetails -> viewModelScope.launch(Dispatchers.Main.immediate) { repository.updateLogFilters(details = event.show) }
             is UiEvent.SetLogFilterShowRecovered -> viewModelScope.launch(Dispatchers.Main.immediate) { repository.updateLogFilters(recovered = event.show) }
+            is UiEvent.ToggleGnssDetail -> updateNavigation { it.copy(isGnssDetailVisible = event.visible) }
             is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
                 val oldState = _uiState.value.permissions
                 val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
@@ -418,6 +422,17 @@ class MainViewModel @Inject constructor(
                 updateState { it.copy(isIdentitySanitized = false) }
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { repository.saveBoolean(IDENTITY_SANITIZED_KEY, false) }
             }
+            is UiEvent.SetRecoveryPending -> {
+                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+                    repository.saveBoolean(IS_RECOVERY_PENDING_KEY, event.pending)
+                    if (event.pending && repository.getLong(RECOVERY_BLOCKED_TS_KEY, 0L) == 0L) {
+                        repository.saveLong(RECOVERY_BLOCKED_TS_KEY, timeProvider.currentTimeMillis())
+                    }
+                    withContext(Dispatchers.Main.immediate) {
+                        updateState { it.copy(isRecoveryPending = event.pending) }
+                    }
+                }
+            }
             is UiEvent.TriggerRecovery -> {
                 viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
                     val appMode = _uiState.value.appMode
@@ -433,6 +448,7 @@ class MainViewModel @Inject constructor(
                             val now = timeProvider.currentTimeMillis()
                             repository.saveBoolean(IS_RECOVERY_PENDING_KEY, false)
                             repository.saveLong(RECOVERY_BLOCKED_TS_KEY, 0L)
+                            updateState { it.copy(isRecoveryPending = false) }
 
                             if (blockedTs > 0) {
                                 val latency = now - blockedTs

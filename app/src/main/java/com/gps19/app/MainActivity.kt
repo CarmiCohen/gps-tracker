@@ -18,6 +18,9 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * July.30.31:
+ * - Issue #634: Foreground Service Start Hardening. Updated onStartService to 
+ *   set recovery pending state upon OS-level start restrictions.
  * July.30.26:
  * - Issue #626: Foreground Service Start Hardening. Added automated recovery 
  *   trigger in onResume when isRecoveryPending is detected.
@@ -50,7 +53,8 @@ class MainActivity : ComponentActivity() {
                         val intent = Intent(this, serviceClass)
                         ContextCompat.startForegroundService(this, intent)
                     } catch (e: Exception) {
-                        Timber.e(e, "Issue #626: Foreground service start failed for mode $mode")
+                        Timber.e(e, "Issue #634: Foreground service start failed for mode $mode. Marking as pending.")
+                        viewModel.onEvent(UiEvent.SetRecoveryPending(true))
                     }
                 },
                 onCleanupAndExit = {
@@ -134,9 +138,9 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
         
-        // Issue #626: Automated recovery trigger for restricted background starts
+        // Issue #626/634: Automated recovery trigger for restricted background starts
         if (viewModel.uiState.value.isRecoveryPending) {
-            Timber.i("Issue #626: Resuming deferred service recovery in onResume")
+            Timber.i("Issue #634: Resuming deferred service recovery in onResume")
             viewModel.onEvent(UiEvent.TriggerRecovery)
         }
 

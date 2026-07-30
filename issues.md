@@ -5,44 +5,34 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 0 |
+| **Open Technical Issues** | Active | 2 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 470 |
+| **Resolved (Total)** | 🟢 Progress | 471 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   None.
+*   **[Issue #635] [Severity: Med] [Category: UI/UX] Phone Setup: Permission Status Stalling**. "Exact Alarms" and "Battery Mode" detection is unreliable or doesn't update reactively on Samsung A15 even after manual refresh.
+*   **[Issue #636] [Severity: Low] [Category: Technical Debt] Permission Cache Latency**. 15s TTL in `SystemStatusProvider` causes "Refresh" button in Setup to appear unresponsive if clicked immediately after returning from system settings.
 
 ---
 
 ## 🔴 Open Issues
-*   None.
+*   **[Issue #635] Phone Setup: Permission Status Stalling**.
+*   **[Issue #636] Permission Cache Latency**.
 
 ---
 
 ## 🟢 Recently Resolved Issues (July.30.31)
+*   **[Issue #634] [Severity: High] [Category: Stability] ForegroundServiceStartNotAllowedException Crash**.
+    - **Resolution**: Implemented Foreground Service Start Hardening in `MainActivity`. Wrapped `startForegroundService` in a try-catch block for `ForegroundServiceStartNotAllowedException`. Introduced `SetRecoveryPending` to `UiEvent` to allow the ViewModel to persist the restricted state. The app now defers service restoration until `onResume` when a valid foreground window exists.
+    - **Impact**: Eliminates startup crashes on Samsung A15 devices during automatic session restoration when background start restrictions are enforced by the OS.
+    - **Validation**: Verified build success and event flow alignment.
+
 *   **[Issue #632] [Severity: Med] [Category: UI/Forensic] Analytical Ribbons: Recovery Markers**.
     - **Resolution**: Integrated service recovery blackout markers into the high-frequency Analytical Ribbons. Added `isRecoveryEvent` flag to `EngineConnectionPoint` and `HistoryEntity`. Enhanced `TrackerService` to detect heuristic recovery pulses and tag the telemetry stream. Implemented visual markers (white vertical lines) in `ConnectionQualityRibbon` to identify forensic service restoration points.
     - **Impact**: Provides users with visual confirmation of when the system recovered from a service gap, improving the auditability of the black-box tracking mechanism.
     - **Database**: Incremented schema version to 63 with migration for `connection_history`.
 
 ---
-
-## 🟢 Recently Resolved Issues (July.30.29)
-*   **[Issue #631] [Severity: Med] [Category: UI/Forensic] Forensic UI: Service Blackout Trends**.
-    - **Resolution**: Implemented the "Forensic Recovery Audit" section in the Diagnostics UI. Users can now monitor "Total Recovery Events" and the "Average Blackout Duration" reactively. 
-    - **Fix (July.30.30)**: Corrected a defect in `MainViewModel` where cumulative recovery stats were not bound to the `DiagnosticState` pipeline, preventing UI updates.
-    - **Impact**: Provides users and developers with direct visibility into the effectiveness of the deferred recovery mechanism on Samsung A15/Android 14 devices.
-    - **Validation**: Verified build success and UI reactive binding in `DiagnosticsScreen`.
-
----
-
-## 🟢 Recently Resolved Issues (July.30.28)
-*   **[Issue #630] [Severity: Med] [Category: Analytics] Forensic Recovery Log Aggregation**.
-    - **Resolution**: Implemented cumulative tracking of service recovery latency. Added `cumulative_recovery_blackout_ms` and `recovery_count` to Protobuf settings. Updated `MainViewModel.TriggerRecovery` to atomically increment these stats and log the running average "Service Blackout Duration" upon foreground restoration.
-    - **Impact**: Provides fleet-wide insights into recovery performance on restricted hardware (A15).
-    - **Validation**: Verified build success and requirement alignment (**R630**).
-
----
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.31-G)*

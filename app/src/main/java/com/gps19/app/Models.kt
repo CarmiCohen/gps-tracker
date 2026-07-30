@@ -11,6 +11,7 @@ import java.util.*
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
  * July.30.31:
+ * - Issue #634: Foreground Service Start Hardening. Added SetRecoveryPending to UiEvent.
  * - Issue #632: Analytical Ribbons: Recovery Markers. Added isRecoveryEvent to 
  *   ConnectionPoint for forensic blackout visibility in UI.
  * July.30.26:
@@ -610,8 +611,9 @@ sealed class UiEvent {
     object DismissIdentitySanitization : UiEvent()
     data class NavigateToDiagnostics(val visible: Boolean) : UiEvent()
     
-    // Issue #626: Foreground Service Start Hardening
+    // Issue #626/634: Foreground Service Start Hardening
     object TriggerRecovery : UiEvent()
+    data class SetRecoveryPending(val pending: Boolean) : UiEvent()
 }
 
 sealed class UiCommand {
