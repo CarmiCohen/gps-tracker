@@ -5,13 +5,15 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 2 |
+| **Open Technical Issues** | Active | 4 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
 | **Resolved (Total)** | 🟢 Progress | 491 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
+*   **[Issue #658] [Severity: High] [Category: Performance] Persistent Startup Davey Stalls**. Logcat confirms 1.8s and 1.2s main thread stalls on Samsung A15 during startup transition, even after IPC throttling.
+*   **[Issue #659] [Severity: Medium] [Category: Stability] libmbrainSDK Initialization Instability**. Detected "Can't load libmbrainSDK" / "initMbrain failed" logs appearing intermittently after successful initial load.
 *   **[Issue #656] [Severity: Medium] [Category: Stability] userfaultfd: MOVE ioctl unsupported**. Kernel-level timeout detected on Samsung A15; may impact ART memory compaction efficiency.
 *   **[Issue #657] [Severity: Low] [Category: Performance] Compose Snapshot Lock Verification Failure**. `SnapshotStateList` methods failing verification, leading to sub-optimal UI performance.
 

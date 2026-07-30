@@ -1,23 +1,26 @@
-# Handover (July.30.46) - Performance Hardening [READY]
+# Handover (July.30.46) - Testing & Issue Identification [READY]
 
-## 🎯 Current Objective
-Ready for **[Issue #653] Excessive Garbage Collection**. Previous task resolved **[Issue #655] Regression: Unthrottled IPC Bursts** by implementing a hardware-level refresh cooldown (`FORCED_REFRESH_COOLDOWN_MS = 2000L`) in `SystemStatusProvider`. This eliminated `getPackageName` logcat spam and 1.1s Davey stalls on Samsung A15 hardware.
+## 🎯 Next Objective
+Focus on **[Issue #658] Persistent Startup Main Thread Stalls**. Testing on Samsung A15 identified critical Davey stalls (up to 1.8s/155 frames) during activity transition, which represents the highest priority performance bottleneck.
 
-## 🆕 New Architectural Requirement
-- **R651 (Hardware Cooldown Authority)**: Even for "forced" refreshes of hardware state (e.g., during active setup), the system MUST enforce a minimum hardware-level cooldown period (default 2000ms) within `SystemStatusProvider` to prevent IPC bursts and manufacturer-level auditing stalls.
+## 🆕 New Architectural Requirements
+- **R658 (Startup Transition Authority)**: The Main thread MUST remain silent during activity transitions. Critical initialization MUST be deferred until the activity is `RESUMED` and the first frame is rendered.
+- **R659 (JNI Initialization Integrity)**: `MbrainHardwareManager` MUST verify native library state before calls and handle background re-initialization if context is lost.
 
 ## 📊 Status Tracker
-- **[Issue #655] Regression: Unthrottled IPC Bursts**: 🟢 Resolved. Added 2s cooldown to `getPermissionState`.
-- **[Issue #654] UI Jank during IPC bursts**: 🟢 Resolved.
-- **[Issue #653] Excessive Garbage Collection**: 🔴 Open. Churn observed at ~34MB/120ms. Next focus.
-- **[Issue #656] userfaultfd unsupported**: 🔍 Tracked. Monitoring kernel behavior on A15.
+- **[Issue #658] Persistent Startup Main Thread Stalls**: 🔴 Open. New high-priority discovery during deployment.
+- **[Issue #659] libmbrainSDK Initialization Instability**: 🔴 Open. Intermittent JNI bridge failures detected.
+- **[Issue #655] Regression: Unthrottled IPC Bursts**: 🟢 Resolved.
+- **[Issue #653] Excessive Garbage Collection**: 🔴 Open. Churn ~34MB/120ms.
+- **[Issue #656] userfaultfd unsupported**: 🔍 Tracked.
 
 ## 🔍 Comprehensive Status
 - **Build Status**: 🟢 **SUCCESSFUL** (Version July.30.46).
-- **Performance**:
-    - **IPC Hygiene**: Eliminated `getPackageName` logcat bursts on Samsung A15.
-    - **Memory**: High allocation pressure persists ([Issue #653]).
+- **Deployment Log Audit**:
+    - Identified 1.8s Davey stalls (#658).
+    - Detected intermittent `libmbrainSDK` load failures (#659).
+    - Verified `getPackageName` IPC spam reduction from previous fix.
 - **Requirement Alignment**: 
-    - **R650/R651**: Fully implemented in `SystemStatusProvider`.
+    - **R658/R659**: Added to SOT_MASTER_REQUIREMENTS.md.
 
-**Status**: IPC logic hardened. VERSION July.30.46. READY FOR NEW CHAT.
+**Status**: Testing complete. New critical issues documented. VERSION July.30.46. READY FOR NEW CHAT.
