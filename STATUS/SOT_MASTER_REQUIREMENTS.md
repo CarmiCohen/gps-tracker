@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - July.30.28 (Forensic Recovery Log Aggregation)
+# System Source of Truth (SoT) - July.30.29 (Forensic UI visualization)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -13,6 +13,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Deferred Service Recovery Authority (R626)**: On Android 12+ (API 31+), service restoration requests from the background (Watchdog/Maintenance) MUST catch `ForegroundServiceStartNotAllowedException`. If a start is restricted, the system MUST persist an `isRecoveryPending` flag. The Application UI MUST reactively trigger service restoration in `onResume` when the app enters the foreground to ensure continuity. (Issue #626, July.30.26)
 *   **Deferred Recovery Latency Audit Authority (R629)**: The system MUST record the timestamp (`recovery_blocked_ts`) when a background start is restricted by the OS. Upon successful restoration in the foreground, the system MUST calculate and log the "Service Blackout Duration" as a forensic performance audit. (Issue #629, July.30.27)
 *   **Forensic Recovery Log Aggregation Authority (R630)**: The system MUST aggregate "Service Blackout Duration" metrics across all recovery events. It MUST maintain a cumulative blackout time and a recovery count in persistent storage. Upon every successful restoration, the system MUST log the current recovery latency along with the updated running average of the "Service Blackout Duration". (Issue #630, July.30.28)
+*   **Forensic UI visualization Authority (R631)**: The system MUST visualize "Service Blackout Duration" trends within the Diagnostics UI. It MUST display the total count of recovery events and the running average blackout duration. Durations exceeding 30,000ms MUST be visually flagged as a performance warning. (Issue #631, July.30.29)
 *   **GNSS Callback Conflation Authority (R614)**: High-frequency GNSS hardware callbacks MUST be sampled to prevent downstream flow processing overhead. (Issue #614, July.28.20)
 *   **Hardware Timing Audit Authority (R615)**: The system MUST monitor GNSS callback timing for hardware-level instability. (Issue #615, July.28.21)
 *   **Repository Event Pipeline Hardening (R616)**: All `MutableSharedFlow` pipelines within the Repository layer MUST utilize `BufferOverflow.DROP_OLDEST`. (Issue #616, July.28.22)
@@ -78,5 +79,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.30.28.
+*   **Current Release**: July.30.29.
 *   **Source of Truth**: app/build.gradle versionName.

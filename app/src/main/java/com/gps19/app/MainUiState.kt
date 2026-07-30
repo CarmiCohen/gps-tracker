@@ -6,6 +6,8 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * July.30.29:
+ * - Issue #631: Forensic UI: Service Blackout Trends. Added recovery stats to DiagnosticState.
  * July.30.26:
  * - Issue #626: Foreground Service Start Hardening. Added isRecoveryPending.
  * July.28.24:
@@ -71,7 +73,7 @@ data class MainUiState(
             
             val configIssue = permissions.hasBackgroundRestriction && 
                              (permissions.backgroundStatus != CapabilityStatus.GRANTED || 
-                              permissions.autostartStatus != CapabilityStatus.GRANTED) && 
+                              permissions.autostartStatus != CapabilityStatus.GRANTED) &&
                              !(permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)
             if (configIssue) count++
             
@@ -113,7 +115,9 @@ data class DiagnosticState(
     val isSirenPlaying: Boolean = false,
     val isRedScreenVisible: Boolean = false,
     val maxTrackerAccuracy: Double = 0.0,
-    val maxViewerAccuracy: Double = 0.0
+    val maxViewerAccuracy: Double = 0.0,
+    val cumulativeRecoveryBlackoutMs: Long = 0L,
+    val recoveryCount: Int = 0
 )
 
 enum class MapFollowMode { TRACKER, VIEWER, AUTO }

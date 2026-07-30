@@ -110,6 +110,8 @@ class SettingsRepository @Inject constructor(
     val lastAlarmsJsonFlow: Flow<String> = dataStore.data.map { it.lastAlarmsJson }
     val isRecoveryPendingFlow: Flow<Boolean> = dataStore.data.map { it.isRecoveryPending }
     val recoveryBlockedTsFlow: Flow<Long> = dataStore.data.map { it.recoveryBlockedTs }
+    val cumulativeRecoveryBlackoutMsFlow: Flow<Long> = dataStore.data.map { it.cumulativeRecoveryBlackoutMs }
+    val recoveryCountFlow: Flow<Int> = dataStore.data.map { it.recoveryCount }
 
     suspend fun getSettingsSnapshot(): AppSettings = dataStore.data.first()
 

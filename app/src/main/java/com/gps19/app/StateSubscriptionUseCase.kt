@@ -10,6 +10,8 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * July.30.29:
+ * - Issue #631: Forensic UI: Service Blackout Trends. Added recovery stats to ConnectivityUpdate.
  * July.28.24:
  * - Issue #621: UseCase Internalization Audit. Internalized distinctUntilChanged() 
  *   operators where appropriate to reduce ViewModel boilerplate and standardize 
@@ -115,9 +117,11 @@ class StateSubscriptionUseCase @Inject constructor(
         return combine(
             repository.isRelayConnected,
             repository.lastRtt,
-            repository.lastRemoteActivityTs
-        ) { connected, rtt, remoteTs ->
-            ConnectivityUpdate(connected, rtt, remoteTs)
+            repository.lastRemoteActivityTs,
+            repository.cumulativeRecoveryBlackoutMsFlow,
+            repository.recoveryCountFlow
+        ) { connected, rtt, remoteTs, blackoutMs, count ->
+            ConnectivityUpdate(connected, rtt, remoteTs, blackoutMs, count)
         }
         .distinctUntilChanged() // Internalized transformation for combine result
         .flowOn(Dispatchers.Default)
@@ -164,6 +168,8 @@ class StateSubscriptionUseCase @Inject constructor(
     data class ConnectivityUpdate(
         val isRelayConnected: Boolean,
         val lastRtt: Int,
-        val lastRemoteActivityTs: Long
+        val lastRemoteActivityTs: Long,
+        val cumulativeRecoveryBlackoutMs: Long,
+        val recoveryCount: Int
     )
 }

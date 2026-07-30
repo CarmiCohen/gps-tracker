@@ -17,12 +17,12 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * July.30.29:
+ * - Issue #631: Forensic UI: Service Blackout Trends. Exposed recovery stats flows.
  * July.30.28:
  * - Issue #630: Forensic Recovery Log Aggregation. Added incrementRecoveryStats and getSettingsSnapshot.
  * July.30.26:
  * - Issue #626: Foreground Service Start Hardening. Added isRecoveryPendingFlow.
- * July.29.01:
- * - Issue #623: Structural: Latency Monitor Metric Cleanup.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -120,6 +120,8 @@ class MainRepository @Inject constructor(
     val isSystemActiveFlow = settings.isSystemActiveFlow
     val lastAlarmsJsonFlow = settings.lastAlarmsJsonFlow
     val isRecoveryPendingFlow = settings.isRecoveryPendingFlow
+    val cumulativeRecoveryBlackoutMsFlow = settings.cumulativeRecoveryBlackoutMsFlow
+    val recoveryCountFlow = settings.recoveryCountFlow
 
     init {
         scope.launch {

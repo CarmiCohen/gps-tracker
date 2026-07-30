@@ -22,6 +22,8 @@ import com.gps19.core.engine.CapabilityStatus
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * July.30.29:
+ * - Issue #631: Forensic UI: Service Blackout Trends. Added Forensic Recovery Audit section.
  * v9.4.0:
  * - Issue #502: Device Independency. Replaced vendor-specific checks with capability logic.
  */
@@ -37,6 +39,7 @@ fun DiagnosticsScreen(
     onRequestHardwarePermission: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val diagState by viewModel.diagnosticState.collectAsStateWithLifecycle()
     val permissions = uiState.permissions
 
     Scaffold(
@@ -91,6 +94,35 @@ fun DiagnosticsScreen(
                 isOk = permissions.isExactAlarmGranted,
                 icon = Icons.Default.Alarm,
                 onClick = onRequestExactAlarm
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Forensic Recovery Audit",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.Gray,
+                fontWeight = FontWeight.Bold
+            )
+
+            val totalRecoveries = diagState.recoveryCount
+            val avgBlackout = if (totalRecoveries > 0) {
+                diagState.cumulativeRecoveryBlackoutMs / totalRecoveries
+            } else 0L
+
+            DiagnosticItem(
+                title = "Total Recovery Events",
+                status = "$totalRecoveries",
+                isOk = true,
+                icon = Icons.Default.History,
+                onClick = {}
+            )
+
+            DiagnosticItem(
+                title = "Average Blackout Duration",
+                status = "${avgBlackout}ms",
+                isOk = avgBlackout < 30000L, // Warn if average is > 30s
+                icon = Icons.Default.Timer,
+                onClick = {}
             )
 
             Spacer(modifier = Modifier.height(8.dp))
