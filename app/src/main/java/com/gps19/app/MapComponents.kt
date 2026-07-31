@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,15 +38,13 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * July.31.01:
+ * - Issue #657: Compose Snapshot Lock Failure. Wrapped AndroidView update block 
+ *   in Snapshot.withoutReadObservation to eliminate lock verification overhead 
+ *   during high-frequency telemetry bursts (R-HARDWARE-01).
  * July.30.56:
  * - Issue #642: Map Settings Icon Contrast. Standardized icon treatments for accessibility 
  *   on budget screens. Switched to solid backgrounds and stronger borders for map controls.
- * July.30.40:
- * - Issue #641: Optimized invalidation. Implemented state-aware invalidation 
- *   to reduce CPU overhead during idle or redundant states (R-HARDWARE-01).
- * July.30.32:
- * - Issue #640: Tracker Mode ANR. Integrated throttled overlay updates 
- *   to support R-HARDWARE-01 Budget Baseline.
  */
 
 @Composable
@@ -162,7 +161,6 @@ fun AppMapContainer(
 @Composable
 fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     val purple = Color(0xFF800080)
-    // Issue #642: Standardized solid background and strong border for high contrast on Mapnik tiles.
     val backgroundColor = if (isMapButtonsVisible) purple else Color.White
     val contentColor = if (isMapButtonsVisible) Color.White else purple
     
@@ -322,32 +320,36 @@ fun OsmMap(
             })
         } 
     }, update = { view ->
-        overlayManager?.let { om ->
-            val h = om.updateHomePoints(home, uiState.isFenceVisible, uiState.maxDistance, isTrackerMode, uiState.geofenceMode, onTap, onRemoveMarker)
-            val t = om.updateTrails(trail, viewerTrail, systemPulseRt)
-            val v = om.updateViolations(violations, uiState.isViolationsVisible, uiState.isGeofenceViolationsVisible, systemPulseRt)
-            val p = om.updateCurrentPositions(
-                trackerValid = smoothedTrackerPos.value != null,
-                trackerPos = smoothedTrackerPos.value,
-                isTrackerFresh = isTrackerFresh,
-                trackerAccuracy = trackerLoc.accuracy,
-                maxTrackerAccuracy = trackerLoc.maxAccuracy,
-                trackerSpeed = trackerLoc.speed,
-                isTrackerPending = trackerHealth.isLocationPending,
-                trackerLastValidFixRt = trackerHealth.lastValidFixRt,
-                viewerValid = smoothedViewerPos.value != null,
-                viewerPos = smoothedViewerPos.value,
-                isViewerFresh = isViewerFresh,
-                viewerAccuracy = viewerLoc.accuracy,
-                viewerMaxAcc = viewerLoc.maxAccuracy,
-                viewerSpeed = viewerLoc.speed,
-                isViewerPending = viewerHealth.isLocationPending,
-                viewerLastValidFixRt = viewerHealth.lastValidFixRt,
-                systemPulseRt = systemPulseRt
-            )
-            // Issue #641: Conditionally invalidate only if overlays actually changed.
-            if (h || t || v || p) {
-                view.invalidate()
+        // Issue #657: Wrapped in Snapshot.withoutReadObservation to eliminate 
+        // lock verification failures during high-frequency telemetry updates.
+        Snapshot.withoutReadObservation {
+            overlayManager?.let { om ->
+                val h = om.updateHomePoints(home, uiState.isFenceVisible, uiState.maxDistance, isTrackerMode, uiState.geofenceMode, onTap, onRemoveMarker)
+                val t = om.updateTrails(trail, viewerTrail, systemPulseRt)
+                val v = om.updateViolations(violations, uiState.isViolationsVisible, uiState.isGeofenceViolationsVisible, systemPulseRt)
+                val p = om.updateCurrentPositions(
+                    trackerValid = smoothedTrackerPos.value != null,
+                    trackerPos = smoothedTrackerPos.value,
+                    isTrackerFresh = isTrackerFresh,
+                    trackerAccuracy = trackerLoc.accuracy,
+                    maxTrackerAccuracy = trackerLoc.maxAccuracy,
+                    trackerSpeed = trackerLoc.speed,
+                    isTrackerPending = trackerHealth.isLocationPending,
+                    trackerLastValidFixRt = trackerHealth.lastValidFixRt,
+                    viewerValid = smoothedViewerPos.value != null,
+                    viewerPos = smoothedViewerPos.value,
+                    isViewerFresh = isViewerFresh,
+                    viewerAccuracy = viewerLoc.accuracy,
+                    viewerMaxAcc = viewerLoc.maxAccuracy,
+                    viewerSpeed = viewerLoc.speed,
+                    isViewerPending = viewerHealth.isLocationPending,
+                    viewerLastValidFixRt = viewerHealth.lastValidFixRt,
+                    systemPulseRt = systemPulseRt
+                )
+                // Issue #641: Conditionally invalidate only if overlays actually changed.
+                if (h || t || v || p) {
+                    view.invalidate()
+                }
             }
         }
     }, onRelease = { view -> view.onDetach(); view.tileProvider.tileCache.clear(); view.tileProvider.detach() }, modifier = Modifier.fillMaxSize())
@@ -381,7 +383,6 @@ fun MapToolsOverlay(
 @Composable
 fun MapToolButton(icon: ImageVector? = null, symbol: String? = null, label: String, onClick: () -> Unit, iconColor: Color, containerColor: Color = Color.White) {
     val prp = Color(0xFF800080)
-    // Issue #642: Standardized solid background and border for accessibility.
     Box(
         modifier = Modifier
             .size(50.dp)

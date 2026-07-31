@@ -1,27 +1,27 @@
-# Handover (July.31.00) - Kernel Memory Hardening [READY]
+# Handover (July.31.01) - Compose Snapshot Hardening [READY]
 
 ## 🎯 Next Objective
-Focus on **[Issue #657] Compose Snapshot Lock Failure**.
-- **Context**: `SnapshotStateList` and other Compose state objects are failing lock verification in certain race conditions during high-frequency telemetry updates.
-- **Goal**: Analyze the state update patterns and implement thread-safe snapshot mutations or migration to a more robust state management pattern.
+Focus on **[Issue #660] Forensic Audit: Log Buffer Pressure**.
+- **Context**: High-frequency telemetry logging is causing occasional I/O spikes in `LogManager` despite buffer conflation.
+- **Goal**: Implement a non-blocking circular log buffer and optimize SQLite batch inserts to prevent I/O-related Davey stalls on budget hardware.
 
 ## 🆕 New Architectural Requirements
-- **R656 (Kernel-Level Memory Hardening)**: On devices with limited `userfaultfd` support (e.g., Samsung A15), the application MUST utilize `android:largeHeap="true"` to reduce ART compaction frequency and implement aggressive `onTrimMemory` handlers.
+- **R657 (Compose Snapshot Hardening)**: To prevent lock verification failures during high-frequency telemetry updates, imperative `AndroidView` update blocks MUST be wrapped in `Snapshot.withoutReadObservation`.
 
 ## 📊 Status Tracker
-- **[Issue #656] userfaultfd unsupported**: 🟢 Resolved. Implemented large heap and aggressive trim mitigation.
+- **[Issue #657] Compose Snapshot Lock Failure**: 🟢 Resolved. Hardened MapView update cycle.
+- **[Issue #656] userfaultfd unsupported**: 🟢 Resolved.
 - **[Issue #642] Map Settings Icon Contrast**: 🟢 Resolved.
 - **[Issue #653] Excessive Garbage Collection**: 🟢 Resolved.
 - **[Issue #658] Persistent Startup Main Thread Stalls**: 🟢 Resolved.
 - **[Issue #659] libmbrainSDK Initialization Instability**: 🟢 Resolved.
-- **[Issue #657] Compose Snapshot Lock Failure**: 🔍 Tracked.
 
 ## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **SUCCESSFUL** (vJuly.31.00).
+- **Build Status**: 🟢 **SUCCESSFUL** (vJuly.31.01).
 - **Forensic Audit History**:
-    - **Kernel Mitigation**: Standardized `largeHeap` usage and application-level memory triggers to stabilize ART on Samsung A15.
+    - **UI Stability**: Decoupled Osmdroid imperative updates from Compose Recomposer tracking via `Snapshot.withoutReadObservation`.
 - **Requirement Alignment**: 
-    - **R656**: Integrated into `SOT_MASTER_REQUIREMENTS.md`.
+    - **R657**: Integrated into `SOT_MASTER_REQUIREMENTS.md`.
 
-**Status**: Kernel-level stability for memory compaction addressed. Version July.31.00 ready for Compose state hardening.
+**Status**: Compose runtime stability for high-frequency map updates achieved. Version July.31.01 ready for log buffer hardening.
 🟢 **READY FOR NEW CHAT.**
