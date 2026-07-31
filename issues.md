@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (July.30.55)
+# Project Issues & Hardening Tracking (July.30.56)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 1 |
+| **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 494 |
+| **Resolved (Total)** | 🟢 Progress | 495 |
 
 ---
 
@@ -18,11 +18,14 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🔴 Open Issues
-*   **[Issue #642] Map Settings Icon Contrast**. Verified low contrast on Mapnik tiles.
+*   *(None)*
 
 ---
 
-## 🟢 Recently Resolved Issues (July.30.55)
+## 🟢 Recently Resolved Issues (July.30.56)
+*   **[Issue #642] Map Settings Icon Contrast**.
+    *   **Resolution**: Standardized icon treatments for accessibility on budget screens. Switched to solid backgrounds and stronger (2dp) borders for map controls in `MapComponents.kt`.
+    *   **Impact**: Guaranteed visibility on high-brightness or detailed Mapnik tiles.
 *   **[Issue #653] [Severity: High] [Category: Performance] Excessive Garbage Collection**.
     *   **Resolution**: Refactored GPS and Telemetry hot-paths for Zero-Churn. Converted result models (`SentinelResult`, `ProcessedLocation`) to mutable flyweights and replaced functional List operations (`filter`, `minOf`) with indexed loops (R-HARDWARE-01).
     *   **Impact**: Eliminated ~34MB/120ms heap churn on Samsung A15, stabilizing frame rates and preventing Davey stalls.
@@ -32,4 +35,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Added proactive state verification and background re-initialization.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.55-G)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.56-G)

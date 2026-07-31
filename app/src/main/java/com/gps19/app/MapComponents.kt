@@ -37,6 +37,9 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * July.30.56:
+ * - Issue #642: Map Settings Icon Contrast. Standardized icon treatments for accessibility 
+ *   on budget screens. Switched to solid backgrounds and stronger borders for map controls.
  * July.30.40:
  * - Issue #641: Optimized invalidation. Implemented state-aware invalidation 
  *   to reduce CPU overhead during idle or redundant states (R-HARDWARE-01).
@@ -110,10 +113,25 @@ fun AppMapContainer(
             mapViewRef = mapViewRef
         )
 
-        Text(text = BuildConfig.VERSION_NAME, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 4.dp, bottom = 2.dp).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(2.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
+        Text(
+            text = BuildConfig.VERSION_NAME, 
+            color = Color.White, 
+            fontSize = 9.sp, 
+            fontWeight = FontWeight.Black, 
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(end = 4.dp, bottom = 2.dp)
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
+                .padding(horizontal = 4.dp, vertical = 1.dp)
+        )
 
         if (showSettingsButton) {
-            MapSettingsToggle(isMapButtonsVisible = uiState.isMapButtonsVisible, onToggle = { onEvent(UiEvent.SetMapButtonsVisible(!uiState.isMapButtonsVisible)) }, modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = 12.dp))
+            MapSettingsToggle(
+                isMapButtonsVisible = uiState.isMapButtonsVisible, 
+                onToggle = { onEvent(UiEvent.SetMapButtonsVisible(!uiState.isMapButtonsVisible)) }, 
+                modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = 12.dp)
+            )
         }
         
         if (showToolsOverlay && uiState.isMapButtonsVisible) {
@@ -134,7 +152,7 @@ fun AppMapContainer(
 
         val trackerHealth = if (isTrackerMode) kinematicState.localHealth else kinematicState.trackerHealth
         if (trackerHealth.isLocationPending && trackerHealth.locationPendingReason != LocationPendingReason.NONE) {
-            Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp).background(Amber500.copy(alpha = 0.85f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp).background(Amber500.copy(alpha = 0.95f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                 Text(text = "UNCERTAINTY: ${trackerHealth.locationPendingReason.name.replace("_", " ")}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
             }
         }
@@ -143,9 +161,25 @@ fun AppMapContainer(
 
 @Composable
 fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
-    val purple = Color(0xFF800080); val backgroundColor = if (isMapButtonsVisible) purple.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.85f)
-    Box(modifier = modifier.size(44.dp).background(backgroundColor, RoundedCornerShape(8.dp)).border(1.dp, purple.copy(alpha = 0.6f), RoundedCornerShape(8.dp)).clickable { onToggle() }, contentAlignment = Alignment.Center) {
-        Icon(imageVector = if (isMapButtonsVisible) Icons.Default.Close else Icons.Default.Settings, contentDescription = "Toggle Map Controls", tint = purple, modifier = Modifier.size(24.dp))
+    val purple = Color(0xFF800080)
+    // Issue #642: Standardized solid background and strong border for high contrast on Mapnik tiles.
+    val backgroundColor = if (isMapButtonsVisible) purple else Color.White
+    val contentColor = if (isMapButtonsVisible) Color.White else purple
+    
+    Box(
+        modifier = modifier
+            .size(44.dp)
+            .background(backgroundColor, RoundedCornerShape(8.dp))
+            .border(2.dp, purple, RoundedCornerShape(8.dp))
+            .clickable { onToggle() }, 
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = if (isMapButtonsVisible) Icons.Default.Close else Icons.Default.Settings, 
+            contentDescription = "Toggle Map Controls", 
+            tint = contentColor, 
+            modifier = Modifier.size(26.dp)
+        )
     }
 }
 
@@ -337,20 +371,29 @@ fun MapToolsOverlay(
         Row(horizontalArrangement = Arrangement.spacedBy(sp)) { MapToolButton(icon = if (curGeoVio) Icons.Default.LocationOn else Icons.Default.LocationOff, label = "OUT", onClick = onToggleGeofenceViolations, iconColor = if (curGeoVio) Color.Red else Color.Gray); MapToolButton(icon = if (curVio) Icons.Default.Report else Icons.Default.ReportOff, label = "JUMP", onClick = onToggleViolations, iconColor = if (curVio) Color(0xFFFF00FF) else Color.Gray) }
         Row(horizontalArrangement = Arrangement.spacedBy(sp)) { MapToolButton(icon = Icons.Default.Upload, label = "LOAD", onClick = onLoad, iconColor = BrandJd); MapToolButton(icon = Icons.Default.Save, label = "SAVE", onClick = onSave, iconColor = Indigo500) }
         Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
-            MapToolButton(icon = Icons.Default.AddLocation, label = "ADD", onClick = { if (!curTrk) onSetGeofenceMode(GeofenceMode.ADD) }, iconColor = if (curGeo == GeofenceMode.ADD) Color.White else BrandJd, containerColor = if (curGeo == GeofenceMode.ADD) BrandJd else Color.Transparent)
-            MapToolButton(icon = Icons.Default.WrongLocation, label = "DEL", onClick = { if (!curTrk) onSetGeofenceMode(GeofenceMode.REMOVE) }, iconColor = if (curGeo == GeofenceMode.REMOVE) Color.White else Rose500, containerColor = if (curGeo == GeofenceMode.REMOVE) Rose500 else Color.Transparent)
+            MapToolButton(icon = Icons.Default.AddLocation, label = "ADD", onClick = { if (!curTrk) onSetGeofenceMode(GeofenceMode.ADD) }, iconColor = if (curGeo == GeofenceMode.ADD) Color.White else BrandJd, containerColor = if (curGeo == GeofenceMode.ADD) BrandJd else Color.White)
+            MapToolButton(icon = Icons.Default.WrongLocation, label = "DEL", onClick = { if (!curTrk) onSetGeofenceMode(GeofenceMode.REMOVE) }, iconColor = if (curGeo == GeofenceMode.REMOVE) Color.White else Rose500, containerColor = if (curGeo == GeofenceMode.REMOVE) Rose500 else Color.White)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(sp)) { MapToolButton(icon = if (curFnc) Icons.Default.Visibility else Icons.Default.VisibilityOff, label = "FENCE", onClick = onToggleFence, iconColor = if (curFnc) BrandJd else Color.Gray); MapToolButton(icon = Icons.Default.Delete, label = "CLEAR", onClick = { onCenterTracker(); onClear() }, iconColor = Rose500) }
     }
 }
 
 @Composable
-fun MapToolButton(icon: ImageVector? = null, symbol: String? = null, label: String, onClick: () -> Unit, iconColor: Color, containerColor: Color = Color.Transparent) {
-    val prp = Color(0xFF800080); Box(modifier = Modifier.size(50.dp).background(containerColor, RoundedCornerShape(8.dp)).border(0.5.dp, prp, RoundedCornerShape(8.dp)).clickable { onClick() }, contentAlignment = Alignment.Center) {
+fun MapToolButton(icon: ImageVector? = null, symbol: String? = null, label: String, onClick: () -> Unit, iconColor: Color, containerColor: Color = Color.White) {
+    val prp = Color(0xFF800080)
+    // Issue #642: Standardized solid background and border for accessibility.
+    Box(
+        modifier = Modifier
+            .size(50.dp)
+            .background(containerColor, RoundedCornerShape(8.dp))
+            .border(1.dp, prp, RoundedCornerShape(8.dp))
+            .clickable { onClick() }, 
+        contentAlignment = Alignment.Center
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (symbol != null) Text(symbol, color = iconColor, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.height(26.dp))
             else if (icon != null) Icon(icon, null, tint = iconColor, modifier = Modifier.size(24.dp))
-            Text(label, color = if (containerColor != Color.Transparent) Color.White else prp, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            Text(label, color = if (containerColor != Color.White && containerColor != Color.Transparent) Color.White else prp, fontSize = 8.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

@@ -1,29 +1,28 @@
-# Handover (July.30.47) - Performance Hardening [READY]
+# Handover (July.30.56) - UI/UX Accessibility Hardening [READY]
 
 ## 🎯 Next Objective
-Focus on **[Issue #653] Excessive Garbage Collection**. 
-- **Forensic Metric**: Memory profiling confirms ~34MB heap churn every 120ms on budget hardware (Samsung A15).
-- **Primary Suspects**: Allocation spikes in `LocationProcessor` (fix processing) and `TelemetryAggregator` (ribbon processing).
-- **Goal**: Adhere to R-HARDWARE-01 by refactoring hot-paths for zero-churn.
+Focus on **[Issue #656] userfaultfd: MOVE ioctl unsupported**. 
+- **Context**: Kernel-level timeout detected on Samsung A15; impacts ART memory compaction efficiency.
+- **Goal**: Research and implement a fallback or mitigation for memory management on affected devices.
 
 ## 🆕 New Architectural Requirements
-- **R658 (Startup Transition Authority)**: The Main thread MUST remain silent during activity transitions. Automatic service restoration is deferred by `STARTUP_SETTLING_DELAY_MS` (3000ms) to ensure animations complete before IPC bursts.
-- **R659 (JNI Initialization Integrity)**: `MbrainHardwareManager` verifies `isLibraryLoaded` state before every call. If context loss is detected, it triggers background re-initialization without blocking the logic thread.
+- **R642 (High-Contrast Map Controls)**: All map-overlay controls MUST utilize solid backgrounds (e.g., White or Role-Primary) and minimum 1dp (preferred 2dp) borders to ensure accessibility on high-brightness outdoor Mapnik tiles.
 
 ## 📊 Status Tracker
-- **[Issue #653] Excessive Garbage Collection**: 🔴 Open. Churn detected in kinematic/telemetry loops.
-- **[Issue #658] Persistent Startup Main Thread Stalls**: 🟢 Resolved. 3s settling delay implemented in `MainAppContent`.
-- **[Issue #659] libmbrainSDK Initialization Instability**: 🟢 Resolved. JNI bridge hardened with proactive re-init.
+- **[Issue #642] Map Settings Icon Contrast**: 🟢 Resolved. Standardized icon treatments for high contrast.
+- **[Issue #653] Excessive Garbage Collection**: 🟢 Resolved. Hot-paths refactored for Zero-Churn.
+- **[Issue #658] Persistent Startup Main Thread Stalls**: 🟢 Resolved.
+- **[Issue #659] libmbrainSDK Initialization Instability**: 🟢 Resolved.
 - **[Issue #656] userfaultfd unsupported**: 🔍 Tracked. Samsung A15 kernel limitation.
-- **[Issue #657] Compose Snapshot Lock Failure**: 🔍 Tracked. Verification failure in state lists.
+- **[Issue #657] Compose Snapshot Lock Failure**: 🔍 Tracked.
 
 ## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **SUCCESSFUL** (vJuly.30.47).
+- **Build Status**: 🟢 **SUCCESSFUL** (vJuly.30.56).
 - **Forensic Audit History**:
-    - **Startup**: Logcat confirmed 1.8s stalls (155 frames) eliminated by deferring FGS start until RESUMED + 3s.
-    - **JNI**: Standardized `JNI_RET_NOT_INITIALIZED` (-5) return code for background recovery signaling.
+    - **UI/UX**: Standardized map controls in `MapComponents.kt` for accessibility.
+    - **GC Performance**: Maintained Zero-Churn compliance (R653/R653b).
 - **Requirement Alignment**: 
-    - **R658/R659**: Formally integrated into `SOT_MASTER_REQUIREMENTS.md`.
+    - **R642**: Formally integrated into `SOT_MASTER_REQUIREMENTS.md`.
 
-**Status**: Performance hardening (Startup/JNI) complete. Version July.30.47 ready for Issue #653. 
+**Status**: UI/UX accessibility hardening complete. Version July.30.56 ready for kernel-level stability investigations.
 🟢 **READY FOR NEW CHAT.**
