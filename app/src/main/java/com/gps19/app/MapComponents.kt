@@ -38,13 +38,14 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * July.30.657:
+ * - Issue #657: Compose Snapshot Lock Failure (#663 Regression). Enforced strict 
+ *   decoupling by converting SnapshotStateList to static toList() snapshots 
+ *   before imperative MapOverlayManager processing. Eliminates conditionalUpdate 
+ *   lock contention on budget hardware (R-HARDWARE-01).
  * July.31.01:
  * - Issue #657: Compose Snapshot Lock Failure. Wrapped AndroidView update block 
- *   in Snapshot.withoutReadObservation to eliminate lock verification overhead 
- *   during high-frequency telemetry bursts (R-HARDWARE-01).
- * July.30.56:
- * - Issue #642: Map Settings Icon Contrast. Standardized icon treatments for accessibility 
- *   on budget screens. Switched to solid backgrounds and stronger borders for map controls.
+ *   in Snapshot.withoutReadObservation.
  */
 
 @Composable
@@ -320,13 +321,19 @@ fun OsmMap(
             })
         } 
     }, update = { view ->
-        // Issue #657: Wrapped in Snapshot.withoutReadObservation to eliminate 
-        // lock verification failures during high-frequency telemetry updates.
+        // Issue #657 (#663 Regression): Decouple SnapshotStateList from imperative processing.
+        // Convert to plain toList() snapshots outside the update loop to eliminate 
+        // lock contention for conditionalUpdate during high-frequency telemetry.
+        val sTrail = trail.toList()
+        val sViewerTrail = viewerTrail.toList()
+        val sViolations = violations.toList()
+        val sHome = home.toList()
+
         Snapshot.withoutReadObservation {
             overlayManager?.let { om ->
-                val h = om.updateHomePoints(home, uiState.isFenceVisible, uiState.maxDistance, isTrackerMode, uiState.geofenceMode, onTap, onRemoveMarker)
-                val t = om.updateTrails(trail, viewerTrail, systemPulseRt)
-                val v = om.updateViolations(violations, uiState.isViolationsVisible, uiState.isGeofenceViolationsVisible, systemPulseRt)
+                val h = om.updateHomePoints(sHome, uiState.isFenceVisible, uiState.maxDistance, isTrackerMode, uiState.geofenceMode, onTap, onRemoveMarker)
+                val t = om.updateTrails(sTrail, sViewerTrail, systemPulseRt)
+                val v = om.updateViolations(sViolations, uiState.isViolationsVisible, uiState.isGeofenceViolationsVisible, systemPulseRt)
                 val p = om.updateCurrentPositions(
                     trackerValid = smoothedTrackerPos.value != null,
                     trackerPos = smoothedTrackerPos.value,

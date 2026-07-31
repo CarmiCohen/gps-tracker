@@ -1,14 +1,14 @@
-# System Source of Truth (SoT) - July.31.38 (Performance & Stability)
+# System Source of Truth (SoT) - July.30.657 (Snapshot Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Compose Snapshot Hardening (R657)**: (Hardened July.30.657) To prevent lock verification failures during high-frequency telemetry updates, imperative `AndroidView` update blocks MUST be wrapped in `Snapshot.withoutReadObservation`. Furthermore, high-frequency reactive collections (`SnapshotStateList`) MUST be converted to static `toList()` snapshots before being passed to imperative View update blocks. This strictly decouples imperative view manipulations from the Compose Recomposer's tracking mechanism, eliminating transaction contention, `conditionalUpdate` warnings, and "Davey" stalls on budget hardware (R-HARDWARE-01). (Issue #657, #663)
 *   **Log Buffer Pressure Authority (R660)**: To prevent I/O spikes and coroutine overhead during high-frequency telemetry, the logging system MUST utilize a non-blocking circular buffer (Channel-based). Log submission MUST be decoupled from persistence. The `LogRepository` MUST process logs in batches (e.g., 50 entries or 2000ms delay) and utilize SQLite batch inserts within single transactions to minimize disk contention. (Issue #660, July.31.38)
 *   **Foreground Service Restoration Hardening (R661)**: All foreground service start attempts, particularly during automatic restoration or deferred recovery, MUST be wrapped in an exhaustive `try-catch (Throwable)` block to intercept `ForegroundServiceStartNotAllowedException`. If the OS denies the start, the system MUST transition to a "Pending" state and defer the attempt until a valid foreground state is established (e.g., in `onResume`). (Issue #661, July.31.01)
 *   **16KB Page Size Compatibility (R628)**: All native libraries MUST be aligned for 16KB page size compatibility to support Android 15+ hardware (e.g., Samsung A15). Linker flags MUST include `-Wl,-z,max-page-size=16384`, Gradle MUST set `useLegacyPackaging = false`, and `AndroidManifest.xml` MUST set `android:extractNativeLibs="false"` to ensure the OS respects uncompressed alignment. (Issue #665, July.31.37)
 *   **Hardware IPC Throttling (R666)**: On budget hardware (Samsung A15), high-cost system service calls (battery optimization checks, overlay permissions, `checkSelfPermission`) MUST be throttled to a minimum of 5000ms inside `SystemStatusProvider`. Permission polling in `MainViewModel` MUST be relaxed to 5s when the Setup UI is visible to prevent main-thread ANRs caused by `getPackageName` IPC pressure. (Issue #666, July.31.37)
 *   **JNI Bridge Preservation (R662)**: The `MbrainHardwareManager` and all native methods MUST be protected from ProGuard/R8 obfuscation to ensure the JNI linker can resolve symbols at runtime. (Issue #662, July.31.37)
-*   **Compose Snapshot Hardening (R657)**: To prevent lock verification failures during high-frequency telemetry updates, imperative `AndroidView` update blocks MUST be wrapped in `Snapshot.withoutReadObservation`. This decouples imperative view manipulations from the Compose Recomposer's tracking mechanism, eliminating transaction contention and "Davey" stalls. (Issue #657, July.31.01)
 *   **Kernel-Level Memory Hardening (R656)**: On devices with limited `userfaultfd` support (e.g., Samsung A15), the application MUST utilize `android:largeHeap="true"` to reduce ART compaction frequency. Additionally, `GpsApplication` MUST implement aggressive `onTrimMemory` and `onLowMemory` handlers to proactively release non-critical caches before the OS triggers high-pressure compaction cycles. (Issue #656, July.31.00)
 *   **Budget Baseline Optimization (R-HARDWARE-01)**: The Tracking Engine and UI MUST be optimized for a "Budget Baseline" (Samsung A15). High-end hardware capabilities SHALL be bypassed in favor of cross-device stability, aggressive IPC caching, and main-thread silence. Map overlays MUST implement throttling (e.g., 1000ms) for heavy recalculations. (Issue #640, July.30.35)
 *   **High-Contrast Map Controls (R642)**: All map-overlay controls MUST utilize solid backgrounds and minimum 1dp borders to ensure accessibility on high-brightness outdoor tiles. (Issue #642, July.30.56)
@@ -71,5 +71,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.31.38.
+*   **Current Release**: July.30.657.
 *   **Source of Truth**: app/build.gradle versionName.
