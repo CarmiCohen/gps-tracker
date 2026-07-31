@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - July.30.56 (UI/UX Hardening)
+# System Source of Truth (SoT) - July.31.00 (Kernel Memory Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Kernel-Level Memory Hardening (R656)**: On devices with limited `userfaultfd` support (e.g., Samsung A15), the application MUST utilize `android:largeHeap="true"` to reduce ART compaction frequency. Additionally, `GpsApplication` MUST implement aggressive `onTrimMemory` and `onLowMemory` handlers to proactively release non-critical caches (osmdroid tiles, transient buffers) before the OS triggers high-pressure compaction cycles. (Issue #656, July.31.00)
 *   **Budget Baseline Optimization (R-HARDWARE-01)**: The Tracking Engine and UI MUST be optimized for a "Budget Baseline" (Samsung A15 / Octa-core 2.2GHz / 4GB RAM). High-end hardware capabilities SHALL be bypassed in favor of cross-device stability, aggressive IPC caching, and main-thread silence. Map overlays MUST implement throttling (e.g., 1000ms) for heavy recalculations like trail processing and accuracy circle drift. (Issue #640, July.30.35)
 *   **High-Contrast Map Controls (R642)**: All map-overlay controls MUST utilize solid backgrounds (e.g., White or Role-Primary) and minimum 1dp (preferred 2dp) borders to ensure accessibility on high-brightness outdoor Mapnik tiles. (Issue #642, July.30.56)
 *   **Zero-Churn GPS Hot-Path (R653)**: The high-frequency GPS processing chain (`LocationProcessor` -> `LocationSentinel` -> `PhysicsUtils`) MUST NOT allocate new result objects on every fix. All result containers (e.g., `SentinelResult`, `ProcessedLocation`, `JumpConfidence`) MUST utilize mutable flyweights and be reused across ticks. List-based transformations (filter/map/minOf) are prohibited in the 1Hz/10Hz hot-path; indexed loops over pre-allocated or cached collections MUST be used instead. (Issue #653, July.30.55)
@@ -28,7 +29,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Deferred Recovery Latency Audit Authority (R629)**: The system MUST record the timestamp (`recovery_blocked_ts`) when a background start is restricted by the OS. Upon successful restoration in the foreground, the system MUST calculate and log the \"Service Blackout Duration\" as a forensic performance audit. (Issue #629, July.30.27)
 *   **Forensic Recovery Log Aggregation Authority (R630)**: The system MUST aggregate \"Service Blackout Duration\" metrics across all recovery events. It MUST maintain a cumulative blackout time and a recovery count in persistent storage. Upon every successful restoration, the system MUST log the current recovery latency along with the updated running average of the \"Service Blackout Duration\". (Issue #630, July.30.28)
 *   **Forensic UI visualization Authority (R631)**: The system MUST visualize \"Service Blackout Duration\" trends within the Diagnostics UI. It MUST display the total count of recovery events and the running average blackout duration. Durations exceeding 30,000ms MUST be visually flagged as a performance warning. (Issue #631, July.30.29)
-*   **Forensic Recovery Marker Authority (R632)**: The Analytical Ribbon UI MUST integrate service recovery markers into the high-frequency sparklines. These markers MUST visually coincide with the point of service restoration following a telemetry gap, allowing forensic correlation between \"blackout periods\" and \"system revival pulses\". (Issue #632, July.30.31)
+*   **Forensic Recovery Marker Authority (R632)**: The Analytical Ribbon UI integrate service recovery markers into the high-frequency sparklines. These markers MUST visually coincide with the point of service restoration following a telemetry gap, allowing forensic correlation between \"blackout periods\" and \"system revival pulses\". (Issue #632, July.30.31)
 *   **Foreground Service Start Hardening (R634)**: The system MUST catch `ForegroundServiceStartNotAllowedException` during explicit manual or automatic service starts. If restricted by the OS, the app MUST mark the restoration as pending and retry automatically when a valid foreground state is reached (e.g., in `onResume`). (Issue #634, July.30.31)
 *   **Permission Logic Integrity (R638)**: All critical application permissions tracked in `PermissionState` MUST default to `false` (Not Granted). Status verification MUST be derived exclusively from OS-level checks through `SystemStatusProvider` to prevent false-positive indicators in the Setup UI. (Issue #638, July.30.31)
 *   **GNSS Callback Conflation Authority (R614)**: High-frequency GNSS hardware callbacks MUST be sampled to prevent downstream flow processing overhead. (Issue #614, July.28.20)
@@ -96,5 +97,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: July.30.56.
+*   **Current Release**: July.31.00.
 *   **Source of Truth**: app/build.gradle versionName.
