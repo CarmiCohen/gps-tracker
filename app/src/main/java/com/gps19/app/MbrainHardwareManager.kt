@@ -1,22 +1,26 @@
 package com.gps19.app
 
 import com.gps19.core.engine.JNI_RET_EINTR
+import com.gps19.core.engine.JNI_RET_NOT_INITIALIZED
 import com.gps19.core.engine.LATENCY_THRESHOLD_JNI_MS
 import com.gps19.core.engine.LatencyMonitor
 import com.gps19.core.engine.TimeProvider
 import timber.log.Timber
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 
 /**
  * MbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * July.30.47:
+ * - Issue #659: Stability: JNI Initialization Integrity. Implemented R659 with 
+ *   proactive state verification and background re-initialization. Added 
+ *   JNI_RET_NOT_INITIALIZED handling.
  * July.30.25:
- * - Issue #625: Structural: Mbrain JNI Reliability Audit. Hardened bridge with 
- *   EINTR retry logic in executeNativeWithRetry.
  * - Issue #627: Performance: Startup ANR Optimization. Offloaded native library 
- *   loading to background coroutines via explicit loadLibrary() call. Removed init block.
- * July.29.01:
- * - Issue #623: Structural: Latency Monitor Metric Cleanup.
+ *   loading to background coroutines.
  */
 object MbrainHardwareManager {
 
@@ -26,7 +30,7 @@ object MbrainHardwareManager {
 
     /**
      * loadLibrary: Explicitly load the native SDK.
-     * Should be called from a background thread (e.g. Dispatchers.IO) to avoid startup ANRs.
+     * Should be called from a background thread to avoid startup ANRs.
      */
     fun loadLibrary() {
         if (isLibraryLoaded) return
@@ -45,15 +49,19 @@ object MbrainHardwareManager {
     }
 
     /**
-     * executeNativeWithRetry: Hardens JNI calls against EINTR interruptions.
-     * July.30.25 (Issue #625): Standardized retry loop for robust hardware interaction.
+     * executeNativeWithRetry: Hardens JNI calls against EINTR interruptions and 
+     * missing initialization state (Issue #659).
      */
     private inline fun executeNativeWithRetry(
         timeProvider: TimeProvider,
         operation: String,
         crossinline block: () -> Int
     ): Int {
-        if (!isLibraryLoaded) return -1
+        if (!isLibraryLoaded) {
+            triggerBackgroundReinit()
+            return JNI_RET_NOT_INITIALIZED
+        }
+        
         return jniLock.withLock {
             var result: Int
             var attempts = 0
@@ -69,8 +77,13 @@ object MbrainHardwareManager {
                     result = try {
                         block()
                     } catch (e: UnsatisfiedLinkError) {
-                        Timber.e("Native method for $operation not found")
-                        return@measureAndAudit -2
+                        Timber.e("Native method for $operation not found. Triggering re-init.")
+                        isLibraryLoaded = false
+                        triggerBackgroundReinit()
+                        return@measureAndAudit JNI_RET_NOT_INITIALIZED
+                    } catch (e: Exception) {
+                        Timber.e(e, "Unexpected native error in $operation")
+                        return@measureAndAudit -1
                     }
                     attempts++
                 } while (result == JNI_RET_EINTR && attempts < MAX_JNI_RETRIES)
@@ -80,6 +93,13 @@ object MbrainHardwareManager {
                 }
                 result
             }
+        }
+    }
+
+    private fun triggerBackgroundReinit() {
+        @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
+        GlobalScope.launch(Dispatchers.IO) {
+            loadLibrary()
         }
     }
 

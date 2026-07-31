@@ -27,11 +27,12 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * July.30.48:
+ * - Issue #653: Performance: GC Churn Optimization. Refactored updateRibbons 
+ *   and backfill paths to use TelemetryAggregator callback API, eliminating 
+ *   List and Pair allocations in the high-frequency telemetry path (R-HARDWARE-01).
  * July.30.31:
- * - Issue #632: Analytical Ribbons: Recovery Markers. Integrated isRecoveryEvent 
- *   into updateRibbons and forensic backfills.
- * July.29.01:
- * - Issue #623: Structural: Latency Monitor Metric Cleanup.
+ * - Issue #632: Analytical Ribbons: Recovery Markers.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -130,7 +131,9 @@ class HistoryManager @Inject constructor(
             currentMa = currentMa, locationPendingReason = locationPendingReason, kineticEnergy = kineticEnergy
         )
         
-        processResults(aggregator.processPoint(currentPoint))
+        aggregator.processPoint(currentPoint) { scale, point ->
+            repository.addHistoryPoint(scale.key, mapToAppPoint(point))
+        }
 
         if (now - lastTimeTriggerTs >= 60000L || lastTimeTriggerTs == 0L) {
             lastTimeTriggerTs = now
@@ -140,19 +143,6 @@ class HistoryManager @Inject constructor(
             handleHourlyAutoSave(hour)
             handleDailyCleanup(calendar, hour, minute)
             handleDailyArchiving(calendar, hour, minute)
-        }
-    }
-
-    private fun processResults(results: List<Pair<RibbonScale, EngineConnectionPoint>>) {
-        LatencyMonitor.measureAndAudit(
-            timeProvider, LATENCY_THRESHOLD_DB_WRITE_MS,
-            "processResults",
-            LatencyMonitor.AuditType.IO,
-            { message, _ -> _historyEvents.tryEmit(HistoryEvent.LogEvent(message, false)) }
-        ) {
-            results.forEach { (scale, point) -> 
-                repository.addHistoryPoint(scale.key, mapToAppPoint(point)) 
-            }
         }
     }
 
@@ -169,62 +159,50 @@ class HistoryManager @Inject constructor(
         locationPendingReason: LocationPendingReason, kineticEnergy: Double,
         isRecoveryEvent: Boolean
     ) {
-        LatencyMonitor.measureAndAudit(
-            timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
-            "backfillAnalyticalGaps",
-            LatencyMonitor.AuditType.PERFORMANCE,
-            { message, _ -> _historyEvents.tryEmit(HistoryEvent.LogEvent(message, false)) }
-        ) {
-            val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
-            val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
-            
-            val baseTemplate = EngineConnectionPoint(
-                ts = 0L, rt = 0L, rtt = rtt, remoteSig = peerSignal, isConnected = peerAvail, hasGps = hasGps,
-                isRecoveryEvent = isRecoveryEvent,
-                accuracy = accuracy, maxAccuracy = maxAccuracy, noiseIdx = noiseIdx, luxIdx = luxIdx,
-                vibeIdx = vibeIdx, proxIdx = proxIdx, liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx,
-                baroIdx = baroIdx, verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs,
-                sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
-                isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt), isSitActive = isSitActive,
-                isBatterySteepDischarge = isBatterySteepDischarge, isCoolingModeActive = isCoolingModeActive,
-                speed = speed, bearing = bearing, currentMa = currentMa, locationPendingReason = locationPendingReason, kineticEnergy = kineticEnergy
-            )
-            
-            val results = aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplate)
-            val fourMPoints = ArrayList<ConnectionPoint>()
-            
-            results.forEach { (scale, point) ->
-                val appPoint = mapToAppPoint(point)
-                if (scale == RibbonScale.FOUR_MIN) { 
-                    fourMPoints.add(appPoint) 
-                } else { 
-                    repository.addHistoryPoint(scale.key, appPoint) 
-                }
+        val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
+        val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
+        
+        val baseTemplate = EngineConnectionPoint(
+            ts = 0L, rt = 0L, rtt = rtt, remoteSig = peerSignal, isConnected = peerAvail, hasGps = hasGps,
+            isRecoveryEvent = isRecoveryEvent,
+            accuracy = accuracy, maxAccuracy = maxAccuracy, noiseIdx = noiseIdx, luxIdx = luxIdx,
+            vibeIdx = vibeIdx, proxIdx = proxIdx, liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx,
+            baroIdx = baroIdx, verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs,
+            sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
+            isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt), isSitActive = isSitActive,
+            isBatterySteepDischarge = isBatterySteepDischarge, isCoolingModeActive = isCoolingModeActive,
+            speed = speed, bearing = bearing, currentMa = currentMa, locationPendingReason = locationPendingReason, kineticEnergy = kineticEnergy
+        )
+        
+        val fourMPoints = ArrayList<ConnectionPoint>()
+        
+        aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplate) { scale, point ->
+            val appPoint = mapToAppPoint(point)
+            if (scale == RibbonScale.FOUR_MIN) { 
+                fourMPoints.add(appPoint) 
+            } else { 
+                repository.addHistoryPoint(scale.key, appPoint) 
             }
-            
-            if (fourMPoints.isNotEmpty()) {
-                repository.addHistoryPoints("4M", fourMPoints)
-                backfillAuditCount += fourMPoints.size
-                hourlyBackfillTotal += fourMPoints.size
-            }
+        }
+        
+        if (fourMPoints.isNotEmpty()) {
+            repository.addHistoryPoints("4M", fourMPoints)
+            backfillAuditCount += fourMPoints.size
+            hourlyBackfillTotal += fourMPoints.size
         }
     }
 
     private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
-        LatencyMonitor.measureAndAudit(
-            timeProvider, LATENCY_THRESHOLD_DB_WRITE_MS,
-            "fillRealGap",
-            LatencyMonitor.AuditType.IO,
-            { message, _ -> _historyEvents.tryEmit(HistoryEvent.LogEvent(message, false)) }
-        ) {
-            val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs, now) else emptySequence()
-            val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs, now) else emptySequence()
-            
-            RibbonScale.entries.forEach { scale ->
-                val gapPoints = aggregator.fillRealGap(scale.key, scale.intervalSeconds, lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb())
-                if (gapPoints.isNotEmpty()) { 
-                    repository.addHistoryPoints(scale.key, gapPoints.map { mapToAppPoint(it) }) 
-                }
+        val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs, now) else emptySequence()
+        val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs, now) else emptySequence()
+        
+        RibbonScale.entries.forEach { scale ->
+            val gapPoints = ArrayList<ConnectionPoint>()
+            aggregator.fillRealGap(scale, lastTickRt, nowRt, lastTickTs, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb()) { point ->
+                gapPoints.add(mapToAppPoint(point))
+            }
+            if (gapPoints.isNotEmpty()) { 
+                repository.addHistoryPoints(scale.key, gapPoints)
             }
         }
     }

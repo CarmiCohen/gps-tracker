@@ -2,20 +2,15 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.30.47:
+ * - Issue #658: Performance: Startup Transition Hardening. Added 
+ *   STARTUP_SETTLING_DELAY_MS (3000ms) to ensure Main-thread silence 
+ *   during activity transitions on budget hardware (R658).
  * July.30.25:
  * - Issue #625: Structural: Mbrain JNI Reliability Audit. Added JNI_RET_EINTR.
  * July.30.23:
  * - Issue #624: Forensic: System Integrity Periodic Check. Added 
  *   INTEGRITY_HEARTBEAT_INTERVAL_MS for flow connectivity monitoring.
- * July.29.01:
- * - Issue #623: Structural: Latency Monitor Metric Cleanup. Added 
- *   LATENCY_THRESHOLD_ALARM_LOGIC_MS for dedicated watchdog monitoring.
- * July.29.00:
- * - Issue #622: Forensic: Location Refresh Reactivity Hardening. Added 
- *   LOCATION_RECOVERY_DEBOUNCE_MS and updated GPS gap constants.
- * July.28.21:
- * - Issue #615: Forensic: Stability Audit Metric Expansion. Added 
- *   GNSS_EXPECTED_INTERVAL_MS and GNSS_JITTER_THRESHOLD_MS.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -40,6 +35,7 @@ const val LOG_LIMIT_STRICT = 5000
 
 // Native Bridge Constants
 const val JNI_RET_EINTR = -4
+const val JNI_RET_NOT_INITIALIZED = -5
 
 // Physics & Motion Limits
 const val MAX_PHYSICAL_SPEED_MPS = 33.33 // 120 km/h
@@ -195,6 +191,7 @@ const val GPS_REVIVAL_RETRY_INTERVAL_MS = 120000L
 const val MAX_REVIVAL_ATTEMPTS = 3
 const val HARDWARE_BOOT_GRACE_MS = 30000L
 const val LANDING_PAGE_PAUSE_MS = 2000L
+const val STARTUP_SETTLING_DELAY_MS = 3000L
 
 // GPS Polling Intervals (Central Authority)
 const val HIGH_FREQUENCY_GPS_POLLING_MS = 2000L

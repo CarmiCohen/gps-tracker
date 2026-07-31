@@ -19,12 +19,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * July.30.55:
+ * - Issue #653: Performance: Zero-Churn. Updated references to ProcessedLocation 
+ *   after relocation to core.engine (R-HARDWARE-01).
  * July.30.45:
- * - Issue #654: Performance Hardening. Refactored all remaining direct IPC 
- *   calls (microphone check, network audits) to use throttled SystemStatusProvider 
- *   state (R650 compliance).
- * July.30.43:
- * - Issue #649 & #650: Hardened processTick.
+ * - Issue #654: Performance Hardening.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -35,7 +34,7 @@ class TrackerService : BaseMonitorService() {
     private var alarmEvalJob: Job? = null
     
     private var lastKnownLocation: Location? = null
-    private var lastProcessedLocation: LocationProcessor.ProcessedLocation? = null
+    private var lastProcessedLocation: ProcessedLocation? = null
     private var latestGnssDetail: GnssDetail? = null
 
     private var lastGpsSpeed = 0.0
@@ -533,7 +532,7 @@ class TrackerService : BaseMonitorService() {
         if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = nowRt
     }
 
-    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerConnected: Boolean, processed: LocationProcessor.ProcessedLocation, snapshot: AppSensorManager.ForensicSnapshot) {
+    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerConnected: Boolean, processed: ProcessedLocation, snapshot: AppSensorManager.ForensicSnapshot) {
         val health = integrityMonitor.currentHealth
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {

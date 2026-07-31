@@ -16,11 +16,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * July.30.55:
+ * - Issue #653: Performance: Zero-Churn. Updated references to ProcessedLocation 
+ *   after relocation to core.engine (R-HARDWARE-01).
  * July.30.31:
- * - Issue #632: Analytical Ribbons: Recovery Markers. Integrated isRecoveryEvent 
- *   into history updates to flag forensic service restoration.
- * July.28.24:
- * - Issue #621: Fixed regressions from isImportant naming alignment and kinematicState partitioning.
+ * - Issue #632: Analytical Ribbons: Recovery Markers.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -31,7 +31,7 @@ class ViewerService : BaseMonitorService() {
     private var gnssDetailJob: Job? = null
     
     private var lastKnownLocation: Location? = null
-    private var lastProcessedLocation: LocationProcessor.ProcessedLocation? = null
+    private var lastProcessedLocation: ProcessedLocation? = null
     private var latestGnssDetail: GnssDetail? = null
 
     private var lastGpsSpeed = 0.0

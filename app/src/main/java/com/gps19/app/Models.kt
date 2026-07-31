@@ -10,15 +10,17 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * July.30.55:
+ * - Issue #653: Performance: Zero-Churn. Restored AppSensorEvent sealed class 
+ *   required for hardware failure signaling (R-HARDWARE-01).
  * July.30.31:
- * - Issue #634: Foreground Service Start Hardening. Added SetRecoveryPending to UiEvent.
- * - Issue #632: Analytical Ribbons: Recovery Markers. Added isRecoveryEvent to 
- *   ConnectionPoint for forensic blackout visibility in UI.
- * July.30.26:
- * - Issue #626: Foreground Service Start Hardening. Added TriggerRecovery to UiEvent.
- * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection.
+ * - Issue #634: Foreground Service Start Hardening.
  */
+
+sealed class AppSensorEvent {
+    data class HardwareFailure(val reason: String) : AppSensorEvent()
+    data class LogEvent(val message: String, val isImportant: Boolean) : AppSensorEvent()
+}
 
 @Serializable
 data class SerializableGeoPoint(val lat: Double, val lng: Double) {

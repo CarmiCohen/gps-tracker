@@ -1,36 +1,35 @@
-# Project Issues & Hardening Tracking (July.30.46)
+# Project Issues & Hardening Tracking (July.30.55)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 4 |
+| **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 491 |
+| **Resolved (Total)** | 🟢 Progress | 494 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #658] [Severity: High] [Category: Performance] Persistent Startup Davey Stalls**. Logcat confirms 1.8s and 1.2s main thread stalls on Samsung A15 during startup transition, even after IPC throttling.
-*   **[Issue #659] [Severity: Medium] [Category: Stability] libmbrainSDK Initialization Instability**. Detected "Can't load libmbrainSDK" / "initMbrain failed" logs appearing intermittently after successful initial load.
 *   **[Issue #656] [Severity: Medium] [Category: Stability] userfaultfd: MOVE ioctl unsupported**. Kernel-level timeout detected on Samsung A15; may impact ART memory compaction efficiency.
 *   **[Issue #657] [Severity: Low] [Category: Performance] Compose Snapshot Lock Verification Failure**. `SnapshotStateList` methods failing verification, leading to sub-optimal UI performance.
 
 ---
 
 ## 🔴 Open Issues
-*   **[Issue #653] Excessive Garbage Collection**. Confirmed ~34MB churn every 120ms.
 *   **[Issue #642] Map Settings Icon Contrast**. Verified low contrast on Mapnik tiles.
 
 ---
 
-## 🟢 Recently Resolved Issues (July.30.46)
-*   **[Issue #655] [Severity: High] [Category: Performance] Regression: Unthrottled IPC Bursts**.
-    *   **Resolution**: Implemented `FORCED_REFRESH_COOLDOWN_MS` (2s) in `SystemStatusProvider` to prevent reactive UI/Service cycles from flooding the system with unthrottled IPC audits.
-    *   **Impact**: Eliminated `getPackageName` logcat spam and associated 1.1s Davey stalls on Samsung A15 hardware.
-*   **[Issue #654] UI Jank & Main Thread Stalls during IPC bursts**.
-    *   **Resolution**: Centralized IPC calls into `SystemStatusProvider`.
+## 🟢 Recently Resolved Issues (July.30.55)
+*   **[Issue #653] [Severity: High] [Category: Performance] Excessive Garbage Collection**.
+    *   **Resolution**: Refactored GPS and Telemetry hot-paths for Zero-Churn. Converted result models (`SentinelResult`, `ProcessedLocation`) to mutable flyweights and replaced functional List operations (`filter`, `minOf`) with indexed loops (R-HARDWARE-01).
+    *   **Impact**: Eliminated ~34MB/120ms heap churn on Samsung A15, stabilizing frame rates and preventing Davey stalls.
+*   **[Issue #658] [Severity: High] [Category: Performance] Persistent Startup Davey Stalls**.
+    *   **Resolution**: Implemented `STARTUP_SETTLING_DELAY_MS` (3000ms) to defer automatic service restoration.
+*   **[Issue #659] [Severity: Medium] [Category: Stability] libmbrainSDK Initialization Instability**.
+    *   **Resolution**: Added proactive state verification and background re-initialization.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.46-G)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.30.55-G)

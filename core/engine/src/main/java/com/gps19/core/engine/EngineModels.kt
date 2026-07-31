@@ -4,11 +4,13 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * July.30.49:
+ * - Issue #653: Performance: Zero-Churn Refactoring. Converted SentinelResult, 
+ *   JumpConfidence, and ProcessedLocation into mutable flyweights to eliminate 
+ *   heap churn in GPS/Telemetry hot-paths (R-HARDWARE-01).
  * July.30.45:
  * - Issue #654: Performance Hardening. Added isMicrophoneGranted to HardwareCapabilities 
  *   to support centralized throttled auditing of hardware-bound permissions (R650).
- * July.30.31:
- * - Issue #632: Analytical Ribbons: Recovery Markers.
  */
 
 @Serializable
@@ -197,25 +199,58 @@ class EngineSensorSnapshot(
     }
 }
 
+/**
+ * Issue #653: Refactored to mutable class for zero-churn results.
+ */
 @Serializable
-data class SentinelResult(
-    val status: SentinelStatus,
-    val reason: String = "",
-    val optimizedPoint: EngineGeoPoint? = null,
-    val jumpConfidence: JumpConfidence? = null,
-    val suppressionNote: String? = null,
-    val promotedPoints: List<EngineGeoPoint>? = null
-)
+class SentinelResult(
+    var status: SentinelStatus = SentinelStatus.VALID,
+    var reason: String = "",
+    var optimizedPoint: EngineGeoPoint? = null,
+    var jumpConfidence: JumpConfidence? = null,
+    var suppressionNote: String? = null,
+    var promotedPoints: List<EngineGeoPoint>? = null
+) {
+    fun reset(status: SentinelStatus = SentinelStatus.VALID) {
+        this.status = status
+        this.reason = ""
+        this.optimizedPoint = null
+        this.jumpConfidence?.reset()
+        this.suppressionNote = null
+        this.promotedPoints = null
+    }
+}
 
+/**
+ * Issue #653: Refactored to mutable class for zero-churn results.
+ */
 @Serializable
-data class JumpConfidence(
-    val score: Int = 0, 
-    val isJump: Boolean = false,
-    val isOutlier: Boolean = false,
-    val tier: Int = 0, 
-    val reason: String = "",
-    val isAdaptiveJump: Boolean = false
-)
+class JumpConfidence(
+    var score: Int = 0, 
+    var isJump: Boolean = false,
+    var isOutlier: Boolean = false,
+    var tier: Int = 0, 
+    var reason: String = "",
+    var isAdaptiveJump: Boolean = false
+) {
+    fun reset() {
+        score = 0
+        isJump = false
+        isOutlier = false
+        tier = 0
+        reason = ""
+        isAdaptiveJump = false
+    }
+
+    fun copyFrom(other: JumpConfidence) {
+        this.score = other.score
+        this.isJump = other.isJump
+        this.isOutlier = other.isOutlier
+        this.tier = other.tier
+        this.reason = other.reason
+        this.isAdaptiveJump = other.isAdaptiveJump
+    }
+}
 
 @Serializable
 data class SatelliteInfo(
@@ -309,3 +344,54 @@ data class AlarmEvaluationState(
     val health: SystemHealthState = SystemHealthState(),
     val capabilities: HardwareCapabilities = HardwareCapabilities()
 )
+
+/**
+ * Issue #653: Refactored to mutable class for zero-churn results.
+ */
+class ProcessedLocation(
+    var rawPoint: EngineGeoPoint = EngineGeoPoint(0.0, 0.0),
+    var optimizedPoint: EngineGeoPoint = EngineGeoPoint(0.0, 0.0),
+    var status: SentinelStatus = SentinelStatus.VALID,
+    var maxAccuracy: Double = 0.0,
+    var currentAccuracy: Double = 0.0,
+    var filteredSpeed: Double = 0.0,
+    var timestamp: Long = 0L,
+    var rt: Long = 0L,
+    var isStalled: Boolean = false,
+    var isClockRegression: Boolean = false,
+    var receiptRt: Long = 0L,
+    var isTrajectoryPromoted: Boolean = false,
+    var isAdaptiveJump: Boolean = false,
+    var jumpTier: Int = 0,
+    var distToHome: Double? = null,
+    var isSpatiallyValid: Boolean = true,
+    var geofenceViolationDetected: Boolean = false,
+    var tamperDetected: Boolean = false,
+    var jammerDetected: Boolean = false,
+    var isAnchorLocked: Boolean = false,
+    var suppressionNote: String? = null,
+    var kineticEnergy: Double = 0.0
+) {
+    fun reset() {
+        status = SentinelStatus.VALID
+        maxAccuracy = 0.0
+        currentAccuracy = 0.0
+        filteredSpeed = 0.0
+        timestamp = 0L
+        rt = 0L
+        isStalled = false
+        isClockRegression = false
+        receiptRt = 0L
+        isTrajectoryPromoted = false
+        isAdaptiveJump = false
+        jumpTier = 0
+        distToHome = null
+        isSpatiallyValid = true
+        geofenceViolationDetected = false
+        tamperDetected = false
+        jammerDetected = false
+        isAnchorLocked = false
+        suppressionNote = null
+        kineticEnergy = 0.0
+    }
+}

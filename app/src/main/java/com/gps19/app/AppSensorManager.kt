@@ -34,20 +34,14 @@ import javax.inject.Singleton
 import kotlin.math.*
 
 /**
- * AppSensorEvent: Reactive event container for sensor hardware status.
- */
-sealed class AppSensorEvent {
-    data class HardwareFailure(val reason: String) : AppSensorEvent()
-    data class LogEvent(val message: String, val isImportant: Boolean) : AppSensorEvent()
-}
-
-/**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * July.30.48:
+ * - Issue #653: Performance: GC Churn Optimization. Refactored processVibration 
+ *   to use SentinelValidator primitive calculators, eliminating Pair allocation 
+ *   in high-frequency accelerometer path (R-HARDWARE-01).
  * July.30.45:
  * - Issue #654: Performance Hardening. Refactored activity recognition check 
- *   to use SystemStatusProvider (centralized throttled state) to eliminate 
- *   unthrottled IPC calls (R650 compliance). Fixed asCoroutineDispatcher 
- *   receiver type mismatch.
+ *   to use SystemStatusProvider.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -517,8 +511,11 @@ class AppSensorManager @Inject constructor(
         synchronized(this) { 
             if (delta > internalPeakVibration) internalPeakVibration = delta
             adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta, isWarming) 
-            val energyResult = SentinelValidator.updateKineticEnergy(currentKineticEnergy, delta, lastRawVibe, lastHpfValue)
-            currentKineticEnergy = energyResult.first; lastHpfValue = energyResult.second; lastRawVibe = delta
+            
+            // Issue #653: Using primitive-based kinetic energy calculators to eliminate Pair allocation.
+            lastHpfValue = SentinelValidator.computeNextHpf(lastHpfValue, delta, lastRawVibe)
+            currentKineticEnergy = SentinelValidator.computeNextEnergy(currentKineticEnergy, lastHpfValue)
+            lastRawVibe = delta
         }
         lastAccelX = x; lastAccelY = y; lastAccelZ = z
         val oldVal = vibrationCircularBuffer[vibrationCircularIdx]; vibrationCircularBuffer[vibrationCircularIdx] = delta

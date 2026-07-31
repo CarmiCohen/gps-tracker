@@ -4,8 +4,11 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: High-performance geospatial and kinematic calculations.
- * July.26.04:
- * - Architecture Simplification: Added safeDouble and calculateBearing utilities.
+ * July.30.52:
+ * - Issue #653: Performance: GC Churn Optimization. Refactored isVisualJump 
+ *   to accept a mutable flyweight, eliminating per-call allocations (R-HARDWARE-01).
+ * July.30.48:
+ * - Issue #653: Performance: GC Churn Optimization.
  */
 object PhysicsUtils {
 
@@ -99,17 +102,21 @@ object PhysicsUtils {
         return (last + delta * alpha + 360) % 360
     }
 
-    fun interpolateSegment(
+    /**
+     * interpolateSegmentCallback: Part of Issue #653. Callback-based interpolation 
+     * to achieve zero-churn forensics in the high-frequency trajectory path.
+     */
+    fun interpolateSegmentCallback(
         startLat: Double, startLng: Double, startTs: Long,
         endLat: Double, endLng: Double, endTs: Long,
         startAcc: Double, startMaxAcc: Double,
-        endAcc: Double, endMaxAcc: Double
-    ): List<EngineGeoPoint> {
+        endAcc: Double, endMaxAcc: Double,
+        onPoint: (Double, Double, Long, Double, Double) -> Unit
+    ) {
         val durationMs = endTs - startTs
-        if (durationMs <= 1000L) return emptyList()
+        if (durationMs <= 1000L) return
 
         val steps = (durationMs / 1000L).toInt()
-        val points = mutableListOf<EngineGeoPoint>()
 
         for (i in 1..steps) {
             val fraction = i.toDouble() / (steps + 1)
@@ -119,13 +126,12 @@ object PhysicsUtils {
             val acc = startAcc + (endAcc - startAcc) * fraction
             val maxAcc = startMaxAcc + (endMaxAcc - startMaxAcc) * fraction
             
-            points.add(EngineGeoPoint(lat, lng, ts = ts, accuracy = acc, maxAccuracy = maxAcc))
+            onPoint(lat, lng, ts, acc, maxAcc)
         }
-        return points
     }
 
     /**
-     * Multi-Factor Jump Engine logic. Standardized to Double.
+     * Multi-Factor Jump Engine logic. Zero-Churn optimized.
      */
     fun isVisualJump(
         lastLat: Double, lastLng: Double, 
@@ -136,9 +142,11 @@ object PhysicsUtils {
         lastSpeedMps: Double = 0.0,
         isParking: Boolean = false,
         altitudeDelta: Double = 0.0,
-        hasPhysicalMotion: Boolean = true
-    ): JumpConfidence {
-        if (lastLat == 0.0) return JumpConfidence()
+        hasPhysicalMotion: Boolean = true,
+        result: JumpConfidence
+    ) {
+        result.reset()
+        if (lastLat == 0.0) return
         
         val dist = calculateDistance(lastLat, lastLng, newLat, newLng)
         val timeDeltaSec = max(0.1, timeDeltaMs / 1000.0)
@@ -146,10 +154,15 @@ object PhysicsUtils {
         
         // Tier 1: Outlier Filter
         if (dist > OUTLIER_DISTANCE_THRESHOLD || speedMps > OUTLIER_SPEED_CAP_MPS) {
-            return JumpConfidence(score = 100, isJump = true, isOutlier = true, tier = 1, reason = "Hardware/Cold-Start Outlier")
+            result.score = 100
+            result.isJump = true
+            result.isOutlier = true
+            result.tier = 1
+            result.reason = "Hardware/Cold-Start Outlier"
+            return
         }
 
-        if (timeDeltaMs < 100) return JumpConfidence()
+        if (timeDeltaMs < 100) return
         
         var score = 0
         
@@ -191,7 +204,10 @@ object PhysicsUtils {
         var isJump = (isTier2 || isTier3 || score >= 50)
         if (isSnap) isJump = false
         
-        val reason = when {
+        result.score = score.coerceIn(0, 100)
+        result.isJump = isJump
+        result.tier = if (isTier2) 2 else if (isTier3) 3 else 0
+        result.reason = when {
             isSnap -> "Suppressed Accuracy Snap"
             !hasPhysicalMotion && speedMps > mismatchGate -> "Sensor Mismatch Jump (Urban Canyon)"
             isTier2 -> "Security Jump"
@@ -199,12 +215,5 @@ object PhysicsUtils {
             score >= 50 -> "High Confidence Jump"
             else -> ""
         }
-        
-        return JumpConfidence(
-            score = score.coerceIn(0, 100),
-            isJump = isJump,
-            tier = if (isTier2) 2 else if (isTier3) 3 else 0,
-            reason = reason
-        )
     }
 }

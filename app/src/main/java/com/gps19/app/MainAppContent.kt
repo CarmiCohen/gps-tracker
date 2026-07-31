@@ -37,17 +37,17 @@ import androidx.compose.runtime.getValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.gps19.core.engine.LANDING_PAGE_PAUSE_MS
+import com.gps19.core.engine.STARTUP_SETTLING_DELAY_MS
 import com.gps19.core.engine.CapabilityStatus
 import kotlinx.coroutines.delay
 import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * July.30.45:
- * - Issue #654: Performance Hardening. Refactored all permission checks to use 
- *   uiState.permissions (centralized throttled state) to eliminate unthrottled 
- *   main-thread IPC bursts (R650 compliance).
+ * July.30.47:
+ * - Issue #658: Performance: Startup Transition Hardening. Implemented R658 by 
+ *   replacing LANDING_PAGE_PAUSE_MS with STARTUP_SETTLING_DELAY_MS (3000ms) 
+ *   for automatic restoration to eliminate transition Davey stalls.
  */
 @Composable
 fun MainAppContent(
@@ -175,8 +175,9 @@ fun MainAppContent(
         if (mode != null) {
             if (navController.currentDestination?.route == Screen.Landing.route && !isManualSelectionInProgress) {
                 if (hasRequiredPermissions(mode)) {
-                    Timber.d("Automatic restoration: waiting ${LANDING_PAGE_PAUSE_MS}ms")
-                    delay(LANDING_PAGE_PAUSE_MS)
+                    // Issue #658: Use STARTUP_SETTLING_DELAY_MS (3000ms) to ensure activity transition is silent.
+                    Timber.d("Automatic restoration: waiting ${STARTUP_SETTLING_DELAY_MS}ms")
+                    delay(STARTUP_SETTLING_DELAY_MS)
                     onStartService(mode)
                 } else {
                     Timber.i("Automatic restoration: Missing permissions for mode $mode. Triggering request flow.")

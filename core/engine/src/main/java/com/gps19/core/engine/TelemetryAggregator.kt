@@ -4,39 +4,21 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * July.30.48:
+ * - Issue #653: Performance: GC Churn Optimization. Refactored to use array-backed 
+ *   accumulators and callback-based result processing to eliminate Map, Pair, 
+ *   and List allocations in the high-frequency telemetry path (R-HARDWARE-01).
+ * - Implemented result flyweight pooling for zero-churn emissions.
  * July.30.31:
- * - Issue #632: Analytical Ribbons: Recovery Markers. Integrated isRecoveryEvent 
- *   into aggregation to ensure forensic visibility of service restoration.
- * July.27.08:
- * - Issue #604: Ribbon Density & Aliasing Audit. Updated merge() to use peak-retention 
- *   (max) for kineticEnergy and sitShock to preserve forensic visibility at 7D scale.
- * July.27.07:
- * - Issue #602: SIT Timestamp Parity Logic. Integrated sitVz, sitVzTs, and sitVzRt 
- *   into aggregation to ensure peak vertical velocity forensic parity.
+ * - Issue #632: Analytical Ribbons: Recovery Markers.
  */
 class TelemetryAggregator {
 
-    private val accumulators = mutableMapOf<String, MutableAggregationPoint>()
+    private val accumulators = Array(RibbonScale.entries.size) { MutableAggregationPoint() }
+    private val hasData = BooleanArray(RibbonScale.entries.size) { false }
     
-    companion object {
-        private fun getReasonPriority(reason: LocationPendingReason): Int {
-            return when (reason) {
-                LocationPendingReason.NONE -> 0
-                LocationPendingReason.GPS_GAP -> 1
-                LocationPendingReason.SIGNAL_LOSS -> 2
-                LocationPendingReason.GPS_STALL -> 3
-                LocationPendingReason.ACOUSTIC_VIOLATION -> 4
-                LocationPendingReason.JAMMER_SUSPICION -> 5
-            }
-        }
-
-        private fun getHigherPriorityReason(r1: LocationPendingReason, r2: LocationPendingReason): LocationPendingReason {
-            if (r1 == r2) return r1
-            val p1 = getReasonPriority(r1)
-            val p2 = getReasonPriority(r2)
-            return if (p2 >= p1) r2 else r1
-        }
-    }
+    // Flyweight pool for results to avoid per-scale allocations
+    private val resultFlyweights = Array(RibbonScale.entries.size) { EngineConnectionPoint() }
 
     private class MutableAggregationPoint {
         var rtt: Int = 0
@@ -132,77 +114,96 @@ class TelemetryAggregator {
                 sitVzTs = cur.sitVzTs
                 sitVzRt = cur.sitVzRt
             }
-            
-            // Issue #604: Peak retention for forensic indices
             sitShock = max(sitShock, cur.sitShock)
             kineticEnergy = max(kineticEnergy, cur.kineticEnergy)
         }
 
-        fun toImmutable(base: EngineConnectionPoint, isTick: Boolean): EngineConnectionPoint {
-            return EngineConnectionPoint().apply {
-                this.copyFrom(base)
-                this.rtt = this@MutableAggregationPoint.rtt
-                this.remoteSig = this@MutableAggregationPoint.remoteSig
-                this.isConnected = this@MutableAggregationPoint.isConnected
-                this.hasGps = this@MutableAggregationPoint.hasGps
-                this.isRecoveryEvent = this@MutableAggregationPoint.isRecoveryEvent
-                this.accuracy = this@MutableAggregationPoint.accuracy
-                this.maxAccuracy = this@MutableAggregationPoint.maxAccuracy
-                this.isBatterySteepDischarge = this@MutableAggregationPoint.isBatterySteepDischarge
-                this.isCoolingModeActive = this@MutableAggregationPoint.isCoolingModeActive
-                this.speed = this@MutableAggregationPoint.speed
-                this.bearing = this@MutableAggregationPoint.bearing
-                this.currentMa = this@MutableAggregationPoint.currentMa
-                this.locationPendingReason = this@MutableAggregationPoint.locationPendingReason
-                this.gpsIndex = this@MutableAggregationPoint.gpsIndex
-                this.noiseIdx = this@MutableAggregationPoint.noiseIdx
-                this.luxIdx = this@MutableAggregationPoint.luxIdx
-                this.vibeIdx = this@MutableAggregationPoint.vibeIdx
-                this.proxIdx = this@MutableAggregationPoint.proxIdx
-                this.liftIdx = this@MutableAggregationPoint.liftIdx
-                this.snrIdx = this@MutableAggregationPoint.snrIdx
-                this.tiltIdx = this@MutableAggregationPoint.tiltIdx
-                this.baroIdx = this@MutableAggregationPoint.baroIdx
-                this.isSitDetected = this@MutableAggregationPoint.isSitDetected
-                this.isSitActive = this@MutableAggregationPoint.isSitActive
-                this.sitVz = this@MutableAggregationPoint.sitVz
-                this.sitVzTs = this@MutableAggregationPoint.sitVzTs
-                this.sitVzRt = this@MutableAggregationPoint.sitVzRt
-                this.sitShock = this@MutableAggregationPoint.sitShock
-                this.kineticEnergy = this@MutableAggregationPoint.kineticEnergy
-                this.isTick = isTick
-            }
+        fun writeTo(target: EngineConnectionPoint, base: EngineConnectionPoint, isTick: Boolean) {
+            target.copyFrom(base)
+            target.rtt = this.rtt
+            target.remoteSig = this.remoteSig
+            target.isConnected = this.isConnected
+            target.hasGps = this.hasGps
+            target.isRecoveryEvent = this.isRecoveryEvent
+            target.accuracy = this.accuracy
+            target.maxAccuracy = this.maxAccuracy
+            target.isBatterySteepDischarge = this.isBatterySteepDischarge
+            target.isCoolingModeActive = this.isCoolingModeActive
+            target.speed = this.speed
+            target.bearing = this.bearing
+            target.currentMa = this.currentMa
+            target.locationPendingReason = this.locationPendingReason
+            target.gpsIndex = this.gpsIndex
+            target.noiseIdx = this.noiseIdx
+            target.luxIdx = this.luxIdx
+            target.vibeIdx = this.vibeIdx
+            target.proxIdx = this.proxIdx
+            target.liftIdx = this.liftIdx
+            target.snrIdx = this.snrIdx
+            target.tiltIdx = this.tiltIdx
+            target.baroIdx = this.baroIdx
+            target.isSitDetected = this.isSitDetected
+            target.isSitActive = this.isSitActive
+            target.sitVz = this.sitVz
+            target.sitVzTs = this.sitVzTs
+            target.sitVzRt = this.sitVzRt
+            target.sitShock = this.sitShock
+            target.kineticEnergy = this.kineticEnergy
+            target.isTick = isTick
         }
     }
 
-    fun processPoint(point: EngineConnectionPoint): List<Pair<RibbonScale, EngineConnectionPoint>> {
-        val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
+    private companion object {
+        private fun getReasonPriority(reason: LocationPendingReason): Int {
+            return when (reason) {
+                LocationPendingReason.NONE -> 0
+                LocationPendingReason.GPS_GAP -> 1
+                LocationPendingReason.SIGNAL_LOSS -> 2
+                LocationPendingReason.GPS_STALL -> 3
+                LocationPendingReason.ACOUSTIC_VIOLATION -> 4
+                LocationPendingReason.JAMMER_SUSPICION -> 5
+            }
+        }
+
+        private fun getHigherPriorityReason(r1: LocationPendingReason, r2: LocationPendingReason): LocationPendingReason {
+            if (r1 == r2) return r1
+            val p1 = getReasonPriority(r1)
+            val p2 = getReasonPriority(r2)
+            return if (p2 >= p1) r2 else r1
+        }
+    }
+
+    /**
+     * processPoint: Main entrance for telemetry points. Callback-based to eliminate List/Pair churn.
+     */
+    fun processPoint(point: EngineConnectionPoint, onResult: (RibbonScale, EngineConnectionPoint) -> Unit) {
         val timeRef = if (point.rt > 0) point.rt else point.ts
         val totalSeconds = (timeRef / TICK_INTERVAL_MS).toInt()
 
-        RibbonScale.entries.forEach { scale ->
+        RibbonScale.entries.forEachIndexed { index, scale ->
             if (scale == RibbonScale.FOUR_MIN) {
-                val p = EngineConnectionPoint().apply { copyFrom(point); isTick = totalSeconds % 60 == 0 }
-                results.add(scale to p)
-                return@forEach
+                val flyweight = resultFlyweights[index]
+                flyweight.copyFrom(point)
+                flyweight.isTick = totalSeconds % 60 == 0
+                onResult(scale, flyweight)
+                return@forEachIndexed
             }
 
-            val key = scale.key
-            val acc = accumulators[key]
-            
-            if (acc == null) {
-                accumulators[key] = MutableAggregationPoint().apply { reset(point) }
+            val acc = accumulators[index]
+            if (!hasData[index]) {
+                acc.reset(point)
+                hasData[index] = true
             } else {
                 acc.merge(point)
             }
 
             if (totalSeconds % scale.intervalSeconds == 0) {
-                val finalAcc = accumulators[key]!!
-                results.add(scale to finalAcc.toImmutable(point, isScaleTick(scale, totalSeconds)))
-                accumulators.remove(key)
+                val flyweight = resultFlyweights[index]
+                acc.writeTo(flyweight, point, isScaleTick(scale, totalSeconds))
+                onResult(scale, flyweight)
+                hasData[index] = false
             }
         }
-        return results
     }
 
     fun backfillGaps(
@@ -213,10 +214,10 @@ class TelemetryAggregator {
         snrSamples: Sequence<EngineSnrSample>,
         sensorSamples: Sequence<EngineSensorSnapshot>,
         acousticFloor: Double,
-        baseTemplate: EngineConnectionPoint
-    ): List<Pair<RibbonScale, EngineConnectionPoint>> {
+        baseTemplate: EngineConnectionPoint,
+        onResult: (RibbonScale, EngineConnectionPoint) -> Unit
+    ) {
         val fillPointFlyweight = EngineConnectionPoint()
-        val results = mutableListOf<Pair<RibbonScale, EngineConnectionPoint>>()
         var fillRt = lastTickRt + TICK_INTERVAL_MS
         var fillTs = lastTickTs + TICK_INTERVAL_MS
         var pointsGenerated = 0
@@ -228,7 +229,6 @@ class TelemetryAggregator {
         var nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
 
         while (fillRt < nowRt && pointsGenerated < MAX_BACKFILL_POINTS) {
-            val totalSeconds = (fillRt / TICK_INTERVAL_MS).toInt()
             val windowEndRt = fillRt + TICK_INTERVAL_MS - 1
             
             while (nextSnr != null && nextSnr.rt < fillRt) {
@@ -262,7 +262,7 @@ class TelemetryAggregator {
                 ts = fillTs
                 rt = fillRt
                 isGap = false
-                isRecoveryEvent = false // Gaps are not recovery events by definition
+                isRecoveryEvent = false 
                 snrIdx = resolvedSnr
                 noiseIdx = resolvedNoise
                 luxIdx = resolvedLux
@@ -278,34 +278,32 @@ class TelemetryAggregator {
                 kineticEnergy = resolvedKinetic
             }
 
-            results.addAll(processPoint(fillPointFlyweight))
+            processPoint(fillPointFlyweight, onResult)
             fillRt += TICK_INTERVAL_MS
             fillTs += TICK_INTERVAL_MS
             pointsGenerated++
         }
-        return results
     }
 
     fun fillRealGap(
-        ribbonKey: String,
-        intervalSeconds: Int,
+        ribbonScale: RibbonScale,
         lastTickRt: Long,
         nowRt: Long,
         lastTickTs: Long,
-        nowTs: Long,
         snrSamples: Sequence<EngineSnrSample>,
         sensorSamples: Sequence<EngineSensorSnapshot>,
-        acousticFloor: Double
-    ): List<EngineConnectionPoint> {
-        val intervalMs = intervalSeconds * TICK_INTERVAL_MS
+        acousticFloor: Double,
+        onResult: (EngineConnectionPoint) -> Unit
+    ) {
+        val intervalMs = ribbonScale.intervalSeconds * TICK_INTERVAL_MS
         val maxGapMs = intervalMs * 240
         val effectiveStartRt = maxOf(lastTickRt, nowRt - maxGapMs)
         val rtToTsOffset = lastTickTs - lastTickRt
 
-        var currentRt = alignToInterval(effectiveStartRt, intervalSeconds)
+        var currentRt = alignToInterval(effectiveStartRt, ribbonScale.intervalSeconds)
         if (currentRt <= lastTickRt) currentRt += intervalMs
 
-        val gapPoints = mutableListOf<EngineConnectionPoint>()
+        val flyweight = EngineConnectionPoint()
         var pointsGenerated = 0
         
         val snrIter = snrSamples.iterator()
@@ -344,35 +342,35 @@ class TelemetryAggregator {
             val resolvedShock = snapshot?.sitShock ?: 0.0
             val resolvedKinetic = snapshot?.kineticEnergy ?: 0.0
 
-            gapPoints.add(EngineConnectionPoint(
-                ts = currentRt + rtToTsOffset,
-                rt = currentRt,
-                rtt = 0,
-                remoteSig = 0,
-                isConnected = false,
-                isGap = true,
-                isRecoveryEvent = false,
-                snrIdx = resolvedSnr,
-                noiseIdx = resolvedNoise,
-                luxIdx = resolvedLux,
-                vibeIdx = resolvedVibe,
-                proxIdx = resolvedProx,
-                liftIdx = resolvedLift,
-                tiltIdx = resolvedTilt,
-                baroIdx = resolvedBaro,
-                isSitDetected = resolvedSit,
-                sitVzTs = resolvedSitVzTs,
-                sitVzRt = resolvedSitVzRt,
-                sitShock = resolvedShock,
-                kineticEnergy = resolvedKinetic,
-                isTick = isScaleTick(getScaleByKey(ribbonKey), totalSeconds),
-                currentMa = 0,
+            flyweight.apply {
+                ts = currentRt + rtToTsOffset
+                rt = currentRt
+                rtt = 0
+                remoteSig = 0
+                isConnected = false
+                isGap = true
+                isRecoveryEvent = false
+                snrIdx = resolvedSnr
+                noiseIdx = resolvedNoise
+                luxIdx = resolvedLux
+                vibeIdx = resolvedVibe
+                proxIdx = resolvedProx
+                liftIdx = resolvedLift
+                tiltIdx = resolvedTilt
+                baroIdx = resolvedBaro
+                isSitDetected = resolvedSit
+                sitVzTs = resolvedSitVzTs
+                sitVzRt = resolvedSitVzRt
+                sitShock = resolvedShock
+                kineticEnergy = resolvedKinetic
+                isTick = isScaleTick(ribbonScale, totalSeconds)
+                currentMa = 0
                 locationPendingReason = LocationPendingReason.NONE
-            ))
+            }
+            onResult(flyweight)
             currentRt += intervalMs
             pointsGenerated++
         }
-        return gapPoints
     }
 
     private fun alignToInterval(timestamp: Long, intervalSeconds: Int): Long {
@@ -380,8 +378,6 @@ class TelemetryAggregator {
         val secondsToNextAlignment = (intervalSeconds - (totalSec % intervalSeconds)) % intervalSeconds
         return timestamp + (secondsToNextAlignment * TICK_INTERVAL_MS)
     }
-
-    private fun getScaleByKey(key: String) = RibbonScale.entries.find { it.key == key } ?: RibbonScale.FOUR_MIN
 
     private fun isScaleTick(scale: RibbonScale, totalSeconds: Int): Boolean {
         return when (scale) {

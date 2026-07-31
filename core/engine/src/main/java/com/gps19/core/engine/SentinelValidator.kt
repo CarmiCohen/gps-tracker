@@ -5,12 +5,12 @@ import kotlin.math.max
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * July.30.48:
+ * - Issue #653: Performance: GC Churn Optimization. Refactored updateKineticEnergy 
+ *   into separate primitive calculators to eliminate Pair allocation in high-frequency 
+ *   accelerometer path (R-HARDWARE-01 compliance).
  * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Added updateKineticEnergy 
- *   to distinguish sustained motion from impulse events using HPF.
- * July.26.04:
- * - Architecture Simplification (Issue #588): Centralized EMA baseline update logic 
- *   to reduce code churn in LocationSentinel. Fixed accelerAlpha typo.
+ * - Issue #601: Kinetic Energy Anomaly Detection.
  */
 object SentinelValidator {
 
@@ -78,25 +78,21 @@ object SentinelValidator {
     }
 
     /**
-     * Issue #601: High-Pass Filter for Kinetic Energy.
-     * Separates the "impulse" (tamper) from the "sustained" (motion) signal.
+     * computeNextHpf: Part of Issue #601/653. High-Pass Filter primitive.
+     * July.30.48: Replaces updateKineticEnergy to eliminate Pair allocation.
      */
-    fun updateKineticEnergy(
-        currentEnergy: Double, 
-        currentRawVibe: Double, 
-        lastRawVibe: Double, 
-        lastHpfValue: Double
-    ): Pair<Double, Double> {
-        // High-Pass Filter: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
-        val alphaHpf = VIBRATION_HPF_ALPHA
-        val hpfValue = alphaHpf * (lastHpfValue + currentRawVibe - lastRawVibe)
-        
-        // Rectify and Smooth (EMA) to get "Energy"
+    fun computeNextHpf(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double {
+        return VIBRATION_HPF_ALPHA * (lastHpfValue + currentRawVibe - lastRawVibe)
+    }
+
+    /**
+     * computeNextEnergy: Part of Issue #601/653. Energy EMA primitive.
+     * July.30.48: Replaces updateKineticEnergy to eliminate Pair allocation.
+     */
+    fun computeNextEnergy(currentEnergy: Double, hpfValue: Double): Double {
         val instantEnergy = abs(hpfValue)
         val alphaEnergy = VIBRATION_ENERGY_EMA_ALPHA
-        val nextEnergy = (currentEnergy * (1.0 - alphaEnergy)) + (instantEnergy * alphaEnergy)
-        
-        return Pair(nextEnergy, hpfValue)
+        return (currentEnergy * (1.0 - alphaEnergy)) + (instantEnergy * alphaEnergy)
     }
 
     /**

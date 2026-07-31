@@ -5,16 +5,19 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Integrated kineticEnergy 
- *   to differentiate between sustained motion and impulse-based tamper events.
- * July.26.04:
- * - Architecture Simplification (Issue #588): Refactored to use centralized PhysicsUtils 
- *   and SentinelValidator baseline logic. Simplified sensor state updates.
+ * July.30.53:
+ * - Issue #653: Performance: Zero-Churn Refactoring. Fixed compilation error 
+ *   by passing JumpConfidence flyweight to PhysicsUtils.isVisualJump (R-HARDWARE-01).
+ * July.30.50:
+ * - Issue #653: Performance: Zero-Churn Refactoring. Integrated SentinelResult 
+ *   flyweight to eliminate per-fix allocations in the GPS hot-path.
  */
 class LocationSentinel {
 
     private val gtoEngine = GtoEngine()
+    private val resultFlyweight = SentinelResult().apply { 
+        jumpConfidence = JumpConfidence() 
+    }
 
     private var lastValidLat: Double = 0.0
     private var lastValidLng: Double = 0.0
@@ -163,8 +166,6 @@ class LocationSentinel {
                                      plungeMatched
             
             if (isSpatialTriggered) {
-                // Issue #601: SIT/STAND detection now utilizes kineticEnergy to prevent false triggers from impulse shocks.
-                // Impulse shocks have high peakVibrationShock but low sustained kineticEnergy.
                 val hasSufficientForce = (peakShock > VIBRATION_SHOCK_THRESHOLD_G) || plungeMatched || (abs(peakVerticalVelocity) > CHAIR_PLUNGE_VELOCITY_THRESHOLD)
                 
                 if (hasSufficientForce) {
@@ -274,11 +275,16 @@ class LocationSentinel {
         if (lastValidTs == 0L) {
             updateLastValid(lat, lng, alt, timestamp, nowRt, 0.0, bearing, accuracy)
             updateFilters(lat, lng, timestamp, 1.0)
-            return SentinelResult(SentinelStatus.VALID, optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy))
+            resultFlyweight.reset(SentinelStatus.VALID)
+            resultFlyweight.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
+            return resultFlyweight
         }
 
         val timeDeltaMs = timestamp - lastValidTs
-        if (timeDeltaMs <= 0 && timestamp != 0L) return SentinelResult(SentinelStatus.VALID) 
+        if (timeDeltaMs <= 0 && timestamp != 0L) {
+            resultFlyweight.reset(SentinelStatus.VALID)
+            return resultFlyweight
+        }
         
         val altitudeDelta = if (lastValidAlt != 0.0) alt - lastValidAlt else 0.0
         val isParking = isStationary()
@@ -295,7 +301,9 @@ class LocationSentinel {
         val isTractorSlowOverride = gpsMotionStartRt > 0 && (nowRt - gpsMotionStartRt > 10000L)
         val hasPhysicalMotion = if (isMuzzled) false else (currentVibrationIndex > (adaptiveVibrationFloor * 1.5) || isTractorSlowOverride)
 
-        val jumpConfidence = PhysicsUtils.isVisualJump(
+        resultFlyweight.reset()
+        val conf = resultFlyweight.jumpConfidence!!
+        PhysicsUtils.isVisualJump(
             lastLat = lastValidLat, lastLng = lastValidLng,
             newLat = lat, newLng = lng,
             timeDeltaMs = if (lastValidRt > 0) (nowRt - lastValidRt) else timeDeltaMs, 
@@ -305,24 +313,26 @@ class LocationSentinel {
             lastSpeedMps = lastValidSpeedMps,
             isParking = isParking,
             altitudeDelta = altitudeDelta,
-            hasPhysicalMotion = hasPhysicalMotion
+            hasPhysicalMotion = hasPhysicalMotion,
+            result = conf
         )
         
-        var score = jumpConfidence.score
+        var score = conf.score
         val augmentedScore = score.coerceIn(0, 100)
         val timeDeltaSec = (if (lastValidRt > 0) (nowRt - lastValidRt) else timeDeltaMs) / 1000.0
         val currentSpeedMps = dist / max(0.1, timeDeltaSec)
         
-        val finalJumpConfidence = jumpConfidence.copy(
-            score = augmentedScore, 
-            isJump = augmentedScore >= 50 || jumpConfidence.isJump,
-            reason = jumpConfidence.reason
-        )
+        conf.score = augmentedScore
+        conf.isJump = augmentedScore >= 50 || conf.isJump
 
-        if (finalJumpConfidence.isOutlier) return SentinelResult(SentinelStatus.JUMP, finalJumpConfidence.reason, jumpConfidence = finalJumpConfidence)
+        if (conf.isOutlier) {
+            resultFlyweight.status = SentinelStatus.JUMP
+            resultFlyweight.reason = conf.reason
+            return resultFlyweight
+        }
         
-        var behavioralStatus = if (finalJumpConfidence.isJump) SentinelStatus.JUMP else SentinelStatus.VALID
-        var behavioralReason = finalJumpConfidence.reason
+        var behavioralStatus = if (conf.isJump) SentinelStatus.JUMP else SentinelStatus.VALID
+        var behavioralReason = conf.reason
 
         if (!bypassBehavioral) {
             if (gtoEngine.evaluateTrajectory(lat, lng, bearing, currentSpeedMps, timestamp, nowRt)) {
@@ -335,72 +345,112 @@ class LocationSentinel {
                 gtoEngine.clear()
                 updateFilters(lat, lng, timestamp, SUSPICIOUS_Q_SCALE)
                 updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
-                return SentinelResult(SentinelStatus.TRAJECTORY_PROMOTED, "Trajectory Promoted (GTO)", EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy), finalJumpConfidence, promotedPoints = promoted)
+                
+                resultFlyweight.status = SentinelStatus.TRAJECTORY_PROMOTED
+                resultFlyweight.reason = "Trajectory Promoted (GTO)"
+                resultFlyweight.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
+                resultFlyweight.promotedPoints = promoted
+                return resultFlyweight
             }
 
             if (behavioralStatus == SentinelStatus.JUMP) {
                 gtoEngine.addPoint(lat, lng, alt, accuracy, maxAccuracy, bearing, currentSpeedMps, timestamp, nowRt, currentVibrationIndex)
-                return SentinelResult(behavioralStatus, finalJumpConfidence.reason, jumpConfidence = finalJumpConfidence)
+                resultFlyweight.status = behavioralStatus
+                resultFlyweight.reason = behavioralReason
+                return resultFlyweight
             }
 
-            val sensorSentinel = runSensorSentinel(lat, lng, alt, accuracy, bearing, nowRt, isMuzzled)
-            if (sensorSentinel.status != SentinelStatus.VALID) {
-                behavioralStatus = sensorSentinel.status
-                behavioralReason = sensorSentinel.reason
+            runSensorSentinel(lat, lng, alt, accuracy, bearing, nowRt, isMuzzled)
+            if (resultFlyweight.status != SentinelStatus.VALID) {
+                return resultFlyweight
             }
             
-            if (sensorSentinel.status == SentinelStatus.VALID && sensorSentinel.suppressionNote != null) {
+            if (resultFlyweight.status == SentinelStatus.VALID && resultFlyweight.suppressionNote != null) {
                 updateFilters(lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
                 updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
                 gtoEngine.clear()
-                return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy), jumpConfidence = finalJumpConfidence, suppressionNote = sensorSentinel.suppressionNote)
+                resultFlyweight.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
+                return resultFlyweight
             }
         }
 
         updateFilters(lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
         updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
         gtoEngine.clear()
-        return SentinelResult(behavioralStatus, behavioralReason, optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy), jumpConfidence = finalJumpConfidence)
+        resultFlyweight.status = behavioralStatus
+        resultFlyweight.reason = behavioralReason
+        resultFlyweight.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
+        return resultFlyweight
     }
 
     private fun runSensorSentinel(
         lat: Double, lng: Double, alt: Double, accuracy: Double, bearing: Double,
         nowRt: Long,
         isMuzzled: Boolean = false
-    ): SentinelResult {
-        if (!isNear) return SentinelResult(SentinelStatus.TAMPER, "Proximity Far")
-        if (isPowerTamper) return SentinelResult(SentinelStatus.TAMPER, "Power disconnected")
-        if (SentinelValidator.isTiltViolated(currentTiltDegrees)) return SentinelResult(SentinelStatus.TAMPER, "Tilt detected")
-        if (SentinelValidator.isShockViolated(peakVibrationShock, adaptiveVibrationFloor)) return SentinelResult(SentinelStatus.TAMPER, "Shock detected")
+    ) {
+        if (!isNear) {
+            resultFlyweight.status = SentinelStatus.TAMPER
+            resultFlyweight.reason = "Proximity Far"
+            return
+        }
+        if (isPowerTamper) {
+            resultFlyweight.status = SentinelStatus.TAMPER
+            resultFlyweight.reason = "Power disconnected"
+            return
+        }
+        if (SentinelValidator.isTiltViolated(currentTiltDegrees)) {
+            resultFlyweight.status = SentinelStatus.TAMPER
+            resultFlyweight.reason = "Tilt detected"
+            return
+        }
+        if (SentinelValidator.isShockViolated(peakVibrationShock, adaptiveVibrationFloor)) {
+            resultFlyweight.status = SentinelStatus.TAMPER
+            resultFlyweight.reason = "Shock detected"
+            return
+        }
         
         if (baroBaseline > -999.0) {
             val liftDelta = currentBaroAlt - baroBaseline
             if (SentinelValidator.isLiftViolated(liftDelta)) {
                 if (currentVibrationIndex > VIBRATION_STATIONARY_THRESHOLD) {
-                    return SentinelResult(SentinelStatus.TAMPER, "Lift detected")
+                    resultFlyweight.status = SentinelStatus.TAMPER
+                    resultFlyweight.reason = "Lift detected"
+                    return
                 } else {
-                    return SentinelResult(SentinelStatus.TAMPER, "Barometric drift suspicion (No vibration)")
+                    resultFlyweight.status = SentinelStatus.TAMPER
+                    resultFlyweight.reason = "Barometric drift suspicion (No vibration)"
+                    return
                 }
             }
         }
         
-        if (SentinelValidator.isLightViolated(currentLux, luxBaseline)) return SentinelResult(SentinelStatus.TAMPER, "Light jump")
+        if (SentinelValidator.isLightViolated(currentLux, luxBaseline)) {
+            resultFlyweight.status = SentinelStatus.TAMPER
+            resultFlyweight.reason = "Light jump"
+            return
+        }
 
         val isAcousticLockedOut = (lastFastPathAcousticSpikeRt > 0 && (nowRt - lastFastPathAcousticSpikeRt < ACOUSTIC_LOCKOUT_MS))
         
         if (!isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb)) {
-            return SentinelResult(SentinelStatus.TAMPER, "Acoustic alarm")
+            resultFlyweight.status = SentinelStatus.TAMPER
+            resultFlyweight.reason = "Acoustic alarm"
+            return
         }
 
         if (SentinelValidator.isVibrationSuspicious(currentVibrationIndex, adaptiveVibrationFloor)) {
-            return SentinelResult(SentinelStatus.TAMPER, "Vibration suspicion")
+            resultFlyweight.status = SentinelStatus.TAMPER
+            resultFlyweight.reason = "Vibration suspicion"
+            return
         }
         
         if (!isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb, currentVibrationIndex)) {
-            return SentinelResult(SentinelStatus.TAMPER, "Acoustic suspicion")
+            resultFlyweight.status = SentinelStatus.TAMPER
+            resultFlyweight.reason = "Acoustic suspicion"
+            return
         }
 
-        return SentinelResult(SentinelStatus.VALID)
+        resultFlyweight.status = SentinelStatus.VALID
     }
 
     fun isStationary(): Boolean = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
@@ -435,5 +485,6 @@ class LocationSentinel {
         lastValidAccuracy = 0.0
         kineticEnergy = 0.0
         gtoEngine.clear()
+        resultFlyweight.reset()
     }
 }
