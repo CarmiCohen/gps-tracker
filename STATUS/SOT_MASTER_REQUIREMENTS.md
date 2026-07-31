@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - July.31.01 (Compose Snapshot Hardening)
+# System Source of Truth (SoT) - July.31.01 (Restoration Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Foreground Service Restoration Hardening (R661)**: All foreground service start attempts, particularly during automatic restoration or deferred recovery, MUST be wrapped in an exhaustive `try-catch (Throwable)` block to intercept `ForegroundServiceStartNotAllowedException`. If the OS denies the start, the system MUST transition to a "Pending" state and defer the attempt until a valid foreground state is established (e.g., in `onResume`). (Issue #661, July.31.01)
 *   **Compose Snapshot Hardening (R657)**: To prevent lock verification failures during high-frequency telemetry updates, imperative `AndroidView` update blocks MUST be wrapped in `Snapshot.withoutReadObservation`. This decouples imperative view manipulations from the Compose Recomposer's tracking mechanism, eliminating transaction contention and "Davey" stalls. (Issue #657, July.31.01)
 *   **Kernel-Level Memory Hardening (R656)**: On devices with limited `userfaultfd` support (e.g., Samsung A15), the application MUST utilize `android:largeHeap="true"` to reduce ART compaction frequency. Additionally, `GpsApplication` MUST implement aggressive `onTrimMemory` and `onLowMemory` handlers to proactively release non-critical caches (osmdroid tiles, transient buffers) before the OS triggers high-pressure compaction cycles. (Issue #656, July.31.00)
 *   **Budget Baseline Optimization (R-HARDWARE-01)**: The Tracking Engine and UI MUST be optimized for a "Budget Baseline" (Samsung A15 / Octa-core 2.2GHz / 4GB RAM). High-end hardware capabilities SHALL be bypassed in favor of cross-device stability, aggressive IPC caching, and main-thread silence. Map overlays MUST implement throttling (e.g., 1000ms) for heavy recalculations like trail processing and accuracy circle drift. (Issue #640, July.30.35)

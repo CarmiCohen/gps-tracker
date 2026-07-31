@@ -1,27 +1,25 @@
-# Handover (July.31.01) - Compose Snapshot Hardening [READY]
+# Handover (July.31.01) - Restoration Hardening [READY]
 
 ## 🎯 Next Objective
-Focus on **[Issue #660] Forensic Audit: Log Buffer Pressure**.
-- **Context**: High-frequency telemetry logging is causing occasional I/O spikes in `LogManager` despite buffer conflation.
-- **Goal**: Implement a non-blocking circular log buffer and optimize SQLite batch inserts to prevent I/O-related Davey stalls on budget hardware.
+Focus on **[Issue #662] libmbrainSDK Loading Failure**.
+- **Context**: `libmbrainSDK` fails to load on Samsung A15 hardware, disabling critical hardware stabilization.
+- **Goal**: Resolve the JNI loading failure to restore hardware watchdog and performance features for budget hardware.
 
 ## 🆕 New Architectural Requirements
-- **R657 (Compose Snapshot Hardening)**: To prevent lock verification failures during high-frequency telemetry updates, imperative `AndroidView` update blocks MUST be wrapped in `Snapshot.withoutReadObservation`.
+- **R661 (FGS Restoration Hardening)**: All foreground service start attempts, especially during automatic restoration or deferred recovery, MUST be wrapped in an exhaustive `try-catch (Throwable)` block to catch `ForegroundServiceStartNotAllowedException` and correctly transition to a `Pending` state.
 
 ## 📊 Status Tracker
-- **[Issue #657] Compose Snapshot Lock Failure**: 🟢 Resolved. Hardened MapView update cycle.
+- **[Issue #661] FGS Restoration Crash**: 🟢 Resolved. Hardened `MainActivity` start logic.
+- **[Issue #657] Compose Snapshot Lock Failure**: 🟢 Resolved. 
 - **[Issue #656] userfaultfd unsupported**: 🟢 Resolved.
-- **[Issue #642] Map Settings Icon Contrast**: 🟢 Resolved.
-- **[Issue #653] Excessive Garbage Collection**: 🟢 Resolved.
-- **[Issue #658] Persistent Startup Main Thread Stalls**: 🟢 Resolved.
-- **[Issue #659] libmbrainSDK Initialization Instability**: 🟢 Resolved.
+- **[Issue #659] libmbrainSDK Instability**: 🔍 Regressed (See Issue #662).
 
 ## 🔍 Comprehensive Status
 - **Build Status**: 🟢 **SUCCESSFUL** (vJuly.31.01).
 - **Forensic Audit History**:
-    - **UI Stability**: Decoupled Osmdroid imperative updates from Compose Recomposer tracking via `Snapshot.withoutReadObservation`.
+    - **Stability**: Eliminated fatal crash during restoration by hardening FGS start-catch logic in `MainActivity`.
 - **Requirement Alignment**: 
-    - **R657**: Integrated into `SOT_MASTER_REQUIREMENTS.md`.
+    - **R661**: Integrated into `SOT_MASTER_REQUIREMENTS.md`.
 
-**Status**: Compose runtime stability for high-frequency map updates achieved. Version July.31.01 ready for log buffer hardening.
+**Status**: App stability during restoration achieved. Version July.31.01 ready for hardware-level SDK debugging.
 🟢 **READY FOR NEW CHAT.**

@@ -19,12 +19,13 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * July.31.01:
+ * - Issue #661: Foreground Service Start Hardening. Hardened onStartService to 
+ *   catch ForegroundServiceStartNotAllowedException even if RESUMED check passes, 
+ *   ensuring recovery pending state is always set on OS denial.
  * July.30.40:
  * - Issue #643: Foreground Service Start Hardening. Defensive check for RESUMED 
  *   state and Throwable catch to prevent fatal FGS start crashes on cold start.
- * July.30.31:
- * - Issue #634: Foreground Service Start Hardening. Updated onStartService to 
- *   set recovery pending state upon OS-level start restrictions.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -47,18 +48,18 @@ class MainActivity : ComponentActivity() {
                 activity = this,
                 viewModel = viewModel,
                 onStartService = { mode ->
-                    // Issue #643: Prevent start if not in foreground to avoid OS-level restriction crash
-                    if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                        try {
+                    // Issue #661: Prevent start crash if OS blocks FGS despite foreground state.
+                    try {
+                        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
                             val serviceClass = if (mode == "tracker") TrackerService::class.java else ViewerService::class.java
                             val intent = Intent(this, serviceClass)
                             ContextCompat.startForegroundService(this, intent)
-                        } catch (e: Throwable) {
-                            Timber.e(e, "Issue #643: Foreground service start failed for mode $mode. Marking as pending.")
+                        } else {
+                            Timber.w("Issue #661: Deferred service start for $mode (Activity not RESUMED)")
                             viewModel.onEvent(UiEvent.SetRecoveryPending(true))
                         }
-                    } else {
-                        Timber.w("Issue #643: Deferred service start for $mode (Activity not RESUMED)")
+                    } catch (e: Throwable) {
+                        Timber.e(e, "Issue #661: Foreground service start failed for mode $mode. Marking as pending.")
                         viewModel.onEvent(UiEvent.SetRecoveryPending(true))
                     }
                 },

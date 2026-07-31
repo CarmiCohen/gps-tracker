@@ -5,36 +5,39 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 0 |
+| **Open Technical Issues** | Active | 3 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 497 |
+| **Resolved (Total)** | 🟢 Progress | 498 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   *(None)*
+*   **[Issue #662] [Severity: High] [Category: Hardware] libmbrainSDK Loading Failure**.
+    *   **Concern**: `libmbrainSDK` fails to load on the target device, disabling hardware watchdog pokes and stabilization features for budget hardware (Samsung A15).
+*   **[Issue #663] [Severity: Medium] [Category: Performance] SnapshotStateList Lock Verification Failure**.
+    *   **Concern**: Regression or incomplete fix for #657. JIT/Dex verification warnings for `SnapshotStateList.conditionalUpdate` are appearing in Logcat, potentially impacting telemetry processing throughput.
+*   **[Issue #664] [Severity: Medium] [Category: Performance] Startup Davey Stalls (Regression)**.
+    *   **Concern**: 1.7s+ Davey stalls observed during startup (PID 27707), indicating that the `STARTUP_SETTLING_DELAY_MS` (3000ms) might be deferring the symptom rather than resolving the root cause of main-thread contention.
 
 ---
 
 ## 🔴 Open Issues
-*   *(None)*
+*   **[Issue #660] Forensic Audit: Log Buffer Pressure**.
+    *   **Description**: High-frequency telemetry logging causing occasional I/O spikes in `LogManager`.
+    *   **Objective**: Implement non-blocking circular log buffer and optimize SQLite batch inserts.
 
 ---
 
 ## 🟢 Recently Resolved Issues (July.31.01)
+*   **[Issue #661] [Severity: Critical] [Category: Stability] ForegroundServiceStartNotAllowedException during Restoration**.
+    *   **Resolution**: Hardened `onStartService` in `MainActivity.kt` by wrapping the FGS start attempt and the lifecycle check in a comprehensive `try-catch` block. This ensures that any OS-level denials (even while the Activity is technically RESUMED) are caught, preventing fatal crashes and correctly triggering the `SetRecoveryPending` state.
 *   **[Issue #657] [Severity: Low] [Category: Performance] Compose Snapshot Lock Verification Failure**.
-    *   **Resolution**: Hardened the `AndroidView` update cycle in `MapComponents.kt` by wrapping imperative overlay updates in `Snapshot.withoutReadObservation`. This decouples Osmdroid manipulations from the Compose Recomposer's tracking mechanism.
-    *   **Impact**: Eliminated lock verification failures and associated "Davey" stalls during high-frequency telemetry bursts (R-HARDWARE-01).
+    *   **Resolution**: Hardened the `AndroidView` update cycle in `MapComponents.kt` by wrapping imperative overlay updates in `Snapshot.withoutReadObservation`.
 *   **[Issue #656] [Severity: Medium] [Category: Stability] userfaultfd: MOVE ioctl unsupported**.
-    *   **Resolution**: Implemented kernel-level memory hardening (R656). Enabled `android:largeHeap="true"` to reduce ART compaction frequency and added aggressive `onTrimMemory`/`onLowMemory` handlers.
 *   **[Issue #642] Map Settings Icon Contrast**.
-    *   **Resolution**: Standardized icon treatments for accessibility. Switched to solid backgrounds and stronger (2dp) borders for map controls.
 *   **[Issue #653] [Severity: High] [Category: Performance] Excessive Garbage Collection**.
-    *   **Resolution**: Refactored GPS and Telemetry hot-paths for Zero-Churn. Converted result models to mutable flyweights.
 *   **[Issue #658] [Severity: High] [Category: Performance] Persistent Startup Davey Stalls**.
-    *   **Resolution**: Implemented `STARTUP_SETTLING_DELAY_MS` (3000ms) to defer automatic service restoration.
 *   **[Issue #659] [Severity: Medium] [Category: Stability] libmbrainSDK Initialization Instability**.
-    *   **Resolution**: Added proactive state verification and background re-initialization.
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vJuly.31.01-G)
