@@ -1,25 +1,27 @@
-# Handover (July.31.37) - Hardware SDK Hardening [READY]
+# Handover (July.31.38) - Log Pipeline Hardened
 
 ## 🎯 Next Objective
-Focus on **[Issue #660] Forensic Audit: Log Buffer Pressure**.
-- **Context**: High-frequency telemetry logging causing occasional I/O spikes in `LogManager`.
-- **Goal**: Implement non-blocking circular log buffer and optimize SQLite batch inserts to prevent main-thread contention.
+**[Issue #663] Forensic Audit: SnapshotStateList Lock Verification Failure**.
+- **Context**: Regression or incomplete fix for #657. JIT/Dex verification warnings for `SnapshotStateList.conditionalUpdate` appearing in Logcat.
+- **Goal**: Resolve lock contention and verify stability of telemetry processing throughput on Samsung A15.
 
 ## 🆕 New Architectural Requirements
-- **R628 (16KB Page Alignment Enforcement)**: All native libraries MUST be aligned for 16KB page size. `app/build.gradle` MUST maintain `useLegacyPackaging = false` to ensure native libs are stored uncompressed and aligned in the APK, supporting Android 15+ hardware. (Issue #662, July.31.37)
+- **R660 (Log Buffer Pressure Authority)**: (Added July.31.38) The logging system MUST utilize a non-blocking circular buffer (Channel-based). Log submission MUST be decoupled from persistence via a background batch processor (50 entries or 2000ms delay) using SQLite batch inserts. (Issue #660)
+- **R628 (16KB Page Alignment Enforcement)**: All native libraries MUST be aligned for 16KB page size. `app/build.gradle` MUST maintain `useLegacyPackaging = false`. (Issue #665)
+- **R666 (Hardware IPC Throttling)**: High-cost system service calls MUST be throttled to 5000ms on budget hardware. (Issue #666)
 
 ## 📊 Status Tracker
-- **[Issue #662] libmbrainSDK Loading Failure**: 🟢 Resolved. Fixed ProGuard rules and 16KB page alignment config.
+- **[Issue #660] Log Buffer Pressure**: 🟢 Resolved. Implemented Channel buffer and batch inserts.
+- **[Issue #666] Phone Setup ANR**: 🟢 Resolved. Relaxed polling and enforced IPC throttling.
+- **[Issue #665] 16KB Alignment Regression**: 🟢 Resolved. Applied Manifest fix.
 - **[Issue #661] FGS Restoration Crash**: 🟢 Resolved.
-- **[Issue #657] Compose Snapshot Lock Failure**: 🟢 Resolved. 
-- **[Issue #659] libmbrainSDK Instability**: 🟢 Resolved via #662.
 
 ## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **SUCCESSFUL** (vJuly.31.37).
+- **Build Status**: 🟢 **SUCCESSFUL** (vJuly.31.38-I).
 - **Forensic Audit History**:
-    - **Hardware**: Restored libmbrainSDK functionality on Samsung A15 (ARM64) by correcting packaging and preservation rules.
-- **Requirement Alignment**: 
-    - **R628**: Re-validated and enforced in `app/build.gradle`.
+    - **Performance**: Decoupled logging from I/O hot-path to prevent main-thread spikes.
+    - **Stability**: Hardened Samsung A15 startup via IPC throttling and FGS start protection.
+    - **SOT Integrity**: Architectural requirements updated for R660.
 
-**Status**: Hardware-level stabilization features restored for budget devices. Version July.31.37 ready for deployment.
-🟢 **READY FOR NEW CHAT.**
+**Status**: READY FOR NEW FRESH CHAT.
+ vJuly.31.38-I

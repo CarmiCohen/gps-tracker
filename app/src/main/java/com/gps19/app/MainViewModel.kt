@@ -23,16 +23,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * July.31.37:
+ * - Issue #666: Phone Setup ANR (Hardening). Relaxed polling interval to 5s and 
+ *   heartbeat to 5s for Samsung A15 to eliminate main-thread contention.
  * July.30.36:
  * - Issue #635 & #636: Phone Setup: Permission Status Stalling. Enhanced polling 
- *   reactivity (3s interval) and implemented "Robust Refresh" in RefreshPermissionStatus 
- *   to overcome OS-level status propagation latency on budget hardware (Samsung A15).
- * July.30.31:
- * - Issue #634: Foreground Service Start Hardening. Added SetRecoveryPending handler 
- *   to gracefully manage OS-level foreground start restrictions.
- * July.30.29:
- * - Issue #631: Forensic UI: Service Blackout Trends. Fixed reactive binding missing 
- *   in startHeavyObservations for cumulativeRecoveryBlackoutMs and recoveryCount.
+ *   reactivity (3s interval) and implemented "Robust Refresh" in RefreshPermissionStatus.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -112,7 +108,7 @@ class MainViewModel @Inject constructor(
     val activeGnssDetail: StateFlow<GnssDetail?> = combine(_uiState, _kinematicState, _gnssDetail) { ui, kin, localDetail ->
         if (ui.appMode == "viewer") kin.trackerLocation.gnssDetail else localDetail
     }
-    .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+    .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val dashboardState: StateFlow<DashboardState> = combine(
@@ -135,7 +131,7 @@ class MainViewModel @Inject constructor(
         dashboardStateProvider.buildDashboardState(mode, kin, diag, pulse, trkState, lMax, tMax)
     }
     .flowOn(Dispatchers.Default)
-    .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L) 
+    .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L) 
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
 
     val eventLogsFlow: StateFlow<List<LogEntry>> = combine(
@@ -148,22 +144,22 @@ class MainViewModel @Inject constructor(
             repository.eventLogsFlow(limit)
         } else flowOf(emptyList()) 
     }
-    .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+    .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val trackerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
         .flatMapLatest { mode -> if (mode != null) repository.trackerTrailFlow else flowOf(emptyList()) }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val viewerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
         .flatMapLatest { mode -> if (mode != null) repository.viewerTrailFlow else flowOf(emptyList()) }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val violationPointsFlow: Flow<List<ViolationPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
         .flatMapLatest { mode -> if (mode != null) repository.violationsFlow else flowOf(emptyList()) }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
 
     var appStartTime: Long = 0L
     private var autoSaveJob: Job? = null
@@ -213,13 +209,14 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) { 
             while(true) { 
                 val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
-                // Issue #635: Bypassing cache via forceRefresh when setup is visible to ensure reactivity.
+                // Issue #635 & #666: Bypassing cache via forceRefresh when setup is visible to ensure reactivity.
+                // Adjusted to 5s for budget hardware stabilization.
                 val newState = systemStatusProvider.getPermissionState(forceRefresh = refreshFast)
                 val isA15 = systemStatusProvider.isA15Hardware()
                 withContext(Dispatchers.Main.immediate) { 
                     updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
                 }
-                delay(if (refreshFast) 3000L else 30000L) 
+                delay(if (refreshFast) 5000L else 30000L) 
             } 
         }
 
@@ -397,7 +394,7 @@ class MainViewModel @Inject constructor(
             is UiEvent.SetLogFilterShowRecovered -> viewModelScope.launch(Dispatchers.Main.immediate) { repository.updateLogFilters(recovered = event.show) }
             is UiEvent.ToggleGnssDetail -> updateNavigation { it.copy(isGnssDetailVisible = event.visible) }
             is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
-                // Issue #635: Robust refresh for budget hardware. OS status updates can be lazy.
+                // Issue #635 & #666: Robust refresh for budget hardware. OS status updates can be lazy.
                 // We perform an immediate check and a second check after a short delay.
                 repeat(2) { attempt ->
                     val oldState = _uiState.value.permissions
@@ -676,7 +673,8 @@ class MainViewModel @Inject constructor(
         val nav = _uiState.value.navigation
         val isA15 = _uiState.value.permissions.isA15Device
         return if (nav.isSettingsOpen || nav.isLogVisible || nav.isPhoneSetupVisible || nav.isRibbonsVisible) {
-            if (isA15) 3000L else 2000L
+            // Issue #666: Heartbeat relaxed to 5s for budget hardware stabilization.
+            if (isA15) 5000L else 2000L
         } else {
             if (isA15) 5000L else 2000L
         }

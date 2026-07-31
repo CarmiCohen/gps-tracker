@@ -35,12 +35,13 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * July.31.37:
+ * - Issue #666: Performance Stabilization (Samsung A15). Increased FORCED_REFRESH_COOLDOWN_MS 
+ *   to 5s and PERMISSION_TTL_MS to 10s to eliminate main-thread contention and ANRs 
+ *   during setup phases. Optimized IPC auditing to prevent getPackageName spam.
  * July.30.45:
- * - Issue #655: Performance Hardening (Fix). Implemented FORCED_REFRESH_COOLDOWN_MS (2s) 
- *   to prevent IPC bursts during reactive setup phases. Eliminated getPackageName spam 
- *   on Samsung A15 by ensuring forceRefresh respects a hardware-level throttle.
- * - Issue #654: Performance Hardening. Centralized ACCESS_FINE_LOCATION and 
- *   NetworkInterface checks into throttled IPC audit to eliminate main-thread stalls.
+ * - Issue #655: Performance Hardening (Fix). Implemented FORCED_REFRESH_COOLDOWN_MS 
+ *   to prevent IPC bursts during reactive setup phases.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -96,15 +97,16 @@ class SystemStatusProviderImpl @Inject constructor(
     private val isS21FE by lazy { isS21FEDevice() }
     private val isA15 by lazy { isA15Device() }
     
-    private val PERMISSION_TTL_MS = 2000L
-    private val FORCED_REFRESH_COOLDOWN_MS = 2000L
+    // Issue #666: Aggressive throttling for budget hardware stabilization.
+    private val PERMISSION_TTL_MS = 10000L
+    private val FORCED_REFRESH_COOLDOWN_MS = 5000L
     private val STORAGE_POLL_INTERVAL_MS = 60_000L
     private val POWER_POLL_INTERVAL_MS = 60_000L
     
     private var lastInternetCheckRt = 0L
     private var cachedInternetStatus = false
     private var cachedNetworkInterface = "UNKNOWN"
-    private val INTERNET_CACHE_TTL_MS = 5000L
+    private val INTERNET_CACHE_TTL_MS = 10000L
 
     private var lastHardwareCheckRt = 0L
     private val HARDWARE_IPC_THROTTLE_MS = 5000L
@@ -157,8 +159,7 @@ class SystemStatusProviderImpl @Inject constructor(
         val now = SystemClock.elapsedRealtime()
         val isStale = now - lastFullRefreshTime > PERMISSION_TTL_MS
         
-        // Issue #655: Hardware refresh cooldown. Even for "forced" refreshes, 
-        // we enforce a minimum interval of 2 seconds to prevent manufacturer IPC auditing stalls.
+        // Issue #655 & #666: Strict hardware refresh cooldown. 
         val shouldExecute = when {
             forceRefresh -> (now - lastHardwareCheckRt >= FORCED_REFRESH_COOLDOWN_MS) || lastHardwareCheckRt == 0L
             else -> isStale
@@ -175,51 +176,44 @@ class SystemStatusProviderImpl @Inject constructor(
                 if (doubleCheckExecute) {
                     try {
                         val current = cachedState.get()
-                        val useCache = currentNow - lastHardwareCheckRt <= HARDWARE_IPC_THROTTLE_MS && lastHardwareCheckRt != 0L && !forceRefresh
-                        
-                        val newState = if (useCache) {
-                            current
-                        } else {
-                            withContext(Dispatchers.IO) {
-                                val fineLocGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                                val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
-                                val overlayGranted = Settings.canDrawOverlays(context)
-                                val micGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                                val alarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true
-                                val notifyGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true
-                                val bgLocGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true
-                                val actRecogGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true
+                        withContext(Dispatchers.IO) {
+                            val fineLocGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                            val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
+                            val overlayGranted = Settings.canDrawOverlays(context)
+                            val micGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                            val alarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true
+                            val notifyGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true
+                            val bgLocGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true
+                            val actRecogGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true
 
-                                val xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
-                                val xiaomiAutostart = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
+                            val xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
+                            val xiaomiAutostart = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
 
-                                lastHardwareCheckRt = currentNow
+                            lastHardwareCheckRt = currentNow
+                            lastFullRefreshTime = currentNow
+                            
+                            val newState = PermissionState(
+                                isFineLocationGranted = fineLocGranted,
+                                isBatteryWhitelisted = batteryWhitelisted,
+                                isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, cachedPackageName) else batteryWhitelisted,
+                                isOverlayGranted = overlayGranted,
+                                isMicrophoneGranted = micGranted,
+                                isExactAlarmGranted = alarmGranted,
+                                isPostNotificationsGranted = notifyGranted,
+                                isBackgroundLocationGranted = bgLocGranted,
+                                isActivityRecognitionGranted = actRecogGranted,
                                 
-                                PermissionState(
-                                    isFineLocationGranted = fineLocGranted,
-                                    isBatteryWhitelisted = batteryWhitelisted,
-                                    isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, cachedPackageName) else batteryWhitelisted,
-                                    isOverlayGranted = overlayGranted,
-                                    isMicrophoneGranted = micGranted,
-                                    isExactAlarmGranted = alarmGranted,
-                                    isPostNotificationsGranted = notifyGranted,
-                                    isBackgroundLocationGranted = bgLocGranted,
-                                    isActivityRecognitionGranted = actRecogGranted,
-                                    
-                                    hasBackgroundRestriction = isXiaomi,
-                                    backgroundStatus = toCapabilityStatus(xiaomiStatus),
-                                    autostartStatus = toCapabilityStatus(xiaomiAutostart),
-                                    isManualOverride = current.isManualOverride,
-                                    requiresWakeLockRenewal = isSamsung,
-                                    requiresExtraTopPadding = isXiaomi,
-                                    requiresAdaptationMuzzle = isS21FE,
-                                    isA15Device = isA15
-                                )
-                            }
+                                hasBackgroundRestriction = isXiaomi,
+                                backgroundStatus = toCapabilityStatus(xiaomiStatus),
+                                autostartStatus = toCapabilityStatus(xiaomiAutostart),
+                                isManualOverride = current.isManualOverride,
+                                requiresWakeLockRenewal = isSamsung,
+                                requiresExtraTopPadding = isXiaomi,
+                                requiresAdaptationMuzzle = isS21FE,
+                                isA15Device = isA15
+                            )
+                            cachedState.set(newState)
                         }
-
-                        cachedState.set(newState)
-                        lastFullRefreshTime = currentNow
                     } catch (e: Exception) {
                         Timber.e(e, "Permission check failed during refresh")
                     }

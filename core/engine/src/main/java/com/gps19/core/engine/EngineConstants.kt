@@ -2,15 +2,13 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * July.31.38:
+ * - Issue #660: Forensic Audit: Log Buffer Pressure. Added LOG_BATCH_SIZE, 
+ *   LOG_BATCH_DELAY_MS, and LOG_BUFFER_CAPACITY for optimized persistence.
  * July.30.47:
  * - Issue #658: Performance: Startup Transition Hardening. Added 
  *   STARTUP_SETTLING_DELAY_MS (3000ms) to ensure Main-thread silence 
  *   during activity transitions on budget hardware (R658).
- * July.30.25:
- * - Issue #625: Structural: Mbrain JNI Reliability Audit. Added JNI_RET_EINTR.
- * July.30.23:
- * - Issue #624: Forensic: System Integrity Periodic Check. Added 
- *   INTEGRITY_HEARTBEAT_INTERVAL_MS for flow connectivity monitoring.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -32,6 +30,11 @@ const val LOG_LATENCY_THRESHOLD_MS = 1000L
 const val LOG_RETRIEVAL_THRESHOLD_MS = 500L
 const val LOG_LIMIT_STANDARD = 1000
 const val LOG_LIMIT_STRICT = 5000
+
+// Issue #660: Forensic Audit: Log Buffer Pressure
+const val LOG_BATCH_SIZE = 50
+const val LOG_BATCH_DELAY_MS = 2000L
+const val LOG_BUFFER_CAPACITY = 500
 
 // Native Bridge Constants
 const val JNI_RET_EINTR = -4

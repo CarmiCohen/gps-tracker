@@ -8,12 +8,12 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * July.31.38:
+ * - Issue #660: Forensic Audit: Log Buffer Pressure. Added insertAll to LogDao 
+ *   for optimized batch inserts.
  * July.30.31:
  * - Issue #632: Analytical Ribbons: Recovery Markers. Added isRecoveryEvent 
  *   to HistoryEntity and incremented version to 63.
- * July.27.07:
- * - Issue #605: Forensic Log Latency Audit. Optimized indices for pruning (isImportant, isSpecial) 
- *   and sync (synced, timestamp). Incremented version to 62.
  */
 @Entity(
     tableName = "logs", 
@@ -160,6 +160,7 @@ data class PendingStatusEntity(
 @Dao
 abstract class LogDao {
     @Insert abstract suspend fun insert(log: LogEntity): Long
+    @Insert abstract suspend fun insertAll(logs: List<LogEntity>)
     @Update abstract suspend fun update(log: LogEntity)
     @Query("SELECT * FROM logs WHERE localId = :localId") abstract suspend fun getLogByLocalId(localId: String): LogEntity?
     @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1") abstract suspend fun getLastLog(): LogEntity?
