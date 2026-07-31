@@ -1,25 +1,25 @@
-# Handover (July.31.01) - Restoration Hardening [READY]
+# Handover (July.31.37) - Hardware SDK Hardening [READY]
 
 ## 🎯 Next Objective
-Focus on **[Issue #662] libmbrainSDK Loading Failure**.
-- **Context**: `libmbrainSDK` fails to load on Samsung A15 hardware, disabling critical hardware stabilization.
-- **Goal**: Resolve the JNI loading failure to restore hardware watchdog and performance features for budget hardware.
+Focus on **[Issue #660] Forensic Audit: Log Buffer Pressure**.
+- **Context**: High-frequency telemetry logging causing occasional I/O spikes in `LogManager`.
+- **Goal**: Implement non-blocking circular log buffer and optimize SQLite batch inserts to prevent main-thread contention.
 
 ## 🆕 New Architectural Requirements
-- **R661 (FGS Restoration Hardening)**: All foreground service start attempts, especially during automatic restoration or deferred recovery, MUST be wrapped in an exhaustive `try-catch (Throwable)` block to catch `ForegroundServiceStartNotAllowedException` and correctly transition to a `Pending` state.
+- **R628 (16KB Page Alignment Enforcement)**: All native libraries MUST be aligned for 16KB page size. `app/build.gradle` MUST maintain `useLegacyPackaging = false` to ensure native libs are stored uncompressed and aligned in the APK, supporting Android 15+ hardware. (Issue #662, July.31.37)
 
 ## 📊 Status Tracker
-- **[Issue #661] FGS Restoration Crash**: 🟢 Resolved. Hardened `MainActivity` start logic.
+- **[Issue #662] libmbrainSDK Loading Failure**: 🟢 Resolved. Fixed ProGuard rules and 16KB page alignment config.
+- **[Issue #661] FGS Restoration Crash**: 🟢 Resolved.
 - **[Issue #657] Compose Snapshot Lock Failure**: 🟢 Resolved. 
-- **[Issue #656] userfaultfd unsupported**: 🟢 Resolved.
-- **[Issue #659] libmbrainSDK Instability**: 🔍 Regressed (See Issue #662).
+- **[Issue #659] libmbrainSDK Instability**: 🟢 Resolved via #662.
 
 ## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **SUCCESSFUL** (vJuly.31.01).
+- **Build Status**: 🟢 **SUCCESSFUL** (vJuly.31.37).
 - **Forensic Audit History**:
-    - **Stability**: Eliminated fatal crash during restoration by hardening FGS start-catch logic in `MainActivity`.
+    - **Hardware**: Restored libmbrainSDK functionality on Samsung A15 (ARM64) by correcting packaging and preservation rules.
 - **Requirement Alignment**: 
-    - **R661**: Integrated into `SOT_MASTER_REQUIREMENTS.md`.
+    - **R628**: Re-validated and enforced in `app/build.gradle`.
 
-**Status**: App stability during restoration achieved. Version July.31.01 ready for hardware-level SDK debugging.
+**Status**: Hardware-level stabilization features restored for budget devices. Version July.31.37 ready for deployment.
 🟢 **READY FOR NEW CHAT.**

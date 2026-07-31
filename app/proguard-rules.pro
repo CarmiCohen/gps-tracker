@@ -37,5 +37,12 @@
 -keep class com.gps19.app.BatteryState { *; }
 -keep class com.gps19.app.ConnectivityState { *; }
 
+# --- JNI / Native SDK (Issue #662) ---
+# Preserve the JNI bridge for vendor hardware stabilization.
+-keep class com.gps19.app.MbrainHardwareManager { *; }
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
 # --- General Android ---
 -keepattributes Signature, *Annotation*, EnclosingMethod

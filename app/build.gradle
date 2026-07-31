@@ -30,7 +30,7 @@ android {
         targetSdk = 35
         
         versionCode = getGitVersionCode()
-        versionName = "July.31.01"
+        versionName = "July.31.37"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -41,6 +41,11 @@ android {
             cmake {
                 cppFlags ""
             }
+        }
+
+        ndk {
+            // Samsung A15 is arm64-v8a. Ensure explicit targeting for budget hardware.
+            abiFilters "armeabi-v7a", "arm64-v8a"
         }
     }
 
@@ -66,8 +71,10 @@ android {
     }
     packaging {
         jniLibs {
-            // Issue #628: Ensure native libraries are stored uncompressed and aligned to 16KB
-            useLegacyPackaging = true
+            // Issue #662: Ensure native libraries are stored uncompressed and aligned to 16KB.
+            // set useLegacyPackaging to false to enable extractNativeLibs="false" behavior 
+            // required for Android 15+ 16KB page size support.
+            useLegacyPackaging = false
         }
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
