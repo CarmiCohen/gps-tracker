@@ -1,6 +1,7 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
+import timber.log.Timber
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -9,6 +10,10 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Aug.04.10:
+ * - Issue #710: Forensic Audit: Memory-Mapped Buffer Overflow Protection.
+ *   Updated logForensicTraceOptimized and logForensicTrace to detect spill-buffer 
+ *   overflows and log ALERT_ID_FORENSIC_OVERFLOW events (R710).
  * Aug.03.47:
  * - Issue #702: Forensic Audit: Trace Serialization Hardening. Updated 
  *   logForensicTraceOptimized() to pass raw telemetry for binary serialization (R702).
@@ -30,6 +35,7 @@ class LogManager @Inject constructor(
 ) {
     private var sessionStartTs = 0L
     private val isLoggingInProgress = AtomicBoolean(false)
+    private val isOverflowLogged = AtomicBoolean(false)
 
     private val connectivitySuite: ConnectivitySuite by lazy(LazyThreadSafetyMode.PUBLICATION) {
         connectivitySuiteProvider.get()
@@ -37,6 +43,7 @@ class LogManager @Inject constructor(
 
     fun startNewSession() {
         sessionStartTs = timeProvider.currentTimeMillis()
+        isOverflowLogged.set(false)
     }
 
     /**
@@ -58,7 +65,12 @@ class LogManager @Inject constructor(
             lng = lng,
             accuracy = accuracy
         )
-        logRepository.addLog(log)
+        
+        if (!forensicSpillBuffer.writeTrace(log)) {
+            handleOverflow()
+        } else {
+            isOverflowLogged.set(false)
+        }
     }
 
     /**
@@ -69,10 +81,27 @@ class LogManager @Inject constructor(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
         vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double
     ) {
-        forensicSpillBuffer.writeTraceOptimized(
+        if (!forensicSpillBuffer.writeTraceOptimized(
             timestamp, lat, lng, accuracy, maxAccuracy, vibe, snr, 
             batteryLevel, isCharging, batteryTemp
-        )
+        )) {
+            handleOverflow()
+        } else {
+            isOverflowLogged.set(false)
+        }
+    }
+
+    private fun handleOverflow() {
+        if (isOverflowLogged.compareAndSet(false, true)) {
+            Timber.w("Forensic Spill-Buffer Overflow! Dropping new traces until space is cleared.")
+            submitToLogSink(
+                message = "FORENSIC AUDIT: Spill-buffer overflow detected. Sampling inhibited to protect un-persisted data.",
+                type = ALERT_ID_FORENSIC_OVERFLOW,
+                isImportant = true,
+                isSpecial = true,
+                specialColor = FORENSIC_PINK_COLOR
+            )
+        }
     }
 
     fun submitToLogSink(

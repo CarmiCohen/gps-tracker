@@ -19,20 +19,17 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.04.10:
+ * - Issue #710: Forensic Audit: Memory-Mapped Buffer Overflow Protection.
+ *   Inherited hardened LogManager path for spill-buffer overflow protection (R710).
+ * Aug.03.85:
+ * - Issue #709: Forensic Audit: Adaptive Sampling Thermal Throttling. 
+ *   Enforced FORENSIC_SAMPLING_INTERVAL_COOLING_MS (500ms) floor when 
+ *   isCoolingModeActive is true to maintain hardware integrity (R709).
  * Aug.03.47:
  * - Issue #702: Forensic Audit: Trace Serialization Hardening. Updated 
  *   startForensicSamplingLoop() and stress tests to use the hardened binary 
  *   serialization path. String formatting is now moved out of the hot-path (R702).
- * Aug.03.46:
- * - Issue #701: Forensic Audit: Spatial Quantization. Implemented trace 
- *   compression in startForensicSamplingLoop(). Traces are now suppressed 
- *   if displacement < 0.1m AND IMU delta (vibe/tilt) is negligible. (R701)
- * Aug.03.45:
- * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Implemented 
- *   startForensicSamplingLoop() with dynamic 10Hz-100Hz scaling. Decoupled 
- *   logic/forensic sensor consumption to prevent peak data loss (R700).
- * Aug.03.37:
- * - Issue #669: Forensic Audit: Database I/O Contention.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -295,7 +292,7 @@ class TrackerService : BaseMonitorService() {
                             
                             logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = tLat, lng = tLng, accuracy = tAcc)
                             
-                            // Issue #669/700/702: Testing high-frequency zero-allocation path
+                            // Issue #669/700/702/710: Testing high-frequency zero-allocation path
                             repeat(100) { i ->
                                 logManager.logForensicTraceOptimized(
                                     timestamp = wallTs, lat = tLat, lng = tLng, accuracy = tAcc, maxAccuracy = tAcc, 
@@ -560,7 +557,7 @@ class TrackerService : BaseMonitorService() {
                 if (shouldLog) {
                     lastForensicLat = lat; lastForensicLng = lng; lastForensicVibe = vibe; lastForensicTilt = tilt
                     
-                    // R668/R702: Zero-allocation path for 100Hz capture (Hardened Serialization)
+                    // R668/R702/R710: Zero-allocation path for 100Hz capture (Hardened Serialization)
                     logManager.logForensicTraceOptimized(
                         timestamp = timeProvider.currentTimeMillis(),
                         lat = lat,
@@ -575,9 +572,12 @@ class TrackerService : BaseMonitorService() {
                     )
                 }
                 
-                // R700: Dynamic scaling logic
-                val isNominal = health.isCharging && !health.isCoolingModeActive
-                val delayMs = if (isNominal) FORENSIC_SAMPLING_INTERVAL_MIN_MS else FORENSIC_SAMPLING_INTERVAL_MAX_MS
+                // R700 / R709: Dynamic scaling logic
+                val delayMs = when {
+                    health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS
+                    health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS
+                    else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS
+                }
                 
                 delay(delayMs)
             }

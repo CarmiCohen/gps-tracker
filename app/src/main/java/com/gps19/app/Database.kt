@@ -8,12 +8,12 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.03.65:
+ * - Issue #705: Forensic Audit: Trace Deduplication Performance Optimization. 
+ *   Added spillIdx to LogEntity and specialized index for fast duplicate detection.
  * July.31.38:
  * - Issue #660: Forensic Audit: Log Buffer Pressure. Added insertAll to LogDao 
  *   for optimized batch inserts.
- * July.30.31:
- * - Issue #632: Analytical Ribbons: Recovery Markers. Added isRecoveryEvent 
- *   to HistoryEntity and incremented version to 63.
  */
 @Entity(
     tableName = "logs", 
@@ -23,7 +23,8 @@ import com.gps19.core.engine.*
         Index(value = ["isImportant"]),
         Index(value = ["isSpecial"]),
         Index(value = ["synced", "timestamp"]), // Optimized for telemetry sync
-        Index(value = ["type", "role", "deviceId", "timestamp"]) // Optimized for deduplication
+        Index(value = ["type", "role", "deviceId", "timestamp"]), // Optimized for deduplication
+        Index(value = ["type", "spillIdx", "timestamp"]) // Issue #705: Forensic Deduplication
     ]
 )
 data class LogEntity(
@@ -48,7 +49,8 @@ data class LogEntity(
     @ColumnInfo(defaultValue = "0") val accuracy: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0,
     val snrSnapshot: Double? = null,
-    val vibeSnapshot: Double? = null
+    val vibeSnapshot: Double? = null,
+    @ColumnInfo(defaultValue = "-1") val spillIdx: Int = -1 // Issue #705
 )
 
 @Entity(tableName = "trail_points", indices = [Index(value = ["timestamp"])])
@@ -171,6 +173,10 @@ abstract class LogDao {
     @Query("UPDATE logs SET synced = 1 WHERE localId IN (:localIds)") abstract suspend fun markLogsAsSynced(localIds: List<String>)
     @Query("DELETE FROM logs") abstract suspend fun clearAll()
     @Query("SELECT COUNT(*) FROM logs") abstract suspend fun getCount(): Int
+    
+    // Issue #705: Bulk check for existing forensic traces to prevent duplicates after crash
+    @Query("SELECT timestamp || '_' || spillIdx FROM logs WHERE type = 'FORENSIC_TRACE' AND timestamp >= :minTimestamp") 
+    abstract suspend fun getExistingForensicSignatures(minTimestamp: Long): List<String>
 
     @Transaction
     open suspend fun deepPruneLogs() {
@@ -224,7 +230,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 63, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 64, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -233,6 +239,14 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingStatusDao(): PendingStatusDao
 
     companion object {
+        val MIGRATION_63_64 = object : Migration(63, 64) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #705: Add spillIdx to logs and specialized index for deduplication.
+                db.execSQL("ALTER TABLE logs ADD COLUMN spillIdx INTEGER NOT NULL DEFAULT -1")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_spillIdx_timestamp ON logs (type, spillIdx, timestamp)")
+            }
+        }
+
         val MIGRATION_62_63 = object : Migration(62, 63) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #632: Add isRecoveryEvent to connection_history.

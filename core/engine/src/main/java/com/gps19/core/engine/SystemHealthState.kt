@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Aug.03.95:
+ * - Issue #711: Forensic Audit: Persistence Latency Correlation. Added cpuLoad 
+ *   and ioWait for correlated diagnostic profiling (R711).
  * Aug.03.37:
  * - Issue #669: Forensic Audit: Database I/O Contention. Added reset() for 
  *   zero-churn compliance (R668).
@@ -49,6 +52,10 @@ class SystemHealthState(
     var tiltIdx: Double = 0.0,
     var baroIdx: Double = 0.0,
     
+    // Performance & Load Correlation (Issue #711/R711)
+    var cpuLoad: Double = 0.0,
+    var ioWait: Double = 0.0,
+
     // Connectivity Stats
     var uptimeMs: Long = 0L,
     var lastConnTs: Long = 0L,
@@ -128,6 +135,8 @@ class SystemHealthState(
         this.liftIdx = other.liftIdx
         this.tiltIdx = other.tiltIdx
         this.baroIdx = other.baroIdx
+        this.cpuLoad = other.cpuLoad
+        this.ioWait = other.ioWait
         this.uptimeMs = other.uptimeMs
         this.lastConnTs = other.lastConnTs
         this.lastDiscTs = other.lastDiscTs
@@ -176,7 +185,8 @@ class SystemHealthState(
         peakVibrationShock: Double, isPowerTamper: Boolean, isLocationPending: Boolean,
         locationPendingReason: LocationPendingReason, isPowerSaveMode: Boolean, standbyBucket: Int,
         netInterface: String, isStorageLow: Boolean, isStorageCritical: Boolean,
-        isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean
+        isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
+        cpuLoad: Double = 0.0, ioWait: Double = 0.0
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -208,6 +218,8 @@ class SystemHealthState(
         this.isStorageCritical = isStorageCritical
         this.isBatterySteepDischarge = isBatterySteepDischarge
         this.isCoolingModeActive = isCoolingModeActive
+        this.cpuLoad = cpuLoad
+        this.ioWait = ioWait
     }
 
     fun reset() {
@@ -246,6 +258,8 @@ class SystemHealthState(
         liftIdx = 0.0
         tiltIdx = 0.0
         baroIdx = 0.0
+        cpuLoad = 0.0
+        ioWait = 0.0
         uptimeMs = 0L
         lastConnTs = 0L
         lastDiscTs = 0L

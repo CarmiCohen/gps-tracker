@@ -10,14 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.03.65:
+ * - Issue #705: Forensic Audit: Trace Deduplication Performance Optimization. 
+ *   Added spillIdx to LogEntry to support exactly-once forensic persistence (R705).
  * Aug.03.37:
  * - Issue #669: Forensic Audit: Database I/O Contention. Added reset() methods 
  *   to mutable state classes to support zero-churn UI state management (R668).
- *   Added isAdaptiveJump to TrackerStatus for forensic parity. Fixed field 
- *   mapping typos in toMap().
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Converted LocationState, StatsState, 
- *   and BatteryState to mutable flyweights for zero-churn telemetry (R-HARDWARE-01).
  */
 
 sealed class AppSensorEvent {
@@ -144,7 +142,8 @@ data class LogEntry(
     val accuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0,
     val snrSnapshot: Double? = null,
-    val vibeSnapshot: Double? = null
+    val vibeSnapshot: Double? = null,
+    val spillIdx: Int = -1 // Issue #705: Physical index in ForensicSpillBuffer
 ) {
     fun toJSONObject(): JSONObject {
         return JSONObject().apply {
@@ -166,6 +165,7 @@ data class LogEntry(
             extremeValue?.let { if (!it.isNaN() && !it.isInfinite()) put("extreme_value", it) }
             snrSnapshot?.let { put("snr_snapshot", it) }
             vibeSnapshot?.let { put("vibe_snapshot", it) }
+            if (spillIdx != -1) put("spill_idx", spillIdx)
         }
     }
 
@@ -197,7 +197,8 @@ data class LogEntry(
                 accuracy = obj.optDouble("accuracy", 0.0),
                 maxAccuracy = obj.optDouble("max_accuracy", 0.0),
                 snrSnapshot = if (obj.has("snr_snapshot")) obj.optDouble("snr_snapshot") else null,
-                vibeSnapshot = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot") else null
+                vibeSnapshot = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot") else null,
+                spillIdx = obj.optInt("spill_idx", -1)
             )
         }
     }

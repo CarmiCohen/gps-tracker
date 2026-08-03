@@ -2,20 +2,20 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.04.10:
+ * - Issue #710: Forensic Audit: Memory-Mapped Buffer Overflow Protection.
+ *   Added ALERT_ID_FORENSIC_OVERFLOW (R710).
+ * Aug.03.85:
+ * - Issue #709: Forensic Audit: Adaptive Sampling Thermal Throttling.
+ *   Added FORENSIC_SAMPLING_INTERVAL_COOLING_MS (500ms) to preserve hardware 
+ *   integrity during peak thermal stress (R709).
+ * Aug.03.70:
+ * - Issue #706: Forensic Audit: Binary Trace Delta-Encoding. Optimized trace 
+ *   footprint by reducing entry size to 128 bytes and doubling capacity to 2000 (R706).
  * Aug.03.46:
  * - Issue #701: Forensic Audit: Spatial Quantization. Added 
  *   FORENSIC_SPATIAL_GATE_METERS (0.1m), FORENSIC_IMU_VIBRATION_THRESHOLD, 
  *   and FORENSIC_IMU_TILT_THRESHOLD for trace compression.
- * Aug.03.45:
- * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Added 
- *   FORENSIC_SAMPLING_INTERVAL_MIN/MAX constants.
- * Aug.03.37:
- * - Issue #669: Forensic Audit: Database I/O Contention. Added constants for 
- *   Forensic Spill-Buffer (MappedByteBuffer) to decouple high-frequency 
- *   trace capture from DB persistence.
- * July.31.38:
- * - Issue #660: Forensic Audit: Log Buffer Pressure. Added LOG_BATCH_SIZE, 
- *   LOG_BATCH_DELAY_MS, and LOG_BUFFER_CAPACITY for optimized persistence.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -44,13 +44,14 @@ const val LOG_BUFFER_CAPACITY = 500
 
 // Issue #669: Forensic Spill-Buffer (MappedByteBuffer)
 const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"
-const val FORENSIC_SPILL_ENTRY_SIZE = 256 // Fixed-size binary entries for zero-allocation
-const val FORENSIC_SPILL_CAPACITY = 1000 // 1000 traces buffer (10 seconds at 100Hz)
+const val FORENSIC_SPILL_ENTRY_SIZE = 128 // Issue #706: Reduced for delta-encoding optimization
+const val FORENSIC_SPILL_CAPACITY = 2000   // Issue #706: Doubled capacity within same memory footprint
 const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
 
 // Issue #700: Forensic Sampling Scaling
 const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  // 100Hz (Peak Fidelity)
 const val FORENSIC_SAMPLING_INTERVAL_MAX_MS = 100L // 10Hz (Power Aware)
+const val FORENSIC_SAMPLING_INTERVAL_COOLING_MS = 500L // Issue #709: Thermal Safety Floor
 
 // Issue #701: Forensic Spatial Quantization
 const val FORENSIC_SPATIAL_GATE_METERS = 0.1
@@ -360,6 +361,7 @@ const val ALERT_ID_SYSTEM_STORAGE_CRITICAL = "SYSTEM_STORAGE_CRITICAL"
 const val ALERT_ID_BATTERY_STEEP_DISCHARGE = "BATTERY_HEALTH"
 const val ALERT_ID_HARDWARE_CONFIGURATION = "HARDWARE_CONFIG_MISSING"
 const val ALERT_ID_PERFORMANCE_SPIKE = "PERFORMANCE_SPIKE"
+const val ALERT_ID_FORENSIC_OVERFLOW = "FORENSIC_OVERFLOW"
 
 // Alert Titles (R747 Standardized)
 const val ALERT_TITLE_LOCAL_INTERNET = "This device: Internet Lost"
@@ -386,6 +388,7 @@ const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "System Storage Critical"
 const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "Critical Battery Health"
 const val ALERT_TITLE_HARDWARE_CONFIGURATION = "Hardware Config Incomplete"
 const val ALERT_TITLE_PERFORMANCE_SPIKE = "Performance Warning"
+const val ALERT_TITLE_FORENSIC_OVERFLOW = "Forensic Buffer Overflow"
 
 // System Watchdog & Grace Periods
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L

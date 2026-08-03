@@ -18,21 +18,24 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * Aug.03.55:
- * - Issue #704: Forensic Audit: Trace Backfill Flow Hardening. Refactored 
- *   forensic drainer to use transactional peek/commit. Moved forensic DB 
- *   insertions outside the global repository mutex to eliminate contention 
- *   with real-time log flushing (R704).
- * Aug.03.45:
- * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Increased forensic 
- *   drain batch size to 1000 to keep pace with 100Hz telemetry (R700).
+ * Aug.03.95:
+ * - Issue #711: Forensic Audit: Persistence Latency Correlation. Implemented 
+ *   telemetry correlation for convergence stalls. Captures SystemHealthState 
+ *   snapshots during backfill pressure (R711). Fixed unresolved reference in 
+ *   flushBatch.
+ * Aug.03.80:
+ * - Issue #708: Forensic Audit: Multi-Batch Backfill Convergence Monitoring. 
+ *   Implemented tracking for forensic drain progress. Added stall detection and 
+ *   convergence logging to ensure spill-buffer clears effectively during 
+ *   high-frequency telemetry (R708).
  */
 @Singleton
 class LogRepository @Inject constructor(
     private val logDao: LogDao,
     private val forensicSpillBuffer: ForensicSpillBuffer,
     @ApplicationScope private val scope: CoroutineScope,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val telemetry: TelemetryRepository
 ) {
     private val logMutex = Mutex()
     private var logWriteCount = 0
@@ -48,6 +51,10 @@ class LogRepository @Inject constructor(
         private val INTERRUPTION_REGEX = Regex("""\s*after an interruption of[^.]+""", RegexOption.IGNORE_CASE)
         private val COLON_VALUE_REGEX = Regex(""":\s*-?\d+(\.\d+)?\s*[A-Za-z%°]*""")
         private val SPACE_VALUE_REGEX = Regex("""\s+-?\d+(\.\d+)?\s*[A-Za-z%°]*""")
+        
+        private const val FORENSIC_ADAPTIVE_CHECK_INTERVAL_MS = 500L
+        private const val FORENSIC_FILL_THRESHOLD = FORENSIC_SPILL_CAPACITY / 2
+        private const val FORENSIC_CONVERGENCE_STALL_LIMIT = 3
     }
 
     init {
@@ -86,14 +93,31 @@ class LogRepository @Inject constructor(
 
     private fun startForensicDrainer() {
         scope.launch(Dispatchers.IO) {
+            var lastDrainTime = timeProvider.currentTimeMillis()
+            var consecutiveStalls = 0
+            
             while (isActive) {
                 try {
-                    delay(FORENSIC_DRAIN_INTERVAL_MS)
-                    if (forensicSpillBuffer.hasPending()) {
-                        // Issue #704: Use peek for transactional safety
-                        val traces = forensicSpillBuffer.peek(1000)
+                    delay(FORENSIC_ADAPTIVE_CHECK_INTERVAL_MS)
+                    
+                    val now = timeProvider.currentTimeMillis()
+                    val pendingAtStart = forensicSpillBuffer.getPendingCount()
+                    
+                    // Issue #707: Adaptive Trigger - Flush if buffer > 50% or idle > 5s
+                    val shouldDrain = (pendingAtStart >= FORENSIC_FILL_THRESHOLD) || 
+                                    (pendingAtStart > 0 && now - lastDrainTime >= FORENSIC_DRAIN_INTERVAL_MS)
+                    
+                    if (shouldDrain) {
+                        val traces = forensicSpillBuffer.peek(FORENSIC_SPILL_CAPACITY)
                         if (traces.isNotEmpty()) {
-                            val entities = traces.map { 
+                            // Issue #705: Deduplicate against already persisted traces
+                            val minTs = traces.minOf { it.timestamp }
+                            val existingSignatures = logDao.getExistingForensicSignatures(minTs).toSet()
+
+                            val toInsert = traces.filter { 
+                                val signature = "${it.timestamp}_${it.spillIdx}"
+                                !existingSignatures.contains(signature)
+                            }.map { 
                                 LogEntity(
                                     localId = UUID.randomUUID().toString(),
                                     timestamp = it.timestamp, message = it.message, type = it.type,
@@ -101,28 +125,64 @@ class LogRepository @Inject constructor(
                                     isSpecial = it.isSpecial, role = it.role,
                                     lat = it.lat, lng = it.lng, accuracy = it.accuracy,
                                     maxAccuracy = it.maxAccuracy, snrSnapshot = it.snrSnapshot,
-                                    vibeSnapshot = it.vibeSnapshot, synced = false
+                                    vibeSnapshot = it.vibeSnapshot, synced = false,
+                                    spillIdx = it.spillIdx
                                 )
                             }
                             
-                            // Perform insertion outside the global mutex to avoid blocking real-time logs
-                            logDao.insertAll(entities)
+                            if (toInsert.isNotEmpty()) {
+                                logDao.insertAll(toInsert)
+                            }
                             
-                            // Commit only after successful DB insertion
-                            forensicSpillBuffer.commitDrain(entities.size)
+                            forensicSpillBuffer.commitDrain(traces.size)
+                            lastDrainTime = now
+                            
+                            // Issue #708: Convergence Monitoring
+                            val pendingAfter = forensicSpillBuffer.getPendingCount()
+                            if (pendingAfter > 0) {
+                                if (pendingAfter >= pendingAtStart) {
+                                    consecutiveStalls++
+                                    if (consecutiveStalls >= FORENSIC_CONVERGENCE_STALL_LIMIT) {
+                                        // Issue #711: Forensic Audit Correlation
+                                        val health = telemetry.systemHealth.value
+                                        val msg = "Forensic Stall Correlated: Backfill not converging (%d pending). System: [CPU: %.1f, IOW: %.1f, Temp: %.1fC, Batt: %d%%]".format(
+                                            pendingAfter, health.cpuLoad, health.ioWait, health.batteryTemp, health.batteryLevel
+                                        )
+                                        Timber.w(msg)
+                                        addLog(LogEntry(
+                                            localId = UUID.randomUUID().toString(),
+                                            timestamp = timeProvider.currentTimeMillis(),
+                                            message = msg, type = "SYSTEM", isImportant = true,
+                                            id = "SYSTEM", viewerId = "SYSTEM", isSpecial = true,
+                                            specialColor = FORENSIC_PINK_COLOR
+                                        ), initiallySynced = true)
+                                    }
+                                } else {
+                                    consecutiveStalls = 0
+                                }
+                            } else {
+                                consecutiveStalls = 0
+                                Timber.d("Forensic Backfill: Convergence achieved.")
+                            }
                             
                             logMutex.withLock {
-                                logWriteCount += entities.size
+                                logWriteCount += toInsert.size
                                 if (logWriteCount >= DB_PRUNE_THRESHOLD) {
                                     logWriteCount = 0
                                     triggerAsyncPruning()
                                 }
                             }
+                        } else if (pendingAtStart > 0) {
+                            // If we have pending but peek was empty (corrupted entries skipped), 
+                            // we must still advance or commit to avoid infinite loop.
+                            forensicSpillBuffer.commitDrain(pendingAtStart)
+                            lastDrainTime = now
+                            consecutiveStalls = 0
                         }
                     }
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
-                    Timber.e(e, "Error in forensic drainer - data preserved in spill-buffer")
+                    Timber.e(e, "Error in forensic drainer")
                 }
             }
         }
@@ -189,7 +249,8 @@ class LogRepository @Inject constructor(
                             firstSeenTs = if (entry.firstSeenTs == 0L) (entry.timestamp - entry.durationMs) else entry.firstSeenTs,
                             role = entry.role, synced = initiallySynced, lat = entry.lat, lng = entry.lng, 
                             accuracy = entry.accuracy, maxAccuracy = entry.maxAccuracy, 
-                            snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot
+                            snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
+                            spillIdx = entry.spillIdx
                         ))
                         logWriteCount++
                     }
@@ -227,7 +288,8 @@ class LogRepository @Inject constructor(
                     extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial, 
                     specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                     lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
-                    snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot
+                    snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
+                    spillIdx = it.spillIdx
                 ) 
             }
         }.flowOn(Dispatchers.Default)
@@ -286,7 +348,8 @@ class LogRepository @Inject constructor(
                 extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial,
                 specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                 lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
-                snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot
+                snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
+                spillIdx = it.spillIdx
             )
         }
     }
@@ -331,7 +394,8 @@ class LogRepository @Inject constructor(
                 extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial, 
                 specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                 lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
-                snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot
+                snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
+                spillIdx = it.spillIdx
             ) 
         }
     }

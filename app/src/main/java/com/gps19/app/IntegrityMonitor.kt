@@ -26,11 +26,13 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.03.90:
+ * - Issue #711: Forensic Audit: Persistence Latency Correlation. Integrated 
+ *   cpuLoad and ioWait polling into performIntegrityHeartbeat for diagnostic 
+ *   profiling (R711).
  * Aug.01.10:
  * - Issue #668: Performance: Object Churn. Refactored to use mutable flyweight 
  *   updates for SystemHealthState to eliminate allocation churn (R-HARDWARE-01).
- * July.30.45:
- * - Issue #654: Performance Hardening.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -145,7 +147,15 @@ class IntegrityMonitor @Inject constructor(
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
         }
 
-        updateHealth { it.lastIntegrityHeartbeatRt = nowRt }
+        // Issue #711: Poll performance metrics for diagnostic correlation
+        val cpu = systemStatusProvider.getCpuLoad()
+        val iow = systemStatusProvider.getIoWait()
+
+        updateHealth { h ->
+            h.lastIntegrityHeartbeatRt = nowRt
+            h.cpuLoad = cpu
+            h.ioWait = iow
+        }
     }
 
     /**
