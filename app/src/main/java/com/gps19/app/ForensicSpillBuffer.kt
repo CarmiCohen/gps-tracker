@@ -15,6 +15,9 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.03.45:
+ * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Added 
+ *   writeTraceOptimized() to eliminate object churn in 100Hz sampling (R668).
  * Aug.03.37:
  * - Issue #669: Forensic Audit: Database I/O Contention. Implemented MappedByteBuffer 
  *   to decouple 100Hz trace capture from SQLite WAL pressure (R-HARDWARE-01).
@@ -76,6 +79,49 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
             buffer.put(msgBytes, 0, msgLen)
 
             // Update header
+            val nextIdx = (currentIdx + 1) % FORENSIC_SPILL_CAPACITY
+            writeIdx.set(nextIdx)
+            buffer.putInt(0, nextIdx)
+            
+            val count = totalCount.get()
+            if (count < FORENSIC_SPILL_CAPACITY) {
+                val newCount = count + 1
+                totalCount.set(newCount)
+                buffer.putInt(4, newCount)
+            }
+        }
+    }
+
+    /**
+     * writeTraceOptimized: Zero-allocation entry point for high-frequency telemetry.
+     * Prevents LogEntry object churn in 100Hz sampling loops (R668).
+     */
+    fun writeTraceOptimized(
+        timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
+        vibe: Double, snr: Double, message: String
+    ) {
+        val buffer = mappedBuffer ?: return
+        
+        synchronized(this) {
+            val currentIdx = writeIdx.get()
+            val offset = 1024 + (currentIdx * FORENSIC_SPILL_ENTRY_SIZE)
+            
+            buffer.position(offset)
+            buffer.putLong(timestamp)
+            buffer.putDouble(lat)
+            buffer.putDouble(lng)
+            buffer.putDouble(accuracy)
+            buffer.putDouble(maxAccuracy)
+            buffer.putDouble(vibe)
+            buffer.putDouble(snr)
+            buffer.putInt(0) // isImportant = false
+            buffer.putInt(0) // isSpecial = false
+            
+            val msgBytes = message.toByteArray(Charsets.UTF_8)
+            val msgLen = msgBytes.size.coerceAtMost(FORENSIC_SPILL_ENTRY_SIZE - 64)
+            buffer.putInt(msgLen)
+            buffer.put(msgBytes, 0, msgLen)
+
             val nextIdx = (currentIdx + 1) % FORENSIC_SPILL_CAPACITY
             writeIdx.set(nextIdx)
             buffer.putInt(0, nextIdx)

@@ -9,15 +9,17 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Aug.03.45:
+ * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Added 
+ *   logForensicTraceOptimized() to support zero-allocation 100Hz capture (R668).
  * Aug.03.37:
  * - Issue #669: Forensic Audit: Database I/O Contention. Added logForensicTrace 
  *   to utilize MappedByteBuffer spill-buffer for high-frequency diagnostics.
- * July.28.24:
- * - Issue #621: Alignment of isImportant naming for Boolean consistency.
  */
 @Singleton
 class LogManager @Inject constructor(
     private val logRepository: LogRepository,
+    private val forensicSpillBuffer: ForensicSpillBuffer,
     private val telemetry: TelemetryRepository,
     private val connectivitySuiteProvider: Provider<ConnectivitySuite>,
     private val configManager: ConfigManager,
@@ -54,6 +56,17 @@ class LogManager @Inject constructor(
             accuracy = accuracy
         )
         logRepository.addLog(log)
+    }
+
+    /**
+     * logForensicTraceOptimized: Zero-allocation path for 100Hz sampling.
+     * Directly serializes raw primitives to the spill-buffer (R668).
+     */
+    fun logForensicTraceOptimized(
+        timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
+        vibe: Double, snr: Double, message: String
+    ) {
+        forensicSpillBuffer.writeTraceOptimized(timestamp, lat, lng, accuracy, maxAccuracy, vibe, snr, message)
     }
 
     fun submitToLogSink(

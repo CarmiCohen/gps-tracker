@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.03.45:
+ * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Added 
+ *   FORENSIC_SAMPLING_INTERVAL_MIN/MAX constants.
  * Aug.03.37:
  * - Issue #669: Forensic Audit: Database I/O Contention. Added constants for 
  *   Forensic Spill-Buffer (MappedByteBuffer) to decouple high-frequency 
@@ -40,6 +43,10 @@ const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"
 const val FORENSIC_SPILL_ENTRY_SIZE = 256 // Fixed-size binary entries for zero-allocation
 const val FORENSIC_SPILL_CAPACITY = 1000 // 1000 traces buffer (10 seconds at 100Hz)
 const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
+
+// Issue #700: Forensic Sampling Scaling
+const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  // 100Hz (Peak Fidelity)
+const val FORENSIC_SAMPLING_INTERVAL_MAX_MS = 100L // 10Hz (Power Aware)
 
 // Native Bridge Constants
 const val JNI_RET_EINTR = -4

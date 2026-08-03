@@ -13,7 +13,8 @@ import java.util.*
  * Aug.03.37:
  * - Issue #669: Forensic Audit: Database I/O Contention. Added reset() methods 
  *   to mutable state classes to support zero-churn UI state management (R668).
- *   Added isAdaptiveJump to TrackerStatus for forensic parity.
+ *   Added isAdaptiveJump to TrackerStatus for forensic parity. Fixed field 
+ *   mapping typos in toMap().
  * Aug.01.10:
  * - Issue #668: Performance: Object Churn. Converted LocationState, StatsState, 
  *   and BatteryState to mutable flyweights for zero-churn telemetry (R-HARDWARE-01).
@@ -325,7 +326,7 @@ data class TrackerStatus(
             put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_mode_active", isCoolingModeActive)
             put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
             put("is_jump", isJump); put("mic_pending", micPending)
-            put("snr_idx", snrIdx); put("noise_idx", noiseIdx); put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("clift_idx", liftIdx)
+            put("snr_idx", snrIdx); put("noise_idx", noiseIdx); put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)
             put("tilt_idx", tiltIdx); put("baro_idx", baroIdx)
             put("is_sit_active", isSitActive)
             put("sit_vz", sitVz); put("sit_vz_ts", sitVzTs); put("sit_vz_rt", sitVzRt)

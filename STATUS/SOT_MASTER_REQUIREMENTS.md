@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.03.37 (Forensic I/O Hardening)
+# System Source of Truth (SoT) - Aug.03.45 (Sampling Scaling)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Power-Aware Sampling Authority (R700)**: (Added Aug.03.45) Forensic sampling MUST dynamically scale between 10Hz and 100Hz based on device state. 100Hz (10ms) is permitted ONLY when `isCharging` is true AND `isCoolingModeActive` is false. In all other states, the system MUST throttle to 10Hz (100ms) to preserve battery life and reduce thermal pressure. High-frequency capture MUST utilize the zero-allocation primitive path (`logForensicTraceOptimized`) to ensure R668 compliance. (Issue #700)
 *   **Forensic Spill-Buffer Authority (R669)**: (Added Aug.03.37) To prevent SQLite Write-Ahead Log (WAL) contention and "Davey" stalls (momentary UI freezes) during high-frequency telemetry bursts (up to 100Hz), forensic traces MUST be decoupled from database persistence. The system MUST utilize a memory-mapped circular buffer (`MappedByteBuffer`) for off-heap serialization of high-frequency traces. A dedicated background worker MUST drain this buffer into the database in sequential batches during lower I/O activity. (Issue #669)
 *   **Zero-Churn Telemetry Authority (R668)**: (Added Aug.01.10) High-frequency telemetry containers (`SystemHealthState`, `LocationState`, `ViolationReport`) MUST utilize mutable flyweight patterns and object pooling. Per-tick object instantiation in the logic hot-path (<= 2000ms) is prohibited. UI state containers (`KinematicState`, `DiagnosticState`) MUST utilize a `pulse` field to trigger reactive updates while retaining mutable member references to eliminate allocation churn on budget hardware (R-HARDWARE-01). (Issue #668)
 *   **Zero-Copy JNI State Sync (R667)**: (Added Aug.01.01) High-frequency hardware keep-alive pulses and diagnostic state synchronization between the JVM and native layer MUST utilize a pre-allocated `DirectByteBuffer`. This zero-copy path eliminates `jstring` and object allocation churn during JNI boundary crossings, preventing GC-induced latency spikes on budget hardware (R-HARDWARE-01). Native implementations MUST verify buffer registration before memory access. (Issue #667)
@@ -75,5 +76,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: Aug.03.37.
+*   **Current Release**: Aug.03.45.
 *   **Source of Truth**: app/build.gradle versionName.

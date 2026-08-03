@@ -35,11 +35,13 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * Aug.03.45:
+ * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Decoupled Logic 
+ *   and Forensic peak accumulators to allow independent 100Hz/0.5Hz consumption 
+ *   without data loss.
  * Aug.01.10:
  * - Issue #668: Performance: Object Churn. Implemented object pooling for 
  *   ForensicSnapshot to achieve zero-allocation in the logic hot-path.
- * July.30.48:
- * - Issue #653: Performance: GC Churn Optimization.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -131,14 +133,24 @@ class AppSensorManager @Inject constructor(
     var vibrationRollingSum = 0.0; private set
     private var vibrationBufferCount = 0
 
-    private var internalPeakDb = 0.0
-    private var internalMinDb = 100.0
-    private var internalPeakVibration = 0.0
-    private var internalPeakVerticalVelocity = 0.0
-    private var internalPeakVerticalVelocityTs = 0L
-    private var internalPeakVerticalVelocityRt = 0L
-    private var internalPeakVerticalDisplacement = 0.0
+    // Logic Accumulators (2s Tick)
+    private var logicPeakDb = 0.0
+    private var logicMinDb = 100.0
+    private var logicPeakVibration = 0.0
+    private var logicPeakVerticalVelocity = 0.0
+    private var logicPeakVerticalVelocityTs = 0L
+    private var logicPeakVerticalVelocityRt = 0L
+    private var logicPeakVerticalDisplacement = 0.0
     
+    // Forensic Accumulators (10ms-100ms Loop)
+    private var forensicPeakDb = 0.0
+    private var forensicMinDb = 100.0
+    private var forensicPeakVibration = 0.0
+    private var forensicPeakVerticalVelocity = 0.0
+    private var forensicPeakVerticalVelocityTs = 0L
+    private var forensicPeakVerticalVelocityRt = 0L
+    private var forensicPeakVerticalDisplacement = 0.0
+
     private var lastRawVibe = 0.0
     private var lastHpfValue = 0.0
     private var currentKineticEnergy = 0.0
@@ -169,8 +181,11 @@ class AppSensorManager @Inject constructor(
         }
     }
 
-    private val snapshotPool = Array(4) { ForensicSnapshot() }
-    private var snapshotPoolIdx = 0
+    private val logicSnapshotPool = Array(2) { ForensicSnapshot() }
+    private var logicSnapshotIdx = 0
+    
+    private val forensicSnapshotPool = Array(4) { ForensicSnapshot() }
+    private var forensicSnapshotIdx = 0
 
     private val bufferTs = LongArray(256); private val bufferRt = LongArray(256)
     private val bufferLux = DoubleArray(256); private val bufferVibe = DoubleArray(256)
@@ -267,7 +282,6 @@ class AppSensorManager @Inject constructor(
     private fun attemptStepDetectorRegistration() {
         val detector = stepDetector ?: return
         
-        // Issue #654: Use SystemStatusProvider's throttled audit to prevent IPC bursts.
         scope.launch(Dispatchers.IO) {
             val isGranted = systemStatusProvider.isActivityRecognitionGranted()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isGranted) {
@@ -431,8 +445,12 @@ class AppSensorManager @Inject constructor(
                             var maxAmp = 0; for (i in 0 until read) { val a = Math.abs(buffer[i].toInt()); if (a > maxAmp) maxAmp = a }
                             val db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble() / 1.0) else 0.0
                             synchronized(this) {
-                                currentAcousticDb = db; if (db > internalPeakDb) internalPeakDb = db
-                                if (db < internalMinDb) internalMinDb = db; if (db > secPeakDb) secPeakDb = db
+                                currentAcousticDb = db
+                                if (db > logicPeakDb) logicPeakDb = db
+                                if (db < logicMinDb) logicMinDb = db
+                                if (db > forensicPeakDb) forensicPeakDb = db
+                                if (db < forensicMinDb) forensicMinDb = db
+                                if (db > secPeakDb) secPeakDb = db
                                 if (!isWarming && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) {
                                     val spikeRt = timeProvider.elapsedRealtime(); if (spikeRt - lastAcousticSpikeRt > SPIKE_DEBOUNCE_MS) { lastAcousticSpikeRt = spikeRt; lastAcousticLockoutRt = spikeRt; onAcousticSpike?.invoke() }
                                 }
@@ -452,6 +470,34 @@ class AppSensorManager @Inject constructor(
     fun isAcousticMonitoringActive() = isAcousticRunning
     fun isAcousticMonitoringEnabled() = isMonitoring
 
+    fun consumeLogicSnapshot(): ForensicSnapshot {
+        return LatencyMonitor.measureAndAudit(
+            timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
+            "consumeLogicSnapshot",
+            LatencyMonitor.AuditType.PERFORMANCE,
+            { message, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(message, false)) }
+        ) {
+            synchronized(this) {
+                val snapshot = logicSnapshotPool[logicSnapshotIdx]
+                logicSnapshotIdx = (logicSnapshotIdx + 1) % logicSnapshotPool.size
+                
+                snapshot.apply {
+                    reset()
+                    vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux
+                    isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = logicPeakVibration
+                    peakVerticalVelocity = logicPeakVerticalVelocity; peakVerticalVelocityTs = logicPeakVerticalVelocityTs
+                    peakVerticalVelocityRt = logicPeakVerticalVelocityRt; plungeMatched = !isWarming && plungeMatched; peakVerticalDisplacement = logicPeakVerticalDisplacement
+                    proximityIdx = this@AppSensorManager.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@AppSensorManager.proximityDebounceMs
+                    vibrationRollingSum = this@AppSensorManager.vibrationRollingSum; acousticPeak = logicPeakDb
+                    acousticMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@AppSensorManager.currentKineticEnergy
+                }
+                logicPeakVibration = 0.0; logicPeakVerticalVelocity = 0.0; logicPeakVerticalVelocityTs = 0L; logicPeakVerticalVelocityRt = 0L
+                logicPeakVerticalDisplacement = 0.0; plungeMatched = false; logicPeakDb = 0.0; logicMinDb = 100.0
+                snapshot
+            }
+        }
+    }
+
     fun consumeForensicSnapshot(): ForensicSnapshot {
         return LatencyMonitor.measureAndAudit(
             timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
@@ -460,22 +506,21 @@ class AppSensorManager @Inject constructor(
             { message, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(message, false)) }
         ) {
             synchronized(this) {
-                // Issue #668: Reusing pooled snapshot instance to eliminate tick-level allocation.
-                val snapshot = snapshotPool[snapshotPoolIdx]
-                snapshotPoolIdx = (snapshotPoolIdx + 1) % snapshotPool.size
+                val snapshot = forensicSnapshotPool[forensicSnapshotIdx]
+                forensicSnapshotIdx = (forensicSnapshotIdx + 1) % forensicSnapshotPool.size
                 
                 snapshot.apply {
                     reset()
                     vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux
-                    isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = internalPeakVibration
-                    peakVerticalVelocity = internalPeakVerticalVelocity; peakVerticalVelocityTs = internalPeakVerticalVelocityTs
-                    peakVerticalVelocityRt = internalPeakVerticalVelocityRt; plungeMatched = !isWarming && plungeMatched; peakVerticalDisplacement = internalPeakVerticalDisplacement
+                    isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = forensicPeakVibration
+                    peakVerticalVelocity = forensicPeakVerticalVelocity; peakVerticalVelocityTs = forensicPeakVerticalVelocityTs
+                    peakVerticalVelocityRt = forensicPeakVerticalVelocityRt; plungeMatched = false; peakVerticalDisplacement = forensicPeakVerticalDisplacement
                     proximityIdx = this@AppSensorManager.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@AppSensorManager.proximityDebounceMs
-                    vibrationRollingSum = this@AppSensorManager.vibrationRollingSum; acousticPeak = internalPeakDb
-                    acousticMin = if (internalMinDb >= 100.0) -1.0 else internalMinDb; kineticEnergy = this@AppSensorManager.currentKineticEnergy
+                    vibrationRollingSum = this@AppSensorManager.vibrationRollingSum; acousticPeak = forensicPeakDb
+                    acousticMin = if (forensicMinDb >= 100.0) -1.0 else forensicMinDb; kineticEnergy = this@AppSensorManager.currentKineticEnergy
                 }
-                internalPeakVibration = 0.0; internalPeakVerticalVelocity = 0.0; internalPeakVerticalVelocityTs = 0L; internalPeakVerticalVelocityRt = 0L
-                internalPeakVerticalDisplacement = 0.0; plungeMatched = false; internalPeakDb = 0.0; internalMinDb = 100.0
+                forensicPeakVibration = 0.0; forensicPeakVerticalVelocity = 0.0; forensicPeakVerticalVelocityTs = 0L; forensicPeakVerticalVelocityRt = 0L
+                forensicPeakVerticalDisplacement = 0.0; forensicPeakDb = 0.0; forensicMinDb = 100.0
                 snapshot
             }
         }
@@ -525,7 +570,8 @@ class AppSensorManager @Inject constructor(
         val dx = x.toDouble() - lastAccelX.toDouble(); val dy = y.toDouble() - lastAccelY.toDouble(); val dz = z.toDouble() - lastAccelZ.toDouble()
         val delta = sqrt(dx * dx + dy * dy + dz * dz) / GRAVITY_EARTH
         synchronized(this) { 
-            if (delta > internalPeakVibration) internalPeakVibration = delta
+            if (delta > logicPeakVibration) logicPeakVibration = delta
+            if (delta > forensicPeakVibration) forensicPeakVibration = delta
             adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta, isWarming) 
             
             lastHpfValue = SentinelValidator.computeNextHpf(lastHpfValue, delta, lastRawVibe)
@@ -576,11 +622,17 @@ class AppSensorManager @Inject constructor(
                 1 -> { if (nowRt - lastPlungePhaseRt > CHAIR_PLUNGE_WINDOW_MS) { plungePhase = 0 } else if (currentVerticalVelocity > -CHAIR_PLUNGE_VELOCITY_THRESHOLD * 0.2) { if (abs(currentVerticalDisplacement) > CHAIR_PLUNGE_DISTANCE_THRESHOLD) { plungePhase = 2; lastPlungePhaseRt = nowRt } else { plungePhase = 0 } } }
             }
             synchronized(this) { 
-                if (abs(currentVerticalVelocity) > abs(internalPeakVerticalVelocity)) { 
-                    internalPeakVerticalVelocity = currentVerticalVelocity; internalPeakVerticalVelocityTs = wallNow; internalPeakVerticalVelocityRt = nowRt 
+                if (abs(currentVerticalVelocity) > abs(logicPeakVerticalVelocity)) { 
+                    logicPeakVerticalVelocity = currentVerticalVelocity; logicPeakVerticalVelocityTs = wallNow; logicPeakVerticalVelocityRt = nowRt 
                 }
-                if (abs(currentVerticalDisplacement) > abs(internalPeakVerticalDisplacement)) { 
-                    internalPeakVerticalDisplacement = currentVerticalDisplacement 
+                if (abs(currentVerticalDisplacement) > abs(logicPeakVerticalDisplacement)) { 
+                    logicPeakVerticalDisplacement = currentVerticalDisplacement 
+                } 
+                if (abs(currentVerticalVelocity) > abs(forensicPeakVerticalVelocity)) { 
+                    forensicPeakVerticalVelocity = currentVerticalVelocity; forensicPeakVerticalVelocityTs = wallNow; forensicPeakVerticalVelocityRt = nowRt 
+                }
+                if (abs(currentVerticalDisplacement) > abs(forensicPeakVerticalDisplacement)) { 
+                    forensicPeakVerticalDisplacement = currentVerticalDisplacement
                 } 
             }
         }

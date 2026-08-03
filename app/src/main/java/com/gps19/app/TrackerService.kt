@@ -19,9 +19,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.03.45:
+ * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Implemented 
+ *   startForensicSamplingLoop() with dynamic 10Hz-100Hz scaling. Decoupled 
+ *   logic/forensic sensor consumption to prevent peak data loss (R700).
  * Aug.03.37:
- * - Issue #669: Forensic Audit: Database I/O Contention. Updated stress test 
- *   to utilize logForensicTrace (MappedByteBuffer path).
+ * - Issue #669: Forensic Audit: Database I/O Contention.
  * Aug.01.10:
  * - Issue #668: Performance: Object Churn. Refactored evaluateAlarmsInternal to 
  *   support zero-allocation telemetry path and fixed isAdaptiveJump parameter.
@@ -33,6 +36,7 @@ class TrackerService : BaseMonitorService() {
     private var gnssDetailJob: Job? = null
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
+    private var forensicSamplingJob: Job? = null
     
     private var lastKnownLocation: Location? = null
     private var lastProcessedLocation: ProcessedLocation? = null
@@ -133,6 +137,7 @@ class TrackerService : BaseMonitorService() {
         setupPhysicalFastPaths()
         startTickLoop()
         startHeartbeatLoop()
+        startForensicSamplingLoop()
         
         logManager.logServiceEvent("Tracker Engine Online (Coordinated)", isImportant = true)
     }
@@ -274,12 +279,13 @@ class TrackerService : BaseMonitorService() {
                             val tLat = proc?.optimizedPoint?.lat ?: 0.0
                             val tLng = proc?.optimizedPoint?.lng ?: 0.0
                             val tAcc = proc?.maxAccuracy ?: 0.0
+                            val wallTs = timeProvider.currentTimeMillis()
                             
                             logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = tLat, lng = tLng, accuracy = tAcc)
                             
-                            // Issue #669: Testing high-frequency MappedByteBuffer path
+                            // Issue #669/700: Testing high-frequency zero-allocation path
                             repeat(100) { i ->
-                                logManager.logForensicTrace("STRESS TEST: Forensic Trace #$i", lat = tLat, lng = tLng, accuracy = tAcc)
+                                logManager.logForensicTraceOptimized(wallTs, tLat, tLng, tAcc, tAcc, 0.0, 0.0, "STRESS TEST: Forensic Trace #$i")
                             }
 
                             systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
@@ -459,7 +465,8 @@ class TrackerService : BaseMonitorService() {
         val isViewerActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isPeerAvailable = isSocketConnected && isViewerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
-        val snapshot = appSensorManager.consumeForensicSnapshot()
+        // Issue #700: Use Logic-Specific snapshot to preserve alarm peaks
+        val snapshot = appSensorManager.consumeLogicSnapshot()
 
         locationProcessor.updateSensorData(
             vibration = snapshot.vibration, heading = snapshot.heading, baroAlt = snapshot.baroAlt, lux = snapshot.lux, isNear = snapshot.isNear, powerTamper = health.isPowerTamper, tiltDegrees = snapshot.tiltDegrees, acousticDb = snapshot.acousticDb, peakShock = snapshot.peakShock, peakVerticalVelocity = snapshot.peakVerticalVelocity, peakVerticalVelocityTs = snapshot.peakVerticalVelocityTs, peakVerticalVelocityRt = snapshot.peakVerticalVelocityRt, plungeMatched = snapshot.plungeMatched, peakVerticalDisplacement = snapshot.peakVerticalDisplacement, nowRt = nowRt, nowWall = now
@@ -511,6 +518,37 @@ class TrackerService : BaseMonitorService() {
         serviceTickCounter++
     }
 
+    private fun startForensicSamplingLoop() {
+        forensicSamplingJob?.cancel()
+        forensicSamplingJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
+            while (isActive) {
+                val health = integrityMonitor.currentHealth
+                val proc = lastProcessedLocation
+                
+                // Issue #700: Use Forensic-Specific snapshot for high-frequency capture
+                val snapshot = appSensorManager.consumeForensicSnapshot()
+                
+                // R700: Dynamic scaling logic
+                val isNominal = health.isCharging && !health.isCoolingModeActive
+                val delayMs = if (isNominal) FORENSIC_SAMPLING_INTERVAL_MIN_MS else FORENSIC_SAMPLING_INTERVAL_MAX_MS
+                
+                // R668: Zero-allocation path for 100Hz capture
+                logManager.logForensicTraceOptimized(
+                    timestamp = timeProvider.currentTimeMillis(),
+                    lat = proc?.optimizedPoint?.lat ?: 0.0,
+                    lng = proc?.optimizedPoint?.lng ?: 0.0,
+                    accuracy = proc?.currentAccuracy ?: 0.0,
+                    maxAccuracy = proc?.maxAccuracy ?: 0.0,
+                    vibe = snapshot.vibration,
+                    snr = snapshot.acousticDb,
+                    message = "F_TRACE: P=${health.batteryLevel}% C=${health.isCharging} T=${health.batteryTemp}°C"
+                )
+                
+                delay(delayMs)
+            }
+        }
+    }
+
     override suspend fun onHeartbeat(now: Long, nowRt: Long) {
         if (isSystemActive) {
             val health = integrityMonitor.currentHealth
@@ -555,7 +593,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     override fun onDestroy() {
-        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel()
+        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
         super.onDestroy()
     }
 }

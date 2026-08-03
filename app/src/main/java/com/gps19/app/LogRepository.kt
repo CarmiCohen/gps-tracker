@@ -18,6 +18,9 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.03.45:
+ * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Increased forensic 
+ *   drain batch size to 1000 to keep pace with 100Hz telemetry (R700).
  * Aug.03.37:
  * - Issue #669: Forensic Audit: Database I/O Contention. Integrated 
  *   ForensicSpillBuffer (MappedByteBuffer) to decouple high-frequency 
@@ -88,7 +91,8 @@ class LogRepository @Inject constructor(
                 try {
                     delay(FORENSIC_DRAIN_INTERVAL_MS)
                     if (forensicSpillBuffer.hasPending()) {
-                        val traces = forensicSpillBuffer.drainTo(200)
+                        // Issue #700: Increased batch size to stay ahead of 100Hz stream
+                        val traces = forensicSpillBuffer.drainTo(1000)
                         if (traces.isNotEmpty()) {
                             val entities = traces.map { 
                                 LogEntity(
