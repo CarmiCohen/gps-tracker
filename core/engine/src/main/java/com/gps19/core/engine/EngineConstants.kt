@@ -2,20 +2,23 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * Aug.04.10:
+ * Aug.03.98:
+ * - Issue #717: Forensic Audit: Memory-Mapped Metadata Header. Implemented 128-byte 
+ *   header storing version, capacity, entrySize, and lastWriteRt (R717).
+ * - Issue #715: Forensic Audit: Persistence Health Alerting. Added 
+ *   FORENSIC_RELIABILITY_THRESHOLD (0.85) and 
+ *   FORENSIC_RELIABILITY_DEGRADATION_DURATION_MS (30s) (R715).
+ * Aug.03.97:
+ * - Issue #713: Forensic Audit: Log Buffer Drain Throttling. Added 
+ *   FORENSIC_DRAIN_THROTTLE_MIN_MS (500ms) and 
+ *   FORENSIC_DRAIN_THROTTLE_MAX_MS (5000ms) for dynamic I/O safety (R713).
+ * Aug.03.96:
  * - Issue #710: Forensic Audit: Memory-Mapped Buffer Overflow Protection.
  *   Added ALERT_ID_FORENSIC_OVERFLOW (R710).
  * Aug.03.85:
  * - Issue #709: Forensic Audit: Adaptive Sampling Thermal Throttling.
  *   Added FORENSIC_SAMPLING_INTERVAL_COOLING_MS (500ms) to preserve hardware 
  *   integrity during peak thermal stress (R709).
- * Aug.03.70:
- * - Issue #706: Forensic Audit: Binary Trace Delta-Encoding. Optimized trace 
- *   footprint by reducing entry size to 128 bytes and doubling capacity to 2000 (R706).
- * Aug.03.46:
- * - Issue #701: Forensic Audit: Spatial Quantization. Added 
- *   FORENSIC_SPATIAL_GATE_METERS (0.1m), FORENSIC_IMU_VIBRATION_THRESHOLD, 
- *   and FORENSIC_IMU_TILT_THRESHOLD for trace compression.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -47,6 +50,12 @@ const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"
 const val FORENSIC_SPILL_ENTRY_SIZE = 128 // Issue #706: Reduced for delta-encoding optimization
 const val FORENSIC_SPILL_CAPACITY = 2000   // Issue #706: Doubled capacity within same memory footprint
 const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
+const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 500L
+const val FORENSIC_DRAIN_THROTTLE_MAX_MS = 5000L
+
+// Issue #715: Forensic Persistence Health Alerting
+const val FORENSIC_RELIABILITY_THRESHOLD = 0.85
+const val FORENSIC_RELIABILITY_DEGRADATION_DURATION_MS = 30000L
 
 // Issue #700: Forensic Sampling Scaling
 const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  // 100Hz (Peak Fidelity)

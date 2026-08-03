@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Aug.03.50:
+ * - Issue #715: Forensic Audit: Persistence Health Alerting. Added 
+ *   forensicReliabilityDegradationStartRt to AlarmEvaluationState (R715).
  * Aug.01.10:
  * - Issue #668: Performance: Object Churn. Converted EngineGeoPoint, AlarmEvaluationState, 
  *   and SystemHealthReport into mutable flyweights for zero-churn telemetry (R-HARDWARE-01).
@@ -385,7 +388,10 @@ class AlarmEvaluationState(
     var trackerBaroAltEma: Double = 0.0,
     var isTrackerMode: Boolean = true,
     val health: SystemHealthState = SystemHealthState(),
-    var capabilities: HardwareCapabilities = HardwareCapabilities()
+    var capabilities: HardwareCapabilities = HardwareCapabilities(),
+    
+    // Persistence Alerting (Issue #715)
+    var forensicReliabilityDegradationStartRt: Long = 0L
 ) {
     fun update(
         now: Long, nowRt: Long, serviceStartTime: Long, serviceStartRt: Long,
@@ -460,7 +466,7 @@ class ProcessedLocation(
     var maxAccuracy: Double = 0.0,
     var currentAccuracy: Double = 0.0,
     var filteredSpeed: Double = 0.0,
-    var timestamp: Long = 0L,
+    val timestamp: Long = 0L,
     var rt: Long = 0L,
     var isStalled: Boolean = false,
     var isClockRegression: Boolean = false,
@@ -482,7 +488,6 @@ class ProcessedLocation(
         maxAccuracy = 0.0
         currentAccuracy = 0.0
         filteredSpeed = 0.0
-        timestamp = 0L
         rt = 0L
         isStalled = false
         isClockRegression = false

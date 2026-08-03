@@ -4,13 +4,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.ceil
+import java.util.*
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
- * Aug.03.37:
- * - Issue #669: Refactored to eliminate .copy() usage and fix callback signatures 
- *   following zero-churn transition.
+ * Aug.04.55:
+ * - Issue #716: Forensic Audit: Critical Battery Sentinel. Added unit test 
+ *   for correlated steep discharge alerting (R716).
+ * Aug.04.50:
+ * - Issue #715: Forensic Audit: Persistence Health Alerting. Added unit test 
+ *   for forensic reliability degradation alerting (R715). Renamed local nowRt 
+ *   to avoid reassignment conflict.
  */
 class MainAlarmLogicTest {
 
@@ -22,13 +26,13 @@ class MainAlarmLogicTest {
     private val spikeLogger: (String, Long) -> Unit = { _, _ -> }
 
     private fun createDefaultState(now: Long = 1700000000000L): AlarmEvaluationState {
-        val nowRt = 100000L
+        val baseNowRt = 100000L
         val state = AlarmEvaluationState()
         state.update(
             now = now,
-            nowRt = nowRt,
+            nowRt = baseNowRt,
             serviceStartTime = now - 60000, 
-            serviceStartRt = nowRt - 60000,
+            serviceStartRt = baseNowRt - 60000,
             lastAlarmAckTs = 0L,
             appStartTime = now - 60000,
             isRelayConnected = true,
@@ -39,9 +43,9 @@ class MainAlarmLogicTest {
             trackerGpsAccuracy = 5.0,
             maxTrackerAccuracy = 5.0,
             lastGpsPacketTs = now,
-            lastGpsPacketRt = nowRt,
+            lastGpsPacketRt = baseNowRt,
             trackerLastValidFixTs = now,
-            trackerLastValidFixRt = nowRt,
+            trackerLastValidFixRt = baseNowRt,
             trackerSpeed = 0.0,
             jumpTier = 0,
             isAdaptiveJump = false,
@@ -83,6 +87,9 @@ class MainAlarmLogicTest {
             peakVibrationShock = 0.0
             adaptiveVibrationFloor = 0.12
             tiltDegrees = 0.0
+            forensicReliability = 1.0
+            vibration = 0.0
+            cpuLoad = 0.0
         }
         state.truncateHomePoints(0)
         state.getOrCreateHomePoint(0).update(10.0, 10.0)
@@ -116,13 +123,13 @@ class MainAlarmLogicTest {
     @Test
     fun `Verify Bayesian Expansion suppresses Geofence breach during GPS gap`() {
         val now = 1700000000000L
-        val nowRt = 100000L
+        val baseNowRt = 100000L
         
         val state = createDefaultState(now + 10000).apply {
-            nowRt = 100000L + 10000
+            nowRt = baseNowRt + 10000
             trackerLat = 10.002 // ~220m away.
             trackerLastValidFixTs = now
-            trackerLastValidFixRt = nowRt
+            trackerLastValidFixRt = baseNowRt
             trackerSpeed = 20.0
             health.isLocationPending = true
         }
@@ -137,12 +144,12 @@ class MainAlarmLogicTest {
     @Test
     fun `Verify Jump hold duration`() {
         val now = 1700000000000L
-        val nowRt = 100000L
+        val baseNowRt = 100000L
         val state = createDefaultState(now).apply {
             trackerLat = 10.005 // ~550m away (Violation)
             jumpTier = 2
             firstViolationTs = now
-            firstViolationRt = nowRt
+            firstViolationRt = baseNowRt
             firstViolationWasJump = true
             isAdaptiveJump = true
             health.status = SentinelStatus.JUMP
@@ -150,7 +157,7 @@ class MainAlarmLogicTest {
 
         // Test at 2 min
         state.now = now + 120000
-        state.nowRt = nowRt + 120000
+        state.nowRt = baseNowRt + 120000
         val report1 = SystemHealthReport()
         MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, spikeLogger)
         assertFalse("Adaptive jump should be latched for 6 mins", 
@@ -158,7 +165,7 @@ class MainAlarmLogicTest {
 
         // Test at 7 min
         state.now = now + 420000
-        state.nowRt = nowRt + 420000
+        state.nowRt = baseNowRt + 420000
         val report2 = SystemHealthReport()
         MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, spikeLogger)
         assertTrue("Adaptive jump latch should expire after 6 mins", 
@@ -168,15 +175,15 @@ class MainAlarmLogicTest {
     @Test
     fun `Verify Hardware Boot Grace suppresses alarms`() {
         val now = 1700000000000L
-        val nowRt = 100000L
+        val baseNowRt = 100000L
         val state = createDefaultState(now).apply {
             capabilities = HardwareCapabilities(
                 hasBackgroundRestriction = true,
                 backgroundStatus = CapabilityStatus.DENIED,
                 autostartStatus = CapabilityStatus.DENIED
             )
-            serviceStartRt = nowRt - 10000
-            this.nowRt = nowRt
+            serviceStartRt = baseNowRt - 10000
+            this.nowRt = baseNowRt
         }
         
         val report = SystemHealthReport()
@@ -212,5 +219,63 @@ class MainAlarmLogicTest {
         val tamper = report.reports.find { it.type == ALERT_ID_TRACKER_TAMPER }
         assertTrue(tamper?.conditionMet == true)
         assertEquals(45.0, tamper?.extremeValue ?: 0.0, 0.1)
+    }
+
+    @Test
+    fun `Verify Forensic Persistence Reliability Alerting`() {
+        val now = 1700000000000L
+        val testNowRt = 100000L
+        val state = createDefaultState(now).apply {
+            this.nowRt = testNowRt
+            health.forensicReliability = 0.8 // Below 0.85 threshold
+        }
+
+        // 1. Initial detection of degradation - should NOT trigger yet
+        val report1 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, spikeLogger)
+        val alert1 = report1.reports.find { it.type == ALERT_ID_PERFORMANCE_SPIKE }
+        assertFalse("Alert should not trigger immediately upon degradation", alert1?.conditionMet == true)
+        assertTrue("Degradation start time should be recorded", state.forensicReliabilityDegradationStartRt == testNowRt)
+
+        // 2. 15 seconds later - still below duration threshold (30s)
+        state.nowRt = testNowRt + 15000
+        val report2 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, spikeLogger)
+        val alert2 = report2.reports.find { it.type == ALERT_ID_PERFORMANCE_SPIKE }
+        assertFalse("Alert should not trigger after only 15 seconds", alert2?.conditionMet == true)
+
+        // 3. 31 seconds later - should trigger alert
+        state.nowRt = testNowRt + 31000
+        val report3 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report3, spikeLogger)
+        val alert3 = report3.reports.find { it.type == ALERT_ID_PERFORMANCE_SPIKE }
+        assertTrue("Alert should trigger after 31 seconds of degradation", alert3?.conditionMet == true)
+        assertEquals(0.2, alert3?.extremeValue ?: 0.0, 0.01)
+
+        // 4. Recovery - alert should clear
+        state.health.forensicReliability = 0.9
+        state.nowRt = testNowRt + 40000
+        val report4 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report4, spikeLogger)
+        val alert4 = report4.reports.find { it.type == ALERT_ID_PERFORMANCE_SPIKE }
+        assertFalse("Alert should clear upon recovery", alert4?.conditionMet == true)
+        assertEquals(0L, state.forensicReliabilityDegradationStartRt)
+    }
+
+    @Test
+    fun `Verify Critical Battery Sentinel Enhanced Correlation`() {
+        val state = createDefaultState().apply {
+            health.isBatterySteepDischarge = true
+            health.vibration = 0.5 // High activity (>0.25G)
+            health.cpuLoad = 0.8    // High load (>0.7)
+        }
+        
+        val report = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
+        val alert = report.reports.find { it.type == ALERT_ID_BATTERY_STEEP_DISCHARGE }
+        
+        assertTrue("Battery alert should trigger", alert?.conditionMet == true)
+        assertTrue("Subtitle should indicate imminent shutdown", alert?.subtitle?.contains("IMMINENT SHUTDOWN") == true)
+        assertTrue("Technical details should contain metrics", alert?.technicalDetails?.contains("Vibe: 0.50G") == true)
     }
 }

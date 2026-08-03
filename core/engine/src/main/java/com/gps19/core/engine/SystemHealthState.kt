@@ -4,15 +4,15 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Aug.04.55:
+ * - Issue #716: Forensic Audit: Critical Battery Sentinel. Added vibration to 
+ *   update() for correlated battery health alerting (R716).
+ * Aug.04.45:
+ * - Issue #714: Forensic Audit: Persistence Reliability Metrics. Added 
+ *   forensicReliability (0.0 to 1.0) for real-time persistence health monitoring (R714).
  * Aug.03.95:
  * - Issue #711: Forensic Audit: Persistence Latency Correlation. Added cpuLoad 
  *   and ioWait for correlated diagnostic profiling (R711).
- * Aug.03.37:
- * - Issue #669: Forensic Audit: Database I/O Contention. Added reset() for 
- *   zero-churn compliance (R668).
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Converted to a mutable flyweight 
- *   class to eliminate allocation churn in telemetry pipelines (R-HARDWARE-01).
  */
 @Serializable
 class SystemHealthState(
@@ -55,6 +55,9 @@ class SystemHealthState(
     // Performance & Load Correlation (Issue #711/R711)
     var cpuLoad: Double = 0.0,
     var ioWait: Double = 0.0,
+
+    // Forensic Persistence Health (Issue #714/R714)
+    var forensicReliability: Double = 1.0,
 
     // Connectivity Stats
     var uptimeMs: Long = 0L,
@@ -137,6 +140,7 @@ class SystemHealthState(
         this.baroIdx = other.baroIdx
         this.cpuLoad = other.cpuLoad
         this.ioWait = other.ioWait
+        this.forensicReliability = other.forensicReliability
         this.uptimeMs = other.uptimeMs
         this.lastConnTs = other.lastConnTs
         this.lastDiscTs = other.lastDiscTs
@@ -186,7 +190,8 @@ class SystemHealthState(
         locationPendingReason: LocationPendingReason, isPowerSaveMode: Boolean, standbyBucket: Int,
         netInterface: String, isStorageLow: Boolean, isStorageCritical: Boolean,
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
-        cpuLoad: Double = 0.0, ioWait: Double = 0.0
+        cpuLoad: Double = 0.0, ioWait: Double = 0.0, forensicReliability: Double = 1.0,
+        vibration: Double = 0.0
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -220,6 +225,8 @@ class SystemHealthState(
         this.isCoolingModeActive = isCoolingModeActive
         this.cpuLoad = cpuLoad
         this.ioWait = ioWait
+        this.forensicReliability = forensicReliability
+        this.vibration = vibration
     }
 
     fun reset() {
@@ -260,6 +267,7 @@ class SystemHealthState(
         baroIdx = 0.0
         cpuLoad = 0.0
         ioWait = 0.0
+        forensicReliability = 1.0
         uptimeMs = 0L
         lastConnTs = 0L
         lastDiscTs = 0L

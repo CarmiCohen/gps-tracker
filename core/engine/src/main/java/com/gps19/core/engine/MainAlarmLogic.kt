@@ -5,11 +5,15 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Aug.04.55:
+ * - Issue #716: Forensic Audit: Critical Battery Sentinel. Implemented 
+ *   ALERT_ID_BATTERY_STEEP_DISCHARGE correlation with vibration and cpuLoad (R716).
+ * Aug.04.50:
+ * - Issue #715: Forensic Audit: Persistence Health Alerting. Trigger 
+ *   ALERT_ID_PERFORMANCE_SPIKE if forensicReliability < 0.85 for > 30s (R715).
  * Aug.01.10:
  * - Issue #668: Performance: Object Churn. Refactored detectViolations to use
  *   a mutable SystemHealthReport flyweight and eliminated hot-path allocations (R-HARDWARE-01).
- * July.29.01:
- * - Issue #623: Performance Audit. Updated to use standardized measureAndAudit helper.
  */
 object MainAlarmLogic {
 
@@ -93,7 +97,7 @@ object MainAlarmLogic {
             report.getOrCreate(reportIdx++).update(
                 type = ALERT_ID_SIGNAL_LOSS,
                 title = getTrackerTitleCached(isTracker, if (isTracker) ALERT_TITLE_VIEWER_SIGNAL_LOSS else ALERT_TITLE_SIGNAL_LOSS),
-                subtitle = "No data received from device", // Constant subtitle to avoid allocation
+                subtitle = "No data received from device", 
                 conditionMet = canCheckPeerErrors && health.signalLoss && !shouldSuppressPeerErrors
             )
             
@@ -356,11 +360,27 @@ object MainAlarmLogic {
                 extremeValue = (100.0 - health.batteryLevel)
             )
 
+            // Issue #716: Critical Battery Sentinel (Enhanced Correlation)
+            val isHighSensorActivity = health.vibration > VIBRATION_SUSPICIOUS_THRESHOLD_G
+            val isHighSystemLoad = health.cpuLoad > 0.7
+            val steepConditionMet = health.isBatterySteepDischarge
+            
+            val steepSubtitle = when {
+                steepConditionMet && (isHighSensorActivity || isHighSystemLoad) -> "IMMINENT SHUTDOWN PREDICTED (High Load)"
+                steepConditionMet -> "Abnormal discharge rate detected"
+                else -> "Battery health OK"
+            }
+
+            val steepTech = if (steepConditionMet) {
+                "Vibe: %.2fG, CPU: %.1f, Temp: %.1f°C".format(health.vibration, health.cpuLoad, health.batteryTemp)
+            } else null
+
             report.getOrCreate(reportIdx++).update(
                 type = ALERT_ID_BATTERY_STEEP_DISCHARGE,
                 title = getTrackerTitleCached(isTracker, ALERT_TITLE_BATTERY_STEEP_DISCHARGE),
-                subtitle = "Abnormal discharge rate detected",
-                conditionMet = health.isBatterySteepDischarge
+                subtitle = steepSubtitle,
+                conditionMet = steepConditionMet,
+                technicalDetails = steepTech
             )
 
             val tempCondition = health.batteryTemp > MAX_SAFE_TEMPERATURE_CELSIUS || health.isCoolingModeActive
@@ -417,6 +437,27 @@ object MainAlarmLogic {
                 title = getTrackerTitleCached(isTracker, ALERT_TITLE_HARDWARE_CONFIGURATION),
                 subtitle = configSubtitle,
                 conditionMet = configViolation
+            )
+
+            // 8. FORENSIC PERSISTENCE HEALTH (Issue #715)
+            val isReliabilityDegraded = health.forensicReliability < FORENSIC_RELIABILITY_THRESHOLD
+            if (isReliabilityDegraded) {
+                if (state.forensicReliabilityDegradationStartRt == 0L) {
+                    state.forensicReliabilityDegradationStartRt = nowRt
+                }
+            } else {
+                state.forensicReliabilityDegradationStartRt = 0L
+            }
+
+            val isForensicSustained = state.forensicReliabilityDegradationStartRt > 0L && 
+                                      (nowRt - state.forensicReliabilityDegradationStartRt) >= FORENSIC_RELIABILITY_DEGRADATION_DURATION_MS
+
+            report.getOrCreate(reportIdx++).update(
+                type = ALERT_ID_PERFORMANCE_SPIKE,
+                title = getTrackerTitleCached(isTracker, ALERT_TITLE_PERFORMANCE_SPIKE),
+                subtitle = if (isForensicSustained) "Forensic persistence reliability is low (${String.format(Locale.getDefault(), "%.2f", health.forensicReliability)})" else "Forensic persistence OK",
+                conditionMet = isForensicSustained,
+                extremeValue = 1.0 - health.forensicReliability
             )
 
             report.truncate(reportIdx)

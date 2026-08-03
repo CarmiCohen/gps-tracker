@@ -19,6 +19,9 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.04.60:
+ * - Issue #717: Forensic Audit: Memory-Mapped Metadata Header. Implemented 128-byte 
+ *   header storing version, capacity, entrySize, and lastWriteRt (R717).
  * Aug.04.10:
  * - Issue #710: Forensic Audit: Memory-Mapped Buffer Overflow Protection.
  *   Implemented write-inhibit mechanism (Safe-Wrap). New traces are dropped 
@@ -32,12 +35,15 @@ import kotlin.math.round
  *   delta encoding for timestamps and spatial coordinates (R706).
  */
 @Singleton
-class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val context: Context) {
+class ForensicSpillBuffer @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val timeProvider: TimeProvider
+) {
 
     private val spillFile = File(context.filesDir, FORENSIC_SPILL_FILE_NAME)
     private var mappedBuffer: MappedByteBuffer? = null
     
-    // Header: [0..3] Magic, [4..7] W_Idx, [8..11] Count, [12..15] R_Idx, [16..23] BaseTs, [24..31] BaseLat, [32..39] BaseLng
+    // Pointers and metadata tracked in header
     private val writeIdx = AtomicInteger(0)
     private val totalCount = AtomicInteger(0)
     private val readIdx = AtomicInteger(0)
@@ -50,15 +56,22 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
 
     private companion object {
         const val MAGIC_NUMBER = 0x46535042
-        const val HEADER_SIZE = 1024
+        const val CURRENT_VERSION = 1
+        const val HEADER_SIZE = 128
         const val CHECKSUM_SIZE = 4
         
-        const val OFF_WRITE_IDX = 4
-        const val OFF_COUNT = 8
-        const val OFF_READ_IDX = 12
-        const val OFF_BASE_TS = 16
-        const val OFF_BASE_LAT = 24
-        const val OFF_BASE_LNG = 32
+        // Header Offsets
+        const val OFF_MAGIC = 0
+        const val OFF_VERSION = 4
+        const val OFF_CAPACITY = 8
+        const val OFF_ENTRY_SIZE = 12
+        const val OFF_LAST_WRITE_RT = 16
+        const val OFF_WRITE_IDX = 24
+        const val OFF_COUNT = 28
+        const val OFF_READ_IDX = 32
+        const val OFF_BASE_TS = 36
+        const val OFF_BASE_LAT = 44
+        const val OFF_BASE_LNG = 52
 
         const val PRECISION_SCALE = 10_000_000.0 // 1e7 for ~1cm precision
     }
@@ -73,9 +86,13 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
             
             val buffer = mappedBuffer
             if (buffer != null) {
-                val magic = buffer.getInt(0)
-                if (magic != MAGIC_NUMBER) {
-                    Timber.w("ForensicSpillBuffer: Invalid magic or new file. Resetting.")
+                val magic = buffer.getInt(OFF_MAGIC)
+                val version = if (magic == MAGIC_NUMBER) buffer.getInt(OFF_VERSION) else -1
+                val cap = if (magic == MAGIC_NUMBER) buffer.getInt(OFF_CAPACITY) else -1
+                val entrySz = if (magic == MAGIC_NUMBER) buffer.getInt(OFF_ENTRY_SIZE) else -1
+
+                if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != FORENSIC_SPILL_CAPACITY || entrySz != FORENSIC_SPILL_ENTRY_SIZE) {
+                    Timber.w("ForensicSpillBuffer: Header mismatch or new file. Resetting.")
                     resetBuffer()
                 } else {
                     val recoveredWrite = buffer.getInt(OFF_WRITE_IDX)
@@ -107,7 +124,12 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
 
     private fun resetBuffer() {
         val buffer = mappedBuffer ?: return
-        buffer.putInt(0, MAGIC_NUMBER)
+        buffer.putInt(OFF_MAGIC, MAGIC_NUMBER)
+        buffer.putInt(OFF_VERSION, CURRENT_VERSION)
+        buffer.putInt(OFF_CAPACITY, FORENSIC_SPILL_CAPACITY)
+        buffer.putInt(OFF_ENTRY_SIZE, FORENSIC_SPILL_ENTRY_SIZE)
+        buffer.putLong(OFF_LAST_WRITE_RT, 0L)
+        
         buffer.putInt(OFF_WRITE_IDX, 0)
         buffer.putInt(OFF_COUNT, 0)
         buffer.putInt(OFF_READ_IDX, 0)
@@ -237,6 +259,9 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
         
         val newCount = totalCount.incrementAndGet()
         buffer.putInt(OFF_COUNT, newCount)
+        
+        // Issue #717: Update last write timestamp in header
+        buffer.putLong(OFF_LAST_WRITE_RT, timeProvider.elapsedRealtime())
     }
 
     fun peek(limit: Int): List<LogEntry> {

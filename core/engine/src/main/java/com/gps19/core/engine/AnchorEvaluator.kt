@@ -5,11 +5,12 @@ import kotlin.math.max
 
 /**
  * AnchorEvaluator: Manages stationary anchor state and breakout logic.
+ * Aug.04.50:
+ * - Issue #715: Build Hardening. Applied breakout leniency during accuracy snaps 
+ *   to ensure coordinate-snap artifacts don't trigger premature anchor release.
  * Aug.03.37:
  * - Issue #669: Refactored to utilize mutable flyweight patterns for EngineGeoPoint 
  *   to resolve build errors and ensure zero-churn compliance (R668).
- * July.23.09:
- * - Fix: Coordinate averaging now only includes points within the breakout threshold.
  */
 class AnchorEvaluator(
     private val onLog: (String, Double, Double, Double, Double?) -> Unit
@@ -157,7 +158,8 @@ class AnchorEvaluator(
                 }
 
                 // 4. Decision Logic
-                if (anchorEscapeScore < ANCHOR_ESCAPE_SCORE_THRESHOLD && distFromAnchor < breakoutThreshold) {
+                val effectiveBreakoutThreshold = if (isAccuracySnap) breakoutThreshold * 1.5 else breakoutThreshold
+                if (anchorEscapeScore < ANCHOR_ESCAPE_SCORE_THRESHOLD && distFromAnchor < effectiveBreakoutThreshold) {
                     skipPersistence = true
                     isLockedNow = true
                     

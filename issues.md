@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.03.95)
+# Project Issues & Hardening Tracking (Aug.03.98)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 520 |
+| **Resolved (Total)** | 🟢 Progress | 527 |
 
 ---
 
@@ -21,15 +21,13 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.03.95)
-*   **[Issue #711] [Severity: Medium] [Category: Performance] Forensic Audit: Persistence Latency Correlation**.
-    *   **Resolution**: Implemented telemetry correlation in `LogRepository`. When a convergence stall is detected (3 consecutive batches where incoming rate > drain capacity), the system now captures a snapshot of `SystemHealthState` including new performance metrics: `cpuLoad` (from `/proc/loadavg`) and `ioWait` (from `/proc/stat`). This data is logged as a correlated diagnostic event to aid in identifying hardware-level persistence bottlenecks (R711).
-*   **[Issue #710] [Severity: High] [Category: Robustness] Forensic Audit: Memory-Mapped Buffer Overflow Protection**.
-    *   **Resolution**: Implemented a write-inhibit (Safe-Wrap) mechanism in `ForensicSpillBuffer` (R710).
-*   **[Issue #709] [Severity: Medium] [Category: Performance] Forensic Audit: Adaptive Sampling Thermal Throttling**.
-    *   **Resolution**: Implemented thermal-aware sampling floor (500ms) in `TrackerService` during cooling mode (R709).
-*   **[Issue #708] [Severity: Medium] [Category: Performance] Forensic Audit: Multi-Batch Backfill Convergence Monitoring**.
-    *   **Resolution**: Implemented drain depth tracking and stall detection in `LogRepository` (R708).
+## 🟢 Recently Resolved Issues (Aug.03.98)
+*   **[Issue #717] [Severity: Medium] [Category: Performance] Forensic Audit: Memory-Mapped Metadata Header**.
+    *   **Resolution**: Implemented a 128-byte persistent header in `ForensicSpillBuffer` storing `magicNumber`, `version`, `capacity`, `entrySize`, and `lastWriteRt`. Enhanced initialization to perform integrity resets on version or schema mismatch (R717).
+*   **[Issue #716] [Severity: High] [Category: Robustness] Forensic Audit: Critical Battery Sentinel**.
+    *   **Resolution**: Implemented high-fidelity battery alerting in `MainAlarmLogic`. The sentinel correlates abnormal discharge rates with high system load (`cpuLoad > 0.7`) or sensor activity (`vibration > 0.25G`) to predict and alert on imminent shutdown (R716).
+*   **[Issue #715] [Severity: Medium] [Category: Robustness] Forensic Audit: Persistence Health Alerting**.
+    *   **Resolution**: Implemented duration-based alerting for forensic persistence degradation. Triggering `ALERT_ID_PERFORMANCE_SPIKE` if `forensicReliability` drops below 0.85 for > 30s, ensuring transient I/O pressure doesn't trigger false alarms while capturing sustained failures (R715).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.03.95)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.03.98)

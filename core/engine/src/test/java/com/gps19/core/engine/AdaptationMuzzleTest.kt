@@ -1,25 +1,25 @@
 package com.gps19.core.engine
 
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 
+/**
+ * AdaptationMuzzleTest: Validating A15-specific polling stabilization logic.
+ * Aug.04.50:
+ * - Issue #715: Build Hardening. Updated to reactive flow collection to match 
+ *   zero-churn ProcessorEvent migration.
+ */
 class AdaptationMuzzleTest {
 
     private lateinit var processor: LocationProcessor
     private val timeProvider = TestTimeProvider()
-    private val listener = object : LocationProcessorListener {
-        override fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, status: SentinelStatus, timestamp: Long, accuracy: Double, maxAccuracy: Double) {}
-        override fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Double, snr: Double?, vibe: Double?) {}
-        override fun onMaxAccuracyChanged(accuracy: Double) {}
-        override fun onChairBaselineChanged(baseline: Double) {}
-        override fun onGpsStallDetected(rt: Long) {}
-    }
 
     @Before
     fun setup() {
         processor = LocationProcessor(timeProvider)
-        processor.setListener(listener)
     }
 
     @Test

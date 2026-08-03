@@ -8,6 +8,9 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.04.15:
+ * - Issue #712: Forensic Audit: Adaptive Database Pruning. Updated LogDao 
+ *   to support dynamic pruning limits (R712).
  * Aug.03.65:
  * - Issue #705: Forensic Audit: Trace Deduplication Performance Optimization. 
  *   Added spillIdx to LogEntity and specialized index for fast duplicate detection.
@@ -179,9 +182,9 @@ abstract class LogDao {
     abstract suspend fun getExistingForensicSignatures(minTimestamp: Long): List<String>
 
     @Transaction
-    open suspend fun deepPruneLogs() {
-        pruneRoutineHeartbeats(100)
-        pruneNonForensicLogs(500)
+    open suspend fun deepPruneLogs(heartbeatLimit: Int = 100, generalLimit: Int = 500) {
+        pruneRoutineHeartbeats(heartbeatLimit)
+        pruneNonForensicLogs(generalLimit)
     }
 
     @Query("DELETE FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') AND id NOT IN (SELECT id FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT :limit)")

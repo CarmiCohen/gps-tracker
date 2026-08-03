@@ -1,26 +1,32 @@
-# Handover (Aug.03.95) - Forensic Latency Correlation Implemented
+# Handover (Aug.03.100) - Forensic Subsystem Hardened
 
 ## 🎯 Next Objective
-**[Issue #712] Forensic Audit: Adaptive Database Pruning**.
-- **Context**: While we monitor persistence latency, high-frequency forensic sampling (100Hz) significantly accelerates log growth, potentially leading to storage pressure between scheduled prunings.
-- **Goal**: Implement fill-level aware proactive pruning in `LogRepository`. The system SHOULD trigger a deep-prune operation when `LogDao.getCount()` exceeds a dynamic threshold calculated based on `isStorageLow` status and forensic sampling rate (R712).
+**[Issue #718] [Severity: High] [Category: Robustness] Forensic Audit: Recovery Integrity Re-play**.
+- **Context**: The metadata header is now implemented and validated on startup. We need to implement the actual recovery routine that reads un-persisted traces from the spill buffer and commits them to the database following a crash or force-stop.
+- **Goal**: Implement `recoverAbandonedTraces()` in `LogRepository`. This method must be called during service initialization to safely drain and persist any "abandoned" forensic data using the header offsets (R718).
 
 ## 🆕 New Architectural Requirements
-- **R711 (Forensic Persistence Correlation Authority)**: (Added Aug.03.95) The `LogRepository` MUST correlate forensic convergence stalls with hardware health metadata (CPU load, I/O wait, Battery Temp) to facilitate diagnostic profiling (Issue #711).
-- **R710 (Memory-Mapped Buffer Protection Authority)**: (Added Aug.03.88) The `ForensicSpillBuffer` MUST drop new traces and log an overflow event when capacity is reached (Issue #710).
+- **R717 (Memory-Mapped Metadata Header Authority)**: (Added Aug.03.100) `ForensicSpillBuffer` utilizes a 128-byte persistent header (`magic`, `version`, `capacity`, `lastWriteRt`) to ensure cross-boot integrity validation.
+- **R716 (Critical Battery Sentinel Authority)**: (Added Aug.03.99) Predicts shutdown by correlating `isBatterySteepDischarge` with high CPU load (>0.7) or vibration (>0.25G).
+- **R715 (Persistence Health Alerting Authority)**: (Added Aug.03.98) Monitors `forensicReliability` (flush success rate). Triggers `PERFORMANCE_SPIKE` if success rate < 85% for >30s.
 
 ## 📊 Status Tracker
-- **[Issue #711] Forensic Persistence Correlation**: 🟢 Resolved. Implemented hardware snapshot correlation during stalls (R711).
-- **[Issue #710] Forensic Overflow Protection**: 🟢 Resolved. Implemented write-inhibit mechanism (R710).
-- **[Issue #709] Forensic Adaptive Sampling**: 🟢 Resolved. Implemented thermal safety floor (R709).
-- **[Issue #708] Forensic Convergence Monitoring**: 🟢 Resolved. Implemented drain depth tracking (R708).
+- **[Issue #717] Memory-Mapped Header**: 🟢 Resolved. 128-byte header implemented with version and capacity checks (R717).
+- **[Issue #716] Critical Battery Sentinel**: 🟢 Resolved. Correlated alerting implemented in `MainAlarmLogic` (R716).
+- **[Issue #715] Forensic Persistence Alerting**: 🟢 Resolved. Duration-based monitoring active. Test suite hardened (R715).
+- **[Issue #714] Reliability Metrics**: 🟢 Resolved. EMA-based tracking of flush success rate active in `LogRepository` (R714).
 
-## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **SUCCESSFUL** (vAug.03.95).
-- **Forensic Audit History**:
-    - **Correlation**: Snapshots include CPU load and I/O Wait (R711).
-    - **Overflow Safety**: Write-inhibit active at 2000 entries (R710).
-    - **Thermal Safety**: 500ms floor active during cooling (R709).
+## 🔍 Forensic Subsystem State (vAug.03.100)
+- **#715 Scope & Clarification**: This alert (`ALERT_ID_PERFORMANCE_SPIKE`) specifically monitors the **reliability of the persistence pipeline** (the recorder), not physical sensor events like `chairsit` or `lifting`. 
+    - **Physical Events**: A `chairsit` or `lifting` event does not trigger this alert. 
+    - **Recording Risk**: If this alert is active, it means the system is currently too busy to guarantee that transient, high-speed events (like a 1s chair plunge) are successfully recorded in the "Black Box". It serves as a health warning for the data capture integrity.
+- **Component Status**:
+    - `ForensicSpillBuffer`: Hardened with 128-byte metadata header for cross-boot recovery.
+    - `MainAlarmLogic`: Fully hardened with persistence health and correlated battery sentinels.
+    - `SystemHealthState`: Correctly propagates `vibration`, `cpuLoad`, and `forensicReliability`.
+    - `Test Suite`: 100% pass rate in `:core:engine` (24 tests).
+- **Build Status**: 🟢 **SUCCESSFUL**.
+- **Documentation Integrity**: `SOT_MASTER_REQUIREMENTS.md` and `issues.md` synchronized to Aug.03.100.
 
 **Status**: READY FOR NEW FRESH CHAT.
- vAug.03.95
+vAug.03.100

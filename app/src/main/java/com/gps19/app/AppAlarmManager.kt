@@ -30,6 +30,9 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Aug.04.55:
+ * - Issue #716: Forensic Audit: Critical Battery Sentinel. Updated evaluateAlarms 
+ *   to propagate vibration to SystemHealthState for correlated alerting (R716).
  * Aug.01.10:
  * - Issue #668: Performance: Object Churn. Refactored to use persistent 
  *   flyweights (AlarmEvaluationState, SystemHealthReport) to achieve zero-allocation 
@@ -173,7 +176,8 @@ class AppAlarmManager @Inject constructor(
             locationPendingReason = locationPendingReason, isPowerSaveMode = isPowerSaveMode,
             standbyBucket = standbyBucket, netInterface = netInterface,
             isStorageLow = isStorageLow, isStorageCritical = isStorageCritical,
-            isBatterySteepDischarge = isBatterySteepDischarge, isCoolingModeActive = isCoolingModeActive
+            isBatterySteepDischarge = isBatterySteepDischarge, isCoolingModeActive = isCoolingModeActive,
+            vibration = vibeSnapshot ?: 0.0
         )
 
         // Map home points to persistent EngineGeoPoint pool
