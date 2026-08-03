@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.03.47 (Trace Serialization Hardening)
+# System Source of Truth (SoT) - Aug.03.50 (Forensic Recovery Integrity Validation)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Forensic Recovery Integrity Authority (R703)**: (Added Aug.03.50) Forensic traces MUST include integrity validation to prevent recovery of corrupted data after crashes. The spill-buffer MUST utilize a Magic Number for file identification and perform recovery-time sanity checks on circular buffer indices. Each trace entry MUST contain a CRC32 checksum. To maintain R668/R702 compliance, checksum calculation MUST utilize pre-allocated buffers to ensure zero-allocation in the 100Hz hot-path. (Issue #703)
 *   **Trace Serialization Authority (R702)**: (Added Aug.03.47) Forensic traces MUST utilize full binary serialization for high-frequency capture. Raw telemetry (battery level, charging status, temperature) MUST be serialized as primitive types directly into the `MappedByteBuffer`. Human-readable message formatting MUST be deferred to the background drainage process to eliminate string allocation and StringBuilder churn in the 100Hz hot-path (R668). (Issue #702)
 *   **Power-Aware Sampling Authority (R700)**: (Added Aug.03.45) Forensic sampling MUST dynamically scale between 10Hz and 100Hz based on device state. 100Hz (10ms) is permitted ONLY when `isCharging` is true AND `isCoolingModeActive` is false. In all other states, the system MUST throttle to 10Hz (100ms) to preserve battery life and reduce thermal pressure. High-frequency capture MUST utilize the zero-allocation primitive path (`logForensicTraceOptimized`) to ensure R668 compliance. (Issue #700)
 *   **Forensic Spill-Buffer Authority (R669)**: (Added Aug.03.37) To prevent SQLite Write-Ahead Log (WAL) contention and "Davey" stalls (momentary UI freezes) during high-frequency telemetry bursts (up to 100Hz), forensic traces MUST be decoupled from database persistence. The system MUST utilize a memory-mapped circular buffer (`MappedByteBuffer`) for off-heap serialization of high-frequency traces. A dedicated background worker MUST drain this buffer into the database in sequential batches during lower I/O activity. (Issue #669)
@@ -77,5 +78,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: Aug.03.47.
+*   **Current Release**: Aug.03.50.
 *   **Source of Truth**: app/build.gradle versionName.

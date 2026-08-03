@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.03.47)
+# Project Issues & Hardening Tracking (Aug.03.50)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 511 |
+| **Resolved (Total)** | 🟢 Progress | 512 |
 
 ---
 
@@ -21,7 +21,9 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.03.47)
+## 🟢 Recently Resolved Issues (Aug.03.50)
+*   **[Issue #703] [Severity: Medium] [Category: Robustness] Forensic Audit: Trace Recovery Integrity Validation**.
+    *   **Resolution**: Hardened `ForensicSpillBuffer` recovery logic. Added a `MAGIC_NUMBER` to the header and implemented recovery-time sanity checks for circular buffer indices. Added CRC32 checksum validation for each individual trace entry to detect data corruption after system crashes. Refactored checksum calculation to use a reusable `ByteArray` for API 24 compatibility without sacrificing zero-allocation hot-path performance (R703).
 *   **[Issue #702] [Severity: Medium] [Category: Performance] Forensic Audit: Trace Serialization Hardening**.
     *   **Resolution**: Implemented full binary serialization for the forensic hot-path. Raw telemetry (battery level, charging status, temperature) is now serialized directly to `MappedByteBuffer` as primitive types. Human-readable message formatting is deferred to the background drainer, eliminating string allocation overhead in the 100Hz sampling loop (R702).
 *   **[Issue #701] [Severity: Medium] [Category: Performance] Forensic Audit: Spatial Quantization for Trace Compression**.
@@ -32,12 +34,6 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Implemented `ForensicSpillBuffer` using `MappedByteBuffer` to decouple trace capture from SQLite persistence (R-HARDWARE-01).
 *   **[Issue #668] [Severity: Medium] [Category: Performance] Forensic Audit: Object Churn in Telemetry Pipelines**.
     *   **Resolution**: Implemented zero-allocation telemetry path using mutable flyweight patterns (R668).
-*   **[Issue #667] [Severity: Medium] [Category: Performance] Forensic Audit: Memory Pressure under High-Frequency JNI Traffic**.
-*   **[Issue #664] [Severity: Medium] [Category: Performance] Startup Davey Stalls (Regression)**.
-*   **[Issue #663] Forensic Audit: SnapshotStateList Lock Verification Failure**.
-*   **[Issue #660] Forensic Audit: Log Buffer Pressure**.
-*   **[Issue #666] Phone Setup ANR (Main-Thread Contention)**.
-*   **[Issue #665] 16KB Page Size Alignment Regression**.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.03.47)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.03.50)

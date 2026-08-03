@@ -1,26 +1,26 @@
-# Handover (Aug.03.47) - Trace Serialization Hardening Complete
+# Handover (Aug.03.50) - Forensic Recovery Integrity Validation Complete
 
 ## 🎯 Next Objective
-**[Issue #703] Forensic Audit: Trace Recovery Integrity Validation**.
-- **Context**: Traces are recovered from `MappedByteBuffer` after crashes. We need to ensure that the recovery logic is robust against partial writes or corrupted headers.
-- **Goal**: Implement checksum-based validation for each forensic entry and a recovery-time sanity check for the write index.
+**[Issue #704] Forensic Audit: Trace Backfill Flow Hardening**.
+- **Context**: Once traces are recovered from the spill-buffer, they are drained to `LogRepository`. We need to ensure that this backfill process doesn't cause database contention or block new real-time traces.
+- **Goal**: Harden the `drainTo` consumer logic and verify transaction atomicity during backfill bursts.
 
 ## 🆕 New Architectural Requirements
-- **R702 (Trace Serialization Authority)**: (Added Aug.03.47) Forensic traces MUST utilize full binary serialization for high-frequency capture. Raw telemetry MUST be serialized as primitive types to eliminate string allocation in the 100Hz hot-path. (Issue #702)
+- **R703 (Forensic Recovery Integrity Authority)**: (Added Aug.03.50) Forensic traces MUST include integrity validation (Magic Number, CRC32) to prevent recovery of corrupted data. Checksum calculation MUST be zero-allocation (R668). (Issue #703)
+- **R702 (Trace Serialization Authority)**: (Added Aug.03.47) Forensic traces MUST utilize full binary serialization for high-frequency capture. (Issue #702)
 - **R701 (Forensic Spatial Quantization Authority)**: (Added Aug.03.46) Forensic traces MUST be suppressed if displacement < 0.1m, unless IMU delta exceeds thresholds. (Issue #701)
-- **R700 (Power-Aware Sampling Authority)**: (Added Aug.03.45) Forensic sampling MUST dynamically scale between 10Hz and 100Hz based on power/thermal state. (Issue #700)
 
 ## 📊 Status Tracker
-- **[Issue #702] Trace Serialization Hardening**: 🟢 Resolved. Implemented full binary serialization for forensic traces. Removed string formatting from the hot-path.
-- **[Issue #701] Forensic Spatial Quantization**: 🟢 Resolved. Implemented trace compression based on displacement and IMU deltas.
-- **[Issue #700] Power-Aware Sampling**: 🟢 Resolved. Implemented dynamic 10Hz-100Hz loop with zero-allocation logging.
+- **[Issue #703] Forensic Recovery Integrity Validation**: 🟢 Resolved. Added Magic Number, index sanity checks, and CRC32 entry validation. Refactored for API 24 compatibility.
+- **[Issue #702] Trace Serialization Hardening**: 🟢 Resolved. Implemented full binary serialization for forensic traces.
+- **[Issue #701] Forensic Spatial Quantization**: 🟢 Resolved. Implemented trace compression via spatial gating.
 
 ## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **SUCCESSFUL** (vAug.03.47).
+- **Build Status**: 🟢 **SUCCESSFUL** (vAug.03.50).
 - **Forensic Audit History**:
-    - **Serialization**: Achieved zero-allocation metadata capture by shifting formatting to the background drainage phase (R702).
-    - **Compression**: Reduced I/O churn during stationary periods via spatial gating (R701).
-    - **Performance**: The entire forensic pipeline is now hardened against GC-induced "Davey" stalls.
+    - **Integrity**: Hardened recovery logic against crash-induced corruption via CRC32 validation (R703).
+    - **Serialization**: Eliminated hot-path string allocation via binary primitive serialization (R702).
+    - **Efficiency**: Reduced storage overhead via 0.1m spatial gating (R701).
 
 **Status**: READY FOR NEW FRESH CHAT.
- vAug.03.47
+ vAug.03.50
