@@ -19,15 +19,20 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.03.47:
+ * - Issue #702: Forensic Audit: Trace Serialization Hardening. Updated 
+ *   startForensicSamplingLoop() and stress tests to use the hardened binary 
+ *   serialization path. String formatting is now moved out of the hot-path (R702).
+ * Aug.03.46:
+ * - Issue #701: Forensic Audit: Spatial Quantization. Implemented trace 
+ *   compression in startForensicSamplingLoop(). Traces are now suppressed 
+ *   if displacement < 0.1m AND IMU delta (vibe/tilt) is negligible. (R701)
  * Aug.03.45:
  * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Implemented 
  *   startForensicSamplingLoop() with dynamic 10Hz-100Hz scaling. Decoupled 
  *   logic/forensic sensor consumption to prevent peak data loss (R700).
  * Aug.03.37:
  * - Issue #669: Forensic Audit: Database I/O Contention.
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Refactored evaluateAlarmsInternal to 
- *   support zero-allocation telemetry path and fixed isAdaptiveJump parameter.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -61,6 +66,12 @@ class TrackerService : BaseMonitorService() {
 
     private var lastA15PokeRt = 0L
     private val A15_POKE_INTERVAL_MS = 60_000L
+
+    // Issue #701: Forensic Spatial Quantization State
+    private var lastForensicLat = 0.0
+    private var lastForensicLng = 0.0
+    private var lastForensicVibe = 0.0
+    private var lastForensicTilt = 0.0
 
     private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
 
@@ -280,12 +291,16 @@ class TrackerService : BaseMonitorService() {
                             val tLng = proc?.optimizedPoint?.lng ?: 0.0
                             val tAcc = proc?.maxAccuracy ?: 0.0
                             val wallTs = timeProvider.currentTimeMillis()
+                            val health = integrityMonitor.currentHealth
                             
                             logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = tLat, lng = tLng, accuracy = tAcc)
                             
-                            // Issue #669/700: Testing high-frequency zero-allocation path
+                            // Issue #669/700/702: Testing high-frequency zero-allocation path
                             repeat(100) { i ->
-                                logManager.logForensicTraceOptimized(wallTs, tLat, tLng, tAcc, tAcc, 0.0, 0.0, "STRESS TEST: Forensic Trace #$i")
+                                logManager.logForensicTraceOptimized(
+                                    timestamp = wallTs, lat = tLat, lng = tLng, accuracy = tAcc, maxAccuracy = tAcc, 
+                                    vibe = 0.0, snr = 0.0, batteryLevel = health.batteryLevel, isCharging = health.isCharging, batteryTemp = health.batteryTemp
+                                )
                             }
 
                             systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
@@ -528,21 +543,41 @@ class TrackerService : BaseMonitorService() {
                 // Issue #700: Use Forensic-Specific snapshot for high-frequency capture
                 val snapshot = appSensorManager.consumeForensicSnapshot()
                 
+                // R701: Spatial Quantization Logic
+                val lat = proc?.optimizedPoint?.lat ?: 0.0
+                val lng = proc?.optimizedPoint?.lng ?: 0.0
+                val vibe = snapshot.vibration
+                val tilt = snapshot.tiltDegrees
+                
+                val dist = if (lastForensicLat != 0.0) PhysicsUtils.calculateDistance(lastForensicLat, lastForensicLng, lat, lng) else Double.MAX_VALUE
+                val vibeDelta = abs(vibe - lastForensicVibe)
+                val tiltDelta = abs(tilt - lastForensicTilt)
+                
+                val shouldLog = dist > FORENSIC_SPATIAL_GATE_METERS || 
+                               vibeDelta > FORENSIC_IMU_VIBRATION_THRESHOLD || 
+                               tiltDelta > FORENSIC_IMU_TILT_THRESHOLD
+                
+                if (shouldLog) {
+                    lastForensicLat = lat; lastForensicLng = lng; lastForensicVibe = vibe; lastForensicTilt = tilt
+                    
+                    // R668/R702: Zero-allocation path for 100Hz capture (Hardened Serialization)
+                    logManager.logForensicTraceOptimized(
+                        timestamp = timeProvider.currentTimeMillis(),
+                        lat = lat,
+                        lng = lng,
+                        accuracy = proc?.currentAccuracy ?: 0.0,
+                        maxAccuracy = proc?.maxAccuracy ?: 0.0,
+                        vibe = vibe,
+                        snr = snapshot.acousticDb,
+                        batteryLevel = health.batteryLevel,
+                        isCharging = health.isCharging,
+                        batteryTemp = health.batteryTemp
+                    )
+                }
+                
                 // R700: Dynamic scaling logic
                 val isNominal = health.isCharging && !health.isCoolingModeActive
                 val delayMs = if (isNominal) FORENSIC_SAMPLING_INTERVAL_MIN_MS else FORENSIC_SAMPLING_INTERVAL_MAX_MS
-                
-                // R668: Zero-allocation path for 100Hz capture
-                logManager.logForensicTraceOptimized(
-                    timestamp = timeProvider.currentTimeMillis(),
-                    lat = proc?.optimizedPoint?.lat ?: 0.0,
-                    lng = proc?.optimizedPoint?.lng ?: 0.0,
-                    accuracy = proc?.currentAccuracy ?: 0.0,
-                    maxAccuracy = proc?.maxAccuracy ?: 0.0,
-                    vibe = snapshot.vibration,
-                    snr = snapshot.acousticDb,
-                    message = "F_TRACE: P=${health.batteryLevel}% C=${health.isCharging} T=${health.batteryTemp}°C"
-                )
                 
                 delay(delayMs)
             }

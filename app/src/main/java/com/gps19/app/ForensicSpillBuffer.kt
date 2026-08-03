@@ -12,9 +12,14 @@ import java.nio.channels.FileChannel
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.03.47:
+ * - Issue #702: Forensic Audit: Trace Serialization Hardening. Implemented 
+ *   full binary serialization for optimized traces. Moved string formatting 
+ *   out of the hot-path to the background drainer (R702).
  * Aug.03.45:
  * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Added 
  *   writeTraceOptimized() to eliminate object churn in 100Hz sampling (R668).
@@ -69,12 +74,19 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
             buffer.putDouble(entry.maxAccuracy)
             buffer.putDouble(entry.vibeSnapshot ?: -1.0)
             buffer.putDouble(entry.snrSnapshot ?: -1.0)
-            buffer.putInt(if (entry.isImportant) 1 else 0)
-            buffer.putInt(if (entry.isSpecial) 1 else 0)
+            
+            // Flags: bit0=important, bit1=special
+            var flags = 0
+            if (entry.isImportant) flags = flags or 0x01
+            if (entry.isSpecial) flags = flags or 0x02
+            buffer.putInt(flags)
+            
+            buffer.putInt(0) // batteryLevel
+            buffer.putDouble(0.0) // batteryTemp
             
             // Serialize message as UTF-8 (capped to avoid overflow)
             val msgBytes = entry.message.toByteArray(Charsets.UTF_8)
-            val msgLen = msgBytes.size.coerceAtMost(FORENSIC_SPILL_ENTRY_SIZE - 64)
+            val msgLen = msgBytes.size.coerceAtMost(FORENSIC_SPILL_ENTRY_SIZE - 80)
             buffer.putInt(msgLen)
             buffer.put(msgBytes, 0, msgLen)
 
@@ -94,11 +106,11 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
 
     /**
      * writeTraceOptimized: Zero-allocation entry point for high-frequency telemetry.
-     * Prevents LogEntry object churn in 100Hz sampling loops (R668).
+     * Hardened binary serialization prevents all object churn in 100Hz loop (R702).
      */
     fun writeTraceOptimized(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
-        vibe: Double, snr: Double, message: String
+        vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double
     ) {
         val buffer = mappedBuffer ?: return
         
@@ -114,13 +126,15 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
             buffer.putDouble(maxAccuracy)
             buffer.putDouble(vibe)
             buffer.putDouble(snr)
-            buffer.putInt(0) // isImportant = false
-            buffer.putInt(0) // isSpecial = false
             
-            val msgBytes = message.toByteArray(Charsets.UTF_8)
-            val msgLen = msgBytes.size.coerceAtMost(FORENSIC_SPILL_ENTRY_SIZE - 64)
-            buffer.putInt(msgLen)
-            buffer.put(msgBytes, 0, msgLen)
+            // Flags: bit2=isCharging
+            var flags = 0
+            if (isCharging) flags = flags or 0x04
+            buffer.putInt(flags)
+            
+            buffer.putInt(batteryLevel)
+            buffer.putDouble(batteryTemp)
+            buffer.putInt(0) // msgLen = 0 (means reconstruct from binary fields)
 
             val nextIdx = (currentIdx + 1) % FORENSIC_SPILL_CAPACITY
             writeIdx.set(nextIdx)
@@ -137,7 +151,7 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
 
     /**
      * drainTo: Reads entries from the buffer for database persistence.
-     * Used by background worker to batch-insert traces.
+     * Reconstructs messages from binary fields outside the hot-path.
      */
     fun drainTo(limit: Int): List<LogEntry> {
         val buffer = mappedBuffer ?: return emptyList()
@@ -162,13 +176,23 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
                 val maxAcc = buffer.getDouble()
                 val vibe = buffer.getDouble()
                 val snr = buffer.getDouble()
-                val important = buffer.getInt() == 1
-                val special = buffer.getInt() == 1
+                val flags = buffer.getInt()
+                val batLevel = buffer.getInt()
+                val batTemp = buffer.getDouble()
+                
+                val important = (flags and 0x01) != 0
+                val special = (flags and 0x02) != 0
+                val charging = (flags and 0x04) != 0
                 
                 val msgLen = buffer.getInt()
-                val msgBytes = ByteArray(msgLen)
-                buffer.get(msgBytes)
-                val msg = String(msgBytes, Charsets.UTF_8)
+                val msg = if (msgLen > 0) {
+                    val msgBytes = ByteArray(msgLen)
+                    buffer.get(msgBytes)
+                    String(msgBytes, Charsets.UTF_8)
+                } else {
+                    // Reconstruct from binary fields (Issue #702 hardening)
+                    "F_TRACE: P=$batLevel% C=$charging T=${batTemp.roundToOneDecimal()}°C"
+                }
                 
                 result.add(LogEntry(
                     timestamp = ts, lat = lat, lng = lng, accuracy = acc, maxAccuracy = maxAcc,
@@ -190,6 +214,8 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
         
         return result
     }
+
+    private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
 
     fun hasPending(): Boolean = totalCount.get() > 0
 }

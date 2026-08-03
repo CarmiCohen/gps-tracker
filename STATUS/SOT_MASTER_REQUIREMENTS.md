@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.03.45 (Sampling Scaling)
+# System Source of Truth (SoT) - Aug.03.47 (Trace Serialization Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Trace Serialization Authority (R702)**: (Added Aug.03.47) Forensic traces MUST utilize full binary serialization for high-frequency capture. Raw telemetry (battery level, charging status, temperature) MUST be serialized as primitive types directly into the `MappedByteBuffer`. Human-readable message formatting MUST be deferred to the background drainage process to eliminate string allocation and StringBuilder churn in the 100Hz hot-path (R668). (Issue #702)
 *   **Power-Aware Sampling Authority (R700)**: (Added Aug.03.45) Forensic sampling MUST dynamically scale between 10Hz and 100Hz based on device state. 100Hz (10ms) is permitted ONLY when `isCharging` is true AND `isCoolingModeActive` is false. In all other states, the system MUST throttle to 10Hz (100ms) to preserve battery life and reduce thermal pressure. High-frequency capture MUST utilize the zero-allocation primitive path (`logForensicTraceOptimized`) to ensure R668 compliance. (Issue #700)
 *   **Forensic Spill-Buffer Authority (R669)**: (Added Aug.03.37) To prevent SQLite Write-Ahead Log (WAL) contention and "Davey" stalls (momentary UI freezes) during high-frequency telemetry bursts (up to 100Hz), forensic traces MUST be decoupled from database persistence. The system MUST utilize a memory-mapped circular buffer (`MappedByteBuffer`) for off-heap serialization of high-frequency traces. A dedicated background worker MUST drain this buffer into the database in sequential batches during lower I/O activity. (Issue #669)
 *   **Zero-Churn Telemetry Authority (R668)**: (Added Aug.01.10) High-frequency telemetry containers (`SystemHealthState`, `LocationState`, `ViolationReport`) MUST utilize mutable flyweight patterns and object pooling. Per-tick object instantiation in the logic hot-path (<= 2000ms) is prohibited. UI state containers (`KinematicState`, `DiagnosticState`) MUST utilize a `pulse` field to trigger reactive updates while retaining mutable member references to eliminate allocation churn on budget hardware (R-HARDWARE-01). (Issue #668)
@@ -36,7 +37,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Forensic Recovery Log Aggregation Authority (R630)**: The system MUST aggregate "Service Blackout Duration" metrics across all recovery events and log the current recovery latency along with the running average. (Issue #630, July.30.28)
 *   **Foreground Service Start Hardening (R634)**: Catch `ForegroundServiceStartNotAllowedException` during explicit manual or automatic service starts and mark as pending if restricted. (Issue #634, July.30.31)
 *   **Permission Logic Integrity (R638)**: All critical permissions tracked in `PermissionState` MUST default to `false`. (Issue #638, July.30.31)
-*   **GNSS Callback Conflation Authority (R614)**: High-frequency GNSS hardware callbacks MUST be sampled to prevent downstream flow processing overhead. (Issue #614, July.28.20)
+*   **GNSS Callback Concurrency Authority (R614)**: High-frequency GNSS hardware callbacks MUST be sampled to prevent downstream flow processing overhead. (Issue #614, July.28.20)
 *   **Repository Event Pipeline Hardening (R616)**: All `MutableSharedFlow` pipelines within the Repository layer MUST utilize `BufferOverflow.DROP_OLDEST`. (Issue #616, July.28.22)
 *   **Global SharedFlow Overflow Strategy (R617)**: All reactive event pipelines MUST enforce `BufferOverflow.DROP_OLDEST`. (Issue #617, July.28.2233)
 *   **Dashboard Pipeline Efficiency Policy (R619)**: The UI Dashboard state pipeline MUST be optimized for zero allocation churn. (Issue #619, July.28.24)
@@ -76,5 +77,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: Aug.03.45.
+*   **Current Release**: Aug.03.47.
 *   **Source of Truth**: app/build.gradle versionName.

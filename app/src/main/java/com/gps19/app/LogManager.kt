@@ -9,6 +9,9 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Aug.03.47:
+ * - Issue #702: Forensic Audit: Trace Serialization Hardening. Updated 
+ *   logForensicTraceOptimized() to pass raw telemetry for binary serialization (R702).
  * Aug.03.45:
  * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Added 
  *   logForensicTraceOptimized() to support zero-allocation 100Hz capture (R668).
@@ -60,13 +63,16 @@ class LogManager @Inject constructor(
 
     /**
      * logForensicTraceOptimized: Zero-allocation path for 100Hz sampling.
-     * Directly serializes raw primitives to the spill-buffer (R668).
+     * Directly serializes raw primitives to the spill-buffer (R668/R702).
      */
     fun logForensicTraceOptimized(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
-        vibe: Double, snr: Double, message: String
+        vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double
     ) {
-        forensicSpillBuffer.writeTraceOptimized(timestamp, lat, lng, accuracy, maxAccuracy, vibe, snr, message)
+        forensicSpillBuffer.writeTraceOptimized(
+            timestamp, lat, lng, accuracy, maxAccuracy, vibe, snr, 
+            batteryLevel, isCharging, batteryTemp
+        )
     }
 
     fun submitToLogSink(
