@@ -18,15 +18,14 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.03.55:
+ * - Issue #704: Forensic Audit: Trace Backfill Flow Hardening. Refactored 
+ *   forensic drainer to use transactional peek/commit. Moved forensic DB 
+ *   insertions outside the global repository mutex to eliminate contention 
+ *   with real-time log flushing (R704).
  * Aug.03.45:
  * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Increased forensic 
  *   drain batch size to 1000 to keep pace with 100Hz telemetry (R700).
- * Aug.03.37:
- * - Issue #669: Forensic Audit: Database I/O Contention. Integrated 
- *   ForensicSpillBuffer (MappedByteBuffer) to decouple high-frequency 
- *   trace capture from DB persistence (R-HARDWARE-01).
- * July.31.38:
- * - Issue #660: Forensic Audit: Log Buffer Pressure.
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -91,8 +90,8 @@ class LogRepository @Inject constructor(
                 try {
                     delay(FORENSIC_DRAIN_INTERVAL_MS)
                     if (forensicSpillBuffer.hasPending()) {
-                        // Issue #700: Increased batch size to stay ahead of 100Hz stream
-                        val traces = forensicSpillBuffer.drainTo(1000)
+                        // Issue #704: Use peek for transactional safety
+                        val traces = forensicSpillBuffer.peek(1000)
                         if (traces.isNotEmpty()) {
                             val entities = traces.map { 
                                 LogEntity(
@@ -106,20 +105,24 @@ class LogRepository @Inject constructor(
                                 )
                             }
                             
-                            logMutex.withLock {
-                                logDao.insertAll(entities)
-                                logWriteCount += entities.size
-                            }
+                            // Perform insertion outside the global mutex to avoid blocking real-time logs
+                            logDao.insertAll(entities)
                             
-                            if (logWriteCount >= DB_PRUNE_THRESHOLD) {
-                                logWriteCount = 0
-                                triggerAsyncPruning()
+                            // Commit only after successful DB insertion
+                            forensicSpillBuffer.commitDrain(entities.size)
+                            
+                            logMutex.withLock {
+                                logWriteCount += entities.size
+                                if (logWriteCount >= DB_PRUNE_THRESHOLD) {
+                                    logWriteCount = 0
+                                    triggerAsyncPruning()
+                                }
                             }
                         }
                     }
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
-                    Timber.e(e, "Error in forensic drainer")
+                    Timber.e(e, "Error in forensic drainer - data preserved in spill-buffer")
                 }
             }
         }

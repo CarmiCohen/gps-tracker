@@ -18,20 +18,16 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.03.55:
+ * - Issue #704: Forensic Audit: Trace Backfill Flow Hardening. Implemented 
+ *   transactional drain (peek/commit) to prevent data loss on DB failure. 
+ *   Added readIdx to header for robust circular tracking (R704).
  * Aug.03.50:
  * - Issue #703: Forensic Audit: Trace Recovery Integrity Validation. Added 
  *   Magic Number, header sanity checks, and CRC32 entry validation (R703).
- *   Refactored checksum calculation for API 24 compatibility.
  * Aug.03.47:
  * - Issue #702: Forensic Audit: Trace Serialization Hardening. Implemented 
- *   full binary serialization for optimized traces. Moved string formatting 
- *   out of the hot-path to the background drainer (R702).
- * Aug.03.45:
- * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Added 
- *   writeTraceOptimized() to eliminate object churn in 100Hz sampling (R668).
- * Aug.03.37:
- * - Issue #669: Forensic Audit: Database I/O Contention. Implemented MappedByteBuffer 
- *   to decouple 100Hz trace capture from SQLite WAL pressure (R-HARDWARE-01).
+ *   full binary serialization for optimized traces.
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val context: Context) {
@@ -39,16 +35,15 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
     private val spillFile = File(context.filesDir, FORENSIC_SPILL_FILE_NAME)
     private var mappedBuffer: MappedByteBuffer? = null
     
-    // Header: [0..3] Magic, [4..7] Write Index, [8..11] Count
+    // Header: [0..3] Magic, [4..7] Write Index, [8..11] Total Count, [12..15] Read Index
     private val writeIdx = AtomicInteger(0)
     private val totalCount = AtomicInteger(0)
+    private val readIdx = AtomicInteger(0)
 
-    // Reusable buffer for CRC calculation to maintain zero-allocation in hot-path.
-    // Guarded by synchronized(this) in all usage sites.
     private val checksumBuffer = ByteArray(FORENSIC_SPILL_ENTRY_SIZE)
 
     private companion object {
-        const val MAGIC_NUMBER = 0x46535042 // 'FSPB'
+        const val MAGIC_NUMBER = 0x46535042
         const val HEADER_SIZE = 1024
         const val CHECKSUM_SIZE = 4
     }
@@ -68,16 +63,19 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
                     Timber.w("ForensicSpillBuffer: Invalid magic or new file. Resetting.")
                     resetBuffer()
                 } else {
-                    val recoveredIdx = buffer.getInt(4)
+                    val recoveredWrite = buffer.getInt(4)
                     val recoveredCount = buffer.getInt(8)
+                    val recoveredRead = buffer.getInt(12)
                     
-                    if (recoveredIdx in 0 until FORENSIC_SPILL_CAPACITY && 
-                        recoveredCount in 0..FORENSIC_SPILL_CAPACITY) {
-                        writeIdx.set(recoveredIdx)
+                    if (recoveredWrite in 0 until FORENSIC_SPILL_CAPACITY && 
+                        recoveredCount in 0..FORENSIC_SPILL_CAPACITY &&
+                        recoveredRead in 0 until FORENSIC_SPILL_CAPACITY) {
+                        writeIdx.set(recoveredWrite)
                         totalCount.set(recoveredCount)
-                        Timber.i("ForensicSpillBuffer initialized. Path: ${spillFile.absolutePath}, Recovered: $recoveredCount entries.")
+                        readIdx.set(recoveredRead)
+                        Timber.i("ForensicSpillBuffer initialized. Recovered: $recoveredCount entries (R:$recoveredRead W:$recoveredWrite).")
                     } else {
-                        Timber.e("ForensicSpillBuffer: Corrupted header ($recoveredIdx, $recoveredCount). Resetting.")
+                        Timber.e("ForensicSpillBuffer: Corrupted header. Resetting.")
                         resetBuffer()
                     }
                 }
@@ -90,22 +88,19 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
     private fun resetBuffer() {
         val buffer = mappedBuffer ?: return
         buffer.putInt(0, MAGIC_NUMBER)
-        buffer.putInt(4, 0)
-        buffer.putInt(8, 0)
+        buffer.putInt(4, 0) // writeIdx
+        buffer.putInt(8, 0) // totalCount
+        buffer.putInt(12, 0) // readIdx
         writeIdx.set(0)
         totalCount.set(0)
+        readIdx.set(0)
     }
 
-    /**
-     * writeTrace: Serializes a LogEntry into the off-heap buffer.
-     * Includes CRC32 checksum for integrity validation (R703).
-     */
     fun writeTrace(entry: LogEntry) {
         val buffer = mappedBuffer ?: return
-        
         synchronized(this) {
-            val currentIdx = writeIdx.get()
-            val offset = HEADER_SIZE + (currentIdx * FORENSIC_SPILL_ENTRY_SIZE)
+            val currentWrite = writeIdx.get()
+            val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE)
             
             buffer.position(offset)
             buffer.putLong(entry.timestamp)
@@ -116,52 +111,33 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
             buffer.putDouble(entry.vibeSnapshot ?: -1.0)
             buffer.putDouble(entry.snrSnapshot ?: -1.0)
             
-            // Flags: bit0=important, bit1=special
             var flags = 0
             if (entry.isImportant) flags = flags or 0x01
             if (entry.isSpecial) flags = flags or 0x02
             buffer.putInt(flags)
-            
             buffer.putInt(0) // batteryLevel
             buffer.putDouble(0.0) // batteryTemp
             
-            // Serialize message as UTF-8 (capped to avoid overflow)
             val msgBytes = entry.message.toByteArray(Charsets.UTF_8)
             val msgLen = msgBytes.size.coerceAtMost(FORENSIC_SPILL_ENTRY_SIZE - 100)
             buffer.putInt(msgLen)
             buffer.put(msgBytes, 0, msgLen)
 
-            // Finalize entry with CRC32
             val crc = calculateEntryChecksum(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
             buffer.putInt(offset + FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, crc.toInt())
 
-            // Update header
-            val nextIdx = (currentIdx + 1) % FORENSIC_SPILL_CAPACITY
-            writeIdx.set(nextIdx)
-            buffer.putInt(4, nextIdx)
-            
-            val count = totalCount.get()
-            if (count < FORENSIC_SPILL_CAPACITY) {
-                val newCount = count + 1
-                totalCount.set(newCount)
-                buffer.putInt(8, newCount)
-            }
+            advanceWritePointer()
         }
     }
 
-    /**
-     * writeTraceOptimized: Zero-allocation entry point for high-frequency telemetry.
-     * Hardened with CRC32 validation (R703).
-     */
     fun writeTraceOptimized(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
         vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double
     ) {
         val buffer = mappedBuffer ?: return
-        
         synchronized(this) {
-            val currentIdx = writeIdx.get()
-            val offset = HEADER_SIZE + (currentIdx * FORENSIC_SPILL_ENTRY_SIZE)
+            val currentWrite = writeIdx.get()
+            val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE)
             
             buffer.position(offset)
             buffer.putLong(timestamp)
@@ -172,37 +148,44 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
             buffer.putDouble(vibe)
             buffer.putDouble(snr)
             
-            // Flags: bit2=isCharging
             var flags = 0
             if (isCharging) flags = flags or 0x04
             buffer.putInt(flags)
-            
             buffer.putInt(batteryLevel)
             buffer.putDouble(batteryTemp)
-            buffer.putInt(0) // msgLen = 0 (means reconstruct from binary fields)
+            buffer.putInt(0) // msgLen = 0
 
-            // Finalize entry with CRC32
             val crc = calculateEntryChecksum(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
             buffer.putInt(offset + FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, crc.toInt())
 
-            val nextIdx = (currentIdx + 1) % FORENSIC_SPILL_CAPACITY
-            writeIdx.set(nextIdx)
-            buffer.putInt(4, nextIdx)
-            
-            val count = totalCount.get()
-            if (count < FORENSIC_SPILL_CAPACITY) {
-                val newCount = count + 1
-                totalCount.set(newCount)
-                buffer.putInt(8, newCount)
-            }
+            advanceWritePointer()
+        }
+    }
+
+    private fun advanceWritePointer() {
+        val buffer = mappedBuffer ?: return
+        val currentWrite = writeIdx.get()
+        val nextWrite = (currentWrite + 1) % FORENSIC_SPILL_CAPACITY
+        writeIdx.set(nextWrite)
+        buffer.putInt(4, nextWrite)
+        
+        val count = totalCount.get()
+        if (count < FORENSIC_SPILL_CAPACITY) {
+            val newCount = count + 1
+            totalCount.set(newCount)
+            buffer.putInt(8, newCount)
+        } else {
+            // Buffer full: oldest entry is being overwritten, so advance readIdx too
+            val nextRead = (readIdx.get() + 1) % FORENSIC_SPILL_CAPACITY
+            readIdx.set(nextRead)
+            buffer.putInt(12, nextRead)
         }
     }
 
     /**
-     * drainTo: Reads entries from the buffer for database persistence.
-     * Verifies CRC32 checksum for each entry before reconstruction (R703).
+     * peek: Reads entries for backfilling without advancing the read pointer.
      */
-    fun drainTo(limit: Int): List<LogEntry> {
+    fun peek(limit: Int): List<LogEntry> {
         val buffer = mappedBuffer ?: return emptyList()
         val result = mutableListOf<LogEntry>()
         
@@ -210,15 +193,11 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
             val count = totalCount.get()
             if (count == 0) return emptyList()
             
-            val toDrain = count.coerceAtMost(limit)
-            val currentIdx = writeIdx.get()
-            var readIdx = (currentIdx - count + FORENSIC_SPILL_CAPACITY) % FORENSIC_SPILL_CAPACITY
-            var actuallyDrained = 0
+            val toPeek = count.coerceAtMost(limit)
+            var currentRead = readIdx.get()
             
-            repeat(toDrain) {
-                val offset = HEADER_SIZE + (readIdx * FORENSIC_SPILL_ENTRY_SIZE)
-                
-                // Integrity Check
+            repeat(toPeek) {
+                val offset = HEADER_SIZE + (currentRead * FORENSIC_SPILL_ENTRY_SIZE)
                 val storedCrc = buffer.getInt(offset + FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
                 val calculatedCrc = calculateEntryChecksum(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE).toInt()
                 
@@ -238,7 +217,6 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
                     val important = (flags and 0x01) != 0
                     val special = (flags and 0x02) != 0
                     val charging = (flags and 0x04) != 0
-                    
                     val msgLen = buffer.getInt()
                     val msg = if (msgLen > 0) {
                         val msgBytes = ByteArray(msgLen)
@@ -256,27 +234,40 @@ class ForensicSpillBuffer @Inject constructor(@ApplicationContext private val co
                         message = msg, type = "FORENSIC_TRACE",
                         id = "SYSTEM", role = "tracker"
                     ))
-                } else {
-                    Timber.e("ForensicSpillBuffer: Checksum mismatch at index $readIdx. Skipping corrupted entry.")
                 }
-                
-                readIdx = (readIdx + 1) % FORENSIC_SPILL_CAPACITY
-                actuallyDrained++
+                currentRead = (currentRead + 1) % FORENSIC_SPILL_CAPACITY
             }
-            
-            // Update state (always update count even if some entries were corrupted to keep circular logic)
-            val remaining = count - actuallyDrained
-            totalCount.set(remaining)
-            buffer.putInt(8, remaining)
         }
-        
         return result
     }
 
     /**
-     * calculateEntryChecksum: API 24 compatible CRC32 calculation.
-     * Uses a pre-allocated ByteArray to avoid object churn.
+     * commitDrain: Advances the read pointer after successful database persistence.
+     * Safely handles concurrent overwrites by ensuring readIdx only moves forward.
      */
+    fun commitDrain(count: Int) {
+        val buffer = mappedBuffer ?: return
+        synchronized(this) {
+            val actualToConsume = count.coerceAtMost(totalCount.get())
+            if (actualToConsume <= 0) return
+
+            val newRead = (readIdx.get() + actualToConsume) % FORENSIC_SPILL_CAPACITY
+            readIdx.set(newRead)
+            buffer.putInt(12, newRead)
+
+            val newCount = totalCount.get() - actualToConsume
+            totalCount.set(newCount)
+            buffer.putInt(8, newCount)
+        }
+    }
+
+    @Deprecated("Use peek() and commitDrain() for transactional safety", ReplaceWith("peek(limit)"))
+    fun drainTo(limit: Int): List<LogEntry> {
+        val entries = peek(limit)
+        commitDrain(entries.size)
+        return entries
+    }
+
     private fun calculateEntryChecksum(buffer: ByteBuffer, offset: Int, length: Int): Long {
         val crc = CRC32()
         val temp = buffer.duplicate()

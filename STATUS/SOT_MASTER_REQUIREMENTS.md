@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.03.50 (Forensic Recovery Integrity Validation)
+# System Source of Truth (SoT) - Aug.03.55 (Forensic Trace Backfill Flow Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Transactional Forensic Backfill Authority (R704)**: (Added Aug.03.55) Forensic traces MUST be drained from the spill-buffer using a transactional peek/commit pattern. To ensure no data loss during I/O failures or system crashes, traces MUST only be committed as consumed in the spill-buffer AFTER successful SQLite persistence. Database insertion MUST occur outside the global `LogRepository` mutex to prevent contention and ensure that real-time log flushing remains responsive during high-volume forensic bursts (R-HARDWARE-01). (Issue #704)
 *   **Forensic Recovery Integrity Authority (R703)**: (Added Aug.03.50) Forensic traces MUST include integrity validation to prevent recovery of corrupted data after crashes. The spill-buffer MUST utilize a Magic Number for file identification and perform recovery-time sanity checks on circular buffer indices. Each trace entry MUST contain a CRC32 checksum. To maintain R668/R702 compliance, checksum calculation MUST utilize pre-allocated buffers to ensure zero-allocation in the 100Hz hot-path. (Issue #703)
 *   **Trace Serialization Authority (R702)**: (Added Aug.03.47) Forensic traces MUST utilize full binary serialization for high-frequency capture. Raw telemetry (battery level, charging status, temperature) MUST be serialized as primitive types directly into the `MappedByteBuffer`. Human-readable message formatting MUST be deferred to the background drainage process to eliminate string allocation and StringBuilder churn in the 100Hz hot-path (R668). (Issue #702)
 *   **Power-Aware Sampling Authority (R700)**: (Added Aug.03.45) Forensic sampling MUST dynamically scale between 10Hz and 100Hz based on device state. 100Hz (10ms) is permitted ONLY when `isCharging` is true AND `isCoolingModeActive` is false. In all other states, the system MUST throttle to 10Hz (100ms) to preserve battery life and reduce thermal pressure. High-frequency capture MUST utilize the zero-allocation primitive path (`logForensicTraceOptimized`) to ensure R668 compliance. (Issue #700)
@@ -78,5 +79,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: Aug.03.50.
+*   **Current Release**: Aug.03.55.
 *   **Source of Truth**: app/build.gradle versionName.
