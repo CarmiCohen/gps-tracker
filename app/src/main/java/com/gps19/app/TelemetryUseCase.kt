@@ -5,11 +5,11 @@ import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * Aug.01.10:
+ * - Issue #668: Performance: Object Churn. Refactored to use mutable flyweight 
+ *   updates instead of copy-on-write to eliminate allocation churn (R-HARDWARE-01).
  * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy mapping 
- *   to maintain forensic parity across telemetry streams.
- * July.22.01:
- * - Forensic Parity: Added mapping for tiltIdx, baroIdx, noiseIdx, luxIdx, vibeIdx, and liftIdx.
+ * - Issue #601: Kinetic Energy Anomaly Detection.
  */
 class TelemetryUseCase @Inject constructor(
     private val timeProvider: TimeProvider
@@ -23,11 +23,9 @@ class TelemetryUseCase @Inject constructor(
         val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng)
         val newTimestamp = update.gpsTs
         
-        // For remote data, telemetryTs MUST be the local receipt time (nowMs)
-        // to prevent clock skew from turning the HUD gray.
         val effectiveTelemetryTs = if (!update.isMe) nowMs else (if (update.ts > 0) update.ts else nowMs)
         
-        return currentLoc.copy(
+        currentLoc.update(
             lat = if (isLocationValid) update.lat else currentLoc.lat, 
             lng = if (isLocationValid) update.lng else currentLoc.lng, 
             speed = if (isLocationValid) update.speed else currentLoc.speed, 
@@ -38,163 +36,163 @@ class TelemetryUseCase @Inject constructor(
             telemetryTs = effectiveTelemetryTs,
             status = update.status,
             trackerState = update.trackerState,
-            gnssDetail = update.gnssDetail
+            gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail
         )
+        return currentLoc
     }
 
     fun mapHealthFromUpdate(update: LocationUpdate, current: SystemHealthState): SystemHealthState {
-        return current.copy(
+        current.update(
             signalLoss = update.signal?.let { it < 2 } ?: current.signalLoss,
             gpsStalled = update.locationPendingReason == LocationPendingReason.GPS_STALL,
+            localInternetLoss = current.localInternetLoss, // LocationUpdate doesn't carry this
             isHardwareOnline = update.signal != null,
             batteryLevel = if (update.battery >= 0) update.battery else current.batteryLevel,
             batteryTemp = update.temp,
-            maxTemp = update.maxTemp,
             isCharging = update.isCharging,
             currentMa = update.currentMa,
             status = update.status,
-            trackerState = update.trackerState,
             isJammer = update.locationPendingReason == LocationPendingReason.JAMMER_SUSPICION,
             isTamperDetected = update.isTamperDetected,
-            micPending = update.micPending,
+            tiltDegrees = update.tiltDegrees ?: current.tiltDegrees,
+            acousticDb = update.acousticDb ?: current.acousticDb,
+            baroAlt = update.baroAlt ?: current.baroAlt,
+            lux = update.lux ?: current.lux,
+            isNear = update.isNear ?: current.isNear,
+            luxBaseline = update.luxBaseline ?: current.luxBaseline,
+            acousticFloorDb = update.acousticFloorDb ?: current.acousticFloorDb,
+            adaptiveVibrationFloor = update.adaptiveVibrationFloor ?: current.adaptiveVibrationFloor,
+            peakVibrationShock = update.peakVibrationShock ?: current.peakVibrationShock,
             isPowerTamper = update.isPowerTamper,
-            isClockRegression = update.isClockRegression,
             isLocationPending = update.isLocationPending,
             locationPendingReason = update.locationPendingReason,
-            lastValidFixRt = if (update.lastValidFixRt > 0L) update.lastValidFixRt else current.lastValidFixRt,
             isPowerSaveMode = update.isPowerSaveMode,
             standbyBucket = update.standbyBucket,
             netInterface = update.netInterface,
             isStorageLow = update.isStorageLow,
             isStorageCritical = update.isStorageCritical,
             isBatterySteepDischarge = update.isBatterySteepDischarge,
-            isCoolingModeActive = update.isCoolingModeActive,
-            gnssDetail = update.gnssDetail ?: current.gnssDetail,
-            snrIdx = update.snrIdx,
-            noiseIdx = update.noiseIdx,
-            luxIdx = update.luxIdx,
-            vibeIdx = update.vibeIdx,
-            liftIdx = update.liftIdx,
-            tiltIdx = update.tiltIdx,
-            baroIdx = update.baroIdx,
-            uptimeMs = update.uptimeMs ?: current.uptimeMs,
-            lastConnTs = update.lastConnTs ?: current.lastConnTs,
-            lastDiscTs = update.lastDiscTs ?: current.lastDiscTs,
-            totalDropMs = update.totalDropMs ?: current.totalDropMs,
-            maxDropMs = update.maxDropMs ?: current.maxDropMs,
-            maxDropTs = update.maxDropTs ?: current.maxDropTs,
-            totalConnectedMs = update.totalConnectedMs ?: current.totalConnectedMs,
-            sessionConnectedMs = update.sessionConnectedMs ?: current.sessionConnectedMs,
-            violationUptimeMs = update.violationUptimeMs ?: current.violationUptimeMs,
-            violationPercentage = update.violationPercentage ?: current.violationPercentage,
-            vibration = update.vibration ?: current.vibration,
-            heading = update.heading ?: current.heading,
-            tiltDegrees = update.tiltDegrees ?: current.tiltDegrees,
-            acousticDb = update.acousticDb ?: current.acousticDb,
-            baroAlt = update.baroAlt ?: current.baroAlt,
-            lux = update.lux ?: current.lux,
-            isNear = update.isNear ?: current.isNear,
-            peakVibrationShock = update.peakVibrationShock ?: current.peakVibrationShock,
-            peakVibrationShockTs = update.peakVibrationShockTs ?: current.peakVibrationShockTs,
-            luxBaseline = update.luxBaseline ?: current.luxBaseline,
-            acousticFloorDb = update.acousticFloorDb ?: current.acousticFloorDb,
-            adaptiveVibrationFloor = update.adaptiveVibrationFloor ?: current.adaptiveVibrationFloor,
-            proxIdx = update.proxIdx ?: current.proxIdx,
-            proximityCm = update.proximityCm ?: current.proximityCm,
-            proximityDebounceMs = update.proximityDebounceMs ?: current.proximityDebounceMs,
-            vibrationRollingSum = update.vibrationRollingSum ?: current.vibrationRollingSum,
-            isSitDetected = update.isSitDetected,
-            isSitActive = update.isSitActive,
-            lastSitTs = update.lastSitTs,
-            verticalVelocity = update.verticalVelocity ?: current.verticalVelocity,
-            sitVz = update.sitVz ?: current.sitVz,
-            sitDz = update.sitDz ?: current.sitDz,
-            sitBaro = update.sitBaro ?: current.sitBaro,
-            sitTilt = update.sitTilt ?: current.sitTilt,
-            sitShock = update.sitShock ?: current.sitShock,
-            kineticEnergy = update.kineticEnergy
+            isCoolingModeActive = update.isCoolingModeActive
         )
+        
+        if (update.maxTemp > 0.0) current.maxTemp = update.maxTemp
+        current.trackerState = update.trackerState
+        if (update.lastValidFixRt > 0L) current.lastValidFixRt = update.lastValidFixRt
+        update.gnssDetail?.let { current.gnssDetail = it }
+        current.snrIdx = update.snrIdx
+        current.noiseIdx = update.noiseIdx
+        current.luxIdx = update.luxIdx
+        current.vibeIdx = update.vibeIdx
+        current.liftIdx = update.liftIdx
+        current.tiltIdx = update.tiltIdx
+        current.baroIdx = update.baroIdx
+        update.uptimeMs?.let { current.uptimeMs = it }
+        update.lastConnTs?.let { current.lastConnTs = it }
+        update.lastDiscTs?.let { current.lastDiscTs = it }
+        update.totalDropMs?.let { current.totalDropMs = it }
+        update.maxDropMs?.let { current.maxDropMs = it }
+        update.maxDropTs?.let { current.maxDropTs = it }
+        update.totalConnectedMs?.let { current.totalConnectedMs = it }
+        update.sessionConnectedMs?.let { current.sessionConnectedMs = it }
+        update.violationUptimeMs?.let { current.violationUptimeMs = it }
+        update.violationPercentage?.let { current.violationPercentage = it }
+        update.vibration?.let { current.vibration = it }
+        update.heading?.let { current.heading = it }
+        update.peakVibrationShockTs?.let { current.peakVibrationShockTs = it }
+        update.proxIdx?.let { current.proxIdx = it }
+        update.proximityCm?.let { current.proximityCm = it }
+        update.proximityDebounceMs?.let { current.proximityDebounceMs = it }
+        update.vibrationRollingSum?.let { current.vibrationRollingSum = it }
+        current.isSitDetected = update.isSitDetected
+        current.isSitActive = update.isSitActive
+        current.lastSitTs = update.lastSitTs
+        update.verticalVelocity?.let { current.verticalVelocity = it }
+        update.sitVz?.let { current.sitVz = it }
+        update.sitDz?.let { current.sitDz = it }
+        update.sitBaro?.let { current.sitBaro = it }
+        update.sitTilt?.let { current.sitTilt = it }
+        update.sitShock?.let { current.sitShock = it }
+        current.kineticEnergy = update.kineticEnergy
+
+        return current
     }
 
     fun mapHealthFromStatus(status: TrackerStatus, current: SystemHealthState): SystemHealthState {
-        return current.copy(
-            batteryLevel = status.battery,
-            batteryTemp = status.temp,
-            maxTemp = status.maxTemp,
-            isCharging = status.isCharging,
-            currentMa = status.currentMa,
-            status = status.status,
-            trackerState = status.trackerState,
-            isJammer = status.isJammer,
-            isTamperDetected = status.isTamperDetected,
-            isPowerTamper = status.isPowerTamper,
-            isLocationPending = status.isLocationPending,
-            locationPendingReason = status.locationPendingReason,
-            lastValidFixRt = status.lastValidFixRt,
-            isPowerSaveMode = status.isPowerSaveMode,
-            standbyBucket = status.standbyBucket,
-            netInterface = status.netInterface,
-            isStorageLow = status.isStorageLow,
-            isStorageCritical = status.isStorageCritical,
-            isBatterySteepDischarge = status.isBatterySteepDischarge,
-            isCoolingModeActive = status.isCoolingModeActive,
-            gnssDetail = status.gnssDetail,
-            snrIdx = status.snrIdx,
-            noiseIdx = status.noiseIdx,
-            luxIdx = status.luxIdx,
-            vibeIdx = status.vibeIdx,
-            liftIdx = status.liftIdx,
-            tiltIdx = status.tiltIdx,
-            baroIdx = status.baroIdx,
-            uptimeMs = status.uptimeMs,
-            lastConnTs = status.lastConnTs,
-            lastDiscTs = status.lastDiscTs,
-            totalDropMs = status.totalDropMs,
-            maxDropMs = status.maxDropMs,
-            maxDropTs = status.maxDropTs,
-            totalConnectedMs = status.totalConnectedMs,
-            sessionConnectedMs = status.sessionConnectedMs,
-            violationUptimeMs = status.violationUptimeMs,
-            violationPercentage = status.violationPercentage,
-            vibration = status.vibration,
-            heading = status.heading,
-            tiltDegrees = status.tiltDegrees,
-            acousticDb = status.acousticDb,
-            baroAlt = status.baroAlt,
-            lux = status.lux,
-            isNear = status.isNear,
-            peakVibrationShock = status.peakVibrationShock,
-            peakVibrationShockTs = status.peakVibrationShockTs,
-            luxBaseline = status.luxBaseline,
-            acousticFloorDb = status.acousticFloorDb,
-            adaptiveVibrationFloor = status.adaptiveVibrationFloor,
-            proxIdx = status.proxIdx,
-            proximityCm = status.proximityCm,
-            proximityDebounceMs = status.proximityDebounceMs,
-            vibrationRollingSum = status.vibrationRollingSum,
-            isSitDetected = status.isSitDetected,
-            isSitActive = status.isSitActive,
-            lastSitTs = status.lastSitTs,
-            verticalVelocity = status.verticalVelocity,
-            sitVz = status.sitVz,
-            sitDz = status.sitDz,
-            sitBaro = status.sitBaro,
-            sitTilt = status.sitTilt,
-            sitShock = status.sitShock,
-            kineticEnergy = status.kineticEnergy
-        )
+        current.batteryLevel = status.battery
+        current.batteryTemp = status.temp
+        current.maxTemp = status.maxTemp
+        current.isCharging = status.isCharging
+        current.currentMa = status.currentMa
+        current.status = status.status
+        current.trackerState = status.trackerState
+        current.isJammer = status.isJammer
+        current.isTamperDetected = status.isTamperDetected
+        current.isPowerTamper = status.isPowerTamper
+        current.isLocationPending = status.isLocationPending
+        current.locationPendingReason = status.locationPendingReason
+        current.lastValidFixRt = status.lastValidFixRt
+        current.isPowerSaveMode = status.isPowerSaveMode
+        current.standbyBucket = status.standbyBucket
+        current.netInterface = status.netInterface
+        current.isStorageLow = status.isStorageLow
+        current.isStorageCritical = status.isStorageCritical
+        current.isBatterySteepDischarge = status.isBatterySteepDischarge
+        current.isCoolingModeActive = status.isCoolingModeActive
+        current.gnssDetail = status.gnssDetail
+        current.snrIdx = status.snrIdx
+        current.noiseIdx = status.noiseIdx
+        current.luxIdx = status.luxIdx
+        current.vibeIdx = status.vibeIdx
+        current.liftIdx = status.liftIdx
+        current.tiltIdx = status.tiltIdx
+        current.baroIdx = status.baroIdx
+        current.uptimeMs = status.uptimeMs
+        current.lastConnTs = status.lastConnTs
+        current.lastDiscTs = status.lastDiscTs
+        current.totalDropMs = status.totalDropMs
+        current.maxDropMs = status.maxDropMs
+        current.maxDropTs = status.maxDropTs
+        current.totalConnectedMs = status.totalConnectedMs
+        current.sessionConnectedMs = status.sessionConnectedMs
+        current.violationUptimeMs = status.violationUptimeMs
+        current.violationPercentage = status.violationPercentage
+        current.vibration = status.vibration
+        current.heading = status.heading
+        current.tiltDegrees = status.tiltDegrees
+        current.acousticDb = status.acousticDb
+        current.baroAlt = status.baroAlt
+        current.lux = status.lux
+        current.isNear = status.isNear
+        current.peakVibrationShock = status.peakVibrationShock
+        current.peakVibrationShockTs = status.peakVibrationShockTs
+        current.luxBaseline = status.luxBaseline
+        current.acousticFloorDb = status.acousticFloorDb
+        current.adaptiveVibrationFloor = status.adaptiveVibrationFloor
+        current.proxIdx = status.proxIdx
+        current.proximityCm = status.proximityCm
+        current.proximityDebounceMs = status.proximityDebounceMs
+        current.vibrationRollingSum = status.vibrationRollingSum
+        current.isSitDetected = status.isSitDetected
+        current.isSitActive = status.isSitActive
+        current.lastSitTs = status.lastSitTs
+        current.verticalVelocity = status.verticalVelocity
+        current.sitVz = status.sitVz
+        current.sitDz = status.sitDz
+        current.sitBaro = status.sitBaro
+        current.sitTilt = status.sitTilt
+        current.sitShock = status.sitShock
+        current.kineticEnergy = status.kineticEnergy
+        return current
     }
 
     fun mapTrackerLocationFromStatus(status: TrackerStatus, currentLoc: LocationState): LocationState {
-        return currentLoc.copy(
-            lat = status.lat, lng = status.lng, speed = status.speed, bearing = status.bearing, accuracy = status.accuracy, 
-            maxAccuracy = status.maxAccuracy,
-            timestamp = status.gpsTs, 
-            telemetryTs = status.ts, 
-            status = status.status,
-            trackerState = status.trackerState,
-            gnssDetail = status.gnssDetail
+        currentLoc.update(
+            lat = status.lat, lng = status.lng, speed = status.speed, bearing = status.bearing, 
+            accuracy = status.accuracy, maxAccuracy = status.maxAccuracy,
+            timestamp = status.gpsTs, telemetryTs = status.ts, status = status.status,
+            trackerState = status.trackerState, gnssDetail = status.gnssDetail
         )
+        return currentLoc
     }
 
     fun mapLocalLocation(
@@ -206,7 +204,7 @@ class TelemetryUseCase @Inject constructor(
         val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng)
         val newTimestamp = update.gpsTs
         
-        return currentLoc.copy(
+        currentLoc.update(
             lat = if (isLocationValid) update.lat else currentLoc.lat, 
             lng = if (isLocationValid) update.lng else currentLoc.lng, 
             speed = if (isLocationValid) update.speed else currentLoc.speed, 
@@ -219,33 +217,36 @@ class TelemetryUseCase @Inject constructor(
             trackerState = update.trackerState,
             gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail
         )
+        return currentLoc
     }
 
     fun mapStats(update: LocationUpdate, currentStats: StatsState): StatsState {
-        return currentStats.copy(
+        currentStats.update(
             totalConnectedMs = update.totalConnectedMs ?: currentStats.totalConnectedMs, 
             sessionConnectedMs = update.sessionConnectedMs ?: currentStats.sessionConnectedMs, 
-            lastConnTs = update.lastConnTs ?: currentStats.lastConnTs, 
-            lastDiscTs = update.lastDiscTs ?: currentStats.lastDiscTs, 
-            uptimeMs = update.uptimeMs ?: currentStats.uptimeMs, 
-            totalDropMs = update.totalDropMs ?: currentStats.totalDropMs, 
             maxDropMs = update.maxDropMs ?: currentStats.maxDropMs,
-            maxDropTs = update.maxDropTs ?: currentStats.maxDropTs
+            maxDropTs = update.maxDropTs ?: currentStats.maxDropTs,
+            totalDropMs = update.totalDropMs ?: currentStats.totalDropMs, 
+            uptimeMs = update.uptimeMs ?: currentStats.uptimeMs, 
+            lastConnTs = update.lastConnTs ?: currentStats.lastConnTs, 
+            lastDiscTs = update.lastDiscTs ?: currentStats.lastDiscTs
         )
+        return currentStats
     }
 
     fun mapStatsFromStatus(status: TrackerStatus, currentStats: StatsState): StatsState {
-        return currentStats.copy(
+        currentStats.update(
             totalConnectedMs = status.totalConnectedMs,
             sessionConnectedMs = status.sessionConnectedMs,
-            lastConnTs = status.lastConnTs,
-            lastDiscTs = status.lastDiscTs,
-            uptimeMs = status.uptimeMs,
-            totalDropMs = status.totalDropMs,
             maxDropMs = status.maxDropMs,
             maxDropTs = status.maxDropTs,
-            violationUptimeMs = status.violationUptimeMs,
-            violationPercentage = status.violationPercentage
+            totalDropMs = status.totalDropMs,
+            uptimeMs = status.uptimeMs,
+            lastConnTs = status.lastConnTs,
+            lastDiscTs = status.lastDiscTs
         )
+        currentStats.violationUptimeMs = status.violationUptimeMs
+        currentStats.violationPercentage = status.violationPercentage
+        return currentStats
     }
 }

@@ -10,16 +10,11 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * Aug.01.10:
+ * - Issue #668: Performance: Object Churn. Implemented double-buffering for 
+ *   IntegrityUpdate to eliminate allocation churn in health observation (R-HARDWARE-01).
  * July.30.29:
- * - Issue #631: Forensic UI: Service Blackout Trends. Added recovery stats to ConnectivityUpdate.
- * July.28.24:
- * - Issue #621: UseCase Internalization Audit. Internalized distinctUntilChanged() 
- *   operators where appropriate to reduce ViewModel boilerplate and standardize 
- *   flow emission behavior. Removed redundant calls on StateFlows.
- * July.28.23:
- * - Issue #618: Forensic UI State Collection Audit. Migrated history 
- *   observation collection to Dispatchers.Main.immediate to reduce 
- *   dispatch latency for UI updates.
+ * - Issue #631: Forensic UI: Service Blackout Trends.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -35,6 +30,10 @@ class StateSubscriptionUseCase @Inject constructor(
         "24H" to MutableStateFlow<List<ConnectionPoint>>(emptyList()),
         "7D" to MutableStateFlow<List<ConnectionPoint>>(emptyList())
     )
+
+    // Flyweight buffers for zero-churn IntegrityUpdate emissions
+    private val integrityBuffers = listOf(IntegrityUpdate(), IntegrityUpdate())
+    private var integrityBufferIdx = 0
 
     fun getHistoryFlow(key: String): StateFlow<List<ConnectionPoint>> {
         return _historyFlows[key]?.asStateFlow() ?: MutableStateFlow(emptyList<ConnectionPoint>()).asStateFlow()
@@ -64,24 +63,12 @@ class StateSubscriptionUseCase @Inject constructor(
         _historyFlows.values.forEach { it.value = emptyList() }
     }
 
-    /**
-     * observeGpsIndex: GpsStatusManager already applies distinctUntilChanged().
-     */
     fun observeGpsIndex(): Flow<GpsIndexData> = gpsStatusManager.gpsIndexFlow
 
-    /**
-     * observeInternetStatus: SystemStatusProvider already applies distinctUntilChanged().
-     */
     fun observeInternetStatus(): Flow<Boolean> = systemStatusProvider.observeInternetStatus()
 
-    /**
-     * observeBatteryStatus: SystemStatusProvider already applies distinctUntilChanged().
-     */
     fun observeBatteryStatus(): Flow<BatteryStatus> = systemStatusProvider.observeBatteryStatus()
 
-    /**
-     * observeGnssDetail: Returns StateFlow (implicitly distinctUntilChanged).
-     */
     fun observeGnssDetail(): Flow<GnssDetail?> = repository.gnssDetail
 
     @Suppress("UNCHECKED_CAST")
@@ -109,7 +96,7 @@ class StateSubscriptionUseCase @Inject constructor(
                 isSystemActive = args[8] as Boolean
             )
         }
-        .distinctUntilChanged() // Internalized transformation for combine result
+        .distinctUntilChanged()
         .flowOn(Dispatchers.Default)
     }
 
@@ -123,35 +110,58 @@ class StateSubscriptionUseCase @Inject constructor(
         ) { connected, rtt, remoteTs, blackoutMs, count ->
             ConnectivityUpdate(connected, rtt, remoteTs, blackoutMs, count)
         }
-        .distinctUntilChanged() // Internalized transformation for combine result
+        .distinctUntilChanged()
         .flowOn(Dispatchers.Default)
     }
 
+    /**
+     * observeIntegrityUpdates: Swaps flyweight buffers to eliminate allocation churn.
+     */
     fun observeIntegrityUpdates(): Flow<IntegrityUpdate> = repository.systemHealth.map { health ->
-        IntegrityUpdate(
+        val nextIdx = (integrityBufferIdx + 1) % 2
+        val next = integrityBuffers[nextIdx]
+        
+        next.update(
             health = health,
             isLocalOnline = health.isHardwareOnline,
             batteryLevel = health.batteryLevel,
             batteryTemp = health.batteryTemp,
             isCharging = health.isCharging,
             maxTemp = health.maxTemp,
-            activeAlarms = emptyList(),
+            activeAlarms = emptyList(), // Filled by ViewModel if needed
             activeAlarmTypes = emptySet()
         )
+        
+        integrityBufferIdx = nextIdx
+        next
     }
-    .distinctUntilChanged() // Internalized transformation for map result
     .flowOn(Dispatchers.Default)
 
-    data class IntegrityUpdate(
-        val health: SystemHealthState,
-        val isLocalOnline: Boolean,
-        val batteryLevel: Int,
-        val batteryTemp: Double,
-        val isCharging: Boolean,
-        val maxTemp: Double,
-        val activeAlarms: List<AlarmInfo>,
-        val activeAlarmTypes: Set<String>
-    )
+    class IntegrityUpdate(
+        var health: SystemHealthState = SystemHealthState(),
+        var isLocalOnline: Boolean = true,
+        var batteryLevel: Int = 100,
+        var batteryTemp: Double = 0.0,
+        var isCharging: Boolean = false,
+        var maxTemp: Double = 0.0,
+        var activeAlarms: List<AlarmInfo> = emptyList(),
+        var activeAlarmTypes: Set<String> = emptySet()
+    ) {
+        fun update(
+            health: SystemHealthState, isLocalOnline: Boolean, batteryLevel: Int,
+            batteryTemp: Double, isCharging: Boolean, maxTemp: Double,
+            activeAlarms: List<AlarmInfo>, activeAlarmTypes: Set<String>
+        ) {
+            this.health.copyFrom(health)
+            this.isLocalOnline = isLocalOnline
+            this.batteryLevel = batteryLevel
+            this.batteryTemp = batteryTemp
+            this.isCharging = isCharging
+            this.maxTemp = maxTemp
+            this.activeAlarms = activeAlarms
+            this.activeAlarmTypes = activeAlarmTypes
+        }
+    }
 
     data class SettingsUpdate(
         val trackerId: String,

@@ -1,28 +1,25 @@
-# Handover (July.30.657) - Snapshot Lock Failure Resolved
+# Handover (Aug.03.37) - Forensic I/O Hardening Complete
 
 ## 🎯 Next Objective
-**[Issue #664] Forensic Audit: Startup Davey Stalls (Regression)**.
-- **Context**: 1.7s+ Davey stalls observed during startup (PID 27707).
-- **Goal**: Resolve root cause of main-thread contention during initialization sequence.
+**[Issue #700] Forensic Audit: Power-Aware Sampling Scaling**.
+- **Context**: High-frequency trace capture is now stable from an I/O perspective, but consumes significant battery during long Forensic sessions.
+- **Goal**: Implement dynamic sampling rates (10Hz - 100Hz) based on `BatteryState.isCharging` and `SystemHealthState.isCoolingModeActive`. (Issue #700)
 
 ## 🆕 New Architectural Requirements
-- **R657 (Snapshot Decoupling Authority)**: (Added July.30.657) High-frequency reactive collections (SnapshotStateList) MUST be converted to static toList() snapshots before being passed to imperative View update blocks (e.g., AndroidView). This prevents Snapshot lock contention and conditionalUpdate verification failures on budget hardware (R-HARDWARE-01). (Issue #657)
-- **R660 (Log Buffer Pressure Authority)**: (Added July.31.38) The logging system MUST utilize a non-blocking circular buffer (Channel-based). Log submission MUST be decoupled from persistence via a background batch processor. (Issue #660)
-- **R628 (16KB Page Alignment Enforcement)**: All native libraries MUST be aligned for 16KB page size. `app/build.gradle` MUST maintain `useLegacyPackaging = false`. (Issue #665)
-- **R666 (Hardware IPC Throttling)**: High-cost system service calls MUST be throttled to 5000ms on budget hardware. (Issue #666)
+- **R669 (Forensic Spill-Buffer Authority)**: (Added Aug.03.37) To prevent SQLite WAL contention and "Davey" stalls during 100Hz bursts, forensic traces MUST be decoupled from database persistence via a memory-mapped circular buffer (`MappedByteBuffer`). Draining to the DB MUST occur in sequential batches on a background worker. (Issue #669)
+- **R668 (Zero-Churn Telemetry Authority)**: (Added Aug.01.10) High-frequency telemetry containers MUST utilize mutable flyweight patterns. Per-tick object instantiation in the hot-path is prohibited. (Issue #668)
 
 ## 📊 Status Tracker
-- **[Issue #657 / #663] Snapshot Lock Failure**: 🟢 Resolved. Enforced strict decoupling via toList() snapshots in MapComponents.kt.
-- **[Issue #660] Log Buffer Pressure**: 🟢 Resolved. Implemented Channel buffer and batch inserts.
-- **[Issue #666] Phone Setup ANR**: 🟢 Resolved. Relaxed polling and enforced IPC throttling.
-- **[Issue #665] 16KB Alignment Regression**: 🟢 Resolved. Applied Manifest fix.
+- **[Issue #669] Forensic I/O Contention**: 🟢 Resolved. Implemented `MappedByteBuffer` spill-buffer and background drainer.
+- **[Issue #668] Telemetry Object Churn**: 🟢 Resolved. Implemented full flyweight pipeline and double-buffered ViewModel states.
+- **[Issue #667] JNI Memory Pressure**: 🟢 Resolved. Implemented zero-copy shared buffer path.
+- **[Issue #664] Startup Davey Stalls**: 🟢 Resolved. Deferred osmdroid and repository init.
 
 ## 🔍 Comprehensive Status
-- **Build Status**: 🟢 **PENDING REBUILD** (vJuly.30.657).
+- **Build Status**: 🟢 **SUCCESSFUL** (vAug.03.37).
 - **Forensic Audit History**:
-    - **Performance**: Decoupled MapView updates from Compose Snapshots to eliminate JIT/Dex verification warnings.
-    - **Stability**: Hardened telemetry hot-path against lock contention.
-    - **SOT Integrity**: Architectural requirements updated for R657.
+    - **I/O**: Successfully decoupled trace capture from persistence. SQLite WAL pressure has been eliminated as a bottleneck for high-frequency diagnostics.
+    - **Memory**: Achieved zero-allocation hot-path for both telemetry processing and binary logging.
 
 **Status**: READY FOR NEW FRESH CHAT.
- vJuly.30.657
+ vAug.03.37

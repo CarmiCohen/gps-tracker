@@ -2,19 +2,24 @@ package com.gps19.core.engine
 
 /**
  * TelemetryMerger: Pure logic for aggregating and merging telemetry updates.
+ * Aug.01.10:
+ * - Issue #668: Performance: Object Churn. Refactored to mergeInto() to support 
+ *   in-place mutation of LocationUpdate flyweights (R-HARDWARE-01).
  * July.1.16:
- * - Issue #512: Consolidate Sentinel Statuses. Removed legacy flags (isJump, isJammer).
- * - Issue #511: Simplified telemetry mapping.
+ * - Issue #512: Consolidate Sentinel Statuses.
  */
 object TelemetryMerger {
 
-    fun merge(current: LocationUpdate, incoming: LocationUpdate): LocationUpdate {
+    /**
+     * mergeInto: Updates the [target] flyweight with data from [incoming].
+     */
+    fun mergeInto(target: LocationUpdate, incoming: LocationUpdate) {
         val incomingLat = incoming.lat
         val incomingLng = incoming.lng
         val hasIncomingGps = incomingLat != 0.0 && incomingLng != 0.0
         
-        val isStale = TelemetryProcessor.isUpdateStale(incoming.gpsTs, current.gpsTs)
-        val isMassiveRegression = TelemetryProcessor.isMassiveRegression(incoming.gpsTs, current.gpsTs)
+        val isStale = TelemetryProcessor.isUpdateStale(incoming.gpsTs, target.gpsTs)
+        val isMassiveRegression = TelemetryProcessor.isMassiveRegression(incoming.gpsTs, target.gpsTs)
         
         val preferCached = TelemetryProcessor.shouldPreferCachedCoordinates(
             hasIncomingGps = hasIncomingGps,
@@ -22,26 +27,14 @@ object TelemetryMerger {
             isMassiveRegression = isMassiveRegression
         )
 
-        return if (preferCached) {
-            incoming.copy(
-                lat = current.lat,
-                lng = current.lng,
-                alt = current.alt,
-                speed = current.speed,
-                accuracy = current.accuracy,
-                bearing = current.bearing,
-                gpsTs = current.gpsTs,
-                ts = if (incoming.ts > 0) incoming.ts else current.ts,
-                maxAccuracy = if (incoming.maxAccuracy > 0) incoming.maxAccuracy else current.maxAccuracy,
-                status = current.status,
-                jumpTier = current.jumpTier,
-                distToHome = current.distToHome,
-                distToTracker = current.distToTracker,
-                gnssDetail = incoming.gnssDetail ?: current.gnssDetail,
-                currentMa = current.currentMa
-            )
+        if (preferCached) {
+            // Keep target's spatial data, only update metadata from incoming
+            target.ts = if (incoming.ts > 0) incoming.ts else target.ts
+            if (incoming.maxAccuracy > 0) target.maxAccuracy = incoming.maxAccuracy
+            target.gnssDetail = incoming.gnssDetail ?: target.gnssDetail
         } else {
-            incoming
+            // Overwrite target with incoming data
+            target.copyFrom(incoming)
         }
     }
 }

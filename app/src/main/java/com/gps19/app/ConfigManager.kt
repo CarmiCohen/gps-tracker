@@ -5,29 +5,33 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * ConfigManager: Manages identity and core configuration settings.
+ * Aug.01.00:
+ * - Issue #664: Forensic Audit: Startup Davey Stalls. Consolidated multiple 
+ *   Main.immediate collectors into a single background observation to reduce 
+ *   main-thread pressure during startup.
  * July.28.24:
- * - Issue #618: Forensic UI State Collection Audit. Migrated to 
- *   Dispatchers.Main.immediate to eliminate configuration sync latency (R618).
- * July.24.04:
- * - Issue #540: Identity Sync Bug.
+ * - Issue #618: Forensic UI State Collection Audit.
  */
 @Singleton
 class ConfigManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: MainRepository
 ) {
-    var isTrackerMode: Boolean = true
-    var deviceId: String = ""
-    var viewerId: String = ""
-    var relayUrl: String = DEFAULT_RELAY_URL
+    @Volatile var isTrackerMode: Boolean = true
+    @Volatile var deviceId: String = ""
+    @Volatile var viewerId: String = ""
+    @Volatile var relayUrl: String = DEFAULT_RELAY_URL
 
-    private val scope = CoroutineScope(Dispatchers.Main.immediate)
+    // Issue #664: Using IO scope for initialization and observations to 
+    // prevent main-thread contention during Hilt injection.
+    private val scope = CoroutineScope(Dispatchers.IO)
 
     init {
         observeSettings()
@@ -35,24 +39,18 @@ class ConfigManager @Inject constructor(
 
     private fun observeSettings() {
         scope.launch {
-            repository.appModeFlow.collectLatest { mode ->
+            combine(
+                repository.appModeFlow,
+                repository.trackerIdFlow,
+                repository.viewerIdFlow,
+                repository.relayUrlFlow
+            ) { mode, tId, vId, url ->
+                // Apply values to volatile fields
                 if (mode != null) isTrackerMode = (mode == "tracker")
-            }
-        }
-        scope.launch {
-            repository.trackerIdFlow.collectLatest { id ->
-                if (id.isNotEmpty()) deviceId = id
-            }
-        }
-        scope.launch {
-            repository.relayUrlFlow.collectLatest { url ->
+                if (tId.isNotEmpty()) deviceId = tId
+                if (vId.isNotEmpty()) viewerId = vId
                 if (url.isNotEmpty()) relayUrl = url
-            }
-        }
-        scope.launch {
-            repository.viewerIdFlow.collectLatest { id ->
-                if (id.isNotEmpty()) viewerId = id
-            }
+            }.collect { }
         }
     }
 

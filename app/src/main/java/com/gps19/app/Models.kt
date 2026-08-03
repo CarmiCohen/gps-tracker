@@ -10,11 +10,13 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * July.30.55:
- * - Issue #653: Performance: Zero-Churn. Restored AppSensorEvent sealed class 
- *   required for hardware failure signaling (R-HARDWARE-01).
- * July.30.31:
- * - Issue #634: Foreground Service Start Hardening.
+ * Aug.03.37:
+ * - Issue #669: Forensic Audit: Database I/O Contention. Added reset() methods 
+ *   to mutable state classes to support zero-churn UI state management (R668).
+ *   Added isAdaptiveJump to TrackerStatus for forensic parity.
+ * Aug.01.10:
+ * - Issue #668: Performance: Object Churn. Converted LocationState, StatsState, 
+ *   and BatteryState to mutable flyweights for zero-churn telemetry (R-HARDWARE-01).
  */
 
 sealed class AppSensorEvent {
@@ -289,7 +291,8 @@ data class TrackerStatus(
     val tiltIdx: Double = 0.0,
     val baroIdx: Double = 0.0,
     val micPending: Boolean = false,
-    val kineticEnergy: Double = 0.0
+    val kineticEnergy: Double = 0.0,
+    val isAdaptiveJump: Boolean = false
 ) : SpatialAnchor {
 
     fun toMap(fromViewer: Boolean): Map<String, Any?> {
@@ -322,13 +325,14 @@ data class TrackerStatus(
             put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_mode_active", isCoolingModeActive)
             put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
             put("is_jump", isJump); put("mic_pending", micPending)
-            put("snr_idx", snrIdx); put("noise_idx", noiseIdx); put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)
+            put("snr_idx", snrIdx); put("noise_idx", noiseIdx); put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("clift_idx", liftIdx)
             put("tilt_idx", tiltIdx); put("baro_idx", baroIdx)
             put("is_sit_active", isSitActive)
             put("sit_vz", sitVz); put("sit_vz_ts", sitVzTs); put("sit_vz_rt", sitVzRt)
             put("sit_dz", sitDz); put("sit_baro", sitBaro); put("sit_tilt", sitTilt); put("sit_shock", sitShock)
             put("vertical_velocity", verticalVelocity)
             put("kinetic_energy", kineticEnergy)
+            put("is_adaptive_jump", isAdaptiveJump)
         }
     }
 
@@ -394,6 +398,7 @@ data class TrackerStatus(
             .setLastValidFixRt(lastValidFixRt)
             .setIsClockRegression(isClockRegression)
             .setKineticEnergy(kineticEnergy)
+            .setIsAdaptiveJump(isAdaptiveJump)
     }
 
     fun toProto(fromViewer: Boolean): RealtimeStatus {
@@ -451,20 +456,57 @@ data class AlarmInfo(val title: String, val subtitle: String, val type: String =
 
 /**
  * LocationState: Pure position data. Hardware/Health metadata moved to SystemHealthState.
+ * Aug.01.10: Refactored to mutable class for zero-churn telemetry.
  */
-data class LocationState(
-    val lat: Double = 0.0,
-    val lng: Double = 0.0,
-    val speed: Double = 0.0,
-    val accuracy: Double = 0.0,
-    val maxAccuracy: Double = 0.0,
-    val bearing: Double = 0.0,
-    val timestamp: Long = 0L,
-    val telemetryTs: Long = 0L, 
-    val status: SentinelStatus = SentinelStatus.VALID,
-    val trackerState: TrackerState = TrackerState.UNKNOWN,
-    val gnssDetail: GnssDetail? = null
-)
+class LocationState(
+    var lat: Double = 0.0,
+    var lng: Double = 0.0,
+    var speed: Double = 0.0,
+    var accuracy: Double = 0.0,
+    var maxAccuracy: Double = 0.0,
+    var bearing: Double = 0.0,
+    var timestamp: Long = 0L,
+    var telemetryTs: Long = 0L, 
+    var status: SentinelStatus = SentinelStatus.VALID,
+    var trackerState: TrackerState = TrackerState.UNKNOWN,
+    var gnssDetail: GnssDetail? = null
+) {
+    fun copyFrom(other: LocationState) {
+        this.lat = other.lat
+        this.lng = other.lng
+        this.speed = other.speed
+        this.accuracy = other.accuracy
+        this.maxAccuracy = other.maxAccuracy
+        this.bearing = other.bearing
+        this.timestamp = other.timestamp
+        this.telemetryTs = other.telemetryTs
+        this.status = other.status
+        this.trackerState = other.trackerState
+        this.gnssDetail = other.gnssDetail
+    }
+
+    fun update(
+        lat: Double, lng: Double, speed: Double, accuracy: Double, maxAccuracy: Double,
+        bearing: Double, timestamp: Long, telemetryTs: Long, status: SentinelStatus,
+        trackerState: TrackerState, gnssDetail: GnssDetail?
+    ) {
+        this.lat = lat
+        this.lng = lng
+        this.speed = speed
+        this.accuracy = accuracy
+        this.maxAccuracy = maxAccuracy
+        this.bearing = bearing
+        this.timestamp = timestamp
+        this.telemetryTs = telemetryTs
+        this.status = status
+        this.trackerState = trackerState
+        this.gnssDetail = gnssDetail
+    }
+
+    fun reset() {
+        update(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0L, 0L, SentinelStatus.VALID, TrackerState.UNKNOWN, null)
+    }
+}
 
 data class DashboardState(
     val maxDrop: String = "00:00:00",
@@ -634,19 +676,68 @@ sealed class UiCommand {
     object MapZoomOut : UiCommand()
 }
 
-data class StatsState(
-    val totalConnectedMs: Long = 0L, val sessionConnectedMs: Long = 0L,
-    val maxDropMs: Long = 0L, val maxDropTs: Long = 0L, val totalDropMs: Long = 0L,
-    val uptimeMs: Long = 0L, val lastConnTs: Long = 0L, val lastDiscTs: Long = 0L,
-    val violationUptimeMs: Long = 0L, val violationPercentage: Double = 0.0
-)
+/**
+ * StatsState: Connectivity statistics.
+ * Aug.01.10: Refactored to mutable class for zero-churn telemetry.
+ */
+class StatsState(
+    var totalConnectedMs: Long = 0L, var sessionConnectedMs: Long = 0L,
+    var maxDropMs: Long = 0L, var maxDropTs: Long = 0L, var totalDropMs: Long = 0L,
+    var uptimeMs: Long = 0L, var lastConnTs: Long = 0L, var lastDiscTs: Long = 0L,
+    var violationUptimeMs: Long = 0L, var violationPercentage: Double = 0.0
+) {
+    fun copyFrom(other: StatsState) {
+        this.totalConnectedMs = other.totalConnectedMs
+        this.sessionConnectedMs = other.sessionConnectedMs
+        this.maxDropMs = other.maxDropMs
+        this.maxDropTs = other.maxDropTs
+        this.totalDropMs = other.totalDropMs
+        this.uptimeMs = other.uptimeMs
+        this.lastConnTs = other.lastConnTs
+        this.lastDiscTs = other.lastDiscTs
+        this.violationUptimeMs = other.violationUptimeMs
+        this.violationPercentage = other.violationPercentage
+    }
 
-data class BatteryState(
-    val level: Int = 100, val temp: Double = 0.0, val isCharging: Boolean = false, val isChargingStable: Boolean = false
-)
+    fun update(
+        totalConnectedMs: Long, sessionConnectedMs: Long, maxDropMs: Long, maxDropTs: Long,
+        totalDropMs: Long, uptimeMs: Long, lastConnTs: Long, lastDiscTs: Long
+    ) {
+        this.totalConnectedMs = totalConnectedMs
+        this.sessionConnectedMs = sessionConnectedMs
+        this.maxDropMs = maxDropMs
+        this.maxDropTs = maxDropTs
+        this.totalDropMs = totalDropMs
+        this.uptimeMs = uptimeMs
+        this.lastConnTs = lastConnTs
+        this.lastDiscTs = lastDiscTs
+    }
 
-data class ConnectivityState(
-    val isLocalOnline: Boolean = true, val isRelayConnected: Boolean = false, val isTrackerConnected: Boolean = false,
-    val lastUpdateTs: Long = 0L,
-    val lastRemoteActivityTs: Long = 0L, val connectedViewers: List<String> = emptyList()
-)
+    fun reset() {
+        update(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L)
+        violationUptimeMs = 0L
+        violationPercentage = 0.0
+    }
+}
+
+/**
+ * BatteryState: Device battery and thermal status.
+ * Aug.01.10: Refactored to mutable class for zero-churn telemetry.
+ */
+class BatteryState(
+    var level: Int = 100, var temp: Double = 0.0, var isCharging: Boolean = false, var isChargingStable: Boolean = false
+) {
+    fun copyFrom(other: BatteryState) {
+        this.level = other.level
+        this.temp = other.temp
+        this.isCharging = other.isCharging
+        this.isChargingStable = other.isChargingStable
+    }
+
+    fun reset() {
+        level = 100
+        temp = 0.0
+        isCharging = false
+        isChargingStable = false
+    }
+}

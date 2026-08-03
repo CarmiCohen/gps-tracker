@@ -4,85 +4,124 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
- * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection. Added kineticEnergy field.
- * - Forensic Parity (R118): Added sitVzTs and sitVzRt to maintain parity with LocationSentinel.
- * July.22.01:
- * - Forensic Parity: Added missing indices (noiseIdx, luxIdx, vibeIdx, liftIdx).
+ * Aug.03.37:
+ * - Issue #669: Forensic Audit: Database I/O Contention. Added isAdaptiveJump 
+ *   to maintain forensic parity across signaling roles (R-HARDWARE-01).
+ * Aug.01.10:
+ * - Issue #668: Performance: Object Churn. Converted to mutable flyweight 
+ *   to eliminate allocation churn in telemetry merging and storage (R-HARDWARE-01).
  */
 @Serializable
-data class LocationUpdate(
-    val lat: Double = 0.0, val lng: Double = 0.0, val alt: Double = 0.0,
-    val speed: Double = 0.0, val accuracy: Double = 0.0, val bearing: Double = 0.0,
-    val battery: Int = -1, val temp: Double = 0.0, val maxTemp: Double = 0.0,
-    val isCharging: Boolean = false, val gpsTs: Long = 0L, val isMe: Boolean = true,
-    val ts: Long = 0L, // Wall-clock
-    val rt: Long = 0L, // Monotonic (Issue #102)
-    val status: SentinelStatus = SentinelStatus.VALID,
-    val isJump: Boolean = false, 
-    val isTrajectoryPromoted: Boolean = false,
-    val jumpTier: Int = 0,
-    val distToTracker: Double? = null, val distToHome: Double? = null,
-    val totalConnectedMs: Long? = null, val sessionConnectedMs: Long? = null,
-    val lastConnTs: Long? = null, val lastDiscTs: Long? = null,
-    val satsView: Int = 0, val satsUsed: Int = 0, val maxAccuracy: Double = 0.0,
-    val uptimeMs: Long? = null, val totalDropMs: Long? = null, val maxDropMs: Long? = null, val maxDropTs: Long? = null,
-    val vibration: Double? = null, val heading: Double? = null, val baroAlt: Double? = null,
-    val icon: String? = null, 
-    val lux: Double? = null, val isNear: Boolean? = null, val tiltDegrees: Double? = null,
-    val acousticDb: Double? = null,
-    val luxBaseline: Double? = null,
-    val acousticFloorDb: Double? = null,
-    val peakVibrationShock: Double? = null,
-    val peakVibrationShockTs: Long? = null,
-    val adaptiveVibrationFloor: Double? = null,
-    val isTamperDetected: Boolean = false,
-    val proxIdx: Double? = null,
-    val proximityCm: Double? = null,
-    val proximityDebounceMs: Long? = null,
-    val vibrationRollingSum: Double? = null,
-    val currentMa: Int = 0,
-    val signal: Int? = null,
-    val micPending: Boolean = false,
-    val isPowerTamper: Boolean = false,
-    val violationUptimeMs: Long? = null,
-    val violationPercentage: Double? = null,
-    val isClockRegression: Boolean = false,
-    val isLocationPending: Boolean = false,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRt: Long = 0L,
-    val isPowerSaveMode: Boolean = false,
-    val standbyBucket: Int = -1,
-    val netInterface: String = "UNKNOWN",
-    val isStorageLow: Boolean = false,
-    val isStorageCritical: Boolean = false,
-    val gnssDetail: GnssDetail? = null,
-    val isBatterySteepDischarge: Boolean = false,
-    val isCoolingModeActive: Boolean = false,
-    val trackerState: TrackerState = TrackerState.UNKNOWN,
-    val isJammer: Boolean = false,
-    val isStalled: Boolean = false,
-    val isSuspicious: Boolean = false,
-    val isAnchorLocked: Boolean = false,
+class LocationUpdate(
+    var lat: Double = 0.0, var lng: Double = 0.0, var alt: Double = 0.0,
+    var speed: Double = 0.0, var accuracy: Double = 0.0, var bearing: Double = 0.0,
+    var battery: Int = -1, var temp: Double = 0.0, var maxTemp: Double = 0.0,
+    var isCharging: Boolean = false, var gpsTs: Long = 0L, var isMe: Boolean = true,
+    var ts: Long = 0L, 
+    var rt: Long = 0L,
+    var status: SentinelStatus = SentinelStatus.VALID,
+    var isJump: Boolean = false, 
+    var isTrajectoryPromoted: Boolean = false,
+    var jumpTier: Int = 0,
+    var distToTracker: Double? = null, var distToHome: Double? = null,
+    var totalConnectedMs: Long? = null, var sessionConnectedMs: Long? = null,
+    var lastConnTs: Long? = null, var lastDiscTs: Long? = null,
+    var satsView: Int = 0, var satsUsed: Int = 0, var maxAccuracy: Double = 0.0,
+    var uptimeMs: Long? = null, var totalDropMs: Long? = null, var maxDropMs: Long? = null, var maxDropTs: Long? = null,
+    var vibration: Double? = null, var heading: Double? = null, var baroAlt: Double? = null,
+    var icon: String? = null, 
+    var lux: Double? = null, var isNear: Boolean? = null, var tiltDegrees: Double? = null,
+    var acousticDb: Double? = null,
+    var luxBaseline: Double? = null,
+    var acousticFloorDb: Double? = null,
+    var peakVibrationShock: Double? = null,
+    var peakVibrationShockTs: Long? = null,
+    var adaptiveVibrationFloor: Double? = null,
+    var isTamperDetected: Boolean = false,
+    var proxIdx: Double? = null,
+    var proximityCm: Double? = null,
+    var proximityDebounceMs: Long? = null,
+    var vibrationRollingSum: Double? = null,
+    var currentMa: Int = 0,
+    var signal: Int? = null,
+    var micPending: Boolean = false,
+    var isPowerTamper: Boolean = false,
+    var violationUptimeMs: Long? = null,
+    var violationPercentage: Double? = null,
+    var isClockRegression: Boolean = false,
+    var isLocationPending: Boolean = false,
+    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    var lastValidFixRt: Long = 0L,
+    var isPowerSaveMode: Boolean = false,
+    var standbyBucket: Int = -1,
+    var netInterface: String = "UNKNOWN",
+    var isStorageLow: Boolean = false,
+    var isStorageCritical: Boolean = false,
+    var gnssDetail: GnssDetail? = null,
+    var isBatterySteepDischarge: Boolean = false,
+    var isCoolingModeActive: Boolean = false,
+    var trackerState: TrackerState = TrackerState.UNKNOWN,
+    var isJammer: Boolean = false,
+    var isStalled: Boolean = false,
+    var isSuspicious: Boolean = false,
+    var isAnchorLocked: Boolean = false,
     
     // Forensic Fields
-    val snrIdx: Double = 0.0,
-    val noiseIdx: Double = 0.0,
-    val luxIdx: Double = 0.0,
-    val vibeIdx: Double = 0.0,
-    val liftIdx: Double = 0.0,
-    val tiltIdx: Double = 0.0,
-    val baroIdx: Double = 0.0,
-    val isSitDetected: Boolean = false,
-    val isSitActive: Boolean = false,
-    val lastSitTs: Long = 0L,
-    val verticalVelocity: Double = 0.0,
-    val sitVz: Double = 0.0,
-    val sitVzTs: Long = 0L,
-    val sitVzRt: Long = 0L,
-    val sitDz: Double = 0.0,
-    val sitBaro: Double = 0.0,
-    val sitTilt: Double = 0.0,
-    val sitShock: Double = 0.0,
-    val kineticEnergy: Double = 0.0
-)
+    var snrIdx: Double = 0.0,
+    var noiseIdx: Double = 0.0,
+    var luxIdx: Double = 0.0,
+    var vibeIdx: Double = 0.0,
+    var liftIdx: Double = 0.0,
+    var tiltIdx: Double = 0.0,
+    var baroIdx: Double = 0.0,
+    var isSitDetected: Boolean = false,
+    var isSitActive: Boolean = false,
+    var lastSitTs: Long = 0L,
+    var verticalVelocity: Double = 0.0,
+    var sitVz: Double = 0.0,
+    var sitVzTs: Long = 0L,
+    var sitVzRt: Long = 0L,
+    var sitDz: Double = 0.0,
+    var sitBaro: Double = 0.0,
+    var sitTilt: Double = 0.0,
+    var sitShock: Double = 0.0,
+    var kineticEnergy: Double = 0.0,
+    var isAdaptiveJump: Boolean = false
+) {
+    fun copyFrom(other: LocationUpdate) {
+        this.lat = other.lat; this.lng = other.lng; this.alt = other.alt
+        this.speed = other.speed; this.accuracy = other.accuracy; this.bearing = other.bearing
+        this.battery = other.battery; this.temp = other.temp; this.maxTemp = other.maxTemp
+        this.isCharging = other.isCharging; this.gpsTs = other.gpsTs; this.isMe = other.isMe
+        this.ts = other.ts; this.rt = other.rt; this.status = other.status
+        this.isJump = other.isJump; this.isTrajectoryPromoted = other.isTrajectoryPromoted
+        this.jumpTier = other.jumpTier; this.distToTracker = other.distToTracker; this.distToHome = other.distToHome
+        this.totalConnectedMs = other.totalConnectedMs; this.sessionConnectedMs = other.sessionConnectedMs
+        this.lastConnTs = other.lastConnTs; this.lastDiscTs = other.lastDiscTs
+        this.satsView = other.satsView; this.satsUsed = other.satsUsed; this.maxAccuracy = other.maxAccuracy
+        this.uptimeMs = other.uptimeMs; this.totalDropMs = other.totalDropMs; this.maxDropMs = other.maxDropMs; this.maxDropTs = other.maxDropTs
+        this.vibration = other.vibration; this.heading = other.heading; this.baroAlt = other.baroAlt
+        this.icon = other.icon; this.lux = other.lux; this.isNear = other.isNear; this.tiltDegrees = other.tiltDegrees
+        this.acousticDb = other.acousticDb; this.luxBaseline = other.luxBaseline; this.acousticFloorDb = other.acousticFloorDb
+        this.peakVibrationShock = other.peakVibrationShock; this.peakVibrationShockTs = other.peakVibrationShockTs
+        this.adaptiveVibrationFloor = other.adaptiveVibrationFloor; this.isTamperDetected = other.isTamperDetected
+        this.proxIdx = other.proxIdx; this.proximityCm = other.proximityCm; this.proximityDebounceMs = other.proximityDebounceMs
+        this.vibrationRollingSum = other.vibrationRollingSum; this.currentMa = other.currentMa; this.signal = other.signal
+        this.micPending = other.micPending; this.isPowerTamper = other.isPowerTamper
+        this.violationUptimeMs = other.violationUptimeMs; this.violationPercentage = other.violationPercentage
+        this.isClockRegression = other.isClockRegression; this.isLocationPending = other.isLocationPending
+        this.locationPendingReason = other.locationPendingReason; this.lastValidFixRt = other.lastValidFixRt
+        this.isPowerSaveMode = other.isPowerSaveMode; this.standbyBucket = other.standbyBucket; this.netInterface = other.netInterface
+        this.isStorageLow = other.isStorageLow; this.isStorageCritical = other.isStorageCritical; this.gnssDetail = other.gnssDetail
+        this.isBatterySteepDischarge = other.isBatterySteepDischarge; this.isCoolingModeActive = other.isCoolingModeActive
+        this.trackerState = other.trackerState; this.isJammer = other.isJammer; this.isStalled = other.isStalled
+        this.isSuspicious = other.isSuspicious; this.isAnchorLocked = other.isAnchorLocked
+        this.snrIdx = other.snrIdx; this.noiseIdx = other.noiseIdx; this.luxIdx = other.luxIdx; this.vibeIdx = other.vibeIdx
+        this.liftIdx = other.liftIdx; this.tiltIdx = other.tiltIdx; this.baroIdx = other.baroIdx
+        this.isSitDetected = other.isSitDetected; this.isSitActive = other.isSitActive; this.lastSitTs = other.lastSitTs
+        this.verticalVelocity = other.verticalVelocity; this.sitVz = other.sitVz; this.sitVzTs = other.sitVzTs
+        this.sitVzRt = other.sitVzRt; this.sitDz = other.sitDz; this.sitBaro = other.sitBaro
+        this.sitTilt = other.sitTilt; this.sitShock = other.sitShock; this.kineticEnergy = other.kineticEnergy
+        this.isAdaptiveJump = other.isAdaptiveJump
+    }
+}

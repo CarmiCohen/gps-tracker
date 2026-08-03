@@ -6,7 +6,9 @@ import org.junit.Test
 
 /**
  * AnchorEvaluatorTest: Verifies stationary anchor logic (R990c, R990d, R990e).
- * July.23.09 release validation.
+ * Aug.03.37:
+ * - Issue #669: Refactored to eliminate .copy() usage on EngineGeoPoint 
+ *   to resolve build errors following zero-churn transition.
  */
 class AnchorEvaluatorTest {
 
@@ -21,10 +23,14 @@ class AnchorEvaluatorTest {
         }
     }
 
-    private val basePoint = EngineGeoPoint(32.7940, 34.9896, accuracy = 10.0)
+    private fun createPoint(lat: Double, lng: Double, accuracy: Double) = EngineGeoPoint().apply {
+        update(lat = lat, lng = lng, accuracy = accuracy, maxAccuracy = accuracy)
+    }
 
     @Test
     fun `test engagement and coordinate averaging`() {
+        val basePoint = createPoint(32.7940, 34.9896, 10.0)
+        
         // 1. Engage anchor (accuracy 10m -> threshold 8m)
         val res1 = evaluator.evaluate(
             point = basePoint,
@@ -42,7 +48,7 @@ class AnchorEvaluatorTest {
 
         // 2. Add slightly shifted points (R990c)
         // Shift ~4.4m (0.00004 lat) - well within 8m threshold
-        val shiftedPoint = basePoint.copy(lat = 32.79404) 
+        val shiftedPoint = createPoint(32.79404, 34.9896, 10.0)
         
         repeat(5) {
             evaluator.evaluate(
@@ -66,11 +72,13 @@ class AnchorEvaluatorTest {
 
     @Test
     fun `test breakout by physical motion`() {
+        val basePoint = createPoint(32.7940, 34.9896, 10.0)
         evaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 0.1)
         assertTrue(evaluator.isLocked())
 
+        val movingPoint = createPoint(32.7945, 34.9896, 10.0) // ~55m away
         val res = evaluator.evaluate(
-            point = basePoint.copy(lat = 32.7945), // ~55m away
+            point = movingPoint,
             isPhysicallyStationary = false, // Sensor motion
             stationaryProb = 0.95,
             estimatedSpeed = 5.0,
@@ -86,11 +94,12 @@ class AnchorEvaluatorTest {
 
     @Test
     fun `test safety valve breakout`() {
+        val basePoint = createPoint(32.7940, 34.9896, 10.0)
         // Engagement
         evaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 0.1)
         
         // Large displacement (25m). Safety valve should accelerate breakout despite IMU damping.
-        val farPoint = basePoint.copy(lat = basePoint.lat + 0.000225, accuracy = 10.0)
+        val farPoint = createPoint(32.7940 + 0.000225, 34.9896, 10.0)
         
         var brokeOut = false
         repeat(20) {
@@ -106,9 +115,10 @@ class AnchorEvaluatorTest {
 
     @Test
     fun `test accuracy snap suppression`() {
+        val basePoint = createPoint(32.7940, 34.9896, 10.0)
         evaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 0.1)
         
-        val snapPoint = basePoint.copy(lat = basePoint.lat + 0.00008) // ~9m shift
+        val snapPoint = createPoint(32.7940 + 0.00008, 34.9896, 10.0) // ~9m shift
         
         // Simulate Accuracy Snap
         repeat(5) {

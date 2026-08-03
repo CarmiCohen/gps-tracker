@@ -4,25 +4,25 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * July.30.49:
- * - Issue #653: Performance: Zero-Churn Refactoring. Converted SentinelResult, 
- *   JumpConfidence, and ProcessedLocation into mutable flyweights to eliminate 
- *   heap churn in GPS/Telemetry hot-paths (R-HARDWARE-01).
- * July.30.45:
- * - Issue #654: Performance Hardening. Added isMicrophoneGranted to HardwareCapabilities 
- *   to support centralized throttled auditing of hardware-bound permissions (R650).
+ * Aug.01.10:
+ * - Issue #668: Performance: Object Churn. Converted EngineGeoPoint, AlarmEvaluationState, 
+ *   and SystemHealthReport into mutable flyweights for zero-churn telemetry (R-HARDWARE-01).
  */
 
 @Serializable
-data class EngineGeoPoint(
-    val lat: Double, 
-    val lng: Double, 
-    val alt: Double = 0.0,
-    val ts: Long = 0L,
-    val rt: Long = 0L,
-    val accuracy: Double = 0.0,
-    val maxAccuracy: Double = 0.0
-)
+class EngineGeoPoint(
+    var lat: Double = 0.0, 
+    var lng: Double = 0.0, 
+    var alt: Double = 0.0,
+    var ts: Long = 0L,
+    var rt: Long = 0L,
+    var accuracy: Double = 0.0,
+    var maxAccuracy: Double = 0.0
+) {
+    fun update(lat: Double, lng: Double, alt: Double = 0.0, ts: Long = 0L, rt: Long = 0L, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
+        this.lat = lat; this.lng = lng; this.alt = alt; this.ts = ts; this.rt = rt; this.accuracy = accuracy; this.maxAccuracy = maxAccuracy
+    }
+}
 
 @Serializable
 enum class TrackerState { MOVING, PARKING, JUMPING, OFFLINE, UNKNOWN }
@@ -285,18 +285,57 @@ interface SpatialAnchor {
     val rt: Long
 }
 
+/**
+ * Issue #668: Converted to mutable class for object pooling.
+ */
 @Serializable
-data class ViolationReport(
-    val type: String, 
-    val title: String, 
-    val subtitle: String, 
-    val conditionMet: Boolean,
-    val technicalDetails: String? = null, 
-    val extremeValue: Double? = null
-)
+class ViolationReport(
+    var type: String = "", 
+    var title: String = "", 
+    var subtitle: String = "", 
+    var conditionMet: Boolean = false,
+    var technicalDetails: String? = null, 
+    var extremeValue: Double? = null
+) {
+    fun reset() {
+        type = ""; title = ""; subtitle = ""; conditionMet = false; technicalDetails = null; extremeValue = null
+    }
 
+    fun update(
+        type: String, title: String, subtitle: String, conditionMet: Boolean,
+        technicalDetails: String? = null, extremeValue: Double? = null
+    ) {
+        this.type = type
+        this.title = title
+        this.subtitle = subtitle
+        this.conditionMet = conditionMet
+        this.technicalDetails = technicalDetails
+        this.extremeValue = extremeValue
+    }
+}
+
+/**
+ * Issue #668: Converted to mutable class for zero-churn emissions.
+ */
 @Serializable
-data class SystemHealthReport(val reports: List<ViolationReport>)
+class SystemHealthReport(val reports: MutableList<ViolationReport> = mutableListOf()) {
+    fun reset() {
+        reports.forEach { it.reset() }
+    }
+
+    fun getOrCreate(index: Int): ViolationReport {
+        while (reports.size <= index) {
+            reports.add(ViolationReport())
+        }
+        return reports[index]
+    }
+
+    fun truncate(size: Int) {
+        while (reports.size > size) {
+            reports.removeAt(reports.size - 1)
+        }
+    }
+}
 
 @Serializable
 data class AlarmHistory(
@@ -307,43 +346,109 @@ data class AlarmHistory(
     var firstViolationWasJump: Boolean = false
 )
 
-data class AlarmEvaluationState(
-    val now: Long,
-    val nowRt: Long,
-    val serviceStartTime: Long, 
-    val serviceStartRt: Long,
-    val lastAlarmAckTs: Long, 
-    val appStartTime: Long,
-    val isRelayConnected: Boolean, 
-    val isTrackerConnected: Boolean, 
-    val discoveryPhase: DiscoveryPhase?,
-    val trackerLat: Double, 
-    val trackerLng: Double, 
-    val trackerGpsAccuracy: Double,
-    val maxTrackerAccuracy: Double,
-    val lastGpsPacketTs: Long,
-    val lastGpsPacketRt: Long = 0L,
-    val trackerLastValidFixTs: Long = 0L, 
-    val trackerLastValidFixRt: Long = 0L,
-    val trackerSpeed: Double = 0.0,
-    val jumpTier: Int = 0,
-    val isAdaptiveJump: Boolean = false,
-    val trackerBattery: Int, 
-    val trackerTemp: Double,
+/**
+ * AlarmEvaluationState: Flyweight for zero-churn alarm logic.
+ * Aug.01.10: Refactored to mutable class.
+ */
+class AlarmEvaluationState(
+    var now: Long = 0L,
+    var nowRt: Long = 0L,
+    var serviceStartTime: Long = 0L, 
+    var serviceStartRt: Long = 0L,
+    var lastAlarmAckTs: Long = 0L, 
+    var appStartTime: Long = 0L,
+    var isRelayConnected: Boolean = false, 
+    var isTrackerConnected: Boolean = false, 
+    var discoveryPhase: DiscoveryPhase? = null,
+    var trackerLat: Double = 0.0, 
+    var trackerLng: Double = 0.0, 
+    var trackerGpsAccuracy: Double = 0.0,
+    var maxTrackerAccuracy: Double = 0.0,
+    var lastGpsPacketTs: Long = 0L,
+    var lastGpsPacketRt: Long = 0L,
+    var trackerLastValidFixTs: Long = 0L, 
+    var trackerLastValidFixRt: Long = 0L,
+    var trackerSpeed: Double = 0.0,
+    var jumpTier: Int = 0,
+    var isAdaptiveJump: Boolean = false,
+    var trackerBattery: Int = 100, 
+    var trackerTemp: Double = 0.0,
     var wasDistanceViolated: Boolean = false, 
     var distanceViolationCounter: Int = 0, 
     var firstViolationTs: Long = 0L, 
     var firstViolationRt: Long = 0L,
     var firstViolationWasJump: Boolean = false,
-    val homePoints: List<EngineGeoPoint> = emptyList(),
-    val maxDistance: Double = 60.0,
-    val distToHomeAuthority: Double? = null,
-    val isGpsGap: Boolean = false,
-    val trackerBaroAltEma: Double = 0.0,
-    val isTrackerMode: Boolean = true,
+    var homePoints: MutableList<EngineGeoPoint> = mutableListOf(),
+    var maxDistance: Double = 60.0,
+    var distToHomeAuthority: Double? = null,
+    var isGpsGap: Boolean = false,
+    var trackerBaroAltEma: Double = 0.0,
+    var isTrackerMode: Boolean = true,
     val health: SystemHealthState = SystemHealthState(),
-    val capabilities: HardwareCapabilities = HardwareCapabilities()
-)
+    var capabilities: HardwareCapabilities = HardwareCapabilities()
+) {
+    fun update(
+        now: Long, nowRt: Long, serviceStartTime: Long, serviceStartRt: Long,
+        lastAlarmAckTs: Long, appStartTime: Long, isRelayConnected: Boolean,
+        isTrackerConnected: Boolean, discoveryPhase: DiscoveryPhase?,
+        trackerLat: Double, trackerLng: Double, trackerGpsAccuracy: Double,
+        maxTrackerAccuracy: Double, lastGpsPacketTs: Long, lastGpsPacketRt: Long,
+        trackerLastValidFixTs: Long, trackerLastValidFixRt: Long, trackerSpeed: Double,
+        jumpTier: Int, isAdaptiveJump: Boolean, trackerBattery: Int, trackerTemp: Double,
+        wasDistanceViolated: Boolean, distanceViolationCounter: Int,
+        firstViolationTs: Long, firstViolationRt: Long, firstViolationWasJump: Boolean,
+        maxDistance: Double,
+        distToHomeAuthority: Double?, isGpsGap: Boolean, trackerBaroAltEma: Double,
+        isTrackerMode: Boolean, capabilities: HardwareCapabilities
+    ) {
+        this.now = now
+        this.nowRt = nowRt
+        this.serviceStartTime = serviceStartTime
+        this.serviceStartRt = serviceStartRt
+        this.lastAlarmAckTs = lastAlarmAckTs
+        this.appStartTime = appStartTime
+        this.isRelayConnected = isRelayConnected
+        this.isTrackerConnected = isTrackerConnected
+        this.discoveryPhase = discoveryPhase
+        this.trackerLat = trackerLat
+        this.trackerLng = trackerLng
+        this.trackerGpsAccuracy = trackerGpsAccuracy
+        this.maxTrackerAccuracy = maxTrackerAccuracy
+        this.lastGpsPacketTs = lastGpsPacketTs
+        this.lastGpsPacketRt = lastGpsPacketRt
+        this.trackerLastValidFixTs = trackerLastValidFixTs
+        this.trackerLastValidFixRt = trackerLastValidFixRt
+        this.trackerSpeed = trackerSpeed
+        this.jumpTier = jumpTier
+        this.isAdaptiveJump = isAdaptiveJump
+        this.trackerBattery = trackerBattery
+        this.trackerTemp = trackerTemp
+        this.wasDistanceViolated = wasDistanceViolated
+        this.distanceViolationCounter = distanceViolationCounter
+        this.firstViolationTs = firstViolationTs
+        this.firstViolationRt = firstViolationRt
+        this.firstViolationWasJump = firstViolationWasJump
+        this.maxDistance = maxDistance
+        this.distToHomeAuthority = distToHomeAuthority
+        this.isGpsGap = isGpsGap
+        this.trackerBaroAltEma = trackerBaroAltEma
+        this.isTrackerMode = isTrackerMode
+        this.capabilities = capabilities
+    }
+
+    fun getOrCreateHomePoint(index: Int): EngineGeoPoint {
+        while (homePoints.size <= index) {
+            homePoints.add(EngineGeoPoint())
+        }
+        return homePoints[index]
+    }
+
+    fun truncateHomePoints(size: Int) {
+        while (homePoints.size > size) {
+            homePoints.removeAt(homePoints.size - 1)
+        }
+    }
+}
 
 /**
  * Issue #653: Refactored to mutable class for zero-churn results.

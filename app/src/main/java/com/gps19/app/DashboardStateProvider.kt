@@ -7,10 +7,10 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard states.
+ * Aug.01.10:
+ * - Issue #668: Performance: Object Churn. Fixed smart-cast issue with mutable gnssDetail.
  * July.28.24:
- * - Issue #621: UseCase Internalization Audit. Refactored to accept partitioned 
- *   KinematicState and DiagnosticState, completing the transition from TelemetryState.
- * - Issue #619: Dashboard Pipeline Optimization. Optimized SNR calculation.
+ * - Issue #621: UseCase Internalization Audit.
  */
 interface DashboardStateProvider {
     fun buildDashboardState(
@@ -73,8 +73,9 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         val isTelemetryVisible = telemetryAge < SENSOR_GRACE_PERIOD_MS
         val isForensicFresh = telemetryAge < WATCH_DOG_UI_GRACE_MS
 
-        val snrValue = if (loc.gnssDetail != null && isTelemetryVisible) {
-            val satellites = loc.gnssDetail.satellites
+        val gnss = loc.gnssDetail
+        val snrValue = if (gnss != null && isTelemetryVisible) {
+            val satellites = gnss.satellites
             if (satellites.isEmpty()) "--"
             else {
                 var sum = 0.0

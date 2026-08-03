@@ -27,12 +27,11 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Aug.01.10:
+ * - Issue #668: Performance: Object Churn. Implemented flyweight for EngineConnectionPoint 
+ *   to eliminate per-tick allocations in updateRibbons (R-HARDWARE-01).
  * July.30.48:
- * - Issue #653: Performance: GC Churn Optimization. Refactored updateRibbons 
- *   and backfill paths to use TelemetryAggregator callback API, eliminating 
- *   List and Pair allocations in the high-frequency telemetry path (R-HARDWARE-01).
- * July.30.31:
- * - Issue #632: Analytical Ribbons: Recovery Markers.
+ * - Issue #653: Performance: GC Churn Optimization.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -59,6 +58,10 @@ class HistoryManager @Inject constructor(
     private var clockDriftRef: Long = 0L
     private val aggregator = TelemetryAggregator()
     
+    // Issue #668: Flyweight to eliminate tick-level allocation
+    private val currentPointFlyweight = EngineConnectionPoint()
+    private val baseTemplateFlyweight = EngineConnectionPoint()
+
     private var backfillAuditCount = 0
     private var hourlyBackfillTotal = 0
     private var lastAuditTs = 0L
@@ -117,21 +120,22 @@ class HistoryManager @Inject constructor(
             )
         }
 
-        val currentPoint = EngineConnectionPoint(
-            ts = now, rt = nowRt, rtt = rtt, remoteSig = peerSignal, isConnected = peerAvail, isGap = false,
-            isRecoveryEvent = isRecoveryEvent,
-            hasGps = hasGps, accuracy = accuracy, maxAccuracy = maxAccuracy, gpsIndex = 0.0,
-            noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, proxIdx = proxIdx,
-            liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx, baroIdx = baroIdx,
-            isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt),
-            isSitActive = isSitActive, verticalVelocity = verticalVelocity, sitVz = sitVz,
-            sitVzTs = sitVzTs, sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt,
-            sitShock = sitShock, isBatterySteepDischarge = isBatterySteepDischarge,
-            isCoolingModeActive = isCoolingModeActive, speed = speed, bearing = bearing, isTick = false,
-            currentMa = currentMa, locationPendingReason = locationPendingReason, kineticEnergy = kineticEnergy
-        )
+        // Issue #668: Reusing flyweight
+        currentPointFlyweight.apply {
+            ts = now; rt = nowRt; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; isGap = false
+            this.isRecoveryEvent = isRecoveryEvent
+            this.hasGps = hasGps; this.accuracy = accuracy; this.maxAccuracy = maxAccuracy; gpsIndex = 0.0
+            this.noiseIdx = noiseIdx; this.luxIdx = luxIdx; this.vibeIdx = vibeIdx; this.proxIdx = proxIdx
+            this.liftIdx = liftIdx; this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
+            this.isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt)
+            this.isSitActive = isSitActive; this.verticalVelocity = verticalVelocity; this.sitVz = sitVz
+            this.sitVzTs = sitVzTs; this.sitVzRt = sitVzRt; this.sitDz = sitDz; this.sitBaro = sitBaro
+            this.sitTilt = sitTilt; this.sitShock = sitShock; this.isBatterySteepDischarge = isBatterySteepDischarge
+            this.isCoolingModeActive = isCoolingModeActive; this.speed = speed; this.bearing = bearing; isTick = false
+            this.currentMa = currentMa; this.locationPendingReason = locationPendingReason; this.kineticEnergy = kineticEnergy
+        }
         
-        aggregator.processPoint(currentPoint) { scale, point ->
+        aggregator.processPoint(currentPointFlyweight) { scale, point ->
             repository.addHistoryPoint(scale.key, mapToAppPoint(point))
         }
 
@@ -162,21 +166,23 @@ class HistoryManager @Inject constructor(
         val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
         val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
         
-        val baseTemplate = EngineConnectionPoint(
-            ts = 0L, rt = 0L, rtt = rtt, remoteSig = peerSignal, isConnected = peerAvail, hasGps = hasGps,
-            isRecoveryEvent = isRecoveryEvent,
-            accuracy = accuracy, maxAccuracy = maxAccuracy, noiseIdx = noiseIdx, luxIdx = luxIdx,
-            vibeIdx = vibeIdx, proxIdx = proxIdx, liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx,
-            baroIdx = baroIdx, verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs,
-            sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
-            isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt), isSitActive = isSitActive,
-            isBatterySteepDischarge = isBatterySteepDischarge, isCoolingModeActive = isCoolingModeActive,
-            speed = speed, bearing = bearing, currentMa = currentMa, locationPendingReason = locationPendingReason, kineticEnergy = kineticEnergy
-        )
+        // Issue #668: Reusing baseTemplate flyweight
+        baseTemplateFlyweight.apply {
+            ts = 0L; rt = 0L; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; this.hasGps = hasGps
+            this.isRecoveryEvent = isRecoveryEvent
+            this.accuracy = accuracy; this.maxAccuracy = maxAccuracy; this.noiseIdx = noiseIdx; this.luxIdx = luxIdx
+            this.vibeIdx = vibeIdx; this.proxIdx = proxIdx; this.liftIdx = liftIdx; this.snrIdx = snrIdx; this.tiltIdx = tiltIdx
+            this.baroIdx = baroIdx; this.verticalVelocity = verticalVelocity; this.sitVz = sitVz; this.sitVzTs = sitVzTs
+            this.sitVzRt = sitVzRt; this.sitDz = sitDz; this.sitBaro = sitBaro; this.sitTilt = sitTilt; this.sitShock = sitShock
+            this.isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt)
+            this.isSitActive = isSitActive; this.isBatterySteepDischarge = isBatterySteepDischarge
+            this.isCoolingModeActive = isCoolingModeActive; this.speed = speed; this.bearing = bearing
+            this.currentMa = currentMa; this.locationPendingReason = locationPendingReason; this.kineticEnergy = kineticEnergy
+        }
         
         val fourMPoints = ArrayList<ConnectionPoint>()
         
-        aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplate) { scale, point ->
+        aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplateFlyweight) { scale, point ->
             val appPoint = mapToAppPoint(point)
             if (scale == RibbonScale.FOUR_MIN) { 
                 fourMPoints.add(appPoint) 

@@ -8,10 +8,9 @@ import kotlin.math.ceil
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
- * July.26.04:
- * - Performance Audit Alignment: Updated to support new detectViolations signature.
- * July.21.00:
- * - Forensic Alignment: Aligned with flattened AlarmEvaluationState (Issue #102).
+ * Aug.03.37:
+ * - Issue #669: Refactored to eliminate .copy() usage and fix callback signatures 
+ *   following zero-churn transition.
  */
 class MainAlarmLogicTest {
 
@@ -20,9 +19,12 @@ class MainAlarmLogicTest {
         override fun currentTimeMillis(): Long = 1700000000000L
     }
 
+    private val spikeLogger: (String, Long) -> Unit = { _, _ -> }
+
     private fun createDefaultState(now: Long = 1700000000000L): AlarmEvaluationState {
         val nowRt = 100000L
-        return AlarmEvaluationState(
+        val state = AlarmEvaluationState()
+        state.update(
             now = now,
             nowRt = nowRt,
             serviceStartTime = now - 60000, 
@@ -34,14 +36,15 @@ class MainAlarmLogicTest {
             discoveryPhase = DiscoveryPhase.MONITORING,
             trackerLat = 10.0,
             trackerLng = 10.0,
-            homePoints = listOf(EngineGeoPoint(10.0, 10.0)),
-            maxDistance = 100.0,
             trackerGpsAccuracy = 5.0,
             maxTrackerAccuracy = 5.0,
-            trackerLastValidFixTs = now,
-            trackerLastValidFixRt = nowRt,
             lastGpsPacketTs = now,
             lastGpsPacketRt = nowRt,
+            trackerLastValidFixTs = now,
+            trackerLastValidFixRt = nowRt,
+            trackerSpeed = 0.0,
+            jumpTier = 0,
+            isAdaptiveJump = false,
             trackerBattery = 100,
             trackerTemp = 30.0,
             wasDistanceViolated = false,
@@ -49,16 +52,11 @@ class MainAlarmLogicTest {
             firstViolationTs = 0L,
             firstViolationRt = 0L,
             firstViolationWasJump = false,
+            maxDistance = 100.0,
+            distToHomeAuthority = null,
+            isGpsGap = false,
+            trackerBaroAltEma = 0.0,
             isTrackerMode = true,
-            health = SystemHealthState(
-                isHardwareOnline = true,
-                localInternetLoss = false,
-                isJammer = false,
-                signalLoss = false,
-                gpsStalled = false,
-                batteryLevel = 100,
-                batteryTemp = 30.0
-            ),
             capabilities = HardwareCapabilities(
                 hasBackgroundRestriction = false,
                 backgroundStatus = CapabilityStatus.GRANTED,
@@ -66,29 +64,51 @@ class MainAlarmLogicTest {
                 isManualOverrideActive = false
             )
         )
+        // Initialize health specifically
+        state.health.apply {
+            isHardwareOnline = true
+            localInternetLoss = false
+            isJammer = false
+            signalLoss = false
+            gpsStalled = false
+            batteryLevel = 100
+            batteryTemp = 30.0
+            status = SentinelStatus.VALID
+            isTamperDetected = false
+            isNear = true
+            lux = 0.0
+            luxBaseline = 0.0
+            acousticDb = 0.0
+            acousticFloorDb = 0.0
+            peakVibrationShock = 0.0
+            adaptiveVibrationFloor = 0.12
+            tiltDegrees = 0.0
+        }
+        state.truncateHomePoints(0)
+        state.getOrCreateHomePoint(0).update(10.0, 10.0)
+        return state
     }
 
     @Test
     fun `Verify healthy state has no violations`() {
         val state = createDefaultState()
-        val report = MainAlarmLogic.detectViolations(state, mockTimeProvider, {})
+        val report = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
         assertTrue(report.reports.none { it.conditionMet })
     }
 
     @Test
     fun `Verify Geofence breach detection`() {
         val now = 1700000000000L
-        val breachedState = createDefaultState(now).apply {
+        val state = createDefaultState(now).apply {
             distanceViolationCounter = DISTANCE_ALARM_SAMPLES_REQUIRED
             firstViolationTs = now - 10000
-        }.let { 
-            it.copy(
-                trackerLat = 10.005, // ~550m away
-                trackerLng = 10.005
-            )
+            trackerLat = 10.005 // ~550m away
+            trackerLng = 10.005
         }
         
-        val report = MainAlarmLogic.detectViolations(breachedState, mockTimeProvider, {})
+        val report = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         assertTrue("Geofence should be violated", geofence?.conditionMet == true)
     }
@@ -98,16 +118,17 @@ class MainAlarmLogicTest {
         val now = 1700000000000L
         val nowRt = 100000L
         
-        val stateWithGap = createDefaultState(now + 10000).copy(
-            nowRt = nowRt + 10000,
-            trackerLat = 10.002, // ~220m away.
-            trackerLastValidFixTs = now,
-            trackerLastValidFixRt = nowRt,
-            trackerSpeed = 20.0,
-            health = SystemHealthState(isLocationPending = true)
-        )
+        val state = createDefaultState(now + 10000).apply {
+            nowRt = 100000L + 10000
+            trackerLat = 10.002 // ~220m away.
+            trackerLastValidFixTs = now
+            trackerLastValidFixRt = nowRt
+            trackerSpeed = 20.0
+            health.isLocationPending = true
+        }
         
-        val report = MainAlarmLogic.detectViolations(stateWithGap, mockTimeProvider, {})
+        val report = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         
         assertFalse("Geofence should be suppressed by Bayesian expansion during gap", geofence?.conditionMet == true)
@@ -117,42 +138,49 @@ class MainAlarmLogicTest {
     fun `Verify Jump hold duration`() {
         val now = 1700000000000L
         val nowRt = 100000L
-        val baseState = createDefaultState(now).copy(
-            trackerLat = 10.005, // ~550m away (Violation)
-            jumpTier = 2,
-            firstViolationTs = now,
-            firstViolationRt = nowRt,
-            firstViolationWasJump = true,
-            isAdaptiveJump = true,
-            health = SystemHealthState(status = SentinelStatus.JUMP)
-        )
+        val state = createDefaultState(now).apply {
+            trackerLat = 10.005 // ~550m away (Violation)
+            jumpTier = 2
+            firstViolationTs = now
+            firstViolationRt = nowRt
+            firstViolationWasJump = true
+            isAdaptiveJump = true
+            health.status = SentinelStatus.JUMP
+        }
 
-        val stateAt2Min = baseState.copy(now = now + 120000, nowRt = nowRt + 120000)
-        val report1 = MainAlarmLogic.detectViolations(stateAt2Min, mockTimeProvider, {})
+        // Test at 2 min
+        state.now = now + 120000
+        state.nowRt = nowRt + 120000
+        val report1 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, spikeLogger)
         assertFalse("Adaptive jump should be latched for 6 mins", 
             report1.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
 
-        val stateAt7Min = baseState.copy(now = now + 420000, nowRt = nowRt + 420000)
-        val report3 = MainAlarmLogic.detectViolations(stateAt7Min, mockTimeProvider, {})
+        // Test at 7 min
+        state.now = now + 420000
+        state.nowRt = nowRt + 420000
+        val report2 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, spikeLogger)
         assertTrue("Adaptive jump latch should expire after 6 mins", 
-            report3.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
+            report2.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
     }
 
     @Test
     fun `Verify Hardware Boot Grace suppresses alarms`() {
         val now = 1700000000000L
         val nowRt = 100000L
-        val stateInGrace = createDefaultState(now).copy(
+        val state = createDefaultState(now).apply {
             capabilities = HardwareCapabilities(
                 hasBackgroundRestriction = true,
                 backgroundStatus = CapabilityStatus.DENIED,
                 autostartStatus = CapabilityStatus.DENIED
-            ),
-            serviceStartRt = nowRt - 10000, 
-            nowRt = nowRt
-        )
+            )
+            serviceStartRt = nowRt - 10000
+            this.nowRt = nowRt
+        }
         
-        val report = MainAlarmLogic.detectViolations(stateInGrace, mockTimeProvider, {})
+        val report = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
         val alert = report.reports.find { it.type == ALERT_ID_HARDWARE_CONFIGURATION }
         assertFalse("Alert should be suppressed during boot grace period", alert?.conditionMet == true)
     }
@@ -160,13 +188,14 @@ class MainAlarmLogicTest {
     @Test
     fun `Verify Geofence Predictive Exit trigger`() {
         val now = 1700000000000L
-        val state = createDefaultState(now).copy(
-            trackerLat = 10.0011, // ~120m away
-            trackerSpeed = 5.0,
-            maxDistance = 100.0,
+        val state = createDefaultState(now).apply {
+            trackerLat = 10.0011 // ~120m away
+            trackerSpeed = 5.0
+            maxDistance = 100.0
             lastGpsPacketRt = 100000L
-        )
-        val report = MainAlarmLogic.detectViolations(state, mockTimeProvider, {})
+        }
+        val report = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         assertTrue(geofence?.conditionMet == true)
         assertTrue(geofence?.technicalDetails?.contains("PREDICTIVE EXIT") == true)
@@ -174,13 +203,12 @@ class MainAlarmLogicTest {
 
     @Test
     fun `Verify Tamper extreme values`() {
-        val state = createDefaultState().copy(
-            health = SystemHealthState(
-                tiltDegrees = 45.0,
-                peakVibrationShock = 0.5
-            )
-        )
-        val report = MainAlarmLogic.detectViolations(state, mockTimeProvider, {})
+        val state = createDefaultState().apply {
+            health.tiltDegrees = 45.0
+            health.peakVibrationShock = 0.5
+        }
+        val report = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
         val tamper = report.reports.find { it.type == ALERT_ID_TRACKER_TAMPER }
         assertTrue(tamper?.conditionMet == true)
         assertEquals(45.0, tamper?.extremeValue ?: 0.0, 0.1)

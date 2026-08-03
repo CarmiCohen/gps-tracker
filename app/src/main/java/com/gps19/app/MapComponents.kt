@@ -38,14 +38,11 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * July.30.657:
- * - Issue #657: Compose Snapshot Lock Failure (#663 Regression). Enforced strict 
- *   decoupling by converting SnapshotStateList to static toList() snapshots 
- *   before imperative MapOverlayManager processing. Eliminates conditionalUpdate 
- *   lock contention on budget hardware (R-HARDWARE-01).
- * July.31.01:
- * - Issue #657: Compose Snapshot Lock Failure. Wrapped AndroidView update block 
- *   in Snapshot.withoutReadObservation.
+ * July.30.663:
+ * - Issue #663: Snapshot State Lock Failure. Enforced strict decoupling by 
+ *   converting SnapshotStateList to static toList() snapshots before 
+ *   imperative MapOverlayManager processing. Eliminates lock contention 
+ *   during high-frequency telemetry updates.
  */
 
 @Composable
@@ -321,9 +318,9 @@ fun OsmMap(
             })
         } 
     }, update = { view ->
-        // Issue #657 (#663 Regression): Decouple SnapshotStateList from imperative processing.
-        // Convert to plain toList() snapshots outside the update loop to eliminate 
-        // lock contention for conditionalUpdate during high-frequency telemetry.
+        // Issue #663: Decouple SnapshotStateList from imperative processing.
+        // Convert to static toList() snapshots outside the update loop to eliminate 
+        // lock contention during high-frequency telemetry.
         val sTrail = trail.toList()
         val sViewerTrail = viewerTrail.toList()
         val sViolations = violations.toList()
@@ -353,7 +350,6 @@ fun OsmMap(
                     viewerLastValidFixRt = viewerHealth.lastValidFixRt,
                     systemPulseRt = systemPulseRt
                 )
-                // Issue #641: Conditionally invalidate only if overlays actually changed.
                 if (h || t || v || p) {
                     view.invalidate()
                 }

@@ -26,11 +26,11 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.01.10:
+ * - Issue #668: Performance: Object Churn. Refactored to use mutable flyweight 
+ *   updates for SystemHealthState to eliminate allocation churn (R-HARDWARE-01).
  * July.30.45:
- * - Issue #654: Performance Hardening. Refactored network audits to use 
- *   SystemStatusProvider (throttled IPC) to prevent main-thread stalls (R650).
- * July.30.43:
- * - Issue #649 & #650: Hardened checkInternetIntegrity.
+ * - Issue #654: Performance Hardening.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -75,7 +75,7 @@ class IntegrityMonitor @Inject constructor(
             systemStatusProvider.observeInternetStatus()
                 .onEach { online -> 
                     lastInternetUpdateRt = timeProvider.elapsedRealtime()
-                    updateHealth { it.copy(isHardwareOnline = online) } 
+                    updateHealth { it.isHardwareOnline = online } 
                 }
                 .collect()
         }
@@ -145,16 +145,17 @@ class IntegrityMonitor @Inject constructor(
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
         }
 
-        updateHealth { it.copy(lastIntegrityHeartbeatRt = nowRt) }
+        updateHealth { it.lastIntegrityHeartbeatRt = nowRt }
     }
 
-    private fun updateHealth(transform: (SystemHealthState) -> SystemHealthState) {
+    /**
+     * updateHealth: Performs in-place mutation of flyweight state and notifies repository.
+     */
+    private fun updateHealth(mutator: (SystemHealthState) -> Unit) {
         _health.update { current ->
-            val next = transform(current)
-            if (next != current) {
-                repository.updateHealth(next)
-            }
-            next
+            mutator(current)
+            repository.updateHealth(current)
+            current
         }
     }
 
@@ -174,13 +175,13 @@ class IntegrityMonitor @Inject constructor(
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("GPS STALL: Hardware fix has not updated despite satellite visibility.", true))
         }
 
-        updateHealth { it.copy(
-            isLocationPending = status.isPending,
-            locationPendingReason = status.reason,
-            lastValidFixRt = status.lastFixRt,
-            lastLocationPendingDurationMs = status.lastPendingDurationMs,
-            gpsStalled = isStalled
-        ) }
+        updateHealth { h ->
+            h.isLocationPending = status.isPending
+            h.locationPendingReason = status.reason
+            h.lastValidFixRt = status.lastFixRt
+            h.lastLocationPendingDurationMs = status.lastPendingDurationMs
+            h.gpsStalled = isStalled
+        }
     }
 
     private fun handleBatteryUpdate(status: BatteryStatus) {
@@ -219,15 +220,15 @@ class IntegrityMonitor @Inject constructor(
             isSteepDischarge = false
         }
 
-        updateHealth { it.copy(
-            batteryLevel = status.level,
-            batteryTemp = batteryTemp,
-            maxTemp = maxTemp,
-            isCharging = isCharging,
-            isCoolingModeActive = isCooling,
-            isBatterySteepDischarge = isSteepDischarge,
-            currentMa = status.currentMa
-        ) }
+        updateHealth { h ->
+            h.batteryLevel = status.level
+            h.batteryTemp = batteryTemp
+            h.maxTemp = maxTemp
+            h.isCharging = isCharging
+            h.isCoolingModeActive = isCooling
+            h.isBatterySteepDischarge = isSteepDischarge
+            h.currentMa = status.currentMa
+        }
     }
 
     private fun handleStorageUpdate(status: StorageStatus) {
@@ -252,10 +253,10 @@ class IntegrityMonitor @Inject constructor(
             }
         }
 
-        updateHealth { it.copy(
-            isStorageLow = low,
-            isStorageCritical = critical
-        ) }
+        updateHealth { h ->
+            h.isStorageLow = low
+            h.isStorageCritical = critical
+        }
     }
 
     private fun handlePowerUpdate(status: PowerStatus) {
@@ -290,10 +291,10 @@ class IntegrityMonitor @Inject constructor(
             }
         }
 
-        updateHealth { it.copy(
-            isPowerSaveMode = powerSave,
-            standbyBucket = bucket
-        ) }
+        updateHealth { h ->
+            h.isPowerSaveMode = powerSave
+            h.standbyBucket = bucket
+        }
     }
 
     suspend fun pollSystemStatus(nowWall: Long, nowRt: Long) {
@@ -303,7 +304,6 @@ class IntegrityMonitor @Inject constructor(
 
         val workingHealth = currentHealth
         
-        // Issue #654: Use SystemStatusProvider's throttled audit.
         val newNet = systemStatusProvider.getNetworkInterface()
         if (newNet != workingHealth.netInterface) {
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Network switched to $newNet", false))
@@ -317,10 +317,10 @@ class IntegrityMonitor @Inject constructor(
             }
         }
 
-        updateHealth { it.copy(
-            netInterface = newNet,
-            isPowerTamper = isPowerTamper
-        ) }
+        updateHealth { h ->
+            h.netInterface = newNet
+            h.isPowerTamper = isPowerTamper
+        }
     }
 
     private fun checkBatteryDischarge(nowRt: Long): Boolean {
@@ -345,7 +345,7 @@ class IntegrityMonitor @Inject constructor(
     }
 
     fun setMaxTemperature(temp: Double) {
-        updateHealth { it.copy(maxTemp = temp) }
+        updateHealth { it.maxTemp = temp }
     }
 
     suspend fun isInternetHardwarePresent(): Boolean {
@@ -364,12 +364,12 @@ class IntegrityMonitor @Inject constructor(
             val firstDetected = sustainedViolations.getOrPut(ALERT_ID_LOCAL_INTERNET) { now }
             if (now - firstDetected > INTERNET_LOSS_THRESHOLD_MS) {
                 _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_LOCAL_INTERNET))
-                updateHealth { it.copy(localInternetLoss = true) }
+                updateHealth { it.localInternetLoss = true }
                 return false
             }
         } else {
             sustainedViolations.remove(ALERT_ID_LOCAL_INTERNET)
-            updateHealth { it.copy(localInternetLoss = false) }
+            updateHealth { it.localInternetLoss = false }
         }
         return true
     }
@@ -381,7 +381,7 @@ class IntegrityMonitor @Inject constructor(
             TRACKER_SIGNAL_LOSS_THRESHOLD_MS
         }
         val loss = silenceDelta > threshold
-        updateHealth { it.copy(signalLoss = loss) }
+        updateHealth { it.signalLoss = loss }
         return !loss
     }
 
@@ -403,21 +403,25 @@ class IntegrityMonitor @Inject constructor(
     fun onPowerConnected() {
         lastPowerDisconnectTs = 0L
         if (currentHealth.isPowerTamper) {
-            updateHealth { it.copy(isPowerTamper = false) }
+            updateHealth { it.isPowerTamper = false }
             _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_POWER))
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Tracker power restored", false))
         }
     }
 
     fun clearPowerTamper() {
-        updateHealth { it.copy(isPowerTamper = false) }
+        updateHealth { it.isPowerTamper = false }
         _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_POWER))
         lastPowerDisconnectTs = 0L
     }
 
     fun resetStats() {
         sustainedViolations.clear()
-        _health.value = SystemHealthState()
+        _health.update { h ->
+            h.copyFrom(SystemHealthState())
+            repository.updateHealth(h)
+            h
+        }
         lastPowerDisconnectTs = 0L
         batterySamples.clear()
         lastFullPollTs = 0L

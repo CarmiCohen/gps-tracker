@@ -9,11 +9,11 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Aug.03.37:
+ * - Issue #669: Forensic Audit: Database I/O Contention. Added logForensicTrace 
+ *   to utilize MappedByteBuffer spill-buffer for high-frequency diagnostics.
  * July.28.24:
  * - Issue #621: Alignment of isImportant naming for Boolean consistency.
- * July.27.00:
- * - Issue #596: Signaling Reliability Audit. Promoted Important/Special logs to HIGH 
- *   priority to ensure Alarms and Tamper events bypass forensic log throttling.
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -26,13 +26,34 @@ class LogManager @Inject constructor(
     private var sessionStartTs = 0L
     private val isLoggingInProgress = AtomicBoolean(false)
 
-    // Issue #121: Cache the provider result to avoid repeated lookup overhead in high-frequency paths.
     private val connectivitySuite: ConnectivitySuite by lazy(LazyThreadSafetyMode.PUBLICATION) {
         connectivitySuiteProvider.get()
     }
 
     fun startNewSession() {
         sessionStartTs = timeProvider.currentTimeMillis()
+    }
+
+    /**
+     * logForensicTrace: Routes high-frequency traces to the off-heap spill-buffer.
+     * Bypasses standard log batching and SQLite hot-path to prevent Davey stalls.
+     */
+    fun logForensicTrace(message: String, lat: Double = 0.0, lng: Double = 0.0, accuracy: Double = 0.0) {
+        val now = timeProvider.currentTimeMillis()
+        val log = LogEntry(
+            localId = UUID.randomUUID().toString(),
+            timestamp = now,
+            message = message,
+            type = "FORENSIC_TRACE",
+            isImportant = false,
+            id = configManager.deviceId,
+            viewerId = configManager.viewerId,
+            role = if (configManager.isTrackerMode) "tracker" else "viewer",
+            lat = lat,
+            lng = lng,
+            accuracy = accuracy
+        )
+        logRepository.addLog(log)
     }
 
     fun submitToLogSink(
@@ -51,7 +72,6 @@ class LogManager @Inject constructor(
         snr: Double? = null,
         vibe: Double? = null
     ) {
-        // R998: Prevent recursion if Timber.e triggers another log during this execution
         if (!isLoggingInProgress.compareAndSet(false, true)) return
         
         try {
@@ -59,12 +79,9 @@ class LogManager @Inject constructor(
             val health = telemetry.systemHealth.value
             
             if (type == "hidden") return
-
             val isSuppressedByStorage = health.isStorageCritical && !isSpecial
             if (isSuppressedByStorage) return
-
             if (health.isStorageLow && !isImportant && !isSpecial) return
-
             if (type == "system" && !isImportant && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
                 return
             }
@@ -126,7 +143,6 @@ class LogManager @Inject constructor(
                 vibeSnapshot = finalVibe
             )
             
-            // Accessing the cached instance
             val suite = connectivitySuite
             val isConnected = suite.isConnected()
             
@@ -135,8 +151,6 @@ class LogManager @Inject constructor(
             }
             
             if (isConnected) {
-                // Issue #596: Critical logs (Alarms, confirmed Tampers) use HIGH priority 
-                // to bypass the forensic log throttled queue.
                 val priority = if (isImportant || isSpecial) SignalingPriority.HIGH else SignalingPriority.NORMAL
                 suite.emit("log_update", data, priority)
             }

@@ -35,13 +35,11 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * Aug.01.10:
+ * - Issue #668: Performance: Object Churn. Implemented object pooling for 
+ *   ForensicSnapshot to achieve zero-allocation in the logic hot-path.
  * July.30.48:
- * - Issue #653: Performance: GC Churn Optimization. Refactored processVibration 
- *   to use SentinelValidator primitive calculators, eliminating Pair allocation 
- *   in high-frequency accelerometer path (R-HARDWARE-01).
- * July.30.45:
- * - Issue #654: Performance Hardening. Refactored activity recognition check 
- *   to use SystemStatusProvider.
+ * - Issue #653: Performance: GC Churn Optimization.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -152,6 +150,7 @@ class AppSensorManager @Inject constructor(
     @Volatile private var isHighLoad = false
     @Volatile private var powerSaveMode = false
 
+    // Issue #668: Object Pool for zero-churn telemetry
     class ForensicSnapshot {
         var vibration = 0.0; var heading = 0.0; var baroAlt = 0.0; var lux = 0.0
         var isNear = true; var tiltDegrees = 0.0; var acousticDb = 0.0; var peakShock = 0.0
@@ -159,7 +158,19 @@ class AppSensorManager @Inject constructor(
         var plungeMatched = false; var peakVerticalDisplacement = 0.0; var proximityIdx = 1.0
         var proximityCm = 0.0; var proximityDebounceMs = 0L; var vibrationRollingSum = 0.0
         var acousticPeak = 0.0; var acousticMin = 0.0; var kineticEnergy = 0.0
+
+        fun reset() {
+            vibration = 0.0; heading = 0.0; baroAlt = 0.0; lux = 0.0
+            isNear = true; tiltDegrees = 0.0; acousticDb = 0.0; peakShock = 0.0
+            peakVerticalVelocity = 0.0; peakVerticalVelocityTs = 0L; peakVerticalVelocityRt = 0L
+            plungeMatched = false; peakVerticalDisplacement = 0.0; proximityIdx = 1.0
+            proximityCm = 0.0; proximityDebounceMs = 0L; vibrationRollingSum = 0.0
+            acousticPeak = 0.0; acousticMin = 0.0; kineticEnergy = 0.0
+        }
     }
+
+    private val snapshotPool = Array(4) { ForensicSnapshot() }
+    private var snapshotPoolIdx = 0
 
     private val bufferTs = LongArray(256); private val bufferRt = LongArray(256)
     private val bufferLux = DoubleArray(256); private val bufferVibe = DoubleArray(256)
@@ -389,7 +400,7 @@ class AppSensorManager @Inject constructor(
                         if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Init failed"))
                         try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }
                         continue 
-                    }
+                }
                     try { audioRecord.startRecording() } catch (e: IllegalStateException) {
                         if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Mic occupied"))
                         try { audioRecord.release() } catch (ex: Exception) {}
@@ -449,7 +460,12 @@ class AppSensorManager @Inject constructor(
             { message, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(message, false)) }
         ) {
             synchronized(this) {
-                val snapshot = ForensicSnapshot().apply {
+                // Issue #668: Reusing pooled snapshot instance to eliminate tick-level allocation.
+                val snapshot = snapshotPool[snapshotPoolIdx]
+                snapshotPoolIdx = (snapshotPoolIdx + 1) % snapshotPool.size
+                
+                snapshot.apply {
+                    reset()
                     vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux
                     isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = internalPeakVibration
                     peakVerticalVelocity = internalPeakVerticalVelocity; peakVerticalVelocityTs = internalPeakVerticalVelocityTs
@@ -512,7 +528,6 @@ class AppSensorManager @Inject constructor(
             if (delta > internalPeakVibration) internalPeakVibration = delta
             adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta, isWarming) 
             
-            // Issue #653: Using primitive-based kinetic energy calculators to eliminate Pair allocation.
             lastHpfValue = SentinelValidator.computeNextHpf(lastHpfValue, delta, lastRawVibe)
             currentKineticEnergy = SentinelValidator.computeNextEnergy(currentKineticEnergy, lastHpfValue)
             lastRawVibe = delta

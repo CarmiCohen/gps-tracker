@@ -14,16 +14,17 @@ import javax.inject.Inject
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Aug.01.00:
+ * - Issue #664: Forensic Audit: Startup Davey Stalls. Deferring osmdroid setup by 3s 
+ *   to clear the main-thread critical path during first-frame rendering.
  * July.31.00:
- * - Issue #656: userfaultfd mitigation. Added aggressive onTrimMemory handling 
- *   to reduce ART compaction pressure on Samsung A15 kernels.
- * July.22.04:
- * - Hilt Hardening: Standardized dependency graph.
+ * - Issue #656: userfaultfd mitigation. Added aggressive onTrimMemory handling.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -44,7 +45,6 @@ class GpsApplication : Application(), Configuration.Provider {
             Timber.plant(Timber.DebugTree())
         }
 
-        // Standardized Timber logging for critical errors
         Timber.plant(object : Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
                 if (priority >= Log.ERROR) {
@@ -52,20 +52,21 @@ class GpsApplication : Application(), Configuration.Provider {
                         val fullMessage = if (tag != null) "[$tag] $message" else message
                         val suffix = t?.let { ": ${it.stackTraceToString().take(500)}" } ?: ""
                         logManager.logServiceEvent("CRITICAL ERROR: $fullMessage$suffix", true)
-                    } catch (e: Exception) {
-                        // Fail-safe to prevent logging loops
-                    }
+                    } catch (e: Exception) {}
                 }
             }
         })
 
-        // Issue #115: Startup ANR Hardening - Offload I/O intensive setup to managed scope
+        // Issue #664: Startup ANR Hardening - Defer I/O intensive setup to avoid Davey stalls
         applicationScope.launch(Dispatchers.IO) {
             try {
                 // Issue #456: Layer 3 Watchdog - WorkManager persistence
                 MaintenanceWorker.schedule(this@GpsApplication)
 
-                // Issue #005: Deep silence for osmdroid
+                // Issue #664: Defer heavy osmdroid and SharedPreferences access to avoid 
+                // contention with DataStore and Compose initialization.
+                delay(3000)
+
                 val osmConfig = OsmConfig.getInstance()
                 osmConfig.userAgentValue = "GpsTracker/8.9.91"
                 
@@ -81,9 +82,9 @@ class GpsApplication : Application(), Configuration.Provider {
                 osmConfig.isDebugMode = false
                 osmConfig.isDebugTileProviders = false
                 
-                Timber.d("Issue #115: Managed startup initialization complete.")
+                Timber.d("Issue #664: Deferred startup initialization complete.")
             } catch (e: Exception) {
-                Timber.e(e, "Issue #115: Managed startup failed")
+                Timber.e(e, "Issue #664: Deferred startup failed")
             }
         }
 
@@ -95,14 +96,8 @@ class GpsApplication : Application(), Configuration.Provider {
         }
     }
 
-    /**
-     * Issue #656 Mitigation: Proactively release memory to minimize ART's need for 
-     * page-moving compaction which fails on Samsung A15 kernels (userfaultfd MOVE ioctl).
-     */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        Timber.w("Issue #656: onTrimMemory level $level")
-        
         if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
             trimCaches()
         }
@@ -110,22 +105,13 @@ class GpsApplication : Application(), Configuration.Provider {
 
     override fun onLowMemory() {
         super.onLowMemory()
-        Timber.e("Issue #656: Critical Low Memory. Evicting all caches.")
         trimCaches()
     }
 
     private fun trimCaches() {
         applicationScope.launch(Dispatchers.IO) {
             try {
-                // Clear osmdroid memory caches
-                // SqlTileWriter handles disk, but let's ensure we aren't holding refs
-                // We don't have direct access to internal OSM tile caches here without 
-                // more complex wiring, but we can trigger a GC hint if levels are critical.
-                
-                // If we had a global ImageLoader or custom cache, we'd clear it here.
-                // For now, logging and ensuring we aren't leaking in the Application.
-                
-                System.gc() // Hint to ART to collect now while we are likely in background
+                System.gc()
             } catch (e: Exception) {
                 Timber.e(e, "Issue #656: Cache trim failed")
             }

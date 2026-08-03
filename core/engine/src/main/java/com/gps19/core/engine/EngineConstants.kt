@@ -2,13 +2,13 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.03.37:
+ * - Issue #669: Forensic Audit: Database I/O Contention. Added constants for 
+ *   Forensic Spill-Buffer (MappedByteBuffer) to decouple high-frequency 
+ *   trace capture from DB persistence.
  * July.31.38:
  * - Issue #660: Forensic Audit: Log Buffer Pressure. Added LOG_BATCH_SIZE, 
  *   LOG_BATCH_DELAY_MS, and LOG_BUFFER_CAPACITY for optimized persistence.
- * July.30.47:
- * - Issue #658: Performance: Startup Transition Hardening. Added 
- *   STARTUP_SETTLING_DELAY_MS (3000ms) to ensure Main-thread silence 
- *   during activity transitions on budget hardware (R658).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -20,7 +20,6 @@ const val DEFAULT_LAT = 32.7940
 const val DEFAULT_LNG = 34.9896
 
 // Performance & Latency Thresholds (Issue #589, #600)
-// July.27.11: Raised for A15 Hardening
 const val LATENCY_THRESHOLD_GPS_PROCESS_MS = 100L
 const val LATENCY_THRESHOLD_SENSOR_PROCESS_MS = 50L
 const val LATENCY_THRESHOLD_ALARM_LOGIC_MS = 100L
@@ -35,6 +34,12 @@ const val LOG_LIMIT_STRICT = 5000
 const val LOG_BATCH_SIZE = 50
 const val LOG_BATCH_DELAY_MS = 2000L
 const val LOG_BUFFER_CAPACITY = 500
+
+// Issue #669: Forensic Spill-Buffer (MappedByteBuffer)
+const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"
+const val FORENSIC_SPILL_ENTRY_SIZE = 256 // Fixed-size binary entries for zero-allocation
+const val FORENSIC_SPILL_CAPACITY = 1000 // 1000 traces buffer (10 seconds at 100Hz)
+const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
 
 // Native Bridge Constants
 const val JNI_RET_EINTR = -4
@@ -213,18 +218,17 @@ const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 20000L 
 
 // Stationary Anchor Monitor (Issue #062 - R990)
-// Issue #530 Refinement: Adjusted for 5m breakout sensitivity with urban canyon hardening.
 const val PARKING_ANCHOR_MIN_DIST = 6.0
 const val PARKING_ANCHOR_FACTOR = 0.8
 const val ANCHOR_ENGAGEMENT_PROBABILITY = 0.9
 const val ANCHOR_ESCAPE_SCORE_THRESHOLD = 100.0
 const val ANCHOR_TREND_WINDOW_SIZE = 3
 const val ANCHOR_AVERAGING_WINDOW_SIZE = 8
-const val ANCHOR_TRANSITION_ZONE_START = 0.5 // Start accumulating score at 50% of threshold
+const val ANCHOR_TRANSITION_ZONE_START = 0.5 
 const val ANCHOR_VELOCITY_WEIGHT_MPS = 15.0 
-const val ANCHOR_DISPLACEMENT_WEIGHT = 8.0 // Impact of distance on breakout score
-const val ANCHOR_IMU_DAMPING_FACTOR = 0.5 // Penalty to score accumulation when IMU says stationary
-const val ANCHOR_ACCURACY_PENALTY_LIMIT = 40.0 // Accuracy threshold where displacement weight starts being penalized
+const val ANCHOR_DISPLACEMENT_WEIGHT = 8.0 
+const val ANCHOR_IMU_DAMPING_FACTOR = 0.5 
+const val ANCHOR_ACCURACY_PENALTY_LIMIT = 40.0 
 
 const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 
 
@@ -392,7 +396,6 @@ const val PROXIMITY_DEBOUNCE_MOVING_MS = 1000L
 
 // Issue #012: Adaptive Proximity Debounce
 const val PROXIMITY_DEBOUNCE_MAX_MS = 15000L
-const val PROXIMITY_STARY_SCALING_MS_PER_HOUR = 2000L
 const val PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR = 2000L
 const val PROXIMITY_STRESS_SCALING_MULTIPLIER = 2.0
 

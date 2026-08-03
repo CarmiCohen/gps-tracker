@@ -6,6 +6,8 @@ import com.gps19.core.engine.LATENCY_THRESHOLD_JNI_MS
 import com.gps19.core.engine.LatencyMonitor
 import com.gps19.core.engine.TimeProvider
 import timber.log.Timber
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlinx.coroutines.GlobalScope
@@ -14,13 +16,11 @@ import kotlinx.coroutines.Dispatchers
 
 /**
  * MbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
- * July.30.47:
- * - Issue #659: Stability: JNI Initialization Integrity. Implemented R659 with 
- *   proactive state verification and background re-initialization. Added 
- *   JNI_RET_NOT_INITIALIZED handling.
- * July.30.25:
- * - Issue #627: Performance: Startup ANR Optimization. Offloaded native library 
- *   loading to background coroutines.
+ * Aug.01.01:
+ * - Issue #667: Forensic Audit: Memory Pressure. Implemented zero-copy state path 
+ *   using DirectByteBuffer to eliminate GC churn during high-frequency JNI traffic.
+ * Aug.01.00:
+ * - Issue #664: Performance: Startup ANR Optimization.
  */
 object MbrainHardwareManager {
 
@@ -28,9 +28,14 @@ object MbrainHardwareManager {
     private val jniLock = ReentrantLock()
     private const val MAX_JNI_RETRIES = 3
 
+    // Issue #667: Shared state buffer for zero-allocation JNI sync.
+    // 64 bytes is sufficient for current diagnostic flags and heartbeat counters.
+    private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(64).apply {
+        order(ByteOrder.nativeOrder())
+    }
+
     /**
      * loadLibrary: Explicitly load the native SDK.
-     * Should be called from a background thread to avoid startup ANRs.
      */
     fun loadLibrary() {
         if (isLibraryLoaded) return
@@ -39,7 +44,10 @@ object MbrainHardwareManager {
             try {
                 System.loadLibrary("mbrainSDK")
                 isLibraryLoaded = true
-                Timber.i("libmbrainSDK loaded successfully")
+                
+                // Issue #667: Register the direct buffer immediately after load.
+                nativeRegisterSharedBuffer(sharedStateBuffer)
+                Timber.i("libmbrainSDK loaded and shared buffer registered")
             } catch (e: UnsatisfiedLinkError) {
                 Timber.e("libmbrainSDK load failed: ${e.message}")
             } catch (e: Exception) {
@@ -49,9 +57,18 @@ object MbrainHardwareManager {
     }
 
     /**
-     * executeNativeWithRetry: Hardens JNI calls against EINTR interruptions and 
-     * missing initialization state (Issue #659).
+     * syncState: Pushes current JVM state flags to native hardware layer via shared buffer.
+     * Prevents high-frequency object allocation for diagnostic updates.
      */
+    fun syncState(timeProvider: TimeProvider, heartbeatCount: Int, flags: Int): Int {
+        return executeNativeWithRetry(timeProvider, "Native syncState") {
+            sharedStateBuffer.clear()
+            sharedStateBuffer.putInt(heartbeatCount)
+            sharedStateBuffer.putInt(flags)
+            nativeSyncState()
+        }
+    }
+
     private inline fun executeNativeWithRetry(
         timeProvider: TimeProvider,
         operation: String,
@@ -123,6 +140,8 @@ object MbrainHardwareManager {
 
     fun isAvailable(): Boolean = isLibraryLoaded
 
+    @JvmStatic private external fun nativeRegisterSharedBuffer(buffer: ByteBuffer): Int
+    @JvmStatic private external fun nativeSyncState(): Int
     @JvmStatic private external fun nativeInitMbrain(deviceId: String, flags: Int): Int
     @JvmStatic private external fun nativePunchHardware(): Int
     @JvmStatic private external fun nativeSetPowerBudget(budgetLevel: Int): Int

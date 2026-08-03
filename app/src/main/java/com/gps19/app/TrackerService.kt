@@ -19,11 +19,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * July.30.55:
- * - Issue #653: Performance: Zero-Churn. Updated references to ProcessedLocation 
- *   after relocation to core.engine (R-HARDWARE-01).
- * July.30.45:
- * - Issue #654: Performance Hardening.
+ * Aug.03.37:
+ * - Issue #669: Forensic Audit: Database I/O Contention. Updated stress test 
+ *   to utilize logForensicTrace (MappedByteBuffer path).
+ * Aug.01.10:
+ * - Issue #668: Performance: Object Churn. Refactored evaluateAlarmsInternal to 
+ *   support zero-allocation telemetry path and fixed isAdaptiveJump parameter.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -270,10 +271,15 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.TriggerForensicTest -> {
                         lifecycleScope.launch {
                             val proc = lastProcessedLocation
-                            logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                            val tLat = proc?.optimizedPoint?.lat ?: 0.0
+                            val tLng = proc?.optimizedPoint?.lng ?: 0.0
+                            val tAcc = proc?.maxAccuracy ?: 0.0
                             
+                            logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = tLat, lng = tLng, accuracy = tAcc)
+                            
+                            // Issue #669: Testing high-frequency MappedByteBuffer path
                             repeat(100) { i ->
-                                logManager.logServiceEvent("STRESS TEST: Forensic Log #$i", isImportant = false)
+                                logManager.logForensicTrace("STRESS TEST: Forensic Trace #$i", lat = tLat, lng = tLng, accuracy = tAcc)
                             }
 
                             systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
@@ -384,7 +390,6 @@ class TrackerService : BaseMonitorService() {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val isMicEnabled = appSensorManager.isAcousticMonitoringEnabled()
-            // Issue #654: Use cached throttled permission to avoid IPC burst in ticker.
             val hasPermission = capabilities.isMicrophoneGranted
             if (hasPermission && (isMicEnabled || isRecentUiPulse())) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE 
@@ -404,9 +409,14 @@ class TrackerService : BaseMonitorService() {
         appSensorManager.setHighLoad(health.isCoolingModeActive)
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
-        if (capabilities.isA15Device && nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
-            lastA15PokeRt = nowRt
-            if (MbrainHardwareManager.isAvailable()) MbrainHardwareManager.punchHardware(timeProvider) else systemMonitor.acquireWakeLock(force = true)
+        if (capabilities.isA15Device) {
+            if (MbrainHardwareManager.isAvailable()) {
+                val flags = if (health.isPowerSaveMode) 0x01 else 0x00
+                MbrainHardwareManager.syncState(timeProvider, serviceTickCounter, flags)
+            } else if (nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
+                lastA15PokeRt = nowRt
+                systemMonitor.acquireWakeLock(force = true)
+            }
         }
 
         var recoveryFlagged = false
@@ -537,7 +547,9 @@ class TrackerService : BaseMonitorService() {
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
             alarmManager.evaluateAlarms(
-                now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = true, isRelayConnected = isSocketConnected, isTrackerConnected = true, status = processed.status, isJammer = processed.jammerDetected, jumpTier = processed.jumpTier, trackerLat = processed.optimizedPoint.lat, trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy, maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = lastKnownLocation?.time ?: 0L, trackerLastGpsRt = lastGpsFixRealtime, trackerLastValidFixTs = 0L, trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed, trackerBattery = health.batteryLevel, trackerTemp = health.batteryTemp, isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss, isSignalLoss = health.signalLoss, isGpsStalling = health.gpsStalled, isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = health.locationPendingReason == LocationPendingReason.GPS_GAP, isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees, trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt, trackerBaroAltEma = locationProcessor.getBaroBaseline(), trackerLux = snapshot.lux, isNear = snapshot.isNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = snapshot.peakShock, trackerCurrentMa = health.currentMa, capabilities = capabilities
+                now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = true, isRelayConnected = isSocketConnected, isTrackerConnected = true, status = processed.status, isJammer = processed.jammerDetected, jumpTier = processed.jumpTier, 
+                isAdaptiveJump = processed.isAdaptiveJump,
+                trackerLat = processed.optimizedPoint.lat, trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy, maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = lastKnownLocation?.time ?: 0L, trackerLastGpsRt = lastGpsFixRealtime, trackerLastValidFixTs = 0L, trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed, trackerBattery = health.batteryLevel, trackerTemp = health.batteryTemp, isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss, isSignalLoss = health.signalLoss, isGpsStalling = health.gpsStalled, isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = health.locationPendingReason == LocationPendingReason.GPS_GAP, isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees, trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt, trackerBaroAltEma = locationProcessor.getBaroBaseline(), trackerLux = snapshot.lux, isNear = snapshot.isNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = snapshot.peakShock, trackerCurrentMa = health.currentMa, capabilities = capabilities
             )
         }
     }

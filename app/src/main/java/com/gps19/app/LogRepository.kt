@@ -2,7 +2,6 @@ package com.gps19.app
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -19,13 +18,17 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.03.37:
+ * - Issue #669: Forensic Audit: Database I/O Contention. Integrated 
+ *   ForensicSpillBuffer (MappedByteBuffer) to decouple high-frequency 
+ *   trace capture from DB persistence (R-HARDWARE-01).
  * July.31.38:
- * - Issue #660: Forensic Audit: Log Buffer Pressure. Implemented non-blocking 
- *   circular log buffer using Channel and optimized batch inserts to reduce I/O spikes.
+ * - Issue #660: Forensic Audit: Log Buffer Pressure.
  */
 @Singleton
 class LogRepository @Inject constructor(
     private val logDao: LogDao,
+    private val forensicSpillBuffer: ForensicSpillBuffer,
     @ApplicationScope private val scope: CoroutineScope,
     private val timeProvider: TimeProvider
 ) {
@@ -33,7 +36,6 @@ class LogRepository @Inject constructor(
     private var logWriteCount = 0
     private val isPruning = AtomicBoolean(false)
 
-    // Issue #660: Non-blocking buffer and batching
     private val logBuffer = Channel<BufferedLog>(LOG_BUFFER_CAPACITY)
 
     private data class BufferedLog(val entry: LogEntry, val initiallySynced: Boolean)
@@ -48,6 +50,7 @@ class LogRepository @Inject constructor(
 
     init {
         startBatchProcessor()
+        startForensicDrainer()
     }
 
     private fun startBatchProcessor() {
@@ -57,7 +60,6 @@ class LogRepository @Inject constructor(
 
             while (isActive) {
                 try {
-                    // Try to receive a log, or timeout if we need to flush by time
                     val log = withTimeoutOrNull(LOG_BATCH_DELAY_MS) {
                         logBuffer.receive()
                     }
@@ -75,6 +77,45 @@ class LogRepository @Inject constructor(
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
                     Timber.e(e, "Error in log batch processor")
+                }
+            }
+        }
+    }
+
+    private fun startForensicDrainer() {
+        scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                try {
+                    delay(FORENSIC_DRAIN_INTERVAL_MS)
+                    if (forensicSpillBuffer.hasPending()) {
+                        val traces = forensicSpillBuffer.drainTo(200)
+                        if (traces.isNotEmpty()) {
+                            val entities = traces.map { 
+                                LogEntity(
+                                    localId = UUID.randomUUID().toString(),
+                                    timestamp = it.timestamp, message = it.message, type = it.type,
+                                    isImportant = it.isImportant, deviceId = it.id, viewerId = it.viewerId,
+                                    isSpecial = it.isSpecial, role = it.role,
+                                    lat = it.lat, lng = it.lng, accuracy = it.accuracy,
+                                    maxAccuracy = it.maxAccuracy, snrSnapshot = it.snrSnapshot,
+                                    vibeSnapshot = it.vibeSnapshot, synced = false
+                                )
+                            }
+                            
+                            logMutex.withLock {
+                                logDao.insertAll(entities)
+                                logWriteCount += entities.size
+                            }
+                            
+                            if (logWriteCount >= DB_PRUNE_THRESHOLD) {
+                                logWriteCount = 0
+                                triggerAsyncPruning()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    Timber.e(e, "Error in forensic drainer")
                 }
             }
         }
@@ -185,7 +226,11 @@ class LogRepository @Inject constructor(
         }.flowOn(Dispatchers.Default)
 
     fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
-        // Issue #660: Non-blocking offer to buffer.
+        if (entry.type == "FORENSIC_TRACE") {
+            forensicSpillBuffer.writeTrace(entry)
+            return
+        }
+
         val result = logBuffer.trySend(BufferedLog(entry, initiallySynced))
         if (result.isFailure) {
             Timber.w("Log buffer full, dropping log: ${entry.message}")

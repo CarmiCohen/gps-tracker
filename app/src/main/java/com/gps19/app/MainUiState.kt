@@ -6,13 +6,6 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
- * July.30.45:
- * - Issue #654: Performance Hardening. Added isFineLocationGranted to PermissionState 
- *   to support centralized, throttled permission auditing.
- * July.30.31:
- * - Issue #638: Corrected permission defaults. isBackgroundLocationGranted, 
- *   isActivityRecognitionGranted, and isPostNotificationsGranted now default 
- *   to false to ensure valid setup verification.
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -85,43 +78,121 @@ data class MainUiState(
 }
 
 /**
- * KinematicState: High-frequency transient state focused on motion, position, and sensor data.
+ * KinematicState: High-frequency transient state.
+ * Aug.01.10: 
+ * - Issue #668: Performance: Object Churn. Converted to mutable class with 
+ *   double-buffering support for zero-allocation telemetry (R-HARDWARE-01).
  */
-data class KinematicState(
-    val localLocation: LocationState = LocationState(),
-    val trackerLocation: LocationState = LocationState(),
-    val localHealth: SystemHealthState = SystemHealthState(),
-    val trackerHealth: SystemHealthState = SystemHealthState(),
-    val distanceTrackerToHome: Double? = null,
-    val distanceTrackerToViewer: Double? = null,
-    val distanceViewerToHome: Double? = null,
-    val distanceViewerToTracker: Double? = null
-)
+class KinematicState(
+    var localLocation: LocationState = LocationState(),
+    var trackerLocation: LocationState = LocationState(),
+    var localHealth: SystemHealthState = SystemHealthState(),
+    var trackerHealth: SystemHealthState = SystemHealthState(),
+    var distanceTrackerToHome: Double? = null,
+    var distanceTrackerToViewer: Double? = null,
+    var distanceViewerToHome: Double? = null,
+    var distanceViewerToTracker: Double? = null,
+    var pulse: Long = 0L
+) {
+    fun copyFrom(other: KinematicState) {
+        this.localLocation.copyFrom(other.localLocation)
+        this.trackerLocation.copyFrom(other.trackerLocation)
+        this.localHealth.copyFrom(other.localHealth)
+        this.trackerHealth.copyFrom(other.trackerHealth)
+        this.distanceTrackerToHome = other.distanceTrackerToHome
+        this.distanceTrackerToViewer = other.distanceTrackerToViewer
+        this.distanceViewerToHome = other.distanceViewerToHome
+        this.distanceViewerToTracker = other.distanceViewerToTracker
+        this.pulse = other.pulse
+    }
+
+    fun reset() {
+        localLocation.reset()
+        trackerLocation.reset()
+        localHealth.reset()
+        trackerHealth.reset()
+        distanceTrackerToHome = null
+        distanceTrackerToViewer = null
+        distanceViewerToHome = null
+        distanceViewerToTracker = null
+        pulse = 0L
+    }
+}
 
 /**
- * DiagnosticState: Low-frequency scalar state focused on connectivity, battery, and system status.
+ * DiagnosticState: Low-frequency scalar state.
+ * Aug.01.10: 
+ * - Issue #668: Performance: Object Churn. Converted to mutable class with 
+ *   double-buffering support for zero-allocation telemetry (R-HARDWARE-01).
  */
-data class DiagnosticState(
-    val battery: BatteryState = BatteryState(),
-    val stats: StatsState = StatsState(),
-    val viewerSatsView: Int = 0,
-    val viewerSatsUsed: Int = 0,
-    val trackerStats: StatsState = StatsState(),
-    val trackerBattery: BatteryState = BatteryState(),
-    val trackerSatsView: Int = 0,
-    val trackerSatsUsed: Int = 0,
-    val connectivity: ConnectivityState = ConnectivityState(),
-    val activeAlarms: List<AlarmInfo> = emptyList(),
-    val isNewViolationDetected: Boolean = false,
-    val powerAlarmPending: Boolean = false,
-    val isAlarmSilenced: Boolean = false,
-    val isSirenPlaying: Boolean = false,
-    val isRedScreenVisible: Boolean = false,
-    val maxTrackerAccuracy: Double = 0.0,
-    val maxViewerAccuracy: Double = 0.0,
-    val cumulativeRecoveryBlackoutMs: Long = 0L,
-    val recoveryCount: Int = 0
-)
+class DiagnosticState(
+    var battery: BatteryState = BatteryState(),
+    var stats: StatsState = StatsState(),
+    var viewerSatsView: Int = 0,
+    var viewerSatsUsed: Int = 0,
+    var trackerStats: StatsState = StatsState(),
+    var trackerBattery: BatteryState = BatteryState(),
+    var trackerSatsView: Int = 0,
+    var trackerSatsUsed: Int = 0,
+    var connectivity: ConnectivityState = ConnectivityState(),
+    var activeAlarms: List<AlarmInfo> = emptyList(),
+    var isNewViolationDetected: Boolean = false,
+    var powerAlarmPending: Boolean = false,
+    var isAlarmSilenced: Boolean = false,
+    var isSirenPlaying: Boolean = false,
+    var isRedScreenVisible: Boolean = false,
+    var maxTrackerAccuracy: Double = 0.0,
+    var maxViewerAccuracy: Double = 0.0,
+    var cumulativeRecoveryBlackoutMs: Long = 0L,
+    var recoveryCount: Int = 0,
+    var pulse: Long = 0L
+) {
+    fun copyFrom(other: DiagnosticState) {
+        this.battery.copyFrom(other.battery)
+        this.stats.copyFrom(other.stats)
+        this.viewerSatsView = other.viewerSatsView
+        this.viewerSatsUsed = other.viewerSatsUsed
+        this.trackerStats.copyFrom(other.trackerStats)
+        this.trackerBattery.copyFrom(other.trackerBattery)
+        this.trackerSatsView = other.trackerSatsView
+        this.trackerSatsUsed = other.trackerSatsUsed
+        this.connectivity.copyFrom(other.connectivity)
+        this.activeAlarms = other.activeAlarms
+        this.isNewViolationDetected = other.isNewViolationDetected
+        this.powerAlarmPending = other.powerAlarmPending
+        this.isAlarmSilenced = other.isAlarmSilenced
+        this.isSirenPlaying = other.isSirenPlaying
+        this.isRedScreenVisible = other.isRedScreenVisible
+        this.maxTrackerAccuracy = other.maxTrackerAccuracy
+        this.maxViewerAccuracy = other.maxViewerAccuracy
+        this.cumulativeRecoveryBlackoutMs = other.cumulativeRecoveryBlackoutMs
+        this.recoveryCount = other.recoveryCount
+        this.pulse = other.pulse
+    }
+
+    fun reset() {
+        battery.reset()
+        stats.reset()
+        viewerSatsView = 0
+        viewerSatsUsed = 0
+        trackerStats.reset()
+        trackerBattery.reset()
+        trackerSatsView = 0
+        trackerSatsUsed = 0
+        connectivity.reset()
+        activeAlarms = emptyList()
+        isNewViolationDetected = false
+        powerAlarmPending = false
+        isAlarmSilenced = false
+        isSirenPlaying = false
+        isRedScreenVisible = false
+        maxTrackerAccuracy = 0.0
+        maxViewerAccuracy = 0.0
+        cumulativeRecoveryBlackoutMs = 0L
+        recoveryCount = 0
+        pulse = 0L
+    }
+}
 
 enum class MapFollowMode { TRACKER, VIEWER, AUTO }
 
@@ -167,3 +238,41 @@ data class NavigationState(
 )
 
 enum class SubSettings { ALERTS, SOUND, CLEAN }
+
+/**
+ * ConnectivityState: Mutable flyweight for zero-churn telemetry updates.
+ * Aug.01.10: Refactored to mutable class.
+ */
+class ConnectivityState(
+    var isLocalOnline: Boolean = true,
+    var isRelayConnected: Boolean = false,
+    var isTrackerConnected: Boolean = false,
+    var lastUpdateTs: Long = 0L,
+    var lastRemoteActivityTs: Long = 0L,
+    var connectedViewers: List<String> = emptyList()
+) {
+    fun copyFrom(other: ConnectivityState) {
+        this.isLocalOnline = other.isLocalOnline
+        this.isRelayConnected = other.isRelayConnected
+        this.isTrackerConnected = other.isTrackerConnected
+        this.lastUpdateTs = other.lastUpdateTs
+        this.lastRemoteActivityTs = other.lastRemoteActivityTs
+        this.connectedViewers = other.connectedViewers
+    }
+
+    fun update(
+        isLocalOnline: Boolean, isRelayConnected: Boolean, isTrackerConnected: Boolean,
+        lastUpdateTs: Long, lastRemoteActivityTs: Long, connectedViewers: List<String>
+    ) {
+        this.isLocalOnline = isLocalOnline
+        this.isRelayConnected = isRelayConnected
+        this.isTrackerConnected = isTrackerConnected
+        this.lastUpdateTs = lastUpdateTs
+        this.lastRemoteActivityTs = lastRemoteActivityTs
+        this.connectedViewers = connectedViewers
+    }
+
+    fun reset() {
+        update(true, false, false, 0L, 0L, emptyList())
+    }
+}

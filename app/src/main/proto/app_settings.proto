@@ -184,6 +184,9 @@ message RealtimeStatus {
     // Forensic Parity (R118): Added missing SIT timestamps
     int64 sit_vz_ts = 60;
     int64 sit_vz_rt = 61;
+
+    // Issue #669: Forensic Parity for Adaptive Jump
+    bool is_adaptive_jump = 62;
 }
 
 message GeoPointProto {
@@ -288,4 +291,7 @@ message TrackerStatusProto {
     // Forensic Parity (R118): Added missing SIT timestamps
     int64 sit_vz_ts = 67;
     int64 sit_vz_rt = 68;
+
+    // Issue #669: Forensic Parity for Adaptive Jump
+    bool is_adaptive_jump = 69;
 }

@@ -33,12 +33,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
- * July.28.22:
- * - Issue #617: Global SharedFlow Audit. Hardened _connectivityEvents with 
- *   BufferOverflow.DROP_OLDEST to ensure non-blocking peer signaling (R617).
- * July.27.07:
- * - Issue #602: SIT Timestamp Parity Logic. Integrated sitVzTs/Rt into 
- *   pushCurrentStatus and status extraction to restore full forensic parity.
+ * Aug.03.37:
+ * - Issue #669: Forensic Audit: Database I/O Contention. Added isTrackerAdaptiveJump 
+ *   to restore full forensic parity in viewer mode.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -114,6 +111,7 @@ class ConnectivitySuite @Inject constructor(
     val isTrackerCharging get() = trackerStatus.isCharging
     val isTrackerJammerSuspicion get() = trackerStatus.isJammer
     val isTrackerVisualJump get() = trackerStatus.isJump
+    val isTrackerAdaptiveJump get() = trackerStatus.isAdaptiveJump
     val trackerJumpTier get() = trackerStatus.jumpTier
     val isTrackerTamperDetected get() = trackerStatus.isTamperDetected
     val isTrackerPowerTamper get() = trackerStatus.isPowerTamper
@@ -456,7 +454,8 @@ class ConnectivitySuite @Inject constructor(
         liftIdx: Double = 0.0,
         tiltIdx: Double = 0.0,
         baroIdx: Double = 0.0,
-        kineticEnergy: Double = 0.0
+        kineticEnergy: Double = 0.0,
+        isAdaptiveJump: Boolean = false
     ) {
         val trackerStatus = TrackerStatus(
             deviceId = deviceId, viewerId = viewerId, ts = timeProvider.currentTimeMillis(),
@@ -481,7 +480,7 @@ class ConnectivitySuite @Inject constructor(
             tiltIdx = tiltIdx, baroIdx = baroIdx,
             micPending = micPending, isSitDetected = isSitDetected, isSitActive = isSitActive, lastSitTs = lastSitTs,
             verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs, sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
-            kineticEnergy = kineticEnergy
+            kineticEnergy = kineticEnergy, isAdaptiveJump = isAdaptiveJump
         )
         sendTelemetry(trackerStatus)
     }
@@ -579,7 +578,8 @@ class ConnectivitySuite @Inject constructor(
                     isStalled = statusProto.isStalled,
                     isTamperDetected = statusProto.isTamperDetected,
                     jumpTier = statusProto.jumpTier,
-                    kineticEnergy = statusProto.kineticEnergy
+                    kineticEnergy = statusProto.kineticEnergy,
+                    isAdaptiveJump = statusProto.isAdaptiveJump
                 )
 
                 scope.launch {
@@ -597,7 +597,7 @@ class ConnectivitySuite @Inject constructor(
                         isSitDetected = updatedStatus.isSitDetected, lastSitTs = updatedStatus.lastSitTs,
                         verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitVzTs = updatedStatus.sitVzTs, sitVzRt = updatedStatus.sitVzRt, sitDz = updatedStatus.sitDz,
                         sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock,
-                        kineticEnergy = updatedStatus.kineticEnergy
+                        kineticEnergy = updatedStatus.kineticEnergy, isAdaptiveJump = updatedStatus.isAdaptiveJump
                     ))
                 }
                 updatedStatus
@@ -748,7 +748,8 @@ class ConnectivitySuite @Inject constructor(
                     sitVz = data.optDouble("sit_vz", current.sitVz), sitVzTs = data.optLong("sit_vz_ts", 0L), sitVzRt = data.optLong("sit_vz_rt", 0L),
                     sitDz = data.optDouble("sit_dz", current.sitDz),
                     sitBaro = data.optDouble("sit_baro", current.sitBaro), sitTilt = data.optDouble("sit_tilt", current.sitTilt), sitShock = data.optDouble("sit_shock", current.sitShock),
-                    kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy)
+                    kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy),
+                    isAdaptiveJump = data.optBoolean("is_adaptive_jump", current.isAdaptiveJump)
                 )
 
                 scope.launch {
@@ -766,7 +767,7 @@ class ConnectivitySuite @Inject constructor(
                         isSitDetected = updatedStatus.isSitDetected, lastSitTs = updatedStatus.lastSitTs,
                         verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitVzTs = updatedStatus.sitVzTs, sitVzRt = updatedStatus.sitVzRt, sitDz = updatedStatus.sitDz,
                         sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock,
-                        kineticEnergy = updatedStatus.kineticEnergy
+                        kineticEnergy = updatedStatus.kineticEnergy, isAdaptiveJump = updatedStatus.isAdaptiveJump
                     ))
                 }
                 updatedStatus
