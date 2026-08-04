@@ -7,7 +7,7 @@ project("gps-tracker")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
 
 add_library(
-        mbrainSDK
+        jdMbrain
         SHARED
         mbrain-jni.cpp)
 
@@ -16,5 +16,5 @@ find_library(
         log)
 
 target_link_libraries(
-        mbrainSDK
+        jdMbrain
         ${log-lib})

@@ -16,11 +16,12 @@ import kotlinx.coroutines.Dispatchers
 
 /**
  * MbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Aug.04.101:
+ * - Issue #721: Performance: Renamed native library to jdMbrain to resolve 
+ *   collision with Samsung system libraries (libmbrainSDK).
  * Aug.01.01:
  * - Issue #667: Forensic Audit: Memory Pressure. Implemented zero-copy state path 
  *   using DirectByteBuffer to eliminate GC churn during high-frequency JNI traffic.
- * Aug.01.00:
- * - Issue #664: Performance: Startup ANR Optimization.
  */
 object MbrainHardwareManager {
 
@@ -28,8 +29,6 @@ object MbrainHardwareManager {
     private val jniLock = ReentrantLock()
     private const val MAX_JNI_RETRIES = 3
 
-    // Issue #667: Shared state buffer for zero-allocation JNI sync.
-    // 64 bytes is sufficient for current diagnostic flags and heartbeat counters.
     private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(64).apply {
         order(ByteOrder.nativeOrder())
     }
@@ -42,24 +41,20 @@ object MbrainHardwareManager {
         jniLock.withLock {
             if (isLibraryLoaded) return
             try {
-                System.loadLibrary("mbrainSDK")
+                // Renamed to avoid collision with Samsung's internal libmbrainSDK.so
+                System.loadLibrary("jdMbrain")
                 isLibraryLoaded = true
                 
-                // Issue #667: Register the direct buffer immediately after load.
                 nativeRegisterSharedBuffer(sharedStateBuffer)
-                Timber.i("libmbrainSDK loaded and shared buffer registered")
+                Timber.i("jdMbrain loaded and shared buffer registered")
             } catch (e: UnsatisfiedLinkError) {
-                Timber.e("libmbrainSDK load failed: ${e.message}")
+                Timber.e("jdMbrain load failed: ${e.message}")
             } catch (e: Exception) {
-                Timber.e("Unexpected error loading libmbrainSDK: ${e.message}")
+                Timber.e("Unexpected error loading jdMbrain: ${e.message}")
             }
         }
     }
 
-    /**
-     * syncState: Pushes current JVM state flags to native hardware layer via shared buffer.
-     * Prevents high-frequency object allocation for diagnostic updates.
-     */
     fun syncState(timeProvider: TimeProvider, heartbeatCount: Int, flags: Int): Int {
         return executeNativeWithRetry(timeProvider, "Native syncState") {
             sharedStateBuffer.clear()

@@ -3,7 +3,7 @@
 #include <android/log.h>
 #include <cstring>
 
-#define LOG_TAG "mbrainSDK-JNI"
+#define LOG_TAG "jdMbrain-JNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
@@ -32,7 +32,7 @@ Java_com_gps19_app_MbrainHardwareManager_nativeRegisterSharedBuffer(JNIEnv* env,
         return -2;
     }
 
-    LOGI("mbrainSDK: Shared buffer registered at %p (Size: %lld)", g_sharedBufferPtr, g_sharedBufferSize);
+    LOGI("jdMbrain: Shared buffer registered at %p (Size: %lld)", g_sharedBufferPtr, g_sharedBufferSize);
     return 0;
 }
 
@@ -52,7 +52,7 @@ Java_com_gps19_app_MbrainHardwareManager_nativeSyncState(JNIEnv* env, jclass cla
     memcpy(&flags, (char*)g_sharedBufferPtr + sizeof(int32_t), sizeof(int32_t));
 
     // Internal hardware sync logic placeholder
-    // LOGI("mbrainSDK: Sync - Heartbeat: %d, Flags: 0x%08X", heartbeat, flags);
+    // LOGI("jdMbrain: Sync - Heartbeat: %d, Flags: 0x%08X", heartbeat, flags);
 
     return 0;
 }
@@ -65,7 +65,7 @@ Java_com_gps19_app_MbrainHardwareManager_nativeInitMbrain(JNIEnv* env, jclass cl
     }
     const char* nativeDeviceId = env->GetStringUTFChars(deviceId, nullptr);
     if (nativeDeviceId != nullptr) {
-        LOGI("Initializing mbrainSDK for device: %s with flags: %d", nativeDeviceId, flags);
+        LOGI("Initializing jdMbrain for device: %s with flags: %d", nativeDeviceId, flags);
         env->ReleaseStringUTFChars(deviceId, nativeDeviceId);
     } else {
         LOGE("initMbrain: Failed to get native string");
@@ -76,13 +76,13 @@ Java_com_gps19_app_MbrainHardwareManager_nativeInitMbrain(JNIEnv* env, jclass cl
 
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_MbrainHardwareManager_nativePunchHardware(JNIEnv* env, jclass clazz) {
-    LOGI("mbrainSDK: Hardware punch triggered");
+    LOGI("jdMbrain: Hardware punch triggered");
     return 0;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_MbrainHardwareManager_nativeSetPowerBudget(JNIEnv* env, jclass clazz, jint budgetLevel) {
-    LOGI("mbrainSDK: Setting power budget to %d", budgetLevel);
+    LOGI("jdMbrain: Setting power budget to %d", budgetLevel);
     return 0;
 }
 

@@ -1,27 +1,31 @@
-# Project Issues & Hardening Tracking (Aug.03.98)
+# Project Issues & Hardening Tracking (Aug.04.101)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 0 |
+| **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 527 |
+| **Resolved (Total)** | 🟢 Progress | 528 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   None.
+*   **[Issue #721] [Severity: High] [Category: Performance] Logcat Spam: getPackageName() recursion/spam on Samsung A15.**
+    *   **Concern**: Repetitive `getPackageName: com.gps19.app` logs are flooding the buffer, causing significant UI jank (1s+ stalls) and high CPU overhead during Phone Setup and Dashboard rendering.
 
 ---
 
 ## 🔴 Open Issues
-*   None.
+*   **[Issue #721] Performance: getPackageName() logcat spam.**
+    *   **Context**: Identified during deployment on Samsung A15 (R405).
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.03.98)
+## 🟢 Recently Resolved Issues (Aug.04.75)
+*   **[Issue #718] [Severity: High] [Category: Robustness] Forensic Audit: Recovery Integrity Re-play**.
+    *   **Resolution**: Implemented `recoverAbandonedTraces()` in `LogRepository`, triggered during initialization. The routine performs a one-time drain of the memory-mapped `ForensicSpillBuffer` into SQLite, ensuring zero data loss for forensic telemetry after crashes or unexpected reboots. Integrated deduplication logic using `timestamp_spillIdx` signatures to prevent duplicate records (R718).
 *   **[Issue #717] [Severity: Medium] [Category: Performance] Forensic Audit: Memory-Mapped Metadata Header**.
     *   **Resolution**: Implemented a 128-byte persistent header in `ForensicSpillBuffer` storing `magicNumber`, `version`, `capacity`, `entrySize`, and `lastWriteRt`. Enhanced initialization to perform integrity resets on version or schema mismatch (R717).
 *   **[Issue #716] [Severity: High] [Category: Robustness] Forensic Audit: Critical Battery Sentinel**.
@@ -30,4 +34,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Implemented duration-based alerting for forensic persistence degradation. Triggering `ALERT_ID_PERFORMANCE_SPIKE` if `forensicReliability` drops below 0.85 for > 30s, ensuring transient I/O pressure doesn't trigger false alarms while capturing sustained failures (R715).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.03.98)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.04.101)

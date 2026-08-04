@@ -1,8 +1,10 @@
-# System Source of Truth (SoT) - Aug.03.100 (Metadata Header Implemented)
+# System Source of Truth (SoT) - Aug.04.101 (Samsung Performance Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Native Namespace Integrity (R721)**: (Added Aug.04.101) The project native library MUST be named `jdMbrain` (libjdMbrain.so) to ensure zero-collision with Samsung/Vendor system libraries (e.g., `libmbrainSDK`). All JNI bridge calls MUST utilize this unique identifier. (Issue #721)
+*   **Forensic Recovery Integrity Re-play Authority (R718)**: (Added Aug.04.75) The `LogRepository` MUST perform a one-time recovery drain of the `ForensicSpillBuffer` during initialization. Any abandoned traces found in the memory-mapped buffer after a crash or reboot MUST be replayed into the database. The routine MUST utilize signature-based deduplication to prevent redundant records. (Issue #718)
 *   **Memory-Mapped Metadata Header Authority (R717)**: (Added Aug.03.100) The `ForensicSpillBuffer` MUST utilize a 128-byte persistent metadata header at the start of the file. This header MUST store `magicNumber`, `version`, `capacity`, `entrySize`, and `lastWriteRt`. The system MUST validate these fields during initialization to detect file corruption or schema mismatches, performing a full buffer reset if integrity is compromised. (Issue #717)
 *   **Critical Battery Sentinel Authority (R716)**: (Added Aug.03.99) The system MUST monitor for abnormal battery discharge rates via the `isBatterySteepDischarge` flag. This condition MUST be correlated with high sensor activity (`vibration > 0.25G`) or high system load (`cpuLoad > 0.7`) to predict imminent shutdown. Alerts triggered under these correlated conditions MUST provide forensic metadata in technical details. (Issue #716)
 *   **Persistence Health Alerting Authority (R715)**: (Added Aug.03.98) The system MUST monitor `forensicReliability` in real-time. If reliability remains below 0.85 for 30 consecutive seconds, an `ALERT_ID_PERFORMANCE_SPIKE` MUST be triggered. Note: This tracks the persistence layer success rate (the recorder), not physical events like chairsit. (Issue #715)
@@ -46,10 +48,10 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Startup ANR Optimization (R627)**: Native library loading MUST be offloaded to background coroutines. (Issue #627, July.30.25)
 *   **Budget Hardware Hardening (R606)**: Offload high-frequency platform callbacks to dedicated HandlerThreads. (Issue #606, July.27.11)
 *   **Map Overlay Performance Hardening (R639)**: Map overlays MUST implement granular change detection and movement thresholds. (Issue #639, July.30.31)
-*   **Unified Forensic Audit Naming (R623)**: Standardized naming: "Forensic Performance Audit: [Operation] spike ([duration]ms)". (Issue #623, July.29.22)
+*   **Unified Forensic Audit Naming (R623)**: Standardized naming: \"Forensic Performance Audit: [Operation] spike ([duration]ms)\". (Issue #623, July.29.22)
 *   **JNI Reliability Audit (R625)**: Native JNI bridge implementations MUST include robust error handling for EINTR. (Issue #625, July.30.25)
 *   **Deferred Service Recovery Authority (R626)**: Parasite an `isRecoveryPending` flag if background restoration is restricted on API 31+. (Issue #626, July.30.26)
-*   **Forensic Recovery Log Aggregation Authority (R630)**: Aggregate "Service Blackout Duration" metrics across recovery events. (Issue #630, July.30.28)
+*   **Forensic Recovery Log Aggregation Authority (R630)**: Aggregate \"Service Blackout Duration\" metrics across recovery events. (Issue #630, July.30.28)
 *   **Foreground Service Start Hardening (R634)**: Catch `ForegroundServiceStartNotAllowedException` during service starts. (Issue #634, July.30.31)
 *   **Permission Logic Integrity (R638)**: Critical permissions MUST default to `false`. (Issue #638, July.30.31)
 *   **GNSS Callback Concurrency Authority (R614)**: Sample high-frequency GNSS hardware callbacks. (Issue #614, July.28.20)
@@ -58,7 +60,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Dashboard Pipeline Efficiency Policy (R619)**: UI Dashboard state pipeline MUST be optimized for zero allocation churn. (Issue #619, July.28.24)
 *   **State Partitioning Policy (R620)**: Partition telemetry into `KinematicState` and `DiagnosticState`. (Issue #620, July.28.24)
 *   **UseCase Flow Internalization Policy (R621)**: UseCases MUST internalize common flow transformation logic. (Issue #621, July.28.24)
-*   **Location Refresh Reactivity Hardening Authority (R622)**: Transition from "Location Pending" to "OK" MUST be debounced by 3000ms. (Issue #622, July.29.00)
+*   **Location Refresh Reactivity Hardening Authority (R622)**: Transition from \"Location Pending\" to \"OK\" MUST be debounced by 3000ms. (Issue #622, July.29.00)
 *   **Foreground Service Startup Sync (R607)**: Establish notification channels synchronously in `onCreate()`. (Issue #607, July.27.12)
 *   **Centralized Health Snapshot Authority (R609)**: `IntegrityMonitor` is the single source of truth for health. (Issue #609, July.28.14)
 *   **Lifecycle Idempotency (R591)**: Registration sequences MUST be protected by idempotent guards. (Issue #545, #591)
@@ -78,7 +80,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 ### 3. Temporal & Forensic Integrity
 *   **Temporal Forensic Integrity (R102)**: Monotonic `rt` for logic; wall-clock `ts` for forensic logs. (Issue #102)
 *   **Forensic Parity Authority (R118)**: Strict field parity MUST be maintained across all layers. (Issue #118, #122, #525, #601, #602, #604)
-*   **Strict Forensic Reconstruction (R595)**: Analytical Ribbon MUST provide "Strict Mode". (Issue #595, July.26.04)
+*   **Strict Forensic Reconstruction (R595)**: Analytical Ribbon MUST provide \"Strict Mode\". (Issue #595, July.26.04)
 *   **Direct Binary Flow (R541)**: Telemetry MUST prioritize raw Protobuf binary path. (Issue #541, July.24.05)
 
 ### 4. Persistence & Service Reliability
@@ -92,5 +94,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: Aug.03.100.
+*   **Current Release**: Aug.04.101.
 *   **Source of Truth**: app/build.gradle versionName.

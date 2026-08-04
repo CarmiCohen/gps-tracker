@@ -1,32 +1,25 @@
-# Handover (Aug.03.100) - Forensic Subsystem Hardened
+# Handover (Aug.04.101) - Samsung A15 Performance & Native Conflict Hardening
 
 ## 🎯 Next Objective
-**[Issue #718] [Severity: High] [Category: Robustness] Forensic Audit: Recovery Integrity Re-play**.
-- **Context**: The metadata header is now implemented and validated on startup. We need to implement the actual recovery routine that reads un-persisted traces from the spill buffer and commits them to the database following a crash or force-stop.
-- **Goal**: Implement `recoverAbandonedTraces()` in `LogRepository`. This method must be called during service initialization to safely drain and persist any "abandoned" forensic data using the header offsets (R718).
+**[Issue #721] [Severity: High] [Category: Performance] Logcat Spam: getPackageName() Hardening**.
+- **Context**: While native library collisions are resolved, the `getPackageName: com.gps19.app` spam persists during UI rendering on Samsung A15.
+- **Goal**: Identify the remaining high-frequency caller of `getPackageName()` (likely a system API or Compose property) and implement a cached bypass to eliminate main-thread Davey stalls.
 
 ## 🆕 New Architectural Requirements
-- **R717 (Memory-Mapped Metadata Header Authority)**: (Added Aug.03.100) `ForensicSpillBuffer` utilizes a 128-byte persistent header (`magic`, `version`, `capacity`, `lastWriteRt`) to ensure cross-boot integrity validation.
-- **R716 (Critical Battery Sentinel Authority)**: (Added Aug.03.99) Predicts shutdown by correlating `isBatterySteepDischarge` with high CPU load (>0.7) or vibration (>0.25G).
-- **R715 (Persistence Health Alerting Authority)**: (Added Aug.03.98) Monitors `forensicReliability` (flush success rate). Triggers `PERFORMANCE_SPIKE` if success rate < 85% for >30s.
+- **R721 (Native Namespace Integrity)**: (Added Aug.04.101) The project native library is named `jdMbrain` (libjdMbrain.so) to ensure zero-collision with Samsung/Vendor system libraries (`libmbrainSDK`).
+- **R718 (Forensic Recovery Integrity Re-play Authority)**: `LogRepository` performs a one-time recovery of abandoned traces from `ForensicSpillBuffer` on startup.
 
 ## 📊 Status Tracker
-- **[Issue #717] Memory-Mapped Header**: 🟢 Resolved. 128-byte header implemented with version and capacity checks (R717).
-- **[Issue #716] Critical Battery Sentinel**: 🟢 Resolved. Correlated alerting implemented in `MainAlarmLogic` (R716).
-- **[Issue #715] Forensic Persistence Alerting**: 🟢 Resolved. Duration-based monitoring active. Test suite hardened (R715).
-- **[Issue #714] Reliability Metrics**: 🟢 Resolved. EMA-based tracking of flush success rate active in `LogRepository` (R714).
+- **[Issue #721] Samsung A15 Native Collision**: 🟢 Resolved. Renamed library to `jdMbrain`. "Can't load libmbrainSDK" errors eliminated.
+- **[Issue #721] Logcat Spam: getPackageName()**: 🔴 Open. Investigating high-frequency system calls on budget hardware.
+- **[Issue #718] Forensic Recovery Integrity Re-play**: 🟢 Resolved. Deduplication and replay logic active (R718).
+- **[Issue #717] Memory-Mapped Header**: 🟢 Resolved. 128-byte header active (R717).
 
-## 🔍 Forensic Subsystem State (vAug.03.100)
-- **#715 Scope & Clarification**: This alert (`ALERT_ID_PERFORMANCE_SPIKE`) specifically monitors the **reliability of the persistence pipeline** (the recorder), not physical sensor events like `chairsit` or `lifting`. 
-    - **Physical Events**: A `chairsit` or `lifting` event does not trigger this alert. 
-    - **Recording Risk**: If this alert is active, it means the system is currently too busy to guarantee that transient, high-speed events (like a 1s chair plunge) are successfully recorded in the "Black Box". It serves as a health warning for the data capture integrity.
-- **Component Status**:
-    - `ForensicSpillBuffer`: Hardened with 128-byte metadata header for cross-boot recovery.
-    - `MainAlarmLogic`: Fully hardened with persistence health and correlated battery sentinels.
-    - `SystemHealthState`: Correctly propagates `vibration`, `cpuLoad`, and `forensicReliability`.
-    - `Test Suite`: 100% pass rate in `:core:engine` (24 tests).
+## 🔍 Forensic Subsystem State (vAug.04.101)
+- **Native Stability**: The JNI bridge has been stabilized on Samsung hardware by moving to a unique namespace (`jdMbrain`). This prevents the OS from attempting to hook into our private hardware manager as if it were a system component.
+- **Performance State**: Main thread jank is still observed on A15 during setup. Current hypothesis is that `isIgnoringBatteryOptimizations` or a similar permission check is triggering the `getPackageName` spam.
 - **Build Status**: 🟢 **SUCCESSFUL**.
-- **Documentation Integrity**: `SOT_MASTER_REQUIREMENTS.md` and `issues.md` synchronized to Aug.03.100.
+- **Documentation Integrity**: `SOT_MASTER_REQUIREMENTS.md`, `issues.md`, and `Handover.md` synchronized to Aug.04.101.
 
-**Status**: READY FOR NEW FRESH CHAT.
-vAug.03.100
+**Status**: MONITORING DEPLOYMENT.
+vAug.04.101

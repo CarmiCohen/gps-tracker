@@ -19,13 +19,11 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * Aug.04.45:
- * - Issue #714: Forensic Audit: Persistence Reliability Metrics. Implemented 
- *   real-time tracking of successful vs. failed flushes. Exposes 
- *   forensicReliability metric via Telemetry (R714).
- * Aug.04.30:
- * - Issue #713: Forensic Audit: Log Buffer Drain Throttling. Implemented 
- *   load-aware dynamic throttling for forensic drainage (R713).
+ * Aug.04.101:
+ * - Issue #721: Performance: Reduced convergence log verbosity. Only logging 
+ *   convergence if a previous stall was detected to minimize logcat pressure.
+ * Aug.04.75:
+ * - Issue #718: Forensic Audit: Recovery Integrity Re-play.
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -65,6 +63,7 @@ class LogRepository @Inject constructor(
 
     init {
         startBatchProcessor()
+        recoverAbandonedTraces()
         startForensicDrainer()
     }
 
@@ -97,10 +96,23 @@ class LogRepository @Inject constructor(
         }
     }
 
+    /**
+     * recoverAbandonedTraces: One-time recovery of forensic data from memory-mapped
+     * spill buffer during initialization. Ensures zero-loss after crash.
+     */
+    private fun recoverAbandonedTraces() {
+        scope.launch(Dispatchers.IO) {
+            val pending = forensicSpillBuffer.getPendingCount()
+            if (pending > 0) {
+                Timber.i("Forensic Recovery: Replaying $pending abandoned traces.")
+                performForensicDrain(isRecovery = true)
+            }
+        }
+    }
+
     private fun startForensicDrainer() {
         scope.launch(Dispatchers.IO) {
             var lastDrainTime = timeProvider.currentTimeMillis()
-            var consecutiveStalls = 0
             
             while (isActive) {
                 try {
@@ -122,79 +134,8 @@ class LogRepository @Inject constructor(
                                     (pendingAtStart > 0 && now - lastDrainTime >= FORENSIC_DRAIN_INTERVAL_MS)
                     
                     if (shouldDrain) {
-                        val traces = forensicSpillBuffer.peek(FORENSIC_SPILL_CAPACITY)
-                        if (traces.isNotEmpty()) {
-                            try {
-                                val minTs = traces.minOf { it.timestamp }
-                                val existingSignatures = logDao.getExistingForensicSignatures(minTs).toSet()
-
-                                val toInsert = traces.filter { 
-                                    val signature = "${it.timestamp}_${it.spillIdx}"
-                                    !existingSignatures.contains(signature)
-                                }.map { 
-                                    LogEntity(
-                                        localId = UUID.randomUUID().toString(),
-                                        timestamp = it.timestamp, message = it.message, type = it.type,
-                                        isImportant = it.isImportant, deviceId = it.id, viewerId = it.viewerId,
-                                        isSpecial = it.isSpecial, role = it.role,
-                                        lat = it.lat, lng = it.lng, accuracy = it.accuracy,
-                                        maxAccuracy = it.maxAccuracy, snrSnapshot = it.snrSnapshot,
-                                        vibeSnapshot = it.vibeSnapshot, synced = false,
-                                        spillIdx = it.spillIdx
-                                    )
-                                }
-                                
-                                if (toInsert.isNotEmpty()) {
-                                    logDao.insertAll(toInsert)
-                                }
-                                
-                                forensicSpillBuffer.commitDrain(traces.size)
-                                forensicSuccessCount.incrementAndGet()
-                                updateReliability(true)
-                                lastDrainTime = now
-                                
-                                val pendingAfter = forensicSpillBuffer.getPendingCount()
-                                if (pendingAfter > 0) {
-                                    if (pendingAfter >= pendingAtStart) {
-                                        consecutiveStalls++
-                                        if (consecutiveStalls >= FORENSIC_CONVERGENCE_STALL_LIMIT) {
-                                            val h = telemetry.systemHealth.value
-                                            val msg = "Forensic Stall Correlated: Backfill not converging (%d pending). System: [CPU: %.1f, IOW: %.1f, Temp: %.1fC, Batt: %d%%]".format(
-                                                pendingAfter, h.cpuLoad, h.ioWait, h.batteryTemp, h.batteryLevel
-                                            )
-                                            Timber.w(msg)
-                                            addLog(LogEntry(
-                                                localId = UUID.randomUUID().toString(),
-                                                timestamp = timeProvider.currentTimeMillis(),
-                                                message = msg, type = "SYSTEM", isImportant = true,
-                                                id = "SYSTEM", viewerId = "SYSTEM", isSpecial = true,
-                                                specialColor = FORENSIC_PINK_COLOR
-                                            ), initiallySynced = true)
-                                        }
-                                    } else {
-                                        consecutiveStalls = 0
-                                    }
-                                } else {
-                                    consecutiveStalls = 0
-                                    Timber.d("Forensic Backfill: Convergence achieved.")
-                                }
-                                
-                                logMutex.withLock {
-                                    logWriteCount += toInsert.size
-                                    if (logWriteCount >= DB_PRUNE_THRESHOLD) {
-                                        logWriteCount = 0
-                                        triggerAsyncPruning()
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                forensicFailureCount.incrementAndGet()
-                                updateReliability(false)
-                                Timber.e(e, "Forensic drain failed")
-                            }
-                        } else if (pendingAtStart > 0) {
-                            forensicSpillBuffer.commitDrain(pendingAtStart)
+                        if (performForensicDrain(isRecovery = false)) {
                             lastDrainTime = now
-                            consecutiveStalls = 0
                         }
                     }
                 } catch (e: Exception) {
@@ -202,6 +143,114 @@ class LogRepository @Inject constructor(
                     Timber.e(e, "Error in forensic drainer loop")
                 }
             }
+        }
+    }
+
+    /**
+     * performForensicDrain: Core routine to move data from SpillBuffer to LogDao.
+     * Returns true if successful.
+     */
+    private suspend fun performForensicDrain(isRecovery: Boolean): Boolean {
+        val pendingAtStart = forensicSpillBuffer.getPendingCount()
+        val traces = forensicSpillBuffer.peek(FORENSIC_SPILL_CAPACITY)
+        if (traces.isEmpty()) {
+            if (pendingAtStart > 0) {
+                // Buffer says pending but peek is empty - likely corrupted entries failing checksum
+                forensicSpillBuffer.commitDrain(pendingAtStart)
+            }
+            return false
+        }
+
+        return try {
+            val minTs = traces.minOf { it.timestamp }
+            val existingSignatures = logDao.getExistingForensicSignatures(minTs).toSet()
+
+            val toInsert = traces.filter { 
+                val signature = "${it.timestamp}_${it.spillIdx}"
+                !existingSignatures.contains(signature)
+            }.map { 
+                LogEntity(
+                    localId = UUID.randomUUID().toString(),
+                    timestamp = it.timestamp, message = it.message, type = it.type,
+                    isImportant = it.isImportant, deviceId = it.id, viewerId = it.viewerId,
+                    isSpecial = it.isSpecial, role = it.role,
+                    lat = it.lat, lng = it.lng, accuracy = it.accuracy,
+                    maxAccuracy = it.maxAccuracy, snrSnapshot = it.snrSnapshot,
+                    vibeSnapshot = it.vibeSnapshot, synced = false,
+                    spillIdx = it.spillIdx
+                )
+            }
+            
+            if (toInsert.isNotEmpty()) {
+                logDao.insertAll(toInsert)
+            }
+            
+            forensicSpillBuffer.commitDrain(traces.size)
+            forensicSuccessCount.incrementAndGet()
+            updateReliability(true)
+            
+            if (isRecovery && toInsert.isNotEmpty()) {
+                val msg = "Forensic Recovery Successful: ${toInsert.size} traces replayed."
+                Timber.i(msg)
+                addLog(LogEntry(
+                    localId = UUID.randomUUID().toString(),
+                    timestamp = timeProvider.currentTimeMillis(),
+                    message = msg, type = "SYSTEM", isImportant = true,
+                    id = "SYSTEM", viewerId = "SYSTEM", isSpecial = true,
+                    specialColor = FORENSIC_PINK_COLOR
+                ), initiallySynced = true)
+            }
+            
+            // Check for convergence stalls (not applicable during one-shot recovery)
+            if (!isRecovery) {
+                checkDrainConvergence(pendingAtStart)
+            }
+
+            logMutex.withLock {
+                logWriteCount += toInsert.size
+                if (logWriteCount >= DB_PRUNE_THRESHOLD) {
+                    logWriteCount = 0
+                    triggerAsyncPruning()
+                }
+            }
+            true
+        } catch (e: Exception) {
+            forensicFailureCount.incrementAndGet()
+            updateReliability(false)
+            Timber.e(e, "Forensic drain failed")
+            false
+        }
+    }
+
+    private var consecutiveStalls = 0
+    private fun checkDrainConvergence(pendingAtStart: Int) {
+        val pendingAfter = forensicSpillBuffer.getPendingCount()
+        if (pendingAfter > 0) {
+            if (pendingAfter >= pendingAtStart) {
+                consecutiveStalls++
+                if (consecutiveStalls >= FORENSIC_CONVERGENCE_STALL_LIMIT) {
+                    val h = telemetry.systemHealth.value
+                    val msg = "Forensic Stall Correlated: Backfill not converging (%d pending). System: [CPU: %.1f, IOW: %.1f, Temp: %.1fC, Batt: %d%%]".format(
+                        pendingAfter, h.cpuLoad, h.ioWait, h.batteryTemp, h.batteryLevel
+                    )
+                    Timber.w(msg)
+                    addLog(LogEntry(
+                        localId = UUID.randomUUID().toString(),
+                        timestamp = timeProvider.currentTimeMillis(),
+                        message = msg, type = "SYSTEM", isImportant = true,
+                        id = "SYSTEM", viewerId = "SYSTEM", isSpecial = true,
+                        specialColor = FORENSIC_PINK_COLOR
+                    ), initiallySynced = true)
+                }
+            } else {
+                consecutiveStalls = 0
+            }
+        } else {
+            // Issue #721: Only log convergence if we were previously stalling to reduce idle noise.
+            if (consecutiveStalls > 0) {
+                Timber.d("Forensic Backfill: Convergence achieved.")
+            }
+            consecutiveStalls = 0
         }
     }
 

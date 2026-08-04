@@ -466,7 +466,7 @@ class ProcessedLocation(
     var maxAccuracy: Double = 0.0,
     var currentAccuracy: Double = 0.0,
     var filteredSpeed: Double = 0.0,
-    val timestamp: Long = 0L,
+    var timestamp: Long = 0L,
     var rt: Long = 0L,
     var isStalled: Boolean = false,
     var isClockRegression: Boolean = false,
@@ -488,6 +488,7 @@ class ProcessedLocation(
         maxAccuracy = 0.0
         currentAccuracy = 0.0
         filteredSpeed = 0.0
+        timestamp = 0L
         rt = 0L
         isStalled = false
         isClockRegression = false
