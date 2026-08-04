@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.04.101)
+# Project Issues & Hardening Tracking (Aug.04.110)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | Active | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 528 |
+| **Resolved (Total)** | 🟢 Progress | 532 |
 
 ---
 
@@ -19,19 +19,23 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ## 🔴 Open Issues
 *   **[Issue #721] Performance: getPackageName() logcat spam.**
-    *   **Context**: Identified during deployment on Samsung A15 (R405).
+    *   **Context**: Native library collision resolved; investigation into remaining system-triggered spam (specifically from permission APIs) is active.
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.04.75)
-*   **[Issue #718] [Severity: High] [Category: Robustness] Forensic Audit: Recovery Integrity Re-play**.
-    *   **Resolution**: Implemented `recoverAbandonedTraces()` in `LogRepository`, triggered during initialization. The routine performs a one-time drain of the memory-mapped `ForensicSpillBuffer` into SQLite, ensuring zero data loss for forensic telemetry after crashes or unexpected reboots. Integrated deduplication logic using `timestamp_spillIdx` signatures to prevent duplicate records (R718).
-*   **[Issue #717] [Severity: Medium] [Category: Performance] Forensic Audit: Memory-Mapped Metadata Header**.
-    *   **Resolution**: Implemented a 128-byte persistent header in `ForensicSpillBuffer` storing `magicNumber`, `version`, `capacity`, `entrySize`, and `lastWriteRt`. Enhanced initialization to perform integrity resets on version or schema mismatch (R717).
-*   **[Issue #716] [Severity: High] [Category: Robustness] Forensic Audit: Critical Battery Sentinel**.
-    *   **Resolution**: Implemented high-fidelity battery alerting in `MainAlarmLogic`. The sentinel correlates abnormal discharge rates with high system load (`cpuLoad > 0.7`) or sensor activity (`vibration > 0.25G`) to predict and alert on imminent shutdown (R716).
-*   **[Issue #715] [Severity: Medium] [Category: Robustness] Forensic Audit: Persistence Health Alerting**.
-    *   **Resolution**: Implemented duration-based alerting for forensic persistence degradation. Triggering `ALERT_ID_PERFORMANCE_SPIKE` if `forensicReliability` drops below 0.85 for > 30s, ensuring transient I/O pressure doesn't trigger false alarms while capturing sustained failures (R715).
+## 🟢 Recently Resolved Issues (Aug.04.110)
+*   **[Issue #723] [Severity: Medium] [Category: Performance] Main-Thread Jitter: Synchronous /proc Reads**.
+    *   **Resolution**: Changed `getCpuLoad` and `getIoWait` to suspend functions and wrapped implementations in `withContext(Dispatchers.IO)`. Updated `IntegrityMonitor.performIntegrityHeartbeat` to accommodate non-blocking execution (R723).
+*   **[Issue #722] [Severity: High] [Category: Performance] Setup-Phase Polling Overhead**.
+    *   **Resolution**: Increased `FORCED_REFRESH_COOLDOWN_MS` to 15s in `SystemStatusProviderImpl`. This throttles expensive system permission checks (`Settings.canDrawOverlays`, `isIgnoringBatteryOptimizations`) while the Setup Overlay is active, significantly reducing main-thread stalls and logcat pressure on budget hardware (R722).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.04.101)
+
+## 🟢 Recently Resolved Issues (Aug.04.101)
+*   **[Issue #721] [Severity: High] [Category: Performance] Samsung A15 Native Collision**.
+    *   **Resolution**: Renamed native library from `mbrainSDK` to `jdMbrain` to resolve naming collision with Samsung's internal system libraries (`libmbrainSDK`). Standardized log tags and updated JNI bridge initialization to use unique namespace (R721).
+*   **[Issue #721] [Severity: Low] [Category: Robustness] Log Noise Reduction**.
+    *   **Resolution**: Reduced verbosity of forensic convergence logs in `LogRepository` to minimize logcat pressure on budget hardware.
+
+---
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.04.110)

@@ -1,8 +1,10 @@
-# System Source of Truth (SoT) - Aug.04.101 (Samsung Performance Hardening)
+# System Source of Truth (SoT) - Aug.04.110 (Samsung Performance Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Non-Blocking Forensic Audit (R723)**: (Added Aug.04.110) All file system operations on `/proc` (CPU load, IO wait) MUST be executed on `Dispatchers.IO` to prevent main-thread micro-stalls during high-frequency dashboard rendering. (Issue #723)
+*   **Hardware State Refresh Throttling (R722)**: (Added Aug.04.110) Polling of expensive system hardware/permission states (Overlay, Battery Optimization) is RESTRICTED to a minimum cooldown of 15s to preserve UI smoothness on budget hardware. (Issue #722)
 *   **Native Namespace Integrity (R721)**: (Added Aug.04.101) The project native library MUST be named `jdMbrain` (libjdMbrain.so) to ensure zero-collision with Samsung/Vendor system libraries (e.g., `libmbrainSDK`). All JNI bridge calls MUST utilize this unique identifier. (Issue #721)
 *   **Forensic Recovery Integrity Re-play Authority (R718)**: (Added Aug.04.75) The `LogRepository` MUST perform a one-time recovery drain of the `ForensicSpillBuffer` during initialization. Any abandoned traces found in the memory-mapped buffer after a crash or reboot MUST be replayed into the database. The routine MUST utilize signature-based deduplication to prevent redundant records. (Issue #718)
 *   **Memory-Mapped Metadata Header Authority (R717)**: (Added Aug.03.100) The `ForensicSpillBuffer` MUST utilize a 128-byte persistent metadata header at the start of the file. This header MUST store `magicNumber`, `version`, `capacity`, `entrySize`, and `lastWriteRt`. The system MUST validate these fields during initialization to detect file corruption or schema mismatches, performing a full buffer reset if integrity is compromised. (Issue #717)
@@ -94,5 +96,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: Aug.04.101.
+*   **Current Release**: Aug.04.110.
 *   **Source of Truth**: app/build.gradle versionName.

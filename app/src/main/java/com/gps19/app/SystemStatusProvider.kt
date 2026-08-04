@@ -37,12 +37,14 @@ import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Aug.04.110:
+ * - Issue #722: Performance: Setup-Phase Polling Overhead. Increased 
+ *   FORCED_REFRESH_COOLDOWN_MS to 15s and throttled expensive hardware checks.
+ * - Issue #723: Main-Thread Jitter. Offloaded /proc reads to Dispatchers.IO 
+ *   to eliminate micro-stalls during dashboard rendering (R723).
  * Aug.03.90:
  * - Issue #711: Forensic Audit: Persistence Latency Correlation. Added getCpuLoad 
- *   and getIoWait for performance profiling. Implemented HardwarePropertiesManager 
- *   integration for thermal and load auditing (R711).
- * July.31.37:
- * - Issue #666: Performance Stabilization (Samsung A15).
+ *   and getIoWait for performance profiling.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -69,8 +71,8 @@ interface SystemStatusProvider {
     fun getStorageStatus(): StorageStatus
     fun getPowerStatus(): PowerStatus
 
-    fun getCpuLoad(): Double
-    fun getIoWait(): Double
+    suspend fun getCpuLoad(): Double
+    suspend fun getIoWait(): Double
 }
 
 @Singleton
@@ -104,8 +106,8 @@ class SystemStatusProviderImpl @Inject constructor(
     private val isS21FE by lazy { isS21FEDevice() }
     private val isA15 by lazy { isA15Device() }
     
-    private val PERMISSION_TTL_MS = 10000L
-    private val FORCED_REFRESH_COOLDOWN_MS = 5000L
+    private val PERMISSION_TTL_MS = 30000L // Increased from 10s
+    private val FORCED_REFRESH_COOLDOWN_MS = 15000L // Increased from 5s (Issue #722)
     private val STORAGE_POLL_INTERVAL_MS = 60_000L
     private val POWER_POLL_INTERVAL_MS = 60_000L
     
@@ -368,11 +370,9 @@ class SystemStatusProviderImpl @Inject constructor(
         return PowerStatus(powerSave, standbyBucket)
     }
 
-    override fun getCpuLoad(): Double {
-        return try {
+    override suspend fun getCpuLoad(): Double = withContext(Dispatchers.IO) {
+        try {
             hardwarePropertiesManager?.let {
-                // In a production app, we would use a more complex JNI approach for precise load,
-                // but for forensic correlation, /proc/loadavg is the reliable authority on Android.
                 readProcLoadAvg()
             } ?: readProcLoadAvg()
         } catch (e: Exception) {
@@ -380,8 +380,8 @@ class SystemStatusProviderImpl @Inject constructor(
         }
     }
 
-    override fun getIoWait(): Double {
-        return try {
+    override suspend fun getIoWait(): Double = withContext(Dispatchers.IO) {
+        try {
             readProcIoWait()
         } catch (e: Exception) {
             0.0
@@ -402,7 +402,7 @@ class SystemStatusProviderImpl @Inject constructor(
     private fun readProcIoWait(): Double {
         return try {
             RandomAccessFile("/proc/stat", "r").use { reader ->
-                val line = reader.readLine() // "cpu  user nice system idle iowait ..."
+                val line = reader.readLine()
                 if (line != null) {
                     val parts = line.trim().split("\\s+".toRegex())
                     if (parts.size >= 6) parts[5].toDouble() else 0.0

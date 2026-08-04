@@ -26,13 +26,13 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.04.110:
+ * - Issue #723 Hardening: Updated performIntegrityHeartbeat to suspend to 
+ *   accommodate offloaded /proc I/O in SystemStatusProvider (R723).
  * Aug.03.90:
  * - Issue #711: Forensic Audit: Persistence Latency Correlation. Integrated 
  *   cpuLoad and ioWait polling into performIntegrityHeartbeat for diagnostic 
  *   profiling (R711).
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Refactored to use mutable flyweight 
- *   updates for SystemHealthState to eliminate allocation churn (R-HARDWARE-01).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -131,7 +131,7 @@ class IntegrityMonitor @Inject constructor(
         }
     }
 
-    private fun performIntegrityHeartbeat() {
+    private suspend fun performIntegrityHeartbeat() {
         val nowRt = timeProvider.elapsedRealtime()
         val storageStalled = lastStorageUpdateRt > 0 && (nowRt - lastStorageUpdateRt) > INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
         val powerStalled = lastPowerUpdateRt > 0 && (nowRt - lastPowerUpdateRt) > INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
@@ -147,7 +147,7 @@ class IntegrityMonitor @Inject constructor(
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
         }
 
-        // Issue #711: Poll performance metrics for diagnostic correlation
+        // Issue #723: Offloaded metrics polling
         val cpu = systemStatusProvider.getCpuLoad()
         val iow = systemStatusProvider.getIoWait()
 
