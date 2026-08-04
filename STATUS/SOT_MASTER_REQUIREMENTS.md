@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.04.115 (Integrity Audit)
+# System Source of Truth (SoT) - Aug.04.116 (Bloat Prevention)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Forensic Bloat Prevention (R731)**: (Added Aug.04.116) The `LogRepository` MUST implement a secondary safety tier that chunk-prunes `isSpecial` (Forensic Trace) logs when the total log count exceeds `LOG_LIMIT_STRICT` (5000 entries). This prevents unbounded database growth while preserving the maximum possible forensic history. (Issue #731)
 *   **Automated Database Integrity Validation (R729)**: (Added Aug.04.115) The `MaintenanceWorker` MUST execute a periodic database integrity audit using `PRAGMA integrity_check`. The audit MUST be performed every 24 hours, or every 12 hours if the device is in a charging state. Results MUST be logged to the system logs, and failures MUST trigger a forensic system log entry with high priority. (Issue #729)
 *   **Storage-Aware Adaptive Pruning (R728)**: (Added Aug.04.114) The `LogRepository` MUST implement granular, fragmentation-aware pruning. Deletion cycles MUST utilize `StorageStatsManager` (where available) for precise pressure detection and execute in controlled chunks (`PRUNE_CHUNK_SIZE`) to prevent SQLite B-Tree fragmentation and I/O stalls on budget eMMC storage. (Issue #728)
 *   **UI Ribbon Optimization (R726)**: (Added Aug.04.113) Forensic Ribbons MUST utilize `drawWithCache` to pre-calculate paths and static visual elements (grid, ticks). Traces MUST be rendered using a single `Path` call or `drawPoints` batching to minimize draw-call overhead. Each ribbon container MUST be isolated via `.graphicsLayer()` to ensure independent invalidation and hardware acceleration. (Issue #726)
@@ -101,5 +102,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: Aug.04.115.
+*   **Current Release**: Aug.04.116.
 *   **Source of Truth**: app/build.gradle versionName.

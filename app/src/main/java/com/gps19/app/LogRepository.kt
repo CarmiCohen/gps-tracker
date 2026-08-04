@@ -19,13 +19,14 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.04.116:
+ * - Issue #731: Forensic Bloat: Important/Special Logs Exempt from Pruning. 
+ *   Implemented secondary safety tier in proactivePruning to chunk-delete 
+ *   Special logs when count > LOG_LIMIT_STRICT, preventing unbounded growth (R731).
  * Aug.04.114:
  * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Implemented 
  *   chunked deletion cycles (PRUNE_CHUNK_SIZE=100) and adaptive thresholds 
- *   to minimize B-Tree fragmentation and I/O stalls on budget hardware (R728).
- * Aug.04.113:
- * - Issue #727: Forensic Audit: Dynamic Batch-Write Optimization. Implemented 
- *   dynamic batch sizing in performForensicDrain (R727).
+ *   to minimize B-Tree fragmentation and I/O stalls (R728).
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -107,7 +108,6 @@ class LogRepository @Inject constructor(
             val pending = forensicSpillBuffer.getPendingCount()
             if (pending > 0) {
                 Timber.i("Forensic Recovery: Replaying $pending abandoned traces.")
-                // Recovery uses maximum capacity to clear buffer fast during startup
                 performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = true)
             }
         }
@@ -137,7 +137,6 @@ class LogRepository @Inject constructor(
                                     (pendingAtStart > 0 && now - lastDrainTime >= FORENSIC_DRAIN_INTERVAL_MS)
                     
                     if (shouldDrain) {
-                        // Issue #727: Dynamic Batch Sizing
                         val baseBatchSize = FORENSIC_BATCH_SIZE_MIN + 
                                           ((FORENSIC_BATCH_SIZE_MAX - FORENSIC_BATCH_SIZE_MIN) * fillLevel).toInt()
                         
@@ -156,16 +155,11 @@ class LogRepository @Inject constructor(
         }
     }
 
-    /**
-     * performForensicDrain: Core routine to move data from SpillBuffer to LogDao.
-     * Returns true if successful.
-     */
     private suspend fun performForensicDrain(limit: Int, isRecovery: Boolean): Boolean {
         val pendingAtStart = forensicSpillBuffer.getPendingCount()
         val traces = forensicSpillBuffer.peek(limit)
         if (traces.isEmpty()) {
             if (pendingAtStart > 0) {
-                // Buffer says pending but peek is empty - likely corrupted entries failing checksum
                 forensicSpillBuffer.commitDrain(pendingAtStart)
             }
             return false
@@ -361,7 +355,7 @@ class LogRepository @Inject constructor(
                 operation = "Log retrieval [limit: $limit]",
                 type = LatencyMonitor.AuditType.IO,
                 onSpike = { message, _ -> Timber.w(message) }
-            ) { /* measurement only */ }
+            ) { }
         }
         .map { entities ->
             entities.map { 
@@ -399,7 +393,8 @@ class LogRepository @Inject constructor(
 
     /**
      * proactivePruning: Executes granular deletion cycles based on storage pressure.
-     * Issue #728: fragmentation-aware chunked deletion to prevent I/O stalls.
+     * Issue #728/731: fragmentation-aware chunked deletion with secondary safety tier 
+     * for Special logs when database exceeds strict limits.
      */
     suspend fun proactivePruning() {
         LatencyMonitor.measureAndAudit(
@@ -425,19 +420,24 @@ class LogRepository @Inject constructor(
                     val generalTarget = if (health.isStorageLow) 300 else 500
                     
                     var totalPruned = 0
-                    // Issue #728: Chunked deletion cycles (Fragmentation-Aware)
                     repeat(5) { 
                         val p1 = logDao.pruneRoutineHeartbeatsChunk(heartbeatTarget, PRUNE_CHUNK_SIZE)
                         val p2 = logDao.pruneNonForensicLogsChunk(generalTarget, PRUNE_CHUNK_SIZE)
-                        val chunkPruned = p1 + p2
+                        
+                        // Issue #731: Secondary safety tier for Special/Forensic logs
+                        val p3 = if (count > LOG_LIMIT_STRICT) {
+                            logDao.pruneSpecialLogsChunk(LOG_LIMIT_STANDARD, PRUNE_CHUNK_SIZE)
+                        } else 0
+                        
+                        val chunkPruned = p1 + p2 + p3
                         totalPruned += chunkPruned
                         
-                        if (chunkPruned < PRUNE_CHUNK_SIZE) return@repeat // Targets met
-                        delay(50) // Yield to allow other I/O operations
+                        if (chunkPruned < PRUNE_CHUNK_SIZE) return@repeat 
+                        delay(50) 
                     }
                     
                     if (totalPruned > 0) {
-                        Timber.d("Proactive pruning [Threshold: $threshold, Count: $count, Pruned: $totalPruned]. Targets: H=$heartbeatTarget, G=$generalTarget")
+                        Timber.d("Proactive pruning [Threshold: $threshold, Count: $count, Pruned: $totalPruned]. Targets: H=$heartbeatTarget, G=$generalTarget, S=${if (count > LOG_LIMIT_STRICT) LOG_LIMIT_STANDARD else "NONE"}")
                     }
                 }
             } catch (e: Exception) {

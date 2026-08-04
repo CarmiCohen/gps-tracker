@@ -8,18 +8,16 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.04.116:
+ * - Issue #731: Forensic Bloat: Important/Special Logs Exempt from Pruning. 
+ *   Updated LogDao with pruneSpecialLogsChunk to provide a secondary safety tier 
+ *   for forensic data, preventing unbounded growth while preserving history (R731).
  * Aug.04.115:
  * - Issue #729: Forensic Audit: Automated Database Integrity Validation. 
  *   Added checkIntegrity() to run PRAGMA integrity_check.
  * Aug.04.114:
  * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Updated LogDao 
  *   to support chunked pruning to prevent B-Tree fragmentation and I/O stalls (R728).
- * Aug.04.15:
- * - Issue #712: Forensic Audit: Adaptive Database Pruning. Updated LogDao 
- *   to support dynamic pruning limits (R712).
- * Aug.03.65:
- * - Issue #705: Forensic Audit: Trace Deduplication Performance Optimization. 
- *   Added spillIdx to LogEntity and specialized index for fast duplicate detection.
  */
 @Entity(
     tableName = "logs", 
@@ -116,10 +114,7 @@ data class HistoryEntity(
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
 data class ViolationEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val lat: Double,
-    val lng: Double,
-    val type: String,
-    val ts: Long,
+    val lat: Double, val lng: Double, val type: String, val ts: Long,
     @ColumnInfo(defaultValue = "0") val accuracy: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0
 )
@@ -202,6 +197,10 @@ abstract class LogDao {
 
     @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND id NOT IN (SELECT id FROM logs ORDER BY timestamp DESC LIMIT :limit) LIMIT :chunkSize)")
     abstract suspend fun pruneNonForensicLogsChunk(limit: Int, chunkSize: Int): Int
+
+    // Issue #731: Forensic Bloat: Safety tier for Special/Forensic logs
+    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isSpecial = 1 AND id NOT IN (SELECT id FROM logs WHERE isSpecial = 1 ORDER BY timestamp DESC LIMIT :limit) LIMIT :chunkSize)")
+    abstract suspend fun pruneSpecialLogsChunk(limit: Int, chunkSize: Int): Int
 }
 
 @Dao
