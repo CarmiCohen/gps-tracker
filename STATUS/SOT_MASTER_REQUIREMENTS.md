@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.04.114 (Storage-Aware Pruning)
+# System Source of Truth (SoT) - Aug.04.115 (Integrity Audit)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Automated Database Integrity Validation (R729)**: (Added Aug.04.115) The `MaintenanceWorker` MUST execute a periodic database integrity audit using `PRAGMA integrity_check`. The audit MUST be performed every 24 hours, or every 12 hours if the device is in a charging state. Results MUST be logged to the system logs, and failures MUST trigger a forensic system log entry with high priority. (Issue #729)
 *   **Storage-Aware Adaptive Pruning (R728)**: (Added Aug.04.114) The `LogRepository` MUST implement granular, fragmentation-aware pruning. Deletion cycles MUST utilize `StorageStatsManager` (where available) for precise pressure detection and execute in controlled chunks (`PRUNE_CHUNK_SIZE`) to prevent SQLite B-Tree fragmentation and I/O stalls on budget eMMC storage. (Issue #728)
 *   **UI Ribbon Optimization (R726)**: (Added Aug.04.113) Forensic Ribbons MUST utilize `drawWithCache` to pre-calculate paths and static visual elements (grid, ticks). Traces MUST be rendered using a single `Path` call or `drawPoints` batching to minimize draw-call overhead. Each ribbon container MUST be isolated via `.graphicsLayer()` to ensure independent invalidation and hardware acceleration. (Issue #726)
 *   **Forensic Delta-Encoding Hardening (R725)**: (Added JAug.04.112) The `ForensicSpillBuffer` MUST implement Adaptive Base Resetting, refreshing the delta-encoding bases (timestamp, coordinates) whenever the buffer is completely drained. This prevents long-term `Int` overflow for timestamp deltas. High-frequency write operations MUST be monitored via `LatencyMonitor` with a 5ms threshold to detect micro-stalls on budget hardware. (Issue #725)
@@ -100,5 +101,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: Aug.04.114.
+*   **Current Release**: Aug.04.115.
 *   **Source of Truth**: app/build.gradle versionName.

@@ -17,6 +17,9 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Aug.04.115:
+ * - Issue #729: Forensic Audit: Automated Database Integrity Validation. 
+ *   Added checkDatabaseIntegrity() to expose PRAGMA integrity_check.
  * July.30.31:
  * - Issue #632: Analytical Ribbons: Recovery Markers. Mapped isRecoveryEvent 
  *   between ConnectionPoint and HistoryEntity.
@@ -486,4 +489,11 @@ class MainRepository @Inject constructor(
 
     suspend fun incrementRecoveryStats(blackoutMs: Long) = settings.incrementRecoveryStats(blackoutMs)
     suspend fun getSettingsSnapshot() = settings.getSettingsSnapshot()
+
+    /**
+     * Issue #729: Runs database integrity check and returns status.
+     */
+    suspend fun checkDatabaseIntegrity(): String = withContext(Dispatchers.IO) {
+        database.checkIntegrity()
+    }
 }

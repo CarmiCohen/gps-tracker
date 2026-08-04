@@ -10,16 +10,18 @@ import com.gps19.core.engine.*
 import androidx.hilt.work.HiltWorker
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * Aug.04.115:
+ * - Issue #729: Forensic Audit: Automated Database Integrity Validation. 
+ *   Integrated checkDatabaseIntegrity() with charging-aware execution.
  * JAug.04.111:
  * - Issue #721: Performance Hardening. Refactored to use GpsApplication.PACKAGE_NAME 
  *   shadow-cache to eliminate repetitive getPackageName() calls on Samsung A15.
- * July.30.27:
- * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs recording.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -32,6 +34,9 @@ class MaintenanceWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     companion object {
+        private const val LAST_INTEGRITY_CHECK_TS_KEY = "last_integrity_check_ts"
+        private const val INTEGRITY_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L // 24 Hours
+
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<MaintenanceWorker>(15, TimeUnit.MINUTES)
                 .setBackoffCriteria(BackoffPolicy.LINEAR, 1, TimeUnit.MINUTES)
@@ -68,6 +73,9 @@ class MaintenanceWorker @AssistedInject constructor(
         val networkStatus = if (isNetworkAlive) "ALIVE" else "DEAD"
 
         Log.d("GPS19", "MAINTENANCE: Periodic check. Mode: $savedMode, Active: $isSystemActive, Silence: ${silenceDurationMs/1000}s, Uptime: ${appUptimeMs/1000}s, Net: $networkStatus")
+
+        // Issue #729: Automated Database Integrity Check
+        performIntegrityAudit(now)
 
         if (appUptimeMs < RECOVERY_GRACE_PERIOD_MS) {
             Log.d("GPS19", "MAINTENANCE: Within startup grace period (${appUptimeMs/1000}s). Skipping recovery check.")
@@ -152,5 +160,40 @@ class MaintenanceWorker @AssistedInject constructor(
         }
 
         return Result.success()
+    }
+
+    private suspend fun performIntegrityAudit(now: Long) {
+        val lastCheck = repository.getLong(LAST_INTEGRITY_CHECK_TS_KEY, 0L)
+        val batteryStatus = systemStatusProvider.observeBatteryStatus().first()
+        val isCharging = batteryStatus.isCharging
+        
+        // Check every 24h, OR more frequently if charging and 12h have passed
+        val interval = if (isCharging) INTEGRITY_CHECK_INTERVAL_MS / 2 else INTEGRITY_CHECK_INTERVAL_MS
+        val shouldCheck = (now - lastCheck >= interval)
+        
+        if (shouldCheck) {
+            Log.i("GPS19", "MAINTENANCE: Starting Database Integrity Audit (Charging: $isCharging)...")
+            val result = repository.checkDatabaseIntegrity()
+            val isOk = result.equals("ok", ignoreCase = true)
+            
+            val msg = if (isOk) {
+                "MAINTENANCE: Database Integrity Audit PASSED."
+            } else {
+                "MAINTENANCE: Database Integrity Audit FAILED: $result"
+            }
+            
+            Log.w("GPS19", msg)
+            repository.addLog(LogEntry(
+                id = "SYSTEM",
+                timestamp = now,
+                message = msg,
+                type = "SYSTEM",
+                isImportant = !isOk,
+                isSpecial = !isOk,
+                specialColor = if (isOk) null else FORENSIC_PINK_COLOR
+            ), initiallySynced = true)
+            
+            repository.saveLong(LAST_INTEGRITY_CHECK_TS_KEY, now)
+        }
     }
 }
