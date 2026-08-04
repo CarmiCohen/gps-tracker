@@ -2,6 +2,7 @@ package com.gps19.app
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.usage.StorageStatsManager
 import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -18,11 +19,10 @@ import android.os.HardwarePropertiesManager
 import android.os.PowerManager
 import android.os.StatFs
 import android.os.SystemClock
+import android.os.storage.StorageManager
 import android.provider.Settings
 import androidx.core.content.ContextCompat
-import com.gps19.core.engine.CapabilityStatus
-import com.gps19.core.engine.SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB
-import com.gps19.core.engine.SYSTEM_STORAGE_LOW_THRESHOLD_MB
+import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
@@ -31,20 +31,19 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import java.io.RandomAccessFile
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
- * Aug.04.110:
- * - Issue #722: Performance: Setup-Phase Polling Overhead. Increased 
- *   FORCED_REFRESH_COOLDOWN_MS to 15s and throttled expensive hardware checks.
- * - Issue #723: Main-Thread Jitter. Offloaded /proc reads to Dispatchers.IO 
- *   to eliminate micro-stalls during dashboard rendering (R723).
- * Aug.03.90:
- * - Issue #711: Forensic Audit: Persistence Latency Correlation. Added getCpuLoad 
- *   and getIoWait for performance profiling.
+ * Aug.04.114:
+ * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Integrated 
+ *   StorageStatsManager and implemented percentage-based pressure detection (R728).
+ * JAug.04.111:
+ * - Issue #721: Performance Hardening. Refactored to use GpsApplication.PACKAGE_NAME 
+ *   shadow-cache.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -85,6 +84,13 @@ class SystemStatusProviderImpl @Inject constructor(
     private val connectivityManager by lazy { context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager }
     private val alarmManager by lazy { context.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
     private val batteryManager by lazy { context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager }
+    private val storageStatsManager by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.getSystemService(Context.STORAGE_STATS_SERVICE) as? StorageStatsManager
+        } else null
+    }
+    private val storageManager by lazy { context.getSystemService(Context.STORAGE_SERVICE) as StorageManager }
+    
     private val hardwarePropertiesManager by lazy {
         context.getSystemService(Context.HARDWARE_PROPERTIES_SERVICE) as? HardwarePropertiesManager
     }
@@ -93,8 +99,6 @@ class SystemStatusProviderImpl @Inject constructor(
             context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         } else null
     }
-    
-    private val cachedPackageName = context.packageName
     
     private var lastFullRefreshTime: Long = 0
     private val cachedState = AtomicReference<PermissionState>(PermissionState())
@@ -106,8 +110,8 @@ class SystemStatusProviderImpl @Inject constructor(
     private val isS21FE by lazy { isS21FEDevice() }
     private val isA15 by lazy { isA15Device() }
     
-    private val PERMISSION_TTL_MS = 30000L // Increased from 10s
-    private val FORCED_REFRESH_COOLDOWN_MS = 15000L // Increased from 5s (Issue #722)
+    private val PERMISSION_TTL_MS = 30000L 
+    private val FORCED_REFRESH_COOLDOWN_MS = 15000L 
     private val STORAGE_POLL_INTERVAL_MS = 60_000L
     private val POWER_POLL_INTERVAL_MS = 60_000L
     
@@ -182,9 +186,10 @@ class SystemStatusProviderImpl @Inject constructor(
                 if (doubleCheckExecute) {
                     try {
                         val current = cachedState.get()
+                        val pkg = GpsApplication.PACKAGE_NAME
                         withContext(Dispatchers.IO) {
                             val fineLocGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                            val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(cachedPackageName)
+                            val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(pkg)
                             val overlayGranted = Settings.canDrawOverlays(context)
                             val micGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
                             val alarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true
@@ -192,8 +197,8 @@ class SystemStatusProviderImpl @Inject constructor(
                             val bgLocGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true
                             val actRecogGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true
 
-                            val xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
-                            val xiaomiAutostart = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, cachedPackageName) else XiaomiPermissionStatus.UNKNOWN
+                            val xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, pkg) else XiaomiPermissionStatus.UNKNOWN
+                            val xiaomiAutostart = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, pkg) else XiaomiPermissionStatus.UNKNOWN
 
                             lastHardwareCheckRt = currentNow
                             lastFullRefreshTime = currentNow
@@ -201,7 +206,7 @@ class SystemStatusProviderImpl @Inject constructor(
                             val newState = PermissionState(
                                 isFineLocationGranted = fineLocGranted,
                                 isBatteryWhitelisted = batteryWhitelisted,
-                                isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, cachedPackageName) else batteryWhitelisted,
+                                isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, pkg) else batteryWhitelisted,
                                 isOverlayGranted = overlayGranted,
                                 isMicrophoneGranted = micGranted,
                                 isExactAlarmGranted = alarmGranted,
@@ -314,16 +319,39 @@ class SystemStatusProviderImpl @Inject constructor(
     override fun getStorageStatus(): StorageStatus {
         return try {
             val stat = StatFs(context.filesDir.path)
-            val bytesAvailable = stat.availableBlocksLong * stat.blockSizeLong
-            val megabytesAvailable = bytesAvailable / (1024 * 1024)
+            
+            // Issue #728: Granular pressure detection using StorageStatsManager
+            var totalMbValue: Long
+            var availableMbValue: Long
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && storageStatsManager != null) {
+                try {
+                    val totalBytes = storageStatsManager!!.getTotalBytes(StorageManager.UUID_DEFAULT)
+                    val freeBytes = storageStatsManager!!.getFreeBytes(StorageManager.UUID_DEFAULT)
+                    totalMbValue = totalBytes / (1024 * 1024)
+                    availableMbValue = freeBytes / (1024 * 1024)
+                } catch (e: Exception) {
+                    totalMbValue = (stat.blockCountLong * stat.blockSizeLong) / (1024 * 1024)
+                    availableMbValue = (stat.availableBlocksLong * stat.blockSizeLong) / (1024 * 1024)
+                }
+            } else {
+                totalMbValue = (stat.blockCountLong * stat.blockSizeLong) / (1024 * 1024)
+                availableMbValue = (stat.availableBlocksLong * stat.blockSizeLong) / (1024 * 1024)
+            }
+
+            val availablePct = if (totalMbValue > 0) availableMbValue.toDouble() / totalMbValue else 1.0
+            val low = availableMbValue < SYSTEM_STORAGE_LOW_THRESHOLD_MB || availablePct < SYSTEM_STORAGE_LOW_THRESHOLD_PCT
+            val critical = availableMbValue < SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB || availablePct < SYSTEM_STORAGE_CRITICAL_THRESHOLD_PCT
+
             StorageStatus(
-                availableMb = megabytesAvailable,
-                isLow = megabytesAvailable < SYSTEM_STORAGE_LOW_THRESHOLD_MB,
-                isCritical = megabytesAvailable < SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB
+                availableMb = availableMbValue,
+                totalMb = totalMbValue,
+                isLow = low,
+                isCritical = critical
             )
         } catch (e: Exception) {
             Timber.e(e, "Failed to calculate storage status")
-            StorageStatus(0, isLow = true, isCritical = true)
+            StorageStatus(0, 0, isLow = true, isCritical = true)
         }
     }
 
@@ -423,6 +451,7 @@ data class BatteryStatus(
 
 data class StorageStatus(
     val availableMb: Long,
+    val totalMb: Long,
     val isLow: Boolean,
     val isCritical: Boolean
 )

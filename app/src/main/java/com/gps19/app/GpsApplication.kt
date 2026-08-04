@@ -20,6 +20,9 @@ import java.io.File
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Aug.04.111:
+ * - Issue #721: Logcat Spam Hardening. Added PACKAGE_NAME shadow-cache to prevent
+ *   repetitive getPackageName() calls which trigger system-level logcat spam on Samsung A15.
  * Aug.01.00:
  * - Issue #664: Forensic Audit: Startup Davey Stalls. Deferring osmdroid setup by 3s 
  *   to clear the main-thread critical path during first-frame rendering.
@@ -33,6 +36,15 @@ class GpsApplication : Application(), Configuration.Provider {
     @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
     @Inject lateinit var logManager: LogManager
 
+    companion object {
+        /**
+         * Shadow-cache for the package name to avoid triggering Samsung's repetitive 
+         * 'getPackageName' logcat spam during high-frequency UI/Background operations.
+         */
+        lateinit var PACKAGE_NAME: String
+            private set
+    }
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -41,6 +53,8 @@ class GpsApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         
+        PACKAGE_NAME = super.getPackageName()
+
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
@@ -82,7 +96,7 @@ class GpsApplication : Application(), Configuration.Provider {
                 osmConfig.isDebugMode = false
                 osmConfig.isDebugTileProviders = false
                 
-                Timber.d("Issue #664: Deferred startup initialization complete.")
+                Timber.d("Issue #721: Shadow-cache initialized. Deferred startup complete.")
             } catch (e: Exception) {
                 Timber.e(e, "Issue #664: Deferred startup failed")
             }

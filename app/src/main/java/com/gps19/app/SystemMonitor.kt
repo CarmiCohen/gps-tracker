@@ -26,12 +26,12 @@ sealed class SystemMonitorEvent {
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * JAug.04.111:
+ * - Issue #721: Performance Hardening. Refactored to use GpsApplication.PACKAGE_NAME 
+ *   shadow-cache to eliminate repetitive getPackageName() calls on Samsung A15.
  * July.28.22:
  * - Issue #617: Global SharedFlow Audit. Hardened _systemMonitorEvents with 
  *   BufferOverflow.DROP_OLDEST to ensure non-blocking resource management (R617).
- * July.26.04:
- * - Issue #545c: Service Reactive Migration. Replaced legacy watchdog listener 
- *   with a SharedFlow (systemMonitorEvents) for reactive event dispatching.
  */
 @Singleton
 class SystemMonitor @Inject constructor(
@@ -52,8 +52,6 @@ class SystemMonitor @Inject constructor(
     
     private var lastWakeLockRenewalTs = 0L
     private val WAKELOCK_RENEWAL_TTL_MS = 300_000L // 5 minutes
-
-    private val cachedPkgName = context.packageName
 
     var jumpStateStartTs = 0L
     var gpsStallStartTs = 0L
@@ -113,7 +111,7 @@ class SystemMonitor @Inject constructor(
         }
 
         val alarmManagerService = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(ACTION_ALARM_WAKEUP).setPackage(cachedPkgName)
+        val intent = Intent(ACTION_ALARM_WAKEUP).setPackage(GpsApplication.PACKAGE_NAME)
         val pendingIntent = PendingIntent.getBroadcast(
             context, 0, intent, 
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -146,7 +144,7 @@ class SystemMonitor @Inject constructor(
     fun cancelWatchdogAlarm() {
         try {
             val alarmManagerService = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val intent = Intent(ACTION_ALARM_WAKEUP).setPackage(cachedPkgName)
+            val intent = Intent(ACTION_ALARM_WAKEUP).setPackage(GpsApplication.PACKAGE_NAME)
             val pendingIntent = PendingIntent.getBroadcast(
                 context, 0, intent, 
                 PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE

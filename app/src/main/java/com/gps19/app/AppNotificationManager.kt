@@ -18,12 +18,12 @@ import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
+ * JAug.04.111:
+ * - Issue #721: Performance Hardening. Refactored to use GpsApplication.PACKAGE_NAME 
+ *   shadow-cache to eliminate repetitive getPackageName() calls on Samsung A15.
  * July.27.13:
  * - Issue #608: Startup Notification Flicker. Added getPulseMessage() to allow 
  *   services to build rich notifications during startForeground() initialization.
- * July.27.12:
- * - Issue #607: Foreground Service Startup Race Condition. Added init block to 
- *   ensure notification channels are created immediately upon injection.
  */
 @Singleton
 class AppNotificationManager @Inject constructor(
@@ -35,7 +35,6 @@ class AppNotificationManager @Inject constructor(
     private val notificationId = 1919
     private val alarmNotificationId = 1920
     
-    private val cachedPkgName = context.packageName
     private var isTrackerMode = false
 
     init {
@@ -132,7 +131,7 @@ class AppNotificationManager @Inject constructor(
 
         if (showPermissionAction) {
             val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", cachedPkgName, null)
+                data = Uri.fromParts("package", GpsApplication.PACKAGE_NAME, null)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             val settingsPendingIntent = PendingIntent.getActivity(

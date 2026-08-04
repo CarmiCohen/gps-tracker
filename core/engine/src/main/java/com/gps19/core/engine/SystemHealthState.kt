@@ -4,15 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
- * Aug.04.55:
- * - Issue #716: Forensic Audit: Critical Battery Sentinel. Added vibration to 
- *   update() for correlated battery health alerting (R716).
- * Aug.04.45:
- * - Issue #714: Forensic Audit: Persistence Reliability Metrics. Added 
- *   forensicReliability (0.0 to 1.0) for real-time persistence health monitoring (R714).
- * Aug.03.95:
- * - Issue #711: Forensic Audit: Persistence Latency Correlation. Added cpuLoad 
- *   and ioWait for correlated diagnostic profiling (R711).
+ * Aug.04.114:
+ * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Added 
+ *   storageAvailableMb and storageTotalMb for granular pressure diagnostics (R728).
+ * Aug.04.113:
+ * - Issue #716: Forensic Audit: Critical Battery Sentinel. Added vibration 
+ *   alerting (R716).
  */
 @Serializable
 class SystemHealthState(
@@ -41,6 +38,8 @@ class SystemHealthState(
     var netInterface: String = "UNKNOWN",
     var isStorageLow: Boolean = false,
     var isStorageCritical: Boolean = false,
+    var storageAvailableMb: Long = 0L,
+    var storageTotalMb: Long = 0L,
     var isBatterySteepDischarge: Boolean = false,
     var isCoolingModeActive: Boolean = false,
     var gnssDetail: GnssDetail? = null,
@@ -128,6 +127,8 @@ class SystemHealthState(
         this.netInterface = other.netInterface
         this.isStorageLow = other.isStorageLow
         this.isStorageCritical = other.isStorageCritical
+        this.storageAvailableMb = other.storageAvailableMb
+        this.storageTotalMb = other.storageTotalMb
         this.isBatterySteepDischarge = other.isBatterySteepDischarge
         this.isCoolingModeActive = other.isCoolingModeActive
         this.gnssDetail = other.gnssDetail
@@ -191,7 +192,7 @@ class SystemHealthState(
         netInterface: String, isStorageLow: Boolean, isStorageCritical: Boolean,
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
         cpuLoad: Double = 0.0, ioWait: Double = 0.0, forensicReliability: Double = 1.0,
-        vibration: Double = 0.0
+        vibration: Double = 0.0, storageAvailableMb: Long = 0L, storageTotalMb: Long = 0L
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -221,6 +222,8 @@ class SystemHealthState(
         this.netInterface = netInterface
         this.isStorageLow = isStorageLow
         this.isStorageCritical = isStorageCritical
+        this.storageAvailableMb = storageAvailableMb
+        this.storageTotalMb = storageTotalMb
         this.isBatterySteepDischarge = isBatterySteepDischarge
         this.isCoolingModeActive = isCoolingModeActive
         this.cpuLoad = cpuLoad
@@ -255,6 +258,8 @@ class SystemHealthState(
         netInterface = "UNKNOWN"
         isStorageLow = false
         isStorageCritical = false
+        storageAvailableMb = 0L
+        storageTotalMb = 0L
         isBatterySteepDischarge = false
         isCoolingModeActive = false
         gnssDetail = null

@@ -8,15 +8,15 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.04.114:
+ * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Updated LogDao 
+ *   to support chunked pruning to prevent B-Tree fragmentation and I/O stalls (R728).
  * Aug.04.15:
  * - Issue #712: Forensic Audit: Adaptive Database Pruning. Updated LogDao 
  *   to support dynamic pruning limits (R712).
  * Aug.03.65:
  * - Issue #705: Forensic Audit: Trace Deduplication Performance Optimization. 
  *   Added spillIdx to LogEntity and specialized index for fast duplicate detection.
- * July.31.38:
- * - Issue #660: Forensic Audit: Log Buffer Pressure. Added insertAll to LogDao 
- *   for optimized batch inserts.
  */
 @Entity(
     tableName = "logs", 
@@ -192,6 +192,13 @@ abstract class LogDao {
 
     @Query("DELETE FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND id NOT IN (SELECT id FROM logs ORDER BY timestamp DESC LIMIT :limit)")
     abstract suspend fun pruneNonForensicLogs(limit: Int)
+
+    // Issue #728: Chunked Pruning to minimize fragmentation and I/O stalls
+    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') AND id NOT IN (SELECT id FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT :limit) LIMIT :chunkSize)")
+    abstract suspend fun pruneRoutineHeartbeatsChunk(limit: Int, chunkSize: Int): Int
+
+    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND id NOT IN (SELECT id FROM logs ORDER BY timestamp DESC LIMIT :limit) LIMIT :chunkSize)")
+    abstract suspend fun pruneNonForensicLogsChunk(limit: Int, chunkSize: Int): Int
 }
 
 @Dao

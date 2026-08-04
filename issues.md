@@ -1,41 +1,35 @@
-# Project Issues & Hardening Tracking (Aug.04.110)
+# Project Issues & Hardening Tracking (Aug.04.114)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 1 |
+| **Open Technical Issues** | Active | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 532 |
+| **Resolved (Total)** | 🟢 Progress | 537 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #721] [Severity: High] [Category: Performance] Logcat Spam: getPackageName() recursion/spam on Samsung A15.**
-    *   **Concern**: Repetitive `getPackageName: com.gps19.app` logs are flooding the buffer, causing significant UI jank (1s+ stalls) and high CPU overhead during Phone Setup and Dashboard rendering.
+*   *None identified in Aug.04.114.*
 
 ---
 
 ## 🔴 Open Issues
-*   **[Issue #721] Performance: getPackageName() logcat spam.**
-    *   **Context**: Native library collision resolved; investigation into remaining system-triggered spam (specifically from permission APIs) is active.
+*   *No high-priority open issues.*
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.04.110)
-*   **[Issue #723] [Severity: Medium] [Category: Performance] Main-Thread Jitter: Synchronous /proc Reads**.
-    *   **Resolution**: Changed `getCpuLoad` and `getIoWait` to suspend functions and wrapped implementations in `withContext(Dispatchers.IO)`. Updated `IntegrityMonitor.performIntegrityHeartbeat` to accommodate non-blocking execution (R723).
-*   **[Issue #722] [Severity: High] [Category: Performance] Setup-Phase Polling Overhead**.
-    *   **Resolution**: Increased `FORCED_REFRESH_COOLDOWN_MS` to 15s in `SystemStatusProviderImpl`. This throttles expensive system permission checks (`Settings.canDrawOverlays`, `isIgnoringBatteryOptimizations`) while the Setup Overlay is active, significantly reducing main-thread stalls and logcat pressure on budget hardware (R722).
+## 🟢 Recently Resolved Issues (Aug.04.114)
+*   **[Issue #728] [Severity: Medium] [Category: Performance] Forensic Audit: Storage-Aware Adaptive Pruning**.
+    *   **Resolution**: Refined `LogRepository.proactivePruning` to utilize `StorageStatsManager` for granular pressure detection. Implemented "Fragmentation-Aware" deletion cycles using chunked deletes (`PRUNE_CHUNK_SIZE = 100`) and adaptive thresholds (300 to 3000 entries) based on storage state (Critical, Low, Normal, Charging). This prevents SQLite database fragmentation and I/O stalls on budget eMMC storage while maintaining a lean persistence footprint (R728).
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.04.101)
-*   **[Issue #721] [Severity: High] [Category: Performance] Samsung A15 Native Collision**.
-    *   **Resolution**: Renamed native library from `mbrainSDK` to `jdMbrain` to resolve naming collision with Samsung's internal system libraries (`libmbrainSDK`). Standardized log tags and updated JNI bridge initialization to use unique namespace (R721).
-*   **[Issue #721] [Severity: Low] [Category: Robustness] Log Noise Reduction**.
-    *   **Resolution**: Reduced verbosity of forensic convergence logs in `LogRepository` to minimize logcat pressure on budget hardware.
+## 🟢 Recently Resolved Issues (Aug.04.113)
+*   **[Issue #727] [Severity: Medium] [Category: Performance] Forensic Trace Persistence: Batch-Write Optimization**.
+    *   **Resolution**: Implemented Dynamic Batch Sizing in `LogRepository.performForensicDrain` (R727).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.04.110)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.04.114)

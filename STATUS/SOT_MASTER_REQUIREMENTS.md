@@ -1,8 +1,12 @@
-# System Source of Truth (SoT) - Aug.04.110 (Samsung Performance Hardening)
+# System Source of Truth (SoT) - Aug.04.114 (Storage-Aware Pruning)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Storage-Aware Adaptive Pruning (R728)**: (Added Aug.04.114) The `LogRepository` MUST implement granular, fragmentation-aware pruning. Deletion cycles MUST utilize `StorageStatsManager` (where available) for precise pressure detection and execute in controlled chunks (`PRUNE_CHUNK_SIZE`) to prevent SQLite B-Tree fragmentation and I/O stalls on budget eMMC storage. (Issue #728)
+*   **UI Ribbon Optimization (R726)**: (Added Aug.04.113) Forensic Ribbons MUST utilize `drawWithCache` to pre-calculate paths and static visual elements (grid, ticks). Traces MUST be rendered using a single `Path` call or `drawPoints` batching to minimize draw-call overhead. Each ribbon container MUST be isolated via `.graphicsLayer()` to ensure independent invalidation and hardware acceleration. (Issue #726)
+*   **Forensic Delta-Encoding Hardening (R725)**: (Added JAug.04.112) The `ForensicSpillBuffer` MUST implement Adaptive Base Resetting, refreshing the delta-encoding bases (timestamp, coordinates) whenever the buffer is completely drained. This prevents long-term `Int` overflow for timestamp deltas. High-frequency write operations MUST be monitored via `LatencyMonitor` with a 5ms threshold to detect micro-stalls on budget hardware. (Issue #725)
+*   **Package Name Shadow-Caching (R724)**: (Added JAug.04.111) To eliminate repetitive `getPackageName()` system calls which trigger excessive logcat spam and UI jank on Samsung A15/G990 hardware, the application MUST utilize the `GpsApplication.PACKAGE_NAME` shadow-cache for all high-frequency or background operations. (Issue #721)
 *   **Non-Blocking Forensic Audit (R723)**: (Added Aug.04.110) All file system operations on `/proc` (CPU load, IO wait) MUST be executed on `Dispatchers.IO` to prevent main-thread micro-stalls during high-frequency dashboard rendering. (Issue #723)
 *   **Hardware State Refresh Throttling (R722)**: (Added Aug.04.110) Polling of expensive system hardware/permission states (Overlay, Battery Optimization) is RESTRICTED to a minimum cooldown of 15s to preserve UI smoothness on budget hardware. (Issue #722)
 *   **Native Namespace Integrity (R721)**: (Added Aug.04.101) The project native library MUST be named `jdMbrain` (libjdMbrain.so) to ensure zero-collision with Samsung/Vendor system libraries (e.g., `libmbrainSDK`). All JNI bridge calls MUST utilize this unique identifier. (Issue #721)
@@ -96,5 +100,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: Internal telemetry MUST use `Double` precision. (Issue #077, #532)
 
 ### 6. Version Authority
-*   **Current Release**: Aug.04.110.
+*   **Current Release**: Aug.04.114.
 *   **Source of Truth**: app/build.gradle versionName.

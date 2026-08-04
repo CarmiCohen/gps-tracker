@@ -15,11 +15,11 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * JAug.04.111:
+ * - Issue #721: Performance Hardening. Refactored to use GpsApplication.PACKAGE_NAME 
+ *   shadow-cache to eliminate repetitive getPackageName() calls on Samsung A15.
  * July.30.27:
  * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs recording.
- * July.30.26:
- * - Issue #626: Foreground Service Start Hardening. Added handling for 
- *   ForegroundServiceStartNotAllowedException with deferred recovery flagging.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -30,8 +30,6 @@ class MaintenanceWorker @AssistedInject constructor(
     private val notificationManager: AppNotificationManager,
     private val systemStatusProvider: SystemStatusProvider
 ) : CoroutineWorker(context, params) {
-    
-    private val cachedPkgName = applicationContext.packageName
 
     companion object {
         fun schedule(context: Context) {
@@ -116,7 +114,7 @@ class MaintenanceWorker @AssistedInject constructor(
 
                 val serviceClass = if (savedMode == "tracker") TrackerService::class.java else ViewerService::class.java
                 val serviceIntent = Intent(applicationContext, serviceClass).apply {
-                    setPackage(cachedPkgName)
+                    setPackage(GpsApplication.PACKAGE_NAME)
                 }
                 
                 try {

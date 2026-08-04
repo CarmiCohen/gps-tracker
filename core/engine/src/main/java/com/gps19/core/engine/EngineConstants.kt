@@ -2,23 +2,20 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.04.114:
+ * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Added 
+ *   PRUNE_CHUNK_SIZE (100) and ADAPTIVE_PRUNE thresholds for granular 
+ *   fragmentation-aware deletion cycles. Added percentage-based storage 
+ *   pressure thresholds (R728).
+ * Aug.04.113:
+ * - Issue #727: Forensic Audit: Dynamic Batch-Write Optimization. Added 
+ *   FORENSIC_BATCH_SIZE_MIN (50), MAX (500), and DEFAULT (100) (R727).
  * Aug.03.98:
  * - Issue #717: Forensic Audit: Memory-Mapped Metadata Header. Implemented 128-byte 
  *   header storing version, capacity, entrySize, and lastWriteRt (R717).
  * - Issue #715: Forensic Audit: Persistence Health Alerting. Added 
  *   FORENSIC_RELIABILITY_THRESHOLD (0.85) and 
  *   FORENSIC_RELIABILITY_DEGRADATION_DURATION_MS (30s) (R715).
- * Aug.03.97:
- * - Issue #713: Forensic Audit: Log Buffer Drain Throttling. Added 
- *   FORENSIC_DRAIN_THROTTLE_MIN_MS (500ms) and 
- *   FORENSIC_DRAIN_THROTTLE_MAX_MS (5000ms) for dynamic I/O safety (R713).
- * Aug.03.96:
- * - Issue #710: Forensic Audit: Memory-Mapped Buffer Overflow Protection.
- *   Added ALERT_ID_FORENSIC_OVERFLOW (R710).
- * Aug.03.85:
- * - Issue #709: Forensic Audit: Adaptive Sampling Thermal Throttling.
- *   Added FORENSIC_SAMPLING_INTERVAL_COOLING_MS (500ms) to preserve hardware 
- *   integrity during peak thermal stress (R709).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -53,9 +50,21 @@ const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
 const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 500L
 const val FORENSIC_DRAIN_THROTTLE_MAX_MS = 5000L
 
+// Issue #727: Dynamic Batching
+const val FORENSIC_BATCH_SIZE_MIN = 50
+const val FORENSIC_BATCH_SIZE_MAX = 500
+const val FORENSIC_BATCH_SIZE_DEFAULT = 100
+
 // Issue #715: Forensic Persistence Health Alerting
 const val FORENSIC_RELIABILITY_THRESHOLD = 0.85
 const val FORENSIC_RELIABILITY_DEGRADATION_DURATION_MS = 30000L
+
+// Issue #728: Storage-Aware Adaptive Pruning
+const val PRUNE_CHUNK_SIZE = 100
+const val ADAPTIVE_PRUNE_THRESHOLD_CRITICAL = 300
+const val ADAPTIVE_PRUNE_THRESHOLD_LOW = 600
+const val ADAPTIVE_PRUNE_THRESHOLD_NORMAL = 1500
+const val ADAPTIVE_PRUNE_THRESHOLD_CHARGING = 3000
 
 // Issue #700: Forensic Sampling Scaling
 const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  // 100Hz (Peak Fidelity)
@@ -292,6 +301,8 @@ const val BATTERY_STEEP_DISCHARGE_WINDOW_MS = 600000L
 // Storage thresholds
 const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB = 10L
 const val SYSTEM_STORAGE_LOW_THRESHOLD_MB = 50L
+const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_PCT = 0.01 // 1%
+const val SYSTEM_STORAGE_LOW_THRESHOLD_PCT = 0.05 // 5%
 
 // GPS Polling & Filtering (v8.7.5 Centralization)
 const val GPS_SEQUENCE_TOLERANCE_MS = 60000L

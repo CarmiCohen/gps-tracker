@@ -19,6 +19,11 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * JAug.04.112:
+ * - Issue #725: Forensic Audit: Delta-Encoding Hardening & Micro-Stall Detection.
+ *   Implemented Adaptive Base Resetting when buffer is drained to prevent 
+ *   long-term Int-overflow of timestamp deltas. Integrated LatencyMonitor 
+ *   into write-path with 5ms threshold to ensure zero-jitter on budget hardware (R725).
  * Aug.04.60:
  * - Issue #717: Forensic Audit: Memory-Mapped Metadata Header. Implemented 128-byte 
  *   header storing version, capacity, entrySize, and lastWriteRt (R717).
@@ -74,6 +79,7 @@ class ForensicSpillBuffer @Inject constructor(
         const val OFF_BASE_LNG = 52
 
         const val PRECISION_SCALE = 10_000_000.0 // 1e7 for ~1cm precision
+        const val WRITE_STALL_THRESHOLD_MS = 5L
     }
 
     init {
@@ -164,45 +170,53 @@ class ForensicSpillBuffer @Inject constructor(
      * Returns true if successful, false if buffer is full (Overflow).
      */
     fun writeTrace(entry: LogEntry): Boolean {
-        val buffer = mappedBuffer ?: return false
-        synchronized(this) {
-            if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return false
-            
-            updateBasesIfNeeded(entry.timestamp, entry.lat, entry.lng)
-            
-            val currentWrite = writeIdx.get()
-            val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE)
-            
-            buffer.position(offset)
-            
-            // Delta Encoding (Issue #706)
-            buffer.putInt((entry.timestamp - baseTs.get()).toInt())
-            buffer.putInt(((entry.lat - baseLat) * PRECISION_SCALE).toInt())
-            buffer.putInt(((entry.lng - baseLng) * PRECISION_SCALE).toInt())
-            
-            // Other fields as Floats/Ints to save space
-            buffer.putFloat(entry.accuracy.toFloat())
-            buffer.putFloat(entry.maxAccuracy.toFloat())
-            buffer.putFloat(entry.vibeSnapshot?.toFloat() ?: -1.0f)
-            buffer.putFloat(entry.snrSnapshot?.toFloat() ?: -1.0f)
-            
-            var flags = 0
-            if (entry.isImportant) flags = flags or 0x01
-            if (entry.isSpecial) flags = flags or 0x02
-            buffer.putInt(flags)
-            buffer.putInt(0) // batteryLevel
-            buffer.putFloat(0.0f) // batteryTemp
-            
-            val msgBytes = entry.message.toByteArray(Charsets.UTF_8)
-            val msgLen = msgBytes.size.coerceAtMost(80) // 80 bytes reserved for message
-            buffer.putInt(msgLen)
-            buffer.put(msgBytes, 0, msgLen)
+        return LatencyMonitor.measureAndAudit(
+            timeProvider = timeProvider,
+            thresholdMs = WRITE_STALL_THRESHOLD_MS,
+            operation = "Forensic Write",
+            type = LatencyMonitor.AuditType.PERFORMANCE,
+            onSpike = { msg, _ -> Timber.w(msg) }
+        ) {
+            val buffer = mappedBuffer ?: return@measureAndAudit false
+            synchronized(this) {
+                if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
+                
+                updateBasesIfNeeded(entry.timestamp, entry.lat, entry.lng)
+                
+                val currentWrite = writeIdx.get()
+                val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE)
+                
+                buffer.position(offset)
+                
+                // Delta Encoding (Issue #706)
+                buffer.putInt((entry.timestamp - baseTs.get()).toInt())
+                buffer.putInt(((entry.lat - baseLat) * PRECISION_SCALE).toInt())
+                buffer.putInt(((entry.lng - baseLng) * PRECISION_SCALE).toInt())
+                
+                // Other fields as Floats/Ints to save space
+                buffer.putFloat(entry.accuracy.toFloat())
+                buffer.putFloat(entry.maxAccuracy.toFloat())
+                buffer.putFloat(entry.vibeSnapshot?.toFloat() ?: -1.0f)
+                buffer.putFloat(entry.snrSnapshot?.toFloat() ?: -1.0f)
+                
+                var flags = 0
+                if (entry.isImportant) flags = flags or 0x01
+                if (entry.isSpecial) flags = flags or 0x02
+                buffer.putInt(flags)
+                buffer.putInt(0) // batteryLevel
+                buffer.putFloat(0.0f) // batteryTemp
+                
+                val msgBytes = entry.message.toByteArray(Charsets.UTF_8)
+                val msgLen = msgBytes.size.coerceAtMost(80) // 80 bytes reserved for message
+                buffer.putInt(msgLen)
+                buffer.put(msgBytes, 0, msgLen)
 
-            val crc = calculateEntryChecksum(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
-            buffer.putInt(offset + FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, crc.toInt())
+                val crc = calculateEntryChecksumLocked(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                buffer.putInt(offset + FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, crc.toInt())
 
-            advanceWritePointer()
-            return true
+                advanceWritePointer()
+                true
+            }
         }
     }
 
@@ -214,39 +228,47 @@ class ForensicSpillBuffer @Inject constructor(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
         vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double
     ): Boolean {
-        val buffer = mappedBuffer ?: return false
-        synchronized(this) {
-            if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return false
-            
-            updateBasesIfNeeded(timestamp, lat, lng)
-            
-            val currentWrite = writeIdx.get()
-            val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE)
-            
-            buffer.position(offset)
-            
-            // Delta Encoding (Issue #706)
-            buffer.putInt((timestamp - baseTs.get()).toInt())
-            buffer.putInt(((lat - baseLat) * PRECISION_SCALE).toInt())
-            buffer.putInt(((lng - baseLng) * PRECISION_SCALE).toInt())
-            
-            buffer.putFloat(accuracy.toFloat())
-            buffer.putFloat(maxAccuracy.toFloat())
-            buffer.putFloat(vibe.toFloat())
-            buffer.putFloat(snr.toFloat())
-            
-            var flags = 0
-            if (isCharging) flags = flags or 0x04
-            buffer.putInt(flags)
-            buffer.putInt(batteryLevel)
-            buffer.putFloat(batteryTemp.toFloat())
-            buffer.putInt(0) // msgLen = 0
+        return LatencyMonitor.measureAndAudit(
+            timeProvider = timeProvider,
+            thresholdMs = WRITE_STALL_THRESHOLD_MS,
+            operation = "Forensic Write Optimized",
+            type = LatencyMonitor.AuditType.PERFORMANCE,
+            onSpike = { msg, _ -> Timber.w(msg) }
+        ) {
+            val buffer = mappedBuffer ?: return@measureAndAudit false
+            synchronized(this) {
+                if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
+                
+                updateBasesIfNeeded(timestamp, lat, lng)
+                
+                val currentWrite = writeIdx.get()
+                val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE)
+                
+                buffer.position(offset)
+                
+                // Delta Encoding (Issue #706)
+                buffer.putInt((timestamp - baseTs.get()).toInt())
+                buffer.putInt(((lat - baseLat) * PRECISION_SCALE).toInt())
+                buffer.putInt(((lng - baseLng) * PRECISION_SCALE).toInt())
+                
+                buffer.putFloat(accuracy.toFloat())
+                buffer.putFloat(maxAccuracy.toFloat())
+                buffer.putFloat(vibe.toFloat())
+                buffer.putFloat(snr.toFloat())
+                
+                var flags = 0
+                if (isCharging) flags = flags or 0x04
+                buffer.putInt(flags)
+                buffer.putInt(batteryLevel)
+                buffer.putFloat(batteryTemp.toFloat())
+                buffer.putInt(0) // msgLen = 0
 
-            val crc = calculateEntryChecksum(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
-            buffer.putInt(offset + FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, crc.toInt())
+                val crc = calculateEntryChecksumLocked(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                buffer.putInt(offset + FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, crc.toInt())
 
-            advanceWritePointer()
-            return true
+                advanceWritePointer()
+                true
+            }
         }
     }
 
@@ -278,7 +300,7 @@ class ForensicSpillBuffer @Inject constructor(
             repeat(toPeek) {
                 val offset = HEADER_SIZE + (currentRead * FORENSIC_SPILL_ENTRY_SIZE)
                 val storedCrc = buffer.getInt(offset + FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
-                val calculatedCrc = calculateEntryChecksum(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE).toInt()
+                val calculatedCrc = calculateEntryChecksumLocked(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE).toInt()
                 
                 if (storedCrc == calculatedCrc) {
                     buffer.position(offset)
@@ -337,15 +359,35 @@ class ForensicSpillBuffer @Inject constructor(
             val newCount = totalCount.get() - actualToConsume
             totalCount.set(newCount)
             buffer.putInt(OFF_COUNT, newCount)
+            
+            // Issue #725: Adaptive Base Resetting
+            // Reset bases when buffer is empty to ensure next trace becomes new base,
+            // preventing long-term Int-overflow of deltas.
+            if (newCount == 0) {
+                baseTs.set(0L)
+                baseLat = 0.0
+                baseLng = 0.0
+                buffer.putLong(OFF_BASE_TS, 0L)
+                buffer.putDouble(OFF_BASE_LAT, 0.0)
+                buffer.putDouble(OFF_BASE_LNG, 0.0)
+            }
         }
     }
 
-    private fun calculateEntryChecksum(buffer: ByteBuffer, offset: Int, length: Int): Long {
+    /**
+     * calculateEntryChecksumLocked: Zero-allocation checksum calculation.
+     * MUST be called within synchronized(this) block.
+     */
+    private fun calculateEntryChecksumLocked(buffer: ByteBuffer, offset: Int, length: Int): Long {
         val crc = CRC32()
-        val temp = buffer.duplicate()
-        temp.position(offset)
-        temp.get(checksumBuffer, 0, length)
-        crc.update(checksumBuffer, 0, length)
+        val originalPos = buffer.position()
+        try {
+            buffer.position(offset)
+            buffer.get(checksumBuffer, 0, length)
+            crc.update(checksumBuffer, 0, length)
+        } finally {
+            buffer.position(originalPos)
+        }
         return crc.value
     }
 

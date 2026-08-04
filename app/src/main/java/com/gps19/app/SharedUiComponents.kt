@@ -18,10 +18,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.PlatformTextStyle
@@ -44,11 +43,12 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Aug.04.113:
+ * - Issue #726: UI Ribbon Rendering Optimization. Implemented Path-caching and 
+ *   batch-drawing (drawPoints, drawPath) to minimize draw-calls (R726).
  * July.30.31:
  * - Issue #632: Analytical Ribbons: Recovery Markers. Integrated isRecoveryEvent 
  *   visualization into ConnectionQualityRibbon as forensic markers.
- * July.28.24:
- * - Issue #620: State Partitioning Audit.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -191,6 +191,7 @@ fun ForensicRibbonContainer(
             .weight(1f)
             .height(height)
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+            .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen) // R726: Isolated layer for HW acceleration
             .drawWithCache {
                 onDrawWithContent {
                     drawContent()
@@ -216,6 +217,7 @@ fun ForensicRibbonContainer(
                         val strictGapColor = Color.Red.copy(alpha = 0.4f)
                         val tickColor = Color.White.copy(alpha = 0.2f)
 
+                        // R726: Batch background element drawing
                         for (index in history.indices) {
                             val p = history[index]
                             val xPos = (startOffset + index) * pointWidth
@@ -301,8 +303,6 @@ fun GenericSensorRibbon(
     ) { totalPoints, pointWidth, baseLineY, maxHeight, landscape ->
         if (history.isEmpty()) return@ForensicRibbonContainer
         
-        var lastPos: Offset? = null
-        val gapLimitWidth = pointWidth * 10
         val strokeW = if (landscape) 1.5.dp.toPx() else 1.dp.toPx()
         val circleR = if (landscape) 1.2.dp.toPx() else 0.8.dp.toPx()
         val rectW = maxOf(1f, pointWidth)
@@ -310,45 +310,62 @@ fun GenericSensorRibbon(
         val barColor = lineColor.copy(alpha = 0.6f)
         val driftColor = Color.Yellow.copy(alpha = 0.5f)
 
-        for (index in history.indices) {
-            val p = history[index]
-            if (p.isGap) {
-                lastPos = null
-                continue
-            }
-
-            val xPos = (startOffset + index) * pointWidth
-            val value = valueSelector(p).coerceIn(0f, 1f)
-            
-            if (isStrictMode && driftSelector != null) {
-                val drift = driftSelector(p)
-                if (drift > 2000L) {
-                    drawRect(
-                        color = driftColor,
-                        topLeft = Offset(xPos, baseLineY - maxHeight),
-                        size = Size(maxOf(2f, pointWidth), maxHeight * 0.1f)
-                    )
-                }
-            }
-
-            if (renderType == RibbonRenderType.BAR) {
+        if (renderType == RibbonRenderType.BAR) {
+            for (index in history.indices) {
+                val p = history[index]
+                if (p.isGap) continue
+                val xPos = (startOffset + index) * pointWidth
+                val value = valueSelector(p).coerceIn(0f, 1f)
                 if (value > 0.01f) {
                     val barHeight = value * maxHeight
                     drawRect(barColor, Offset(xPos, baseLineY - barHeight), Size(rectW, barHeight))
                 }
-            } else {
+            }
+        } else {
+            // R726: Batch LINE and POINT rendering using Path and drawPoints
+            val path = Path()
+            val points = mutableListOf<Offset>()
+            var lastPos: Offset? = null
+            val gapLimitWidth = pointWidth * 10
+
+            for (index in history.indices) {
+                val p = history[index]
+                if (p.isGap) {
+                    lastPos = null
+                    continue
+                }
+
+                val xPos = (startOffset + index) * pointWidth
+                val value = valueSelector(p).coerceIn(0f, 1f)
                 val yPos = baseLineY - (value * maxHeight)
                 val currentPos = Offset(xPos + (rectW / 2f), yPos)
-                
-                lastPos?.let { lp ->
-                    if (currentPos.x - lp.x < gapLimitWidth) {
-                        drawLine(color = lineColor, start = lp, end = currentPos, strokeWidth = strokeW)
+
+                if (isStrictMode && driftSelector != null) {
+                    val drift = driftSelector(p)
+                    if (drift > 2000L) {
+                        drawRect(
+                            color = driftColor,
+                            topLeft = Offset(xPos, baseLineY - maxHeight),
+                            size = Size(maxOf(2f, pointWidth), maxHeight * 0.1f)
+                        )
                     }
                 }
+
+                if (lastPos != null && (currentPos.x - lastPos.x < gapLimitWidth)) {
+                    path.lineTo(currentPos.x, currentPos.y)
+                } else {
+                    path.moveTo(currentPos.x, currentPos.y)
+                }
+                
                 if (value > 0.05f) {
-                    drawCircle(color = lineColor, radius = circleR, center = currentPos)
+                    points.add(currentPos)
                 }
                 lastPos = currentPos
+            }
+            
+            drawPath(path = path, color = lineColor, style = Stroke(width = strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            if (points.isNotEmpty()) {
+                drawPoints(points = points, pointMode = PointMode.Points, color = lineColor, strokeWidth = circleR * 2, cap = StrokeCap.Round)
             }
         }
     }
@@ -407,13 +424,16 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
 
         val ribbonMaxHeight = if (landscape) 16.dp.toPx() else 10.dp.toPx()
         val effectiveBaseY = connectionBaseY - (if (landscape) 4.dp.toPx() else 2.dp.toPx())
-        var lastGpsPos: Offset? = null
         val cyanColor = Color(0xFF00FFFF)
         val rectW = maxOf(1f, pointWidth)
         val startOffset = totalPoints - history.size
 
         val firstTs = history[0].ts
         val baseTickTs = ((firstTs + alignMs - 1) / alignMs) * alignMs
+
+        val gpsPath = Path()
+        val gpsPoints = mutableListOf<Offset>()
+        var lastGpsPos: Offset? = null
 
         for (index in history.indices) {
             val p = history[index]
@@ -453,18 +473,17 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
                 }
 
                 if (p.hasGps && p.gpsIndex > 0.0) {
-                    val dotRadius = (if (landscape) 1.2.dp.toPx() else 0.8.dp.toPx())
                     val baseHeight = if (landscape) 24.dp.toPx() else 14.dp.toPx()
                     val normalizedHeight = (p.gpsIndex.toFloat().coerceIn(0f, 1f) * baseHeight)
                     val yPos = effectiveBaseY - ribbonMaxHeight - (if (landscape) 4.dp.toPx() else 2.dp.toPx()) - normalizedHeight
                     val currentPos = Offset(xPos + (rectW / 2f), yPos)
                     
-                    lastGpsPos?.let { lastPos ->
-                        if (currentPos.x - lastPos.x < pointWidth * 10) {
-                            drawLine(color = cyanColor, start = lastPos, end = currentPos, strokeWidth = (if (landscape) 1.dp.toPx() else 0.5.dp.toPx()))
-                        }
+                    if (lastGpsPos != null && (currentPos.x - lastGpsPos.x < pointWidth * 10)) {
+                        gpsPath.lineTo(currentPos.x, currentPos.y)
+                    } else {
+                        gpsPath.moveTo(currentPos.x, currentPos.y)
                     }
-                    drawCircle(color = cyanColor, radius = dotRadius, center = currentPos)
+                    gpsPoints.add(currentPos)
                     lastGpsPos = currentPos
                 }
             } else {
@@ -490,6 +509,13 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
                     }
                 }
             }
+        }
+
+        // R726: Render batched GPS path and points
+        drawPath(path = gpsPath, color = cyanColor, style = Stroke(width = if (landscape) 1.dp.toPx() else 0.5.dp.toPx()))
+        if (gpsPoints.isNotEmpty()) {
+            val dotRadius = (if (landscape) 1.2.dp.toPx() else 0.8.dp.toPx())
+            drawPoints(points = gpsPoints, pointMode = PointMode.Points, color = cyanColor, strokeWidth = dotRadius * 2, cap = StrokeCap.Round)
         }
     }
 }

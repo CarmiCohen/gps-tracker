@@ -26,13 +26,11 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.04.114:
+ * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Propagating 
+ *   granular storage metrics (available/total MB) to LogRepository (R728).
  * Aug.04.110:
- * - Issue #723 Hardening: Updated performIntegrityHeartbeat to suspend to 
- *   accommodate offloaded /proc I/O in SystemStatusProvider (R723).
- * Aug.03.90:
- * - Issue #711: Forensic Audit: Persistence Latency Correlation. Integrated 
- *   cpuLoad and ioWait polling into performIntegrityHeartbeat for diagnostic 
- *   profiling (R711).
+ * - Issue #723 Hardening: Updated performIntegrityHeartbeat to suspend.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -147,7 +145,6 @@ class IntegrityMonitor @Inject constructor(
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
         }
 
-        // Issue #723: Offloaded metrics polling
         val cpu = systemStatusProvider.getCpuLoad()
         val iow = systemStatusProvider.getIoWait()
 
@@ -158,9 +155,6 @@ class IntegrityMonitor @Inject constructor(
         }
     }
 
-    /**
-     * updateHealth: Performs in-place mutation of flyweight state and notifies repository.
-     */
     private fun updateHealth(mutator: (SystemHealthState) -> Unit) {
         _health.update { current ->
             mutator(current)
@@ -266,6 +260,8 @@ class IntegrityMonitor @Inject constructor(
         updateHealth { h ->
             h.isStorageLow = low
             h.isStorageCritical = critical
+            h.storageAvailableMb = status.availableMb
+            h.storageTotalMb = status.totalMb
         }
     }
 
