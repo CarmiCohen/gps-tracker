@@ -10,24 +10,17 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Aug.05.121:
+ * - Issue #735: Startup Davey Stall Remediation. Refactored to use 
+ *   Provider<ForensicSpillBuffer> to defer MappedByteBuffer I/O until first 
+ *   background access, clearing the main-thread startup critical path (R735).
  * Aug.04.10:
  * - Issue #710: Forensic Audit: Memory-Mapped Buffer Overflow Protection.
- *   Updated logForensicTraceOptimized and logForensicTrace to detect spill-buffer 
- *   overflows and log ALERT_ID_FORENSIC_OVERFLOW events (R710).
- * Aug.03.47:
- * - Issue #702: Forensic Audit: Trace Serialization Hardening. Updated 
- *   logForensicTraceOptimized() to pass raw telemetry for binary serialization (R702).
- * Aug.03.45:
- * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Added 
- *   logForensicTraceOptimized() to support zero-allocation 100Hz capture (R668).
- * Aug.03.37:
- * - Issue #669: Forensic Audit: Database I/O Contention. Added logForensicTrace 
- *   to utilize MappedByteBuffer spill-buffer for high-frequency diagnostics.
  */
 @Singleton
 class LogManager @Inject constructor(
     private val logRepository: LogRepository,
-    private val forensicSpillBuffer: ForensicSpillBuffer,
+    private val forensicSpillBufferProvider: Provider<ForensicSpillBuffer>,
     private val telemetry: TelemetryRepository,
     private val connectivitySuiteProvider: Provider<ConnectivitySuite>,
     private val configManager: ConfigManager,
@@ -66,7 +59,7 @@ class LogManager @Inject constructor(
             accuracy = accuracy
         )
         
-        if (!forensicSpillBuffer.writeTrace(log)) {
+        if (!forensicSpillBufferProvider.get().writeTrace(log)) {
             handleOverflow()
         } else {
             isOverflowLogged.set(false)
@@ -81,7 +74,7 @@ class LogManager @Inject constructor(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
         vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double
     ) {
-        if (!forensicSpillBuffer.writeTraceOptimized(
+        if (!forensicSpillBufferProvider.get().writeTraceOptimized(
             timestamp, lat, lng, accuracy, maxAccuracy, vibe, snr, 
             batteryLevel, isCharging, batteryTemp
         )) {

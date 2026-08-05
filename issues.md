@@ -1,24 +1,29 @@
-# Project Issues & Hardening Tracking (Aug.05.119)
+# Project Issues & Hardening Tracking (Aug.05.122)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | Active | 1 |
+| **Open Technical Issues** | 🟢 Clean | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 543 |
+| **Resolved (Total)** | 🟢 Progress | 544 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #735] [Severity: Low] [Category: Performance] UI Thread Jitter during Startup.**
-    *   *Concern*: `MainActivity` skipped 130 frames during cold start. Heavy initialization in `onCreate` or Compose composition needs optimization.
+*   *None at this time.*
 
 ---
 
 ## 🔴 Open Issues
-*   **[Issue #735] UI Thread Jitter during Startup.**
+*   *None at this time.*
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.05.122)
+*   **[Issue #735] [Severity: Low] [Category: Performance] UI Thread Jitter during Startup.**
+    *   **Resolution**: Refactored `LogRepository` and `LogManager` to use `Provider<ForensicSpillBuffer>`, deferring synchronous `MappedByteBuffer` allocation until first background access. Successfully eliminated 130-frame Davey stall from the startup critical path. (R735).
 
 ---
 
@@ -33,4 +38,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Aligned native libraries for 16KB page size. Bumped `androidx.datastore` to `1.2.1` and explicitly added `androidx.graphics:graphics-path:1.1.0`. (R732).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.05.119)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.05.122)

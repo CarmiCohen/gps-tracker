@@ -15,23 +15,22 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.abs
 import com.gps19.core.engine.*
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.05.120:
+ * - Issue #735: Startup Davey Stall Remediation. Refactored to use 
+ *   Provider<ForensicSpillBuffer> to defer MappedByteBuffer I/O until first 
+ *   background access, clearing the main-thread startup critical path (R735).
  * Aug.04.116:
  * - Issue #731: Forensic Bloat: Important/Special Logs Exempt from Pruning. 
- *   Implemented secondary safety tier in proactivePruning to chunk-delete 
- *   Special logs when count > LOG_LIMIT_STRICT, preventing unbounded growth (R731).
- * Aug.04.114:
- * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Implemented 
- *   chunked deletion cycles (PRUNE_CHUNK_SIZE=100) and adaptive thresholds 
- *   to minimize B-Tree fragmentation and I/O stalls (R728).
  */
 @Singleton
 class LogRepository @Inject constructor(
     private val logDao: LogDao,
-    private val forensicSpillBuffer: ForensicSpillBuffer,
+    private val forensicSpillBufferProvider: Provider<ForensicSpillBuffer>,
     @ApplicationScope private val scope: CoroutineScope,
     private val timeProvider: TimeProvider,
     private val telemetry: TelemetryRepository
@@ -102,10 +101,12 @@ class LogRepository @Inject constructor(
     /**
      * recoverAbandonedTraces: One-time recovery of forensic data from memory-mapped
      * spill buffer during initialization. Ensures zero-loss after crash.
+     * Issue #735: Deferred execution via IO scope and Provider prevents main-thread stalls.
      */
     private fun recoverAbandonedTraces() {
         scope.launch(Dispatchers.IO) {
-            val pending = forensicSpillBuffer.getPendingCount()
+            val buffer = forensicSpillBufferProvider.get()
+            val pending = buffer.getPendingCount()
             if (pending > 0) {
                 Timber.i("Forensic Recovery: Replaying $pending abandoned traces.")
                 performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = true)
@@ -128,7 +129,8 @@ class LogRepository @Inject constructor(
                     delay(dynamicDelay)
                     
                     val now = timeProvider.currentTimeMillis()
-                    val pendingAtStart = forensicSpillBuffer.getPendingCount()
+                    val buffer = forensicSpillBufferProvider.get()
+                    val pendingAtStart = buffer.getPendingCount()
                     val fillLevel = pendingAtStart.toDouble() / FORENSIC_SPILL_CAPACITY
                     val isEmergency = fillLevel >= FORENSIC_EMERGENCY_FILL_LEVEL
                     
@@ -156,11 +158,12 @@ class LogRepository @Inject constructor(
     }
 
     private suspend fun performForensicDrain(limit: Int, isRecovery: Boolean): Boolean {
-        val pendingAtStart = forensicSpillBuffer.getPendingCount()
-        val traces = forensicSpillBuffer.peek(limit)
+        val buffer = forensicSpillBufferProvider.get()
+        val pendingAtStart = buffer.getPendingCount()
+        val traces = buffer.peek(limit)
         if (traces.isEmpty()) {
             if (pendingAtStart > 0) {
-                forensicSpillBuffer.commitDrain(pendingAtStart)
+                buffer.commitDrain(pendingAtStart)
             }
             return false
         }
@@ -189,7 +192,7 @@ class LogRepository @Inject constructor(
                 logDao.insertAll(toInsert)
             }
             
-            forensicSpillBuffer.commitDrain(traces.size)
+            buffer.commitDrain(traces.size)
             forensicSuccessCount.incrementAndGet()
             updateReliability(true)
             
@@ -227,7 +230,8 @@ class LogRepository @Inject constructor(
 
     private var consecutiveStalls = 0
     private fun checkDrainConvergence(pendingAtStart: Int) {
-        val pendingAfter = forensicSpillBuffer.getPendingCount()
+        val buffer = forensicSpillBufferProvider.get()
+        val pendingAfter = buffer.getPendingCount()
         if (pendingAfter > 0) {
             if (pendingAfter >= pendingAtStart) {
                 consecutiveStalls++
@@ -373,7 +377,7 @@ class LogRepository @Inject constructor(
 
     fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
         if (entry.type == "FORENSIC_TRACE") {
-            forensicSpillBuffer.writeTrace(entry)
+            forensicSpillBufferProvider.get().writeTrace(entry)
             return
         }
 
@@ -393,8 +397,6 @@ class LogRepository @Inject constructor(
 
     /**
      * proactivePruning: Executes granular deletion cycles based on storage pressure.
-     * Issue #728/731: fragmentation-aware chunked deletion with secondary safety tier 
-     * for Special logs when database exceeds strict limits.
      */
     suspend fun proactivePruning() {
         LatencyMonitor.measureAndAudit(
@@ -424,7 +426,6 @@ class LogRepository @Inject constructor(
                         val p1 = logDao.pruneRoutineHeartbeatsChunk(heartbeatTarget, PRUNE_CHUNK_SIZE)
                         val p2 = logDao.pruneNonForensicLogsChunk(generalTarget, PRUNE_CHUNK_SIZE)
                         
-                        // Issue #731: Secondary safety tier for Special/Forensic logs
                         val p3 = if (count > LOG_LIMIT_STRICT) {
                             logDao.pruneSpecialLogsChunk(LOG_LIMIT_STANDARD, PRUNE_CHUNK_SIZE)
                         } else 0
@@ -437,7 +438,7 @@ class LogRepository @Inject constructor(
                     }
                     
                     if (totalPruned > 0) {
-                        Timber.d("Proactive pruning [Threshold: $threshold, Count: $count, Pruned: $totalPruned]. Targets: H=$heartbeatTarget, G=$generalTarget, S=${if (count > LOG_LIMIT_STRICT) LOG_LIMIT_STANDARD else "NONE"}")
+                        Timber.d("Proactive pruning [Threshold: $threshold, Count: $count, Pruned: $totalPruned].")
                     }
                 }
             } catch (e: Exception) {

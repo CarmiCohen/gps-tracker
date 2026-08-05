@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.05.119 (Stability Hardening)
+# System Source of Truth (SoT) - Aug.05.122 (Startup Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Startup Critical Path Hardening (R735)**: (Added Aug.05.122) High-cost initializations (e.g., memory-mapped files, synchronous I/O) MUST be deferred using `Provider<T>` and accessed on `Dispatchers.IO` to prevent main-thread Davey stalls during cold start. (Issue #735)
 *   **Resource Lifecycle Hardening (R734)**: (Added Aug.05.119) All `Closeable` resources (RandomAccessFile, Streams, Cursors) MUST be managed via `.use {}` or explicit `try-finally` blocks. Hardware callbacks in `callbackFlow` MUST implement `awaitClose` to ensure registration cleanup. (Issue #734)
 *   **Android 15 (16KB Page Size) Compatibility (R732)**: (Updated Aug.05.118) All native libraries MUST be aligned for 16KB page size compatibility. (Issue #732)
 *   **JNI Namespace Integrity (R733)**: (Added Aug.04.117) Utilize the `jdMbrain` namespace. (Issue #733)
@@ -105,5 +106,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: `Double` precision for telemetry. (Issue #077)
 
 ### 6. Version Authority
-*   **Current Release**: Aug.05.119.
+*   **Current Release**: Aug.05.122.
 *   **Source of Truth**: app/build.gradle versionName.
