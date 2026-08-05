@@ -1,9 +1,9 @@
-# System Source of Truth (SoT) - Aug.04.117 (A15 & JNI Hardening)
+# System Source of Truth (SoT) - Aug.05.118 (A15 & JNI Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
-*   **Android 15 (16KB Page Size) Compatibility (R732)**: (Added Aug.04.117) All native libraries MUST be aligned for 16KB page size compatibility using `-Wl,-z,max-page-size=16384` during linking. Packaging MUST ensure libraries are stored uncompressed and page-aligned within the APK (`useLegacyPackaging = false` and `extractNativeLibs="false"`) to support Android 15+ hardware. (Issue #732)
+*   **Android 15 (16KB Page Size) Compatibility (R732)**: (Updated Aug.05.118) All native libraries MUST be aligned for 16KB page size compatibility using `-Wl,-z,max-page-size=16384` during linking. Packaging MUST ensure libraries are stored uncompressed and page-aligned within the APK (`useLegacyPackaging = false` and `extractNativeLibs="false"`) to support Android 15+ hardware. (Issue #732)
 *   **JNI Namespace Integrity (R733)**: (Added Aug.04.117) All hardware-specific JNI bridge calls, log messages, and internal telemetry identifiers MUST strictly utilize the `jdMbrain` namespace. References to legacy `mbrainSDK` identifiers are forbidden to prevent diagnostic confusion with vendor system libraries. (Issue #733)
 *   **Forensic Bloat Prevention (R731)**: (Added Aug.04.116) The `LogRepository` MUST implement a secondary safety tier that chunk-prunes `isSpecial` (Forensic Trace) logs when the total log count exceeds `LOG_LIMIT_STRICT` (5000 entries). (Issue #731)
 *   **Automated Database Integrity Validation (R729)**: (Added Aug.04.115) The `MaintenanceWorker` MUST execute a periodic database integrity audit using `PRAGMA integrity_check`. (Issue #729)
@@ -104,5 +104,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Type Safety Authority (R999)**: `Double` precision for telemetry. (Issue #077)
 
 ### 6. Version Authority
-*   **Current Release**: Aug.04.117.
+*   **Current Release**: Aug.05.118.
 *   **Source of Truth**: app/build.gradle versionName.

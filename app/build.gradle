@@ -30,7 +30,7 @@ android {
         targetSdk = 35
         
         versionCode = getGitVersionCode()
-        versionName = "Aug.04.117"
+        versionName = "Aug.05.118"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -71,9 +71,8 @@ android {
     }
     packaging {
         jniLibs {
-            // Issue #662: Ensure native libraries are stored uncompressed and aligned to 16KB.
-            // set useLegacyPackaging to false to enable extractNativeLibs="false" behavior 
-            // required for Android 15+ 16KB page size support.
+            // Issue #732: Ensure native libraries are stored uncompressed and aligned to 16KB.
+            // useLegacyPackaging = false enables extractNativeLibs="false" behavior.
             useLegacyPackaging = false
         }
         resources {
@@ -116,7 +115,9 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.8.7'
     implementation 'androidx.lifecycle:lifecycle-service:2.8.7'
     implementation 'androidx.activity:activity-compose:1.10.0'
-    implementation platform('androidx.compose:compose-bom:2024.04.01')
+    
+    // Issue #732: Update Compose BOM to 2024.10.01 for Android 15 compatible native libs.
+    implementation platform('androidx.compose:compose-bom:2024.10.01')
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
     implementation 'androidx.compose.ui:ui-tooling-preview'
@@ -128,8 +129,13 @@ dependencies {
 
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3"
 
-    implementation "androidx.datastore:datastore:1.1.2"
-    implementation "androidx.datastore:datastore-preferences:1.1.2"
+    // Issue #732: Ensure Datastore 1.1.1+ for 16KB page support.
+    implementation "androidx.datastore:datastore:1.1.1"
+    implementation "androidx.datastore:datastore-preferences:1.1.1"
+    
+    // Issue #732: Explicitly add graphics-path for 16KB page alignment.
+    implementation "androidx.graphics:graphics-path:1.0.1"
+
     implementation "com.google.protobuf:protobuf-javalite:3.25.1"
 
     implementation ('io.socket:socket.io-client:2.1.0') {
@@ -160,7 +166,7 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-    androidTestImplementation platform('androidx.compose:compose-bom:2024.04.01')
+    androidTestImplementation platform('androidx.compose:compose-bom:2024.10.01')
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
