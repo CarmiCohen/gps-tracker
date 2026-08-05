@@ -19,25 +19,11 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * JAug.05.119:
+ * - Issue #734: Resource Leak: Unclosed Closeable. Wrapped RandomAccessFile in 
+ *   init block with .use {} to ensure file descriptor closure after mapping (R734).
  * JAug.04.112:
  * - Issue #725: Forensic Audit: Delta-Encoding Hardening & Micro-Stall Detection.
- *   Implemented Adaptive Base Resetting when buffer is drained to prevent 
- *   long-term Int-overflow of timestamp deltas. Integrated LatencyMonitor 
- *   into write-path with 5ms threshold to ensure zero-jitter on budget hardware (R725).
- * Aug.04.60:
- * - Issue #717: Forensic Audit: Memory-Mapped Metadata Header. Implemented 128-byte 
- *   header storing version, capacity, entrySize, and lastWriteRt (R717).
- * Aug.04.10:
- * - Issue #710: Forensic Audit: Memory-Mapped Buffer Overflow Protection.
- *   Implemented write-inhibit mechanism (Safe-Wrap). New traces are dropped 
- *   when totalCount >= FORENSIC_SPILL_CAPACITY to prevent corruption of 
- *   un-persisted data (R710).
- * Aug.03.75:
- * - Issue #707: Forensic Audit: Adaptive Buffer Flushing. Added getPendingCount() 
- *   to support adaptive persistence triggers (R707).
- * Aug.03.70:
- * - Issue #706: Forensic Audit: Binary Trace Delta-Encoding. Implemented header-based 
- *   delta encoding for timestamps and spatial coordinates (R706).
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -85,9 +71,10 @@ class ForensicSpillBuffer @Inject constructor(
     init {
         try {
             val size = (FORENSIC_SPILL_CAPACITY * FORENSIC_SPILL_ENTRY_SIZE).toLong() + HEADER_SIZE
-            val raf = RandomAccessFile(spillFile, "rw")
-            mappedBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, size).apply {
-                order(ByteOrder.nativeOrder())
+            RandomAccessFile(spillFile, "rw").use { raf ->
+                mappedBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, size).apply {
+                    order(ByteOrder.nativeOrder())
+                }
             }
             
             val buffer = mappedBuffer
