@@ -32,6 +32,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Aug.05.122:
+ * - Issue #736: Dashboard Recomposition Audit. Removed unused kinematicState from TelemetryBox.
  * July.28.24:
  * - Issue #620: State Partitioning Audit. Migrated from TelemetryState to 
  *   partitioned KinematicState and DiagnosticState to reduce UI re-computation churn.
@@ -273,7 +275,6 @@ fun ViewerDashboard(uiState: MainUiState, kinematicState: KinematicState, diagno
                     Spacer(Modifier.height(4.dp))
                     TelemetryBox(
                         uiState = uiState, 
-                        kinematicState = kinematicState,
                         diagnosticState = diagnosticState,
                         dashboard = dashboardState, 
                         systemPulse = systemPulse, 

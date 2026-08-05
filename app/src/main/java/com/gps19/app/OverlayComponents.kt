@@ -24,6 +24,9 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Aug.05.122:
+ * - Issue #736: Dashboard Recomposition Audit. Decomposed DashboardState consumption
+ *   in sub-sections to minimize recomposition churn. Removed unused kinematicState.
  * July.28.24:
  * - Issue #620: State Partitioning Audit. Decomposed TelemetryState consumption 
  *   into KinematicState and DiagnosticState to refine UI re-computation.
@@ -34,7 +37,6 @@ import com.gps19.core.engine.*
 @Composable
 fun MainDashboardGrid(
     uiState: MainUiState,
-    kinematicState: KinematicState,
     diagnosticState: DiagnosticState,
     dashboard: DashboardState,
     systemPulse: Long,
@@ -63,22 +65,103 @@ fun MainDashboardGrid(
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            DashboardHeader(d)
+            DashboardHeader(
+                isGpsFresh = d.isGpsFresh,
+                trackerState = d.trackerState,
+                isLocationPending = d.isLocationPending,
+                locationPendingReason = d.locationPendingReason,
+                status = d.status,
+                isTelemetryFresh = d.isTelemetryFresh,
+                isTamperDetected = d.isTamperDetected,
+                isBatterySteepDischarge = d.isBatterySteepDischarge
+            )
             
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
             Spacer(Modifier.height(4.dp))
 
-            SystemHealthSection(d, uiState, diagnosticState, isConnStale, relayColor, masterColor, rttValue)
+            SystemHealthSection(
+                maxDrop = d.maxDrop,
+                lastSeen = d.lastSeen,
+                totalDrop = d.totalDrop,
+                totalUptime = d.totalUptime,
+                session = d.session,
+                engineVersion = d.engineVersion,
+                sinceConn = d.sinceConn,
+                sinceDisco = d.sinceDisco,
+                violationUptime = d.violationUptime,
+                watchdogCountdown = d.watchdogCountdown,
+                watchdogOk = d.watchdogOk,
+                isPowerSaveMode = d.isPowerSaveMode,
+                standbyBucket = d.standbyBucket,
+                netInterface = d.netInterface,
+                isStorageLow = d.isStorageLow,
+                isStorageCritical = d.isStorageCritical,
+                isBatteryWhitelisted = uiState.permissions.isBatteryWhitelisted,
+                isTelemetryFresh = d.isTelemetryFresh,
+                isConnStale = isConnStale,
+                relayColor = relayColor,
+                masterColor = masterColor,
+                rttValue = rttValue
+            )
             SectionDivider()
-            PositionSection(d, uiState, diagnosticState, gpsIdx, gpsColor, onShowGnssDetail)
+            PositionSection(
+                distToHome = d.distToHome,
+                distToViewer = d.distToViewer,
+                lat = d.lat,
+                lng = d.lng,
+                gpsSpeed = d.gpsSpeed,
+                trackerAccuracy = d.trackerAccuracy,
+                trackerMaxAcc = d.trackerMaxAcc,
+                viewerAccuracy = d.viewerAccuracy,
+                viewerMaxAcc = d.viewerMaxAcc,
+                satsIndex = d.satsIndex,
+                isSatsIndexWarning = d.isSatsIndexWarning,
+                snr = d.snr,
+                isGpsFresh = d.isGpsFresh,
+                gpsIdx = gpsIdx,
+                isViewer = isViewer,
+                isLocalOnline = diagnosticState.connectivity.isLocalOnline,
+                gpsColor = gpsColor,
+                onShowGnssDetail = onShowGnssDetail
+            )
             SectionDivider()
-            ForensicSection(d, telemetryColor, isViewer, diagnosticState)
+            ForensicSection(
+                vibration = d.vibration,
+                heading = d.heading,
+                tilt = d.tilt,
+                acoustic = d.acoustic,
+                lift = d.lift,
+                lux = d.lux,
+                proximity = d.proximity,
+                proximityCm = d.proximityCm,
+                proximityDebounce = d.proximityDebounce,
+                rollingVibration = d.rollingVibration,
+                trackerMaxTemp = d.trackerMaxTemp,
+                viewerMaxTemp = d.viewerMaxTemp,
+                peakShock = d.peakShock,
+                vibrationFloor = d.vibrationFloor,
+                luxBaseline = d.luxBaseline,
+                acousticFloor = d.acousticFloor,
+                trackerCurrentMa = d.trackerCurrentMa,
+                isTelemetryFresh = d.isTelemetryFresh,
+                isViewer = isViewer,
+                isLocalOnline = diagnosticState.connectivity.isLocalOnline
+            )
         }
     }
 }
 
 @Composable
-private fun DashboardHeader(d: DashboardState) {
+private fun DashboardHeader(
+    isGpsFresh: Boolean,
+    trackerState: TrackerState,
+    isLocationPending: Boolean,
+    locationPendingReason: LocationPendingReason,
+    status: SentinelStatus,
+    isTelemetryFresh: Boolean,
+    isTamperDetected: Boolean,
+    isBatterySteepDischarge: Boolean
+) {
     val infiniteTransition = rememberInfiniteTransition(label = "DashboardPulse")
     val movingAlpha by infiniteTransition.animateFloat(
         initialValue = 0.5f, targetValue = 1f,
@@ -88,22 +171,22 @@ private fun DashboardHeader(d: DashboardState) {
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            val stateColor = if (d.isGpsFresh) BrandJd else Slate500
-            val isMoving = d.trackerState == TrackerState.MOVING
-            val stateText = d.trackerState.name
+            val stateColor = if (isGpsFresh) BrandJd else Slate500
+            val isMoving = trackerState == TrackerState.MOVING
+            val stateText = trackerState.name
             
             Text(
-                text = if (isMoving && d.isGpsFresh) "»\u2009$stateText\u2009«" else stateText,
-                color = stateColor.copy(alpha = if (isMoving && d.isGpsFresh) movingAlpha else 1f),
+                text = if (isMoving && isGpsFresh) "»\u2009$stateText\u2009«" else stateText,
+                color = stateColor.copy(alpha = if (isMoving && isGpsFresh) movingAlpha else 1f),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
         }
         
-        if (d.isLocationPending && d.locationPendingReason != LocationPendingReason.NONE) {
+        if (isLocationPending && locationPendingReason != LocationPendingReason.NONE) {
             Text(
-                text = "UNCERTAINTY: ${d.locationPendingReason.name.replace("_", " ")}",
+                text = "UNCERTAINTY: ${locationPendingReason.name.replace("_", " ")}",
                 color = Amber500,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Black,
@@ -112,80 +195,141 @@ private fun DashboardHeader(d: DashboardState) {
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (d.status == SentinelStatus.TAMPER) Badge("[TAMPER]", if (d.isTelemetryFresh) Rose500 else Slate500)
-            if (d.isTamperDetected) Badge("[HW TAMPER]", if (d.isTelemetryFresh) Rose500 else Slate500)
-            if (d.isBatterySteepDischarge) Badge("[BATT HEALTH]", if (d.isTelemetryFresh) Rose500 else Slate500)
+            if (status == SentinelStatus.TAMPER) Badge("[TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
+            if (isTamperDetected) Badge("[HW TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
+            if (isBatterySteepDischarge) Badge("[BATT HEALTH]", if (isTelemetryFresh) Rose500 else Slate500)
         }
     }
 }
 
 @Composable
-private fun SystemHealthSection(d: DashboardState, uiState: MainUiState, diagnosticState: DiagnosticState, isConnStale: Boolean, relayColor: Color, masterColor: Color, rttValue: Int) {
-    InfoRow(leftVal = d.maxDrop, leftLabel = stringResource(R.string.label_max_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = d.lastSeen, rightLabel = stringResource(R.string.label_last_seen), rightColor = relayColor)
-    InfoRow(leftVal = d.totalDrop, leftLabel = stringResource(R.string.label_total_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = d.totalUptime, rightLabel = stringResource(R.string.label_app_bruto), rightColor = masterColor)
+private fun SystemHealthSection(
+    maxDrop: String,
+    lastSeen: String,
+    totalDrop: String,
+    totalUptime: String,
+    session: String,
+    engineVersion: String,
+    sinceConn: String,
+    sinceDisco: String,
+    violationUptime: String,
+    watchdogCountdown: String,
+    watchdogOk: Boolean,
+    isPowerSaveMode: Boolean,
+    standbyBucket: Int,
+    netInterface: String,
+    isStorageLow: Boolean,
+    isStorageCritical: Boolean,
+    isBatteryWhitelisted: Boolean,
+    isTelemetryFresh: Boolean,
+    isConnStale: Boolean,
+    relayColor: Color,
+    masterColor: Color,
+    rttValue: Int
+) {
+    InfoRow(leftVal = maxDrop, leftLabel = stringResource(R.string.label_max_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = lastSeen, rightLabel = stringResource(R.string.label_last_seen), rightColor = relayColor)
+    InfoRow(leftVal = totalDrop, leftLabel = stringResource(R.string.label_total_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = totalUptime, rightLabel = stringResource(R.string.label_app_bruto), rightColor = masterColor)
     
     val pingStr = if (rttValue > 0) "${rttValue}ms" else "--"
-    InfoRow(leftVal = pingStr, leftLabel = stringResource(R.string.label_ping), leftColor = relayColor, rightVal = d.totalUptime, rightLabel = stringResource(R.string.label_total_monitor), rightColor = masterColor)
+    InfoRow(leftVal = pingStr, leftLabel = stringResource(R.string.label_ping), leftColor = relayColor, rightVal = totalUptime, rightLabel = stringResource(R.string.label_total_monitor), rightColor = masterColor)
     
-    val isUnrestricted = uiState.permissions.isBatteryWhitelisted
-    InfoRow(leftVal = d.watchdogCountdown, leftLabel = stringResource(R.string.label_watchdog), leftColor = if (isConnStale) Slate500 else (if(d.watchdogOk) BrandJd else Rose500), rightVal = if(isUnrestricted) "UNREST" else "RESTR", rightLabel = "Batt", rightColor = if (isConnStale) Slate500 else (if(isUnrestricted) BrandJd else Amber500))
+    InfoRow(leftVal = watchdogCountdown, leftLabel = stringResource(R.string.label_watchdog), leftColor = if (isConnStale) Slate500 else (if(watchdogOk) BrandJd else Rose500), rightVal = if(isBatteryWhitelisted) "UNREST" else "RESTR", rightLabel = "Batt", rightColor = if (isConnStale) Slate500 else (if(isBatteryWhitelisted) BrandJd else Amber500))
     
-    val standbyText = when (d.standbyBucket) {
-        10 -> "ACTIVE"; 20 -> "WORKING"; 30 -> "FREQUENT"; 40 -> "RARE"; 45 -> "RESTRICTED"; else -> "U-${d.standbyBucket}"
+    val standbyText = when (standbyBucket) {
+        10 -> "ACTIVE"; 20 -> "WORKING"; 30 -> "FREQUENT"; 40 -> "RARE"; 45 -> "RESTRICTED"; else -> "U-$standbyBucket"
     }
-    val standbyColor = when (d.standbyBucket) {
+    val standbyColor = when (standbyBucket) {
         10 -> BrandJd; 20 -> BrandJd; 30 -> Amber500; else -> Rose500
     }
-    InfoRow(leftVal = if (d.isPowerSaveMode) "ON" else "OFF", leftLabel = "PwrSave", leftColor = if (d.isPowerSaveMode) Rose500 else BrandJd, rightVal = standbyText, rightLabel = "Standby", rightColor = if (isConnStale) Slate500 else standbyColor)
+    InfoRow(leftVal = if (isPowerSaveMode) "ON" else "OFF", leftLabel = "PwrSave", leftColor = if (isPowerSaveMode) Rose500 else BrandJd, rightVal = standbyText, rightLabel = "Standby", rightColor = if (isConnStale) Slate500 else standbyColor)
     
     val (storageText, storageColor) = when {
-        d.isStorageCritical -> "CRITICAL" to Rose500
-        d.isStorageLow -> "LOW" to Amber500
+        isStorageCritical -> "CRITICAL" to Rose500
+        isStorageLow -> "LOW" to Amber500
         else -> "OK" to BrandJd
     }
-    InfoRow(leftVal = d.netInterface, leftLabel = "Network", leftColor = if (d.netInterface == "OFFLINE") Rose500 else Color.White, rightVal = storageText, rightLabel = "Storage", rightColor = if (isConnStale) Slate500 else storageColor)
+    InfoRow(leftVal = netInterface, leftLabel = "Network", leftColor = if (netInterface == "OFFLINE") Rose500 else Color.White, rightVal = storageText, rightLabel = "Storage", rightColor = if (isConnStale) Slate500 else storageColor)
     
-    InfoRow(leftVal = d.totalUptime, leftLabel = "Uptime", leftColor = masterColor, rightVal = d.session, rightLabel = stringResource(R.string.label_session), rightColor = masterColor)
-    InfoRow(leftVal = d.engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = d.sinceConn, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else BrandJd)
-    InfoRow(leftVal = d.sinceDisco, leftLabel = "Disconnected", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = d.violationUptime, rightLabel = "Violation", rightColor = if (!d.isTelemetryFresh) Slate500 else Rose500)
+    InfoRow(leftVal = totalUptime, leftLabel = "Uptime", leftColor = masterColor, rightVal = session, rightLabel = stringResource(R.string.label_session), rightColor = masterColor)
+    InfoRow(leftVal = engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = sinceConn, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else BrandJd)
+    InfoRow(leftVal = sinceDisco, leftLabel = "Disconnected", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = violationUptime, rightLabel = "Violation", rightColor = if (!isTelemetryFresh) Slate500 else Rose500)
 }
 
 @Composable
-private fun PositionSection(d: DashboardState, uiState: MainUiState, diagnosticState: DiagnosticState, gpsIdx: GpsIndexData, gpsColor: Color, onShowGnssDetail: () -> Unit) {
-    val isViewer = uiState.appMode == "viewer"
-    InfoRow(leftVal = d.distToHome, leftLabel = "Dist Home", leftColor = gpsColor, rightVal = d.distToViewer, rightLabel = "Dist Other", rightColor = gpsColor)
-    InfoRow(leftVal = d.lat, leftLabel = "Lat", leftColor = gpsColor, rightVal = d.lng, rightLabel = "Long", rightColor = gpsColor)
+private fun PositionSection(
+    distToHome: String,
+    distToViewer: String,
+    lat: String,
+    lng: String,
+    gpsSpeed: String,
+    trackerAccuracy: String,
+    trackerMaxAcc: String,
+    viewerAccuracy: String,
+    viewerMaxAcc: String,
+    satsIndex: String,
+    isSatsIndexWarning: Boolean,
+    snr: String,
+    isGpsFresh: Boolean,
+    gpsIdx: GpsIndexData,
+    isViewer: Boolean,
+    isLocalOnline: Boolean,
+    gpsColor: Color,
+    onShowGnssDetail: () -> Unit
+) {
+    InfoRow(leftVal = distToHome, leftLabel = "Dist Home", leftColor = gpsColor, rightVal = distToViewer, rightLabel = "Dist Other", rightColor = gpsColor)
+    InfoRow(leftVal = lat, leftLabel = "Lat", leftColor = gpsColor, rightVal = lng, rightLabel = "Long", rightColor = gpsColor)
     
     val gpsIdxStr = "%.2f".format(Locale.getDefault(), gpsIdx.totalIndex)
-    InfoRow(leftVal = gpsIdxStr, leftLabel = "GPS-Index", leftColor = if(!d.isGpsFresh) Slate500 else BrandJd, rightVal = d.gpsSpeed, rightLabel = "GPS Speed", rightColor = if(!d.isGpsFresh) Slate500 else BrandJd, onLeftClick = onShowGnssDetail)
+    InfoRow(leftVal = gpsIdxStr, leftLabel = "GPS-Index", leftColor = if(!isGpsFresh) Slate500 else BrandJd, rightVal = gpsSpeed, rightLabel = "GPS Speed", rightColor = if(!isGpsFresh) Slate500 else BrandJd, onLeftClick = onShowGnssDetail)
     
-    val trkAccDisplay = "${d.trackerAccuracy} (${d.trackerMaxAcc})"
-    val vwrAccDisplay = if (isViewer) "${d.viewerAccuracy} (${d.viewerMaxAcc})" else ""
-    InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !diagnosticState.connectivity.isLocalOnline) Slate500 else ViewerCyan, rightVal = trkAccDisplay, rightLabel = "Tr Accuracy", rightColor = gpsColor)
+    val trkAccDisplay = "$trackerAccuracy ($trackerMaxAcc)"
+    val vwrAccDisplay = if (isViewer) "$viewerAccuracy ($viewerMaxAcc)" else ""
+    InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !isLocalOnline) Slate500 else ViewerCyan, rightVal = trkAccDisplay, rightLabel = "Tr Accuracy", rightColor = gpsColor)
     
-    InfoRow(leftVal = d.satsIndex, leftLabel = "Satellites Index", leftColor = if(!d.isGpsFresh) Slate500 else if(d.isSatsIndexWarning) Rose500 else Color.White, rightVal = "%.2f".format(Locale.getDefault(), gpsIdx.ageIndex), rightLabel = "Age Index", rightColor = if(!d.isGpsFresh) Slate500 else Amber500)
-    InfoRow(leftVal = "%.2f".format(Locale.getDefault(), gpsIdx.accIndex), leftLabel = "Acc Index", leftColor = if(!d.isGpsFresh) Slate500 else Color.White, rightVal = d.snr, rightLabel = "Avg SNR", rightColor = if(!d.isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = onShowGnssDetail)
+    InfoRow(leftVal = satsIndex, leftLabel = "Satellites Index", leftColor = if(!isGpsFresh) Slate500 else if(isSatsIndexWarning) Rose500 else Color.White, rightVal = "%.2f".format(Locale.getDefault(), gpsIdx.ageIndex), rightLabel = "Age Index", rightColor = if(!isGpsFresh) Slate500 else Amber500)
+    InfoRow(leftVal = "%.2f".format(Locale.getDefault(), gpsIdx.accIndex), leftLabel = "Acc Index", leftColor = if(!isGpsFresh) Slate500 else Color.White, rightVal = snr, rightLabel = "Avg SNR", rightColor = if(!isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = onShowGnssDetail)
 }
 
 @Composable
-private fun ForensicSection(d: DashboardState, telemetryColor: Color, isViewer: Boolean, diagnosticState: DiagnosticState) {
+private fun ForensicSection(
+    vibration: String,
+    heading: String,
+    tilt: String,
+    acoustic: String,
+    lift: String,
+    lux: String,
+    proximity: String,
+    proximityCm: String,
+    proximityDebounce: String,
+    rollingVibration: String,
+    trackerMaxTemp: String,
+    viewerMaxTemp: String,
+    peakShock: String,
+    vibrationFloor: String,
+    luxBaseline: String,
+    acousticFloor: String,
+    trackerCurrentMa: String,
+    isTelemetryFresh: Boolean,
+    isViewer: Boolean,
+    isLocalOnline: Boolean
+) {
     val staleColor = Slate500
-    val tFresh = d.isTelemetryFresh
+    val tFresh = isTelemetryFresh
     
-    InfoRow(leftVal = d.vibration, leftLabel = "Vibration", leftColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR), rightVal = d.heading, rightLabel = "Compass", rightColor = if(!tFresh) staleColor else Color(0xFFFB923C))
-    InfoRow(leftVal = d.tilt, leftLabel = "Tilt", leftColor = if(!tFresh) staleColor else Violet500, rightVal = d.acoustic, rightLabel = "Noise Level", rightColor = if(!tFresh) staleColor else Color(0xFF38BDF8))
-    InfoRow(leftVal = d.lift, leftLabel = "Lift", leftColor = if(!tFresh) staleColor else Color(0xFFFACC15), rightVal = d.lux, rightLabel = "Lux", rightColor = if(!tFresh) staleColor else Amber500)
+    InfoRow(leftVal = vibration, leftLabel = "Vibration", leftColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR), rightVal = heading, rightLabel = "Compass", rightColor = if(!tFresh) staleColor else Color(0xFFFB923C))
+    InfoRow(leftVal = tilt, leftLabel = "Tilt", leftColor = if(!tFresh) staleColor else Violet500, rightVal = acoustic, rightLabel = "Noise Level", rightColor = if(!tFresh) staleColor else Color(0xFF38BDF8))
+    InfoRow(leftVal = lift, leftLabel = "Lift", leftColor = if(!tFresh) staleColor else Color(0xFFFACC15), rightVal = lux, rightLabel = "Lux", rightColor = if(!tFresh) staleColor else Amber500)
     
-    InfoRow(leftVal = d.proximity, leftLabel = "Proximity", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = d.proximityCm, rightLabel = "Raw Prox", rightColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR))
-    InfoRow(leftVal = d.proximityDebounce, leftLabel = "Prox Debounce", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = d.rollingVibration, rightLabel = "Rolling Vibe", rightColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR))
+    InfoRow(leftVal = proximity, leftLabel = "Proximity", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = proximityCm, rightLabel = "Raw Prox", rightColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR))
+    InfoRow(leftVal = proximityDebounce, leftLabel = "Prox Debounce", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = rollingVibration, rightLabel = "Rolling Vibe", rightColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR))
 
-    InfoRow(leftVal = d.trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = if (isViewer) d.viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !diagnosticState.connectivity.isLocalOnline) staleColor else ViewerCyan)
+    InfoRow(leftVal = trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = if (isViewer) viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !isLocalOnline) staleColor else ViewerCyan)
 
     SectionDivider()
 
-    InfoRow(leftVal = d.peakShock, leftLabel = "Peak Shock", leftColor = if (!tFresh) staleColor else Rose500, rightVal = d.vibrationFloor, rightLabel = "Vibration Floor", rightColor = if (tFresh) Slate400 else staleColor)
-    InfoRow(leftVal = d.luxBaseline, leftLabel = "Lux Baseline", leftColor = if(!tFresh) staleColor else Amber500, rightVal = d.acousticFloor, rightLabel = "Acoustic Floor", rightColor = if(!tFresh) staleColor else Color(0xFF38BDF8))
-    InfoRow(leftVal = d.trackerCurrentMa, leftLabel = stringResource(R.string.log_diag_battery), leftColor = if(!tFresh) staleColor else Color.White, rightVal = "", rightLabel = "")
+    InfoRow(leftVal = peakShock, leftLabel = "Peak Shock", leftColor = if (!tFresh) staleColor else Rose500, rightVal = vibrationFloor, rightLabel = "Vibration Floor", rightColor = if (tFresh) Slate400 else staleColor)
+    InfoRow(leftVal = luxBaseline, leftLabel = "Lux Baseline", leftColor = if(!tFresh) staleColor else Amber500, rightVal = acousticFloor, rightLabel = "Acoustic Floor", rightColor = if(!tFresh) staleColor else Color(0xFF38BDF8))
+    InfoRow(leftVal = trackerCurrentMa, leftLabel = stringResource(R.string.log_diag_battery), leftColor = if(!tFresh) staleColor else Color.White, rightVal = "", rightLabel = "")
 }
 
 @Composable
@@ -236,14 +380,13 @@ private fun InfoRow(
 @Composable
 fun TelemetryBox(
     uiState: MainUiState, 
-    kinematicState: KinematicState,
     diagnosticState: DiagnosticState,
     dashboard: DashboardState, 
     systemPulse: Long, 
     gpsIndexDataFlow: StateFlow<GpsIndexData>,
     rttFlow: StateFlow<Int>,
     onShowGnssDetail: () -> Unit = {}
-) { MainDashboardGrid(uiState, kinematicState, diagnosticState, dashboard, systemPulse, gpsIndexDataFlow, rttFlow, onShowGnssDetail) }
+) { MainDashboardGrid(uiState, diagnosticState, dashboard, systemPulse, gpsIndexDataFlow, rttFlow, onShowGnssDetail) }
 
 @Composable
 fun DebugTable(

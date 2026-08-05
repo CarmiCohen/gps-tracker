@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.05.122)
+# Project Issues & Hardening Tracking (Aug.05.123)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Clean | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 544 |
+| **Resolved (Total)** | 🟢 Progress | 545 |
 
 ---
 
@@ -18,6 +18,12 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ## 🔴 Open Issues
 *   *None at this time.*
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.05.123)
+*   **[Issue #736] [Severity: Low] [Category: Performance] Dashboard Recomposition Audit.**
+    *   **Resolution**: Decomposed monolithic `DashboardState` consumption in `OverlayComponents.kt`. Refactored `DashboardHeader`, `SystemHealthSection`, `PositionSection`, and `ForensicSection` to accept individual parameters. This allows Jetpack Compose to skip recomposition for sections whose data remains static during telemetry updates. Cleaned up unused `kinematicState` dependencies in UI grid.
 
 ---
 
@@ -38,4 +44,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Aligned native libraries for 16KB page size. Bumped `androidx.datastore` to `1.2.1` and explicitly added `androidx.graphics:graphics-path:1.1.0`. (R732).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.05.122)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.05.123)

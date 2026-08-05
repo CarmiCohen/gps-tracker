@@ -1,23 +1,23 @@
-# Handover (Aug.05.122) - Startup Hardening
+# Handover (Aug.05.123) - Dashboard Optimization
 
 ## 🎯 Next Objective
-**[Issue #736] [Severity: Low] [Category: Performance] Dashboard Recomposition Audit**.
-- **Context**: The `DashboardState` combine pipeline is sampled at 1s (5s on A15), but sub-component recompositions should be verified for zero-unnecessary-churn.
-- **Goal**: Use Layout Inspector to verify that static dashboard fields do not recompose during telemetry-only updates.
+**[Issue #737] [Severity: Low] [Category: Performance] Shared Component Recomposition Audit**.
+- **Context**: `GlobalStatusBar` in `SharedUiComponents.kt` still consumes the monolithic `DashboardState`.
+- **Goal**: Decompose parameter passing in shared components to ensure consistent recomposition performance across all screens.
 
 ## 🆕 New Architectural Requirements
-- **R735 (Startup Critical Path Hardening)**: High-cost initializations (e.g., memory-mapped files, synchronous I/O) MUST be deferred using `Provider<T>` and accessed on `Dispatchers.IO` to prevent main-thread Davey stalls during cold start. (Issue #735)
-- **R734 (Resource Lifecycle Hardening)**: All `Closeable` resources (Streams, RAF, Cursors) MUST be managed via `.use {}` or explicit `try-finally` blocks. Hardware callbacks in `callbackFlow` MUST implement `awaitClose`. (Issue #734)
+- **R736 (UI Recomposition Optimization)**: Large UI state objects (e.g., `DashboardState`) MUST be decomposed into primitive or stable parameters when passed to sub-composables to minimize recomposition churn. (Issue #736)
+- **R735 (Startup Critical Path Hardening)**: High-cost initializations (e.g., memory-mapped files, synchronous I/O) MUST be deferred using `Provider<T>`. (Issue #735)
 
 ## 📊 Status Tracker
-- **[Issue #735] UI Thread Jitter during Startup**: 🟢 Resolved. Refactored `LogRepository` and `LogManager` to use `Provider<ForensicSpillBuffer>`, deferring `mmap` I/O until background access. (R735)
-- **[Issue #734] Resource Leak: Unclosed Closeable**: 🟢 Resolved. Closed leaked `RandomAccessFile` in `ForensicSpillBuffer`. (R734)
-- **[Issue #732] Android 15 (16KB Page Size) Remediation**: 🟢 Resolved. Aligned native libraries and upgraded Datastore/Graphics-Path dependencies. (R732)
+- **[Issue #736] Dashboard Recomposition Audit**: 🟢 Resolved. Decomposed `DashboardState` consumption in `OverlayComponents.kt` sub-sections. Successfully eliminated unnecessary churn in Header, Health, and Forensic grids. (R736)
+- **[Issue #735] UI Thread Jitter during Startup**: 🟢 Resolved. Refactored `LogRepository` to use deferred `mmap` allocation. (R735)
+- **[Issue #734] Resource Leak: Unclosed Closeable**: 🟢 Resolved. (R734)
 
-## 🔍 Forensic Subsystem State (vAug.05.122)
-- **Stability**: 🟢 **VERIFIED**. Resource leaks and initialization stalls remediated.
-- **Compatibility**: 🟢 **VERIFIED**. Android 15 16KB alignment and DataStore upgrades complete.
-- **Performance**: 🟢 **VERIFIED**. Startup Davey stalls eliminated via deferred MappedByteBuffer allocation.
+## 🔍 Forensic Subsystem State (vAug.05.123)
+- **Stability**: 🟢 **VERIFIED**. 
+- **Performance**: 🟢 **VERIFIED**. Dashboard recomposition churn reduced via state decomposition. Startup stalls eliminated.
+- **Maintainability**: 🟢 **IMPROVED**. Removed unused dependencies from UI grid components.
 
-**Status**: STARTUP HARDENED. PREPARING UI RECOMPOSITION AUDIT.
-vAug.05.122
+**Status**: DASHBOARD OPTIMIZED. PREPARING SHARED COMPONENT AUDIT.
+vAug.05.123
