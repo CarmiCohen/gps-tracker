@@ -1,26 +1,24 @@
-# Handover (Aug.04.116) - Forensic Persistence Hardening
+# Handover (Aug.04.117) - Native & Compatibility Hardening
 
 ## 🎯 Next Objective
-**[Issue #730] [Severity: Medium] [Category: Performance] Forensic UI: Real-time Persistence Latency Visualization**.
-- **Context**: With R731 now preventing forensic log bloat, the persistence layer is stable. The next step is to expose these internal health metrics (DB write latency, integrity status) directly on the Forensic Dashboard.
-- **Goal**: Implement a specialized "Persistence Health" ribbon or overlay in `SharedUiComponents` to visualize `LatencyMonitor` spikes and integrity audit results.
+**[Issue #732] [Severity: Critical] [Category: Compatibility] Android 15 (16KB Page Size) Remediation**.
+- **Context**: Deployment on Samsung A15 (Android 15) revealed critical incompatibilities with 16KB page sizes for `libjdMbrain.so` and other libraries.
+- **Goal**: Re-align and re-compile native libraries with 16KB page alignment. Update `build.gradle` and `CMakeLists.txt` to ensure strict compliance with Android 15 memory management requirements.
 
 ## 🆕 New Architectural Requirements
-- **R731 (Forensic Bloat Prevention)**: (Added Aug.04.116) The `LogRepository` MUST implement a secondary safety tier that chunk-prunes `isSpecial` logs when the total count exceeds `LOG_LIMIT_STRICT` (5000). (Issue #731)
-- **R729 (Automated Integrity Validation)**: (Added Aug.04.115) The `MaintenanceWorker` MUST execute `PRAGMA integrity_check` every 24h (or 12h if charging). Failures MUST be logged as high-priority forensic events. (Issue #729)
-- **R728 (Storage-Aware Pruning)**: (Added Aug.04.114) The `LogRepository` MUST implement chunked deletion cycles and adaptive thresholds based on `StorageStatsManager`. (Issue #728)
+- **R733 (JNI Namespace Integrity)**: (Added Aug.04.117) All hardware-specific JNI calls and logs MUST strictly refer to the `jdMbrain` namespace to avoid confusion with legacy `mbrainSDK` vendor libraries. (Issue #733)
+- **R732 (16KB Page Alignment)**: (Added Aug.04.117) Native libraries MUST be compiled with `-Wl,-z,max-page-size=16384` and packaged uncompressed (`extractNativeLibs="false"`) to support Android 15+. (Issue #732)
 
 ## 📊 Status Tracker
-- **[Issue #731] Forensic Bloat: Important/Special Logs Exempt from Pruning**: 🟢 Resolved. Implemented secondary safety tier for `isSpecial` logs with strict ceiling.
-- **[Issue #729] Forensic Audit: Automated Database Integrity Validation**: 🟢 Resolved. Integrated `PRAGMA integrity_check` into `MaintenanceWorker`.
-- **[Issue #728] Forensic Audit: Storage-Aware Adaptive Pruning**: 🟢 Resolved. Integrated `StorageStatsManager` for granular pressure detection.
-- **[Issue #727] Forensic Trace Persistence: Batch-Write Optimization**: 🟢 Resolved. Dynamic batching implemented.
+- **[Issue #733] Native Library Initialization Failure**: 🟢 Resolved. Corrected misleading log references in `TrackerService` and verified JNI loading path for `jdMbrain`.
+- **[Issue #731] Forensic Bloat: Important/Special Logs Exempt from Pruning**: 🟢 Resolved. Implemented secondary safety tier for `isSpecial` logs.
+- **[Issue #729] Forensic Audit: Automated Database Integrity Validation**: 🟢 Resolved. Integrated `PRAGMA integrity_check`.
 
-## 🔍 Forensic Subsystem State (vAug.04.116)
-- **Persistence Health**: 🟢 **VERIFIED**. Bloat prevention tier active for Special logs.
-- **Logcat Status**: 🟢 **SILENT**. Pruning cycles yield to I/O correctly.
-- **Storage Monitoring**: 🟢 **GRANULAR**. Adaptive pruning reacting to storage pressure.
-- **Build Status**: 🟢 **SUCCESSFUL**.
+## 🔍 Forensic Subsystem State (vAug.04.117)
+- **Compatibility**: 🔴 **CRITICAL**. Android 15 16KB page size warning active.
+- **Native JNI**: 🟢 **VERIFIED**. `jdMbrain` loading confirmed, legacy naming purged from logs.
+- **Stability**: 🟡 **MONITORING**. Identified potential resource leak in `SystemStatusProvider` (Issue #734).
+- **Performance**: 🟡 **DEGRADED**. High frame jitter during startup (Issue #735).
 
-**Status**: FORENSIC PERSISTENCE SECURED AGAINST UNBOUNDED GROWTH.
-vAug.04.116
+**Status**: NATIVE NAMESPACE SECURED. TRANSITIONING TO ANDROID 15 COMPATIBILITY.
+vAug.04.117

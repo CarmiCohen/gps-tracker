@@ -33,8 +33,8 @@ class IdentityPersistenceTest {
         repository.resetStatsBulk()
         repository.clearDraftSettings()
         // Ensure baseline
-        repository.saveString(SettingsRepository.TRACKER_ID_KEY, "T-ORIG")
-        repository.saveString(SettingsRepository.VIEWER_ID_KEY, "V-ORIG")
+        repository.saveString(TRACKER_ID_KEY, "T-ORIG")
+        repository.saveString(VIEWER_ID_KEY, "V-ORIG")
     }
 
     @Test
@@ -78,7 +78,7 @@ class IdentityPersistenceTest {
         val result = repository.commitDraftSettings()
 
         assertTrue("Commit must fail due to non-unique IDs", result.error != null)
-        assertEquals("IDs must be unique", result.error)
+        assertEquals("Identity Conflict: Some IDs (e.g., 'viewer', 'Trk') are reserved for cross-version compatibility. Please choose unique IDs.", result.error)
         
         // Verify primary values did not change
         assertEquals("T-ORIG", repository.trackerIdFlow.first())
@@ -88,8 +88,8 @@ class IdentityPersistenceTest {
     @Test
     fun verifyDefaultIdentityPersistence() = runBlocking {
         // Clear everything to simulate fresh install
-        repository.saveString(SettingsRepository.TRACKER_ID_KEY, "")
-        repository.saveString(SettingsRepository.VIEWER_ID_KEY, "")
+        repository.saveString(TRACKER_ID_KEY, "")
+        repository.saveString(VIEWER_ID_KEY, "")
         
         assertEquals("Should default to T", SettingsRepository.DEFAULT_TRACKER_ID, repository.trackerIdFlow.first())
         assertEquals("Should default to V", SettingsRepository.DEFAULT_VIEWER_ID, repository.viewerIdFlow.first())

@@ -19,6 +19,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.04.117:
+ * - Issue #733: JNI Hardening. Corrected misleading log message to reflect the 
+ *   transition from libmbrainSDK to libjdMbrain (R733).
  * Aug.04.10:
  * - Issue #710: Forensic Audit: Memory-Mapped Buffer Overflow Protection.
  *   Inherited hardened LogManager path for spill-buffer overflow protection (R710).
@@ -26,10 +29,6 @@ import kotlin.math.*
  * - Issue #709: Forensic Audit: Adaptive Sampling Thermal Throttling. 
  *   Enforced FORENSIC_SAMPLING_INTERVAL_COOLING_MS (500ms) floor when 
  *   isCoolingModeActive is true to maintain hardware integrity (R709).
- * Aug.03.47:
- * - Issue #702: Forensic Audit: Trace Serialization Hardening. Updated 
- *   startForensicSamplingLoop() and stress tests to use the hardened binary 
- *   serialization path. String formatting is now moved out of the hot-path (R702).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -91,7 +90,7 @@ class TrackerService : BaseMonitorService() {
                 MbrainHardwareManager.loadLibrary()
                 if (MbrainHardwareManager.isAvailable()) {
                     val res = MbrainHardwareManager.initMbrain(timeProvider, configManager.deviceId, 0)
-                    logManager.logServiceEvent("HARDWARE: libmbrainSDK initialized (Result: $res)", isImportant = true)
+                    logManager.logServiceEvent("HARDWARE: libjdMbrain initialized (Result: $res)", isImportant = true)
                 }
             }
         }
