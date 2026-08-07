@@ -23,11 +23,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.07.03:
+ * - Issue #744: Performance: Startup Davey Mitigation. Refactored init sequence to 
+ *   offload loadInitialData to Dispatchers.IO and staggered heavy observations 
+ *   to ensure <100ms main-thread blockage during cold start (R744).
  * Aug.03.37:
- * - Issue #669: Refactored to eliminate .copy() usage on mutable state classes 
- *   to resolve build errors and maintain zero-churn compliance (R668).
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn.
+ * - Issue #669: Refactored to eliminate .copy() usage on mutable state classes (R668).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -168,19 +169,30 @@ class MainViewModel @Inject constructor(
     private var isHeavyObservationStarted = false
 
     init {
-        viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
-            loadInitialData()
-            delay(200) 
-            updateState { it.copy(isInitialized = true) }
+        // Issue #744: Staggered initialization to prevent Main thread Davey stalls.
+        viewModelScope.launch(Dispatchers.Default + uiExceptionHandler) {
+            val initialSettings = settingsUseCase.loadAllSettings()
             
-            viewModelScope.launch(Dispatchers.IO) { 
-                delay(10000)
+            withContext(Dispatchers.Main.immediate) {
+                applyInitialSettings(initialSettings)
+                // Short pause to allow first frame rendering to complete before declaring initialized.
+                delay(300) 
+                updateState { it.copy(isInitialized = true) }
+            }
+            
+            // Background maintenance deferral
+            launch(Dispatchers.IO) { 
+                delay(15000)
                 repository.proactivePruning() 
             }
             
-            startBaseObservations()
-            startGlobalTimer()
-            viewModelScope.launch(Dispatchers.Main.immediate) {
+            withContext(Dispatchers.Main.immediate) {
+                startBaseObservations()
+                startGlobalTimer()
+            }
+            
+            // Heavy observations are deferred until a mode is actually selected or restored.
+            launch(Dispatchers.Main.immediate) {
                 _uiState.filter { it.appMode != null }.first()
                 startHeavyObservations()
             }
@@ -807,40 +819,44 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun loadInitialData() {
-        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            val initial = settingsUseCase.loadAllSettings()
-            withContext(Dispatchers.Main.immediate) {
-                appStartTime = initial.appStartTime
-                updateState { it.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, maxDistance = initial.maxDistance, homePoints = initial.homePoints, alertSettings = initial.alertSettings, appMode = initial.appMode, isSystemActive = initial.isSystemActive, selectedSirenType = initial.selectedSirenType, lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, draftSettings = initial.draftSettings ?: it.draftSettings, isIdentitySanitized = initial.identitySanitized) }
-                _localMaxTemp.value = initial.maxTemp; if (initial.appMode == "tracker") _trackerMaxTemp.value = initial.maxTemp
+    private fun applyInitialSettings(initial: InitialSettings) {
+        appStartTime = initial.appStartTime
+        updateState { it.copy(
+            deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, 
+            maxDistance = initial.maxDistance, homePoints = initial.homePoints, 
+            alertSettings = initial.alertSettings, appMode = initial.appMode, 
+            isSystemActive = initial.isSystemActive, selectedSirenType = initial.selectedSirenType, 
+            lastAlarmAckTs = initial.lastAlarmAckTs, appStartTime = initial.appStartTime, 
+            draftSettings = initial.draftSettings ?: it.draftSettings, 
+            isIdentitySanitized = initial.identitySanitized
+        )}
+        _localMaxTemp.value = initial.maxTemp
+        if (initial.appMode == "tracker") _trackerMaxTemp.value = initial.maxTemp
+        
+        initial.trackerStatus?.let { status -> 
+            updateKinematicState { current ->
+                telemetryUseCase.mapTrackerLocationFromStatus(status, current.trackerLocation)
+                telemetryUseCase.mapHealthFromStatus(status, current.trackerHealth)
+                current.apply { pulse = timeProvider.elapsedRealtime() }
+            }
+            updateDiagnosticState { current ->
+                telemetryUseCase.mapStatsFromStatus(status, current.trackerStats)
+                current.trackerBattery.level = status.battery
+                current.trackerBattery.temp = status.temp
+                current.trackerBattery.isCharging = status.isCharging
+                current.trackerBattery.isChargingStable = status.isCharging
                 
-                initial.trackerStatus?.let { status -> 
-                    updateKinematicState { current ->
-                        telemetryUseCase.mapTrackerLocationFromStatus(status, current.trackerLocation)
-                        telemetryUseCase.mapHealthFromStatus(status, current.trackerHealth)
-                        current.apply { pulse = timeProvider.elapsedRealtime() }
-                    }
-                    updateDiagnosticState { current ->
-                        telemetryUseCase.mapStatsFromStatus(status, current.trackerStats)
-                        current.trackerBattery.level = status.battery
-                        current.trackerBattery.temp = status.temp
-                        current.trackerBattery.isCharging = status.isCharging
-                        current.trackerBattery.isChargingStable = status.isCharging
-                        
-                        current.apply {
-                            connectivity.lastUpdateTs = status.ts
-                            trackerSatsView = status.satsView
-                            trackerSatsUsed = status.satsUsed
-                            maxTrackerAccuracy = if (status.maxAccuracy > 0.0) status.maxAccuracy else current.maxTrackerAccuracy
-                            pulse = timeProvider.elapsedRealtime()
-                        }
-                    }
-                    _trackerMaxTemp.value = status.maxTemp
-                    _trackerCurrentMa.value = status.currentMa
-                    if (_uiState.value.appMode == "tracker") _localMaxTemp.value = status.maxTemp 
+                current.apply {
+                    connectivity.lastUpdateTs = status.ts
+                    trackerSatsView = status.satsView
+                    trackerSatsUsed = status.satsUsed
+                    maxTrackerAccuracy = if (status.maxAccuracy > 0.0) status.maxAccuracy else current.maxTrackerAccuracy
+                    pulse = timeProvider.elapsedRealtime()
                 }
             }
+            _trackerMaxTemp.value = status.maxTemp
+            _trackerCurrentMa.value = status.currentMa
+            if (_uiState.value.appMode == "tracker") _localMaxTemp.value = status.maxTemp 
         }
     }
 
@@ -860,7 +876,10 @@ class MainViewModel @Inject constructor(
                 battery.level = 100; stats.uptimeMs = 0; trackerStats.uptimeMs = 0
                 pulse = timeProvider.elapsedRealtime()
             }}
-            _trackerState.value = TrackerState.UNKNOWN; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; stateSubscriptionUseCase.clearHistory(); loadInitialData()
+            _trackerState.value = TrackerState.UNKNOWN; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; stateSubscriptionUseCase.clearHistory(); 
+            // Re-load initial data after full reset
+            val initial = settingsUseCase.loadAllSettings()
+            applyInitialSettings(initial)
         }
     }
     

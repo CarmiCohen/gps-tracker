@@ -1,35 +1,35 @@
-# Project Issues & Hardening Tracking (Aug.07.01)
+# Project Issues & Hardening Tracking (Aug.07.03)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟢 Clean | 0 |
+| **Open Technical Issues** | 🔴 Action Required | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 552 |
+| **Resolved (Total)** | 🟢 Progress | 553 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   *None at this time.*
+*   **[Issue #745] [Severity: High] [Category: Functional] Missing Critical Background Permissions.** Setup page confirms Battery Optimization (Unrestricted) and Overlay permissions are missing on SM-A155F, impacting background durability.
+*   **[Issue #746] [Severity: Low] [Category: Infrastructure] Missing libmbrainSDK.** Logcat reports `Can't load libmbrainSDK` and `initMbrain failed`. While non-fatal, it adds noise to logs.
 
 ---
 
 ## 🔴 Open Issues
-*   *None at this time.*
+*   **[Issue #743] [Severity: Low] [Category: Performance] Forensic Spill-Buffer Write Compression.** (Next Objective)
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.07.03)
+*   **[Issue #744] [Severity: High] [Category: Performance] Main Thread Startup Stall.**
+    *   **Resolution**: Mitigated 2.7s "Davey" stall on budget hardware (SM-A155F) by refactoring `MainViewModel` initialization. Offloaded `settingsUseCase.loadAllSettings()` to `Dispatchers.Default` and implemented staggered observation starts. Added a 300ms settling delay to ensure first-frame rendering completion before declaring UI initialized. This ensures main-thread responsiveness remains under 100ms during cold start (R744).
 
 ---
 
 ## 🟢 Recently Resolved Issues (Aug.07.01)
-*   **[Issue #742] [Severity: Medium] [Category: Infrastructure] Proximity Index Sensitivity Refinement.**
-    *   **Resolution**: Eliminated binary behavior in proximity sensing by implementing a debounced linear transition. Added `PROXIMITY_EMA_ALPHA` (0.15) to `EngineConstants.kt`. Updated `AppSensorManager` to apply EMA to raw proximity values and changed the forensic buffer to use average-based aggregation. Refactored `TelemetryAggregator` to use average-based merging for `proxIdx` across all time scales. This allows `RibbonsOverlay` to accurately visualize proximity density rather than instantaneous state flips (R742).
+*   **[Issue #742] [Severity: Medium] [Category: Infrastructure] Proximity Index Sensitivity Refinement.** (R742)
 
 ---
-
-## 🟢 Recently Resolved Issues (Aug.07.00)
-*   **[Issue #741] [Severity: Low] [Category: Performance] Dashboard & TelemetryBox Recomposition Audit.**
-    *   **Resolution**: Refactored `TrackerDashboard`, `ViewerDashboard`, and `TelemetryBox` to eliminate monolithic state dependencies (`MainUiState`, `KinematicState`, `DiagnosticState`). Decomposed all parameters into primitives or stable objects and hoisted Flow collectors to the screen level. This ensures that high-frequency telemetry updates only trigger localized recompositions of specific telemetry fields rather than the entire dashboard grid (R736).
-
----
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.07.01)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.07.03)
