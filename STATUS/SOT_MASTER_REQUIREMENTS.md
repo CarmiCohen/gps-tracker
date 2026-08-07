@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.05.02 (Startup & Permission Hardening)
+# System Source of Truth (SoT) - Aug.07.04 (Forensic Compression Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Forensic Write Compression (R743)**: (Added Aug.07.04) The forensic spill-buffer MUST use a structural compression layer (V2 format) to limit flash IO. Entry size is strictly capped at 96 bytes using bit-packing for flags/battery and optimized field alignment. Capacity is set to 3000 entries. (Issue #743)
 *   **Startup Daveys Prevention (R744)**: (Added Aug.05.02) The main thread MUST NOT be blocked for more than 100ms during `MainActivity` initialization. All heavy IO, database checks, or legacy library initializations MUST be offloaded to `Dispatchers.IO` or deferred. (Issue #744)
 *   **Background Reliability Hardening (R745)**: (Added Aug.05.02) The application MUST verify and prompt for 'Unrestricted' battery mode, 'Appear on Top', and Microphone permissions during the Setup phase. Absence of these constitutes a critical system failure for tracking. (Issue #745)
 *   **Proximity Forensic Sensitivity (R742)**: (Added Aug.07.01) Proximity indices MUST implement a debounced linear transition using Exponential Moving Average (EMA) at the sensor sampling level. Telemetry aggregation for proximity MUST use average-based accumulation across all time scales. (Issue #742)
@@ -25,5 +26,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Strict Forensic Reconstruction (R595)**: Analytical Ribbon "Strict Mode" for forensic auditing. (Issue #595)
 
 ### 3. Version Authority
-*   **Current Release**: Aug.05.02.
+*   **Current Release**: Aug.07.04.
 *   **Source of Truth**: app/build.gradle versionName.

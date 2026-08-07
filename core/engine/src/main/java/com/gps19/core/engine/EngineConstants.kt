@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.07.116:
+ * - Issue #743: Forensic Spill-Buffer Write Compression. Reduced 
+ *   FORENSIC_SPILL_ENTRY_SIZE to 96 bytes and increased capacity to 3000 (R743).
  * Aug.07.115:
  * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement. Added 
  *   PROXIMITY_EMA_ALPHA (0.15) for debounced linear transitions (R742).
@@ -38,8 +41,8 @@ const val LOG_BUFFER_CAPACITY = 500
 
 // Issue #669: Forensic Spill-Buffer (MappedByteBuffer)
 const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"
-const val FORENSIC_SPILL_ENTRY_SIZE = 128 // Issue #706: Reduced for delta-encoding optimization
-const val FORENSIC_SPILL_CAPACITY = 2000   // Issue #706: Doubled capacity within same memory footprint
+const val FORENSIC_SPILL_ENTRY_SIZE = 96 // Issue #743: Reduced to 96 bytes for IO optimization
+const val FORENSIC_SPILL_CAPACITY = 3000   // Issue #743: Increased capacity within 288KB footprint
 const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
 const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 500L
 const val FORENSIC_DRAIN_THROTTLE_MAX_MS = 5000L

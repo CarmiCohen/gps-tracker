@@ -19,11 +19,13 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.07.116:
+ * - Issue #743: Forensic Spill-Buffer Write Compression. Implemented version 2 
+ *   of the binary format with 96-byte entries. Uses bit-packing for flags/battery 
+ *   and optimized alignment to maximize message payload (R743).
  * JAug.05.119:
  * - Issue #734: Resource Leak: Unclosed Closeable. Wrapped RandomAccessFile in 
  *   init block with .use {} to ensure file descriptor closure after mapping (R734).
- * JAug.04.112:
- * - Issue #725: Forensic Audit: Delta-Encoding Hardening & Micro-Stall Detection.
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -47,7 +49,7 @@ class ForensicSpillBuffer @Inject constructor(
 
     private companion object {
         const val MAGIC_NUMBER = 0x46535042
-        const val CURRENT_VERSION = 1
+        const val CURRENT_VERSION = 2 // Issue #743: Bumped for new 96-byte format
         const val HEADER_SIZE = 128
         const val CHECKSUM_SIZE = 4
         
@@ -85,7 +87,7 @@ class ForensicSpillBuffer @Inject constructor(
                 val entrySz = if (magic == MAGIC_NUMBER) buffer.getInt(OFF_ENTRY_SIZE) else -1
 
                 if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != FORENSIC_SPILL_CAPACITY || entrySz != FORENSIC_SPILL_ENTRY_SIZE) {
-                    Timber.w("ForensicSpillBuffer: Header mismatch or new file. Resetting.")
+                    Timber.w("ForensicSpillBuffer: Header mismatch (V$version, S=$entrySz) or new file. Resetting to V$CURRENT_VERSION, S=$FORENSIC_SPILL_ENTRY_SIZE.")
                     resetBuffer()
                 } else {
                     val recoveredWrite = buffer.getInt(OFF_WRITE_IDX)
@@ -180,22 +182,28 @@ class ForensicSpillBuffer @Inject constructor(
                 buffer.putInt(((entry.lat - baseLat) * PRECISION_SCALE).toInt())
                 buffer.putInt(((entry.lng - baseLng) * PRECISION_SCALE).toInt())
                 
-                // Other fields as Floats/Ints to save space
+                // Telemetry Fields (Floats)
                 buffer.putFloat(entry.accuracy.toFloat())
                 buffer.putFloat(entry.maxAccuracy.toFloat())
                 buffer.putFloat(entry.vibeSnapshot?.toFloat() ?: -1.0f)
                 buffer.putFloat(entry.snrSnapshot?.toFloat() ?: -1.0f)
                 
+                buffer.putFloat(0.0f) // batteryTemp (Reserved for optimized)
+                
+                // Bit-Packed Metadata (Issue #743)
                 var flags = 0
                 if (entry.isImportant) flags = flags or 0x01
                 if (entry.isSpecial) flags = flags or 0x02
-                buffer.putInt(flags)
-                buffer.putInt(0) // batteryLevel
-                buffer.putFloat(0.0f) // batteryTemp
+                
+                buffer.put(flags.toByte())
+                buffer.put(0.toByte()) // batteryLevel
                 
                 val msgBytes = entry.message.toByteArray(Charsets.UTF_8)
-                val msgLen = msgBytes.size.coerceAtMost(80) // 80 bytes reserved for message
-                buffer.putInt(msgLen)
+                val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE - 36 - CHECKSUM_SIZE // 96 - 36 - 4 = 56
+                val msgLen = msgBytes.size.coerceAtMost(maxMsgLen)
+                buffer.put(msgLen.toByte())
+                buffer.put(0.toByte()) // Alignment padding
+
                 buffer.put(msgBytes, 0, msgLen)
 
                 val crc = calculateEntryChecksumLocked(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
@@ -243,12 +251,16 @@ class ForensicSpillBuffer @Inject constructor(
                 buffer.putFloat(vibe.toFloat())
                 buffer.putFloat(snr.toFloat())
                 
+                buffer.putFloat(batteryTemp.toFloat())
+
+                // Bit-Packed Metadata (Issue #743)
                 var flags = 0
                 if (isCharging) flags = flags or 0x04
-                buffer.putInt(flags)
-                buffer.putInt(batteryLevel)
-                buffer.putFloat(batteryTemp.toFloat())
-                buffer.putInt(0) // msgLen = 0
+                
+                buffer.put(flags.toByte())
+                buffer.put(batteryLevel.toByte())
+                buffer.put(0.toByte()) // msgLen = 0
+                buffer.put(0.toByte()) // Alignment padding
 
                 val crc = calculateEntryChecksumLocked(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
                 buffer.putInt(offset + FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, crc.toInt())
@@ -301,14 +313,17 @@ class ForensicSpillBuffer @Inject constructor(
                     val maxAcc = buffer.getFloat().toDouble()
                     val vibe = buffer.getFloat().toDouble()
                     val snr = buffer.getFloat().toDouble()
-                    val flags = buffer.getInt()
-                    val batLevel = buffer.getInt()
                     val batTemp = buffer.getFloat().toDouble()
+                    
+                    val flags = buffer.get().toInt()
+                    val batLevel = buffer.get().toInt() and 0xFF
+                    val msgLen = buffer.get().toInt() and 0xFF
+                    buffer.get() // Skip alignment padding
                     
                     val important = (flags and 0x01) != 0
                     val special = (flags and 0x02) != 0
                     val charging = (flags and 0x04) != 0
-                    val msgLen = buffer.getInt()
+
                     val msg = if (msgLen > 0) {
                         val msgBytes = ByteArray(msgLen)
                         buffer.get(msgBytes)
@@ -348,8 +363,6 @@ class ForensicSpillBuffer @Inject constructor(
             buffer.putInt(OFF_COUNT, newCount)
             
             // Issue #725: Adaptive Base Resetting
-            // Reset bases when buffer is empty to ensure next trace becomes new base,
-            // preventing long-term Int-overflow of deltas.
             if (newCount == 0) {
                 baseTs.set(0L)
                 baseLat = 0.0
