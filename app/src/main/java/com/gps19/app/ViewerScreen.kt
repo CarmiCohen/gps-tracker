@@ -32,13 +32,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Aug.07.00:
+ * - Issue #741: Dashboard & TelemetryBox Recomposition Audit. Refactored ViewerDashboard 
+ *   call site to pass decomposed primitive parameters (R736). Hoisted flows.
  * Aug.05.128:
  * - Issue #740: AppMapContainer Recomposition Audit. Refactored call sites to pass 
  *   decomposed primitive parameters instead of monolithic state objects (R736).
- *   Fixed entity mapping: Remote device is "Tracker" in ViewerScreen.
- * Aug.05.126:
- * - Issue #739: Shared Component R736 Compliance. Decomposed HeaderBar and 
- *   GlobalStatusBar call sites to pass primitive parameters (R736).
  */
 
 @Composable
@@ -75,6 +74,9 @@ fun ViewerScreen(
     val context = LocalContext.current
 
     val dashboardState by viewModel.dashboardState.collectAsStateWithLifecycle()
+    val gpsIndexData by viewModel.gpsIndexData.collectAsStateWithLifecycle()
+    val rtt by viewModel.rtt.collectAsStateWithLifecycle()
+    val trackerCurrentMa by viewModel.trackerCurrentMa.collectAsStateWithLifecycle()
 
     val onDashboard = {
         if (isMapVisible) onToggleMap()
@@ -207,7 +209,21 @@ fun ViewerScreen(
                                 showToolsOverlay = true
                             )
                         } else {
-                            ViewerDashboard(uiState, kinematicState, diagnosticState, dashboardState, systemPulse, viewModel, onEvent = { viewModel.onEvent(it) })
+                            ViewerDashboard(
+                                appMode = uiState.appMode ?: "viewer",
+                                isDashboardExpanded = uiState.navigation.isDashboardExpanded,
+                                isBatteryWhitelisted = uiState.permissions.isBatteryWhitelisted,
+                                isLocalOnline = diagnosticState.connectivity.isLocalOnline,
+                                isRelayConnected = diagnosticState.connectivity.isRelayConnected,
+                                lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
+                                trackerLocationTs = kinematicState.trackerLocation.timestamp,
+                                dashboardState = dashboardState,
+                                gpsIdx = gpsIndexData,
+                                rttValue = rtt,
+                                trackerCurrentMaValue = trackerCurrentMa,
+                                systemPulse = systemPulse,
+                                onEvent = { viewModel.onEvent(it) }
+                            )
                         }
                     }
                 }
@@ -309,7 +325,21 @@ fun ViewerScreen(
                     }
                     
                     if (!isMapVisible) {
-                        ViewerDashboard(uiState, kinematicState, diagnosticState, dashboardState, systemPulse, viewModel, onEvent = { viewModel.onEvent(it) })
+                        ViewerDashboard(
+                            appMode = uiState.appMode ?: "viewer",
+                            isDashboardExpanded = uiState.navigation.isDashboardExpanded,
+                            isBatteryWhitelisted = uiState.permissions.isBatteryWhitelisted,
+                            isLocalOnline = diagnosticState.connectivity.isLocalOnline,
+                            isRelayConnected = diagnosticState.connectivity.isRelayConnected,
+                            lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
+                            trackerLocationTs = kinematicState.trackerLocation.timestamp,
+                            dashboardState = dashboardState,
+                            gpsIdx = gpsIndexData,
+                            rttValue = rtt,
+                            trackerCurrentMaValue = trackerCurrentMa,
+                            systemPulse = systemPulse,
+                            onEvent = { viewModel.onEvent(it) }
+                        )
                     }
                 }
             }
@@ -378,31 +408,102 @@ fun ViewerScreen(
 }
 
 @Composable
-fun ViewerDashboard(uiState: MainUiState, kinematicState: KinematicState, diagnosticState: DiagnosticState, dashboardState: DashboardState, systemPulse: Long, viewModel: MainViewModel, onEvent: (UiEvent) -> Unit) {
+fun ViewerDashboard(
+    appMode: String,
+    isDashboardExpanded: Boolean,
+    isBatteryWhitelisted: Boolean,
+    isLocalOnline: Boolean,
+    isRelayConnected: Boolean,
+    lastRemoteActivityTs: Long,
+    trackerLocationTs: Long,
+    dashboardState: DashboardState,
+    gpsIdx: GpsIndexData,
+    rttValue: Int,
+    trackerCurrentMaValue: Int,
+    systemPulse: Long,
+    onEvent: (UiEvent) -> Unit
+) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         item {
-            if (uiState.navigation.isDashboardExpanded) {
+            if (isDashboardExpanded) {
                 if (!isLandscape) {
+                    val gpsAge = if (trackerLocationTs > 0) systemPulse - trackerLocationTs else Long.MAX_VALUE
                     Spacer(Modifier.height(4.dp))
                     TelemetryBox(
-                        uiState = uiState, 
-                        diagnosticState = diagnosticState,
-                        dashboard = dashboardState, 
-                        systemPulse = systemPulse, 
-                        gpsIndexDataFlow = viewModel.gpsIndexData, 
-                        rttFlow = viewModel.rtt,
+                        appMode = appMode,
+                        isBatteryWhitelisted = isBatteryWhitelisted,
+                        isLocalOnline = isLocalOnline,
+                        isRelayConnected = isRelayConnected,
+                        lastRemoteActivityTs = lastRemoteActivityTs,
+                        systemPulse = systemPulse,
+                        isGpsFresh = dashboardState.isGpsFresh,
+                        isTelemetryFresh = dashboardState.isTelemetryFresh,
+                        isLinkFresh = dashboardState.isLinkFresh,
+                        trackerState = dashboardState.trackerState,
+                        isLocationPending = dashboardState.isLocationPending,
+                        locationPendingReason = dashboardState.locationPendingReason,
+                        status = dashboardState.status,
+                        isTamperDetected = dashboardState.isTamperDetected,
+                        isBatterySteepDischarge = dashboardState.isBatterySteepDischarge,
+                        maxDrop = dashboardState.maxDrop,
+                        lastSeen = dashboardState.lastSeen,
+                        totalDrop = dashboardState.totalDrop,
+                        totalUptime = dashboardState.totalUptime,
+                        session = dashboardState.session,
+                        engineVersion = dashboardState.engineVersion,
+                        sinceConn = dashboardState.sinceConn,
+                        sinceDisco = dashboardState.sinceDisco,
+                        violationUptime = dashboardState.violationUptime,
+                        watchdogCountdown = dashboardState.watchdogCountdown,
+                        watchdogOk = dashboardState.watchdogOk,
+                        isPowerSaveMode = dashboardState.isPowerSaveMode,
+                        standbyBucket = dashboardState.standbyBucket,
+                        netInterface = dashboardState.netInterface,
+                        isStorageLow = dashboardState.isStorageLow,
+                        isStorageCritical = dashboardState.isStorageCritical,
+                        distToHome = dashboardState.distToHome,
+                        distToViewer = dashboardState.distToViewer,
+                        lat = dashboardState.lat,
+                        lng = dashboardState.lng,
+                        gpsSpeed = dashboardState.gpsSpeed,
+                        trackerAccuracy = dashboardState.trackerAccuracy,
+                        trackerMaxAcc = dashboardState.trackerMaxAcc,
+                        viewerAccuracy = dashboardState.viewerAccuracy,
+                        viewerMaxAcc = dashboardState.viewerMaxAcc,
+                        satsIndex = dashboardState.satsIndex,
+                        isSatsIndexWarning = dashboardState.isSatsIndexWarning,
+                        snr = dashboardState.snr,
+                        vibration = dashboardState.vibration,
+                        heading = dashboardState.heading,
+                        tilt = dashboardState.tilt,
+                        acoustic = dashboardState.acoustic,
+                        lift = dashboardState.lift,
+                        lux = dashboardState.lux,
+                        proximity = dashboardState.proximity,
+                        proximityCm = dashboardState.proximityCm,
+                        proximityDebounce = dashboardState.proximityDebounce,
+                        rollingVibration = dashboardState.rollingVibration,
+                        trackerMaxTemp = dashboardState.trackerMaxTemp,
+                        viewerMaxTemp = dashboardState.viewerMaxTemp,
+                        peakShock = dashboardState.peakShock,
+                        vibrationFloor = dashboardState.vibrationFloor,
+                        luxBaseline = dashboardState.luxBaseline,
+                        acousticFloor = dashboardState.acousticFloor,
+                        trackerCurrentMa = dashboardState.trackerCurrentMa,
+                        gpsIdx = gpsIdx,
+                        rttValue = rttValue,
                         onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                     )
                     DebugTable(
-                        uiState = uiState, 
-                        kinematicState = kinematicState,
-                        diagnosticState = diagnosticState,
-                        dashboard = dashboardState, 
-                        systemPulse = systemPulse,
-                        rttFlow = viewModel.rtt,
-                        currentMaFlow = if (uiState.appMode == "viewer") viewModel.trackerCurrentMa else viewModel.currentMa
+                        isLinkFresh = dashboardState.isLinkFresh,
+                        isTelemetryFresh = dashboardState.isTelemetryFresh,
+                        isGpsFresh = dashboardState.isGpsFresh,
+                        trackerStateName = dashboardState.trackerState.name,
+                        gpsAgeSec = if (gpsAge != Long.MAX_VALUE) gpsAge / 1000 else -1L,
+                        rtt = rttValue,
+                        currentMa = trackerCurrentMaValue
                     )
                 }
                 
