@@ -37,13 +37,37 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * Data classes for SystemStatusProvider. Moved to top to resolve tool-specific 
+ * compilation stalls and unresolved reference issues (R745).
+ */
+data class BatteryStatus(
+    val level: Int,
+    val temp: Double,
+    val isCharging: Boolean,
+    val currentMa: Int = 0
+)
+
+data class StorageStatus(
+    val availableMb: Long,
+    val totalMb: Long,
+    val isLow: Boolean,
+    val isCritical: Boolean
+)
+
+data class PowerStatus(
+    val isPowerSaveMode: Boolean,
+    val standbyBucket: Int
+)
+
+/**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Aug.07.05:
+ * - Issue #745: Permission Detection Hardening. Reduced FORCED_REFRESH_COOLDOWN_MS 
+ *   to 1000ms to ensure "Refresh" button in Setup is responsive (R745). Moved
+ *   status data classes to top of file to resolve tool-specific compilation stalls.
  * Aug.04.114:
  * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Integrated 
  *   StorageStatsManager and implemented percentage-based pressure detection (R728).
- * JAug.04.111:
- * - Issue #721: Performance Hardening. Refactored to use GpsApplication.PACKAGE_NAME 
- *   shadow-cache.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -111,7 +135,7 @@ class SystemStatusProviderImpl @Inject constructor(
     private val isA15 by lazy { isA15Device() }
     
     private val PERMISSION_TTL_MS = 30000L 
-    private val FORCED_REFRESH_COOLDOWN_MS = 15000L 
+    private val FORCED_REFRESH_COOLDOWN_MS = 1000L // Issue #745: Lowered from 15s to 1s for UX responsiveness
     private val STORAGE_POLL_INTERVAL_MS = 60_000L
     private val POWER_POLL_INTERVAL_MS = 60_000L
     
@@ -197,8 +221,8 @@ class SystemStatusProviderImpl @Inject constructor(
                             val bgLocGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true
                             val actRecogGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true
 
-                            val xiaomiStatus = if (isXiaomi) com.gps19.app.isXiaomiSpecialPermissionGranted(context, pkg) else XiaomiPermissionStatus.UNKNOWN
-                            val xiaomiAutostart = if (isXiaomi) com.gps19.app.getXiaomiAutostartStatus(context, pkg) else XiaomiPermissionStatus.UNKNOWN
+                            val xiaomiStatus = if (isXiaomi) isXiaomiSpecialPermissionGranted(context, pkg) else XiaomiPermissionStatus.UNKNOWN
+                            val xiaomiAutostart = if (isXiaomi) getXiaomiAutostartStatus(context, pkg) else XiaomiPermissionStatus.UNKNOWN
 
                             lastHardwareCheckRt = currentNow
                             lastFullRefreshTime = currentNow
@@ -441,22 +465,3 @@ class SystemStatusProviderImpl @Inject constructor(
         }
     }
 }
-
-data class BatteryStatus(
-    val level: Int,
-    val temp: Double,
-    val isCharging: Boolean,
-    val currentMa: Int = 0
-)
-
-data class StorageStatus(
-    val availableMb: Long,
-    val totalMb: Long,
-    val isLow: Boolean,
-    val isCritical: Boolean
-)
-
-data class PowerStatus(
-    val isPowerSaveMode: Boolean,
-    val standbyBucket: Int
-)
