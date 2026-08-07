@@ -4,13 +4,15 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Aug.07.52:
+ * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement. Changed proxIdx 
+ *   aggregation from min() to average across all scales to support linear 
+ *   forensic transitions (R742).
  * July.30.48:
  * - Issue #653: Performance: GC Churn Optimization. Refactored to use array-backed 
  *   accumulators and callback-based result processing to eliminate Map, Pair, 
  *   and List allocations in the high-frequency telemetry path (R-HARDWARE-01).
  * - Implemented result flyweight pooling for zero-churn emissions.
- * July.30.31:
- * - Issue #632: Analytical Ribbons: Recovery Markers.
  */
 class TelemetryAggregator {
 
@@ -38,7 +40,9 @@ class TelemetryAggregator {
         var noiseIdx: Double = 0.0
         var luxIdx: Double = 0.0
         var vibeIdx: Double = 0.0
-        var proxIdx: Double = 1.0
+        var proxIdx: Double = 0.0
+        var proxSum: Double = 0.0
+        var proxCount: Int = 0
         var liftIdx: Double = 0.0
         var snrIdx: Double = 0.0
         var tiltIdx: Double = 0.0
@@ -70,6 +74,8 @@ class TelemetryAggregator {
             luxIdx = point.luxIdx
             vibeIdx = point.vibeIdx
             proxIdx = point.proxIdx
+            proxSum = point.proxIdx
+            proxCount = 1
             liftIdx = point.liftIdx
             snrIdx = point.snrIdx
             tiltIdx = point.tiltIdx
@@ -101,7 +107,12 @@ class TelemetryAggregator {
             noiseIdx = max(noiseIdx, cur.noiseIdx)
             luxIdx = max(luxIdx, cur.luxIdx)
             vibeIdx = max(vibeIdx, cur.vibeIdx)
-            proxIdx = min(proxIdx, cur.proxIdx)
+            
+            // Issue #742: Average-based proximity aggregation
+            proxSum += cur.proxIdx
+            proxCount++
+            proxIdx = proxSum / proxCount
+            
             liftIdx = max(liftIdx, cur.liftIdx)
             snrIdx = min(snrIdx, cur.snrIdx)
             tiltIdx = max(tiltIdx, cur.tiltIdx)
@@ -332,7 +343,7 @@ class TelemetryAggregator {
             val resolvedNoise = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: 0.0
             val resolvedLux = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: 0.0
             val resolvedVibe = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: 0.0
-            val resolvedProx = snapshot?.proxIdx ?: 1.0
+            val resolvedProx = snapshot?.proxIdx ?: 0.0
             val resolvedLift = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
             val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: 0.0
             val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0

@@ -35,13 +35,14 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * Aug.07.46:
+ * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement. Implemented EMA-based 
+ *   linear transition for proxIdx and changed forensic buffer to use average-based 
+ *   aggregation instead of min() for improved accuracy (R742).
  * Aug.03.45:
  * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Decoupled Logic 
  *   and Forensic peak accumulators to allow independent 100Hz/0.5Hz consumption 
  *   without data loss.
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Implemented object pooling for 
- *   ForensicSnapshot to achieve zero-allocation in the logic hot-path.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -167,7 +168,7 @@ class AppSensorManager @Inject constructor(
         var vibration = 0.0; var heading = 0.0; var baroAlt = 0.0; var lux = 0.0
         var isNear = true; var tiltDegrees = 0.0; var acousticDb = 0.0; var peakShock = 0.0
         var peakVerticalVelocity = 0.0; var peakVerticalVelocityTs = 0L; var peakVerticalVelocityRt = 0L
-        var plungeMatched = false; var peakVerticalDisplacement = 0.0; var proximityIdx = 1.0
+        var plungeMatched = false; var peakVerticalDisplacement = 0.0; var proximityIdx = 0.0
         var proximityCm = 0.0; var proximityDebounceMs = 0L; var vibrationRollingSum = 0.0
         var acousticPeak = 0.0; var acousticMin = 0.0; var kineticEnergy = 0.0
 
@@ -175,7 +176,7 @@ class AppSensorManager @Inject constructor(
             vibration = 0.0; heading = 0.0; baroAlt = 0.0; lux = 0.0
             isNear = true; tiltDegrees = 0.0; acousticDb = 0.0; peakShock = 0.0
             peakVerticalVelocity = 0.0; peakVerticalVelocityTs = 0L; peakVerticalVelocityRt = 0L
-            plungeMatched = false; peakVerticalDisplacement = 0.0; proximityIdx = 1.0
+            plungeMatched = false; peakVerticalDisplacement = 0.0; proximityIdx = 0.0
             proximityCm = 0.0; proximityDebounceMs = 0L; vibrationRollingSum = 0.0
             acousticPeak = 0.0; acousticMin = 0.0; kineticEnergy = 0.0
         }
@@ -195,7 +196,8 @@ class AppSensorManager @Inject constructor(
     private var bufferIdx = 0; private var bufferCount = 0
     private var lastBufferRecordRt = 0L
 
-    private var secPeakLux = 0.0; private var secPeakVibe = 0.0; private var secMinProxIdx = 1.0
+    private var secPeakLux = 0.0; private var secPeakVibe = 0.0
+    private var secSumProxIdx = 0.0; private var secProxCount = 0
     private var secPeakTilt = 0.0; private var secPeakLift = 0.0; private var secPeakDb = 0.0
     private var secSitDetected = false; private var secPeakKinetic = 0.0
     
@@ -217,9 +219,9 @@ class AppSensorManager @Inject constructor(
     var relativeAltitude = 0.0; private set
 
     private var proximityJob: Job? = null
-    private var rawProximityNear = true; private var proximityMaxRange = 5f
-    var isProximityNear = true; private set
-    var proximityIdx = 1.0; private set
+    private var rawProximityNear = false; private var proximityMaxRange = 5f
+    var isProximityNear = false; private set
+    var proximityIdx = 0.0; private set
     var currentProximityCm = -1.0; private set
     var debouncedProximityCm = -1.0; private set
     var proximityDebounceMs = 0L; private set
@@ -350,8 +352,14 @@ class AppSensorManager @Inject constructor(
             Sensor.TYPE_PROXIMITY -> {
                 val value = values[0]; val newValue = value < proximityMaxRange
                 currentProximityCm = value.toDouble(); if (debouncedProximityCm == -1.0) debouncedProximityCm = value.toDouble()
-                proximityIdx = (1.0 - (value / proximityMaxRange)).toDouble().coerceIn(0.0, 1.0)
-                if (proximityIdx < secMinProxIdx) secMinProxIdx = proximityIdx
+                
+                // Linear Transition via EMA (R742)
+                val rawIdx = (1.0 - (value / proximityMaxRange)).toDouble().coerceIn(0.0, 1.0)
+                proximityIdx = (proximityIdx * (1.0 - PROXIMITY_EMA_ALPHA)) + (rawIdx * PROXIMITY_EMA_ALPHA)
+                
+                secSumProxIdx += proximityIdx
+                secProxCount++
+                
                 if (newValue != rawProximityNear) {
                     if (!newValue && isDisplayFlickering.get() && isStationary()) return
                     rawProximityNear = newValue; proximityJob?.cancel()
@@ -380,11 +388,12 @@ class AppSensorManager @Inject constructor(
         if (nowRt - lastBufferRecordRt >= TICK_INTERVAL_MS) {
             synchronized(this) {
                 bufferTs[bufferIdx] = wallNow; bufferRt[bufferIdx] = nowRt; bufferLux[bufferIdx] = secPeakLux; bufferVibe[bufferIdx] = secPeakVibe
-                bufferProxIdx[bufferIdx] = secMinProxIdx; bufferTilt[bufferIdx] = secPeakTilt; bufferLift[bufferIdx] = secPeakLift
+                bufferProxIdx[bufferIdx] = if (secProxCount > 0) secSumProxIdx / secProxCount else proximityIdx
+                bufferTilt[bufferIdx] = secPeakTilt; bufferLift[bufferIdx] = secPeakLift
                 bufferAcoustic[bufferIdx] = secPeakDb; bufferSit[bufferIdx] = secSitDetected; bufferKinetic[bufferIdx] = secPeakKinetic
                 bufferIdx = (bufferIdx + 1) % 256; if (bufferCount < 256) bufferCount++; secSitDetected = false
             }
-            lastBufferRecordRt = nowRt; secPeakLux = currentLux; secPeakVibe = currentVibrationIndex; secMinProxIdx = proximityIdx; secPeakTilt = currentTiltDegrees; secPeakLift = abs(relativeAltitude); secPeakDb = currentAcousticDb; secPeakKinetic = currentKineticEnergy
+            lastBufferRecordRt = nowRt; secPeakLux = currentLux; secPeakVibe = currentVibrationIndex; secSumProxIdx = 0.0; secProxCount = 0; secPeakTilt = currentTiltDegrees; secPeakLift = abs(relativeAltitude); secPeakDb = currentAcousticDb; secPeakKinetic = currentKineticEnergy
         }
     }
 

@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Aug.07.51:
+ * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement. Changed default 
+ *   proxIdx to 0.0 (Far/Clear) to ensure forensic accuracy (R742).
  * Aug.03.50:
  * - Issue #715: Forensic Audit: Persistence Health Alerting. Added 
  *   forensicReliabilityDegradationStartRt to AlarmEvaluationState (R715).
@@ -91,7 +94,7 @@ class EngineConnectionPoint(
     var noiseIdx: Double = 0.0,
     var luxIdx: Double = 0.0,
     var vibeIdx: Double = 0.0,
-    var proxIdx: Double = 1.0,
+    var proxIdx: Double = 0.0,
     var liftIdx: Double = 0.0,
     var snrIdx: Double = 0.0,
     var tiltIdx: Double = 0.0,
@@ -176,7 +179,7 @@ class EngineSensorSnapshot(
     var acoustic: Double = 0.0,
     var lux: Double = 0.0,
     var vibe: Double = 0.0,
-    var proxIdx: Double = 1.0,
+    var proxIdx: Double = 0.0,
     var lift: Double = 0.0,
     var tilt: Double = 0.0,
     var isSitDetected: Boolean = false,

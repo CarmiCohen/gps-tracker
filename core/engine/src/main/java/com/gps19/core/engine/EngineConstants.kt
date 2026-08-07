@@ -2,20 +2,14 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.07.115:
+ * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement. Added 
+ *   PROXIMITY_EMA_ALPHA (0.15) for debounced linear transitions (R742).
  * Aug.04.114:
  * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Added 
  *   PRUNE_CHUNK_SIZE (100) and ADAPTIVE_PRUNE thresholds for granular 
  *   fragmentation-aware deletion cycles. Added percentage-based storage 
  *   pressure thresholds (R728).
- * Aug.04.113:
- * - Issue #727: Forensic Audit: Dynamic Batch-Write Optimization. Added 
- *   FORENSIC_BATCH_SIZE_MIN (50), MAX (500), and DEFAULT (100) (R727).
- * Aug.03.98:
- * - Issue #717: Forensic Audit: Memory-Mapped Metadata Header. Implemented 128-byte 
- *   header storing version, capacity, entrySize, and lastWriteRt (R717).
- * - Issue #715: Forensic Audit: Persistence Health Alerting. Added 
- *   FORENSIC_RELIABILITY_THRESHOLD (0.85) and 
- *   FORENSIC_RELIABILITY_DEGRADATION_DURATION_MS (30s) (R715).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -209,6 +203,7 @@ const val VIBRATION_EMA_DOWN_FAST = 0.1
 const val VIBRATION_EMA_UP_SLOW = 0.001
 const val VIBRATION_EMA_UP_FAST = 0.01
 const val BARO_EMA_SLOW = 0.001 
+const val PROXIMITY_EMA_ALPHA = 0.15
 
 // Engine Execution Parameters
 const val BOOTSTRAP_PHASE_MS = 60000L

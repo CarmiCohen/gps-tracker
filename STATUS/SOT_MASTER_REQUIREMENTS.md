@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.07.00 (Dashboard Recomposition Hardening)
+# System Source of Truth (SoT) - Aug.07.01 (Proximity Sensitivity Refinement)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Proximity Forensic Sensitivity (R742)**: (Added Aug.07.01) Proximity indices MUST implement a debounced linear transition using Exponential Moving Average (EMA) at the sensor sampling level. Telemetry aggregation for proximity MUST use average-based accumulation across all time scales to ensure forensic ribbons accurately represent proximity density rather than binary state flips. (Issue #742)
 *   **UI Recomposition Optimization (R736)**: (Updated Aug.07.00) Large UI state objects MUST be decomposed into primitive or stable parameters when passed to sub-composables. High-frequency state collection (Flows) MUST be hoisted to the highest possible level in the local tree to avoid redundant collectors. Map containers, Dashboards, Telemetry boxes, and complex visual layers MUST rely exclusively on primitive parameters to prevent UI thread stalls during telemetry bursts. (Issue #736, #737, #738, #739, #740, #741)
 *   **Startup Critical Path Hardening (R735)**: (Added Aug.05.122) High-cost initializations (e.g., memory-mapped files, synchronous I/O) MUST be deferred using `Provider<T>` and accessed on `Dispatchers.IO` to prevent main-thread Davey stalls during cold start. (Issue #735)
 *   **Resource Lifecycle Hardening (R734)**: (Added Aug.05.119) All `Closeable` resources MUST be managed via `.use {}` or explicit `try-finally` blocks. Hardware callbacks in `callbackFlow` MUST implement `awaitClose`. (Issue #734)
@@ -22,5 +23,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Strict Forensic Reconstruction (R595)**: Analytical Ribbon "Strict Mode" for forensic auditing. (Issue #595)
 
 ### 3. Version Authority
-*   **Current Release**: Aug.07.00.
+*   **Current Release**: Aug.07.01.
 *   **Source of Truth**: app/build.gradle versionName.
