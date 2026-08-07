@@ -32,11 +32,13 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
- * Aug.05.122:
- * - Issue #736: Dashboard Recomposition Audit. Removed unused kinematicState from TelemetryBox.
- * July.28.24:
- * - Issue #620: State Partitioning Audit. Migrated from TelemetryState to 
- *   partitioned KinematicState and DiagnosticState to reduce UI re-computation churn.
+ * Aug.05.128:
+ * - Issue #740: AppMapContainer Recomposition Audit. Refactored call sites to pass 
+ *   decomposed primitive parameters instead of monolithic state objects (R736).
+ *   Fixed entity mapping: Remote device is "Tracker" in ViewerScreen.
+ * Aug.05.126:
+ * - Issue #739: Shared Component R736 Compliance. Decomposed HeaderBar and 
+ *   GlobalStatusBar call sites to pass primitive parameters (R736).
  */
 
 @Composable
@@ -84,7 +86,13 @@ fun ViewerScreen(
 
     val header = @Composable {
         HeaderBar(
-            uiState = uiState,
+            isLogVisible = nav.isLogVisible,
+            isSettingsOpen = nav.isSettingsOpen,
+            isRibbonsVisible = nav.isRibbonsVisible,
+            isMapVisible = nav.isMapVisible,
+            requiresExtraTopPadding = uiState.permissions.requiresExtraTopPadding,
+            isSystemReady = uiState.isSystemReady,
+            systemIssuesCount = uiState.systemIssuesCount,
             onDashboard = onDashboard,
             onS = onToggleSettings,
             onL = onToggleLog,
@@ -96,10 +104,45 @@ fun ViewerScreen(
 
     val statusBar = @Composable {
         GlobalStatusBar(
-            uiState = uiState,
-            kinematicState = kinematicState,
-            diagnosticState = diagnosticState,
-            dashboardState = dashboardState,
+            appMode = uiState.appMode,
+            isSystemActive = uiState.isSystemActive,
+            deviceId = uiState.deviceId,
+            viewerId = uiState.viewerId,
+            isLocalOnline = diagnosticState.connectivity.isLocalOnline,
+            isRelayConnected = diagnosticState.connectivity.isRelayConnected,
+            lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
+            isRedScreenVisible = diagnosticState.isRedScreenVisible,
+            batteryLevel = diagnosticState.battery.level,
+            trackerBatteryLevel = diagnosticState.trackerBattery.level,
+            isChargingStable = diagnosticState.battery.isChargingStable,
+            trackerChargingStable = diagnosticState.trackerBattery.isChargingStable,
+            activeAlarms = diagnosticState.activeAlarms,
+            trackerSatsView = diagnosticState.trackerSatsView,
+            trackerSatsUsed = diagnosticState.trackerSatsUsed,
+            trackerBatteryTemp = diagnosticState.trackerBattery.temp,
+            viewerBatteryTemp = diagnosticState.battery.temp,
+            viewerSatsUsed = diagnosticState.viewerSatsUsed,
+            viewerSatsView = diagnosticState.viewerSatsView,
+            isSirenPlaying = diagnosticState.isSirenPlaying,
+            trackerGpsTs = kinematicState.trackerLocation.timestamp,
+            trackerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
+            trackerSpeedMps = kinematicState.trackerLocation.speed,
+            trackerAccuracy = kinematicState.trackerLocation.accuracy,
+            trackerMaxAccuracy = kinematicState.trackerLocation.maxAccuracy,
+            localGpsTs = kinematicState.localLocation.timestamp,
+            localAccuracy = kinematicState.localLocation.accuracy,
+            localMaxAccuracy = kinematicState.localLocation.maxAccuracy,
+            localLat = kinematicState.localLocation.lat,
+            trackerLocPending = kinematicState.trackerHealth.isLocationPending,
+            trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
+            localLocPending = kinematicState.localHealth.isLocationPending,
+            localLocPendingReason = kinematicState.localHealth.locationPendingReason,
+            distanceTrackerToHome = kinematicState.distanceTrackerToHome,
+            distanceTrackerToViewer = kinematicState.distanceTrackerToViewer,
+            isTelemetryFresh = dashboardState.isTelemetryFresh,
+            isGpsFresh = dashboardState.isGpsFresh,
+            watchdogOk = dashboardState.watchdogOk,
+            trackerState = dashboardState.trackerState,
             systemPulse = systemPulse,
             rttFlow = viewModel.rtt,
             remoteSignalFlow = viewModel.remoteSignal,
@@ -120,9 +163,39 @@ fun ViewerScreen(
                     Box(modifier = Modifier.weight(1f)) {
                         if (isMapVisible) {
                             AppMapContainer(
-                                uiState = uiState,
-                                kinematicState = kinematicState,
-                                diagnosticState = diagnosticState,
+                                appMode = uiState.appMode,
+                                isMapButtonsVisible = uiState.isMapButtonsVisible,
+                                isFenceVisible = uiState.isFenceVisible,
+                                geofenceMode = uiState.geofenceMode,
+                                isViolationsVisible = uiState.isViolationsVisible,
+                                isGeofenceViolationsVisible = uiState.isGeofenceViolationsVisible,
+                                maxDistance = uiState.maxDistance,
+                                isMapLocked = uiState.isMapLocked,
+                                mapFollowMode = uiState.mapFollowMode,
+                                centeringTrackerTrigger = uiState.centeringTrackerTrigger,
+                                centeringViewerTrigger = uiState.centeringViewerTrigger,
+                                zoomInTrigger = uiState.zoomInTrigger,
+                                zoomOutTrigger = uiState.zoomOutTrigger,
+                                homePoints = uiState.homePoints,
+                                trackerLat = kinematicState.trackerLocation.lat,
+                                trackerLng = kinematicState.trackerLocation.lng,
+                                trackerSpeed = kinematicState.trackerLocation.speed,
+                                trackerAccuracy = kinematicState.trackerLocation.accuracy,
+                                trackerMaxAccuracy = kinematicState.trackerLocation.maxAccuracy,
+                                trackerGpsTs = kinematicState.trackerLocation.timestamp,
+                                trackerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
+                                trackerLocPending = kinematicState.trackerHealth.isLocationPending,
+                                trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
+                                trackerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
+                                viewerLat = kinematicState.localLocation.lat,
+                                viewerLng = kinematicState.localLocation.lng,
+                                viewerSpeed = kinematicState.localLocation.speed,
+                                viewerAccuracy = kinematicState.localLocation.accuracy,
+                                viewerMaxAcc = kinematicState.localLocation.maxAccuracy,
+                                viewerGpsTs = kinematicState.localLocation.timestamp,
+                                viewerTelemetryTs = 0L,
+                                viewerLocPending = kinematicState.localHealth.isLocationPending,
+                                viewerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
                                 systemPulse = systemPulse,
                                 systemPulseRt = systemPulseRt,
                                 onEvent = { viewModel.onEvent(it) },
@@ -142,9 +215,39 @@ fun ViewerScreen(
         } else {
             if (isMapVisible) {
                 AppMapContainer(
-                    uiState = uiState,
-                    kinematicState = kinematicState,
-                    diagnosticState = diagnosticState,
+                    appMode = uiState.appMode,
+                    isMapButtonsVisible = uiState.isMapButtonsVisible,
+                    isFenceVisible = uiState.isFenceVisible,
+                    geofenceMode = uiState.geofenceMode,
+                    isViolationsVisible = uiState.isViolationsVisible,
+                    isGeofenceViolationsVisible = uiState.isGeofenceViolationsVisible,
+                    maxDistance = uiState.maxDistance,
+                    isMapLocked = uiState.isMapLocked,
+                    mapFollowMode = uiState.mapFollowMode,
+                    centeringTrackerTrigger = uiState.centeringTrackerTrigger,
+                    centeringViewerTrigger = uiState.centeringViewerTrigger,
+                    zoomInTrigger = uiState.zoomInTrigger,
+                    zoomOutTrigger = uiState.zoomOutTrigger,
+                    homePoints = uiState.homePoints,
+                    trackerLat = kinematicState.trackerLocation.lat,
+                    trackerLng = kinematicState.trackerLocation.lng,
+                    trackerSpeed = kinematicState.trackerLocation.speed,
+                    trackerAccuracy = kinematicState.trackerLocation.accuracy,
+                    trackerMaxAccuracy = kinematicState.trackerLocation.maxAccuracy,
+                    trackerGpsTs = kinematicState.trackerLocation.timestamp,
+                    trackerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
+                    trackerLocPending = kinematicState.trackerHealth.isLocationPending,
+                    trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
+                    trackerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
+                    viewerLat = kinematicState.localLocation.lat,
+                    viewerLng = kinematicState.localLocation.lng,
+                    viewerSpeed = kinematicState.localLocation.speed,
+                    viewerAccuracy = kinematicState.localLocation.accuracy,
+                    viewerMaxAcc = kinematicState.localLocation.maxAccuracy,
+                    viewerGpsTs = kinematicState.localLocation.timestamp,
+                    viewerTelemetryTs = 0L,
+                    viewerLocPending = kinematicState.localHealth.isLocationPending,
+                    viewerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
                     systemPulse = systemPulse,
                     systemPulseRt = systemPulseRt,
                     onEvent = { viewModel.onEvent(it) },
@@ -254,7 +357,17 @@ fun ViewerScreen(
                 isTelemetryFresh = dashboardState.isTelemetryFresh
             )
         } else if (isRibbonsVisible) {
-            RibbonsOverlay(viewModel = viewModel, onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) })
+            RibbonsOverlay(
+                isStrictMode = uiState.navigation.isStrictMode,
+                history4MFlow = viewModel.history4MFlow,
+                history16MFlow = viewModel.history16MFlow,
+                history1HFlow = viewModel.history1HFlow,
+                history4HFlow = viewModel.history4HFlow,
+                history24HFlow = viewModel.history24HFlow,
+                history7DFlow = viewModel.history7DFlow,
+                onToggleStrictMode = { viewModel.onEvent(UiEvent.ToggleStrictMode(it)) },
+                onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) }
+            )
         } else if (isGnssDetailVisible) {
             GnssDetailOverlay(
                 gnssDetailFlow = viewModel.activeGnssDetail,
