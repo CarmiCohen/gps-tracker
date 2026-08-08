@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.07.05 (Permission Detection Hardened)
+# System Source of Truth (SoT) - Aug.07.06 (JdMbrain Transition Complete)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **JdMbrain Namespace Integrity (R746)**: (Added Aug.07.06) The JNI bridge for vendor hardware stabilization MUST use the `jdMbrain` namespace exclusively. All legacy references to `libmbrainSDK` and `initMbrain` are prohibited to eliminate logcat noise and avoid system-level collisions on budget hardware (Samsung A15). (Issue #746)
 *   **Permission Detection Hardening (R745)**: (Updated Aug.07.05) The application MUST provide near-instant feedback for permission state changes during setup. The permission cache cooldown MUST NOT exceed 1000ms when setup or diagnostics screens are active, ensuring robust verification of 'Unrestricted' battery mode and Overlays on budget hardware (SM-A155F). (Issue #745)
 *   **Forensic Write Compression (R743)**: (Added Aug.07.04) The forensic spill-buffer MUST use a structural compression layer (V2 format) to limit flash IO. Entry size is strictly capped at 96 bytes using bit-packing for flags/battery and optimized field alignment. Capacity is set to 3000 entries. (Issue #743)
 *   **Startup Daveys Prevention (R744)**: (Added Aug.05.02) The main thread MUST NOT be blocked for more than 100ms during `MainActivity` initialization. All heavy IO, database checks, or legacy library initializations MUST be offloaded to `Dispatchers.IO` or deferred. (Issue #744)
@@ -26,5 +27,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Strict Forensic Reconstruction (R595)**: Analytical Ribbon "Strict Mode" for forensic auditing. (Issue #595)
 
 ### 3. Version Authority
-*   **Current Release**: Aug.07.05.
+*   **Current Release**: Aug.07.06.
 *   **Source of Truth**: app/build.gradle versionName.

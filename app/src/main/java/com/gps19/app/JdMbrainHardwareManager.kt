@@ -15,15 +15,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 
 /**
- * MbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * JdMbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Aug.07.122:
+ * - Issue #746: Infrastructure: Fully transitioned to JdMbrain namespace. Renamed 
+ *   manager class from MbrainHardwareManager to JdMbrainHardwareManager to 
+ *   eliminate legacy libmbrainSDK log noise and system-level collisions (R746).
  * Aug.04.101:
  * - Issue #721: Performance: Renamed native library to jdMbrain to resolve 
  *   collision with Samsung system libraries (libmbrainSDK).
- * Aug.01.01:
- * - Issue #667: Forensic Audit: Memory Pressure. Implemented zero-copy state path 
- *   using DirectByteBuffer to eliminate GC churn during high-frequency JNI traffic.
  */
-object MbrainHardwareManager {
+object JdMbrainHardwareManager {
 
     private var isLibraryLoaded = false
     private val jniLock = ReentrantLock()
@@ -115,9 +116,9 @@ object MbrainHardwareManager {
         }
     }
 
-    fun initMbrain(timeProvider: TimeProvider, deviceId: String, flags: Int): Int {
-        return executeNativeWithRetry(timeProvider, "Native initMbrain") {
-            nativeInitMbrain(deviceId, flags)
+    fun initHardware(timeProvider: TimeProvider, deviceId: String, flags: Int): Int {
+        return executeNativeWithRetry(timeProvider, "Native initHardware") {
+            nativeInit(deviceId, flags)
         }
     }
 
@@ -137,7 +138,7 @@ object MbrainHardwareManager {
 
     @JvmStatic private external fun nativeRegisterSharedBuffer(buffer: ByteBuffer): Int
     @JvmStatic private external fun nativeSyncState(): Int
-    @JvmStatic private external fun nativeInitMbrain(deviceId: String, flags: Int): Int
+    @JvmStatic private external fun nativeInit(deviceId: String, flags: Int): Int
     @JvmStatic private external fun nativePunchHardware(): Int
     @JvmStatic private external fun nativeSetPowerBudget(budgetLevel: Int): Int
 }

@@ -6,10 +6,11 @@ project("gps-tracker")
 # Ensures the native library is aligned for Android 15+ 16KB page size devices.
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
 
+# Issue #746: Renamed source to jdmbrain-jni.cpp to eliminate legacy references.
 add_library(
         jdMbrain
         SHARED
-        mbrain-jni.cpp)
+        jdmbrain-jni.cpp)
 
 find_library(
         log-lib

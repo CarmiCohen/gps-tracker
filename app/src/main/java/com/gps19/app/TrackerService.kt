@@ -19,16 +19,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.07.123:
+ * - Issue #746: Infrastructure: Updated to use JdMbrainHardwareManager. Fully 
+ *   decoupled from legacy libmbrainSDK to eliminate logcat noise and system-level 
+ *   collisions on budget hardware (R746).
  * Aug.04.117:
  * - Issue #733: JNI Hardening. Corrected misleading log message to reflect the 
  *   transition from libmbrainSDK to libjdMbrain (R733).
- * Aug.04.10:
- * - Issue #710: Forensic Audit: Memory-Mapped Buffer Overflow Protection.
- *   Inherited hardened LogManager path for spill-buffer overflow protection (R710).
- * Aug.03.85:
- * - Issue #709: Forensic Audit: Adaptive Sampling Thermal Throttling. 
- *   Enforced FORENSIC_SAMPLING_INTERVAL_COOLING_MS (500ms) floor when 
- *   isCoolingModeActive is true to maintain hardware integrity (R709).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -87,9 +84,9 @@ class TrackerService : BaseMonitorService() {
 
         if (capabilities.isA15Device) {
             withContext(Dispatchers.IO) {
-                MbrainHardwareManager.loadLibrary()
-                if (MbrainHardwareManager.isAvailable()) {
-                    val res = MbrainHardwareManager.initMbrain(timeProvider, configManager.deviceId, 0)
+                JdMbrainHardwareManager.loadLibrary()
+                if (JdMbrainHardwareManager.isAvailable()) {
+                    val res = JdMbrainHardwareManager.initHardware(timeProvider, configManager.deviceId, 0)
                     logManager.logServiceEvent("HARDWARE: libjdMbrain initialized (Result: $res)", isImportant = true)
                 }
             }
@@ -427,9 +424,9 @@ class TrackerService : BaseMonitorService() {
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
         if (capabilities.isA15Device) {
-            if (MbrainHardwareManager.isAvailable()) {
+            if (JdMbrainHardwareManager.isAvailable()) {
                 val flags = if (health.isPowerSaveMode) 0x01 else 0x00
-                MbrainHardwareManager.syncState(timeProvider, serviceTickCounter, flags)
+                JdMbrainHardwareManager.syncState(timeProvider, serviceTickCounter, flags)
             } else if (nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
                 lastA15PokeRt = nowRt
                 systemMonitor.acquireWakeLock(force = true)
@@ -506,7 +503,7 @@ class TrackerService : BaseMonitorService() {
         val location = lastKnownLocation
         if (location != null) {
             val processed = locationProcessor.processGpsPoint(
-                lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing, snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = lastGpsFixRealtime, isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, nowWall = now, nowRt = nowRt,
+                lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsAccuracy, snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = lastGpsFixRealtime, isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, nowWall = now, nowRt = nowRt,
                 providedIsStalled = health.gpsStalled
             )
             lastProcessedLocation = processed

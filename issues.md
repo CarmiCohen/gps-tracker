@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.07.05)
+# Project Issues & Hardening Tracking (Aug.07.06)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,17 +7,23 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 Action Required | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 555 |
+| **Resolved (Total)** | 🟢 Progress | 556 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #746] [Severity: Low] [Category: Infrastructure] Missing libmbrainSDK.** Logcat reports `Can't load libmbrainSDK` and `initMbrain failed`. While non-fatal, it adds noise to logs.
+*   *(None)*
 
 ---
 
 ## 🔴 Open Issues
 *   *(None)*
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.07.06)
+*   **[Issue #746] [Severity: Low] [Category: Infrastructure] Missing libmbrainSDK.**
+    *   **Resolution**: Fully transitioned the JNI bridge to the `jdMbrain` namespace to eliminate legacy log noise (`Can't load libmbrainSDK`) and avoid collisions with Samsung system libraries. Renamed `MbrainHardwareManager` to `JdMbrainHardwareManager` and updated native source to `jdmbrain-jni.cpp`. Decoupled all service logic from legacy "mbrain" identifiers (R746).
 
 ---
 
@@ -32,4 +38,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Implemented structural compression for the circular spill-buffer (R743).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.07.05)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.07.06)

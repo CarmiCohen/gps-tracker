@@ -18,7 +18,7 @@ static jlong g_sharedBufferSize = 0;
  * zero-allocation state transfer. (Issue #667)
  */
 JNIEXPORT jint JNICALL
-Java_com_gps19_app_MbrainHardwareManager_nativeRegisterSharedBuffer(JNIEnv* env, jclass clazz, jobject buffer) {
+Java_com_gps19_app_JdMbrainHardwareManager_nativeRegisterSharedBuffer(JNIEnv* env, jclass clazz, jobject buffer) {
     if (buffer == nullptr) {
         LOGE("registerSharedBuffer: Buffer is null");
         return -1;
@@ -41,7 +41,7 @@ Java_com_gps19_app_MbrainHardwareManager_nativeRegisterSharedBuffer(JNIEnv* env,
  * (Issue #667)
  */
 JNIEXPORT jint JNICALL
-Java_com_gps19_app_MbrainHardwareManager_nativeSyncState(JNIEnv* env, jclass clazz) {
+Java_com_gps19_app_JdMbrainHardwareManager_nativeSyncState(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr) return -1;
 
     // Direct memory access - no JNI boundary crossing overhead for data fields
@@ -58,9 +58,9 @@ Java_com_gps19_app_MbrainHardwareManager_nativeSyncState(JNIEnv* env, jclass cla
 }
 
 JNIEXPORT jint JNICALL
-Java_com_gps19_app_MbrainHardwareManager_nativeInitMbrain(JNIEnv* env, jclass clazz, jstring deviceId, jint flags) {
+Java_com_gps19_app_JdMbrainHardwareManager_nativeInit(JNIEnv* env, jclass clazz, jstring deviceId, jint flags) {
     if (deviceId == nullptr) {
-        LOGE("initMbrain: deviceId is null");
+        LOGE("init: deviceId is null");
         return -1;
     }
     const char* nativeDeviceId = env->GetStringUTFChars(deviceId, nullptr);
@@ -68,20 +68,20 @@ Java_com_gps19_app_MbrainHardwareManager_nativeInitMbrain(JNIEnv* env, jclass cl
         LOGI("Initializing jdMbrain for device: %s with flags: %d", nativeDeviceId, flags);
         env->ReleaseStringUTFChars(deviceId, nativeDeviceId);
     } else {
-        LOGE("initMbrain: Failed to get native string");
+        LOGE("init: Failed to get native string");
         return -2;
     }
     return 0;
 }
 
 JNIEXPORT jint JNICALL
-Java_com_gps19_app_MbrainHardwareManager_nativePunchHardware(JNIEnv* env, jclass clazz) {
+Java_com_gps19_app_JdMbrainHardwareManager_nativePunchHardware(JNIEnv* env, jclass clazz) {
     LOGI("jdMbrain: Hardware punch triggered");
     return 0;
 }
 
 JNIEXPORT jint JNICALL
-Java_com_gps19_app_MbrainHardwareManager_nativeSetPowerBudget(JNIEnv* env, jclass clazz, jint budgetLevel) {
+Java_com_gps19_app_JdMbrainHardwareManager_nativeSetPowerBudget(JNIEnv* env, jclass clazz, jint budgetLevel) {
     LOGI("jdMbrain: Setting power budget to %d", budgetLevel);
     return 0;
 }

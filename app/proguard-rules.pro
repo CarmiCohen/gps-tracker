@@ -37,9 +37,10 @@
 -keep class com.gps19.app.BatteryState { *; }
 -keep class com.gps19.app.ConnectivityState { *; }
 
-# --- JNI / Native SDK (Issue #662) ---
+# --- JNI / Native SDK (Issue #746) ---
 # Preserve the JNI bridge for vendor hardware stabilization.
--keep class com.gps19.app.MbrainHardwareManager { *; }
+# Renamed from MbrainHardwareManager to eliminate legacy SDK collisions.
+-keep class com.gps19.app.JdMbrainHardwareManager { *; }
 -keepclasseswithmembernames class * {
     native <methods>;
 }
