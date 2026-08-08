@@ -19,13 +19,13 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.08.21:
+ * - Issue #125: Forensic Audit: Compression Parity Audit. Integrated gpsHardwareLock 
+ *   into bit-packed flags (0x08) to maintain forensic parity (R125).
  * Aug.07.116:
  * - Issue #743: Forensic Spill-Buffer Write Compression. Implemented version 2 
  *   of the binary format with 96-byte entries. Uses bit-packing for flags/battery 
  *   and optimized alignment to maximize message payload (R743).
- * JAug.05.119:
- * - Issue #734: Resource Leak: Unclosed Closeable. Wrapped RandomAccessFile in 
- *   init block with .use {} to ensure file descriptor closure after mapping (R734).
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -190,10 +190,11 @@ class ForensicSpillBuffer @Inject constructor(
                 
                 buffer.putFloat(0.0f) // batteryTemp (Reserved for optimized)
                 
-                // Bit-Packed Metadata (Issue #743)
+                // Bit-Packed Metadata (Issue #743 / #125)
                 var flags = 0
                 if (entry.isImportant) flags = flags or 0x01
                 if (entry.isSpecial) flags = flags or 0x02
+                if (entry.gpsHardwareLock) flags = flags or 0x08
                 
                 buffer.put(flags.toByte())
                 buffer.put(0.toByte()) // batteryLevel
@@ -221,7 +222,8 @@ class ForensicSpillBuffer @Inject constructor(
      */
     fun writeTraceOptimized(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
-        vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double
+        vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double,
+        gpsHardwareLock: Boolean = false
     ): Boolean {
         return LatencyMonitor.measureAndAudit(
             timeProvider = timeProvider,
@@ -253,9 +255,10 @@ class ForensicSpillBuffer @Inject constructor(
                 
                 buffer.putFloat(batteryTemp.toFloat())
 
-                // Bit-Packed Metadata (Issue #743)
+                // Bit-Packed Metadata (Issue #743 / #125)
                 var flags = 0
                 if (isCharging) flags = flags or 0x04
+                if (gpsHardwareLock) flags = flags or 0x08
                 
                 buffer.put(flags.toByte())
                 buffer.put(batteryLevel.toByte())
@@ -323,13 +326,14 @@ class ForensicSpillBuffer @Inject constructor(
                     val important = (flags and 0x01) != 0
                     val special = (flags and 0x02) != 0
                     val charging = (flags and 0x04) != 0
+                    val hwLock = (flags and 0x08) != 0
 
                     val msg = if (msgLen > 0) {
                         val msgBytes = ByteArray(msgLen)
                         buffer.get(msgBytes)
                         String(msgBytes, Charsets.UTF_8)
                     } else {
-                        "F_TRACE: P=$batLevel% C=$charging T=${batTemp.roundToOneDecimal()}°C"
+                        "F_TRACE: P=$batLevel% C=$charging L=$hwLock T=${batTemp.roundToOneDecimal()}°C"
                     }
                     
                     result.add(LogEntry(
@@ -339,7 +343,8 @@ class ForensicSpillBuffer @Inject constructor(
                         isImportant = important, isSpecial = special,
                         message = msg, type = "FORENSIC_TRACE",
                         id = "SYSTEM", role = "tracker",
-                        spillIdx = currentRead
+                        spillIdx = currentRead,
+                        gpsHardwareLock = hwLock
                     ))
                 }
                 currentRead = (currentRead + 1) % FORENSIC_SPILL_CAPACITY

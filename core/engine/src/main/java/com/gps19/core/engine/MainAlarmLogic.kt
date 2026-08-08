@@ -5,22 +5,12 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Aug.07.08:
+ * - Issue #124: GPS Hardware Revival Hardening (R124). Integrated
+ *   ALERT_ID_GPS_HARDWARE_LOCK into violation detection engine.
  * Aug.07.07:
  * - Issue #747: Event & Alert Text Unification (R747). Hardened local event 
  *   subtitles with "this device" references for locality clarity.
- * Aug.07.06:
- * - Issue #747: Event & Alert Text Unification (R747). Synchronized subtitles 
- *   with authoritative mapping, replacing "Tracker" with "Device" and 
- *   standardizing locality references.
- * Aug.04.55:
- * - Issue #716: Forensic Audit: Critical Battery Sentinel. Implemented 
- *   ALERT_ID_BATTERY_STEEP_DISCHARGE correlation with vibration and cpuLoad (R716).
- * Aug.04.50:
- * - Issue #715: Forensic Audit: Persistence Health Alerting. Trigger 
- *   ALERT_ID_PERFORMANCE_SPIKE if forensicReliability < 0.85 for > 30s (R715).
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Refactored detectViolations to use
- *   a mutable SystemHealthReport flyweight and eliminated hot-path allocations (R-HARDWARE-01).
  */
 object MainAlarmLogic {
 
@@ -112,7 +102,14 @@ object MainAlarmLogic {
                 type = ALERT_ID_GPS_STALL,
                 title = getTrackerTitleCached(isTracker, ALERT_TITLE_GPS_STALL),
                 subtitle = "Device GPS location has not updated",
-                conditionMet = canCheckPeerErrors && health.gpsStalled && !shouldSuppressPeerErrors
+                conditionMet = canCheckPeerErrors && health.gpsStalled && !health.gpsHardwareLock && !shouldSuppressPeerErrors
+            )
+
+            report.getOrCreate(reportIdx++).update(
+                type = ALERT_ID_GPS_HARDWARE_LOCK,
+                title = getTrackerTitleCached(isTracker, ALERT_TITLE_GPS_HARDWARE_LOCK),
+                subtitle = "GPS Hardware stall confirmed on this device",
+                conditionMet = health.gpsHardwareLock
             )
 
             report.getOrCreate(reportIdx++).update(

@@ -26,14 +26,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * Aug.07.08:
- * - Issue #748: Log Message Prefix Cleanup (R747). Standardized local power 
- *   event logs to use "Device" and "this device" terminology.
- * Aug.04.114:
- * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Propagating 
- *   granular storage metrics (available/total MB) to LogRepository (R728).
- * Aug.04.110:
- * - Issue #723 Hardening: Updated performIntegrityHeartbeat to suspend.
+ * Aug.07.128:
+ * - Issue #124-Revival: Functional Hardening (R124). Fixed missing health update 
+ *   for gpsHardwareLock in handleRevivalEvent.
+ * Aug.07.126:
+ * - Issue #124-Revival: Functional Hardening (R124). Collecting revivalEvents 
+ *   from GpsManager to surface GPS_HARDWARE_LOCK as a system violation.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -119,7 +117,33 @@ class IntegrityMonitor @Inject constructor(
                 .collect()
         }
 
+        scope.launch {
+            gpsManager.revivalEvents
+                .onEach { event -> handleRevivalEvent(event) }
+                .collect()
+        }
+
         startHeartbeat()
+    }
+
+    private fun handleRevivalEvent(event: GpsManager.RevivalEvent) {
+        when (event) {
+            is GpsManager.RevivalEvent.Attempt -> {
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("GPS REVIVAL: Hardware restart attempt ${event.count} on this device.", false))
+            }
+            is GpsManager.RevivalEvent.HardwareLock -> {
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed on this device. Manual intervention required.", true))
+                _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_GPS_HARDWARE_LOCK))
+                updateHealth { it.gpsHardwareLock = true }
+            }
+            is GpsManager.RevivalEvent.Success -> {
+                if (currentHealth.gpsHardwareLock) {
+                    _integrityEvents.tryEmit(IntegrityEvent.LogEvent("GPS REVIVAL: Hardware fix restored on this device.", false))
+                    _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_GPS_HARDWARE_LOCK))
+                    updateHealth { it.gpsHardwareLock = false }
+                }
+            }
+        }
     }
 
     private fun startHeartbeat() {
@@ -144,7 +168,7 @@ class IntegrityMonitor @Inject constructor(
             if (powerStalled) stalls.add("Power")
             if (locationStalled) stalls.add("Location")
             
-            val msg = "INTEGRITY WARNING: Reactive flow stall detected (${stalls.joinToString(", ")}). Monitoring vitality compromised."
+            val msg = "INTEGRITY WARNING: Reactive flow stall detected (${stalls.joinToString(", ")}). Monitoring vitality compromised on this device."
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
         }
 
@@ -169,12 +193,12 @@ class IntegrityMonitor @Inject constructor(
     private fun handleLocationStatusUpdate(status: GpsManager.LocationStatus) {
         val workingHealth = currentHealth
         if (status.isPending && !workingHealth.isLocationPending) {
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Location fix pending: ${status.reason.name.replace("_", " ")}", false))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Location fix pending: ${status.reason.name.replace("_", " ")} on this device", false))
         } 
         else if (!status.isPending && workingHealth.isLocationPending && status.recoveryConfirmed) {
             val durationSec = status.lastPendingDurationMs / 1000.0
             val reasonStr = workingHealth.locationPendingReason.name.replace("_", " ")
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Location fix restored after ${"%.1f".format(durationSec)}s gap ($reasonStr resolved)", false))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Location fix restored after ${"%.1f".format(durationSec)}s gap ($reasonStr resolved) on this device", false))
         }
 
         val isStalled = status.reason == LocationPendingReason.GPS_STALL
@@ -315,14 +339,14 @@ class IntegrityMonitor @Inject constructor(
         
         val newNet = systemStatusProvider.getNetworkInterface()
         if (newNet != workingHealth.netInterface) {
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Network switched to $newNet", false))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Network switched to $newNet on this device", false))
         }
 
         var isPowerTamper = workingHealth.isPowerTamper
         if (lastPowerDisconnectTs > 0 && !isPowerTamper) {
             if (checkViolationSustained(ALERT_ID_TRACKER_POWER, lastPowerDisconnectTs, POWER_DISCONNECT_DEBOUNCE_MS)) {
                 isPowerTamper = true
-                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Device power tamper confirmed (debounce met)", true))
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Device power tamper confirmed (debounce met) on this device", true))
             }
         }
 
@@ -405,7 +429,7 @@ class IntegrityMonitor @Inject constructor(
     fun onPowerDisconnected() {
         if (!currentHealth.isPowerTamper && lastPowerDisconnectTs == 0L) {
             lastPowerDisconnectTs = timeProvider.elapsedRealtime()
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Device power unplugged, starting debounce...", false))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Device power unplugged, starting debounce... on this device", false))
         }
     }
 
@@ -414,7 +438,7 @@ class IntegrityMonitor @Inject constructor(
         if (currentHealth.isPowerTamper) {
             updateHealth { it.isPowerTamper = false }
             _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_POWER))
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Device power restored", false))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Device power restored on this device", false))
         }
     }
 

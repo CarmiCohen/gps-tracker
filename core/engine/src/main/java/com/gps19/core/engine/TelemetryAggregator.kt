@@ -4,15 +4,11 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Aug.08.21:
+ * - Issue #125: Forensic Audit: Compression Parity Audit. Integrated 
+ *   gpsHardwareLock into aggregation logic to ensure parity (R125).
  * Aug.07.52:
- * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement. Changed proxIdx 
- *   aggregation from min() to average across all scales to support linear 
- *   forensic transitions (R742).
- * July.30.48:
- * - Issue #653: Performance: GC Churn Optimization. Refactored to use array-backed 
- *   accumulators and callback-based result processing to eliminate Map, Pair, 
- *   and List allocations in the high-frequency telemetry path (R-HARDWARE-01).
- * - Implemented result flyweight pooling for zero-churn emissions.
+ * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement.
  */
 class TelemetryAggregator {
 
@@ -54,6 +50,7 @@ class TelemetryAggregator {
         var sitVzRt: Long = 0L
         var sitShock: Double = 0.0
         var kineticEnergy: Double = 0.0
+        var gpsHardwareLock: Boolean = false
 
         fun reset(point: EngineConnectionPoint) {
             rtt = point.rtt
@@ -87,6 +84,7 @@ class TelemetryAggregator {
             sitVzRt = point.sitVzRt
             sitShock = point.sitShock
             kineticEnergy = point.kineticEnergy
+            gpsHardwareLock = point.gpsHardwareLock
         }
 
         fun merge(cur: EngineConnectionPoint) {
@@ -108,7 +106,6 @@ class TelemetryAggregator {
             luxIdx = max(luxIdx, cur.luxIdx)
             vibeIdx = max(vibeIdx, cur.vibeIdx)
             
-            // Issue #742: Average-based proximity aggregation
             proxSum += cur.proxIdx
             proxCount++
             proxIdx = proxSum / proxCount
@@ -127,6 +124,7 @@ class TelemetryAggregator {
             }
             sitShock = max(sitShock, cur.sitShock)
             kineticEnergy = max(kineticEnergy, cur.kineticEnergy)
+            gpsHardwareLock = gpsHardwareLock || cur.gpsHardwareLock
         }
 
         fun writeTo(target: EngineConnectionPoint, base: EngineConnectionPoint, isTick: Boolean) {
@@ -160,6 +158,7 @@ class TelemetryAggregator {
             target.sitVzRt = this.sitVzRt
             target.sitShock = this.sitShock
             target.kineticEnergy = this.kineticEnergy
+            target.gpsHardwareLock = this.gpsHardwareLock
             target.isTick = isTick
         }
     }
@@ -184,9 +183,6 @@ class TelemetryAggregator {
         }
     }
 
-    /**
-     * processPoint: Main entrance for telemetry points. Callback-based to eliminate List/Pair churn.
-     */
     fun processPoint(point: EngineConnectionPoint, onResult: (RibbonScale, EngineConnectionPoint) -> Unit) {
         val timeRef = if (point.rt > 0) point.rt else point.ts
         val totalSeconds = (timeRef / TICK_INTERVAL_MS).toInt()
@@ -287,6 +283,7 @@ class TelemetryAggregator {
                 sitVzRt = resolvedSitVzRt
                 sitShock = resolvedShock
                 kineticEnergy = resolvedKinetic
+                gpsHardwareLock = baseTemplate.gpsHardwareLock
             }
 
             processPoint(fillPointFlyweight, onResult)
@@ -377,6 +374,7 @@ class TelemetryAggregator {
                 isTick = isScaleTick(ribbonScale, totalSeconds)
                 currentMa = 0
                 locationPendingReason = LocationPendingReason.NONE
+                gpsHardwareLock = false
             }
             onResult(flyweight)
             currentRt += intervalMs

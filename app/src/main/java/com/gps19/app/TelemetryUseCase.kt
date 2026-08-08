@@ -5,11 +5,12 @@ import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * Aug.07.130:
+ * - Issue #124: GPS Hardware Revival Hardening (R124). Propagating gpsHardwareLock 
+ *   in mapHealthFromUpdate and mapHealthFromStatus.
  * Aug.01.10:
  * - Issue #668: Performance: Object Churn. Refactored to use mutable flyweight 
  *   updates instead of copy-on-write to eliminate allocation churn (R-HARDWARE-01).
- * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection.
  */
 class TelemetryUseCase @Inject constructor(
     private val timeProvider: TimeProvider
@@ -45,6 +46,7 @@ class TelemetryUseCase @Inject constructor(
         current.update(
             signalLoss = update.signal?.let { it < 2 } ?: current.signalLoss,
             gpsStalled = update.locationPendingReason == LocationPendingReason.GPS_STALL,
+            gpsHardwareLock = update.gpsHardwareLock,
             localInternetLoss = current.localInternetLoss, // LocationUpdate doesn't carry this
             isHardwareOnline = update.signal != null,
             batteryLevel = if (update.battery >= 0) update.battery else current.batteryLevel,
@@ -138,6 +140,7 @@ class TelemetryUseCase @Inject constructor(
         current.isStorageCritical = status.isStorageCritical
         current.isBatterySteepDischarge = status.isBatterySteepDischarge
         current.isCoolingModeActive = status.isCoolingModeActive
+        current.gpsHardwareLock = status.locationPendingReason == LocationPendingReason.GPS_STALL // Approximate mapping for status
         current.gnssDetail = status.gnssDetail
         current.snrIdx = status.snrIdx
         current.noiseIdx = status.noiseIdx

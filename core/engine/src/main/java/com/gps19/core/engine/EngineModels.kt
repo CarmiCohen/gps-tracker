@@ -4,15 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Aug.08.21:
+ * - Issue #125: Forensic Audit: Compression Parity Audit. Added gpsHardwareLock 
+ *   to EngineConnectionPoint for forensic parity (R125).
  * Aug.07.51:
  * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement. Changed default 
  *   proxIdx to 0.0 (Far/Clear) to ensure forensic accuracy (R742).
- * Aug.03.50:
- * - Issue #715: Forensic Audit: Persistence Health Alerting. Added 
- *   forensicReliabilityDegradationStartRt to AlarmEvaluationState (R715).
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Converted EngineGeoPoint, AlarmEvaluationState, 
- *   and SystemHealthReport into mutable flyweights for zero-churn telemetry (R-HARDWARE-01).
  */
 
 @Serializable
@@ -109,7 +106,8 @@ class EngineConnectionPoint(
     var sitBaro: Double = 0.0,
     var sitTilt: Double = 0.0,
     var sitShock: Double = 0.0,
-    var kineticEnergy: Double = 0.0
+    var kineticEnergy: Double = 0.0,
+    var gpsHardwareLock: Boolean = false // Issue #125
 ) {
     fun copyFrom(other: EngineConnectionPoint) {
         this.ts = other.ts
@@ -149,6 +147,7 @@ class EngineConnectionPoint(
         this.sitTilt = other.sitTilt
         this.sitShock = other.sitShock
         this.kineticEnergy = other.kineticEnergy
+        this.gpsHardwareLock = other.gpsHardwareLock
     }
 }
 

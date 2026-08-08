@@ -23,13 +23,11 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.07.125:
+ * - Issue #124-Revival: Functional Hardening (R124). Aligned logs with 
+ *   locality authority ("this device"). Refined hardware lock emission.
  * Aug.07.07:
  * - Issue #124-Revival: Functional: Hardened GPS Revival loop (R124). 
- *   Resolved lint warnings for stable properties and ensured robust 
- *   permission handling for revival pulses.
- * July.29.00:
- * - Issue #622: Forensic: Location Refresh Reactivity Hardening. Implemented 
- *   debounced recovery logic and forensic gap duration tracking (R613).
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -147,7 +145,7 @@ class GpsManager @Inject constructor(
                 } else if (revivalAttemptCount == MAX_REVIVAL_ATTEMPTS) {
                     revivalAttemptCount++ 
                     _revivalEvents.tryEmit(RevivalEvent.HardwareLock)
-                    Timber.e("R124: GPS hardware lock confirmed after 3 failed revivals.")
+                    Timber.e("CRITICAL: GPS_HARDWARE_LOCK - GPS hardware lock confirmed after 3 failed revivals on this device.")
                 }
             }
         } else if (!currentStatus.isPending && revivalAttemptCount > 0) {
@@ -157,10 +155,10 @@ class GpsManager @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        Timber.w("R124: Restarting hardware GPS session (Attempt $revivalAttemptCount)")
+        Timber.w("R124: Restarting hardware GPS session on this device (Attempt $revivalAttemptCount)")
         
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Timber.e("R124: Revival aborted - Missing FINE_LOCATION permission")
+            Timber.e("R124: Revival aborted on this device - Missing FINE_LOCATION permission")
             return
         }
 
@@ -173,9 +171,9 @@ class GpsManager @Inject constructor(
                     override fun onLocationResult(p0: LocationResult) {}
                 }, Looper.getMainLooper())
             } catch (e: SecurityException) {
-                Timber.e(e, "R124: SecurityException during revival pulse")
+                Timber.e(e, "R124: SecurityException during revival pulse on this device")
             } catch (e: Exception) {
-                Timber.e(e, "R124: Manual revival pulse failed")
+                Timber.e(e, "R124: Manual revival pulse failed on this device")
             }
         }
     }

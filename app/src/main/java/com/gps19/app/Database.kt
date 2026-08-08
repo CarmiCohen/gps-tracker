@@ -8,16 +8,11 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.08.21:
+ * - Issue #125: Forensic Audit: Compression Parity Audit. Added gpsHardwareLock 
+ *   to LogEntity to maintain forensic parity with the GPS hardware state (R125).
  * Aug.04.116:
  * - Issue #731: Forensic Bloat: Important/Special Logs Exempt from Pruning. 
- *   Updated LogDao with pruneSpecialLogsChunk to provide a secondary safety tier 
- *   for forensic data, preventing unbounded growth while preserving history (R731).
- * Aug.04.115:
- * - Issue #729: Forensic Audit: Automated Database Integrity Validation. 
- *   Added checkIntegrity() to run PRAGMA integrity_check.
- * Aug.04.114:
- * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Updated LogDao 
- *   to support chunked pruning to prevent B-Tree fragmentation and I/O stalls (R728).
  */
 @Entity(
     tableName = "logs", 
@@ -54,7 +49,8 @@ data class LogEntity(
     @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0,
     val snrSnapshot: Double? = null,
     val vibeSnapshot: Double? = null,
-    @ColumnInfo(defaultValue = "-1") val spillIdx: Int = -1 // Issue #705
+    @ColumnInfo(defaultValue = "-1") val spillIdx: Int = -1, // Issue #705
+    @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false // Issue #125
 )
 
 @Entity(tableName = "trail_points", indices = [Index(value = ["timestamp"])])
@@ -242,7 +238,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 64, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 65, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -269,6 +265,13 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_64_65 = object : Migration(64, 65) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #125: Add gpsHardwareLock to logs.
+                db.execSQL("ALTER TABLE logs ADD COLUMN gpsHardwareLock INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         val MIGRATION_63_64 = object : Migration(63, 64) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #705: Add spillIdx to logs and specialized index for deduplication.

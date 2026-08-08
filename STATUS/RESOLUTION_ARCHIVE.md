@@ -2,11 +2,17 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 561**
+**Total Unique Resolutions: 564**
+
+## 6. Functional Hardening & Revival (Aug.07.07)
+*   **Issue #124-Revival: GPS Hardware Revival Functional Hardening**.
+    *   **Resolution**: Hardened the 120s GPS revival loop in `GpsManager.kt`. Standardized logs with "this device" locality authority (R747). Integrated `revivalEvents` into `IntegrityMonitor.kt` to ensure `GPS_HARDWARE_LOCK` is surfaced as a system violation and health state flag. Synchronized `SystemHealthState`, `LocationUpdate`, and `TelemetryUseCase` to propagate the lock status across signaling roles (R124).
 
 ## 5. UI/UX & Forensic Hardening (Aug.07.06)
 *   **Issue #753: Restoration of Resolution Archive Integrity**.
     *   **Resolution**: Restored truncated historical records (Issues #639, #638, #634) in the archive to satisfy R752 documentation integrity requirements.
+*   **Issue #752: Status Tracking Synchronization**.
+    *   **Resolution**: Synchronized `issues.md` and `RESOLUTION_ARCHIVE.md` baselines. Formalized Status Tracking Integrity requirement (R752).
 *   **Issue #751: Final R747 Terminology Alignment**.
     *   **Resolution**: Performed a final sweep of `event-tables.md` and `EVENTS_DOC.md` to remove all remaining "Tracker:" prefixes and ensure "Device" is used consistently for remote status reporting (R751).
 *   **Issue #750: Documentation Locality Synchronization**.

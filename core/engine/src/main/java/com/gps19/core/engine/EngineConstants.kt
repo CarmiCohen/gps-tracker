@@ -2,23 +2,11 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * Aug.07.118:
- * - Issue #747: Event & Alert Text Unification (R747). Synchronized 
- *   ALERT_TITLE_FORENSIC_OVERFLOW with "This device:" prefix.
- * Aug.07.117:
- * - Issue #747: Event & Alert Text Unification (R747). Synchronized local 
- *   alert titles with "This device:" prefix for locality clarity.
- * Aug.07.116:
- * - Issue #743: Forensic Spill-Buffer Write Compression. Reduced 
- *   FORENSIC_SPILL_ENTRY_SIZE to 96 bytes and increased capacity to 3000 (R743).
- * Aug.07.115:
- * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement. Added 
- *   PROXIMITY_EMA_ALPHA (0.15) for debounced linear transitions (R742).
- * Aug.04.114:
- * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Added 
- *   PRUNE_CHUNK_SIZE (100) and ADAPTIVE_PRUNE thresholds for granular 
- *   fragmentation-aware deletion cycles. Added percentage-based storage 
- *   pressure thresholds (R728).
+ * Aug.08.21:
+ * - Issue #125: Forensic Audit: Compression Parity Audit. Added 
+ *   FORENSIC_PINK_COLOR and synchronized hardware suppression constants (R125).
+ * Aug.07.119:
+ * - Issue #124: GPS Hardware Revival Hardening (R124).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -386,6 +374,7 @@ const val ALERT_ID_BATTERY_STEEP_DISCHARGE = "BATTERY_HEALTH"
 const val ALERT_ID_HARDWARE_CONFIGURATION = "HARDWARE_CONFIG_MISSING"
 const val ALERT_ID_PERFORMANCE_SPIKE = "PERFORMANCE_SPIKE"
 const val ALERT_ID_FORENSIC_OVERFLOW = "FORENSIC_OVERFLOW"
+const val ALERT_ID_GPS_HARDWARE_LOCK = "GPS_HARDWARE_LOCK"
 
 // Alert Titles (R747 Standardized)
 const val ALERT_TITLE_LOCAL_INTERNET = "This device: Internet Lost"
@@ -413,6 +402,7 @@ const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "This device: Battery Health"
 const val ALERT_TITLE_HARDWARE_CONFIGURATION = "This device: Hardware Config"
 const val ALERT_TITLE_PERFORMANCE_SPIKE = "This device: Performance Warning"
 const val ALERT_TITLE_FORENSIC_OVERFLOW = "This device: Forensic Buffer Overflow"
+const val ALERT_TITLE_GPS_HARDWARE_LOCK = "This device: GPS Hardware Lock"
 
 // System Watchdog & Grace Periods
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L

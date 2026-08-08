@@ -4,12 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
+ * Aug.07.129:
+ * - Issue #124: GPS Hardware Revival Hardening (R124). Added gpsHardwareLock 
+ *   to ensure critical hardware status is carried in telemetry.
  * Aug.03.37:
  * - Issue #669: Forensic Audit: Database I/O Contention. Added isAdaptiveJump 
  *   to maintain forensic parity across signaling roles (R-HARDWARE-01).
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Converted to mutable flyweight 
- *   to eliminate allocation churn in telemetry merging and storage (R-HARDWARE-01).
  */
 @Serializable
 class LocationUpdate(
@@ -63,6 +63,7 @@ class LocationUpdate(
     var trackerState: TrackerState = TrackerState.UNKNOWN,
     var isJammer: Boolean = false,
     var isStalled: Boolean = false,
+    var gpsHardwareLock: Boolean = false,
     var isSuspicious: Boolean = false,
     var isAnchorLocked: Boolean = false,
     
@@ -115,6 +116,7 @@ class LocationUpdate(
         this.isStorageLow = other.isStorageLow; this.isStorageCritical = other.isStorageCritical; this.gnssDetail = other.gnssDetail
         this.isBatterySteepDischarge = other.isBatterySteepDischarge; this.isCoolingModeActive = other.isCoolingModeActive
         this.trackerState = other.trackerState; this.isJammer = other.isJammer; this.isStalled = other.isStalled
+        this.gpsHardwareLock = other.gpsHardwareLock
         this.isSuspicious = other.isSuspicious; this.isAnchorLocked = other.isAnchorLocked
         this.snrIdx = other.snrIdx; this.noiseIdx = other.noiseIdx; this.luxIdx = other.luxIdx; this.vibeIdx = other.vibeIdx
         this.liftIdx = other.liftIdx; this.tiltIdx = other.tiltIdx; this.baroIdx = other.baroIdx

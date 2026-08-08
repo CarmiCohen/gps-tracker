@@ -30,13 +30,12 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Aug.07.131:
+ * - Issue #124: GPS Hardware Revival Hardening (R124). Propagating 
+ *   isGpsHardwareLock to SystemHealthState in evaluateAlarms.
  * Aug.04.55:
  * - Issue #716: Forensic Audit: Critical Battery Sentinel. Updated evaluateAlarms 
  *   to propagate vibration to SystemHealthState for correlated alerting (R716).
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Refactored to use persistent 
- *   flyweights (AlarmEvaluationState, SystemHealthReport) to achieve zero-allocation 
- *   hot-path evaluation (R-HARDWARE-01). Fixed missing isAdaptiveJump parameter.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -157,14 +156,17 @@ class AppAlarmManager @Inject constructor(
         isBatterySteepDischarge: Boolean = false, isCoolingModeActive: Boolean = false,
         discoveryPhase: DiscoveryPhase? = null, capabilities: HardwareCapabilities = HardwareCapabilities(),
         isLocationPending: Boolean = false, locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-        snrSnapshot: Double? = null, vibeSnapshot: Double? = null
+        snrSnapshot: Double? = null, vibeSnapshot: Double? = null,
+        isGpsHardwareLock: Boolean = false
     ) {
         this.isTrackerMode = isTrackerMode
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
         
         // Zero-churn property updates for persistent health flyweight
         evaluationState.health.update(
-            signalLoss = isSignalLoss, gpsStalled = isGpsStalling, localInternetLoss = isLocalInternetLoss,
+            signalLoss = isSignalLoss, gpsStalled = isGpsStalling, 
+            gpsHardwareLock = isGpsHardwareLock,
+            localInternetLoss = isLocalInternetLoss,
             isHardwareOnline = isHardwareOnline, batteryLevel = trackerBattery, batteryTemp = trackerTemp,
             isCharging = false, // Not used in alarm evaluation logic directly from here
             currentMa = trackerCurrentMa, status = status, isJammer = isJammer,

@@ -4,17 +4,18 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Aug.07.127:
+ * - Issue #124: GPS Hardware Revival Hardening (R124). Added gpsHardwareLock 
+ *   to track critical hardware stall escalations.
  * Aug.04.114:
  * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Added 
  *   storageAvailableMb and storageTotalMb for granular pressure diagnostics (R728).
- * Aug.04.113:
- * - Issue #716: Forensic Audit: Critical Battery Sentinel. Added vibration 
- *   alerting (R716).
  */
 @Serializable
 class SystemHealthState(
     var signalLoss: Boolean = false,
     var gpsStalled: Boolean = false,
+    var gpsHardwareLock: Boolean = false,
     var localInternetLoss: Boolean = false,
     var isHardwareOnline: Boolean = true,
     var batteryLevel: Int = 100,
@@ -104,6 +105,7 @@ class SystemHealthState(
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
         this.gpsStalled = other.gpsStalled
+        this.gpsHardwareLock = other.gpsHardwareLock
         this.localInternetLoss = other.localInternetLoss
         this.isHardwareOnline = other.isHardwareOnline
         this.batteryLevel = other.batteryLevel
@@ -182,7 +184,7 @@ class SystemHealthState(
     }
     
     fun update(
-        signalLoss: Boolean, gpsStalled: Boolean, localInternetLoss: Boolean, isHardwareOnline: Boolean,
+        signalLoss: Boolean, gpsStalled: Boolean, gpsHardwareLock: Boolean, localInternetLoss: Boolean, isHardwareOnline: Boolean,
         batteryLevel: Int, batteryTemp: Double, isCharging: Boolean, currentMa: Int,
         status: SentinelStatus, isJammer: Boolean, isTamperDetected: Boolean, tiltDegrees: Double,
         acousticDb: Double, baroAlt: Double, lux: Double, isNear: Boolean,
@@ -196,6 +198,7 @@ class SystemHealthState(
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
+        this.gpsHardwareLock = gpsHardwareLock
         this.localInternetLoss = localInternetLoss
         this.isHardwareOnline = isHardwareOnline
         this.batteryLevel = batteryLevel
@@ -235,6 +238,7 @@ class SystemHealthState(
     fun reset() {
         signalLoss = false
         gpsStalled = false
+        gpsHardwareLock = false
         localInternetLoss = false
         isHardwareOnline = true
         batteryLevel = 100

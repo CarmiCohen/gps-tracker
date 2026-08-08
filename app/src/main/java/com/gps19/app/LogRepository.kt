@@ -20,12 +20,13 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.08.21:
+ * - Issue #125: Forensic Audit: Compression Parity Audit. Updated mappings to 
+ *   include gpsHardwareLock, ensuring persistence parity (R125).
  * Aug.05.120:
  * - Issue #735: Startup Davey Stall Remediation. Refactored to use 
  *   Provider<ForensicSpillBuffer> to defer MappedByteBuffer I/O until first 
  *   background access, clearing the main-thread startup critical path (R735).
- * Aug.04.116:
- * - Issue #731: Forensic Bloat: Important/Special Logs Exempt from Pruning. 
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -98,11 +99,6 @@ class LogRepository @Inject constructor(
         }
     }
 
-    /**
-     * recoverAbandonedTraces: One-time recovery of forensic data from memory-mapped
-     * spill buffer during initialization. Ensures zero-loss after crash.
-     * Issue #735: Deferred execution via IO scope and Provider prevents main-thread stalls.
-     */
     private fun recoverAbandonedTraces() {
         scope.launch(Dispatchers.IO) {
             val buffer = forensicSpillBufferProvider.get()
@@ -184,7 +180,8 @@ class LogRepository @Inject constructor(
                     lat = it.lat, lng = it.lng, accuracy = it.accuracy,
                     maxAccuracy = it.maxAccuracy, snrSnapshot = it.snrSnapshot,
                     vibeSnapshot = it.vibeSnapshot, synced = false,
-                    spillIdx = it.spillIdx
+                    spillIdx = it.spillIdx,
+                    gpsHardwareLock = it.gpsHardwareLock
                 )
             }
             
@@ -296,7 +293,8 @@ class LogRepository @Inject constructor(
                                 count = entry.count, durationMs = entry.durationMs, isSpecial = entry.isSpecial,
                                 specialColor = entry.specialColor, role = entry.role, synced = initiallySynced,
                                 lat = entry.lat, lng = entry.lng, accuracy = entry.accuracy,
-                                maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot
+                                maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
+                                gpsHardwareLock = entry.gpsHardwareLock
                             ))
                             continue
                         }
@@ -315,7 +313,8 @@ class LogRepository @Inject constructor(
                                     } else last.extremeValue,
                                     timestamp = entry.timestamp, message = entry.message, synced = initiallySynced,
                                     lat = entry.lat, lng = entry.lng, accuracy = entry.accuracy,
-                                    maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot
+                                    maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
+                                    gpsHardwareLock = entry.gpsHardwareLock
                                 ))
                                 continue
                             }
@@ -331,7 +330,8 @@ class LogRepository @Inject constructor(
                             role = entry.role, synced = initiallySynced, lat = entry.lat, lng = entry.lng, 
                             accuracy = entry.accuracy, maxAccuracy = entry.maxAccuracy, 
                             snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
-                            spillIdx = entry.spillIdx
+                            spillIdx = entry.spillIdx,
+                            gpsHardwareLock = entry.gpsHardwareLock
                         ))
                         logWriteCount++
                     }
@@ -370,7 +370,7 @@ class LogRepository @Inject constructor(
                     specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                     lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
                     snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
-                    spillIdx = it.spillIdx
+                    spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock
                 ) 
             }
         }.flowOn(Dispatchers.Default)
@@ -395,9 +395,6 @@ class LogRepository @Inject constructor(
         }
     }
 
-    /**
-     * proactivePruning: Executes granular deletion cycles based on storage pressure.
-     */
     suspend fun proactivePruning() {
         LatencyMonitor.measureAndAudit(
             timeProvider = timeProvider,
@@ -462,7 +459,7 @@ class LogRepository @Inject constructor(
                 specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                 lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
                 snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
-                spillIdx = it.spillIdx
+                spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock
             )
         }
     }
@@ -508,7 +505,7 @@ class LogRepository @Inject constructor(
                 specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                 lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
                 snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
-                spillIdx = it.spillIdx
+                spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock
             ) 
         }
     }

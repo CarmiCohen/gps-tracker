@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.08.21:
+ * - Issue #125: Forensic Audit: Compression Parity Audit. Added gpsHardwareLock 
+ *   to LogEntry to maintain forensic parity with the GPS hardware state (R125).
  * Aug.03.65:
  * - Issue #705: Forensic Audit: Trace Deduplication Performance Optimization. 
  *   Added spillIdx to LogEntry to support exactly-once forensic persistence (R705).
@@ -143,7 +146,8 @@ data class LogEntry(
     val maxAccuracy: Double = 0.0,
     val snrSnapshot: Double? = null,
     val vibeSnapshot: Double? = null,
-    val spillIdx: Int = -1 // Issue #705: Physical index in ForensicSpillBuffer
+    val spillIdx: Int = -1, // Issue #705: Physical index in ForensicSpillBuffer
+    val gpsHardwareLock: Boolean = false // Issue #125: Hardware lock parity
 ) {
     fun toJSONObject(): JSONObject {
         return JSONObject().apply {
@@ -166,6 +170,7 @@ data class LogEntry(
             snrSnapshot?.let { put("snr_snapshot", it) }
             vibeSnapshot?.let { put("vibe_snapshot", it) }
             if (spillIdx != -1) put("spill_idx", spillIdx)
+            if (gpsHardwareLock) put("gps_hw_lock", true)
         }
     }
 
@@ -198,7 +203,8 @@ data class LogEntry(
                 maxAccuracy = obj.optDouble("max_accuracy", 0.0),
                 snrSnapshot = if (obj.has("snr_snapshot")) obj.optDouble("snr_snapshot") else null,
                 vibeSnapshot = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot") else null,
-                spillIdx = obj.optInt("spill_idx", -1)
+                spillIdx = obj.optInt("spill_idx", -1),
+                gpsHardwareLock = obj.optBoolean("gps_hw_lock", false)
             )
         }
     }
