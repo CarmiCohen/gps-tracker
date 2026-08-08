@@ -2,7 +2,29 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 423**
+**Total Unique Resolutions: 561**
+
+## 5. UI/UX & Forensic Hardening (Aug.07.06)
+*   **Issue #753: Restoration of Resolution Archive Integrity**.
+    *   **Resolution**: Restored truncated historical records (Issues #639, #638, #634) in the archive to satisfy R752 documentation integrity requirements.
+*   **Issue #751: Final R747 Terminology Alignment**.
+    *   **Resolution**: Performed a final sweep of `event-tables.md` and `EVENTS_DOC.md` to remove all remaining "Tracker:" prefixes and ensure "Device" is used consistently for remote status reporting (R751).
+*   **Issue #750: Documentation Locality Synchronization**.
+    *   **Resolution**: Synchronized formal documentation (specifically `ALARM_AND_SIREN_MECHANISM.md`, `SETTINGS_PAGE_DETAIL.md`, `EVENTS_AND_LOGGING_MECHANISM.md`, and `GUIDE_AND_SETTINGS.md`) with the R747 authority (R750).
+*   **Issue #749: Documentation & Shard Synchronization**.
+    *   **Resolution**: Synchronized the historical record to reflect the 558 resolution baseline. Formalized documentation integrity rules in SOT (R749).
+*   **Issue #748: Log Message Prefix Cleanup**.
+    *   **Resolution**: Hardened log message consistency by removing legacy "Tracker:" prefixes and standardizing "Device" terminology in `IntegrityMonitor.kt` and `ViewerService.kt`. Ensures full compliance with R747 locality rules (R748).
+*   **Issue #747: Event & Alert Text Unification**.
+    *   **Resolution**: Synchronized all system event and alert text with the authoritative mapping (R747). Viewer-local events now use the "This device:" prefix, and tracker-remote events use "Device" in subtitles to ensure professional consistency and locality clarity. Updated `MainAlarmLogic.kt` and `EngineConstants.kt`.
+*   **Issue #746: Missing libmbrainSDK**.
+    *   **Resolution**: Fully transitioned the JNI bridge to the `jdMbrain` namespace to eliminate legacy log noise (`Can't load libmbrainSDK`) and avoid collisions with Samsung system libraries. Renamed `MbrainHardwareManager` to `JdMbrainHardwareManager` and updated native source to `jdmbrain-jni.cpp`. Decoupled all service logic from legacy "mbrain" identifiers (R746).
+*   **Issue #745: Missing Critical Background Permissions**.
+    *   **Resolution**: Hardened permission detection responsiveness by reducing `FORCED_REFRESH_COOLDOWN_MS` from 15s to 1s in `SystemStatusProviderImpl`. This ensures the Setup UI "Refresh" button provides immediate feedback (R745).
+*   **Issue #744: Startup Daveys Prevention**.
+    *   **Resolution**: Offloaded heavy IO and legacy initializations to background dispatchers in `MainActivity` to prevent main-thread stalls (R744).
+*   **Issue #743: Forensic Spill-Buffer Write Compression**.
+    *   **Resolution**: Implemented structural compression (V2 format) for the circular spill-buffer. Caps entry size at 96 bytes and increases capacity to 3000 entries (R743).
 
 ## 4. Stability & Budget Baseline (July.30.35)
 *   **Issue #640: Tracker Mode ANR (Regression)**.

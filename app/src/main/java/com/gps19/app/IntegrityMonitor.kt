@@ -26,6 +26,9 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.07.08:
+ * - Issue #748: Log Message Prefix Cleanup (R747). Standardized local power 
+ *   event logs to use "Device" and "this device" terminology.
  * Aug.04.114:
  * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Propagating 
  *   granular storage metrics (available/total MB) to LogRepository (R728).
@@ -176,7 +179,7 @@ class IntegrityMonitor @Inject constructor(
 
         val isStalled = status.reason == LocationPendingReason.GPS_STALL
         if (isStalled && !workingHealth.gpsStalled) {
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("GPS STALL: Hardware fix has not updated despite satellite visibility.", true))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("GPS STALL: Hardware fix on this device has not updated despite satellite visibility.", true))
         }
 
         updateHealth { h ->
@@ -203,11 +206,11 @@ class IntegrityMonitor @Inject constructor(
         var isCooling = workingHealth.isCoolingModeActive
         if (!isCooling && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
             isCooling = true
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE. Sensors and GPS throttled.", true))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE on this device.", true))
             _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_TRACKER_TEMP))
         } else if (isCooling && batteryTemp < MAX_SAFE_TEMPERATURE_RECOVERY) {
             isCooling = false
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Thermal limit recovered (${batteryTemp}°C). Normal tracking resumed.", false))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Thermal limit recovered (${batteryTemp}°C) on this device.", false))
         }
 
         if (isCharging) onPowerConnected() else onPowerDisconnected()
@@ -243,17 +246,17 @@ class IntegrityMonitor @Inject constructor(
         
         if (critical != workingHealth.isStorageCritical) {
             if (critical) {
-                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB). ALL non-essential logging HALTED to prevent corruption.", true))
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB) on this device.", true))
                 _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL))
             }
         }
 
         if (low != workingHealth.isStorageLow) {
             if (low && !critical) {
-                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB). Throttling logs.", true))
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB) on this device.", true))
                 _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW))
             } else if (!low) {
-                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Storage space restored (${megabytesAvailable}MB).", false))
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Storage space restored (${megabytesAvailable}MB) on this device.", false))
             }
         }
 
@@ -272,9 +275,9 @@ class IntegrityMonitor @Inject constructor(
 
         if (powerSave != workingHealth.isPowerSaveMode) {
             if (powerSave) {
-                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM WARNING: Power Save Mode active. Sensors and GPS may be throttled by OS.", true))
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM WARNING: Power Save Mode active on this device. Sensors and GPS may be throttled.", true))
             } else {
-                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Power Save Mode deactivated. Normal tracking resumed.", false))
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Power Save Mode deactivated on this device.", false))
             }
         }
 
@@ -291,7 +294,7 @@ class IntegrityMonitor @Inject constructor(
                 
                 if (workingHealth.standbyBucket != -1) {
                     val isCritical = bucket >= UsageStatsManager.STANDBY_BUCKET_RARE
-                    val msg = "SYSTEM PRIORITY: Standby bucket changed to $bucketName. ${if (isCritical) "Background tracking may be severely limited." else ""}"
+                    val msg = "SYSTEM PRIORITY: Standby bucket on this device changed to $bucketName. ${if (isCritical) "Background tracking may be severely limited." else ""}"
                     _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, isCritical))
                 }
             }
@@ -319,7 +322,7 @@ class IntegrityMonitor @Inject constructor(
         if (lastPowerDisconnectTs > 0 && !isPowerTamper) {
             if (checkViolationSustained(ALERT_ID_TRACKER_POWER, lastPowerDisconnectTs, POWER_DISCONNECT_DEBOUNCE_MS)) {
                 isPowerTamper = true
-                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Tracker power tamper confirmed (debounce met)", true))
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Device power tamper confirmed (debounce met)", true))
             }
         }
 
@@ -344,7 +347,7 @@ class IntegrityMonitor @Inject constructor(
         
         if (isSteep && !currentHealth.isBatterySteepDischarge) {
             val elapsedMin = (nowRt - earliest.first) / 60000
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected ($drop% in ${elapsedMin}m). System shutdown likely imminent.", true))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected on this device ($drop% in ${elapsedMin}m).", true))
             _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE))
         }
         return isSteep
@@ -402,7 +405,7 @@ class IntegrityMonitor @Inject constructor(
     fun onPowerDisconnected() {
         if (!currentHealth.isPowerTamper && lastPowerDisconnectTs == 0L) {
             lastPowerDisconnectTs = timeProvider.elapsedRealtime()
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Tracker power unplugged, starting debounce...", false))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Device power unplugged, starting debounce...", false))
         }
     }
 
@@ -411,7 +414,7 @@ class IntegrityMonitor @Inject constructor(
         if (currentHealth.isPowerTamper) {
             updateHealth { it.isPowerTamper = false }
             _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_POWER))
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Tracker power restored", false))
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Device power restored", false))
         }
     }
 

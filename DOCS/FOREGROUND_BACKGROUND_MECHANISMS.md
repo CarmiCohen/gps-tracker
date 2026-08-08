@@ -1,21 +1,21 @@
-# GPS-Tracker: Foreground & Background Mechanisms (July.23.11)
+# GPS-Tracker: Foreground & Background Mechanisms (vAug.07.06)
 
-This document provides a comprehensive technical overview of how the GPS-Tracker app maintains its high-persistence state on Android using specialized service roles and a Triple-Lock Watchdog system.
+This document provides a comprehensive technical overview of how the GPS-Tracker app maintains its high-persistence state on Android using specialized service roles and a Triple-Lock Watchdog system. As of vAug.07.06, all terminology follows the R747 Locality Authority.
 
 ## 1. General Architecture
 The app is designed with a **"Reliability-First"** philosophy. Services operate independently of the Activity lifecycle to ensure forensic continuity.
 
 ### Specialized Service Roles
 The service architecture is split into two role-based services, both extending `BaseMonitorService`:
-*   **TrackerService**: Optimized for stealth and battery efficiency. Focuses on sensor fidelity and location reporting.
-*   **ViewerService**: Optimized for real-time HUD telemetry, analytical ribbons, and remote data synchronization.
+*   **TrackerService (Device)**: Optimized for stealth and battery efficiency on the remote device. Focuses on sensor fidelity, JdMbrain stabilization (R746), and location reporting.
+*   **ViewerService**: Optimized for real-time HUD telemetry on this device, analytical ribbons, and remote data synchronization.
 
 ---
 
 ## 2. Foreground Mechanism (The Primary Layer)
 
 ### BaseMonitorService (R406b Hardening)
-Both `TrackerService` and `ViewerService` inherit from `BaseMonitorService`, which is implemented as a `LifecycleService`.
+Both services inherit from `BaseMonitorService`, which is implemented as a `LifecycleService`.
 *   **Foreground Service Immediacy (R406b)**: To prevent `ForegroundServiceDidNotStartInTimeException`, the service MUST call `startForeground()` immediately within the Main-thread `onCreate()`. Delayed initialization inside coroutines or background threads is strictly forbidden.
 *   **Foreground Service Types**: 
     *   **TrackerService**: Requests `location`, `microphone`, and `specialUse`. The microphone type is managed with a 45s hysteresis (`FGS_STICKY_DELAY_MS`).
@@ -24,7 +24,7 @@ Both `TrackerService` and `ViewerService` inherit from `BaseMonitorService`, whi
 
 ### Foreground UI Overlay
 The app utilizes `SYSTEM_ALERT_WINDOW` permissions to draw critical red-screen alerts over other apps. 
-*   **Stealth Requirement (R872)**: These overlays are strictly suppressed in Tracker mode.
+*   **Stealth Requirement (R872)**: These overlays are strictly suppressed in Tracker mode on the device.
 
 ---
 
@@ -42,4 +42,4 @@ The `MaintenanceWorker` provides a high-level reliability layer, verifying servi
 ---
 
 ## 4. Security & Integrity Monitoring
-In the background, the system continuously evaluates Internet, Signal, Storage, GNSS, and Power integrity. All events are geographically anchored with Dual-Metric accuracy.
+In the background, the system continuously evaluates Internet, Signal, Storage, GNSS, and Power integrity. All events are geographically anchored with Dual-Metric accuracy and follow the R747 locality mapping (e.g., "This device: Internet Lost" for local events).

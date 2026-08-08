@@ -1,6 +1,6 @@
-# Setup Guide & Configuration Mechanism (July.22.05)
+# Setup Guide & Configuration Mechanism (vAug.07.06)
 
-This document describes the implementation of the "Phone Setup" guide and the persistence logic for application settings.
+This document describes the implementation of the "Phone Setup" guide and the persistence logic for application settings. As of vAug.07.06, all terminology follows the R747 Locality Authority.
 
 ## 1. The Setup Guide (`PhoneSetupOverlay`)
 The `PhoneSetupOverlay` guides the user through the Android permissions and battery optimizations required for high-reliability background tracking.
@@ -20,11 +20,11 @@ The application uses a **Hilt-managed Jetpack DataStore** for configuration.
 To prevent `IllegalStateException` during startup, the `SettingsRepository` accesses DataStore via a `Context.dataStore` property delegate. This ensures exactly one instance exists per process, shared across all Hilt entry points (Issue #511).
 
 ### B. Reactive Updates
-UI components observe settings via a `Flow<Settings>` exposed by the repository, ensuring real-time UI updates across Tracker and Viewer roles.
+UI components observe settings via a `Flow<Settings>` exposed by the repository, ensuring real-time UI updates across Device and Viewer roles.
 
 ### C. Debounced Sync
 Significant changes (Relay URL/IDs) trigger a debounced re-initialization of the network stack.
 
 ## 3. Configuration Management
 - **Load Config**: Import JSON configuration for instant setup.
-- **Export Logs**: Provides a forensic snapshot of event history. Standardized to include mandatory role fields and Log Spatial Anchors.
+- **Export Logs**: Provides a forensic snapshot of event history. Standardized to include mandatory role fields and Log Locality (R747).

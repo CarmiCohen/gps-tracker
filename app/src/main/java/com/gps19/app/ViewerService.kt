@@ -16,11 +16,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Aug.07.09:
+ * - Issue #748: Log Message Prefix Cleanup (R747). Synchronized log 
+ *   messages with authoritative terminology ("Device" instead of "Tracker").
  * Aug.01.10:
  * - Issue #668: Performance: Object Churn. Refactored evaluateAlarmsInternal to 
  *   support zero-allocation telemetry path and fixed isAdaptiveJump parameter (R-HARDWARE-01).
- * July.30.55:
- * - Issue #653: Performance: Zero-Churn.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -149,7 +150,7 @@ class ViewerService : BaseMonitorService() {
                     }
                     is ProcessorEvent.ChairBaselineChanged -> {
                         val proc = lastProcessedLocation
-                        logManager.logServiceEvent("Tracker: Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", event.baseline)}°",
+                        logManager.logServiceEvent("Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", event.baseline)}°",
                             lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
                     else -> {}
@@ -255,7 +256,7 @@ class ViewerService : BaseMonitorService() {
         }
         if (sessionManager.onTrackerPulse(id, timeProvider.currentTimeMillis(), false)) {
             val proc = lastProcessedLocation
-            logManager.logServiceEvent("Tracker connected: $id", lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+            logManager.logServiceEvent("Device connected: $id", lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
             startTickLoop()
         }
     }

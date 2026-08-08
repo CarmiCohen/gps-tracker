@@ -1,12 +1,12 @@
-# Alarming & Siren Mechanism (July.23.11)
+# Alarming & Siren Mechanism (vAug.07.06)
 
-This document describes the critical alert system of the GPS Tracker, which uses software-synthesized audio, full-screen system intents, and visual overlays to ensure theft or failure events are noticed immediately.
+This document describes the critical alert system of the GPS Tracker, which uses software-synthesized audio, full-screen system intents, and visual overlays to ensure theft or failure events are noticed immediately. As of vAug.07.06, all terminology follows the R747 Locality Authority.
 
 ## 1. Alarm Trigger Logic (`MainAlarmLogic.kt`)
 The system continuously evaluates tracking data against a set of security rules. An alarm is triggered when one or more of the following conditions are met:
-- **Distance Violation**: Tracker moves beyond the fence radius plus a dynamic buffer.
-- **Tracker Tamper**: Real-time monitoring of physical hardware integrity (Tilt, Light, Proximity, Shock).
-- **System Integrity**: Storage Watchdog, Signal Loss (Jammer), and GPS Stalled detection.
+- **Geofence**: Device moves beyond the fence radius plus a dynamic buffer.
+- **Tamper Detected**: Real-time monitoring of physical hardware integrity (Tilt, Light, Proximity, Shock).
+- **System Integrity**: Storage Low/Critical, Signal Lost, Jammer Alert, and GPS Stalled detection.
 - **Low Battery**: Level < 20% or steep discharge (5% in 10m).
 
 ## 2. Audio Synthesis & Role-Based Silence (R872)
@@ -18,7 +18,7 @@ Real-time PCM generation for high-stress alerts:
 ## 3. Full-Screen Alert & UI Hardening
 When a violation is detected, the system launches a high-priority Red Alert overlay:
 - **Stealth Requirement (Tracker Mode)**: Visual alerts are suppressed in Tracker mode. The device remains dark. Violations are transmitted to the Viewer only.
-- **Standardized Titles (R747)**: Local alerts use "This device:", remote alerts use the simplified ID or "Offline".
+- **Standardized Titles (R747)**: Local alerts use "This device:" prefix. Remote alerts omit the "Tracker:" prefix for clarity (e.g., "Offline", "Signal Lost").
 - **Monotonic Timing**: A 30-second lockout applies after dismissal using `TimeProvider.elapsedRealtime()`.
 
 ## 4. Forensic Continuity

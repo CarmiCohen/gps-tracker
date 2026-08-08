@@ -2,6 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.07.118:
+ * - Issue #747: Event & Alert Text Unification (R747). Synchronized 
+ *   ALERT_TITLE_FORENSIC_OVERFLOW with "This device:" prefix.
+ * Aug.07.117:
+ * - Issue #747: Event & Alert Text Unification (R747). Synchronized local 
+ *   alert titles with "This device:" prefix for locality clarity.
  * Aug.07.116:
  * - Issue #743: Forensic Spill-Buffer Write Compression. Reduced 
  *   FORENSIC_SPILL_ENTRY_SIZE to 96 bytes and increased capacity to 3000 (R743).
@@ -401,12 +407,12 @@ const val ALERT_TITLE_TRACKER_TAMPER = "Tamper Detected"
 const val ALERT_TITLE_TRACKER_TILT = "Tilt Alert"
 const val ALERT_TITLE_TRACKER_ACOUSTIC = "Acoustic Alert"
 const val ALERT_TITLE_TRACKER_LIFT = "Lift"
-const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "System Storage Low"
-const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "System Storage Critical"
-const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "Critical Battery Health"
-const val ALERT_TITLE_HARDWARE_CONFIGURATION = "Hardware Config Incomplete"
-const val ALERT_TITLE_PERFORMANCE_SPIKE = "Performance Warning"
-const val ALERT_TITLE_FORENSIC_OVERFLOW = "Forensic Buffer Overflow"
+const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "This device: Storage Low"
+const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "This device: Storage Critical"
+const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "This device: Battery Health"
+const val ALERT_TITLE_HARDWARE_CONFIGURATION = "This device: Hardware Config"
+const val ALERT_TITLE_PERFORMANCE_SPIKE = "This device: Performance Warning"
+const val ALERT_TITLE_FORENSIC_OVERFLOW = "This device: Forensic Buffer Overflow"
 
 // System Watchdog & Grace Periods
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L

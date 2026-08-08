@@ -23,12 +23,14 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.07.06:
+ * - Issue #120b: Performance Hardening (R104b). Ensured 15s delay for all 
+ *   non-critical background maintenance tasks to prevent I/O contention 
+ *   on budget hardware (Samsung A15).
  * Aug.07.03:
  * - Issue #744: Performance: Startup Davey Mitigation. Refactored init sequence to 
  *   offload loadInitialData to Dispatchers.IO and staggered heavy observations 
  *   to ensure <100ms main-thread blockage during cold start (R744).
- * Aug.03.37:
- * - Issue #669: Refactored to eliminate .copy() usage on mutable state classes (R668).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -180,7 +182,8 @@ class MainViewModel @Inject constructor(
                 updateState { it.copy(isInitialized = true) }
             }
             
-            // Background maintenance deferral
+            // Issue #120b: Background maintenance deferral (Requirement R104b)
+            // Deferred for 15,000ms to clear the cold-start I/O critical path.
             launch(Dispatchers.IO) { 
                 delay(15000)
                 repository.proactivePruning() 
@@ -555,7 +558,7 @@ class MainViewModel @Inject constructor(
             is UiEvent.UpdateDraftRelayUrl -> updateDraft { it.copy(relayUrl = event.url) }
             is UiEvent.UpdateDraftMaxDistance -> updateDraft { it.copy(maxDistance = event.distance) }
             is UiEvent.UpdateDraftAlertSettings -> updateDraft { it.copy(alertSettings = event.settings) }
-            is UiEvent.UpdateDraftAlarmVolume -> updateDraft { it.copy(alertSettings = it.alertSettings.copy(alarmVolume = event.volume)) }
+            is UiEvent.UpdateDraftAlarmVolume -> updateDraft { it.alertSettings.copy(alarmVolume = event.volume).let { s -> it.copy(alertSettings = s) } }
             is UiEvent.CommitSettings -> commitDraft()
             else -> {}
         }

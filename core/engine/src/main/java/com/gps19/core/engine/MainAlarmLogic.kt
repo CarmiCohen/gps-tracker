@@ -5,6 +5,13 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Aug.07.07:
+ * - Issue #747: Event & Alert Text Unification (R747). Hardened local event 
+ *   subtitles with "this device" references for locality clarity.
+ * Aug.07.06:
+ * - Issue #747: Event & Alert Text Unification (R747). Synchronized subtitles 
+ *   with authoritative mapping, replacing "Tracker" with "Device" and 
+ *   standardizing locality references.
  * Aug.04.55:
  * - Issue #716: Forensic Audit: Critical Battery Sentinel. Implemented 
  *   ALERT_ID_BATTERY_STEEP_DISCHARGE correlation with vibration and cpuLoad (R716).
@@ -97,7 +104,7 @@ object MainAlarmLogic {
             report.getOrCreate(reportIdx++).update(
                 type = ALERT_ID_SIGNAL_LOSS,
                 title = getTrackerTitleCached(isTracker, if (isTracker) ALERT_TITLE_VIEWER_SIGNAL_LOSS else ALERT_TITLE_SIGNAL_LOSS),
-                subtitle = "No data received from device", 
+                subtitle = "Communication with device was lost", 
                 conditionMet = canCheckPeerErrors && health.signalLoss && !shouldSuppressPeerErrors
             )
             
@@ -111,7 +118,7 @@ object MainAlarmLogic {
             report.getOrCreate(reportIdx++).update(
                 type = ALERT_ID_TRACKER_GAP,
                 title = getTrackerTitleCached(isTracker, if (isTracker) ALERT_TITLE_VIEWER_GAP else ALERT_TITLE_TRACKER_GAP),
-                subtitle = "Device GPS fix is older than threshold",
+                subtitle = "No data received from device for >180s",
                 conditionMet = canCheckPeerErrors && state.isGpsGap && !shouldSuppressPeerErrors
             )
 
@@ -347,8 +354,8 @@ object MainAlarmLogic {
             val batterySubtitle = if (batteryConditionMet) {
                 when {
                     isCriticalBattery -> "Device battery level is CRITICAL"
-                    isChargeDeficit -> "Charge Deficit detected"
-                    else -> "Low battery"
+                    isChargeDeficit -> "Charge Deficit"
+                    else -> "Device battery level is low"
                 }
             } else "Device battery OK"
 
@@ -366,9 +373,9 @@ object MainAlarmLogic {
             val steepConditionMet = health.isBatterySteepDischarge
             
             val steepSubtitle = when {
-                steepConditionMet && (isHighSensorActivity || isHighSystemLoad) -> "IMMINENT SHUTDOWN PREDICTED (High Load)"
-                steepConditionMet -> "Abnormal discharge rate detected"
-                else -> "Battery health OK"
+                steepConditionMet && (isHighSensorActivity || isHighSystemLoad) -> "IMMINENT SHUTDOWN PREDICTED on this device (High Load)"
+                steepConditionMet -> "Abnormal discharge rate detected on this device"
+                else -> "Battery health on this device is OK"
             }
 
             val steepTech = if (steepConditionMet) {
@@ -387,7 +394,7 @@ object MainAlarmLogic {
             report.getOrCreate(reportIdx++).update(
                 type = ALERT_ID_TRACKER_TEMP,
                 title = getTrackerTitleCached(isTracker, ALERT_TITLE_TRACKER_TEMP),
-                subtitle = if (tempCondition) String.format(Locale.getDefault(), "Temperature reached %.1f°C", health.batteryTemp) else "Temperature OK",
+                subtitle = if (tempCondition) String.format(Locale.getDefault(), "Device temperature reached %.1f°C", health.batteryTemp) else "Temperature OK",
                 conditionMet = tempCondition,
                 extremeValue = health.batteryTemp
             )
@@ -395,14 +402,14 @@ object MainAlarmLogic {
             report.getOrCreate(reportIdx++).update(
                 type = ALERT_ID_SYSTEM_STORAGE_LOW,
                 title = getTrackerTitleCached(isTracker, ALERT_TITLE_SYSTEM_STORAGE_LOW),
-                subtitle = "System storage is low",
+                subtitle = "System storage on this device is low",
                 conditionMet = health.isStorageLow && !health.isStorageCritical
             )
 
             report.getOrCreate(reportIdx++).update(
                 type = ALERT_ID_SYSTEM_STORAGE_CRITICAL,
                 title = getTrackerTitleCached(isTracker, ALERT_TITLE_SYSTEM_STORAGE_CRITICAL),
-                subtitle = "CRITICAL STORAGE EMERGENCY",
+                subtitle = "CRITICAL STORAGE EMERGENCY on this device",
                 conditionMet = health.isStorageCritical
             )
 
@@ -425,11 +432,11 @@ object MainAlarmLogic {
             } else false
 
             val configSubtitle = when {
-                !caps.hasBackgroundRestriction -> "Hardware configuration OK"
-                isBootGraceActive -> "Hardware status stabilizing..."
-                isExplicitlyDenied -> "Background/Autostart explicitly DENIED"
-                isIndeterminate -> "Hardware status UNKNOWN"
-                else -> "Hardware configuration OK"
+                !caps.hasBackgroundRestriction -> "Hardware configuration on this device is OK"
+                isBootGraceActive -> "Hardware status on this device is stabilizing..."
+                isExplicitlyDenied -> "Background/Autostart on this device explicitly DENIED"
+                isIndeterminate -> "Hardware status on this device is UNKNOWN"
+                else -> "Hardware configuration on this device is OK"
             }
 
             report.getOrCreate(reportIdx++).update(
@@ -455,7 +462,7 @@ object MainAlarmLogic {
             report.getOrCreate(reportIdx++).update(
                 type = ALERT_ID_PERFORMANCE_SPIKE,
                 title = getTrackerTitleCached(isTracker, ALERT_TITLE_PERFORMANCE_SPIKE),
-                subtitle = if (isForensicSustained) "Forensic persistence reliability is low (${String.format(Locale.getDefault(), "%.2f", health.forensicReliability)})" else "Forensic persistence OK",
+                subtitle = if (isForensicSustained) "Forensic persistence reliability on this device is low (${String.format(Locale.getDefault(), "%.2f", health.forensicReliability)})" else "Forensic persistence on this device is OK",
                 conditionMet = isForensicSustained,
                 extremeValue = 1.0 - health.forensicReliability
             )
