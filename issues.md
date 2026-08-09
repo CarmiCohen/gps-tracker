@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 Action Required | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 565 |
+| **Resolved (Total)** | 🟢 Progress | 566 |
 
 ---
 
@@ -22,6 +22,9 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🟢 Recently Resolved Issues (Aug.08.21)
+*   **[Issue #126-Telemetry] [Severity: High] [Category: Telemetry] Forensic Payload Overflow Audit.**
+    *   **Resolution**: Implemented safe UTF-8 truncation in `ForensicSpillBuffer.kt` to prevent diagnostic message corruption at the 56-byte boundary. The implementation ensures that multi-byte UTF-8 sequences are not split during truncation by backtracking to the sequence start (R126).
+
 *   **[Issue #125-Telemetry] [Severity: High] [Category: Telemetry] Forensic Data Compression Parity Audit.**
     *   **Resolution**: Remedied the forensic parity gap by integrating the `gpsHardwareLock` flag into the bit-packed `flags` byte (bit 0x08) of the V2 `ForensicSpillBuffer` binary format. Synchronized `LogEntry`, `LogEntity` (Migration 65), and `EngineConnectionPoint` to support the new flag. Updated `TelemetryAggregator` to ensure the hardware lock state is correctly preserved during ribbon reconstruction across all scales (R125).
 

@@ -5,6 +5,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 ### 1. Performance & Startup Authority
 *   **Escalated GPS Revival (R124)**: (Updated Aug.07.07) If a GPS hardware stall is detected (R745), the system MUST trigger an escalated revival pulse every 120,000ms. If the fix is not recovered after 3 consecutive attempts, a `GPS_HARDWARE_LOCK` critical event MUST be emitted. (Issue #124-Revival).
 *   **Forensic Parity Audit (R125)**: (Added Aug.08.21) The forensic spill-buffer V2 format MUST include the `gpsHardwareLock` flag within the bit-packed flags byte (bit 0x08) to maintain state parity across the telemetry pipeline, database persistence, and remote reporting (Issue #125). **Status: Implemented & Verified.**
+*   **Forensic Payload Integrity (R126)**: (Added Aug.08.21) Diagnostic messages written to the forensic spill-buffer MUST be safely truncated to the 56-byte payload limit without corrupting multi-byte UTF-8 sequences. (Issue #126-Telemetry). **Status: Implemented & Verified.**
 *   **Forensic Write Compression (R743)**: (Added Aug.07.04) The forensic spill-buffer MUST use a structural compression layer (V2 format). Entry size is strictly capped at 96 bytes. (Issue #743)
 *   **Startup I/O Stabilization (R104b)**: (Added Aug.07.06) Defer non-critical maintenance for 15,000ms after startup. (Issue #120b)
 *   **JdMbrain Namespace Integrity (R746)**: (Added Aug.07.06) JNI bridge MUST use `jdMbrain` namespace. (Issue #746)

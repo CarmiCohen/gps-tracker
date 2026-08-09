@@ -20,6 +20,8 @@ import kotlin.math.round
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
  * Aug.08.21:
+ * - Issue #126: Forensic Payload Overflow Audit. Implemented safe UTF-8 truncation 
+ *   to prevent corruption of multi-byte sequences at the 56-byte boundary (R126).
  * - Issue #125: Forensic Audit: Compression Parity Audit. Integrated gpsHardwareLock 
  *   into bit-packed flags (0x08) to maintain forensic parity (R125).
  * Aug.07.116:
@@ -199,13 +201,23 @@ class ForensicSpillBuffer @Inject constructor(
                 buffer.put(flags.toByte())
                 buffer.put(0.toByte()) // batteryLevel
                 
-                val msgBytes = entry.message.toByteArray(Charsets.UTF_8)
+                val rawBytes = entry.message.toByteArray(Charsets.UTF_8)
                 val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE - 36 - CHECKSUM_SIZE // 96 - 36 - 4 = 56
-                val msgLen = msgBytes.size.coerceAtMost(maxMsgLen)
+                
+                var msgLen = rawBytes.size.coerceAtMost(maxMsgLen)
+                
+                // Safe UTF-8 Truncation (Issue #126): Ensure we don't split a multi-byte sequence.
+                // In UTF-8, continuation bytes start with '10' in binary (0x80 to 0xBF).
+                if (msgLen < rawBytes.size) {
+                    while (msgLen > 0 && (rawBytes[msgLen].toInt() and 0xC0) == 0x80) {
+                        msgLen--
+                    }
+                }
+
                 buffer.put(msgLen.toByte())
                 buffer.put(0.toByte()) // Alignment padding
 
-                buffer.put(msgBytes, 0, msgLen)
+                buffer.put(rawBytes, 0, msgLen)
 
                 val crc = calculateEntryChecksumLocked(buffer, offset, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
                 buffer.putInt(offset + FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, crc.toInt())
