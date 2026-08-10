@@ -1,12 +1,13 @@
-# System Source of Truth (SoT) - Aug.10.23 (Metadata Pressure Hardened)
+# System Source of Truth (SoT) - Aug.10.24 (Storage Pruning Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
-*   **Forensic Metadata Pressure Hardening (R128)**: (Added Aug.10.23) The `TelemetryAggregator` MUST prevent "Aggregation Storms" during high-frequency IMU capture (e.g., 100Hz vibration). Aggregate ribbon scales (16M and above) MUST use stateful tick-gating to ensure O(1) emission per interval. The 4M scale MUST remain high-fidelity. Averaging operations (e.g., `proxIdx`) MUST be deferred to the write-path to minimize per-point arithmetic overhead (Issue #128-Sentinel). **Status: Implemented & Verified.**
-*   **Forensic Drain Latency Hardening (R127)**: (Added Aug.09.22) The `ForensicSpillBuffer` MUST ensure zero-lock contention during high-pressure spills. The `synchronized` critical sections MUST be limited to sub-millisecond memory copies. All expensive operations (UTF-8 processing, CRC calculation, and object instantiation) MUST occur outside the lock. Drain cycles MUST NOT exceed a 5ms stall threshold under 100Hz sampling (Issue #127-Telemetry). **Status: Implemented & Verified.**
-*   **Escalated GPS Revival (R124)**: (Updated Aug.07.07) If a GPS hardware stall is detected (R745), the system MUST trigger an escalated revival pulse every 120,000ms. If the fix is not recovered after 3 consecutive attempts, a `GPS_HARDWARE_LOCK` critical event MUST be emitted. (Issue #124-Revival).
-*   **Forensic Parity Audit (R125)**: (Added Aug.08.21) The forensic spill-buffer V2 format MUST include the `gpsHardwareLock` flag within the bit-packed flags byte (bit 0x08) to maintain state parity across the telemetry pipeline, database persistence, and remote reporting (Issue #125). **Status: Implemented & Verified.**
+*   **Forensic Storage Pruning Sensitivity (R129)**: (Added Aug.10.24) Database maintenance MUST be battery-aware to prevent I/O-induced power spikes during critical battery states. Pruning operations in `LogRepository` and `MainRepository` MUST be deferred or throttled when `isBatteryLow` or `isBatteryCritical` is detected. The system MUST prioritize battery preservation over background log cleanup unless `isStorageCritical` is also active (Issue #129-Sentinel). **Status: Implemented & Verified.**
+*   **Forensic Metadata Pressure Hardening (R128)**: (Added Aug.10.23) The `TelemetryAggregator` MUST prevent "Aggregation Storms" during high-frequency IMU capture. Aggregate ribbon scales (16M and above) MUST use stateful tick-gating. Averaging operations MUST be deferred to the write-path (Issue #128-Sentinel). **Status: Implemented & Verified.**
+*   **Forensic Drain Latency Hardening (R127)**: (Added Aug.09.22) The `ForensicSpillBuffer` MUST ensure zero-lock contention during high-pressure spills. Drain cycles MUST NOT exceed a 5ms stall threshold under 100Hz sampling (Issue #127-Telemetry). **Status: Implemented & Verified.**
+*   **Escalated GPS Revival (R124)**: (Updated Aug.07.07) If a GPS hardware stall is detected, the system MUST trigger an escalated revival pulse every 120,000ms. (Issue #124-Revival).
+*   **Forensic Parity Audit (R125)**: (Added Aug.08.21) The forensic spill-buffer V2 format MUST include the `gpsHardwareLock` flag within the bit-packed flags byte (bit 0x08) (Issue #125). **Status: Implemented & Verified.**
 *   **Forensic Payload Integrity (R126)**: (Added Aug.08.21) Diagnostic messages written to the forensic spill-buffer MUST be safely truncated to the 56-byte payload limit without corrupting multi-byte UTF-8 sequences. (Issue #126-Telemetry). **Status: Implemented & Verified.**
 *   **Forensic Write Compression (R743)**: (Added Aug.07.04) The forensic spill-buffer MUST use a structural compression layer (V2 format). Entry size is strictly capped at 96 bytes. (Issue #743)
 *   **Startup I/O Stabilization (R104b)**: (Added Aug.07.06) Defer non-critical maintenance for 15,000ms after startup. (Issue #120b)
@@ -25,5 +26,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) The historical resolution record MUST be synchronized across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.10.23.
+*   **Current Release**: Aug.10.24.
 *   **Source of Truth**: app/build.gradle versionName.

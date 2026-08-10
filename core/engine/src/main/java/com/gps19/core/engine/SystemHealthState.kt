@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Aug.10.24:
+ * - Issue #129: Forensic Storage Pruning Sensitivity. Added isBatteryLow and 
+ *   isBatteryCritical to support battery-aware adaptive pruning (R129).
  * Aug.07.127:
  * - Issue #124: GPS Hardware Revival Hardening (R124). Added gpsHardwareLock 
  *   to track critical hardware stall escalations.
@@ -100,7 +103,11 @@ class SystemHealthState(
     var sitDz: Double = 0.0,
     var sitBaro: Double = 0.0,
     var sitTilt: Double = 0.0,
-    var sitShock: Double = 0.0
+    var sitShock: Double = 0.0,
+
+    // Issue #129: Adaptive Pruning Sensitivity
+    var isBatteryLow: Boolean = false,
+    var isBatteryCritical: Boolean = false
 ) {
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
@@ -181,6 +188,8 @@ class SystemHealthState(
         this.sitBaro = other.sitBaro
         this.sitTilt = other.sitTilt
         this.sitShock = other.sitShock
+        this.isBatteryLow = other.isBatteryLow
+        this.isBatteryCritical = other.isBatteryCritical
     }
     
     fun update(
@@ -194,7 +203,8 @@ class SystemHealthState(
         netInterface: String, isStorageLow: Boolean, isStorageCritical: Boolean,
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
         cpuLoad: Double = 0.0, ioWait: Double = 0.0, forensicReliability: Double = 1.0,
-        vibration: Double = 0.0, storageAvailableMb: Long = 0L, storageTotalMb: Long = 0L
+        vibration: Double = 0.0, storageAvailableMb: Long = 0L, storageTotalMb: Long = 0L,
+        isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -233,6 +243,8 @@ class SystemHealthState(
         this.ioWait = ioWait
         this.forensicReliability = forensicReliability
         this.vibration = vibration
+        this.isBatteryLow = isBatteryLow
+        this.isBatteryCritical = isBatteryCritical
     }
 
     fun reset() {
@@ -314,5 +326,7 @@ class SystemHealthState(
         sitBaro = 0.0
         sitTilt = 0.0
         sitShock = 0.0
+        isBatteryLow = false
+        isBatteryCritical = false
     }
 }

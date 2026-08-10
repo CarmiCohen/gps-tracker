@@ -10,15 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.10.24:
+ * - Issue #129: Forensic Storage Pruning Sensitivity. Added isBatteryLow and 
+ *   isBatteryCritical to TrackerStatus for remote health visibility (R129).
  * Aug.08.21:
  * - Issue #125: Forensic Audit: Compression Parity Audit. Added gpsHardwareLock 
  *   to LogEntry to maintain forensic parity with the GPS hardware state (R125).
- * Aug.03.65:
- * - Issue #705: Forensic Audit: Trace Deduplication Performance Optimization. 
- *   Added spillIdx to LogEntry to support exactly-once forensic persistence (R705).
- * Aug.03.37:
- * - Issue #669: Forensic Audit: Database I/O Contention. Added reset() methods 
- *   to mutable state classes to support zero-churn UI state management (R668).
  */
 
 sealed class AppSensorEvent {
@@ -146,8 +143,8 @@ data class LogEntry(
     val maxAccuracy: Double = 0.0,
     val snrSnapshot: Double? = null,
     val vibeSnapshot: Double? = null,
-    val spillIdx: Int = -1, // Issue #705: Physical index in ForensicSpillBuffer
-    val gpsHardwareLock: Boolean = false // Issue #125: Hardware lock parity
+    val spillIdx: Int = -1,
+    val gpsHardwareLock: Boolean = false 
 ) {
     fun toJSONObject(): JSONObject {
         return JSONObject().apply {
@@ -300,7 +297,11 @@ data class TrackerStatus(
     val baroIdx: Double = 0.0,
     val micPending: Boolean = false,
     val kineticEnergy: Double = 0.0,
-    val isAdaptiveJump: Boolean = false
+    val isAdaptiveJump: Boolean = false,
+    
+    // Issue #129
+    val isBatteryLow: Boolean = false,
+    val isBatteryCritical: Boolean = false
 ) : SpatialAnchor {
 
     fun toMap(fromViewer: Boolean): Map<String, Any?> {
@@ -341,6 +342,8 @@ data class TrackerStatus(
             put("vertical_velocity", verticalVelocity)
             put("kinetic_energy", kineticEnergy)
             put("is_adaptive_jump", isAdaptiveJump)
+            put("is_battery_low", isBatteryLow)
+            put("is_battery_critical", isBatteryCritical)
         }
     }
 
@@ -464,7 +467,6 @@ data class AlarmInfo(val title: String, val subtitle: String, val type: String =
 
 /**
  * LocationState: Pure position data. Hardware/Health metadata moved to SystemHealthState.
- * Aug.01.10: Refactored to mutable class for zero-churn telemetry.
  */
 class LocationState(
     var lat: Double = 0.0,
@@ -584,7 +586,9 @@ data class DashboardState(
     val isLinkVisible: Boolean = true,   
     val isBatterySteepDischarge: Boolean = false, 
     val isCoolingModeActive: Boolean = false,
-    val trackerCurrentMa: String = "--"
+    val trackerCurrentMa: String = "--",
+    val isBatteryLow: Boolean = false,
+    val isBatteryCritical: Boolean = false
 )
 
 sealed class UiEvent {
@@ -686,7 +690,6 @@ sealed class UiCommand {
 
 /**
  * StatsState: Connectivity statistics.
- * Aug.01.10: Refactored to mutable class for zero-churn telemetry.
  */
 class StatsState(
     var totalConnectedMs: Long = 0L, var sessionConnectedMs: Long = 0L,
@@ -730,7 +733,6 @@ class StatsState(
 
 /**
  * BatteryState: Device battery and thermal status.
- * Aug.01.10: Refactored to mutable class for zero-churn telemetry.
  */
 class BatteryState(
     var level: Int = 100, var temp: Double = 0.0, var isCharging: Boolean = false, var isChargingStable: Boolean = false

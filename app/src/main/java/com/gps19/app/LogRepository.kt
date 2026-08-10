@@ -20,13 +20,13 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.10.24:
+ * - Issue #129: Forensic Storage Pruning Sensitivity. Refactored proactivePruning 
+ *   to be battery-aware, deferring I/O during critical battery states to prevent 
+ *   spikes and WAL checkpointing pressure (R129).
  * Aug.08.21:
  * - Issue #125: Forensic Audit: Compression Parity Audit. Updated mappings to 
  *   include gpsHardwareLock, ensuring persistence parity (R125).
- * Aug.05.120:
- * - Issue #735: Startup Davey Stall Remediation. Refactored to use 
- *   Provider<ForensicSpillBuffer> to defer MappedByteBuffer I/O until first 
- *   background access, clearing the main-thread startup critical path (R735).
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -293,7 +293,8 @@ class LogRepository @Inject constructor(
                                 count = entry.count, durationMs = entry.durationMs, isSpecial = entry.isSpecial,
                                 specialColor = entry.specialColor, role = entry.role, synced = initiallySynced,
                                 lat = entry.lat, lng = entry.lng, accuracy = entry.accuracy,
-                                maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
+                                maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot,
+                                vibeSnapshot = entry.vibeSnapshot,
                                 gpsHardwareLock = entry.gpsHardwareLock
                             ))
                             continue
@@ -407,9 +408,12 @@ class LogRepository @Inject constructor(
                 val health = telemetry.systemHealth.value
                 val count = logDao.getCount()
                 
+                // Issue #129: Refine threshold logic to defer pruning during battery pressure
                 val threshold = when {
                     health.isStorageCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
+                    health.isBatteryCritical -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING // Defer I/O spikes
                     health.isStorageLow -> ADAPTIVE_PRUNE_THRESHOLD_LOW
+                    health.isBatteryLow -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
                     health.isCharging && !health.isCoolingModeActive -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING
                     else -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
                 }
@@ -418,8 +422,16 @@ class LogRepository @Inject constructor(
                     val heartbeatTarget = if (health.isStorageLow) 50 else 100
                     val generalTarget = if (health.isStorageLow) 300 else 500
                     
+                    // Issue #129: Scale pruning intensity based on power state
+                    val maxChunks = when {
+                        health.isBatteryCritical -> 1
+                        health.isBatteryLow -> 2
+                        health.isStorageCritical -> 10
+                        else -> 5
+                    }
+                    
                     var totalPruned = 0
-                    repeat(5) { 
+                    repeat(maxChunks) { 
                         val p1 = logDao.pruneRoutineHeartbeatsChunk(heartbeatTarget, PRUNE_CHUNK_SIZE)
                         val p2 = logDao.pruneNonForensicLogsChunk(generalTarget, PRUNE_CHUNK_SIZE)
                         
@@ -431,7 +443,7 @@ class LogRepository @Inject constructor(
                         totalPruned += chunkPruned
                         
                         if (chunkPruned < PRUNE_CHUNK_SIZE) return@repeat 
-                        delay(50) 
+                        delay(if (health.isBatteryLow) 200 else 50) // Issue #129: Yield more under battery pressure
                     }
                     
                     if (totalPruned > 0) {

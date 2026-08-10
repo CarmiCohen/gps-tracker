@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.10.23)
+# Project Issues & Hardening Tracking (Aug.10.24)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,12 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 Action Required | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 568 |
+| **Resolved (Total)** | 🟢 Progress | 569 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #128-Sentinel] Aggregation Storm Risk**: `TelemetryAggregator` lacks a stateful tick-gate, causing redundant emissions and O(N) traversal overhead when multiple forensic points (e.g., 100Hz IMU) arrive within a single 2-second quantization window.
+*   **[Issue #130-Sentinel] Proto Health Parity**: `TrackerStatus.writeTo` does not yet include the `isBatteryLow` and `isBatteryCritical` flags in the Proto buffer serialization, as the Proto definition requires synchronization with this change.
 
 ---
 
@@ -21,7 +21,10 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.10.23)
+## 🟢 Recently Resolved Issues (Aug.10.24)
+*   **[Issue #129-Sentinel] [Severity: High] [Category: Storage] Forensic Storage Pruning Sensitivity.**
+    *   **Resolution**: Hardened database maintenance against battery-induced I/O spikes. Refactored `LogRepository.kt` and `MainRepository.kt` to be battery-aware, deferring or throttling pruning operations when `isBatteryLow` or `isBatteryCritical` is detected. Integrated battery pressure flags into `SystemHealthState` and `IntegrityMonitor` to ensure adaptive yielding during SQLite WAL checkpointing (R129).
+
 *   **[Issue #128-Sentinel] [Severity: High] [Category: Telemetry] Forensic Metadata Pressure Hardening.**
     *   **Resolution**: Hardened `TelemetryAggregator.kt` against high-frequency ribbon collisions. Implemented a stateful `lastEmittedTick` gate to prevent "Aggregation Storms" during 100Hz IMU spikes. Optimized O(N) traversal by caching `RibbonScale` entries and streamlining aggregation arithmetic (proxIdx averaging deferred to write-path). Verified 10ms processing threshold on A15-equivalent hardware (R128).
 
@@ -62,4 +65,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Fully transitioned the JNI bridge to the `jdMbrain` namespace to eliminate legacy log noise (`Can't load libmbrainSDK`) and avoid collisions with Samsung system libraries (R746).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.10.23)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.10.24)

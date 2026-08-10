@@ -17,14 +17,12 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Aug.10.24:
+ * - Issue #129: Forensic Storage Pruning Sensitivity. Refactored background 
+ *   pruning to be battery-aware, deferring maintenance during critical battery 
+ *   states to preserve power and reduce I/O spikes (R129).
  * Aug.04.115:
  * - Issue #729: Forensic Audit: Automated Database Integrity Validation. 
- *   Added checkDatabaseIntegrity() to expose PRAGMA integrity_check.
- * July.30.31:
- * - Issue #632: Analytical Ribbons: Recovery Markers. Mapped isRecoveryEvent 
- *   between ConnectionPoint and HistoryEntity.
- * July.30.29:
- * - Issue #631: Forensic UI: Service Blackout Trends. Exposed recovery stats flows.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -421,6 +419,13 @@ class MainRepository @Inject constructor(
     private fun triggerBackgroundPruning() {
         if (isPruningActive.getAndSet(true)) return
         
+        val health = telemetry.systemHealth.value
+        // Issue #129: Defer background maintenance during critical battery states
+        if (health.isBatteryCritical) {
+            isPruningActive.set(false)
+            return
+        }
+
         scope.launch {
             try {
                 LatencyMonitor.measureAndAudit(

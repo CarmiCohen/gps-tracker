@@ -26,12 +26,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.10.24:
+ * - Issue #129: Forensic Storage Pruning Sensitivity. Propagating isBatteryLow 
+ *   and isBatteryCritical flags to SystemHealthState (R129).
  * Aug.07.128:
  * - Issue #124-Revival: Functional Hardening (R124). Fixed missing health update 
  *   for gpsHardwareLock in handleRevivalEvent.
- * Aug.07.126:
- * - Issue #124-Revival: Functional Hardening (R124). Collecting revivalEvents 
- *   from GpsManager to surface GPS_HARDWARE_LOCK as a system violation.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -259,6 +259,8 @@ class IntegrityMonitor @Inject constructor(
             h.isCoolingModeActive = isCooling
             h.isBatterySteepDischarge = isSteepDischarge
             h.currentMa = status.currentMa
+            h.isBatteryLow = status.isLow
+            h.isBatteryCritical = status.isCritical
         }
     }
 

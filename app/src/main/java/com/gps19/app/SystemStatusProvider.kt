@@ -44,7 +44,9 @@ data class BatteryStatus(
     val level: Int,
     val temp: Double,
     val isCharging: Boolean,
-    val currentMa: Int = 0
+    val currentMa: Int = 0,
+    val isLow: Boolean = false,
+    val isCritical: Boolean = false
 )
 
 data class StorageStatus(
@@ -61,13 +63,13 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Aug.10.24:
+ * - Issue #129: Forensic Storage Pruning Sensitivity. Updated BatteryStatus to 
+ *   include pressure flags (isLow/isCritical) for adaptive pruning (R129).
  * Aug.07.05:
  * - Issue #745: Permission Detection Hardening. Reduced FORCED_REFRESH_COOLDOWN_MS 
  *   to 1000ms to ensure "Refresh" button in Setup is responsive (R745). Moved
  *   status data classes to top of file to resolve tool-specific compilation stalls.
- * Aug.04.114:
- * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Integrated 
- *   StorageStatsManager and implemented percentage-based pressure detection (R728).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -307,7 +309,11 @@ class SystemStatusProviderImpl @Inject constructor(
                 val currentMa = try {
                     batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) / 1000
                 } catch (e: Exception) { 0 }
-                trySend(BatteryStatus(pct, temp, isCharging, currentMa))
+                
+                val isLow = pct <= BATTERY_ALARM_THRESHOLD
+                val isCritical = pct <= CRITICAL_BATTERY_THRESHOLD
+                
+                trySend(BatteryStatus(pct, temp, isCharging, currentMa, isLow, isCritical))
             }
         }
         try {

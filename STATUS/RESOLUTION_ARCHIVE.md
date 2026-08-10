@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 568**
+**Total Unique Resolutions: 569**
+
+## 9. Forensic Storage Hardening (Aug.10.24)
+*   **Issue #129-Sentinel: Forensic Storage Pruning Sensitivity**.
+    *   **Resolution**: Hardened database maintenance against battery-induced I/O spikes. Refactored `LogRepository.kt` and `MainRepository.kt` to be battery-aware, deferring or throttling pruning operations when `isBatteryLow` or `isBatteryCritical` is detected. Integrated battery pressure flags into `SystemHealthState` and `IntegrityMonitor` to ensure adaptive yielding during SQLite WAL checkpointing (R129).
 
 ## 8. Forensic Telemetry & Metadata Hardening (Aug.10.23)
 *   **Issue #128-Sentinel: Forensic Metadata Pressure Hardening**.
