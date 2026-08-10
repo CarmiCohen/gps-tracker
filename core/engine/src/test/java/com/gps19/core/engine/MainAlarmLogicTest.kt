@@ -8,6 +8,9 @@ import java.util.*
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
+ * Aug.10.31:
+ * - Issue #133: Forensic Anomaly Correlation Engine. Added unit test for 
+ *   Silent Failure detection (R133).
  * Aug.04.55:
  * - Issue #716: Forensic Audit: Critical Battery Sentinel. Added unit test 
  *   for correlated steep discharge alerting (R716).
@@ -277,5 +280,47 @@ class MainAlarmLogicTest {
         assertTrue("Battery alert should trigger", alert?.conditionMet == true)
         assertTrue("Subtitle should indicate imminent shutdown", alert?.subtitle?.contains("IMMINENT SHUTDOWN") == true)
         assertTrue("Technical details should contain metrics", alert?.technicalDetails?.contains("Vibe: 0.50G") == true)
+    }
+
+    @Test
+    fun `Verify Silent Failure Correlation Detection`() {
+        val state = createDefaultState().apply {
+            health.gpsStalled = true
+            health.isTamperDetected = false
+            health.cpuLoad = 0.9    // Above 0.85 threshold
+            health.ioWait = 0.1
+        }
+        
+        // 1. Triggered by CPU Load
+        val report1 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, spikeLogger)
+        val alert1 = report1.reports.find { it.type == ALERT_ID_SILENT_FAILURE }
+        assertTrue("Silent Failure should trigger due to high CPU", alert1?.conditionMet == true)
+        assertTrue(alert1?.subtitle?.contains("CPU: 0.9") == true)
+
+        // 2. Triggered by IO Wait
+        state.health.cpuLoad = 0.5
+        state.health.ioWait = 0.5 // Above 0.40 threshold
+        val report2 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, spikeLogger)
+        val alert2 = report2.reports.find { it.type == ALERT_ID_SILENT_FAILURE }
+        assertTrue("Silent Failure should trigger due to high IOWait", alert2?.conditionMet == true)
+        assertTrue(alert2?.subtitle?.contains("IOW: 0.5") == true)
+
+        // 3. Triggered by IO Latency
+        state.health.ioWait = 0.1
+        state.health.maxIoLatency = 1000L // Above 800ms threshold
+        val report3 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report3, spikeLogger)
+        val alert3 = report3.reports.find { it.type == ALERT_ID_SILENT_FAILURE }
+        assertTrue("Silent Failure should trigger due to high IO Latency", alert3?.conditionMet == true)
+        assertTrue(alert3?.technicalDetails?.contains("1000ms") == true)
+
+        // 4. Suppressed by Tamper (Tamper takes precedence)
+        state.health.isTamperDetected = true
+        val report4 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report4, spikeLogger)
+        val alert4 = report4.reports.find { it.type == ALERT_ID_SILENT_FAILURE }
+        assertFalse("Silent Failure should be suppressed if tamper is detected", alert4?.conditionMet == true)
     }
 }

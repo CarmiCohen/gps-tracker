@@ -30,7 +30,7 @@ android {
         targetSdk = 35
         
         versionCode = getGitVersionCode()
-        versionName = "Aug.10.26"
+        versionName = "Aug.10.29"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

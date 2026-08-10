@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 573**
+**Total Unique Resolutions: 574**
+
+## 14. Forensic Pulse Hardening (Aug.10.29)
+*   **Issue #134-Sentinel: Forensic Pulse Frequency Hardening**.
+    *   **Resolution**: Implemented a high-frequency "Forensic Pulse" (10s) in `IntegrityMonitor` to reduce the latency of "Silent Failure" detection (CPU/IO correlation). Added `FORENSIC_PULSE_INTERVAL_MS` to `EngineConstants.kt` and updated the heartbeat loop. Maintained legacy 3-minute thresholds for reactive flow stall detection using `INTEGRITY_HEARTBEAT_INTERVAL_MS` logic (R134).
 
 ## 13. Forensic Anomaly Correlation (Aug.10.28)
 *   **Issue #133-Sentinel: Forensic Anomaly Correlation Engine (Silent Failure Detection)**.

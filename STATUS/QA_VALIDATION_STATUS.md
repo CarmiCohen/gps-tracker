@@ -1,13 +1,23 @@
-# QA Validation Status (July.23.11)
+# QA Validation Status (Aug.10.29)
 
 This document tracks the verification status of all hardening and logic refinements.
 
 ## 🏁 Validation Dashboard
 | Category | Passed | Pending | Failed |
 | :--- | :--- | :--- | :--- |
-| **Logic Refinement** | 18 | 0 | 0 |
+| **Logic Refinement** | 18 | 2 | 0 |
 | **Hardware Compatibility** | 10 | 0 | 0 |
 | **Stability / Long-Run** | 7 | 0 | 0 |
+| **UI / UX** | 0 | 1 | 0 |
+
+---
+
+## 🟡 Pending Validation (Aug.10.29)
+| ID | Feature | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| **R133** | **Anomaly Correlation Engine** | **Pending** | Awaiting stress test verification of CPU/IO correlation logic (Silent Failure Detection). |
+| **R134** | **Forensic Pulse Hardening** | **Pending** | Verify 10s interval stability and impact on low-power states. |
+| **R132** | **Forensic UI Metrics** | **Pending** | Verify real-time trend rendering for cpuLoad and ioWait in Dashboard. |
 
 ---
 

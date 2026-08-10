@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Aug.10.30:
+ * - Issue #133: Forensic Anomaly Correlation Engine. Integrated ALERT_ID_SILENT_FAILURE 
+ *   into violation engine via SentinelValidator.isSilentFailure (R133).
  * Aug.07.08:
  * - Issue #124: GPS Hardware Revival Hardening (R124). Integrated
  *   ALERT_ID_GPS_HARDWARE_LOCK into violation detection engine.
@@ -462,6 +465,27 @@ object MainAlarmLogic {
                 subtitle = if (isForensicSustained) "Forensic persistence reliability on this device is low (${String.format(Locale.getDefault(), "%.2f", health.forensicReliability)})" else "Forensic persistence on this device is OK",
                 conditionMet = isForensicSustained,
                 extremeValue = 1.0 - health.forensicReliability
+            )
+
+            // Issue #133: Forensic Anomaly Correlation (Silent Failure)
+            val isSilentFailure = SentinelValidator.isSilentFailure(
+                gpsStalled = health.gpsStalled,
+                isTamperDetected = health.isTamperDetected,
+                cpuLoad = health.cpuLoad,
+                ioWait = health.ioWait,
+                maxIoLatency = health.maxIoLatency
+            )
+
+            val silentSubtitle = if (isSilentFailure) {
+                "GPS stall correlated with high hardware load (CPU: %.1f, IOW: %.1f)".format(health.cpuLoad, health.ioWait)
+            } else "Forensic health on this device is OK"
+
+            report.getOrCreate(reportIdx++).update(
+                type = ALERT_ID_SILENT_FAILURE,
+                title = getTrackerTitleCached(isTracker, ALERT_TITLE_SILENT_FAILURE),
+                subtitle = silentSubtitle,
+                conditionMet = isSilentFailure,
+                technicalDetails = if (isSilentFailure) "IO Latency: %dms".format(health.maxIoLatency) else null
             )
 
             report.truncate(reportIdx)

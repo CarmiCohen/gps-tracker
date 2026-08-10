@@ -1,47 +1,40 @@
-# Handover (Aug.10.28) - Forensic Anomaly Correlation Engine Complete
+# Handover (Aug.10.30) - ANR Identified
 
-## 🎯 Next Objective: [Issue #134-Sentinel] Forensic Pulse Frequency Hardening.
-- **Goal**: Implement a high-frequency "Forensic Pulse" (e.g., 10s) for resource-critical correlations to reduce the latency of "Silent Failure" detection.
-- **Context**: The current 60s `IntegrityMonitor` heartbeat may delay detection of transient load-correlated stalls. Hardening this interval ensures more responsive forensic alerting.
+## 🎯 Next Objective: [Issue #135] UI Davey/ANR Mitigation for Settings Transition.
+- **Goal**: Remediate the application unresponsiveness (ANR) occurring when opening the Settings Overlay on Samsung A15 (budget hardware).
+- **Context**: Tapping the gear icon triggers a main-thread stall (>1700ms) leading to an OS ANR dialog. Likely caused by main-thread contention between telemetry flow updates and complex UI recomposition.
 
-## 🆕 Recent Architectural Hardening (Issue #133 Resolved)
-- **Anomaly Correlation Engine (R133)**: Implemented cross-domain correlation between location stability and system resource stress.
-    - **Logic**: Added `isSilentFailure` detection to identify stalls driven by CPU/IO exhaustion (>85% CPU or >800ms IO Latency).
-    - **Persistence**: Ensured the anomaly flag is aggregated into forensic ribbons and persisted in historical records.
-    - **Signaling**: Updated Protobuf and app models to propagate the `isSilentFailure` state for remote diagnostics.
-    - **UX**: Integrated the anomaly indicator into the Forensic Dashboard for immediate auditing.
-- **System Version**: Incremented to **Aug.10.28**.
+## 🆕 Recent Architectural Monitoring (Issue #135 Identified)
+- **Observed**: ANR detected during UI exercise on Samsung A15. Logcat indicates frame skips (>150ms) and GC pressure during the transition to `SettingsOverlay`.
+- **System Version**: Incremented to **Aug.10.30**.
 
 ## 🏗️ Forensic Dashboard Architecture
-The system now provides a unified, correlation-ready view of device health:
-1.  **Hardware Health**: Battery temperature, current (mA), and charging stability.
-2.  **Execution Quality**: CPU Load, I/O Wait, Peak I/O Latency, and load-correlated failure state (Issue #133).
-3.  **Sensor Fidelity**: IMU (Vibration/Kinetic), Baro, Lux, and Proximity indices.
-4.  **Connectivity**: RTT, Signal Strength, and Relay Handshake status.
+The system provides a unified view of device health:
+1.  **High-Frequency Audit**: CPU, I/O, and Latency checked every 10s (R134).
+2.  **Hardware Health**: Battery temperature and charging stability monitored reactively.
+3.  **Silent Failure Correlation**: Cross-domain detection of location stalls vs. hardware stress (R133).
 
-## 🔍 Forensic Subsystem State (vAug.10.28)
+## 🔍 Forensic Subsystem State (vAug.10.30)
 | Component | Status | Logic / Technical Detail |
 | :--- | :--- | :--- |
-| **Correlation** | 🟢 **STABLE** | **R133**: Load-correlated "Silent Failure" detection implemented. |
-| **UI/UX** | 🟢 **STABLE** | **R132**: Dashboards and Ribbons include performance auditing. |
-| **Performance** | 🟢 **STABLE** | **R131**: Peak I/O auditing; A15 spike detection (>1s). |
-| **Telemetry** | 🟢 **STABLE** | **R130**: Proto health parity; full-stack flag propagation. |
+| **Integrity Loop** | 🟢 **STABLE** | R134: 10s Forensic Pulse implemented. |
+| **Correlation** | 🟢 **STABLE** | R133: Load-correlated "Silent Failure" detection. |
+| **UI Responsiveness**| 🔴 **FAILING**| **Issue #135**: ANR during Settings transition on A15. |
 
 ## 📊 Status Tracker
-- **[Issue #133-Sentinel] Anomaly Correlation Engine**: 🟢 Resolved. (R133)
-- **[Issue #132-Sentinel] Forensic UI Refinement**: 🟢 Resolved. (R132)
-- **Total Unique Resolutions**: 573 (Verified in `RESOLUTION_ARCHIVE.md` and `issues.md`).
+- **[Issue #135] UI Davey/ANR during Settings Overlay Transition**: 🔴 Identified / In Progress.
+- **Total Unique Resolutions**: 574 (Verified in `RESOLUTION_ARCHIVE.md` and `issues.md`).
 
 ## ⚠️ Newly Identified Risks
-- **[Issue #134-Sentinel] Silent Failure Detection Latency**: The 60s integrity heartbeat may delay correlation of transient spikes. Requires a dedicated high-frequency forensic pulse.
+- **[Issue #135] UI Contention**: Heavy telemetry flow sampling (even at 5s) combined with complex overlay composition exceeds budget CPU/Main-thread budget on A15.
 
 ## 🛠️ Git Release Preparation
 ```bash
 git add .
-git commit -m "release: Aug.10.28 - Forensic Anomaly Correlation Engine (Issue #133)"
-git tag -a vAug.10.28 -m "Implemented cross-domain correlation between location stalls and hardware resource stress (CPU/IO)."
+git commit -m "release: Aug.10.30 - Identify Settings ANR on A15 hardware (Issue #135)"
+git tag -a vAug.10.30 -m "Documented high-severity ANR risk during settings transition on budget hardware (R135)."
 git push origin main --tags
 ```
 
-**Status**: R133 COMPLETE. Forensic Engine now correlates location health with system load.
-vAug.10.28
+**Status**: Issue #135 documented. Ready for remediation.
+vAug.10.30

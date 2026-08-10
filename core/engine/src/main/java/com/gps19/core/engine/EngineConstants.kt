@@ -2,17 +2,15 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.10.29:
+ * - Issue #134: Forensic Pulse Frequency Hardening. Added FORENSIC_PULSE_INTERVAL_MS (10s) 
+ *   for high-frequency anomaly detection (R134).
  * Aug.10.27:
  * - Issue #133: Forensic Anomaly Correlation Engine. Added thresholds for 
  *   Silent Failure detection (CPU/IO/Latency correlation) (R133).
  * Aug.10.27:
  * - Issue #132: Forensic UI Dashboard Refinement. Added ribbon scaling constants 
  *   for CPU, I/O, and Latency trends (R132).
- * Aug.08.21:
- * - Issue #125: Forensic Audit: Compression Parity Audit. Added 
- *   FORENSIC_PINK_COLOR and synchronized hardware suppression constants (R125).
- * Aug.07.119:
- * - Issue #124: GPS Hardware Revival Hardening (R124).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -46,8 +44,8 @@ const val LOG_BUFFER_CAPACITY = 500
 
 // Issue #669: Forensic Spill-Buffer (MappedByteBuffer)
 const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"
-const val FORENSIC_SPILL_ENTRY_SIZE = 96 // Issue #743: Reduced to 96 bytes for IO optimization
-const val FORENSIC_SPILL_CAPACITY = 3000   // Issue #743: Increased capacity within 288KB footprint
+const val FORENSIC_SPILL_ENTRY_SIZE = 96 
+const val FORENSIC_SPILL_CAPACITY = 3000   
 const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
 const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 500L
 const val FORENSIC_DRAIN_THROTTLE_MAX_MS = 5000L
@@ -433,6 +431,7 @@ const val SIREN_RESUME_COOLDOWN_MS = 15000L
 const val ALARM_OVERLAY_THROTTLE_MS = 30000L
 const val HEARTBEAT_INTERVAL_MS = 360000L
 const val INTEGRITY_HEARTBEAT_INTERVAL_MS = 60000L
+const val FORENSIC_PULSE_INTERVAL_MS = 10000L
 
 // UI Health & Visibility
 const val WATCH_DOG_UI_GRACE_MS = 15000L 

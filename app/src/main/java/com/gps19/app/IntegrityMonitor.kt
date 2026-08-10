@@ -26,12 +26,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.10.29:
+ * - Issue #134: Forensic Pulse Frequency Hardening. Increased heartbeat frequency 
+ *   to 10s (FORENSIC_PULSE_INTERVAL_MS) for low-latency anomaly detection (R134).
  * Aug.10.28:
  * - Issue #133: Forensic Anomaly Correlation Engine. Integrated isSilentFailure 
  *   detection into performIntegrityHeartbeat (R133).
- * Aug.10.26:
- * - Issue #131: Forensic Performance Audit. Integrated maxIoLatency collection 
- *   into performIntegrityHeartbeat for budget hardware (A15) diagnostics (R131).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -151,13 +151,14 @@ class IntegrityMonitor @Inject constructor(
             delay(BOOTSTRAP_PHASE_MS)
             while (isActive) {
                 performIntegrityHeartbeat()
-                delay(INTEGRITY_HEARTBEAT_INTERVAL_MS)
+                delay(FORENSIC_PULSE_INTERVAL_MS)
             }
         }
     }
 
     private suspend fun performIntegrityHeartbeat() {
         val nowRt = timeProvider.elapsedRealtime()
+        // Issue #134: Keep stall detection at 3-min threshold using the legacy interval constant
         val storageStalled = lastStorageUpdateRt > 0 && (nowRt - lastStorageUpdateRt) > INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
         val powerStalled = lastPowerUpdateRt > 0 && (nowRt - lastPowerUpdateRt) > INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
         val locationStalled = lastLocationStatusUpdateRt > 0 && (nowRt - lastLocationStatusUpdateRt) > 30000L
