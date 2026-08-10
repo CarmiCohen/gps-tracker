@@ -32,15 +32,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Aug.10.31:
+ * - Issue #135: UI Davey/ANR Mitigation. Refactored SettingsOverlay call site 
+ *   to pass decomposed primitive parameters (R135).
  * Aug.10.26:
  * - Issue #132: Forensic UI Dashboard Refinement. Passed cpuLoad, ioWait, 
  *   and maxIoLatency to TelemetryBox (R132).
- * Aug.10.24:
- * - Issue #130: Proto Health Parity. Passed isBatteryLow and isBatteryCritical to TelemetryBox.
- * Aug.07.00:
- * - Issue #741: Dashboard & TelemetryBox Recomposition Audit. Refactored TrackerDashboard 
- *   to take fully decomposed primitive parameters instead of monolithic DashboardState (R736).
- *   Hoisted Flow collectors to screen level to optimize recomposition performance.
  */
 
 @Composable
@@ -472,7 +469,15 @@ fun TrackerScreen(
 
         if (isSettingsOpen) {
             SettingsOverlay(
-                uiState = uiState, diagnosticState = diagnosticState, onClose = onToggleSettings, onReset = onResetStats,
+                activeSubSettings = uiState.navigation.activeSubSettings,
+                draftDeviceId = uiState.draftSettings.deviceId,
+                draftViewerId = uiState.draftSettings.viewerId,
+                draftRelayUrl = uiState.draftSettings.relayUrl,
+                draftMaxDistance = uiState.draftSettings.maxDistance,
+                draftAlertSettings = uiState.draftSettings.alertSettings,
+                selectedSirenType = uiState.selectedSirenType,
+                isSirenPlaying = diagnosticState.isSirenPlaying,
+                onClose = onToggleSettings, onReset = onResetStats,
                 onExport = onExportLogs, onClear = onClearHome, onImportConfig = onImportConfig,
                 onFullInitialization = { viewModel.fullInitialization(context) },
                 onUpdateDeviceId = { viewModel.onEvent(UiEvent.UpdateDraftDeviceId(it)) },
@@ -497,7 +502,7 @@ fun TrackerScreen(
                     }
                 },
                 onShowPhoneSetup = { viewModel.onEvent(UiEvent.TogglePhoneSetup(true)) },
-                viewModel = viewModel
+                onEvent = { viewModel.onEvent(it) }
             )
         } else if (isLogVisible) {
             val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()

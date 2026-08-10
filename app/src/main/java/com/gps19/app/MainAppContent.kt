@@ -44,10 +44,12 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * July.30.47:
+ * Aug.10.31:
+ * - Issue #135: UI Davey/ANR Mitigation. Refactored DiagnosticsScreen and 
+ *   PhoneSetupOverlay call sites to pass decomposed parameters (R135).
+ * Aug.10.29:
  * - Issue #658: Performance: Startup Transition Hardening. Implemented R658 by 
- *   replacing LANDING_PAGE_PAUSE_MS with STARTUP_SETTLING_DELAY_MS (3000ms) 
- *   for automatic restoration to eliminate transition Davey stalls.
+ *   replacing LANDING_PAGE_PAUSE_MS with STARTUP_SETTLING_DELAY_MS (3000ms).
  */
 @Composable
 fun MainAppContent(
@@ -58,6 +60,7 @@ fun MainAppContent(
     onRequestBatteryExemption: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onRequestAppInfo: () -> Unit,
+    onRequestAppInfoForMode: (String) -> Unit = {},
     onRequestExactAlarm: () -> Unit,
     onRequestHardwarePermission: () -> Unit,
     onStopTracking: () -> Unit
@@ -175,7 +178,6 @@ fun MainAppContent(
         if (mode != null) {
             if (navController.currentDestination?.route == Screen.Landing.route && !isManualSelectionInProgress) {
                 if (hasRequiredPermissions(mode)) {
-                    // Issue #658: Use STARTUP_SETTLING_DELAY_MS (3000ms) to ensure activity transition is silent.
                     Timber.d("Automatic restoration: waiting ${STARTUP_SETTLING_DELAY_MS}ms")
                     delay(STARTUP_SETTLING_DELAY_MS)
                     onStartService(mode)
@@ -358,8 +360,12 @@ fun MainAppContent(
                     composable(Screen.Diagnostics.route) {
                         BackHandler { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) }
                         DiagnosticsScreen(
-                            viewModel = viewModel,
+                            permissions = uiState.permissions,
+                            recoveryCount = diagnosticState.recoveryCount,
+                            cumulativeRecoveryBlackoutMs = diagnosticState.cumulativeRecoveryBlackoutMs,
                             onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
+                            onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
+                            onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                             onRequestBatteryExemption = onRequestBatteryExemption,
                             onRequestOverlayPermission = onRequestOverlayPermission,
                             onRequestAppInfo = onRequestAppInfo,

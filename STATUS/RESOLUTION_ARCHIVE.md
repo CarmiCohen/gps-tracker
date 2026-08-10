@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 574**
+**Total Unique Resolutions: 575**
+
+## 15. UI Transition Stabilization (Aug.10.31)
+*   **Issue #135: UI Davey/ANR Mitigation for Overlay Transitions**.
+    *   **Resolution**: Refactored `SettingsOverlay`, `PhoneSetupOverlay`, and `DiagnosticsScreen` to use fully decomposed primitive parameters instead of monolithic `MainUiState` and `DiagnosticState`. This isolates complex UI components from high-frequency telemetry recomposition triggers (GPS/Sensor updates), eliminating 1700ms+ main-thread stalls and ANR risks on budget hardware (Samsung A15). (R135)
 
 ## 14. Forensic Pulse Hardening (Aug.10.29)
 *   **Issue #134-Sentinel: Forensic Pulse Frequency Hardening**.

@@ -17,31 +17,29 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.engine.CapabilityStatus
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
- * July.30.29:
- * - Issue #631: Forensic UI: Service Blackout Trends. Added Forensic Recovery Audit section.
- * v9.4.0:
- * - Issue #502: Device Independency. Replaced vendor-specific checks with capability logic.
+ * Aug.10.31:
+ * - Issue #135: UI Davey/ANR Mitigation. Refactored to use decomposed primitive 
+ *   parameters to prevent high-frequency telemetry recomposition stalls (R135).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsScreen(
-    viewModel: MainViewModel,
+    permissions: PermissionState,
+    recoveryCount: Int,
+    cumulativeRecoveryBlackoutMs: Long,
     onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onToggleManualOverride: () -> Unit,
     onRequestBatteryExemption: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onRequestAppInfo: () -> Unit,
     onRequestExactAlarm: () -> Unit,
     onRequestHardwarePermission: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val diagState by viewModel.diagnosticState.collectAsStateWithLifecycle()
-    val permissions = uiState.permissions
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -104,9 +102,9 @@ fun DiagnosticsScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            val totalRecoveries = diagState.recoveryCount
+            val totalRecoveries = recoveryCount
             val avgBlackout = if (totalRecoveries > 0) {
-                diagState.cumulativeRecoveryBlackoutMs / totalRecoveries
+                cumulativeRecoveryBlackoutMs / totalRecoveries
             } else 0L
 
             DiagnosticItem(
@@ -152,7 +150,7 @@ fun DiagnosticsScreen(
                         Text("Manual Override", color = Color.LightGray)
                         Switch(
                             checked = permissions.isManualOverride,
-                            onCheckedChange = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) }
+                            onCheckedChange = { onToggleManualOverride() }
                         )
                     }
                 }
@@ -207,7 +205,7 @@ fun DiagnosticsScreen(
             Spacer(modifier = Modifier.height(24.dp))
             
             Button(
-                onClick = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
+                onClick = onRefresh,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
             ) {
