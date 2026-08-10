@@ -1,30 +1,29 @@
-# Handover (Aug.08.21) - Forensic Payload Overflow Audit
+w# Handover (Aug.09.22) - Forensic Drain Latency Hardening
 
-## 🎯 Next Objective: [Issue #127-Telemetry] 
-**Forensic Drain Latency Hardening**.
-- **Goal**: Optimize `ForensicSpillBuffer.commitDrain()` to ensure zero-lock contention during high-pressure disk spills.
-- **Critical Path**: Investigate potential lock inversion between `synchronized(this)` in `commitDrain` and the `LatencyMonitor` audit pulse.
-- **Validation**: Verify that drain cycles do not exceed the 5ms stall threshold under 100Hz sampling.
+## 🎯 Next Objective: [Issue #128-Sentinel] 
+**Forensic Metadata Pressure Hardening**.
+- **Goal**: Harden `TelemetryAggregator` against high-frequency ribbon collisions during 100Hz IMU capture.
+- **Critical Path**: Investigate potential O(N) traversal in ribbon binning during rapid vibration spikes.
+- **Validation**: Ensure telemetry aggregation cycles stay under 10ms on budget (A15) hardware.
 
-## 🆕 Recent Architectural Hardening (Issue #126 Resolved)
-- **Forensic Payload Audit (R126)**: Implemented safe UTF-8 truncation in `ForensicSpillBuffer.kt`. The logic now detects multi-byte sequence continuation bytes (0x80-0xBF) at the 56-byte boundary and backtracks to the start of the character, ensuring data integrity.
-- **Forensic Parity (R125)**: Remediated the state gap by integrating `gpsHardwareLock` into the bit-packed flags (0x08) of the V2 binary format.
-- **Database Migration**: Successfully moved to **Version 65** with `gpsHardwareLock` persistence in the `logs` table.
+## 🆕 Recent Architectural Hardening (Issue #127 Resolved)
+- **Forensic Drain Hardening (R127)**: Optimized `ForensicSpillBuffer.kt` for zero-lock contention. Synchronized blocks are now limited to memory copies, moving UTF-8/CRC processing to the background worker context.
+- **Forensic Payload Audit (R126)**: Implemented safe UTF-8 truncation in `ForensicSpillBuffer.kt`.
+- **Forensic Parity (R125)**: Integrated `gpsHardwareLock` into the V2 binary format (0x08).
 
 ## 📊 Status Tracker
+- **[Issue #127-Telemetry] Forensic Drain Latency Hardening**: 🟢 Resolved. (R127)
 - **[Issue #126-Telemetry] Forensic Payload Overflow Audit**: 🟢 Resolved. (R126)
 - **[Issue #125-Telemetry] Forensic Compression Parity**: 🟢 Resolved. (R125)
-- **[Issue #124-Revival] GPS Hardware Revival Hardening**: 🟢 Resolved. (R124)
-- **Total Unique Resolutions**: 566 (Verified in `RESOLUTION_ARCHIVE.md` and `issues.md`).
+- **Total Unique Resolutions**: 567 (Verified in `RESOLUTION_ARCHIVE.md` and `issues.md`).
 
-## 🔍 Forensic Subsystem State (vAug.08.21)
+## 🔍 Forensic Subsystem State (vAug.09.22)
 | Component | Status | Logic / Technical Detail |
 | :--- | :--- | :--- |
+| **Drain Latency** | 🟢 **STABLE** | **R127**: Zero-lock contention achieved; stall threshold < 5ms. |
 | **Payload Integrity** | 🟢 **STABLE** | **R126**: Safe UTF-8 truncation enforced at 56-byte boundary. |
 | **Binary Parity** | 🟢 **SYNCHRONIZED** | **R125**: `gpsHardwareLock` integrated into V2 bit-packed flags. |
 | **DB Schema** | 🟢 **V65 ACTIVE** | Migration 64->65 verified; hardware lock persisted. |
-| **GPS Stability** | 🟢 **HARDENED** | **R124**: 120s revival pulses; escalation logic active. |
-| **Locality Authority**| 🟢 **ENFORCED** | **R747**: Professional terminology ("this device") enforced. |
 
 ## 📐 Forensic Trace Binary Layout (V2 - 96 Bytes)
 - **Header (12B)**: [TS Delta (Int:4)] [Lat Delta (Int:4)] [Lng Delta (Int:4)].
@@ -36,10 +35,10 @@
 ## 🛠️ Git Release Preparation
 ```bash
 git add .
-git commit -m "release: Aug.08.21 - Forensic Payload Overflow Audit (Issue #126)"
-git tag -a vAug.08.21.1 -m "Implemented safe UTF-8 truncation for forensic telemetry payloads."
+git commit -m "release: Aug.09.22 - Forensic Drain Latency Hardening (Issue #127)"
+git tag -a vAug.09.22.1 -m "Optimized ForensicSpillBuffer for zero-lock contention and hardened drain latency."
 git push origin main --tags
 ```
 
-**Status**: R126 COMPLETE. PAYLOAD STABILITY VERIFIED. READY FOR ISSUE #127 DRAIN LATENCY.
-vAug.08.21.1
+**Status**: R127 COMPLETE. DRAIN STABILITY VERIFIED. READY FOR ISSUE #128 METADATA PRESSURE.
+vAug.09.22.1

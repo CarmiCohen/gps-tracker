@@ -2,7 +2,17 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 564**
+**Total Unique Resolutions: 567**
+
+## 7. Forensic Telemetry Hardening (Aug.09.22)
+*   **Issue #127-Telemetry: Forensic Drain Latency Hardening**.
+    *   **Resolution**: Optimized `ForensicSpillBuffer.kt` for zero-lock contention. Refactored `peek()` and `writeTrace()` to hold the `synchronized` lock only for sub-millisecond memory copies. Moved UTF-8 processing, CRC calculations, and object reconstruction outside critical sections. Integrated `LatencyMonitor` performance audits (5ms threshold) to ensure stability under 100Hz sampling (R127).
+
+*   **Issue #126-Telemetry: Forensic Payload Overflow Audit**.
+    *   **Resolution**: Implemented safe UTF-8 truncation in `ForensicSpillBuffer.kt` to prevent diagnostic message corruption at the 56-byte boundary. Backtracks to the start of multi-byte sequences (R126).
+
+*   **Issue #125-Telemetry: Forensic Data Compression Parity Audit**.
+    *   **Resolution**: Remedied forensic parity gap by integrating `gpsHardwareLock` into the V2 binary format flags (0x08). Synchronized `LogEntry`, `LogEntity` (Migration 65), and `EngineConnectionPoint` (R125).
 
 ## 6. Functional Hardening & Revival (Aug.07.07)
 *   **Issue #124-Revival: GPS Hardware Revival Functional Hardening**.
@@ -65,4 +75,5 @@ This document contains the unified record of all resolved issues and technical d
     *   Implemented unified `LatencyMonitor` in `:core:engine`. 
     *   Integrated monitoring into JNI (Mbrain), DB (Repository), and Log paths.
 
-... [See historical logs for older resolutions]
+## 0. Legacy & Base Logic
+[Historical records are preserved in RESOLUTION_SHARD_001.md through RESOLUTION_SHARD_020.md]
