@@ -2,6 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.10.27:
+ * - Issue #133: Forensic Anomaly Correlation Engine. Added thresholds for 
+ *   Silent Failure detection (CPU/IO/Latency correlation) (R133).
+ * Aug.10.27:
+ * - Issue #132: Forensic UI Dashboard Refinement. Added ribbon scaling constants 
+ *   for CPU, I/O, and Latency trends (R132).
  * Aug.08.21:
  * - Issue #125: Forensic Audit: Compression Parity Audit. Added 
  *   FORENSIC_PINK_COLOR and synchronized hardware suppression constants (R125).
@@ -27,6 +33,11 @@ const val LOG_LATENCY_THRESHOLD_MS = 1000L
 const val LOG_RETRIEVAL_THRESHOLD_MS = 500L
 const val LOG_LIMIT_STANDARD = 1000
 const val LOG_LIMIT_STRICT = 5000
+
+// Issue #133: Silent Failure Correlation Thresholds
+const val SILENT_FAILURE_CPU_THRESHOLD = 0.85
+const val SILENT_FAILURE_IOW_THRESHOLD = 0.40
+const val SILENT_FAILURE_LATENCY_THRESHOLD_MS = 800L
 
 // Issue #660: Forensic Audit: Log Buffer Pressure
 const val LOG_BATCH_SIZE = 50
@@ -316,6 +327,9 @@ const val RIBBON_SNR_SCALE_DB = 45.0
 const val RIBBON_CURRENT_SCALE_MA = 1000.0
 const val RIBBON_SIT_TILT_SCALE_DEG = 15.0
 const val RIBBON_SIT_BARO_SCALE_METERS = 2.0
+const val RIBBON_CPU_LOAD_SCALE = 1.0
+const val RIBBON_IO_WAIT_SCALE = 1.0
+const val RIBBON_LATENCY_SCALE_MS = 1000.0
 
 const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 const val MAX_BACKFILL_POINTS = 1000
@@ -375,6 +389,7 @@ const val ALERT_ID_HARDWARE_CONFIGURATION = "HARDWARE_CONFIG_MISSING"
 const val ALERT_ID_PERFORMANCE_SPIKE = "PERFORMANCE_SPIKE"
 const val ALERT_ID_FORENSIC_OVERFLOW = "FORENSIC_OVERFLOW"
 const val ALERT_ID_GPS_HARDWARE_LOCK = "GPS_HARDWARE_LOCK"
+const val ALERT_ID_SILENT_FAILURE = "SILENT_FAILURE"
 
 // Alert Titles (R747 Standardized)
 const val ALERT_TITLE_LOCAL_INTERNET = "This device: Internet Lost"
@@ -403,6 +418,7 @@ const val ALERT_TITLE_HARDWARE_CONFIGURATION = "This device: Hardware Config"
 const val ALERT_TITLE_PERFORMANCE_SPIKE = "This device: Performance Warning"
 const val ALERT_TITLE_FORENSIC_OVERFLOW = "This device: Forensic Buffer Overflow"
 const val ALERT_TITLE_GPS_HARDWARE_LOCK = "This device: GPS Hardware Lock"
+const val ALERT_TITLE_SILENT_FAILURE = "Forensic: Silent Failure"
 
 // System Watchdog & Grace Periods
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L

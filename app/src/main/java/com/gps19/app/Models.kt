@@ -10,14 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * Aug.10.24:
- * - Issue #130: Proto Health Parity. Synchronized RealtimeStatus writeTo with 
- *   isBatteryLow and isBatteryCritical flags (R130).
- * - Issue #129: Forensic Storage Pruning Sensitivity. Added isBatteryLow and 
- *   isBatteryCritical to TrackerStatus for remote health visibility (R129).
- * Aug.08.21:
- * - Issue #125: Forensic Audit: Compression Parity Audit. Added gpsHardwareLock 
- *   to LogEntry to maintain forensic parity with the GPS hardware state (R125).
+ * Aug.10.28:
+ * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure to 
+ *   ConnectionPoint and DashboardState for load-correlated anomaly tracking (R133).
+ * Aug.10.27:
+ * - Issue #132: Forensic UI Dashboard Refinement. Added cpuLoad, ioWait, and 
+ *   maxIoLatency to ConnectionPoint to support trend visualization (R132).
  */
 
 sealed class AppSensorEvent {
@@ -118,7 +116,15 @@ data class ConnectionPoint(
     val sitBaro: Double = 0.0,
     val sitTilt: Double = 0.0,
     val sitShock: Double = 0.0,
-    val kineticEnergy: Double = 0.0
+    val kineticEnergy: Double = 0.0,
+
+    // Performance & Load Correlation (Issue #132)
+    val cpuLoad: Double = 0.0,
+    val ioWait: Double = 0.0,
+    val maxIoLatency: Long = 0L,
+
+    // Anomaly Correlation (Issue #133)
+    val isSilentFailure: Boolean = false
 )
 
 data class ViolationPoint(
@@ -302,10 +308,9 @@ data class TrackerStatus(
     val micPending: Boolean = false,
     val kineticEnergy: Double = 0.0,
     val isAdaptiveJump: Boolean = false,
-    
-    // Issue #129
     val isBatteryLow: Boolean = false,
-    val isBatteryCritical: Boolean = false
+    val isBatteryCritical: Boolean = false,
+    val isSilentFailure: Boolean = false
 ) : SpatialAnchor {
 
     fun toMap(fromViewer: Boolean): Map<String, Any?> {
@@ -348,6 +353,7 @@ data class TrackerStatus(
             put("is_adaptive_jump", isAdaptiveJump)
             put("is_battery_low", isBatteryLow)
             put("is_battery_critical", isBatteryCritical)
+            put("is_silent_failure", isSilentFailure)
         }
     }
 
@@ -416,6 +422,7 @@ data class TrackerStatus(
             .setIsAdaptiveJump(isAdaptiveJump)
             .setIsBatteryLow(isBatteryLow)
             .setIsBatteryCritical(isBatteryCritical)
+            .setIsSilentFailure(isSilentFailure)
     }
 
     fun toProto(fromViewer: Boolean): RealtimeStatus {
@@ -594,7 +601,15 @@ data class DashboardState(
     val isCoolingModeActive: Boolean = false,
     val trackerCurrentMa: String = "--",
     val isBatteryLow: Boolean = false,
-    val isBatteryCritical: Boolean = false
+    val isBatteryCritical: Boolean = false,
+    
+    // Issue #132: Forensic UI Dashboard Refinement
+    val cpuLoad: String = "--",
+    val ioWait: String = "--",
+    val maxIoLatency: String = "--",
+
+    // Issue #133: Forensic Anomaly Correlation
+    val isSilentFailure: Boolean = false
 )
 
 sealed class UiEvent {

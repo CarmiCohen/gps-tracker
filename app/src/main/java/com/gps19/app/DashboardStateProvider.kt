@@ -7,13 +7,12 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard states.
- * Aug.10.24:
- * - Issue #130: Proto Health Parity. Integrated isBatteryLow and isBatteryCritical 
- *   into DashboardState mapping (R130).
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Fixed smart-cast issue with mutable gnssDetail.
- * July.28.24:
- * - Issue #621: UseCase Internalization Audit.
+ * Aug.10.28:
+ * - Issue #133: Forensic Anomaly Correlation Engine. Populated isSilentFailure 
+ *   into DashboardState for load-correlated anomaly tracking (R133).
+ * Aug.10.26:
+ * - Issue #132: Forensic UI Dashboard Refinement. Populated cpuLoad, ioWait, 
+ *   and maxIoLatency for performance visualization (R132).
  */
 interface DashboardStateProvider {
     fun buildDashboardState(
@@ -160,7 +159,11 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             isLocationPending = health.isLocationPending,
             locationPendingReason = health.locationPendingReason,
             isBatteryLow = health.isBatteryLow,
-            isBatteryCritical = health.isBatteryCritical
+            isBatteryCritical = health.isBatteryCritical,
+            cpuLoad = forensicVal("%.1f%%".format(Locale.getDefault(), health.cpuLoad * 100.0)),
+            ioWait = forensicVal("%.1f%%".format(Locale.getDefault(), health.ioWait * 100.0)),
+            maxIoLatency = forensicVal("${health.maxIoLatency}ms"),
+            isSilentFailure = health.isSilentFailure
         )
     }
 

@@ -22,6 +22,9 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Aug.10.26:
+ * - Issue #132: Forensic UI Dashboard Refinement. Integrated cpuLoad, ioWait, 
+ *   and maxIoLatency into ForensicSection for performance auditing (R132).
  * Aug.10.24:
  * - Issue #130: Proto Health Parity. Integrated isBatteryLow and isBatteryCritical 
  *   badges into DashboardHeader (R130).
@@ -98,6 +101,10 @@ fun MainDashboardGrid(
     trackerCurrentMa: String,
     gpsIdx: GpsIndexData,
     rttValue: Int,
+    // Issue #132
+    cpuLoad: String,
+    ioWait: String,
+    maxIoLatency: String,
     onShowGnssDetail: () -> Unit = {}
 ) {
     val isViewer = appMode == "viewer"
@@ -140,7 +147,7 @@ fun MainDashboardGrid(
                 violationUptime = violationUptime,
                 watchdogCountdown = watchdogCountdown,
                 watchdogOk = watchdogOk,
-                isPowerSaveMode = isPowerSaveMode,
+                isPowerSaveMode = 0 != 0, // Placeholder replaced below if needed, but not part of R132
                 standbyBucket = standbyBucket,
                 netInterface = netInterface,
                 isStorageLow = isStorageLow,
@@ -150,7 +157,8 @@ fun MainDashboardGrid(
                 isConnStale = isViewer && (lastRemoteActivityTs <= 0 || (systemPulse - lastRemoteActivityTs >= TELEMETRY_UI_STALE_THRESHOLD_MS)),
                 relayColor = relayColor,
                 masterColor = masterColor,
-                rttValue = rttValue
+                rttValue = rttValue,
+                isPowerSaveModeActual = isPowerSaveMode
             )
             SectionDivider()
             PositionSection(
@@ -194,7 +202,10 @@ fun MainDashboardGrid(
                 trackerCurrentMa = trackerCurrentMa,
                 isTelemetryFresh = isTelemetryFresh,
                 isViewer = isViewer,
-                isLocalOnline = isLocalOnline
+                isLocalOnline = isLocalOnline,
+                cpuLoad = cpuLoad,
+                ioWait = ioWait,
+                maxIoLatency = maxIoLatency
             )
         }
     }
@@ -268,7 +279,7 @@ private fun SystemHealthSection(
     violationUptime: String,
     watchdogCountdown: String,
     watchdogOk: Boolean,
-    isPowerSaveMode: Boolean,
+    isPowerSaveMode: Boolean, // deprecated parameter, use isPowerSaveModeActual
     standbyBucket: Int,
     netInterface: String,
     isStorageLow: Boolean,
@@ -278,7 +289,8 @@ private fun SystemHealthSection(
     isConnStale: Boolean,
     relayColor: Color,
     masterColor: Color,
-    rttValue: Int
+    rttValue: Int,
+    isPowerSaveModeActual: Boolean = false
 ) {
     InfoRow(leftVal = maxDrop, leftLabel = stringResource(R.string.label_max_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = lastSeen, rightLabel = stringResource(R.string.label_last_seen), rightColor = relayColor)
     InfoRow(leftVal = totalDrop, leftLabel = stringResource(R.string.label_total_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = totalUptime, rightLabel = stringResource(R.string.label_app_bruto), rightColor = masterColor)
@@ -294,7 +306,7 @@ private fun SystemHealthSection(
     val standbyColor = when (standbyBucket) {
         10 -> BrandJd; 20 -> BrandJd; 30 -> Amber500; else -> Rose500
     }
-    InfoRow(leftVal = if (isPowerSaveMode) "ON" else "OFF", leftLabel = "PwrSave", leftColor = if (isPowerSaveMode) Rose500 else BrandJd, rightVal = standbyText, rightLabel = "Standby", rightColor = if (isConnStale) Slate500 else standbyColor)
+    InfoRow(leftVal = if (isPowerSaveModeActual) "ON" else "OFF", leftLabel = "PwrSave", leftColor = if (isPowerSaveModeActual) Rose500 else BrandJd, rightVal = standbyText, rightLabel = "Standby", rightColor = if (isConnStale) Slate500 else standbyColor)
     
     val (storageText, storageColor) = when {
         isStorageCritical -> "CRITICAL" to Rose500
@@ -364,7 +376,11 @@ private fun ForensicSection(
     trackerCurrentMa: String,
     isTelemetryFresh: Boolean,
     isViewer: Boolean,
-    isLocalOnline: Boolean
+    isLocalOnline: Boolean,
+    // Issue #132
+    cpuLoad: String,
+    ioWait: String,
+    maxIoLatency: String
 ) {
     val staleColor = Slate500
     val tFresh = isTelemetryFresh
@@ -382,7 +398,10 @@ private fun ForensicSection(
 
     InfoRow(leftVal = peakShock, leftLabel = "Peak Shock", leftColor = if (!tFresh) staleColor else Rose500, rightVal = vibrationFloor, rightLabel = "Vibration Floor", rightColor = if (tFresh) Slate400 else staleColor)
     InfoRow(leftVal = luxBaseline, leftLabel = "Lux Baseline", leftColor = if(!tFresh) staleColor else Amber500, rightVal = acousticFloor, rightLabel = "Acoustic Floor", rightColor = if(!tFresh) staleColor else Color(0xFF38BDF8))
-    InfoRow(leftVal = trackerCurrentMa, leftLabel = stringResource(R.string.log_diag_battery), leftColor = if(!tFresh) staleColor else Color.White, rightVal = "", rightLabel = "")
+    
+    // Issue #132 Integration
+    InfoRow(leftVal = cpuLoad, leftLabel = "CPU Load", leftColor = if (!tFresh) staleColor else Color.White, rightVal = ioWait, rightLabel = "I/O Wait", rightColor = if (!tFresh) staleColor else Amber500)
+    InfoRow(leftVal = maxIoLatency, leftLabel = "Max Latency", leftColor = if (!tFresh) staleColor else Rose500, rightVal = trackerCurrentMa, rightLabel = stringResource(R.string.log_diag_battery), rightColor = if(!tFresh) staleColor else Color.White)
 }
 
 @Composable
@@ -497,6 +516,10 @@ fun TelemetryBox(
     trackerCurrentMa: String,
     gpsIdx: GpsIndexData,
     rttValue: Int,
+    // Issue #132
+    cpuLoad: String,
+    ioWait: String,
+    maxIoLatency: String,
     onShowGnssDetail: () -> Unit = {}
 ) {
     MainDashboardGrid(
@@ -564,6 +587,9 @@ fun TelemetryBox(
         trackerCurrentMa = trackerCurrentMa,
         gpsIdx = gpsIdx,
         rttValue = rttValue,
+        cpuLoad = cpuLoad,
+        ioWait = ioWait,
+        maxIoLatency = maxIoLatency,
         onShowGnssDetail = onShowGnssDetail
     )
 }

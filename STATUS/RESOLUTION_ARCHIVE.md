@@ -2,7 +2,15 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 571**
+**Total Unique Resolutions: 573**
+
+## 13. Forensic Anomaly Correlation (Aug.10.28)
+*   **Issue #133-Sentinel: Forensic Anomaly Correlation Engine (Silent Failure Detection)**.
+    *   **Resolution**: Implemented cross-domain correlation between location stability and hardware resource stress. Added `isSilentFailure` logic to `SentinelValidator` to identify stalls driven by CPU/IO exhaustion (>85% CPU or >800ms IO Latency) rather than physical tamper. Integrated detection into `IntegrityMonitor` and propagated the anomaly flag through forensic ribbons, historical persistence, and Protobuf signaling for remote diagnostics (R133).
+
+## 12. Forensic UI Refinement (Aug.10.27)
+*   **Issue #132-Sentinel: Forensic UI Dashboard Refinement for Performance Metrics**.
+    *   **Resolution**: Integrated `cpuLoad`, `ioWait`, and `maxIoLatency` trends into the Tracker and Viewer Forensic Dashboard UI. Refined `ForensicSection` to include a dedicated performance auditing row, enabling visual confirmation of hardware stress and I/O spikes on budget hardware. Ensured full-stack primitive decomposition for optimal recomposition performance (R132).
 
 ## 11. Forensic Performance Hardening (Aug.10.26)
 *   **Issue #131-Sentinel: Forensic Performance Audit for budget hardware**.

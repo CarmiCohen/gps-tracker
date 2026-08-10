@@ -26,12 +26,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.10.28:
+ * - Issue #133: Forensic Anomaly Correlation Engine. Integrated isSilentFailure 
+ *   detection into performIntegrityHeartbeat (R133).
  * Aug.10.26:
  * - Issue #131: Forensic Performance Audit. Integrated maxIoLatency collection 
  *   into performIntegrityHeartbeat for budget hardware (A15) diagnostics (R131).
- * Aug.10.24:
- * - Issue #129: Forensic Storage Pruning Sensitivity. Propagating isBatteryLow 
- *   and isBatteryCritical flags to SystemHealthState (R129).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -188,6 +188,23 @@ class IntegrityMonitor @Inject constructor(
             h.cpuLoad = cpu
             h.ioWait = iow
             h.maxIoLatency = maxIo
+            
+            // Issue #133: Silent Failure Correlation
+            val isSilent = SentinelValidator.isSilentFailure(
+                gpsStalled = h.gpsStalled,
+                isTamperDetected = h.isTamperDetected,
+                cpuLoad = cpu,
+                ioWait = iow,
+                maxIoLatency = maxIo
+            )
+            
+            if (isSilent && !h.isSilentFailure) {
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("FORENSIC ALERT: Silent Failure detected on this device. Location stall correlated with high resource load.", true))
+                _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_SILENT_FAILURE))
+            } else if (!isSilent && h.isSilentFailure) {
+                _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_SILENT_FAILURE))
+            }
+            h.isSilentFailure = isSilent
         }
     }
 

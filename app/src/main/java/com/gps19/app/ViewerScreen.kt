@@ -32,6 +32,9 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Aug.10.26:
+ * - Issue #132: Forensic UI Dashboard Refinement. Passed cpuLoad, ioWait, 
+ *   and maxIoLatency to TelemetryBox (R132).
  * Aug.10.24:
  * - Issue #130: Proto Health Parity. Passed isBatteryLow and isBatteryCritical to TelemetryBox (R130).
  * Aug.07.00:
@@ -495,6 +498,9 @@ fun ViewerDashboard(
                         trackerCurrentMa = dashboardState.trackerCurrentMa,
                         gpsIdx = gpsIdx,
                         rttValue = rttValue,
+                        cpuLoad = dashboardState.cpuLoad,
+                        ioWait = dashboardState.ioWait,
+                        maxIoLatency = dashboardState.maxIoLatency,
                         onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                     )
                     DebugTable(

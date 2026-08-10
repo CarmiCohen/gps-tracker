@@ -27,11 +27,12 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Implemented flyweight for EngineConnectionPoint 
- *   to eliminate per-tick allocations in updateRibbons (R-HARDWARE-01).
- * July.30.48:
- * - Issue #653: Performance: GC Churn Optimization.
+ * Aug.10.28:
+ * - Issue #133: Forensic Anomaly Correlation Engine. Updated mapToAppPoint to 
+ *   include isSilentFailure for load-correlated anomaly tracking (R133).
+ * Aug.10.27:
+ * - Issue #132: Forensic UI Dashboard Refinement. Updated mapToAppPoint to include 
+ *   cpuLoad, ioWait, and maxIoLatency for trend visualization (R132).
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -95,7 +96,11 @@ class HistoryManager @Inject constructor(
         isSitActive: Boolean = false, currentMa: Int = 0,
         locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
         kineticEnergy: Double = 0.0,
-        isRecoveryEvent: Boolean = false
+        isRecoveryEvent: Boolean = false,
+        cpuLoad: Double = 0.0,
+        ioWait: Double = 0.0,
+        maxIoLatency: Long = 0L,
+        isSilentFailure: Boolean = false
     ) {
         detectClockTampering(now)
         val deltaRt = if (lastTickRt > 0) nowRt - lastTickRt else 0L
@@ -116,7 +121,8 @@ class HistoryManager @Inject constructor(
                 accuracy, maxAccuracy, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, tiltIdx, baroIdx,
                 verticalVelocity, sitVz, sitVzTs, sitVzRt, sitDz, sitBaro, sitTilt, sitShock,
                 isBatterySteepDischarge, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive,
-                currentMa, locationPendingReason, kineticEnergy, isRecoveryEvent
+                currentMa, locationPendingReason, kineticEnergy, isRecoveryEvent,
+                cpuLoad, ioWait, maxIoLatency, isSilentFailure
             )
         }
 
@@ -133,6 +139,7 @@ class HistoryManager @Inject constructor(
             this.sitTilt = sitTilt; this.sitShock = sitShock; this.isBatterySteepDischarge = isBatterySteepDischarge
             this.isCoolingModeActive = isCoolingModeActive; this.speed = speed; this.bearing = bearing; isTick = false
             this.currentMa = currentMa; this.locationPendingReason = locationPendingReason; this.kineticEnergy = kineticEnergy
+            this.cpuLoad = cpuLoad; this.ioWait = ioWait; this.maxIoLatency = maxIoLatency; this.isSilentFailure = isSilentFailure
         }
         
         aggregator.processPoint(currentPointFlyweight) { scale, point ->
@@ -161,7 +168,8 @@ class HistoryManager @Inject constructor(
         isCoolingModeActive: Boolean, speed: Double, bearing: Double,
         isSitDetected: Boolean, isSitActive: Boolean, currentMa: Int,
         locationPendingReason: LocationPendingReason, kineticEnergy: Double,
-        isRecoveryEvent: Boolean
+        isRecoveryEvent: Boolean, cpuLoad: Double, ioWait: Double, maxIoLatency: Long,
+        isSilentFailure: Boolean
     ) {
         val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
         val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
@@ -178,6 +186,7 @@ class HistoryManager @Inject constructor(
             this.isSitActive = isSitActive; this.isBatterySteepDischarge = isBatterySteepDischarge
             this.isCoolingModeActive = isCoolingModeActive; this.speed = speed; this.bearing = bearing
             this.currentMa = currentMa; this.locationPendingReason = locationPendingReason; this.kineticEnergy = kineticEnergy
+            this.cpuLoad = cpuLoad; this.ioWait = ioWait; this.maxIoLatency = maxIoLatency; this.isSilentFailure = isSilentFailure
         }
         
         val fourMPoints = ArrayList<ConnectionPoint>()
@@ -246,7 +255,8 @@ class HistoryManager @Inject constructor(
         gpsIndex = p.gpsIndex, noiseIdx = p.noiseIdx, luxIdx = p.luxIdx, vibeIdx = p.vibeIdx, proxIdx = p.proxIdx,
         liftIdx = p.liftIdx, snrIdx = p.snrIdx, tiltIdx = p.tiltIdx, baroIdx = p.baroIdx, isSitDetected = p.isSitDetected,
         isSitActive = p.isSitActive, sitVz = p.sitVz, sitVzTs = p.sitVzTs, sitVzRt = p.sitVzRt, sitDz = p.sitDz,
-        sitBaro = p.sitBaro, sitTilt = p.sitTilt, sitShock = p.sitShock, kineticEnergy = p.kineticEnergy
+        sitBaro = p.sitBaro, sitTilt = p.sitTilt, sitShock = p.sitShock, kineticEnergy = p.kineticEnergy,
+        cpuLoad = p.cpuLoad, ioWait = p.ioWait, maxIoLatency = p.maxIoLatency, isSilentFailure = p.isSilentFailure
     )
 
     private fun handleHourlyAutoSave(hour: Int) {

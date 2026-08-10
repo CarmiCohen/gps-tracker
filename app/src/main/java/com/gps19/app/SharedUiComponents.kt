@@ -45,6 +45,9 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Aug.10.27:
+ * - Issue #132: Forensic UI Dashboard Refinement. Integrated CPU, I/O Wait, 
+ *   and Latency trend ribbons into AnalyticalRibbons (R132).
  * Aug.05.128:
  * - Issue #740: Performance Hardening. Refactored SharedUiComponents to use named 
  *   arguments for all layout and material components, resolving build regressions 
@@ -137,6 +140,11 @@ fun AnalyticalRibbons(
     val svzSelector = remember { { p: ConnectionPoint -> (kotlin.math.abs(p.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f) } }
     val svzDriftSelector = remember { { p: ConnectionPoint -> if (p.sitVzTs > 0) kotlin.math.abs(p.ts - p.sitVzTs) else 0L } }
     val sdzSelector = remember { { p: ConnectionPoint -> (kotlin.math.abs(p.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f) } }
+    
+    // Issue #132: Performance selectors
+    val cpuSelector = remember { { p: ConnectionPoint -> (p.cpuLoad.toFloat() / RIBBON_CPU_LOAD_SCALE.toFloat()).coerceIn(0f, 1f) } }
+    val iowSelector = remember { { p: ConnectionPoint -> (p.ioWait.toFloat() / RIBBON_IO_WAIT_SCALE.toFloat()).coerceIn(0f, 1f) } }
+    val latSelector = remember { { p: ConnectionPoint -> (p.maxIoLatency.toFloat() / RIBBON_LATENCY_SCALE_MS.toFloat()).coerceIn(0f, 1f) } }
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
@@ -198,6 +206,13 @@ fun AnalyticalRibbons(
         GenericSensorRibbon(history, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), isStrictMode = isStrictMode, valueSelector = barSelector)
         GenericSensorRibbon(history, "SVZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = svzSelector, driftSelector = svzDriftSelector)
         GenericSensorRibbon(history, "SDZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = sdzSelector)
+        
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
+        
+        // Issue #132: Performance Trends
+        GenericSensorRibbon(history, "CPU", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = cpuSelector)
+        GenericSensorRibbon(history, "IOW", selectedScale, lineColor = Amber500, isStrictMode = isStrictMode, valueSelector = iowSelector)
+        GenericSensorRibbon(history, "LAT", selectedScale, lineColor = Rose500, isStrictMode = isStrictMode, valueSelector = latSelector)
     }
 }
 

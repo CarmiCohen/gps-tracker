@@ -191,6 +191,9 @@ message RealtimeStatus {
     // Issue #130: Proto Health Parity
     bool is_battery_low = 63;
     bool is_battery_critical = 64;
+
+    // Issue #133: Forensic Anomaly Correlation
+    bool is_silent_failure = 65;
 }
 
 message GeoPointProto {
@@ -302,4 +305,7 @@ message TrackerStatusProto {
     // Issue #130: Proto Health Parity
     bool is_battery_low = 70;
     bool is_battery_critical = 71;
+
+    // Issue #133: Forensic Anomaly Correlation
+    bool is_silent_failure = 72;
 }

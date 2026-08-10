@@ -4,13 +4,12 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
- * Aug.10.23:
- * - Issue #128: Forensic Metadata Pressure Hardening. Optimized O(N) traversal 
- *   using tick-gating and deferred averaging. Fixed "Aggregation Storm" bug 
- *   where high-frequency IMU caused redundant ribbon emissions (R128).
- * Aug.08.21:
- * - Issue #125: Forensic Audit: Compression Parity Audit. Integrated 
- *   gpsHardwareLock into aggregation logic to ensure parity (R125).
+ * Aug.10.28:
+ * - Issue #133: Forensic Anomaly Correlation Engine. Integrated isSilentFailure 
+ *   into aggregation logic for load-correlated anomaly tracking (R133).
+ * Aug.10.27:
+ * - Issue #132: Forensic UI Dashboard Refinement. Integrated cpuLoad, ioWait, 
+ *   and maxIoLatency into aggregation logic for trend visualization (R132).
  */
 class TelemetryAggregator {
 
@@ -55,6 +54,14 @@ class TelemetryAggregator {
         var sitShock: Double = 0.0
         var kineticEnergy: Double = 0.0
         var gpsHardwareLock: Boolean = false
+        
+        // Issue #132
+        var cpuLoad: Double = 0.0
+        var ioWait: Double = 0.0
+        var maxIoLatency: Long = 0L
+
+        // Issue #133
+        var isSilentFailure: Boolean = false
 
         fun reset(point: EngineConnectionPoint) {
             rtt = point.rtt
@@ -89,6 +96,10 @@ class TelemetryAggregator {
             sitShock = point.sitShock
             kineticEnergy = point.kineticEnergy
             gpsHardwareLock = point.gpsHardwareLock
+            cpuLoad = point.cpuLoad
+            ioWait = point.ioWait
+            maxIoLatency = point.maxIoLatency
+            isSilentFailure = point.isSilentFailure
         }
 
         fun merge(cur: EngineConnectionPoint) {
@@ -99,7 +110,7 @@ class TelemetryAggregator {
             isRecoveryEvent = isRecoveryEvent || cur.isRecoveryEvent
             accuracy = max(accuracy, cur.accuracy)
             maxAccuracy = max(maxAccuracy, cur.maxAccuracy)
-            isBatterySteepDischarge = isBatterySteepDischarge || cur.isBatterySteepDischarge
+            isBatterySteepDischarge = isBatteryDischargeOr(isBatterySteepDischarge, cur.isBatterySteepDischarge)
             isCoolingModeActive = isCoolingModeActive || cur.isCoolingModeActive
             speed = max(speed, cur.speed)
             if (cur.hasGps) bearing = cur.bearing
@@ -112,7 +123,6 @@ class TelemetryAggregator {
             
             proxSum += cur.proxIdx
             proxCount++
-            // Issue #128: Division deferred to writeTo for O(N) pressure reduction
             
             liftIdx = max(liftIdx, cur.liftIdx)
             snrIdx = min(snrIdx, cur.snrIdx)
@@ -129,7 +139,14 @@ class TelemetryAggregator {
             sitShock = max(sitShock, cur.sitShock)
             kineticEnergy = max(kineticEnergy, cur.kineticEnergy)
             gpsHardwareLock = gpsHardwareLock || cur.gpsHardwareLock
+            
+            cpuLoad = max(cpuLoad, cur.cpuLoad)
+            ioWait = max(ioWait, cur.ioWait)
+            maxIoLatency = max(maxIoLatency, cur.maxIoLatency)
+            isSilentFailure = isSilentFailure || cur.isSilentFailure
         }
+
+        private fun isBatteryDischargeOr(old: Boolean, new: Boolean): Boolean = old || new
 
         fun writeTo(target: EngineConnectionPoint, base: EngineConnectionPoint, isTick: Boolean) {
             target.copyFrom(base)
@@ -151,7 +168,6 @@ class TelemetryAggregator {
             target.luxIdx = this.luxIdx
             target.vibeIdx = this.vibeIdx
             
-            // Issue #128: Finalize averaging on write-path
             if (proxCount > 0) {
                 this.proxIdx = proxSum / proxCount
             }
@@ -169,6 +185,10 @@ class TelemetryAggregator {
             target.sitShock = this.sitShock
             target.kineticEnergy = this.kineticEnergy
             target.gpsHardwareLock = this.gpsHardwareLock
+            target.cpuLoad = this.cpuLoad
+            target.ioWait = this.ioWait
+            target.maxIoLatency = this.maxIoLatency
+            target.isSilentFailure = this.isSilentFailure
             target.isTick = isTick
         }
     }
@@ -198,22 +218,17 @@ class TelemetryAggregator {
         val totalSeconds = (timeRef / TICK_INTERVAL_MS).toInt()
 
         // 1. FOUR_MIN (Index 0): High-fidelity pass-through. 
-        // We always emit every point for the 4M scale to preserve forensic detail.
         val flyweight4M = resultFlyweights[0]
         flyweight4M.copyFrom(point)
         flyweight4M.isTick = totalSeconds % 60 == 0
         onResult(scales[0], flyweight4M)
 
         // 2. Other scales: Aggregated to prevent "Aggregation Storms".
-        // Issue #128: For 100Hz IMU, we merge into accumulators, but only emit at the 
-        // first point of a new interval-tick. This ensures O(1) emission per interval.
         for (i in 1 until scales.size) {
             val scale = scales[i]
             val acc = accumulators[i]
             
-            // Check for interval boundary
             if (totalSeconds % scale.intervalSeconds == 0) {
-                // If this is the FIRST point of a new interval-tick, emit the previous aggregate
                 if (lastEmittedTick[i] != totalSeconds) {
                     if (hasData[i]) {
                         val res = resultFlyweights[i]
@@ -305,6 +320,10 @@ class TelemetryAggregator {
                 sitShock = resolvedShock
                 kineticEnergy = resolvedKinetic
                 gpsHardwareLock = baseTemplate.gpsHardwareLock
+                cpuLoad = baseTemplate.cpuLoad
+                ioWait = baseTemplate.ioWait
+                maxIoLatency = baseTemplate.maxIoLatency
+                isSilentFailure = baseTemplate.isSilentFailure
             }
 
             processPoint(fillPointFlyweight, onResult)
@@ -396,6 +415,10 @@ class TelemetryAggregator {
                 currentMa = 0
                 locationPendingReason = LocationPendingReason.NONE
                 gpsHardwareLock = false
+                cpuLoad = 0.0
+                ioWait = 0.0
+                maxIoLatency = 0L
+                isSilentFailure = false
             }
             onResult(flyweight)
             currentRt += intervalMs

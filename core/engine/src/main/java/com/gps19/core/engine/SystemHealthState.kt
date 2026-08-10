@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Aug.10.27:
+ * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure 
+ *   to track load-correlated location stalls (R133).
  * Aug.10.26:
  * - Issue #131: Forensic Performance Audit. Added maxIoLatency to track 
  *   performance spikes on budget hardware (A15) (R131).
@@ -105,7 +108,10 @@ class SystemHealthState(
 
     // Issue #129: Adaptive Pruning Sensitivity
     var isBatteryLow: Boolean = false,
-    var isBatteryCritical: Boolean = false
+    var isBatteryCritical: Boolean = false,
+
+    // Issue #133: Forensic Anomaly Correlation
+    var isSilentFailure: Boolean = false
 ) {
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
@@ -189,6 +195,7 @@ class SystemHealthState(
         this.sitShock = other.sitShock
         this.isBatteryLow = other.isBatteryLow
         this.isBatteryCritical = other.isBatteryCritical
+        this.isSilentFailure = other.isSilentFailure
     }
     
     fun update(
@@ -203,7 +210,8 @@ class SystemHealthState(
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
         cpuLoad: Double = 0.0, ioWait: Double = 0.0, forensicReliability: Double = 1.0,
         vibration: Double = 0.0, storageAvailableMb: Long = 0L, storageTotalMb: Long = 0L,
-        isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false, maxIoLatency: Long = 0L
+        isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false, maxIoLatency: Long = 0L,
+        isSilentFailure: Boolean = false
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -245,6 +253,7 @@ class SystemHealthState(
         this.vibration = vibration
         this.isBatteryLow = isBatteryLow
         this.isBatteryCritical = isBatteryCritical
+        this.isSilentFailure = isSilentFailure
     }
 
     fun reset() {
@@ -329,5 +338,6 @@ class SystemHealthState(
         sitShock = 0.0
         isBatteryLow = false
         isBatteryCritical = false
+        isSilentFailure = false
     }
 }

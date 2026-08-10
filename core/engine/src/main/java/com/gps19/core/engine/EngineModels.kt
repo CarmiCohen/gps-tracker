@@ -4,12 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Aug.08.21:
- * - Issue #125: Forensic Audit: Compression Parity Audit. Added gpsHardwareLock 
- *   to EngineConnectionPoint for forensic parity (R125).
- * Aug.07.51:
- * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement. Changed default 
- *   proxIdx to 0.0 (Far/Clear) to ensure forensic accuracy (R742).
+ * Aug.10.27:
+ * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure 
+ *   to EngineConnectionPoint for load-correlated stall tracking (R133).
+ * Aug.10.26:
+ * - Issue #132: Forensic UI Dashboard Refinement. Added cpuLoad, ioWait, 
+ *   and maxIoLatency to EngineConnectionPoint for trend visualization (R132).
  */
 
 @Serializable
@@ -107,7 +107,15 @@ class EngineConnectionPoint(
     var sitTilt: Double = 0.0,
     var sitShock: Double = 0.0,
     var kineticEnergy: Double = 0.0,
-    var gpsHardwareLock: Boolean = false // Issue #125
+    var gpsHardwareLock: Boolean = false, // Issue #125
+
+    // Performance & Load Correlation (Issue #132)
+    var cpuLoad: Double = 0.0,
+    var ioWait: Double = 0.0,
+    var maxIoLatency: Long = 0L,
+
+    // Anomaly Correlation (Issue #133)
+    var isSilentFailure: Boolean = false
 ) {
     fun copyFrom(other: EngineConnectionPoint) {
         this.ts = other.ts
@@ -148,6 +156,10 @@ class EngineConnectionPoint(
         this.sitShock = other.sitShock
         this.kineticEnergy = other.kineticEnergy
         this.gpsHardwareLock = other.gpsHardwareLock
+        this.cpuLoad = other.cpuLoad
+        this.ioWait = other.ioWait
+        this.maxIoLatency = other.maxIoLatency
+        this.isSilentFailure = other.isSilentFailure
     }
 }
 

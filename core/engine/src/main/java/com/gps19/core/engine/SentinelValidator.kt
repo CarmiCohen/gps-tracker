@@ -5,12 +5,13 @@ import kotlin.math.max
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Aug.10.27:
+ * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure 
+ *   to correlate GPS stalls with CPU/IO resource exhaustion (R133).
  * July.30.48:
  * - Issue #653: Performance: GC Churn Optimization. Refactored updateKineticEnergy 
  *   into separate primitive calculators to eliminate Pair allocation in high-frequency 
  *   accelerometer path (R-HARDWARE-01 compliance).
- * July.27.06:
- * - Issue #601: Kinetic Energy Anomaly Detection.
  */
 object SentinelValidator {
 
@@ -58,6 +59,20 @@ object SentinelValidator {
     fun isLightViolated(lux: Double, luxBaseline: Double): Boolean {
         if (luxBaseline < 0.0) return false
         return (lux - luxBaseline) > LIGHT_THRESHOLD_LUX_JUMP
+    }
+
+    fun isSilentFailure(
+        gpsStalled: Boolean,
+        isTamperDetected: Boolean,
+        cpuLoad: Double,
+        ioWait: Double,
+        maxIoLatency: Long
+    ): Boolean {
+        if (!gpsStalled || isTamperDetected) return false
+        
+        return cpuLoad >= SILENT_FAILURE_CPU_THRESHOLD || 
+               ioWait >= SILENT_FAILURE_IOW_THRESHOLD || 
+               maxIoLatency >= SILENT_FAILURE_LATENCY_THRESHOLD_MS
     }
 
     /**

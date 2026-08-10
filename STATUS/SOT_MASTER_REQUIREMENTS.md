@@ -1,8 +1,10 @@
-# System Source of Truth (SoT) - Aug.10.26 (Forensic Performance Audit)
+# System Source of Truth (SoT) - Aug.10.28 (Forensic Anomaly Correlation)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Forensic Anomaly Correlation Engine (R133)**: (Added Aug.10.28) The system MUST implement cross-domain correlation between location stability and hardware resource stress. A `SILENT_FAILURE` MUST be flagged if a GPS stall is detected while `cpuLoad` >= 85%, `ioWait` >= 40%, or `maxIoLatency` >= 800ms, provided no physical tamper events are active. This correlation MUST be propagated through forensic ribbons and Protobuf signaling for remote diagnostics (Issue #133-Sentinel). **Status: Implemented & Verified.**
+*   **Forensic UI Dashboard Refinement (R132)**: (Added Aug.10.27) The Forensic Dashboard (Tracker & Viewer) MUST integrate `cpuLoad`, `ioWait`, and `maxIoLatency` trends into the `ForensicSection` visualization. Performance metrics MUST be formatted for immediate auditing to allow visual correlation between hardware stress and telemetry health. stale data MUST be visually distinct (Slate500) (Issue #132-Sentinel). **Status: Implemented & Verified.**
 *   **Forensic Performance Audit (R131)**: (Added Aug.10.26) The system MUST track and audit peak I/O latency across all critical subsystems (DB, File, Network). Budget hardware (Samsung A15) MUST trigger a forensic `PERFORMANCE_SPIKE` alert if disk I/O latency exceeds 1,000ms. Peak latency MUST be propagated via the `SystemHealthState` for remote forensic trend analysis (Issue #131-Sentinel). **Status: Implemented & Verified.**
 *   **Proto Health Parity (R130)**: (Added Aug.10.25) The `RealtimeStatus` Protobuf definition MUST be synchronized with the system health monitors to include `is_battery_low` and `is_battery_critical` flags. Telemetry Hot-Paths (Binary and JSON) MUST propagate these flags across all signaling roles to ensure forensic health awareness in the Viewer Dashboard (Issue #130-Sentinel). **Status: Implemented & Verified.**
 *   **Forensic Storage Pruning Sensitivity (R129)**: (Added Aug.10.24) Database maintenance MUST be battery-aware to prevent I/O-induced power spikes during critical battery states. Pruning operations in `LogRepository` and `MainRepository` MUST be deferred or throttled when `isBatteryLow` or `isBatteryCritical` is detected. The system MUST prioritize battery preservation over background log cleanup unless `isStorageCritical` is also active (Issue #129-Sentinel). **Status: Implemented & Verified.**
@@ -28,5 +30,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) The historical resolution record MUST be synchronized across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.10.26.
+*   **Current Release**: Aug.10.28.
 *   **Source of Truth**: app/build.gradle versionName.

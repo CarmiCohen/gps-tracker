@@ -32,6 +32,9 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Aug.10.26:
+ * - Issue #132: Forensic UI Dashboard Refinement. Passed cpuLoad, ioWait, 
+ *   and maxIoLatency to TelemetryBox (R132).
  * Aug.10.24:
  * - Issue #130: Proto Health Parity. Passed isBatteryLow and isBatteryCritical to TelemetryBox.
  * Aug.07.00:
@@ -280,6 +283,9 @@ fun TrackerScreen(
                                 rttValue = rtt,
                                 currentMaValue = currentMa,
                                 systemPulse = systemPulse,
+                                cpuLoad = dashboardState.cpuLoad,
+                                ioWait = dashboardState.ioWait,
+                                maxIoLatency = dashboardState.maxIoLatency,
                                 onEvent = { viewModel.onEvent(it) }
                             )
                         }
@@ -454,6 +460,9 @@ fun TrackerScreen(
                             rttValue = rtt,
                             currentMaValue = currentMa,
                             systemPulse = systemPulse,
+                            cpuLoad = dashboardState.cpuLoad,
+                            ioWait = dashboardState.ioWait,
+                            maxIoLatency = dashboardState.maxIoLatency,
                             onEvent = { viewModel.onEvent(it) }
                         )
                     }
@@ -596,6 +605,10 @@ fun TrackerDashboard(
     rttValue: Int,
     currentMaValue: Int,
     systemPulse: Long,
+    // Issue #132
+    cpuLoad: String,
+    ioWait: String,
+    maxIoLatency: String,
     onEvent: (UiEvent) -> Unit
 ) {
     val gpsAge = if (localLocationTs > 0) systemPulse - localLocationTs else Long.MAX_VALUE
@@ -673,6 +686,9 @@ fun TrackerDashboard(
                     trackerCurrentMa = trackerCurrentMa,
                     gpsIdx = gpsIdx,
                     rttValue = rttValue,
+                    cpuLoad = cpuLoad,
+                    ioWait = ioWait,
+                    maxIoLatency = maxIoLatency,
                     onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                 )
                 DebugTable(
