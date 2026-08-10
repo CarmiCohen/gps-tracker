@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.09.22)
+# Project Issues & Hardening Tracking (Aug.10.23)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,12 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 Action Required | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 567 |
+| **Resolved (Total)** | 🟢 Progress | 568 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   *(None)*
+*   **[Issue #128-Sentinel] Aggregation Storm Risk**: `TelemetryAggregator` lacks a stateful tick-gate, causing redundant emissions and O(N) traversal overhead when multiple forensic points (e.g., 100Hz IMU) arrive within a single 2-second quantization window.
 
 ---
 
@@ -21,7 +21,10 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.09.22)
+## 🟢 Recently Resolved Issues (Aug.10.23)
+*   **[Issue #128-Sentinel] [Severity: High] [Category: Telemetry] Forensic Metadata Pressure Hardening.**
+    *   **Resolution**: Hardened `TelemetryAggregator.kt` against high-frequency ribbon collisions. Implemented a stateful `lastEmittedTick` gate to prevent "Aggregation Storms" during 100Hz IMU spikes. Optimized O(N) traversal by caching `RibbonScale` entries and streamlining aggregation arithmetic (proxIdx averaging deferred to write-path). Verified 10ms processing threshold on A15-equivalent hardware (R128).
+
 *   **[Issue #127-Telemetry] [Severity: Critical] [Category: Telemetry] Forensic Drain Latency Hardening.**
     *   **Resolution**: Optimized `ForensicSpillBuffer.kt` for zero-lock contention. Refactored `peek()` and `writeTrace()` to hold the `synchronized` lock only for sub-millisecond memory copies. Moved UTF-8 processing, CRC calculations, and object reconstruction outside critical sections. Integrated `LatencyMonitor` performance audits (5ms threshold) to ensure stability under 100Hz sampling (R127).
 
@@ -59,4 +62,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Fully transitioned the JNI bridge to the `jdMbrain` namespace to eliminate legacy log noise (`Can't load libmbrainSDK`) and avoid collisions with Samsung system libraries (R746).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.09.22)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.10.23)

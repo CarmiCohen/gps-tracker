@@ -4,19 +4,23 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Aug.10.23:
+ * - Issue #128: Forensic Metadata Pressure Hardening. Optimized O(N) traversal 
+ *   using tick-gating and deferred averaging. Fixed "Aggregation Storm" bug 
+ *   where high-frequency IMU caused redundant ribbon emissions (R128).
  * Aug.08.21:
  * - Issue #125: Forensic Audit: Compression Parity Audit. Integrated 
  *   gpsHardwareLock into aggregation logic to ensure parity (R125).
- * Aug.07.52:
- * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement.
  */
 class TelemetryAggregator {
 
-    private val accumulators = Array(RibbonScale.entries.size) { MutableAggregationPoint() }
-    private val hasData = BooleanArray(RibbonScale.entries.size) { false }
+    private val scales = RibbonScale.entries
+    private val accumulators = Array(scales.size) { MutableAggregationPoint() }
+    private val hasData = BooleanArray(scales.size) { false }
+    private val lastEmittedTick = IntArray(scales.size) { -1 }
     
     // Flyweight pool for results to avoid per-scale allocations
-    private val resultFlyweights = Array(RibbonScale.entries.size) { EngineConnectionPoint() }
+    private val resultFlyweights = Array(scales.size) { EngineConnectionPoint() }
 
     private class MutableAggregationPoint {
         var rtt: Int = 0
@@ -108,7 +112,7 @@ class TelemetryAggregator {
             
             proxSum += cur.proxIdx
             proxCount++
-            proxIdx = proxSum / proxCount
+            // Issue #128: Division deferred to writeTo for O(N) pressure reduction
             
             liftIdx = max(liftIdx, cur.liftIdx)
             snrIdx = min(snrIdx, cur.snrIdx)
@@ -146,7 +150,13 @@ class TelemetryAggregator {
             target.noiseIdx = this.noiseIdx
             target.luxIdx = this.luxIdx
             target.vibeIdx = this.vibeIdx
+            
+            // Issue #128: Finalize averaging on write-path
+            if (proxCount > 0) {
+                this.proxIdx = proxSum / proxCount
+            }
             target.proxIdx = this.proxIdx
+            
             target.liftIdx = this.liftIdx
             target.snrIdx = this.snrIdx
             target.tiltIdx = this.tiltIdx
@@ -187,28 +197,39 @@ class TelemetryAggregator {
         val timeRef = if (point.rt > 0) point.rt else point.ts
         val totalSeconds = (timeRef / TICK_INTERVAL_MS).toInt()
 
-        RibbonScale.entries.forEachIndexed { index, scale ->
-            if (scale == RibbonScale.FOUR_MIN) {
-                val flyweight = resultFlyweights[index]
-                flyweight.copyFrom(point)
-                flyweight.isTick = totalSeconds % 60 == 0
-                onResult(scale, flyweight)
-                return@forEachIndexed
+        // 1. FOUR_MIN (Index 0): High-fidelity pass-through. 
+        // We always emit every point for the 4M scale to preserve forensic detail.
+        val flyweight4M = resultFlyweights[0]
+        flyweight4M.copyFrom(point)
+        flyweight4M.isTick = totalSeconds % 60 == 0
+        onResult(scales[0], flyweight4M)
+
+        // 2. Other scales: Aggregated to prevent "Aggregation Storms".
+        // Issue #128: For 100Hz IMU, we merge into accumulators, but only emit at the 
+        // first point of a new interval-tick. This ensures O(1) emission per interval.
+        for (i in 1 until scales.size) {
+            val scale = scales[i]
+            val acc = accumulators[i]
+            
+            // Check for interval boundary
+            if (totalSeconds % scale.intervalSeconds == 0) {
+                // If this is the FIRST point of a new interval-tick, emit the previous aggregate
+                if (lastEmittedTick[i] != totalSeconds) {
+                    if (hasData[i]) {
+                        val res = resultFlyweights[i]
+                        acc.writeTo(res, point, isScaleTick(scale, totalSeconds))
+                        onResult(scale, res)
+                        hasData[i] = false
+                    }
+                    lastEmittedTick[i] = totalSeconds
+                }
             }
 
-            val acc = accumulators[index]
-            if (!hasData[index]) {
+            if (!hasData[i]) {
                 acc.reset(point)
-                hasData[index] = true
+                hasData[i] = true
             } else {
                 acc.merge(point)
-            }
-
-            if (totalSeconds % scale.intervalSeconds == 0) {
-                val flyweight = resultFlyweights[index]
-                acc.writeTo(flyweight, point, isScaleTick(scale, totalSeconds))
-                onResult(scale, flyweight)
-                hasData[index] = false
             }
         }
     }

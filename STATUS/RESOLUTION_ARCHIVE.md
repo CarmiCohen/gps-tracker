@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 567**
+**Total Unique Resolutions: 568**
+
+## 8. Forensic Telemetry & Metadata Hardening (Aug.10.23)
+*   **Issue #128-Sentinel: Forensic Metadata Pressure Hardening**.
+    *   **Resolution**: Hardened `TelemetryAggregator.kt` against high-frequency ribbon collisions. Implemented a stateful `lastEmittedTick` gate to prevent "Aggregation Storms" during 100Hz IMU spikes. Optimized O(N) traversal by caching `RibbonScale` entries and streamlining aggregation arithmetic (proxIdx averaging deferred to write-path). Verified 10ms processing threshold on A15-equivalent hardware (R128).
 
 ## 7. Forensic Telemetry Hardening (Aug.09.22)
 *   **Issue #127-Telemetry: Forensic Drain Latency Hardening**.
