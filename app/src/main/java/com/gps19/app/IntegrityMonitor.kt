@@ -26,12 +26,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.10.26:
+ * - Issue #131: Forensic Performance Audit. Integrated maxIoLatency collection 
+ *   into performIntegrityHeartbeat for budget hardware (A15) diagnostics (R131).
  * Aug.10.24:
  * - Issue #129: Forensic Storage Pruning Sensitivity. Propagating isBatteryLow 
  *   and isBatteryCritical flags to SystemHealthState (R129).
- * Aug.07.128:
- * - Issue #124-Revival: Functional Hardening (R124). Fixed missing health update 
- *   for gpsHardwareLock in handleRevivalEvent.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -174,11 +174,20 @@ class IntegrityMonitor @Inject constructor(
 
         val cpu = systemStatusProvider.getCpuLoad()
         val iow = systemStatusProvider.getIoWait()
+        val maxIo = LatencyMonitor.consumeMaxIoLatency()
+
+        // Issue #131: Audit spikes on budget hardware
+        if (maxIo > LATENCY_THRESHOLD_DB_WRITE_MS && systemStatusProvider.isA15Hardware()) {
+            val msg = "PERFORMANCE WARNING: Critical I/O Spike detected on budget hardware (%dms). System stress: [CPU: %.1f, IOW: %.1f]".format(maxIo, cpu, iow)
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
+            _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_PERFORMANCE_SPIKE))
+        }
 
         updateHealth { h ->
             h.lastIntegrityHeartbeatRt = nowRt
             h.cpuLoad = cpu
             h.ioWait = iow
+            h.maxIoLatency = maxIo
         }
     }
 

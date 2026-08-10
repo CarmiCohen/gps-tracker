@@ -4,15 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Aug.10.26:
+ * - Issue #131: Forensic Performance Audit. Added maxIoLatency to track 
+ *   performance spikes on budget hardware (A15) (R131).
  * Aug.10.24:
  * - Issue #129: Forensic Storage Pruning Sensitivity. Added isBatteryLow and 
  *   isBatteryCritical to support battery-aware adaptive pruning (R129).
- * Aug.07.127:
- * - Issue #124: GPS Hardware Revival Hardening (R124). Added gpsHardwareLock 
- *   to track critical hardware stall escalations.
- * Aug.04.114:
- * - Issue #728: Forensic Audit: Storage-Aware Adaptive Pruning. Added 
- *   storageAvailableMb and storageTotalMb for granular pressure diagnostics (R728).
  */
 @Serializable
 class SystemHealthState(
@@ -58,6 +55,7 @@ class SystemHealthState(
     // Performance & Load Correlation (Issue #711/R711)
     var cpuLoad: Double = 0.0,
     var ioWait: Double = 0.0,
+    var maxIoLatency: Long = 0L, // Issue #131: Max I/O latency in ms
 
     // Forensic Persistence Health (Issue #714/R714)
     var forensicReliability: Double = 1.0,
@@ -150,6 +148,7 @@ class SystemHealthState(
         this.baroIdx = other.baroIdx
         this.cpuLoad = other.cpuLoad
         this.ioWait = other.ioWait
+        this.maxIoLatency = other.maxIoLatency
         this.forensicReliability = other.forensicReliability
         this.uptimeMs = other.uptimeMs
         this.lastConnTs = other.lastConnTs
@@ -204,7 +203,7 @@ class SystemHealthState(
         isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean,
         cpuLoad: Double = 0.0, ioWait: Double = 0.0, forensicReliability: Double = 1.0,
         vibration: Double = 0.0, storageAvailableMb: Long = 0L, storageTotalMb: Long = 0L,
-        isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false
+        isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false, maxIoLatency: Long = 0L
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -241,6 +240,7 @@ class SystemHealthState(
         this.isCoolingModeActive = isCoolingModeActive
         this.cpuLoad = cpuLoad
         this.ioWait = ioWait
+        this.maxIoLatency = maxIoLatency
         this.forensicReliability = forensicReliability
         this.vibration = vibration
         this.isBatteryLow = isBatteryLow
@@ -288,6 +288,7 @@ class SystemHealthState(
         baroIdx = 0.0
         cpuLoad = 0.0
         ioWait = 0.0
+        maxIoLatency = 0L
         forensicReliability = 1.0
         uptimeMs = 0L
         lastConnTs = 0L

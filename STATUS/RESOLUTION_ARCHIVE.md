@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 570**
+**Total Unique Resolutions: 571**
+
+## 11. Forensic Performance Hardening (Aug.10.26)
+*   **Issue #131-Sentinel: Forensic Performance Audit for budget hardware**.
+    *   **Resolution**: Integrated rolling maximum I/O latency tracking into `LatencyMonitor` and `IntegrityMonitor`. Hardened performance auditing for budget hardware (Samsung A15) by triggering forensic alerts upon detecting critical disk spikes (>1000ms). Propagated `maxIoLatency` to the central health state for remote diagnostics (R131).
 
 ## 10. Forensic Proto Alignment (Aug.10.25)
 *   **Issue #130-Sentinel: Proto Health Parity**.
