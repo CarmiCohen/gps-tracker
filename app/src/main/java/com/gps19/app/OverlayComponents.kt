@@ -22,13 +22,13 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Aug.10.24:
+ * - Issue #130: Proto Health Parity. Integrated isBatteryLow and isBatteryCritical 
+ *   badges into DashboardHeader (R130).
  * Aug.07.00:
  * - Issue #741: Dashboard & TelemetryBox Recomposition Audit. Refactored MainDashboardGrid,
  *   TelemetryBox, and DebugTable to take primitive parameters instead of monolithic 
  *   state objects (R736).
- * Aug.05.122:
- * - Issue #736: Dashboard Recomposition Audit. Decomposed DashboardState consumption
- *   in sub-sections to minimize recomposition churn. Removed unused kinematicState.
  */
 
 @Composable
@@ -49,6 +49,8 @@ fun MainDashboardGrid(
     status: SentinelStatus,
     isTamperDetected: Boolean,
     isBatterySteepDischarge: Boolean,
+    isBatteryLow: Boolean,
+    isBatteryCritical: Boolean,
     maxDrop: String,
     lastSeen: String,
     totalDrop: String,
@@ -118,7 +120,9 @@ fun MainDashboardGrid(
                 status = status,
                 isTelemetryFresh = isTelemetryFresh,
                 isTamperDetected = isTamperDetected,
-                isBatterySteepDischarge = isBatterySteepDischarge
+                isBatterySteepDischarge = isBatterySteepDischarge,
+                isBatteryLow = isBatteryLow,
+                isBatteryCritical = isBatteryCritical
             )
             
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
@@ -205,7 +209,9 @@ private fun DashboardHeader(
     status: SentinelStatus,
     isTelemetryFresh: Boolean,
     isTamperDetected: Boolean,
-    isBatterySteepDischarge: Boolean
+    isBatterySteepDischarge: Boolean,
+    isBatteryLow: Boolean,
+    isBatteryCritical: Boolean
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "DashboardPulse")
     val movingAlpha by infiniteTransition.animateFloat(
@@ -243,6 +249,8 @@ private fun DashboardHeader(
             if (status == SentinelStatus.TAMPER) Badge("[TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
             if (isTamperDetected) Badge("[HW TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
             if (isBatterySteepDischarge) Badge("[BATT HEALTH]", if (isTelemetryFresh) Rose500 else Slate500)
+            if (isBatteryCritical) Badge("[BATT CRITICAL]", if (isTelemetryFresh) Rose500 else Slate500)
+            else if (isBatteryLow) Badge("[BATT LOW]", if (isTelemetryFresh) Amber500 else Slate500)
         }
     }
 }
@@ -440,6 +448,8 @@ fun TelemetryBox(
     status: SentinelStatus,
     isTamperDetected: Boolean,
     isBatterySteepDischarge: Boolean,
+    isBatteryLow: Boolean,
+    isBatteryCritical: Boolean,
     maxDrop: String,
     lastSeen: String,
     totalDrop: String,
@@ -505,6 +515,8 @@ fun TelemetryBox(
         status = status,
         isTamperDetected = isTamperDetected,
         isBatterySteepDischarge = isBatterySteepDischarge,
+        isBatteryLow = isBatteryLow,
+        isBatteryCritical = isBatteryCritical,
         maxDrop = maxDrop,
         lastSeen = lastSeen,
         totalDrop = totalDrop,

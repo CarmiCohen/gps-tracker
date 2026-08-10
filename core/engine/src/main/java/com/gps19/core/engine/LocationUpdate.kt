@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
+ * Aug.10.24:
+ * - Issue #130: Proto Health Parity. Added isBatteryLow and isBatteryCritical 
+ *   to maintain forensic parity in viewer mode (R130).
  * Aug.07.129:
  * - Issue #124: GPS Hardware Revival Hardening (R124). Added gpsHardwareLock 
  *   to ensure critical hardware status is carried in telemetry.
@@ -87,7 +90,9 @@ class LocationUpdate(
     var sitTilt: Double = 0.0,
     var sitShock: Double = 0.0,
     var kineticEnergy: Double = 0.0,
-    var isAdaptiveJump: Boolean = false
+    var isAdaptiveJump: Boolean = false,
+    var isBatteryLow: Boolean = false,
+    var isBatteryCritical: Boolean = false
 ) {
     fun copyFrom(other: LocationUpdate) {
         this.lat = other.lat; this.lng = other.lng; this.alt = other.alt
@@ -125,5 +130,7 @@ class LocationUpdate(
         this.sitVzRt = other.sitVzRt; this.sitDz = other.sitDz; this.sitBaro = other.sitBaro
         this.sitTilt = other.sitTilt; this.sitShock = other.sitShock; this.kineticEnergy = other.kineticEnergy
         this.isAdaptiveJump = other.isAdaptiveJump
+        this.isBatteryLow = other.isBatteryLow
+        this.isBatteryCritical = other.isBatteryCritical
     }
 }

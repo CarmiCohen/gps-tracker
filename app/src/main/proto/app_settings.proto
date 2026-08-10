@@ -187,6 +187,10 @@ message RealtimeStatus {
 
     // Issue #669: Forensic Parity for Adaptive Jump
     bool is_adaptive_jump = 62;
+
+    // Issue #130: Proto Health Parity
+    bool is_battery_low = 63;
+    bool is_battery_critical = 64;
 }
 
 message GeoPointProto {
@@ -294,4 +298,8 @@ message TrackerStatusProto {
 
     // Issue #669: Forensic Parity for Adaptive Jump
     bool is_adaptive_jump = 69;
+
+    // Issue #130: Proto Health Parity
+    bool is_battery_low = 70;
+    bool is_battery_critical = 71;
 }

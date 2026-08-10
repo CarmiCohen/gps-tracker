@@ -1,36 +1,44 @@
-# Handover (Aug.10.24) - Forensic Storage Pruning Hardening
+# Handover (Aug.10.25) - Proto Health Parity Completion
 
-## 🎯 Next Objective: [Issue #130-Sentinel] 
-**Proto Health Parity**.
-- **Goal**: Synchronize the `RealtimeStatus` Protobuf definition and `TrackerStatus.writeTo` mapping to include `isBatteryLow` and `isBatteryCritical` flags.
-- **Critical Path**: Update `realtime_status.proto` and regenerate Java/Kotlin sources. Ensure the Viewer's UI correctly interprets these pressure flags for proactive health reporting.
-- **Validation**: Verify that battery pressure states on the Tracker are correctly reflected in the Viewer's Dashboard under stress conditions.
+## 🎯 Next Objective: [Issue #131-Sentinel] Forensic Performance Audit for budget hardware.
+- **Goal**: Analyze I/O latency and battery drain trends on A15 hardware following the Proto Parity expansion.
 
-## 🆕 Recent Architectural Hardening (Issue #129 Resolved)
-- **Battery-Aware Pruning (R129)**: Hardened database maintenance in `LogRepository.kt` and `MainRepository.kt`. Pruning is now deferred or throttled during `isBatteryLow` or `isBatteryCritical` states to prevent I/O-induced power spikes.
-- **Health Propagation**: Integrated battery pressure flags into `SystemHealthState` and `IntegrityMonitor`.
-- **WAL Protection**: Pruning intensity is now dynamically scaled (chunk limit and yielding delay) to minimize Write-Ahead Log (WAL) checkpointing pressure during low-power windows.
+## 🆕 Recent Architectural Hardening (Issue #130 Resolved)
+- **Proto Health Parity (R130)**: Synchronized the `RealtimeStatus` Protobuf definition and `TrackerStatus.writeTo` mapping to include `isBatteryLow` and `isBatteryCritical` flags.
+- **Full-Stack Synchronization**: 
+    - **Protobuf**: Updated `app_settings.proto` (Hot-path binary and persistence parity).
+    - **Engine**: Aligned `:core:engine:LocationUpdate` and `SystemHealthState` with new health flags.
+    - **Persistence**: Implemented `MIGRATION_65_66` and synchronized `HistoryEntity` and `PendingStatusEntity` mappings.
+    - **Ingestion**: Hardened `ConnectivitySuite.kt` and `TelemetryUseCase.kt` to map battery health flags across binary and JSON pipelines.
+- **UI Visibility**: Integrated `[BATT LOW]` (Amber) and `[BATT CRITICAL]` (Rose) badges into the Viewer Dashboard for immediate remote health awareness.
 
-## 📊 Status Tracker
-- **[Issue #129-Sentinel] Forensic Storage Pruning Sensitivity**: 🟢 Resolved. (R129)
-- **[Issue #128-Sentinel] Forensic Metadata Pressure Hardening**: 🟢 Resolved. (R128)
-- **Total Unique Resolutions**: 569 (Verified in `RESOLUTION_ARCHIVE.md` and `issues.md`).
+## 🏗️ Forensic Pipeline Architecture Summary
+The forensic subsystem is now a hardened, multi-tier pipeline:
+1.  **Ingestion**: `ForensicSpillBuffer.kt` uses a 288KB circular `MappedByteBuffer` (V2 format, 96-byte entries). Enforces multi-byte safe UTF-8 truncation.
+2.  **Aggregation**: `TelemetryAggregator.kt` implements stateful tick-gating to prevent "Aggregation Storms".
+3.  **Persistence**: `LogRepository.kt` drains the spill-buffer to Room. Features battery-aware proactive pruning (R129) and health parity (R130).
+4.  **Health**: `IntegrityMonitor.kt` tracks Storage, Power, and Battery pressure, now fully propagated via Protobuf hot-paths.
 
-## 🔍 Forensic Subsystem State (vAug.10.24)
+## 🔍 Forensic Subsystem State (vAug.10.25)
 | Component | Status | Logic / Technical Detail |
 | :--- | :--- | :--- |
-| **Storage** | 🟢 **STABLE** | **R129**: Battery-aware pruning active; WAL pressure mitigated. |
-| **Aggregation** | 🟢 **STABLE** | **R128**: Tick-gating active; Storm-risk eliminated. |
-| **Drain Latency** | 🟢 **STABLE** | **R127**: Zero-lock contention achieved; stall threshold < 5ms. |
-| **Payload Integrity** | 🟢 **STABLE** | **R126**: Safe UTF-8 truncation enforced at 56-byte boundary. |
+| **Telemetry** | 🟢 **STABLE** | **R130**: Proto health parity; full-stack flag propagation. |
+| **Storage** | 🟢 **STABLE** | **R129**: Battery-aware pruning; adaptive WAL yielding. |
+| **Aggregation** | 🟢 **STABLE** | **R128**: Stateful tick-gating; O(1) interval emission. |
+| **Drain Latency** | 🟢 **STABLE** | **R127**: Zero-lock contention; stall threshold < 5ms. |
+
+## 📊 Status Tracker
+- **[Issue #130-Sentinel] Proto Health Parity**: 🟢 Resolved. (R130)
+- **[Issue #129-Sentinel] Forensic Storage Pruning Sensitivity**: 🟢 Resolved. (R129)
+- **Total Unique Resolutions**: 570 (Verified in `RESOLUTION_ARCHIVE.md` and `issues.md`).
 
 ## 🛠️ Git Release Preparation
 ```bash
 git add .
-git commit -m "release: Aug.10.24 - Forensic Storage Pruning Sensitivity (Issue #129)"
-git tag -a vAug.10.24.0 -m "Refactored pruning logic to be battery-aware, preventing I/O spikes during critical battery states."
+git commit -m "release: Aug.10.25 - Proto Health Parity (Issue #130)"
+git tag -a vAug.10.25 -m "Synchronized Protobuf and telemetry hot-paths with battery health flags."
 git push origin main --tags
 ```
 
-**Status**: R129 COMPLETE. STORAGE STABILITY VERIFIED. READY FOR ISSUE #130 PROTO PARITY.
-vAug.10.24.0
+**Status**: R130 COMPLETE. PROTO PARITY VERIFIED. TELEMETRY STACK HARDENED.
+vAug.10.25

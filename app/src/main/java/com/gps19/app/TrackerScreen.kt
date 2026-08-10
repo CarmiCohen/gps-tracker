@@ -32,13 +32,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Aug.10.24:
+ * - Issue #130: Proto Health Parity. Passed isBatteryLow and isBatteryCritical to TelemetryBox.
  * Aug.07.00:
  * - Issue #741: Dashboard & TelemetryBox Recomposition Audit. Refactored TrackerDashboard 
  *   to take fully decomposed primitive parameters instead of monolithic DashboardState (R736).
  *   Hoisted Flow collectors to screen level to optimize recomposition performance.
- * Aug.05.128:
- * - Issue #740: AppMapContainer Recomposition Audit. Refactored call sites to pass 
- *   decomposed primitive parameters instead of monolithic state objects (R736).
  */
 
 @Composable
@@ -230,6 +229,8 @@ fun TrackerScreen(
                                 status = dashboardState.status,
                                 isTamperDetected = dashboardState.isTamperDetected,
                                 isBatterySteepDischarge = dashboardState.isBatterySteepDischarge,
+                                isBatteryLow = dashboardState.isBatteryLow,
+                                isBatteryCritical = dashboardState.isBatteryCritical,
                                 maxDrop = dashboardState.maxDrop,
                                 lastSeen = dashboardState.lastSeen,
                                 totalDrop = dashboardState.totalDrop,
@@ -402,6 +403,8 @@ fun TrackerScreen(
                             status = dashboardState.status,
                             isTamperDetected = dashboardState.isTamperDetected,
                             isBatterySteepDischarge = dashboardState.isBatterySteepDischarge,
+                            isBatteryLow = dashboardState.isBatteryLow,
+                            isBatteryCritical = dashboardState.isBatteryCritical,
                             maxDrop = dashboardState.maxDrop,
                             lastSeen = dashboardState.lastSeen,
                             totalDrop = dashboardState.totalDrop,
@@ -541,6 +544,8 @@ fun TrackerDashboard(
     status: SentinelStatus,
     isTamperDetected: Boolean,
     isBatterySteepDischarge: Boolean,
+    isBatteryLow: Boolean,
+    isBatteryCritical: Boolean,
     maxDrop: String,
     lastSeen: String,
     totalDrop: String,
@@ -619,6 +624,8 @@ fun TrackerDashboard(
                     status = status,
                     isTamperDetected = isTamperDetected,
                     isBatterySteepDischarge = isBatterySteepDischarge,
+                    isBatteryLow = isBatteryLow,
+                    isBatteryCritical = isBatteryCritical,
                     maxDrop = maxDrop,
                     lastSeen = lastSeen,
                     totalDrop = totalDrop,

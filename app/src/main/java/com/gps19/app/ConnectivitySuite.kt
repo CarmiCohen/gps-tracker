@@ -33,6 +33,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Aug.10.24:
+ * - Issue #130: Proto Health Parity. Integrated isBatteryLow and isBatteryCritical 
+ *   into binary and JSON telemetry pipelines (R130).
  * Aug.03.37:
  * - Issue #669: Forensic Audit: Database I/O Contention. Added isTrackerAdaptiveJump 
  *   to restore full forensic parity in viewer mode.
@@ -120,6 +123,8 @@ class ConnectivitySuite @Inject constructor(
     val trackerLocationDetail get() = trackerStatus.gnssDetail
     val isTrackerBatterySteepDischarge get() = trackerStatus.isBatterySteepDischarge
     val isTrackerCoolingModeActive get() = trackerStatus.isCoolingModeActive
+    val isTrackerBatteryLow get() = trackerStatus.isBatteryLow
+    val isTrackerBatteryCritical get() = trackerStatus.isBatteryCritical
     val isTrackerPowerSaveMode get() = trackerStatus.isPowerSaveMode
     val trackerStandbyBucket get() = trackerStatus.standbyBucket
     val trackerNetInterface get() = trackerStatus.netInterface
@@ -360,7 +365,7 @@ class ConnectivitySuite @Inject constructor(
                 trackerState = try { TrackerState.valueOf(entity.trackerState) } catch(e: Exception) { TrackerState.UNKNOWN },
                 isStorageLow = entity.isStorageLow, isStorageCritical = entity.isStorageCritical,
                 isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface,
-                kineticEnergy = 0.0
+                kineticEnergy = 0.0, isBatteryLow = entity.isBatteryLow, isBatteryCritical = entity.isBatteryCritical
             )
             // Issue #596: Flushed updates use NORMAL to avoid blocking live traffic.
             if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) offlineRepository.deletePendingStatusUpdate(entity.id)
@@ -383,7 +388,8 @@ class ConnectivitySuite @Inject constructor(
                     isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical,
                     isPowerSaveMode = status.isPowerSaveMode, standbyBucket = status.standbyBucket,
                     netInterface = status.netInterface, lastValidFixRt = status.lastValidFixRt,
-                    locationPendingReason = status.locationPendingReason.name, trackerState = status.trackerState.name, status = status.status.name
+                    locationPendingReason = status.locationPendingReason.name, trackerState = status.trackerState.name, status = status.status.name,
+                    isBatteryLow = status.isBatteryLow, isBatteryCritical = status.isBatteryCritical
                 ))
             }
         }
@@ -455,7 +461,9 @@ class ConnectivitySuite @Inject constructor(
         tiltIdx: Double = 0.0,
         baroIdx: Double = 0.0,
         kineticEnergy: Double = 0.0,
-        isAdaptiveJump: Boolean = false
+        isAdaptiveJump: Boolean = false,
+        isBatteryLow: Boolean = false,
+        isBatteryCritical: Boolean = false
     ) {
         val trackerStatus = TrackerStatus(
             deviceId = deviceId, viewerId = viewerId, ts = timeProvider.currentTimeMillis(),
@@ -480,7 +488,8 @@ class ConnectivitySuite @Inject constructor(
             tiltIdx = tiltIdx, baroIdx = baroIdx,
             micPending = micPending, isSitDetected = isSitDetected, isSitActive = isSitActive, lastSitTs = lastSitTs,
             verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs, sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
-            kineticEnergy = kineticEnergy, isAdaptiveJump = isAdaptiveJump
+            kineticEnergy = kineticEnergy, isAdaptiveJump = isAdaptiveJump,
+            isBatteryLow = isBatteryLow, isBatteryCritical = isBatteryCritical
         )
         sendTelemetry(trackerStatus)
     }
@@ -553,6 +562,7 @@ class ConnectivitySuite @Inject constructor(
                     status = processed.status, 
                     isLocationPending = statusProto.isLocationPending, locationPendingReason = trackerLocationPendingReason,
                     lastValidFixRt = lastFixRt, isBatterySteepDischarge = statusProto.isBatterySteepDischarge, isCoolingModeActive = statusProto.isCoolingModeActive,
+                    isBatteryLow = statusProto.isBatteryLow, isBatteryCritical = statusProto.isBatteryCritical,
                     trackerState = TrackerStatus.mapProtoToTrackerState(statusProto.state),
                     ts = now,
                     snrIdx = statusProto.snrIdx, noiseIdx = statusProto.noiseIdx, 
@@ -597,7 +607,8 @@ class ConnectivitySuite @Inject constructor(
                         isSitDetected = updatedStatus.isSitDetected, lastSitTs = updatedStatus.lastSitTs,
                         verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitVzTs = updatedStatus.sitVzTs, sitVzRt = updatedStatus.sitVzRt, sitDz = updatedStatus.sitDz,
                         sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock,
-                        kineticEnergy = updatedStatus.kineticEnergy, isAdaptiveJump = updatedStatus.isAdaptiveJump
+                        kineticEnergy = updatedStatus.kineticEnergy, isAdaptiveJump = updatedStatus.isAdaptiveJump,
+                        isBatteryLow = updatedStatus.isBatteryLow, isBatteryCritical = updatedStatus.isBatteryCritical
                     ))
                 }
                 updatedStatus
@@ -723,6 +734,7 @@ class ConnectivitySuite @Inject constructor(
                     status = trackerStatus, isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
                     isLocationPending = isTrackerLocationPending, locationPendingReason = trackerLocationPendingReason,
                     lastValidFixRt = lastFixRt, isBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false), isCoolingModeActive = data.optBoolean("is_cooling_mode_active", false),
+                    isBatteryLow = data.optBoolean("is_battery_low", false), isBatteryCritical = data.optBoolean("is_battery_critical", false),
                     isPowerSaveMode = data.optBoolean("is_power_save_mode", current.isPowerSaveMode), standbyBucket = data.optInt("standby_bucket", current.standbyBucket), netInterface = data.optString("net_interface", current.netInterface),
                     isStorageLow = data.optBoolean("is_storage_low", current.isStorageLow), isStorageCritical = data.optBoolean("is_storage_critical", current.isStorageCritical), 
                     trackerState = try { TrackerState.valueOf(data.optString("tracker_state", "UNKNOWN")) } catch(e: Exception) { current.trackerState }, 
@@ -767,7 +779,8 @@ class ConnectivitySuite @Inject constructor(
                         isSitDetected = updatedStatus.isSitDetected, lastSitTs = updatedStatus.lastSitTs,
                         verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitVzTs = updatedStatus.sitVzTs, sitVzRt = updatedStatus.sitVzRt, sitDz = updatedStatus.sitDz,
                         sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock,
-                        kineticEnergy = updatedStatus.kineticEnergy, isAdaptiveJump = updatedStatus.isAdaptiveJump
+                        kineticEnergy = updatedStatus.kineticEnergy, isAdaptiveJump = updatedStatus.isAdaptiveJump,
+                        isBatteryLow = updatedStatus.isBatteryLow, isBatteryCritical = updatedStatus.isBatteryCritical
                     ))
                 }
                 updatedStatus

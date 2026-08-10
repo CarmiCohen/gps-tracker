@@ -18,6 +18,8 @@ import javax.inject.Singleton
 /**
  * MainRepository: Centralized data hub for the application.
  * Aug.10.24:
+ * - Issue #130: Proto Health Parity. Synchronized HistoryEntity mapping with 
+ *   isBatteryLow and isBatteryCritical flags (R130).
  * - Issue #129: Forensic Storage Pruning Sensitivity. Refactored background 
  *   pruning to be battery-aware, deferring maintenance during critical battery 
  *   states to preserve power and reduce I/O spikes (R129).
@@ -304,6 +306,8 @@ class MainRepository @Inject constructor(
                 hasGps = entity.hasGps,
                 isBatterySteepDischarge = entity.isBatterySteepDischarge,
                 isCoolingModeActive = entity.isCoolingModeActive,
+                isBatteryLow = entity.isBatteryLow,
+                isBatteryCritical = entity.isBatteryCritical,
                 speed = entity.speed, bearing = entity.bearing,
                 currentMa = entity.currentMa,
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE },
@@ -355,6 +359,8 @@ class MainRepository @Inject constructor(
                 isBatterySteepDischarge = point.isBatterySteepDischarge,
                 remoteSig = point.remoteSig,
                 isCoolingModeActive = point.isCoolingModeActive,
+                isBatteryLow = point.isBatteryLow,
+                isBatteryCritical = point.isBatteryCritical,
                 speed = point.speed, bearing = point.bearing,
                 currentMa = point.currentMa,
                 locationPendingReason = point.locationPendingReason.name,

@@ -8,6 +8,9 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.10.24:
+ * - Issue #130: Proto Health Parity. Added isBatteryLow and isBatteryCritical 
+ *   to HistoryEntity and PendingStatusEntity (R130).
  * Aug.08.21:
  * - Issue #125: Forensic Audit: Compression Parity Audit. Added gpsHardwareLock 
  *   to LogEntity to maintain forensic parity with the GPS hardware state (R125).
@@ -104,7 +107,9 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "NONE") val locationPendingReason: String = "NONE",
     @ColumnInfo(defaultValue = "0") val accuracy: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val isAnchorLocked: Boolean = false
+    @ColumnInfo(defaultValue = "0") val isAnchorLocked: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val isBatteryLow: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val isBatteryCritical: Boolean = false
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -153,7 +158,9 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "NONE") val locationPendingReason: String = "NONE",
     @ColumnInfo(defaultValue = "0") val isAnchorLocked: Boolean = false,
     @ColumnInfo(defaultValue = "UNKNOWN") val trackerState: String = "UNKNOWN",
-    @ColumnInfo(defaultValue = "VALID") val status: String = "VALID"
+    @ColumnInfo(defaultValue = "VALID") val status: String = "VALID",
+    @ColumnInfo(defaultValue = "0") val isBatteryLow: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val isBatteryCritical: Boolean = false
 )
 
 @Dao
@@ -211,7 +218,7 @@ interface TrailDao {
 @Dao
 interface HistoryDao {
     @Insert suspend fun insert(point: HistoryEntity)
-    @Insert suspend fun insertAll(points: List<HistoryEntity>)
+    @Insert abstract suspend fun insertAll(points: List<HistoryEntity>)
     @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 1000") fun getHistoryFlow(ribbonKey: String): Flow<List<HistoryEntity>>
     @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 1000") suspend fun getHistory(ribbonKey: String): List<HistoryEntity>
     @Query("DELETE FROM connection_history WHERE ribbonKey = :ribbonKey") suspend fun clearHistory(ribbonKey: String)
@@ -238,7 +245,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 65, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 66, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -265,6 +272,16 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_65_66 = object : Migration(65, 66) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #130: Proto Health Parity
+                db.execSQL("ALTER TABLE connection_history ADD COLUMN isBatteryLow INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE connection_history ADD COLUMN isBatteryCritical INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isBatteryLow INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isBatteryCritical INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         val MIGRATION_64_65 = object : Migration(64, 65) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #125: Add gpsHardwareLock to logs.
@@ -341,7 +358,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_connection_history_ts ON connection_history (ts)")
 
                 // pending_status_updates (Renamed lastValidFixRealtime -> lastValidFixRt)
-                db.execSQL("CREATE TABLE pending_status_updates_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, speed REAL NOT NULL, accuracy REAL NOT NULL, bearing REAL NOT NULL, battery INTEGER NOT NULL, temp REAL NOT NULL, isCharging INTEGER NOT NULL, currentMa INTEGER NOT NULL DEFAULT 0, timestamp INTEGER NOT NULL, gpsTs INTEGER NOT NULL DEFAULT 0, satsView INTEGER NOT NULL, satsUsed INTEGER NOT NULL, name TEXT, maxAccuracy REAL NOT NULL, distToTracker REAL, distToHome REAL, snrIdx REAL NOT NULL DEFAULT 0, tiltIdx REAL NOT NULL DEFAULT 0, baroIdx REAL NOT NULL DEFAULT 0, isBatterySteepDischarge INTEGER NOT NULL DEFAULT 0, isCoolingModeActive INTEGER NOT NULL DEFAULT 0, isSitDetected INTEGER NOT NULL DEFAULT 0, isSitActive INTEGER NOT NULL DEFAULT 0, sitVz REAL NOT NULL DEFAULT 0, sitVzTs INTEGER NOT NULL DEFAULT 0, sitDz REAL NOT NULL DEFAULT 0, verticalVelocity REAL NOT NULL DEFAULT 0, sitBaro REAL NOT NULL DEFAULT 0, sitTilt REAL NOT NULL DEFAULT 0, sitShock REAL NOT NULL DEFAULT 0, isStorageLow INTEGER NOT NULL DEFAULT 0, isStorageCritical INTEGER NOT NULL DEFAULT 0, isPowerSaveMode INTEGER NOT NULL DEFAULT 0, standbyBucket INTEGER NOT NULL DEFAULT -1, netInterface TEXT NOT NULL DEFAULT 'UNKNOWN', lastValidFixRt INTEGER NOT NULL DEFAULT 0, locationPendingReason TEXT NOT NULL DEFAULT 'NONE', isAnchorLocked INTEGER NOT NULL DEFAULT 0, trackerState TEXT NOT NULL DEFAULT 'UNKNOWN')")
+                db.execSQL("CREATE TABLE pending_status_updates_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, speed REAL NOT NULL, accuracy REAL NOT NULL, bearing REAL NOT NULL, battery INTEGER NOT NULL, temp REAL NOT NULL, isCharging INTEGER NOT NULL, currentMa INTEGER NOT NULL DEFAULT 0, timestamp INTEGER NOT NULL, gpsTs INTEGER NOT NULL DEFAULT 0, satsView INTEGER NOT NULL, satsUsed INTEGER NOT NULL, name TEXT, maxAccuracy REAL NOT NULL, distToTracker REAL, distToHome REAL, snrIdx REAL NOT NULL DEFAULT 0, tiltIdx REAL NOT NULL DEFAULT 0, baroIdx REAL NOT NULL DEFAULT 0, isBatterySteepDischarge INTEGER NOT NULL DEFAULT 0, isCoolingModeActive INTEGER NOT NULL DEFAULT 0, isXiaomiAutostartGranted INTEGER NOT NULL DEFAULT 0, isSitDetected INTEGER NOT NULL DEFAULT 0, isSitActive INTEGER NOT NULL DEFAULT 0, sitVz REAL NOT NULL DEFAULT 0, sitVzTs INTEGER NOT NULL DEFAULT 0, sitDz REAL NOT NULL DEFAULT 0, verticalVelocity REAL NOT NULL DEFAULT 0, sitBaro REAL NOT NULL DEFAULT 0, sitTilt REAL NOT NULL DEFAULT 0, sitShock REAL NOT NULL DEFAULT 0, isStorageLow INTEGER NOT NULL DEFAULT 0, isStorageCritical INTEGER NOT NULL DEFAULT 0, isPowerSaveMode INTEGER NOT NULL DEFAULT 0, standbyBucket INTEGER NOT NULL DEFAULT -1, netInterface TEXT NOT NULL DEFAULT 'UNKNOWN', lastValidFixRt INTEGER NOT NULL DEFAULT 0, locationPendingReason TEXT NOT NULL DEFAULT 'NONE', isAnchorLocked INTEGER NOT NULL DEFAULT 0, trackerState TEXT NOT NULL DEFAULT 'UNKNOWN')")
                 db.execSQL("INSERT INTO pending_status_updates_new SELECT id, lat, lng, speed, accuracy, bearing, battery, temp, isCharging, currentMa, timestamp, gpsTs, satsView, satsUsed, name, maxAccuracy, distToTracker, distToHome, snrIdx, tiltIdx, baroIdx, isBatterySteepDischarge, isCoolingModeActive, isXiaomiAutostartGranted, isSitDetected, isSitActive, sitVz, sitVzTs, sitDz, verticalVelocity, sitBaro, sitTilt, sitShock, isStorageLow, isStorageCritical, isPowerSaveMode, standbyBucket, netInterface, lastValidFixRealtime, locationPendingReason, isAnchorLocked, trackerState FROM pending_status_updates")
                 db.execSQL("DROP TABLE pending_status_updates"); db.execSQL("ALTER TABLE pending_status_updates_new RENAME TO pending_status_updates")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_status_updates_timestamp ON pending_status_updates (timestamp)")

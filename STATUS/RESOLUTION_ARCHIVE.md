@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 569**
+**Total Unique Resolutions: 570**
+
+## 10. Forensic Proto Alignment (Aug.10.25)
+*   **Issue #130-Sentinel: Proto Health Parity**.
+    *   **Resolution**: Synchronized the `RealtimeStatus` Protobuf definition and `TrackerStatus.writeTo` mapping to include `isBatteryLow` and `isBatteryCritical` flags. Hardened the entire telemetry pipeline (Binary, JSON, Persistence, and UI) to ensure forensic health parity between the Tracker and Viewer. Implemented Migration 66 to support battery-aware history and pending updates (R130).
 
 ## 9. Forensic Storage Hardening (Aug.10.24)
 *   **Issue #129-Sentinel: Forensic Storage Pruning Sensitivity**.

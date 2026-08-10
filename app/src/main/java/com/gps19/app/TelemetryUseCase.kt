@@ -5,6 +5,9 @@ import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * Aug.10.24:
+ * - Issue #130: Proto Health Parity. Synchronized isBatteryLow and isBatteryCritical 
+ *   mapping across all health ingestion paths (R130).
  * Aug.07.130:
  * - Issue #124: GPS Hardware Revival Hardening (R124). Propagating gpsHardwareLock 
  *   in mapHealthFromUpdate and mapHealthFromStatus.
@@ -74,7 +77,9 @@ class TelemetryUseCase @Inject constructor(
             isStorageLow = update.isStorageLow,
             isStorageCritical = update.isStorageCritical,
             isBatterySteepDischarge = update.isBatterySteepDischarge,
-            isCoolingModeActive = update.isCoolingModeActive
+            isCoolingModeActive = update.isCoolingModeActive,
+            isBatteryLow = update.isBatteryLow,
+            isBatteryCritical = update.isBatteryCritical
         )
         
         if (update.maxTemp > 0.0) current.maxTemp = update.maxTemp
@@ -140,6 +145,8 @@ class TelemetryUseCase @Inject constructor(
         current.isStorageCritical = status.isStorageCritical
         current.isBatterySteepDischarge = status.isBatterySteepDischarge
         current.isCoolingModeActive = status.isCoolingModeActive
+        current.isBatteryLow = status.isBatteryLow
+        current.isBatteryCritical = status.isBatteryCritical
         current.gpsHardwareLock = status.locationPendingReason == LocationPendingReason.GPS_STALL // Approximate mapping for status
         current.gnssDetail = status.gnssDetail
         current.snrIdx = status.snrIdx

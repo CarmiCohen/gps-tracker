@@ -11,6 +11,8 @@ import java.util.*
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
  * Aug.10.24:
+ * - Issue #130: Proto Health Parity. Synchronized RealtimeStatus writeTo with 
+ *   isBatteryLow and isBatteryCritical flags (R130).
  * - Issue #129: Forensic Storage Pruning Sensitivity. Added isBatteryLow and 
  *   isBatteryCritical to TrackerStatus for remote health visibility (R129).
  * Aug.08.21:
@@ -90,6 +92,8 @@ data class ConnectionPoint(
     val isTick: Boolean = false, val hasGps: Boolean = false,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
+    val isBatteryLow: Boolean = false,
+    val isBatteryCritical: Boolean = false,
     val speed: Double = 0.0, val bearing: Double = 0.0,
     val currentMa: Int = 0,
     val status: SentinelStatus = SentinelStatus.VALID,
@@ -410,6 +414,8 @@ data class TrackerStatus(
             .setIsClockRegression(isClockRegression)
             .setKineticEnergy(kineticEnergy)
             .setIsAdaptiveJump(isAdaptiveJump)
+            .setIsBatteryLow(isBatteryLow)
+            .setIsBatteryCritical(isBatteryCritical)
     }
 
     fun toProto(fromViewer: Boolean): RealtimeStatus {

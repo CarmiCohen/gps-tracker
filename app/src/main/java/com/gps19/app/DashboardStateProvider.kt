@@ -7,6 +7,9 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard states.
+ * Aug.10.24:
+ * - Issue #130: Proto Health Parity. Integrated isBatteryLow and isBatteryCritical 
+ *   into DashboardState mapping (R130).
  * Aug.01.10:
  * - Issue #668: Performance: Object Churn. Fixed smart-cast issue with mutable gnssDetail.
  * July.28.24:
@@ -155,7 +158,9 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             isCoolingModeActive = health.isCoolingModeActive,
             trackerCurrentMa = sensorVal("${health.currentMa}mA"),
             isLocationPending = health.isLocationPending,
-            locationPendingReason = health.locationPendingReason
+            locationPendingReason = health.locationPendingReason,
+            isBatteryLow = health.isBatteryLow,
+            isBatteryCritical = health.isBatteryCritical
         )
     }
 
