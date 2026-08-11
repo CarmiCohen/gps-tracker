@@ -44,12 +44,14 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Aug.11.00:
+ * - Issue #137: UI Davey/ANR Remediation. Resolved 3000ms stall by implementing 
+ *   Deferred UI Hydration (R137) in SettingsComponents.kt.
+ * Aug.10.32:
+ * - Issue #137: Performance: Identified ANR on Settings Overlay entry.
  * Aug.10.31:
  * - Issue #135: UI Davey/ANR Mitigation. Refactored DiagnosticsScreen and 
  *   PhoneSetupOverlay call sites to pass decomposed parameters (R135).
- * Aug.10.29:
- * - Issue #658: Performance: Startup Transition Hardening. Implemented R658 by 
- *   replacing LANDING_PAGE_PAUSE_MS with STARTUP_SETTLING_DELAY_MS (3000ms).
  */
 @Composable
 fun MainAppContent(

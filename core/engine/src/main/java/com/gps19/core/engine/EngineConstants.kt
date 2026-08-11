@@ -2,15 +2,14 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.11.00:
+ * - Issue #137: UI Davey/ANR Remediation. Resolved 3000ms stall by implementing 
+ *   Deferred UI Hydration (R137) in SettingsComponents.kt.
+ * Aug.10.32:
+ * - Issue #137: Performance: Identified ANR on Settings Overlay entry.
  * Aug.10.29:
- * - Issue #134: Forensic Pulse Frequency Hardening. Added FORENSIC_PULSE_INTERVAL_MS (10s) 
+ * - Issue #134: Forensic Pulse Frequency Hardening. Added FORENSIC_PULSE_INTERVAL_MS 
  *   for high-frequency anomaly detection (R134).
- * Aug.10.27:
- * - Issue #133: Forensic Anomaly Correlation Engine. Added thresholds for 
- *   Silent Failure detection (CPU/IO/Latency correlation) (R133).
- * Aug.10.27:
- * - Issue #132: Forensic UI Dashboard Refinement. Added ribbon scaling constants 
- *   for CPU, I/O, and Latency trends (R132).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
