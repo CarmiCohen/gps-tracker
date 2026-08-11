@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.11.03 (R139 Resolved)
+# System Source of Truth (SoT) - Aug.11.04 (R136 Resolved)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Compose Preview Coverage Authority (R136)**: (Added Aug.11.04) The system MUST maintain functional Compose Previews for all decomposed overlays (`SettingsOverlay`, `PhoneSetupOverlay`). Previews MUST support mock hydration states to verify both loading and rendered UI paths without requiring a full application build (Issue #136). **Status: Implemented.**
 *   **TrackerScreen ANR Remediation (R139)**: (Added Aug.11.02) The system MUST eliminate the 3000ms+ Main-thread stall occurring during the transition from LandingScreen to TrackerScreen on budget hardware (Samsung A15 class). UI composition and state collection MUST be optimized to ensure frame integrity (Issue #139). **Status: Implemented (Deferred UI Hydration).**
 *   **Settings Overlay ANR Remediation (R137)**: (Added Aug.10.32) The system MUST eliminate the 3000ms+ Main-thread stall occurring during the transition to the Settings overlay. Navigation to configuration screens MUST be non-blocking and decoupled from high-frequency telemetry processing (Issue #137). **Status: Implemented.**
 *   **UI Transition Stabilization for Budget Hardware (R135)**: (Added Aug.10.30) The system MUST ensure that transitions to complex overlays (Settings, Phone Setup, Diagnostics) do not exceed a 500ms Main-thread stall on budget hardware (Samsung A15 class). Telemetry flow updates and UI recomposition MUST be staggered or throttled during active transitions to prevent OS ANR dialogs. (Issue #135). **Status: Implemented.**
@@ -34,5 +35,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) The historical resolution record MUST be synchronized across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.11.03.
+*   **Current Release**: Aug.11.04.
 *   **Source of Truth**: app/build.gradle versionName.

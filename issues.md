@@ -1,24 +1,29 @@
-# Project Issues & Hardening Tracking (Aug.11.03)
+# Project Issues & Hardening Tracking (Aug.11.04)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 PENDING | 1 |
+| **Open Technical Issues** | 🟢 STABLE | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 578 |
+| **Resolved (Total)** | 🟢 Progress | 579 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #136] [Severity: Low] [Category: Performance] Compose Preview Coverage Gap.**
-    *   **Concern**: The recent decomposition of overlays significantly changed their signatures. Compose Previews for `SettingsOverlay` and `PhoneSetupOverlay` need to be updated to ensure visual regression testing remains viable. (R136)
+*   (None)
 
 ---
 
 ## 🔴 Open Issues
-*   **[Issue #136] Update Compose Previews for Decomposed Overlays.** (Low Priority)
+*   (None)
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.11.04)
+*   **[Issue #136] [Severity: Low] [Category: Performance] Compose Preview Coverage Gap.**
+    *   **Resolution**: Restored Compose Preview functionality for `SettingsOverlay` and `PhoneSetupOverlay` in `SettingsComponents.kt`. Updated signatures to support decomposed parameters and added `isHydrated` mock support to verify rendering paths (R136).
 
 ---
 
@@ -39,4 +44,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Implemented **Deferred UI Hydration** (R137) in `SettingsComponents.kt`. By deferring content rendering by 100-150ms using `LaunchedEffect` and an `isHydrated` gate, the main thread is able to prioritize overlay transition animations, eliminating 3000ms+ stalls. (R137)
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.03)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.04)

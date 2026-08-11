@@ -23,11 +23,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.tooling.preview.Preview
 import com.gps19.core.engine.*
 import kotlinx.coroutines.delay
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Aug.11.04:
+ * - Issue #136: Restored Compose Preview coverage for SettingsOverlay and 
+ *   PhoneSetupOverlay following the R135/R137 decomposition (R136).
  * Aug.11.00:
  * - Issue #137: UI Davey/ANR Remediation. Implemented Deferred UI Hydration 
  *   (R137) to prevent 3000ms+ main-thread stalls during overlay entry. 
@@ -350,4 +354,53 @@ fun GuideSection(title: String, description: String, onClick: () -> Unit, button
         if (isCompleted == false && !reason.isNullOrEmpty()) { Text("Reason: $reason", color = Amber500, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 28.dp, top = 2.dp)) }
         Text(description, color = Slate500, fontSize = 12.sp, modifier = Modifier.padding(start = 28.dp)); if (buttonText.isNotEmpty() && buttonText != stringResource(R.string.setup_info_only)) { Spacer(Modifier.height(4.dp)); Button(onClick = onClick, modifier = Modifier.padding(start = 28.dp).height(32.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)) { Text(buttonText, fontSize = 11.sp) } }
     }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F172A)
+@Composable
+fun SettingsOverlayPreview() {
+    SettingsOverlay(
+        activeSubSettings = null,
+        draftDeviceId = "TRK-001",
+        draftViewerId = "VIEW-001",
+        draftRelayUrl = "wss://relay.example.com",
+        draftMaxDistance = "100",
+        draftAlertSettings = AlertSettings(),
+        selectedSirenType = "Siren",
+        isSirenPlaying = false,
+        onClose = {},
+        onImportConfig = {},
+        onFullInitialization = {},
+        onUpdateDeviceId = {},
+        onUpdateViewerId = {},
+        onUpdateRelayUrl = {},
+        onUpdateMaxDistance = {},
+        onUpdateAlertSettings = {},
+        onUpdateSirenType = {},
+        onUpdateAlarmVolume = {},
+        onTestSiren = {},
+        onEvent = {}
+    )
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF020617)
+@Composable
+fun PhoneSetupOverlayPreview() {
+    PhoneSetupOverlay(
+        onClose = {},
+        onWhitelist = {},
+        onOverlay = {},
+        onAppInfo = {},
+        onExactAlarm = {},
+        onHardwarePermission = {},
+        onRefresh = {},
+        onTestAlarm = {},
+        permissions = PermissionState(
+            isFineLocationGranted = true,
+            isBatteryWhitelisted = false,
+            isOverlayGranted = true
+        ),
+        homePointsCount = 0,
+        isTrackerMode = true
+    )
 }

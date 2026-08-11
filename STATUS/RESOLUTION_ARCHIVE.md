@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 578**
+**Total Unique Resolutions: 579**
+
+## 19. Compose Preview Restoration (Aug.11.04)
+*   **Issue #136: Update Compose Previews for Decomposed Overlays**.
+    *   **Resolution**: Restored Compose Preview functionality for `SettingsOverlay` and `PhoneSetupOverlay` in `SettingsComponents.kt`. Previews were updated to support the decomposed primitive parameters and hydration gating (`isHydrated`) introduced in R135/R137. This ensures visual regression testing is available for high-complexity overlays without requiring a full device deployment. (R136)
 
 ## 18. Tracker Mode Transition Hardening (Aug.11.03)
 *   **Issue #139: Persistent ANR on Tracker Mode Transition**.
