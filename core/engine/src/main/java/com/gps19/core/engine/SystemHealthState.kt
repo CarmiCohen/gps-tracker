@@ -4,15 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Aug.11.08:
+ * - Issue #143: Forensic Integrity Verification. Added isThermalThrottling 
+ *   to track load-correlated location stalls under heat (R133).
  * Aug.10.27:
  * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure 
  *   to track load-correlated location stalls (R133).
- * Aug.10.26:
- * - Issue #131: Forensic Performance Audit. Added maxIoLatency to track 
- *   performance spikes on budget hardware (A15) (R131).
- * Aug.10.24:
- * - Issue #129: Forensic Storage Pruning Sensitivity. Added isBatteryLow and 
- *   isBatteryCritical to support battery-aware adaptive pruning (R129).
  */
 @Serializable
 class SystemHealthState(
@@ -58,7 +55,8 @@ class SystemHealthState(
     // Performance & Load Correlation (Issue #711/R711)
     var cpuLoad: Double = 0.0,
     var ioWait: Double = 0.0,
-    var maxIoLatency: Long = 0L, // Issue #131: Max I/O latency in ms
+    var maxIoLatency: Long = 0L, 
+    var isThermalThrottling: Boolean = false,
 
     // Forensic Persistence Health (Issue #714/R714)
     var forensicReliability: Double = 1.0,
@@ -155,6 +153,7 @@ class SystemHealthState(
         this.cpuLoad = other.cpuLoad
         this.ioWait = other.ioWait
         this.maxIoLatency = other.maxIoLatency
+        this.isThermalThrottling = other.isThermalThrottling
         this.forensicReliability = other.forensicReliability
         this.uptimeMs = other.uptimeMs
         this.lastConnTs = other.lastConnTs
@@ -197,7 +196,7 @@ class SystemHealthState(
         this.isBatteryCritical = other.isBatteryCritical
         this.isSilentFailure = other.isSilentFailure
     }
-    
+
     fun update(
         signalLoss: Boolean, gpsStalled: Boolean, gpsHardwareLock: Boolean, localInternetLoss: Boolean, isHardwareOnline: Boolean,
         batteryLevel: Int, batteryTemp: Double, isCharging: Boolean, currentMa: Int,
@@ -211,7 +210,7 @@ class SystemHealthState(
         cpuLoad: Double = 0.0, ioWait: Double = 0.0, forensicReliability: Double = 1.0,
         vibration: Double = 0.0, storageAvailableMb: Long = 0L, storageTotalMb: Long = 0L,
         isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false, maxIoLatency: Long = 0L,
-        isSilentFailure: Boolean = false
+        isSilentFailure: Boolean = false, isThermalThrottling: Boolean = false
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -249,13 +248,14 @@ class SystemHealthState(
         this.cpuLoad = cpuLoad
         this.ioWait = ioWait
         this.maxIoLatency = maxIoLatency
+        this.isThermalThrottling = isThermalThrottling
         this.forensicReliability = forensicReliability
         this.vibration = vibration
         this.isBatteryLow = isBatteryLow
         this.isBatteryCritical = isBatteryCritical
         this.isSilentFailure = isSilentFailure
     }
-
+    
     fun reset() {
         signalLoss = false
         gpsStalled = false
@@ -298,6 +298,7 @@ class SystemHealthState(
         cpuLoad = 0.0
         ioWait = 0.0
         maxIoLatency = 0L
+        isThermalThrottling = false
         forensicReliability = 1.0
         uptimeMs = 0L
         lastConnTs = 0L

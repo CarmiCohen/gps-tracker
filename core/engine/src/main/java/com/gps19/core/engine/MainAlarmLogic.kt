@@ -5,15 +5,12 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Aug.11.08:
+ * - Issue #143: Forensic Integrity Verification. Updated Silent Failure 
+ *   detection to include thermal throttling in correlation logic (R133).
  * Aug.10.30:
  * - Issue #133: Forensic Anomaly Correlation Engine. Integrated ALERT_ID_SILENT_FAILURE 
  *   into violation engine via SentinelValidator.isSilentFailure (R133).
- * Aug.07.08:
- * - Issue #124: GPS Hardware Revival Hardening (R124). Integrated
- *   ALERT_ID_GPS_HARDWARE_LOCK into violation detection engine.
- * Aug.07.07:
- * - Issue #747: Event & Alert Text Unification (R747). Hardened local event 
- *   subtitles with "this device" references for locality clarity.
  */
 object MainAlarmLogic {
 
@@ -473,7 +470,8 @@ object MainAlarmLogic {
                 isTamperDetected = health.isTamperDetected,
                 cpuLoad = health.cpuLoad,
                 ioWait = health.ioWait,
-                maxIoLatency = health.maxIoLatency
+                maxIoLatency = health.maxIoLatency,
+                isThermalThrottling = health.isThermalThrottling
             )
 
             val silentSubtitle = if (isSilentFailure) {

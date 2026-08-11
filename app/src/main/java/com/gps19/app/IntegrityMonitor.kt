@@ -2,7 +2,6 @@ package com.gps19.app
 
 import android.app.usage.UsageStatsManager
 import android.content.Context
-import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import com.gps19.core.engine.*
@@ -26,15 +25,11 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.11.08:
+ * - Issue #143: Forensic Integrity Verification. Mapped Thermal Throttling to 
+ *   Silent Failure correlation engine (R133). Corrected NetworkCapabilities import.
  * Aug.11.00:
- * - Issue #137: UI Davey/ANR Remediation. Incremented versioning following 
- *   Settings Overlay optimization (Deferred UI Hydration).
- * Aug.10.32:
- * - Issue #137: Performance: Identified ANR on Settings Overlay entry during 
- *   monitoring. Documented in issues.md.
- * Aug.10.29:
- * - Issue #134: Forensic Pulse Frequency Hardening. Increased heartbeat frequency 
- *   to 10s (FORENSIC_PULSE_INTERVAL_MS).
+ * - Issue #137: UI Davey/ANR Remediation.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -196,7 +191,8 @@ class IntegrityMonitor @Inject constructor(
                 isTamperDetected = h.isTamperDetected,
                 cpuLoad = cpu,
                 ioWait = iow,
-                maxIoLatency = maxIo
+                maxIoLatency = maxIo,
+                isThermalThrottling = h.isThermalThrottling
             )
             
             if (isSilent && !h.isSilentFailure) {
@@ -284,6 +280,7 @@ class IntegrityMonitor @Inject constructor(
             h.maxTemp = maxTemp
             h.isCharging = isCharging
             h.isCoolingModeActive = isCooling
+            h.isThermalThrottling = isCooling // R133: Link thermal state to throttling flag
             h.isBatterySteepDischarge = isSteepDischarge
             h.currentMa = status.currentMa
             h.isBatteryLow = status.isLow

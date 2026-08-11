@@ -5,13 +5,12 @@ import kotlin.math.max
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Aug.11.08:
+ * - Issue #143: Forensic Integrity Verification. Updated isSilentFailure 
+ *   to correlate GPS stalls with thermal throttling (R133).
  * Aug.10.27:
  * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure 
  *   to correlate GPS stalls with CPU/IO resource exhaustion (R133).
- * July.30.48:
- * - Issue #653: Performance: GC Churn Optimization. Refactored updateKineticEnergy 
- *   into separate primitive calculators to eliminate Pair allocation in high-frequency 
- *   accelerometer path (R-HARDWARE-01 compliance).
  */
 object SentinelValidator {
 
@@ -66,13 +65,15 @@ object SentinelValidator {
         isTamperDetected: Boolean,
         cpuLoad: Double,
         ioWait: Double,
-        maxIoLatency: Long
+        maxIoLatency: Long,
+        isThermalThrottling: Boolean
     ): Boolean {
         if (!gpsStalled || isTamperDetected) return false
         
         return cpuLoad >= SILENT_FAILURE_CPU_THRESHOLD || 
                ioWait >= SILENT_FAILURE_IOW_THRESHOLD || 
-               maxIoLatency >= SILENT_FAILURE_LATENCY_THRESHOLD_MS
+               maxIoLatency >= SILENT_FAILURE_LATENCY_THRESHOLD_MS ||
+               isThermalThrottling
     }
 
     /**
@@ -94,7 +95,6 @@ object SentinelValidator {
 
     /**
      * computeNextHpf: Part of Issue #601/653. High-Pass Filter primitive.
-     * July.30.48: Replaces updateKineticEnergy to eliminate Pair allocation.
      */
     fun computeNextHpf(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double {
         return VIBRATION_HPF_ALPHA * (lastHpfValue + currentRawVibe - lastRawVibe)
@@ -102,7 +102,6 @@ object SentinelValidator {
 
     /**
      * computeNextEnergy: Part of Issue #601/653. Energy EMA primitive.
-     * July.30.48: Replaces updateKineticEnergy to eliminate Pair allocation.
      */
     fun computeNextEnergy(currentEnergy: Double, hpfValue: Double): Double {
         val instantEnergy = abs(hpfValue)
