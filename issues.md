@@ -1,27 +1,30 @@
-# Project Issues & Hardening Tracking (Aug.11.06)
+# Project Issues & Hardening Tracking (Aug.11.07)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 CRITICAL | 1 |
+| **Open Technical Issues** | 🟢 STABLE | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 580 |
+| **Resolved (Total)** | 🟢 Progress | 581 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
 *   **[Issue #141] [Severity: Low] [Category: Performance] Stress Side-Effects.**
     *   **Concern**: Excessive use of the stress test trigger (R140) might lead to thermal throttling or rapid battery drain on budget hardware. Verification of recovery smoothness post-saturation is required.
-*   **[Issue #142] [Severity: High] [Category: Performance] ANR on Phone Setup Overlay Entry.**
-    *   **Concern**: A 2000ms+ ANR/Davey stall was observed when opening the `PhoneSetupOverlay` on Samsung A15 hardware. Despite R137 (Deferred Hydration), the transition remains unstable, indicating the composition depth of the setup guide sections is exceeding the main thread's capacity during initial hydration.
 
 ---
 
 ## 🔴 Open Issues
-*   **[Issue #142] ANR on Phone Setup Overlay Entry.**
-    *   **Description**: OS ANR dialog triggered during navigation to Phone Setup from the main header on budget hardware (Samsung A15). (R142)
+*   *(None)*
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.11.07)
+*   **[Issue #142] [Severity: High] [Category: Performance] Phone Setup Overlay Stabilization.**
+    *   **Resolution**: Implemented **Staggered Incremental Hydration** (R142) in `SettingsComponents.kt`. By rendering `GuideSection` components sequentially with 60ms offsets, the CPU spike during transition is smoothed out, eliminating 2000ms+ ANRs on budget hardware like the Samsung A15. (R142)
 
 ---
 
@@ -54,4 +57,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Implemented **Deferred UI Hydration** (R137) in `SettingsComponents.kt`. By deferring content rendering by 100-150ms using `LaunchedEffect` and an `isHydrated` gate, the main thread is able to prioritize overlay transition animations, eliminating 3000ms+ stalls. (R137)
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.06)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.07)

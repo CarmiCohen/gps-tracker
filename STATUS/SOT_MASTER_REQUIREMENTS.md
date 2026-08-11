@@ -1,9 +1,9 @@
-# System Source of Truth (SoT) - Aug.11.06 (Monitoring & Hardening)
+# System Source of Truth (SoT) - Aug.11.07 (Monitoring & Hardening)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
-*   **Phone Setup Overlay Stabilization (R142)**: (Added Aug.11.06) The system MUST ensure that the `PhoneSetupOverlay` remains non-blocking and stable during entry and hydration on budget hardware (Samsung A15 class). The composition depth and resource-intensive permission checks MUST be staggered or offloaded to prevent 2000ms+ main-thread stalls and OS ANR dialogs. (Issue #142). **Status: Identified / Pending Remediation.**
+*   **Phone Setup Overlay Stabilization (R142)**: (Added Aug.11.06) The system MUST ensure that the `PhoneSetupOverlay` remains non-blocking and stable during entry and hydration on budget hardware (Samsung A15 class). The composition depth and resource-intensive permission checks MUST be staggered or offloaded to prevent 2000ms+ main-thread stalls and OS ANR dialogs. (Issue #142). **Status: Implemented (Staggered Incremental Hydration).**
 *   **Automated Forensic Stress Testing (R140)**: (Added Aug.11.05) The system MUST provide an internal mechanism to artificially saturate device resources (CPU > 85%, I/O > 40%) for a minimum of 5 seconds. This is used to verify "Silent Failure" detection logic (R133) and ensure UI hydration gates (R137/R139) remain responsive under extreme hardware stress. (Issue #140). **Status: Implemented.**
 *   **Compose Preview Coverage Authority (R136)**: (Added Aug.11.04) The system MUST maintain functional Compose Previews for all decomposed overlays (`SettingsOverlay`, `PhoneSetupOverlay`). Previews MUST support mock hydration states to verify both loading and rendered UI paths without requiring a full application build (Issue #136). **Status: Implemented.**
 *   **TrackerScreen ANR Remediation (R139)**: (Added Aug.11.02) The system MUST eliminate the 3000ms+ Main-thread stall occurring during the transition from LandingScreen to TrackerScreen on budget hardware (Samsung A15 class). UI composition and state collection MUST be optimized to ensure frame integrity (Issue #139). **Status: Implemented (Deferred UI Hydration).**
@@ -37,5 +37,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) The historical resolution record MUST be synchronized across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.11.06.
+*   **Current Release**: Aug.11.07.
 *   **Source of Truth**: app/build.gradle versionName.

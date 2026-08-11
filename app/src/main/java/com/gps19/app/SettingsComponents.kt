@@ -29,16 +29,17 @@ import kotlinx.coroutines.delay
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Aug.11.06:
+ * - Issue #142: Phone Setup Overlay Stabilization. Implemented Staggered 
+ *   Incremental Hydration (R142) to prevent ANRs on budget hardware (Samsung A15). 
+ *   GuideSection components are now rendered sequentially with 60ms offsets to 
+ *   avoid exceeding main-thread frame budget during transition.
  * Aug.11.04:
  * - Issue #136: Restored Compose Preview coverage for SettingsOverlay and 
  *   PhoneSetupOverlay following the R135/R137 decomposition (R136).
  * Aug.11.00:
  * - Issue #137: UI Davey/ANR Remediation. Implemented Deferred UI Hydration 
  *   (R137) to prevent 3000ms+ main-thread stalls during overlay entry. 
- *   Content rendering is deferred by 100ms to allow transition stabilization.
- * Aug.10.31:
- * - Issue #135: UI Davey/ANR Mitigation. Refactored all overlays to use 
- *   fully decomposed primitive parameters.
  */
 
 @Composable
@@ -250,86 +251,127 @@ fun PhoneSetupOverlay(
     permissions: PermissionState,
     homePointsCount: Int, isTrackerMode: Boolean, onGoToMap: () -> Unit = {}
 ) {
-    // Issue #137: Deferred hydration for Setup Overlay
-    var isHydrated by remember { mutableStateOf(false) }
+    // Issue #142: Staggered Incremental Hydration. 
+    // Instead of one monolithic hydration gate, we reveal sections one by one.
+    var visibleCount by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
-        delay(150) // Setup is even heavier due to multiple build-checks
-        isHydrated = true
+        delay(100) // Initial delay for container animation
+        repeat(15) { // Up to 15 sections/spacers
+            visibleCount++
+            delay(60) // 60ms delay ensures each section renders in its own frame(s) on low-end A15
+        }
     }
 
-    val manufacturer = Build.MANUFACTURER.uppercase(); val model = Build.MODEL.uppercase()
+    val manufacturer = remember { Build.MANUFACTURER.uppercase() }
+    val model = remember { Build.MODEL.uppercase() }
+    val recentsLockDesc = remember { getRecentsLockDescription() }
+    val batteryOptDesc = remember { getBatteryOptimizationDescription() }
+    val autoStartDesc = remember { getAutoStartDescription() }
+
     Card(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().navigationBarsPadding(), colors = CardDefaults.cardColors(containerColor = Slate950)) {
-        if (isHydrated) {
+        if (visibleCount > 0) {
             Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column { Text("Phone Setup", color = BrandJd, fontSize = 24.sp, fontWeight = FontWeight.Bold); Text(stringResource(R.string.setup_detected_device, manufacturer, model), color = Slate500, fontSize = 10.sp) } }
-                Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step1_title), getRecentsLockDescription(), {}, stringResource(R.string.setup_info_only), if (permissions.requiresWakeLockRenewal) true else null, Icons.Default.Lock)
-                Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), getBatteryOptimizationDescription(), onWhitelist, stringResource(R.string.btn_open_settings), permissions.isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!permissions.isBatteryWhitelisted) "Battery Optimization: Unrestricted mode NOT active" else null)
-                Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step3_title), stringResource(R.string.setup_step3_desc), onOverlay, stringResource(R.string.btn_authorize), permissions.isOverlayGranted, Icons.Default.Layers, reason = if (!permissions.isOverlayGranted) "Appear on Top: Permission NOT granted" else null)
-                Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step4_title), stringResource(R.string.setup_step4_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isMicrophoneGranted, Icons.Default.Mic, reason = if (!permissions.isMicrophoneGranted) "Microphone: Permission NOT granted" else null)
-                Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step5_title), description = getAutoStartDescription(), onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBatteryWhitelisted, icon = Icons.Default.PlayCircle, reason = if (!permissions.isBatteryWhitelisted) "Manual verification required: Ensure 'Unrestricted' battery mode and 'Background activity' are allowed in system settings." else null)
-                Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step6_title), stringResource(R.string.setup_step6_desc), {}, stringResource(R.string.setup_info_only), null, Icons.Default.Wifi)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step7_title), stringResource(R.string.setup_step7_desc), onExactAlarm, stringResource(R.string.btn_authorize), permissions.isExactAlarmGranted, Icons.Default.Alarm, reason = if (!permissions.isExactAlarmGranted) "Exact Alarms: Permission NOT granted" else null) }
                 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    Spacer(Modifier.height(16.dp)); GuideSection(title = "Notification Alerts", description = "Required to show status and critical alerts in the notification shade.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isPostNotificationsGranted, icon = Icons.Default.Notifications, reason = if (!permissions.isPostNotificationsGranted) "Notifications: Permission NOT granted" else null)
+                if (visibleCount >= 1) {
+                    Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step1_title), recentsLockDesc, {}, stringResource(R.string.setup_info_only), if (permissions.requiresWakeLockRenewal) true else null, Icons.Default.Lock)
+                }
+                if (visibleCount >= 2) {
+                    Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), batteryOptDesc, onWhitelist, stringResource(R.string.btn_open_settings), permissions.isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!permissions.isBatteryWhitelisted) "Battery Optimization: Unrestricted mode NOT active" else null)
+                }
+                if (visibleCount >= 3) {
+                    Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step3_title), stringResource(R.string.setup_step3_desc), onOverlay, stringResource(R.string.btn_authorize), permissions.isOverlayGranted, Icons.Default.Layers, reason = if (!permissions.isOverlayGranted) "Appear on Top: Permission NOT granted" else null)
+                }
+                if (visibleCount >= 4) {
+                    Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step4_title), stringResource(R.string.setup_step4_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isMicrophoneGranted, Icons.Default.Mic, reason = if (!permissions.isMicrophoneGranted) "Microphone: Permission NOT granted" else null)
+                }
+                if (visibleCount >= 5) {
+                    Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step5_title), description = autoStartDesc, onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBatteryWhitelisted, icon = Icons.Default.PlayCircle, reason = if (!permissions.isBatteryWhitelisted) "Manual verification required: Ensure 'Unrestricted' battery mode and 'Background activity' are allowed in system settings." else null)
+                }
+                if (visibleCount >= 6) {
+                    Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step6_title), stringResource(R.string.setup_step6_desc), {}, stringResource(R.string.setup_info_only), null, Icons.Default.Wifi)
                 }
                 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    Spacer(Modifier.height(16.dp)); GuideSection(title = "Background Location", description = "Allows tracking and geofencing to work while the screen is off or app is in background.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, reason = if (!permissions.isBackgroundLocationGranted) "Background Location: Set to 'Allow all the time' in system settings" else null)
-                    Spacer(Modifier.height(16.dp)); GuideSection(title = "Physical Activity", description = "Required for Step Detector and stay-alive pulsing to stabilize background performance.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isActivityRecognitionGranted, icon = Icons.AutoMirrored.Filled.DirectionsRun, reason = if (!permissions.isActivityRecognitionGranted) "Physical Activity: Permission NOT granted" else null)
+                if (visibleCount >= 7) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step7_title), stringResource(R.string.setup_step7_desc), onExactAlarm, stringResource(R.string.btn_authorize), permissions.isExactAlarmGranted, Icons.Default.Alarm, reason = if (!permissions.isExactAlarmGranted) "Exact Alarms: Permission NOT granted" else null) }
+                }
+                
+                if (visibleCount >= 8) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        Spacer(Modifier.height(16.dp)); GuideSection(title = "Notification Alerts", description = "Required to show status and critical alerts in the notification shade.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isPostNotificationsGranted, icon = Icons.Default.Notifications, reason = if (!permissions.isPostNotificationsGranted) "Notifications: Permission NOT granted" else null)
+                    }
+                }
+                
+                if (visibleCount >= 9) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        Spacer(Modifier.height(16.dp)); GuideSection(title = "Background Location", description = "Allows tracking and geofencing to work while the screen is off or app is in background.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, reason = if (!permissions.isBackgroundLocationGranted) "Background Location: Set to 'Allow all the time' in system settings" else null)
+                        Spacer(Modifier.height(16.dp)); GuideSection(title = "Physical Activity", description = "Required for Step Detector and stay-alive pulsing to stabilize background performance.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isActivityRecognitionGranted, icon = Icons.AutoMirrored.Filled.DirectionsRun, reason = if (!permissions.isActivityRecognitionGranted) "Physical Activity: Permission NOT granted" else null)
+                    }
                 }
 
-                if (permissions.hasBackgroundRestriction) { 
-                    Spacer(Modifier.height(16.dp))
-                    val isCompleted = when(permissions.backgroundStatus) {
-                        CapabilityStatus.GRANTED -> true
-                        CapabilityStatus.DENIED -> false
-                        CapabilityStatus.UNKNOWN -> permissions.isManualOverride
-                    }
-                    GuideSection(
-                        title = "Background Service Lock", 
-                        description = "Required to ensure the tracking service remains active on this hardware.", 
-                        onClick = onHardwarePermission, 
-                        buttonText = stringResource(R.string.btn_miui_permissions), 
-                        isCompleted = isCompleted, 
-                        icon = Icons.Default.Security, 
-                        reason = if (permissions.backgroundStatus == CapabilityStatus.DENIED) "Hardware Policy: Required for Lock Screen alerts" else if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && !permissions.isManualOverride) "Hardware Policy: Automatic verification failed. Please check manually." else null
-                    )
-                    if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN) {
-                        Spacer(Modifier.height(4.dp))
-                        Row(modifier = Modifier.padding(start = 28.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = permissions.isManualOverride, onCheckedChange = { onToggleManualOverride() })
-                            Text("Manually verified (Status detection failed)", color = Color.White, fontSize = 11.sp)
+                if (visibleCount >= 10) {
+                    if (permissions.hasBackgroundRestriction) { 
+                        Spacer(Modifier.height(16.dp))
+                        val isCompleted = when(permissions.backgroundStatus) {
+                            CapabilityStatus.GRANTED -> true
+                            CapabilityStatus.DENIED -> false
+                            CapabilityStatus.UNKNOWN -> permissions.isManualOverride
+                        }
+                        GuideSection(
+                            title = "Background Service Lock", 
+                            description = "Required to ensure the tracking service remains active on this hardware.", 
+                            onClick = onHardwarePermission, 
+                            buttonText = stringResource(R.string.btn_miui_permissions), 
+                            isCompleted = isCompleted, 
+                            icon = Icons.Default.Security, 
+                            reason = if (permissions.backgroundStatus == CapabilityStatus.DENIED) "Hardware Policy: Required for Lock Screen alerts" else if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && !permissions.isManualOverride) "Hardware Policy: Automatic verification failed. Please check manually." else null
+                        )
+                        if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN) {
+                            Spacer(Modifier.height(4.dp))
+                            Row(modifier = Modifier.padding(start = 28.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = permissions.isManualOverride, onCheckedChange = { onToggleManualOverride() })
+                                Text("Manually verified (Status detection failed)", color = Color.White, fontSize = 11.sp)
+                            }
                         }
                     }
                 }
-                if (!isTrackerMode) { Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step9_title), description = stringResource(R.string.setup_step9_desc), onClick = onGoToMap, buttonText = stringResource(R.string.btn_open_map), isCompleted = homePointsCount > 0, icon = Icons.Default.Map, reason = if (homePointsCount == 0) "Geofence: No Home Points defined" else null) }
-                
-                Spacer(Modifier.height(32.dp))
-                Button(
-                    onClick = onNavigateToDiagnostics,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Slate700)
-                ) {
-                    Icon(Icons.Default.HealthAndSafety, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.btn_view_diagnostics), fontWeight = FontWeight.Bold)
-                }
 
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onRefresh, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh)) }
-                    Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm)) }
+                if (visibleCount >= 11) {
+                    if (!isTrackerMode) { Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step9_title), description = stringResource(R.string.setup_step9_desc), onClick = onGoToMap, buttonText = stringResource(R.string.btn_open_map), isCompleted = homePointsCount > 0, icon = Icons.Default.Map, reason = if (homePointsCount == 0) "Geofence: No Home Points defined" else null) }
                 }
-                if (isTrackerMode) {
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick = onTriggerForensicTest, modifier = Modifier.fillMaxWidth().height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(FORENSIC_PINK_COLOR).copy(alpha = 0.8f))) {
-                        Icon(Icons.Default.BugReport, null)
+                
+                if (visibleCount >= 12) {
+                    Spacer(Modifier.height(32.dp))
+                    Button(
+                        onClick = onNavigateToDiagnostics,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Slate700)
+                    ) {
+                        Icon(Icons.Default.HealthAndSafety, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("TRIGGER FORENSIC STRESS TEST", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                        Text(stringResource(R.string.btn_view_diagnostics), fontWeight = FontWeight.Bold)
                     }
                 }
-                Spacer(Modifier.height(24.dp))
+
+                if (visibleCount >= 13) {
+                    Spacer(Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = onRefresh, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh)) }
+                        Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm)) }
+                    }
+                }
+
+                if (visibleCount >= 14) {
+                    if (isTrackerMode) {
+                        Spacer(Modifier.height(8.dp))
+                        Button(onClick = onTriggerForensicTest, modifier = Modifier.fillMaxWidth().height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(FORENSIC_PINK_COLOR).copy(alpha = 0.8f))) {
+                            Icon(Icons.Default.BugReport, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("TRIGGER FORENSIC STRESS TEST", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
             }
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
