@@ -44,14 +44,12 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Aug.11.05:
+ * - Issue #140: Automated Forensic Stress Test. Wired the stress test trigger 
+ *   in PhoneSetupOverlay to the ViewModel (R140).
  * Aug.11.00:
  * - Issue #137: UI Davey/ANR Remediation. Resolved 3000ms stall by implementing 
  *   Deferred UI Hydration (R137) in SettingsComponents.kt.
- * Aug.10.32:
- * - Issue #137: Performance: Identified ANR on Settings Overlay entry.
- * Aug.10.31:
- * - Issue #135: UI Davey/ANR Mitigation. Refactored DiagnosticsScreen and 
- *   PhoneSetupOverlay call sites to pass decomposed parameters (R135).
  */
 @Composable
 fun MainAppContent(
@@ -388,6 +386,7 @@ fun MainAppContent(
                         onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, 
                         onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onTestAlarm = { viewModel.onEvent(UiEvent.RequestTestAlarm) },
+                        onTriggerForensicTest = { viewModel.onEvent(UiEvent.RequestForensicTest) },
                         onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
                         permissions = uiState.permissions,
                         homePointsCount = uiState.homePoints.size,

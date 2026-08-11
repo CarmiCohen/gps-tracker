@@ -14,17 +14,18 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
+import java.io.File
 import java.util.*
 import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.11.05:
+ * - Issue #140: Automated Forensic Stress Test. Implemented a 5-second 
+ *   CPU/IO saturation routine to validate forensic anomaly detection (R140).
  * Aug.11.02:
  * - Issue #138: ANR Remediation. Offloaded all event observers and high-frequency 
  *   collection jobs to Dispatchers.Default to clear the main-thread critical path (R138).
- * Aug.07.123:
- * - Issue #746: Infrastructure: Updated to use JdMbrainHardwareManager. Fully 
- *   decoupled from legacy libmbrainSDK to eliminate logcat noise.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -276,29 +277,63 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start() }
-                    is CommandEvent.TriggerForensicTest -> {
-                        val proc = lastProcessedLocation
-                        val tLat = proc?.optimizedPoint?.lat ?: 0.0
-                        val tLng = proc?.optimizedPoint?.lng ?: 0.0
-                        val tAcc = proc?.maxAccuracy ?: 0.0
-                        val wallTs = timeProvider.currentTimeMillis()
-                        val health = integrityMonitor.currentHealth
-                        
-                        logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = tLat, lng = tLng, accuracy = tAcc)
-                        
-                        repeat(100) { i ->
-                            logManager.logForensicTraceOptimized(
-                                timestamp = wallTs, lat = tLat, lng = tLng, accuracy = tAcc, maxAccuracy = tAcc, 
-                                vibe = 0.0, snr = 0.0, batteryLevel = health.batteryLevel, isCharging = health.isCharging, batteryTemp = health.batteryTemp
-                            )
-                        }
-
-                        systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
-                        systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L
-                    }
+                    is CommandEvent.TriggerForensicTest -> executeAutomatedStressTest()
                     else -> {}
                 }
             }
+        }
+    }
+
+    private fun executeAutomatedStressTest() {
+        lifecycleScope.launch(Dispatchers.Default) {
+            val proc = lastProcessedLocation
+            val tLat = proc?.optimizedPoint?.lat ?: 0.0
+            val tLng = proc?.optimizedPoint?.lng ?: 0.0
+            val tAcc = proc?.maxAccuracy ?: 0.0
+            val wallTs = timeProvider.currentTimeMillis()
+            val health = integrityMonitor.currentHealth
+            
+            logManager.logServiceEvent("FORENSIC STRESS TEST: Initiating 5s CPU/IO saturation (R140)", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = tLat, lng = tLng, accuracy = tAcc)
+            
+            // Phase 1: Rapid Trace Burst (Log Pressure)
+            repeat(150) { i ->
+                logManager.logForensicTraceOptimized(
+                    timestamp = wallTs, lat = tLat, lng = tLng, accuracy = tAcc, maxAccuracy = tAcc, 
+                    vibe = 0.5, snr = 65.0, batteryLevel = health.batteryLevel, isCharging = health.isCharging, batteryTemp = health.batteryTemp
+                )
+            }
+
+            // Phase 2: Concurrent CPU and IO Stress
+            val stressDurationMs = 5000L
+            val startRt = timeProvider.elapsedRealtime()
+            
+            val cpuJob = launch(Dispatchers.Default) {
+                while (timeProvider.elapsedRealtime() - startRt < stressDurationMs) {
+                    // Artificial CPU load: Intensive trig calculations
+                    var x = 1.1
+                    for (i in 0..1000) { x = sin(x) + cos(x) + sqrt(x) }
+                }
+            }
+
+            val ioJob = launch(Dispatchers.IO) {
+                val stressFile = File(cacheDir, "forensic_stress_temp.bin")
+                val buffer = ByteArray(1024 * 1024) { 0xFF.toByte() } // 1MB buffer
+                try {
+                    while (timeProvider.elapsedRealtime() - startRt < stressDurationMs) {
+                        stressFile.writeBytes(buffer)
+                        stressFile.readBytes()
+                    }
+                } finally {
+                    stressFile.delete()
+                }
+            }
+
+            // Phase 3: Simulated Sensor Failures for Silent Failure correlation
+            systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
+            systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L
+
+            joinAll(cpuJob, ioJob)
+            logManager.logServiceEvent("FORENSIC STRESS TEST: Saturation routine completed.", isImportant = true)
         }
     }
 

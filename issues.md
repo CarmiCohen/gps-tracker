@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.11.04)
+# Project Issues & Hardening Tracking (Aug.11.05)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,17 +7,24 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 STABLE | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 579 |
+| **Resolved (Total)** | 🟢 Progress | 580 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   (None)
+*   **[Issue #141] [Severity: Low] [Category: Performance] Stress Side-Effects.**
+    *   **Concern**: Excessive use of the stress test trigger (R140) might lead to thermal throttling or rapid battery drain on budget hardware. Verification of recovery smoothness post-saturation is required.
 
 ---
 
 ## 🔴 Open Issues
 *   (None)
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.11.05)
+*   **[Issue #140] [Severity: Medium] [Category: Performance] Automated Forensic Stress Test.**
+    *   **Resolution**: Implemented a 5-second CPU/IO saturation routine in `TrackerService` triggered via the `PhoneSetupOverlay`. This allows formal verification of forensic ribbons and "Silent Failure" detection logic (R140).
 
 ---
 
@@ -44,4 +51,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Implemented **Deferred UI Hydration** (R137) in `SettingsComponents.kt`. By deferring content rendering by 100-150ms using `LaunchedEffect` and an `isHydrated` gate, the main thread is able to prioritize overlay transition animations, eliminating 3000ms+ stalls. (R137)
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.04)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.05)

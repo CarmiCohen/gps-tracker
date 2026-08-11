@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.11.04 (R136 Resolved)
+# System Source of Truth (SoT) - Aug.11.05 (R140 Resolved)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Automated Forensic Stress Testing (R140)**: (Added Aug.11.05) The system MUST provide an internal mechanism to artificially saturate device resources (CPU > 85%, I/O > 40%) for a minimum of 5 seconds. This is used to verify "Silent Failure" detection logic (R133) and ensure UI hydration gates (R137/R139) remain responsive under extreme hardware stress. (Issue #140). **Status: Implemented.**
 *   **Compose Preview Coverage Authority (R136)**: (Added Aug.11.04) The system MUST maintain functional Compose Previews for all decomposed overlays (`SettingsOverlay`, `PhoneSetupOverlay`). Previews MUST support mock hydration states to verify both loading and rendered UI paths without requiring a full application build (Issue #136). **Status: Implemented.**
 *   **TrackerScreen ANR Remediation (R139)**: (Added Aug.11.02) The system MUST eliminate the 3000ms+ Main-thread stall occurring during the transition from LandingScreen to TrackerScreen on budget hardware (Samsung A15 class). UI composition and state collection MUST be optimized to ensure frame integrity (Issue #139). **Status: Implemented (Deferred UI Hydration).**
 *   **Settings Overlay ANR Remediation (R137)**: (Added Aug.10.32) The system MUST eliminate the 3000ms+ Main-thread stall occurring during the transition to the Settings overlay. Navigation to configuration screens MUST be non-blocking and decoupled from high-frequency telemetry processing (Issue #137). **Status: Implemented.**
@@ -35,5 +36,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) The historical resolution record MUST be synchronized across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.11.04.
+*   **Current Release**: Aug.11.05.
 *   **Source of Truth**: app/build.gradle versionName.
