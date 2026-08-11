@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.11.02)
+# Project Issues & Hardening Tracking (Aug.11.03)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🔴 PENDING | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 577 |
+| **Resolved (Total)** | 🟢 Progress | 578 |
 
 ---
 
@@ -22,6 +22,12 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
+## 🟢 Recently Resolved Issues (Aug.11.03)
+*   **[Issue #139] [Severity: High] [Category: Performance] Persistent ANR on Tracker Mode Transition.**
+    *   **Resolution**: Implemented **Deferred UI Hydration** (R139) in `TrackerScreen.kt`. By deferring the rendering of heavy components (Map/Dashboard) by 200ms, the navigation transition is allowed to complete smoothly, eliminating 3000ms+ "Davey" stalls on Samsung A15 hardware. (R139)
+
+---
+
 ## 🟢 Recently Resolved Issues (Aug.11.02)
 *   **[Issue #138] [Severity: High] [Category: Performance] ANR on Tracker Mode Transition.**
     *   **Resolution**: Offloaded all event observers and high-frequency collection jobs in `TrackerService` and `ViewerService` to `Dispatchers.Default` (R138). This cleared the main-thread critical path during service initialization, eliminating 3000ms+ "Davey" stalls and system ANR dialogs.
@@ -33,10 +39,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Implemented **Deferred UI Hydration** (R137) in `SettingsComponents.kt`. By deferring content rendering by 100-150ms using `LaunchedEffect` and an `isHydrated` gate, the main thread is able to prioritize overlay transition animations, eliminating 3000ms+ stalls. (R137)
 
 ---
-
-## 🟢 Recently Resolved Issues (Aug.10.31)
-*   **[Issue #135] [Severity: High] [Category: Performance] UI Davey/ANR Mitigation for Overlay Transitions.**
-    *   **Resolution**: Refactored `SettingsOverlay`, `PhoneSetupOverlay`, and `DiagnosticsScreen` to use fully decomposed primitive parameters. (R135)
-
----
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.02)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.03)

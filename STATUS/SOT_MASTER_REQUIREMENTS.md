@@ -1,10 +1,11 @@
-# System Source of Truth (SoT) - Aug.10.32 (Monitoring & ANR Identification)
+# System Source of Truth (SoT) - Aug.11.03 (R139 Resolved)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
-*   **Settings Overlay ANR Remediation (R137)**: (Added Aug.10.32) The system MUST eliminate the 3000ms+ Main-thread stall occurring during the transition to the Settings overlay. Navigation to configuration screens MUST be non-blocking and decoupled from high-frequency telemetry processing (Issue #137). **Status: Identified / Pending Remediation.**
-*   **UI Transition Stabilization for Budget Hardware (R135)**: (Added Aug.10.30) The system MUST ensure that transitions to complex overlays (Settings, Phone Setup, Diagnostics) do not exceed a 500ms Main-thread stall on budget hardware (Samsung A15 class). Telemetry flow updates and UI recomposition MUST be staggered or throttled during active transitions to prevent OS ANR dialogs. (Issue #135). **Status: Implemented (Refinement required per R137).**
+*   **TrackerScreen ANR Remediation (R139)**: (Added Aug.11.02) The system MUST eliminate the 3000ms+ Main-thread stall occurring during the transition from LandingScreen to TrackerScreen on budget hardware (Samsung A15 class). UI composition and state collection MUST be optimized to ensure frame integrity (Issue #139). **Status: Implemented (Deferred UI Hydration).**
+*   **Settings Overlay ANR Remediation (R137)**: (Added Aug.10.32) The system MUST eliminate the 3000ms+ Main-thread stall occurring during the transition to the Settings overlay. Navigation to configuration screens MUST be non-blocking and decoupled from high-frequency telemetry processing (Issue #137). **Status: Implemented.**
+*   **UI Transition Stabilization for Budget Hardware (R135)**: (Added Aug.10.30) The system MUST ensure that transitions to complex overlays (Settings, Phone Setup, Diagnostics) do not exceed a 500ms Main-thread stall on budget hardware (Samsung A15 class). Telemetry flow updates and UI recomposition MUST be staggered or throttled during active transitions to prevent OS ANR dialogs. (Issue #135). **Status: Implemented.**
 *   **Forensic Pulse Frequency Hardening (R134)**: (Added Aug.10.29) The system MUST implement a high-frequency "Forensic Pulse" (10,000ms) for auditing resource-critical correlations (CPU, I/O, and Silent Failure detection). This pulse ensures that transient hardware stress causing "Silent Failures" is detected with minimal latency compared to the legacy 60s integrity heartbeat. Reactive flow stall detection (Storage, Power) MAY maintain the legacy 3-minute threshold logic (Issue #134-Sentinel). **Status: Implemented & Verified.**
 *   **Forensic Anomaly Correlation Engine (R133)**: (Added Aug.10.28) The system MUST implement cross-domain correlation between location stability and hardware resource stress. A `SILENT_FAILURE` MUST be flagged if a GPS stall is detected while `cpuLoad` >= 85%, `ioWait` >= 40%, or `maxIoLatency` >= 800ms, provided no physical tamper events are active (Issue #133-Sentinel). **Status: Implemented & Verified.**
 *   **Forensic UI Dashboard Refinement (R132)**: (Added Aug.10.27) The Forensic Dashboard (Tracker & Viewer) MUST integrate `cpuLoad`, `ioWait`, and `maxIoLatency` trends into the `ForensicSection` visualization (Issue #132-Sentinel). **Status: Implemented & Verified.**
@@ -33,5 +34,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) The historical resolution record MUST be synchronized across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.10.32.
+*   **Current Release**: Aug.11.03.
 *   **Source of Truth**: app/build.gradle versionName.

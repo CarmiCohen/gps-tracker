@@ -2,7 +2,15 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 576**
+**Total Unique Resolutions: 578**
+
+## 18. Tracker Mode Transition Hardening (Aug.11.03)
+*   **Issue #139: Persistent ANR on Tracker Mode Transition**.
+    *   **Resolution**: Implemented **Deferred UI Hydration** (R139) in `TrackerScreen.kt`. By deferring the rendering of heavy components (Map/Dashboard) by 200ms using a `LaunchedEffect` gate, the navigation transition is allowed to complete and stabilize before the main thread is tasked with expensive UI composition. This eliminated 3000ms+ "Davey" stalls on budget hardware (Samsung A15). (R139)
+
+## 17. Service Initialization Hardening (Aug.11.02)
+*   **Issue #138: ANR on Tracker Mode Transition**.
+    *   **Resolution**: Offloaded all high-frequency flow collections and event observers in `TrackerService` and `ViewerService` to `Dispatchers.Default`. This ensures that service startup—which occurs during mode transitions—does not compete for main-thread resources required for UI rendering. (R138)
 
 ## 16. Settings Overlay Optimization (Aug.11.00)
 *   **Issue #137: ANR on Settings Overlay Entry**.

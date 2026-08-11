@@ -28,10 +28,15 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.osmdroid.util.GeoPoint
 import com.gps19.core.engine.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Aug.11.03:
+ * - Issue #139: UI Davey/ANR Remediation. Implemented Deferred UI Hydration (R139).
+ *   Heavy components (Map/Dashboard) are deferred by 200ms to allow navigation 
+ *   transition to stabilize, preventing 3000ms+ main-thread stalls.
  * Aug.10.31:
  * - Issue #135: UI Davey/ANR Mitigation. Refactored SettingsOverlay call site 
  *   to pass decomposed primitive parameters (R135).
@@ -64,6 +69,13 @@ fun TrackerScreen(
     onSaveTrail: () -> Unit = {},
     onLoadTrail: () -> Unit = {}
 ) {
+    // Issue #139: Deferred hydration to prevent ANR during navigation transition
+    var isHydrated by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(200) // Allow navigation transition to stabilize
+        isHydrated = true
+    }
+
     val nav = uiState.navigation
     val isMapVisible = nav.isMapVisible
     val isLogVisible = nav.isLogVisible
@@ -119,8 +131,8 @@ fun TrackerScreen(
             isChargingStable = diagnosticState.battery.isChargingStable,
             trackerChargingStable = diagnosticState.trackerBattery.isChargingStable,
             activeAlarms = diagnosticState.activeAlarms,
-            trackerSatsView = diagnosticState.trackerSatsView,
             trackerSatsUsed = diagnosticState.trackerSatsUsed,
+            trackerSatsView = diagnosticState.trackerSatsView,
             trackerBatteryTemp = diagnosticState.trackerBattery.temp,
             viewerBatteryTemp = diagnosticState.battery.temp,
             viewerSatsUsed = diagnosticState.viewerSatsUsed,
@@ -155,60 +167,242 @@ fun TrackerScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (isLandscape) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                header()
-                
-                Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
-                    statusBar()
+        if (!isHydrated) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
+            }
+        } else {
+            if (isLandscape) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    header()
                     
-                    Box(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
+                        statusBar()
+                        
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (isMapVisible) {
+                                AppMapContainer(
+                                    appMode = uiState.appMode,
+                                    isMapButtonsVisible = uiState.isMapButtonsVisible,
+                                    isFenceVisible = uiState.isFenceVisible,
+                                    geofenceMode = uiState.geofenceMode,
+                                    isViolationsVisible = uiState.isViolationsVisible,
+                                    isGeofenceViolationsVisible = uiState.isGeofenceViolationsVisible,
+                                    maxDistance = uiState.maxDistance,
+                                    isMapLocked = uiState.isMapLocked,
+                                    mapFollowMode = uiState.mapFollowMode,
+                                    centeringTrackerTrigger = uiState.centeringTrackerTrigger,
+                                    centeringViewerTrigger = uiState.centeringViewerTrigger,
+                                    zoomInTrigger = uiState.zoomInTrigger,
+                                    zoomOutTrigger = uiState.zoomOutTrigger,
+                                    homePoints = uiState.homePoints,
+                                    trackerLat = kinematicState.localLocation.lat,
+                                    trackerLng = kinematicState.localLocation.lng,
+                                    trackerSpeed = kinematicState.localLocation.speed,
+                                    trackerAccuracy = kinematicState.localLocation.accuracy,
+                                    trackerMaxAccuracy = kinematicState.localLocation.maxAccuracy,
+                                    trackerGpsTs = kinematicState.localLocation.timestamp,
+                                    trackerTelemetryTs = 0L,
+                                    trackerLocPending = kinematicState.localHealth.isLocationPending,
+                                    trackerLocPendingReason = kinematicState.localHealth.locationPendingReason,
+                                    trackerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
+                                    viewerLat = kinematicState.trackerLocation.lat,
+                                    viewerLng = kinematicState.trackerLocation.lng,
+                                    viewerSpeed = kinematicState.trackerLocation.speed,
+                                    viewerAccuracy = kinematicState.trackerLocation.accuracy,
+                                    viewerMaxAcc = kinematicState.trackerLocation.maxAccuracy,
+                                    viewerGpsTs = kinematicState.trackerLocation.timestamp,
+                                    viewerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
+                                    viewerLocPending = kinematicState.trackerHealth.isLocationPending,
+                                    viewerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
+                                    systemPulse = systemPulse,
+                                    systemPulseRt = systemPulseRt,
+                                    onEvent = { viewModel.onEvent(it) },
+                                    onClearTrails = { viewModel.clearTrails(context) },
+                                    trail = trail, viewerTrail = viewerTrail, 
+                                    violations = violations, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail, 
+                                    showAccuracyBadge = true,
+                                    showSettingsButton = true,
+                                    showToolsOverlay = true
+                                )
+                            } else {
+                                TrackerDashboard(
+                                    appMode = uiState.appMode ?: "tracker",
+                                    isSystemActive = uiState.isSystemActive,
+                                    isDashboardExpanded = uiState.navigation.isDashboardExpanded,
+                                    isBatteryWhitelisted = uiState.permissions.isBatteryWhitelisted,
+                                    isLocalOnline = diagnosticState.connectivity.isLocalOnline,
+                                    isRelayConnected = diagnosticState.connectivity.isRelayConnected,
+                                    lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
+                                    localLat = kinematicState.localLocation.lat,
+                                    localLocationTs = kinematicState.localLocation.timestamp,
+                                    // Decomposed DashboardState
+                                    isGpsFresh = dashboardState.isGpsFresh,
+                                    isTelemetryFresh = dashboardState.isTelemetryFresh,
+                                    isLinkFresh = dashboardState.isLinkFresh,
+                                    trackerState = dashboardState.trackerState,
+                                    isLocationPending = dashboardState.isLocationPending,
+                                    locationPendingReason = dashboardState.locationPendingReason,
+                                    status = dashboardState.status,
+                                    isTamperDetected = dashboardState.isTamperDetected,
+                                    isBatterySteepDischarge = dashboardState.isBatterySteepDischarge,
+                                    isBatteryLow = dashboardState.isBatteryLow,
+                                    isBatteryCritical = dashboardState.isBatteryCritical,
+                                    maxDrop = dashboardState.maxDrop,
+                                    lastSeen = dashboardState.lastSeen,
+                                    totalDrop = dashboardState.totalDrop,
+                                    totalUptime = dashboardState.totalUptime,
+                                    session = dashboardState.session,
+                                    engineVersion = dashboardState.engineVersion,
+                                    sinceConn = dashboardState.sinceConn,
+                                    sinceDisco = dashboardState.sinceDisco,
+                                    violationUptime = dashboardState.violationUptime,
+                                    watchdogCountdown = dashboardState.watchdogCountdown,
+                                    watchdogOk = dashboardState.watchdogOk,
+                                    isPowerSaveMode = dashboardState.isPowerSaveMode,
+                                    standbyBucket = dashboardState.standbyBucket,
+                                    netInterface = dashboardState.netInterface,
+                                    isStorageLow = dashboardState.isStorageLow,
+                                    isStorageCritical = dashboardState.isStorageCritical,
+                                    distToHome = dashboardState.distToHome,
+                                    distToViewer = dashboardState.distToViewer,
+                                    lat = dashboardState.lat,
+                                    lng = dashboardState.lng,
+                                    gpsSpeed = dashboardState.gpsSpeed,
+                                    trackerAccuracy = dashboardState.trackerAccuracy,
+                                    trackerMaxAcc = dashboardState.trackerMaxAcc,
+                                    viewerAccuracy = dashboardState.viewerAccuracy,
+                                    viewerMaxAcc = dashboardState.viewerMaxAcc,
+                                    satsIndex = dashboardState.satsIndex,
+                                    isSatsIndexWarning = dashboardState.isSatsIndexWarning,
+                                    snr = dashboardState.snr,
+                                    vibration = dashboardState.vibration,
+                                    heading = dashboardState.heading,
+                                    tilt = dashboardState.tilt,
+                                    acoustic = dashboardState.acoustic,
+                                    lift = dashboardState.lift,
+                                    lux = dashboardState.lux,
+                                    proximity = dashboardState.proximity,
+                                    proximityCm = dashboardState.proximityCm,
+                                    proximityDebounce = dashboardState.proximityDebounce,
+                                    rollingVibration = dashboardState.rollingVibration,
+                                    trackerMaxTemp = dashboardState.trackerMaxTemp,
+                                    viewerMaxTemp = dashboardState.viewerMaxTemp,
+                                    peakShock = dashboardState.peakShock,
+                                    vibrationFloor = dashboardState.vibrationFloor,
+                                    luxBaseline = dashboardState.luxBaseline,
+                                    acousticFloor = dashboardState.acousticFloor,
+                                    trackerCurrentMa = dashboardState.trackerCurrentMa,
+                                    gpsIdx = gpsIndexData,
+                                    rttValue = rtt,
+                                    currentMaValue = currentMa,
+                                    systemPulse = systemPulse,
+                                    cpuLoad = dashboardState.cpuLoad,
+                                    ioWait = dashboardState.ioWait,
+                                    maxIoLatency = dashboardState.maxIoLatency,
+                                    onEvent = { viewModel.onEvent(it) }
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (isMapVisible) {
+                    AppMapContainer(
+                        appMode = uiState.appMode,
+                        isMapButtonsVisible = uiState.isMapButtonsVisible,
+                        isFenceVisible = uiState.isFenceVisible,
+                        geofenceMode = uiState.geofenceMode,
+                        isViolationsVisible = uiState.isViolationsVisible,
+                        isGeofenceViolationsVisible = uiState.isGeofenceViolationsVisible,
+                        maxDistance = uiState.maxDistance,
+                        isMapLocked = uiState.isMapLocked,
+                        mapFollowMode = uiState.mapFollowMode,
+                        centeringTrackerTrigger = uiState.centeringTrackerTrigger,
+                        centeringViewerTrigger = uiState.centeringViewerTrigger,
+                        zoomInTrigger = uiState.zoomInTrigger,
+                        zoomOutTrigger = uiState.zoomOutTrigger,
+                        homePoints = uiState.homePoints,
+                        trackerLat = kinematicState.localLocation.lat,
+                        trackerLng = kinematicState.localLocation.lng,
+                        trackerSpeed = kinematicState.localLocation.speed,
+                        trackerAccuracy = kinematicState.localLocation.accuracy,
+                        trackerMaxAccuracy = kinematicState.localLocation.maxAccuracy,
+                        trackerGpsTs = kinematicState.localLocation.timestamp,
+                        trackerTelemetryTs = 0L,
+                        trackerLocPending = kinematicState.localHealth.isLocationPending,
+                        trackerLocPendingReason = kinematicState.localHealth.locationPendingReason,
+                        trackerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
+                        viewerLat = kinematicState.trackerLocation.lat,
+                        viewerLng = kinematicState.trackerLocation.lng,
+                        viewerSpeed = kinematicState.trackerLocation.speed,
+                        viewerAccuracy = kinematicState.trackerLocation.accuracy,
+                        viewerMaxAcc = kinematicState.trackerLocation.maxAccuracy,
+                        viewerGpsTs = kinematicState.trackerLocation.timestamp,
+                        viewerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
+                        viewerLocPending = kinematicState.trackerHealth.isLocationPending,
+                        viewerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
+                        systemPulse = systemPulse,
+                        systemPulseRt = systemPulseRt,
+                        onEvent = { viewModel.onEvent(it) },
+                        onClearTrails = { viewModel.clearTrails(context) },
+                        trail = trail, viewerTrail = viewerTrail, 
+                        violations = violations, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail, 
+                        showAccuracyBadge = true,
+                        showSettingsButton = false,
+                        showToolsOverlay = false 
+                    )
+                }
+
+                if (!isSettingsOpen && !isLogVisible && !isRibbonsVisible && !isGnssDetailVisible) {
+                    Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.background,
+                            modifier = Modifier.fillMaxWidth().zIndex(10f)
+                        ) {
+                            Column {
+                                Box(Modifier.statusBarsPadding()) {
+                                    header()
+                                }
+                                statusBar()
+                            }
+                        }
+
                         if (isMapVisible) {
-                            AppMapContainer(
-                                appMode = uiState.appMode,
-                                isMapButtonsVisible = uiState.isMapButtonsVisible,
-                                isFenceVisible = uiState.isFenceVisible,
-                                geofenceMode = uiState.geofenceMode,
-                                isViolationsVisible = uiState.isViolationsVisible,
-                                isGeofenceViolationsVisible = uiState.isGeofenceViolationsVisible,
-                                maxDistance = uiState.maxDistance,
-                                isMapLocked = uiState.isMapLocked,
-                                mapFollowMode = uiState.mapFollowMode,
-                                centeringTrackerTrigger = uiState.centeringTrackerTrigger,
-                                centeringViewerTrigger = uiState.centeringViewerTrigger,
-                                zoomInTrigger = uiState.zoomInTrigger,
-                                zoomOutTrigger = uiState.zoomOutTrigger,
-                                homePoints = uiState.homePoints,
-                                trackerLat = kinematicState.localLocation.lat,
-                                trackerLng = kinematicState.localLocation.lng,
-                                trackerSpeed = kinematicState.localLocation.speed,
-                                trackerAccuracy = kinematicState.localLocation.accuracy,
-                                trackerMaxAccuracy = kinematicState.localLocation.maxAccuracy,
-                                trackerGpsTs = kinematicState.localLocation.timestamp,
-                                trackerTelemetryTs = 0L,
-                                trackerLocPending = kinematicState.localHealth.isLocationPending,
-                                trackerLocPendingReason = kinematicState.localHealth.locationPendingReason,
-                                trackerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
-                                viewerLat = kinematicState.trackerLocation.lat,
-                                viewerLng = kinematicState.trackerLocation.lng,
-                                viewerSpeed = kinematicState.trackerLocation.speed,
-                                viewerAccuracy = kinematicState.trackerLocation.accuracy,
-                                viewerMaxAcc = kinematicState.trackerLocation.maxAccuracy,
-                                viewerGpsTs = kinematicState.trackerLocation.timestamp,
-                                viewerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
-                                viewerLocPending = kinematicState.trackerHealth.isLocationPending,
-                                viewerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
-                                systemPulse = systemPulse,
-                                systemPulseRt = systemPulseRt,
-                                onEvent = { viewModel.onEvent(it) },
-                                onClearTrails = { viewModel.clearTrails(context) },
-                                trail = trail, viewerTrail = viewerTrail, 
-                                violations = violations, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail, 
-                                showAccuracyBadge = true,
-                                showSettingsButton = true,
-                                showToolsOverlay = true
-                            )
-                        } else {
+                            Box(Modifier.fillMaxWidth().padding(top = 8.dp, end = 12.dp), contentAlignment = Alignment.CenterEnd) {
+                                MapSettingsToggle(
+                                    isMapButtonsVisible = uiState.isMapButtonsVisible,
+                                    onToggle = { viewModel.onEvent(UiEvent.SetMapButtonsVisible(!uiState.isMapButtonsVisible)) }
+                                )
+                            }
+
+                            if (uiState.isMapButtonsVisible) {
+                                Box(Modifier.fillMaxWidth().padding(end = 8.dp), contentAlignment = Alignment.CenterEnd) {
+                                    MapToolsOverlay(
+                                        isTrackerMode = true,
+                                        trackerValid = PhysicsUtils.isValidLocation(kinematicState.localLocation.lat, kinematicState.localLocation.lng),
+                                        viewerValid = PhysicsUtils.isValidLocation(kinematicState.trackerLocation.lat, kinematicState.trackerLocation.lng),
+                                        showFence = uiState.isFenceVisible,
+                                        onToggleFence = { viewModel.onEvent(UiEvent.SetFenceVisible(!uiState.isFenceVisible)) },
+                                        geofenceMode = uiState.geofenceMode,
+                                        onSetGeofenceMode = { viewModel.onEvent(UiEvent.SetGeofenceMode(it)) },
+                                        showViolations = uiState.isViolationsVisible,
+                                        onToggleViolations = { viewModel.onEvent(UiEvent.SetViolationsVisible(!uiState.isViolationsVisible)) },
+                                        showGeofenceViolations = uiState.isGeofenceViolationsVisible,
+                                        onToggleGeofenceViolations = { viewModel.onEvent(UiEvent.SetGeofenceViolationsVisible(!uiState.isGeofenceViolationsVisible)) },
+                                        onClear = { viewModel.clearTrails(context) },
+                                        onSave = onSaveTrail,
+                                        onLoad = onLoadTrail,
+                                        onCenterTracker = { viewModel.onEvent(UiEvent.CenterTracker) },
+                                        onCenterViewer = { viewModel.onEvent(UiEvent.CenterViewer) },
+                                        onZoomIn = { viewModel.onEvent(UiEvent.MapZoomIn) },
+                                        onZoomOut = { viewModel.onEvent(UiEvent.MapZoomOut) }
+                                    )
+                                }
+                            }
+                        }
+                        
+                        if (!isMapVisible) {
                             TrackerDashboard(
                                 appMode = uiState.appMode ?: "tracker",
                                 isSystemActive = uiState.isSystemActive,
@@ -286,182 +480,6 @@ fun TrackerScreen(
                                 onEvent = { viewModel.onEvent(it) }
                             )
                         }
-                    }
-                }
-            }
-        } else {
-            if (isMapVisible) {
-                AppMapContainer(
-                    appMode = uiState.appMode,
-                    isMapButtonsVisible = uiState.isMapButtonsVisible,
-                    isFenceVisible = uiState.isFenceVisible,
-                    geofenceMode = uiState.geofenceMode,
-                    isViolationsVisible = uiState.isViolationsVisible,
-                    isGeofenceViolationsVisible = uiState.isGeofenceViolationsVisible,
-                    maxDistance = uiState.maxDistance,
-                    isMapLocked = uiState.isMapLocked,
-                    mapFollowMode = uiState.mapFollowMode,
-                    centeringTrackerTrigger = uiState.centeringTrackerTrigger,
-                    centeringViewerTrigger = uiState.centeringViewerTrigger,
-                    zoomInTrigger = uiState.zoomInTrigger,
-                    zoomOutTrigger = uiState.zoomOutTrigger,
-                    homePoints = uiState.homePoints,
-                    trackerLat = kinematicState.localLocation.lat,
-                    trackerLng = kinematicState.localLocation.lng,
-                    trackerSpeed = kinematicState.localLocation.speed,
-                    trackerAccuracy = kinematicState.localLocation.accuracy,
-                    trackerMaxAccuracy = kinematicState.localLocation.maxAccuracy,
-                    trackerGpsTs = kinematicState.localLocation.timestamp,
-                    trackerTelemetryTs = 0L,
-                    trackerLocPending = kinematicState.localHealth.isLocationPending,
-                    trackerLocPendingReason = kinematicState.localHealth.locationPendingReason,
-                    trackerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
-                    viewerLat = kinematicState.trackerLocation.lat,
-                    viewerLng = kinematicState.trackerLocation.lng,
-                    viewerSpeed = kinematicState.trackerLocation.speed,
-                    viewerAccuracy = kinematicState.trackerLocation.accuracy,
-                    viewerMaxAcc = kinematicState.trackerLocation.maxAccuracy,
-                    viewerGpsTs = kinematicState.trackerLocation.timestamp,
-                    viewerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
-                    viewerLocPending = kinematicState.trackerHealth.isLocationPending,
-                    viewerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
-                    systemPulse = systemPulse,
-                    systemPulseRt = systemPulseRt,
-                    onEvent = { viewModel.onEvent(it) },
-                    onClearTrails = { viewModel.clearTrails(context) },
-                    trail = trail, viewerTrail = viewerTrail, 
-                    violations = violations, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail, 
-                    showAccuracyBadge = true,
-                    showSettingsButton = false,
-                    showToolsOverlay = false 
-                )
-            }
-
-            if (!isSettingsOpen && !isLogVisible && !isRibbonsVisible && !isGnssDetailVisible) {
-                Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.background,
-                        modifier = Modifier.fillMaxWidth().zIndex(10f)
-                    ) {
-                        Column {
-                            Box(Modifier.statusBarsPadding()) {
-                                header()
-                            }
-                            statusBar()
-                        }
-                    }
-
-                    if (isMapVisible) {
-                        Box(Modifier.fillMaxWidth().padding(top = 8.dp, end = 12.dp), contentAlignment = Alignment.CenterEnd) {
-                            MapSettingsToggle(
-                                isMapButtonsVisible = uiState.isMapButtonsVisible,
-                                onToggle = { viewModel.onEvent(UiEvent.SetMapButtonsVisible(!uiState.isMapButtonsVisible)) }
-                            )
-                        }
-
-                        if (uiState.isMapButtonsVisible) {
-                            Box(Modifier.fillMaxWidth().padding(end = 8.dp), contentAlignment = Alignment.CenterEnd) {
-                                MapToolsOverlay(
-                                    isTrackerMode = true,
-                                    trackerValid = PhysicsUtils.isValidLocation(kinematicState.localLocation.lat, kinematicState.localLocation.lng),
-                                    viewerValid = PhysicsUtils.isValidLocation(kinematicState.trackerLocation.lat, kinematicState.trackerLocation.lng),
-                                    showFence = uiState.isFenceVisible,
-                                    onToggleFence = { viewModel.onEvent(UiEvent.SetFenceVisible(!uiState.isFenceVisible)) },
-                                    geofenceMode = uiState.geofenceMode,
-                                    onSetGeofenceMode = { viewModel.onEvent(UiEvent.SetGeofenceMode(it)) },
-                                    showViolations = uiState.isViolationsVisible,
-                                    onToggleViolations = { viewModel.onEvent(UiEvent.SetViolationsVisible(!uiState.isViolationsVisible)) },
-                                    showGeofenceViolations = uiState.isGeofenceViolationsVisible,
-                                    onToggleGeofenceViolations = { viewModel.onEvent(UiEvent.SetGeofenceViolationsVisible(!uiState.isGeofenceViolationsVisible)) },
-                                    onClear = { viewModel.clearTrails(context) },
-                                    onSave = onSaveTrail,
-                                    onLoad = onLoadTrail,
-                                    onCenterTracker = { viewModel.onEvent(UiEvent.CenterTracker) },
-                                    onCenterViewer = { viewModel.onEvent(UiEvent.CenterViewer) },
-                                    onZoomIn = { viewModel.onEvent(UiEvent.MapZoomIn) },
-                                    onZoomOut = { viewModel.onEvent(UiEvent.MapZoomOut) }
-                                )
-                            }
-                        }
-                    }
-                    
-                    if (!isMapVisible) {
-                        TrackerDashboard(
-                            appMode = uiState.appMode ?: "tracker",
-                            isSystemActive = uiState.isSystemActive,
-                            isDashboardExpanded = uiState.navigation.isDashboardExpanded,
-                            isBatteryWhitelisted = uiState.permissions.isBatteryWhitelisted,
-                            isLocalOnline = diagnosticState.connectivity.isLocalOnline,
-                            isRelayConnected = diagnosticState.connectivity.isRelayConnected,
-                            lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
-                            localLat = kinematicState.localLocation.lat,
-                            localLocationTs = kinematicState.localLocation.timestamp,
-                            // Decomposed DashboardState
-                            isGpsFresh = dashboardState.isGpsFresh,
-                            isTelemetryFresh = dashboardState.isTelemetryFresh,
-                            isLinkFresh = dashboardState.isLinkFresh,
-                            trackerState = dashboardState.trackerState,
-                            isLocationPending = dashboardState.isLocationPending,
-                            locationPendingReason = dashboardState.locationPendingReason,
-                            status = dashboardState.status,
-                            isTamperDetected = dashboardState.isTamperDetected,
-                            isBatterySteepDischarge = dashboardState.isBatterySteepDischarge,
-                            isBatteryLow = dashboardState.isBatteryLow,
-                            isBatteryCritical = dashboardState.isBatteryCritical,
-                            maxDrop = dashboardState.maxDrop,
-                            lastSeen = dashboardState.lastSeen,
-                            totalDrop = dashboardState.totalDrop,
-                            totalUptime = dashboardState.totalUptime,
-                            session = dashboardState.session,
-                            engineVersion = dashboardState.engineVersion,
-                            sinceConn = dashboardState.sinceConn,
-                            sinceDisco = dashboardState.sinceDisco,
-                            violationUptime = dashboardState.violationUptime,
-                            watchdogCountdown = dashboardState.watchdogCountdown,
-                            watchdogOk = dashboardState.watchdogOk,
-                            isPowerSaveMode = dashboardState.isPowerSaveMode,
-                            standbyBucket = dashboardState.standbyBucket,
-                            netInterface = dashboardState.netInterface,
-                            isStorageLow = dashboardState.isStorageLow,
-                            isStorageCritical = dashboardState.isStorageCritical,
-                            distToHome = dashboardState.distToHome,
-                            distToViewer = dashboardState.distToViewer,
-                            lat = dashboardState.lat,
-                            lng = dashboardState.lng,
-                            gpsSpeed = dashboardState.gpsSpeed,
-                            trackerAccuracy = dashboardState.trackerAccuracy,
-                            trackerMaxAcc = dashboardState.trackerMaxAcc,
-                            viewerAccuracy = dashboardState.viewerAccuracy,
-                            viewerMaxAcc = dashboardState.viewerMaxAcc,
-                            satsIndex = dashboardState.satsIndex,
-                            isSatsIndexWarning = dashboardState.isSatsIndexWarning,
-                            snr = dashboardState.snr,
-                            vibration = dashboardState.vibration,
-                            heading = dashboardState.heading,
-                            tilt = dashboardState.tilt,
-                            acoustic = dashboardState.acoustic,
-                            lift = dashboardState.lift,
-                            lux = dashboardState.lux,
-                            proximity = dashboardState.proximity,
-                            proximityCm = dashboardState.proximityCm,
-                            proximityDebounce = dashboardState.proximityDebounce,
-                            rollingVibration = dashboardState.rollingVibration,
-                            trackerMaxTemp = dashboardState.trackerMaxTemp,
-                            viewerMaxTemp = dashboardState.viewerMaxTemp,
-                            peakShock = dashboardState.peakShock,
-                            vibrationFloor = dashboardState.vibrationFloor,
-                            luxBaseline = dashboardState.luxBaseline,
-                            acousticFloor = dashboardState.acousticFloor,
-                            trackerCurrentMa = dashboardState.trackerCurrentMa,
-                            gpsIdx = gpsIndexData,
-                            rttValue = rtt,
-                            currentMaValue = currentMa,
-                            systemPulse = systemPulse,
-                            cpuLoad = dashboardState.cpuLoad,
-                            ioWait = dashboardState.ioWait,
-                            maxIoLatency = dashboardState.maxIoLatency,
-                            onEvent = { viewModel.onEvent(it) }
-                        )
                     }
                 }
             }
