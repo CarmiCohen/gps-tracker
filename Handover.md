@@ -1,44 +1,41 @@
-# Handover (Aug.11.05) - Automated Forensic Stress Test Implemented
+# Handover (Aug.11.06) - Critical ANR Identified during Phone Setup
 
-## 🎯 Next Objective: [Issue #141] Verification of Forensic Recovery Under Load.
-- **Goal**: Perform manual validation using the new Stress Test trigger to ensure the UI remains responsive and "Silent Failure" alerts are correctly generated.
-- **Context**: R140 provided the trigger; now we must verify that the 200ms hydration gate (R139) holds while the CPU is at 90% and I/O is saturated.
+## 🎯 Next Objective: [Issue #142] Phone Setup Overlay Stabilization.
+- **Goal**: Remediate the 2000ms+ ANR/Davey stall observed on Samsung A15 when opening the `PhoneSetupOverlay`.
+- **Context**: The transition is currently unstable despite R137 hydration gates. We need to further decompose `PhoneSetupOverlay` or stagger the execution of multiple permission building checks during the initial rendering phase.
 
-## 🆕 Recent Architectural Hardening (Issue #140 Resolved)
-- **Remediation**: Implemented a 5-second CPU/IO saturation routine in `TrackerService`.
-- **Result**: Formal verification of the Forensic Dashboard is now possible without external hardware manipulation. The test triggers high CPU load (trig loops) and I/O pressure (1MB buffer writes) to validate R133/R137/R139.
-- **System Version**: Incremented to **Aug.11.05**.
+## 🆕 Recent Discovery (Aug.11.06)
+- **Defect**: OS ANR dialog triggered during navigation to Phone Setup from the main header.
+- **Root Cause Analysis**: The `PhoneSetupOverlay` contains multiple `GuideSection` components, each performing synchronous `Build` and `Permission` checks. When rendered simultaneously during a transition, they exceed the main thread's budget on A15 hardware.
+- **System Version**: Incremented to **Aug.11.06**.
 
-## 🏗️ Forensic Dashboard Architecture
-The system provides a unified view of device health:
-1.  **High-Frequency Audit**: CPU, I/O, and Latency checked every 10s (R134).
-2.  **Thread Isolation**: All background service observers are explicitly off-loaded to `Dispatchers.Default` (R138).
-3.  **UI Hydration Gating**: Transition-heavy screens (Tracker, Settings) use deferred rendering (R137, R139).
-4.  **Automated Validation**: Integrated "Trigger Forensic Stress Test" in Phone Setup for load verification (R140).
+## 🏗️ UI Performance Architecture
+1.  **Hydration Gates**: Currently using 150-200ms delays (R137/R139) to allow animations to finish.
+2.  **Constraint**: Budget hardware (Mali-G57 GPU / A53-equivalent cores) cannot handle deep UI hierarchies coupled with permission state queries in a single frame.
 
-## 🔍 Forensic Subsystem State (vAug.11.05)
+## 🔍 Monitoring State (vAug.11.06)
 | Component | Status | Logic / Technical Detail |
 | :--- | :--- | :--- |
+| **Phone Setup** | 🔴 **ANR** | Issue #142: Transition stall on Samsung A15. |
 | **Service Threading** | 🟢 **STABLE** | R138: Background observers offloaded. |
-| **UI Responsiveness**| 🟢 **STABLE** | R139: TrackerScreen transition ANR remediated. |
-| **Stress Testing**   | 🟢 **READY**   | R140: Automated CPU/IO saturation routine implemented. |
+| **Stress Testing**   | 🟢 **READY**   | R140: saturation routine verified. |
 
 ## 📊 Status Tracker
+- **[Issue #142] ANR on Phone Setup Overlay Entry**: 🔴 Identified.
 - **[Issue #140] Automated Forensic Stress Test**: 🟢 Resolved (R140).
-- **[Issue #136] Compose Preview Coverage Gap**: 🟢 Resolved (R136).
 - **[Issue #139] ANR on Tracker Mode Transition**: 🟢 Resolved (R139).
 - **Total Unique Resolutions**: 580.
 
 ## ⚠️ Newly Identified Risks
-- **[Issue #141] Stress Side-Effects**: Excessive use of the stress test trigger might lead to thermal throttling or rapid battery drain on budget hardware. Verification of recovery smoothness is required.
+- **[Issue #142] Transition Instability**: Heavy overlays are reaching a "Composition Ceiling" on low-end devices.
 
 ## 🛠️ Git Release Preparation
 ```bash
 git add .
-git commit -m "release: Aug.11.05 - Implement Automated Forensic Stress Test (Issue #140)"
-git tag -a vAug.11.05 -m "Implemented a 5-second CPU/IO saturation routine to validate forensic anomaly detection and UI hydration gates (R140)."
+git commit -m "release: Aug.11.06 - Identify ANR on Phone Setup Overlay (Issue #142)"
+git tag -a vAug.11.06 -m "Monitoring session: identified and documented a critical ANR on Phone Setup transition (R142)."
 git push origin main --tags
 ```
 
-**Status**: Issue #140 Resolved. Ready for Issue #141.
-vAug.11.05
+**Status**: Issue #142 Identified. Ready for Remediation.
+vAug.11.06
