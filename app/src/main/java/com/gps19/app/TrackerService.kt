@@ -19,13 +19,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.11.02:
+ * - Issue #138: ANR Remediation. Offloaded all event observers and high-frequency 
+ *   collection jobs to Dispatchers.Default to clear the main-thread critical path (R138).
  * Aug.07.123:
  * - Issue #746: Infrastructure: Updated to use JdMbrainHardwareManager. Fully 
- *   decoupled from legacy libmbrainSDK to eliminate logcat noise and system-level 
- *   collisions on budget hardware (R746).
- * Aug.04.117:
- * - Issue #733: JNI Hardening. Corrected misleading log message to reflect the 
- *   transition from libmbrainSDK to libjdMbrain (R733).
+ *   decoupled from legacy libmbrainSDK to eliminate logcat noise.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -60,7 +59,6 @@ class TrackerService : BaseMonitorService() {
     private var lastA15PokeRt = 0L
     private val A15_POKE_INTERVAL_MS = 60_000L
 
-    // Issue #701: Forensic Spatial Quantization State
     private var lastForensicLat = 0.0
     private var lastForensicLng = 0.0
     private var lastForensicVibe = 0.0
@@ -119,10 +117,11 @@ class TrackerService : BaseMonitorService() {
         commandRouter.register()
         commandRouter.startObservingCommands(lifecycleScope)
 
-        gpsCollectionJob = lifecycleScope.launch { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
-        gnssDetailJob = lifecycleScope.launch { gpsManager.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
+        // Issue #138: Explicit Default dispatcher to prevent main-thread congestion
+        gpsCollectionJob = lifecycleScope.launch(Dispatchers.Default) { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
+        gnssDetailJob = lifecycleScope.launch(Dispatchers.Default) { gpsManager.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
 
-        settingsJob = lifecycleScope.launch {
+        settingsJob = lifecycleScope.launch(Dispatchers.Default) {
             launch { repository.alertSettingsFlow.collectLatest { settings -> alarmManager.updateSettings(settings) } }
             launch { repository.homePointsFlow.collectLatest { points -> locationProcessor.setHomePoints(points.map { EngineGeoPoint(it.latitude, it.longitude) }) } }
             launch { repository.maxDistanceFlow.collectLatest { dist -> locationProcessor.setMaxDistanceAuthority(dist) } }
@@ -147,7 +146,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun observeAlarmEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             alarmManager.alarmEvents.collect { event ->
                 when (event) {
                     is AlarmEvent.LogEvent -> {
@@ -174,7 +173,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun observeIntegrityEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             integrityMonitor.integrityEvents.collect { event ->
                 when (event) {
                     is IntegrityEvent.ViolationSustained -> if (event.type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(true)
@@ -193,7 +192,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun observeProcessorEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             locationProcessor.processorEvents.collect { event ->
                 when (event) {
                     is ProcessorEvent.TrailPointSaved -> {
@@ -222,7 +221,7 @@ class TrackerService : BaseMonitorService() {
                         val proc = lastProcessedLocation
                         logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°",
                             lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                        lifecycleScope.launch { repository.saveDouble(CHAIR_BASELINE_TILT_KEY, event.baseline) }
+                        repository.saveDouble(CHAIR_BASELINE_TILT_KEY, event.baseline)
                     }
                     else -> {}
                 }
@@ -231,7 +230,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun observeConnectivityEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             connectivitySuite.connectivityEvents.collect { event ->
                 when (event) {
                     is ConnectivityEvent.PeerPulse -> handleViewerPulse(event.id)
@@ -241,7 +240,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun observeHistoryEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             historyManager.historyEvents.collect { event ->
                 when (event) {
                     is HistoryEvent.LogEvent -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
@@ -251,7 +250,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun observeSensorEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             appSensorManager.sensorEvents.collect { event ->
                 when (event) {
                     is AppSensorEvent.HardwareFailure -> {
@@ -267,7 +266,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun observeCommandEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             commandRouter.commandEvents.collect { event ->
                 when (event) {
                     is CommandEvent.ViewerPulse -> handleViewerPulse(event.id)
@@ -276,30 +275,28 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
-                    is CommandEvent.SyncSensors -> { lifecycleScope.launch(Dispatchers.Default) { refreshCapabilitiesInternal(); appSensorManager.start() } }
+                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start() }
                     is CommandEvent.TriggerForensicTest -> {
-                        lifecycleScope.launch {
-                            val proc = lastProcessedLocation
-                            val tLat = proc?.optimizedPoint?.lat ?: 0.0
-                            val tLng = proc?.optimizedPoint?.lng ?: 0.0
-                            val tAcc = proc?.maxAccuracy ?: 0.0
-                            val wallTs = timeProvider.currentTimeMillis()
-                            val health = integrityMonitor.currentHealth
-                            
-                            logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = tLat, lng = tLng, accuracy = tAcc)
-                            
-                            // Issue #669/700/702/710: Testing high-frequency zero-allocation path
-                            repeat(100) { i ->
-                                logManager.logForensicTraceOptimized(
-                                    timestamp = wallTs, lat = tLat, lng = tLng, accuracy = tAcc, maxAccuracy = tAcc, 
-                                    vibe = 0.0, snr = 0.0, batteryLevel = health.batteryLevel, isCharging = health.isCharging, batteryTemp = health.batteryTemp
-                                )
-                            }
-
-                            systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
-                            systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L
+                        val proc = lastProcessedLocation
+                        val tLat = proc?.optimizedPoint?.lat ?: 0.0
+                        val tLng = proc?.optimizedPoint?.lng ?: 0.0
+                        val tAcc = proc?.maxAccuracy ?: 0.0
+                        val wallTs = timeProvider.currentTimeMillis()
+                        val health = integrityMonitor.currentHealth
+                        
+                        logManager.logServiceEvent("SIGNALING AUDIT: Injecting 100-log burst for load validation", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = tLat, lng = tLng, accuracy = tAcc)
+                        
+                        repeat(100) { i ->
+                            logManager.logForensicTraceOptimized(
+                                timestamp = wallTs, lat = tLat, lng = tLng, accuracy = tAcc, maxAccuracy = tAcc, 
+                                vibe = 0.0, snr = 0.0, batteryLevel = health.batteryLevel, isCharging = health.isCharging, batteryTemp = health.batteryTemp
+                            )
                         }
+
+                        systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
+                        systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L
                     }
+                    else -> {}
                 }
             }
         }
@@ -335,7 +332,7 @@ class TrackerService : BaseMonitorService() {
         if ((configManager.viewerId == SettingsRepository.DEFAULT_TRACKER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
             configManager.viewerId = id
             connectivitySuite.updateIdentity(configManager.deviceId, id, true)
-            lifecycleScope.launch { repository.saveString(VIEWER_ID_KEY, id) } 
+            lifecycleScope.launch(Dispatchers.IO) { repository.saveString(VIEWER_ID_KEY, id) } 
         }
         if (sessionManager.onViewerPulse(id, timeProvider.currentTimeMillis(), true)) { 
             logManager.logServiceEvent("Viewer connected: $id")
@@ -473,7 +470,6 @@ class TrackerService : BaseMonitorService() {
         val isViewerActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isPeerAvailable = isSocketConnected && isViewerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
-        // Issue #700: Use Logic-Specific snapshot to preserve alarm peaks
         val snapshot = appSensorManager.consumeLogicSnapshot()
 
         locationProcessor.updateSensorData(
@@ -532,11 +528,8 @@ class TrackerService : BaseMonitorService() {
             while (isActive) {
                 val health = integrityMonitor.currentHealth
                 val proc = lastProcessedLocation
-                
-                // Issue #700: Use Forensic-Specific snapshot for high-frequency capture
                 val snapshot = appSensorManager.consumeForensicSnapshot()
                 
-                // R701: Spatial Quantization Logic
                 val lat = proc?.optimizedPoint?.lat ?: 0.0
                 val lng = proc?.optimizedPoint?.lng ?: 0.0
                 val vibe = snapshot.vibration
@@ -553,7 +546,6 @@ class TrackerService : BaseMonitorService() {
                 if (shouldLog) {
                     lastForensicLat = lat; lastForensicLng = lng; lastForensicVibe = vibe; lastForensicTilt = tilt
                     
-                    // R668/R702/R710: Zero-allocation path for 100Hz capture (Hardened Serialization)
                     logManager.logForensicTraceOptimized(
                         timestamp = timeProvider.currentTimeMillis(),
                         lat = lat,
@@ -568,7 +560,6 @@ class TrackerService : BaseMonitorService() {
                     )
                 }
                 
-                // R700 / R709: Dynamic scaling logic
                 val delayMs = when {
                     health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS
                     health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS

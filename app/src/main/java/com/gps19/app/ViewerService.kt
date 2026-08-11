@@ -16,12 +16,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Aug.11.02:
+ * - Issue #138: ANR Remediation. Offloaded all event observers to Dispatchers.Default 
+ *   to clear the main-thread critical path (R138).
  * Aug.07.09:
  * - Issue #748: Log Message Prefix Cleanup (R747). Synchronized log 
  *   messages with authoritative terminology ("Device" instead of "Tracker").
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Refactored evaluateAlarmsInternal to 
- *   support zero-allocation telemetry path and fixed isAdaptiveJump parameter (R-HARDWARE-01).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -87,10 +87,11 @@ class ViewerService : BaseMonitorService() {
         commandRouter.register()
         commandRouter.startObservingCommands(lifecycleScope)
 
-        gpsCollectionJob = lifecycleScope.launch { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
-        gnssDetailJob = lifecycleScope.launch { gpsManager.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
+        // Issue #138: Explicit Default dispatcher to prevent main-thread congestion
+        gpsCollectionJob = lifecycleScope.launch(Dispatchers.Default) { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
+        gnssDetailJob = lifecycleScope.launch(Dispatchers.Default) { gpsManager.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
 
-        settingsJob = lifecycleScope.launch {
+        settingsJob = lifecycleScope.launch(Dispatchers.Default) {
             launch { repository.alertSettingsFlow.collectLatest { settings -> alarmManager.updateSettings(settings) } }
             launch { repository.homePointsFlow.collectLatest { points -> locationProcessor.setHomePoints(points.map { EngineGeoPoint(it.latitude, it.longitude) } ) } }
             launch { repository.maxDistanceFlow.collectLatest { dist -> locationProcessor.setMaxDistanceAuthority(dist) } }
@@ -112,7 +113,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     private fun observeAlarmEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             alarmManager.alarmEvents.collectLatest { event ->
                 when (event) {
                     is AlarmEvent.LogEvent -> {
@@ -124,7 +125,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     private fun observeIntegrityEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             integrityMonitor.integrityEvents.collectLatest { event ->
                 when (event) {
                     is IntegrityEvent.LogEvent -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
@@ -135,7 +136,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     private fun observeProcessorEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             locationProcessor.processorEvents.collectLatest { event ->
                 when (event) {
                     is ProcessorEvent.TrailPointSaved -> {
@@ -160,7 +161,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     private fun observeConnectivityEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             connectivitySuite.connectivityEvents.collectLatest { event ->
                 when (event) {
                     is ConnectivityEvent.PeerPulse -> handleTrackerPulse(event.id)
@@ -170,7 +171,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     private fun observeHistoryEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             historyManager.historyEvents.collectLatest { event ->
                 when (event) {
                     is HistoryEvent.LogEvent -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
@@ -180,7 +181,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     private fun observeCommandEvents() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Default) {
             commandRouter.commandEvents.collectLatest { event ->
                 when (event) {
                     is CommandEvent.ViewerPulse -> handleTrackerPulse(event.id)
@@ -189,7 +190,7 @@ class ViewerService : BaseMonitorService() {
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
-                    is CommandEvent.SyncSensors -> { lifecycleScope.launch(Dispatchers.Default) { refreshCapabilitiesInternal() } }
+                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal() }
                     else -> {}
                 }
             }
@@ -206,7 +207,6 @@ class ViewerService : BaseMonitorService() {
             isManualOverrideActive = perms.isManualOverride,
             isA15Device = perms.isA15Device
         )
-        Timber.i("Issue #098: Viewer capabilities refreshed.")
     }
 
     private fun onLocationChanged(location: Location) {
@@ -252,7 +252,7 @@ class ViewerService : BaseMonitorService() {
         if (!SignalingConstants.isValidTrackerId(id)) return
         if ((configManager.deviceId == SettingsRepository.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
             configManager.deviceId = id; connectivitySuite.updateIdentity(id, configManager.viewerId, false)
-            lifecycleScope.launch { repository.saveString(VIEWER_ID_KEY, id) }
+            lifecycleScope.launch(Dispatchers.IO) { repository.saveString(VIEWER_ID_KEY, id) }
         }
         if (sessionManager.onTrackerPulse(id, timeProvider.currentTimeMillis(), false)) {
             val proc = lastProcessedLocation
@@ -315,7 +315,6 @@ class ViewerService : BaseMonitorService() {
     override suspend fun processTick(now: Long, nowRt: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRt)
         val health = integrityMonitor.currentHealth
-        // Issue #609: Redundant manual propagation removed. IntegrityMonitor now handles repository sync.
 
         if (timeProvider.elapsedRealtime() > 0) systemMonitor.renewWakeLock()
 
