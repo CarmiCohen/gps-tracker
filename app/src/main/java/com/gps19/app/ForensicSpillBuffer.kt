@@ -19,17 +19,14 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.11.21:
+ * - Issue #151: Phone Setup ANR Remediation. Refactored to use granular locking 
+ *   and buffer duplication (R151). I/O operations in peek() now occur outside 
+ *   the main synchronization lock using a duplicate buffer, preventing stalls 
+ *   from blocking concurrent writes.
  * Aug.11.16:
  * - Issue #145: Forensic Spill-Buffer Overflow Protection. Added getFillLevel() 
  *   and isHighPressure() for proactive throttling (R669).
- * Aug.09.22:
- * - Issue #127: Forensic Drain Latency Hardening. Refactored lock critical sections 
- *   to sub-millisecond durations. Moved UTF-8 truncation, CRC calculation, and 
- *   object reconstruction outside synchronized blocks. Eliminated shared checksum 
- *   buffers to prevent lock inversion with LatencyMonitor pulses (R127).
- * Aug.08.21:
- * - Issue #126: Forensic Payload Overflow Audit. Implemented safe UTF-8 truncation (R126).
- * - Issue #125: Forensic Audit: Compression Parity Audit. Integrated gpsHardwareLock (R125).
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -45,8 +42,8 @@ class ForensicSpillBuffer @Inject constructor(
     private val readIdx = AtomicInteger(0)
     
     private val baseTs = AtomicLong(0L)
-    private var baseLat: Double = 0.0
-    private var baseLng: Double = 0.0
+    @Volatile private var baseLat: Double = 0.0
+    @Volatile private var baseLng: Double = 0.0
 
     private companion object {
         const val MAGIC_NUMBER = 0x46535042
@@ -290,33 +287,45 @@ class ForensicSpillBuffer @Inject constructor(
             type = LatencyMonitor.AuditType.PERFORMANCE,
             onSpike = { msg, _ -> Timber.w(msg) }
         ) {
-            val buffer = mappedBuffer ?: return@measureAndAudit emptyList()
+            val mainBuffer = mappedBuffer ?: return@measureAndAudit emptyList()
+            
+            // Issue #151: Duplicate the buffer to allow thread-local position management.
+            // This allows us to perform I/O (get) outside the synchronized block.
+            val readBuffer = mainBuffer.duplicate().order(ByteOrder.nativeOrder())
+            
             val rawEntries = mutableListOf<Pair<Int, ByteArray>>()
             var currentBaseTs = 0L
             var currentBaseLat = 0.0
             var currentBaseLng = 0.0
+            var toPeekCount = 0
+            var currentReadIdx = 0
 
             synchronized(this) {
                 val count = totalCount.get()
                 if (count == 0) return@synchronized
                 
-                val toPeek = count.coerceAtMost(limit)
-                var currentRead = readIdx.get()
+                toPeekCount = count.coerceAtMost(limit)
+                currentReadIdx = readIdx.get()
                 currentBaseTs = baseTs.get()
                 currentBaseLat = baseLat
                 currentBaseLng = baseLng
-                
-                repeat(toPeek) {
-                    val offset = HEADER_SIZE + (currentRead * FORENSIC_SPILL_ENTRY_SIZE)
-                    val entryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE)
-                    buffer.position(offset)
-                    buffer.get(entryBytes)
-                    rawEntries.add(currentRead to entryBytes)
-                    currentRead = (currentRead + 1) % FORENSIC_SPILL_CAPACITY
-                }
             }
             
-            if (rawEntries.isEmpty()) return@measureAndAudit emptyList()
+            if (toPeekCount == 0) return@measureAndAudit emptyList()
+
+            // Perform I/O outside synchronized block using the duplicate buffer.
+            // Producer (writeTrace) will only overwrite data that is NOT yet peeked/drained
+            // if the buffer is full, but writeTrace fails when totalCount == CAPACITY.
+            // Thus, these slots are guaranteed stable while totalCount > 0.
+            var tempRead = currentReadIdx
+            repeat(toPeekCount) {
+                val offset = HEADER_SIZE + (tempRead * FORENSIC_SPILL_ENTRY_SIZE)
+                val entryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE)
+                readBuffer.position(offset)
+                readBuffer.get(entryBytes)
+                rawEntries.add(tempRead to entryBytes)
+                tempRead = (tempRead + 1) % FORENSIC_SPILL_CAPACITY
+            }
 
             rawEntries.map { (slotIdx, bytes) ->
                 val bb = ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder())

@@ -20,6 +20,10 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.11.21:
+ * - Issue #151: Phone Setup ANR Remediation. Offloaded forensic trace writes 
+ *   to Dispatchers.Default in addLog() to prevent main-thread stalls during 
+ *   MappedByteBuffer I/O pressure (R151).
  * Aug.10.24:
  * - Issue #129: Forensic Storage Pruning Sensitivity. Refactored proactivePruning 
  *   to be battery-aware, deferring I/O during critical battery states to prevent 
@@ -376,9 +380,17 @@ class LogRepository @Inject constructor(
             }
         }.flowOn(Dispatchers.Default)
 
+    /**
+     * addLog: Entry point for all logging.
+     * Issue #151: Forensic traces are offloaded to Dispatchers.Default to ensure 
+     * that MappedByteBuffer I/O stalls on the persistence lock never block 
+     * the caller (which may be the Main thread during UI events).
+     */
     fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
         if (entry.type == "FORENSIC_TRACE") {
-            forensicSpillBufferProvider.get().writeTrace(entry)
+            scope.launch(Dispatchers.Default) {
+                forensicSpillBufferProvider.get().writeTrace(entry)
+            }
             return
         }
 
