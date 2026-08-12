@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.11.16)
+# Project Issues & Hardening Tracking (Aug.11.20)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,17 +7,23 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 STABLE | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 584 |
+| **Resolved (Total)** | 🟢 Progress | 585 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   *(None)*
+*   **[Issue #146] Drain Convergence**: The forensic drainer in `LogRepository` may need increased priority when the spill-buffer is in "High Pressure" mode to avoid sustained sampling inhibition.
 
 ---
 
 ## 🔴 Open Issues
 *   *(None)*
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.11.20)
+*   **[Issue #145] [Severity: High] [Category: Logic] Forensic Spill-Buffer Overflow Protection.**
+    *   **Resolution**: Hardened the **Forensic Sampling Authority (R669/R700)**. Implemented proactive pressure-aware throttling in the `TrackerService`. The system now monitors the `MappedByteBuffer` fill level; when it exceeds 80% (`HIGH_PRESSURE_THRESHOLD`), the forensic sampling interval is automatically increased to `FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS` (250ms). This prevents buffer overflows during high-frequency stress periods while maintaining data integrity. (R669)
 
 ---
 
@@ -50,4 +56,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Implemented a 5-second CPU/IO saturation routine in `TrackerService` triggered via the `PhoneSetupOverlay`. This allows formal verification of forensic ribbons and "Silent Failure" detection logic (R140).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.16)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.20)

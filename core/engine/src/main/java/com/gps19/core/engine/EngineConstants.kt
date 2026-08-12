@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.11.16:
+ * - Issue #145: Forensic Spill-Buffer Overflow Protection. Added 
+ *   FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS for proactive pressure management (R669).
  * Aug.11.00:
  * - Issue #137: UI Davey/ANR Remediation. Resolved 3000ms stall by implementing 
  *   Deferred UI Hydration (R137) in SettingsComponents.kt.
@@ -69,6 +72,7 @@ const val ADAPTIVE_PRUNE_THRESHOLD_CHARGING = 3000
 const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  // 100Hz (Peak Fidelity)
 const val FORENSIC_SAMPLING_INTERVAL_MAX_MS = 100L // 10Hz (Power Aware)
 const val FORENSIC_SAMPLING_INTERVAL_COOLING_MS = 500L // Issue #709: Thermal Safety Floor
+const val FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS = 250L // Issue #145: Pressure Throttling
 
 // Issue #701: Forensic Spatial Quantization
 const val FORENSIC_SPATIAL_GATE_METERS = 0.1

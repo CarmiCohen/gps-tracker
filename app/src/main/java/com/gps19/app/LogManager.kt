@@ -10,6 +10,9 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Aug.11.16:
+ * - Issue #145: Forensic Spill-Buffer Overflow Protection. Added 
+ *   isForensicBufferUnderPressure() to enable proactive throttling (R669).
  * Aug.05.121:
  * - Issue #735: Startup Davey Stall Remediation. Refactored to use 
  *   Provider<ForensicSpillBuffer> to defer MappedByteBuffer I/O until first 
@@ -83,6 +86,8 @@ class LogManager @Inject constructor(
             isOverflowLogged.set(false)
         }
     }
+
+    fun isForensicBufferUnderPressure(): Boolean = forensicSpillBufferProvider.get().isHighPressure()
 
     private fun handleOverflow() {
         if (isOverflowLogged.compareAndSet(false, true)) {

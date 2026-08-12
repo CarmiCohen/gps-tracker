@@ -19,6 +19,9 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.11.16:
+ * - Issue #145: Forensic Spill-Buffer Overflow Protection. Added getFillLevel() 
+ *   and isHighPressure() for proactive throttling (R669).
  * Aug.09.22:
  * - Issue #127: Forensic Drain Latency Hardening. Refactored lock critical sections 
  *   to sub-millisecond durations. Moved UTF-8 truncation, CRC calculation, and 
@@ -66,6 +69,8 @@ class ForensicSpillBuffer @Inject constructor(
         const val PRECISION_SCALE = 10_000_000.0
         const val DRAIN_STALL_THRESHOLD_MS = 5L
         const val WRITE_STALL_THRESHOLD_MS = 5L
+        
+        const val HIGH_PRESSURE_THRESHOLD = 0.8 // 80% fill level
     }
 
     init {
@@ -390,4 +395,7 @@ class ForensicSpillBuffer @Inject constructor(
     fun hasPending(): Boolean = totalCount.get() > 0
     fun getPendingCount(): Int = totalCount.get()
     fun isFull(): Boolean = totalCount.get() >= FORENSIC_SPILL_CAPACITY
+    
+    fun getFillLevel(): Double = totalCount.get().toDouble() / FORENSIC_SPILL_CAPACITY
+    fun isHighPressure(): Boolean = getFillLevel() >= HIGH_PRESSURE_THRESHOLD
 }

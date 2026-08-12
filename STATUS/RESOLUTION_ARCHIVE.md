@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 584**
+**Total Unique Resolutions: 585**
+
+## 24. Forensic Spill-Buffer Hardening (Aug.11.20)
+*   **Issue #145: Forensic Spill-Buffer Overflow Protection**.
+    *   **Resolution**: Hardened the **Forensic Sampling Authority (R669/R700)** by implementing proactive pressure-aware throttling. The system now monitors the `MappedByteBuffer` fill level within `ForensicSpillBuffer`; when pressure exceeds 80% (`HIGH_PRESSURE_THRESHOLD`), the `TrackerService` forensic sampling loop is automatically throttled to `FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS` (250ms). This prevents buffer overflows during high-frequency stress periods (e.g., 100Hz charging mode) on storage-constrained hardware while protecting un-persisted telemetry data. (R669)
 
 ## 23. Bayesian Uncertainty & Geofence (Aug.11.16)
 *   **Issue #144: Geofence Uncertainty Growth Validation**.
@@ -37,4 +41,4 @@ This document contains the unified record of all resolved issues and technical d
     *   **Resolution**: Implemented **Deferred UI Hydration** (R137) in `SettingsOverlay` and `PhoneSetupOverlay`. Content rendering is gated by an internal `isHydrated` state and a 100-150ms delay, eliminating 3000ms+ stalls on budget hardware. (R137)
 
 ---
-*For historical resolutions #1 through #15, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.11.16)
+*For historical resolutions #1 through #15, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.11.20)

@@ -21,6 +21,8 @@ import kotlin.math.*
 /**
  * TrackerService: The "Black Box" background process.
  * Aug.11.16:
+ * - Issue #145: Forensic Spill-Buffer Overflow Protection. Implemented proactive 
+ *   throttling (R669) in startForensicSamplingLoop based on buffer pressure.
  * - Issue #141: Stress Recovery Verification. Fixed syntax errors, resolved 
  *   SentinelStatus.status reference, and implemented dynamic interval 
  *   return-to-baseline (R406a) with Adaptation Muzzle (R141).
@@ -629,6 +631,7 @@ class TrackerService : BaseMonitorService() {
                 
                 val delayMs = when {
                     health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS
+                    logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS
                     health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS
                     else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS
                 }
