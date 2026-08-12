@@ -1,42 +1,43 @@
-# Handover (Aug.11.20) - Forensic Spill-Buffer Hardened
+# Handover (Aug.11.20) - ANR Regression Identified
 
-## 🎯 Next Objective: [Issue #146] Dynamic Batching Authority Audit.
-- **Goal**: Verify that `LogRepository` dynamic batching (R727) correctly correlates with the new spill-buffer pressure metrics.
-- **Context**: Forensic overflow protection is now active (Issue #145). The next step is ensuring the drain logic (persistence hot-path) scales its intensity to match the new proactive throttling markers.
+## 🎯 Next Objective: [Issue #151] Root Cause Analysis of Setup Overlay ANR.
+- **Goal**: Investigate why "Staggered Incremental Hydration" (R142) failed to prevent a main-thread stall on Samsung A15 during setup entry.
+- **Context**: The app experienced a fatal ANR during manual trigger of the Phone Setup overlay. This coincides with observed 198ms spikes in the forensic persistence path (Issue #146).
 
-## 🟢 Recent Resolution (Aug.11.20)
-- **Resolution**: Implemented **Forensic Spill-Buffer Overflow Protection** (Issue #145).
-- **Root Cause Remediation**: Hardened the **Forensic Sampling Authority (R669/R700)**. Added buffer fill-level telemetry to `ForensicSpillBuffer`. The `TrackerService` now monitors buffer pressure (80% threshold) and proactively throttles the sampling interval to `FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS` (250ms), preventing `MappedByteBuffer` overflows during high-frequency stress periods.
-- **System Version**: Incremented to **Aug.11.20**.
+## 🟢 Recent Monitoring (Aug.11.20)
+- **Activity**: Deployed to Samsung A15 (SM-A155F), monitored logcat, and exercised setup flow.
+- **Critical Finding**: Encountered **ANR** on setup navigation. Logcat confirms `Forensic Peek` spikes of 198ms, suggesting high I/O pressure or main-thread blocking during `MappedByteBuffer` operations.
+- **System Version**: Documentation tracks **Aug.11.20**, but `build.gradle` is lagging at **Aug.11.08** (Issue #147).
 
 ## 🏗️ UI Performance Architecture
-1.  **Proactive Throttling**: (R669) Spill-buffer pressure-aware sampling back-off.
-2.  **Adaptive Polling**: (R406a) Real-time hardware rate adjustment via `flatMapLatest`.
-3.  **Uncertainty Hysteresis**: (R460) Drift-aware geofence clearance.
+1.  **Staggered Hydration**: (R142) Intended to smooth CPU spikes on entry. Currently unstable.
+2.  **Proactive Throttling**: (R669) Spill-buffer back-off active at 80% saturation.
+3.  **Header Arrangement**: (R736/Issue #148) Layout inversion detected in visual output.
 
 ## 🔍 Monitoring State (vAug.11.20)
 | Component | Status | Logic / Technical Detail |
 | :--- | :--- | :--- |
-| **Forensic Logic** | 🟢 **STABLE** | R669: Sampling throttled at 80% buffer saturation. |
-| **Geofence Logic** | 🟢 **STABLE** | R460: Clearance gated by drifted uncertainty (`acc`). |
-| **Recovery Logic** | 🟢 **VERIFIED** | R141: Synthetic latches flushed on completion. |
+| **Setup Overlay** | 🔴 **CRITICAL** | Issue #151: ANR on entry. Staggered logic bypassed? |
+| **Forensic Logic** | 🔴 **AT RISK** | Issue #146: Persistence spikes (198ms) during hydration. |
+| **Detection Logic** | 🟡 **DEFECT** | Issue #150: R405 prompt failed to trigger for A15. |
 
 ## 📊 Status Tracker
-- **[Issue #145] Forensic Spill-Buffer Overflow Protection**: 🟢 Resolved (R669).
-- **[Issue #144] Geofence Uncertainty Growth Validation**: 🟢 Resolved (R460).
-- **[Issue #141] Stress Recovery Verification**: 🟢 Resolved (R141).
-- **Total Unique Resolutions**: 585.
+- **[Issue #151] Phone Setup ANR**: 🔴 Identified.
+- **[Issue #146] Drain Convergence**: 🔴 Identified (Confirmed spikes).
+- **[Issue #148] Header Layout Inversion**: 🟡 Identified.
+- **[Issue #150] R405 Detection Bypass**: 🟡 Identified.
+- **[Issue #147] Version Inconsistency**: 🟡 Identified.
 
 ## ⚠️ Newly Identified Risks
-- **[Issue #146] Drain Convergence**: The forensic drainer in `LogRepository` may need increased priority when the spill-buffer is in "High Pressure" mode to avoid sustained sampling inhibition.
+- **[Issue #151] Phone Setup ANR**: High risk of total app failure on entry-level hardware during transition.
 
 ## 🛠️ Git Release Preparation
 ```bash
 git add .
-git commit -m "release: Aug.11.20 - Forensic Spill-Buffer Overflow Protection (Issue #145)"
-git tag -a vAug.11.20 -m "Implemented proactive forensic throttling: sampling rate now back-offs at 80% buffer saturation to prevent MappedByteBuffer overflows (R669)."
+git commit -m "monitoring: identify ANR regression on A15 and forensic spikes (Issues #151, #146)"
+git tag -a vAug.11.20-monitor -m "Monitoring phase complete: ANR identified on Samsung A15 during setup transition. Forensic persistence spikes confirmed."
 git push origin main --tags
 ```
 
-**Status**: Issue #145 Resolved. Ready for Dynamic Batching Authority Audit.
+**Status**: Monitoring complete. Ready for ANR Root Cause Remediation.
 vAug.11.20
