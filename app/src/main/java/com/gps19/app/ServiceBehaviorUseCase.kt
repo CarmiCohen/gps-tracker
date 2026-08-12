@@ -6,10 +6,9 @@ import javax.inject.Singleton
 
 /**
  * ServiceBehaviorUseCase: Encapsulates high-level logic for service-level state transitions.
- * July.23.02:
- * - Issue #526: Power Optimization. Centralized power-save mode evaluation.
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
+ * Aug.11.12:
+ * - Issue #141: Stress Recovery Verification. Added reset() to ensure high-latency 
+ *   latches don't persist across sessions (R141).
  */
 @Singleton
 class ServiceBehaviorUseCase @Inject constructor(
@@ -17,6 +16,14 @@ class ServiceBehaviorUseCase @Inject constructor(
 ) {
     private var lastSuspiciousTriggerTs = 0L
     private var lastMotionDetectedTs = 0L
+
+    /**
+     * reset: Clears all behavioral latches (R141).
+     */
+    fun reset() {
+        lastSuspiciousTriggerTs = 0L
+        lastMotionDetectedTs = 0L
+    }
 
     /**
      * Calculates the target GPS polling interval based on device state and forensic triggers.

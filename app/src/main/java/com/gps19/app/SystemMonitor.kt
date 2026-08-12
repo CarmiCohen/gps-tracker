@@ -26,12 +26,12 @@ sealed class SystemMonitorEvent {
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * Aug.11.09:
+ * - Issue #141: Stress Recovery Verification. Implemented resetSimulatedAnomalies() 
+ *   to ensure sticky stress-test states don't persist post-saturation.
  * JAug.04.111:
  * - Issue #721: Performance Hardening. Refactored to use GpsApplication.PACKAGE_NAME 
  *   shadow-cache to eliminate repetitive getPackageName() calls on Samsung A15.
- * July.28.22:
- * - Issue #617: Global SharedFlow Audit. Hardened _systemMonitorEvents with 
- *   BufferOverflow.DROP_OLDEST to ensure non-blocking resource management (R617).
  */
 @Singleton
 class SystemMonitor @Inject constructor(
@@ -55,6 +55,15 @@ class SystemMonitor @Inject constructor(
 
     var jumpStateStartTs = 0L
     var gpsStallStartTs = 0L
+
+    /**
+     * resetSimulatedAnomalies: Clears synthetic stress-test timestamps (R141).
+     */
+    fun resetSimulatedAnomalies() {
+        jumpStateStartTs = 0L
+        gpsStallStartTs = 0L
+        Timber.i("Stress Recovery: Simulated anomaly latches cleared.")
+    }
 
     /**
      * acquireWakeLock: Acquires or renews the partial wake lock.

@@ -23,11 +23,10 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
- * Aug.07.125:
- * - Issue #124-Revival: Functional Hardening (R124). Aligned logs with 
- *   locality authority ("this device"). Refined hardware lock emission.
- * Aug.07.07:
- * - Issue #124-Revival: Functional: Hardened GPS Revival loop (R124). 
+ * Aug.11.09:
+ * - Issue #141: Stress Recovery Verification. Implemented dynamic polling 
+ *   interval adjustment (R406a) via flatMapLatest to ensure hardware 
+ *   responsiveness during state transitions. Added ExperimentalCoroutinesApi opt-in.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -52,6 +51,15 @@ class GpsManager @Inject constructor(
     
     private var pendingEnterRt = 0L
     
+    private val pollingIntervalFlow = MutableStateFlow(TICK_INTERVAL_MS)
+
+    fun setPollingInterval(intervalMs: Long) {
+        if (pollingIntervalFlow.value != intervalMs) {
+            pollingIntervalFlow.value = intervalMs
+            Timber.d("GPS Hardware: Polling interval updated to ${intervalMs}ms")
+        }
+    }
+
     // R124: Revival State
     private var revivalAttemptCount = 0
     private val _revivalEvents = MutableSharedFlow<RevivalEvent>(extraBufferCapacity = 8)
@@ -207,15 +215,31 @@ class GpsManager @Inject constructor(
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @SuppressLint("MissingPermission")
-    private val hardwareObservationFlow = callbackFlow<GpsUpdate> {
-        try { locationManager.registerGnssStatusCallback(gnssStatusCallback, gpsHandler) } catch (e: Exception) { Timber.e(e, "GPS: Failed to register GNSS callback") }
-        fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
-        val fusedCallback = object : LocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, TICK_INTERVAL_MS).setMinUpdateIntervalMillis(TICK_INTERVAL_MS / 2).setMinUpdateDistanceMeters(0.0f).setWaitForAccurateLocation(false).build()
-        try { fusedLocationClient.requestLocationUpdates(request, fusedCallback, gpsThread.looper) } catch (e: Exception) { Timber.e(e, "CRITICAL: GPS Request failed"); close(e) }
-        val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
-        awaitClose { internalJob.cancel(); try { fusedLocationClient.removeLocationUpdates(fusedCallback); locationManager.unregisterGnssStatusCallback(gnssStatusCallback) } catch (e: Exception) {} }
+    private val hardwareObservationFlow = pollingIntervalFlow.flatMapLatest { interval ->
+        callbackFlow<GpsUpdate> {
+            try { locationManager.registerGnssStatusCallback(gnssStatusCallback, gpsHandler) } catch (e: Exception) { Timber.e(e, "GPS: Failed to register GNSS callback") }
+            fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
+            val fusedCallback = object : LocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
+            
+            val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval)
+                .setMinUpdateIntervalMillis(interval / 2)
+                .setMinUpdateDistanceMeters(0.0f)
+                .setWaitForAccurateLocation(false)
+                .build()
+            
+            try { fusedLocationClient.requestLocationUpdates(request, fusedCallback, gpsThread.looper) } catch (e: Exception) { Timber.e(e, "CRITICAL: GPS Request failed"); close(e) }
+            val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
+            
+            awaitClose { 
+                internalJob.cancel()
+                try { 
+                    fusedLocationClient.removeLocationUpdates(fusedCallback)
+                    locationManager.unregisterGnssStatusCallback(gnssStatusCallback) 
+                } catch (e: Exception) {} 
+            }
+        }
     }.shareIn(scope = externalScope, started = SharingStarted.WhileSubscribed(5000), replay = 1)
 
     fun getLocationFlow(): Flow<Location> = hardwareObservationFlow.filterIsInstance<GpsUpdate.LocationUpdate>().map { it.location }

@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.11.08)
+# Project Issues & Hardening Tracking (Aug.11.13)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,18 +7,23 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 STABLE | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 582 |
+| **Resolved (Total)** | 🟢 Progress | 583 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #141] [Severity: Low] [Category: Performance] Stress Side-Effects.**
-    *   **Concern**: Excessive use of the stress test trigger (R140) might lead to thermal throttling or rapid battery drain on budget hardware. Verification of recovery smoothness post-saturation is required.
+*   *(None)*
 
 ---
 
 ## 🔴 Open Issues
 *   *(None)*
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.11.13)
+*   **[Issue #141] [Severity: Low] [Category: Performance] Stress Recovery Verification.**
+    *   **Resolution**: Hardened the system's return-to-baseline logic post-saturation. Implemented `resetSimulatedAnomalies()` in `SystemMonitor` to clear synthetic test latches. Integrated dynamic hardware GPS polling (R406a) via `flatMapLatest` in `GpsManager` and implemented a 5000ms "Adaptation Muzzle" (ADAPTATION_SETTLING_MS) in `TrackerService` to suppress stabilization artifacts during frequency transitions. Added session-level resets for behavioral latches in `ServiceBehaviorUseCase`. (R141)
 
 ---
 
@@ -45,4 +50,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Restored Compose Preview functionality for `SettingsOverlay` and `PhoneSetupOverlay` in `SettingsComponents.kt`. Updated signatures to support decomposed parameters and added `isHydrated` mock support to verify rendering paths (R136).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.08)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.13)

@@ -4,12 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Aug.11.09:
+ * - Issue #141: Stress Recovery Verification. Added requiresAdaptationMuzzle 
+ *   to HardwareCapabilities for budget hardware state management (R141).
  * Aug.10.27:
  * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure 
  *   to EngineConnectionPoint for load-correlated stall tracking (R133).
- * Aug.10.26:
- * - Issue #132: Forensic UI Dashboard Refinement. Added cpuLoad, ioWait, 
- *   and maxIoLatency to EngineConnectionPoint for trend visualization (R132).
  */
 
 @Serializable
@@ -51,7 +51,8 @@ data class HardwareCapabilities(
     val requiresExtraTopPadding: Boolean = false,
     val isManualOverrideActive: Boolean = false,
     val isA15Device: Boolean = false,
-    val isMicrophoneGranted: Boolean = false
+    val isMicrophoneGranted: Boolean = false,
+    val requiresAdaptationMuzzle: Boolean = false
 )
 
 enum class LocationPendingReason {

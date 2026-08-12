@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 582**
+**Total Unique Resolutions: 583**
+
+## 22. Stress Recovery & Adaptive Polling (Aug.11.13)
+*   **Issue #141: Stress Recovery Verification**.
+    *   **Resolution**: Hardened the system's return-to-baseline logic post-saturation. Implemented `resetSimulatedAnomalies()` in `SystemMonitor` to clear synthetic test latches. Integrated dynamic hardware GPS polling (R406a) via `flatMapLatest` in `GpsManager` and implemented a 5000ms "Adaptation Muzzle" (ADAPTATION_SETTLING_MS) in `TrackerService` to suppress hardware stabilization artifacts during frequency transitions. Added session-level resets for behavioral latches in `ServiceBehaviorUseCase`. (R141)
 
 ## 21. Forensic Integrity & Thermal Correlation (Aug.11.08)
 *   **Issue #143: Forensic Integrity Verification**.
@@ -29,4 +33,4 @@ This document contains the unified record of all resolved issues and technical d
     *   **Resolution**: Implemented **Deferred UI Hydration** (R137) in `SettingsOverlay` and `PhoneSetupOverlay`. Content rendering is gated by an internal `isHydrated` state and a 100-150ms delay, eliminating 3000ms+ stalls on budget hardware. (R137)
 
 ---
-*For older resolutions, see the unified record below or [issues.md](issues.md). (vAug.11.08)
+*For historical resolutions #1 through #15, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.11.13)

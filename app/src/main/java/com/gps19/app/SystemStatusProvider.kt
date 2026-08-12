@@ -63,13 +63,11 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Aug.11.13:
+ * - Issue #141: Stress Recovery Verification. Correctly populating 
+ *   requiresAdaptationMuzzle in PermissionState for budget hardware (R141).
  * Aug.10.24:
- * - Issue #129: Forensic Storage Pruning Sensitivity. Updated BatteryStatus to 
- *   include pressure flags (isLow/isCritical) for adaptive pruning (R129).
- * Aug.07.05:
- * - Issue #745: Permission Detection Hardening. Reduced FORCED_REFRESH_COOLDOWN_MS 
- *   to 1000ms to ensure "Refresh" button in Setup is responsive (R745). Moved
- *   status data classes to top of file to resolve tool-specific compilation stalls.
+ * - Issue #129: Forensic Storage Pruning Sensitivity.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -137,7 +135,7 @@ class SystemStatusProviderImpl @Inject constructor(
     private val isA15 by lazy { isA15Device() }
     
     private val PERMISSION_TTL_MS = 30000L 
-    private val FORCED_REFRESH_COOLDOWN_MS = 1000L // Issue #745: Lowered from 15s to 1s for UX responsiveness
+    private val FORCED_REFRESH_COOLDOWN_MS = 1000L 
     private val STORAGE_POLL_INTERVAL_MS = 60_000L
     private val POWER_POLL_INTERVAL_MS = 60_000L
     
@@ -268,6 +266,11 @@ class SystemStatusProviderImpl @Inject constructor(
         }
     }
 
+    private fun isXiaomiDevice(): Boolean = Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)
+    private fun isSamsungDevice(): Boolean = Build.MANUFACTURER.equals("Samsung", ignoreCase = true)
+    private fun isS21FEDevice(): Boolean = Build.MODEL.contains("G990", ignoreCase = true)
+    private fun isA15Device(): Boolean = Build.MODEL.contains("A15", ignoreCase = true) || Build.PRODUCT.contains("A15", ignoreCase = true)
+
     private val sharedInternetStatusFlow = callbackFlow<Boolean> {
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) { trySend(true) }
@@ -350,7 +353,6 @@ class SystemStatusProviderImpl @Inject constructor(
         return try {
             val stat = StatFs(context.filesDir.path)
             
-            // Issue #728: Granular pressure detection using StorageStatsManager
             var totalMbValue: Long
             var availableMbValue: Long
             
@@ -430,9 +432,7 @@ class SystemStatusProviderImpl @Inject constructor(
 
     override suspend fun getCpuLoad(): Double = withContext(Dispatchers.IO) {
         try {
-            hardwarePropertiesManager?.let {
-                readProcLoadAvg()
-            } ?: readProcLoadAvg()
+            readProcLoadAvg()
         } catch (e: Exception) {
             0.0
         }

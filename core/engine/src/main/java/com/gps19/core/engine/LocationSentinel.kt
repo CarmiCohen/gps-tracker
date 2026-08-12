@@ -5,12 +5,13 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * July.30.53:
- * - Issue #653: Performance: Zero-Churn Refactoring. Fixed compilation error 
- *   by passing JumpConfidence flyweight to PhysicsUtils.isVisualJump (R-HARDWARE-01).
- * July.30.50:
- * - Issue #653: Performance: Zero-Churn Refactoring. Integrated SentinelResult 
- *   flyweight to eliminate per-fix allocations in the GPS hot-path.
+ * Aug.11.14:
+ * - Issue #141: Stress Recovery Verification. Refactored runSensorSentinel() 
+ *   to checkPhysicalTamper() to allow sensor-only status polling in the 
+ *   service tick loop (R141). Corrected parameter names.
+ * Aug.11.09:
+ * - Issue #141: Stress Recovery Verification. Fixed sensor sentinel to respect 
+ *   isMuzzled flag.
  */
 class LocationSentinel {
 
@@ -360,7 +361,7 @@ class LocationSentinel {
                 return resultFlyweight
             }
 
-            runSensorSentinel(lat, lng, alt, accuracy, bearing, nowRt, isMuzzled)
+            resultFlyweight.status = checkPhysicalTamper(nowRt, isMuzzled)
             if (resultFlyweight.status != SentinelStatus.VALID) {
                 return resultFlyweight
             }
@@ -383,74 +384,68 @@ class LocationSentinel {
         return resultFlyweight
     }
 
-    private fun runSensorSentinel(
-        lat: Double, lng: Double, alt: Double, accuracy: Double, bearing: Double,
-        nowRt: Long,
+    /**
+     * checkPhysicalTamper: Publicly accessible sensor status evaluator (R141).
+     */
+    fun checkPhysicalTamper(
+        nowRt: Long = 0L,
         isMuzzled: Boolean = false
-    ) {
+    ): SentinelStatus {
+        if (isMuzzled) return SentinelStatus.VALID
+
         if (!isNear) {
-            resultFlyweight.status = SentinelStatus.TAMPER
             resultFlyweight.reason = "Proximity Far"
-            return
+            return SentinelStatus.TAMPER
         }
         if (isPowerTamper) {
-            resultFlyweight.status = SentinelStatus.TAMPER
             resultFlyweight.reason = "Power disconnected"
-            return
+            return SentinelStatus.TAMPER
         }
         if (SentinelValidator.isTiltViolated(currentTiltDegrees)) {
-            resultFlyweight.status = SentinelStatus.TAMPER
             resultFlyweight.reason = "Tilt detected"
-            return
+            return SentinelStatus.TAMPER
         }
         if (SentinelValidator.isShockViolated(peakVibrationShock, adaptiveVibrationFloor)) {
-            resultFlyweight.status = SentinelStatus.TAMPER
             resultFlyweight.reason = "Shock detected"
-            return
+            return SentinelStatus.TAMPER
         }
         
         if (baroBaseline > -999.0) {
             val liftDelta = currentBaroAlt - baroBaseline
             if (SentinelValidator.isLiftViolated(liftDelta)) {
                 if (currentVibrationIndex > VIBRATION_STATIONARY_THRESHOLD) {
-                    resultFlyweight.status = SentinelStatus.TAMPER
                     resultFlyweight.reason = "Lift detected"
-                    return
+                    return SentinelStatus.TAMPER
                 } else {
-                    resultFlyweight.status = SentinelStatus.TAMPER
                     resultFlyweight.reason = "Barometric drift suspicion (No vibration)"
-                    return
+                    return SentinelStatus.TAMPER
                 }
             }
         }
         
         if (SentinelValidator.isLightViolated(currentLux, luxBaseline)) {
-            resultFlyweight.status = SentinelStatus.TAMPER
             resultFlyweight.reason = "Light jump"
-            return
+            return SentinelStatus.TAMPER
         }
 
         val isAcousticLockedOut = (lastFastPathAcousticSpikeRt > 0 && (nowRt - lastFastPathAcousticSpikeRt < ACOUSTIC_LOCKOUT_MS))
         
         if (!isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb)) {
-            resultFlyweight.status = SentinelStatus.TAMPER
             resultFlyweight.reason = "Acoustic alarm"
-            return
+            return SentinelStatus.TAMPER
         }
 
         if (SentinelValidator.isVibrationSuspicious(currentVibrationIndex, adaptiveVibrationFloor)) {
-            resultFlyweight.status = SentinelStatus.TAMPER
             resultFlyweight.reason = "Vibration suspicion"
-            return
+            return SentinelStatus.TAMPER
         }
         
         if (!isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb, currentVibrationIndex)) {
-            resultFlyweight.status = SentinelStatus.TAMPER
             resultFlyweight.reason = "Acoustic suspicion"
-            return
+            return SentinelStatus.TAMPER
         }
 
-        resultFlyweight.status = SentinelStatus.VALID
+        return SentinelStatus.VALID
     }
 
     fun isStationary(): Boolean = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
