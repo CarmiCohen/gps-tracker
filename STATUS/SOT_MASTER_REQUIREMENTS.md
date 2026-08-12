@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - Aug.11.13 (Recovery & Adaptive Polling)
+# System Source of Truth (SoT) - Aug.11.16 (Uncertainty Growth & Recovery)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -11,6 +11,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Forensic Anomaly Correlation Engine (R133)**: (Updated Aug.11.08) Cross-domain correlation between location stability and hardware load. (Issue #133-Sentinel). **Status: Implemented & Verified.**
 
 ### 2. Temporal & Forensic Integrity
+*   **Bayesian Uncertainty Authority (R460)**: (Updated Aug.11.16) The system MUST expand geofence thresholds during GPS gaps using time-drifted uncertainty (`acc`). Geofence hysteresis (Return to Safe Range) MUST be gated by the *current* drifted uncertainty, not the static accuracy of the last fix, to prevent false "Safe" clearances when position is unknown. (Issue #144). **Status: Implemented & Verified.**
 *   **Temporal Forensic Integrity (R102)**: Monotonic `rt` for logic; wall-clock `ts` for logs. (Issue #102)
 *   **Forensic Parity Authority (R118)**: Strict field parity across Protobuf, Database, and UI. (Issue #118)
 
@@ -22,5 +23,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.11.13.
+*   **Current Release**: Aug.11.16.
 *   **Source of Truth**: app/build.gradle versionName.

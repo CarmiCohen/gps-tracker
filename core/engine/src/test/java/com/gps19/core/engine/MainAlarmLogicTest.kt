@@ -8,6 +8,9 @@ import java.util.*
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
+ * Aug.11.14:
+ * - Issue #144: Geofence Uncertainty Growth Validation. Added test case for 
+ *   Bayesian Drift protection during GPS gaps.
  * Aug.10.31:
  * - Issue #133: Forensic Anomaly Correlation Engine. Added unit test for 
  *   Silent Failure detection (R133).
@@ -129,7 +132,7 @@ class MainAlarmLogicTest {
         val baseNowRt = 100000L
         
         val state = createDefaultState(now + 10000).apply {
-            nowRt = baseNowRt + 10000
+            this.nowRt = baseNowRt + 10000
             trackerLat = 10.002 // ~220m away.
             trackerLastValidFixTs = now
             trackerLastValidFixRt = baseNowRt
@@ -142,6 +145,38 @@ class MainAlarmLogicTest {
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         
         assertFalse("Geofence should be suppressed by Bayesian expansion during gap", geofence?.conditionMet == true)
+    }
+
+    @Test
+    fun `Verify Geofence breach does NOT clear during GPS gap despite uncertainty growth`() {
+        val now = 1700000000000L
+        val baseNowRt = 100000L
+        
+        // 1. Establish violation
+        val state = createDefaultState(now).apply {
+            this.nowRt = baseNowRt
+            trackerLat = 10.005 // ~550m away (Violation > 100m + buffer)
+            wasDistanceViolated = true
+            distanceViolationCounter = DISTANCE_ALARM_SAMPLES_REQUIRED
+            trackerLastValidFixRt = baseNowRt
+            maxTrackerAccuracy = 5.0
+        }
+        
+        // 2. Simulate GPS gap with high drift
+        // After 100 seconds at 15m/s (conservative) drift, acc = 5 + 1500 = 1505m.
+        // threshold = 100 + (1505 * 6) = 9130m.
+        // 550m is now well within the threshold (Inside range = 550 <= 9130 - 5).
+        state.apply {
+            this.now = now + 100000
+            this.nowRt = baseNowRt + 100000
+            trackerSpeed = 20.0
+            health.isLocationPending = true
+        }
+        
+        val report = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
+        
+        assertTrue("Violation should persist during GPS gap uncertainty expansion", state.wasDistanceViolated)
     }
 
     @Test

@@ -1,42 +1,42 @@
-# Handover (Aug.11.13) - Stress Recovery Hardened
+# Handover (Aug.11.16) - Geofence Uncertainty Hardened
 
-## 🎯 Next Objective: [Issue #144] Geofence Uncertainty Growth Validation.
-- **Goal**: Verify the Bayesian uncertainty growth logic (R460) during extended GPS gaps.
-- **Context**: Now that Stress Recovery is verified (R141), we must ensure that the geofence "Accuracy Buffer" correctly expands during signal loss to prevent false "Safe" returns when the device is actually drifting.
+## 🎯 Next Objective: [Issue #145] Forensic Spill-Buffer Overflow Protection.
+- **Goal**: Implement proactive throttling for the `MappedByteBuffer` (R669) when forensic pressure exceeds `FORENSIC_SPILL_CAPACITY`.
+- **Context**: Geofence drift is now correctly managed (R460). The next priority is ensuring that high-frequency forensic logging during stress doesn't cause buffer overflows on storage-constrained devices.
 
-## 🟢 Recent Resolution (Aug.11.13)
-- **Resolution**: Implemented **Stress Recovery Verification** (R141).
-- **Root Cause Remediation**: Hardened the transition from saturated/thermal states back to baseline. Implemented synthetic anomaly resets in `SystemMonitor` and dynamic hardware-level polling in `GpsManager`. Integrated a 5000ms **Adaptation Muzzle** in `TrackerService` to suppress stabilization artifacts during recovery.
-- **System Version**: Incremented to **Aug.11.13**.
+## 🟢 Recent Resolution (Aug.11.16)
+- **Resolution**: Implemented **Geofence Uncertainty Growth Validation** (Issue #144).
+- **Root Cause Remediation**: Hardened the **Bayesian Uncertainty Authority (R460)**. Fixed a flaw where geofence violations were cleared based on stale accuracy metrics. The system now correctly uses the time-drifted uncertainty (`acc`) to gate "Return to Safe Range" events, ensuring persistent alerts during GPS gaps.
+- **System Version**: Incremented to **Aug.11.16**.
 
 ## 🏗️ UI Performance Architecture
 1.  **Adaptive Polling**: (R406a) Real-time hardware rate adjustment via `flatMapLatest`.
-2.  **Staggered Hydration**: (R142) Sequential rendering of guide sections.
+2.  **Uncertainty Hysteresis**: (R460) Drift-aware geofence clearance.
 3.  **Thermal Correlation**: (R143) Linking hardware heat status to location integrity.
 
-## 🔍 Monitoring State (vAug.11.13)
+## 🔍 Monitoring State (vAug.11.16)
 | Component | Status | Logic / Technical Detail |
 | :--- | :--- | :--- |
+| **Geofence Logic** | 🟢 **STABLE** | R460: Clearance gated by drifted uncertainty (`acc`). |
 | **Recovery Logic** | 🟢 **VERIFIED** | R141: Synthetic latches flushed on completion. |
-| **GPS Hardware** | 🟢 **DYNAMIC** | R406a: Dynamic rate updates via GpsManager. |
 | **Muzzle Logic** | 🟢 **ACTIVE** | Adaptation Muzzle suppresses recovery artifacts. |
 
 ## 📊 Status Tracker
+- **[Issue #144] Geofence Uncertainty Growth Validation**: 🟢 Resolved (R460).
 - **[Issue #141] Stress Recovery Verification**: 🟢 Resolved (R141).
 - **[Issue #143] Forensic Integrity Verification**: 🟢 Resolved (R143).
-- **[Issue #140] Automated Forensic Stress Test**: 🟢 Resolved (R140).
-- **Total Unique Resolutions**: 583.
+- **Total Unique Resolutions**: 584.
 
 ## ⚠️ Newly Identified Risks
-- **[Issue #144] Geofence Drift**: Potential for false "Inside Range" logs if uncertainty growth (R460) isn't aggressive enough during long hardware stalls.
+- **[Issue #145] Spill-Buffer Pressure**: MappedByteBuffer (R669) may overflow during high-load forensic spikes if not actively throttled.
 
 ## 🛠️ Git Release Preparation
 ```bash
 git add .
-git commit -m "release: Aug.11.13 - Stress Recovery Verification (Issue #141)"
-git tag -a vAug.11.13 -m "Hardened stress recovery: implemented synthetic latch resets, dynamic hardware polling (R406a), and Adaptation Muzzle (R141)."
+git commit -m "release: Aug.11.16 - Geofence Uncertainty Growth Hardened (Issue #144)"
+git tag -a vAug.11.16 -m "Hardened geofence hysteresis: clearance now requires fresh accuracy validation, accounting for Bayesian drift (R460)."
 git push origin main --tags
 ```
 
-**Status**: Issue #141 Resolved. Ready for Geofence Uncertainty Validation.
-vAug.11.13
+**Status**: Issue #144 Resolved. Ready for Forensic Spill-Buffer Hardening.
+vAug.11.16

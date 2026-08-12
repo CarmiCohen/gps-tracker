@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 583**
+**Total Unique Resolutions: 584**
+
+## 23. Bayesian Uncertainty & Geofence (Aug.11.16)
+*   **Issue #144: Geofence Uncertainty Growth Validation**.
+    *   **Resolution**: Hardened the **Bayesian Uncertainty Authority (R460)** by correcting a flaw in the geofence hysteresis ("Return to Safe Range") logic. The system now uses the time-drifted uncertainty (`acc`) instead of the static accuracy of the last valid fix to gate the clearance of violations. This ensures that geofence alerts remain active during extended GPS gaps where the actual position is unknown, even if the last known point was technically within range. Updated `MainAlarmLogic.kt` and added regression tests in `MainAlarmLogicTest.kt`. (R460)
 
 ## 22. Stress Recovery & Adaptive Polling (Aug.11.13)
 *   **Issue #141: Stress Recovery Verification**.
@@ -33,4 +37,4 @@ This document contains the unified record of all resolved issues and technical d
     *   **Resolution**: Implemented **Deferred UI Hydration** (R137) in `SettingsOverlay` and `PhoneSetupOverlay`. Content rendering is gated by an internal `isHydrated` state and a 100-150ms delay, eliminating 3000ms+ stalls on budget hardware. (R137)
 
 ---
-*For historical resolutions #1 through #15, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.11.13)
+*For historical resolutions #1 through #15, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.11.16)

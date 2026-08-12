@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Aug.11.16:
+ * - Issue #144: Geofence Uncertainty Growth Validation. Fixed "Return to Safe Range" 
+ *   logic to use drifted uncertainty (acc) instead of static accuracy (R460).
  * Aug.11.08:
  * - Issue #143: Forensic Integrity Verification. Updated Silent Failure 
  *   detection to include thermal throttling in correlation logic (R133).
@@ -292,7 +295,7 @@ object MainAlarmLogic {
                         extremeValue = deviation
                     )
                 } else if (dValue <= (threshold - GEOFENCE_HYSTERESIS_METERS) && !isJump) {
-                    if (state.wasDistanceViolated && state.maxTrackerAccuracy < RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT) {
+                    if (state.wasDistanceViolated && acc < RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT) {
                         state.wasDistanceViolated = false
                         report.getOrCreate(reportIdx++).update(
                             type = ALERT_ID_TRACKER_GEOFENCE,

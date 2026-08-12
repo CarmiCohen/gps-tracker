@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.11.13)
+# Project Issues & Hardening Tracking (Aug.11.16)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 STABLE | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 583 |
+| **Resolved (Total)** | 🟢 Progress | 584 |
 
 ---
 
@@ -18,6 +18,12 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ## 🔴 Open Issues
 *   *(None)*
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.11.16)
+*   **[Issue #144] [Severity: High] [Category: Logic] Geofence Uncertainty Growth Validation.**
+    *   **Resolution**: Hardened the **Bayesian Uncertainty Authority (R460)** by fixing a flaw in the geofence hysteresis logic. The system now uses the time-drifted uncertainty (`acc`) instead of the static accuracy of the last valid fix when determining if a device has "returned to safe range". This prevents false "Safe" clearances during extended GPS gaps where the actual position is unknown. Updated `MainAlarmLogic.kt` and verified via `MainAlarmLogicTest.kt`. (R460)
 
 ---
 
@@ -44,10 +50,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Implemented a 5-second CPU/IO saturation routine in `TrackerService` triggered via the `PhoneSetupOverlay`. This allows formal verification of forensic ribbons and "Silent Failure" detection logic (R140).
 
 ---
-
-## 🟢 Recently Resolved Issues (Aug.11.04)
-*   **[Issue #136] [Severity: Low] [Category: Performance] Compose Preview Coverage Gap.**
-    *   **Resolution**: Restored Compose Preview functionality for `SettingsOverlay` and `PhoneSetupOverlay` in `SettingsComponents.kt`. Updated signatures to support decomposed parameters and added `isHydrated` mock support to verify rendering paths (R136).
-
----
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.13)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.11.16)
