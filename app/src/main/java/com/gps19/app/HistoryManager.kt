@@ -27,12 +27,12 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Aug.13.06:
+ * - Issue #152: Excessive GC Pressure. Implemented ConnectionPoint pooling and 
+ *   flyweight mapping to eliminate allocation churn in the 1Hz telemetry hot-path (R152).
  * Aug.10.28:
  * - Issue #133: Forensic Anomaly Correlation Engine. Updated mapToAppPoint to 
  *   include isSilentFailure for load-correlated anomaly tracking (R133).
- * Aug.10.27:
- * - Issue #132: Forensic UI Dashboard Refinement. Updated mapToAppPoint to include 
- *   cpuLoad, ioWait, and maxIoLatency for trend visualization (R132).
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -59,9 +59,12 @@ class HistoryManager @Inject constructor(
     private var clockDriftRef: Long = 0L
     private val aggregator = TelemetryAggregator()
     
-    // Issue #668: Flyweight to eliminate tick-level allocation
+    // Issue #668/152: Flyweights to eliminate tick-level allocation
     private val currentPointFlyweight = EngineConnectionPoint()
     private val baseTemplateFlyweight = EngineConnectionPoint()
+    
+    // Issue #152: Pooled app-level points for aggregator callbacks
+    private val appPointPool = Array(RibbonScale.entries.size) { ConnectionPoint() }
 
     private var backfillAuditCount = 0
     private var hourlyBackfillTotal = 0
@@ -126,7 +129,7 @@ class HistoryManager @Inject constructor(
             )
         }
 
-        // Issue #668: Reusing flyweight
+        // Issue #668/152: Reusing flyweight
         currentPointFlyweight.apply {
             ts = now; rt = nowRt; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; isGap = false
             this.isRecoveryEvent = isRecoveryEvent
@@ -143,7 +146,9 @@ class HistoryManager @Inject constructor(
         }
         
         aggregator.processPoint(currentPointFlyweight) { scale, point ->
-            repository.addHistoryPoint(scale.key, mapToAppPoint(point))
+            val flyweight = appPointPool[scale.ordinal]
+            mapToAppPoint(point, flyweight)
+            repository.addHistoryPoint(scale.key, flyweight)
         }
 
         if (now - lastTimeTriggerTs >= 60000L || lastTimeTriggerTs == 0L) {
@@ -174,7 +179,7 @@ class HistoryManager @Inject constructor(
         val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
         val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
         
-        // Issue #668: Reusing baseTemplate flyweight
+        // Issue #668/152: Reusing baseTemplate flyweight
         baseTemplateFlyweight.apply {
             ts = 0L; rt = 0L; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; this.hasGps = hasGps
             this.isRecoveryEvent = isRecoveryEvent
@@ -189,21 +194,26 @@ class HistoryManager @Inject constructor(
             this.cpuLoad = cpuLoad; this.ioWait = ioWait; this.maxIoLatency = maxIoLatency; this.isSilentFailure = isSilentFailure
         }
         
-        val fourMPoints = ArrayList<ConnectionPoint>()
+        // Issue #152: Use a managed list of points for batch insertion to avoid list-growth allocations
+        val backfillBuffer = ArrayList<ConnectionPoint>(60) 
         
         aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplateFlyweight) { scale, point ->
-            val appPoint = mapToAppPoint(point)
+            // For backfill, we allocate because these points must survive the callback to be batched.
+            // However, this happens rarely (only on gaps).
+            val appPoint = ConnectionPoint()
+            mapToAppPoint(point, appPoint)
+            
             if (scale == RibbonScale.FOUR_MIN) { 
-                fourMPoints.add(appPoint) 
+                backfillBuffer.add(appPoint) 
             } else { 
                 repository.addHistoryPoint(scale.key, appPoint) 
             }
         }
         
-        if (fourMPoints.isNotEmpty()) {
-            repository.addHistoryPoints("4M", fourMPoints)
-            backfillAuditCount += fourMPoints.size
-            hourlyBackfillTotal += fourMPoints.size
+        if (backfillBuffer.isNotEmpty()) {
+            repository.addHistoryPoints("4M", backfillBuffer)
+            backfillAuditCount += backfillBuffer.size
+            hourlyBackfillTotal += backfillBuffer.size
         }
     }
 
@@ -214,7 +224,9 @@ class HistoryManager @Inject constructor(
         RibbonScale.entries.forEach { scale ->
             val gapPoints = ArrayList<ConnectionPoint>()
             aggregator.fillRealGap(scale, lastTickRt, nowRt, lastTickTs, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb()) { point ->
-                gapPoints.add(mapToAppPoint(point))
+                val appPoint = ConnectionPoint()
+                mapToAppPoint(point, appPoint)
+                gapPoints.add(appPoint)
             }
             if (gapPoints.isNotEmpty()) { 
                 repository.addHistoryPoints(scale.key, gapPoints)
@@ -247,17 +259,19 @@ class HistoryManager @Inject constructor(
         return true
     }
 
-    private fun mapToAppPoint(p: EngineConnectionPoint) = ConnectionPoint(
-        ts = p.ts, rt = p.rt, rtt = p.rtt, localSig = 10, remoteSig = p.remoteSig, isConnected = p.isConnected,
-        isGap = p.isGap, isRecoveryEvent = p.isRecoveryEvent, hasGps = p.hasGps, isTick = p.isTick, gpsAccuracy = p.accuracy, maxAccuracy = p.maxAccuracy,
-        isBatterySteepDischarge = p.isBatterySteepDischarge, isCoolingModeActive = p.isCoolingModeActive,
-        speed = p.speed, bearing = p.bearing, currentMa = p.currentMa, locationPendingReason = p.locationPendingReason,
-        gpsIndex = p.gpsIndex, noiseIdx = p.noiseIdx, luxIdx = p.luxIdx, vibeIdx = p.vibeIdx, proxIdx = p.proxIdx,
-        liftIdx = p.liftIdx, snrIdx = p.snrIdx, tiltIdx = p.tiltIdx, baroIdx = p.baroIdx, isSitDetected = p.isSitDetected,
-        isSitActive = p.isSitActive, sitVz = p.sitVz, sitVzTs = p.sitVzTs, sitVzRt = p.sitVzRt, sitDz = p.sitDz,
-        sitBaro = p.sitBaro, sitTilt = p.sitTilt, sitShock = p.sitShock, kineticEnergy = p.kineticEnergy,
-        cpuLoad = p.cpuLoad, ioWait = p.ioWait, maxIoLatency = p.maxIoLatency, isSilentFailure = p.isSilentFailure
-    )
+    private fun mapToAppPoint(p: EngineConnectionPoint, out: ConnectionPoint) {
+        out.apply {
+            ts = p.ts; rt = p.rt; rtt = p.rtt; localSig = 10; remoteSig = p.remoteSig; isConnected = p.isConnected
+            isGap = p.isGap; isRecoveryEvent = p.isRecoveryEvent; hasGps = p.hasGps; isTick = p.isTick; gpsAccuracy = p.accuracy; maxAccuracy = p.maxAccuracy
+            isBatterySteepDischarge = p.isBatterySteepDischarge; isCoolingModeActive = p.isCoolingModeActive
+            speed = p.speed; bearing = p.bearing; currentMa = p.currentMa; locationPendingReason = p.locationPendingReason
+            gpsIndex = p.gpsIndex; snrIdx = p.snrIdx; noiseIdx = p.noiseIdx; luxIdx = p.luxIdx; vibeIdx = p.vibeIdx; proxIdx = p.proxIdx
+            liftIdx = p.liftIdx; snrIdx = p.snrIdx; tiltIdx = p.tiltIdx; baroIdx = p.baroIdx; isSitDetected = p.isSitDetected
+            isSitActive = p.isSitActive; sitVz = p.sitVz; sitVzTs = p.sitVzTs; sitVzRt = p.sitVzRt; sitDz = p.sitDz
+            sitBaro = p.sitBaro; sitTilt = p.sitTilt; sitShock = p.sitShock; kineticEnergy = p.kineticEnergy
+            cpuLoad = p.cpuLoad; ioWait = p.ioWait; maxIoLatency = p.maxIoLatency; isSilentFailure = p.isSilentFailure
+        }
+    }
 
     private fun handleHourlyAutoSave(hour: Int) {
         scope?.launch {

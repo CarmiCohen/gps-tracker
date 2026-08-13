@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 589**
+**Total Unique Resolutions: 590**
+
+## 29. Telemetry GC Pressure Mitigation (Aug.13.06)
+*   **Issue #152: Excessive GC Pressure**.
+    *   **Resolution**: Implemented **Telemetry Flyweight Pooling (R152)**. Refactored `ConnectionPoint` into a mutable class and eliminated expensive default `UUID.randomUUID()` generation. Introduced a managed pool of `ConnectionPoint` instances in `HistoryManager` and optimized `MainRepository` to support zero-allocation buffering for history persistence. This eliminates 1Hz object churn during steady-state tracking, significantly reducing GC spikes on budget hardware. (R152)
 
 ## 28. Startup Davey Stall Mitigation (Aug.13.05)
 *   **Issue #153: Startup Davey Stalls**.
@@ -20,9 +24,5 @@ This document contains the unified record of all resolved issues and technical d
 *   **Issue #146: Optimize Forensic Drainer**.
     *   **Resolution**: Hardened the **Forensic Drainer (R146)** to eliminate 200ms latency spikes and high GC pressure. Refactored `ForensicSpillBuffer` to utilize zero-allocation paths for `peek()` and `writeTrace()` by implementing pre-allocated processing buffers. Streamlined `LogRepository.performForensicDrain()` using a single-pass filtering/mapping loop and optimized signature deduplication.
 
-## 24. Forensic Spill-Buffer Hardening (Aug.11.20)
-*   **Issue #145: Forensic Spill-Buffer Overflow Protection**.
-    *   **Resolution**: Hardened the **Forensic Sampling Authority (R669/R700)** by implementing proactive pressure-aware throttling. (R669)
-
 ---
-*For historical resolutions #1 through #23, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.05)
+*For historical resolutions #1 through #24, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.06)

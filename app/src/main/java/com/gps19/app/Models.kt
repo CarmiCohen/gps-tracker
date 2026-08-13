@@ -10,12 +10,13 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.13.06:
+ * - Issue #152: Excessive GC Pressure. Refactored ConnectionPoint to a mutable 
+ *   class with pooling support to eliminate object churn in the telemetry 
+ *   hot-path (R152).
  * Aug.10.28:
  * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure to 
  *   ConnectionPoint and DashboardState for load-correlated anomaly tracking (R133).
- * Aug.10.27:
- * - Issue #132: Forensic UI Dashboard Refinement. Added cpuLoad, ioWait, and 
- *   maxIoLatency to ConnectionPoint to support trend visualization (R132).
  */
 
 sealed class AppSensorEvent {
@@ -80,52 +81,126 @@ data class AlertSettings(
     val systemStorageLow: Boolean = true
 )
 
-data class ConnectionPoint(
-    val localId: String = UUID.randomUUID().toString(),
-    val ts: Long, val rt: Long, val rtt: Int, val localSig: Int, val remoteSig: Int,
-    val isConnected: Boolean, val isGap: Boolean = false, 
-    val isRecoveryEvent: Boolean = false,
-    val gpsAccuracy: Double = 0.0,
-    val maxAccuracy: Double = 0.0,
-    val isTick: Boolean = false, val hasGps: Boolean = false,
-    val isBatterySteepDischarge: Boolean = false,
-    val isCoolingModeActive: Boolean = false,
-    val isBatteryLow: Boolean = false,
-    val isBatteryCritical: Boolean = false,
-    val speed: Double = 0.0, val bearing: Double = 0.0,
-    val currentMa: Int = 0,
-    val status: SentinelStatus = SentinelStatus.VALID,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+/**
+ * Issue #152: Refactored to mutable class for zero-churn telemetry.
+ */
+class ConnectionPoint(
+    var localId: String = "",
+    var ts: Long = 0, 
+    var rt: Long = 0, 
+    var rtt: Int = 0, 
+    var localSig: Int = 10, 
+    var remoteSig: Int = 0,
+    var isConnected: Boolean = false, 
+    var isGap: Boolean = false, 
+    var isRecoveryEvent: Boolean = false,
+    var gpsAccuracy: Double = 0.0,
+    var maxAccuracy: Double = 0.0,
+    var isTick: Boolean = false, 
+    var hasGps: Boolean = false,
+    var isBatterySteepDischarge: Boolean = false,
+    var isCoolingModeActive: Boolean = false,
+    var isBatteryLow: Boolean = false,
+    var isBatteryCritical: Boolean = false,
+    var speed: Double = 0.0, 
+    var bearing: Double = 0.0,
+    var currentMa: Int = 0,
+    var status: SentinelStatus = SentinelStatus.VALID,
+    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     
     // Forensic Indices
-    val gpsIndex: Double = 0.0,
-    val snrIdx: Double = 0.0,
-    val noiseIdx: Double = 0.0,
-    val luxIdx: Double = 0.0,
-    val vibeIdx: Double = 0.0,
-    val proxIdx: Double = 1.0,
-    val liftIdx: Double = 0.0,
-    val tiltIdx: Double = 0.0,
-    val baroIdx: Double = 0.0,
-    val isSitDetected: Boolean = false,
-    val isSitActive: Boolean = false,
-    val sitVz: Double = 0.0,
-    val sitVzTs: Long = 0L,
-    val sitVzRt: Long = 0L,
-    val sitDz: Double = 0.0,
-    val sitBaro: Double = 0.0,
-    val sitTilt: Double = 0.0,
-    val sitShock: Double = 0.0,
-    val kineticEnergy: Double = 0.0,
+    var gpsIndex: Double = 0.0,
+    var snrIdx: Double = 0.0,
+    var noiseIdx: Double = 0.0,
+    var luxIdx: Double = 0.0,
+    var vibeIdx: Double = 0.0,
+    var proxIdx: Double = 1.0,
+    var liftIdx: Double = 0.0,
+    var tiltIdx: Double = 0.0,
+    var baroIdx: Double = 0.0,
+    var isSitDetected: Boolean = false,
+    var isSitActive: Boolean = false,
+    var sitVz: Double = 0.0,
+    var sitVzTs: Long = 0L,
+    var sitVzRt: Long = 0L,
+    var sitDz: Double = 0.0,
+    var sitBaro: Double = 0.0,
+    var sitTilt: Double = 0.0,
+    var sitShock: Double = 0.0,
+    var kineticEnergy: Double = 0.0,
 
-    // Performance & Load Correlation (Issue #132)
-    val cpuLoad: Double = 0.0,
-    val ioWait: Double = 0.0,
-    val maxIoLatency: Long = 0L,
+    // Performance & Load Correlation
+    var cpuLoad: Double = 0.0,
+    var ioWait: Double = 0.0,
+    var maxIoLatency: Long = 0L,
 
-    // Anomaly Correlation (Issue #133)
-    val isSilentFailure: Boolean = false
-)
+    // Anomaly Correlation
+    var isSilentFailure: Boolean = false
+) {
+    fun copyFrom(other: ConnectionPoint) {
+        this.localId = other.localId
+        this.ts = other.ts
+        this.rt = other.rt
+        this.rtt = other.rtt
+        this.localSig = other.localSig
+        this.remoteSig = other.remoteSig
+        this.isConnected = other.isConnected
+        this.isGap = other.isGap
+        this.isRecoveryEvent = other.isRecoveryEvent
+        this.gpsAccuracy = other.gpsAccuracy
+        this.maxAccuracy = other.maxAccuracy
+        this.isTick = other.isTick
+        this.hasGps = other.hasGps
+        this.isBatterySteepDischarge = other.isBatterySteepDischarge
+        this.isCoolingModeActive = other.isCoolingModeActive
+        this.isBatteryLow = other.isBatteryLow
+        this.isBatteryCritical = other.isBatteryCritical
+        this.speed = other.speed
+        this.bearing = other.bearing
+        this.currentMa = other.currentMa
+        this.status = other.status
+        this.locationPendingReason = other.locationPendingReason
+        this.gpsIndex = other.gpsIndex
+        this.snrIdx = other.snrIdx
+        this.noiseIdx = other.noiseIdx
+        this.luxIdx = other.luxIdx
+        this.vibeIdx = other.vibeIdx
+        this.proxIdx = other.proxIdx
+        this.liftIdx = other.liftIdx
+        this.tiltIdx = other.tiltIdx
+        this.baroIdx = other.baroIdx
+        this.isSitDetected = other.isSitDetected
+        this.isSitActive = other.isSitActive
+        this.sitVz = other.sitVz
+        this.sitVzTs = other.sitVzTs
+        this.sitVzRt = other.sitVzRt
+        this.sitDz = other.sitDz
+        this.sitBaro = other.sitBaro
+        this.sitTilt = other.sitTilt
+        this.sitShock = other.sitShock
+        this.kineticEnergy = other.kineticEnergy
+        this.cpuLoad = other.cpuLoad
+        this.ioWait = other.ioWait
+        this.maxIoLatency = other.maxIoLatency
+        this.isSilentFailure = other.isSilentFailure
+    }
+
+    fun reset() {
+        localId = ""
+        ts = 0; rt = 0; rtt = 0; localSig = 10; remoteSig = 0
+        isConnected = false; isGap = false; isRecoveryEvent = false
+        gpsAccuracy = 0.0; maxAccuracy = 0.0; isTick = false; hasGps = false
+        isBatterySteepDischarge = false; isCoolingModeActive = false
+        isBatteryLow = false; isBatteryCritical = false
+        speed = 0.0; bearing = 0.0; currentMa = 0
+        status = SentinelStatus.VALID; locationPendingReason = LocationPendingReason.NONE
+        gpsIndex = 0.0; snrIdx = 0.0; noiseIdx = 0.0; luxIdx = 0.0; vibeIdx = 0.0
+        proxIdx = 1.0; liftIdx = 0.0; tiltIdx = 0.0; baroIdx = 0.0
+        isSitDetected = false; isSitActive = false; sitVz = 0.0; sitVzTs = 0L; sitVzRt = 0L
+        sitDz = 0.0; sitBaro = 0.0; sitTilt = 0.0; sitShock = 0.0; kineticEnergy = 0.0
+        cpuLoad = 0.0; ioWait = 0.0; maxIoLatency = 0L; isSilentFailure = false
+    }
+}
 
 data class ViolationPoint(
     val localId: String = UUID.randomUUID().toString(),
