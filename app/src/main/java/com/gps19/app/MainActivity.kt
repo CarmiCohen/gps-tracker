@@ -19,13 +19,12 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * Aug.13.04:
+ * - Issue #150: Samsung A15 R405 Detection Hardening. Removed redundant R405 
+ *   trigger logic as it was moved to MainViewModel monitoring loop (R405).
  * July.31.01:
  * - Issue #661: Foreground Service Start Hardening. Hardened onStartService to 
- *   catch ForegroundServiceStartNotAllowedException even if RESUMED check passes, 
- *   ensuring recovery pending state is always set on OS denial.
- * July.30.40:
- * - Issue #643: Foreground Service Start Hardening. Defensive check for RESUMED 
- *   state and Throwable catch to prevent fatal FGS start crashes on cold start.
+ *   catch ForegroundServiceStartNotAllowedException even if RESUMED check passes.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -150,11 +149,6 @@ class MainActivity : ComponentActivity() {
             viewModel.onEvent(UiEvent.TriggerRecovery)
         }
 
-        // R405: Samsung A15 detected without battery exemption. Prompting user.
-        val state = viewModel.uiState.value
-        if (state.permissions.isA15Device && !state.permissions.isBatteryWhitelisted && !state.navigation.isPhoneSetupVisible) {
-            Timber.i("R405: Samsung A15 detected without battery exemption. Prompting user.")
-            viewModel.onEvent(UiEvent.TogglePhoneSetup(true))
-        }
+        // R405 logic moved to MainViewModel monitoring loop.
     }
 }

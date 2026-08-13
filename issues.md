@@ -1,18 +1,17 @@
-# Project Issues & Hardening Tracking (Aug.13.02)
+# Project Issues & Hardening Tracking (Aug.13.04)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 AT RISK | 5 |
+| **Open Technical Issues** | 🔴 AT RISK | 4 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 590 |
+| **Resolved (Total)** | 🟢 Progress | 591 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #150] R405 Detection Bypass**: Automated Phone Setup prompt (R405) failed to trigger on verified Samsung A15 (SM-A155F) hardware despite missing battery exemptions.
 *   **[Issue #152] Excessive GC Pressure**: Logcat indicates high allocation rates in the hot path. *Note: Partially mitigated by R146 optimizations.*
 *   **[Issue #153] Startup Davey Stalls**: Significant main-thread stalls (up to 1600ms) detected during application startup and initial composition.
 *   **[Issue #155] Phone Setup UI Clutter**: Action buttons in `PhoneSetupOverlay` remain visible after step completion, causing visual noise and user confusion.
@@ -22,6 +21,12 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ## 🔴 Open Issues
 *   *(None)*
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.13.04)
+*   **[Issue #150] [Severity: High] [Category: Compatibility] Samsung A15 Phone Setup Bypass.**
+    *   **Resolution**: Hardened the **Samsung A15 Detection Logic (R405)**. Broadened `isA15Device` in `SystemStatusProvider` to inspect `Build.DEVICE` and `Build.PRODUCT` strings. Relocated the automated setup trigger from `MainActivity` to the `MainViewModel` monitoring loop to eliminate race conditions between initialization and permission state acquisition.
 
 ---
 
@@ -36,14 +41,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Hardened the **Forensic Drainer (R146)**. Refactored `ForensicSpillBuffer.peek()` and `writeTrace()` to use pre-allocated buffers and single-pass I/O, eliminating per-entry allocations. Optimized `LogRepository.performForensicDrain()` to use single-pass filtering and mapping, significantly reducing latency spikes and GC pressure.
 
 ---
-
-## 🟢 Recently Resolved Issues (Aug.11.21)
-*   **[Issue #148] [Severity: Low] [Category: UI] Header Layout Inversion.**
-    *   **Resolution**: Hardened the **HeaderBar UI (R148)**. Explicitly forced `LayoutDirection.Ltr` within the `HeaderBar` composable using `CompositionLocalProvider`.
-*   **[Issue #151] [Severity: High] [Category: Performance] Phone Setup ANR.**
-    *   **Resolution**: Hardened the **Forensic Persistence Path (R151)**. Decoupled forensic writes from the UI thread by offloading them to background dispatchers in `LogRepository`.
-*   **[Issue #147] [Severity: Low] [Category: Documentation] Version Inconsistency.**
-    *   **Resolution**: Synchronized all tracking files to version `Aug.11.21`.
-
----
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.02)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.04)

@@ -23,14 +23,14 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.13.04:
+ * - Issue #150: Samsung A15 R405 Detection Hardening. Moved automated setup 
+ *   trigger from MainActivity to ViewModel monitoring loop to resolve race 
+ *   conditions and ensure reliable detection (R405).
  * Aug.07.06:
  * - Issue #120b: Performance Hardening (R104b). Ensured 15s delay for all 
  *   non-critical background maintenance tasks to prevent I/O contention 
  *   on budget hardware (Samsung A15).
- * Aug.07.03:
- * - Issue #744: Performance: Startup Davey Mitigation. Refactored init sequence to 
- *   offload loadInitialData to Dispatchers.IO and staggered heavy observations 
- *   to ensure <100ms main-thread blockage during cold start (R744).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -233,7 +233,14 @@ class MainViewModel @Inject constructor(
                 val newState = systemStatusProvider.getPermissionState(forceRefresh = refreshFast)
                 val isA15 = systemStatusProvider.isA15Hardware()
                 withContext(Dispatchers.Main.immediate) { 
+                    val oldState = _uiState.value
                     updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
+                    
+                    // Issue #150: R405: Samsung A15 detected without battery exemption (Monitoring).
+                    if (isA15 && !newState.isBatteryWhitelisted && !oldState.navigation.isPhoneSetupVisible && oldState.isInitialized) {
+                        Timber.i("R405: Samsung A15 detected without battery exemption (Monitoring). Prompting user.")
+                        onEvent(UiEvent.TogglePhoneSetup(true))
+                    }
                 }
                 delay(if (refreshFast) 5000L else 30000L) 
             } 
@@ -453,7 +460,15 @@ class MainViewModel @Inject constructor(
                     val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
                     val isA15 = systemStatusProvider.isA15Hardware()
                     withContext(Dispatchers.Main.immediate) { 
+                        val currentUi = _uiState.value
                         updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
+                        
+                        // Issue #150: R405: Samsung A15 detected without battery exemption (Manual Refresh).
+                        if (isA15 && !newState.isBatteryWhitelisted && !currentUi.navigation.isPhoneSetupVisible && currentUi.isInitialized) {
+                            Timber.i("R405: Samsung A15 detected without battery exemption (Refresh). Prompting user.")
+                            onEvent(UiEvent.TogglePhoneSetup(true))
+                        }
+                        
                         if (!oldState.isActivityRecognitionGranted && newState.isActivityRecognitionGranted) {
                             Timber.i("Issue #098: ACTIVITY_RECOGNITION granted. Triggering reactive sensor sync.")
                             repository.sendCommand(UiCommand.SettingsUpdated)

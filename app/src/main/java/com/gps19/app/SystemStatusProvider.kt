@@ -63,11 +63,12 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Aug.13.03:
+ * - Issue #150: Samsung A15 Detection Hardening. Broadened detection logic to 
+ *   include Build.DEVICE and Build.BRAND to ensure R405 triggers reliably (R405).
  * Aug.11.13:
  * - Issue #141: Stress Recovery Verification. Correctly populating 
  *   requiresAdaptationMuzzle in PermissionState for budget hardware (R141).
- * Aug.10.24:
- * - Issue #129: Forensic Storage Pruning Sensitivity.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -267,9 +268,22 @@ class SystemStatusProviderImpl @Inject constructor(
     }
 
     private fun isXiaomiDevice(): Boolean = Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)
-    private fun isSamsungDevice(): Boolean = Build.MANUFACTURER.equals("Samsung", ignoreCase = true)
+    private fun isSamsungDevice(): Boolean = Build.MANUFACTURER.equals("Samsung", ignoreCase = true) || Build.BRAND.equals("Samsung", ignoreCase = true)
     private fun isS21FEDevice(): Boolean = Build.MODEL.contains("G990", ignoreCase = true)
-    private fun isA15Device(): Boolean = Build.MODEL.contains("A15", ignoreCase = true) || Build.PRODUCT.contains("A15", ignoreCase = true)
+    
+    /**
+     * Issue #150: Hardened Samsung A15 detection.
+     * Uses Model, Product, and Device strings to catch all variants of SM-A155/SM-A156.
+     */
+    private fun isA15Device(): Boolean {
+        if (!isSamsung) return false
+        val model = Build.MODEL ?: ""
+        val product = Build.PRODUCT ?: ""
+        val device = Build.DEVICE ?: ""
+        return model.contains("A15", ignoreCase = true) || 
+               product.contains("A15", ignoreCase = true) || 
+               device.contains("a15", ignoreCase = true)
+    }
 
     private val sharedInternetStatusFlow = callbackFlow<Boolean> {
         val callback = object : ConnectivityManager.NetworkCallback() {
