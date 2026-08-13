@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 588**
+**Total Unique Resolutions: 589**
+
+## 28. Startup Davey Stall Mitigation (Aug.13.05)
+*   **Issue #153: Startup Davey Stalls**.
+    *   **Resolution**: Implemented **Staggered UI Hydration (R153)**. Introduced a multi-stage `hydrationLevel` in `MainUiState` to decouple the theme scaffold from complex Navigation and Screen content. Refactored `MainViewModel` to progressively increment hydration (Stages 0-3) with intentional delays (150ms-300ms) during cold-boot initialization. This spreads the massive initial composition pass across multiple frames, eliminating the 1600ms Davey stalls previously observed on budget hardware like the Samsung A15. (R153)
 
 ## 27. Samsung A15 Detection Hardening (Aug.13.04)
 *   **Issue #150: Samsung A15 Phone Setup Bypass**.
@@ -21,4 +25,4 @@ This document contains the unified record of all resolved issues and technical d
     *   **Resolution**: Hardened the **Forensic Sampling Authority (R669/R700)** by implementing proactive pressure-aware throttling. (R669)
 
 ---
-*For historical resolutions #1 through #23, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.04)
+*For historical resolutions #1 through #23, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.05)

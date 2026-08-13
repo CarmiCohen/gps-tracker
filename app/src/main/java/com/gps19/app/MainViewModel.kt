@@ -23,14 +23,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.13.05:
+ * - Issue #153: Startup Davey Stalls. Implemented staggered hydration logic 
+ *   in init block to spread initialization load across multiple frames (R153).
  * Aug.13.04:
  * - Issue #150: Samsung A15 R405 Detection Hardening. Moved automated setup 
- *   trigger from MainActivity to ViewModel monitoring loop to resolve race 
- *   conditions and ensure reliable detection (R405).
- * Aug.07.06:
- * - Issue #120b: Performance Hardening (R104b). Ensured 15s delay for all 
- *   non-critical background maintenance tasks to prevent I/O contention 
- *   on budget hardware (Samsung A15).
+ *   trigger from MainActivity to ViewModel monitoring loop.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -171,19 +169,26 @@ class MainViewModel @Inject constructor(
     private var isHeavyObservationStarted = false
 
     init {
-        // Issue #744: Staggered initialization to prevent Main thread Davey stalls.
+        // Issue #153: Staggered hydration to prevent Main thread Davey stalls.
         viewModelScope.launch(Dispatchers.Default + uiExceptionHandler) {
             val initialSettings = settingsUseCase.loadAllSettings()
             
             withContext(Dispatchers.Main.immediate) {
                 applyInitialSettings(initialSettings)
-                // Short pause to allow first frame rendering to complete before declaring initialized.
-                delay(300) 
-                updateState { it.copy(isInitialized = true) }
+                
+                // Level 1: Surface Hydration (Basic theme and layout)
+                updateState { it.copy(hydrationLevel = 1) }
+                delay(150) // Breathing room for first frame
+                
+                // Level 2: Core/Nav Hydration (Navigation and primary screens)
+                updateState { it.copy(hydrationLevel = 2) }
+                delay(300) // Stabilize navigation host
+                
+                // Level 3: Full Hydration (Heavy components like Map and Ribbons)
+                updateState { it.copy(hydrationLevel = 3, isInitialized = true) }
             }
             
             // Issue #120b: Background maintenance deferral (Requirement R104b)
-            // Deferred for 15,000ms to clear the cold-start I/O critical path.
             launch(Dispatchers.IO) { 
                 delay(15000)
                 repository.proactivePruning() 
@@ -194,7 +199,6 @@ class MainViewModel @Inject constructor(
                 startGlobalTimer()
             }
             
-            // Heavy observations are deferred until a mode is actually selected or restored.
             launch(Dispatchers.Main.immediate) {
                 _uiState.filter { it.appMode != null }.first()
                 startHeavyObservations()
@@ -236,7 +240,6 @@ class MainViewModel @Inject constructor(
                     val oldState = _uiState.value
                     updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
                     
-                    // Issue #150: R405: Samsung A15 detected without battery exemption (Monitoring).
                     if (isA15 && !newState.isBatteryWhitelisted && !oldState.navigation.isPhoneSetupVisible && oldState.isInitialized) {
                         Timber.i("R405: Samsung A15 detected without battery exemption (Monitoring). Prompting user.")
                         onEvent(UiEvent.TogglePhoneSetup(true))
@@ -463,7 +466,6 @@ class MainViewModel @Inject constructor(
                         val currentUi = _uiState.value
                         updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
                         
-                        // Issue #150: R405: Samsung A15 detected without battery exemption (Manual Refresh).
                         if (isA15 && !newState.isBatteryWhitelisted && !currentUi.navigation.isPhoneSetupVisible && currentUi.isInitialized) {
                             Timber.i("R405: Samsung A15 detected without battery exemption (Refresh). Prompting user.")
                             onEvent(UiEvent.TogglePhoneSetup(true))
@@ -895,7 +897,6 @@ class MainViewModel @Inject constructor(
                 pulse = timeProvider.elapsedRealtime()
             }}
             _trackerState.value = TrackerState.UNKNOWN; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; stateSubscriptionUseCase.clearHistory(); 
-            // Re-load initial data after full reset
             val initial = settingsUseCase.loadAllSettings()
             applyInitialSettings(initial)
         }

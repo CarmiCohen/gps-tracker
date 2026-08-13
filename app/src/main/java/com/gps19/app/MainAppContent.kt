@@ -44,12 +44,12 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Aug.13.05:
+ * - Issue #153: Startup Davey Stalls. Implemented Staggered UI Hydration (R153).
+ *   Defers NavHost and complex screen rendering until hydrationLevel >= 2 and 
+ *   >= 3 respectively to ensure frame-rate stability on budget hardware.
  * Aug.11.05:
- * - Issue #140: Automated Forensic Stress Test. Wired the stress test trigger 
- *   in PhoneSetupOverlay to the ViewModel (R140).
- * Aug.11.00:
- * - Issue #137: UI Davey/ANR Remediation. Resolved 3000ms stall by implementing 
- *   Deferred UI Hydration (R137) in SettingsComponents.kt.
+ * - Issue #140: Automated Forensic Stress Test wired to PhoneSetupOverlay.
  */
 @Composable
 fun MainAppContent(
@@ -210,7 +210,8 @@ fun MainAppContent(
         }
     }
 
-    if (!uiState.isInitialized) {
+    // Level 0: Pure black box during cold boot.
+    if (uiState.hydrationLevel == 0) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black))
         return
     }
@@ -269,6 +270,7 @@ fun MainAppContent(
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { MainFileHelper.importConfig(activity, viewModel, uri) } }
     val importTrailLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> MainFileHelper.importTrails(activity, viewModel, uris) }
     
+    // Level 1: Surface Hydration (Theme and Basic Scaffold)
     GpsTrackerTheme(appMode = uiState.appMode) {
         Surface(
             modifier = Modifier
@@ -281,101 +283,113 @@ fun MainAppContent(
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
-                NavHost(navController = navController, startDestination = Screen.Landing.route) {
-                    composable(Screen.Landing.route) {
-                        BackHandler { onCleanupAndExit() }
-                        LandingScreen { mode -> 
-                            if (hasRequiredPermissions(mode)) { 
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !uiState.permissions.isBackgroundLocationGranted) {
-                                    viewModel.onEvent(UiEvent.SetPendingMode(mode))
-                                    showBackgroundDisclosure = true
-                                } else {
-                                    proceedToMode(mode)
+                // Level 2+: Navigation and Core Content
+                if (uiState.hydrationLevel >= 2) {
+                    NavHost(navController = navController, startDestination = Screen.Landing.route) {
+                        composable(Screen.Landing.route) {
+                            BackHandler { onCleanupAndExit() }
+                            // Level 3+: Full Screen Content
+                            if (uiState.hydrationLevel >= 3) {
+                                LandingScreen { mode -> 
+                                    if (hasRequiredPermissions(mode)) { 
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !uiState.permissions.isBackgroundLocationGranted) {
+                                            viewModel.onEvent(UiEvent.SetPendingMode(mode))
+                                            showBackgroundDisclosure = true
+                                        } else {
+                                            proceedToMode(mode)
+                                        }
+                                    } else { 
+                                        checkAndRequestPermissions(mode)
+                                    } 
                                 }
-                            } else { 
-                                checkAndRequestPermissions(mode)
-                            } 
-                        }
-                    }
-                    composable(Screen.Tracker.route) {
-                        val trackerTrail by viewModel.trackerTrailFlow.collectAsStateWithLifecycle()
-                        val viewerTrail by viewModel.viewerTrailFlow.collectAsStateWithLifecycle()
-                        val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
-
-                        BackHandler {
-                            val nav = uiState.navigation
-                            when {
-                                nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
-                                nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
-                                nav.activeSubSettings != null -> viewModel.onEvent(UiEvent.SetSubSettings(null))
-                                nav.isSettingsOpen -> { viewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
-                                nav.isLogVisible -> viewModel.onEvent(UiEvent.ToggleLog(false))
-                                nav.isRibbonsVisible -> viewModel.onEvent(UiEvent.ToggleRibbons(false))
-                                !nav.isMapVisible -> viewModel.onEvent(UiEvent.ToggleMap(true))
-                                else -> onCleanupAndExit()
                             }
                         }
-                        TrackerScreen(
-                            uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
-                            systemPulse = systemPulse, systemPulseRt = systemPulseRt,
-                            onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
-                            onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
-                            onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
-                            onExit = onCleanupAndExit,
-                            onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
-                            onImportConfig = { importLauncher.launch("application/json") }, onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
-                            onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
-                        )
-                    }
-                    composable(Screen.Viewer.route) {
-                        val trackerTrail by viewModel.trackerTrailFlow.collectAsStateWithLifecycle()
-                        val viewerTrail by viewModel.viewerTrailFlow.collectAsStateWithLifecycle()
-                        val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+                        composable(Screen.Tracker.route) {
+                            val trackerTrail by viewModel.trackerTrailFlow.collectAsStateWithLifecycle()
+                            val viewerTrail by viewModel.viewerTrailFlow.collectAsStateWithLifecycle()
+                            val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
-                        BackHandler {
-                            val nav = uiState.navigation
-                            when {
-                                nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
-                                nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
-                                nav.activeSubSettings != null -> viewModel.onEvent(UiEvent.SetSubSettings(null))
-                                nav.isSettingsOpen -> { viewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
-                                nav.isLogVisible -> viewModel.onEvent(UiEvent.ToggleLog(false))
-                                nav.isRibbonsVisible -> viewModel.onEvent(UiEvent.ToggleRibbons(false))
-                                !nav.isMapVisible -> viewModel.onEvent(UiEvent.ToggleMap(true))
-                                else -> onCleanupAndExit()
+                            BackHandler {
+                                val nav = uiState.navigation
+                                when {
+                                    nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
+                                    nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
+                                    nav.activeSubSettings != null -> viewModel.onEvent(UiEvent.SetSubSettings(null))
+                                    nav.isSettingsOpen -> { viewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
+                                    nav.isLogVisible -> viewModel.onEvent(UiEvent.ToggleLog(false))
+                                    nav.isRibbonsVisible -> viewModel.onEvent(UiEvent.ToggleRibbons(false))
+                                    !nav.isMapVisible -> viewModel.onEvent(UiEvent.ToggleMap(true))
+                                    else -> onCleanupAndExit()
+                                }
+                            }
+                            if (uiState.hydrationLevel >= 3) {
+                                TrackerScreen(
+                                    uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
+                                    systemPulse = systemPulse, systemPulseRt = systemPulseRt,
+                                    onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
+                                    onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
+                                    onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
+                                    onExit = onCleanupAndExit,
+                                    onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
+                                    onImportConfig = { importLauncher.launch("application/json") }, onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
+                                    onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
+                                )
                             }
                         }
-                        ViewerScreen(
-                            uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
-                            systemPulse = systemPulse, systemPulseRt = systemPulseRt,
-                            onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
-                            onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) },
-                            onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
-                            onExit = onCleanupAndExit,
-                            onImportConfig = { importLauncher.launch("application/json") }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) },
-                            onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
-                            onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
-                        )
-                    }
-                    composable(Screen.Diagnostics.route) {
-                        BackHandler { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) }
-                        DiagnosticsScreen(
-                            permissions = uiState.permissions,
-                            recoveryCount = diagnosticState.recoveryCount,
-                            cumulativeRecoveryBlackoutMs = diagnosticState.cumulativeRecoveryBlackoutMs,
-                            onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
-                            onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
-                            onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
-                            onRequestBatteryExemption = onRequestBatteryExemption,
-                            onRequestOverlayPermission = onRequestOverlayPermission,
-                            onRequestAppInfo = onRequestAppInfo,
-                            onRequestExactAlarm = onRequestExactAlarm,
-                            onRequestHardwarePermission = onRequestHardwarePermission
-                        )
+                        composable(Screen.Viewer.route) {
+                            val trackerTrail by viewModel.trackerTrailFlow.collectAsStateWithLifecycle()
+                            val viewerTrail by viewModel.viewerTrailFlow.collectAsStateWithLifecycle()
+                            val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+
+                            BackHandler {
+                                val nav = uiState.navigation
+                                when {
+                                    nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
+                                    nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
+                                    nav.activeSubSettings != null -> viewModel.onEvent(UiEvent.SetSubSettings(null))
+                                    nav.isSettingsOpen -> { viewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
+                                    nav.isLogVisible -> viewModel.onEvent(UiEvent.ToggleLog(false))
+                                    nav.isRibbonsVisible -> viewModel.onEvent(UiEvent.ToggleRibbons(false))
+                                    !nav.isMapVisible -> viewModel.onEvent(UiEvent.ToggleMap(true))
+                                    else -> onCleanupAndExit()
+                                }
+                            }
+                            if (uiState.hydrationLevel >= 3) {
+                                ViewerScreen(
+                                    uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
+                                    systemPulse = systemPulse, systemPulseRt = systemPulseRt,
+                                    onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
+                                    onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) },
+                                    onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
+                                    onExit = onCleanupAndExit,
+                                    onImportConfig = { importLauncher.launch("application/json") }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) },
+                                    onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
+                                    onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
+                                )
+                            }
+                        }
+                        composable(Screen.Diagnostics.route) {
+                            BackHandler { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) }
+                            if (uiState.hydrationLevel >= 3) {
+                                DiagnosticsScreen(
+                                    permissions = uiState.permissions,
+                                    recoveryCount = diagnosticState.recoveryCount,
+                                    cumulativeRecoveryBlackoutMs = diagnosticState.cumulativeRecoveryBlackoutMs,
+                                    onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
+                                    onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
+                                    onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
+                                    onRequestBatteryExemption = onRequestBatteryExemption,
+                                    onRequestOverlayPermission = onRequestOverlayPermission,
+                                    onRequestAppInfo = onRequestAppInfo,
+                                    onRequestExactAlarm = onRequestExactAlarm,
+                                    onRequestHardwarePermission = onRequestHardwarePermission
+                                )
+                            }
+                        }
                     }
                 }
                 
-                if (uiState.navigation.isPhoneSetupVisible) {
+                if (uiState.navigation.isPhoneSetupVisible && uiState.hydrationLevel >= 3) {
                     PhoneSetupOverlay(
                         onClose = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)) }, 
                         onWhitelist = { onRequestBatteryExemption() },
@@ -395,7 +409,7 @@ fun MainAppContent(
                     )
                 }
 
-                if (diagnosticState.isRedScreenVisible && uiState.appMode != null) {
+                if (diagnosticState.isRedScreenVisible && uiState.appMode != null && uiState.hydrationLevel >= 3) {
                     AlarmOverlay(
                         alarms = diagnosticState.activeAlarms, isMuted = diagnosticState.isAlarmSilenced,
                         isLocationPending = kinematicState.trackerHealth.isLocationPending,
@@ -411,7 +425,7 @@ fun MainAppContent(
                     )
                 }
 
-                if (uiState.navigation.isStopTrackingConfirmationVisible) {
+                if (uiState.navigation.isStopTrackingConfirmationVisible && uiState.hydrationLevel >= 3) {
                     var timeLeft by remember { mutableStateOf(5) }
                     LaunchedEffect(Unit) {
                         while (timeLeft > 0) {

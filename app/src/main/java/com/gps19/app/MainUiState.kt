@@ -6,9 +6,13 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Aug.13.05:
+ * - Issue #153: Startup Davey Stalls. Introduced hydrationLevel to support 
+ *   staggered UI initialization (R153).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
+    val hydrationLevel: Int = 0, // 0: Cold, 1: Surface, 2: Core/Nav, 3: Full
     val appMode: String? = null,
     val isSystemActive: Boolean = false,
     val deviceId: String = MainRepository.DEFAULT_TRACKER_ID,
@@ -37,6 +41,8 @@ data class MainUiState(
     val isIdentitySanitized: Boolean = false,
     val isRecoveryPending: Boolean = false
 ) {
+    val isFullyHydrated: Boolean get() = hydrationLevel >= 3
+
     val isSystemReady: Boolean
         get() = permissions.isFineLocationGranted &&
                 permissions.isBatteryWhitelisted && 

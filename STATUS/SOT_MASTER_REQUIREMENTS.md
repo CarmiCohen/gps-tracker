@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.13.04 (A15 Hardened)
+# System Source of Truth (SoT) - Aug.13.05 (Davey Stalls Resolved)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Staggered UI Hydration Authority (R153)**: (Added Aug.13.05) The application UI MUST initialize in granular stages using a `hydrationLevel` state. Complex components (NavHost, Screen Content, Maps) MUST be deferred across multiple frames during cold boot to prevent Main-thread Davey stalls. The `MainViewModel` MUST orchestrate this sequence with intentional delays to ensure frame-rate stability on budget hardware (Samsung A15). (Issue #153). **Status: Implemented.**
 *   **Samsung A15 Detection Hardening (R405)**: (Added Aug.13.04) The system MUST reliably identify Samsung A15 devices by inspecting `Build.MODEL`, `Build.PRODUCT`, and `Build.DEVICE` strings. The automated battery exemption prompt MUST be triggered within the `MainViewModel` monitoring loop to eliminate race conditions between device identification and UI initialization. (Issue #150). **Status: Implemented.**
 *   **Forensic Drainer Optimization (R146)**: (Added Aug.13.00) The system MUST optimize the telemetry drain loop to eliminate latency spikes and GC pressure. The `ForensicSpillBuffer` MUST utilize zero-allocation paths for `peek()` and `writeTrace()` operations using pre-allocated buffers. The `LogRepository` MUST implement single-pass filtering and mapping for trace persistence to ensure drain convergence under high pressure. (Issue #146). **Status: Implemented.**
 *   **Forensic Persistence Hardening (R151)**: (Added Aug.11.21) The system MUST decouple forensic trace persistence from the Main thread. Forensic writes MUST be offloaded to background dispatchers, and the spill-buffer concurrency model MUST utilize granular locking and `MappedByteBuffer` duplication. (Issue #151). **Status: Implemented.**
@@ -28,5 +29,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.13.04.
+*   **Current Release**: Aug.13.05.
 *   **Source of Truth**: app/build.gradle versionName.
