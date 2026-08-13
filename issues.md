@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.13.09)
+# Project Issues & Hardening Tracking (Aug.13.10)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 STABLE | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 597 |
+| **Resolved (Total)** | 🟢 Progress | 599 |
 
 ---
 
@@ -21,33 +21,41 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
+## 🟢 Recently Resolved Issues (Aug.13.10)
+*   **[Issue #159] [Severity: Low] [Category: Telemetry] SELinux LoadAvg Denials.**
+    *   **Resolution**: Implemented SDK-aware branching in `SystemStatusProviderImpl.kt` (R159) to disable `/proc/loadavg` and `/proc/stat` reads on SDK 29+. This eliminates SELinux audit noise. Stress detection now correctly relies on I/O latency and thermal throttling proxies on modern Android versions.
+
+---
+
 ## 🟢 Recently Resolved Issues (Aug.13.09)
+*   **[Issue #158] [Severity: Medium] [Category: QA] Forensic Validation & QA Audit.**
+    *   **Resolution**: Performed end-to-end validation of R152, R153, R156, and R157 optimizations. Verified log throttling, staggered hydration stability, and synchronized `versionName` to `Aug.13.09` across the build system and UI.
 *   **[Issue #157] [Severity: Medium] [Category: Performance] Violation Path Allocations.**
-    *   **Resolution**: Eliminated object churn in the violation detection and mapping hot-paths by refactoring `ViolationPoint` to a mutable class with primitive coordinates and cached `GeoPoint` (R157). This removes `UUID.randomUUID()` and transient `GeoPoint` allocations that were causing secondary GC spikes during high-activity scenarios.
+    *   **Resolution**: Eliminated object churn in the violation detection and mapping hot-paths by refactoring `ViolationPoint` to a mutable class with primitive coordinates and cached `GeoPoint` (R157). This removes `UUID.randomUUID()` and transient `GeoPoint` allocations.
 
 ---
 
 ## 🟢 Recently Resolved Issues (Aug.13.08)
 *   **[Issue #156] [Severity: Medium] [Category: Performance] WakeLock Log Saturation.**
-    *   **Resolution**: Implemented **WakeLock Log Throttling (R156)** in `SystemMonitor`. Acquisition logs are now throttled to 1/min using `WAKELOCK_LOG_THROTTLE_MS`, preventing `AppSensorManager`'s high-frequency stay-alive pulses from saturating logcat while maintaining periodic visibility for audit.
+    *   **Resolution**: Implemented **WakeLock Log Throttling (R156)** in `SystemMonitor`. Acquisition logs are now throttled to 1/min using `WAKELOCK_LOG_THROTTLE_MS`.
 
 ---
 
 ## 🟢 Recently Resolved Issues (Aug.13.07)
 *   **[Issue #155] [Severity: Low] [Category: UI/UX] Phone Setup UI Clutter.**
-    *   **Resolution**: Refined `GuideSection` in `PhoneSetupOverlay` to hide completion-dependent action buttons once steps are verified (`isCompleted == true`). This reduces visual noise and clarifies the remaining setup tasks for the user.
+    *   **Resolution**: Refined `GuideSection` in `PhoneSetupOverlay` to hide completion-dependent action buttons once steps are verified (`isCompleted == true`).
 
 ---
 
 ## 🟢 Recently Resolved Issues (Aug.13.06)
 *   **[Issue #152] [Severity: Medium] [Category: Performance] Excessive GC Pressure.**
-    *   **Resolution**: Refactored the telemetry hot-path to use **Flyweight Pooling (R152)**. Converted `ConnectionPoint` to a mutable class and removed automatic `UUID` generation. Implemented a pooling strategy in `HistoryManager` and `MainRepository` to eliminate object churn during 1Hz steady-state tracking. UI flows now receive stable copies while the persistence layer utilizes zero-allocation mapping to Room entities.
+    *   **Resolution**: Refactored the telemetry hot-path to use **Flyweight Pooling (R152)**. Converted `ConnectionPoint` to a mutable class and removed automatic `UUID` generation.
 
 ---
 
 ## 🟢 Recently Resolved Issues (Aug.13.05)
 *   **[Issue #153] [Severity: High] [Category: Performance] Startup Davey Stalls.**
-    *   **Resolution**: Implemented **Staggered UI Hydration (R153)**. Introduced a multi-stage boot sequence to spread composition load across multiple frames, eliminating 1600ms stalls on Samsung A15.
+    *   **Resolution**: Implemented **Staggered UI Hydration (R153)**. Introduced a multi-stage boot sequence to spread composition load across multiple frames.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.09)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.10)

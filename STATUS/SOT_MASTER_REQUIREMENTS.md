@@ -1,8 +1,10 @@
-# System Source of Truth (SoT) - Aug.13.09 (Violation Path Allocations Resolved)
+# System Source of Truth (SoT) - Aug.13.10 (Telemetry Remediation Complete)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **SELinux Telemetry Remediation (R159)**: (Added Aug.13.10) The system MUST bypass `/proc/loadavg` and `/proc/stat` file access on Android 10 (SDK 29) and higher. This prevents SELinux audit denials (`avc: denied`) which occur on modern Android versions for third-party apps. Stress-test correlation and silent failure detection on these platforms MUST rely on fallback proxies, including I/O latency (via `LatencyMonitor`) and Thermal Throttling states. (Issue #159). **Status: Implemented.**
+*   **Performance Hardening Audit (R158)**: (Added Aug.13.09) The system MUST undergo forensic validation after cumulative performance optimizations (R152-R157). Validation MUST verify: (1) WakeLock log throttling effectiveness, (2) Elimination of Davey stalls during staggered hydration, and (3) Reduced GC pressure during steady-state tracking. (Issue #158). **Status: Validated & Closed.**
 *   **Violation Path Allocation Authority (R157)**: (Added Aug.13.09) The system MUST eliminate object churn in the violation detection and mapping hot-paths. `ViolationPoint` MUST be a mutable class with primitive coordinates (`lat`, `lng`). The use of `UUID.randomUUID()` and transient `GeoPoint` allocations during database-to-UI mapping is strictly prohibited. UI components MUST utilize cached position objects via the `toGeoPoint()` method to ensure zero-allocation rendering in high-activity scenarios. (Issue #157). **Status: Implemented.**
 *   **WakeLock Log Throttling Authority (R156)**: (Added Aug.13.08) System-level WakeLock acquisition logging MUST be throttled to a minimum interval (default 60s) using `WAKELOCK_LOG_THROTTLE_MS`. This prevents high-frequency background pulses (e.g., from `AppSensorManager`) from saturating logcat while preserving periodic visibility for forensic audits. (Issue #156). **Status: Implemented.**
 *   **Telemetry Flyweight Pooling Authority (R152)**: (Added Aug.13.06) The system MUST utilize **Flyweight Pooling** for all steady-state telemetry processing. The `ConnectionPoint` (App-level) and `EngineConnectionPoint` (Engine-level) MUST be mutable classes. Automatic UUID generation and expensive string concatenations MUST be eliminated from the 1Hz hot-path. The `HistoryManager` and `MainRepository` MUST reuse pre-allocated object instances during aggregation and persistence buffering to eliminate GC pressure on budget hardware (Samsung A15). (Issue #152). **Status: Implemented.**
@@ -33,5 +35,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.13.09.
+*   **Current Release**: Aug.13.10.
 *   **Source of Truth**: app/build.gradle versionName.

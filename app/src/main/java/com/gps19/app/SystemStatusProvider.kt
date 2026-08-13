@@ -63,6 +63,10 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Aug.13.10:
+ * - Issue #159: SELinux LoadAvg Remediation. Disabled /proc/loadavg and /proc/stat 
+ *   access on SDK 29+ to prevent SELinux denials. Stress monitoring now falls back 
+ *   to I/O latency and thermal throttling on modern Android versions (R159).
  * Aug.13.03:
  * - Issue #150: Samsung A15 Detection Hardening. Broadened detection logic to 
  *   include Build.DEVICE and Build.BRAND to ensure R405 triggers reliably (R405).
@@ -445,6 +449,9 @@ class SystemStatusProviderImpl @Inject constructor(
     }
 
     override suspend fun getCpuLoad(): Double = withContext(Dispatchers.IO) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return@withContext 0.0 // SELinux blocks /proc/loadavg on SDK 29+
+        }
         try {
             readProcLoadAvg()
         } catch (e: Exception) {
@@ -453,6 +460,9 @@ class SystemStatusProviderImpl @Inject constructor(
     }
 
     override suspend fun getIoWait(): Double = withContext(Dispatchers.IO) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return@withContext 0.0 // SELinux blocks /proc/stat on SDK 29+
+        }
         try {
             readProcIoWait()
         } catch (e: Exception) {
