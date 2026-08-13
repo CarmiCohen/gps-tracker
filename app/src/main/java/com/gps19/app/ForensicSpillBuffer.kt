@@ -10,6 +10,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
+import java.util.Arrays
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.CRC32
@@ -19,14 +20,13 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.13.00:
+ * - Issue #146: Optimized Forensic Drainer. Refactored peek() and writeTrace() 
+ *   to eliminate per-entry allocations and redundant I/O passes (R146). 
+ *   Added buffer zeroing to ensure CRC stability.
  * Aug.11.21:
  * - Issue #151: Phone Setup ANR Remediation. Refactored to use granular locking 
- *   and buffer duplication (R151). I/O operations in peek() now occur outside 
- *   the main synchronization lock using a duplicate buffer, preventing stalls 
- *   from blocking concurrent writes.
- * Aug.11.16:
- * - Issue #145: Forensic Spill-Buffer Overflow Protection. Added getFillLevel() 
- *   and isHighPressure() for proactive throttling (R669).
+ *   and buffer duplication (R151).
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -44,6 +44,10 @@ class ForensicSpillBuffer @Inject constructor(
     private val baseTs = AtomicLong(0L)
     @Volatile private var baseLat: Double = 0.0
     @Volatile private var baseLng: Double = 0.0
+
+    // R146: Pre-allocated buffers for writes and CRC to avoid per-write allocation.
+    private val entryWriteBuffer = ByteBuffer.allocate(FORENSIC_SPILL_ENTRY_SIZE).order(ByteOrder.nativeOrder())
+    private val writeCrc = CRC32()
 
     private companion object {
         const val MAGIC_NUMBER = 0x46535042
@@ -157,8 +161,6 @@ class ForensicSpillBuffer @Inject constructor(
                 }
             }
 
-            val entryData = ByteBuffer.allocate(FORENSIC_SPILL_ENTRY_SIZE).order(ByteOrder.nativeOrder())
-            
             synchronized(this) {
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
                 if (baseTs.get() == 0L || baseLat == 0.0) {
@@ -170,37 +172,41 @@ class ForensicSpillBuffer @Inject constructor(
                     buffer.putDouble(OFF_BASE_LNG, entry.lng)
                 }
 
-                entryData.putInt((entry.timestamp - baseTs.get()).toInt())
-                entryData.putInt(((entry.lat - baseLat) * PRECISION_SCALE).toInt())
-                entryData.putInt(((entry.lng - baseLng) * PRECISION_SCALE).toInt())
+                entryWriteBuffer.clear()
+                // R146: Zero-out message area to ensure CRC stability.
+                Arrays.fill(entryWriteBuffer.array(), 36, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
+
+                entryWriteBuffer.putInt((entry.timestamp - baseTs.get()).toInt())
+                entryWriteBuffer.putInt(((entry.lat - baseLat) * PRECISION_SCALE).toInt())
+                entryWriteBuffer.putInt(((entry.lng - baseLng) * PRECISION_SCALE).toInt())
                 
-                entryData.putFloat(entry.accuracy.toFloat())
-                entryData.putFloat(entry.maxAccuracy.toFloat())
-                entryData.putFloat(entry.vibeSnapshot?.toFloat() ?: -1.0f)
-                entryData.putFloat(entry.snrSnapshot?.toFloat() ?: -1.0f)
-                entryData.putFloat(0.0f)
+                entryWriteBuffer.putFloat(entry.accuracy.toFloat())
+                entryWriteBuffer.putFloat(entry.maxAccuracy.toFloat())
+                entryWriteBuffer.putFloat(entry.vibeSnapshot?.toFloat() ?: -1.0f)
+                entryWriteBuffer.putFloat(entry.snrSnapshot?.toFloat() ?: -1.0f)
+                entryWriteBuffer.putFloat(0.0f)
 
                 var flags = 0
                 if (entry.isImportant) flags = flags or 0x01
                 if (entry.isSpecial) flags = flags or 0x02
                 if (entry.gpsHardwareLock) flags = flags or 0x08
-                entryData.put(flags.toByte())
-                entryData.put(0.toByte())
-                entryData.put(msgLen.toByte())
-                entryData.put(0.toByte())
-                entryData.put(rawBytes, 0, msgLen)
+                entryWriteBuffer.put(flags.toByte())
+                entryWriteBuffer.put(0.toByte())
+                entryWriteBuffer.put(msgLen.toByte())
+                entryWriteBuffer.put(0.toByte())
+                entryWriteBuffer.put(rawBytes, 0, msgLen)
                 
-                entryData.position(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                entryWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
 
-                val crc = CRC32()
-                crc.update(entryData.array(), 0, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
-                entryData.putInt(crc.value.toInt())
+                writeCrc.reset()
+                writeCrc.update(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                entryWriteBuffer.putInt(writeCrc.value.toInt())
 
                 val currentWrite = writeIdx.get()
                 val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE)
                 
                 buffer.position(offset)
-                buffer.put(entryData.array())
+                buffer.put(entryWriteBuffer.array())
 
                 advanceWritePointer(buffer)
                 true
@@ -210,7 +216,7 @@ class ForensicSpillBuffer @Inject constructor(
 
     fun writeTraceOptimized(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
-        vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double,
+        vibe: Double, snr: Double, batteryTemp: Double, batteryLevel: Int, isCharging: Boolean,
         gpsHardwareLock: Boolean = false
     ): Boolean {
         return LatencyMonitor.measureAndAudit(
@@ -221,7 +227,6 @@ class ForensicSpillBuffer @Inject constructor(
             onSpike = { msg, _ -> Timber.w(msg) }
         ) {
             val buffer = mappedBuffer ?: return@measureAndAudit false
-            val entryData = ByteBuffer.allocate(FORENSIC_SPILL_ENTRY_SIZE).order(ByteOrder.nativeOrder())
             
             synchronized(this) {
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
@@ -235,33 +240,37 @@ class ForensicSpillBuffer @Inject constructor(
                     buffer.putDouble(OFF_BASE_LNG, lng)
                 }
                 
-                entryData.putInt((timestamp - baseTs.get()).toInt())
-                entryData.putInt(((lat - baseLat) * PRECISION_SCALE).toInt())
-                entryData.putInt(((lng - baseLng) * PRECISION_SCALE).toInt())
-                entryData.putFloat(accuracy.toFloat())
-                entryData.putFloat(maxAccuracy.toFloat())
-                entryData.putFloat(vibe.toFloat())
-                entryData.putFloat(snr.toFloat())
-                entryData.putFloat(batteryTemp.toFloat())
+                entryWriteBuffer.clear()
+                // R146: Zero-out message area to ensure CRC stability.
+                Arrays.fill(entryWriteBuffer.array(), 36, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
+
+                entryWriteBuffer.putInt((timestamp - baseTs.get()).toInt())
+                entryWriteBuffer.putInt(((lat - baseLat) * PRECISION_SCALE).toInt())
+                entryWriteBuffer.putInt(((lng - baseLng) * PRECISION_SCALE).toInt())
+                entryWriteBuffer.putFloat(accuracy.toFloat())
+                entryWriteBuffer.putFloat(maxAccuracy.toFloat())
+                entryWriteBuffer.putFloat(vibe.toFloat())
+                entryWriteBuffer.putFloat(snr.toFloat())
+                entryWriteBuffer.putFloat(batteryTemp.toFloat())
 
                 var flags = 0
                 if (isCharging) flags = flags or 0x04
                 if (gpsHardwareLock) flags = flags or 0x08
                 
-                entryData.put(flags.toByte())
-                entryData.put(batteryLevel.toByte())
-                entryData.put(0.toByte())
-                entryData.put(0.toByte())
+                entryWriteBuffer.put(flags.toByte())
+                entryWriteBuffer.put(batteryLevel.toByte())
+                entryWriteBuffer.put(0.toByte())
+                entryWriteBuffer.put(0.toByte())
 
-                entryData.position(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
-                val crc = CRC32()
-                crc.update(entryData.array(), 0, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
-                entryData.putInt(crc.value.toInt())
+                entryWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                writeCrc.reset()
+                writeCrc.update(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                entryWriteBuffer.putInt(writeCrc.value.toInt())
 
                 val currentWrite = writeIdx.get()
                 val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE)
                 buffer.position(offset)
-                buffer.put(entryData.array())
+                buffer.put(entryWriteBuffer.array())
 
                 advanceWritePointer(buffer)
                 true
@@ -279,6 +288,12 @@ class ForensicSpillBuffer @Inject constructor(
         buffer.putLong(OFF_LAST_WRITE_RT, timeProvider.elapsedRealtime())
     }
 
+    /**
+     * peek: Optimized telemetry retrieval.
+     * R146: Eliminated per-entry ByteArray and ByteBuffer allocations by using 
+     * a single reusable processing buffer. Directly maps result list to avoid 
+     * intermediate collections.
+     */
     fun peek(limit: Int): List<LogEntry> {
         return LatencyMonitor.measureAndAudit(
             timeProvider = timeProvider,
@@ -288,12 +303,8 @@ class ForensicSpillBuffer @Inject constructor(
             onSpike = { msg, _ -> Timber.w(msg) }
         ) {
             val mainBuffer = mappedBuffer ?: return@measureAndAudit emptyList()
-            
-            // Issue #151: Duplicate the buffer to allow thread-local position management.
-            // This allows us to perform I/O (get) outside the synchronized block.
             val readBuffer = mainBuffer.duplicate().order(ByteOrder.nativeOrder())
             
-            val rawEntries = mutableListOf<Pair<Int, ByteArray>>()
             var currentBaseTs = 0L
             var currentBaseLat = 0.0
             var currentBaseLng = 0.0
@@ -313,58 +324,54 @@ class ForensicSpillBuffer @Inject constructor(
             
             if (toPeekCount == 0) return@measureAndAudit emptyList()
 
-            // Perform I/O outside synchronized block using the duplicate buffer.
-            // Producer (writeTrace) will only overwrite data that is NOT yet peeked/drained
-            // if the buffer is full, but writeTrace fails when totalCount == CAPACITY.
-            // Thus, these slots are guaranteed stable while totalCount > 0.
-            var tempRead = currentReadIdx
+            val results = ArrayList<LogEntry>(toPeekCount)
+            val entryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE)
+            val bb = ByteBuffer.wrap(entryBytes).order(ByteOrder.nativeOrder())
+            val crc = CRC32()
+
+            var tempReadIdx = currentReadIdx
             repeat(toPeekCount) {
-                val offset = HEADER_SIZE + (tempRead * FORENSIC_SPILL_ENTRY_SIZE)
-                val entryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE)
+                val offset = HEADER_SIZE + (tempReadIdx * FORENSIC_SPILL_ENTRY_SIZE)
                 readBuffer.position(offset)
                 readBuffer.get(entryBytes)
-                rawEntries.add(tempRead to entryBytes)
-                tempRead = (tempRead + 1) % FORENSIC_SPILL_CAPACITY
-            }
-
-            rawEntries.map { (slotIdx, bytes) ->
-                val bb = ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder())
-                val storedCrc = bb.getInt(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
-                val crc = CRC32()
-                crc.update(bytes, 0, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
                 
-                if (storedCrc != crc.value.toInt()) return@map null
+                bb.clear()
+                crc.reset()
+                crc.update(entryBytes, 0, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                
+                val storedCrc = bb.getInt(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                if (storedCrc == crc.value.toInt()) {
+                    val ts = currentBaseTs + bb.getInt()
+                    val lat = currentBaseLat + (bb.getInt() / PRECISION_SCALE)
+                    val lng = currentBaseLng + (bb.getInt() / PRECISION_SCALE)
+                    val acc = bb.getFloat().toDouble()
+                    val maxAcc = bb.getFloat().toDouble()
+                    val vibe = bb.getFloat().toDouble()
+                    val snr = bb.getFloat().toDouble()
+                    val batTemp = bb.getFloat().toDouble()
+                    val flags = bb.get().toInt()
+                    val batLevel = bb.get().toInt() and 0xFF
+                    val msgLen = bb.get().toInt() and 0xFF
+                    bb.get() // Alignment
 
-                val ts = currentBaseTs + bb.getInt()
-                val lat = currentBaseLat + (bb.getInt() / PRECISION_SCALE)
-                val lng = currentBaseLng + (bb.getInt() / PRECISION_SCALE)
-                val acc = bb.getFloat().toDouble()
-                val maxAcc = bb.getFloat().toDouble()
-                val vibe = bb.getFloat().toDouble()
-                val snr = bb.getFloat().toDouble()
-                val batTemp = bb.getFloat().toDouble()
-                val flags = bb.get().toInt()
-                val batLevel = bb.get().toInt() and 0xFF
-                val msgLen = bb.get().toInt() and 0xFF
-                bb.get() // Alignment
+                    val msg = if (msgLen > 0) {
+                        String(entryBytes, bb.position(), msgLen, Charsets.UTF_8)
+                    } else {
+                        "F_TRACE: P=$batLevel% C=${(flags and 0x04) != 0} L=${(flags and 0x08) != 0} T=${(round(batTemp * 10) / 10)}°C"
+                    }
 
-                val msg = if (msgLen > 0) {
-                    val msgBytes = ByteArray(msgLen)
-                    bb.get(msgBytes)
-                    String(msgBytes, Charsets.UTF_8)
-                } else {
-                    "F_TRACE: P=$batLevel% C=${(flags and 0x04) != 0} L=${(flags and 0x08) != 0} T=${(round(batTemp * 10) / 10)}°C"
+                    results.add(LogEntry(
+                        timestamp = ts, lat = lat, lng = lng, accuracy = acc, maxAccuracy = maxAcc,
+                        vibeSnapshot = if (vibe == -1.0) null else vibe,
+                        snrSnapshot = if (snr == -1.0) null else snr,
+                        isImportant = (flags and 0x01) != 0, isSpecial = (flags and 0x02) != 0,
+                        message = msg, type = "FORENSIC_TRACE", id = "SYSTEM", role = "tracker",
+                        spillIdx = tempReadIdx, gpsHardwareLock = (flags and 0x08) != 0
+                    ))
                 }
-
-                LogEntry(
-                    timestamp = ts, lat = lat, lng = lng, accuracy = acc, maxAccuracy = maxAcc,
-                    vibeSnapshot = if (vibe == -1.0) null else vibe,
-                    snrSnapshot = if (snr == -1.0) null else snr,
-                    isImportant = (flags and 0x01) != 0, isSpecial = (flags and 0x02) != 0,
-                    message = msg, type = "FORENSIC_TRACE", id = "SYSTEM", role = "tracker",
-                    spillIdx = slotIdx, gpsHardwareLock = (flags and 0x08) != 0
-                )
-            }.filterNotNull()
+                tempReadIdx = (tempReadIdx + 1) % FORENSIC_SPILL_CAPACITY
+            }
+            results
         }
     }
 

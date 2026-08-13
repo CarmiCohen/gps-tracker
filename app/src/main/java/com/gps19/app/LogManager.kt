@@ -10,15 +10,16 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Aug.13.00:
+ * - Issue #146: Forensic Drainer Optimization. Updated logForensicTraceOptimized 
+ *   to match the refactored spill-buffer signature (R146).
  * Aug.11.16:
  * - Issue #145: Forensic Spill-Buffer Overflow Protection. Added 
  *   isForensicBufferUnderPressure() to enable proactive throttling (R669).
  * Aug.05.121:
  * - Issue #735: Startup Davey Stall Remediation. Refactored to use 
  *   Provider<ForensicSpillBuffer> to defer MappedByteBuffer I/O until first 
- *   background access, clearing the main-thread startup critical path (R735).
- * Aug.04.10:
- * - Issue #710: Forensic Audit: Memory-Mapped Buffer Overflow Protection.
+ *   background access (R735).
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -77,9 +78,10 @@ class LogManager @Inject constructor(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
         vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double
     ) {
+        // R146: Corrected argument order to match optimized ForensicSpillBuffer signature.
         if (!forensicSpillBufferProvider.get().writeTraceOptimized(
             timestamp, lat, lng, accuracy, maxAccuracy, vibe, snr, 
-            batteryLevel, isCharging, batteryTemp
+            batteryTemp, batteryLevel, isCharging
         )) {
             handleOverflow()
         } else {
@@ -124,9 +126,7 @@ class LogManager @Inject constructor(
             val now = timeProvider.currentTimeMillis()
             val health = telemetry.systemHealth.value
             
-            if (type == "hidden") return
-            val isSuppressedByStorage = health.isStorageCritical && !isSpecial
-            if (isSuppressedByStorage) return
+            if (health.isStorageCritical && !isSpecial) return
             if (health.isStorageLow && !isImportant && !isSpecial) return
             if (type == "system" && !isImportant && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
                 return

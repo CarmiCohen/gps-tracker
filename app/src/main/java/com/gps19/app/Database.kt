@@ -8,14 +8,16 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.13.00:
+ * - Issue #146: Forensic Drainer Optimization. Refactored LogDao to support 
+ *   primitive-based signature retrieval, eliminating string-concatenation overhead 
+ *   in the deduplication hot-path (R146).
  * Aug.10.24:
  * - Issue #130: Proto Health Parity. Added isBatteryLow and isBatteryCritical 
  *   to HistoryEntity and PendingStatusEntity (R130).
  * Aug.08.21:
  * - Issue #125: Forensic Audit: Compression Parity Audit. Added gpsHardwareLock 
  *   to LogEntity to maintain forensic parity with the GPS hardware state (R125).
- * Aug.04.116:
- * - Issue #731: Forensic Bloat: Important/Special Logs Exempt from Pruning. 
  */
 @Entity(
     tableName = "logs", 
@@ -54,6 +56,15 @@ data class LogEntity(
     val vibeSnapshot: Double? = null,
     @ColumnInfo(defaultValue = "-1") val spillIdx: Int = -1, // Issue #705
     @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false // Issue #125
+)
+
+/**
+ * ForensicSignature: Optimized POJO for deduplication check.
+ * R146: Used to retrieve raw fields from SQLite without expensive string concatenation.
+ */
+data class ForensicSignature(
+    val timestamp: Long,
+    val spillIdx: Int
 )
 
 @Entity(tableName = "trail_points", indices = [Index(value = ["timestamp"])])
@@ -179,8 +190,9 @@ abstract class LogDao {
     @Query("SELECT COUNT(*) FROM logs") abstract suspend fun getCount(): Int
     
     // Issue #705: Bulk check for existing forensic traces to prevent duplicates after crash
-    @Query("SELECT timestamp || '_' || spillIdx FROM logs WHERE type = 'FORENSIC_TRACE' AND timestamp >= :minTimestamp") 
-    abstract suspend fun getExistingForensicSignatures(minTimestamp: Long): List<String>
+    // R146: Refactored to return raw fields instead of concatenated strings.
+    @Query("SELECT timestamp, spillIdx FROM logs WHERE type = 'FORENSIC_TRACE' AND timestamp >= :minTimestamp") 
+    abstract suspend fun getExistingForensicSignatures(minTimestamp: Long): List<ForensicSignature>
 
     @Transaction
     open suspend fun deepPruneLogs(heartbeatLimit: Int = 100, generalLimit: Int = 500) {
