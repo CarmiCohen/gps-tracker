@@ -26,12 +26,14 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -45,19 +47,12 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Aug.11.21:
+ * - Issue #148: Header Layout Inversion Fix. Explicitly forced LayoutDirection.Ltr 
+ *   in HeaderBar to prevent unintended RTL inversions (R148).
  * Aug.10.27:
  * - Issue #132: Forensic UI Dashboard Refinement. Integrated CPU, I/O Wait, 
  *   and Latency trend ribbons into AnalyticalRibbons (R132).
- * Aug.05.128:
- * - Issue #740: Performance Hardening. Refactored SharedUiComponents to use named 
- *   arguments for all layout and material components, resolving build regressions 
- *   and ensuring R736/R526 compliance. Fixed parameter name mismatch in StatusBar call.
- * Aug.05.127:
- * - Issue #738: Ribbon Component Drawing Optimization. Fixed drawWithCache syntax 
- *   and restored missing HeaderBar. Consolidated state collection (R726/R736).
- * Aug.05.126:
- * - Issue #739: Shared Component R736 Compliance. Final cleanup of GlobalStatusBar 
- *   and HeaderBar to eliminate remaining monolithic/unstable dependencies (R736).
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -449,49 +444,19 @@ fun HeaderBar(
     val alertPulse = rememberInfiniteTransition(label = "AlertPulse")
     val alertAlpha by alertPulse.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "Alpha")
 
-    if (isLandscape) {
-        Column(
-            modifier = Modifier.fillMaxHeight().width(48.dp).background(Color.Black.copy(alpha = 0.4f)), 
-            verticalArrangement = Arrangement.Top, 
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(8.dp))
-            IconButton(onClick = { commitAnd(onS); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) }) { 
-                Icon(imageVector = Icons.Default.Settings, contentDescription = null, tint = if (isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) 
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            IconButton(onClick = { commitAnd(onDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(44.dp)) { 
-                Icon(imageVector = Icons.Default.Info, contentDescription = "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
-            }
-            IconButton(onClick = { commitAnd(onR) }, modifier = Modifier.size(44.dp)) { 
-                Icon(imageVector = Icons.Default.BarChart, contentDescription = null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            if (!isSystemReady) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }) { 
-                Box(contentAlignment = Alignment.Center) { 
-                    Icon(imageVector = Icons.Default.ReportProblem, contentDescription = "System Issues", tint = Rose500.copy(alpha = alertAlpha), modifier = Modifier.size(28.dp))
-                    Text(text = systemIssuesCount.toString(), color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) 
-                } 
-            }
-            IconButton(onClick = { commitAnd(onL); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) }) { 
-                Icon(imageVector = Icons.AutoMirrored.Filled.List, contentDescription = null, tint = if (isLogVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
-            }
-            IconButton(onClick = { commitAnd(onM) }) { 
-                Icon(imageVector = Icons.Default.Map, contentDescription = null, tint = if (isMapVisible && !isAnyOverlayOpen) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-    } else {
-        Column(modifier = Modifier.fillMaxWidth().padding(top = topPadding)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), 
-                verticalAlignment = Alignment.CenterVertically, 
-                horizontalArrangement = Arrangement.Start
-            ) { 
-                IconButton(onClick = { commitAnd(onS); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) }, modifier = Modifier.size(44.dp)) { 
-                    Icon(imageVector = Icons.Default.Settings, contentDescription = null, tint = if (isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
+    // Issue #148: Force LayoutDirection.Ltr to prevent inversion if the parent context is RTL.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        if (isLandscape) {
+            Column(
+                modifier = Modifier.fillMaxHeight().width(48.dp).background(Color.Black.copy(alpha = 0.4f)), 
+                verticalArrangement = Arrangement.Top, 
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height(8.dp))
+                IconButton(onClick = { commitAnd(onS); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) }) { 
+                    Icon(imageVector = Icons.Default.Settings, contentDescription = null, tint = if (isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) 
                 }
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 IconButton(onClick = { commitAnd(onDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(44.dp)) { 
                     Icon(imageVector = Icons.Default.Info, contentDescription = "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
                 }
@@ -499,17 +464,50 @@ fun HeaderBar(
                     Icon(imageVector = Icons.Default.BarChart, contentDescription = null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                if (!isSystemReady) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }, modifier = Modifier.size(44.dp)) { 
+                if (!isSystemReady) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }) { 
                     Box(contentAlignment = Alignment.Center) { 
-                        Icon(imageVector = Icons.Default.ReportProblem, contentDescription = "System Issues", tint = Rose500.copy(alpha = alertAlpha), modifier = Modifier.size(26.dp))
+                        Icon(imageVector = Icons.Default.ReportProblem, contentDescription = "System Issues", tint = Rose500.copy(alpha = alertAlpha), modifier = Modifier.size(28.dp))
                         Text(text = systemIssuesCount.toString(), color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) 
                     } 
                 }
-                IconButton(onClick = { commitAnd(onL); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) }, modifier = Modifier.size(44.dp)) { 
+                IconButton(onClick = { commitAnd(onL); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) }) { 
                     Icon(imageVector = Icons.AutoMirrored.Filled.List, contentDescription = null, tint = if (isLogVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
                 }
-                IconButton(onClick = { commitAnd(onM) }, modifier = Modifier.size(44.dp)) { 
+                IconButton(onClick = { commitAnd(onM) }) { 
                     Icon(imageVector = Icons.Default.Map, contentDescription = null, tint = if (isMapVisible && !isAnyOverlayOpen) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        } else {
+            Column(modifier = Modifier.fillMaxWidth().padding(top = topPadding)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.Start
+                ) { 
+                    IconButton(onClick = { commitAnd(onS); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) }, modifier = Modifier.size(44.dp)) { 
+                        Icon(imageVector = Icons.Default.Settings, contentDescription = null, tint = if (isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    IconButton(onClick = { commitAnd(onDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(44.dp)) { 
+                        Icon(imageVector = Icons.Default.Info, contentDescription = "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
+                    }
+                    IconButton(onClick = { commitAnd(onR) }, modifier = Modifier.size(44.dp)) { 
+                        Icon(imageVector = Icons.Default.BarChart, contentDescription = null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (!isSystemReady) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }, modifier = Modifier.size(44.dp)) { 
+                        Box(contentAlignment = Alignment.Center) { 
+                            Icon(imageVector = Icons.Default.ReportProblem, contentDescription = "System Issues", tint = Rose500.copy(alpha = alertAlpha), modifier = Modifier.size(26.dp))
+                            Text(text = systemIssuesCount.toString(), color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) 
+                        } 
+                    }
+                    IconButton(onClick = { commitAnd(onL); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) }, modifier = Modifier.size(44.dp)) { 
+                        Icon(imageVector = Icons.AutoMirrored.Filled.List, contentDescription = null, tint = if (isLogVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
+                    }
+                    IconButton(onClick = { commitAnd(onM) }, modifier = Modifier.size(44.dp)) { 
+                        Icon(imageVector = Icons.Default.Map, contentDescription = null, tint = if (isMapVisible && !isAnyOverlayOpen) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
+                    }
                 }
             }
         }

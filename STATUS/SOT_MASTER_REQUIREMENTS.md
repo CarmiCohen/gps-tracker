@@ -18,6 +18,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Forensic Parity Authority (R118)**: Strict field parity across Protobuf, Database, and UI. (Issue #118)
 
 ### 3. UI/UX & Localization Authority
+*   **Header Layout Direction Locking (R148)**: (Added Aug.11.21) The `HeaderBar` MUST explicitly force `LayoutDirection.Ltr` for its internal layout. This ensures that control icons (Settings, Dashboard, BarChart) are always anchored to the start and navigation icons (System Issues, Log, Map) to the end, regardless of the system locale or parent layout direction. (Issue #148). **Status: Implemented.**
 *   **Event & Alert Text Authority (R747)**: (Added Aug.07.06) Viewer-local events MUST be prefixed with "**This device:**". (Issue #747)
 
 ### 4. Documentation & Integrity Governance
