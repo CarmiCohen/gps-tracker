@@ -20,6 +20,11 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.13.02:
+ * - Build Fix: Resolved type inference failures on budget hardware toolchains by 
+ *   explicitly typing LatencyMonitor and withLock calls.
+ * - Issue #705: Fixed forensic deduplication bug where String signatures were 
+ *   incorrectly compared against ForensicSignature objects (R146).
  * Aug.13.00:
  * - Issue #146: Optimized Forensic Drainer. Refactored performForensicDrain 
  *   to reduce overhead in signature filtering and entity mapping (R146).
@@ -27,13 +32,6 @@ import javax.inject.Singleton
  * - Issue #151: Phone Setup ANR Remediation. Offloaded forensic trace writes 
  *   to Dispatchers.Default in addLog() to prevent main-thread stalls during 
  *   MappedByteBuffer I/O pressure (R151).
- * Aug.10.24:
- * - Issue #129: Forensic Storage Pruning Sensitivity. Refactored proactivePruning 
- *   to be battery-aware, deferring I/O during critical battery states to prevent 
- *   spikes and WAL checkpointing pressure (R129).
- * Aug.08.21:
- * - Issue #125: Forensic Audit: Compression Parity Audit. Updated mappings to 
- *   include gpsHardwareLock, ensuring persistence parity (R125).
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -177,12 +175,17 @@ class LogRepository @Inject constructor(
         }
 
         return try {
-            val minTs = traces.minOf { it.timestamp }
+            // R146: Manual min calculation to avoid generic inference stalls on budget toolchains.
+            var minTs = Long.MAX_VALUE
+            for (t in traces) { if (t.timestamp < minTs) minTs = t.timestamp }
+            if (minTs == Long.MAX_VALUE) minTs = 0L
+
             val existingSignatures = logDao.getExistingForensicSignatures(minTs).toSet()
 
             val toInsert = ArrayList<LogEntity>(traces.size)
             for (trace in traces) {
-                val signature = "${trace.timestamp}_${trace.spillIdx}"
+                // Issue #705: Fixed logic error - comparing ForensicSignature against ForensicSignature set.
+                val signature = ForensicSignature(trace.timestamp, trace.spillIdx)
                 if (!existingSignatures.contains(signature)) {
                     toInsert.add(LogEntity(
                         localId = UUID.randomUUID().toString(),
@@ -222,7 +225,7 @@ class LogRepository @Inject constructor(
                 checkDrainConvergence(pendingAtStart)
             }
 
-            logMutex.withLock {
+            logMutex.withLock<Unit> {
                 logWriteCount += toInsert.size
                 if (logWriteCount >= DB_PRUNE_THRESHOLD) {
                     logWriteCount = 0
@@ -282,8 +285,8 @@ class LogRepository @Inject constructor(
     private suspend fun flushBatch(batch: List<BufferedLog>) {
         if (batch.isEmpty()) return
 
-        logMutex.withLock {
-            LatencyMonitor.measureAndAudit(
+        logMutex.withLock<Unit> {
+            LatencyMonitor.measureAndAudit<Unit>(
                 timeProvider = timeProvider,
                 thresholdMs = LOG_LATENCY_THRESHOLD_MS,
                 operation = "Log batch write [size: ${batch.size}]",
@@ -367,7 +370,7 @@ class LogRepository @Inject constructor(
 
     fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logDao.getAllLogs(limit)
         .onEach { 
-            LatencyMonitor.measureAndAudit(
+            LatencyMonitor.measureAndAudit<Unit>(
                 timeProvider = timeProvider,
                 thresholdMs = LOG_RETRIEVAL_THRESHOLD_MS,
                 operation = "Log retrieval [limit: $limit]",
@@ -418,7 +421,7 @@ class LogRepository @Inject constructor(
     }
 
     suspend fun proactivePruning() {
-        LatencyMonitor.measureAndAudit(
+        LatencyMonitor.measureAndAudit<Unit>(
             timeProvider = timeProvider,
             thresholdMs = LOG_LATENCY_THRESHOLD_MS,
             operation = "Proactive pruning",
@@ -477,7 +480,7 @@ class LogRepository @Inject constructor(
         }
     }
 
-    suspend fun getUnsyncedLogs(limit: Int): List<LogEntry> = LatencyMonitor.measureAndAudit(
+    suspend fun getUnsyncedLogs(limit: Int): List<LogEntry> = LatencyMonitor.measureAndAudit<List<LogEntry>>(
         timeProvider = timeProvider,
         thresholdMs = LOG_RETRIEVAL_THRESHOLD_MS,
         operation = "Unsynced log retrieval [limit: $limit]",
@@ -497,7 +500,7 @@ class LogRepository @Inject constructor(
         }
     }
 
-    suspend fun markLogsAsSynced(localIds: List<String>) = LatencyMonitor.measureAndAudit(
+    suspend fun markLogsAsSynced(localIds: List<String>) = LatencyMonitor.measureAndAudit<Unit>(
         timeProvider = timeProvider,
         thresholdMs = LOG_LATENCY_THRESHOLD_MS,
         operation = "Sync status update [count: ${localIds.size}]",
@@ -523,7 +526,7 @@ class LogRepository @Inject constructor(
         } 
     }
 
-    suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = LatencyMonitor.measureAndAudit(
+    suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = LatencyMonitor.measureAndAudit<List<LogEntry>>(
         timeProvider = timeProvider,
         thresholdMs = LOG_RETRIEVAL_THRESHOLD_MS,
         operation = "Static log retrieval [limit: $limit]",

@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Aug.13.02:
+ * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
+ *   type inference failures (R146/R151).
  * Aug.11.16:
  * - Issue #144: Geofence Uncertainty Growth Validation. Fixed "Return to Safe Range" 
  *   logic to use drifted uncertainty (acc) instead of static accuracy (R460).
@@ -31,7 +34,7 @@ object MainAlarmLogic {
         onSpike: (message: String, duration: Long) -> Unit,
         isWarmup: Boolean = false
     ): SystemHealthReport {
-        return LatencyMonitor.measureAndAudit(
+        return LatencyMonitor.measureAndAudit<SystemHealthReport>(
             timeProvider = timeProvider,
             thresholdMs = LATENCY_THRESHOLD_ALARM_LOGIC_MS,
             operation = "detectViolations",

@@ -20,6 +20,9 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.13.02:
+ * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
+ *   type inference failures (R146/R151).
  * Aug.13.00:
  * - Issue #146: Optimized Forensic Drainer. Refactored peek() and writeTrace() 
  *   to eliminate per-entry allocations and redundant I/O passes (R146). 
@@ -142,7 +145,7 @@ class ForensicSpillBuffer @Inject constructor(
     }
 
     fun writeTrace(entry: LogEntry): Boolean {
-        return LatencyMonitor.measureAndAudit(
+        return LatencyMonitor.measureAndAudit<Boolean>(
             timeProvider = timeProvider,
             thresholdMs = WRITE_STALL_THRESHOLD_MS,
             operation = "Forensic Write",
@@ -219,7 +222,7 @@ class ForensicSpillBuffer @Inject constructor(
         vibe: Double, snr: Double, batteryTemp: Double, batteryLevel: Int, isCharging: Boolean,
         gpsHardwareLock: Boolean = false
     ): Boolean {
-        return LatencyMonitor.measureAndAudit(
+        return LatencyMonitor.measureAndAudit<Boolean>(
             timeProvider = timeProvider,
             thresholdMs = WRITE_STALL_THRESHOLD_MS,
             operation = "Forensic Write Optimized",
@@ -295,7 +298,7 @@ class ForensicSpillBuffer @Inject constructor(
      * intermediate collections.
      */
     fun peek(limit: Int): List<LogEntry> {
-        return LatencyMonitor.measureAndAudit(
+        return LatencyMonitor.measureAndAudit<List<LogEntry>>(
             timeProvider = timeProvider,
             thresholdMs = DRAIN_STALL_THRESHOLD_MS,
             operation = "Forensic Peek",
@@ -376,7 +379,7 @@ class ForensicSpillBuffer @Inject constructor(
     }
 
     fun commitDrain(count: Int) {
-        LatencyMonitor.measureAndAudit(
+        LatencyMonitor.measureAndAudit<Unit>(
             timeProvider = timeProvider,
             thresholdMs = DRAIN_STALL_THRESHOLD_MS,
             operation = "Forensic Commit",

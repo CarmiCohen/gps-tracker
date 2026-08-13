@@ -20,6 +20,9 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Aug.13.02:
+ * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
+ *   type inference failures (R146/R151).
  * July.30.54:
  * - Issue #653: Performance: Zero-Churn Refactoring. Switched to 
  *   interpolateSegmentCallback to eliminate List allocations during 
@@ -169,7 +172,7 @@ class LocationProcessor(
         nowRt: Long = timeProvider.elapsedRealtime(),
         nowWall: Long = timeProvider.currentTimeMillis()
     ): Boolean {
-        return LatencyMonitor.measureAndAudit(
+        return LatencyMonitor.measureAndAudit<Boolean>(
             timeProvider,
             LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
             "updateSensorData",
@@ -244,7 +247,7 @@ class LocationProcessor(
         nowWall: Long = timeProvider.currentTimeMillis(),
         nowRt: Long = timeProvider.elapsedRealtime()
     ): ProcessedLocation {
-        return LatencyMonitor.measureAndAudit(
+        return LatencyMonitor.measureAndAudit<ProcessedLocation>(
             timeProvider,
             LATENCY_THRESHOLD_GPS_PROCESS_MS,
             "processGpsPoint",

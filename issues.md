@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (Aug.13.00)
+# Project Issues & Hardening Tracking (Aug.13.02)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 AT RISK | 3 |
+| **Open Technical Issues** | 🔴 AT RISK | 5 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 589 |
+| **Resolved (Total)** | 🟢 Progress | 590 |
 
 ---
 
@@ -15,11 +15,19 @@ This document tracks active issues, technical debt, and pending implementation t
 *   **[Issue #150] R405 Detection Bypass**: Automated Phone Setup prompt (R405) failed to trigger on verified Samsung A15 (SM-A155F) hardware despite missing battery exemptions.
 *   **[Issue #152] Excessive GC Pressure**: Logcat indicates high allocation rates in the hot path. *Note: Partially mitigated by R146 optimizations.*
 *   **[Issue #153] Startup Davey Stalls**: Significant main-thread stalls (up to 1600ms) detected during application startup and initial composition.
+*   **[Issue #155] Phone Setup UI Clutter**: Action buttons in `PhoneSetupOverlay` remain visible after step completion, causing visual noise and user confusion.
+*   **[Issue #156] WakeLock Log Saturation**: Frequent `acquireWakeLock(force=true)` calls from `AppSensorManager` saturate logcat, masking other forensic events.
 
 ---
 
 ## 🔴 Open Issues
 *   *(None)*
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.13.02)
+*   **[Issue #154] [Severity: Medium] [Category: Build] Type Inference Failures.**
+    *   **Resolution**: Hardened the **Latency Monitoring Framework (R154)**. Explicitly typed all `LatencyMonitor.measureAndAudit` calls and refactored `LogRepository` to eliminate generic inference stalls on budget hardware toolchains. Fixed a forensic deduplication bug in `LogRepository` (Issue #705) where `String` signatures were compared against `ForensicSignature` objects.
 
 ---
 
@@ -38,4 +46,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Synchronized all tracking files to version `Aug.11.21`.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.00)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.02)

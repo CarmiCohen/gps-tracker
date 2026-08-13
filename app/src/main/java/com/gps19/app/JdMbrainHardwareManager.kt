@@ -16,6 +16,9 @@ import kotlinx.coroutines.Dispatchers
 
 /**
  * JdMbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Aug.13.02:
+ * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
+ *   type inference failures (R146/R151).
  * Aug.07.122:
  * - Issue #746: Infrastructure: Fully transitioned to JdMbrain namespace. Renamed 
  *   manager class from MbrainHardwareManager to JdMbrainHardwareManager to 
@@ -79,7 +82,7 @@ object JdMbrainHardwareManager {
             var result: Int
             var attempts = 0
             
-            LatencyMonitor.measureAndAudit(
+            LatencyMonitor.measureAndAudit<Int>(
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_JNI_MS,
                 operation = operation,

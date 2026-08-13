@@ -35,6 +35,9 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * Aug.13.02:
+ * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
+ *   type inference failures (R146/R151).
  * Aug.07.46:
  * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement. Implemented EMA-based 
  *   linear transition for proxIdx and changed forensic buffer to use average-based 
@@ -480,7 +483,7 @@ class AppSensorManager @Inject constructor(
     fun isAcousticMonitoringEnabled() = isMonitoring
 
     fun consumeLogicSnapshot(): ForensicSnapshot {
-        return LatencyMonitor.measureAndAudit(
+        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(
             timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
             "consumeLogicSnapshot",
             LatencyMonitor.AuditType.PERFORMANCE,
@@ -508,7 +511,7 @@ class AppSensorManager @Inject constructor(
     }
 
     fun consumeForensicSnapshot(): ForensicSnapshot {
-        return LatencyMonitor.measureAndAudit(
+        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(
             timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
             "consumeForensicSnapshot",
             LatencyMonitor.AuditType.PERFORMANCE,
@@ -536,7 +539,7 @@ class AppSensorManager @Inject constructor(
     }
 
     fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<EngineSensorSnapshot> = sequence {
-        LatencyMonitor.measureAndAudit(
+        LatencyMonitor.measureAndAudit<Unit>(
             timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
             "getSensorSamples",
             LatencyMonitor.AuditType.PERFORMANCE,
@@ -556,7 +559,7 @@ class AppSensorManager @Inject constructor(
     }
 
     fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
-        LatencyMonitor.measureAndAudit(
+        LatencyMonitor.measureAndAudit<Unit>(
             timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
             "getAcousticSamples",
             LatencyMonitor.AuditType.PERFORMANCE,

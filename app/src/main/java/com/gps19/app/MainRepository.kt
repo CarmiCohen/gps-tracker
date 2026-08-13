@@ -17,14 +17,15 @@ import javax.inject.Singleton
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Aug.13.02:
+ * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
+ *   type inference failures (R146/R151).
  * Aug.10.24:
  * - Issue #130: Proto Health Parity. Synchronized HistoryEntity mapping with 
  *   isBatteryLow and isBatteryCritical flags (R130).
  * - Issue #129: Forensic Storage Pruning Sensitivity. Refactored background 
  *   pruning to be battery-aware, deferring maintenance during critical battery 
  *   states to preserve power and reduce I/O spikes (R129).
- * Aug.04.115:
- * - Issue #729: Forensic Audit: Automated Database Integrity Validation. 
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -232,7 +233,7 @@ class MainRepository @Inject constructor(
         )) return
 
         scope.launch {
-            LatencyMonitor.measureAndAudit(
+            LatencyMonitor.measureAndAudit<Unit>(
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
                 operation = "Trail Write",
@@ -279,7 +280,7 @@ class MainRepository @Inject constructor(
 
         val wallTs = timestamp ?: timeProvider.currentTimeMillis()
         scope.launch { 
-            LatencyMonitor.measureAndAudit(
+            LatencyMonitor.measureAndAudit<Unit>(
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
                 operation = "Violation Write",
@@ -402,7 +403,7 @@ class MainRepository @Inject constructor(
         
         if (dbPoints.isNotEmpty()) {
             lastBatchWriteRealtime = nowRt
-            LatencyMonitor.measureAndAudit(
+            LatencyMonitor.measureAndAudit<Unit>(
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
                 operation = "History Batch Write (${dbPoints.size} pts)",
@@ -434,7 +435,7 @@ class MainRepository @Inject constructor(
 
         scope.launch {
             try {
-                LatencyMonitor.measureAndAudit(
+                LatencyMonitor.measureAndAudit<Unit>(
                     timeProvider = timeProvider,
                     thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS * 4,
                     operation = "Background Pruning",
