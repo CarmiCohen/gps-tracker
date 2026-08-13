@@ -33,16 +33,11 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Aug.13.11:
+ * - Issue #162: Phone Setup ANR Remediation. Passing isPhoneSetupVisible to 
+ *   HeaderBar to optimize main-thread performance during overlay transitions (R162).
  * Aug.11.03:
  * - Issue #139: UI Davey/ANR Remediation. Implemented Deferred UI Hydration (R139).
- *   Heavy components (Map/Dashboard) are deferred by 200ms to allow navigation 
- *   transition to stabilize, preventing 3000ms+ main-thread stalls.
- * Aug.10.31:
- * - Issue #135: UI Davey/ANR Mitigation. Refactored SettingsOverlay call site 
- *   to pass decomposed primitive parameters (R135).
- * Aug.10.26:
- * - Issue #132: Forensic UI Dashboard Refinement. Passed cpuLoad, ioWait, 
- *   and maxIoLatency to TelemetryBox (R132).
  */
 
 @Composable
@@ -104,6 +99,7 @@ fun TrackerScreen(
             isSettingsOpen = nav.isSettingsOpen,
             isRibbonsVisible = nav.isRibbonsVisible,
             isMapVisible = nav.isMapVisible,
+            isPhoneSetupVisible = nav.isPhoneSetupVisible, // Issue #162
             requiresExtraTopPadding = uiState.permissions.requiresExtraTopPadding,
             isSystemReady = uiState.isSystemReady,
             systemIssuesCount = uiState.systemIssuesCount,
@@ -236,7 +232,6 @@ fun TrackerScreen(
                                     lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
                                     localLat = kinematicState.localLocation.lat,
                                     localLocationTs = kinematicState.localLocation.timestamp,
-                                    // Decomposed DashboardState
                                     isGpsFresh = dashboardState.isGpsFresh,
                                     isTelemetryFresh = dashboardState.isTelemetryFresh,
                                     isLinkFresh = dashboardState.isLinkFresh,
@@ -413,7 +408,6 @@ fun TrackerScreen(
                                 lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
                                 localLat = kinematicState.localLocation.lat,
                                 localLocationTs = kinematicState.localLocation.timestamp,
-                                // Decomposed DashboardState
                                 isGpsFresh = dashboardState.isGpsFresh,
                                 isTelemetryFresh = dashboardState.isTelemetryFresh,
                                 isLinkFresh = dashboardState.isLinkFresh,
@@ -566,7 +560,6 @@ fun TrackerDashboard(
     lastRemoteActivityTs: Long,
     localLat: Double,
     localLocationTs: Long,
-    // Decomposed DashboardState fields
     isGpsFresh: Boolean,
     isTelemetryFresh: Boolean,
     isLinkFresh: Boolean,
@@ -623,12 +616,10 @@ fun TrackerDashboard(
     luxBaseline: String,
     acousticFloor: String,
     trackerCurrentMa: String,
-    // Collect Flow Values
     gpsIdx: GpsIndexData,
     rttValue: Int,
     currentMaValue: Int,
     systemPulse: Long,
-    // Issue #132
     cpuLoad: String,
     ioWait: String,
     maxIoLatency: String,

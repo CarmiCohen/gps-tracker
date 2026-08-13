@@ -29,18 +29,17 @@ import kotlinx.coroutines.delay
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Aug.13.11:
+ * - Issue #162: Phone Setup ANR Remediation. Hardened hydration gate (150ms) 
+ *   and increased staggered rendering offsets (80ms) to prevent main-thread 
+ *   stalls on budget hardware. Memoized static descriptions (R162).
  * Aug.13.07:
  * - Issue #155: Phone Setup UI Clutter. Refined GuideSection to hide action 
  *   buttons once a step is verified (isCompleted == true), improving 
  *   out-of-box experience and reducing visual noise.
  * Aug.11.06:
  * - Issue #142: Phone Setup Overlay Stabilization. Implemented Staggered 
- *   Incremental Hydration (R142) to prevent ANRs on budget hardware (Samsung A15). 
- *   GuideSection components are now rendered sequentially with 60ms offsets to 
- *   avoid exceeding main-thread frame budget during transition.
- * Aug.11.04:
- * - Issue #136: Restored Compose Preview coverage for SettingsOverlay and 
- *   PhoneSetupOverlay following the R135/R137 decomposition (R136).
+ *   Incremental Hydration (R142).
  */
 
 @Composable
@@ -252,17 +251,20 @@ fun PhoneSetupOverlay(
     permissions: PermissionState,
     homePointsCount: Int, isTrackerMode: Boolean, onGoToMap: () -> Unit = {}
 ) {
-    // Issue #142: Staggered Incremental Hydration. 
-    // Instead of one monolithic hydration gate, we reveal sections one by one.
+    // Issue #162: Hardened hydration gate.
+    var isHydrated by remember { mutableStateOf(false) }
     var visibleCount by remember { mutableIntStateOf(0) }
+    
     LaunchedEffect(Unit) {
-        delay(100) // Initial delay for container animation
+        delay(150) // Issue #162: Increased initial delay to allow container transition to settle
+        isHydrated = true
         repeat(15) { // Up to 15 sections/spacers
             visibleCount++
-            delay(60) // 60ms delay ensures each section renders in its own frame(s) on low-end A15
+            delay(80) // Issue #162: Increased delay to 80ms to provide more breathing room per frame
         }
     }
 
+    // Issue #162: Memoize static descriptions to avoid redundant lookups during heartbeats
     val manufacturer = remember { Build.MANUFACTURER.uppercase() }
     val model = remember { Build.MODEL.uppercase() }
     val recentsLockDesc = remember { getRecentsLockDescription() }
@@ -270,7 +272,7 @@ fun PhoneSetupOverlay(
     val autoStartDesc = remember { getAutoStartDescription() }
 
     Card(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().navigationBarsPadding(), colors = CardDefaults.cardColors(containerColor = Slate950)) {
-        if (visibleCount > 0) {
+        if (isHydrated && visibleCount > 0) {
             Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column { Text("Phone Setup", color = BrandJd, fontSize = 24.sp, fontWeight = FontWeight.Bold); Text(stringResource(R.string.setup_detected_device, manufacturer, model), color = Slate500, fontSize = 10.sp) } }
                 

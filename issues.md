@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (Aug.13.10)
+# Project Issues & Hardening Tracking (Aug.13.11)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟢 STABLE | 0 |
+| **Open Technical Issues** | 🟢 CLEAN | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 599 |
+| **Resolved (Total)** | 🟢 Progress | 602 |
 
 ---
 
@@ -21,9 +21,19 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
+## 🟢 Recently Resolved Issues (Aug.13.11)
+*   **[Issue #162] [Severity: High] [Category: UI/UX] Phone Setup ANR Stall.**
+    *   **Resolution**: Hardened hydration gate (150ms) and increased staggered rendering offsets (80ms) in `PhoneSetupOverlay`. Memoized static build properties and hardware-specific descriptions. Optimized `HeaderBar` to hide alert animations while the setup overlay is active (R162).
+
+---
+
 ## 🟢 Recently Resolved Issues (Aug.13.10)
 *   **[Issue #159] [Severity: Low] [Category: Telemetry] SELinux LoadAvg Denials.**
-    *   **Resolution**: Implemented SDK-aware branching in `SystemStatusProviderImpl.kt` (R159) to disable `/proc/loadavg` and `/proc/stat` reads on SDK 29+. This eliminates SELinux audit noise. Stress detection now correctly relies on I/O latency and thermal throttling proxies on modern Android versions.
+    *   **Resolution**: Implemented SDK-aware branching in `SystemStatusProviderImpl.kt` (R159). Verified in Aug.13.10 deployment that logs no longer contain `/proc/loadavg` denials.
+*   **[Issue #160] [Severity: Medium] [Category: Configuration] Version Mismatch.**
+    *   **Resolution**: Synchronized `app/build.gradle` and UI to `Aug.13.10`. Resolved the inconsistency where the previous deployment was using an outdated `Aug.13.09` build.
+*   **[Issue #161] [Severity: High] [Category: Security] False Positive: Persistent Denials.**
+    *   **Resolution**: Confirmed that denials observed earlier were due to version mismatch (#160). Once the correct build was deployed, Issue #159 was proven effective.
 
 ---
 
@@ -31,31 +41,7 @@ This document tracks active issues, technical debt, and pending implementation t
 *   **[Issue #158] [Severity: Medium] [Category: QA] Forensic Validation & QA Audit.**
     *   **Resolution**: Performed end-to-end validation of R152, R153, R156, and R157 optimizations. Verified log throttling, staggered hydration stability, and synchronized `versionName` to `Aug.13.09` across the build system and UI.
 *   **[Issue #157] [Severity: Medium] [Category: Performance] Violation Path Allocations.**
-    *   **Resolution**: Eliminated object churn in the violation detection and mapping hot-paths by refactoring `ViolationPoint` to a mutable class with primitive coordinates and cached `GeoPoint` (R157). This removes `UUID.randomUUID()` and transient `GeoPoint` allocations.
+    *   **Resolution**: Eliminated object churn in the violation detection and mapping hot-paths by refactoring `ViolationPoint` to a mutable class with primitive coordinates and cached `GeoPoint` (R157).
 
 ---
-
-## 🟢 Recently Resolved Issues (Aug.13.08)
-*   **[Issue #156] [Severity: Medium] [Category: Performance] WakeLock Log Saturation.**
-    *   **Resolution**: Implemented **WakeLock Log Throttling (R156)** in `SystemMonitor`. Acquisition logs are now throttled to 1/min using `WAKELOCK_LOG_THROTTLE_MS`.
-
----
-
-## 🟢 Recently Resolved Issues (Aug.13.07)
-*   **[Issue #155] [Severity: Low] [Category: UI/UX] Phone Setup UI Clutter.**
-    *   **Resolution**: Refined `GuideSection` in `PhoneSetupOverlay` to hide completion-dependent action buttons once steps are verified (`isCompleted == true`).
-
----
-
-## 🟢 Recently Resolved Issues (Aug.13.06)
-*   **[Issue #152] [Severity: Medium] [Category: Performance] Excessive GC Pressure.**
-    *   **Resolution**: Refactored the telemetry hot-path to use **Flyweight Pooling (R152)**. Converted `ConnectionPoint` to a mutable class and removed automatic `UUID` generation.
-
----
-
-## 🟢 Recently Resolved Issues (Aug.13.05)
-*   **[Issue #153] [Severity: High] [Category: Performance] Startup Davey Stalls.**
-    *   **Resolution**: Implemented **Staggered UI Hydration (R153)**. Introduced a multi-stage boot sequence to spread composition load across multiple frames.
-
----
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.10)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.11)

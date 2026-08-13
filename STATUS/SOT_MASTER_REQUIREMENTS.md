@@ -1,33 +1,34 @@
-# System Source of Truth (SoT) - Aug.13.10 (Telemetry Remediation Complete)
+# System Source of Truth (SoT) - Aug.13.11 (Phone Setup ANR Remediation Complete)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
-*   **SELinux Telemetry Remediation (R159)**: (Added Aug.13.10) The system MUST bypass `/proc/loadavg` and `/proc/stat` file access on Android 10 (SDK 29) and higher. This prevents SELinux audit denials (`avc: denied`) which occur on modern Android versions for third-party apps. Stress-test correlation and silent failure detection on these platforms MUST rely on fallback proxies, including I/O latency (via `LatencyMonitor`) and Thermal Throttling states. (Issue #159). **Status: Implemented.**
-*   **Performance Hardening Audit (R158)**: (Added Aug.13.09) The system MUST undergo forensic validation after cumulative performance optimizations (R152-R157). Validation MUST verify: (1) WakeLock log throttling effectiveness, (2) Elimination of Davey stalls during staggered hydration, and (3) Reduced GC pressure during steady-state tracking. (Issue #158). **Status: Validated & Closed.**
-*   **Violation Path Allocation Authority (R157)**: (Added Aug.13.09) The system MUST eliminate object churn in the violation detection and mapping hot-paths. `ViolationPoint` MUST be a mutable class with primitive coordinates (`lat`, `lng`). The use of `UUID.randomUUID()` and transient `GeoPoint` allocations during database-to-UI mapping is strictly prohibited. UI components MUST utilize cached position objects via the `toGeoPoint()` method to ensure zero-allocation rendering in high-activity scenarios. (Issue #157). **Status: Implemented.**
-*   **WakeLock Log Throttling Authority (R156)**: (Added Aug.13.08) System-level WakeLock acquisition logging MUST be throttled to a minimum interval (default 60s) using `WAKELOCK_LOG_THROTTLE_MS`. This prevents high-frequency background pulses (e.g., from `AppSensorManager`) from saturating logcat while preserving periodic visibility for forensic audits. (Issue #156). **Status: Implemented.**
-*   **Telemetry Flyweight Pooling Authority (R152)**: (Added Aug.13.06) The system MUST utilize **Flyweight Pooling** for all steady-state telemetry processing. The `ConnectionPoint` (App-level) and `EngineConnectionPoint` (Engine-level) MUST be mutable classes. Automatic UUID generation and expensive string concatenations MUST be eliminated from the 1Hz hot-path. The `HistoryManager` and `MainRepository` MUST reuse pre-allocated object instances during aggregation and persistence buffering to eliminate GC pressure on budget hardware (Samsung A15). (Issue #152). **Status: Implemented.**
-*   **Staggered UI Hydration Authority (R153)**: (Added Aug.13.05) The application UI MUST initialize in granular stages using a `hydrationLevel` state. Complex components (NavHost, Screen Content, Maps) MUST be deferred across multiple frames during cold boot to prevent Main-thread Davey stalls. (Issue #153). **Status: Implemented.**
-*   **Samsung A15 Detection Hardening (R405)**: (Added Aug.13.04) The system MUST reliably identify Samsung A15 devices by inspecting `Build.MODEL`, `Build.PRODUCT`, and `Build.DEVICE` strings. (Issue #150). **Status: Implemented.**
-*   **Forensic Drainer Optimization (R146)**: (Added Aug.13.00) The system MUST optimize the telemetry drain loop to eliminate latency spikes and GC pressure. (Issue #146). **Status: Implemented.**
+*   **Phone Setup ANR Remediation (R162)**: (Added Aug.13.11) The system MUST utilize a hardened hydration gate (minimum 150ms) in `PhoneSetupOverlay` to allow navigation transitions to settle before rendering heavy layout components. sequential rendering offsets for setup sections MUST be at least 80ms. Static hardware strings and permission descriptions MUST be memoized to prevent redundant resource lookups. Alert animations in `HeaderBar` MUST be suppressed while the setup overlay is active. (Issue #162). **Status: Implemented.**
+*   **SELinux Telemetry Remediation (R159)**: (Added Aug.13.10) The system MUST bypass `/proc/loadavg` and `/proc/stat` file access on Android 10 (SDK 29) and higher. (Issue #159). **Status: Implemented.**
+*   **Performance Hardening Audit (R158)**: (Added Aug.13.09) The system MUST undergo forensic validation after cumulative performance optimizations (R152-R157). (Issue #158). **Status: Validated & Closed.**
+*   **Violation Path Allocation Authority (R157)**: (Added Aug.13.09) The system MUST eliminate object churn in the violation detection and mapping hot-paths. (Issue #157). **Status: Implemented.**
+*   **WakeLock Log Throttling Authority (R156)**: (Added Aug.13.08) System-level WakeLock acquisition logging MUST be throttled to a minimum interval (default 60s). (Issue #156). **Status: Implemented.**
+*   **Telemetry Flyweight Pooling Authority (R152)**: (Added Aug.13.06) The system MUST utilize **Flyweight Pooling** for all steady-state telemetry processing. (Issue #152). **Status: Implemented.**
+*   **Staggered UI Hydration Authority (R153)**: (Added Aug.13.05) The application UI MUST initialize in granular stages using a `hydrationLevel` state. (Issue #153). **Status: Implemented.**
+*   **Samsung A15 Detection Hardening (R405)**: (Added Aug.13.04) The system MUST reliably identify Samsung A15 devices. (Issue #150). **Status: Implemented.**
+*   **Forensic Drainer Optimization (R146)**: (Added Aug.13.00) The system MUST optimize the telemetry drain loop. (Issue #146). **Status: Implemented.**
 *   **Forensic Persistence Hardening (R151)**: (Added Aug.11.21) The system MUST decouple forensic trace persistence from the Main thread. (Issue #151). **Status: Implemented.**
 *   **Forensic Pressure Authority (R669)**: (Added Aug.11.20) The system MUST monitor the `MappedByteBuffer` fill level. (Issue #145). **Status: Implemented.**
 *   **Stress Recovery Authority (R141)**: (Added Aug.11.13) The system MUST ensure that all synthetic stress-test latches and thermal safety states are flushed immediately upon recovery. (Issue #141). **Status: Implemented & Verified.**
-*   **Adaptive Polling Strategy (R406a)**: (Updated Aug.11.13) Hardware GPS polling rates MUST be dynamically adjusted based on motion, thermal status, and suspicious triggers. (Issue #057 / #406a). **Status: Implemented.**
+*   **Adaptive Polling Strategy (R406a)**: (Updated Aug.11.13) Hardware GPS polling rates MUST be dynamically adjusted. (Issue #057 / #406a). **Status: Implemented.**
 *   **Forensic Integrity Verification (R143)**: (Added Aug.11.08) The system MUST verify that the Forensic Stress Test (R140) correctly triggers "Silent Failure" recordings. (Issue #143). **Status: Implemented & Verified.**
 *   **Phone Setup Overlay Stabilization (R142)**: (Added Aug.11.06) The system MUST ensure that the `PhoneSetupOverlay` remains non-blocking and stable on budget hardware. (Issue #142). **Status: Implemented.**
-*   **Automated Forensic Stress Testing (R140)**: (Added Aug.11.05) The system MUST provide an internal mechanism to artificially saturate device resources for forensic validation. (Issue #140). **Status: Implemented.**
+*   **Automated Forensic Stress Testing (R140)**: (Added Aug.11.05) The system MUST provide an internal mechanism to artificially saturate device resources. (Issue #140). **Status: Implemented.**
 *   **Forensic Anomaly Correlation Engine (R133)**: (Updated Aug.11.08) Cross-domain correlation between location stability and hardware load. (Issue #133-Sentinel). **Status: Implemented & Verified.**
 
 ### 2. Temporal & Forensic Integrity
-*   **Bayesian Uncertainty Authority (R460)**: (Updated Aug.11.16) The system MUST expand geofence thresholds during GPS gaps using time-drifted uncertainty (`acc`). (Issue #144). **Status: Implemented & Verified.**
+*   **Bayesian Uncertainty Authority (R460)**: (Updated Aug.11.16) The system MUST expand geofence thresholds during GPS gaps. (Issue #144). **Status: Implemented & Verified.**
 *   **Temporal Forensic Integrity (R102)**: Monotonic `rt` for logic; wall-clock `ts` for logs. (Issue #102)
 *   **Forensic Parity Authority (R118)**: Strict field parity across Protobuf, Database, and UI. (Issue #118)
 
 ### 3. UI/UX & Localization Authority
-*   **Phone Setup Clutter Reduction (R155)**: (Added Aug.13.07) The `PhoneSetupOverlay` MUST hide completion-dependent action buttons once the corresponding setup step is verified (`isCompleted == true`). This ensures a focused and simplified onboarding experience. (Issue #155). **Status: Implemented.**
-*   **Header Layout Direction Locking (R148)**: (Added Aug.11.21) The `HeaderBar` MUST explicitly force `LayoutDirection.Ltr` for its internal layout. (Issue #148). **Status: Implemented.**
+*   **Phone Setup Clutter Reduction (R155)**: (Added Aug.13.07) The `PhoneSetupOverlay` MUST hide completion-dependent action buttons once the corresponding setup step is verified (`isCompleted == true`). (Issue #155). **Status: Implemented.**
+*   **Header Layout Direction Locking (R148)**: (Added Aug.11.21) The `HeaderBar` MUST explicitly force `LayoutDirection.Ltr`. (Issue #148). **Status: Implemented.**
 *   **Event & Alert Text Authority (R747)**: (Added Aug.07.06) Viewer-local events MUST be prefixed with "**This device:**". (Issue #747)
 
 ### 4. Documentation & Integrity Governance
@@ -35,5 +36,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.13.10.
+*   **Current Release**: Aug.13.11.
 *   **Source of Truth**: app/build.gradle versionName.

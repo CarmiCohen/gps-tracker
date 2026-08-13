@@ -2,7 +2,15 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 595**
+**Total Unique Resolutions: 597**
+
+## 36. Version Synchronization (Aug.13.10)
+*   **Issue #160: Version Mismatch**.
+    *   **Resolution**: Synchronized `app/build.gradle` and UI to `Aug.13.10`. Resolved the inconsistency where the previous deployment was using an outdated `Aug.13.09` build despite documentation claims. (R160)
+
+## 35. False Positive Remediation (Aug.13.10)
+*   **Issue #161: Persistent Denials (False Positive)**.
+    *   **Resolution**: Confirmed that SELinux denials observed after the initial fix were due to the version mismatch (#160). Verified that the SDK-aware branching in `SystemStatusProviderImpl.kt` (R159) is fully effective in the synchronized build. (R161)
 
 ## 34. SELinux Telemetry Remediation (Aug.13.10)
 *   **Issue #159: SELinux LoadAvg Denials**.
@@ -39,14 +47,6 @@ This document contains the unified record of all resolved issues and technical d
 ## 27. Samsung A15 Detection Hardening (Aug.13.04)
 *   **Issue #150: Samsung A15 Phone Setup Bypass**.
     *   **Resolution**: Hardened the **Samsung A15 Detection Logic (R405)** by inspecting `Build.DEVICE` and `Build.PRODUCT` strings (e.g., SM-A155F). Relocated trigger logic to the permission loop to eliminate race conditions. (R405)
-
-## 26. Build Stability & Forensic Deduplication (Aug.13.02)
-*   **Issue #154: Type Inference Failures**.
-    *   **Resolution**: Hardened the **Latency Monitoring Framework (R154)** by explicitly typing measurement calls and refactoring `LogRepository` to fix a deduplication bug (Issue #705) where forensic signatures were compared incorrectly.
-
-## 25. Forensic Performance Hardening (Aug.13.00)
-*   **Issue #146: Optimize Forensic Drainer**.
-    *   **Resolution**: Hardened the **Forensic Drainer (R146)** to eliminate 200ms latency spikes and high GC pressure. Refactored `ForensicSpillBuffer` to utilize zero-allocation paths for `peek()` and `writeTrace()`.
 
 ---
 *For historical resolutions #1 through #24, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.10)

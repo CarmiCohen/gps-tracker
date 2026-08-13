@@ -47,6 +47,11 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Aug.13.11:
+ * - Issue #162: Phone Setup ANR Remediation. Modified HeaderBar to hide the 
+ *   System Issues icon when the overlay is already visible, reducing 
+ *   animation overhead and preventing redundant triggers. Fixed syntax error 
+ *   in ForensicRibbonContainer.
  * Aug.11.21:
  * - Issue #148: Header Layout Inversion Fix. Explicitly forced LayoutDirection.Ltr 
  *   in HeaderBar to prevent unintended RTL inversions (R148).
@@ -432,8 +437,10 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
 
 @Composable
 fun HeaderBar(
-    isLogVisible: Boolean, isSettingsOpen: Boolean, isRibbonsVisible: Boolean, isMapVisible: Boolean, requiresExtraTopPadding: Boolean, 
-    isSystemReady: Boolean, systemIssuesCount: Int, onDashboard: () -> Unit = {}, onS: () -> Unit = {}, onL: () -> Unit = {}, 
+    isLogVisible: Boolean, isSettingsOpen: Boolean, isRibbonsVisible: Boolean, isMapVisible: Boolean, 
+    isPhoneSetupVisible: Boolean = false, // Issue #162: Track setup visibility
+    requiresExtraTopPadding: Boolean, isSystemReady: Boolean, systemIssuesCount: Int, 
+    onDashboard: () -> Unit = {}, onS: () -> Unit = {}, onL: () -> Unit = {}, 
     onM: () -> Unit = {}, onR: () -> Unit = {}, onEvent: (UiEvent) -> Unit
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -444,7 +451,7 @@ fun HeaderBar(
     val alertPulse = rememberInfiniteTransition(label = "AlertPulse")
     val alertAlpha by alertPulse.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "Alpha")
 
-    // Issue #148: Force LayoutDirection.Ltr to prevent inversion if the parent context is RTL.
+    // Issue #148: Force LayoutDirection.Ltr
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         if (isLandscape) {
             Column(
@@ -464,7 +471,8 @@ fun HeaderBar(
                     Icon(imageVector = Icons.Default.BarChart, contentDescription = null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                if (!isSystemReady) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }) { 
+                // Issue #162: Hide icon if PhoneSetupOverlay is already visible to reduce main-thread load
+                if (!isSystemReady && !isPhoneSetupVisible) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }) { 
                     Box(contentAlignment = Alignment.Center) { 
                         Icon(imageVector = Icons.Default.ReportProblem, contentDescription = "System Issues", tint = Rose500.copy(alpha = alertAlpha), modifier = Modifier.size(28.dp))
                         Text(text = systemIssuesCount.toString(), color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) 
@@ -496,7 +504,8 @@ fun HeaderBar(
                         Icon(imageVector = Icons.Default.BarChart, contentDescription = null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
                     }
                     Spacer(modifier = Modifier.weight(1f))
-                    if (!isSystemReady) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }, modifier = Modifier.size(44.dp)) { 
+                    // Issue #162: Hide icon if PhoneSetupOverlay is already visible
+                    if (!isSystemReady && !isPhoneSetupVisible) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }, modifier = Modifier.size(44.dp)) {
                         Box(contentAlignment = Alignment.Center) { 
                             Icon(imageVector = Icons.Default.ReportProblem, contentDescription = "System Issues", tint = Rose500.copy(alpha = alertAlpha), modifier = Modifier.size(26.dp))
                             Text(text = systemIssuesCount.toString(), color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) 
