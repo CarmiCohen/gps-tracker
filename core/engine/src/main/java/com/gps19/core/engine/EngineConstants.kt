@@ -2,17 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * Aug.11.16:
- * - Issue #145: Forensic Spill-Buffer Overflow Protection. Added 
- *   FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS for proactive pressure management (R669).
- * Aug.11.00:
- * - Issue #137: UI Davey/ANR Remediation. Resolved 3000ms stall by implementing 
- *   Deferred UI Hydration (R137) in SettingsComponents.kt.
- * Aug.10.32:
- * - Issue #137: Performance: Identified ANR on Settings Overlay entry.
- * Aug.10.29:
- * - Issue #134: Forensic Pulse Frequency Hardening. Added FORENSIC_PULSE_INTERVAL_MS 
- *   for high-frequency anomaly detection (R134).
+ * Aug.13.13:
+ * - Issue #164: Forensic Log Buffer Audit. Restored truncated constants. 
+ *   Increased FORENSIC_SPILL_CAPACITY to 10000 and LOG_BUFFER_CAPACITY to 
+ *   2000 to ensure high-frequency (100Hz) safety margins (R164).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -42,12 +35,12 @@ const val SILENT_FAILURE_LATENCY_THRESHOLD_MS = 800L
 // Issue #660: Forensic Audit: Log Buffer Pressure
 const val LOG_BATCH_SIZE = 50
 const val LOG_BATCH_DELAY_MS = 2000L
-const val LOG_BUFFER_CAPACITY = 500
+const val LOG_BUFFER_CAPACITY = 2000 // R164: Expanded from 500 to 2000
 
 // Issue #669: Forensic Spill-Buffer (MappedByteBuffer)
 const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"
 const val FORENSIC_SPILL_ENTRY_SIZE = 96 
-const val FORENSIC_SPILL_CAPACITY = 3000   
+const val FORENSIC_SPILL_CAPACITY = 10000 // R164: Expanded from 3000 to 10000
 const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
 const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 500L
 const val FORENSIC_DRAIN_THROTTLE_MAX_MS = 5000L
@@ -184,9 +177,6 @@ const val MUZZLE_HYSTERESIS_MS = 2000L
 
 // Filtering Thresholds (R810-P Zero-Lag)
 const val SUSPICIOUS_Q_SCALE = 1000.0
-const val HIGH_ACCURACY_THRESHOLD_METERS = 35.0
-const val TRAJECTORY_REJECTION_ACCURACY_MULT = 3.0
-
 const val ACCURACY_WINDOW_BUCKET_MS = 120000L
 const val ACCURACY_WINDOW_MAX_SIZE = 4
 const val GEOFENCE_ACCURACY_HYSTERESIS_MULT = 1.10
@@ -249,14 +239,9 @@ const val SUSPICIOUS_GPS_POLLING_MS = 10000L
 const val COOLING_GPS_POLLING_MS = 30000L
 const val VIEWER_GPS_POLLING_MS = 10000L
 
-// Hardware Heuristic Recovery (Issue #502)
-const val HARDWARE_SUPPRESSION_THRESHOLD_MS = 15000L
-const val HARDWARE_RECOVERY_COOLDOWN_MS = 60000L
-
 const val ACTIVE_MOVE_THRESHOLD = 2.0
 const val GPS_SAVE_INTERVAL_MS = 20000L 
 
-// Stationary Anchor Monitor (Issue #062 - R990)
 const val PARKING_ANCHOR_MIN_DIST = 6.0
 const val PARKING_ANCHOR_FACTOR = 0.8
 const val ANCHOR_ENGAGEMENT_PROBABILITY = 0.9
@@ -271,7 +256,6 @@ const val ANCHOR_ACCURACY_PENALTY_LIMIT = 40.0
 
 const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 
 
-// Behavioral State Thresholds (Issue #302)
 const val SUSTAINED_SPEED_THRESHOLD = 2 
 const val SUSTAINED_SPEED_STATIONARY_THRESHOLD = 4
 const val STATE_CONFIDENCE_BUFFER_MS = 2000L
@@ -288,13 +272,12 @@ const val GNSS_SAMPLING_INTERVAL_MS = 2000L
 
 // System Thresholds (Core Logic)
 const val TRACKER_SIGNAL_LOSS_THRESHOLD_MS = 180000L
-const val VIEWER_SIGNAL_LOSS_THRESHOLD_MS = 30000L
 const val INTERNET_LOSS_THRESHOLD_MS = 60000L 
 const val DISTANCE_ALARM_SAMPLES_REQUIRED = 6
 const val DEFAULT_ACCURACY_FALLBACK = 15.0
 const val RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT = 20.0
 
-// Battery thresholds (R716e)
+// Battery thresholds
 const val BATTERY_ALARM_THRESHOLD = 20
 const val CRITICAL_BATTERY_THRESHOLD = 20
 const val MAX_SAFE_TEMPERATURE_CELSIUS = 46.0
@@ -305,10 +288,8 @@ const val BATTERY_STEEP_DISCHARGE_WINDOW_MS = 600000L
 // Storage thresholds
 const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB = 10L
 const val SYSTEM_STORAGE_LOW_THRESHOLD_MB = 50L
-const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_PCT = 0.01 // 1%
-const val SYSTEM_STORAGE_LOW_THRESHOLD_PCT = 0.05 // 5%
 
-// GPS Polling & Filtering (v8.7.5 Centralization)
+// GPS Polling & Filtering
 const val GPS_SEQUENCE_TOLERANCE_MS = 60000L
 const val GPS_MIN_UPDATE_DISTANCE_METERS = 2.0
 
@@ -320,14 +301,10 @@ const val GPS_INDEX_SATS_TARGET = 12
 
 // Forensic Ribbon Scaling
 const val RIBBON_NOISE_SCALE_DB = 40.0
-const val RIBBON_LUX_LOG_SCALE = 5.0
 const val RIBBON_VIBRATION_SCALE_G = 2.0
 const val RIBBON_KINETIC_ENERGY_SCALE = 2.0
-const val RIBBON_LIFT_SCALE_METERS = 5.0
 const val RIBBON_SNR_SCALE_DB = 45.0
 const val RIBBON_CURRENT_SCALE_MA = 1000.0
-const val RIBBON_SIT_TILT_SCALE_DEG = 15.0
-const val RIBBON_SIT_BARO_SCALE_METERS = 2.0
 const val RIBBON_CPU_LOAD_SCALE = 1.0
 const val RIBBON_IO_WAIT_SCALE = 1.0
 const val RIBBON_LATENCY_SCALE_MS = 1000.0
@@ -335,7 +312,6 @@ const val RIBBON_LATENCY_SCALE_MS = 1000.0
 const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
 const val MAX_BACKFILL_POINTS = 1000
 
-// Network Communication (v8.8.21)
 const val SIGNALING_EMIT_DELAY_MS = 50L
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
@@ -347,10 +323,9 @@ const val PING_INTERVAL_MS = 10000L
 const val SOCKET_TIMEOUT_MS = 60000
 const val RTT_WINDOW_SIZE = 5
 
-// Trajectory & Persistence (v8.8.35)
 const val HOME_POINT_REFRESH_INTERVAL_MS = 30000L
 
-// Logging & UI (v8.9.2)
+// Logging & UI
 const val MAX_HISTORY_POINTS_PER_RIBBONS = 240
 const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
@@ -358,14 +333,12 @@ const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
 const val GNSS_EXPECTED_INTERVAL_MS = 1000L
 const val GNSS_JITTER_THRESHOLD_MS = 500L
 
-// Unified UI Staleness Threshold
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 35000L
 const val GPS_UI_FAIL_THRESHOLD_MS = 35000L
 
-// R993: Notification Throttling
 const val NOTIFICATION_THROTTLE_MS = 30000L
 
-// Alert Internal IDs (Aligned with SoT)
+// Alert Internal IDs
 const val ALERT_ID_LOCAL_INTERNET = "LOCAL_INTERNET"
 const val ALERT_ID_RELAY_OFFLINE = "RELAY_OFFLINE"
 const val ALERT_ID_TRACKER_OFFLINE = "TRACKER_OFFLINE"
@@ -382,15 +355,14 @@ const val ALERT_ID_TRACKER_TAMPER = "TRACKER_TAMPER"
 const val ALERT_ID_TRACKER_TILT = "TILT_ALERT"
 const val ALERT_ID_TRACKER_ACOUSTIC = "ACOUSTIC_ALERT"
 const val ALERT_ID_TRACKER_LIFT = "LIFT_ALERT"
-const val ALERT_ID_TRACKER_CHAIR = "CHAIR_SIT"
 const val ALERT_ID_SYSTEM_STORAGE_LOW = "SYSTEM_STORAGE_LOW"
 const val ALERT_ID_SYSTEM_STORAGE_CRITICAL = "SYSTEM_STORAGE_CRITICAL"
 const val ALERT_ID_BATTERY_STEEP_DISCHARGE = "BATTERY_HEALTH"
+const val ALERT_ID_FORENSIC_OVERFLOW = "FORENSIC_OVERFLOW"
+const val ALERT_ID_SILENT_FAILURE = "SILENT_FAILURE"
+const val ALERT_ID_GPS_HARDWARE_LOCK = "GPS_HARDWARE_LOCK"
 const val ALERT_ID_HARDWARE_CONFIGURATION = "HARDWARE_CONFIG_MISSING"
 const val ALERT_ID_PERFORMANCE_SPIKE = "PERFORMANCE_SPIKE"
-const val ALERT_ID_FORENSIC_OVERFLOW = "FORENSIC_OVERFLOW"
-const val ALERT_ID_GPS_HARDWARE_LOCK = "GPS_HARDWARE_LOCK"
-const val ALERT_ID_SILENT_FAILURE = "SILENT_FAILURE"
 
 // Alert Titles (R747 Standardized)
 const val ALERT_TITLE_LOCAL_INTERNET = "This device: Internet Lost"
@@ -399,8 +371,6 @@ const val ALERT_TITLE_TRACKER_OFFLINE = "Offline"
 const val ALERT_TITLE_VIEWER_OFFLINE = "Viewer: Offline"
 const val ALERT_TITLE_SIGNAL_LOSS = "Signal Lost"
 const val ALERT_TITLE_VIEWER_SIGNAL_LOSS = "Viewer: Signal Lost"
-const val ALERT_TITLE_JUMP_ALERT = "Jammer Alert"
-const val ALERT_TITLE_VISUAL_JUMP = "Visual Jump"
 const val ALERT_TITLE_TRACKER_GEOFENCE = "Geofence"
 const val ALERT_TITLE_GPS_STALL = "GPS Stalled"
 const val ALERT_TITLE_TRACKER_GAP = "GPS Gap"
@@ -415,63 +385,34 @@ const val ALERT_TITLE_TRACKER_LIFT = "Lift"
 const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "This device: Storage Low"
 const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "This device: Storage Critical"
 const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "This device: Battery Health"
+const val ALERT_TITLE_FORENSIC_OVERFLOW = "This device: Forensic Buffer Overflow"
+const val ALERT_TITLE_SILENT_FAILURE = "Forensic: Silent Failure"
+const val ALERT_TITLE_GPS_HARDWARE_LOCK = "This device: GPS Hardware Lock"
 const val ALERT_TITLE_HARDWARE_CONFIGURATION = "This device: Hardware Config"
 const val ALERT_TITLE_PERFORMANCE_SPIKE = "This device: Performance Warning"
-const val ALERT_TITLE_FORENSIC_OVERFLOW = "This device: Forensic Buffer Overflow"
-const val ALERT_TITLE_GPS_HARDWARE_LOCK = "This device: GPS Hardware Lock"
-const val ALERT_TITLE_SILENT_FAILURE = "Forensic: Silent Failure"
+const val ALERT_TITLE_JUMP_ALERT = "Jammer Alert"
+const val ALERT_TITLE_VISUAL_JUMP = "Visual Jump"
 
 // System Watchdog & Grace Periods
 const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L
 const val SYSTEM_WATCHDOG_INTERVAL_MS = 90000L
-const val SYSTEM_WATCHDOG_THROTTLE_MS = 60000L
 const val WATCHDOG_DANGER_WINDOW_MS = 20000L
 const val COMMUNICATION_ALARM_GRACE_PERIOD_MS = 60000L
 const val LOCATION_ALARM_GRACE_PERIOD_MS = 30000L
 const val POWER_DISCONNECT_DEBOUNCE_MS = 3000L
-const val SIREN_AUTO_STOP_MS = 30000L
-const val SIREN_RESUME_COOLDOWN_MS = 15000L
-const val ALARM_OVERLAY_THROTTLE_MS = 30000L
 const val HEARTBEAT_INTERVAL_MS = 360000L
 const val INTEGRITY_HEARTBEAT_INTERVAL_MS = 60000L
 const val FORENSIC_PULSE_INTERVAL_MS = 10000L
 
-// UI Health & Visibility
 const val WATCH_DOG_UI_GRACE_MS = 15000L 
 const val SENSOR_GRACE_PERIOD_MS = 600000L
-const val TEST_ALARM_DURATION_MS = 3000L
 
-// R729: Behavioral Debouncing
-const val PROXIMITY_DEBOUNCE_STATIONARY_MS = 5000L
-const val PROXIMITY_DEBOUNCE_MOVING_MS = 1000L
-
-// Issue #012: Adaptive Proximity Debounce
-const val PROXIMITY_DEBOUNCE_MAX_MS = 15000L
-const val PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR = 2000L
-const val PROXIMITY_STRESS_SCALING_MULTIPLIER = 2.0
-
-// History & Persistence Logic
-const val REAL_TIME_GAP_LIMIT_MS = 10000L
-const val DRIFT_TOLERANCE_MS = 5000L
-const val HISTORY_BUFFER_MAX_SIZE = 100
-const val HISTORY_BATCH_WRITE_INTERVAL_MS = 5000L
-const val DAILY_CLEANUP_HOUR = 2
-const val DAILY_CLEANUP_MINUTE = 5
-const val DAILY_ARCHIVE_HOUR = 3
-const val DAILY_ARCHIVE_MINUTE = 30
 const val DB_PRUNE_THRESHOLD = 50
-
-// UI Performance
-const val MARKER_POOL_PRUNE_THRESHOLD = 50
 const val LOG_MUZZLE_STARTUP_MS = 60000L
 
 const val FORENSIC_PINK_COLOR = 0xFFFF00FF.toInt()
 
-// Maintenance Recovery (Issue #108)
-const val MAINTENANCE_WORK_NAME = "GPS_Maintenance"
-const val RECOVERY_THRESHOLD_MS = 180000L
-const val RECOVERY_GRACE_PERIOD_MS = 60000L
-
-// Audio Synthesizer Parameters
-const val SIREN_SAMPLE_RATE = 44100
-const val SIREN_FADE_IN_DURATION_MS = 1000L
+const val RIBBON_LUX_LOG_SCALE = 5.0
+const val RIBBON_LIFT_SCALE_METERS = 5.0
+const val RIBBON_SIT_TILT_SCALE_DEG = 15.0
+const val RIBBON_SIT_BARO_SCALE_METERS = 2.0

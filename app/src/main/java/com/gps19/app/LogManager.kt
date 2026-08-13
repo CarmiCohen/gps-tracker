@@ -2,7 +2,6 @@ package com.gps19.app
 
 import com.gps19.core.engine.*
 import timber.log.Timber
-import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Provider
@@ -10,16 +9,10 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
- * Aug.13.00:
- * - Issue #146: Forensic Drainer Optimization. Updated logForensicTraceOptimized 
- *   to match the refactored spill-buffer signature (R146).
- * Aug.11.16:
- * - Issue #145: Forensic Spill-Buffer Overflow Protection. Added 
- *   isForensicBufferUnderPressure() to enable proactive throttling (R669).
- * Aug.05.121:
- * - Issue #735: Startup Davey Stall Remediation. Refactored to use 
- *   Provider<ForensicSpillBuffer> to defer MappedByteBuffer I/O until first 
- *   background access (R735).
+ * Aug.13.12:
+ * - Issue #164: Forensic Log Buffer Audit. Removed the AtomicBoolean guard in 
+ *   submitToLogSink to prevent non-deterministic log drops under high-frequency 
+ *   load. Relying on LogRepository's Channel for thread-safe backpressure (R164).
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -31,7 +24,6 @@ class LogManager @Inject constructor(
     private val timeProvider: TimeProvider
 ) {
     private var sessionStartTs = 0L
-    private val isLoggingInProgress = AtomicBoolean(false)
     private val isOverflowLogged = AtomicBoolean(false)
 
     private val connectivitySuite: ConnectivitySuite by lazy(LazyThreadSafetyMode.PUBLICATION) {
@@ -45,12 +37,11 @@ class LogManager @Inject constructor(
 
     /**
      * logForensicTrace: Routes high-frequency traces to the off-heap spill-buffer.
-     * Bypasses standard log batching and SQLite hot-path to prevent Davey stalls.
      */
     fun logForensicTrace(message: String, lat: Double = 0.0, lng: Double = 0.0, accuracy: Double = 0.0) {
         val now = timeProvider.currentTimeMillis()
         val log = LogEntry(
-            localId = UUID.randomUUID().toString(),
+            localId = "", 
             timestamp = now,
             message = message,
             type = "FORENSIC_TRACE",
@@ -72,13 +63,11 @@ class LogManager @Inject constructor(
 
     /**
      * logForensicTraceOptimized: Zero-allocation path for 100Hz sampling.
-     * Directly serializes raw primitives to the spill-buffer (R668/R702).
      */
     fun logForensicTraceOptimized(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
         vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double
     ) {
-        // R146: Corrected argument order to match optimized ForensicSpillBuffer signature.
         if (!forensicSpillBufferProvider.get().writeTraceOptimized(
             timestamp, lat, lng, accuracy, maxAccuracy, vibe, snr, 
             batteryTemp, batteryLevel, isCharging
@@ -104,6 +93,11 @@ class LogManager @Inject constructor(
         }
     }
 
+    /**
+     * submitToLogSink: Unified entry for all standard system logs.
+     * R164: Removed AtomicBoolean lock. All logs are now passed to LogRepository 
+     * which handles buffering and persistence in a thread-safe manner.
+     */
     fun submitToLogSink(
         message: String, 
         type: String, 
@@ -120,91 +114,89 @@ class LogManager @Inject constructor(
         snr: Double? = null,
         vibe: Double? = null
     ) {
-        if (!isLoggingInProgress.compareAndSet(false, true)) return
+        val now = timeProvider.currentTimeMillis()
+        val health = telemetry.systemHealth.value
         
-        try {
-            val now = timeProvider.currentTimeMillis()
-            val health = telemetry.systemHealth.value
-            
-            if (health.isStorageCritical && !isSpecial) return
-            if (health.isStorageLow && !isImportant && !isSpecial) return
-            if (type == "system" && !isImportant && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
-                return
-            }
-
-            var finalLat = lat
-            var finalLng = lng
-            var finalAccuracy = accuracy
-            var finalMaxAccuracy = maxAccuracy
-            var finalSnr = snr
-            var finalVibe = vibe
-            
-            val local = telemetry.localLocation.value
-            val tracker = telemetry.trackerLocation.value
-            
-            val fallbackTelem = if (configManager.isTrackerMode) {
-                if (local.lat != 0.0) local else tracker
-            } else {
-                if (tracker.lat != 0.0) tracker else local
-            }
-
-            if (finalLat == 0.0 && finalLng == 0.0) {
-                if (fallbackTelem.lat != 0.0 && fallbackTelem.lng != 0.0) {
-                    finalLat = fallbackTelem.lat
-                    finalLng = fallbackTelem.lng
-                    finalAccuracy = fallbackTelem.accuracy
-                    finalMaxAccuracy = fallbackTelem.maxAccuracy
-                }
-            } else {
-                if (finalAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
-                    finalAccuracy = fallbackTelem.accuracy
-                }
-                if (finalMaxAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
-                    finalMaxAccuracy = fallbackTelem.maxAccuracy
-                }
-            }
-
-            if (finalVibe == null && (fallbackTelem.vibration ?: 0.0) > 0.0) {
-                finalVibe = fallbackTelem.vibration
-            }
-
-            val log = LogEntry(
-                localId = localId ?: UUID.randomUUID().toString(),
-                timestamp = now,
-                message = message,
-                type = type,
-                isImportant = isImportant,
-                id = configManager.deviceId,
-                viewerId = configManager.viewerId,
-                extremeValue = extremeValue,
-                durationMs = durationMs,
-                isSpecial = isSpecial,
-                specialColor = specialColor,
-                role = if (configManager.isTrackerMode) "tracker" else "viewer",
-                lat = finalLat,
-                lng = finalLng,
-                accuracy = finalAccuracy,
-                maxAccuracy = finalMaxAccuracy,
-                snrSnapshot = finalSnr,
-                vibeSnapshot = finalVibe
-            )
-            
-            val suite = connectivitySuite
-            val isConnected = suite.isConnected()
-            
-            val data = log.toJSONObject().apply {
-                put("ver", BuildConfig.VERSION_NAME)
-            }
-            
-            if (isConnected) {
-                val priority = if (isImportant || isSpecial) SignalingPriority.HIGH else SignalingPriority.NORMAL
-                suite.emit("log_update", data, priority)
-            }
-            
-            logRepository.addLog(log, initiallySynced = isConnected)
-        } finally {
-            isLoggingInProgress.set(false)
+        // Critical safety checks (storage/startup)
+        if (health.isStorageCritical && !isSpecial) return
+        if (health.isStorageLow && !isImportant && !isSpecial) return
+        if (type == "system" && !isImportant && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
+            return
         }
+
+        var finalLat = lat
+        var finalLng = lng
+        var finalAccuracy = accuracy
+        var finalMaxAccuracy = maxAccuracy
+        var finalSnr = snr
+        var finalVibe = vibe
+        
+        val local = telemetry.localLocation.value
+        val tracker = telemetry.trackerLocation.value
+        
+        val fallbackTelem = if (configManager.isTrackerMode) {
+            if (local.lat != 0.0) local else tracker
+        } else {
+            if (tracker.lat != 0.0) tracker else local
+        }
+
+        if (finalLat == 0.0 && finalLng == 0.0) {
+            if (fallbackTelem.lat != 0.0 && fallbackTelem.lng != 0.0) {
+                finalLat = fallbackTelem.lat
+                finalLng = fallbackTelem.lng
+                finalAccuracy = fallbackTelem.accuracy
+                finalMaxAccuracy = fallbackTelem.maxAccuracy
+            }
+        } else {
+            if (finalAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
+                finalAccuracy = fallbackTelem.accuracy
+            }
+            if (finalMaxAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
+                finalMaxAccuracy = fallbackTelem.maxAccuracy
+            }
+        }
+
+        if (finalVibe == null && (fallbackTelem.vibration ?: 0.0) > 0.0) {
+            finalVibe = fallbackTelem.vibration
+        }
+
+        val log = LogEntry(
+            localId = localId ?: "", 
+            timestamp = now,
+            message = message,
+            type = type,
+            isImportant = isImportant,
+            id = configManager.deviceId,
+            viewerId = configManager.viewerId,
+            extremeValue = extremeValue,
+            durationMs = durationMs,
+            isSpecial = isSpecial,
+            specialColor = specialColor,
+            role = if (configManager.isTrackerMode) "tracker" else "viewer",
+            lat = finalLat,
+            lng = finalLng,
+            accuracy = finalAccuracy,
+            maxAccuracy = finalMaxAccuracy,
+            snrSnapshot = finalSnr,
+            vibeSnapshot = finalVibe,
+            tempSnapshot = health.batteryTemp,
+            battSnapshot = health.batteryLevel,
+            chargingSnapshot = health.isCharging
+        )
+        
+        val suite = connectivitySuite
+        val isConnected = suite.isConnected()
+        
+        val data = log.toJSONObject().apply {
+            put("ver", BuildConfig.VERSION_NAME)
+        }
+        
+        if (isConnected) {
+            val priority = if (isImportant || isSpecial) SignalingPriority.HIGH else SignalingPriority.NORMAL
+            suite.emit("log_update", data, priority)
+        }
+        
+        logRepository.addLog(log, initiallySynced = isConnected)
     }
 
     fun logServiceEvent(

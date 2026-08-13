@@ -20,16 +20,13 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
- * Aug.13.02:
- * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
- *   type inference failures (R146/R151).
+ * Aug.13.12:
+ * - Issue #164: Forensic Log Buffer Audit. Updated peek() to populate 
+ *   raw forensic snapshots, eliminating string-concatenation churn during 
+ *   drainage (R164).
  * Aug.13.00:
  * - Issue #146: Optimized Forensic Drainer. Refactored peek() and writeTrace() 
  *   to eliminate per-entry allocations and redundant I/O passes (R146). 
- *   Added buffer zeroing to ensure CRC stability.
- * Aug.11.21:
- * - Issue #151: Phone Setup ANR Remediation. Refactored to use granular locking 
- *   and buffer duplication (R151).
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -48,7 +45,6 @@ class ForensicSpillBuffer @Inject constructor(
     @Volatile private var baseLat: Double = 0.0
     @Volatile private var baseLng: Double = 0.0
 
-    // R146: Pre-allocated buffers for writes and CRC to avoid per-write allocation.
     private val entryWriteBuffer = ByteBuffer.allocate(FORENSIC_SPILL_ENTRY_SIZE).order(ByteOrder.nativeOrder())
     private val writeCrc = CRC32()
 
@@ -176,7 +172,6 @@ class ForensicSpillBuffer @Inject constructor(
                 }
 
                 entryWriteBuffer.clear()
-                // R146: Zero-out message area to ensure CRC stability.
                 Arrays.fill(entryWriteBuffer.array(), 36, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
 
                 entryWriteBuffer.putInt((entry.timestamp - baseTs.get()).toInt())
@@ -187,14 +182,16 @@ class ForensicSpillBuffer @Inject constructor(
                 entryWriteBuffer.putFloat(entry.maxAccuracy.toFloat())
                 entryWriteBuffer.putFloat(entry.vibeSnapshot?.toFloat() ?: -1.0f)
                 entryWriteBuffer.putFloat(entry.snrSnapshot?.toFloat() ?: -1.0f)
-                entryWriteBuffer.putFloat(0.0f)
+                entryWriteBuffer.putFloat(entry.tempSnapshot?.toFloat() ?: 0.0f)
 
                 var flags = 0
                 if (entry.isImportant) flags = flags or 0x01
                 if (entry.isSpecial) flags = flags or 0x02
+                if (entry.chargingSnapshot == true) flags = flags or 0x04
                 if (entry.gpsHardwareLock) flags = flags or 0x08
+                
                 entryWriteBuffer.put(flags.toByte())
-                entryWriteBuffer.put(0.toByte())
+                entryWriteBuffer.put(entry.battSnapshot?.toByte() ?: 0.toByte())
                 entryWriteBuffer.put(msgLen.toByte())
                 entryWriteBuffer.put(0.toByte())
                 entryWriteBuffer.put(rawBytes, 0, msgLen)
@@ -244,7 +241,6 @@ class ForensicSpillBuffer @Inject constructor(
                 }
                 
                 entryWriteBuffer.clear()
-                // R146: Zero-out message area to ensure CRC stability.
                 Arrays.fill(entryWriteBuffer.array(), 36, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
 
                 entryWriteBuffer.putInt((timestamp - baseTs.get()).toInt())
@@ -293,9 +289,8 @@ class ForensicSpillBuffer @Inject constructor(
 
     /**
      * peek: Optimized telemetry retrieval.
-     * R146: Eliminated per-entry ByteArray and ByteBuffer allocations by using 
-     * a single reusable processing buffer. Directly maps result list to avoid 
-     * intermediate collections.
+     * R164: Now populates raw forensic snapshot fields to avoid per-entry 
+     * string concatenation during drainage.
      */
     fun peek(limit: Int): List<LogEntry> {
         return LatencyMonitor.measureAndAudit<List<LogEntry>>(
@@ -360,13 +355,16 @@ class ForensicSpillBuffer @Inject constructor(
                     val msg = if (msgLen > 0) {
                         String(entryBytes, bb.position(), msgLen, Charsets.UTF_8)
                     } else {
-                        "F_TRACE: P=$batLevel% C=${(flags and 0x04) != 0} L=${(flags and 0x08) != 0} T=${(round(batTemp * 10) / 10)}°C"
+                        "FORENSIC_TRACE" // R164: Defer formatting to persistence.
                     }
 
                     results.add(LogEntry(
                         timestamp = ts, lat = lat, lng = lng, accuracy = acc, maxAccuracy = maxAcc,
                         vibeSnapshot = if (vibe == -1.0) null else vibe,
                         snrSnapshot = if (snr == -1.0) null else snr,
+                        tempSnapshot = batTemp,
+                        battSnapshot = batLevel,
+                        chargingSnapshot = (flags and 0x04) != 0,
                         isImportant = (flags and 0x01) != 0, isSpecial = (flags and 0x02) != 0,
                         message = msg, type = "FORENSIC_TRACE", id = "SYSTEM", role = "tracker",
                         spillIdx = tempReadIdx, gpsHardwareLock = (flags and 0x08) != 0

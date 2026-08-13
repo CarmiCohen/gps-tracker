@@ -8,16 +8,14 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.13.12:
+ * - Issue #164: Forensic Log Buffer Audit. Added forensic snapshot columns 
+ *   (temp, battery, charging) to LogEntity to eliminate string churn in the 
+ *   high-frequency drainage path (R164).
  * Aug.13.00:
  * - Issue #146: Forensic Drainer Optimization. Refactored LogDao to support 
  *   primitive-based signature retrieval, eliminating string-concatenation overhead 
  *   in the deduplication hot-path (R146).
- * Aug.10.24:
- * - Issue #130: Proto Health Parity. Added isBatteryLow and isBatteryCritical 
- *   to HistoryEntity and PendingStatusEntity (R130).
- * Aug.08.21:
- * - Issue #125: Forensic Audit: Compression Parity Audit. Added gpsHardwareLock 
- *   to LogEntity to maintain forensic parity with the GPS hardware state (R125).
  */
 @Entity(
     tableName = "logs", 
@@ -54,13 +52,16 @@ data class LogEntity(
     @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0,
     val snrSnapshot: Double? = null,
     val vibeSnapshot: Double? = null,
-    @ColumnInfo(defaultValue = "-1") val spillIdx: Int = -1, // Issue #705
-    @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false // Issue #125
+    @ColumnInfo(defaultValue = "-1") val spillIdx: Int = -1,
+    @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false,
+    // R164: Forensic snapshots to eliminate string churn.
+    val tempSnapshot: Double? = null,
+    val battSnapshot: Int? = null,
+    val chargingSnapshot: Boolean? = null
 )
 
 /**
  * ForensicSignature: Optimized POJO for deduplication check.
- * R146: Used to retrieve raw fields from SQLite without expensive string concatenation.
  */
 data class ForensicSignature(
     val timestamp: Long,
@@ -189,8 +190,6 @@ abstract class LogDao {
     @Query("DELETE FROM logs") abstract suspend fun clearAll()
     @Query("SELECT COUNT(*) FROM logs") abstract suspend fun getCount(): Int
     
-    // Issue #705: Bulk check for existing forensic traces to prevent duplicates after crash
-    // R146: Refactored to return raw fields instead of concatenated strings.
     @Query("SELECT timestamp, spillIdx FROM logs WHERE type = 'FORENSIC_TRACE' AND timestamp >= :minTimestamp") 
     abstract suspend fun getExistingForensicSignatures(minTimestamp: Long): List<ForensicSignature>
 
@@ -206,14 +205,12 @@ abstract class LogDao {
     @Query("DELETE FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND id NOT IN (SELECT id FROM logs ORDER BY timestamp DESC LIMIT :limit)")
     abstract suspend fun pruneNonForensicLogs(limit: Int)
 
-    // Issue #728: Chunked Pruning to minimize fragmentation and I/O stalls
     @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') AND id NOT IN (SELECT id FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT :limit) LIMIT :chunkSize)")
     abstract suspend fun pruneRoutineHeartbeatsChunk(limit: Int, chunkSize: Int): Int
 
     @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND id NOT IN (SELECT id FROM logs ORDER BY timestamp DESC LIMIT :limit) LIMIT :chunkSize)")
     abstract suspend fun pruneNonForensicLogsChunk(limit: Int, chunkSize: Int): Int
 
-    // Issue #731: Forensic Bloat: Safety tier for Special/Forensic logs
     @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isSpecial = 1 AND id NOT IN (SELECT id FROM logs WHERE isSpecial = 1 ORDER BY timestamp DESC LIMIT :limit) LIMIT :chunkSize)")
     abstract suspend fun pruneSpecialLogsChunk(limit: Int, chunkSize: Int): Int
 }
@@ -257,7 +254,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 66, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 67, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -265,9 +262,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun violationDao(): ViolationDao
     abstract fun pendingStatusDao(): PendingStatusDao
 
-    /**
-     * Issue #729: Runs PRAGMA integrity_check to detect corruption.
-     */
     fun checkIntegrity(): String {
         val cursor = query("PRAGMA integrity_check", null)
         return try {
@@ -284,9 +278,17 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_66_67 = object : Migration(66, 67) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #164: Add forensic snapshot columns to logs.
+                db.execSQL("ALTER TABLE logs ADD COLUMN tempSnapshot REAL")
+                db.execSQL("ALTER TABLE logs ADD COLUMN battSnapshot INTEGER")
+                db.execSQL("ALTER TABLE logs ADD COLUMN chargingSnapshot INTEGER")
+            }
+        }
+
         val MIGRATION_65_66 = object : Migration(65, 66) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #130: Proto Health Parity
                 db.execSQL("ALTER TABLE connection_history ADD COLUMN isBatteryLow INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE connection_history ADD COLUMN isBatteryCritical INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isBatteryLow INTEGER NOT NULL DEFAULT 0")
@@ -296,14 +298,12 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_64_65 = object : Migration(64, 65) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #125: Add gpsHardwareLock to logs.
                 db.execSQL("ALTER TABLE logs ADD COLUMN gpsHardwareLock INTEGER NOT NULL DEFAULT 0")
             }
         }
 
         val MIGRATION_63_64 = object : Migration(63, 64) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #705: Add spillIdx to logs and specialized index for deduplication.
                 db.execSQL("ALTER TABLE logs ADD COLUMN spillIdx INTEGER NOT NULL DEFAULT -1")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_spillIdx_timestamp ON logs (type, spillIdx, timestamp)")
             }
@@ -311,14 +311,12 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_62_63 = object : Migration(62, 63) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #632: Add isRecoveryEvent to connection_history.
                 db.execSQL("ALTER TABLE connection_history ADD COLUMN isRecoveryEvent INTEGER NOT NULL DEFAULT 0")
             }
         }
 
         val MIGRATION_61_62 = object : Migration(61, 62) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #605: Optimize log maintenance and sync queries.
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_isImportant ON logs (isImportant)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_isSpecial ON logs (isSpecial)")
                 db.execSQL("DROP INDEX IF EXISTS index_logs_synced")
@@ -328,7 +326,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_60_61 = object : Migration(60, 61) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #605: Add initial indices for log deduplication and sync performance.
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_synced ON logs (synced)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_role_deviceId_timestamp ON logs (type, role, deviceId, timestamp)")
             }
@@ -336,40 +333,33 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_59_60 = object : Migration(59, 60) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #595: Add 'rt' column to connection_history.
                 db.execSQL("ALTER TABLE connection_history ADD COLUMN rt INTEGER NOT NULL DEFAULT 0")
             }
         }
 
         val MIGRATION_56_57 = object : Migration(56, 57) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #097: Re-harmonize all tables to resolve Identity Hash mismatch.
-                // logs
                 db.execSQL("CREATE TABLE logs_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, localId TEXT NOT NULL, timestamp INTEGER NOT NULL, message TEXT NOT NULL, type TEXT NOT NULL, isImportant INTEGER NOT NULL, deviceId TEXT NOT NULL, viewerId TEXT NOT NULL, count INTEGER NOT NULL, extremeValue REAL, durationMs INTEGER NOT NULL, isSpecial INTEGER NOT NULL, specialColor INTEGER, firstSeenTs INTEGER NOT NULL DEFAULT 0, role TEXT NOT NULL DEFAULT 'tracker', synced INTEGER NOT NULL DEFAULT 0, lat REAL NOT NULL DEFAULT 0, lng REAL NOT NULL DEFAULT 0, accuracy REAL NOT NULL DEFAULT 0, maxAccuracy REAL NOT NULL DEFAULT 0, snrSnapshot REAL, vibeSnapshot REAL)")
                 db.execSQL("INSERT INTO logs_new SELECT id, localId, timestamp, message, type, isImportant, deviceId, viewerId, count, extremeValue, durationMs, isSpecial, specialColor, firstSeenTs, role, synced, lat, lng, accuracy, maxAccuracy, snrSnapshot, vibeSnapshot FROM logs")
                 db.execSQL("DROP TABLE logs"); db.execSQL("ALTER TABLE logs_new RENAME TO logs")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_timestamp ON logs (timestamp)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_localId ON logs (localId)")
 
-                // trail_points
                 db.execSQL("CREATE TABLE trail_points_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, timestamp INTEGER NOT NULL, isViewerTrail INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'VALID', accuracy REAL NOT NULL DEFAULT 0, maxAccuracy REAL NOT NULL DEFAULT 0)")
                 db.execSQL("INSERT INTO trail_points_new (id, lat, lng, timestamp, isViewerTrail, status, accuracy, maxAccuracy) SELECT id, lat, lng, timestamp, isViewerTrail, (CASE WHEN isJump = 1 THEN 'JUMP' ELSE 'VALID' END), accuracy, maxAccuracy FROM trail_points")
                 db.execSQL("DROP TABLE trail_points"); db.execSQL("ALTER TABLE trail_points_new RENAME TO trail_points")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_trail_points_timestamp ON trail_points (timestamp)")
 
-                // violations
                 db.execSQL("CREATE TABLE violations_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, type TEXT NOT NULL, ts INTEGER NOT NULL, accuracy REAL NOT NULL DEFAULT 0, maxAccuracy REAL NOT NULL DEFAULT 0)")
                 db.execSQL("INSERT INTO violations_new SELECT id, lat, lng, type, ts, accuracy, maxAccuracy FROM violations")
                 db.execSQL("DROP TABLE violations"); db.execSQL("ALTER TABLE violations_new RENAME TO violations")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_violations_ts ON violations (ts)")
 
-                // connection_history
                 db.execSQL("CREATE TABLE connection_history_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, ts INTEGER NOT NULL, rtt INTEGER NOT NULL, isConnected INTEGER NOT NULL, isGap INTEGER NOT NULL, hasGps INTEGER NOT NULL, isTick INTEGER NOT NULL, ribbonKey TEXT NOT NULL, gpsIndex REAL NOT NULL DEFAULT 0, noiseIdx REAL NOT NULL DEFAULT 0, luxIdx REAL NOT NULL DEFAULT 0, vibeIdx REAL NOT NULL DEFAULT 0, proxIdx REAL NOT NULL DEFAULT 1, liftIdx REAL NOT NULL DEFAULT 0, snrIdx REAL NOT NULL DEFAULT 0, tiltIdx REAL NOT NULL DEFAULT 0, baroIdx REAL NOT NULL DEFAULT 0, verticalVelocity REAL NOT NULL DEFAULT 0, sitVz REAL NOT NULL DEFAULT 0, sitVzTs INTEGER NOT NULL DEFAULT 0, sitDz REAL NOT NULL DEFAULT 0, isBatterySteepDischarge INTEGER NOT NULL DEFAULT 0, remoteSig INTEGER NOT NULL DEFAULT 10, isCoolingModeActive INTEGER NOT NULL DEFAULT 0, speed REAL NOT NULL DEFAULT 0, bearing REAL NOT NULL DEFAULT 0, isSitDetected INTEGER NOT NULL DEFAULT 0, isSitActive INTEGER NOT NULL DEFAULT 0, sitBaro REAL NOT NULL DEFAULT 0, sitTilt REAL NOT NULL DEFAULT 0, sitShock REAL NOT NULL DEFAULT 0, currentMa INTEGER NOT NULL DEFAULT 0, locationPendingReason TEXT NOT NULL DEFAULT 'NONE', accuracy REAL NOT NULL DEFAULT 0, maxAccuracy REAL NOT NULL DEFAULT 0, isAnchorLocked INTEGER NOT NULL DEFAULT 0)")
                 db.execSQL("INSERT INTO connection_history_new SELECT id, ts, rtt, isConnected, isGap, hasGps, isTick, ribbonKey, gpsIndex, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, tiltIdx, baroIdx, verticalVelocity, sitVz, sitVzTs, sitDz, isBatterySteepDischarge, remoteSig, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive, sitBaro, sitTilt, sitShock, currentMa, locationPendingReason, accuracy, maxAccuracy, isAnchorLocked FROM connection_history")
                 db.execSQL("DROP TABLE connection_history"); db.execSQL("ALTER TABLE connection_history_new RENAME TO connection_history")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_connection_history_ts ON connection_history (ts)")
 
-                // pending_status_updates (Renamed lastValidFixRealtime -> lastValidFixRt)
                 db.execSQL("CREATE TABLE pending_status_updates_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, speed REAL NOT NULL, accuracy REAL NOT NULL, bearing REAL NOT NULL, battery INTEGER NOT NULL, temp REAL NOT NULL, isCharging INTEGER NOT NULL, currentMa INTEGER NOT NULL DEFAULT 0, timestamp INTEGER NOT NULL, gpsTs INTEGER NOT NULL DEFAULT 0, satsView INTEGER NOT NULL, satsUsed INTEGER NOT NULL, name TEXT, maxAccuracy REAL NOT NULL, distToTracker REAL, distToHome REAL, snrIdx REAL NOT NULL DEFAULT 0, tiltIdx REAL NOT NULL DEFAULT 0, baroIdx REAL NOT NULL DEFAULT 0, isBatterySteepDischarge INTEGER NOT NULL DEFAULT 0, isCoolingModeActive INTEGER NOT NULL DEFAULT 0, isXiaomiAutostartGranted INTEGER NOT NULL DEFAULT 0, isSitDetected INTEGER NOT NULL DEFAULT 0, isSitActive INTEGER NOT NULL DEFAULT 0, sitVz REAL NOT NULL DEFAULT 0, sitVzTs INTEGER NOT NULL DEFAULT 0, sitDz REAL NOT NULL DEFAULT 0, verticalVelocity REAL NOT NULL DEFAULT 0, sitBaro REAL NOT NULL DEFAULT 0, sitTilt REAL NOT NULL DEFAULT 0, sitShock REAL NOT NULL DEFAULT 0, isStorageLow INTEGER NOT NULL DEFAULT 0, isStorageCritical INTEGER NOT NULL DEFAULT 0, isPowerSaveMode INTEGER NOT NULL DEFAULT 0, standbyBucket INTEGER NOT NULL DEFAULT -1, netInterface TEXT NOT NULL DEFAULT 'UNKNOWN', lastValidFixRt INTEGER NOT NULL DEFAULT 0, locationPendingReason TEXT NOT NULL DEFAULT 'NONE', isAnchorLocked INTEGER NOT NULL DEFAULT 0, trackerState TEXT NOT NULL DEFAULT 'UNKNOWN')")
                 db.execSQL("INSERT INTO pending_status_updates_new SELECT id, lat, lng, speed, accuracy, bearing, battery, temp, isCharging, currentMa, timestamp, gpsTs, satsView, satsUsed, name, maxAccuracy, distToTracker, distToHome, snrIdx, tiltIdx, baroIdx, isBatterySteepDischarge, isCoolingModeActive, isXiaomiAutostartGranted, isSitDetected, isSitActive, sitVz, sitVzTs, sitDz, verticalVelocity, sitBaro, sitTilt, sitShock, isStorageLow, isStorageCritical, isPowerSaveMode, standbyBucket, netInterface, lastValidFixRealtime, locationPendingReason, isAnchorLocked, trackerState FROM pending_status_updates")
                 db.execSQL("DROP TABLE pending_status_updates"); db.execSQL("ALTER TABLE pending_status_updates_new RENAME TO pending_status_updates")
@@ -377,13 +367,10 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
         val MIGRATION_57_58 = object : Migration(57, 58) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #105: Room identity hash mismatch resolution. 
-            }
+            override fun migrate(db: SupportSQLiteDatabase) { }
         }
         val MIGRATION_58_59 = object : Migration(58, 59) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #118: Forensic Parity for pending_status_updates.
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN noiseIdx REAL NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN luxIdx REAL NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN vibeIdx REAL NOT NULL DEFAULT 0")

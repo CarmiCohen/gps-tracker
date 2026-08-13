@@ -10,14 +10,14 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.13.12:
+ * - Issue #164: Forensic Log Buffer Audit. Optimized LogEntry and LogEntity 
+ *   to support deferred/reusable ID generation and added forensic snapshots 
+ *   to eliminate string churn in high-frequency paths (R164).
  * Aug.13.11:
  * - Issue #163: 1Hz Telemetry Path Optimization. Refactored DashboardState 
  *   to use primitive types instead of pre-formatted strings to eliminate 
  *   object churn in the telemetry hot-path. (R163)
- * Aug.13.08:
- * - Issue #157: Violation Path Allocations. Refactored ViolationPoint to a 
- *   mutable class with primitive coordinates to eliminate UUID and GeoPoint 
- *   churn in the detection and mapping hot-paths (R157).
  */
 
 sealed class AppSensorEvent {
@@ -240,7 +240,7 @@ class ViolationPoint(
 
 @Serializable
 data class LogEntry(
-    val localId: String = UUID.randomUUID().toString(),
+    val localId: String = "", 
     val timestamp: Long, val message: String, val type: String,
     val isImportant: Boolean, val id: String = "", val viewerId: String = "",
     val count: Int = 1, val extremeValue: Double? = null,
@@ -256,7 +256,11 @@ data class LogEntry(
     val snrSnapshot: Double? = null,
     val vibeSnapshot: Double? = null,
     val spillIdx: Int = -1,
-    val gpsHardwareLock: Boolean = false 
+    val gpsHardwareLock: Boolean = false,
+    // R164: Forensic snapshots to eliminate string churn in high-frequency drainage.
+    val tempSnapshot: Double? = null,
+    val battSnapshot: Int? = null,
+    val chargingSnapshot: Boolean? = null
 ) {
     fun toJSONObject(): JSONObject {
         return JSONObject().apply {
@@ -280,13 +284,16 @@ data class LogEntry(
             vibeSnapshot?.let { put("vibe_snapshot", it) }
             if (spillIdx != -1) put("spill_idx", spillIdx)
             if (gpsHardwareLock) put("gps_hw_lock", true)
+            tempSnapshot?.let { put("temp_snapshot", it) }
+            battSnapshot?.let { put("batt_snapshot", it) }
+            chargingSnapshot?.let { put("charging_snapshot", it) }
         }
     }
 
     companion object {
         fun fromJSONObject(obj: JSONObject): LogEntry {
             val ts = obj.optLong("timestamp")
-            val localId = obj.optString("localId").ifBlank { UUID.randomUUID().toString() }
+            val localId = obj.optString("localId").ifBlank { "" }
             
             return LogEntry(
                 localId = localId,
@@ -313,7 +320,10 @@ data class LogEntry(
                 snrSnapshot = if (obj.has("snr_snapshot")) obj.optDouble("snr_snapshot") else null,
                 vibeSnapshot = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot") else null,
                 spillIdx = obj.optInt("spill_idx", -1),
-                gpsHardwareLock = obj.optBoolean("gps_hw_lock", false)
+                gpsHardwareLock = obj.optBoolean("gps_hw_lock", false),
+                tempSnapshot = if (obj.has("temp_snapshot")) obj.optDouble("temp_snapshot") else null,
+                battSnapshot = if (obj.has("batt_snapshot")) obj.optInt("batt_snapshot") else null,
+                chargingSnapshot = if (obj.has("charging_snapshot")) obj.optBoolean("charging_snapshot") else null
             )
         }
     }

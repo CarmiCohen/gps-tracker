@@ -20,18 +20,14 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.13.12:
+ * - Issue #164: Forensic Log Buffer Audit. Implemented deterministic 
+ *   composite IDs (F-timestamp-idx) for forensic traces to eliminate UUID 
+ *   churn. Utilizing new snapshot columns to avoid string concatenation 
+ *   in high-frequency drainage (R164).
  * Aug.13.02:
  * - Build Fix: Resolved type inference failures on budget hardware toolchains by 
  *   explicitly typing LatencyMonitor and withLock calls.
- * - Issue #705: Fixed forensic deduplication bug where String signatures were 
- *   incorrectly compared against ForensicSignature objects (R146).
- * Aug.13.00:
- * - Issue #146: Optimized Forensic Drainer. Refactored performForensicDrain 
- *   to reduce overhead in signature filtering and entity mapping (R146).
- * Aug.11.21:
- * - Issue #151: Phone Setup ANR Remediation. Offloaded forensic trace writes 
- *   to Dispatchers.Default in addLog() to prevent main-thread stalls during 
- *   MappedByteBuffer I/O pressure (R151).
  */
 @Singleton
 class LogRepository @Inject constructor(
@@ -45,7 +41,6 @@ class LogRepository @Inject constructor(
     private var logWriteCount = 0
     private val isPruning = AtomicBoolean(false)
 
-    // Issue #714: Reliability Tracking
     private val forensicSuccessCount = AtomicInteger(0)
     private val forensicFailureCount = AtomicInteger(0)
     private var liveReliability = 1.0
@@ -64,8 +59,6 @@ class LogRepository @Inject constructor(
         private const val FORENSIC_FILL_THRESHOLD = FORENSIC_SPILL_CAPACITY / 2
         private const val FORENSIC_CONVERGENCE_STALL_LIMIT = 3
         private const val FORENSIC_EMERGENCY_FILL_LEVEL = 0.9
-        
-        // R714: EMA factor for reliability smoothing
         private const val RELIABILITY_EMA_ALPHA = 0.1 
     }
 
@@ -160,8 +153,8 @@ class LogRepository @Inject constructor(
 
     /**
      * performForensicDrain: Optimized drain logic for telemetry persistence.
-     * R146: Reduced overhead by using a single-pass filter/map operation and 
-     * minimizing string allocations for signature checks.
+     * R164: Utilizing deterministic composite IDs for forensic traces. Allocated 
+     * objects only for traces passing the deduplication gate.
      */
     private suspend fun performForensicDrain(limit: Int, isRecovery: Boolean): Boolean {
         val buffer = forensicSpillBufferProvider.get()
@@ -175,20 +168,22 @@ class LogRepository @Inject constructor(
         }
 
         return try {
-            // R146: Manual min calculation to avoid generic inference stalls on budget toolchains.
             var minTs = Long.MAX_VALUE
             for (t in traces) { if (t.timestamp < minTs) minTs = t.timestamp }
             if (minTs == Long.MAX_VALUE) minTs = 0L
 
             val existingSignatures = logDao.getExistingForensicSignatures(minTs).toSet()
 
-            val toInsert = ArrayList<LogEntity>(traces.size)
+            val toInsert = ArrayList<LogEntity>()
             for (trace in traces) {
-                // Issue #705: Fixed logic error - comparing ForensicSignature against ForensicSignature set.
                 val signature = ForensicSignature(trace.timestamp, trace.spillIdx)
                 if (!existingSignatures.contains(signature)) {
+                    // R164: Deterministic ID generation to replace UUID.randomUUID()
+                    val compositeId = if (trace.localId.isNotEmpty()) trace.localId 
+                                     else "F-${trace.timestamp}-${trace.spillIdx}"
+                    
                     toInsert.add(LogEntity(
-                        localId = UUID.randomUUID().toString(),
+                        localId = compositeId,
                         timestamp = trace.timestamp, message = trace.message, type = trace.type,
                         isImportant = trace.isImportant, deviceId = trace.id, viewerId = trace.viewerId,
                         isSpecial = trace.isSpecial, role = trace.role,
@@ -196,7 +191,10 @@ class LogRepository @Inject constructor(
                         maxAccuracy = trace.maxAccuracy, snrSnapshot = trace.snrSnapshot,
                         vibeSnapshot = trace.vibeSnapshot, synced = false,
                         spillIdx = trace.spillIdx,
-                        gpsHardwareLock = trace.gpsHardwareLock
+                        gpsHardwareLock = trace.gpsHardwareLock,
+                        tempSnapshot = trace.tempSnapshot,
+                        battSnapshot = trace.battSnapshot,
+                        chargingSnapshot = trace.chargingSnapshot
                     ))
                 }
             }
@@ -211,9 +209,8 @@ class LogRepository @Inject constructor(
             
             if (isRecovery && toInsert.isNotEmpty()) {
                 val msg = "Forensic Recovery Successful: ${toInsert.size} traces replayed."
-                Timber.i(msg)
                 addLog(LogEntry(
-                    localId = UUID.randomUUID().toString(),
+                    localId = "RECOVERY-${timeProvider.currentTimeMillis()}",
                     timestamp = timeProvider.currentTimeMillis(),
                     message = msg, type = "SYSTEM", isImportant = true,
                     id = "SYSTEM", viewerId = "SYSTEM", isSpecial = true,
@@ -250,12 +247,11 @@ class LogRepository @Inject constructor(
                 consecutiveStalls++
                 if (consecutiveStalls >= FORENSIC_CONVERGENCE_STALL_LIMIT) {
                     val h = telemetry.systemHealth.value
-                    val msg = "Forensic Stall Correlated: Backfill not converging (%d pending). System: [CPU: %.1f, IOW: %.1f, Temp: %.1fC, Batt: %d%%]".format(
-                        pendingAfter, h.cpuLoad, h.ioWait, h.batteryTemp, h.batteryLevel
-                    )
+                    // R164: Formatted message only created on actual failure path.
+                    val msg = "Forensic Stall Correlated: Backfill not converging ($pendingAfter pending). System: [CPU: ${h.cpuLoad}, IOW: ${h.ioWait}, Temp: ${h.batteryTemp}C, Batt: ${h.batteryLevel}%]"
                     Timber.w(msg)
                     addLog(LogEntry(
-                        localId = UUID.randomUUID().toString(),
+                        localId = "STALL-${timeProvider.currentTimeMillis()}",
                         timestamp = timeProvider.currentTimeMillis(),
                         message = msg, type = "SYSTEM", isImportant = true,
                         id = "SYSTEM", viewerId = "SYSTEM", isSpecial = true,
@@ -266,9 +262,6 @@ class LogRepository @Inject constructor(
                 consecutiveStalls = 0
             }
         } else {
-            if (consecutiveStalls > 0) {
-                Timber.d("Forensic Backfill: Convergence achieved.")
-            }
             consecutiveStalls = 0
         }
     }
@@ -311,7 +304,10 @@ class LogRepository @Inject constructor(
                                 lat = entry.lat, lng = entry.lng, accuracy = entry.accuracy,
                                 maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot,
                                 vibeSnapshot = entry.vibeSnapshot,
-                                gpsHardwareLock = entry.gpsHardwareLock
+                                gpsHardwareLock = entry.gpsHardwareLock,
+                                tempSnapshot = entry.tempSnapshot,
+                                battSnapshot = entry.battSnapshot,
+                                chargingSnapshot = entry.chargingSnapshot
                             ))
                             continue
                         }
@@ -331,24 +327,30 @@ class LogRepository @Inject constructor(
                                     timestamp = entry.timestamp, message = entry.message, synced = initiallySynced,
                                     lat = entry.lat, lng = entry.lng, accuracy = entry.accuracy,
                                     maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
-                                    gpsHardwareLock = entry.gpsHardwareLock
+                                    gpsHardwareLock = entry.gpsHardwareLock,
+                                    tempSnapshot = entry.tempSnapshot,
+                                    battSnapshot = entry.battSnapshot,
+                                    chargingSnapshot = entry.chargingSnapshot
                                 ))
                                 continue
                             }
                         }
 
                         toInsert.add(LogEntity(
-                            localId = if (entry.localId.isBlank()) UUID.randomUUID().toString() else entry.localId, 
+                            localId = if (entry.localId.isBlank()) "L-${entry.timestamp}-${UUID.randomUUID().toString().take(4)}" else entry.localId, 
                             timestamp = entry.timestamp, message = entry.message, type = entry.type, 
                             isImportant = entry.isImportant, deviceId = entry.id, viewerId = entry.viewerId, 
-                            count = entry.count, extremeValue = entry.extremeValue, durationMs = entry.durationMs, 
-                            isSpecial = entry.isSpecial, specialColor = entry.specialColor,
+                            count = entry.count, extremeValue = entry.extremeValue, durationMs = durationMs, 
+                            isSpecial = entry.isSpecial, specialColor = specialColor,
                             firstSeenTs = if (entry.firstSeenTs == 0L) (entry.timestamp - entry.durationMs) else entry.firstSeenTs,
                             role = entry.role, synced = initiallySynced, lat = entry.lat, lng = entry.lng, 
                             accuracy = entry.accuracy, maxAccuracy = entry.maxAccuracy, 
                             snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
                             spillIdx = entry.spillIdx,
-                            gpsHardwareLock = entry.gpsHardwareLock
+                            gpsHardwareLock = entry.gpsHardwareLock,
+                            tempSnapshot = entry.tempSnapshot,
+                            battSnapshot = entry.battSnapshot,
+                            chargingSnapshot = entry.chargingSnapshot
                         ))
                         logWriteCount++
                     }
@@ -387,7 +389,9 @@ class LogRepository @Inject constructor(
                     specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                     lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
                     snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
-                    spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock
+                    spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
+                    tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
+                    chargingSnapshot = it.chargingSnapshot
                 ) 
             }
         }.flowOn(Dispatchers.Default)
@@ -432,10 +436,9 @@ class LogRepository @Inject constructor(
                 val health = telemetry.systemHealth.value
                 val count = logDao.getCount()
                 
-                // Issue #129: Refine threshold logic to defer pruning during battery pressure
                 val threshold = when {
                     health.isStorageCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
-                    health.isBatteryCritical -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING // Defer I/O spikes
+                    health.isBatteryCritical -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING 
                     health.isStorageLow -> ADAPTIVE_PRUNE_THRESHOLD_LOW
                     health.isBatteryLow -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
                     health.isCharging && !health.isCoolingModeActive -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING
@@ -446,7 +449,6 @@ class LogRepository @Inject constructor(
                     val heartbeatTarget = if (health.isStorageLow) 50 else 100
                     val generalTarget = if (health.isStorageLow) 300 else 500
                     
-                    // Issue #129: Scale pruning intensity based on power state
                     val maxChunks = when {
                         health.isBatteryCritical -> 1
                         health.isBatteryLow -> 2
@@ -467,7 +469,7 @@ class LogRepository @Inject constructor(
                         totalPruned += chunkPruned
                         
                         if (chunkPruned < PRUNE_CHUNK_SIZE) return@repeat 
-                        delay(if (health.isBatteryLow) 200 else 50) // Issue #129: Yield more under battery pressure
+                        delay(if (health.isBatteryLow) 200 else 50)
                     }
                     
                     if (totalPruned > 0) {
@@ -495,7 +497,9 @@ class LogRepository @Inject constructor(
                 specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                 lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
                 snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
-                spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock
+                spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
+                tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
+                chargingSnapshot = it.chargingSnapshot
             )
         }
     }
@@ -541,7 +545,9 @@ class LogRepository @Inject constructor(
                 specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                 lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
                 snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
-                spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock
+                spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
+                tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
+                chargingSnapshot = it.chargingSnapshot
             ) 
         }
     }

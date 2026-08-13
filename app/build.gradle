@@ -30,7 +30,7 @@ android {
         targetSdk = 35
         
         versionCode = getGitVersionCode()
-        versionName = "Aug.13.12"
+        versionName = "Aug.13.13"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -44,7 +44,6 @@ android {
         }
 
         ndk {
-            // Samsung A15 is arm64-v8a. Ensure explicit targeting for budget hardware.
             abiFilters "armeabi-v7a", "arm64-v8a"
         }
     }
@@ -71,8 +70,6 @@ android {
     }
     packaging {
         jniLibs {
-            // Issue #732: Ensure native libraries are stored uncompressed and aligned to 16KB.
-            // useLegacyPackaging = false enables extractNativeLibs="false" behavior.
             useLegacyPackaging = false
         }
         resources {
@@ -110,15 +107,12 @@ protobuf {
 
 dependencies {
     implementation project(':core:engine')
-
     implementation 'androidx.core:core-ktx:1.15.0'
     implementation 'androidx.appcompat:appcompat:1.7.1'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
     implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.8.7'
     implementation 'androidx.lifecycle:lifecycle-service:2.8.7'
     implementation 'androidx.activity:activity-compose:1.10.0'
-    
-    // Issue #732: Update Compose BOM to 2024.10.01 for Android 15 compatible native libs.
     implementation platform('androidx.compose:compose-bom:2024.10.01')
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
@@ -128,43 +122,26 @@ dependencies {
     implementation 'androidx.compose.material:material-icons-extended'
     implementation "androidx.navigation:navigation-compose:2.8.7"
     implementation 'androidx.preference:preference-ktx:1.2.1'
-
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3"
-
-    // Issue #732: Ensure Datastore 1.1.1+ for 16KB page support.
     implementation "androidx.datastore:datastore:1.1.1"
     implementation "androidx.datastore:datastore-preferences:1.1.1"
-    
-    // Issue #732: Explicitly add graphics-path for 16KB page alignment.
     implementation "androidx.graphics:graphics-path:1.0.1"
-
     implementation "com.google.protobuf:protobuf-javalite:3.25.1"
-
     implementation ('io.socket:socket.io-client:2.1.0') {
         exclude group: 'org.json', module: 'json'
     }
-
     implementation 'com.google.android.gms:play-services-location:21.3.0'
-
-    // Room
     implementation "androidx.room:room-runtime:2.6.1"
     implementation "androidx.room:room-ktx:2.6.1"
     kapt "androidx.room:room-compiler:2.6.1"
-
-    // WorkManager
     implementation "androidx.work:work-runtime-ktx:2.9.1"
-
-    // Hilt
     implementation "com.google.dagger:hilt-android:2.51"
     kapt "com.google.dagger:hilt-compiler:2.51"
     implementation 'androidx.hilt:hilt-navigation-compose:1.2.0'
     implementation 'androidx.hilt:hilt-work:1.2.0'
     kapt 'androidx.hilt:hilt-compiler:1.2.0'
-
     implementation 'org.osmdroid:osmdroid-android:6.1.18'
-
     implementation 'com.jakewharton.timber:timber:5.0.1'
-
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'

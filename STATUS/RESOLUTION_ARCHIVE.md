@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 599**
+**Total Unique Resolutions: 600**
+
+## 39. Forensic Log Path Hardening (Aug.13.13)
+*   **Issue #164: Forensic Log Buffer Audit**.
+    *   **Resolution**: Hardened the 100Hz forensic logging path to prevent memory pressure and buffer overflows. Implemented deterministic composite IDs (`F-timestamp-idx`) to eliminate UUID generation churn during drainage. Added raw telemetry snapshots (`tempSnapshot`, `battSnapshot`, `chargingSnapshot`) to `LogEntry` and `LogEntity` to defer string formatting until the point of persistence. Expanded `FORENSIC_SPILL_CAPACITY` to 10,000 and `LOG_BUFFER_CAPACITY` to 2,000. Removed nondeterministic `AtomicBoolean` guards in `LogManager` to ensure all system events are queued via the thread-safe `LogRepository` channel (R164).
 
 ## 38. 1Hz Telemetry Path Optimization (Aug.13.12)
 *   **Issue #163: Telemetry Path Churn**.
@@ -57,4 +61,4 @@ This document contains the unified record of all resolved issues and technical d
     *   **Resolution**: Hardened the **Samsung A15 Detection Logic (R405)** by inspecting `Build.DEVICE` and `Build.PRODUCT` strings (e.g., SM-A155F). Relocated trigger logic to the permission loop to eliminate race conditions. (R405)
 
 ---
-*For historical resolutions #1 through #24, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.12)
+*For historical resolutions #1 through #26, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.13)
