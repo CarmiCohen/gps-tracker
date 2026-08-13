@@ -53,6 +53,7 @@ const val CONFLATION_DELAY_MS = 100L
 const val LOG_INTERVAL_FAST_MS = 15000L
 const val LOG_INTERVAL_SLOW_MS = 60000L
 const val LOG_INTERVAL_COUNT_THRESHOLD = 30
+const val WAKELOCK_LOG_THROTTLE_MS = 60000L
 
 // History Manager Tasks
 val DAILY_CLEANUP_DATE_KEY = "last_daily_cleanup_date"

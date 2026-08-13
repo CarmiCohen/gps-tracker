@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 591**
+**Total Unique Resolutions: 592**
+
+## 31. System Log Hardening (Aug.13.08)
+*   **Issue #156: WakeLock Log Saturation**.
+    *   **Resolution**: Implemented **WakeLock Log Throttling (R156)** in `SystemMonitor`. Introduced a minimum 60-second logging interval for WakeLock acquisitions using `WAKELOCK_LOG_THROTTLE_MS`. This prevents high-frequency background pulses (such as the 10s stay-alive checks in `AppSensorManager`) from flooding the logcat while ensuring that resource state changes remain visible for forensic analysis. (R156)
 
 ## 30. Phone Setup UI Refinement (Aug.13.07)
 *   **Issue #155: Phone Setup UI Clutter**.
@@ -29,4 +33,4 @@ This document contains the unified record of all resolved issues and technical d
     *   **Resolution**: Hardened the **Forensic Drainer (R146)** to eliminate 200ms latency spikes and high GC pressure. Refactored `ForensicSpillBuffer` to utilize zero-allocation paths for `peek()` and `writeTrace()` by implementing pre-allocated processing buffers. Streamlined `LogRepository.performForensicDrain()` using a single-pass filtering/mapping loop and optimized signature deduplication.
 
 ---
-*For historical resolutions #1 through #24, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.07)
+*For historical resolutions #1 through #24, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.08)

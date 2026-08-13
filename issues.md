@@ -1,24 +1,29 @@
-# Project Issues & Hardening Tracking (Aug.13.07)
+# Project Issues & Hardening Tracking (Aug.13.08)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 AT RISK | 2 |
+| **Open Technical Issues** | 🔴 AT RISK | 1 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 594 |
+| **Resolved (Total)** | 🟢 Progress | 595 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #156] WakeLock Log Saturation**: Frequent `acquireWakeLock(force=true)` calls from `AppSensorManager` saturate logcat, masking other forensic events.
 *   **[Issue #157] Violation Path Allocations**: `ViolationPoint` and `ViolationEntity` still use `UUID.randomUUID()` and `GeoPoint` allocations in the detection hot-path, which may cause secondary GC spikes during high-activity scenarios.
 
 ---
 
 ## 🔴 Open Issues
 *   *(None)*
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.13.08)
+*   **[Issue #156] [Severity: Medium] [Category: Performance] WakeLock Log Saturation.**
+    *   **Resolution**: Implemented **WakeLock Log Throttling (R156)** in `SystemMonitor`. Acquisition logs are now throttled to 1/min using `WAKELOCK_LOG_THROTTLE_MS`, preventing `AppSensorManager`'s high-frequency stay-alive pulses from saturating logcat while maintaining periodic visibility for audit.
 
 ---
 
@@ -39,4 +44,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Implemented **Staggered UI Hydration (R153)**. Introduced a multi-stage boot sequence to spread composition load across multiple frames, eliminating 1600ms stalls on Samsung A15.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.07)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.08)

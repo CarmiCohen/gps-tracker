@@ -26,6 +26,9 @@ sealed class SystemMonitorEvent {
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * Aug.13.08:
+ * - Issue #156: WakeLock Log Saturation. Throttled WakeLock acquisition logging 
+ *   to once per minute to prevent logcat saturation (R156).
  * Aug.11.09:
  * - Issue #141: Stress Recovery Verification. Implemented resetSimulatedAnomalies() 
  *   to ensure sticky stress-test states don't persist post-saturation.
@@ -51,6 +54,7 @@ class SystemMonitor @Inject constructor(
     private var skippedCounter = 0
     
     private var lastWakeLockRenewalTs = 0L
+    private var lastWakeLockLogTs = 0L
     private val WAKELOCK_RENEWAL_TTL_MS = 300_000L // 5 minutes
 
     var jumpStateStartTs = 0L
@@ -83,7 +87,11 @@ class SystemMonitor @Inject constructor(
             
             wakeLock?.acquire(WAKELOCK_TIMEOUT_MS) 
             lastWakeLockRenewalTs = now
-            Timber.d("WakeLock acquired/renewed for ${WAKELOCK_TIMEOUT_MS/1000}s")
+            
+            if (now - lastWakeLockLogTs > WAKELOCK_LOG_THROTTLE_MS) {
+                Timber.d("WakeLock acquired/renewed for ${WAKELOCK_TIMEOUT_MS/1000}s (Throttled Log)")
+                lastWakeLockLogTs = now
+            }
         } catch (e: Exception) {
             Timber.e(e, "Failed to acquire WakeLock")
         }
@@ -104,6 +112,7 @@ class SystemMonitor @Inject constructor(
         } finally {
             wakeLock = null
             lastWakeLockRenewalTs = 0L
+            lastWakeLockLogTs = 0L
         }
     }
 
