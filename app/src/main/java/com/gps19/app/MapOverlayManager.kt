@@ -20,12 +20,13 @@ import kotlin.math.log10
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Aug.13.08:
+ * - Issue #157: Violation Path Allocations. Updated to use the refactored 
+ *   ViolationPoint class, utilizing toGeoPoint() to access cached position 
+ *   objects (R157).
  * July.30.40:
  * - Issue #641: Optimized invalidation. Methods now return Boolean to signal 
  *   required view.invalidate(), reducing idle CPU consumption.
- * July.30.34:
- * - Issue #640: Refined accuracy circle throttling to include position changes 
- *   for R-HARDWARE-01 Budget Baseline. Ensures O(N) pointsAsCircle is strictly gated.
  */
 class MapOverlayManager(
     private val context: Context,
@@ -198,12 +199,13 @@ class MapOverlayManager(
         filteredViolations.forEachIndexed { index, v ->
             val m = if (index < violationMarkerPool.size) violationMarkerPool[index] else Marker(mapView).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); violationMarkerPool.add(m) }
             val isJump = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
-            m.position = v.point; m.icon = if (isJump) jumpIcon else geofenceIcon; violationMarkersFolder.add(m)
+            val gp = v.toGeoPoint()
+            m.position = gp; m.icon = if (isJump) jumpIcon else geofenceIcon; violationMarkersFolder.add(m)
             
             val hAcc = if (v.maxAccuracy > 0.0) v.maxAccuracy else v.accuracy
             if (hAcc > 0.0) {
                 val c = if (index < violationCirclePool.size) violationCirclePool[index] else Polygon(mapView).also { p -> p.fillPaint.color = 0; p.outlinePaint.strokeWidth = 2f; p.setInfoWindow(null); violationCirclePool.add(p) }
-                c.points = Polygon.pointsAsCircle(v.point, hAcc).map { GeoPoint(it.latitude, it.longitude) }
+                c.points = Polygon.pointsAsCircle(gp, hAcc).map { GeoPoint(it.latitude, it.longitude) }
                 c.outlinePaint.color = (if (isJump) 0x60FF00FF else 0x60FF0000).toInt()
                 violationAccuracyFolder.add(c)
             }

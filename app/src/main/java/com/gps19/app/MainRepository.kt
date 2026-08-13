@@ -17,12 +17,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Aug.13.08:
+ * - Issue #157: Violation Path Allocations. Optimized violationsFlow to use 
+ *   primitive-based mapping to the refactored ViolationPoint class (R157).
  * Aug.13.06:
  * - Issue #152: Excessive GC Pressure. Optimized addHistoryPoint to support 
  *   flyweight-to-entity mapping without intermediate list allocations (R152).
- * Aug.13.02:
- * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
- *   type inference failures (R146/R151).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -85,7 +85,7 @@ class MainRepository @Inject constructor(
     }.flowOn(Dispatchers.Default)
 
     val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> 
-        entities.map { ViolationPoint(point = GeoPoint(it.lat, it.lng), type = it.type, ts = it.ts, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy) } 
+        entities.map { ViolationPoint(lat = it.lat, lng = it.lng, type = it.type, ts = it.ts, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy) }
     }.flowOn(Dispatchers.Default)
 
     private val _uiCommands = MutableSharedFlow<UiCommand>(

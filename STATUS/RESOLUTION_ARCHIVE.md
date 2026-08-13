@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 592**
+**Total Unique Resolutions: 593**
+
+## 32. Violation Path Optimization (Aug.13.09)
+*   **Issue #157: Violation Path Allocations**.
+    *   **Resolution**: Eliminated object churn in the violation detection and mapping hot-paths by refactoring `ViolationPoint` into a mutable class with primitive coordinates (`lat`, `lng`) and internal `GeoPoint` caching (R157). Removed automatic `UUID.randomUUID()` generation and transient `GeoPoint` allocations during database-to-UI mapping, significantly reducing GC pressure during high-activity scenarios where multiple violations are processed and rendered. (R157)
 
 ## 31. System Log Hardening (Aug.13.08)
 *   **Issue #156: WakeLock Log Saturation**.
@@ -33,4 +37,4 @@ This document contains the unified record of all resolved issues and technical d
     *   **Resolution**: Hardened the **Forensic Drainer (R146)** to eliminate 200ms latency spikes and high GC pressure. Refactored `ForensicSpillBuffer` to utilize zero-allocation paths for `peek()` and `writeTrace()` by implementing pre-allocated processing buffers. Streamlined `LogRepository.performForensicDrain()` using a single-pass filtering/mapping loop and optimized signature deduplication.
 
 ---
-*For historical resolutions #1 through #24, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.08)
+*For historical resolutions #1 through #24, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.09)

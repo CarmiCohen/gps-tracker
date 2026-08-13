@@ -10,13 +10,14 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.13.08:
+ * - Issue #157: Violation Path Allocations. Refactored ViolationPoint to a 
+ *   mutable class with primitive coordinates to eliminate UUID and GeoPoint 
+ *   churn in the detection and mapping hot-paths (R157).
  * Aug.13.06:
  * - Issue #152: Excessive GC Pressure. Refactored ConnectionPoint to a mutable 
  *   class with pooling support to eliminate object churn in the telemetry 
  *   hot-path (R152).
- * Aug.10.28:
- * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure to 
- *   ConnectionPoint and DashboardState for load-correlated anomaly tracking (R133).
  */
 
 sealed class AppSensorEvent {
@@ -202,14 +203,40 @@ class ConnectionPoint(
     }
 }
 
-data class ViolationPoint(
-    val localId: String = UUID.randomUUID().toString(),
-    val point: GeoPoint, 
-    val type: String, 
-    val ts: Long,
-    val accuracy: Double = 0.0,
-    val maxAccuracy: Double = 0.0
-)
+/**
+ * Issue #157: Refactored to mutable class with primitive coords for zero-churn violations.
+ */
+class ViolationPoint(
+    var localId: String = "",
+    var lat: Double = 0.0,
+    var lng: Double = 0.0,
+    var type: String = "", 
+    var ts: Long = 0,
+    var accuracy: Double = 0.0,
+    var maxAccuracy: Double = 0.0
+) {
+    private var _cachedGeoPoint: GeoPoint? = null
+
+    fun toGeoPoint(): GeoPoint {
+        val cached = _cachedGeoPoint
+        if (cached != null && cached.latitude == lat && cached.longitude == lng) {
+            return cached
+        }
+        val newPoint = GeoPoint(lat, lng)
+        _cachedGeoPoint = newPoint
+        return newPoint
+    }
+
+    fun copyFrom(other: ViolationPoint) {
+        this.localId = other.localId
+        this.lat = other.lat
+        this.lng = other.lng
+        this.type = other.type
+        this.ts = other.ts
+        this.accuracy = other.accuracy
+        this.maxAccuracy = other.maxAccuracy
+    }
+}
 
 @Serializable
 data class LogEntry(
