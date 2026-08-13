@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - Aug.13.06 (Telemetry GC Pressure Resolved)
+# System Source of Truth (SoT) - Aug.13.07 (Phone Setup UI Clutter Resolved)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -22,6 +22,7 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Forensic Parity Authority (R118)**: Strict field parity across Protobuf, Database, and UI. (Issue #118)
 
 ### 3. UI/UX & Localization Authority
+*   **Phone Setup Clutter Reduction (R155)**: (Added Aug.13.07) The `PhoneSetupOverlay` MUST hide completion-dependent action buttons once the corresponding setup step is verified (`isCompleted == true`). This ensures a focused and simplified onboarding experience. (Issue #155). **Status: Implemented.**
 *   **Header Layout Direction Locking (R148)**: (Added Aug.11.21) The `HeaderBar` MUST explicitly force `LayoutDirection.Ltr` for its internal layout. (Issue #148). **Status: Implemented.**
 *   **Event & Alert Text Authority (R747)**: (Added Aug.07.06) Viewer-local events MUST be prefixed with "**This device:**". (Issue #747)
 
@@ -30,5 +31,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.13.06.
+*   **Current Release**: Aug.13.07.
 *   **Source of Truth**: app/build.gradle versionName.

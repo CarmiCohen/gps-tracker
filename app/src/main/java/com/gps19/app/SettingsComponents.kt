@@ -29,6 +29,10 @@ import kotlinx.coroutines.delay
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Aug.13.07:
+ * - Issue #155: Phone Setup UI Clutter. Refined GuideSection to hide action 
+ *   buttons once a step is verified (isCompleted == true), improving 
+ *   out-of-box experience and reducing visual noise.
  * Aug.11.06:
  * - Issue #142: Phone Setup Overlay Stabilization. Implemented Staggered 
  *   Incremental Hydration (R142) to prevent ANRs on budget hardware (Samsung A15). 
@@ -37,9 +41,6 @@ import kotlinx.coroutines.delay
  * Aug.11.04:
  * - Issue #136: Restored Compose Preview coverage for SettingsOverlay and 
  *   PhoneSetupOverlay following the R135/R137 decomposition (R136).
- * Aug.11.00:
- * - Issue #137: UI Davey/ANR Remediation. Implemented Deferred UI Hydration 
- *   (R137) to prevent 3000ms+ main-thread stalls during overlay entry. 
  */
 
 @Composable
@@ -394,7 +395,7 @@ fun GuideSection(title: String, description: String, onClick: () -> Unit, button
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) { Icon(statusIcon, null, tint = statusColor, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Icon(icon, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp) }
         if (isCompleted == false && !reason.isNullOrEmpty()) { Text("Reason: $reason", color = Amber500, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 28.dp, top = 2.dp)) }
-        Text(description, color = Slate500, fontSize = 12.sp, modifier = Modifier.padding(start = 28.dp)); if (buttonText.isNotEmpty() && buttonText != stringResource(R.string.setup_info_only)) { Spacer(Modifier.height(4.dp)); Button(onClick = onClick, modifier = Modifier.padding(start = 28.dp).height(32.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)) { Text(buttonText, fontSize = 11.sp) } }
+        Text(description, color = Slate500, fontSize = 12.sp, modifier = Modifier.padding(start = 28.dp)); if (isCompleted != true && buttonText.isNotEmpty() && buttonText != stringResource(R.string.setup_info_only)) { Spacer(Modifier.height(4.dp)); Button(onClick = onClick, modifier = Modifier.padding(start = 28.dp).height(32.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)) { Text(buttonText, fontSize = 11.sp) } }
     }
 }
 

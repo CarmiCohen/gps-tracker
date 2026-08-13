@@ -1,18 +1,17 @@
-# Project Issues & Hardening Tracking (Aug.13.06)
+# Project Issues & Hardening Tracking (Aug.13.07)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 AT RISK | 3 |
+| **Open Technical Issues** | 🔴 AT RISK | 2 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 593 |
+| **Resolved (Total)** | 🟢 Progress | 594 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #155] Phone Setup UI Clutter**: Action buttons in `PhoneSetupOverlay` remain visible after step completion, causing visual noise and user confusion.
 *   **[Issue #156] WakeLock Log Saturation**: Frequent `acquireWakeLock(force=true)` calls from `AppSensorManager` saturate logcat, masking other forensic events.
 *   **[Issue #157] Violation Path Allocations**: `ViolationPoint` and `ViolationEntity` still use `UUID.randomUUID()` and `GeoPoint` allocations in the detection hot-path, which may cause secondary GC spikes during high-activity scenarios.
 
@@ -20,6 +19,12 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ## 🔴 Open Issues
 *   *(None)*
+
+---
+
+## 🟢 Recently Resolved Issues (Aug.13.07)
+*   **[Issue #155] [Severity: Low] [Category: UI/UX] Phone Setup UI Clutter.**
+    *   **Resolution**: Refined `GuideSection` in `PhoneSetupOverlay` to hide completion-dependent action buttons once steps are verified (`isCompleted == true`). This reduces visual noise and clarifies the remaining setup tasks for the user.
 
 ---
 
@@ -34,4 +39,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   **Resolution**: Implemented **Staggered UI Hydration (R153)**. Introduced a multi-stage boot sequence to spread composition load across multiple frames, eliminating 1600ms stalls on Samsung A15.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.06)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.13.07)

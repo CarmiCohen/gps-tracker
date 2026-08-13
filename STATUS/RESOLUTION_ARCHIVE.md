@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 590**
+**Total Unique Resolutions: 591**
+
+## 30. Phone Setup UI Refinement (Aug.13.07)
+*   **Issue #155: Phone Setup UI Clutter**.
+    *   **Resolution**: Refined the `GuideSection` component in `PhoneSetupOverlay` to hide completion-dependent action buttons once steps are verified (`isCompleted == true`). This improvement clarifies the remaining setup tasks and reduces visual noise, enhancing the "out-of-box" experience. (R155)
 
 ## 29. Telemetry GC Pressure Mitigation (Aug.13.06)
 *   **Issue #152: Excessive GC Pressure**.
@@ -25,4 +29,4 @@ This document contains the unified record of all resolved issues and technical d
     *   **Resolution**: Hardened the **Forensic Drainer (R146)** to eliminate 200ms latency spikes and high GC pressure. Refactored `ForensicSpillBuffer` to utilize zero-allocation paths for `peek()` and `writeTrace()` by implementing pre-allocated processing buffers. Streamlined `LogRepository.performForensicDrain()` using a single-pass filtering/mapping loop and optimized signature deduplication.
 
 ---
-*For historical resolutions #1 through #24, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.06)
+*For historical resolutions #1 through #24, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.07)
