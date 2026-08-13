@@ -2,7 +2,15 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 597**
+**Total Unique Resolutions: 599**
+
+## 38. 1Hz Telemetry Path Optimization (Aug.13.12)
+*   **Issue #163: Telemetry Path Churn**.
+    *   **Resolution**: Eliminated object churn in the 1Hz telemetry path by refactoring `DashboardState` to use primitive types instead of pre-formatted strings. Moved formatting logic into the UI layer (`MainDashboardGrid`, `TelemetryBox`, `ForensicSection`) using `remember` blocks to ensure string allocations only occur when the underlying data actually changes. This significantly reduces GC pressure and improves UI fluidity on budget hardware (R163).
+
+## 37. Phone Setup ANR Remediation (Aug.13.11)
+*   **Issue #162: Phone Setup ANR Stall**.
+    *   **Resolution**: Resolved Main-thread ANR stalls during phone setup by implementing a 150ms hydration gate and 80ms sequential rendering offsets in `PhoneSetupOverlay`. Memoized static build properties and hardware strings to minimize resource lookup overhead. Optimized `HeaderBar` to suppress pulse animations while the setup overlay is visible (R162).
 
 ## 36. Version Synchronization (Aug.13.10)
 *   **Issue #160: Version Mismatch**.
@@ -49,4 +57,4 @@ This document contains the unified record of all resolved issues and technical d
     *   **Resolution**: Hardened the **Samsung A15 Detection Logic (R405)** by inspecting `Build.DEVICE` and `Build.PRODUCT` strings (e.g., SM-A155F). Relocated trigger logic to the permission loop to eliminate race conditions. (R405)
 
 ---
-*For historical resolutions #1 through #24, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.10)
+*For historical resolutions #1 through #24, please refer to the Git history or individual backlog shards in `STATUS/backlog_shards/`. (vAug.13.12)

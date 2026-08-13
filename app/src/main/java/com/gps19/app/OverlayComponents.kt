@@ -22,16 +22,13 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Aug.13.11:
+ * - Issue #163: 1Hz Telemetry Path Optimization. Refactored all dashboard 
+ *   components to handle primitive types and utilized memoized formatting 
+ *   to eliminate object churn during 1Hz telemetry updates (R163).
  * Aug.10.26:
  * - Issue #132: Forensic UI Dashboard Refinement. Integrated cpuLoad, ioWait, 
  *   and maxIoLatency into ForensicSection for performance auditing (R132).
- * Aug.10.24:
- * - Issue #130: Proto Health Parity. Integrated isBatteryLow and isBatteryCritical 
- *   badges into DashboardHeader (R130).
- * Aug.07.00:
- * - Issue #741: Dashboard & TelemetryBox Recomposition Audit. Refactored MainDashboardGrid,
- *   TelemetryBox, and DebugTable to take primitive parameters instead of monolithic 
- *   state objects (R736).
  */
 
 @Composable
@@ -54,57 +51,56 @@ fun MainDashboardGrid(
     isBatterySteepDischarge: Boolean,
     isBatteryLow: Boolean,
     isBatteryCritical: Boolean,
-    maxDrop: String,
-    lastSeen: String,
-    totalDrop: String,
-    totalUptime: String,
-    session: String,
+    maxDropMs: Long,
+    lastSeenTs: Long,
+    totalDropMs: Long,
+    totalUptimeMs: Long,
+    sessionMs: Long,
     engineVersion: String,
-    sinceConn: String,
-    sinceDisco: String,
-    violationUptime: String,
-    watchdogCountdown: String,
+    sinceConnMs: Long,
+    sinceDiscoMs: Long,
+    violationUptimeMs: Long,
+    watchdogCountdownSec: Long,
     watchdogOk: Boolean,
     isPowerSaveMode: Boolean,
     standbyBucket: Int,
     netInterface: String,
     isStorageLow: Boolean,
     isStorageCritical: Boolean,
-    distToHome: String,
-    distToViewer: String,
-    lat: String,
-    lng: String,
-    gpsSpeed: String,
-    trackerAccuracy: String,
-    trackerMaxAcc: String,
-    viewerAccuracy: String,
-    viewerMaxAcc: String,
-    satsIndex: String,
+    distToHome: Double?,
+    distToViewer: Double?,
+    lat: Double,
+    lng: Double,
+    gpsSpeedMps: Double,
+    trackerAccuracy: Double,
+    trackerMaxAcc: Double,
+    viewerAccuracy: Double,
+    viewerMaxAcc: Double,
+    satsUsed: Int,
+    satsView: Int,
     isSatsIndexWarning: Boolean,
-    snr: String,
-    vibration: String,
-    heading: String,
-    tilt: String,
-    acoustic: String,
-    lift: String,
-    lux: String,
-    proximity: String,
-    proximityCm: String,
-    proximityDebounce: String,
-    rollingVibration: String,
-    trackerMaxTemp: String,
-    viewerMaxTemp: String,
-    peakShock: String,
-    vibrationFloor: String,
-    luxBaseline: String,
-    acousticFloor: String,
-    trackerCurrentMa: String,
+    snr: Double,
+    vibration: Double,
+    heading: Double,
+    tilt: Double,
+    acousticDb: Double,
+    baroAlt: Double,
+    lux: Double,
+    proximityCm: Double,
+    proximityDebounceMs: Long,
+    rollingVibration: Double,
+    trackerMaxTemp: Double,
+    viewerMaxTemp: Double,
+    peakShock: Double,
+    vibrationFloor: Double,
+    luxBaseline: Double,
+    acousticFloorDb: Double,
+    trackerCurrentMa: Int,
     gpsIdx: GpsIndexData,
     rttValue: Int,
-    // Issue #132
-    cpuLoad: String,
-    ioWait: String,
-    maxIoLatency: String,
+    cpuLoad: Double,
+    ioWait: Double,
+    maxIoLatencyMs: Long,
     onShowGnssDetail: () -> Unit = {}
 ) {
     val isViewer = appMode == "viewer"
@@ -136,18 +132,17 @@ fun MainDashboardGrid(
             Spacer(Modifier.height(4.dp))
 
             SystemHealthSection(
-                maxDrop = maxDrop,
-                lastSeen = lastSeen,
-                totalDrop = totalDrop,
-                totalUptime = totalUptime,
-                session = session,
+                maxDropMs = maxDropMs,
+                lastSeenTs = lastSeenTs,
+                totalDropMs = totalDropMs,
+                totalUptimeMs = totalUptimeMs,
+                sessionMs = sessionMs,
                 engineVersion = engineVersion,
-                sinceConn = sinceConn,
-                sinceDisco = sinceDisco,
-                violationUptime = violationUptime,
-                watchdogCountdown = watchdogCountdown,
+                sinceConnMs = sinceConnMs,
+                sinceDiscoMs = sinceDiscoMs,
+                violationUptimeMs = violationUptimeMs,
+                watchdogCountdownSec = watchdogCountdownSec,
                 watchdogOk = watchdogOk,
-                isPowerSaveMode = 0 != 0, // Placeholder replaced below if needed, but not part of R132
                 standbyBucket = standbyBucket,
                 netInterface = netInterface,
                 isStorageLow = isStorageLow,
@@ -158,7 +153,8 @@ fun MainDashboardGrid(
                 relayColor = relayColor,
                 masterColor = masterColor,
                 rttValue = rttValue,
-                isPowerSaveModeActual = isPowerSaveMode
+                isPowerSaveMode = isPowerSaveMode,
+                systemPulse = systemPulse
             )
             SectionDivider()
             PositionSection(
@@ -166,12 +162,13 @@ fun MainDashboardGrid(
                 distToViewer = distToViewer,
                 lat = lat,
                 lng = lng,
-                gpsSpeed = gpsSpeed,
+                gpsSpeedMps = gpsSpeedMps,
                 trackerAccuracy = trackerAccuracy,
                 trackerMaxAcc = trackerMaxAcc,
                 viewerAccuracy = viewerAccuracy,
                 viewerMaxAcc = viewerMaxAcc,
-                satsIndex = satsIndex,
+                satsUsed = satsUsed,
+                satsView = satsView,
                 isSatsIndexWarning = isSatsIndexWarning,
                 snr = snr,
                 isGpsFresh = isGpsFresh,
@@ -186,26 +183,25 @@ fun MainDashboardGrid(
                 vibration = vibration,
                 heading = heading,
                 tilt = tilt,
-                acoustic = acoustic,
-                lift = lift,
+                acousticDb = acousticDb,
+                baroAlt = baroAlt,
                 lux = lux,
-                proximity = proximity,
                 proximityCm = proximityCm,
-                proximityDebounce = proximityDebounce,
+                proximityDebounceMs = proximityDebounceMs,
                 rollingVibration = rollingVibration,
                 trackerMaxTemp = trackerMaxTemp,
                 viewerMaxTemp = viewerMaxTemp,
                 peakShock = peakShock,
                 vibrationFloor = vibrationFloor,
                 luxBaseline = luxBaseline,
-                acousticFloor = acousticFloor,
+                acousticFloorDb = acousticFloorDb,
                 trackerCurrentMa = trackerCurrentMa,
                 isTelemetryFresh = isTelemetryFresh,
                 isViewer = isViewer,
                 isLocalOnline = isLocalOnline,
                 cpuLoad = cpuLoad,
                 ioWait = ioWait,
-                maxIoLatency = maxIoLatency
+                maxIoLatencyMs = maxIoLatencyMs
             )
         }
     }
@@ -247,8 +243,9 @@ private fun DashboardHeader(
         }
         
         if (isLocationPending && locationPendingReason != LocationPendingReason.NONE) {
+            val reasonLabel = remember(locationPendingReason) { locationPendingReason.name.replace("_", " ") }
             Text(
-                text = "UNCERTAINTY: ${locationPendingReason.name.replace("_", " ")}",
+                text = "UNCERTAINTY: $reasonLabel",
                 color = Amber500,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Black,
@@ -268,18 +265,17 @@ private fun DashboardHeader(
 
 @Composable
 private fun SystemHealthSection(
-    maxDrop: String,
-    lastSeen: String,
-    totalDrop: String,
-    totalUptime: String,
-    session: String,
+    maxDropMs: Long,
+    lastSeenTs: Long,
+    totalDropMs: Long,
+    totalUptimeMs: Long,
+    sessionMs: Long,
     engineVersion: String,
-    sinceConn: String,
-    sinceDisco: String,
-    violationUptime: String,
-    watchdogCountdown: String,
+    sinceConnMs: Long,
+    sinceDiscoMs: Long,
+    violationUptimeMs: Long,
+    watchdogCountdownSec: Long,
     watchdogOk: Boolean,
-    isPowerSaveMode: Boolean, // deprecated parameter, use isPowerSaveModeActual
     standbyBucket: Int,
     netInterface: String,
     isStorageLow: Boolean,
@@ -290,23 +286,34 @@ private fun SystemHealthSection(
     relayColor: Color,
     masterColor: Color,
     rttValue: Int,
-    isPowerSaveModeActual: Boolean = false
+    isPowerSaveMode: Boolean,
+    systemPulse: Long
 ) {
-    InfoRow(leftVal = maxDrop, leftLabel = stringResource(R.string.label_max_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = lastSeen, rightLabel = stringResource(R.string.label_last_seen), rightColor = relayColor)
-    InfoRow(leftVal = totalDrop, leftLabel = stringResource(R.string.label_total_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = totalUptime, rightLabel = stringResource(R.string.label_app_bruto), rightColor = masterColor)
+    val maxDropStr = remember(maxDropMs) { formatDuration(maxDropMs) }
+    val lastSeenStr = remember(lastSeenTs, systemPulse) { 
+        if (lastSeenTs > 0) {
+            val delta = (systemPulse - lastSeenTs) / 1000
+            if (delta < 60) "${delta}s" else "${delta / 60}m"
+        } else "--"
+    }
+    InfoRow(leftVal = maxDropStr, leftLabel = stringResource(R.string.label_max_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = lastSeenStr, rightLabel = stringResource(R.string.label_last_seen), rightColor = relayColor)
+    
+    val totalDropStr = remember(totalDropMs) { formatDuration(totalDropMs) }
+    val totalUptimeStr = remember(totalUptimeMs) { formatDuration(totalUptimeMs) }
+    InfoRow(leftVal = totalDropStr, leftLabel = stringResource(R.string.label_total_drop), leftColor = if (isConnStale) Slate500 else Rose500, rightVal = totalUptimeStr, rightLabel = stringResource(R.string.label_app_bruto), rightColor = masterColor)
     
     val pingStr = if (rttValue > 0) "${rttValue}ms" else "--"
-    InfoRow(leftVal = pingStr, leftLabel = stringResource(R.string.label_ping), leftColor = relayColor, rightVal = totalUptime, rightLabel = stringResource(R.string.label_total_monitor), rightColor = masterColor)
+    InfoRow(leftVal = pingStr, leftLabel = stringResource(R.string.label_ping), leftColor = relayColor, rightVal = totalUptimeStr, rightLabel = stringResource(R.string.label_total_monitor), rightColor = masterColor)
     
-    InfoRow(leftVal = watchdogCountdown, leftLabel = stringResource(R.string.label_watchdog), leftColor = if (isConnStale) Slate500 else (if(watchdogOk) BrandJd else Rose500), rightVal = if(isBatteryWhitelisted) "UNREST" else "RESTR", rightLabel = "Batt", rightColor = if (isConnStale) Slate500 else (if(isBatteryWhitelisted) BrandJd else Amber500))
+    val watchdogStr = remember(watchdogCountdownSec) { if (watchdogCountdownSec > 0) "${watchdogCountdownSec}s" else "--" }
+    InfoRow(leftVal = watchdogStr, leftLabel = stringResource(R.string.label_watchdog), leftColor = if (isConnStale) Slate500 else (if(watchdogOk) BrandJd else Rose500), rightVal = if(isBatteryWhitelisted) "UNREST" else "RESTR", rightLabel = "Batt", rightColor = if (isConnStale) Slate500 else (if(isBatteryWhitelisted) BrandJd else Amber500))
     
-    val standbyText = when (standbyBucket) {
-        10 -> "ACTIVE"; 20 -> "WORKING"; 30 -> "FREQUENT"; 40 -> "RARE"; 45 -> "RESTRICTED"; else -> "U-$standbyBucket"
+    val (standbyText, standbyColor) = remember(standbyBucket) {
+        when (standbyBucket) {
+            10 -> "ACTIVE" to BrandJd; 20 -> "WORKING" to BrandJd; 30 -> "FREQUENT" to Amber500; 40 -> "RARE" to Rose500; 45 -> "RESTRICTED" to Rose500; else -> "U-$standbyBucket" to Rose500
+        }
     }
-    val standbyColor = when (standbyBucket) {
-        10 -> BrandJd; 20 -> BrandJd; 30 -> Amber500; else -> Rose500
-    }
-    InfoRow(leftVal = if (isPowerSaveModeActual) "ON" else "OFF", leftLabel = "PwrSave", leftColor = if (isPowerSaveModeActual) Rose500 else BrandJd, rightVal = standbyText, rightLabel = "Standby", rightColor = if (isConnStale) Slate500 else standbyColor)
+    InfoRow(leftVal = if (isPowerSaveMode) "ON" else "OFF", leftLabel = "PwrSave", leftColor = if (isPowerSaveMode) Rose500 else BrandJd, rightVal = standbyText, rightLabel = "Standby", rightColor = if (isConnStale) Slate500 else standbyColor)
     
     val (storageText, storageColor) = when {
         isStorageCritical -> "CRITICAL" to Rose500
@@ -315,25 +322,32 @@ private fun SystemHealthSection(
     }
     InfoRow(leftVal = netInterface, leftLabel = "Network", leftColor = if (netInterface == "OFFLINE") Rose500 else Color.White, rightVal = storageText, rightLabel = "Storage", rightColor = if (isConnStale) Slate500 else storageColor)
     
-    InfoRow(leftVal = totalUptime, leftLabel = "Uptime", leftColor = masterColor, rightVal = session, rightLabel = stringResource(R.string.label_session), rightColor = masterColor)
-    InfoRow(leftVal = engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = sinceConn, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else BrandJd)
-    InfoRow(leftVal = sinceDisco, leftLabel = "Disconnected", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = violationUptime, rightLabel = "Violation", rightColor = if (!isTelemetryFresh) Slate500 else Rose500)
+    val sessionStr = remember(sessionMs) { formatDuration(sessionMs) }
+    InfoRow(leftVal = totalUptimeStr, leftLabel = "Uptime", leftColor = masterColor, rightVal = sessionStr, rightLabel = stringResource(R.string.label_session), rightColor = masterColor)
+    
+    val sinceConnStr = remember(sinceConnMs) { if (sinceConnMs > 0) formatDuration(sinceConnMs) else "--" }
+    InfoRow(leftVal = engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = sinceConnStr, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else BrandJd)
+    
+    val sinceDiscoStr = remember(sinceDiscoMs) { if (sinceDiscoMs > 0) formatDuration(sinceDiscoMs) else "--" }
+    val violationUptimeStr = remember(violationUptimeMs) { formatDuration(violationUptimeMs) }
+    InfoRow(leftVal = sinceDiscoStr, leftLabel = "Disconnected", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = violationUptimeStr, rightLabel = "Violation", rightColor = if (!isTelemetryFresh) Slate500 else Rose500)
 }
 
 @Composable
 private fun PositionSection(
-    distToHome: String,
-    distToViewer: String,
-    lat: String,
-    lng: String,
-    gpsSpeed: String,
-    trackerAccuracy: String,
-    trackerMaxAcc: String,
-    viewerAccuracy: String,
-    viewerMaxAcc: String,
-    satsIndex: String,
+    distToHome: Double?,
+    distToViewer: Double?,
+    lat: Double,
+    lng: Double,
+    gpsSpeedMps: Double,
+    trackerAccuracy: Double,
+    trackerMaxAcc: Double,
+    viewerAccuracy: Double,
+    viewerMaxAcc: Double,
+    satsUsed: Int,
+    satsView: Int,
     isSatsIndexWarning: Boolean,
-    snr: String,
+    snr: Double,
     isGpsFresh: Boolean,
     gpsIdx: GpsIndexData,
     isViewer: Boolean,
@@ -341,67 +355,100 @@ private fun PositionSection(
     gpsColor: Color,
     onShowGnssDetail: () -> Unit
 ) {
-    InfoRow(leftVal = distToHome, leftLabel = "Dist Home", leftColor = gpsColor, rightVal = distToViewer, rightLabel = "Dist Other", rightColor = gpsColor)
-    InfoRow(leftVal = lat, leftLabel = "Lat", leftColor = gpsColor, rightVal = lng, rightLabel = "Long", rightColor = gpsColor)
+    val distToHomeStr = remember(distToHome) { formatDist(distToHome) }
+    val distToViewerStr = remember(distToViewer) { formatDist(distToViewer) }
+    InfoRow(leftVal = distToHomeStr, leftLabel = "Dist Home", leftColor = gpsColor, rightVal = distToViewerStr, rightLabel = "Dist Other", rightColor = gpsColor)
     
-    val gpsIdxStr = "%.2f".format(Locale.getDefault(), gpsIdx.totalIndex)
-    InfoRow(leftVal = gpsIdxStr, leftLabel = "GPS-Index", leftColor = if(!isGpsFresh) Slate500 else BrandJd, rightVal = gpsSpeed, rightLabel = "GPS Speed", rightColor = if(!isGpsFresh) Slate500 else BrandJd, onLeftClick = onShowGnssDetail)
+    val latStr = remember(lat, isGpsFresh) { if (isGpsFresh) "%.6f".format(Locale.getDefault(), lat) else "--" }
+    val lngStr = remember(lng, isGpsFresh) { if (isGpsFresh) "%.6f".format(Locale.getDefault(), lng) else "--" }
+    InfoRow(leftVal = latStr, leftLabel = "Lat", leftColor = gpsColor, rightVal = lngStr, rightLabel = "Long", rightColor = gpsColor)
     
-    val trkAccDisplay = "$trackerAccuracy ($trackerMaxAcc)"
-    val vwrAccDisplay = if (isViewer) "$viewerAccuracy ($viewerMaxAcc)" else ""
+    val gpsIdxStr = remember(gpsIdx.totalIndex) { "%.2f".format(Locale.getDefault(), gpsIdx.totalIndex) }
+    val gpsSpeedStr = remember(gpsSpeedMps, isGpsFresh) { if (isGpsFresh) "%.1fkm/h".format(Locale.getDefault(), gpsSpeedMps * 3.6) else "--" }
+    InfoRow(leftVal = gpsIdxStr, leftLabel = "GPS-Index", leftColor = if(!isGpsFresh) Slate500 else BrandJd, rightVal = gpsSpeedStr, rightLabel = "GPS Speed", rightColor = if(!isGpsFresh) Slate500 else BrandJd, onLeftClick = onShowGnssDetail)
+    
+    val trkAccDisplay = remember(trackerAccuracy, trackerMaxAcc, isGpsFresh) { if (isGpsFresh) "±%.1fm (±%.1fm)".format(Locale.getDefault(), trackerAccuracy, trackerMaxAcc) else "--" }
+    val vwrAccDisplay = remember(viewerAccuracy, viewerMaxAcc, isViewer) { if (isViewer) "±%.1fm (±%.1fm)".format(Locale.getDefault(), viewerAccuracy, viewerMaxAcc) else "" }
     InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !isLocalOnline) Slate500 else ViewerCyan, rightVal = trkAccDisplay, rightLabel = "Tr Accuracy", rightColor = gpsColor)
     
-    InfoRow(leftVal = satsIndex, leftLabel = "Satellites Index", leftColor = if(!isGpsFresh) Slate500 else if(isSatsIndexWarning) Rose500 else Color.White, rightVal = "%.2f".format(Locale.getDefault(), gpsIdx.ageIndex), rightLabel = "Age Index", rightColor = if(!isGpsFresh) Slate500 else Amber500)
-    InfoRow(leftVal = "%.2f".format(Locale.getDefault(), gpsIdx.accIndex), leftLabel = "Acc Index", leftColor = if(!isGpsFresh) Slate500 else Color.White, rightVal = snr, rightLabel = "Avg SNR", rightColor = if(!isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = onShowGnssDetail)
+    val satsIndexStr = remember(satsUsed, satsView, isGpsFresh) { if (isGpsFresh) "$satsUsed/$satsView" else "--" }
+    val ageIdxStr = remember(gpsIdx.ageIndex) { "%.2f".format(Locale.getDefault(), gpsIdx.ageIndex) }
+    InfoRow(leftVal = satsIndexStr, leftLabel = "Satellites Index", leftColor = if(!isGpsFresh) Slate500 else if(isSatsIndexWarning) Rose500 else Color.White, rightVal = ageIdxStr, rightLabel = "Age Index", rightColor = if(!isGpsFresh) Slate500 else Amber500)
+    
+    val accIdxStr = remember(gpsIdx.accIndex) { "%.2f".format(Locale.getDefault(), gpsIdx.accIndex) }
+    val snrStr = remember(snr, isGpsFresh) { if (isGpsFresh) "${snr.toInt()}dB" else "--" }
+    InfoRow(leftVal = accIdxStr, leftLabel = "Acc Index", leftColor = if(!isGpsFresh) Slate500 else Color.White, rightVal = snrStr, rightLabel = "Avg SNR", rightColor = if(!isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = onShowGnssDetail)
 }
 
 @Composable
 private fun ForensicSection(
-    vibration: String,
-    heading: String,
-    tilt: String,
-    acoustic: String,
-    lift: String,
-    lux: String,
-    proximity: String,
-    proximityCm: String,
-    proximityDebounce: String,
-    rollingVibration: String,
-    trackerMaxTemp: String,
-    viewerMaxTemp: String,
-    peakShock: String,
-    vibrationFloor: String,
-    luxBaseline: String,
-    acousticFloor: String,
-    trackerCurrentMa: String,
+    vibration: Double,
+    heading: Double,
+    tilt: Double,
+    acousticDb: Double,
+    baroAlt: Double,
+    lux: Double,
+    proximityCm: Double,
+    proximityDebounceMs: Long,
+    rollingVibration: Double,
+    trackerMaxTemp: Double,
+    viewerMaxTemp: Double,
+    peakShock: Double,
+    vibrationFloor: Double,
+    luxBaseline: Double,
+    acousticFloorDb: Double,
+    trackerCurrentMa: Int,
     isTelemetryFresh: Boolean,
     isViewer: Boolean,
     isLocalOnline: Boolean,
-    // Issue #132
-    cpuLoad: String,
-    ioWait: String,
-    maxIoLatency: String
+    cpuLoad: Double,
+    ioWait: Double,
+    maxIoLatencyMs: Long
 ) {
     val staleColor = Slate500
     val tFresh = isTelemetryFresh
     
-    InfoRow(leftVal = vibration, leftLabel = "Vibration", leftColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR), rightVal = heading, rightLabel = "Compass", rightColor = if(!tFresh) staleColor else Color(0xFFFB923C))
-    InfoRow(leftVal = tilt, leftLabel = "Tilt", leftColor = if(!tFresh) staleColor else Violet500, rightVal = acoustic, rightLabel = "Noise Level", rightColor = if(!tFresh) staleColor else Color(0xFF38BDF8))
-    InfoRow(leftVal = lift, leftLabel = "Lift", leftColor = if(!tFresh) staleColor else Color(0xFFFACC15), rightVal = lux, rightLabel = "Lux", rightColor = if(!tFresh) staleColor else Amber500)
+    val vibeStr = remember(vibration, tFresh) { if (tFresh) "%.2fG".format(Locale.getDefault(), vibration) else "--" }
+    val headingStr = remember(heading, tFresh) { if (tFresh) "%.0f°".format(Locale.getDefault(), heading) else "--" }
+    InfoRow(leftVal = vibeStr, leftLabel = "Vibration", leftColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR), rightVal = headingStr, rightLabel = "Compass", rightColor = if(!tFresh) staleColor else Color(0xFFFB923C))
     
-    InfoRow(leftVal = proximity, leftLabel = "Proximity", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = proximityCm, rightLabel = "Raw Prox", rightColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR))
-    InfoRow(leftVal = proximityDebounce, leftLabel = "Prox Debounce", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = rollingVibration, rightLabel = "Rolling Vibe", rightColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR))
+    val tiltStr = remember(tilt, tFresh) { if (tFresh) "%.1f°".format(Locale.getDefault(), tilt) else "--" }
+    val acousticStr = remember(acousticDb, tFresh) { if (tFresh) "%.0fdB".format(Locale.getDefault(), acousticDb) else "--" }
+    InfoRow(leftVal = tiltStr, leftLabel = "Tilt", leftColor = if(!tFresh) staleColor else Violet500, rightVal = acousticStr, rightLabel = "Noise Level", rightColor = if(!tFresh) staleColor else Color(0xFF38BDF8))
+    
+    val liftStr = remember(baroAlt, tFresh) { if (tFresh) "%.1fm".format(Locale.getDefault(), baroAlt) else "--" }
+    val luxStr = remember(lux, tFresh) { if (tFresh) "%.0flx".format(Locale.getDefault(), lux) else "--" }
+    InfoRow(leftVal = liftStr, leftLabel = "Lift", leftColor = if(!tFresh) staleColor else Color(0xFFFACC15), rightVal = luxStr, rightLabel = "Lux", rightColor = if(!tFresh) staleColor else Amber500)
+    
+    val proxStr = remember(proximityCm, tFresh) { if (tFresh) (if (proximityCm in 0.0..5.0) "NEAR" else "FAR") else "--" }
+    val rawProxStr = remember(proximityCm, tFresh) { if (tFresh && proximityCm >= 0) "${proximityCm.toInt()}cm" else "--" }
+    InfoRow(leftVal = proxStr, leftLabel = "Proximity", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = rawProxStr, rightLabel = "Raw Prox", rightColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR))
+    
+    val proxDebounceStr = remember(proximityDebounceMs, tFresh) { if (tFresh) "${proximityDebounceMs}ms" else "--" }
+    val rollingVibeStr = remember(rollingVibration, tFresh) { if (tFresh) "%.3fG".format(Locale.getDefault(), rollingVibration) else "--" }
+    InfoRow(leftVal = proxDebounceStr, leftLabel = "Prox Debounce", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = rollingVibeStr, rightLabel = "Rolling Vibe", rightColor = if (!tFresh) staleColor else Color(FORENSIC_PINK_COLOR))
 
-    InfoRow(leftVal = trackerMaxTemp, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = if (isViewer) viewerMaxTemp else "", rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !isLocalOnline) staleColor else ViewerCyan)
+    val trkMaxTempStr = remember(trackerMaxTemp, tFresh) { if (tFresh) "%.1f°C".format(Locale.getDefault(), trackerMaxTemp) else "--" }
+    val vwrMaxTempStr = remember(viewerMaxTemp, isViewer) { if (isViewer) "%.1f°C".format(Locale.getDefault(), viewerMaxTemp) else "" }
+    InfoRow(leftVal = trkMaxTempStr, leftLabel = if (isViewer) "Tracker Max" else "Max Temp", leftColor = if (!tFresh) staleColor else BrandJd, rightVal = vwrMaxTempStr, rightLabel = if (isViewer) "Viewer Max" else "", rightColor = if (isViewer && !isLocalOnline) staleColor else ViewerCyan)
 
     SectionDivider()
 
-    InfoRow(leftVal = peakShock, leftLabel = "Peak Shock", leftColor = if (!tFresh) staleColor else Rose500, rightVal = vibrationFloor, rightLabel = "Vibration Floor", rightColor = if (tFresh) Slate400 else staleColor)
-    InfoRow(leftVal = luxBaseline, leftLabel = "Lux Baseline", leftColor = if(!tFresh) staleColor else Amber500, rightVal = acousticFloor, rightLabel = "Acoustic Floor", rightColor = if(!tFresh) staleColor else Color(0xFF38BDF8))
+    val peakShockStr = remember(peakShock, tFresh) { if (tFresh) "%.2fG".format(Locale.getDefault(), peakShock) else "--" }
+    val vibeFloorStr = remember(vibrationFloor, tFresh) { if (tFresh) "%.2fG".format(Locale.getDefault(), vibrationFloor) else "--" }
+    InfoRow(leftVal = peakShockStr, leftLabel = "Peak Shock", leftColor = if (!tFresh) staleColor else Rose500, rightVal = vibeFloorStr, rightLabel = "Vibration Floor", rightColor = if (tFresh) Slate400 else staleColor)
     
-    // Issue #132 Integration
-    InfoRow(leftVal = cpuLoad, leftLabel = "CPU Load", leftColor = if (!tFresh) staleColor else Color.White, rightVal = ioWait, rightLabel = "I/O Wait", rightColor = if (!tFresh) staleColor else Amber500)
-    InfoRow(leftVal = maxIoLatency, leftLabel = "Max Latency", leftColor = if (!tFresh) staleColor else Rose500, rightVal = trackerCurrentMa, rightLabel = stringResource(R.string.log_diag_battery), rightColor = if(!tFresh) staleColor else Color.White)
+    val luxBaseStr = remember(luxBaseline, tFresh) { if (tFresh) "%.0flx".format(Locale.getDefault(), luxBaseline) else "--" }
+    val acousticFloorStr = remember(acousticFloorDb, tFresh) { if (tFresh) "%.0fdB".format(Locale.getDefault(), acousticFloorDb) else "--" }
+    InfoRow(leftVal = luxBaseStr, leftLabel = "Lux Baseline", leftColor = if(!tFresh) staleColor else Amber500, rightVal = acousticFloorStr, rightLabel = "Acoustic Floor", rightColor = if(!tFresh) staleColor else Color(0xFF38BDF8))
+    
+    val cpuLoadStr = remember(cpuLoad, tFresh) { if (tFresh) "%.1f%%".format(Locale.getDefault(), cpuLoad * 100.0) else "--" }
+    val ioWaitStr = remember(ioWait, tFresh) { if (tFresh) "%.1f%%".format(Locale.getDefault(), ioWait * 100.0) else "--" }
+    InfoRow(leftVal = cpuLoadStr, leftLabel = "CPU Load", leftColor = if (!tFresh) staleColor else Color.White, rightVal = ioWaitStr, rightLabel = "I/O Wait", rightColor = if (!tFresh) staleColor else Amber500)
+    
+    val maxLatencyStr = remember(maxIoLatencyMs, tFresh) { if (tFresh) "${maxIoLatencyMs}ms" else "--" }
+    val currentMaStr = remember(trackerCurrentMa, tFresh) { if (tFresh) "${trackerCurrentMa}mA" else "--" }
+    InfoRow(leftVal = maxLatencyStr, leftLabel = "Max Latency", leftColor = if (!tFresh) staleColor else Rose500, rightVal = currentMaStr, rightLabel = stringResource(R.string.log_diag_battery), rightColor = if(!tFresh) staleColor else Color.White)
 }
 
 @Composable
@@ -469,57 +516,56 @@ fun TelemetryBox(
     isBatterySteepDischarge: Boolean,
     isBatteryLow: Boolean,
     isBatteryCritical: Boolean,
-    maxDrop: String,
-    lastSeen: String,
-    totalDrop: String,
-    totalUptime: String,
-    session: String,
+    maxDropMs: Long,
+    lastSeenTs: Long,
+    totalDropMs: Long,
+    totalUptimeMs: Long,
+    sessionMs: Long,
     engineVersion: String,
-    sinceConn: String,
-    sinceDisco: String,
-    violationUptime: String,
-    watchdogCountdown: String,
+    sinceConnMs: Long,
+    sinceDiscoMs: Long,
+    violationUptimeMs: Long,
+    watchdogCountdownSec: Long,
     watchdogOk: Boolean,
     isPowerSaveMode: Boolean,
     standbyBucket: Int,
     netInterface: String,
     isStorageLow: Boolean,
     isStorageCritical: Boolean,
-    distToHome: String,
-    distToViewer: String,
-    lat: String,
-    lng: String,
-    gpsSpeed: String,
-    trackerAccuracy: String,
-    trackerMaxAcc: String,
-    viewerAccuracy: String,
-    viewerMaxAcc: String,
-    satsIndex: String,
+    distToHome: Double?,
+    distToViewer: Double?,
+    lat: Double,
+    lng: Double,
+    gpsSpeedMps: Double,
+    trackerAccuracy: Double,
+    trackerMaxAcc: Double,
+    viewerAccuracy: Double,
+    viewerMaxAcc: Double,
+    satsUsed: Int,
+    satsView: Int,
     isSatsIndexWarning: Boolean,
-    snr: String,
-    vibration: String,
-    heading: String,
-    tilt: String,
-    acoustic: String,
-    lift: String,
-    lux: String,
-    proximity: String,
-    proximityCm: String,
-    proximityDebounce: String,
-    rollingVibration: String,
-    trackerMaxTemp: String,
-    viewerMaxTemp: String,
-    peakShock: String,
-    vibrationFloor: String,
-    luxBaseline: String,
-    acousticFloor: String,
-    trackerCurrentMa: String,
+    snr: Double,
+    vibration: Double,
+    heading: Double,
+    tilt: Double,
+    acousticDb: Double,
+    baroAlt: Double,
+    lux: Double,
+    proximityCm: Double,
+    proximityDebounceMs: Long,
+    rollingVibration: Double,
+    trackerMaxTemp: Double,
+    viewerMaxTemp: Double,
+    peakShock: Double,
+    vibrationFloor: Double,
+    luxBaseline: Double,
+    acousticFloorDb: Double,
+    trackerCurrentMa: Int,
     gpsIdx: GpsIndexData,
     rttValue: Int,
-    // Issue #132
-    cpuLoad: String,
-    ioWait: String,
-    maxIoLatency: String,
+    cpuLoad: Double,
+    ioWait: Double,
+    maxIoLatencyMs: Long,
     onShowGnssDetail: () -> Unit = {}
 ) {
     MainDashboardGrid(
@@ -540,16 +586,16 @@ fun TelemetryBox(
         isBatterySteepDischarge = isBatterySteepDischarge,
         isBatteryLow = isBatteryLow,
         isBatteryCritical = isBatteryCritical,
-        maxDrop = maxDrop,
-        lastSeen = lastSeen,
-        totalDrop = totalDrop,
-        totalUptime = totalUptime,
-        session = session,
+        maxDropMs = maxDropMs,
+        lastSeenTs = lastSeenTs,
+        totalDropMs = totalDropMs,
+        totalUptimeMs = totalUptimeMs,
+        sessionMs = sessionMs,
         engineVersion = engineVersion,
-        sinceConn = sinceConn,
-        sinceDisco = sinceDisco,
-        violationUptime = violationUptime,
-        watchdogCountdown = watchdogCountdown,
+        sinceConnMs = sinceConnMs,
+        sinceDiscoMs = sinceDiscoMs,
+        violationUptimeMs = violationUptimeMs,
+        watchdogCountdownSec = watchdogCountdownSec,
         watchdogOk = watchdogOk,
         isPowerSaveMode = isPowerSaveMode,
         standbyBucket = standbyBucket,
@@ -560,36 +606,36 @@ fun TelemetryBox(
         distToViewer = distToViewer,
         lat = lat,
         lng = lng,
-        gpsSpeed = gpsSpeed,
+        gpsSpeedMps = gpsSpeedMps,
         trackerAccuracy = trackerAccuracy,
         trackerMaxAcc = trackerMaxAcc,
         viewerAccuracy = viewerAccuracy,
         viewerMaxAcc = viewerMaxAcc,
-        satsIndex = satsIndex,
+        satsUsed = satsUsed,
+        satsView = satsView,
         isSatsIndexWarning = isSatsIndexWarning,
         snr = snr,
         vibration = vibration,
         heading = heading,
         tilt = tilt,
-        acoustic = acoustic,
-        lift = lift,
+        acousticDb = acousticDb,
+        baroAlt = baroAlt,
         lux = lux,
-        proximity = proximity,
         proximityCm = proximityCm,
-        proximityDebounce = proximityDebounce,
+        proximityDebounceMs = proximityDebounceMs,
         rollingVibration = rollingVibration,
         trackerMaxTemp = trackerMaxTemp,
         viewerMaxTemp = viewerMaxTemp,
         peakShock = peakShock,
         vibrationFloor = vibrationFloor,
         luxBaseline = luxBaseline,
-        acousticFloor = acousticFloor,
+        acousticFloorDb = acousticFloorDb,
         trackerCurrentMa = trackerCurrentMa,
         gpsIdx = gpsIdx,
         rttValue = rttValue,
         cpuLoad = cpuLoad,
         ioWait = ioWait,
-        maxIoLatency = maxIoLatency,
+        maxIoLatencyMs = maxIoLatencyMs,
         onShowGnssDetail = onShowGnssDetail
     )
 }
@@ -630,5 +676,22 @@ private fun DebugItem(label: String, value: String, valueColor: Color = Color.Wh
     Column(modifier = Modifier.width(140.dp)) {
         Text(label, color = Slate500, fontSize = 8.sp, fontWeight = FontWeight.Bold)
         Text(value, color = valueColor, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+    }
+}
+
+private fun formatDuration(ms: Long): String {
+    val totalSeconds = ms / 1000
+    val h = totalSeconds / 3600
+    val m = (totalSeconds % 3600) / 60
+    val s = totalSeconds % 60
+    return "%02d:%02d:%02d".format(h, m, s)
+}
+
+private fun formatDist(d: Double?): String {
+    if (d == null || d.isNaN() || d == 0.0) return "--"
+    return when {
+        d >= 9000 -> String.format(Locale.getDefault(), "%.0fkm", d / 1000.0)
+        d >= 1000 -> String.format(Locale.getDefault(), "%.1fkm", d / 1000.0)
+        else -> "${d.toInt()}m"
     }
 }

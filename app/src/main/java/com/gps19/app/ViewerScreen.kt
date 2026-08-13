@@ -32,12 +32,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Aug.13.12:
+ * - Issue #163: 1Hz Telemetry Path Optimization. Updated ViewerDashboard 
+ *   to handle refactored DashboardState primitive fields (R163).
  * Aug.10.31:
  * - Issue #135: UI Davey/ANR Mitigation. Refactored SettingsOverlay call site 
  *   to pass decomposed primitive parameters (R135).
- * Aug.10.26:
- * - Issue #132: Forensic UI Dashboard Refinement. Passed cpuLoad, ioWait, 
- *   and maxIoLatency to TelemetryBox (R132).
  */
 
 @Composable
@@ -457,16 +457,16 @@ fun ViewerDashboard(
                         isBatterySteepDischarge = dashboardState.isBatterySteepDischarge,
                         isBatteryLow = dashboardState.isBatteryLow,
                         isBatteryCritical = dashboardState.isBatteryCritical,
-                        maxDrop = dashboardState.maxDrop,
-                        lastSeen = dashboardState.lastSeen,
-                        totalDrop = dashboardState.totalDrop,
-                        totalUptime = dashboardState.totalUptime,
-                        session = dashboardState.session,
+                        maxDropMs = dashboardState.maxDropMs,
+                        lastSeenTs = dashboardState.lastSeenTs,
+                        totalDropMs = dashboardState.totalDropMs,
+                        totalUptimeMs = dashboardState.totalUptimeMs,
+                        sessionMs = dashboardState.sessionMs,
                         engineVersion = dashboardState.engineVersion,
-                        sinceConn = dashboardState.sinceConn,
-                        sinceDisco = dashboardState.sinceDisco,
-                        violationUptime = dashboardState.violationUptime,
-                        watchdogCountdown = dashboardState.watchdogCountdown,
+                        sinceConnMs = dashboardState.sinceConnMs,
+                        sinceDiscoMs = dashboardState.sinceDiscoMs,
+                        violationUptimeMs = dashboardState.violationUptimeMs,
+                        watchdogCountdownSec = dashboardState.watchdogCountdownSec,
                         watchdogOk = dashboardState.watchdogOk,
                         isPowerSaveMode = dashboardState.isPowerSaveMode,
                         standbyBucket = dashboardState.standbyBucket,
@@ -477,36 +477,36 @@ fun ViewerDashboard(
                         distToViewer = dashboardState.distToViewer,
                         lat = dashboardState.lat,
                         lng = dashboardState.lng,
-                        gpsSpeed = dashboardState.gpsSpeed,
+                        gpsSpeedMps = dashboardState.gpsSpeedMps,
                         trackerAccuracy = dashboardState.trackerAccuracy,
                         trackerMaxAcc = dashboardState.trackerMaxAcc,
                         viewerAccuracy = dashboardState.viewerAccuracy,
                         viewerMaxAcc = dashboardState.viewerMaxAcc,
-                        satsIndex = dashboardState.satsIndex,
+                        satsUsed = dashboardState.satsUsed,
+                        satsView = dashboardState.satsView,
                         isSatsIndexWarning = dashboardState.isSatsIndexWarning,
                         snr = dashboardState.snr,
                         vibration = dashboardState.vibration,
                         heading = dashboardState.heading,
                         tilt = dashboardState.tilt,
-                        acoustic = dashboardState.acoustic,
-                        lift = dashboardState.lift,
+                        acousticDb = dashboardState.acousticDb,
+                        baroAlt = dashboardState.baroAlt,
                         lux = dashboardState.lux,
-                        proximity = dashboardState.proximity,
                         proximityCm = dashboardState.proximityCm,
-                        proximityDebounce = dashboardState.proximityDebounce,
+                        proximityDebounceMs = dashboardState.proximityDebounceMs,
                         rollingVibration = dashboardState.rollingVibration,
                         trackerMaxTemp = dashboardState.trackerMaxTemp,
                         viewerMaxTemp = dashboardState.viewerMaxTemp,
                         peakShock = dashboardState.peakShock,
                         vibrationFloor = dashboardState.vibrationFloor,
                         luxBaseline = dashboardState.luxBaseline,
-                        acousticFloor = dashboardState.acousticFloor,
+                        acousticFloorDb = dashboardState.acousticFloorDb,
                         trackerCurrentMa = dashboardState.trackerCurrentMa,
                         gpsIdx = gpsIdx,
                         rttValue = rttValue,
                         cpuLoad = dashboardState.cpuLoad,
                         ioWait = dashboardState.ioWait,
-                        maxIoLatency = dashboardState.maxIoLatency,
+                        maxIoLatencyMs = dashboardState.maxIoLatencyMs,
                         onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                     )
                     DebugTable(

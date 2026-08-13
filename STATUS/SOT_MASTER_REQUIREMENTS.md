@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.13.11 (Phone Setup ANR Remediation Complete)
+# System Source of Truth (SoT) - Aug.13.12 (Telemetry Path Optimization Complete)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Telemetry Path Optimization (R163)**: (Added Aug.13.12) The system MUST eliminate object churn in the 1Hz telemetry path. `DashboardState` MUST utilize primitive types for all high-frequency data. UI components MUST perform string formatting using `remember` blocks to ensure that new string objects are only allocated when the underlying data changes, minimizing GC pressure on budget hardware. (Issue #163). **Status: Implemented.**
 *   **Phone Setup ANR Remediation (R162)**: (Added Aug.13.11) The system MUST utilize a hardened hydration gate (minimum 150ms) in `PhoneSetupOverlay` to allow navigation transitions to settle before rendering heavy layout components. sequential rendering offsets for setup sections MUST be at least 80ms. Static hardware strings and permission descriptions MUST be memoized to prevent redundant resource lookups. Alert animations in `HeaderBar` MUST be suppressed while the setup overlay is active. (Issue #162). **Status: Implemented.**
 *   **SELinux Telemetry Remediation (R159)**: (Added Aug.13.10) The system MUST bypass `/proc/loadavg` and `/proc/stat` file access on Android 10 (SDK 29) and higher. (Issue #159). **Status: Implemented.**
 *   **Performance Hardening Audit (R158)**: (Added Aug.13.09) The system MUST undergo forensic validation after cumulative performance optimizations (R152-R157). (Issue #158). **Status: Validated & Closed.**
@@ -36,5 +37,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.13.11.
+*   **Current Release**: Aug.13.12.
 *   **Source of Truth**: app/build.gradle versionName.

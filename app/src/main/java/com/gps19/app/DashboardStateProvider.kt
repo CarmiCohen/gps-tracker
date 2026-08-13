@@ -1,18 +1,18 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard states.
+ * Aug.13.11:
+ * - Issue #163: 1Hz Telemetry Path Optimization. Refactored to pass raw 
+ *   primitive values instead of pre-formatted strings to eliminate object 
+ *   churn in the 1Hz heartbeat (R163).
  * Aug.10.28:
  * - Issue #133: Forensic Anomaly Correlation Engine. Populated isSilentFailure 
  *   into DashboardState for load-correlated anomaly tracking (R133).
- * Aug.10.26:
- * - Issue #132: Forensic UI Dashboard Refinement. Populated cpuLoad, ioWait, 
- *   and maxIoLatency for performance visualization (R132).
  */
 interface DashboardStateProvider {
     fun buildDashboardState(
@@ -44,21 +44,10 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
 
         val activeStats = if (isViewer) diagnosticState.trackerStats else diagnosticState.stats
         
-        val totalUptime = formatDuration(activeStats.uptimeMs)
-        val session = if (activeStats.lastConnTs > 0) formatDuration(activeStats.sessionConnectedMs) else "00:00:00"
-        val sinceConn = if (activeStats.lastConnTs > 0) formatDuration(now - activeStats.lastConnTs) else "--"
-        val sinceDisco = if (activeStats.lastDiscTs > 0) formatDuration(now - activeStats.lastDiscTs) else "--"
-        
-        val totalDrop = formatDuration(activeStats.totalDropMs)
-        val maxDrop = formatDuration(activeStats.maxDropMs)
-        
-        val lastSeen = if (diagnosticState.connectivity.lastRemoteActivityTs > 0) {
-            val delta = (now - diagnosticState.connectivity.lastRemoteActivityTs) / 1000
-            if (delta < 60) "${delta}s" else "${delta / 60}m"
-        } else "--"
+        val lastSeenTs = diagnosticState.connectivity.lastRemoteActivityTs
 
-        val watchdogSec = if (diagnosticState.connectivity.lastRemoteActivityTs > 0) {
-            val remaining = (WATCH_TIMEOUT_MS - (now - diagnosticState.connectivity.lastRemoteActivityTs)) / 1000
+        val watchdogSec = if (lastSeenTs > 0) {
+            val remaining = (WATCH_TIMEOUT_MS - (now - lastSeenTs)) / 1000
             maxOf(0L, remaining)
         } else 0L
 
@@ -72,72 +61,63 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
 
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
         val isGpsActive = totalGpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
-        val isTelemetryVisible = telemetryAge < SENSOR_GRACE_PERIOD_MS
-        val isForensicFresh = telemetryAge < WATCH_DOG_UI_GRACE_MS
 
         val gnss = loc.gnssDetail
-        val snrValue = if (gnss != null && isTelemetryVisible) {
+        var avgCn0 = 0.0
+        if (gnss != null) {
             val satellites = gnss.satellites
-            if (satellites.isEmpty()) "--"
-            else {
+            if (satellites.isNotEmpty()) {
                 var sum = 0.0
                 for (sat in satellites) {
                     sum += sat.cn0
                 }
-                val avgCn0 = sum / satellites.size
-                "${avgCn0.toInt()}dB"
+                avgCn0 = sum / satellites.size
             }
-        } else "--"
+        }
 
-        fun gpsVal(value: String): String = if (isGpsActive) value else "--"
-        fun sensorVal(value: String): String = if (isTelemetryVisible) value else "--"
-        fun forensicVal(value: String): String = if (isForensicFresh) value else "--"
-
-        val rawAcc = loc.accuracy
-        val filteredAcc = if (loc.maxAccuracy > 0) loc.maxAccuracy else rawAcc
-        
         return DashboardState(
             trackerState = trackerState,
             status = loc.status,
             isTamperDetected = health.isTamperDetected,
-            maxDrop = maxDrop,
-            lastSeen = lastSeen,
-            totalDrop = totalDrop,
-            watchdogCountdown = if (isTrackerMode) "--" else "${watchdogSec}s",
+            maxDropMs = activeStats.maxDropMs,
+            lastSeenTs = lastSeenTs,
+            totalDropMs = activeStats.totalDropMs,
+            watchdogCountdownSec = if (isTrackerMode) 0L else watchdogSec,
             watchdogOk = if (isTrackerMode) true else (watchdogSec > 0),
-            totalUptime = totalUptime,
-            session = session,
+            totalUptimeMs = activeStats.uptimeMs,
+            sessionMs = if (activeStats.lastConnTs > 0) activeStats.sessionConnectedMs else 0L,
             engineVersion = BuildConfig.VERSION_NAME,
-            sinceConn = sinceConn,
-            sinceDisco = sinceDisco,
-            violationUptime = formatDuration(health.violationUptimeMs),
-            violationPercentage = "%.1f%%".format(Locale.getDefault(), health.violationPercentage * 100.0),
-            lat = gpsVal("%.6f".format(Locale.getDefault(), loc.lat)),
-            lng = gpsVal("%.6f".format(Locale.getDefault(), loc.lng)),
-            trackerAccuracy = gpsVal("±%.1fm".format(Locale.getDefault(), rawAcc)),
-            trackerMaxAcc = gpsVal("±%.1fm".format(Locale.getDefault(), filteredAcc)),
-            satsIndex = gpsVal("${diagnosticState.trackerSatsUsed}/${diagnosticState.trackerSatsView}"),
+            sinceConnMs = if (activeStats.lastConnTs > 0) (now - activeStats.lastConnTs) else 0L,
+            sinceDiscoMs = if (activeStats.lastDiscTs > 0) (now - activeStats.lastDiscTs) else 0L,
+            violationUptimeMs = health.violationUptimeMs,
+            violationPercentage = health.violationPercentage,
+            lat = if (isGpsActive) loc.lat else 0.0,
+            lng = if (isGpsActive) loc.lng else 0.0,
+            trackerAccuracy = loc.accuracy,
+            trackerMaxAcc = if (loc.maxAccuracy > 0) loc.maxAccuracy else loc.accuracy,
+            satsUsed = diagnosticState.trackerSatsUsed,
+            satsView = diagnosticState.trackerSatsView,
             isSatsIndexWarning = (diagnosticState.trackerSatsUsed < 4 && diagnosticState.trackerSatsView > 0),
-            viewerAccuracy = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), kinematicState.localLocation.accuracy),
-            viewerMaxAcc = if (isTrackerMode) "--" else "±%.1fm".format(Locale.getDefault(), if(kinematicState.localLocation.maxAccuracy > 0) kinematicState.localLocation.maxAccuracy else kinematicState.localLocation.accuracy),
-            vibration = sensorVal("%.2fG".format(Locale.getDefault(), health.vibration)),
-            heading = sensorVal("%.0f°".format(Locale.getDefault(), health.heading)),
-            tilt = sensorVal("%.1f°".format(Locale.getDefault(), health.tiltDegrees)),
-            acoustic = sensorVal("%.0fdB".format(Locale.getDefault(), health.acousticDb)),
-            lift = sensorVal("%.1fm".format(Locale.getDefault(), health.baroAlt)),
-            lux = sensorVal("%.0flx".format(Locale.getDefault(), health.lux)),
-            proximity = sensorVal(if (health.isNear) "NEAR" else "FAR"),
-            proximityCm = sensorVal(if (health.proximityCm >= 0) "${health.proximityCm.toInt()}cm" else "--"),
-            proximityDebounce = forensicVal("${health.proximityDebounceMs}ms"),
-            rollingVibration = forensicVal("%.3fG".format(Locale.getDefault(), health.vibrationRollingSum)),
-            kineticEnergy = forensicVal("%.3fG".format(Locale.getDefault(), health.kineticEnergy)),
-            gpsSpeed = gpsVal("%.1fkm/h".format(Locale.getDefault(), loc.speed * 3.6)),
-            trackerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), trackerMaxTemp)),
-            viewerMaxTemp = sensorVal("%.1f°C".format(Locale.getDefault(), localMaxTemp)),
-            peakShock = sensorVal("%.2fG".format(Locale.getDefault(), health.peakVibrationShock)),
-            vibrationFloor = sensorVal("%.2fG".format(Locale.getDefault(), health.adaptiveVibrationFloor)),
-            luxBaseline = sensorVal("%.0flx".format(Locale.getDefault(), health.luxBaseline)),
-            acousticFloor = sensorVal("%.0fdB".format(Locale.getDefault(), health.acousticFloorDb)),
+            viewerAccuracy = if (isTrackerMode) 0.0 else kinematicState.localLocation.accuracy,
+            viewerMaxAcc = if (isTrackerMode) 0.0 else (if(kinematicState.localLocation.maxAccuracy > 0) kinematicState.localLocation.maxAccuracy else kinematicState.localLocation.accuracy),
+            vibration = health.vibration,
+            heading = health.heading,
+            tilt = health.tiltDegrees,
+            acousticDb = health.acousticDb,
+            baroAlt = health.baroAlt,
+            lux = health.lux,
+            isNear = health.isNear,
+            proximityCm = health.proximityCm,
+            proximityDebounceMs = health.proximityDebounceMs,
+            rollingVibration = health.vibrationRollingSum,
+            kineticEnergy = health.kineticEnergy,
+            gpsSpeedMps = loc.speed,
+            trackerMaxTemp = trackerMaxTemp,
+            viewerMaxTemp = localMaxTemp,
+            peakShock = health.peakVibrationShock,
+            vibrationFloor = health.adaptiveVibrationFloor,
+            luxBaseline = health.luxBaseline,
+            acousticFloorDb = health.acousticFloorDb,
             isMicPending = health.micPending,
             isPowerTamper = health.isPowerTamper,
             isPowerSaveMode = health.isPowerSaveMode,
@@ -145,42 +125,25 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             netInterface = health.netInterface,
             isStorageLow = health.isStorageLow,
             isStorageCritical = health.isStorageCritical,
-            snr = snrValue,
-            distToHome = formatDist(kinematicState.distanceTrackerToHome),
-            distToViewer = formatDist(kinematicState.distanceTrackerToViewer),
+            snr = avgCn0,
+            distToHome = kinematicState.distanceTrackerToHome,
+            distToViewer = kinematicState.distanceTrackerToViewer,
             isGpsFresh = isGpsActive,
             isLinkFresh = (telemetryAge < WATCH_DOG_UI_GRACE_MS),
             isTelemetryFresh = isTelemetryFresh,
-            isGpsVisible = isTelemetryVisible,
-            isLinkVisible = isTelemetryVisible,
+            isGpsVisible = isTelemetryFresh,
+            isLinkVisible = isTelemetryFresh,
             isBatterySteepDischarge = health.isBatterySteepDischarge,
             isCoolingModeActive = health.isCoolingModeActive,
-            trackerCurrentMa = sensorVal("${health.currentMa}mA"),
+            trackerCurrentMa = health.currentMa,
             isLocationPending = health.isLocationPending,
             locationPendingReason = health.locationPendingReason,
             isBatteryLow = health.isBatteryLow,
             isBatteryCritical = health.isBatteryCritical,
-            cpuLoad = forensicVal("%.1f%%".format(Locale.getDefault(), health.cpuLoad * 100.0)),
-            ioWait = forensicVal("%.1f%%".format(Locale.getDefault(), health.ioWait * 100.0)),
-            maxIoLatency = forensicVal("${health.maxIoLatency}ms"),
+            cpuLoad = health.cpuLoad,
+            ioWait = health.ioWait,
+            maxIoLatencyMs = health.maxIoLatency,
             isSilentFailure = health.isSilentFailure
         )
-    }
-
-    private fun formatDuration(ms: Long): String {
-        val totalSeconds = ms / 1000
-        val h = totalSeconds / 3600
-        val m = (totalSeconds % 3600) / 60
-        val s = totalSeconds % 60
-        return "%02d:%02d:%02d".format(h, m, s)
-    }
-
-    private fun formatDist(d: Double?): String {
-        if (d == null || d.isNaN() || d == 0.0) return "--"
-        return when {
-            d >= 9000 -> String.format(Locale.getDefault(), "%.0fkm", d / 1000.0)
-            d >= 1000 -> String.format(Locale.getDefault(), "%.1fkm", d / 1000.0)
-            else -> "${d.toInt()}m"
-        }
     }
 }

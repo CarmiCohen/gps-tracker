@@ -10,14 +10,14 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.13.11:
+ * - Issue #163: 1Hz Telemetry Path Optimization. Refactored DashboardState 
+ *   to use primitive types instead of pre-formatted strings to eliminate 
+ *   object churn in the telemetry hot-path. (R163)
  * Aug.13.08:
  * - Issue #157: Violation Path Allocations. Refactored ViolationPoint to a 
  *   mutable class with primitive coordinates to eliminate UUID and GeoPoint 
  *   churn in the detection and mapping hot-paths (R157).
- * Aug.13.06:
- * - Issue #152: Excessive GC Pressure. Refactored ConnectionPoint to a mutable 
- *   class with pooling support to eliminate object churn in the telemetry 
- *   hot-path (R152).
  */
 
 sealed class AppSensorEvent {
@@ -633,57 +633,61 @@ class LocationState(
     }
 }
 
+/**
+ * Issue #163: DashboardState refactored to use primitives to eliminate string churn.
+ */
 data class DashboardState(
-    val maxDrop: String = "00:00:00",
-    val lastSeen: String = "--:--:--",
-    val totalDrop: String = "00:00:00",
+    val maxDropMs: Long = 0L,
+    val lastSeenTs: Long = 0L,
+    val totalDropMs: Long = 0L,
     val watchdogOk: Boolean = true,
-    val watchdogCountdown: String = "--",
-    val totalUptime: String = "00:00:00",
-    val session: String = "00:00:00",
-    val sinceConn: String = "00:00:00",
-    val sinceDisco: String = "00:00:00",
-    val gpsIndex: String = "--",
-    val trackerAccuracy: String = "--",
-    val satsIndex: String = "--",
-    val trackerMaxAcc: String = "--",
-    val viewerAccuracy: String = "--",
-    val viewerMaxAcc: String = "--",
-    val ageIndex: String = "--",
-    val accIndex: String = "--",
+    val watchdogCountdownSec: Long = 0L,
+    val totalUptimeMs: Long = 0L,
+    val sessionMs: Long = 0L,
+    val sinceConnMs: Long = 0L,
+    val sinceDiscoMs: Long = 0L,
+    val gpsIndex: Double = 0.0,
+    val trackerAccuracy: Double = 0.0,
+    val satsUsed: Int = 0,
+    val satsView: Int = 0,
+    val trackerMaxAcc: Double = 0.0,
+    val viewerAccuracy: Double = 0.0,
+    val viewerMaxAcc: Double = 0.0,
+    val ageIndex: Double = 0.0,
+    val accIndex: Double = 0.0,
     val isSatsIndexWarning: Boolean = false,
     val trackerConnIndex: Int = 0,
     val viewerConnIndex: Int = 0,
-    val trackerTemp: String = "--",
-    val trackerMaxTemp: String = "--",
-    val viewerTemp: String = "--",
-    val viewerMaxTemp: String = "--",
+    val trackerTemp: Double = 0.0,
+    val trackerMaxTemp: Double = 0.0,
+    val viewerTemp: Double = 0.0,
+    val viewerMaxTemp: Double = 0.0,
     val trackerState: TrackerState = TrackerState.UNKNOWN,
     val status: SentinelStatus = SentinelStatus.VALID,
-    val vibration: String = "--",
-    val heading: String = "--",
-    val lat: String = "--",
-    val lng: String = "--",
-    val tilt: String = "--",
-    val acoustic: String = "--",
-    val lift: String = "--",
-    val lux: String = "--",
-    val proximity: String = "--",
-    val proximityCm: String = "--", 
-    val proximityDebounce: String = "--",
-    val rollingVibration: String = "--",
-    val kineticEnergy: String = "--",
-    val gpsSpeed: String = "--",     
+    val vibration: Double = 0.0,
+    val heading: Double = 0.0,
+    val lat: Double = 0.0,
+    val lng: Double = 0.0,
+    val tilt: Double = 0.0,
+    val acousticDb: Double = 0.0,
+    val baroAlt: Double = 0.0,
+    val lux: Double = 0.0,
+    val isNear: Boolean = true,
+    val proximityCm: Double = -1.0, 
+    val proximityDebounceMs: Long = 0L,
+    val rollingVibration: Double = 0.0,
+    val kineticEnergy: Double = 0.0,
+    val gpsSpeedMps: Double = 0.0,     
     val isTamperDetected: Boolean = false,
-    val peakShock: String = "--",
-    val luxBaseline: String = "--",
-    val acousticFloor: String = "--",
-    val vibrationFloor: String = "--",
+    val peakShock: Double = 0.0,
+    val luxBaseline: Double = 0.0,
+    val acousticFloorDb: Double = 0.0,
+    val vibrationFloor: Double = 0.0,
     val isMicPending: Boolean = false,
     val isPowerTamper: Boolean = false,
-    val violationUptime: String = "00:00:00",
-    val violationPercentage: String = "0.0%",
-    val engineVersion: String = "--",
+    val violationUptimeMs: Long = 0L,
+    val violationPercentage: Double = 0.0,
+    val engineVersion: String = "--", 
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isPowerSaveMode: Boolean = false,
@@ -691,9 +695,9 @@ data class DashboardState(
     val netInterface: String = "UNKNOWN",
     val isStorageLow: Boolean = false,
     val isStorageCritical: Boolean = false,
-    val snr: String = "--",
-    val distToHome: String = "--",    
-    val distToViewer: String = "--",  
+    val snr: Double = 0.0,
+    val distToHome: Double? = null,    
+    val distToViewer: Double? = null,  
     val isGpsFresh: Boolean = true,    
     val isLinkFresh: Boolean = true,
     val isTelemetryFresh: Boolean = true,
@@ -701,14 +705,14 @@ data class DashboardState(
     val isLinkVisible: Boolean = true,   
     val isBatterySteepDischarge: Boolean = false, 
     val isCoolingModeActive: Boolean = false,
-    val trackerCurrentMa: String = "--",
+    val trackerCurrentMa: Int = 0,
     val isBatteryLow: Boolean = false,
     val isBatteryCritical: Boolean = false,
     
     // Issue #132: Forensic UI Dashboard Refinement
-    val cpuLoad: String = "--",
-    val ioWait: String = "--",
-    val maxIoLatency: String = "--",
+    val cpuLoad: Double = 0.0,
+    val ioWait: Double = 0.0,
+    val maxIoLatencyMs: Long = 0L,
 
     // Issue #133: Forensic Anomaly Correlation
     val isSilentFailure: Boolean = false
