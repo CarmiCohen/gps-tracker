@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.14.02 (Forensic Replay Restored)
+# System Source of Truth (SoT) - Aug.14.03 (Forensic Jitter Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Forensic Jitter Protection (R171)**: (Added Aug.14.03) The system MUST maintain temporal integrity during multi-viewer forensic streams. Telemetry processing MUST allow a 2s jitter window (`MONOTONIC_JITTER_TOLERANCE_MS`) to prevent data loss while ensuring that aggregators and UI history buffers maintain strict monotonicity via sorted merging and deduplication. (Issue #171). **Status: Implemented.**
 *   **Forensic Replay Sync (R170)**: (Added Aug.14.02) The system MUST support coordinate-aware scrubbing in telemetry ribbons. Map cursor positioning MUST utilize O(log N) binary search on historical trail data to ensure frame-perfect alignment with sensor trends (e.g., `vibeIdx` spikes) during 100Hz playback simulation. (Issue #170). **Status: Implemented.**
 *   **Geofence-Aware Polling (R169)**: (Added Aug.14.01) The system MUST maintain a safe polling interval (5s for standard, 2s for budget hardware) when a geofence is active and the device is moving, regardless of screen state. (Issue #169). **Status: Implemented.**
 *   **Forensic Stress Integrity (R165)**: (Added Aug.14.00) The system MUST maintain stability during a 5-minute sustained 100Hz load. Forensic drainage MUST NOT induce Main-thread Davey stalls or SQLite write contention. (Issue #165). **Status: Implemented & Verified.**
@@ -40,5 +41,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.14.02.
+*   **Current Release**: Aug.14.03.
 *   **Source of Truth**: app/build.gradle versionName.

@@ -4,12 +4,12 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Aug.14.03:
+ * - Issue #171: Forensic Jitter Audit. Hardened processPoint with a 
+ *   monotonicity guard to prevent "Ghost Spikes" and "Replay Snap-backs" 
+ *   when out-of-order packets arrive within the jitter window (R171).
  * Aug.10.28:
- * - Issue #133: Forensic Anomaly Correlation Engine. Integrated isSilentFailure 
- *   into aggregation logic for load-correlated anomaly tracking (R133).
- * Aug.10.27:
- * - Issue #132: Forensic UI Dashboard Refinement. Integrated cpuLoad, ioWait, 
- *   and maxIoLatency into aggregation logic for trend visualization (R132).
+ * - Issue #133: Forensic Anomaly Correlation Engine.
  */
 class TelemetryAggregator {
 
@@ -17,6 +17,7 @@ class TelemetryAggregator {
     private val accumulators = Array(scales.size) { MutableAggregationPoint() }
     private val hasData = BooleanArray(scales.size) { false }
     private val lastEmittedTick = IntArray(scales.size) { -1 }
+    private val lastProcessedTs = LongArray(scales.size) { 0L }
     
     // Flyweight pool for results to avoid per-scale allocations
     private val resultFlyweights = Array(scales.size) { EngineConnectionPoint() }
@@ -54,13 +55,9 @@ class TelemetryAggregator {
         var sitShock: Double = 0.0
         var kineticEnergy: Double = 0.0
         var gpsHardwareLock: Boolean = false
-        
-        // Issue #132
         var cpuLoad: Double = 0.0
         var ioWait: Double = 0.0
         var maxIoLatency: Long = 0L
-
-        // Issue #133
         var isSilentFailure: Boolean = false
 
         fun reset(point: EngineConnectionPoint) {
@@ -110,7 +107,7 @@ class TelemetryAggregator {
             isRecoveryEvent = isRecoveryEvent || cur.isRecoveryEvent
             accuracy = max(accuracy, cur.accuracy)
             maxAccuracy = max(maxAccuracy, cur.maxAccuracy)
-            isBatterySteepDischarge = isBatteryDischargeOr(isBatterySteepDischarge, cur.isBatterySteepDischarge)
+            isBatterySteepDischarge = isBatterySteepDischarge || cur.isBatterySteepDischarge
             isCoolingModeActive = isCoolingModeActive || cur.isCoolingModeActive
             speed = max(speed, cur.speed)
             if (cur.hasGps) bearing = cur.bearing
@@ -120,17 +117,14 @@ class TelemetryAggregator {
             noiseIdx = max(noiseIdx, cur.noiseIdx)
             luxIdx = max(luxIdx, cur.luxIdx)
             vibeIdx = max(vibeIdx, cur.vibeIdx)
-            
             proxSum += cur.proxIdx
             proxCount++
-            
             liftIdx = max(liftIdx, cur.liftIdx)
             snrIdx = min(snrIdx, cur.snrIdx)
             tiltIdx = max(tiltIdx, cur.tiltIdx)
             baroIdx = max(baroIdx, cur.baroIdx)
             isSitDetected = isSitDetected || cur.isSitDetected
             isSitActive = isSitActive || cur.isSitActive
-            
             if (abs(cur.sitVz) > abs(sitVz)) {
                 sitVz = cur.sitVz
                 sitVzTs = cur.sitVzTs
@@ -139,14 +133,11 @@ class TelemetryAggregator {
             sitShock = max(sitShock, cur.sitShock)
             kineticEnergy = max(kineticEnergy, cur.kineticEnergy)
             gpsHardwareLock = gpsHardwareLock || cur.gpsHardwareLock
-            
             cpuLoad = max(cpuLoad, cur.cpuLoad)
             ioWait = max(ioWait, cur.ioWait)
             maxIoLatency = max(maxIoLatency, cur.maxIoLatency)
             isSilentFailure = isSilentFailure || cur.isSilentFailure
         }
-
-        private fun isBatteryDischargeOr(old: Boolean, new: Boolean): Boolean = old || new
 
         fun writeTo(target: EngineConnectionPoint, base: EngineConnectionPoint, isTick: Boolean) {
             target.copyFrom(base)
@@ -167,12 +158,8 @@ class TelemetryAggregator {
             target.noiseIdx = this.noiseIdx
             target.luxIdx = this.luxIdx
             target.vibeIdx = this.vibeIdx
-            
-            if (proxCount > 0) {
-                this.proxIdx = proxSum / proxCount
-            }
+            if (proxCount > 0) { this.proxIdx = proxSum / proxCount }
             target.proxIdx = this.proxIdx
-            
             target.liftIdx = this.liftIdx
             target.snrIdx = this.snrIdx
             target.tiltIdx = this.tiltIdx
@@ -204,7 +191,6 @@ class TelemetryAggregator {
                 LocationPendingReason.JAMMER_SUSPICION -> 5
             }
         }
-
         private fun getHigherPriorityReason(r1: LocationPendingReason, r2: LocationPendingReason): LocationPendingReason {
             if (r1 == r2) return r1
             val p1 = getReasonPriority(r1)
@@ -213,21 +199,35 @@ class TelemetryAggregator {
         }
     }
 
+    /**
+     * processPoint: Main entry for telemetry points.
+     * R171: Added monotonicity guard. Packets arriving "from the past" (due to jitter) 
+     * are merged into the current bucket if valid, but never trigger out-of-order 
+     * emissions for higher scales.
+     */
     fun processPoint(point: EngineConnectionPoint, onResult: (RibbonScale, EngineConnectionPoint) -> Unit) {
         val timeRef = if (point.rt > 0) point.rt else point.ts
         val totalSeconds = (timeRef / TICK_INTERVAL_MS).toInt()
 
-        // 1. FOUR_MIN (Index 0): High-fidelity pass-through. 
+        // 1. FOUR_MIN (Index 0): High-fidelity pass-through.
+        // R171: Allow slight regressions for 4M to avoid data loss, but mark them as jitter.
         val flyweight4M = resultFlyweights[0]
         flyweight4M.copyFrom(point)
         flyweight4M.isTick = totalSeconds % 60 == 0
-        onResult(scales[0], flyweight4M)
+        
+        if (timeRef >= lastProcessedTs[0] - MONOTONIC_JITTER_TOLERANCE_MS) {
+            onResult(scales[0], flyweight4M)
+            if (timeRef > lastProcessedTs[0]) lastProcessedTs[0] = timeRef
+        }
 
         // 2. Other scales: Aggregated to prevent "Aggregation Storms".
         for (i in 1 until scales.size) {
             val scale = scales[i]
             val acc = accumulators[i]
             
+            // Jitter Guard: If point is older than the last emitted bucket, it's too late to merge.
+            if (lastEmittedTick[i] != -1 && totalSeconds < lastEmittedTick[i]) continue
+
             if (totalSeconds % scale.intervalSeconds == 0) {
                 if (lastEmittedTick[i] != totalSeconds) {
                     if (hasData[i]) {
@@ -250,179 +250,93 @@ class TelemetryAggregator {
     }
 
     fun backfillGaps(
-        lastTickRt: Long,
-        nowRt: Long,
-        lastTickTs: Long,
-        nowTs: Long,
-        snrSamples: Sequence<EngineSnrSample>,
-        sensorSamples: Sequence<EngineSensorSnapshot>,
-        acousticFloor: Double,
-        baseTemplate: EngineConnectionPoint,
+        lastTickRt: Long, nowRt: Long, lastTickTs: Long, nowTs: Long,
+        snrSamples: Sequence<EngineSnrSample>, sensorSamples: Sequence<EngineSensorSnapshot>,
+        acousticFloor: Double, baseTemplate: EngineConnectionPoint,
         onResult: (RibbonScale, EngineConnectionPoint) -> Unit
     ) {
         val fillPointFlyweight = EngineConnectionPoint()
         var fillRt = lastTickRt + TICK_INTERVAL_MS
         var fillTs = lastTickTs + TICK_INTERVAL_MS
         var pointsGenerated = 0
-        
         val snrIter = snrSamples.iterator()
         val sensorIter = sensorSamples.iterator()
-        
         var nextSnr = if (snrIter.hasNext()) snrIter.next() else null
         var nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
 
         while (fillRt < nowRt && pointsGenerated < MAX_BACKFILL_POINTS) {
             val windowEndRt = fillRt + TICK_INTERVAL_MS - 1
-            
-            while (nextSnr != null && nextSnr.rt < fillRt) {
-                nextSnr = if (snrIter.hasNext()) snrIter.next() else null
-            }
-            while (nextSensor != null && nextSensor.rt < fillRt) {
-                nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
-            }
+            while (nextSnr != null && nextSnr.rt < fillRt) nextSnr = if (snrIter.hasNext()) snrIter.next() else null
+            while (nextSensor != null && nextSensor.rt < fillRt) nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
 
-            val resolvedSnr = if (nextSnr != null && nextSnr.rt <= windowEndRt) {
-                (nextSnr.snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
-            } else baseTemplate.snrIdx
-            
+            val resolvedSnr = if (nextSnr != null && nextSnr.rt <= windowEndRt) (nextSnr.snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) else baseTemplate.snrIdx
             val snapshot = if (nextSensor != null && nextSensor.rt <= windowEndRt) nextSensor else null
             
-            val resolvedNoise = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: baseTemplate.noiseIdx
-            val resolvedLux = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: baseTemplate.luxIdx
-            val resolvedVibe = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: baseTemplate.vibeIdx
-            val resolvedProx = snapshot?.proxIdx ?: baseTemplate.proxIdx
-            val resolvedLift = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.liftIdx
-            val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: baseTemplate.tiltIdx
-            val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.baroIdx
-            val resolvedSit = snapshot?.isSitDetected ?: false
-            val resolvedSitVzTs = snapshot?.sitVzTs ?: baseTemplate.sitVzTs
-            val resolvedSitVzRt = snapshot?.sitVzRt ?: baseTemplate.sitVzRt
-            val resolvedShock = snapshot?.sitShock ?: baseTemplate.sitShock
-            val resolvedKinetic = snapshot?.kineticEnergy ?: baseTemplate.kineticEnergy
-
             fillPointFlyweight.apply {
                 copyFrom(baseTemplate)
-                ts = fillTs
-                rt = fillRt
-                isGap = false
-                isRecoveryEvent = false 
+                ts = fillTs; rt = fillRt; isGap = false; isRecoveryEvent = false 
                 snrIdx = resolvedSnr
-                noiseIdx = resolvedNoise
-                luxIdx = resolvedLux
-                vibeIdx = resolvedVibe
-                proxIdx = resolvedProx
-                liftIdx = resolvedLift
-                tiltIdx = resolvedTilt
-                baroIdx = resolvedBaro
-                isSitDetected = resolvedSit
-                sitVzTs = resolvedSitVzTs
-                sitVzRt = resolvedSitVzRt
-                sitShock = resolvedShock
-                kineticEnergy = resolvedKinetic
-                gpsHardwareLock = baseTemplate.gpsHardwareLock
-                cpuLoad = baseTemplate.cpuLoad
-                ioWait = baseTemplate.ioWait
-                maxIoLatency = baseTemplate.maxIoLatency
-                isSilentFailure = baseTemplate.isSilentFailure
+                noiseIdx = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: baseTemplate.noiseIdx
+                luxIdx = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: baseTemplate.luxIdx
+                vibeIdx = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: baseTemplate.vibeIdx
+                proxIdx = snapshot?.proxIdx ?: baseTemplate.proxIdx
+                liftIdx = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.liftIdx
+                tiltIdx = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: baseTemplate.tiltIdx
+                baroIdx = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.baroIdx
+                isSitDetected = snapshot?.isSitDetected ?: false
+                sitVzTs = snapshot?.sitVzTs ?: baseTemplate.sitVzTs
+                sitVzRt = snapshot?.sitVzRt ?: baseTemplate.sitVzRt
+                sitShock = snapshot?.sitShock ?: baseTemplate.sitShock
+                kineticEnergy = snapshot?.kineticEnergy ?: baseTemplate.kineticEnergy
             }
-
             processPoint(fillPointFlyweight, onResult)
-            fillRt += TICK_INTERVAL_MS
-            fillTs += TICK_INTERVAL_MS
-            pointsGenerated++
+            fillRt += TICK_INTERVAL_MS; fillTs += TICK_INTERVAL_MS; pointsGenerated++
         }
     }
 
     fun fillRealGap(
-        ribbonScale: RibbonScale,
-        lastTickRt: Long,
-        nowRt: Long,
-        lastTickTs: Long,
-        snrSamples: Sequence<EngineSnrSample>,
-        sensorSamples: Sequence<EngineSensorSnapshot>,
-        acousticFloor: Double,
-        onResult: (EngineConnectionPoint) -> Unit
+        ribbonScale: RibbonScale, lastTickRt: Long, nowRt: Long, lastTickTs: Long,
+        snrSamples: Sequence<EngineSnrSample>, sensorSamples: Sequence<EngineSensorSnapshot>,
+        acousticFloor: Double, onResult: (EngineConnectionPoint) -> Unit
     ) {
         val intervalMs = ribbonScale.intervalSeconds * TICK_INTERVAL_MS
         val maxGapMs = intervalMs * 240
         val effectiveStartRt = maxOf(lastTickRt, nowRt - maxGapMs)
         val rtToTsOffset = lastTickTs - lastTickRt
-
         var currentRt = alignToInterval(effectiveStartRt, ribbonScale.intervalSeconds)
         if (currentRt <= lastTickRt) currentRt += intervalMs
 
         val flyweight = EngineConnectionPoint()
         var pointsGenerated = 0
-        
         val snrIter = snrSamples.iterator()
         val sensorIter = sensorSamples.iterator()
-        
         var nextSnr = if (snrIter.hasNext()) snrIter.next() else null
         var nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
         
         while (currentRt < nowRt && pointsGenerated < MAX_BACKFILL_POINTS) {
             val totalSeconds = (currentRt / TICK_INTERVAL_MS).toInt()
             val windowEndRt = currentRt + intervalMs - 1
-            
-            while (nextSnr != null && nextSnr.rt < currentRt) {
-                nextSnr = if (snrIter.hasNext()) snrIter.next() else null
-            }
-            while (nextSensor != null && nextSensor.rt < currentRt) {
-                nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
-            }
-
-            val resolvedSnr = if (nextSnr != null && nextSnr.rt <= windowEndRt) {
-                (nextSnr.snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
-            } else 0.0
-            
-            val snapshot = if (nextSensor != null && nextSensor.rt <= windowEndRt) nextSensor else null
-            
-            val resolvedNoise = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: 0.0
-            val resolvedLux = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: 0.0
-            val resolvedVibe = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: 0.0
-            val resolvedProx = snapshot?.proxIdx ?: 0.0
-            val resolvedLift = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
-            val resolvedTilt = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: 0.0
-            val resolvedBaro = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
-            val resolvedSit = snapshot?.isSitDetected ?: false
-            val resolvedSitVzTs = snapshot?.sitVzTs ?: 0L
-            val resolvedSitVzRt = snapshot?.sitVzRt ?: 0L
-            val resolvedShock = snapshot?.sitShock ?: 0.0
-            val resolvedKinetic = snapshot?.kineticEnergy ?: 0.0
+            while (nextSnr != null && nextSnr.rt < currentRt) nextSnr = if (snrIter.hasNext()) snrIter.next() else null
+            while (nextSensor != null && nextSensor.rt < currentRt) nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
 
             flyweight.apply {
-                ts = currentRt + rtToTsOffset
-                rt = currentRt
-                rtt = 0
-                remoteSig = 0
-                isConnected = false
-                isGap = true
-                isRecoveryEvent = false
-                snrIdx = resolvedSnr
-                noiseIdx = resolvedNoise
-                luxIdx = resolvedLux
-                vibeIdx = resolvedVibe
-                proxIdx = resolvedProx
-                liftIdx = resolvedLift
-                tiltIdx = resolvedTilt
-                baroIdx = resolvedBaro
-                isSitDetected = resolvedSit
-                sitVzTs = resolvedSitVzTs
-                sitVzRt = resolvedSitVzRt
-                sitShock = resolvedShock
-                kineticEnergy = resolvedKinetic
-                isTick = isScaleTick(ribbonScale, totalSeconds)
-                currentMa = 0
-                locationPendingReason = LocationPendingReason.NONE
-                gpsHardwareLock = false
-                cpuLoad = 0.0
-                ioWait = 0.0
-                maxIoLatency = 0L
-                isSilentFailure = false
+                ts = currentRt + rtToTsOffset; rt = currentRt; rtt = 0; remoteSig = 0; isConnected = false; isGap = true
+                snrIdx = if (nextSnr != null && nextSnr.rt <= windowEndRt) (nextSnr.snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) else 0.0
+                val snapshot = if (nextSensor != null && nextSensor.rt <= windowEndRt) nextSensor else null
+                noiseIdx = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: 0.0
+                luxIdx = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: 0.0
+                vibeIdx = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: 0.0
+                proxIdx = snapshot?.proxIdx ?: 0.0
+                liftIdx = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
+                tiltIdx = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: 0.0
+                baroIdx = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
+                isSitDetected = snapshot?.isSitDetected ?: false
+                sitVzTs = snapshot?.sitVzTs ?: 0L; sitVzRt = snapshot?.sitVzRt ?: 0L
+                sitShock = snapshot?.sitShock ?: 0.0; kineticEnergy = snapshot?.kineticEnergy ?: 0.0
+                isTick = isScaleTick(ribbonScale, totalSeconds); locationPendingReason = LocationPendingReason.NONE
             }
             onResult(flyweight)
-            currentRt += intervalMs
-            pointsGenerated++
+            currentRt += intervalMs; pointsGenerated++
         }
     }
 

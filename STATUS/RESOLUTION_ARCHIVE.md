@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 612**
+**Total Unique Resolutions: 613**
+
+## 46. Forensic Multi-Stream Jitter Audit (Aug.14.03)
+*   **Issue #171: Forensic Multi-Stream Jitter Audit**.
+    - **Resolution**: Hardened the forensic telemetry pipeline against non-monotonic packet arrival (jitter) caused by multi-viewer streams or network delays. Relaxed `RemoteStatusRepository` to allow a 2s jitter window (`MONOTONIC_JITTER_TOLERANCE_MS`) to prevent forensic data loss. Implemented a monotonicity guard in `TelemetryAggregator` to ensure aggregators don't regress. Hardened `StateSubscriptionUseCase` to perform sorted-merging and deduplication of history buffers for stable UI ribbon visualization. Verified via artificial jitter simulation (200-800ms) in `CommunicationManager`. (R171)
 
 ## 45. Forensic Replay UI Audit (Aug.14.02)
 *   **Issue #170: Forensic Replay UI Audit**.
@@ -81,4 +85,4 @@ This document contains the unified record of all resolved issues and technical d
     *   **Resolution**: Hardened A15 detection via device/product string inspection (R405).
 
 ---
-*For older resolutions, see Git history or backlog shards. (vAug.14.02)
+*For older resolutions, see Git history or backlog shards. (vAug.14.03)

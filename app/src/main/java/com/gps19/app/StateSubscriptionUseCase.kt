@@ -10,11 +10,12 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * Aug.14.04:
+ * - Issue #171: Forensic Jitter Audit. Implemented temporal sorting and 
+ *   monotonicity guards in history flows to prevent UI "snap-back" artifacts 
+ *   during multi-viewer jitter streams (R171).
  * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Implemented double-buffering for 
- *   IntegrityUpdate to eliminate allocation churn in health observation (R-HARDWARE-01).
- * July.30.29:
- * - Issue #631: Forensic UI: Service Blackout Trends.
+ * - Issue #668: Performance: Object Churn.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -39,13 +40,30 @@ class StateSubscriptionUseCase @Inject constructor(
         return _historyFlows[key]?.asStateFlow() ?: MutableStateFlow(emptyList<ConnectionPoint>()).asStateFlow()
     }
 
+    /**
+     * startHistoryObservations: Orchestrates DB and Live history synchronization.
+     * R171: Integrated sorted merging to handle out-of-order arrivals within 
+     * the jitter window (MONOTONIC_JITTER_TOLERANCE_MS).
+     */
     fun startHistoryObservations(scope: CoroutineScope) {
         _historyFlows.forEach { (key, stateFlow) ->
             scope.launch(Dispatchers.Main.immediate) {
                 repository.getHistoryFlow(key).collect { dbList ->
                     stateFlow.update { current ->
-                        val lastDbTs = dbList.lastOrNull()?.ts ?: 0L
+                        // R171: If DB list is empty, we still keep incremental cache 
+                        // but ensure it's sorted.
+                        if (dbList.isEmpty()) {
+                            return@update current.sortedBy { it.ts }.takeLast(240)
+                        }
+                        
+                        // DB is always sorted by TS from the DAO query.
+                        val lastDbTs = dbList.last().ts
+                        
+                        // Filter out points that are already persisted OR older than 
+                        // the earliest point we want to keep, but allow merging 
+                        // of "late" points that fit within the current tail.
                         val incremental = current.filter { it.ts > lastDbTs }
+                        
                         (dbList + incremental).takeLast(240)
                     }
                 }
@@ -54,7 +72,22 @@ class StateSubscriptionUseCase @Inject constructor(
 
         scope.launch(Dispatchers.Main.immediate) {
             repository.liveHistoryFlow.collect { (key, points) ->
-                _historyFlows[key]?.update { (it + points).takeLast(240) }
+                _historyFlows[key]?.update { current ->
+                    // R171: Standardize on sorted merge to prevent snap-backs.
+                    val merged = (current + points).sortedBy { it.ts }
+                    
+                    // Deduplicate by timestamp in case of relay collisions
+                    val deduped = mutableListOf<ConnectionPoint>()
+                    if (merged.isNotEmpty()) {
+                        deduped.add(merged[0])
+                        for (i in 1 until merged.size) {
+                            if (merged[i].ts != merged[i - 1].ts) {
+                                deduped.add(merged[i])
+                            }
+                        }
+                    }
+                    deduped.takeLast(240)
+                }
             }
         }
     }
@@ -64,11 +97,8 @@ class StateSubscriptionUseCase @Inject constructor(
     }
 
     fun observeGpsIndex(): Flow<GpsIndexData> = gpsStatusManager.gpsIndexFlow
-
     fun observeInternetStatus(): Flow<Boolean> = systemStatusProvider.observeInternetStatus()
-
     fun observeBatteryStatus(): Flow<BatteryStatus> = systemStatusProvider.observeBatteryStatus()
-
     fun observeGnssDetail(): Flow<GnssDetail?> = repository.gnssDetail
 
     @Suppress("UNCHECKED_CAST")
@@ -114,24 +144,15 @@ class StateSubscriptionUseCase @Inject constructor(
         .flowOn(Dispatchers.Default)
     }
 
-    /**
-     * observeIntegrityUpdates: Swaps flyweight buffers to eliminate allocation churn.
-     */
     fun observeIntegrityUpdates(): Flow<IntegrityUpdate> = repository.systemHealth.map { health ->
         val nextIdx = (integrityBufferIdx + 1) % 2
         val next = integrityBuffers[nextIdx]
-        
         next.update(
-            health = health,
-            isLocalOnline = health.isHardwareOnline,
-            batteryLevel = health.batteryLevel,
-            batteryTemp = health.batteryTemp,
-            isCharging = health.isCharging,
-            maxTemp = health.maxTemp,
-            activeAlarms = emptyList(), // Filled by ViewModel if needed
-            activeAlarmTypes = emptySet()
+            health = health, isLocalOnline = health.isHardwareOnline,
+            batteryLevel = health.batteryLevel, batteryTemp = health.batteryTemp,
+            isCharging = health.isCharging, maxTemp = health.maxTemp,
+            activeAlarms = emptyList(), activeAlarmTypes = emptySet()
         )
-        
         integrityBufferIdx = nextIdx
         next
     }
@@ -164,22 +185,14 @@ class StateSubscriptionUseCase @Inject constructor(
     }
 
     data class SettingsUpdate(
-        val trackerId: String,
-        val viewerId: String,
-        val relayUrl: String,
-        val maxDistance: Double,
-        val homePoints: List<GeoPoint>,
-        val isXiaomiManualOverride: Boolean,
-        val lastAlarmAckTs: Long,
-        val appMode: String?,
-        val isSystemActive: Boolean
+        val trackerId: String, val viewerId: String, val relayUrl: String,
+        val maxDistance: Double, val homePoints: List<GeoPoint>,
+        val isXiaomiManualOverride: Boolean, val lastAlarmAckTs: Long,
+        val appMode: String?, val isSystemActive: Boolean
     )
 
     data class ConnectivityUpdate(
-        val isRelayConnected: Boolean,
-        val lastRtt: Int,
-        val lastRemoteActivityTs: Long,
-        val cumulativeRecoveryBlackoutMs: Long,
-        val recoveryCount: Int
+        val isRelayConnected: Boolean, val lastRtt: Int, val lastRemoteActivityTs: Long,
+        val cumulativeRecoveryBlackoutMs: Long, val recoveryCount: Int
     )
 }

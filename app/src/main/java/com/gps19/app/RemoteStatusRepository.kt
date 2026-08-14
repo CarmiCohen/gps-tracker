@@ -11,13 +11,12 @@ import javax.inject.Singleton
 
 /**
  * RemoteStatusRepository: Single Source of Truth for Remote Peer Telemetry.
+ * Aug.14.03:
+ * - Issue #171: Forensic Jitter Audit. Relaxed shouldProcessPacket to allow 
+ *   out-of-order packets within MONOTONIC_JITTER_TOLERANCE_MS (2s) to prevent 
+ *   forensic data loss during multi-viewer jitter (R171).
  * July.26.02:
- * - Issue #545b: Lifecycle Idempotency. Added isInitialized AtomicBoolean guard 
- *   to initialize() to prevent redundant state restoration from MainRepository 
- *   during service re-attachment or multi-mode transitions.
- * July.23.01:
- * - SIT Hardening (Issue #522): Consolidated forensic state authority.
- * - Deep Purge: Removed references to the obsolete RemoteHandler.
+ * - Issue #545b: Lifecycle Idempotency.
  */
 @Singleton
 class RemoteStatusRepository @Inject constructor(
@@ -76,9 +75,21 @@ class RemoteStatusRepository @Inject constructor(
         _peerSignal.value = signal
     }
 
+    /**
+     * shouldProcessPacket: Determines if a packet is fresh enough to process.
+     * R171: Relaxed to allow jitter. Only drops if packet is older than 2 seconds 
+     * relative to the newest packet received (MONOTONIC_JITTER_TOLERANCE_MS).
+     */
     fun shouldProcessPacket(remoteTs: Long): Boolean {
-        if (remoteTs > 0 && remoteTs < lastRemotePacketTs) return false
-        if (remoteTs > 0) lastRemotePacketTs = remoteTs
+        if (remoteTs <= 0) return true
+        
+        // Drop if it's a severe regression (e.g. historical data re-sending)
+        if (remoteTs < lastRemotePacketTs - MONOTONIC_JITTER_TOLERANCE_MS) return false
+        
+        // Update high-water mark
+        if (remoteTs > lastRemotePacketTs) {
+            lastRemotePacketTs = remoteTs
+        }
         return true
     }
 

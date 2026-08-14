@@ -15,21 +15,18 @@ import kotlinx.coroutines.flow.asSharedFlow
 import org.json.JSONObject
 import timber.log.Timber
 import java.util.Arrays
+import java.util.Random
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Aug.14.03:
+ * - Issue #171: Forensic Jitter Audit. Integrated artificial latency simulator 
+ *   to model out-of-order packet arrival from multi-relay forensic streams (R171).
  * July.28.22:
  * - Issue #617: Global SharedFlow Audit. Hardened _signalingFlow with 
  *   BufferOverflow.DROP_OLDEST to prevent socket thread suspension (R617).
- * July.26.03:
- * - Issue #545c: Flow Architecture Standardization. Replaced RemoteUpdateListener 
- *   with a SharedFlow (signalingFlow) for reactive event dispatching.
- * July.25.08:
- * - Issue #560c: Socket-Level Pressure.
- * July.27.03:
- * - Issue #596: Centralized SIGNALING_EMIT_DELAY_MS usage.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -61,9 +58,13 @@ class CommunicationManager @Inject constructor(
 
     private var onConnectionLost: (() -> Unit)? = null
 
+    // Issue #171: Jitter Simulation Controls
+    private val DEBUG_JITTER_SIMULATION = false // Set to true for forensic auditing
+    private val jitterRandom = Random()
+
     // Standardized Flow implementation
     private val _signalingFlow = MutableSharedFlow<SignalingEvent>(
-        extraBufferCapacity = 64,
+        extraBufferCapacity = 128, // Expanded for jitter simulation
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     override val signalingFlow: SharedFlow<SignalingEvent> = _signalingFlow.asSharedFlow()
@@ -282,7 +283,14 @@ class CommunicationManager @Inject constructor(
                     isTrackerMode = isTrackerMode
             )) return
             
-            _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(data))
+            if (DEBUG_JITTER_SIMULATION) {
+                scope.launch {
+                    delay(200L + jitterRandom.nextInt(600)) // 200-800ms jitter
+                    _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(data))
+                }
+            } else {
+                _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(data))
+            }
         } catch (e: Exception) {
             Log.e("GPS19", "location_relay parse error")
         }
@@ -291,7 +299,14 @@ class CommunicationManager @Inject constructor(
     private fun handleLocationRelayBinary(args: Array<Any>) {
         try {
             val data = args[0] as ByteArray
-            _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
+            if (DEBUG_JITTER_SIMULATION) {
+                scope.launch {
+                    delay(200L + jitterRandom.nextInt(600)) // 200-800ms jitter
+                    _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
+                }
+            } else {
+                _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
+            }
         } catch (e: Exception) {
             Log.e("GPS19", "location_relay_bin direct dispatch failure")
         }
