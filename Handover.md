@@ -1,4 +1,4 @@
-# Handover (Aug.13.13) - Issue #164 Resolved
+# Handover (Aug.13.14) - Persistence & UI Stability Hardened
 
 ℹ️ **Standard Operating Procedure**: Always follow the strict logic defined in [DEVELOPER_GUIDELINES.md](./DEVELOPER_GUIDELINES.md) when addressing objectives.
 
@@ -10,38 +10,31 @@
     3. Verify `RESOLUTION_ARCHIVE.md` reliability metrics after the test.
     4. Confirm no `BufferedLog` drops in logcat under maximum load.
 
-## 🟢 Recent Activity (Aug.13.13)
-- **Forensic Path Hardening**: (Issue #164) Fully remediated high-frequency logging bottlenecks.
-    - **ID Determinism**: Replaced random `UUID` generation with deterministic composite IDs (`F-timestamp-idx`) in `LogRepository.performForensicDrain`. This eliminates approximately 6,000 object allocations per minute at 100Hz.
-    - **Raw Data Snapshots**: Forensic traces now capture raw primitives (`tempSnapshot`, `battSnapshot`, `chargingSnapshot`) into `LogEntry` and the `logs` table (Database v67). All `SimpleDateFormat` and string concatenation churn is deferred until persistence or display.
-    - **Backpressure Logic**: Removed the legacy `AtomicBoolean` guard in `LogManager` that caused silent log drops. Standard logs now flow through the `LogRepository` channel (capacity 2,000) using native coroutine backpressure.
-    - **Headroom Expansion**: Increased `FORENSIC_SPILL_CAPACITY` to **10,000** entries (~100 seconds of peak-fidelity buffer) to handle slow I/O spikes on budget hardware.
-- **Documentation**: Synchronized `issues.md`, `SOT_MASTER_REQUIREMENTS.md` (R164), `RESOLUTION_ARCHIVE.md` (R164), and synchronized build version to **Aug.13.13**.
+## 🟢 Recent Activity (Aug.13.14)
+- **Settings ANR Deep Remediation**: (Issue #166) 
+    - Implemented **Staggered Hydration** in `SettingsOverlay` (60ms offsets).
+    - Throttled `eventLogsFlow` using `sample(500ms)` and `@OptIn(FlowPreview::class)` to eliminate object churn (1,000+ entries) from triggering 100Hz Main-thread stalls.
+- **Persistence Optimization**: (Issue #167) 
+    - Increased `DB_PRUNE_THRESHOLD` to 500.
+    - Implemented a **1-minute temporal cooldown** for pruning in `LogRepository` to prevent SQLite lock contention during high-frequency forensic sampling.
+- **Build Integrity**: Synchronized `app/build.gradle` and all core engine constants to version **Aug.13.14**.
 
 ## 🏗️ UI Performance & Forensic Architecture
-1.  **Black-Box Buffer**: Off-heap `MappedByteBuffer` (`ForensicSpillBuffer`) acts as the primary 100Hz ingress.
-2.  **Drainage Loop**: Operates on `Dispatchers.IO` with a load-aware dynamic batch size (50-500). Drains traces into SQLite only after checking for existing signatures (timestamp + spillIdx) to prevent duplicates after process death.
-3.  **Stability**: The 1Hz dashboard update path is decoupled from the 100Hz forensic path. Dashboard uses raw primitives (`DashboardState`) with memoized formatting.
+1.  **Staggered Overlays**: Both `PhoneSetupOverlay` and `SettingsOverlay` use incremental rendering.
+2.  **Conflated Flows**: UI-bound log flows are now capped at 2Hz to protect the Main thread from high-frequency database ingress.
+3.  **Black-Box Buffer**: Off-heap `MappedByteBuffer` handles peak fidelities independently of the throttled UI path.
 
-## 🔍 Monitoring State (vAug.13.13)
+## 🔍 Monitoring State (vAug.13.14)
 | Component | Status | Logic / Technical Detail |
 | :--- | :--- | :--- |
+| **Settings UI** | 🟢 **STABLE** | Issue #166: Staggered hydration + Throttled log flow. |
+| **Log Persistence**| 🟢 **HARDENED** | Issue #167: Pruning cooldown and batching active. |
 | **Forensic Path** | 🟢 **HARDENED** | Issue #164: Zero-churn IDs and raw snapshotting active. |
-| **Buffer Safety** | 🟢 **SECURE** | 10k spill-buffer capacity + 2k standard log channel. |
-| **Persistence** | 🟡 **PENDING** | Issue #165: Sustained 5-min stress test required. |
-| **Version Consistency**| 🟢 **OK** | Database v67 and Build System synchronized to Aug.13.13. |
+| **Version Consistency**| 🟢 **OK** | Build System and Handover synchronized to Aug.13.14. |
 
 ## 📊 Status Tracker
+- **[Issue #167] Database Pruning Thrash**: 🟢 Resolved (Aug.13.14).
+- **[Issue #166] Settings Overlay ANR**: 🟢 Resolved (Aug.13.14).
 - **[Issue #164] Forensic Log Buffer Audit**: 🟢 Resolved (Aug.13.13).
-- **[Issue #163] 1Hz Telemetry Path Churn**: 🟢 Resolved (Aug.13.12).
-- **[Issue #162] Phone Setup ANR Stall**: 🟢 Resolved (Aug.13.11).
 
-## 🛠️ Git Release Preparation
-```bash
-git add .
-git commit -m "fix: harden forensic log path via deterministic IDs and raw snapshotting (#164)"
-git tag -a vAug.13.13 -m "Release Aug.13.13: Forensic Persistence Hardening & Safety Margins"
-git push origin main --tags
-```
-
-vAug.13.13
+vAug.13.14

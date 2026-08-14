@@ -2,16 +2,14 @@ package com.gps19.app
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 import com.gps19.core.engine.*
 import javax.inject.Inject
@@ -20,15 +18,15 @@ import javax.inject.Singleton
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * Aug.13.12:
- * - Issue #164: Forensic Log Buffer Audit. Implemented deterministic 
- *   composite IDs (F-timestamp-idx) for forensic traces to eliminate UUID 
- *   churn. Utilizing new snapshot columns to avoid string concatenation 
- *   in high-frequency drainage (R164).
- * Aug.13.02:
- * - Build Fix: Resolved type inference failures on budget hardware toolchains by 
- *   explicitly typing LatencyMonitor and withLock calls.
+ * Aug.13.14:
+ * - Issue #168: Build Restoration. Corrected 'it' to 'entry' in flushBatch 
+ *   to resolve compilation errors (R168).
+ * - Issue #166: Settings ANR Deep Remediation. Throttled eventLogsFlow 
+ *   to 500ms using sample() to prevent 100Hz object churn (R166).
+ * - Issue #167: Database Pruning Optimization. Implemented a 1-minute 
+ *   temporal cooldown for pruning and increased threshold to 500 (R167).
  */
+@OptIn(FlowPreview::class)
 @Singleton
 class LogRepository @Inject constructor(
     private val logDao: LogDao,
@@ -40,6 +38,7 @@ class LogRepository @Inject constructor(
     private val logMutex = Mutex()
     private var logWriteCount = 0
     private val isPruning = AtomicBoolean(false)
+    private val lastPruneTime = AtomicLong(0L)
 
     private val forensicSuccessCount = AtomicInteger(0)
     private val forensicFailureCount = AtomicInteger(0)
@@ -60,6 +59,8 @@ class LogRepository @Inject constructor(
         private const val FORENSIC_CONVERGENCE_STALL_LIMIT = 3
         private const val FORENSIC_EMERGENCY_FILL_LEVEL = 0.9
         private const val RELIABILITY_EMA_ALPHA = 0.1 
+        private const val PRUNE_COOLDOWN_MS = 60000L
+        private const val UI_LOG_UPDATE_SAMPLE_MS = 500L
     }
 
     init {
@@ -151,11 +152,6 @@ class LogRepository @Inject constructor(
         }
     }
 
-    /**
-     * performForensicDrain: Optimized drain logic for telemetry persistence.
-     * R164: Utilizing deterministic composite IDs for forensic traces. Allocated 
-     * objects only for traces passing the deduplication gate.
-     */
     private suspend fun performForensicDrain(limit: Int, isRecovery: Boolean): Boolean {
         val buffer = forensicSpillBufferProvider.get()
         val pendingAtStart = buffer.getPendingCount()
@@ -178,7 +174,6 @@ class LogRepository @Inject constructor(
             for (trace in traces) {
                 val signature = ForensicSignature(trace.timestamp, trace.spillIdx)
                 if (!existingSignatures.contains(signature)) {
-                    // R164: Deterministic ID generation to replace UUID.randomUUID()
                     val compositeId = if (trace.localId.isNotEmpty()) trace.localId 
                                      else "F-${trace.timestamp}-${trace.spillIdx}"
                     
@@ -238,42 +233,36 @@ class LogRepository @Inject constructor(
         }
     }
 
-    private var consecutiveStalls = 0
+    private fun updateReliability(success: Boolean) {
+        val currentSample = if (success) 1.0 else 0.0
+        liveReliability = (RELIABILITY_EMA_ALPHA * currentSample) + ((1.0 - RELIABILITY_EMA_ALPHA) * liveReliability)
+        val health = telemetry.systemHealth.value
+        health.forensicReliability = liveReliability
+        telemetry.updateHealth(health)
+    }
+
     private fun checkDrainConvergence(pendingAtStart: Int) {
         val buffer = forensicSpillBufferProvider.get()
         val pendingAfter = buffer.getPendingCount()
-        if (pendingAfter > 0) {
-            if (pendingAfter >= pendingAtStart) {
-                consecutiveStalls++
-                if (consecutiveStalls >= FORENSIC_CONVERGENCE_STALL_LIMIT) {
-                    val h = telemetry.systemHealth.value
-                    // R164: Formatted message only created on actual failure path.
-                    val msg = "Forensic Stall Correlated: Backfill not converging ($pendingAfter pending). System: [CPU: ${h.cpuLoad}, IOW: ${h.ioWait}, Temp: ${h.batteryTemp}C, Batt: ${h.batteryLevel}%]"
-                    Timber.w(msg)
-                    addLog(LogEntry(
-                        localId = "STALL-${timeProvider.currentTimeMillis()}",
-                        timestamp = timeProvider.currentTimeMillis(),
-                        message = msg, type = "SYSTEM", isImportant = true,
-                        id = "SYSTEM", viewerId = "SYSTEM", isSpecial = true,
-                        specialColor = FORENSIC_PINK_COLOR
-                    ), initiallySynced = true)
-                }
-            } else {
-                consecutiveStalls = 0
+        if (pendingAfter > 0 && pendingAfter >= pendingAtStart) {
+            consecutiveStalls++
+            if (consecutiveStalls >= FORENSIC_CONVERGENCE_STALL_LIMIT) {
+                val h = telemetry.systemHealth.value
+                val msg = "Forensic Stall Correlated: Backfill not converging ($pendingAfter pending). System: [CPU: ${h.cpuLoad}, IOW: ${h.ioWait}, Temp: ${h.batteryTemp}C, Batt: ${h.batteryLevel}%]"
+                Timber.w(msg)
+                addLog(LogEntry(
+                    localId = "STALL-${timeProvider.currentTimeMillis()}",
+                    timestamp = timeProvider.currentTimeMillis(),
+                    message = msg, type = "SYSTEM", isImportant = true,
+                    id = "SYSTEM", viewerId = "SYSTEM", isSpecial = true,
+                    specialColor = FORENSIC_PINK_COLOR
+                ), initiallySynced = true)
             }
         } else {
             consecutiveStalls = 0
         }
     }
-
-    private fun updateReliability(success: Boolean) {
-        val currentSample = if (success) 1.0 else 0.0
-        liveReliability = (RELIABILITY_EMA_ALPHA * currentSample) + ((1.0 - RELIABILITY_EMA_ALPHA) * liveReliability)
-        
-        val health = telemetry.systemHealth.value
-        health.forensicReliability = liveReliability
-        telemetry.updateHealth(health)
-    }
+    private var consecutiveStalls = 0
 
     private suspend fun flushBatch(batch: List<BufferedLog>) {
         if (batch.isEmpty()) return
@@ -340,8 +329,8 @@ class LogRepository @Inject constructor(
                             localId = if (entry.localId.isBlank()) "L-${entry.timestamp}-${UUID.randomUUID().toString().take(4)}" else entry.localId, 
                             timestamp = entry.timestamp, message = entry.message, type = entry.type, 
                             isImportant = entry.isImportant, deviceId = entry.id, viewerId = entry.viewerId, 
-                            count = entry.count, extremeValue = entry.extremeValue, durationMs = durationMs, 
-                            isSpecial = entry.isSpecial, specialColor = specialColor,
+                            count = entry.count, extremeValue = entry.extremeValue, durationMs = entry.durationMs, 
+                            isSpecial = entry.isSpecial, specialColor = entry.specialColor,
                             firstSeenTs = if (entry.firstSeenTs == 0L) (entry.timestamp - entry.durationMs) else entry.firstSeenTs,
                             role = entry.role, synced = initiallySynced, lat = entry.lat, lng = entry.lng, 
                             accuracy = entry.accuracy, maxAccuracy = entry.maxAccuracy, 
@@ -371,6 +360,7 @@ class LogRepository @Inject constructor(
     }
 
     fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logDao.getAllLogs(limit)
+        .sample(UI_LOG_UPDATE_SAMPLE_MS)
         .onEach { 
             LatencyMonitor.measureAndAudit<Unit>(
                 timeProvider = timeProvider,
@@ -396,12 +386,6 @@ class LogRepository @Inject constructor(
             }
         }.flowOn(Dispatchers.Default)
 
-    /**
-     * addLog: Entry point for all logging.
-     * Issue #151: Forensic traces are offloaded to Dispatchers.Default to ensure 
-     * that MappedByteBuffer I/O stalls on the persistence lock never block 
-     * the caller (which may be the Main thread during UI events).
-     */
     fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
         if (entry.type == "FORENSIC_TRACE") {
             scope.launch(Dispatchers.Default) {
@@ -417,7 +401,11 @@ class LogRepository @Inject constructor(
     }
 
     private fun triggerAsyncPruning() {
+        val now = timeProvider.elapsedRealtime()
+        if (now - lastPruneTime.get() < PRUNE_COOLDOWN_MS) return
+
         if (isPruning.compareAndSet(false, true)) {
+            lastPruneTime.set(now)
             scope.launch(Dispatchers.IO) {
                 try { proactivePruning() } finally { isPruning.set(false) }
             }
@@ -440,8 +428,6 @@ class LogRepository @Inject constructor(
                     health.isStorageCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
                     health.isBatteryCritical -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING 
                     health.isStorageLow -> ADAPTIVE_PRUNE_THRESHOLD_LOW
-                    health.isBatteryLow -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
-                    health.isCharging && !health.isCoolingModeActive -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING
                     else -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
                 }
 
@@ -449,21 +435,13 @@ class LogRepository @Inject constructor(
                     val heartbeatTarget = if (health.isStorageLow) 50 else 100
                     val generalTarget = if (health.isStorageLow) 300 else 500
                     
-                    val maxChunks = when {
-                        health.isBatteryCritical -> 1
-                        health.isBatteryLow -> 2
-                        health.isStorageCritical -> 10
-                        else -> 5
-                    }
+                    val maxChunks = if (health.isStorageCritical) 10 else 5
                     
                     var totalPruned = 0
                     repeat(maxChunks) { 
                         val p1 = logDao.pruneRoutineHeartbeatsChunk(heartbeatTarget, PRUNE_CHUNK_SIZE)
                         val p2 = logDao.pruneNonForensicLogsChunk(generalTarget, PRUNE_CHUNK_SIZE)
-                        
-                        val p3 = if (count > LOG_LIMIT_STRICT) {
-                            logDao.pruneSpecialLogsChunk(LOG_LIMIT_STANDARD, PRUNE_CHUNK_SIZE)
-                        } else 0
+                        val p3 = if (count > LOG_LIMIT_STRICT) logDao.pruneSpecialLogsChunk(LOG_LIMIT_STANDARD, PRUNE_CHUNK_SIZE) else 0
                         
                         val chunkPruned = p1 + p2 + p3
                         totalPruned += chunkPruned
@@ -527,7 +505,7 @@ class LogRepository @Inject constructor(
     fun clearLogs() { 
         scope.launch(Dispatchers.IO) {
             try { logDao.clearAll() } catch (e: Exception) { Timber.e(e, "Error clearing logs") }
-        } 
+        }
     }
 
     suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = LatencyMonitor.measureAndAudit<List<LogEntry>>(

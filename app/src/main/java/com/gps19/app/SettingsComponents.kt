@@ -29,17 +29,13 @@ import kotlinx.coroutines.delay
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Aug.13.14:
+ * - Issue #166: Settings Overlay ANR. Implemented staggered hydration 
+ *   to reduce initial composition load on the main thread (R166).
  * Aug.13.11:
  * - Issue #162: Phone Setup ANR Remediation. Hardened hydration gate (150ms) 
  *   and increased staggered rendering offsets (80ms) to prevent main-thread 
  *   stalls on budget hardware. Memoized static descriptions (R162).
- * Aug.13.07:
- * - Issue #155: Phone Setup UI Clutter. Refined GuideSection to hide action 
- *   buttons once a step is verified (isCompleted == true), improving 
- *   out-of-box experience and reducing visual noise.
- * Aug.11.06:
- * - Issue #142: Phone Setup Overlay Stabilization. Implemented Staggered 
- *   Incremental Hydration (R142).
  */
 
 @Composable
@@ -69,79 +65,108 @@ fun SettingsOverlay(
     onShowPhoneSetup: () -> Unit = {}, 
     onEvent: (UiEvent) -> Unit
 ) { 
-    // Issue #137: Deferred hydration state to prevent ANR during transition
+    // Issue #166: Staggered hydration to prevent ANR during heavy composition
     var isHydrated by remember { mutableStateOf(false) }
+    var visibleCount by remember { mutableIntStateOf(0) }
+    
     LaunchedEffect(Unit) {
-        delay(100) // Allow overlay container to render and animate before heavy layout
+        delay(150) 
         isHydrated = true
+        repeat(10) { 
+            visibleCount++
+            delay(60) 
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Card(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), colors = CardDefaults.cardColors(containerColor = Slate900), shape = androidx.compose.ui.graphics.RectangleShape) { 
-            if (isHydrated) {
+            if (isHydrated && visibleCount > 0) {
                 Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) { 
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.settings_title), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
-                    Spacer(Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(
-                            value = draftDeviceId, 
-                            onValueChange = onUpdateDeviceId, 
-                            label = { Text(stringResource(R.string.settings_label_tracker_id), fontSize = 12.sp) }, 
-                            leadingIcon = { Icon(Icons.Default.Agriculture, null, tint = BrandJd, modifier = Modifier.size(18.dp)) }, 
-                            modifier = Modifier.weight(1f), 
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = BrandJd, 
-                                unfocusedBorderColor = BrandJd.copy(alpha = 0.5f), 
-                                focusedLabelColor = BrandJd, 
-                                unfocusedLabelColor = BrandJd.copy(alpha = 0.7f), 
-                                focusedTextColor = BrandJd, 
-                                unfocusedTextColor = BrandJd,
-                                cursorColor = BrandJd
-                            ), 
-                            singleLine = true, 
-                            textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                        )
-                        OutlinedTextField(
-                            value = draftViewerId, 
-                            onValueChange = onUpdateViewerId, 
-                            label = { Text(stringResource(R.string.settings_label_viewer_id), fontSize = 12.sp) }, 
-                            leadingIcon = { Icon(Icons.Default.Person, null, tint = ViewerCyan, modifier = Modifier.size(18.dp)) }, 
-                            modifier = Modifier.weight(1f), 
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = ViewerCyan, 
-                                unfocusedBorderColor = ViewerCyan.copy(alpha = 0.5f), 
-                                focusedLabelColor = ViewerCyan, 
-                                unfocusedLabelColor = ViewerCyan.copy(alpha = 0.7f), 
-                                focusedTextColor = ViewerCyan, 
-                                unfocusedTextColor = ViewerCyan,
-                                cursorColor = ViewerCyan
-                            ), 
-                            singleLine = true, 
-                            textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                        ) 
+                    if (visibleCount >= 1) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.settings_title), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
+                        Spacer(Modifier.height(16.dp))
                     }
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedTextField(value = draftMaxDistance, onValueChange = onUpdateMaxDistance, label = { Text(stringResource(R.string.settings_label_geofence), fontSize = 12.sp) }, placeholder = { Text(stringResource(R.string.settings_placeholder_radius), color = Slate500) }, leadingIcon = { Icon(Icons.Default.RadioButtonChecked, null, tint = Color.White, modifier = Modifier.size(18.dp)) }, trailingIcon = { Text(stringResource(R.string.settings_unit_meters), color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(end = 8.dp)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = 0.3f), focusedLabelColor = Color.White, unfocusedLabelColor = Slate500, focusedTextColor = Color.White, unfocusedTextColor = Color.White), singleLine = true, textStyle = LocalTextStyle.current.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
-                    
-                    Spacer(Modifier.height(24.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.CLEAN)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteSweep, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clean)) }
-                        Button(onClick = onShowPhoneSetup, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.HelpCenter, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_phone_setup)) }
+
+                    if (visibleCount >= 2) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedTextField(
+                                value = draftDeviceId, 
+                                onValueChange = onUpdateDeviceId, 
+                                label = { Text(stringResource(R.string.settings_label_tracker_id), fontSize = 12.sp) }, 
+                                leadingIcon = { Icon(Icons.Default.Agriculture, null, tint = BrandJd, modifier = Modifier.size(18.dp)) }, 
+                                modifier = Modifier.weight(1f), 
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = BrandJd, 
+                                    unfocusedBorderColor = BrandJd.copy(alpha = 0.5f), 
+                                    focusedLabelColor = BrandJd, 
+                                    unfocusedLabelColor = BrandJd.copy(alpha = 0.7f), 
+                                    focusedTextColor = BrandJd, 
+                                    unfocusedTextColor = BrandJd,
+                                    cursorColor = BrandJd
+                                ), 
+                                singleLine = true, 
+                                textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            )
+                            OutlinedTextField(
+                                value = draftViewerId, 
+                                onValueChange = onUpdateViewerId, 
+                                label = { Text(stringResource(R.string.settings_label_viewer_id), fontSize = 12.sp) }, 
+                                leadingIcon = { Icon(Icons.Default.Person, null, tint = ViewerCyan, modifier = Modifier.size(18.dp)) }, 
+                                modifier = Modifier.weight(1f), 
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = ViewerCyan, 
+                                    unfocusedBorderColor = ViewerCyan.copy(alpha = 0.5f), 
+                                    focusedLabelColor = ViewerCyan, 
+                                    unfocusedLabelColor = ViewerCyan.copy(alpha = 0.7f), 
+                                    focusedTextColor = ViewerCyan, 
+                                    unfocusedTextColor = ViewerCyan,
+                                    cursorColor = ViewerCyan
+                                ), 
+                                singleLine = true, 
+                                textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            ) 
+                        }
+                        Spacer(Modifier.height(16.dp))
                     }
-                    Spacer(Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
-                        Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.Default.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
+
+                    if (visibleCount >= 3) {
+                        OutlinedTextField(value = draftMaxDistance, onValueChange = onUpdateMaxDistance, label = { Text(stringResource(R.string.settings_label_geofence), fontSize = 12.sp) }, placeholder = { Text(stringResource(R.string.settings_placeholder_radius), color = Slate500) }, leadingIcon = { Icon(Icons.Default.RadioButtonChecked, null, tint = Color.White, modifier = Modifier.size(18.dp)) }, trailingIcon = { Text(stringResource(R.string.settings_unit_meters), color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(end = 8.dp)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = 0.3f), focusedLabelColor = Color.White, unfocusedLabelColor = Slate500, focusedTextColor = Color.White, unfocusedTextColor = Color.White), singleLine = true, textStyle = LocalTextStyle.current.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
+                        Spacer(Modifier.height(24.dp))
                     }
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = { onEvent(UiEvent.NavigateToDiagnostics(true)) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
-                    
-                    Spacer(Modifier.height(24.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = onImportConfig, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_load_config), fontSize = 11.sp) }
-                        if (onExport != null) { Button(onClick = onExport, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_save_logs), fontSize = 11.sp) } }
+
+                    if (visibleCount >= 4) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.CLEAN)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteSweep, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clean)) }
+                            Button(onClick = onShowPhoneSetup, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.HelpCenter, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_phone_setup)) }
+                        }
+                        Spacer(Modifier.height(16.dp))
                     }
-                    Spacer(Modifier.height(24.dp)); OutlinedTextField(value = draftRelayUrl, onValueChange = onUpdateRelayUrl, label = { Text(stringResource(R.string.settings_label_relay_url)) }, modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(48.dp))
+
+                    if (visibleCount >= 5) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
+                            Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.Default.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
+                        }
+                        Spacer(Modifier.height(16.dp))
+                    }
+
+                    if (visibleCount >= 6) {
+                        Button(onClick = { onEvent(UiEvent.NavigateToDiagnostics(true)) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
+                        Spacer(Modifier.height(24.dp))
+                    }
+
+                    if (visibleCount >= 7) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = onImportConfig, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_load_config), fontSize = 11.sp) }
+                            if (onExport != null) { Button(onClick = onExport, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_save_logs), fontSize = 11.sp) } }
+                        }
+                        Spacer(Modifier.height(24.dp))
+                    }
+
+                    if (visibleCount >= 8) {
+                        OutlinedTextField(value = draftRelayUrl, onValueChange = onUpdateRelayUrl, label = { Text(stringResource(R.string.settings_label_relay_url)) }, modifier = Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(48.dp))
+                    }
                 } 
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -149,7 +174,7 @@ fun SettingsOverlay(
                 }
             }
         }
-        if (isHydrated) {
+        if (isHydrated && visibleCount >= 9) {
             when (activeSubSettings) {
                 SubSettings.CLEAN -> CleanSetupOverlay(onClear = onClear, onReset = onReset, onFullInitialization = onFullInitialization, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
                 SubSettings.ALERTS -> AlertManagementOverlay(draftAlertSettings = draftAlertSettings, onUpdateAlertSettings = onUpdateAlertSettings, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
