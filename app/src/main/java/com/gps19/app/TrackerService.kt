@@ -20,16 +20,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.14.01:
+ * - Issue #169: Geofence Accuracy vs. Battery Audit. Integrated isGeofenceActive 
+ *   into calculateGpsInterval to prevent 45s polling blind-spots when moving 
+ *   with screen off (R406a).
  * Aug.13.13:
  * - Issue #165: Forensic Persistence Stress Test. Extended automated stress 
  *   test routine to 5 minutes with continuous 100Hz trace logging to audit 
  *   database throughput and spill-buffer drainage stability (R165).
- * Aug.11.16:
- * - Issue #145: Forensic Spill-Buffer Overflow Protection. Implemented proactive 
- *   throttling (R669) in startForensicSamplingLoop based on buffer pressure.
- * - Issue #141: Stress Recovery Verification. Fixed syntax errors, resolved 
- *   SentinelStatus.status reference, and implemented dynamic interval 
- *   return-to-baseline (R406a) with Adaptation Muzzle (R141).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -291,11 +289,6 @@ class TrackerService : BaseMonitorService() {
         }
     }
 
-    /**
-     * executeAutomatedStressTest: Comprehensive audit routine.
-     * R165: Extended to 5 minutes with continuous 100Hz trace logging to 
-     * verify database throughput and prevent Davey stalls under load.
-     */
     private fun executeAutomatedStressTest() {
         lifecycleScope.launch(Dispatchers.Default) {
             val proc = lastProcessedLocation
@@ -482,11 +475,13 @@ class TrackerService : BaseMonitorService() {
             nowRt = nowRt
         )
         
+        // Issue #169: Pass isGeofenceActive to polling logic.
         val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(
             isCoolingMode = health.isCoolingModeActive,
             isSuspiciousMode = isSuspiciousMode,
             isStationary = appSensorManager.isStationary(),
             isScreenOn = appSensorManager.isScreenOn(),
+            isGeofenceActive = locationProcessor.getMaxDistanceAuthority() > 0.0,
             nowRt = nowRt,
             deviceSpecialFlags = ServiceBehaviorUseCase.DeviceSpecialFlags(
                 isS21FE = capabilities.requiresAdaptationMuzzle,

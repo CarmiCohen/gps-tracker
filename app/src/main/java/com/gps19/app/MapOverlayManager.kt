@@ -20,13 +20,12 @@ import kotlin.math.log10
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Aug.14.02:
+ * - Issue #170: Forensic Replay UI Audit. Added replayMarker and replayCircle 
+ *   to support frame-perfect historical coordinate visualization during 
+ *   ribbon scrubbing (R170).
  * Aug.13.08:
- * - Issue #157: Violation Path Allocations. Updated to use the refactored 
- *   ViolationPoint class, utilizing toGeoPoint() to access cached position 
- *   objects (R157).
- * July.30.40:
- * - Issue #641: Optimized invalidation. Methods now return Boolean to signal 
- *   required view.invalidate(), reducing idle CPU consumption.
+ * - Issue #157: Violation Path Allocations.
  */
 class MapOverlayManager(
     private val context: Context,
@@ -43,12 +42,17 @@ class MapOverlayManager(
     private val accuracyCirclesFolder = FolderOverlay()
     private val violationMarkersFolder = FolderOverlay()
     private val violationAccuracyFolder = FolderOverlay()
+    private val replayFolder = FolderOverlay()
 
     // Fixed Overlays
     val trackerMarker = Marker(mapView).apply { setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); setInfoWindow(null) }
     val viewerMarker = Marker(mapView).apply { setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); setInfoWindow(null) }
     private val trackerCircle = Polygon(mapView).apply { fillPaint.color = 0; outlinePaint.strokeWidth = 3f; setInfoWindow(null) }
     private val viewerCircle = Polygon(mapView).apply { fillPaint.color = 0; outlinePaint.strokeWidth = 3f; setInfoWindow(null) }
+
+    // Issue #170: Replay Cursor
+    private val replayMarker = Marker(mapView).apply { setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); setInfoWindow(null) }
+    private val replayCircle = Polygon(mapView).apply { fillPaint.color = 0; outlinePaint.strokeWidth = 2f; setInfoWindow(null) }
 
     // Pools
     private val homeMarkerPool = mutableListOf<Marker>()
@@ -64,6 +68,7 @@ class MapOverlayManager(
     private val viewerIconStale = createViewerBitmap(density, false).toDrawable(resources)
     private val jumpIcon = createJumpMarkerBitmap(density).toDrawable(resources)
     private val geofenceIcon = createGeofenceViolationBitmap(density).toDrawable(resources)
+    private val replayIcon = createReplayMarkerBitmap(density).toDrawable(resources)
     private val homeIcons = mutableMapOf<Int, BitmapDrawable>()
 
     // State Caches
@@ -84,8 +89,9 @@ class MapOverlayManager(
     private var lastViewerPos: GeoPoint? = null
     private var lastViewerDrift: Double = -1.0
     private var lastViewerFresh: Boolean? = null
+    
+    private var lastReplayPos: GeoPoint? = null
 
-    // Budget Baseline (R-HARDWARE-01) Throttling
     private var lastTrailUpdateTs = 0L
     private var lastViewerTrailUpdateTs = 0L
     private var lastDriftUpdateTs = 0L
@@ -100,6 +106,7 @@ class MapOverlayManager(
         mapView.overlays.add(accuracyCirclesFolder)
         mapView.overlays.add(fenceFolder)
         mapView.overlays.add(homeMarkersFolder)
+        mapView.overlays.add(replayFolder)
     }
 
     fun updateHomePoints(
@@ -213,6 +220,24 @@ class MapOverlayManager(
         lastViolationsSize = violations.size
         lastViolationVisibility = visibilityPair
         lastViolationUpdateTs = systemPulseRt
+        return true
+    }
+
+    fun updateReplayCursor(pos: GeoPoint?): Boolean {
+        if (lastReplayPos == pos) return false
+        
+        replayFolder.items.clear()
+        if (pos != null) {
+            replayMarker.position = pos
+            replayMarker.icon = replayIcon
+            replayFolder.add(replayMarker)
+            
+            replayCircle.points = Polygon.pointsAsCircle(pos, 5.0).map { GeoPoint(it.latitude, it.longitude) }
+            replayCircle.outlinePaint.color = android.graphics.Color.WHITE
+            replayFolder.add(replayCircle)
+        }
+        
+        lastReplayPos = pos
         return true
     }
 
@@ -413,6 +438,18 @@ class MapOverlayManager(
         b.applyCanvas {
             p.style = Paint.Style.STROKE; p.color = android.graphics.Color.RED; p.strokeWidth = 2f * density
             val off = p.strokeWidth / 2f; drawCircle(sz/2f, sz/2f, sz/2f - off, p)
+        }
+        return b
+    }
+
+    private fun createReplayMarkerBitmap(density: Float): Bitmap {
+        val sz = (24 * density).toInt()
+        val b = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        b.applyCanvas {
+            p.color = android.graphics.Color.WHITE; drawCircle(sz/2f, sz/2f, sz/2f - density, p)
+            p.style = Paint.Style.STROKE; p.color = android.graphics.Color.BLUE; p.strokeWidth = 2f * density
+            drawCircle(sz/2f, sz/2f, sz/3f, p)
         }
         return b
     }

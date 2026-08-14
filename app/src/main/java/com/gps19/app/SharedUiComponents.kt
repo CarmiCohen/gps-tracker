@@ -3,6 +3,7 @@ package com.gps19.app
 import android.content.res.Configuration
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -47,17 +49,10 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * Aug.13.11:
- * - Issue #162: Phone Setup ANR Remediation. Modified HeaderBar to hide the 
- *   System Issues icon when the overlay is already visible, reducing 
- *   animation overhead and preventing redundant triggers. Fixed syntax error 
- *   in ForensicRibbonContainer.
- * Aug.11.21:
- * - Issue #148: Header Layout Inversion Fix. Explicitly forced LayoutDirection.Ltr 
- *   in HeaderBar to prevent unintended RTL inversions (R148).
- * Aug.10.27:
- * - Issue #132: Forensic UI Dashboard Refinement. Integrated CPU, I/O Wait, 
- *   and Latency trend ribbons into AnalyticalRibbons (R132).
+ * Aug.14.02:
+ * - Issue #170: Forensic Replay UI Audit. Implemented coordinate-aware 
+ *   scrubbing in ForensicRibbonContainer. Fixed compilation errors in 
+ *   StatusBar where isRedScreenVisible was shadowed (R170).
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -65,6 +60,7 @@ enum class RibbonRenderType { BAR, LINE }
 @Composable
 fun RibbonsOverlay(
     isStrictMode: Boolean,
+    replayCursorTs: Long?,
     history4MFlow: StateFlow<List<ConnectionPoint>>,
     history16MFlow: StateFlow<List<ConnectionPoint>>,
     history1HFlow: StateFlow<List<ConnectionPoint>>,
@@ -72,6 +68,7 @@ fun RibbonsOverlay(
     history24HFlow: StateFlow<List<ConnectionPoint>>,
     history7DFlow: StateFlow<List<ConnectionPoint>>,
     onToggleStrictMode: (Boolean) -> Unit,
+    onScrub: (Long?) -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(
@@ -86,13 +83,15 @@ fun RibbonsOverlay(
                 Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                     AnalyticalRibbons(
                         isStrictMode = isStrictMode,
+                        replayCursorTs = replayCursorTs,
                         history4MFlow = history4MFlow,
                         history16MFlow = history16MFlow,
                         history1HFlow = history1HFlow,
                         history4HFlow = history4HFlow,
                         history24HFlow = history24HFlow,
                         history7DFlow = history7DFlow,
-                        onToggleStrictMode = onToggleStrictMode
+                        onToggleStrictMode = onToggleStrictMode,
+                        onScrub = onScrub
                     )
                 }
             }
@@ -103,13 +102,15 @@ fun RibbonsOverlay(
 @Composable
 fun AnalyticalRibbons(
     isStrictMode: Boolean,
+    replayCursorTs: Long?,
     history4MFlow: StateFlow<List<ConnectionPoint>>,
     history16MFlow: StateFlow<List<ConnectionPoint>>,
     history1HFlow: StateFlow<List<ConnectionPoint>>,
     history4HFlow: StateFlow<List<ConnectionPoint>>,
     history24HFlow: StateFlow<List<ConnectionPoint>>,
     history7DFlow: StateFlow<List<ConnectionPoint>>,
-    onToggleStrictMode: (Boolean) -> Unit
+    onToggleStrictMode: (Boolean) -> Unit,
+    onScrub: (Long?) -> Unit
 ) {
     var selectedScale by remember { mutableStateOf("4M") }
     
@@ -141,7 +142,6 @@ fun AnalyticalRibbons(
     val svzDriftSelector = remember { { p: ConnectionPoint -> if (p.sitVzTs > 0) kotlin.math.abs(p.ts - p.sitVzTs) else 0L } }
     val sdzSelector = remember { { p: ConnectionPoint -> (kotlin.math.abs(p.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f) } }
     
-    // Issue #132: Performance selectors
     val cpuSelector = remember { { p: ConnectionPoint -> (p.cpuLoad.toFloat() / RIBBON_CPU_LOAD_SCALE.toFloat()).coerceIn(0f, 1f) } }
     val iowSelector = remember { { p: ConnectionPoint -> (p.ioWait.toFloat() / RIBBON_IO_WAIT_SCALE.toFloat()).coerceIn(0f, 1f) } }
     val latSelector = remember { { p: ConnectionPoint -> (p.maxIoLatency.toFloat() / RIBBON_LATENCY_SCALE_MS.toFloat()).coerceIn(0f, 1f) } }
@@ -188,31 +188,30 @@ fun AnalyticalRibbons(
             }
         }
 
-        ConnectionQualityRibbon(history, selectedScale, isStrictMode)
+        ConnectionQualityRibbon(history, selectedScale, isStrictMode, replayCursorTs, onScrub)
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
 
-        GenericSensorRibbon(history, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), isStrictMode = isStrictMode, valueSelector = snrSelector)
-        GenericSensorRibbon(history, "NOI", selectedScale, lineColor = Amber500, isStrictMode = isStrictMode, valueSelector = noiseSelector)
-        GenericSensorRibbon(history, "KNT", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = kineticSelector)
-        GenericSensorRibbon(history, "LUX", selectedScale, lineColor = Color.White, isStrictMode = isStrictMode, valueSelector = luxSelector)
-        GenericSensorRibbon(history, "VIB", selectedScale, lineColor = Color.Magenta, isStrictMode = isStrictMode, valueSelector = vibeSelector)
-        GenericSensorRibbon(history, "PRX", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = proxSelector)
-        GenericSensorRibbon(history, "LIF", selectedScale, lineColor = Color(0xFFFACC15), isStrictMode = isStrictMode, valueSelector = liftSelector)
-        GenericSensorRibbon(history, "BAT", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = batSelector)
-        GenericSensorRibbon(history, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = thmSelector)
-        GenericSensorRibbon(history, "CUR", selectedScale, lineColor = Color(0xFFFB923C), isStrictMode = isStrictMode, valueSelector = curSelector)
-        GenericSensorRibbon(history, "SIT", selectedScale, lineColor = BrandJd, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = sitSelector)
-        GenericSensorRibbon(history, "TLT", selectedScale, lineColor = Color(0xFF818CF8), isStrictMode = isStrictMode, valueSelector = tltSelector)
-        GenericSensorRibbon(history, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), isStrictMode = isStrictMode, valueSelector = barSelector)
-        GenericSensorRibbon(history, "SVZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = svzSelector, driftSelector = svzDriftSelector)
-        GenericSensorRibbon(history, "SDZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = sdzSelector)
+        GenericSensorRibbon(history, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), isStrictMode = isStrictMode, valueSelector = snrSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "NOI", selectedScale, lineColor = Amber500, isStrictMode = isStrictMode, valueSelector = noiseSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "KNT", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = kineticSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "LUX", selectedScale, lineColor = Color.White, isStrictMode = isStrictMode, valueSelector = luxSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "VIB", selectedScale, lineColor = Color.Magenta, isStrictMode = isStrictMode, valueSelector = vibeSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "PRX", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = proxSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "LIF", selectedScale, lineColor = Color(0xFFFACC15), isStrictMode = isStrictMode, valueSelector = liftSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "BAT", selectedScale, lineColor = Rose500, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = batSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = thmSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "CUR", selectedScale, lineColor = Color(0xFFFB923C), isStrictMode = isStrictMode, valueSelector = curSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "SIT", selectedScale, lineColor = BrandJd, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = sitSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "TLT", selectedScale, lineColor = Color(0xFF818CF8), isStrictMode = isStrictMode, valueSelector = tltSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), isStrictMode = isStrictMode, valueSelector = barSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "SVZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = svzSelector, driftSelector = svzDriftSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "SDZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = sdzSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
         
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
         
-        // Issue #132: Performance Trends
-        GenericSensorRibbon(history, "CPU", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = cpuSelector)
-        GenericSensorRibbon(history, "IOW", selectedScale, lineColor = Amber500, isStrictMode = isStrictMode, valueSelector = iowSelector)
-        GenericSensorRibbon(history, "LAT", selectedScale, lineColor = Rose500, isStrictMode = isStrictMode, valueSelector = latSelector)
+        GenericSensorRibbon(history, "CPU", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = cpuSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "IOW", selectedScale, lineColor = Amber500, isStrictMode = isStrictMode, valueSelector = iowSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "LAT", selectedScale, lineColor = Rose500, isStrictMode = isStrictMode, valueSelector = latSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
     }
 }
 
@@ -224,6 +223,8 @@ fun ForensicRibbonContainer(
     history: List<ConnectionPoint>,
     scale: String,
     isStrictMode: Boolean = false,
+    replayCursorTs: Long? = null,
+    onScrub: (Long?) -> Unit = {},
     onDrawRibbon: DrawScope.(
         totalPoints: Float,
         pointWidth: Float,
@@ -257,6 +258,26 @@ fun ForensicRibbonContainer(
             .weight(1f)
             .height(height)
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+            .pointerInput(history, scale) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val totalPoints = MAX_HISTORY_POINTS_PER_RIBBONS.toFloat()
+                        val pointWidth = size.width / totalPoints
+                        val startOffset = totalPoints - history.size
+                        val index = ((offset.x / pointWidth) - startOffset).toInt()
+                        if (index in history.indices) onScrub(history[index].ts)
+                    },
+                    onDrag = { change, _ ->
+                        val totalPoints = MAX_HISTORY_POINTS_PER_RIBBONS.toFloat()
+                        val pointWidth = size.width / totalPoints
+                        val startOffset = totalPoints - history.size
+                        val index = ((change.position.x / pointWidth) - startOffset).toInt()
+                        if (index in history.indices) onScrub(history[index].ts)
+                    },
+                    onDragEnd = { onScrub(null) },
+                    onDragCancel = { onScrub(null) }
+                )
+            }
             .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
             .drawWithCache {
                 val totalPoints = MAX_HISTORY_POINTS_PER_RIBBONS.toFloat()
@@ -314,6 +335,20 @@ fun ForensicRibbonContainer(
                     drawPath(strictGaps, Color.Red.copy(alpha = 0.4f))
                     
                     onDrawRibbon(totalPoints, pointWidth, baseLineY, maxHeight, isLandscape)
+
+                    replayCursorTs?.let { cursorTs ->
+                        val startOffset = totalPoints - history.size
+                        val index = history.indexOfFirst { it.ts >= cursorTs }
+                        if (index != -1) {
+                            val xPos = (startOffset + index) * pointWidth
+                            drawLine(
+                                color = Color.White,
+                                start = Offset(xPos, 0f),
+                                end = Offset(xPos, size.height),
+                                strokeWidth = 1.5.dp.toPx()
+                            )
+                        }
+                    }
                 }
             }
         )
@@ -328,10 +363,12 @@ fun GenericSensorRibbon(
     lineColor: Color, 
     renderType: RibbonRenderType = RibbonRenderType.LINE,
     isStrictMode: Boolean = false,
+    replayCursorTs: Long? = null,
+    onScrub: (Long?) -> Unit = {},
     valueSelector: (ConnectionPoint) -> Float,
     driftSelector: ((ConnectionPoint) -> Long)? = null
 ) {
-    ForensicRibbonContainer(title, lineColor, if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) 40.dp else 24.dp, history, scale, isStrictMode) { totalPoints, pointWidth, baseLineY, maxHeight, landscape ->
+    ForensicRibbonContainer(title, lineColor, if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) 40.dp else 24.dp, history, scale, isStrictMode, replayCursorTs, onScrub) { totalPoints, pointWidth, baseLineY, maxHeight, landscape ->
         if (history.isEmpty()) return@ForensicRibbonContainer
         
         val startOffset = totalPoints - history.size
@@ -379,7 +416,7 @@ fun GenericSensorRibbon(
 }
 
 @Composable
-fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStrictMode: Boolean = false) {
+fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStrictMode: Boolean = false, replayCursorTs: Long? = null, onScrub: (Long?) -> Unit = {}) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val dateFormatter = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
@@ -388,7 +425,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
     val density = LocalDensity.current
     val textPaint = remember(isLandscape, density) { android.graphics.Paint().apply { color = android.graphics.Color.WHITE; with(density) { textSize = (if (isLandscape) 10.sp.toPx() else 7.sp.toPx()) }; textAlign = android.graphics.Paint.Align.CENTER; typeface = android.graphics.Typeface.MONOSPACE } }
 
-    ForensicRibbonContainer(scale, Color.Gray, if (isLandscape) 60.dp else 34.dp, history, scale, isStrictMode) { totalPoints, pointWidth, connectionBaseY, maxHeight, landscape ->
+    ForensicRibbonContainer(scale, Color.Gray, if (isLandscape) 60.dp else 34.dp, history, scale, isStrictMode, replayCursorTs, onScrub) { totalPoints, pointWidth, connectionBaseY, maxHeight, landscape ->
         if (history.isEmpty()) return@ForensicRibbonContainer
         val ribbonMaxHeight = if (landscape) 16.dp.toPx() else 10.dp.toPx()
         val effectiveBaseY = connectionBaseY - (if (landscape) 4.dp.toPx() else 2.dp.toPx())
@@ -438,7 +475,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
 @Composable
 fun HeaderBar(
     isLogVisible: Boolean, isSettingsOpen: Boolean, isRibbonsVisible: Boolean, isMapVisible: Boolean, 
-    isPhoneSetupVisible: Boolean = false, // Issue #162: Track setup visibility
+    isPhoneSetupVisible: Boolean = false, 
     requiresExtraTopPadding: Boolean, isSystemReady: Boolean, systemIssuesCount: Int, 
     onDashboard: () -> Unit = {}, onS: () -> Unit = {}, onL: () -> Unit = {}, 
     onM: () -> Unit = {}, onR: () -> Unit = {}, onEvent: (UiEvent) -> Unit
@@ -451,7 +488,6 @@ fun HeaderBar(
     val alertPulse = rememberInfiniteTransition(label = "AlertPulse")
     val alertAlpha by alertPulse.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "Alpha")
 
-    // Issue #148: Force LayoutDirection.Ltr
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         if (isLandscape) {
             Column(
@@ -471,7 +507,6 @@ fun HeaderBar(
                     Icon(imageVector = Icons.Default.BarChart, contentDescription = null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                // Issue #162: Hide icon if PhoneSetupOverlay is already visible to reduce main-thread load
                 if (!isSystemReady && !isPhoneSetupVisible) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }) { 
                     Box(contentAlignment = Alignment.Center) { 
                         Icon(imageVector = Icons.Default.ReportProblem, contentDescription = "System Issues", tint = Rose500.copy(alpha = alertAlpha), modifier = Modifier.size(28.dp))
@@ -504,7 +539,6 @@ fun HeaderBar(
                         Icon(imageVector = Icons.Default.BarChart, contentDescription = null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) 
                     }
                     Spacer(modifier = Modifier.weight(1f))
-                    // Issue #162: Hide icon if PhoneSetupOverlay is already visible
                     if (!isSystemReady && !isPhoneSetupVisible) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }, modifier = Modifier.size(44.dp)) {
                         Box(contentAlignment = Alignment.Center) { 
                             Icon(imageVector = Icons.Default.ReportProblem, contentDescription = "System Issues", tint = Rose500.copy(alpha = alertAlpha), modifier = Modifier.size(26.dp))
@@ -620,8 +654,8 @@ fun StatusBar(
     val trkIdLabel = trackerId.take(6).uppercase()
     val viewIdLabel = viewerId.take(6).uppercase()
     val infiniteTransition = rememberInfiniteTransition(label = "StatusBarAnimations")
-    val alarmAlpha by infiniteTransition.animateFloat(0.4f, 1f, infiniteRepeatable(tween(500), RepeatMode.Reverse), label = "AlarmAlpha")
-    val movingAlpha by infiniteTransition.animateFloat(0.5f, 1f, infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "MovingAlpha")
+    val alarmAlpha by infiniteTransition.animateFloat(0.4f, 1f, infiniteRepeatable(tween(500), repeatMode = RepeatMode.Reverse), label = "AlarmAlpha")
+    val movingAlpha by infiniteTransition.animateFloat(0.5f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "MovingAlpha")
 
     Card(modifier = modifier.fillMaxWidth(), shape = RectangleShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = if (isLandscape) 0.7f else 0.9f)), elevation = CardDefaults.cardElevation(0.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 3.dp)) {
@@ -687,7 +721,7 @@ fun StatusRowData(
     val contentColor = if (isConnStale) Slate500 else color
     val distColor = if (isTelemetryFresh && !isConnStale) (overrideDistanceColor ?: color) else Slate500
     val infiniteTransition = rememberInfiniteTransition(label = "HandshakeAnimations")
-    val handshakeAlpha by infiniteTransition.animateFloat(0.3f, 1f, infiniteRepeatable(tween(1200), RepeatMode.Reverse), label = "HandshakeAlpha")
+    val handshakeAlpha by infiniteTransition.animateFloat(0.3f, 1f, infiniteRepeatable(tween(1200), repeatMode = RepeatMode.Reverse), label = "HandshakeAlpha")
     val animatedBattery by animateIntAsState(battery, tween(1500), label = "BatteryAnim")
 
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = horizontalPadding), verticalAlignment = Alignment.CenterVertically) {

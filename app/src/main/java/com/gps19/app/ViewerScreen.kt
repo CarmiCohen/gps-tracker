@@ -32,12 +32,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Aug.14.04:
+ * - Issue #170: Forensic Replay UI Audit. Wired replayCursorTs and 
+ *   replayCursorPos to support interactive historical trace auditing in 
+ *   viewer mode (R170).
  * Aug.13.12:
- * - Issue #163: 1Hz Telemetry Path Optimization. Updated ViewerDashboard 
- *   to handle refactored DashboardState primitive fields (R163).
- * Aug.10.31:
- * - Issue #135: UI Davey/ANR Mitigation. Refactored SettingsOverlay call site 
- *   to pass decomposed primitive parameters (R135).
+ * - Issue #163: 1Hz Telemetry Path Optimization.
  */
 
 @Composable
@@ -198,6 +198,7 @@ fun ViewerScreen(
                                 viewerTelemetryTs = 0L,
                                 viewerLocPending = kinematicState.localHealth.isLocationPending,
                                 viewerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
+                                replayCursorPos = kinematicState.replayCursorPos,
                                 systemPulse = systemPulse,
                                 systemPulseRt = systemPulseRt,
                                 onEvent = { viewModel.onEvent(it) },
@@ -264,6 +265,7 @@ fun ViewerScreen(
                     viewerTelemetryTs = 0L,
                     viewerLocPending = kinematicState.localHealth.isLocationPending,
                     viewerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
+                    replayCursorPos = kinematicState.replayCursorPos,
                     systemPulse = systemPulse,
                     systemPulseRt = systemPulseRt,
                     onEvent = { viewModel.onEvent(it) },
@@ -397,6 +399,7 @@ fun ViewerScreen(
         } else if (isRibbonsVisible) {
             RibbonsOverlay(
                 isStrictMode = uiState.navigation.isStrictMode,
+                replayCursorTs = uiState.navigation.replayCursorTs,
                 history4MFlow = viewModel.history4MFlow,
                 history16MFlow = viewModel.history16MFlow,
                 history1HFlow = viewModel.history1HFlow,
@@ -404,6 +407,7 @@ fun ViewerScreen(
                 history24HFlow = viewModel.history24HFlow,
                 history7DFlow = viewModel.history7DFlow,
                 onToggleStrictMode = { viewModel.onEvent(UiEvent.ToggleStrictMode(it)) },
+                onScrub = { viewModel.onEvent(UiEvent.SetReplayCursor(it)) },
                 onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) }
             )
         } else if (isGnssDetailVisible) {

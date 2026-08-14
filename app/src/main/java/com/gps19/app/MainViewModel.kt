@@ -23,12 +23,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.14.02:
+ * - Issue #170: Forensic Replay UI Audit. Implemented SetReplayCursor handler. 
+ *   Performs O(log N) binary search on historical trails to find coordinate 
+ *   matches for frame-perfect replay synchronization (R170).
  * Aug.13.05:
- * - Issue #153: Startup Davey Stalls. Implemented staggered hydration logic 
- *   in init block to spread initialization load across multiple frames (R153).
- * Aug.13.04:
- * - Issue #150: Samsung A15 R405 Detection Hardening. Moved automated setup 
- *   trigger from MainActivity to ViewModel monitoring loop.
+ * - Issue #153: Startup Davey Stalls.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -169,26 +169,18 @@ class MainViewModel @Inject constructor(
     private var isHeavyObservationStarted = false
 
     init {
-        // Issue #153: Staggered hydration to prevent Main thread Davey stalls.
         viewModelScope.launch(Dispatchers.Default + uiExceptionHandler) {
             val initialSettings = settingsUseCase.loadAllSettings()
             
             withContext(Dispatchers.Main.immediate) {
                 applyInitialSettings(initialSettings)
-                
-                // Level 1: Surface Hydration (Basic theme and layout)
                 updateState { it.copy(hydrationLevel = 1) }
-                delay(150) // Breathing room for first frame
-                
-                // Level 2: Core/Nav Hydration (Navigation and primary screens)
+                delay(150) 
                 updateState { it.copy(hydrationLevel = 2) }
-                delay(300) // Stabilize navigation host
-                
-                // Level 3: Full Hydration (Heavy components like Map and Ribbons)
+                delay(300) 
                 updateState { it.copy(hydrationLevel = 3, isInitialized = true) }
             }
             
-            // Issue #120b: Background maintenance deferral (Requirement R104b)
             launch(Dispatchers.IO) { 
                 delay(15000)
                 repository.proactivePruning() 
@@ -404,6 +396,7 @@ class MainViewModel @Inject constructor(
                 updateNavigation { it.copy(isStrictMode = event.visible) }
                 addPersistentLog("user", "USER ACTION: Forensic Strict Mode ${if (event.visible) "ENABLED" else "DISABLED"}", isImportant = true)
             }
+            is UiEvent.SetReplayCursor -> handleReplayCursor(event.ts)
             is UiEvent.SetPendingMode -> updateNavigation { it.copy(pendingMode = event.mode) }
             is UiEvent.SetRedScreenVisible -> updateDiagnosticState { it.apply { isRedScreenVisible = event.visible; pulse = timeProvider.elapsedRealtime() } }
             is UiEvent.SetUiVisible -> {
@@ -506,7 +499,6 @@ class MainViewModel @Inject constructor(
                     val appMode = _uiState.value.appMode
                     val isSystemActive = _uiState.value.isSystemActive
                     if (appMode != null && isSystemActive) {
-                        Timber.i("Issue #626: Triggering deferred service recovery for mode $appMode")
                         val serviceClass = if (appMode == "tracker") TrackerService::class.java else ViewerService::class.java
                         val intent = Intent(context, serviceClass)
                         try {
@@ -524,8 +516,6 @@ class MainViewModel @Inject constructor(
                                 val snapshot = repository.getSettingsSnapshot()
                                 val avg = if (snapshot.recoveryCount > 0) snapshot.cumulativeRecoveryBlackoutMs / snapshot.recoveryCount else 0L
                                 addPersistentLog("system", "Forensic Performance Audit: Deferred service recovery blackout (${latency}ms) [Avg: ${avg}ms]", isImportant = true)
-                            } else {
-                                addPersistentLog("system", "SYSTEM: Deferred recovery successful ($appMode)", isImportant = true)
                             }
                         } catch (e: Exception) {
                             Timber.e(e, "Issue #626: Deferred recovery failed")
@@ -535,6 +525,48 @@ class MainViewModel @Inject constructor(
                 }
             }
             else -> {}
+        }
+    }
+
+    private fun handleReplayCursor(ts: Long?) {
+        updateNavigation { it.copy(replayCursorTs = ts) }
+        
+        if (ts == null) {
+            updateKinematicState { it.apply { replayCursorPos = null } }
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.Default) {
+            val mode = _uiState.value.appMode
+            val trail = if (mode == "viewer") trackerTrailFlow.value else viewerTrailFlow.value
+            
+            // Binary search for closest coordinate match
+            if (trail.isNotEmpty()) {
+                var low = 0
+                var high = trail.size - 1
+                var bestIdx = 0
+                var minDiff = Long.MAX_VALUE
+
+                while (low <= high) {
+                    val mid = (low + high) / 2
+                    val diff = kotlin.math.abs(trail[mid].timestamp - ts)
+                    if (diff < minDiff) {
+                        minDiff = diff
+                        bestIdx = mid
+                    }
+                    if (trail[mid].timestamp < ts) low = mid + 1
+                    else if (trail[mid].timestamp > ts) high = mid - 1
+                    else break
+                }
+                
+                val bestPoint = trail[bestIdx]
+                withContext(Dispatchers.Main.immediate) {
+                    updateKinematicState { it.apply { 
+                        replayCursorPos = bestPoint.toGeoPoint() 
+                        pulse = timeProvider.elapsedRealtime()
+                    }}
+                }
+            }
         }
     }
 

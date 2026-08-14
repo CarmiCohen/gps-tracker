@@ -10,14 +10,13 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.14.02:
+ * - Issue #170: Forensic Replay UI Audit. Added SetReplayCursor to UiEvent 
+ *   to support coordinate-aware scrubbing. Fixed typo in TrackerStatus.toMap.
  * Aug.13.12:
  * - Issue #164: Forensic Log Buffer Audit. Optimized LogEntry and LogEntity 
  *   to support deferred/reusable ID generation and added forensic snapshots 
  *   to eliminate string churn in high-frequency paths (R164).
- * Aug.13.11:
- * - Issue #163: 1Hz Telemetry Path Optimization. Refactored DashboardState 
- *   to use primitive types instead of pre-formatted strings to eliminate 
- *   object churn in the telemetry hot-path. (R163)
  */
 
 sealed class AppSensorEvent {
@@ -378,7 +377,7 @@ data class TrackerStatus(
     val acousticFloorDb: Double = 0.0,
     val adaptiveVibrationFloor: Double = 0.12,
     val proxIdx: Double = 1.0,
-    val proximityCm: Double = -1.0,
+    val proximityCm: Double = -1.0, 
     val proximityDebounceMs: Long = 0L,
     val vibrationRollingSum: Double = 0.0,
     val isClockRegression: Boolean = false,
@@ -807,6 +806,9 @@ sealed class UiEvent {
     // Issue #626/634: Foreground Service Start Hardening
     object TriggerRecovery : UiEvent()
     data class SetRecoveryPending(val pending: Boolean) : UiEvent()
+
+    // Issue #170: Forensic Replay UI Audit
+    data class SetReplayCursor(val ts: Long?) : UiEvent()
 }
 
 sealed class UiCommand {

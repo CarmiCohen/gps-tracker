@@ -6,6 +6,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Aug.14.02:
+ * - Issue #170: Forensic Replay UI Audit. Added replayCursorTs to NavigationState 
+ *   to support coordinate-aware scrubbing across ribbons and map.
  * Aug.13.05:
  * - Issue #153: Startup Davey Stalls. Introduced hydrationLevel to support 
  *   staggered UI initialization (R153).
@@ -85,6 +88,8 @@ data class MainUiState(
 
 /**
  * KinematicState: High-frequency transient state.
+ * Aug.14.02:
+ * - Issue #170: Added replayCursorPos to support map visualization during scrubbing.
  * Aug.01.10: 
  * - Issue #668: Performance: Object Churn. Converted to mutable class with 
  *   double-buffering support for zero-allocation telemetry (R-HARDWARE-01).
@@ -98,6 +103,7 @@ class KinematicState(
     var distanceTrackerToViewer: Double? = null,
     var distanceViewerToHome: Double? = null,
     var distanceViewerToTracker: Double? = null,
+    var replayCursorPos: GeoPoint? = null,
     var pulse: Long = 0L
 ) {
     fun copyFrom(other: KinematicState) {
@@ -109,6 +115,7 @@ class KinematicState(
         this.distanceTrackerToViewer = other.distanceTrackerToViewer
         this.distanceViewerToHome = other.distanceViewerToHome
         this.distanceViewerToTracker = other.distanceViewerToTracker
+        this.replayCursorPos = other.replayCursorPos
         this.pulse = other.pulse
     }
 
@@ -121,6 +128,7 @@ class KinematicState(
         distanceTrackerToViewer = null
         distanceViewerToHome = null
         distanceViewerToTracker = null
+        replayCursorPos = null
         pulse = 0L
     }
 }
@@ -240,7 +248,8 @@ data class NavigationState(
     val isDiagnosticsVisible: Boolean = false,
     val activeSubSettings: SubSettings? = null,
     val wasMapVisibleBeforeOverlay: Boolean = true,
-    val pendingMode: String? = null
+    val pendingMode: String? = null,
+    val replayCursorTs: Long? = null
 )
 
 enum class SubSettings { ALERTS, SOUND, CLEAN }

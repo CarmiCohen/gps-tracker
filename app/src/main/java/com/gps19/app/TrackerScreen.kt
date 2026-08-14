@@ -33,12 +33,11 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * TrackerScreen: Tracker-mode UI.
- * Aug.13.12:
- * - Issue #163: 1Hz Telemetry Path Optimization. Updated TrackerDashboard 
- *   to handle refactored DashboardState primitive fields (R163).
- * Aug.13.11:
- * - Issue #162: Phone Setup ANR Remediation. Passing isPhoneSetupVisible to 
- *   HeaderBar to optimize main-thread performance during overlay transitions (R162).
+ * Aug.14.03:
+ * - Issue #170: Forensic Replay UI Audit. Fixed variable name error in 
+ *   TrackerDashboard (rtt -> rttValue) to restore build integrity (R170).
+ * Aug.14.02:
+ * - Issue #170: Wired replayCursorTs and replayCursorPos (R170).
  */
 
 @Composable
@@ -65,10 +64,9 @@ fun TrackerScreen(
     onSaveTrail: () -> Unit = {},
     onLoadTrail: () -> Unit = {}
 ) {
-    // Issue #139: Deferred hydration to prevent ANR during navigation transition
     var isHydrated by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        delay(200) // Allow navigation transition to stabilize
+        delay(200) 
         isHydrated = true
     }
 
@@ -100,7 +98,7 @@ fun TrackerScreen(
             isSettingsOpen = nav.isSettingsOpen,
             isRibbonsVisible = nav.isRibbonsVisible,
             isMapVisible = nav.isMapVisible,
-            isPhoneSetupVisible = nav.isPhoneSetupVisible, // Issue #162
+            isPhoneSetupVisible = nav.isPhoneSetupVisible, 
             requiresExtraTopPadding = uiState.permissions.requiresExtraTopPadding,
             isSystemReady = uiState.isSystemReady,
             systemIssuesCount = uiState.systemIssuesCount,
@@ -212,6 +210,7 @@ fun TrackerScreen(
                                     viewerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
                                     viewerLocPending = kinematicState.trackerHealth.isLocationPending,
                                     viewerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
+                                    replayCursorPos = kinematicState.replayCursorPos,
                                     systemPulse = systemPulse,
                                     systemPulseRt = systemPulseRt,
                                     onEvent = { viewModel.onEvent(it) },
@@ -338,6 +337,7 @@ fun TrackerScreen(
                         viewerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
                         viewerLocPending = kinematicState.trackerHealth.isLocationPending,
                         viewerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
+                        replayCursorPos = kinematicState.replayCursorPos,
                         systemPulse = systemPulse,
                         systemPulseRt = systemPulseRt,
                         onEvent = { viewModel.onEvent(it) },
@@ -532,6 +532,7 @@ fun TrackerScreen(
         } else if (isRibbonsVisible) {
             RibbonsOverlay(
                 isStrictMode = uiState.navigation.isStrictMode,
+                replayCursorTs = uiState.navigation.replayCursorTs,
                 history4MFlow = viewModel.history4MFlow,
                 history16MFlow = viewModel.history16MFlow,
                 history1HFlow = viewModel.history1HFlow,
@@ -539,6 +540,7 @@ fun TrackerScreen(
                 history24HFlow = viewModel.history24HFlow,
                 history7DFlow = viewModel.history7DFlow,
                 onToggleStrictMode = { viewModel.onEvent(UiEvent.ToggleStrictMode(it)) },
+                onScrub = { viewModel.onEvent(UiEvent.SetReplayCursor(it)) },
                 onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) }
             )
         } else if (isGnssDetailVisible) {

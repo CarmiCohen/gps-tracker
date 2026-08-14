@@ -38,9 +38,11 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Aug.14.02:
+ * - Issue #170: Forensic Replay UI Audit. Integrated replayCursorPos into 
+ *   AppMapContainer and OsmMap to visualize historical trace alignment (R170).
  * Aug.05.128:
- * - Issue #740: AppMapContainer Recomposition Audit. Decomposed parameters for 
- *   AppMapContainer and OsmMap to eliminate monolithic state dependencies (R736).
+ * - Issue #740: AppMapContainer Recomposition Audit.
  */
 
 @Composable
@@ -78,6 +80,7 @@ fun AppMapContainer(
     viewerTelemetryTs: Long,
     viewerLocPending: Boolean,
     viewerLastValidFixRt: Long,
+    replayCursorPos: GeoPoint?,
     systemPulse: Long,
     systemPulseRt: Long,
     onEvent: (UiEvent) -> Unit,
@@ -96,7 +99,6 @@ fun AppMapContainer(
     
     val isTrackerMode = appMode == "tracker"
 
-    // Freshness Logic
     fun calculateFreshness(ts: Long, telemetryTs: Long): Boolean {
         if (ts <= 0) return false
         val telemetryAge = if (telemetryTs > 0) now - telemetryTs else Long.MAX_VALUE
@@ -146,6 +148,7 @@ fun AppMapContainer(
             viewerMaxAcc = viewerMaxAcc,
             viewerLocPending = viewerLocPending,
             viewerLastValidFixRt = viewerLastValidFixRt,
+            replayCursorPos = replayCursorPos,
             trail = trail,
             viewerTrail = viewerTrail,
             violations = violations,
@@ -257,6 +260,7 @@ fun OsmMap(
     viewerMaxAcc: Double,
     viewerLocPending: Boolean,
     viewerLastValidFixRt: Long,
+    replayCursorPos: GeoPoint?,
     trail: List<TrailPoint>,
     viewerTrail: List<TrailPoint>,
     violations: List<ViolationPoint>, 
@@ -279,7 +283,6 @@ fun OsmMap(
         mapViewRef.value?.let { MapOverlayManager(context, it, density) }
     }
 
-    // Smoothing States
     val smoothedTrackerPos = remember { mutableStateOf<GeoPoint?>(null) }
     val smoothedViewerPos = remember { mutableStateOf<GeoPoint?>(null) }
 
@@ -395,6 +398,7 @@ fun OsmMap(
                 val h = om.updateHomePoints(sHome, isFenceVisible, maxDistance, isTrackerMode, geofenceMode, onTap, onRemoveMarker)
                 val t = om.updateTrails(sTrail, sViewerTrail, systemPulseRt)
                 val v = om.updateViolations(sViolations, isViolationsVisible, isGeofenceViolationsVisible, systemPulseRt)
+                val r = om.updateReplayCursor(replayCursorPos)
                 val p = om.updateCurrentPositions(
                     trackerValid = smoothedTrackerPos.value != null,
                     trackerPos = smoothedTrackerPos.value,
@@ -414,7 +418,7 @@ fun OsmMap(
                     viewerLastValidFixRt = viewerLastValidFixRt,
                     systemPulseRt = systemPulseRt
                 )
-                if (h || t || v || p) {
+                if (h || t || v || r || p) {
                     view.invalidate()
                 }
             }

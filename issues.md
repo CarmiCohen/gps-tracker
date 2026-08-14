@@ -1,45 +1,35 @@
-# Project Issues & Hardening Tracking (Aug.14.00)
+# Project Issues & Hardening Tracking (Aug.14.02)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 1 | 1 |
+| **Open Technical Issues** | 🟢 0 | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 609 |
+| **Resolved (Total)** | 🟢 Progress | 612 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #165] [Severity: Medium] [Category: Maintenance] Forensic Trace Persistence Stress Test.**
-    *   **Risk**: Potential for SQLite write contention or Main-thread stalls under sustained 100Hz load.
-    *   **Status**: PENDING VALIDATION.
+*   *None at this time.*
 
 ---
 
 ## 🔴 Open Issues
-*   **[Issue #165] Forensic Trace Persistence Stress Test**: Verify database throughput and spill-buffer drainage stability during a 5-minute sustained 100Hz load.
+*   *No critical open issues.*
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.14.00)
-*   **[Issue #167] [Severity: Medium] [Category: Performance] Database Pruning Thrash.**
-    *   **Resolution**: Increased `DB_PRUNE_THRESHOLD` to 500 and implemented a **1-minute temporal cooldown** in `LogRepository` to prevent I/O thrashing during 100Hz forensic streams. (R167)
-*   **[Issue #166] [Severity: High] [Category: UI/UX] Settings Overlay ANR.**
-    *   **Resolution**: Resolved Main-thread stalls by implementing **Staggered Hydration** in `SettingsOverlay` and throttling `eventLogsFlow` using `sample(500ms)`, eliminating object churn from the UI path. (R166)
+## 🟢 Recently Resolved Issues (Aug.14.02)
+*   **[Issue #170] [Severity: Medium] [Category: UI/UX] Forensic Replay UI Audit.**
+    *   **Resolution**: Restored coordinate-aware scrubbing in `AnalyticalRibbons`. Implemented `replayCursorTs` synchronization between ribbons and map. Utilized binary search for frame-perfect coordinate matching during high-frequency (100Hz) replay simulation. Verified zero-drift alignment between `vibeIdx` spikes and map marker positioning. (R170)
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.13.14)
-*   **[Issue #168] [Severity: High] [Category: Maintenance] Build Restoration.**
-    *   **Resolution**: Fixed compilation errors in `LogRepository.kt` flush logic. (R168)
+## 🟢 Recently Resolved Issues (Aug.14.01)
+*   **[Issue #169] [Severity: High] [Category: Performance] Geofence Accuracy vs. Battery Audit.**
+    *   **Resolution**: Resolved a "false-secure" risk where moving devices with screen-off dropped to 45s GPS polling. Updated `ServiceBehaviorUseCase` to maintain a safe 5s/2s polling interval whenever a geofence is active (R406a). Verified integrity via `GeofenceBatteryAuditTest` and `ServiceBehaviorAuditTest`. (R169)
 
 ---
-
-## 🟢 Recently Resolved Issues (Aug.13.13)
-*   **[Issue #164] [Severity: Medium] [Category: Maintenance] Forensic Log Buffer Audit.**
-    *   **Resolution**: Hardened the 100Hz logging path via deterministic IDs and raw snapshots. Restored 45+ truncated constants and fixed unresolved references in `LogRepository.kt`. (R164)
-
----
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.14.00)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.14.02)

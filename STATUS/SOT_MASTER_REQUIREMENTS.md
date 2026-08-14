@@ -1,14 +1,17 @@
-# System Source of Truth (SoT) - Aug.14.00 (Persistence & UI Stability Hardened)
+# System Source of Truth (SoT) - Aug.14.02 (Forensic Replay Restored)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
-*   **Database Pruning Optimization (R167)**: (Added Aug.14.00) The system MUST utilize a minimum `DB_PRUNE_THRESHOLD` of 500. Pruning operations MUST be governed by a **1-minute temporal cooldown** (`PRUNE_COOLDOWN_MS`) to prevent SQLite lock contention during 100Hz forensic streams. (Issue #167). **Status: Implemented.**
-*   **Settings UI Hardening (R166)**: (Added Aug.14.00) The `SettingsOverlay` MUST utilize **Staggered Hydration** (60ms offsets) to maintain main-thread responsiveness. Log flows for UI display MUST be throttled to a maximum of 2Hz (using `sample(500ms)`) to eliminate object churn under high-frequency ingress. (Issue #166). **Status: Implemented.**
-*   **Forensic Log Path Hardening (R164)**: (Added Aug.13.13) The system MUST utilize deterministic composite IDs (`F-timestamp-idx`) for all forensic traces to eliminate UUID generation churn. Capture raw snapshots (`tempSnapshot`, `battSnapshot`, `chargingSnapshot`) in `LogEntry` to defer string formatting. `FORENSIC_SPILL_CAPACITY` = 10,000; `LOG_BUFFER_CAPACITY` = 2,000. (Issue #164). **Status: Implemented.**
-*   **Telemetry Path Optimization (R163)**: (Added Aug.13.12) Eliminate object churn in the 1Hz telemetry path. `DashboardState` MUST utilize primitive types. UI components MUST perform string formatting using `remember` blocks. (Issue #163). **Status: Implemented.**
-*   **Phone Setup ANR Remediation (R162)**: (Added Aug.13.11) 150ms hydration gate and 80ms sequential rendering offsets in `PhoneSetupOverlay`. Memoize static hardware strings. (Issue #162). **Status: Implemented.**
-*   **SELinux Telemetry Remediation (R159)**: (Added Aug.13.10) Bypass `/proc/loadavg` and `/proc/stat` file access on Android 10 (SDK 29) and higher. (Issue #159). **Status: Implemented.**
+*   **Forensic Replay Sync (R170)**: (Added Aug.14.02) The system MUST support coordinate-aware scrubbing in telemetry ribbons. Map cursor positioning MUST utilize O(log N) binary search on historical trail data to ensure frame-perfect alignment with sensor trends (e.g., `vibeIdx` spikes) during 100Hz playback simulation. (Issue #170). **Status: Implemented.**
+*   **Geofence-Aware Polling (R169)**: (Added Aug.14.01) The system MUST maintain a safe polling interval (5s for standard, 2s for budget hardware) when a geofence is active and the device is moving, regardless of screen state. (Issue #169). **Status: Implemented.**
+*   **Forensic Stress Integrity (R165)**: (Added Aug.14.00) The system MUST maintain stability during a 5-minute sustained 100Hz load. Forensic drainage MUST NOT induce Main-thread Davey stalls or SQLite write contention. (Issue #165). **Status: Implemented & Verified.**
+*   **Database Pruning Optimization (R167)**: (Added Aug.14.00) The system MUST utilize a minimum `DB_PRUNE_THRESHOLD` of 500. Pruning operations MUST be governed by a **1-minute temporal cooldown** (`PRUNE_COOLDOWN_MS`). (Issue #167). **Status: Implemented.**
+*   **Settings UI Hardening (R166)**: (Added Aug.14.00) The `SettingsOverlay` MUST utilize **Staggered Hydration** (60ms offsets). Log flows for UI display MUST be throttled to 2Hz (`sample(500ms)`). (Issue #166). **Status: Implemented.**
+*   **Forensic Log Path Hardening (R164)**: (Added Aug.13.13) The system MUST utilize deterministic composite IDs (`F-timestamp-idx`). Capture raw snapshots in `LogEntry` to defer string formatting. (Issue #164). **Status: Implemented.**
+*   **Telemetry Path Optimization (R163)**: (Added Aug.13.12) Eliminate object churn in the 1Hz telemetry path. `DashboardState` MUST utilize primitive types. (Issue #163). **Status: Implemented.**
+*   **Phone Setup ANR Remediation (R162)**: (Added Aug.13.11) 150ms hydration gate and 80ms sequential rendering offsets in `PhoneSetupOverlay`. (Issue #162). **Status: Implemented.**
+*   **SELinux Telemetry Remediation (R159)**: (Added Aug.13.10) Bypass `/proc/loadavg` and `/proc/stat` file access on Android 10+. (Issue #159). **Status: Implemented.**
 *   **Performance Hardening Audit (R158)**: (Added Aug.13.09) End-to-end validation of performance optimizations (R152-R157). (Issue #158). **Status: Validated & Closed.**
 *   **Violation Path Allocation Authority (R157)**: (Added Aug.13.09) Eliminate object churn in violation detection mapping. (Issue #157). **Status: Implemented.**
 *   **WakeLock Log Throttling Authority (R156)**: (Added Aug.13.08) Acquisition logging throttled to 60s minimum. (Issue #156). **Status: Implemented.**
@@ -37,5 +40,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.14.00.
+*   **Current Release**: Aug.14.02.
 *   **Source of Truth**: app/build.gradle versionName.

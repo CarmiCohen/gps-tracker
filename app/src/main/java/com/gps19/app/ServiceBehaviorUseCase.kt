@@ -6,6 +6,10 @@ import javax.inject.Singleton
 
 /**
  * ServiceBehaviorUseCase: Encapsulates high-level logic for service-level state transitions.
+ * Aug.14.01:
+ * - Issue #169: Geofence Accuracy vs. Battery Audit. Added isGeofenceActive to 
+ *   calculateGpsInterval to prevent 45s polling blind-spots when moving with 
+ *   screen off (R406a).
  * Aug.11.12:
  * - Issue #141: Stress Recovery Verification. Added reset() to ensure high-latency 
  *   latches don't persist across sessions (R141).
@@ -27,12 +31,14 @@ class ServiceBehaviorUseCase @Inject constructor(
 
     /**
      * Calculates the target GPS polling interval based on device state and forensic triggers.
+     * R406a: Dynamic Polling.
      */
     fun calculateGpsInterval(
         isCoolingMode: Boolean,
         isSuspiciousMode: Boolean,
         isStationary: Boolean,
         isScreenOn: Boolean,
+        isGeofenceActive: Boolean,
         nowRt: Long,
         deviceSpecialFlags: DeviceSpecialFlags
     ): Long {
@@ -45,7 +51,8 @@ class ServiceBehaviorUseCase @Inject constructor(
             isCoolingMode -> COOLING_GPS_POLLING_MS
             isSuspiciousMode -> SUSPICIOUS_GPS_POLLING_MS
             isStationaryState -> STATIONARY_GPS_POLLING_MS
-            !isScreenOn -> SCREEN_OFF_GPS_POLLING_MS 
+            // Issue #169: If Geofence is active and we are moving, do NOT drop to 45s even if screen is off.
+            !isScreenOn && !isGeofenceActive -> SCREEN_OFF_GPS_POLLING_MS
             deviceSpecialFlags.isS21FE || deviceSpecialFlags.isXiaomi -> HIGH_FREQUENCY_GPS_POLLING_MS
             else -> MOVING_GPS_POLLING_MS
         }
