@@ -1,10 +1,10 @@
-# System Source of Truth (SoT) - Aug.13.14 (Persistence & UI Stability Hardened)
+# System Source of Truth (SoT) - Aug.14.00 (Persistence & UI Stability Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
-*   **Database Pruning Optimization (R167)**: (Added Aug.13.14) The system MUST utilize a minimum `DB_PRUNE_THRESHOLD` of 500. Pruning operations MUST be governed by a **1-minute temporal cooldown** (`PRUNE_COOLDOWN_MS`) to prevent SQLite lock contention during 100Hz forensic streams. (Issue #167). **Status: Implemented.**
-*   **Settings UI Hardening (R166)**: (Added Aug.13.14) The `SettingsOverlay` MUST utilize **Staggered Hydration** (60ms offsets) to maintain main-thread responsiveness. Log flows for UI display MUST be throttled to a maximum of 2Hz (using `sample(500ms)`) to eliminate object churn under high-frequency ingress. (Issue #166). **Status: Implemented.**
+*   **Database Pruning Optimization (R167)**: (Added Aug.14.00) The system MUST utilize a minimum `DB_PRUNE_THRESHOLD` of 500. Pruning operations MUST be governed by a **1-minute temporal cooldown** (`PRUNE_COOLDOWN_MS`) to prevent SQLite lock contention during 100Hz forensic streams. (Issue #167). **Status: Implemented.**
+*   **Settings UI Hardening (R166)**: (Added Aug.14.00) The `SettingsOverlay` MUST utilize **Staggered Hydration** (60ms offsets) to maintain main-thread responsiveness. Log flows for UI display MUST be throttled to a maximum of 2Hz (using `sample(500ms)`) to eliminate object churn under high-frequency ingress. (Issue #166). **Status: Implemented.**
 *   **Forensic Log Path Hardening (R164)**: (Added Aug.13.13) The system MUST utilize deterministic composite IDs (`F-timestamp-idx`) for all forensic traces to eliminate UUID generation churn. Capture raw snapshots (`tempSnapshot`, `battSnapshot`, `chargingSnapshot`) in `LogEntry` to defer string formatting. `FORENSIC_SPILL_CAPACITY` = 10,000; `LOG_BUFFER_CAPACITY` = 2,000. (Issue #164). **Status: Implemented.**
 *   **Telemetry Path Optimization (R163)**: (Added Aug.13.12) Eliminate object churn in the 1Hz telemetry path. `DashboardState` MUST utilize primitive types. UI components MUST perform string formatting using `remember` blocks. (Issue #163). **Status: Implemented.**
 *   **Phone Setup ANR Remediation (R162)**: (Added Aug.13.11) 150ms hydration gate and 80ms sequential rendering offsets in `PhoneSetupOverlay`. Memoize static hardware strings. (Issue #162). **Status: Implemented.**
@@ -37,5 +37,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.13.14.
+*   **Current Release**: Aug.14.00.
 *   **Source of Truth**: app/build.gradle versionName.
