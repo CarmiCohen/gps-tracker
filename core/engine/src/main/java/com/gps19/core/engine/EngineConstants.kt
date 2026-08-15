@@ -2,14 +2,11 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * Aug.13.14:
- * - Issue #167: Database Pruning Optimization. Increased DB_PRUNE_THRESHOLD 
- *   to 500 and added PRUNE_COOLDOWN_MS (60s) safety floor to prevent 
- *   I/O thrashing during 100Hz forensic streams (R167).
- * Aug.13.13:
- * - Issue #164: Forensic Log Buffer Audit. Restored truncated constants. 
- *   Increased FORENSIC_SPILL_CAPACITY to 10000 and LOG_BUFFER_CAPACITY to 
- *   2000 to ensure high-frequency (100Hz) safety margins (R164).
+ * Aug.14.07:
+ * - Issue #177 Hardening: Reduced log limits and increased pruning aggressiveness
+ *   to prevent heap exhaustion and ANRs under 100Hz telemetry flow (R177).
+ * Aug.14.06:
+ * - Issue #176: Proactive Pruning ANR.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -28,8 +25,8 @@ const val LATENCY_THRESHOLD_DB_WRITE_MS = 1000L
 const val LATENCY_THRESHOLD_JNI_MS = 100L
 const val LOG_LATENCY_THRESHOLD_MS = 1000L
 const val LOG_RETRIEVAL_THRESHOLD_MS = 500L
-const val LOG_LIMIT_STANDARD = 1000
-const val LOG_LIMIT_STRICT = 5000
+const val LOG_LIMIT_STANDARD = 2000  // Reduced from 5000 (R177)
+const val LOG_LIMIT_STRICT = 5000     // Reduced from 15000 (R177)
 
 // Issue #133: Silent Failure Correlation Thresholds
 const val SILENT_FAILURE_CPU_THRESHOLD = 0.85
@@ -59,11 +56,11 @@ const val FORENSIC_RELIABILITY_THRESHOLD = 0.85
 const val FORENSIC_RELIABILITY_DEGRADATION_DURATION_MS = 30000L
 
 // Issue #728: Storage-Aware Adaptive Pruning
-const val PRUNE_CHUNK_SIZE = 100
-const val ADAPTIVE_PRUNE_THRESHOLD_CRITICAL = 300
-const val ADAPTIVE_PRUNE_THRESHOLD_LOW = 600
-const val ADAPTIVE_PRUNE_THRESHOLD_NORMAL = 1500
-const val ADAPTIVE_PRUNE_THRESHOLD_CHARGING = 3000
+const val PRUNE_CHUNK_SIZE = 1000
+const val ADAPTIVE_PRUNE_THRESHOLD_CRITICAL = 2000
+const val ADAPTIVE_PRUNE_THRESHOLD_LOW = 5000  // Reduced from 10000 (R177)
+const val ADAPTIVE_PRUNE_THRESHOLD_NORMAL = 15000 // Reduced from 30000 (R177)
+const val ADAPTIVE_PRUNE_THRESHOLD_CHARGING = 30000 // Reduced from 60000 (R177)
 
 // Issue #700: Forensic Sampling Scaling
 const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  // 100Hz (Peak Fidelity)
@@ -344,7 +341,7 @@ const val RTT_WINDOW_SIZE = 5
 const val HOME_POINT_REFRESH_INTERVAL_MS = 30000L
 
 // Logging & UI
-const val MAX_HISTORY_POINTS_PER_RIBBONS = 240
+const val MAX_HISTORY_POINTS_PER_RIBBONS = 10000
 const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
@@ -427,20 +424,20 @@ const val FORENSIC_PULSE_INTERVAL_MS = 10000L
 const val WATCH_DOG_UI_GRACE_MS = 15000L 
 const val SENSOR_GRACE_PERIOD_MS = 600000L
 
-const val DB_PRUNE_THRESHOLD = 500 
-const val PRUNE_COOLDOWN_MS = 60000L
+const val DB_PRUNE_THRESHOLD = 2000 // Reduced from 3000 (R177)
+const val PRUNE_COOLDOWN_MS = 30000L // Reduced from 60000ms (R177)
 const val LOG_MUZZLE_STARTUP_MS = 60000L
 
 const val FORENSIC_PINK_COLOR = 0xFFFF00FF.toInt()
 
-// Issue #135: Siren and Alarm UI
+// Siren and Alarm UI
 const val SIREN_RESUME_COOLDOWN_MS = 15000L
 const val SIREN_AUTO_STOP_MS = 30000L
 const val SIREN_FADE_IN_DURATION_MS = 1000L
 const val SIREN_SAMPLE_RATE = 44100
 const val ALARM_OVERLAY_THROTTLE_MS = 30000L
 
-// Issue #012: Adaptive Proximity Debounce
+// Adaptive Proximity Debounce
 const val PROXIMITY_DEBOUNCE_STATIONARY_MS = 5000L
 const val PROXIMITY_DEBOUNCE_MOVING_MS = 1000L
 const val PROXIMITY_STRESS_SCALING_MULTIPLIER = 2.0

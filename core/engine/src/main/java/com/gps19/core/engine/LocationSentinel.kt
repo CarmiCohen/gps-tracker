@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Aug.14.06:
+ * - Issue #172: Viewer-Side State Audit. Finalized forensic parity by adding 
+ *   Vz timestamps (sitVzTs, sitVzRt) to loadForensicState (R172).
  * Aug.14.04:
  * - Issue #172: Viewer-Side State Audit. Enhanced loadForensicState to restore 
  *   full SIT telemetry (Vz, Dz, Baro, Tilt, Shock) for mirror parity (R172).
@@ -102,7 +105,9 @@ class LocationSentinel {
         savedSitDz: Double = 0.0,
         savedSitBaro: Double = 0.0,
         savedSitTilt: Double = 0.0,
-        savedSitShock: Double = 0.0
+        savedSitShock: Double = 0.0,
+        savedSitVzTs: Long = 0L,
+        savedSitVzRt: Long = 0L
     ) {
         this.lastSitTs = savedLastSitTs
         this.baselineSitTilt = savedBaseline
@@ -111,6 +116,8 @@ class LocationSentinel {
         this.lastSitBaro = savedSitBaro
         this.lastSitTilt = savedSitTilt
         this.lastSitShock = savedSitShock
+        this.lastSitVzTs = savedSitVzTs
+        this.lastSitVzRt = savedSitVzRt
     }
 
     fun setSpatialAnchor(lat: Double, lng: Double, alt: Double, timestamp: Long, rt: Long, accuracy: Double = 0.0) {

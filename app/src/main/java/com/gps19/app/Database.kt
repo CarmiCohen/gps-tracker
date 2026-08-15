@@ -8,14 +8,10 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
- * Aug.13.12:
- * - Issue #164: Forensic Log Buffer Audit. Added forensic snapshot columns 
- *   (temp, battery, charging) to LogEntity to eliminate string churn in the 
- *   high-frequency drainage path (R164).
- * Aug.13.00:
- * - Issue #146: Forensic Drainer Optimization. Refactored LogDao to support 
- *   primitive-based signature retrieval, eliminating string-concatenation overhead 
- *   in the deduplication hot-path (R146).
+ * Aug.14.07:
+ * - Issue #177 Hardening: Added Important-Non-Special pruning support to 
+ *   eliminate database bloat beyond thresholds (R177).
+ * - Issue #176: Proactive Pruning ANR.
  */
 @Entity(
     tableName = "logs", 
@@ -24,9 +20,11 @@ import com.gps19.core.engine.*
         Index(value = ["localId"]),
         Index(value = ["isImportant"]),
         Index(value = ["isSpecial"]),
-        Index(value = ["synced", "timestamp"]), // Optimized for telemetry sync
-        Index(value = ["type", "role", "deviceId", "timestamp"]), // Optimized for deduplication
-        Index(value = ["type", "spillIdx", "timestamp"]) // Issue #705: Forensic Deduplication
+        Index(value = ["synced", "timestamp"]), 
+        Index(value = ["type", "role", "deviceId", "timestamp"]), 
+        Index(value = ["type", "spillIdx", "timestamp"]),
+        Index(value = ["type", "timestamp"]), 
+        Index(value = ["isImportant", "isSpecial", "timestamp"]) 
     ]
 )
 data class LogEntity(
@@ -54,15 +52,11 @@ data class LogEntity(
     val vibeSnapshot: Double? = null,
     @ColumnInfo(defaultValue = "-1") val spillIdx: Int = -1,
     @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false,
-    // R164: Forensic snapshots to eliminate string churn.
     val tempSnapshot: Double? = null,
     val battSnapshot: Int? = null,
     val chargingSnapshot: Boolean? = null
 )
 
-/**
- * ForensicSignature: Optimized POJO for deduplication check.
- */
 data class ForensicSignature(
     val timestamp: Long,
     val spillIdx: Int
@@ -193,55 +187,59 @@ abstract class LogDao {
     @Query("SELECT timestamp, spillIdx FROM logs WHERE type = 'FORENSIC_TRACE' AND timestamp >= :minTimestamp") 
     abstract suspend fun getExistingForensicSignatures(minTimestamp: Long): List<ForensicSignature>
 
-    @Transaction
-    open suspend fun deepPruneLogs(heartbeatLimit: Int = 100, generalLimit: Int = 500) {
-        pruneRoutineHeartbeats(heartbeatLimit)
-        pruneNonForensicLogs(generalLimit)
-    }
+    // Optimized Pruning Support (R177)
+    @Query("SELECT timestamp FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
+    abstract suspend fun getHeartbeatPruneThreshold(limit: Int): Long?
 
-    @Query("DELETE FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') AND id NOT IN (SELECT id FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT :limit)")
-    abstract suspend fun pruneRoutineHeartbeats(limit: Int)
+    @Query("SELECT timestamp FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND type NOT IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
+    abstract suspend fun getGeneralPruneThreshold(limit: Int): Long?
 
-    @Query("DELETE FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND id NOT IN (SELECT id FROM logs ORDER BY timestamp DESC LIMIT :limit)")
-    abstract suspend fun pruneNonForensicLogs(limit: Int)
+    @Query("SELECT timestamp FROM logs WHERE isImportant = 1 AND isSpecial = 0 ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
+    abstract suspend fun getImportantPruneThreshold(limit: Int): Long?
 
-    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') AND id NOT IN (SELECT id FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT :limit) LIMIT :chunkSize)")
-    abstract suspend fun pruneRoutineHeartbeatsChunk(limit: Int, chunkSize: Int): Int
+    @Query("SELECT timestamp FROM logs WHERE isSpecial = 1 ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
+    abstract suspend fun getSpecialPruneThreshold(limit: Int): Long?
 
-    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND id NOT IN (SELECT id FROM logs ORDER BY timestamp DESC LIMIT :limit) LIMIT :chunkSize)")
-    abstract suspend fun pruneNonForensicLogsChunk(limit: Int, chunkSize: Int): Int
+    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') AND timestamp < :threshold LIMIT :chunkSize)")
+    abstract suspend fun pruneHeartbeatsByThreshold(threshold: Long, chunkSize: Int): Int
 
-    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isSpecial = 1 AND id NOT IN (SELECT id FROM logs WHERE isSpecial = 1 ORDER BY timestamp DESC LIMIT :limit) LIMIT :chunkSize)")
-    abstract suspend fun pruneSpecialLogsChunk(limit: Int, chunkSize: Int): Int
+    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND type NOT IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') AND timestamp < :threshold LIMIT :chunkSize)")
+    abstract suspend fun pruneGeneralByThreshold(threshold: Long, chunkSize: Int): Int
+
+    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isImportant = 1 AND isSpecial = 0 AND timestamp < :threshold LIMIT :chunkSize)")
+    abstract suspend fun pruneImportantByThreshold(threshold: Long, chunkSize: Int): Int
+
+    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isSpecial = 1 AND timestamp < :threshold LIMIT :chunkSize)")
+    abstract suspend fun pruneSpecialByThreshold(threshold: Long, chunkSize: Int): Int
 }
 
 @Dao
 interface TrailDao {
     @Insert suspend fun insert(point: TrailEntity)
-    @Query("SELECT * FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp ASC LIMIT 1000") fun getTrail(isViewer: Boolean): Flow<List<TrailEntity>>
-    @Query("SELECT * FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp ASC LIMIT 1000") suspend fun getTrailStatic(isViewer: Boolean): List<TrailEntity>
+    @Query("SELECT * FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp ASC LIMIT 10000") fun getTrail(isViewer: Boolean): Flow<List<TrailEntity>>
+    @Query("SELECT * FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp ASC LIMIT 10000") suspend fun getTrailStatic(isViewer: Boolean): List<TrailEntity>
     @Query("DELETE FROM trail_points WHERE isViewerTrail = :isViewer") suspend fun clearTrail(isViewer: Boolean)
-    @Query("DELETE FROM trail_points WHERE isViewerTrail = :isViewer AND timestamp < (SELECT timestamp FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp DESC LIMIT 1 OFFSET 999)") suspend fun pruneTrail(isViewer: Boolean): Int
+    @Query("DELETE FROM trail_points WHERE isViewerTrail = :isViewer AND timestamp < (SELECT timestamp FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp DESC LIMIT 1 OFFSET 9999)") suspend fun pruneTrail(isViewer: Boolean): Int
 }
 
 @Dao
 interface HistoryDao {
     @Insert suspend fun insert(point: HistoryEntity)
     @Insert abstract suspend fun insertAll(points: List<HistoryEntity>)
-    @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 1000") fun getHistoryFlow(ribbonKey: String): Flow<List<HistoryEntity>>
-    @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 1000") suspend fun getHistory(ribbonKey: String): List<HistoryEntity>
+    @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 10000") fun getHistoryFlow(ribbonKey: String): Flow<List<HistoryEntity>>
+    @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 10000") suspend fun getHistory(ribbonKey: String): List<HistoryEntity>
     @Query("DELETE FROM connection_history WHERE ribbonKey = :ribbonKey") suspend fun clearHistory(ribbonKey: String)
     @Query("DELETE FROM connection_history") suspend fun clearAll()
-    @Query("DELETE FROM connection_history WHERE ribbonKey = :ribbonKey AND ts < (SELECT ts FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts DESC LIMIT 1 OFFSET 999)") suspend fun pruneHistory(ribbonKey: String)
+    @Query("DELETE FROM connection_history WHERE ribbonKey = :ribbonKey AND ts < (SELECT ts FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts DESC LIMIT 1 OFFSET 9999)") suspend fun pruneHistory(ribbonKey: String)
 }
 
 @Dao
 interface ViolationDao {
     @Insert suspend fun insert(violation: ViolationEntity)
-    @Query("SELECT * FROM violations ORDER BY ts ASC LIMIT 1000") fun getAllFlow(): Flow<List<ViolationEntity>>
-    @Query("SELECT * FROM violations ORDER BY ts ASC LIMIT 1000") suspend fun getAll(): List<ViolationEntity>
+    @Query("SELECT * FROM violations ORDER BY ts ASC LIMIT 10000") fun getAllFlow(): Flow<List<ViolationEntity>>
+    @Query("SELECT * FROM violations ORDER BY ts ASC LIMIT 10000") suspend fun getAll(): List<ViolationEntity>
     @Query("DELETE FROM violations") suspend fun clearAll()
-    @Query("DELETE FROM violations WHERE ts < (SELECT ts FROM violations ORDER BY ts DESC LIMIT 1 OFFSET 999)") suspend fun prune()
+    @Query("DELETE FROM violations WHERE ts < (SELECT ts FROM violations ORDER BY ts DESC LIMIT 1 OFFSET 9999)") suspend fun prune()
 }
 
 @Dao
@@ -250,11 +248,11 @@ interface PendingStatusDao {
     @Query("SELECT * FROM pending_status_updates ORDER BY timestamp ASC LIMIT :limit") suspend fun getOldestPending(limit: Int): List<PendingStatusEntity>
     @Query("DELETE FROM pending_status_updates WHERE id IN (:ids)") suspend fun deletePending(ids: LongArray)
     @Query("SELECT COUNT(*) FROM pending_status_updates") suspend fun getCount(): Int
-    @Query("DELETE FROM pending_status_updates WHERE timestamp < (SELECT timestamp FROM pending_status_updates ORDER BY timestamp DESC LIMIT 1 OFFSET 999)") suspend fun prune()
+    @Query("DELETE FROM pending_status_updates WHERE timestamp < (SELECT timestamp FROM pending_status_updates ORDER BY timestamp DESC LIMIT 1 OFFSET 9999)") suspend fun prune()
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 67, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 68, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -278,9 +276,15 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_67_68 = object : Migration(67, 68) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_timestamp ON logs (type, timestamp)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_isImportant_isSpecial_timestamp ON logs (isImportant, isSpecial, timestamp)")
+            }
+        }
+
         val MIGRATION_66_67 = object : Migration(66, 67) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #164: Add forensic snapshot columns to logs.
                 db.execSQL("ALTER TABLE logs ADD COLUMN tempSnapshot REAL")
                 db.execSQL("ALTER TABLE logs ADD COLUMN battSnapshot INTEGER")
                 db.execSQL("ALTER TABLE logs ADD COLUMN chargingSnapshot INTEGER")

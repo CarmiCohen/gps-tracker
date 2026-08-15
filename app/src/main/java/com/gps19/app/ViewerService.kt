@@ -16,6 +16,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Aug.14.06:
+ * - Issue #172: Viewer-Side State Audit. Finalized forensic parity by restoring 
+ *   Vz timestamps (sitVzTs, sitVzRt) during initialization (R172).
  * Aug.14.04:
  * - Issue #172: Viewer-Side State Audit. Restored full SIT forensic state 
  *   (Vz, Dz, Baro, Tilt, Shock) during initialization.
@@ -105,7 +108,9 @@ class ViewerService : BaseMonitorService() {
             savedSitDz = trackerState?.sitDz ?: 0.0,
             savedSitBaro = trackerState?.sitBaro ?: 0.0,
             savedSitTilt = trackerState?.sitTilt ?: 0.0,
-            savedSitShock = trackerState?.sitShock ?: 0.0
+            savedSitShock = trackerState?.sitShock ?: 0.0,
+            savedSitVzTs = trackerState?.sitVzTs ?: 0L,
+            savedSitVzRt = trackerState?.sitVzRt ?: 0L
         )
         
         // Self processor initializes with zero state (pure local filtering)

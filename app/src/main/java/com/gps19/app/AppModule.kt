@@ -59,7 +59,8 @@ abstract class AppModule {
             )
             .setJournalMode(androidx.room.RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
             .addMigrations(
-                AppDatabase.MIGRATION_56_57
+                AppDatabase.MIGRATION_56_57,
+                AppDatabase.MIGRATION_67_68
             )
             .fallbackToDestructiveMigration()
             .build()

@@ -1,10 +1,12 @@
-# System Source of Truth (SoT) - Aug.14.04 (Viewer Mirror Hardened)
+# System Source of Truth (SoT) - Aug.14.07 (Log Infrastructure Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Logging Memory & I/O Hardening (R177)**: (Added Aug.14.07) The system MUST maintain heap stability during 100Hz telemetry flows. Reactive log limits MUST NOT exceed 2,000 (Standard) or 5,000 (Strict). Pruning MUST account for ALL log categories, including "Important" logs, to prevent database growth beyond 15,000 entries. Forensic signature lookups MUST be limited to a 1-hour temporal window to prevent OOM during deep recovery. (Issue #177). **Status: Implemented.**
+*   **Viewer Forensic Parity (R172)**: (Updated Aug.14.06) The system MUST maintain full forensic parity in the viewer-side mirrored state. `LocationProcessor` MUST correctly restore ALL forensic attributes, including SIT detection timestamps (`lastSitTs`), vertical velocity peaks and their associated timestamps (`sitVz`, `sitVzTs`, `sitVzRt`), displacement (`sitDz`), barometric delta (`sitBaro`), tilt (`sitTilt`), and peak shock (`sitShock`) from remote telemetry after service restarts or multi-viewer handovers. (Issue #172). **Status: Implemented.**
+*   **Forensic Replay Latency (R174)**: (Added Aug.14.05) The system MUST support sub-16ms frame coordination during replay scrubbing even with datasets exceeding 10,000 points. Coordinate matching and cursor positioning MUST utilize $O(\log N)$ binary search. Scrubbing events MUST be processed via a non-blocking `collectLatest` pipeline to eliminate coroutine churn (Issue #174). **Status: Implemented.**
 *   **Multi-Stream Processor Contention (R173)**: (Added Aug.14.04) The `ViewerService` MUST maintain two distinct `LocationProcessor` instances: one for filtering the viewer's own location ("Self") and one for filtering the remote tracker's telemetry ("Remote"). Interleaving these streams in a single processor is STRICTLY PROHIBITED to prevent filter state corruption. (Issue #173). **Status: Implemented.**
-*   **Viewer Forensic Parity (R172)**: (Added Aug.14.04) The system MUST maintain full forensic parity in the viewer-side mirrored state. `LocationProcessor` MUST correctly restore forensic attributes (lastSitTs, sitVz, sitDz, sitBaro, sitTilt, sitShock) from remote telemetry after service restarts or multi-viewer handovers to ensure "Zero-Lag" UI transitions. (Issue #172). **Status: Implemented.**
 *   **Forensic Jitter Protection (R171)**: (Added Aug.14.03) The system MUST maintain temporal integrity during multi-viewer forensic streams. Telemetry processing MUST allow a 2s jitter window (`MONOTONIC_JITTER_TOLERANCE_MS`) to prevent data loss while ensuring that aggregators and UI history buffers maintain strict monotonicity via sorted merging and deduplication. (Issue #171). **Status: Implemented.**
 *   **Forensic Replay Sync (R170)**: (Added Aug.14.02) The system MUST support coordinate-aware scrubbing in telemetry ribbons. Map cursor positioning MUST utilize O(log N) binary search on historical trail data to ensure frame-perfect alignment with sensor trends (e.g., `vibeIdx` spikes) during 100Hz playback simulation. (Issue #170). **Status: Implemented.**
 *   **Geofence-Aware Polling (R169)**: (Added Aug.14.01) The system MUST maintain a safe polling interval (5s for standard, 2s for budget hardware) when a geofence is active and the device is moving, regardless of screen state. (Issue #169). **Status: Implemented.**
@@ -43,5 +45,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.14.04.
+*   **Current Release**: Aug.14.07.
 *   **Source of Truth**: app/build.gradle versionName.

@@ -4,8 +4,9 @@ import kotlin.math.*
 
 /**
  * TelemetryUtils: Logic for scoring and evaluating signal quality.
- * v9.4.06:
- * - Issue #077 Hardening: Cleaned up satsIndex math to leverage implicit promotion.
+ * Aug.14.05:
+ * - Issue #174: Forensic Replay Latency Audit. Added high-performance 
+ *   binary search utilities for telemetry and trail lookups (R174).
  * v9.4.05:
  * - Issue #077 Hardening: Simplified GPS index calculation math.
  */
@@ -48,5 +49,29 @@ object TelemetryUtils {
         val total = (ageIndex + accIndex + satsIndex) / 3.0
         
         return GpsIndexData(ageIndex, accIndex, satsIndex, total)
+    }
+
+    /**
+     * Issue #174: Performs O(log N) binary search for the closest timestamp match.
+     */
+    fun findClosestTimestampIndex(timestamps: LongArray, targetTs: Long): Int {
+        if (timestamps.isEmpty()) return -1
+        var low = 0
+        var high = timestamps.size - 1
+        
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            val midTs = timestamps[mid]
+            
+            if (midTs < targetTs) low = mid + 1
+            else if (midTs > targetTs) high = mid - 1
+            else return mid
+        }
+        
+        // Closest match logic
+        if (low >= timestamps.size) return timestamps.size - 1
+        if (high < 0) return 0
+        
+        return if (abs(timestamps[low] - targetTs) < abs(timestamps[high] - targetTs)) low else high
     }
 }

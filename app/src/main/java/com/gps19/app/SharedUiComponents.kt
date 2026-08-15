@@ -49,10 +49,13 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Aug.14.05:
+ * - Issue #174: Forensic Replay Latency Audit. Optimized replay cursor lookup 
+ *   using O(log N) binary search in ForensicRibbonContainer, ensuring 
+ *   smooth 60fps scrubbing with 10,000+ data points (R174).
+ *   Fixed property access typos in sensor selectors.
  * Aug.14.02:
- * - Issue #170: Forensic Replay UI Audit. Implemented coordinate-aware 
- *   scrubbing in ForensicRibbonContainer. Fixed compilation errors in 
- *   StatusBar where isRedScreenVisible was shadowed (R170).
+ * - Issue #170: Forensic Replay UI Audit.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -137,7 +140,7 @@ fun AnalyticalRibbons(
     val curSelector = remember { { p: ConnectionPoint -> (kotlin.math.abs(p.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) } }
     val sitSelector = remember { { p: ConnectionPoint -> if (p.isSitActive) 1f else 0f } }
     val tltSelector = remember { { p: ConnectionPoint -> p.tiltIdx.toFloat() } }
-    val barSelector = remember { { p: ConnectionPoint -> p.baroIdx.toFloat() } }
+    val baroSelector = remember { { p: ConnectionPoint -> p.baroIdx.toFloat() } }
     val svzSelector = remember { { p: ConnectionPoint -> (kotlin.math.abs(p.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f) } }
     val svzDriftSelector = remember { { p: ConnectionPoint -> if (p.sitVzTs > 0) kotlin.math.abs(p.ts - p.sitVzTs) else 0L } }
     val sdzSelector = remember { { p: ConnectionPoint -> (kotlin.math.abs(p.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f) } }
@@ -203,7 +206,7 @@ fun AnalyticalRibbons(
         GenericSensorRibbon(history, "CUR", selectedScale, lineColor = Color(0xFFFB923C), isStrictMode = isStrictMode, valueSelector = curSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
         GenericSensorRibbon(history, "SIT", selectedScale, lineColor = BrandJd, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = sitSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
         GenericSensorRibbon(history, "TLT", selectedScale, lineColor = Color(0xFF818CF8), isStrictMode = isStrictMode, valueSelector = tltSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), isStrictMode = isStrictMode, valueSelector = barSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), isStrictMode = isStrictMode, valueSelector = baroSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
         GenericSensorRibbon(history, "SVZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = svzSelector, driftSelector = svzDriftSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
         GenericSensorRibbon(history, "SDZ", selectedScale, lineColor = Violet500, isStrictMode = isStrictMode, valueSelector = sdzSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
         
@@ -338,8 +341,11 @@ fun ForensicRibbonContainer(
 
                     replayCursorTs?.let { cursorTs ->
                         val startOffset = totalPoints - history.size
-                        val index = history.indexOfFirst { it.ts >= cursorTs }
-                        if (index != -1) {
+                        // Issue #174: Optimized O(log N) binary search for replay cursor position.
+                        val rawIndex = history.binarySearch { it.ts.compareTo(cursorTs) }
+                        val index = if (rawIndex >= 0) rawIndex else -(rawIndex + 1)
+                        
+                        if (index in history.indices) {
                             val xPos = (startOffset + index) * pointWidth
                             drawLine(
                                 color = Color.White,

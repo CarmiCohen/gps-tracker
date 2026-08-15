@@ -23,12 +23,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.14.05:
+ * - Issue #174: Forensic Replay Latency Audit. Optimized handleReplayCursor 
+ *   to use collectLatest and high-performance binary search, eliminating 
+ *   coroutine churn during rapid high-frequency (100Hz) scrubbing (R174).
  * Aug.14.02:
- * - Issue #170: Forensic Replay UI Audit. Implemented SetReplayCursor handler. 
- *   Performs O(log N) binary search on historical trails to find coordinate 
- *   matches for frame-perfect replay synchronization (R170).
- * Aug.13.05:
- * - Issue #153: Startup Davey Stalls.
+ * - Issue #170: Forensic Replay UI Audit.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -168,6 +168,8 @@ class MainViewModel @Inject constructor(
     private var lastAlarmAckRt: Long = 0L
     private var isHeavyObservationStarted = false
 
+    private val replayCursorRequest = MutableStateFlow<Long?>(null)
+
     init {
         viewModelScope.launch(Dispatchers.Default + uiExceptionHandler) {
             val initialSettings = settingsUseCase.loadAllSettings()
@@ -194,6 +196,30 @@ class MainViewModel @Inject constructor(
             launch(Dispatchers.Main.immediate) {
                 _uiState.filter { it.appMode != null }.first()
                 startHeavyObservations()
+            }
+
+            // Issue #174: Optimized replay scrubbing using collectLatest
+            launch(Dispatchers.Default) {
+                replayCursorRequest.collectLatest { ts ->
+                    if (ts == null) {
+                        withContext(Dispatchers.Main.immediate) {
+                            updateKinematicState { it.apply { replayCursorPos = null } }
+                        }
+                        return@collectLatest
+                    }
+                    val mode = _uiState.value.appMode
+                    val trail = if (mode == "viewer") trackerTrailFlow.value else viewerTrailFlow.value
+                    val bestPoint = stateSubscriptionUseCase.findClosestTrailPoint(trail, ts)
+                    
+                    bestPoint?.let { bp ->
+                        withContext(Dispatchers.Main.immediate) {
+                            updateKinematicState { it.apply { 
+                                replayCursorPos = bp.toGeoPoint() 
+                                pulse = timeProvider.elapsedRealtime()
+                            }}
+                        }
+                    }
+                }
             }
         }
     }
@@ -530,44 +556,7 @@ class MainViewModel @Inject constructor(
 
     private fun handleReplayCursor(ts: Long?) {
         updateNavigation { it.copy(replayCursorTs = ts) }
-        
-        if (ts == null) {
-            updateKinematicState { it.apply { replayCursorPos = null } }
-            return
-        }
-
-        viewModelScope.launch(Dispatchers.Default) {
-            val mode = _uiState.value.appMode
-            val trail = if (mode == "viewer") trackerTrailFlow.value else viewerTrailFlow.value
-            
-            // Binary search for closest coordinate match
-            if (trail.isNotEmpty()) {
-                var low = 0
-                var high = trail.size - 1
-                var bestIdx = 0
-                var minDiff = Long.MAX_VALUE
-
-                while (low <= high) {
-                    val mid = (low + high) / 2
-                    val diff = kotlin.math.abs(trail[mid].timestamp - ts)
-                    if (diff < minDiff) {
-                        minDiff = diff
-                        bestIdx = mid
-                    }
-                    if (trail[mid].timestamp < ts) low = mid + 1
-                    else if (trail[mid].timestamp > ts) high = mid - 1
-                    else break
-                }
-                
-                val bestPoint = trail[bestIdx]
-                withContext(Dispatchers.Main.immediate) {
-                    updateKinematicState { it.apply { 
-                        replayCursorPos = bestPoint.toGeoPoint() 
-                        pulse = timeProvider.elapsedRealtime()
-                    }}
-                }
-            }
-        }
+        replayCursorRequest.value = ts
     }
 
     private fun handleConfigEvent(event: UiEvent) {
@@ -787,7 +776,7 @@ class MainViewModel @Inject constructor(
                 }
 
                 val currentInterval = getActiveHeartbeatInterval(0)
-                delay(currentInterval.toLong())
+                delay(currentInterval)
             }
         }
     }
@@ -928,7 +917,7 @@ class MainViewModel @Inject constructor(
                 battery.level = 100; stats.uptimeMs = 0; trackerStats.uptimeMs = 0
                 pulse = timeProvider.elapsedRealtime()
             }}
-            _trackerState.value = TrackerState.UNKNOWN; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; stateSubscriptionUseCase.clearHistory(); 
+            _trackerState.value = TrackerState.UNKNOWN; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; stateSubscriptionUseCase.clearHistory()
             val initial = settingsUseCase.loadAllSettings()
             applyInitialSettings(initial)
         }

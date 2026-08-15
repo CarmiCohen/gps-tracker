@@ -20,6 +20,9 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Aug.14.06:
+ * - Issue #172: Viewer-Side State Audit. Finalized forensic parity by adding 
+ *   Vz timestamps (sitVzTs, sitVzRt) to loadState (R172).
  * Aug.14.04:
  * - Issue #172: Viewer-Side State Audit. Expanded loadState to restore full 
  *   SIT forensic parameters (Vz, Dz, Baro, Tilt, Shock) to sentinel (R172).
@@ -86,7 +89,9 @@ class LocationProcessor(
         savedSitDz: Double = 0.0,
         savedSitBaro: Double = 0.0,
         savedSitTilt: Double = 0.0,
-        savedSitShock: Double = 0.0
+        savedSitShock: Double = 0.0,
+        savedSitVzTs: Long = 0L,
+        savedSitVzRt: Long = 0L
     ) {
         if (savedMaxAccuracy > 0.0) {
             maxAccuracy = savedMaxAccuracy
@@ -95,7 +100,8 @@ class LocationProcessor(
         
         sentinel.loadForensicState(
             savedLastSitTs, savedBaseline,
-            savedSitVz, savedSitDz, savedSitBaro, savedSitTilt, savedSitShock
+            savedSitVz, savedSitDz, savedSitBaro, savedSitTilt, savedSitShock,
+            savedSitVzTs, savedSitVzRt
         )
         
         if (trackerState != null && trackerState.lat != 0.0) {
