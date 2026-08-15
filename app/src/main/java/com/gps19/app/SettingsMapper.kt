@@ -4,6 +4,10 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsMapper: Conversion logic between DataStore Protos and Domain Models.
+ * Aug.14.04:
+ * - Issue #172: Viewer-Side State Audit. Restored SIT forensic fields (lastSitTs, 
+ *   sitVz, sitDz, sitBaro, sitTilt, sitShock, verticalVelocity) to TrackerStatus 
+ *   mapping to ensure mirror parity during viewer restarts (R172).
  * July.1.16:
  * - Issue #510: Abandoned Chair Sit Detection. Removed sit-related fields from mapping.
  * - Issue #512 & #515: Removed legacy flags (isSuspicious, isJammer, isAnchorLocked) from TrackerStatus mapping.
@@ -101,7 +105,21 @@ object SettingsMapper {
             isCoolingModeActive = s.isCoolingModeActive,
             currentMa = s.currentMa,
             trackerState = try { if (s.trackerState.isNullOrBlank()) TrackerState.UNKNOWN else TrackerState.valueOf(s.trackerState) } catch (e: Exception) { TrackerState.UNKNOWN },
-            status = try { if (s.status.isNullOrBlank()) SentinelStatus.VALID else SentinelStatus.valueOf(s.status) } catch (e: Exception) { SentinelStatus.VALID }
+            status = try { if (s.status.isNullOrBlank()) SentinelStatus.VALID else SentinelStatus.valueOf(s.status) } catch (e: Exception) { SentinelStatus.VALID },
+            
+            // Issue #172: Forensic Parity
+            lastSitTs = s.lastSitTs,
+            sitVz = s.sitVz,
+            sitDz = s.sitDz,
+            sitBaro = s.sitBaro,
+            sitTilt = s.sitTilt,
+            sitShock = s.sitShock,
+            verticalVelocity = s.verticalVelocity,
+            kineticEnergy = s.kineticEnergy,
+            isAdaptiveJump = s.isAdaptiveJump,
+            isBatteryLow = s.isBatteryLow,
+            isBatteryCritical = s.isBatteryCritical,
+            isSilentFailure = s.isSilentFailure
         )
     }
 
@@ -157,6 +175,20 @@ object SettingsMapper {
             .setCurrentMa(status.currentMa)
             .setTrackerState(status.trackerState.name)
             .setStatus(status.status.name)
+            
+            // Issue #172: Forensic Parity
+            .setLastSitTs(status.lastSitTs)
+            .setSitVz(status.sitVz)
+            .setSitDz(status.sitDz)
+            .setSitBaro(status.sitBaro)
+            .setSitTilt(status.sitTilt)
+            .setSitShock(status.sitShock)
+            .setVerticalVelocity(status.verticalVelocity)
+            .setKineticEnergy(status.kineticEnergy)
+            .setIsAdaptiveJump(status.isAdaptiveJump)
+            .setIsBatteryLow(status.isBatteryLow)
+            .setIsBatteryCritical(status.isBatteryCritical)
+            .setIsSilentFailure(status.isSilentFailure)
             .build()
     }
 }

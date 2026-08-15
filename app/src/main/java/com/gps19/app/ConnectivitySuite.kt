@@ -33,12 +33,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Aug.14.04:
+ * - Issue #173: Multi-Stream Contention. Added updateRemoteProcessor() to 
+ *   support decoupled processor instances in ViewerService (R173).
  * Aug.10.24:
  * - Issue #130: Proto Health Parity. Integrated isBatteryLow and isBatteryCritical 
  *   into binary and JSON telemetry pipelines (R130).
- * Aug.03.37:
- * - Issue #669: Forensic Audit: Database I/O Contention. Added isTrackerAdaptiveJump 
- *   to restore full forensic parity in viewer mode.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -50,7 +50,7 @@ class ConnectivitySuite @Inject constructor(
     private val signalingProvider: SignalingProvider,
     private val sessionManager: SessionManager,
     private val gpsManager: GpsManager,
-    private val locationProcessor: LocationProcessor,
+    private var locationProcessor: LocationProcessor, // Current (Self or Shared)
     private val offlineRepository: OfflineRepository,
     private val mainRepository: MainRepository,
     private val remoteStatusRepository: RemoteStatusRepository
@@ -179,6 +179,13 @@ class ConnectivitySuite @Inject constructor(
             logManagerProvider.get().logServiceEvent("Network Handover: Interface Lost.", false)
             telemetryRepository.updateRelayStatus(false)
         }
+    }
+
+    /**
+     * Issue #173: Inject a dedicated processor for remote telemetry filtering.
+     */
+    fun updateRemoteProcessor(processor: LocationProcessor) {
+        this.locationProcessor = processor
     }
 
     fun start(url: String, dId: String, vId: String, isTracker: Boolean) {

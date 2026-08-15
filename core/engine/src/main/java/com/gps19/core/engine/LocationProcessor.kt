@@ -20,16 +20,12 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Aug.14.04:
+ * - Issue #172: Viewer-Side State Audit. Expanded loadState to restore full 
+ *   SIT forensic parameters (Vz, Dz, Baro, Tilt, Shock) to sentinel (R172).
  * Aug.13.02:
  * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
  *   type inference failures (R146/R151).
- * July.30.54:
- * - Issue #653: Performance: Zero-Churn Refactoring. Switched to 
- *   interpolateSegmentCallback to eliminate List allocations during 
- *   trajectory promotion (R-HARDWARE-01).
- * July.30.51:
- * - Issue #653: Performance: Zero-Churn Refactoring. Integrated ProcessedLocation 
- *   flyweight and replaced List allocations with indexed loops.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -84,14 +80,23 @@ class LocationProcessor(
         savedBaseline: Double,
         trackerState: SpatialAnchor?,
         homePoints: List<EngineGeoPoint>,
-        maxDistance: Double
+        maxDistance: Double,
+        // Issue #172: Forensic Parity
+        savedSitVz: Double = 0.0,
+        savedSitDz: Double = 0.0,
+        savedSitBaro: Double = 0.0,
+        savedSitTilt: Double = 0.0,
+        savedSitShock: Double = 0.0
     ) {
         if (savedMaxAccuracy > 0.0) {
             maxAccuracy = savedMaxAccuracy
             addAccuracyToWindow(savedMaxAccuracy)
         }
         
-        sentinel.loadForensicState(savedLastSitTs, savedBaseline)
+        sentinel.loadForensicState(
+            savedLastSitTs, savedBaseline,
+            savedSitVz, savedSitDz, savedSitBaro, savedSitTilt, savedSitShock
+        )
         
         if (trackerState != null && trackerState.lat != 0.0) {
             lastLat = trackerState.lat

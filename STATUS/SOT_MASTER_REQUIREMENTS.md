@@ -1,8 +1,10 @@
-# System Source of Truth (SoT) - Aug.14.03 (Forensic Jitter Hardened)
+# System Source of Truth (SoT) - Aug.14.04 (Viewer Mirror Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Multi-Stream Processor Contention (R173)**: (Added Aug.14.04) The `ViewerService` MUST maintain two distinct `LocationProcessor` instances: one for filtering the viewer's own location ("Self") and one for filtering the remote tracker's telemetry ("Remote"). Interleaving these streams in a single processor is STRICTLY PROHIBITED to prevent filter state corruption. (Issue #173). **Status: Implemented.**
+*   **Viewer Forensic Parity (R172)**: (Added Aug.14.04) The system MUST maintain full forensic parity in the viewer-side mirrored state. `LocationProcessor` MUST correctly restore forensic attributes (lastSitTs, sitVz, sitDz, sitBaro, sitTilt, sitShock) from remote telemetry after service restarts or multi-viewer handovers to ensure "Zero-Lag" UI transitions. (Issue #172). **Status: Implemented.**
 *   **Forensic Jitter Protection (R171)**: (Added Aug.14.03) The system MUST maintain temporal integrity during multi-viewer forensic streams. Telemetry processing MUST allow a 2s jitter window (`MONOTONIC_JITTER_TOLERANCE_MS`) to prevent data loss while ensuring that aggregators and UI history buffers maintain strict monotonicity via sorted merging and deduplication. (Issue #171). **Status: Implemented.**
 *   **Forensic Replay Sync (R170)**: (Added Aug.14.02) The system MUST support coordinate-aware scrubbing in telemetry ribbons. Map cursor positioning MUST utilize O(log N) binary search on historical trail data to ensure frame-perfect alignment with sensor trends (e.g., `vibeIdx` spikes) during 100Hz playback simulation. (Issue #170). **Status: Implemented.**
 *   **Geofence-Aware Polling (R169)**: (Added Aug.14.01) The system MUST maintain a safe polling interval (5s for standard, 2s for budget hardware) when a geofence is active and the device is moving, regardless of screen state. (Issue #169). **Status: Implemented.**
@@ -20,11 +22,11 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Staggered UI Hydration Authority (R153)**: (Added Aug.13.05) Stage-based UI initialization via `hydrationLevel`. (Issue #153). **Status: Implemented.**
 *   **Samsung A15 Detection Hardening (R405)**: (Added Aug.13.04) Reliable A15 hardware identification via device/product strings. (Issue #150). **Status: Implemented.**
 *   **Forensic Drainer Optimization (R146)**: (Added Aug.13.00) Optimized telemetry drain loop to support high-frequency persistence. (Issue #146). **Status: Implemented.**
+*   **Samsung A15 Adaptation Authority (R141b)**: (Added Aug.11.23) Integrated Adaptation Muzzle for budget GPS stability. (Issue #141). **Status: Implemented.**
 *   **Forensic Persistence Hardening (R151)**: (Added Aug.11.21) Decouple forensic trace persistence from the Main thread. (Issue #151). **Status: Implemented.**
 *   **Forensic Pressure Authority (R669)**: (Added Aug.11.20) Monitor `MappedByteBuffer` fill level and inhibit sampling during pressure. (Issue #145). **Status: Implemented.**
 *   **Stress Recovery Authority (R141)**: (Added Aug.11.13) Immediate flush of thermal safety states upon test termination. (Issue #141). **Status: Implemented & Verified.**
 *   **Adaptive Polling Strategy (R406a)**: (Updated Aug.11.13) Dynamic GPS polling rates based on motion state. (Issue #057). **Status: Implemented.**
-*   **Forensic Anomaly Correlation Engine (R133)**: (Updated Aug.11.08) Cross-domain correlation between location and hardware load. (Issue #133). **Status: Implemented & Verified.**
 
 ### 2. Temporal & Forensic Integrity
 *   **Bayesian Uncertainty Authority (R460)**: (Updated Aug.11.16) Expand geofence thresholds during GPS gaps. (Issue #144). **Status: Implemented & Verified.**
@@ -41,5 +43,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.14.03.
+*   **Current Release**: Aug.14.04.
 *   **Source of Truth**: app/build.gradle versionName.

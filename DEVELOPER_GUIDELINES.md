@@ -1,4 +1,4 @@
-# 🟢 Guidelines for Implementation
+//# 🟢 Guidelines for Implementation
 
 The following rules MUST be followed strictly for every task:
 
@@ -24,3 +24,4 @@ Perform the full sequence once the specific issue is resolved:
 - **j.** After completing the fix for the issue, stop the chat and do not attempt to fix any other issues.
 - **k.** Recheck `issues.md`, `sot_master_requirements.md`, `resolution_archive.md`, and `handover.md`.
 - **l.** Do not fix more than one issue, do not continue to the next issue: after completing the issue - stop this chat.
+- **m.** Please verify that the removal of the lines from issues.md, sot_master_requirements.md, resolution_archive.md, and build.gradle is correct.

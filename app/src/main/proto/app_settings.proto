@@ -308,4 +308,13 @@ message TrackerStatusProto {
 
     // Issue #133: Forensic Anomaly Correlation
     bool is_silent_failure = 72;
+
+    // Forensic Parity R172: Restored SIT state fields
+    int64 last_sit_ts = 73;
+    double sit_vz = 74;
+    double sit_dz = 75;
+    double sit_baro = 76;
+    double sit_tilt = 77;
+    double sit_shock = 78;
+    double vertical_velocity = 79;
 }

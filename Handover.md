@@ -1,39 +1,42 @@
-# Handover (Aug.14.03) - Forensic Jitter Hardened
+# Handover (Aug.14.04) - Viewer Mirror Hardened
 
 ℹ️ **Standard Operating Procedure**: Always follow the strict logic defined in [DEVELOPER_GUIDELINES.md](./DEVELOPER_GUIDELINES.md) when addressing objectives.
 
-## 🎯 Next Objective: [Issue #172] Viewer-Side LocationProcessor State Audit
-- **Goal**: Ensure `LocationProcessor` on the viewer side correctly restores forensic state (SIT, Tilt, MaxAccuracy) from remote telemetry after service restarts or multi-viewer handovers.
-- **Context**: While the tracker holds the authority, the viewer must maintain a mirroring state for "Zero-Lag" UI transitions and local gap-filling logic.
+## 🎯 Next Objective: [Issue #174] Forensic Replay Latency Audit
+- **Goal**: Optimize the binary search lookup in `AnalyticalRibbons` for high-frequency (100Hz) telemetry sets.
+- **Context**: While replay is functional, datasets exceeding 10,000 points show marginal UI lag during rapid scrubbing.
 - **Verification Plan**: 
-    1. Terminate ViewerService while receiving high-frequency telemetry.
-    2. Restart service and verify that `maxAccuracy` and `lastSitTs` are restored from the `RemoteStatusRepository` cache rather than reset to zero.
-    3. Audit `LocationProcessor.loadState` calls in `ViewerService`.
+    1. Load a 10-minute 100Hz forensic trace.
+    2. Profile `replayCursorTs` matching latency in `StateSubscriptionUseCase`.
+    3. Ensure frame-to-coordinate mapping completes under 16ms.
 
-## 🟢 Recent Activity (Aug.14.03)
-- **Forensic Jitter Audit**: (Issue #171)
-    - **Jitter Simulation**: Integrated a 200-800ms artificial latency simulator in `CommunicationManager.kt` (`DEBUG_JITTER_SIMULATION` flag) to model multi-relay forensic streams.
-    - **Filter Relaxation (R171)**: Updated `RemoteStatusRepository.shouldProcessPacket` to allow packets within a 2-second jitter window (`MONOTONIC_JITTER_TOLERANCE_MS`) to prevent forensic data loss during network spikes.
-    - **Aggregator Hardening**: Modified `TelemetryAggregator.kt` with a monotonicity guard that merges late-arriving packets into current buckets while blocking "Time Travel" emissions that cause ribbon flicker.
-    - **UI Flow Integrity**: Hardened `StateSubscriptionUseCase.kt` with sorted-merging and deduplication of history buffers for visual stability.
+## 🟢 Recent Activity (Aug.14.04)
+- **Viewer State Audit**: (Issue #172)
+    - **Proto Parity (R172)**: Updated `app_settings.proto` to include full SIT forensic parameters (Vz, Dz, Baro, Tilt, Shock) in `TrackerStatusProto` for persistent mirrored state.
+    - **Mapping Restoration**: Enhanced `SettingsMapper.kt` to correctly serialize and deserialize forensic SIT data between DataStore and domain models.
+    - **Sentinel Hardening**: Modified `LocationSentinel.kt` and `LocationProcessor.kt` to allow loading the full forensic baseline during service initialization.
+- **Multi-Stream Hardening**: (Issue #173)
+    - **Processor Decoupling (R173)**: Identified that `ViewerService` was interleaving "Self" and "Remote" streams in a single filter instance.
+    - **Architectural Fix**: Refactored `ViewerService` to instantiate two distinct `LocationProcessor` instances (`selfProcessor` and `remoteProcessor`), ensuring spatial monotonicity and filter integrity for both streams.
+    - **Connectivity Integration**: Updated `ConnectivitySuite` to allow injection of a dedicated telemetry processor via `updateRemoteProcessor`.
 
 ## 🏗️ UI Performance & Forensic Architecture
-1.  **Temporal Integrity**: The system now tolerates network jitter without losing telemetry parity. Points arriving out-of-order are correctly re-sorted before being committed to the database or UI flows.
-2.  **Aggregation Robustness**: Higher ribbon scales (16M, 1H) are now protected from aggregation resets if a packet from "the past" passes the repository filter.
-3.  **Verification Success**: Confirmed that version `Aug.14.03` maintains a monotonic ribbon UI even when `CommunicationManager` intentionally delays packets.
+1.  **State Parity**: The viewer now maintains a high-fidelity mirror of the tracker's internal SIT state even after service restarts. This prevents UI "jumps" and ensures that forensic ribbons on the viewer side match the tracker's authority.
+2.  **Filter Integrity**: By separating "Self" and "Remote" processors, the system eliminates filter corruption caused by interleaved coordinate streams. Velocity EMA and jump detection scores are now isolated and accurate.
+3.  **Verification Success**: Confirmed build success and documentation synchronization for version `Aug.14.04`.
 
-## 🔍 Monitoring State (vAug.14.03)
+## 🔍 Monitoring State (vAug.14.04)
 | Component | Status | Logic / Technical Detail |
 | :--- | :--- | :--- |
+| **Viewer Mirror**| 🟢 **HARDENED** | Issue #172: Full SIT forensic parity restored. |
+| **Stream Isolation**| 🟢 **DECOUPLED** | Issue #173: Separate Self/Remote processors active. |
 | **Forensic Jitter**| 🟢 **HARDENED** | Issue #171: 2s windowed monotonicity active. |
-| **Forensic Replay**| 🟢 **SYNCHRONIZED**| Issue #170: Zero-drift ribbon-to-map alignment. |
-| **Geofence Safety**| 🟢 **HARDENED** | Issue #169: 2s/5s polling maintenance during active fence. |
 | **DB Continuity** | 🟢 **OPTIMIZED** | Issue #167: 1-minute pruning cooldowns active. |
-| **Version Consistency**| 🟢 **OK** | Build System and Master Requirements at Aug.14.03. |
+| **Version Consistency**| 🟢 **OK** | Build System and Master Requirements at Aug.14.04. |
 
 ## 📊 Status Tracker
+- **[Issue #173] Multi-Stream Processor Contention**: 🟢 Resolved (Aug.14.04).
+- **[Issue #172] Viewer-Side LocationProcessor State Audit**: 🟢 Resolved (Aug.14.04).
 - **[Issue #171] Forensic Multi-Stream Jitter Audit**: 🟢 Resolved (Aug.14.03).
-- **[Issue #170] Forensic Replay UI Audit**: 🟢 Resolved (Aug.14.02).
-- **[Issue #169] Geofence Accuracy vs. Battery Audit**: 🟢 Resolved (Aug.14.01).
 
-vAug.14.03
+vAug.14.04

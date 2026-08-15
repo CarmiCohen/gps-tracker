@@ -5,13 +5,13 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Aug.14.04:
+ * - Issue #172: Viewer-Side State Audit. Enhanced loadForensicState to restore 
+ *   full SIT telemetry (Vz, Dz, Baro, Tilt, Shock) for mirror parity (R172).
  * Aug.11.14:
  * - Issue #141: Stress Recovery Verification. Refactored runSensorSentinel() 
  *   to checkPhysicalTamper() to allow sensor-only status polling in the 
  *   service tick loop (R141). Corrected parameter names.
- * Aug.11.09:
- * - Issue #141: Stress Recovery Verification. Fixed sensor sentinel to respect 
- *   isMuzzled flag.
  */
 class LocationSentinel {
 
@@ -66,13 +66,13 @@ class LocationSentinel {
     var baselineSitTilt: Double = -1.0
     
     // SIT Forensic Parameters (Forensic Parity R522)
-    var lastSitVz: Double = 0.0; private set
-    var lastSitVzTs: Long = 0L; private set
-    var lastSitVzRt: Long = 0L; private set
-    var lastSitDz: Double = 0.0; private set
-    var lastSitBaro: Double = 0.0; private set
-    var lastSitTilt: Double = 0.0; private set
-    var lastSitShock: Double = 0.0; private set
+    var lastSitVz: Double = 0.0; internal set
+    var lastSitVzTs: Long = 0L; internal set
+    var lastSitVzRt: Long = 0L; internal set
+    var lastSitDz: Double = 0.0; internal set
+    var lastSitBaro: Double = 0.0; internal set
+    var lastSitTilt: Double = 0.0; internal set
+    var lastSitShock: Double = 0.0; internal set
 
     private var sitDetectionCooldownRt: Long = 0L 
     private var stationaryStartRt: Long = 0L 
@@ -95,9 +95,22 @@ class LocationSentinel {
     private var lastSnr: Double = 0.0
     private var lastSatsUsed: Int = 0
 
-    fun loadForensicState(savedLastSitTs: Long, savedBaseline: Double) {
+    fun loadForensicState(
+        savedLastSitTs: Long, 
+        savedBaseline: Double,
+        savedSitVz: Double = 0.0,
+        savedSitDz: Double = 0.0,
+        savedSitBaro: Double = 0.0,
+        savedSitTilt: Double = 0.0,
+        savedSitShock: Double = 0.0
+    ) {
         this.lastSitTs = savedLastSitTs
         this.baselineSitTilt = savedBaseline
+        this.lastSitVz = savedSitVz
+        this.lastSitDz = savedSitDz
+        this.lastSitBaro = savedSitBaro
+        this.lastSitTilt = savedSitTilt
+        this.lastSitShock = savedSitShock
     }
 
     fun setSpatialAnchor(lat: Double, lng: Double, alt: Double, timestamp: Long, rt: Long, accuracy: Double = 0.0) {
