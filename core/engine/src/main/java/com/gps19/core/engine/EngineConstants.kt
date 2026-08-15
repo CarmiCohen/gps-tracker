@@ -2,11 +2,11 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * Aug.14.07:
- * - Issue #177 Hardening: Reduced log limits and increased pruning aggressiveness
- *   to prevent heap exhaustion and ANRs under 100Hz telemetry flow (R177).
- * Aug.14.06:
- * - Issue #176: Proactive Pruning ANR.
+ * Aug.15.01:
+ * - Issue #178: Forensic Optimization. Reduced signature lookback to 10 minutes 
+ *   to resolve OOM/ANR under 100Hz flow (R178).
+ * Aug.15.00:
+ * - Version alignment for Sustained Load Validation release.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -45,6 +45,7 @@ const val FORENSIC_SPILL_CAPACITY = 10000
 const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
 const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 500L
 const val FORENSIC_DRAIN_THROTTLE_MAX_MS = 5000L
+const val FORENSIC_SIGNATURE_LOOKBACK_MS = 600000L // Reduced to 10 min for Issue #178
 
 // Issue #727: Dynamic Batching
 const val FORENSIC_BATCH_SIZE_MIN = 50

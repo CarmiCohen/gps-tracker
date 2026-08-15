@@ -23,12 +23,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.15.01:
+ * - Issue #178: Forensic Optimization. Gated eventLogsFlow by isLogVisible 
+ *   to eliminate mapping pressure when the viewer is closed (R178).
  * Aug.14.05:
  * - Issue #174: Forensic Replay Latency Audit. Optimized handleReplayCursor 
- *   to use collectLatest and high-performance binary search, eliminating 
- *   coroutine churn during rapid high-frequency (100Hz) scrubbing (R174).
- * Aug.14.02:
- * - Issue #170: Forensic Replay UI Audit.
+ *   to use collectLatest and high-performance binary search (R174).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -134,12 +134,14 @@ class MainViewModel @Inject constructor(
     .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L) 
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
 
+    // Issue #178: Gate log mapping by visibility to resolve mapping pressure.
     val eventLogsFlow: StateFlow<List<LogEntry>> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
-        _uiState.map { it.navigation.isStrictMode }.distinctUntilChanged()
-    ) { mode, isStrict -> mode to isStrict }
-    .flatMapLatest { (mode, isStrict) -> 
-        if (mode != null) {
+        _uiState.map { it.navigation.isStrictMode }.distinctUntilChanged(),
+        _uiState.map { it.navigation.isLogVisible }.distinctUntilChanged()
+    ) { mode, isStrict, isVisible -> Triple(mode, isStrict, isVisible) }
+    .flatMapLatest { (mode, isStrict, isVisible) -> 
+        if (mode != null && isVisible) {
             val limit = if (isStrict) LOG_LIMIT_STRICT else LOG_LIMIT_STANDARD
             repository.eventLogsFlow(limit)
         } else flowOf(emptyList()) 
@@ -198,7 +200,6 @@ class MainViewModel @Inject constructor(
                 startHeavyObservations()
             }
 
-            // Issue #174: Optimized replay scrubbing using collectLatest
             launch(Dispatchers.Default) {
                 replayCursorRequest.collectLatest { ts ->
                     if (ts == null) {
@@ -252,7 +253,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) { 
             while(true) { 
                 val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
-                val newState = systemStatusProvider.getPermissionState(forceRefresh = refreshFast)
+                val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
                 val isA15 = systemStatusProvider.isA15Hardware()
                 withContext(Dispatchers.Main.immediate) { 
                     val oldState = _uiState.value

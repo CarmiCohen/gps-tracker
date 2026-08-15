@@ -8,6 +8,8 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.15.00:
+ * - Version alignment for Sustained Load Validation release.
  * Aug.14.07:
  * - Issue #177 Hardening: Added Important-Non-Special pruning support to 
  *   eliminate database bloat beyond thresholds (R177).

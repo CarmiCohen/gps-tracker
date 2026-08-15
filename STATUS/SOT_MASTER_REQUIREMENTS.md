@@ -1,9 +1,9 @@
-# System Source of Truth (SoT) - Aug.14.07 (Log Infrastructure Hardened)
+# System Source of Truth (SoT) - Aug.15.00 (Sustained Load Validation)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
-*   **Logging Memory & I/O Hardening (R177)**: (Added Aug.14.07) The system MUST maintain heap stability during 100Hz telemetry flows. Reactive log limits MUST NOT exceed 2,000 (Standard) or 5,000 (Strict). Pruning MUST account for ALL log categories, including "Important" logs, to prevent database growth beyond 15,000 entries. Forensic signature lookups MUST be limited to a 1-hour temporal window to prevent OOM during deep recovery. (Issue #177). **Status: Implemented.**
+*   **Logging Memory & I/O Hardening (R177)**: (Added Aug.15.00) The system MUST maintain heap stability during 100Hz telemetry flows. Reactive log limits MUST NOT exceed 2,000 (Standard) or 5,000 (Strict). Pruning MUST account for ALL log categories, including "Important" logs, to prevent database growth beyond 15,000 entries. Forensic signature lookups MUST be limited to a 1-hour temporal window to prevent OOM during deep recovery. (Issue #177). **Status: Implemented.**
 *   **Viewer Forensic Parity (R172)**: (Updated Aug.14.06) The system MUST maintain full forensic parity in the viewer-side mirrored state. `LocationProcessor` MUST correctly restore ALL forensic attributes, including SIT detection timestamps (`lastSitTs`), vertical velocity peaks and their associated timestamps (`sitVz`, `sitVzTs`, `sitVzRt`), displacement (`sitDz`), barometric delta (`sitBaro`), tilt (`sitTilt`), and peak shock (`sitShock`) from remote telemetry after service restarts or multi-viewer handovers. (Issue #172). **Status: Implemented.**
 *   **Forensic Replay Latency (R174)**: (Added Aug.14.05) The system MUST support sub-16ms frame coordination during replay scrubbing even with datasets exceeding 10,000 points. Coordinate matching and cursor positioning MUST utilize $O(\log N)$ binary search. Scrubbing events MUST be processed via a non-blocking `collectLatest` pipeline to eliminate coroutine churn (Issue #174). **Status: Implemented.**
 *   **Multi-Stream Processor Contention (R173)**: (Added Aug.14.04) The `ViewerService` MUST maintain two distinct `LocationProcessor` instances: one for filtering the viewer's own location ("Self") and one for filtering the remote tracker's telemetry ("Remote"). Interleaving these streams in a single processor is STRICTLY PROHIBITED to prevent filter state corruption. (Issue #173). **Status: Implemented.**
@@ -45,5 +45,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Historical Traceability (R749)**: (Added Aug.07.06) Synchronization across `issues.md` and `RESOLUTION_ARCHIVE.md`. (Issue #749)
 
 ### 5. Version Authority
-*   **Current Release**: Aug.14.07.
+*   **Current Release**: Aug.15.00.
 *   **Source of Truth**: app/build.gradle versionName.

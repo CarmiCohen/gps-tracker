@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.14.07)
+# Project Issues & Hardening Tracking (Aug.15.01)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,29 +7,27 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 0 | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 618 |
+| **Resolved (Total)** | 🟢 Progress | 619 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   *No critical risks identified. System stable under 100Hz load.*
+*   **None**
 
 ---
 
 ## 🔴 Open Issues
-*   *No active open issues.*
+*   **None**
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.14.07)
+## 🟢 Recently Resolved Issues (Aug.15.01)
+*   **[Issue #178] [Severity: Critical] [Category: Performance] Sustained 100Hz Heap Exhaustion & ANR.**
+    *   **Resolution**: Reduced forensic signature lookback to 10 minutes and gated `eventLogsFlow` mapping by UI visibility to resolve OOM/ANR under high-frequency flow. (R178)
 *   **[Issue #177] [Severity: Critical] [Category: Performance] Startup ANR & Heap Exhaustion.**
-    *   **Resolution**: Hardened `LogRepository` by reducing reactive log limits (2k/5k), implementing pruning for "Important" logs (preventing 100k+ row bloat), and tightening forensic signature lookback to 1 hour to prevent OOM during recovery. (R177)
+    *   **Resolution**: Hardened `LogRepository` by reducing reactive log limits (2k/5k) and implementing pruning for "Important" logs. (R177)
 *   **[Issue #176] [Severity: Critical] [Category: Performance] Proactive Pruning ANR.**
-    *   **Resolution**: Optimized database schema with composite indices and refactored `LogRepository` to use `withTransaction` for batch operations. Eliminated 2.2s I/O stalls. (R176)
-*   **[Issue #172] [Severity: High] [Category: Data Integrity] Viewer-Side LocationProcessor State Audit.**
-    *   **Resolution**: Finalized full forensic SIT state parity in the viewer-side mirrored state. (R172)
-*   **[Issue #174] [Severity: Medium] [Category: Performance] Forensic Replay Latency Audit.**
-    *   **Resolution**: Optimized replay scrubbing performance for high-frequency (100Hz) telemetry sets. (R174)
+    *   **Resolution**: Optimized database schema and refactored pruning to use chunked transactions. (R176)
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.14.07)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.15.01)

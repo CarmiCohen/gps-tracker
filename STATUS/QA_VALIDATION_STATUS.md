@@ -1,4 +1,4 @@
-# QA Validation Status (Aug.10.29)
+# QA Validation Status (Aug.15.01)
 
 This document tracks the verification status of all hardening and logic refinements.
 
@@ -7,31 +7,31 @@ This document tracks the verification status of all hardening and logic refineme
 | :--- | :--- | :--- | :--- |
 | **Logic Refinement** | 18 | 2 | 0 |
 | **Hardware Compatibility** | 10 | 0 | 0 |
-| **Stability / Long-Run** | 7 | 0 | 0 |
+| **Stability / Long-Run** | 7 | 0 | 🔴 1 |
 | **UI / UX** | 0 | 1 | 0 |
+
+---
+
+## 🔴 Failed Validation (Aug.15.01)
+| ID | Feature | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| **R177** | **Log Hardening / 100Hz Load** | **FAILED** | Identified Issue #178. Heap exhaustion (174MB) and ANR detected under sustained 100Hz telemetry. |
 
 ---
 
 ## 🟡 Pending Validation (Aug.10.29)
 | ID | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **R133** | **Anomaly Correlation Engine** | **Pending** | Awaiting stress test verification of CPU/IO correlation logic (Silent Failure Detection). |
-| **R134** | **Forensic Pulse Hardening** | **Pending** | Verify 10s interval stability and impact on low-power states. |
-| **R132** | **Forensic UI Metrics** | **Pending** | Verify real-time trend rendering for cpuLoad and ioWait in Dashboard. |
+| **R133** | **Anomaly Correlation Engine** | **Pending** | Awaiting stress test verification of CPU/IO correlation logic. |
+| **R134** | **Forensic Pulse Hardening** | **Pending** | Verify 10s interval stability. |
 
 ---
 
 ## 🟢 Validated & Resolved (July.23.11)
 | ID | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **R872** | **Tracker Stealth (Silence)** | **Passed** | Verified that AppAlarmManager suppresses all local audio in tracker mode. Tracker remains silent during violations. |
-| **R406b** | **FGS Startup Immediacy** | **Passed** | Verified that startForeground in Main-thread onCreate prevents crashes during landing-page restoration loops. |
-
-## 🟢 Validated & Resolved (July.23.10)
-| ID | Feature | Status | Notes |
-| :--- | :--- | :--- | :--- |
-| **#533** | **SRV Status Indicator** | **Passed** | Proactive relay status updates verified in CommunicationManager. |
-| **#098** | **Step Detector Permission** | **Passed** | Explicit permission check prevents hardware registration failures. |
+| **R872** | **Tracker Stealth (Silence)** | **Passed** | Verified suppressed local audio in tracker mode. |
+| **R406b** | **FGS Startup Immediacy** | **Passed** | Verified startForeground in onCreate. |
 
 ---
 *For historical validation results, see [RESOLUTION_ARCHIVE.md](RESOLUTION_ARCHIVE.md).*

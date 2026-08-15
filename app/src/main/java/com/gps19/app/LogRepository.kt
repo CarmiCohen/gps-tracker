@@ -19,11 +19,11 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * Aug.14.07:
- * - Issue #177 Hardening: Refactored proactivePruning to include "Important" log 
- *   category and increased chunking efficiency. Optimized performForensicDrain 
- *   to avoid heap exhaustion by tightening the signature lookback (R177).
- * - Issue #176: Proactive Pruning ANR.
+ * Aug.15.01:
+ * - Issue #178: Forensic Optimization. Reduced signature lookback to 
+ *   FORENSIC_SIGNATURE_LOOKBACK_MS (10 min) to prevent OOM (R178).
+ * Aug.15.00:
+ * - Version alignment for Sustained Load Validation release.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -169,10 +169,10 @@ class LogRepository @Inject constructor(
             var minTs = Long.MAX_VALUE
             for (t in traces) { if (t.timestamp < minTs) minTs = t.timestamp }
             
-            // If the buffer has very old traces (e.g. after long offline), limit lookback to 1 hour
+            // Issue #178: Limit lookback to 10 minutes (FORENSIC_SIGNATURE_LOOKBACK_MS)
             // to prevent loading millions of signatures into memory.
             val now = timeProvider.currentTimeMillis()
-            val lookbackLimit = now - 3600000L
+            val lookbackLimit = now - FORENSIC_SIGNATURE_LOOKBACK_MS
             val effectiveMinTs = if (minTs < lookbackLimit) lookbackLimit else minTs
 
             val existingSignatures = logDao.getExistingForensicSignatures(effectiveMinTs).toSet()
@@ -460,20 +460,20 @@ class LogRepository @Inject constructor(
                         var chunkPruned = 0
                         
                         db.withTransaction {
-                            heartbeatThreshold?.let { 
-                                chunkPruned += logDao.pruneHeartbeatsByThreshold(it, REFINED_PRUNE_CHUNK_SIZE)
+                            heartbeatThreshold?.let { t ->
+                                chunkPruned += logDao.pruneHeartbeatsByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
                             }
                             
-                            generalThreshold?.let {
-                                chunkPruned += logDao.pruneGeneralByThreshold(it, REFINED_PRUNE_CHUNK_SIZE)
+                            generalThreshold?.let { t ->
+                                chunkPruned += logDao.pruneGeneralByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
                             }
 
-                            importantThreshold?.let {
-                                chunkPruned += logDao.pruneImportantByThreshold(it, REFINED_PRUNE_CHUNK_SIZE)
+                            importantThreshold?.let { t ->
+                                chunkPruned += logDao.pruneImportantByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
                             }
                             
-                            specialThreshold?.let {
-                                chunkPruned += logDao.pruneSpecialByThreshold(it, REFINED_PRUNE_CHUNK_SIZE)
+                            specialThreshold?.let { t ->
+                                chunkPruned += logDao.pruneSpecialByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
                             }
                         }
                         
@@ -481,7 +481,6 @@ class LogRepository @Inject constructor(
                         
                         if (chunkPruned == 0) return@repeat 
                         
-                        // Enforce yielding to avoid blocking I/O pipeline
                         delay(if (health.isBatteryLow) 150 else 50)
                     }
                     
