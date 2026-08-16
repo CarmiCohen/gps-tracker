@@ -8,23 +8,22 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
- * Aug.15.00:
- * - Version alignment for Sustained Load Validation release.
- * Aug.14.07:
- * - Issue #177 Hardening: Added Important-Non-Special pruning support to 
- *   eliminate database bloat beyond thresholds (R177).
- * - Issue #176: Proactive Pruning ANR.
+ * Aug.15.03:
+ * - Issue #182 Hardening: Reduced connection_history retrieval limit to 300 
+ *   to eliminate massive object churn and main-thread pressure (R182).
+ * - Issue #180 Remediation: Bump to v71. Forced removal of legacy unique constraint 
+ *   on (type, timestamp, spillIdx) to resolve persistent SQLiteConstraintException (R180).
  */
 @Entity(
     tableName = "logs", 
     indices = [
         Index(value = ["timestamp"]), 
-        Index(value = ["localId"]),
+        Index(value = ["localId"], unique = true),
         Index(value = ["isImportant"]),
         Index(value = ["isSpecial"]),
         Index(value = ["synced", "timestamp"]), 
         Index(value = ["type", "role", "deviceId", "timestamp"]), 
-        Index(value = ["type", "spillIdx", "timestamp"]),
+        Index(value = ["type", "timestamp", "spillIdx"]),
         Index(value = ["type", "timestamp"]), 
         Index(value = ["isImportant", "isSpecial", "timestamp"]) 
     ]
@@ -100,6 +99,7 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "0") val verticalVelocity: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val sitVz: Double = 0.0, 
     @ColumnInfo(defaultValue = "0") val sitVzTs: Long = 0L,
+    @ColumnInfo(defaultValue = "0") val sitVzRt: Long = 0L,
     @ColumnInfo(defaultValue = "0") val sitDz: Double = 0.0,
     @ColumnInfo(name = "isBatterySteepDischarge", defaultValue = "0") val isBatterySteepDischarge: Boolean = false,
     @ColumnInfo(defaultValue = "10") val remoteSig: Int = 10,
@@ -173,8 +173,8 @@ data class PendingStatusEntity(
 
 @Dao
 abstract class LogDao {
-    @Insert abstract suspend fun insert(log: LogEntity): Long
-    @Insert abstract suspend fun insertAll(logs: List<LogEntity>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun insert(log: LogEntity): Long
+    @Insert(onConflict = OnConflictStrategy.IGNORE) abstract suspend fun insertAll(logs: List<LogEntity>)
     @Update abstract suspend fun update(log: LogEntity)
     @Query("SELECT * FROM logs WHERE localId = :localId") abstract suspend fun getLogByLocalId(localId: String): LogEntity?
     @Query("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 1") abstract suspend fun getLastLog(): LogEntity?
@@ -228,11 +228,11 @@ interface TrailDao {
 interface HistoryDao {
     @Insert suspend fun insert(point: HistoryEntity)
     @Insert abstract suspend fun insertAll(points: List<HistoryEntity>)
-    @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 10000") fun getHistoryFlow(ribbonKey: String): Flow<List<HistoryEntity>>
-    @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 10000") suspend fun getHistory(ribbonKey: String): List<HistoryEntity>
+    @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 300") fun getHistoryFlow(ribbonKey: String): Flow<List<HistoryEntity>>
+    @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 300") suspend fun getHistory(ribbonKey: String): List<HistoryEntity>
     @Query("DELETE FROM connection_history WHERE ribbonKey = :ribbonKey") suspend fun clearHistory(ribbonKey: String)
     @Query("DELETE FROM connection_history") suspend fun clearAll()
-    @Query("DELETE FROM connection_history WHERE ribbonKey = :ribbonKey AND ts < (SELECT ts FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts DESC LIMIT 1 OFFSET 9999)") suspend fun pruneHistory(ribbonKey: String)
+    @Query("DELETE FROM connection_history WHERE ribbonKey = :ribbonKey AND ts < (SELECT ts FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts DESC LIMIT 1 OFFSET 299)") suspend fun pruneHistory(ribbonKey: String)
 }
 
 @Dao
@@ -254,7 +254,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 68, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 71, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -278,6 +278,33 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_70_71 = object : Migration(70, 71) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Definitively force index_logs_type_timestamp_spillIdx to be NON-UNIQUE
+                db.execSQL("DROP INDEX IF EXISTS index_logs_type_timestamp_spillIdx")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
+                // Ensure localId is unique
+                db.execSQL("DROP INDEX IF EXISTS index_logs_localId")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_logs_localId ON logs (localId)")
+            }
+        }
+
+        val MIGRATION_69_70 = object : Migration(69, 70) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP INDEX IF EXISTS index_logs_type_timestamp_spillIdx")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
+                db.execSQL("DROP INDEX IF EXISTS index_logs_localId")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_logs_localId ON logs (localId)")
+            }
+        }
+
+        val MIGRATION_68_69 = object : Migration(68, 69) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP INDEX IF EXISTS index_logs_type_spillIdx_timestamp")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
+            }
+        }
+
         val MIGRATION_67_68 = object : Migration(67, 68) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_timestamp ON logs (type, timestamp)")

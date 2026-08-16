@@ -20,12 +20,13 @@ import kotlin.math.log10
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Aug.16.00:
+ * - Issue #182 Hardening: Optimized trail and accuracy circle rendering to 
+ *   eliminate redundant object allocations (map/toList churn) which caused 
+ *   GC thrashing and Startup ANR (R182).
  * Aug.14.02:
  * - Issue #170: Forensic Replay UI Audit. Added replayMarker and replayCircle 
- *   to support frame-perfect historical coordinate visualization during 
- *   ribbon scrubbing (R170).
- * Aug.13.08:
- * - Issue #157: Violation Path Allocations.
+ *   to support frame-perfect historical coordinate visualization (R170).
  */
 class MapOverlayManager(
     private val context: Context,
@@ -132,7 +133,7 @@ class MapOverlayManager(
         if (isFenceVisible) {
             home.forEachIndexed { idx, p ->
                 fenceFolder.add(Polygon(mapView).apply { 
-                    points = Polygon.pointsAsCircle(p, maxD).map { GeoPoint(it.latitude, it.longitude) }
+                    points = Polygon.pointsAsCircle(p, maxD)
                     fillPaint.color = 0x28CBD5E1.toInt(); outlinePaint.color = 0xC8CBD5E1.toInt(); outlinePaint.strokeWidth = 2f; setInfoWindow(null) 
                 })
                 val marker = if (idx < homeMarkerPool.size) homeMarkerPool[idx] else Marker(mapView).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); homeMarkerPool.add(m) }
@@ -212,7 +213,7 @@ class MapOverlayManager(
             val hAcc = if (v.maxAccuracy > 0.0) v.maxAccuracy else v.accuracy
             if (hAcc > 0.0) {
                 val c = if (index < violationCirclePool.size) violationCirclePool[index] else Polygon(mapView).also { p -> p.fillPaint.color = 0; p.outlinePaint.strokeWidth = 2f; p.setInfoWindow(null); violationCirclePool.add(p) }
-                c.points = Polygon.pointsAsCircle(gp, hAcc).map { GeoPoint(it.latitude, it.longitude) }
+                c.points = Polygon.pointsAsCircle(gp, hAcc)
                 c.outlinePaint.color = (if (isJump) 0x60FF00FF else 0x60FF0000).toInt()
                 violationAccuracyFolder.add(c)
             }
@@ -232,7 +233,7 @@ class MapOverlayManager(
             replayMarker.icon = replayIcon
             replayFolder.add(replayMarker)
             
-            replayCircle.points = Polygon.pointsAsCircle(pos, 5.0).map { GeoPoint(it.latitude, it.longitude) }
+            replayCircle.points = Polygon.pointsAsCircle(pos, 5.0)
             replayCircle.outlinePaint.color = android.graphics.Color.WHITE
             replayFolder.add(replayCircle)
         }
@@ -275,7 +276,7 @@ class MapOverlayManager(
                 
                 if (canUpdateDrift && (posChanged || driftSignificant)) {
                     accuracyCirclesFolder.items.remove(trackerCircle)
-                    trackerCircle.points = Polygon.pointsAsCircle(trackerPos, drift).map { GeoPoint(it.latitude, it.longitude) }
+                    trackerCircle.points = Polygon.pointsAsCircle(trackerPos, drift)
                     trackerCircle.outlinePaint.color = if (isTrackerFresh) BrandJd.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                     accuracyCirclesFolder.add(trackerCircle)
                     lastTrackerPos = trackerPos
@@ -321,7 +322,7 @@ class MapOverlayManager(
 
                 if (canUpdateDrift && (posChanged || driftSignificant)) {
                     accuracyCirclesFolder.items.remove(viewerCircle)
-                    viewerCircle.points = Polygon.pointsAsCircle(viewerPos, drift).map { GeoPoint(it.latitude, it.longitude) }
+                    viewerCircle.points = Polygon.pointsAsCircle(viewerPos, drift)
                     viewerCircle.outlinePaint.color = if (isViewerFresh) ViewerCyan.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                     accuracyCirclesFolder.add(viewerCircle)
                     lastViewerPos = viewerPos
@@ -372,7 +373,15 @@ class MapOverlayManager(
                 
                 if (simplified.size > 1) {
                     val line = if (poolIdx < pool.size) pool[poolIdx] else Polyline(view).also { l -> l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); pool.add(l) }
-                    line.setPoints(simplified.map { it.toGeoPoint() }); line.outlinePaint.color = color; folder.add(line); poolIdx++
+                    
+                    // Issue #182: Reuse cached GeoPoints from TrailPoint to eliminate list mapping churn.
+                    val linePoints = ArrayList<GeoPoint>(simplified.size)
+                    for (i in simplified.indices) {
+                        linePoints.add(simplified[i].toGeoPoint())
+                    }
+                    line.setPoints(linePoints)
+                    
+                    line.outlinePaint.color = color; folder.add(line); poolIdx++
                 }
             }
             if (currentIdx == trailPoints.size) break

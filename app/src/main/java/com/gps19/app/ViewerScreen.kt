@@ -32,12 +32,9 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
- * Aug.14.04:
- * - Issue #170: Forensic Replay UI Audit. Wired replayCursorTs and 
- *   replayCursorPos to support interactive historical trace auditing in 
- *   viewer mode (R170).
- * Aug.13.12:
- * - Issue #163: 1Hz Telemetry Path Optimization.
+ * Aug.15.03:
+ * - Issue #182 Hardening: Gated AppMapContainer by overlay visibility to 
+ *   eliminate background rendering pressure during Settings/Log interaction (R182).
  */
 
 @Composable
@@ -70,6 +67,8 @@ fun ViewerScreen(
     val isSettingsOpen = nav.isSettingsOpen
     val isRibbonsVisible = nav.isRibbonsVisible
     val isGnssDetailVisible = nav.isGnssDetailVisible
+    val isAnyOverlayOpen = isSettingsOpen || isLogVisible || isRibbonsVisible || isGnssDetailVisible
+
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
 
@@ -163,7 +162,8 @@ fun ViewerScreen(
                     statusBar()
                     
                     Box(modifier = Modifier.weight(1f)) {
-                        if (isMapVisible) {
+                        // Issue #182: Gate Map by overlay visibility
+                        if (isMapVisible && !isAnyOverlayOpen) {
                             AppMapContainer(
                                 appMode = uiState.appMode,
                                 isMapButtonsVisible = uiState.isMapButtonsVisible,
@@ -209,7 +209,7 @@ fun ViewerScreen(
                                 showSettingsButton = true,
                                 showToolsOverlay = true
                             )
-                        } else {
+                        } else if (!isMapVisible) {
                             ViewerDashboard(
                                 appMode = uiState.appMode ?: "viewer",
                                 isDashboardExpanded = uiState.navigation.isDashboardExpanded,
@@ -230,7 +230,8 @@ fun ViewerScreen(
                 }
             }
         } else {
-            if (isMapVisible) {
+            // Issue #182: Gate Map by overlay visibility
+            if (isMapVisible && !isAnyOverlayOpen) {
                 AppMapContainer(
                     appMode = uiState.appMode,
                     isMapButtonsVisible = uiState.isMapButtonsVisible,
@@ -278,7 +279,7 @@ fun ViewerScreen(
                 )
             }
 
-            if (!isSettingsOpen && !isLogVisible && !isRibbonsVisible && !isGnssDetailVisible) {
+            if (!isAnyOverlayOpen) {
                 Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
                     Surface(
                         color = MaterialTheme.colorScheme.background,

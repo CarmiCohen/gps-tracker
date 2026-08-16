@@ -17,12 +17,11 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainRepository: Centralized data hub for the application.
- * Aug.13.08:
- * - Issue #157: Violation Path Allocations. Optimized violationsFlow to use 
- *   primitive-based mapping to the refactored ViolationPoint class (R157).
- * Aug.13.06:
- * - Issue #152: Excessive GC Pressure. Optimized addHistoryPoint to support 
- *   flyweight-to-entity mapping without intermediate list allocations (R152).
+ * Aug.15.01:
+ * - Issue #179: Forensic Performance Optimization. Implemented UI history 
+ *   buffering to eliminate 100Hz allocation churn. Live history is now 
+ *   batched and emitted at 2Hz to resolve heap exhaustion (R179).
+ * - Issue #157: Violation Path Allocations. Optimized violationsFlow (R157).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -63,6 +62,7 @@ class MainRepository @Inject constructor(
         
         private const val DB_PRUNE_THRESHOLD_HISTORY = 500
         private const val DB_PRUNE_THRESHOLD_TRAIL = 100
+        private const val UI_HISTORY_EMIT_INTERVAL_MS = 500L // 2Hz for UI stability
     }
 
     val isRelayConnected = telemetry.isRelayConnected
@@ -130,6 +130,7 @@ class MainRepository @Inject constructor(
         scope.launch {
             homePointsFlow.collect { cachedHomePoints = it }
         }
+        startUiHistoryEmitter()
     }
 
     suspend fun saveString(key: String, value: String) = settings.saveString(key, value)
@@ -339,15 +340,17 @@ class MainRepository @Inject constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     val liveHistoryFlow = _liveHistoryFlow.asSharedFlow()
+    
+    // Issue #179: Live history buffer to decouple 100Hz telemetry from UI emissions.
+    private val liveHistoryBuffer = ConcurrentLinkedQueue<Pair<String, ConnectionPoint>>()
 
     fun addHistoryPoint(ribbonKey: String, point: ConnectionPoint) {
-        // Issue #152: Zero-allocation path for single points
         val health = telemetry.systemHealth.value
         
-        // 1. Emit stable copy to UI Flow (Must be copy if point is flyweight)
+        // 1. Buffer for UI emission (Stable copy)
         val uiCopy = ConnectionPoint()
         uiCopy.copyFrom(point)
-        scope.launch { _liveHistoryFlow.emit(ribbonKey to listOf(uiCopy)) }
+        liveHistoryBuffer.add(ribbonKey to uiCopy)
 
         if (!PersistencePolicy.shouldSaveHistoryPoint(health)) return
 
@@ -363,7 +366,7 @@ class MainRepository @Inject constructor(
     }
 
     fun addHistoryPoints(ribbonKey: String, points: List<ConnectionPoint>) {
-        // Issue #152: Batch emission with stability
+        // Batch emission for gaps/recovery
         val uiCopies = points.map { p -> ConnectionPoint().apply { copyFrom(p) } }
         scope.launch { _liveHistoryFlow.emit(ribbonKey to uiCopies) }
         
@@ -379,6 +382,30 @@ class MainRepository @Inject constructor(
         
         if (shouldWrite) {
             scope.launch { flushHistoryBufferInternal(nowRt) }
+        }
+    }
+
+    /**
+     * startUiHistoryEmitter: Throttled loop to emit live telemetry at 2Hz.
+     * R179: Eliminates allocation churn caused by 100Hz UI emissions.
+     */
+    private fun startUiHistoryEmitter() {
+        scope.launch {
+            while (isActive) {
+                delay(UI_HISTORY_EMIT_INTERVAL_MS)
+                if (liveHistoryBuffer.isEmpty()) continue
+                
+                val batches = mutableMapOf<String, MutableList<ConnectionPoint>>()
+                while (liveHistoryBuffer.isNotEmpty()) {
+                    liveHistoryBuffer.poll()?.let { (key, point) ->
+                        batches.getOrPut(key) { mutableListOf() }.add(point)
+                    }
+                }
+                
+                batches.forEach { (key, list) ->
+                    _liveHistoryFlow.emit(key to list)
+                }
+            }
         }
     }
 

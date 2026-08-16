@@ -20,10 +20,9 @@ import androidx.room.withTransaction
 /**
  * LogRepository: Dedicated repository for application logs.
  * Aug.15.01:
- * - Issue #178: Forensic Optimization. Reduced signature lookback to 
- *   FORENSIC_SIGNATURE_LOOKBACK_MS (10 min) to prevent OOM (R178).
- * Aug.15.00:
- * - Version alignment for Sustained Load Validation release.
+ * - Issue #179: Forensic Performance Optimization. Removed heap-intensive manual 
+ *   signature checking in favor of DB-level UNIQUE constraints (R179).
+ * - Issue #178: Forensic Optimization. Reduced signature lookback to 10 min (R178).
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -59,9 +58,9 @@ class LogRepository @Inject constructor(
         private const val FORENSIC_CONVERGENCE_STALL_LIMIT = 3
         private const val FORENSIC_EMERGENCY_FILL_LEVEL = 0.9
         private const val RELIABILITY_EMA_ALPHA = 0.1 
-        private const val PRUNE_COOLDOWN_MS = 30000L // Aligned with EngineConstants (R177)
-        private const val UI_LOG_UPDATE_SAMPLE_MS = 1000L // Increased sample to reduce UI flow pressure (R177)
-        private const val REFINED_PRUNE_CHUNK_SIZE = 1000 // Aligned with EngineConstants (R177)
+        private const val PRUNE_COOLDOWN_MS = 30000L 
+        private const val UI_LOG_UPDATE_SAMPLE_MS = 1000L 
+        private const val REFINED_PRUNE_CHUNK_SIZE = 1000 
     }
 
     init {
@@ -165,40 +164,29 @@ class LogRepository @Inject constructor(
         }
 
         return try {
-            // Issue #177 Hardening: Tighten minTs to avoid massive signature lookups in heap
-            var minTs = Long.MAX_VALUE
-            for (t in traces) { if (t.timestamp < minTs) minTs = t.timestamp }
-            
-            // Issue #178: Limit lookback to 10 minutes (FORENSIC_SIGNATURE_LOOKBACK_MS)
-            // to prevent loading millions of signatures into memory.
-            val now = timeProvider.currentTimeMillis()
-            val lookbackLimit = now - FORENSIC_SIGNATURE_LOOKBACK_MS
-            val effectiveMinTs = if (minTs < lookbackLimit) lookbackLimit else minTs
+            // Issue #179 Optimization: Removed getExistingForensicSignatures and HashSet 
+            // creation to eliminate heap exhaustion. We now rely on LogDao UNIQUE constraint
+            // with OnConflictStrategy.IGNORE (R179).
 
-            val existingSignatures = logDao.getExistingForensicSignatures(effectiveMinTs).toSet()
-
-            val toInsert = ArrayList<LogEntity>()
+            val toInsert = ArrayList<LogEntity>(traces.size)
             for (trace in traces) {
-                val signature = ForensicSignature(trace.timestamp, trace.spillIdx)
-                if (!existingSignatures.contains(signature)) {
-                    val compositeId = if (trace.localId.isNotEmpty()) trace.localId 
-                                     else "F-${trace.timestamp}-${trace.spillIdx}"
-                    
-                    toInsert.add(LogEntity(
-                        localId = compositeId,
-                        timestamp = trace.timestamp, message = trace.message, type = trace.type,
-                        isImportant = trace.isImportant, deviceId = trace.id, viewerId = trace.viewerId,
-                        isSpecial = trace.isSpecial, role = trace.role,
-                        lat = trace.lat, lng = trace.lng, accuracy = trace.accuracy,
-                        maxAccuracy = trace.maxAccuracy, snrSnapshot = trace.snrSnapshot,
-                        vibeSnapshot = trace.vibeSnapshot, synced = false,
-                        spillIdx = trace.spillIdx,
-                        gpsHardwareLock = trace.gpsHardwareLock,
-                        tempSnapshot = trace.tempSnapshot,
-                        battSnapshot = trace.battSnapshot,
-                        chargingSnapshot = trace.chargingSnapshot
-                    ))
-                }
+                val compositeId = if (trace.localId.isNotEmpty()) trace.localId 
+                                 else "F-${trace.timestamp}-${trace.spillIdx}"
+                
+                toInsert.add(LogEntity(
+                    localId = compositeId,
+                    timestamp = trace.timestamp, message = trace.message, type = trace.type,
+                    isImportant = trace.isImportant, deviceId = trace.id, viewerId = trace.viewerId,
+                    isSpecial = trace.isSpecial, role = trace.role,
+                    lat = trace.lat, lng = trace.lng, accuracy = trace.accuracy,
+                    maxAccuracy = trace.maxAccuracy, snrSnapshot = trace.snrSnapshot,
+                    vibeSnapshot = trace.vibeSnapshot, synced = false,
+                    spillIdx = trace.spillIdx,
+                    gpsHardwareLock = trace.gpsHardwareLock,
+                    tempSnapshot = trace.tempSnapshot,
+                    battSnapshot = trace.battSnapshot,
+                    chargingSnapshot = trace.chargingSnapshot
+                ))
             }
             
             if (toInsert.isNotEmpty()) {

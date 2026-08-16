@@ -20,14 +20,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.15.03:
+ * - Issue #182 Hardening: Added STARTUP_SETTLING_DELAY_MS to 
+ *   startForensicSamplingLoop to prevent immediate 100Hz pressure during 
+ *   cold-boot hydration (R182).
  * Aug.14.01:
  * - Issue #169: Geofence Accuracy vs. Battery Audit. Integrated isGeofenceActive 
  *   into calculateGpsInterval to prevent 45s polling blind-spots when moving 
  *   with screen off (R406a).
- * Aug.13.13:
- * - Issue #165: Forensic Persistence Stress Test. Extended automated stress 
- *   test routine to 5 minutes with continuous 100Hz trace logging to audit 
- *   database throughput and spill-buffer drainage stability (R165).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -603,6 +603,10 @@ class TrackerService : BaseMonitorService() {
     private fun startForensicSamplingLoop() {
         forensicSamplingJob?.cancel()
         forensicSamplingJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
+            // Issue #182: Initial settling delay to prevent 100Hz allocation 
+            // pressure during Map hydration/UI startup.
+            delay(STARTUP_SETTLING_DELAY_MS)
+
             while (isActive) {
                 val health = integrityMonitor.currentHealth
                 val proc = lastProcessedLocation

@@ -2,28 +2,20 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 618**
+**Total Unique Resolutions: 624**
 
-## 51. Log Infrastructure Hardening (Aug.14.07)
-*   **Issue #177: Startup ANR & Heap Exhaustion**.
-    - **Resolution**: Hardened the logging infrastructure to prevent main-thread stalls during high-frequency (100Hz) telemetry flow. Reduced reactive log limits to 2,000 (Standard) and 5,000 (Strict) entries. Implemented pruning support for the "Important" log category to eliminate a 100,000+ row database leak. Optimized `performForensicDrain` by tightening the signature lookback window to 1 hour, preventing OOM/GC-thrashing during deep recovery. (R177)
-*   **Issue #176: Proactive Pruning ANR**.
-    - **Resolution**: Optimized the database schema with composite indices on `(type, timestamp)` and `(isImportant, isSpecial, timestamp)` to eliminate full table scans during pruning. Refactored `LogRepository` to utilize transactional chunking (500-1000 rows) and offloaded all bulk mapping to `Dispatchers.Default`, eliminating 2.2s I/O stalls. (R176)
+## 53. Map & Startup Hardening (Aug.16.00)
+*   **Issue #182: Startup ANR & GC Thrashing**.
+    - **Resolution**: Eliminated the massive allocation churn in the map rendering pipeline. `MapOverlayManager` now reuses cached `GeoPoint` objects within `TrailPoint` and `ViolationPoint`, preventing the repeated mapping and list creation that caused 50MB+ GC cycles and Startup ANRs. Increased `STARTUP_SETTLING_DELAY_MS` to 10s and deferred `GpsApplication` osmdroid setup to clear the main-thread critical path during frame rendering. (R182)
+*   **Issue #181: DeadSystemException on Startup**.
+    - **Resolution**: Addressed Binder exhaustion and system-server stalls by increasing the startup settling delay to 10,000ms. This ensures that heavy database migrations (v56-v71) and UI hydration complete before the high-frequency (100Hz) telemetry engine initiates, stabilizing the environment on resource-constrained devices. (R181)
 
-## 50. Forensic Mirror Parity Audit (Aug.14.06)
-*   **Issue #172: Viewer-Side LocationProcessor State Audit**.
-    - **Resolution**: Finalized full forensic SIT state parity in the viewer-side mirrored state. Enhanced `LocationProcessor` and `ViewerService` to correctly restore forensic attributes including vertical velocity timestamps (`sitVzTs`, `sitVzRt`), displacement (`sitDz`), barometric delta (`sitBaro`), tilt (`sitTilt`), and peak shock (`sitShock`) from remote telemetry. This ensures high-fidelity mirroring and "Zero-Lag" UI transitions after service restarts or handovers. (R172)
-
-## 49. Multi-Stream Processor Contention (Aug.14.04)
-*   **Issue #173: Multi-Stream Processor Contention**.
-    - **Resolution**: Hardened `ViewerService` by decoupling "Self" and "Remote" location streams. Instantiated two distinct `LocationProcessor` instances to prevent filter state corruption (velocity EMA, jump detection scores) caused by interleaved coordinate streams. (R173)
-
-## 48. Forensic Replay Latency Audit (Aug.14.05)
-*   **Issue #174: Forensic Replay Latency Audit**.
-    - **Resolution**: Optimized replay scrubbing performance for high-frequency (100Hz) telemetry sets. Increased trail and ribbon history limits to 10,000 points. Implemented $O(\log N)$ binary search for coordinate matching in `StateSubscriptionUseCase` and cursor positioning in `SharedUiComponents`. Hardened `MainViewModel` to use `collectLatest` for scrubbing events, eliminating coroutine churn. Verified sub-16ms latency for 10-minute forensic traces. (R174)
-
-## 47. Forensic Multi-Stream Jitter Audit (Aug.14.03)
-*   **Issue #171: Forensic Multi-Stream Jitter Audit**.
-    - **Resolution**: Hardened the forensic telemetry pipeline against non-monotonic packet arrival (jitter) caused by multi-viewer streams or network delays. Relaxed `RemoteStatusRepository` to allow a 2s jitter window (`MONOTONIC_JITTER_TOLERANCE_MS`) to prevent forensic data loss. Implemented a monotonicity guard in `TelemetryAggregator` to ensure aggregators don't regress. Hardened `StateSubscriptionUseCase` to perform sorted-merging and deduplication of history buffers for stable UI ribbon visualization. Verified via artificial jitter simulation (200-800ms) in `CommunicationManager`. (R171)
+## 52. Forensic Stability & Memory Hardening (Aug.15.01)
+*   **Issue #180: SQLite UNIQUE constraint failure on regular logs**.
+    - **Resolution**: Transitioned the `UNIQUE` constraint in the `logs` table from the broad `(type, timestamp, spillIdx)` composite to the specific `localId` column (Migration 70). Updated `LogDao` to utilize `OnConflictStrategy.IGNORE`. This resolved the critical regression where non-forensic logs (e.g., heartbeats) sharing the same millisecond timestamp caused `SQLiteConstraintException` and database lockups. (R180)
+*   **Issue #179: Persistent Heap Exhaustion & ANR at 100Hz**.
+    - **Resolution**: Eliminated the ~120MB/s allocation churn that overwhelmed the heap during 100Hz telemetry. Implemented a throttled **2Hz UI History Emitter** in `MainRepository` using a `ConcurrentLinkedQueue` to decouple high-frequency engine ticks from UI Flow emissions. Replaced memory-intensive manual signature checks in `LogRepository` (which previously created massive `HashSet` objects) with database-level unique indexing and `IGNORE` logic. (R179)
+*   **Issue #178: Sustained 100Hz Heap Exhaustion & ANR**.
+    - **Resolution**: Optimized the UI data pipeline by gating heavy log mapping operations by visibility. The `eventLogsFlow` in `MainViewModel` now yields `emptyList()` when the log viewer is closed, preventing redundant list-copying and string-formatting churn. Tightened the forensic signature lookback window to a fixed 10-minute period (`FORENSIC_SIGNATURE_LOOKBACK_MS`) to maintain predictable memory usage. (R178)
 
 ... (rest of archive)

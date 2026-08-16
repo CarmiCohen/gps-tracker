@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.15.01)
+# Project Issues & Hardening Tracking (Aug.16.00)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,27 +7,27 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 0 | 0 |
 | **Validation Tasks** | 🔍 Tracked | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 619 |
+| **Resolved (Total)** | 🟢 Progress | 624 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **None**
+*   *None at this time.*
 
 ---
 
 ## 🔴 Open Issues
-*   **None**
+*   *None at this time.*
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.15.01)
-*   **[Issue #178] [Severity: Critical] [Category: Performance] Sustained 100Hz Heap Exhaustion & ANR.**
-    *   **Resolution**: Reduced forensic signature lookback to 10 minutes and gated `eventLogsFlow` mapping by UI visibility to resolve OOM/ANR under high-frequency flow. (R178)
-*   **[Issue #177] [Severity: Critical] [Category: Performance] Startup ANR & Heap Exhaustion.**
-    *   **Resolution**: Hardened `LogRepository` by reducing reactive log limits (2k/5k) and implementing pruning for "Important" logs. (R177)
-*   **[Issue #176] [Severity: Critical] [Category: Performance] Proactive Pruning ANR.**
-    *   **Resolution**: Optimized database schema and refactored pruning to use chunked transactions. (R176)
+## 🟢 Recently Resolved Issues (Aug.16.00)
+*   **[Issue #182] [Severity: Critical] [Category: Environment] Startup ANR & GC Thrashing.**
+    *   **Resolution**: Optimized `MapOverlayManager` to reuse cached `GeoPoint` objects within `TrailPoint` and `ViolationPoint`, eliminating massive allocation churn during map updates. Increased `STARTUP_SETTLING_DELAY_MS` to 10s and deferred `GpsApplication` osmdroid setup to ensure main-thread clarity during first-frame rendering. (R182)
+*   **[Issue #181] [Severity: High] [Category: Performance] DeadSystemException on Startup.**
+    *   **Resolution**: Addressed via the increased `STARTUP_SETTLING_DELAY_MS` (10000ms) which prevents Binder exhaustion and system-server stalls during heavy database and UI initialization on resource-constrained environments. (R181)
+*   **[Issue #180] [Severity: Critical] [Category: Performance] SQLite UNIQUE constraint failure regression.**
+    *   **Resolution**: Transitioned the `UNIQUE` constraint to `localId` (Migration 70/71) and updated `LogDao` to use `OnConflictStrategy.IGNORE`. Wired all missing migrations in `AppModule`. (R180)
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.15.01)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.16.00)

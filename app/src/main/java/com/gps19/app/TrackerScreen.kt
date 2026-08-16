@@ -33,11 +33,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * TrackerScreen: Tracker-mode UI.
- * Aug.14.03:
- * - Issue #170: Forensic Replay UI Audit. Fixed variable name error in 
- *   TrackerDashboard (rtt -> rttValue) to restore build integrity (R170).
- * Aug.14.02:
- * - Issue #170: Wired replayCursorTs and replayCursorPos (R170).
+ * Aug.15.03:
+ * - Issue #182 Hardening: Gated AppMapContainer by overlay visibility to 
+ *   eliminate background rendering pressure during Settings/Log interaction. 
+ *   This prevents main-thread stalls and Interaction ANRs (R182).
  */
 
 @Composable
@@ -76,6 +75,8 @@ fun TrackerScreen(
     val isSettingsOpen = nav.isSettingsOpen
     val isRibbonsVisible = nav.isRibbonsVisible
     val isGnssDetailVisible = nav.isGnssDetailVisible
+    val isAnyOverlayOpen = isSettingsOpen || isLogVisible || isRibbonsVisible || isGnssDetailVisible
+    
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
     
@@ -175,7 +176,8 @@ fun TrackerScreen(
                         statusBar()
                         
                         Box(modifier = Modifier.weight(1f)) {
-                            if (isMapVisible) {
+                            // Issue #182: Gate Map by overlay visibility
+                            if (isMapVisible && !isAnyOverlayOpen) {
                                 AppMapContainer(
                                     appMode = uiState.appMode,
                                     isMapButtonsVisible = uiState.isMapButtonsVisible,
@@ -221,7 +223,7 @@ fun TrackerScreen(
                                     showSettingsButton = true,
                                     showToolsOverlay = true
                                 )
-                            } else {
+                            } else if (!isMapVisible) {
                                 TrackerDashboard(
                                     appMode = uiState.appMode ?: "tracker",
                                     isSystemActive = uiState.isSystemActive,
@@ -302,7 +304,8 @@ fun TrackerScreen(
                     }
                 }
             } else {
-                if (isMapVisible) {
+                // Issue #182: Gate Map by overlay visibility
+                if (isMapVisible && !isAnyOverlayOpen) {
                     AppMapContainer(
                         appMode = uiState.appMode,
                         isMapButtonsVisible = uiState.isMapButtonsVisible,
@@ -350,7 +353,7 @@ fun TrackerScreen(
                     )
                 }
 
-                if (!isSettingsOpen && !isLogVisible && !isRibbonsVisible && !isGnssDetailVisible) {
+                if (!isAnyOverlayOpen) {
                     Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
                         Surface(
                             color = MaterialTheme.colorScheme.background,

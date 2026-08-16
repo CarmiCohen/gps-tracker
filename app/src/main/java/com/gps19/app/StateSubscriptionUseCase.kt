@@ -5,18 +5,18 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.osmdroid.util.GeoPoint
 import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * Aug.15.03:
+ * - Issue #182 Hardening: Offloaded history merging to Dispatchers.Default 
+ *   to prevent Main-thread stalls and Startup ANRs (R182).
  * Aug.14.05:
  * - Issue #174: Forensic Replay Latency Audit. Implemented high-performance 
- *   binary search lookup for trail synchronization. Optimized lookup to 
- *   avoid O(N) allocations, ensuring sub-16ms coordination even with 
- *   10,000+ points (R174).
- * Aug.14.04:
- * - Issue #171: Forensic Jitter Audit.
+ *   binary search lookup for trail synchronization.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -42,34 +42,41 @@ class StateSubscriptionUseCase @Inject constructor(
 
     fun startHistoryObservations(scope: CoroutineScope) {
         _historyFlows.forEach { (key, stateFlow) ->
-            scope.launch(Dispatchers.Main.immediate) {
+            scope.launch(Dispatchers.Default) {
                 repository.getHistoryFlow(key).collect { dbList ->
-                    stateFlow.update { current ->
+                    val merged = withContext(Dispatchers.Default) {
+                        val current = stateFlow.value
                         if (dbList.isEmpty()) {
-                            return@update current.sortedBy { it.ts }.takeLast(240)
+                            current.sortedBy { it.ts }.takeLast(240)
+                        } else {
+                            val lastDbTs = dbList.last().ts
+                            val incremental = current.filter { it.ts > lastDbTs }
+                            (dbList + incremental).takeLast(240)
                         }
-                        val lastDbTs = dbList.last().ts
-                        val incremental = current.filter { it.ts > lastDbTs }
-                        (dbList + incremental).takeLast(240)
                     }
+                    stateFlow.emit(merged)
                 }
             }
         }
 
-        scope.launch(Dispatchers.Main.immediate) {
+        scope.launch(Dispatchers.Default) {
             repository.liveHistoryFlow.collect { (key, points) ->
-                _historyFlows[key]?.update { current ->
-                    val merged = (current + points).sortedBy { it.ts }
-                    val deduped = mutableListOf<ConnectionPoint>()
-                    if (merged.isNotEmpty()) {
-                        deduped.add(merged[0])
-                        for (i in 1 until merged.size) {
-                            if (merged[i].ts != merged[i - 1].ts) {
-                                deduped.add(merged[i])
+                _historyFlows[key]?.let { stateFlow ->
+                    val merged = withContext(Dispatchers.Default) {
+                        val current = stateFlow.value
+                        val combined = (current + points).sortedBy { it.ts }
+                        val deduped = mutableListOf<ConnectionPoint>()
+                        if (combined.isNotEmpty()) {
+                            deduped.add(combined[0])
+                            for (i in 1 until combined.size) {
+                                if (combined[i].ts != combined[i - 1].ts) {
+                                    deduped.add(combined[i])
+                                }
                             }
                         }
+                        deduped.takeLast(240)
                     }
-                    deduped.takeLast(240)
+                    stateFlow.emit(merged)
                 }
             }
         }
@@ -78,8 +85,6 @@ class StateSubscriptionUseCase @Inject constructor(
     /**
      * Issue #174: Optimized trail lookup using binary search.
      * Completes in O(log N) to support high-frequency scrubbing.
-     * vAug.14.05: Removed O(N) timestamp extraction to ensure frame-perfect 
-     * performance during rapid UI interaction.
      */
     fun findClosestTrailPoint(trail: List<TrailPoint>, targetTs: Long): TrailPoint? {
         if (trail.isEmpty()) return null
@@ -93,7 +98,6 @@ class StateSubscriptionUseCase @Inject constructor(
                 insertionPoint >= trail.size -> trail.size - 1
                 insertionPoint <= 0 -> 0
                 else -> {
-                    // Find closest match between insertionPoint and insertionPoint - 1
                     val d1 = kotlin.math.abs(trail[insertionPoint].timestamp - targetTs)
                     val d2 = kotlin.math.abs(trail[insertionPoint - 1].timestamp - targetTs)
                     if (d1 < d2) insertionPoint else insertionPoint - 1

@@ -2,11 +2,19 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * Aug.15.01:
- * - Issue #178: Forensic Optimization. Reduced signature lookback to 10 minutes 
- *   to resolve OOM/ANR under 100Hz flow (R178).
- * Aug.15.00:
- * - Version alignment for Sustained Load Validation release.
+ * Aug.16.00:
+ * - Issue #182 Hardening: Increased STARTUP_SETTLING_DELAY_MS to 10000ms to 
+ *   prevent Binder exhaustion and DeadSystemException during heavy startup 
+ *   hydration on emulator environments (R182).
+ * Aug.15.03:
+ * - Issue #182 Hardening: Reduced MAX_HISTORY_POINTS_PER_RIBBONS to 300 
+ *   to align with DB retrieval limits and eliminate Interaction ANRs (R182).
+ * - Issue #182 Hardening: Increased LANDING_PAGE_PAUSE_MS to 10000ms to 
+ *   prevent Startup ANR and GC thrashing caused by early background 
+ *   maintenance during Map hydration (R182).
+ * - Issue #181 Hardening: Increased STARTUP_SETTLING_DELAY_MS to 5000ms to 
+ *   prevent DeadSystemException/Binder exhaustion during heavy DB migration 
+ *   v56-v71 on resource-constrained environments (R181).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -232,8 +240,8 @@ const val ADAPTATION_SETTLING_MS = 5000L
 const val GPS_REVIVAL_RETRY_INTERVAL_MS = 120000L
 const val MAX_REVIVAL_ATTEMPTS = 3
 const val HARDWARE_BOOT_GRACE_MS = 30000L
-const val LANDING_PAGE_PAUSE_MS = 2000L
-const val STARTUP_SETTLING_DELAY_MS = 3000L
+const val LANDING_PAGE_PAUSE_MS = 10000L
+const val STARTUP_SETTLING_DELAY_MS = 10000L
 
 // GPS Polling Intervals (Central Authority)
 const val HIGH_FREQUENCY_GPS_POLLING_MS = 2000L
@@ -342,7 +350,7 @@ const val RTT_WINDOW_SIZE = 5
 const val HOME_POINT_REFRESH_INTERVAL_MS = 30000L
 
 // Logging & UI
-const val MAX_HISTORY_POINTS_PER_RIBBONS = 10000
+const val MAX_HISTORY_POINTS_PER_RIBBONS = 300
 const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
 const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
