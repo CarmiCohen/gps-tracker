@@ -2,9 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 627**
+**Total Unique Resolutions: 628**
 
-## 54. Map Hydration & IO Hardening (Aug.16.13)
+## 54. Map Hydration & Sensor Hardening (Aug.16.14)
+*   **Issue #186: Gated Sensor Startup**.
+    - **Resolution**: Implemented a deferred sensor registration mechanism in `AppSensorManager`. High-frequency sensors (Accelerometer, Linear Accel) are now gated by a 2000ms settling delay (`SENSOR_SETTLING_DELAY_MS`) upon service start. This prevents IPC/Binder saturation during the critical first 2 seconds of Tracker/Viewer entry, ensuring the UI thread has exclusive priority for Map hydration and Dashboard composition. (R186)
 *   **Issue #185: Startup ANR during Map Hydration**.
     - **Resolution**: Eliminated main-thread saturation by offloading trail segment hashing and simplification to background threads. `MapTrailSegment` now carries a pre-computed `checksum` calculated in the `MainViewModel`, allowing `MapOverlayManager.updateTrails` to perform O(1) change detection. This ensures the UI thread remains responsive during hydration of the initial 2,000 points. (R185)
 *   **Issue #184: Stress Test IO Race Condition**.

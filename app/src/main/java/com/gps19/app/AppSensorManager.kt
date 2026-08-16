@@ -35,17 +35,13 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * Aug.16.14:
+ * - Issue #186 Hardening: Implemented Gated Sensor Start. Added support for 
+ *   deferred sensor registration (SENSOR_SETTLING_DELAY_MS) to prevent 
+ *   IPC/Binder saturation during critical UI hydration (R186).
  * Aug.13.02:
  * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
  *   type inference failures (R146/R151).
- * Aug.07.46:
- * - Issue #742: Forensic Audit: Proximity Sensitivity Refinement. Implemented EMA-based 
- *   linear transition for proxIdx and changed forensic buffer to use average-based 
- *   aggregation instead of min() for improved accuracy (R742).
- * Aug.03.45:
- * - Issue #700: Forensic Audit: Power-Aware Sampling Scaling. Decoupled Logic 
- *   and Forensic peak accumulators to allow independent 100Hz/0.5Hz consumption 
- *   without data loss.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -239,19 +235,38 @@ class AppSensorManager @Inject constructor(
     private var initialRotationMatrix = FloatArray(9); private var hasInitialRotation = false
     private var plungePhase = 0; private var plungeMatched = false; private var lastPlungePhaseRt = 0L
 
-    fun start() {
+    /**
+     * start: Initiates sensor management.
+     * @param deferred: If true, delays actual listener registration to allow 
+     * the system to settle (Issue #186).
+     */
+    fun start(deferred: Boolean = false) {
         if (isStarted.getAndSet(true)) return
         sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt
         hasLoggedThreadInfo.set(false); proximityMaxRange = proximity?.maximumRange ?: 5f
+        
         if (sensorThread == null) {
             sensorThread = HandlerThread("AppSensorThread").apply { start() }
             sensorHandler = Handler(sensorThread!!.looper)
         }
-        registerSensors()
+
         displayManager.registerDisplayListener(displayListener, sensorHandler)
         val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
         if (display != null) lastDisplayState = display.state
-        startAcousticMonitoring()
+
+        if (deferred) {
+            scope.launch {
+                delay(SENSOR_SETTLING_DELAY_MS)
+                if (isStarted.get()) {
+                    registerSensors()
+                    startAcousticMonitoring()
+                    Timber.i("Forensic: Gated Sensor Start complete after ${SENSOR_SETTLING_DELAY_MS}ms")
+                }
+            }
+        } else {
+            registerSensors()
+            startAcousticMonitoring()
+        }
     }
 
     private fun registerSensors() {

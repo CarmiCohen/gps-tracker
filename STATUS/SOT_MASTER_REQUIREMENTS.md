@@ -1,11 +1,12 @@
-# System Source of Truth (SoT) - Aug.16.13 (Issue #185 Resolved)
+# System Source of Truth (SoT) - Aug.16.14 (Gated Sensor Startup)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
-*   **Map Hydration Hardening (R185)**: (Added Aug.16.13) The system MUST offload trail segment hashing and simplification to background threads. `MapTrailSegment` MUST contain a pre-computed `checksum` generated in the `MainViewModel` (via `computeTrailSegments`) to eliminate O(N) hashing overhead on the main thread during UI updates. `MapOverlayManager` MUST utilize these pre-computed checksums for change detection. (Issue #185). **Status: Implemented.**
-*   **Forensic IO Hardening (R184)**: (Added Aug.16.12) Forensic stress test `ioJob` MUST use unique filenames (`forensic_stress_${System.currentTimeMillis()}.bin`) and internal error suppression to prevent service termination during high-frequency disk contention. (Issue #184). **Status: Implemented.**
-*   **Startup Hydration Limits (R183)**: (Added Aug.16.10) Trail and violation retrieval limits MUST be capped at 2,000 points to prevent OOM and Binder saturation on resource-constrained devices. (Issue #183). **Status: Implemented.**
+*   **Gated Sensor Startup (R186)**: (Added Aug.16.14) The system MUST defer registration of high-frequency sensors (Accelerometer, Linear Accel) for 2000ms (`SENSOR_SETTLING_DELAY_MS`) after service initiation. This prevents IPC/Binder saturation during the critical UI hydration phase. (Issue #186). **Status: Implemented.**
+*   **Map Hydration Hardening (R185)**: (Added Aug.16.13) The system MUST offload trail segment hashing and simplification to background threads. `MapTrailSegment` MUST contain a pre-computed `checksum` generated in the `MainViewModel`. `MapOverlayManager` MUST utilize these pre-computed checksums for O(1) change detection. (Issue #185). **Status: Implemented.**
+*   **Forensic IO Hardening (R184)**: (Added Aug.16.12) Forensic stress test `ioJob` MUST use unique filenames and internal error suppression to prevent service termination during disk contention. (Issue #184). **Status: Implemented.**
+*   **Startup Hydration Limits (R183)**: (Added Aug.16.10) Trail and violation retrieval limits MUST be capped at 2,000 points to prevent OOM and Binder saturation. (Issue #183). **Status: Implemented.**
 *   **Map Allocation Hardening (R182)**: (Added Aug.16.00) The system MUST eliminate allocation churn during map rendering by reusing cached `GeoPoint` objects. `STARTUP_SETTLING_DELAY_MS` is increased to 10000ms. (Issue #182). **Status: Implemented.**
 *   **System Startup Hardening (R181)**: (Updated Aug.16.00) The system MUST defer 100Hz telemetry engine start and heavy osmdroid initialization until after a 10000ms settling period. (Issue #181). **Status: Implemented.**
 *   **Log Identity Integrity (R180)**: (Updated Aug.15.03) The system MUST utilize `localId` as the primary unique constraint for all log entries. (Issue #180). **Status: Implemented.**
@@ -21,5 +22,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Event & Alert Text Authority (R747)**: Local event prefixing with "**This device:**". (Issue #747)
 
 ### 4. Version Authority
-*   **Current Release**: Aug.16.13.
+*   **Current Release**: Aug.16.14.
 *   **Source of Truth**: app/build.gradle versionName.

@@ -20,18 +20,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.16.14:
+ * - Issue #186 Hardening: Implemented Gated Sensor Start. Deferred sensor 
+ *   registration via appSensorManager.start(deferred = true) to stabilize 
+ *   startup IPC load (R186).
  * Aug.16.10:
  * - Issue #184 Hardening: Hardened forensic stress test IO job with unique 
  *   filenames and transient error handling to prevent fatal crashes during 
  *   5-min CPU/IO saturation routine (R184).
- * Aug.15.03:
- * - Issue #182 Hardening: Added STARTUP_SETTLING_DELAY_MS to 
- *   startForensicSamplingLoop to prevent immediate 100Hz pressure during 
- *   cold-boot hydration (R182).
- * Aug.14.01:
- * - Issue #169: Geofence Accuracy vs. Battery Audit. Integrated isGeofenceActive 
- *   into calculateGpsInterval to prevent 45s polling blind-spots when moving 
- *   with screen off (R406a).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -123,7 +119,8 @@ class TrackerService : BaseMonitorService() {
         alarmManager.restoreState(savedAlarms)
 
         historyManager.initialize(lifecycleScope)
-        appSensorManager.start()
+        // Issue #186: Deferred sensor start to stabilize startup IPC load.
+        appSensorManager.start(deferred = true)
 
         commandRouter.register()
         commandRouter.startObservingCommands(lifecycleScope)
@@ -285,7 +282,7 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
-                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start() }
+                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start(deferred = true) }
                     is CommandEvent.TriggerForensicTest -> executeAutomatedStressTest()
                     else -> {}
                 }

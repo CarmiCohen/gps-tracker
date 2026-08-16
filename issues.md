@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.16.13)
+# Project Issues & Hardening Tracking (Aug.16.14)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,14 +7,13 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Clean | 0 |
 | **Validation Tasks** | 🔍 Pending | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 627 |
+| **Resolved (Total)** | 🟢 Progress | 628 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **[Issue #186] [Severity: Medium] [Category: Performance] Forensic Test UI Responsiveness.**
-    *   **Risk**: While the ANR is resolved, the UI may still feel sluggish during the 100Hz saturation test on API 35 emulators.
-    *   **Concern**: We may need to further throttle map invalidation during peak stress.
+*   **[Issue #187] [Severity: Low] [Category: UI] Dashboard Layout Jitter.**
+    *   **Risk**: Minor UI jumping when telemetry fields transition from "--" to live values during hydration.
 
 ---
 
@@ -23,15 +22,13 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.16.13)
+## 🟢 Recently Resolved Issues (Aug.16.14)
+*   **[Issue #186] [Severity: High] [Category: Performance] Gated Sensor Startup.**
+    *   **Resolution**: Implemented deferred sensor registration in `AppSensorManager` using `SENSOR_SETTLING_DELAY_MS` (2000ms). This prevents high-frequency IPC/Binder saturation during the critical first 2 seconds of role entry, ensuring the UI thread has exclusive priority for Map/Dashboard hydration (R186).
 *   **[Issue #185] [Severity: Critical] [Category: Stability] Startup ANR during Map Hydration.**
-    *   **Resolution**: Eliminated O(N) hashing on the main thread by offloading `MapTrailSegment` checksum computation to the background thread in `MainViewModel`. Refactored `MapOverlayManager.updateTrails` to use these pre-computed checksums, freeing the UI budget during hydration of the initial 2,000 points (R185).
+    *   **Resolution**: Eliminated O(N) hashing on the main thread by offloading `MapTrailSegment` checksum computation to the background thread in `MainViewModel`. Refactored `MapOverlayManager.updateTrails` to use these pre-computed checksums (R185).
 *   **[Issue #184] [Severity: High] [Category: Stability] Stress Test IO Race Condition.**
-    *   **Resolution**: Hardened the forensic stress test `ioJob` in `TrackerService` with unique timestamps in filenames and internal try-catch blocks to prevent `FileNotFoundException` (R184).
-*   **[Issue #183] [Severity: Critical] [Category: Performance] Startup OOM in Tracker Mode.**
-    *   **Resolution**: Reduced trail and violation retrieval limits from 10,000 to 2,000 in `Database.kt` (R183).
-*   **[Issue #182] [Severity: Critical] [Category: Environment] Startup ANR & GC Thrashing.**
-    *   **Resolution**: Optimized `MapOverlayManager` to reuse cached `GeoPoint` objects. Increased `STARTUP_SETTLING_DELAY_MS` to 10s (R182).
+    *   **Resolution**: Hardened the forensic stress test `ioJob` in `TrackerService` (R184).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.16.13)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.16.14)

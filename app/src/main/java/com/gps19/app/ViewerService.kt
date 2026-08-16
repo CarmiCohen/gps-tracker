@@ -16,18 +16,13 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Aug.16.14:
+ * - Issue #186 Hardening: Implemented Gated Sensor Start. Deferred sensor 
+ *   registration via appSensorManager.start(deferred = true) to stabilize 
+ *   startup IPC load (R186).
  * Aug.14.06:
  * - Issue #172: Viewer-Side State Audit. Finalized forensic parity by restoring 
  *   Vz timestamps (sitVzTs, sitVzRt) during initialization (R172).
- * Aug.14.04:
- * - Issue #172: Viewer-Side State Audit. Restored full SIT forensic state 
- *   (Vz, Dz, Baro, Tilt, Shock) during initialization.
- * - Issue #173: Multi-Stream Contention. Decoupled remote and self location 
- *   processing into distinct LocationProcessor instances (remoteProcessor, 
- *   selfProcessor) to prevent filter state corruption (R173).
- * Aug.11.02:
- * - Issue #138: ANR Remediation. Offloaded all event observers to Dispatchers.Default 
- *   to clear the main-thread critical path (R138).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -117,6 +112,9 @@ class ViewerService : BaseMonitorService() {
         selfProcessor.loadState(0.0, 0L, -1000.0, null, homePoints, maxDist)
 
         historyManager.initialize(lifecycleScope)
+
+        // Issue #186: Deferred sensor start to stabilize startup IPC load.
+        appSensorManager.start(deferred = true)
 
         commandRouter.register()
         commandRouter.startObservingCommands(lifecycleScope)
@@ -256,7 +254,7 @@ class ViewerService : BaseMonitorService() {
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
-                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal() }
+                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start(deferred = true) }
                     else -> {}
                 }
             }
@@ -484,7 +482,7 @@ class ViewerService : BaseMonitorService() {
             alarmManager.evaluateAlarms(
                 now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = false, isRelayConnected = isSocketConnected, isTrackerConnected = isTrackerActive, status = connectivitySuite.trackerStatus.status, isJammer = isTrackerJammerSuspicion, jumpTier = connectivitySuite.trackerJumpTier,
                 isAdaptiveJump = connectivitySuite.isTrackerAdaptiveJump,
-                trackerLat = connectivitySuite.trackerLat, trackerLng = connectivitySuite.trackerLng, trackerAccuracy = connectivitySuite.trackerAccuracy, maxTrackerAccuracy = connectivitySuite.trackerMaxAccuracy, trackerLastGpsTs = connectivitySuite.trackerLastGpsTs, trackerLastGpsRt = 0L, trackerLastValidFixTs = 0L, trackerLastValidFixRt = connectivitySuite.trackerLastValidFixRt, trackerSpeed = connectivitySuite.trackerSpeed, trackerBattery = connectivitySuite.trackerBattery, trackerTemp = connectivitySuite.trackerTemp, isHardwareOnline = localHealth.isHardwareOnline, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()), isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(), distToHomeAuthority = connectivitySuite.trackerDistToHome, maxDistanceAuthority = remoteProcessor.getMaxDistanceAuthority(), isGpsGap = isTrackerGap, isTamperDetected = connectivitySuite.isTrackerTamperDetected, isPowerTamper = connectivitySuite.isTrackerPowerTamper, trackerTiltDegrees = connectivitySuite.trackerTiltDegrees, trackerAcousticDb = connectivitySuite.trackerAcousticDb, trackerBaroAlt = connectivitySuite.trackerBaroAlt, trackerBaroAltEma = remoteProcessor.getBaroBaseline(), trackerLux = connectivitySuite.trackerLux, isNear = connectivitySuite.isTrackerNear, luxBaseline = remoteProcessor.getLuxBaseline(), acousticFloorDb = remoteProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = remoteProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = connectivitySuite.trackerPeakVibrationShock, trackerCurrentMa = connectivitySuite.trackerCurrentMa, isPowerSaveMode = connectivitySuite.isTrackerPowerSaveMode, standbyBucket = connectivitySuite.trackerStandbyBucket, netInterface = connectivitySuite.trackerNetInterface, isStorageLow = connectivitySuite.isTrackerStorageLow, isStorageCritical = connectivitySuite.isTrackerStorageCritical, isBatterySteepDischarge = connectivitySuite.isTrackerBatterySteepDischarge, isCoolingModeActive = connectivitySuite.isTrackerCoolingModeActive, discoveryPhase = null, capabilities = capabilities, isLocationPending = connectivitySuite.isTrackerLocationPending, locationPendingReason = connectivitySuite.trackerLocationPendingReason, snrSnapshot = gpsManager.averageSnr, vibeSnapshot = 0.0
+                trackerLat = connectivitySuite.trackerLat, trackerLng = connectivitySuite.trackerLng, trackerAccuracy = connectivitySuite.trackerAccuracy, maxTrackerAccuracy = connectivitySuite.trackerMaxAccuracy, trackerLastGpsTs = connectivitySuite.trackerLastGpsTs, trackerLastGpsRt = 0L, trackerLastValidFixRt = connectivitySuite.trackerLastValidFixRt, trackerSpeed = connectivitySuite.trackerSpeed, trackerBattery = connectivitySuite.trackerBattery, trackerTemp = connectivitySuite.trackerTemp, isHardwareOnline = localHealth.isHardwareOnline, isLocalInternetLoss = !integrityMonitor.checkInternetIntegrity(timeProvider.elapsedRealtime()), isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(), distToHomeAuthority = connectivitySuite.trackerDistToHome, maxDistanceAuthority = remoteProcessor.getMaxDistanceAuthority(), isGpsGap = isTrackerGap, isTamperDetected = connectivitySuite.isTrackerTamperDetected, isPowerTamper = connectivitySuite.isTrackerPowerTamper, trackerTiltDegrees = connectivitySuite.trackerTiltDegrees, trackerAcousticDb = connectivitySuite.trackerAcousticDb, trackerBaroAlt = connectivitySuite.trackerBaroAlt, trackerBaroAltEma = remoteProcessor.getBaroBaseline(), trackerLux = connectivitySuite.trackerLux, isNear = connectivitySuite.isTrackerNear, luxBaseline = remoteProcessor.getLuxBaseline(), acousticFloorDb = remoteProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = remoteProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = connectivitySuite.trackerPeakVibrationShock, trackerCurrentMa = connectivitySuite.trackerCurrentMa, isPowerSaveMode = connectivitySuite.isTrackerPowerSaveMode, standbyBucket = connectivitySuite.trackerStandbyBucket, netInterface = connectivitySuite.trackerNetInterface, isStorageLow = connectivitySuite.isTrackerStorageLow, isStorageCritical = connectivitySuite.isTrackerStorageCritical, isBatterySteepDischarge = connectivitySuite.isTrackerBatterySteepDischarge, isCoolingModeActive = connectivitySuite.isTrackerCoolingModeActive, discoveryPhase = null, capabilities = capabilities, isLocationPending = connectivitySuite.isTrackerLocationPending, locationPendingReason = connectivitySuite.trackerLocationPendingReason, snrSnapshot = gpsManager.averageSnr, vibeSnapshot = 0.0
             )
         }
     }
