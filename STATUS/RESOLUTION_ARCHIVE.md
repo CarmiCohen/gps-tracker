@@ -2,7 +2,15 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 624**
+**Total Unique Resolutions: 627**
+
+## 54. Map Hydration & IO Hardening (Aug.16.13)
+*   **Issue #185: Startup ANR during Map Hydration**.
+    - **Resolution**: Eliminated main-thread saturation by offloading trail segment hashing and simplification to background threads. `MapTrailSegment` now carries a pre-computed `checksum` calculated in the `MainViewModel`, allowing `MapOverlayManager.updateTrails` to perform O(1) change detection. This ensures the UI thread remains responsive during hydration of the initial 2,000 points. (R185)
+*   **Issue #184: Stress Test IO Race Condition**.
+    - **Resolution**: Hardened the forensic stress test `ioJob` in `TrackerService` to use unique timestamps in filenames and internal try-catch blocks. This prevents `FileNotFoundException` and service crashes during high-frequency disk contention on restricted hardware. (R184)
+*   **Issue #183: Startup OOM in Tracker Mode**.
+    - **Resolution**: Reduced trail and violation retrieval limits from 10,000 to 2,000 in `Database.kt` to align with the memory budget of API 35/36 emulator environments. (R183)
 
 ## 53. Map & Startup Hardening (Aug.16.00)
 *   **Issue #182: Startup ANR & GC Thrashing**.

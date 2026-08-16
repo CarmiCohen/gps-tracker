@@ -20,13 +20,13 @@ import kotlin.math.log10
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
- * Aug.16.00:
- * - Issue #182 Hardening: Optimized trail and accuracy circle rendering to 
- *   eliminate redundant object allocations (map/toList churn) which caused 
- *   GC thrashing and Startup ANR (R182).
- * Aug.14.02:
- * - Issue #170: Forensic Replay UI Audit. Added replayMarker and replayCircle 
- *   to support frame-perfect historical coordinate visualization (R170).
+ * Aug.16.12:
+ * - Issue #185 Hardening: Refactored updateTrails to accept pre-simplified 
+ *   segments, eliminating main-thread simplification and mapping churn 
+ *   which caused Startup ANRs (R185).
+ * - Issue #185 Hardening: Offloaded segment checksum computation from UI 
+ *   thread. updateTrails now uses pre-computed checksums to detect changes, 
+ *   eliminating O(N) hashCode() calls on the main thread (R185).
  */
 class MapOverlayManager(
     private val context: Context,
@@ -78,8 +78,8 @@ class MapOverlayManager(
     private var lastIsTrackerMode: Boolean? = null
     private var lastGeofenceMode: GeofenceMode? = null
     
-    private var lastTrailSize = -1
-    private var lastViewerTrailSize = -1
+    private var lastTrailChecksum = -1
+    private var lastViewerTrailChecksum = -1
     private var lastViolationsSize = -1
     private var lastViolationVisibility: Pair<Boolean, Boolean>? = null
     
@@ -158,26 +158,47 @@ class MapOverlayManager(
         return true
     }
 
-    fun updateTrails(trail: List<TrailPoint>, viewerTrail: List<TrailPoint>, systemPulseRt: Long): Boolean {
+    /**
+     * updateTrails: Optimized trail rendering using background-calculated checksums.
+     * Part of Issue #185 ANR mitigation.
+     */
+    fun updateTrails(
+        trackerSegments: List<MapTrailSegment>, 
+        viewerSegments: List<MapTrailSegment>, 
+        systemPulseRt: Long
+    ): Boolean {
         var changed = false
-        val canUpdateTracker = (systemPulseRt - lastTrailUpdateTs) > BUDGET_THROTTLE_MS || lastTrailSize == -1
-        val canUpdateViewer = (systemPulseRt - lastViewerTrailUpdateTs) > BUDGET_THROTTLE_MS || lastViewerTrailSize == -1
+        val canUpdateTracker = (systemPulseRt - lastTrailUpdateTs) > BUDGET_THROTTLE_MS || lastTrailChecksum == -1
+        val canUpdateViewer = (systemPulseRt - lastViewerTrailUpdateTs) > BUDGET_THROTTLE_MS || lastViewerTrailChecksum == -1
 
-        if (canUpdateTracker && lastTrailSize != trail.size) {
+        // Issue #185: Use fast checksum accumulation instead of O(N) hashCode() on the UI thread.
+        val currentTrackerChecksum = trackerSegments.fold(0) { acc, seg -> acc * 31 + seg.checksum }
+        if (canUpdateTracker && lastTrailChecksum != currentTrackerChecksum) {
             trailFolder.items.clear()
-            val trSegs = drawTrailToFolder(mapView, trailFolder, trail, BrandJd.toArgb(), trackerPolylinePool)
-            lastTrailSize = trail.size
+            trackerSegments.forEachIndexed { idx, segment ->
+                val line = if (idx < trackerPolylinePool.size) trackerPolylinePool[idx] else Polyline(mapView).also { l -> l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); trackerPolylinePool.add(l) }
+                line.setPoints(segment.points)
+                line.outlinePaint.color = segment.color
+                trailFolder.add(line)
+            }
+            lastTrailChecksum = currentTrackerChecksum
             lastTrailUpdateTs = systemPulseRt
-            while(trackerPolylinePool.size > maxOf(trSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)) trackerPolylinePool.removeAt(trackerPolylinePool.size - 1)
+            while(trackerPolylinePool.size > maxOf(trackerSegments.size + 5, MARKER_POOL_PRUNE_THRESHOLD)) trackerPolylinePool.removeAt(trackerPolylinePool.size - 1)
             changed = true
         }
         
-        if (canUpdateViewer && lastViewerTrailSize != viewerTrail.size) {
+        val currentViewerChecksum = viewerSegments.fold(0) { acc, seg -> acc * 31 + seg.checksum }
+        if (canUpdateViewer && lastViewerTrailChecksum != currentViewerChecksum) {
             viewerTrailFolder.items.clear()
-            val viSegs = drawTrailToFolder(mapView, viewerTrailFolder, viewerTrail, ViewerCyan.toArgb(), viewerPolylinePool)
-            lastViewerTrailSize = viewerTrail.size
+            viewerSegments.forEachIndexed { idx, segment ->
+                val line = if (idx < viewerPolylinePool.size) viewerPolylinePool[idx] else Polyline(mapView).also { l -> l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); viewerPolylinePool.add(l) }
+                line.setPoints(segment.points)
+                line.outlinePaint.color = segment.color
+                viewerTrailFolder.add(line)
+            }
+            lastViewerTrailChecksum = currentViewerChecksum
             lastViewerTrailUpdateTs = systemPulseRt
-            while(viewerPolylinePool.size > maxOf(viSegs + 5, MARKER_POOL_PRUNE_THRESHOLD)) viewerPolylinePool.removeAt(viewerPolylinePool.size - 1)
+            while(viewerPolylinePool.size > maxOf(viewerSegments.size + 5, MARKER_POOL_PRUNE_THRESHOLD)) viewerPolylinePool.removeAt(viewerPolylinePool.size - 1)
             changed = true
         }
         return changed
@@ -356,38 +377,6 @@ class MapOverlayManager(
             changed = true
         }
         return changed
-    }
-
-    private fun drawTrailToFolder(view: MapView, folder: FolderOverlay, trailPoints: List<TrailPoint>, color: Int, pool: MutableList<Polyline>): Int {
-        if (trailPoints.isEmpty()) return 0
-        var poolIdx = 0; var startIdx = 0
-        while (startIdx < trailPoints.size) {
-            val segmentPoints = mutableListOf<TrailPoint>(); var currentIdx = startIdx
-            while (currentIdx < trailPoints.size) {
-                val pt = trailPoints[currentIdx]; if (pt.status != SentinelStatus.VALID && currentIdx > startIdx) break
-                segmentPoints.add(pt); currentIdx++
-                if (pt.status != SentinelStatus.VALID) { startIdx = currentIdx; break }
-            }
-            if (segmentPoints.size > 1) {
-                val simplified = PhysicsUtils.simplifyTrail(segmentPoints, 1.0, { it.lat }, { it.lng })
-                
-                if (simplified.size > 1) {
-                    val line = if (poolIdx < pool.size) pool[poolIdx] else Polyline(view).also { l -> l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); pool.add(l) }
-                    
-                    // Issue #182: Reuse cached GeoPoints from TrailPoint to eliminate list mapping churn.
-                    val linePoints = ArrayList<GeoPoint>(simplified.size)
-                    for (i in simplified.indices) {
-                        linePoints.add(simplified[i].toGeoPoint())
-                    }
-                    line.setPoints(linePoints)
-                    
-                    line.outlinePaint.color = color; folder.add(line); poolIdx++
-                }
-            }
-            if (currentIdx == trailPoints.size) break
-            startIdx = if (startIdx < currentIdx) (if (trailPoints[currentIdx - 1].status == SentinelStatus.VALID) currentIdx - 1 else currentIdx) else startIdx + 1
-        }
-        return poolIdx
     }
 
     private fun createTrackerBitmap(density: Float, isFresh: Boolean): Bitmap { 

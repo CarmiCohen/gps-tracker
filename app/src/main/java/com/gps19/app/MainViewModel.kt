@@ -3,6 +3,7 @@ package com.gps19.app
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,18 +18,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.osmdroid.util.GeoPoint
 import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * Aug.15.01:
- * - Issue #178: Forensic Optimization. Gated eventLogsFlow by isLogVisible 
- *   to eliminate mapping pressure when the viewer is closed (R178).
- * Aug.14.05:
- * - Issue #174: Forensic Replay Latency Audit. Optimized handleReplayCursor 
- *   to use collectLatest and high-performance binary search (R174).
+ * Aug.16.12:
+ * - Issue #185 Hardening: Implemented background trail simplification and 
+ *   segmentation via trackerTrailSegments and viewerTrailSegments flows. 
+ *   Offloads O(N) simplification from the UI thread to eliminate Startup ANR (R185).
+ * - Issue #185 Hardening: Offloaded MapTrailSegment checksum computation 
+ *   to background thread within computeTrailSegments to eliminate O(N) 
+ *   hashCode() calls on the main thread (R185).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -134,7 +137,6 @@ class MainViewModel @Inject constructor(
     .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L) 
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
 
-    // Issue #178: Gate log mapping by visibility to resolve mapping pressure.
     val eventLogsFlow: StateFlow<List<LogEntry>> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
         _uiState.map { it.navigation.isStrictMode }.distinctUntilChanged(),
@@ -157,6 +159,17 @@ class MainViewModel @Inject constructor(
     val viewerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
         .flatMapLatest { mode -> if (mode != null) repository.viewerTrailFlow else flowOf(emptyList()) }
         .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Issue #185: Background Trail Simplification
+    val trackerTrailSegments: StateFlow<List<MapTrailSegment>> = trackerTrailFlow
+        .map { trail -> computeTrailSegments(trail, BrandJd.toArgb()) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val viewerTrailSegments: StateFlow<List<MapTrailSegment>> = viewerTrailFlow
+        .map { trail -> computeTrailSegments(trail, ViewerCyan.toArgb()) }
+        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val violationPointsFlow: Flow<List<ViolationPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
@@ -925,4 +938,41 @@ class MainViewModel @Inject constructor(
     }
     
     fun clearTrails(context: Context) { viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) { MainFileHelper.manualExportTrails(context, this@MainViewModel, timeProvider); repository.clearTrails(); addPersistentLog("user", "USER ACTION: Trails cleared", isImportant = true); Toast.makeText(context, "Trails exported and cleared", Toast.LENGTH_SHORT).show() } }
+
+    /**
+     * computeTrailSegments: Background trail segmentation and simplification.
+     * Part of Issue #185 ANR mitigation.
+     */
+    private fun computeTrailSegments(trailPoints: List<TrailPoint>, color: Int): List<MapTrailSegment> {
+        if (trailPoints.isEmpty()) return emptyList()
+        val segments = mutableListOf<MapTrailSegment>()
+        var startIdx = 0
+        while (startIdx < trailPoints.size) {
+            val segmentPoints = mutableListOf<TrailPoint>()
+            var currentIdx = startIdx
+            while (currentIdx < trailPoints.size) {
+                val pt = trailPoints[currentIdx]
+                if (pt.status != SentinelStatus.VALID && currentIdx > startIdx) break
+                segmentPoints.add(pt)
+                currentIdx++
+                if (pt.status != SentinelStatus.VALID) {
+                    startIdx = currentIdx
+                    break
+                }
+            }
+            if (segmentPoints.size > 1) {
+                val simplified = PhysicsUtils.simplifyTrail(segmentPoints, 1.0, { it.lat }, { it.lng })
+                if (simplified.size > 1) {
+                    val geoPoints = simplified.map { it.toGeoPoint() }
+                    // Issue #185: Offload O(N) hashing from UI thread to background computation.
+                    segments.add(MapTrailSegment(geoPoints, color, geoPoints.hashCode()))
+                }
+            }
+            if (currentIdx == trailPoints.size) break
+            startIdx = if (startIdx < currentIdx) {
+                if (trailPoints[currentIdx - 1].status == SentinelStatus.VALID) currentIdx - 1 else currentIdx
+            } else startIdx + 1
+        }
+        return segments
+    }
 }

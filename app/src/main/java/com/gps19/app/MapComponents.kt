@@ -38,11 +38,13 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * Aug.14.02:
- * - Issue #170: Forensic Replay UI Audit. Integrated replayCursorPos into 
- *   AppMapContainer and OsmMap to visualize historical trace alignment (R170).
- * Aug.05.128:
- * - Issue #740: AppMapContainer Recomposition Audit.
+ * Aug.16.12:
+ * - Issue #185 Hardening: Updated AppMapContainer and OsmMap to receive 
+ *   pre-simplified MapTrailSegments. Moved simplification churn out of 
+ *   the UI update block to eliminate Startup ANRs (R185).
+ * Aug.16.00:
+ * - Issue #179 Hardening: Optimized OsmMap update block by removing redundant 
+ *   toList() allocations on the main thread (R179).
  */
 
 @Composable
@@ -85,8 +87,8 @@ fun AppMapContainer(
     systemPulseRt: Long,
     onEvent: (UiEvent) -> Unit,
     onClearTrails: () -> Unit,
-    trail: List<TrailPoint>,
-    viewerTrail: List<TrailPoint>,
+    trackerSegments: List<MapTrailSegment>,
+    viewerSegments: List<MapTrailSegment>,
     violations: List<ViolationPoint>,
     onSaveTrail: () -> Unit,
     onLoadTrail: () -> Unit,
@@ -149,8 +151,8 @@ fun AppMapContainer(
             viewerLocPending = viewerLocPending,
             viewerLastValidFixRt = viewerLastValidFixRt,
             replayCursorPos = replayCursorPos,
-            trail = trail,
-            viewerTrail = viewerTrail,
+            trackerSegments = trackerSegments,
+            viewerSegments = viewerSegments,
             violations = violations,
             onTap = { onEvent(UiEvent.MapTap(it)) },
             onRemoveMarker = { if (!isTrackerMode) onEvent(UiEvent.RemoveHomePoint(it)) },
@@ -261,8 +263,8 @@ fun OsmMap(
     viewerLocPending: Boolean,
     viewerLastValidFixRt: Long,
     replayCursorPos: GeoPoint?,
-    trail: List<TrailPoint>,
-    viewerTrail: List<TrailPoint>,
+    trackerSegments: List<MapTrailSegment>,
+    viewerSegments: List<MapTrailSegment>,
     violations: List<ViolationPoint>, 
     onTap: (GeoPoint) -> Unit,
     onRemoveMarker: (Int) -> Unit,
@@ -388,16 +390,12 @@ fun OsmMap(
             })
         } 
     }, update = { view ->
-        val sTrail = trail.toList()
-        val sViewerTrail = viewerTrail.toList()
-        val sViolations = violations.toList()
-        val sHome = homePoints.toList()
-
+        // Issue #185: Pass pre-simplified segments to MapOverlayManager.
         Snapshot.withoutReadObservation {
             overlayManager?.let { om ->
-                val h = om.updateHomePoints(sHome, isFenceVisible, maxDistance, isTrackerMode, geofenceMode, onTap, onRemoveMarker)
-                val t = om.updateTrails(sTrail, sViewerTrail, systemPulseRt)
-                val v = om.updateViolations(sViolations, isViolationsVisible, isGeofenceViolationsVisible, systemPulseRt)
+                val h = om.updateHomePoints(homePoints, isFenceVisible, maxDistance, isTrackerMode, geofenceMode, onTap, onRemoveMarker)
+                val t = om.updateTrails(trackerSegments, viewerSegments, systemPulseRt)
+                val v = om.updateViolations(violations, isViolationsVisible, isGeofenceViolationsVisible, systemPulseRt)
                 val r = om.updateReplayCursor(replayCursorPos)
                 val p = om.updateCurrentPositions(
                     trackerValid = smoothedTrackerPos.value != null,

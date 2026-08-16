@@ -8,6 +8,10 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.16.05:
+ * - Issue #183 Hardening: Reduced trail and violation retrieval limits to 2000 
+ *   to resolve Startup OOM and process restart loops on memory-constrained 
+ *   emulator environments (R183).
  * Aug.15.03:
  * - Issue #182 Hardening: Reduced connection_history retrieval limit to 300 
  *   to eliminate massive object churn and main-thread pressure (R182).
@@ -218,10 +222,10 @@ abstract class LogDao {
 @Dao
 interface TrailDao {
     @Insert suspend fun insert(point: TrailEntity)
-    @Query("SELECT * FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp ASC LIMIT 10000") fun getTrail(isViewer: Boolean): Flow<List<TrailEntity>>
-    @Query("SELECT * FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp ASC LIMIT 10000") suspend fun getTrailStatic(isViewer: Boolean): List<TrailEntity>
+    @Query("SELECT * FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp ASC LIMIT 2000") fun getTrail(isViewer: Boolean): Flow<List<TrailEntity>>
+    @Query("SELECT * FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp ASC LIMIT 2000") suspend fun getTrailStatic(isViewer: Boolean): List<TrailEntity>
     @Query("DELETE FROM trail_points WHERE isViewerTrail = :isViewer") suspend fun clearTrail(isViewer: Boolean)
-    @Query("DELETE FROM trail_points WHERE isViewerTrail = :isViewer AND timestamp < (SELECT timestamp FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp DESC LIMIT 1 OFFSET 9999)") suspend fun pruneTrail(isViewer: Boolean): Int
+    @Query("DELETE FROM trail_points WHERE isViewerTrail = :isViewer AND timestamp < (SELECT timestamp FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp DESC LIMIT 1 OFFSET 1999)") suspend fun pruneTrail(isViewer: Boolean): Int
 }
 
 @Dao
@@ -238,10 +242,10 @@ interface HistoryDao {
 @Dao
 interface ViolationDao {
     @Insert suspend fun insert(violation: ViolationEntity)
-    @Query("SELECT * FROM violations ORDER BY ts ASC LIMIT 10000") fun getAllFlow(): Flow<List<ViolationEntity>>
-    @Query("SELECT * FROM violations ORDER BY ts ASC LIMIT 10000") suspend fun getAll(): List<ViolationEntity>
+    @Query("SELECT * FROM violations ORDER BY ts ASC LIMIT 2000") fun getAllFlow(): Flow<List<ViolationEntity>>
+    @Query("SELECT * FROM violations ORDER BY ts ASC LIMIT 2000") suspend fun getAll(): List<ViolationEntity>
     @Query("DELETE FROM violations") suspend fun clearAll()
-    @Query("DELETE FROM violations WHERE ts < (SELECT ts FROM violations ORDER BY ts DESC LIMIT 1 OFFSET 9999)") suspend fun prune()
+    @Query("DELETE FROM violations WHERE ts < (SELECT ts FROM violations ORDER BY ts DESC LIMIT 1 OFFSET 1999)") suspend fun prune()
 }
 
 @Dao
@@ -250,7 +254,7 @@ interface PendingStatusDao {
     @Query("SELECT * FROM pending_status_updates ORDER BY timestamp ASC LIMIT :limit") suspend fun getOldestPending(limit: Int): List<PendingStatusEntity>
     @Query("DELETE FROM pending_status_updates WHERE id IN (:ids)") suspend fun deletePending(ids: LongArray)
     @Query("SELECT COUNT(*) FROM pending_status_updates") suspend fun getCount(): Int
-    @Query("DELETE FROM pending_status_updates WHERE timestamp < (SELECT timestamp FROM pending_status_updates ORDER BY timestamp DESC LIMIT 1 OFFSET 9999)") suspend fun prune()
+    @Query("DELETE FROM pending_status_updates WHERE timestamp < (SELECT timestamp FROM pending_status_updates ORDER BY timestamp DESC LIMIT 1 OFFSET 1999)") suspend fun prune()
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 

@@ -20,6 +20,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.16.10:
+ * - Issue #184 Hardening: Hardened forensic stress test IO job with unique 
+ *   filenames and transient error handling to prevent fatal crashes during 
+ *   5-min CPU/IO saturation routine (R184).
  * Aug.15.03:
  * - Issue #182 Hardening: Added STARTUP_SETTLING_DELAY_MS to 
  *   startForensicSamplingLoop to prevent immediate 100Hz pressure during 
@@ -304,7 +308,7 @@ class TrackerService : BaseMonitorService() {
             
             // Background trace job (100Hz)
             val traceJob = launch(Dispatchers.Default) {
-                while (timeProvider.elapsedRealtime() - startRt < stressDurationMs) {
+                while (isActive && timeProvider.elapsedRealtime() - startRt < stressDurationMs) {
                     logManager.logForensicTraceOptimized(
                         timestamp = timeProvider.currentTimeMillis(),
                         lat = tLat, lng = tLng, accuracy = tAcc, maxAccuracy = tAcc, 
@@ -316,22 +320,30 @@ class TrackerService : BaseMonitorService() {
             }
 
             val cpuJob = launch(Dispatchers.Default) {
-                while (timeProvider.elapsedRealtime() - startRt < stressDurationMs) {
+                while (isActive && timeProvider.elapsedRealtime() - startRt < stressDurationMs) {
                     var x = 1.1
                     for (i in 0..1000) { x = sin(x) + cos(x) + sqrt(x) }
+                    yield()
                 }
             }
 
             val ioJob = launch(Dispatchers.IO) {
-                val stressFile = File(cacheDir, "forensic_stress_temp.bin")
+                val stressFile = File(cacheDir, "forensic_stress_${System.currentTimeMillis()}.bin")
                 val buffer = ByteArray(1024 * 1024) { 0xFF.toByte() }
                 try {
-                    while (timeProvider.elapsedRealtime() - startRt < stressDurationMs) {
-                        stressFile.writeBytes(buffer)
-                        stressFile.readBytes()
+                    while (isActive && timeProvider.elapsedRealtime() - startRt < stressDurationMs) {
+                        try {
+                            stressFile.writeBytes(buffer)
+                            if (stressFile.exists()) {
+                                stressFile.readBytes()
+                            }
+                        } catch (e: Exception) {
+                            // Suppress transient IO errors during stress saturation
+                        }
+                        yield()
                     }
                 } finally {
-                    stressFile.delete()
+                    try { stressFile.delete() } catch (e: Exception) {}
                 }
             }
 

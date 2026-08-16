@@ -40,16 +40,18 @@ import androidx.navigation.compose.rememberNavController
 import com.gps19.core.engine.STARTUP_SETTLING_DELAY_MS
 import com.gps19.core.engine.CapabilityStatus
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * Aug.13.05:
- * - Issue #153: Startup Davey Stalls. Implemented Staggered UI Hydration (R153).
- *   Defers NavHost and complex screen rendering until hydrationLevel >= 2 and 
- *   >= 3 respectively to ensure frame-rate stability on budget hardware.
- * Aug.11.05:
- * - Issue #140: Automated Forensic Stress Test wired to PhoneSetupOverlay.
+ * Aug.16.12:
+ * - Issue #185 Hardening: Updated to collect and pass pre-simplified 
+ *   MapTrailSegments to Tracker/Viewer screens, offloading O(N) mapping 
+ *   from the UI thread to eliminate Startup ANR (R185).
+ * Aug.16.00:
+ * - Issue #182 Hardening: Synchronized manual mode selection with 
+ *   STARTUP_SETTLING_DELAY_MS (R182).
  */
 @Composable
 fun MainAppContent(
@@ -73,6 +75,7 @@ fun MainAppContent(
     
     val navController = rememberNavController()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -92,11 +95,23 @@ fun MainAppContent(
 
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
     var isManualSelectionInProgress by remember { mutableStateOf(false) }
+    val startupTime = remember { System.currentTimeMillis() }
 
     fun proceedToMode(mode: String) {
         isManualSelectionInProgress = true
         viewModel.onEvent(UiEvent.SetAppMode(mode))
-        onStartService(mode)
+        
+        val elapsed = System.currentTimeMillis() - startupTime
+        if (elapsed < STARTUP_SETTLING_DELAY_MS) {
+            val remaining = STARTUP_SETTLING_DELAY_MS - elapsed
+            Timber.i("Manual selection: waiting ${remaining}ms for startup stabilization")
+            scope.launch {
+                delay(remaining)
+                onStartService(mode)
+            }
+        } else {
+            onStartService(mode)
+        }
         
         if (!uiState.isSystemReady) {
             viewModel.onEvent(UiEvent.TogglePhoneSetup(true))
@@ -210,7 +225,6 @@ fun MainAppContent(
         }
     }
 
-    // Level 0: Pure black box during cold boot.
     if (uiState.hydrationLevel == 0) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black))
         return
@@ -270,7 +284,6 @@ fun MainAppContent(
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { MainFileHelper.importConfig(activity, viewModel, uri) } }
     val importTrailLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> MainFileHelper.importTrails(activity, viewModel, uris) }
     
-    // Level 1: Surface Hydration (Theme and Basic Scaffold)
     GpsTrackerTheme(appMode = uiState.appMode) {
         Surface(
             modifier = Modifier
@@ -283,12 +296,10 @@ fun MainAppContent(
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
-                // Level 2+: Navigation and Core Content
                 if (uiState.hydrationLevel >= 2) {
                     NavHost(navController = navController, startDestination = Screen.Landing.route) {
                         composable(Screen.Landing.route) {
                             BackHandler { onCleanupAndExit() }
-                            // Level 3+: Full Screen Content
                             if (uiState.hydrationLevel >= 3) {
                                 LandingScreen { mode -> 
                                     if (hasRequiredPermissions(mode)) { 
@@ -305,8 +316,9 @@ fun MainAppContent(
                             }
                         }
                         composable(Screen.Tracker.route) {
-                            val trackerTrail by viewModel.trackerTrailFlow.collectAsStateWithLifecycle()
-                            val viewerTrail by viewModel.viewerTrailFlow.collectAsStateWithLifecycle()
+                            // Issue #185: Collect background-simplified trail segments
+                            val trackerSegments by viewModel.trackerTrailSegments.collectAsStateWithLifecycle()
+                            val viewerSegments by viewModel.viewerTrailSegments.collectAsStateWithLifecycle()
                             val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
                             BackHandler {
@@ -324,7 +336,8 @@ fun MainAppContent(
                             }
                             if (uiState.hydrationLevel >= 3) {
                                 TrackerScreen(
-                                    uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
+                                    uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, 
+                                    trackerSegments = trackerSegments, viewerSegments = viewerSegments, violations = violations,
                                     systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
@@ -337,8 +350,9 @@ fun MainAppContent(
                             }
                         }
                         composable(Screen.Viewer.route) {
-                            val trackerTrail by viewModel.trackerTrailFlow.collectAsStateWithLifecycle()
-                            val viewerTrail by viewModel.viewerTrailFlow.collectAsStateWithLifecycle()
+                            // Issue #185: Collect background-simplified trail segments
+                            val trackerSegments by viewModel.trackerTrailSegments.collectAsStateWithLifecycle()
+                            val viewerSegments by viewModel.viewerTrailSegments.collectAsStateWithLifecycle()
                             val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
                             BackHandler {
@@ -356,7 +370,8 @@ fun MainAppContent(
                             }
                             if (uiState.hydrationLevel >= 3) {
                                 ViewerScreen(
-                                    uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, trackerTrail = trackerTrail, viewerTrail = viewerTrail, violations = violations,
+                                    uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, 
+                                    trackerSegments = trackerSegments, viewerSegments = viewerSegments, violations = violations,
                                     systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) },

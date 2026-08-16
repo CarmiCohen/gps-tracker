@@ -33,10 +33,13 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * TrackerScreen: Tracker-mode UI.
- * Aug.15.03:
- * - Issue #182 Hardening: Gated AppMapContainer by overlay visibility to 
- *   eliminate background rendering pressure during Settings/Log interaction. 
- *   This prevents main-thread stalls and Interaction ANRs (R182).
+ * Aug.16.12:
+ * - Issue #185 Hardening: Updated to collect and pass pre-simplified 
+ *   MapTrailSegments to AppMapContainer, eliminating main-thread 
+ *   simplification churn during startup hydration (R185). Fixed 
+ *   dashboardState and currentMa parameter mismatches.
+ * Aug.16.00:
+ * - Issue #179 Hardening: Fixed compilation error in TrackerDashboard (R179).
  */
 
 @Composable
@@ -46,8 +49,8 @@ fun TrackerScreen(
     diagnosticState: DiagnosticState,
     viewModel: MainViewModel,
     logsFlow: StateFlow<List<LogEntry>>,
-    trail: List<TrailPoint>,
-    viewerTrail: List<TrailPoint>,
+    trackerSegments: List<MapTrailSegment>,
+    viewerSegments: List<MapTrailSegment>,
     violations: List<ViolationPoint>,
     systemPulse: Long,
     systemPulseRt: Long,
@@ -75,7 +78,9 @@ fun TrackerScreen(
     val isSettingsOpen = nav.isSettingsOpen
     val isRibbonsVisible = nav.isRibbonsVisible
     val isGnssDetailVisible = nav.isGnssDetailVisible
-    val isAnyOverlayOpen = isSettingsOpen || isLogVisible || isRibbonsVisible || isGnssDetailVisible
+    val isPhoneSetupVisible = nav.isPhoneSetupVisible
+    
+    val isAnyOverlayOpen = isSettingsOpen || isLogVisible || isRibbonsVisible || isGnssDetailVisible || isPhoneSetupVisible
     
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
@@ -91,6 +96,7 @@ fun TrackerScreen(
         if (isSettingsOpen) onToggleSettings()
         if (isRibbonsVisible) viewModel.onEvent(UiEvent.ToggleRibbons(false))
         if (isGnssDetailVisible) viewModel.onEvent(UiEvent.ToggleGnssDetail(false))
+        if (isPhoneSetupVisible) viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
     }
 
     val header = @Composable {
@@ -176,7 +182,6 @@ fun TrackerScreen(
                         statusBar()
                         
                         Box(modifier = Modifier.weight(1f)) {
-                            // Issue #182: Gate Map by overlay visibility
                             if (isMapVisible && !isAnyOverlayOpen) {
                                 AppMapContainer(
                                     appMode = uiState.appMode,
@@ -217,7 +222,8 @@ fun TrackerScreen(
                                     systemPulseRt = systemPulseRt,
                                     onEvent = { viewModel.onEvent(it) },
                                     onClearTrails = { viewModel.clearTrails(context) },
-                                    trail = trail, viewerTrail = viewerTrail, 
+                                    trackerSegments = trackerSegments,
+                                    viewerSegments = viewerSegments,
                                     violations = violations, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail, 
                                     showAccuracyBadge = true,
                                     showSettingsButton = true,
@@ -292,7 +298,7 @@ fun TrackerScreen(
                                     trackerCurrentMa = dashboardState.trackerCurrentMa,
                                     gpsIdx = gpsIndexData,
                                     rttValue = rtt,
-                                    currentMaValue = currentMa,
+                                    currentMa = currentMa,
                                     systemPulse = systemPulse,
                                     cpuLoad = dashboardState.cpuLoad,
                                     ioWait = dashboardState.ioWait,
@@ -304,7 +310,6 @@ fun TrackerScreen(
                     }
                 }
             } else {
-                // Issue #182: Gate Map by overlay visibility
                 if (isMapVisible && !isAnyOverlayOpen) {
                     AppMapContainer(
                         appMode = uiState.appMode,
@@ -337,7 +342,7 @@ fun TrackerScreen(
                         viewerAccuracy = kinematicState.trackerLocation.accuracy,
                         viewerMaxAcc = kinematicState.trackerLocation.maxAccuracy,
                         viewerGpsTs = kinematicState.trackerLocation.timestamp,
-                        viewerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
+                        viewerTelemetryTs = 0L,
                         viewerLocPending = kinematicState.trackerHealth.isLocationPending,
                         viewerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
                         replayCursorPos = kinematicState.replayCursorPos,
@@ -345,7 +350,8 @@ fun TrackerScreen(
                         systemPulseRt = systemPulseRt,
                         onEvent = { viewModel.onEvent(it) },
                         onClearTrails = { viewModel.clearTrails(context) },
-                        trail = trail, viewerTrail = viewerTrail, 
+                        trackerSegments = trackerSegments,
+                        viewerSegments = viewerSegments,
                         violations = violations, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail, 
                         showAccuracyBadge = true,
                         showSettingsButton = false,
@@ -470,7 +476,7 @@ fun TrackerScreen(
                                 trackerCurrentMa = dashboardState.trackerCurrentMa,
                                 gpsIdx = gpsIndexData,
                                 rttValue = rtt,
-                                currentMaValue = currentMa,
+                                currentMa = currentMa,
                                 systemPulse = systemPulse,
                                 cpuLoad = dashboardState.cpuLoad,
                                 ioWait = dashboardState.ioWait,
@@ -624,7 +630,7 @@ fun TrackerDashboard(
     trackerCurrentMa: Int,
     gpsIdx: GpsIndexData,
     rttValue: Int,
-    currentMaValue: Int,
+    currentMa: Int,
     systemPulse: Long,
     cpuLoad: Double,
     ioWait: Double,
@@ -718,7 +724,7 @@ fun TrackerDashboard(
                     trackerStateName = trackerState.name,
                     gpsAgeSec = if (gpsAge != Long.MAX_VALUE) gpsAge / 1000 else -1L,
                     rtt = rttValue,
-                    currentMa = currentMaValue
+                    currentMa = currentMa
                 )
                 
                 Spacer(Modifier.height(16.dp))

@@ -10,13 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * Aug.14.02:
- * - Issue #170: Forensic Replay UI Audit. Added SetReplayCursor to UiEvent 
- *   to support coordinate-aware scrubbing. Fixed typo in TrackerStatus.toMap.
- * Aug.13.12:
- * - Issue #164: Forensic Log Buffer Audit. Optimized LogEntry and LogEntity 
- *   to support deferred/reusable ID generation and added forensic snapshots 
- *   to eliminate string churn in high-frequency paths (R164).
+ * Aug.16.12:
+ * - Issue #185 Hardening: Added MapTrailSegment to support background trail 
+ *   simplification and eliminate Startup ANR (R185). Fixed bad inheritance 
+ *   for RequestTestAlarm and RequestForensicTest. Restored missing AlarmInfo (R185).
+ * - Issue #185 Hardening: Added checksum to MapTrailSegment to offload O(N) 
+ *   hashing from the UI thread to background computation (R185).
  */
 
 sealed class AppSensorEvent {
@@ -53,6 +52,16 @@ data class TrailPoint(
         return newPoint
     }
 }
+
+/**
+ * MapTrailSegment: Pre-simplified trail segment for background processing.
+ * Part of Issue #185 ANR mitigation.
+ */
+data class MapTrailSegment(
+    val points: List<GeoPoint>,
+    val color: Int,
+    val checksum: Int = 0 // Issue #185: Offload hashing from UI thread
+)
 
 @Serializable
 data class AlertSettings(
@@ -120,6 +129,7 @@ class ConnectionPoint(
     var baroIdx: Double = 0.0,
     var isSitDetected: Boolean = false,
     var isSitActive: Boolean = false,
+    var verticalVelocity: Double = 0.0,
     var sitVz: Double = 0.0,
     var sitVzTs: Long = 0L,
     var sitVzRt: Long = 0L,

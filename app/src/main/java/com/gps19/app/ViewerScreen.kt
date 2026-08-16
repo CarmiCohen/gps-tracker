@@ -32,9 +32,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Aug.16.12:
+ * - Issue #185 Hardening: Updated to collect and pass pre-simplified 
+ *   MapTrailSegments to AppMapContainer, eliminating main-thread 
+ *   simplification churn during startup hydration (R185).
  * Aug.15.03:
- * - Issue #182 Hardening: Gated AppMapContainer by overlay visibility to 
- *   eliminate background rendering pressure during Settings/Log interaction (R182).
+ * - Issue #182 Hardening: Gated AppMapContainer by overlay visibility (R182).
  */
 
 @Composable
@@ -44,8 +47,8 @@ fun ViewerScreen(
     diagnosticState: DiagnosticState,
     viewModel: MainViewModel,
     logsFlow: StateFlow<List<LogEntry>>,
-    trackerTrail: List<TrailPoint>,
-    viewerTrail: List<TrailPoint>,
+    trackerSegments: List<MapTrailSegment>,
+    viewerSegments: List<MapTrailSegment>,
     violations: List<ViolationPoint>,
     systemPulse: Long,
     systemPulseRt: Long,
@@ -162,7 +165,6 @@ fun ViewerScreen(
                     statusBar()
                     
                     Box(modifier = Modifier.weight(1f)) {
-                        // Issue #182: Gate Map by overlay visibility
                         if (isMapVisible && !isAnyOverlayOpen) {
                             AppMapContainer(
                                 appMode = uiState.appMode,
@@ -203,7 +205,8 @@ fun ViewerScreen(
                                 systemPulseRt = systemPulseRt,
                                 onEvent = { viewModel.onEvent(it) },
                                 onClearTrails = { viewModel.clearTrails(context) },
-                                trail = trackerTrail, viewerTrail = viewerTrail, 
+                                trackerSegments = trackerSegments,
+                                viewerSegments = viewerSegments,
                                 violations = violations, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail, 
                                 showAccuracyBadge = false,
                                 showSettingsButton = true,
@@ -230,7 +233,6 @@ fun ViewerScreen(
                 }
             }
         } else {
-            // Issue #182: Gate Map by overlay visibility
             if (isMapVisible && !isAnyOverlayOpen) {
                 AppMapContainer(
                     appMode = uiState.appMode,
@@ -271,7 +273,8 @@ fun ViewerScreen(
                     systemPulseRt = systemPulseRt,
                     onEvent = { viewModel.onEvent(it) },
                     onClearTrails = { viewModel.clearTrails(context) },
-                    trail = trackerTrail, viewerTrail = viewerTrail, 
+                    trackerSegments = trackerSegments,
+                    viewerSegments = viewerSegments,
                     violations = violations, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail, 
                     showAccuracyBadge = false,
                     showSettingsButton = false,
