@@ -1,34 +1,27 @@
-# Handover (Aug.17.02) - Dashboard Stability Verified
+# Handover (Aug.17.07) - Forensic Stress Verified
 
-## 🎯 Next Objective: Issue #189 - Forensic Stress Test
-- **Goal**: Execute and verify the 5-minute CPU/IO saturation routine at 100Hz on API 35/36.
-- **Status**: 🟢 **READY FOR TRIGGER**.
-- **Context**: The build is stabilized (vAug.17.02). Issue #187 (Dashboard Jitter) is resolved, ensuring a stable UI during stress testing.
+## 🎯 Next Objective: Issue #191 - Heat Mitigation Validation
+- **Goal**: Verify the dynamic polling throttle during simulated thermal events (Cooling Mode).
+- **Status**: 🟢 **READY FOR IMPLEMENTATION**.
+- **Context**: Forensic stability is now baseline. The system survived the 5-minute saturation routine (#189).
 
-## 🧬 Forensic Architecture Status (vAug.17.02)
-The system is operationally verified with the following hardened components:
+## 🧬 System Status (vAug.17.07)
+The system is operationally verified and hardened:
 
-### 1. UI Stability (`OverlayComponents.kt`)
-*   **Layout Hardening (R187)**: InfoRow stabilized with fixed height (18.dp), single-line truncation, and disabled font padding. This prevents layout jitter during telemetry hydration.
+### 1. Forensic Integrity (#189)
+*   **Stress Test Success**: Verified 100Hz telemetry logging, parallel CPU saturation, and 1MB IO write/read cycles for 5 minutes without ANRs or OOMs.
+*   **Recovery Routine**: Confirmed automated recovery transition post-stress.
 
-### 2. Stress Test Engine (`TrackerService.kt`)
-*   **Saturation Routine**: A 300,000ms (5-minute) routine involving three parallel jobs:
-    *   **Trace Job**: 100Hz telemetry logging via `logForensicTraceOptimized`.
-    *   **CPU Job**: Continuous trigonometric calculations to saturate processing cores.
-    *   **IO Job**: High-frequency 1MB buffer write/read cycles using unique filenames (`forensic_stress_${timestamp}.bin`) with transient error suppression (R184).
+### 2. Database Stability (#190)
+*   **Migration Hardened**: Resolved startup crash loops (v68->v71) by implementing aggressive deduplication and removing invalid unique constraints on `localId`.
+*   **Schema Parity**: Restored missing `sitVzRt` column in `connection_history` to match entity definitions.
 
-### 3. Stabilization Guards
-*   **Hydration Window (R182)**: Mandatory 10s delay in `forensicSamplingJob` to prevent startup ANRs.
-*   **IO Integrity (R184)**: Stress test IO is decoupled and hardened against fatal crashes.
-*   **Viewer Parity (R188)**: Remote parity for `peakVibrationShock` is verified.
+### 3. Dashboard Stability (#187)
+*   **Layout Hardened**: InfoRows are vertically stable with fixed heights and single-line truncation.
 
-## 🛠️ Execution Sequence
-1.  **Launch**: Ensure `:app` is running on the device.
-2.  **Hydrate**: Wait 10 seconds for the startup settling window.
-3.  **Command**: Tap **"TRIGGER FORENSIC STRESS TEST"** in the Forensic view.
-4.  **Verification**: Confirm survival for 5 minutes and check for ANRs.
+## 🛠️ Execution Sequence for Next Task
+1.  **Simulation**: Use `MainViewModel.simulateThermalEvent(true)` or command equivalent.
+2.  **Verification**: Confirm `TrackerService` updates polling interval to `FORENSIC_SAMPLING_INTERVAL_COOLING_MS`.
+3.  **Audit**: Check Logcat for "POWER SAVER: ENGAGED" or "COOLING MODE ACTIVE".
 
-## ⚠️ Risks & Concerns
-- **[Issue #189] Saturation Impact**: Monitor heap usage during the 100Hz logging phase.
-
-vAug.17.02
+vAug.17.07

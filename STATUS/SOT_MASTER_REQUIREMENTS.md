@@ -1,8 +1,10 @@
-# System Source of Truth (SoT) - Aug.17.02 (Stability Restored)
+# System Source of Truth (SoT) - Aug.17.07 (Forensic Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Database Migration Hardening (R190)**: (Added Aug.17.07) The system MUST utilize non-unique indices for telemetry logs to resolve `SQLiteConstraintException` caused by high-frequency data duplication. Aggressive deduplication MUST be performed in `MIGRATION_68_69`, `69_70`, and `70_71` to ensure a stable upgrade path to v71. (Issue #190). **Status: Implemented.**
+*   **Forensic Stress Verification (R189)**: (Added Aug.17.07) The system MUST survive a 5-minute 100Hz CPU/IO saturation routine without ANRs or process termination. Recovery MUST automatically initiate upon completion. (Issue #189). **Status: Verified.**
 *   **Viewer Service Stabilization (R188)**: (Added Aug.17.00) The system MUST maintain strict syntax integrity in `ViewerService.kt`. Log messages MUST use standard string formatting, and forensic telemetry MUST correctly reference `peakVibrationShock` from `TrackerStatus` to ensure build stability. (Issue #188). **Status: Implemented.**
 *   **Map Hydration Hardening (R185)**: (Added Aug.16.13) The system MUST offload trail segment hashing and simplification to background threads. `MapTrailSegment` MUST contain a pre-computed `checksum` generated in the `MainViewModel`. `MapOverlayManager` MUST utilize these pre-computed checksums for O(1) change detection. (Issue #185). **Status: Implemented.**
 *   **Forensic IO Hardening (R184)**: (Added Aug.16.12) Forensic stress test `ioJob` MUST use unique filenames (`forensic_stress_${System.currentTimeMillis()}.bin`) and internal error suppression to prevent service termination during high-frequency disk contention. (Issue #184). **Status: Implemented.**
@@ -23,5 +25,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Event & Alert Text Authority (R747)**: Local event prefixing with "**This device:**". (Issue #747)
 
 ### 4. Version Authority
-*   **Current Release**: Aug.17.02.
+*   **Current Release**: Aug.17.07.
 *   **Source of Truth**: app/build.gradle versionName.

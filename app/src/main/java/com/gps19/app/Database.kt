@@ -8,21 +8,17 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
- * Aug.16.05:
- * - Issue #183 Hardening: Reduced trail and violation retrieval limits to 2000 
- *   to resolve Startup OOM and process restart loops on memory-constrained 
- *   emulator environments (R183).
- * Aug.15.03:
- * - Issue #182 Hardening: Reduced connection_history retrieval limit to 300 
- *   to eliminate massive object churn and main-thread pressure (R182).
- * - Issue #180 Remediation: Bump to v71. Forced removal of legacy unique constraint 
- *   on (type, timestamp, spillIdx) to resolve persistent SQLiteConstraintException (R180).
+ * Aug.17.07:
+ * - Issue #190 Hardening: Added missing sitVzRt column to connection_history 
+ *   in MIGRATION_70_71 to resolve IllegalStateException on startup (R190e).
+ * Aug.17.06:
+ * - Issue #190 Hardening: Removed unique constraint from localId in @Entity.
  */
 @Entity(
     tableName = "logs", 
     indices = [
         Index(value = ["timestamp"]), 
-        Index(value = ["localId"], unique = true),
+        Index(value = ["localId"]),
         Index(value = ["isImportant"]),
         Index(value = ["isSpecial"]),
         Index(value = ["synced", "timestamp"]), 
@@ -284,28 +280,36 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         val MIGRATION_70_71 = object : Migration(70, 71) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Definitively force index_logs_type_timestamp_spillIdx to be NON-UNIQUE
+                // R190e: Correct schema mismatch in connection_history
+                db.execSQL("ALTER TABLE connection_history ADD COLUMN sitVzRt INTEGER NOT NULL DEFAULT 0")
+
+                // R190: Force non-unique indices to resolve legacy duplication conflicts
                 db.execSQL("DROP INDEX IF EXISTS index_logs_type_timestamp_spillIdx")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
-                // Ensure localId is unique
                 db.execSQL("DROP INDEX IF EXISTS index_logs_localId")
-                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_logs_localId ON logs (localId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_localId ON logs (localId)")
             }
         }
 
         val MIGRATION_69_70 = object : Migration(69, 70) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                // R190c: Purge duplicates to prevent UNIQUE localId constraint violation
+                db.execSQL("DELETE FROM logs WHERE id NOT IN (SELECT MIN(id) FROM logs GROUP BY localId)")
+                
                 db.execSQL("DROP INDEX IF EXISTS index_logs_type_timestamp_spillIdx")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
                 db.execSQL("DROP INDEX IF EXISTS index_logs_localId")
-                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_logs_localId ON logs (localId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_localId ON logs (localId)")
             }
         }
 
         val MIGRATION_68_69 = object : Migration(68, 69) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                // R190c: Purge duplicates for high-frequency telemetry keys
+                db.execSQL("DELETE FROM logs WHERE id NOT IN (SELECT MIN(id) FROM logs GROUP BY type, timestamp, spillIdx)")
+
                 db.execSQL("DROP INDEX IF EXISTS index_logs_type_spillIdx_timestamp")
-                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
             }
         }
 
