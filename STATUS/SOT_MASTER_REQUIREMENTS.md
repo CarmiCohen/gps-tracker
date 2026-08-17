@@ -1,4 +1,4 @@
-# System Source of Truth (SoT) - Aug.17.01 (Stability Restored)
+# System Source of Truth (SoT) - Aug.17.02 (Stability Restored)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
@@ -18,9 +18,10 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Forensic Parity Authority (R118)**: Strict field parity across Protobuf, Database, and UI. (Issue #118)
 
 ### 3. UI/UX & Localization Authority
+*   **Dashboard Layout Stability (R187)**: (Added Aug.17.02) Dashboard telemetry rows (`InfoRow`) MUST maintain a fixed height and utilize single-line truncation (`maxLines=1`) with Ellipsis. Font padding MUST be disabled to ensure vertical alignment remains constant during telemetry hydration and 1Hz updates. (Issue #187). **Status: Implemented.**
 *   **Staggered UI Hydration Authority (R153)**: Stage-based UI initialization via `hydrationLevel` (0-3). (Issue #153). **Status: Implemented.**
 *   **Event & Alert Text Authority (R747)**: Local event prefixing with "**This device:**". (Issue #747)
 
 ### 4. Version Authority
-*   **Current Release**: Aug.17.01.
+*   **Current Release**: Aug.17.02.
 *   **Source of Truth**: app/build.gradle versionName.

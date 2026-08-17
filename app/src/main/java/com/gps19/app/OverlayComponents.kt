@@ -13,8 +13,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.*
@@ -22,13 +25,14 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Aug.17.02:
+ * - Issue #187: Dashboard Layout Jitter. Stabilized InfoRow with fixed height, 
+ *   maxLines=1, and disabled font padding to eliminate vertical jumping during 
+ *   telemetry hydration (R187).
  * Aug.13.11:
  * - Issue #163: 1Hz Telemetry Path Optimization. Refactored all dashboard 
  *   components to handle primitive types and utilized memoized formatting 
  *   to eliminate object churn during 1Hz telemetry updates (R163).
- * Aug.10.26:
- * - Issue #132: Forensic UI Dashboard Refinement. Integrated cpuLoad, ioWait, 
- *   and maxIoLatency into ForensicSection for performance auditing (R132).
  */
 
 @Composable
@@ -470,12 +474,37 @@ private fun InfoRow(
     onLeftClick: (() -> Unit)? = null,
     onRightClick: (() -> Unit)? = null
 ) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp, horizontal = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+    val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(18.dp)
+            .padding(horizontal = 2.dp), 
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Row(modifier = Modifier.weight(1.3f).clickable(enabled = onLeftClick != null) { onLeftClick?.invoke() }, verticalAlignment = Alignment.CenterVertically) { 
             if (leftVal.isNotEmpty()) {
-                Text(leftVal, color = leftColor, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, modifier = Modifier.width(115.dp))
+                Text(
+                    text = leftVal, 
+                    color = leftColor, 
+                    fontSize = 11.sp, 
+                    fontFamily = FontFamily.Monospace, 
+                    fontWeight = FontWeight.Bold, 
+                    modifier = Modifier.width(115.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = compactStyle
+                )
                 Spacer(Modifier.width(2.dp))
-                Text(leftLabel, color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                Text(
+                    text = leftLabel, 
+                    color = Color.Gray, 
+                    fontSize = 10.sp, 
+                    fontWeight = FontWeight.Medium, 
+                    maxLines = 1,
+                    style = compactStyle
+                )
                 if (onLeftClick != null) {
                     Spacer(Modifier.width(4.dp))
                     Icon(Icons.Default.Refresh, null, tint = leftColor.copy(alpha = 0.6f), modifier = Modifier.size(10.dp))
@@ -484,9 +513,26 @@ private fun InfoRow(
         }
         Row(modifier = Modifier.weight(1.2f).clickable(enabled = onRightClick != null) { onRightClick?.invoke() }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) {
             if (rightVal.isNotEmpty()) {
-                Text(rightVal, color = rightColor, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, modifier = Modifier.width(105.dp))
+                Text(
+                    text = rightVal, 
+                    color = rightColor, 
+                    fontSize = 11.sp, 
+                    fontFamily = FontFamily.Monospace, 
+                    fontWeight = FontWeight.Bold, 
+                    modifier = Modifier.width(105.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = compactStyle
+                )
                 Spacer(Modifier.width(2.dp))
-                Text(rightLabel, color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                Text(
+                    text = rightLabel, 
+                    color = Color.Gray, 
+                    fontSize = 10.sp, 
+                    fontWeight = FontWeight.Medium, 
+                    maxLines = 1,
+                    style = compactStyle
+                )
                 if (onRightClick != null) {
                     Spacer(Modifier.width(4.dp))
                     Icon(Icons.Default.Refresh, null, tint = rightColor.copy(alpha = 0.6f), modifier = Modifier.size(10.dp))
