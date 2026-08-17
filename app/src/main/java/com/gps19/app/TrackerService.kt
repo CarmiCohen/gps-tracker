@@ -20,10 +20,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * Aug.16.14:
- * - Issue #186 Hardening: Implemented Gated Sensor Start. Deferred sensor 
- *   registration via appSensorManager.start(deferred = true) to stabilize 
- *   startup IPC load (R186).
+ * Aug.16.13:
+ * - Reverted Gated Sensor Start (Issue #186 rollback). Restored immediate 
+ *   sensor registration to resolve Startup Black Screen regression.
  * Aug.16.10:
  * - Issue #184 Hardening: Hardened forensic stress test IO job with unique 
  *   filenames and transient error handling to prevent fatal crashes during 
@@ -88,13 +87,11 @@ class TrackerService : BaseMonitorService() {
         refreshCapabilitiesInternal()
 
         if (capabilities.isA15Device) {
-            withContext(Dispatchers.IO) {
-                JdMbrainHardwareManager.loadLibrary()
-                if (JdMbrainHardwareManager.isAvailable()) {
-                    val res = JdMbrainHardwareManager.initHardware(timeProvider, configManager.deviceId, 0)
-                    logManager.logServiceEvent("HARDWARE: libjdMbrain initialized (Result: $res)", isImportant = true)
-                }
-            }
+             JdMbrainHardwareManager.loadLibrary()
+             if (JdMbrainHardwareManager.isAvailable()) {
+                val res = JdMbrainHardwareManager.initHardware(timeProvider, configManager.deviceId, 0)
+                logManager.logServiceEvent("HARDWARE: libjdMbrain initialized (Result: $res)", isImportant = true)
+             }
         }
 
         observeAlarmEvents()
@@ -119,8 +116,7 @@ class TrackerService : BaseMonitorService() {
         alarmManager.restoreState(savedAlarms)
 
         historyManager.initialize(lifecycleScope)
-        // Issue #186: Deferred sensor start to stabilize startup IPC load.
-        appSensorManager.start(deferred = true)
+        appSensorManager.start()
 
         commandRouter.register()
         commandRouter.startObservingCommands(lifecycleScope)
@@ -282,7 +278,7 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
-                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start(deferred = true) }
+                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start() }
                     is CommandEvent.TriggerForensicTest -> executeAutomatedStressTest()
                     else -> {}
                 }

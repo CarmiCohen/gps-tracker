@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.16.14)
+# Project Issues & Hardening Tracking (Aug.17.01)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -18,17 +18,17 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🔴 Open Issues
-*   *No open critical issues.*
+*   *No open critical issues. System stable and ready for Stress Test.*
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.16.14)
-*   **[Issue #186] [Severity: High] [Category: Performance] Gated Sensor Startup.**
-    *   **Resolution**: Implemented deferred sensor registration in `AppSensorManager` using `SENSOR_SETTLING_DELAY_MS` (2000ms). This prevents high-frequency IPC/Binder saturation during the critical first 2 seconds of role entry, ensuring the UI thread has exclusive priority for Map/Dashboard hydration (R186).
+## 🟢 Recently Resolved Issues (Aug.17.01)
+*   **[Issue #188] [Severity: Critical] [Category: Stability] Build Regression in ViewerService.**
+    *   **Resolution**: Fixed invalid string template escaping and corrected unresolved reference to `peakVibrationShock`. Restored full build stability for the Aug.17 branch.
 *   **[Issue #185] [Severity: Critical] [Category: Stability] Startup ANR during Map Hydration.**
     *   **Resolution**: Eliminated O(N) hashing on the main thread by offloading `MapTrailSegment` checksum computation to the background thread in `MainViewModel`. Refactored `MapOverlayManager.updateTrails` to use these pre-computed checksums (R185).
 *   **[Issue #184] [Severity: High] [Category: Stability] Stress Test IO Race Condition.**
     *   **Resolution**: Hardened the forensic stress test `ioJob` in `TrackerService` (R184).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.16.14)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.17.01)

@@ -35,10 +35,9 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * Aug.16.14:
- * - Issue #186 Hardening: Implemented Gated Sensor Start. Added support for 
- *   deferred sensor registration (SENSOR_SETTLING_DELAY_MS) to prevent 
- *   IPC/Binder saturation during critical UI hydration (R186).
+ * Aug.16.13:
+ * - Reverted Gated Sensor Start (Issue #186 rollback). Restored immediate 
+ *   registration to resolve Startup Black Screen regression.
  * Aug.13.02:
  * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
  *   type inference failures (R146/R151).
@@ -235,12 +234,7 @@ class AppSensorManager @Inject constructor(
     private var initialRotationMatrix = FloatArray(9); private var hasInitialRotation = false
     private var plungePhase = 0; private var plungeMatched = false; private var lastPlungePhaseRt = 0L
 
-    /**
-     * start: Initiates sensor management.
-     * @param deferred: If true, delays actual listener registration to allow 
-     * the system to settle (Issue #186).
-     */
-    fun start(deferred: Boolean = false) {
+    fun start() {
         if (isStarted.getAndSet(true)) return
         sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt
         hasLoggedThreadInfo.set(false); proximityMaxRange = proximity?.maximumRange ?: 5f
@@ -254,19 +248,8 @@ class AppSensorManager @Inject constructor(
         val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
         if (display != null) lastDisplayState = display.state
 
-        if (deferred) {
-            scope.launch {
-                delay(SENSOR_SETTLING_DELAY_MS)
-                if (isStarted.get()) {
-                    registerSensors()
-                    startAcousticMonitoring()
-                    Timber.i("Forensic: Gated Sensor Start complete after ${SENSOR_SETTLING_DELAY_MS}ms")
-                }
-            }
-        } else {
-            registerSensors()
-            startAcousticMonitoring()
-        }
+        registerSensors()
+        startAcousticMonitoring()
     }
 
     private fun registerSensors() {
