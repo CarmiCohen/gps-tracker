@@ -16,17 +16,16 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.CRC32
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.18.06:
+ * - Issue #202: Forensic Performance. Added peekToEntities() and removed 
+ *   obsolete peek() to eliminate intermediate LogEntry allocations during 
+ *   drainage (R202).
  * Aug.17.10:
  * - Issue #193: Forensic Signature Persistence Audit. Added recovery logging 
  *   to init block to verify that traces are retained across process death.
- * Aug.13.12:
- * - Issue #164: Forensic Log Buffer Audit. Updated peek() to populate 
- *   raw forensic snapshots, eliminating string-concatenation churn during 
- *   drainage (R164).
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -295,15 +294,15 @@ class ForensicSpillBuffer @Inject constructor(
     }
 
     /**
-     * peek: Optimized telemetry retrieval.
-     * R164: Now populates raw forensic snapshot fields to avoid per-entry 
-     * string concatenation during drainage.
+     * peekToEntities: Direct buffer to LogEntity conversion.
+     * Issue #202: Eliminates intermediate LogEntry allocations to reduce 
+     * GC pressure during 100Hz forensic bursts.
      */
-    fun peek(limit: Int): List<LogEntry> {
-        return LatencyMonitor.measureAndAudit<List<LogEntry>>(
+    fun peekToEntities(limit: Int): List<LogEntity> {
+        return LatencyMonitor.measureAndAudit<List<LogEntity>>(
             timeProvider = timeProvider,
             thresholdMs = DRAIN_STALL_THRESHOLD_MS,
-            operation = "Forensic Peek",
+            operation = "Forensic Peek Entities",
             type = LatencyMonitor.AuditType.PERFORMANCE,
             onSpike = { msg, _ -> Timber.w(msg) }
         ) {
@@ -329,7 +328,7 @@ class ForensicSpillBuffer @Inject constructor(
             
             if (toPeekCount == 0) return@measureAndAudit emptyList()
 
-            val results = ArrayList<LogEntry>(toPeekCount)
+            val results = ArrayList<LogEntity>(toPeekCount)
             val entryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE)
             val bb = ByteBuffer.wrap(entryBytes).order(ByteOrder.nativeOrder())
             val crc = CRC32()
@@ -362,19 +361,31 @@ class ForensicSpillBuffer @Inject constructor(
                     val msg = if (msgLen > 0) {
                         String(entryBytes, bb.position(), msgLen, Charsets.UTF_8)
                     } else {
-                        "FORENSIC_TRACE" // R164: Defer formatting to persistence.
+                        "FORENSIC_TRACE"
                     }
 
-                    results.add(LogEntry(
-                        timestamp = ts, lat = lat, lng = lng, accuracy = acc, maxAccuracy = maxAcc,
-                        vibeSnapshot = if (vibe == -1.0) null else vibe,
+                    results.add(LogEntity(
+                        localId = "F-$ts-$tempReadIdx",
+                        timestamp = ts,
+                        message = msg,
+                        type = "FORENSIC_TRACE",
+                        isImportant = (flags and 0x01) != 0,
+                        deviceId = "SYSTEM",
+                        viewerId = "",
+                        isSpecial = (flags and 0x02) != 0,
+                        role = "tracker",
+                        lat = lat,
+                        lng = lng,
+                        accuracy = acc,
+                        maxAccuracy = maxAcc,
                         snrSnapshot = if (snr == -1.0) null else snr,
+                        vibeSnapshot = if (vibe == -1.0) null else vibe,
+                        synced = false,
+                        spillIdx = tempReadIdx,
+                        gpsHardwareLock = (flags and 0x08) != 0,
                         tempSnapshot = batTemp,
                         battSnapshot = batLevel,
-                        chargingSnapshot = (flags and 0x04) != 0,
-                        isImportant = (flags and 0x01) != 0, isSpecial = (flags and 0x02) != 0,
-                        message = msg, type = "FORENSIC_TRACE", id = "SYSTEM", role = "tracker",
-                        spillIdx = tempReadIdx, gpsHardwareLock = (flags and 0x08) != 0
+                        chargingSnapshot = (flags and 0x04) != 0
                     ))
                 }
                 tempReadIdx = (tempReadIdx + 1) % FORENSIC_SPILL_CAPACITY

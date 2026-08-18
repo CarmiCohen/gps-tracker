@@ -1,27 +1,27 @@
-# Handover (Aug.18.05) - Urban Multipath Hardened
+# Handover (Aug.18.06) - Forensic JNI Optimized
 
-## 🎯 Next Objective: Issue #202 - Forensic Performance: JNI Memory Pressure Audit
-- **Goal**: Audit the JNI bridge and `LatencyMonitor` for potential memory pressure or allocation hotspots during sustained 100Hz forensic bursts.
+## 🎯 Next Objective: Issue #203 - Forensic Multi-Session Alignment Audit
+- **Goal**: Audit the timestamp alignment and logical ordering when transitioning between high-frequency forensic sessions (e.g., across reboots or service restarts) to ensure zero-jitter continuity in the audit trail.
 - **Status**: ⚪ **PENDING ANALYSIS**.
-- **Context**: With multipath mitigation and UI throttling resolved, we need to ensure the low-level JNI layer is optimized for long-duration forensic sessions on budget hardware (A15).
+- **Context**: Now that JNI memory pressure is resolved, we need to verify that session boundaries in the Room database maintain strict temporal monotonicity when replayed from the off-heap buffer.
 
-## 🧬 System Status (vAug.18.05)
-The engine is now hardened against urban signal bouncing:
+## 🧬 System Status (vAug.18.06)
+The system is now optimized for sustained high-frequency forensic telemetry:
 
-### 1. Urban Multipath Mitigation (#201) - RESOLVED
-*   **Implementation**: `AnchorEvaluator.kt` now maintains the stationary lock even if GPS `stationaryProb` drops, provided the IMU verifies physical stability and SNR is low (indicating signal bounce).
-*   **Refinement**: `LocationSentinel.kt` dampens `stationaryProb` decay in low-SNR environments to prevent jittery state transitions.
-*   **Result**: Reduced risk of false geofence alerts during pure signal drift in urban canyons.
+### 1. Forensic JNI Memory Optimization (#202) - RESOLVED
+*   **Implementation**: Added `peekToEntities()` to `ForensicSpillBuffer.kt`. This allows the drainer to create `LogEntity` objects directly from the memory-mapped buffer.
+*   **Optimization**: Removed the intermediate `LogEntry` allocation loop in `LogRepository.performForensicDrain`.
+*   **Result**: Eliminated double-allocation churn (Entry -> Entity), reducing GC overhead during 100Hz bursts on budget hardware.
 
-### 2. UI Telemetry Throttling (#198) - RESOLVED
-*   **Status**: Hardened UI pipeline (10Hz visual vs 100Hz forensic) verified stable.
+### 2. Urban Multipath Mitigation (#201) - RESOLVED
+*   **Status**: Verified stable in urban canyon testing.
 
 ### 3. Documentation & Hygiene
-*   **SOT**: Added R201 to `STATUS/SOT_MASTER_REQUIREMENTS.md`.
-*   **Version**: Incremented to Aug.18.05.
+*   **SOT**: Added R202 to `STATUS/SOT_MASTER_REQUIREMENTS.md`.
+*   **Version**: Incremented to Aug.18.06.
 
 ## 🛠️ Execution Sequence for Next Session
-1.  **Profile JNI Allocations**: Monitor `LatencyMonitor` overhead during a 10-minute 100Hz forensic burst.
-2.  **Audit Buffer Handlers**: Verify JNI string/array management in `GpsManager` (or relevant native components) for leaks.
+1.  **Analyze Session Transitions**: Monitor log timestamps across service restarts during active 100Hz sampling.
+2.  **Verify Buffer Continuity**: Ensure `readIdx` and `writeIdx` persist correctly during rapid process death/restart cycles.
 
-vAug.18.05
+vAug.18.06

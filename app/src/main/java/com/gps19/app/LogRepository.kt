@@ -19,18 +19,13 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.18.06:
+ * - Issue #202: Forensic Performance. Updated performForensicDrain to use 
+ *   peekToEntities() and eliminated intermediate LogEntry allocations (R202).
  * Aug.18.01:
  * - Issue #197: Forensic Storage-Aware Adaptive Pruning. Refined proactivePruning 
  *   to handle high-frequency forensic traces (100Hz) with chunked deletion and 
  *   storage-aware retention targets (R197).
- * Aug.18.00:
- * - Issue #196: Forensic Log Buffer Pressure Audit. Lowered FORENSIC_FILL_THRESHOLD 
- *   to 25% and modified drainer logic to prioritize high-pressure relief even 
- *   under high CPU load to prevent FORENSIC_OVERFLOW (R196).
- * Aug.15.01:
- * - Issue #179: Forensic Performance Optimization. Removed heap-intensive manual 
- *   signature checking in favor of DB-level UNIQUE constraints (R179).
- * - Issue #178: Forensic Optimization. Reduced signature lookback to 10 min (R178).
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -169,8 +164,10 @@ class LogRepository @Inject constructor(
     private suspend fun performForensicDrain(limit: Int, isRecovery: Boolean): Boolean {
         val buffer = forensicSpillBufferProvider.get()
         val pendingAtStart = buffer.getPendingCount()
-        val traces = buffer.peek(limit)
-        if (traces.isEmpty()) {
+        
+        // Issue #202: Use peekToEntities to eliminate LogEntry -> LogEntity churn.
+        val entities = buffer.peekToEntities(limit)
+        if (entities.isEmpty()) {
             if (pendingAtStart > 0) {
                 buffer.commitDrain(pendingAtStart)
             }
@@ -178,37 +175,16 @@ class LogRepository @Inject constructor(
         }
 
         return try {
-            val toInsert = ArrayList<LogEntity>(traces.size)
-            for (trace in traces) {
-                val compositeId = if (trace.localId.isNotEmpty()) trace.localId 
-                                 else "F-${trace.timestamp}-${trace.spillIdx}"
-                
-                toInsert.add(LogEntity(
-                    localId = compositeId,
-                    timestamp = trace.timestamp, message = trace.message, type = trace.type,
-                    isImportant = trace.isImportant, deviceId = trace.id, viewerId = trace.viewerId,
-                    isSpecial = trace.isSpecial, role = trace.role,
-                    lat = trace.lat, lng = trace.lng, accuracy = trace.accuracy,
-                    maxAccuracy = trace.maxAccuracy, snrSnapshot = trace.snrSnapshot,
-                    vibeSnapshot = trace.vibeSnapshot, synced = false,
-                    spillIdx = trace.spillIdx,
-                    gpsHardwareLock = trace.gpsHardwareLock,
-                    tempSnapshot = trace.tempSnapshot,
-                    battSnapshot = trace.battSnapshot,
-                    chargingSnapshot = trace.chargingSnapshot
-                ))
+            if (entities.isNotEmpty()) {
+                logDao.insertAll(entities)
             }
             
-            if (toInsert.isNotEmpty()) {
-                logDao.insertAll(toInsert)
-            }
-            
-            buffer.commitDrain(traces.size)
+            buffer.commitDrain(entities.size)
             forensicSuccessCount.incrementAndGet()
             updateReliability(true)
             
-            if (isRecovery && toInsert.isNotEmpty()) {
-                val msg = "Forensic Recovery Successful: ${toInsert.size} traces replayed."
+            if (isRecovery && entities.isNotEmpty()) {
+                val msg = "Forensic Recovery Successful: ${entities.size} traces replayed."
                 addLog(LogEntry(
                     localId = "RECOVERY-${timeProvider.currentTimeMillis()}",
                     timestamp = timeProvider.currentTimeMillis(),
@@ -223,7 +199,7 @@ class LogRepository @Inject constructor(
             }
 
             logMutex.withLock<Unit> {
-                logWriteCount += toInsert.size
+                logWriteCount += entities.size
                 if (logWriteCount >= DB_PRUNE_THRESHOLD) {
                     logWriteCount = 0
                     triggerAsyncPruning()

@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 640**
+**Total Unique Resolutions: 641**
+
+## 62. Forensic Performance & JNI Optimization (Aug.18.06)
+*   **Issue #202: Forensic Performance: JNI Memory Pressure Audit**.
+    - **Resolution**: Eliminated intermediate heap allocations in the forensic log draining pipeline. Implemented `peekToEntities` in `ForensicSpillBuffer.kt` to directly map off-heap buffer data to `LogEntity` (Room) objects. Updated `LogRepository.kt` to utilize this zero-churn path, removing the `LogEntry` allocation loop and significantly reducing GC pressure during sustained 100Hz telemetry bursts on budget hardware. (R202)
 
 ## 61. Forensic Storage & Pruning Hardening (Aug.18.02)
 *   **Issue #197: Forensic Storage-Aware Adaptive Pruning Refinement**.

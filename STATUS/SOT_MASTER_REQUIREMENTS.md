@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.18.05 (Urban Multipath Hardened)
+# System Source of Truth (SoT) - Aug.18.06 (Forensic JNI Optimized)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Forensic Allocation Optimization (R202)**: (Added Aug.18.06) The system MUST eliminate intermediate heap allocations during the forensic log draining process. The `ForensicSpillBuffer` MUST provide a direct mapping from the memory-mapped buffer to `LogEntity` objects (`peekToEntities`). The `LogRepository` drainer MUST utilize this zero-churn path to avoid the creation of intermediate `LogEntry` objects, thereby minimizing GC pressure during sustained 100Hz telemetry bursts. (Issue #202). **Status: Implemented.**
 *   **Urban Multipath Mitigation (R201)**: (Added Aug.18.05) The system MUST harden stationary state management against GPS signal bouncing in urban canyons. The `AnchorEvaluator` MUST maintain the stationary anchor even if GPS-derived `stationaryProb` drops below engagement thresholds, provided the IMU confirms the device is physically stationary and SNR is low (`JUMP_GATE_LOW_SNR_THRESHOLD`). The `LocationSentinel` MUST dampen the decay of `stationaryProb` during low-SNR physically stationary events to prevent jittery anchor release. (Issue #201). **Status: Implemented.**
 *   **UI Telemetry Throttling (R198)**: (Added Aug.18.03) The system MUST throttle high-frequency telemetry updates to the UI thread to prevent thread starvation and redundant recompositions during forensic bursts. `localLocation` and `trackerLocation` collectors in the `MainViewModel` MUST utilize sampling (e.g., 10Hz / 100ms) to cap the processing rate of visual state updates, while background forensic logging and persistence MUST remain at full fidelity (up to 100Hz). (Issue #198). **Status: Implemented.**
 *   **Forensic Storage-Aware Adaptive Pruning (R197)**: (Added Aug.18.02) The system MUST implement storage-aware adaptive pruning to handle high-frequency (100Hz) forensic trace accumulation. Pruning MUST be performed in chunks (`PRUNE_CHUNK_SIZE`) to minimize database transaction lock duration. Retention targets MUST be dynamically selected based on `SystemHealthState`: `ADAPTIVE_PRUNE_THRESHOLD_CRITICAL` (5,000) during critical storage pressure, `ADAPTIVE_PRUNE_THRESHOLD_LOW` (10,000) for low storage, and `ADAPTIVE_PRUNE_THRESHOLD_CHARGING` (50,000) to allow deeper history when power is stable. Forensic traces MUST have dedicated retention limits (`FORENSIC_PRUNE_LIMIT_NORMAL` etc.) to prevent telemetry from displacing critical system logs. (Issue #197). **Status: Implemented.**
@@ -33,5 +34,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Event & Alert Text Authority (R747)**: Local event prefixing with "**This device:**". (Issue #747)
 
 ### 4. Version Authority
-*   **Current Release**: Aug.18.05.
+*   **Current Release**: Aug.18.06.
 *   **Source of Truth**: app/build.gradle versionName.
