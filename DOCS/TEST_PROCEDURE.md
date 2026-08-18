@@ -39,7 +39,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **3.3 Forensic Stress Test:**
     *   Go to **Settings -> Phone Setup** and tap **TRIGGER FORENSIC STRESS TEST**.
     *   **Verification:** Open the Log Overlay and confirm `JAMMER SUSPICION` and `GPS STALL` markers are injected and latched correctly.
-*   **3.4 Service Persistence:**
+*   **3.4 Heat Mitigation Validation (Issue #191):**
+    *   Trigger thermal simulation via `MainViewModel.simulateThermalEvent(true)` (Command: `SimulateThermalEvent`).
+    *   **Verification:**
+        1. Check Logcat for `SYSTEM EMERGENCY: Simulated Thermal limit reached. Entering forced COOLING MODE.`
+        2. Monitor `TrackerService` forensic sampling. Confirm delay updates to `FORENSIC_SAMPLING_INTERVAL_COOLING_MS` (500ms).
+        3. Verify the Dashboard shows Cooling Mode active.
+        4. Disable simulation and verify recovery to `FORENSIC_SAMPLING_INTERVAL_MAX_MS`.
+*   **3.5 Service Persistence:**
     *   Swipe the app away from the "Recents" menu.
     *   **Verification:** Confirm the foreground notification remains visible and telemetry continues to log (verified via `adb logcat -s TrackerService`).
 

@@ -17,6 +17,9 @@ import javax.inject.Singleton
 
 /**
  * CommandEvent: Reactive event container for system and UI commands.
+ * Aug.17.08:
+ * - Issue #191 Validation: Added SimulateThermalEvent to support dynamic 
+ *   polling throttle verification (R191).
  * July.28.22:
  * - Issue #617: Global SharedFlow Audit. Hardened _commandEvents with 
  *   BufferOverflow.DROP_OLDEST to ensure non-blocking command routing (R617).
@@ -33,6 +36,7 @@ sealed class CommandEvent {
     object ResetTimers : CommandEvent()
     object SyncSensors : CommandEvent()
     object TriggerForensicTest : CommandEvent()
+    data class SimulateThermalEvent(val active: Boolean) : CommandEvent()
 }
 
 /**
@@ -170,6 +174,9 @@ class CommandRouter @Inject constructor(
                         }
                         is UiCommand.ExecuteForensicTest -> {
                             _commandEvents.emit(CommandEvent.TriggerForensicTest)
+                        }
+                        is UiCommand.SimulateThermalEvent -> {
+                            _commandEvents.emit(CommandEvent.SimulateThermalEvent(command.active))
                         }
                     }
                 } catch (e: Exception) {

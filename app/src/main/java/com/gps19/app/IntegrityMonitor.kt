@@ -25,6 +25,9 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.17.08:
+ * - Issue #191 Validation: Implemented simulateCoolingMode() to support dynamic 
+ *   polling throttle verification (R191).
  * Aug.11.08:
  * - Issue #143: Forensic Integrity Verification. Mapped Thermal Throttling to 
  *   Silent Failure correlation engine (R133). Corrected NetworkCapabilities import.
@@ -405,6 +408,22 @@ class IntegrityMonitor @Inject constructor(
 
     fun setMaxTemperature(temp: Double) {
         updateHealth { it.maxTemp = temp }
+    }
+
+    /**
+     * simulateCoolingMode: External simulation trigger for heat mitigation (Issue #191).
+     */
+    fun simulateCoolingMode(active: Boolean) {
+        val msg = if (active) "SYSTEM EMERGENCY: Simulated Thermal limit reached. Entering forced COOLING MODE." 
+                  else "System Info: Simulated Thermal limit recovered."
+        _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, active))
+        if (active) _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_TRACKER_TEMP))
+        else _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_TEMP))
+
+        updateHealth { h ->
+            h.isCoolingModeActive = active
+            h.isThermalThrottling = active
+        }
     }
 
     suspend fun isInternetHardwarePresent(): Boolean {

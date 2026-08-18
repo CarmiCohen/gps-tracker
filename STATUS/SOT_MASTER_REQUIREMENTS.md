@@ -1,8 +1,11 @@
-# System Source of Truth (SoT) - Aug.17.07 (Forensic Hardened)
+# System Source of Truth (SoT) - Aug.17.10 (Forensic Persistence Audited)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Forensic Signature Persistence Audit (R193)**: (Added Aug.17.10) The system MUST audit and log the restoration of forensic traces from the memory-mapped `forensic_spill.bin` file during initialization. This ensures that the write/read indices and entry count are correctly recovered after process death or thermal cycles, maintaining zero-data-loss integrity within the forensic sampling window. (Issue #193). **Status: Implemented.**
+*   **Recovery Latency Audit (R192)**: (Added Aug.17.08) The system MUST measure and log the latency between a thermal event recovery (Cooling Mode OFF) and the resumption of high-frequency forensic sampling. This metric ensures that the system returns to peak fidelity within an acceptable temporal window post-throttle. (Issue #192). **Status: Implemented.**
+*   **Heat Mitigation Validation (R191)**: (Added Aug.17.08) The system MUST support a simulated thermal event trigger to verify dynamic polling throttle. During "Cooling Mode", the forensic sampling interval MUST be forced to `FORENSIC_SAMPLING_INTERVAL_COOLING_MS` (500ms) to reduce CPU load and thermal output. (Issue #191). **Status: Implemented.**
 *   **Database Migration Hardening (R190)**: (Added Aug.17.07) The system MUST utilize non-unique indices for telemetry logs to resolve `SQLiteConstraintException` caused by high-frequency data duplication. Aggressive deduplication MUST be performed in `MIGRATION_68_69`, `69_70`, and `70_71` to ensure a stable upgrade path to v71. (Issue #190). **Status: Implemented.**
 *   **Forensic Stress Verification (R189)**: (Added Aug.17.07) The system MUST survive a 5-minute 100Hz CPU/IO saturation routine without ANRs or process termination. Recovery MUST automatically initiate upon completion. (Issue #189). **Status: Verified.**
 *   **Viewer Service Stabilization (R188)**: (Added Aug.17.00) The system MUST maintain strict syntax integrity in `ViewerService.kt`. Log messages MUST use standard string formatting, and forensic telemetry MUST correctly reference `peakVibrationShock` from `TrackerStatus` to ensure build stability. (Issue #188). **Status: Implemented.**
@@ -25,5 +28,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Event & Alert Text Authority (R747)**: Local event prefixing with "**This device:**". (Issue #747)
 
 ### 4. Version Authority
-*   **Current Release**: Aug.17.07.
+*   **Current Release**: Aug.17.10.
 *   **Source of Truth**: app/build.gradle versionName.

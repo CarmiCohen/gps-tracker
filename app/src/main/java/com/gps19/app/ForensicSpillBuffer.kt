@@ -20,13 +20,13 @@ import kotlin.math.round
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.17.10:
+ * - Issue #193: Forensic Signature Persistence Audit. Added recovery logging 
+ *   to init block to verify that traces are retained across process death.
  * Aug.13.12:
  * - Issue #164: Forensic Log Buffer Audit. Updated peek() to populate 
  *   raw forensic snapshots, eliminating string-concatenation churn during 
  *   drainage (R164).
- * Aug.13.00:
- * - Issue #146: Optimized Forensic Drainer. Refactored peek() and writeTrace() 
- *   to eliminate per-entry allocations and redundant I/O passes (R146). 
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -75,6 +75,7 @@ class ForensicSpillBuffer @Inject constructor(
 
     init {
         try {
+            val exists = spillFile.exists()
             val size = (FORENSIC_SPILL_CAPACITY * FORENSIC_SPILL_ENTRY_SIZE).toLong() + HEADER_SIZE
             RandomAccessFile(spillFile, "rw").use { raf ->
                 mappedBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, size).apply {
@@ -91,6 +92,7 @@ class ForensicSpillBuffer @Inject constructor(
 
                 if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != FORENSIC_SPILL_CAPACITY || entrySz != FORENSIC_SPILL_ENTRY_SIZE) {
                     resetBuffer()
+                    if (exists) Timber.w("Forensic Persistence Audit: Spill-buffer signature mismatch or corruption. Resetting.")
                 } else {
                     val recoveredWrite = buffer.getInt(OFF_WRITE_IDX)
                     val recoveredCount = buffer.getInt(OFF_COUNT)
@@ -106,8 +108,13 @@ class ForensicSpillBuffer @Inject constructor(
                         baseTs.set(buffer.getLong(OFF_BASE_TS))
                         baseLat = buffer.getDouble(OFF_BASE_LAT)
                         baseLng = buffer.getDouble(OFF_BASE_LNG)
+                        
+                        if (recoveredCount > 0) {
+                            Timber.i("Forensic Persistence Audit: Successfully restored $recoveredCount traces from spill-buffer.")
+                        }
                     } else {
                         resetBuffer()
+                        Timber.w("Forensic Persistence Audit: Spill-buffer indices out of bounds. Resetting.")
                     }
                 }
             }

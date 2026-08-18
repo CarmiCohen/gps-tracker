@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.17.07)
+# Project Issues & Hardening Tracking (Aug.17.10)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Clean | 0 |
 | **Validation Tasks** | 🔍 Pending | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 632 |
+| **Resolved (Total)** | 🟢 Progress | 637 |
 
 ---
 
@@ -17,17 +17,15 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🔴 Open Issues
-*   *No open critical issues. System stable and stress-tested.*
+*   **Issue #194: Battery Steep Discharge Logic Hardening**: Establishing baseline and saturation metrics to refine threshold logic.
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.17.07)
-*   **[Issue #189] [Severity: High] [Category: Forensic] Forensic Stress Test.**
-    *   **Resolution**: Successfully executed 5-minute CPU/IO saturation routine at 100Hz on API 35. Verified system survival, lack of ANRs, and successful recovery transition (R189).
-*   **[Issue #190] [Severity: Critical] [Category: Stability] Database Migration Failure (v68-v71).**
-    *   **Resolution**: Hardened `AppDatabase` by implementing aggressive deduplication in migrations, removing invalid `UNIQUE` constraints on `localId` in both entity and indices, and restoring the missing `sitVzRt` column in `connection_history` (R190).
-*   **[Issue #187] [Severity: Low] [Category: UI] Dashboard Layout Jitter.**
-    *   **Resolution**: Stabilized `InfoRow` in `OverlayComponents.kt` with fixed height (18.dp) and disabled font padding (R187).
+## 🟢 Recently Resolved Issues (Aug.17.10)
+*   **Issue #195: Database Migration Crash Loop**: 
+    *   Hardened `AppDatabase` migrations (`68` through `72`) to explicitly drop legacy indices before creation, resolving `UNIQUE constraint` violations.
+    *   Resolved `connection_history` schema mismatch by forcing the addition of `sitVzRt` in a hardened recovery migration (v72).
+    *   Verified successful app startup and UI rendering on physical device.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.17.07)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.17.10)

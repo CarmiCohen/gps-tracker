@@ -6,6 +6,10 @@ import org.junit.Test
 
 /**
  * ServiceBehaviorAuditTest: Audit of R406a Dynamic Polling Intervals.
+ * Aug.17.08:
+ * - Issue #191 Validation: Added Audit of Cooling Mode throttle to ensure 
+ *   thermal safety floor (30s GPS / 500ms Forensic) overrides all other 
+ *   behavioral states (R191).
  * [Issue #169] Geofence Accuracy vs. Battery Audit.
  */
 class ServiceBehaviorAuditTest {
@@ -13,6 +17,28 @@ class ServiceBehaviorAuditTest {
     private val mockTimeProvider = object : TimeProvider {
         override fun elapsedRealtime(): Long = 100000L
         override fun currentTimeMillis(): Long = 1700000000000L
+    }
+
+    @Test
+    fun `Audit Polling Interval - Cooling Mode Override`() {
+        val behavior = ServiceBehaviorUseCase(mockTimeProvider)
+        val stdFlags = ServiceBehaviorUseCase.DeviceSpecialFlags(isS21FE = false, isXiaomi = false)
+        
+        // SCENARIO: Moving, Geofence Active, Screen On (Normally 5s or 2s)
+        // BUT: Cooling Mode is ACTIVE.
+        val interval = behavior.calculateGpsInterval(
+            isCoolingMode = true, 
+            isSuspiciousMode = true, // Even if suspicious
+            isStationary = false, 
+            isScreenOn = true,
+            isGeofenceActive = true, 
+            nowRt = 100000L, 
+            deviceSpecialFlags = stdFlags
+        )
+        
+        // VERIFICATION: Thermal Safety Floor (30s) MUST be maintained.
+        assertEquals(COOLING_GPS_POLLING_MS, interval)
+        assertEquals(30000L, interval)
     }
 
     @Test
@@ -30,7 +56,6 @@ class ServiceBehaviorAuditTest {
         assertEquals(45000L, intervalOffNoGeoA15)
 
         // 1b. Moving, Screen OFF, Geofence ACTIVE -> 2s (HIGH_FREQUENCY_GPS_POLLING_MS)
-        // FIX VERIFICATION: R406a safety margin maintained. 45s drop bypassed.
         val intervalOffWithGeoA15 = behavior.calculateGpsInterval(
             isCoolingMode = false, isSuspiciousMode = false, isStationary = false, isScreenOn = false,
             isGeofenceActive = true, nowRt = 100000L, deviceSpecialFlags = a15Flags
@@ -41,7 +66,6 @@ class ServiceBehaviorAuditTest {
         val stdFlags = ServiceBehaviorUseCase.DeviceSpecialFlags(isS21FE = false, isXiaomi = false)
 
         // 2a. Moving, Screen OFF, Geofence ACTIVE -> 5s (MOVING_GPS_POLLING_MS)
-        // FIX VERIFICATION: R406a safety margin maintained for standard devices.
         val intervalOffWithGeoStd = behavior.calculateGpsInterval(
             isCoolingMode = false, isSuspiciousMode = false, isStationary = false, isScreenOn = false,
             isGeofenceActive = true, nowRt = 100000L, deviceSpecialFlags = stdFlags

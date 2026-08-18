@@ -20,13 +20,15 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.17.08:
+ * - Issue #192: Automated Recovery Latency Audit. Added latency measurement 
+ *   to startForensicSamplingLoop to log the time taken to resume high-frequency 
+ *   sampling post-thermal event (R192).
+ * - Issue #191 Validation: Handled CommandEvent.SimulateThermalEvent to 
+ *   verify dynamic polling throttle during simulated thermal events (R191).
  * Aug.16.13:
  * - Reverted Gated Sensor Start (Issue #186 rollback). Restored immediate 
  *   sensor registration to resolve Startup Black Screen regression.
- * Aug.16.10:
- * - Issue #184 Hardening: Hardened forensic stress test IO job with unique 
- *   filenames and transient error handling to prevent fatal crashes during 
- *   5-min CPU/IO saturation routine (R184).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -69,6 +71,9 @@ class TrackerService : BaseMonitorService() {
     private var lastForensicLng = 0.0
     private var lastForensicVibe = 0.0
     private var lastForensicTilt = 0.0
+
+    private var lastWasCooling = false
+    private var recoveryTriggerRt = 0L
 
     private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
 
@@ -280,7 +285,7 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start() }
                     is CommandEvent.TriggerForensicTest -> executeAutomatedStressTest()
-                    else -> {}
+                    is CommandEvent.SimulateThermalEvent -> integrityMonitor.simulateCoolingMode(event.active)
                 }
             }
         }
@@ -621,7 +626,12 @@ class TrackerService : BaseMonitorService() {
                 val lng = proc?.optimizedPoint?.lng ?: 0.0
                 val vibe = snapshot.vibration
                 val tilt = snapshot.tiltDegrees
-                
+
+                // Issue #192: Recovery Latency Audit
+                if (lastWasCooling && !health.isCoolingModeActive) {
+                    recoveryTriggerRt = timeProvider.elapsedRealtime()
+                }
+
                 val dist = if (lastForensicLat != 0.0) PhysicsUtils.calculateDistance(lastForensicLat, lastForensicLng, lat, lng) else Double.MAX_VALUE
                 val vibeDelta = abs(vibe - lastForensicVibe)
                 val tiltDelta = abs(tilt - lastForensicTilt)
@@ -653,7 +663,15 @@ class TrackerService : BaseMonitorService() {
                     health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS
                     else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS
                 }
-                
+
+                // Issue #192: Log recovery latency once loop resumes standard/peak frequency
+                if (recoveryTriggerRt > 0 && delayMs < FORENSIC_SAMPLING_INTERVAL_COOLING_MS) {
+                    val latency = timeProvider.elapsedRealtime() - recoveryTriggerRt
+                    logManager.logServiceEvent("Forensic Performance Audit: Thermal Recovery Latency: ${latency}ms", isImportant = true)
+                    recoveryTriggerRt = 0L
+                }
+
+                lastWasCooling = health.isCoolingModeActive
                 delay(delayMs)
             }
         }

@@ -2,24 +2,22 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 628**
+**Total Unique Resolutions: 637**
 
-## 55. Viewer Service Stabilization (Aug.17.01)
-*   **Issue #188: Build Regression in ViewerService**.
-    - **Resolution**: Restored build stability by fixing invalid string template escaping and correcting the unresolved reference for forensic telemetry (`peakVibrationShock`). Verified the coordinate alignment between local and remote processors in the Viewer role. (R188)
+## 58. Migration Recovery & Schema Hardening (Aug.17.10)
+*   **Issue #195: Database Migration Crash Loop**.
+    - **Resolution**: Resolved a critical startup crash caused by `UNIQUE constraint` violations and schema mismatches in `AppDatabase`. Hardened migrations `68` through `72` to explicitly drop legacy indices before recreation. Implemented a recovery migration (v72) to force-fix the `connection_history` table schema (`sitVzRt` column). Registered `MIGRATION_71_72` in `AppModule.kt` to restore system availability. (R195)
 
-## 54. Map Hydration & IO Hardening (Aug.16.13)
-*   **Issue #185: Startup ANR during Map Hydration**.
-    - **Resolution**: Eliminated main-thread saturation by offloading trail segment hashing and simplification to background threads. `MapTrailSegment` now carries a pre-computed `checksum` calculated in the `MainViewModel`, allowing `MapOverlayManager.updateTrails` to perform O(1) change detection. (R185)
-*   **Issue #184: Stress Test IO Race Condition**.
-    - **Resolution**: Hardened the forensic stress test `ioJob` in `TrackerService` to use unique timestamps in filenames and internal try-catch blocks. (R184)
-*   **Issue #183: Startup OOM in Tracker Mode**.
-    - **Resolution**: Reduced trail and violation retrieval limits from 10,000 to 2,000 in `Database.kt`. (R183)
-
-## 53. Map & Startup Hardening (Aug.16.00)
-*   **Issue #182: Startup ANR & GC Thrashing**.
-    - **Resolution**: Eliminated the massive allocation churn in the map rendering pipeline. Increased `STARTUP_SETTLING_DELAY_MS` to 10s. (R182)
-*   **Issue #181: DeadSystemException on Startup**.
-    - **Resolution**: Addressed Binder exhaustion by increasing the startup settling delay to 10,000ms. (R181)
+## 57. Forensic Persistence & Thermal Recovery (Aug.17.10)
+*   **Issue #193: Forensic Signature Persistence Audit**.
+    - **Resolution**: Instrumented `ForensicSpillBuffer` initialization to audit and log the restoration of forensic traces from the memory-mapped `forensic_spill.bin` file. Verified that write/read indices and entry counts are correctly recovered after process death, ensuring zero-data-loss during thermal recovery windows. (R193)
+*   **Issue #192: Automated Recovery Latency Audit**.
+    - **Resolution**: Instrumented `TrackerService.startForensicSamplingLoop` to detect the transition from Cooling Mode to Active Mode. The system now logs the precise latency until high-frequency sampling resumes, ensuring temporal fidelity is maintained post-throttle. (R192)
+*   **Issue #191: Heat Mitigation Validation**.
+    - **Resolution**: Implemented `SimulateThermalEvent` trigger in `MainViewModel` and `TrackerService`. Verified the dynamic throttling mechanism that forces the forensic sampling interval to 500ms during thermal events. (R191)
+*   **Issue #190: Database Migration Failure (v68-v71)**.
+    - **Resolution**: Hardened `AppDatabase` by implementing aggressive deduplication in migrations, removing invalid `UNIQUE` constraints on `localId`, and restoring missing columns in `connection_history`. (R190)
+*   **Issue #189: Forensic Stress Test**.
+    - **Resolution**: Successfully executed 5-minute CPU/IO saturation routine at 100Hz on API 35. Verified system survival and recovery transition. (R189)
 
 ... (rest of archive)

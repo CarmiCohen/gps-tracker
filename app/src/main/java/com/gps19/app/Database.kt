@@ -8,6 +8,9 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.17.10:
+ * - Issue #195 Hardening: Bumped to v72. Added MIGRATION_71_72 to resolve 
+ *   connection_history schema mismatch and force drop legacy UNIQUE indices.
  * Aug.17.07:
  * - Issue #190 Hardening: Added missing sitVzRt column to connection_history 
  *   in MIGRATION_70_71 to resolve IllegalStateException on startup (R190e).
@@ -254,7 +257,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 71, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 72, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -278,10 +281,29 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_71_72 = object : Migration(71, 72) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // R195: Hardened recovery for connection_history schema mismatch
+                try {
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN sitVzRt INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {
+                    // Column might already exist if migration 70_71 partially succeeded
+                }
+                
+                // Force non-unique indices to clear any persistent legacy UNIQUE constraints
+                db.execSQL("DROP INDEX IF EXISTS index_logs_type_timestamp_spillIdx")
+                db.execSQL("CREATE INDEX index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
+                db.execSQL("DROP INDEX IF EXISTS index_logs_localId")
+                db.execSQL("CREATE INDEX index_logs_localId ON logs (localId)")
+            }
+        }
+
         val MIGRATION_70_71 = object : Migration(70, 71) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // R190e: Correct schema mismatch in connection_history
-                db.execSQL("ALTER TABLE connection_history ADD COLUMN sitVzRt INTEGER NOT NULL DEFAULT 0")
+                try {
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN sitVzRt INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {}
 
                 // R190: Force non-unique indices to resolve legacy duplication conflicts
                 db.execSQL("DROP INDEX IF EXISTS index_logs_type_timestamp_spillIdx")
@@ -309,6 +331,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("DELETE FROM logs WHERE id NOT IN (SELECT MIN(id) FROM logs GROUP BY type, timestamp, spillIdx)")
 
                 db.execSQL("DROP INDEX IF EXISTS index_logs_type_spillIdx_timestamp")
+                db.execSQL("DROP INDEX IF EXISTS index_logs_type_timestamp_spillIdx")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
             }
         }

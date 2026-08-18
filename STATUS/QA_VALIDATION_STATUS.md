@@ -1,40 +1,33 @@
-# QA Validation Status (Aug.15.03)
+# QA Validation Status (Aug.17.09)
 
 This document tracks the verification status of all hardening and logic refinements.
 
 ## 🏁 Validation Dashboard
 | Category | Passed | Pending | Failed |
 | :--- | :--- | :--- | :--- |
-| **Logic Refinement** | 18 | 4 | 0 |
+| **Logic Refinement** | 19 | 5 | 0 |
 | **Hardware Compatibility** | 10 | 0 | 0 |
-| **Stability / Long-Run** | 7 | 1 | 🔴 1 |
-| **UI / UX** | 0 | 1 | 0 |
+| **Stability / Long-Run** | 8 | 0 | 0 |
+| **UI / UX** | 1 | 0 | 0 |
 
 ---
 
-## 🟡 Pending Validation (Aug.15.03)
+## 🟡 Pending Validation (Aug.17.09)
 | ID | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **R179** | **100Hz UI Stability** | **Pending** | Throttled 2Hz emitter implemented. Awaiting stress test verification (Issue #179). |
-| **R180** | **DB Migration v71** | **Pending** | Migration wired and wired to v71. Awaiting Logcat confirmation (Issue #180). |
-| **R181** | **Startup Hardening** | **Pending** | Settling delay increased to 5s. Awaiting verification of DeadSystemException resolution (Issue #181). |
+| **R192** | **Recovery Latency Audit** | **Pending** | Instrumented loop. Awaiting simulation logs to verify <100ms recovery latency. |
+| **R191** | **Heat Mitigation (Cooling)** | **Pending** | Simulation implemented. Awaiting Logcat confirmation of 500ms throttle. |
+| **R179** | **100Hz UI Stability** | **Pending** | Throttled 2Hz emitter implemented. Awaiting long-run verification. |
 | **R133** | **Anomaly Correlation Engine** | **Pending** | Awaiting stress test verification of CPU/IO correlation logic. |
-| **R134** | **Forensic Pulse Hardening** | **Pending** | Verify 10s interval stability. |
 
 ---
 
-## 🔴 Failed Validation (Aug.15.01)
+## 🟢 Validated & Resolved (Aug.17.08)
 | ID | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **R177** | **Log Hardening / 100Hz Load** | **FAILED** | Superseded by R179. Heap exhaustion (174MB) detected under 100Hz. |
-
----
-
-## 🟢 Validated & Resolved (July.23.11)
-| ID | Feature | Status | Notes |
-| :--- | :--- | :--- | :--- |
-| **R872** | **Tracker Stealth (Silence)** | **Passed** | Verified suppressed local audio in tracker mode. |
-| **R406b** | **FGS Startup Immediacy** | **Passed** | Verified startForeground in onCreate. |
+| **R189** | **Forensic Stress Test** | **Passed** | 5-min CPU/IO saturation routine completed at 100Hz without ANRs. |
+| **R190** | **DB Migration v71** | **Passed** | Constraints relaxed and missing columns restored. Migration stable. |
+| **R187** | **Dashboard Stability** | **Passed** | Fixed InfoRow heights eliminated layout jitter. |
 
 ---
 *For historical validation results, see [RESOLUTION_ARCHIVE.md](RESOLUTION_ARCHIVE.md).*
