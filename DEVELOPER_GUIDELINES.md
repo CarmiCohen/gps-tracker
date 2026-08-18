@@ -25,4 +25,4 @@ Perform the full sequence once the specific issue is resolved:
 - **k.** Recheck `issues.md`, `sot_master_requirements.md`, `resolution_archive.md`, and `handover.md`.
 - **l.** Do not fix more than one issue, do not continue to the next issue: after completing the issue - stop this chat.
 - **m.** Please verify that the removal of the lines from issues.md, sot_master_requirements.md, resolution_archive.md, and build.gradle is correct.
-- **n.** Suggest your ideas, if you have, how to simplify the code and the app, so that it will be easier to work with. Save your ideas in Simplify_Ideas.md
+- **n.** Suggest your ideas, if you have, how to simplify the code and the app, so that it will be easier to work with. Save your ideas in Simplify_Ideas2.md

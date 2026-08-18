@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.18.05:
+ * - Issue #201 Hardening: Urban Edge Case Multipath Mitigation. Introduced 
+ *   JUMP_WEIGHT_LOW_SNR and ANCHOR_SKEPTICISM thresholds to harden the engine 
+ *   against signal bouncing in urban canyons (R201).
  * Aug.18.01:
  * - Issue #197: Forensic Storage-Aware Adaptive Pruning. Refined ADAPTIVE_PRUNE 
  *   thresholds and introduced forensic-specific retention limits to handle 
@@ -112,6 +116,7 @@ const val JUMP_WEIGHT_ALTITUDE_DELTA = 30
 const val JUMP_WEIGHT_TRADITIONAL_SPEED = 50
 const val JUMP_WEIGHT_ACCURACY_LOW = 30
 const val JUMP_WEIGHT_ACCURACY_HIGH = 20
+const val JUMP_WEIGHT_LOW_SNR = 40 // Issue #201: Urban Canyon Hardening
 
 const val JUMP_GATE_SENSOR_MISMATCH_MPS = 2.0
 const val JUMP_GATE_SPEED_ACCURACY_LOW_MPS = 22.2
@@ -119,6 +124,7 @@ const val JUMP_GATE_SPEED_ACCURACY_HIGH_MPS = 8.3
 const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0
 const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0
 const val JUMP_GATE_VISUAL_JITTER_METERS = 10.0
+const val JUMP_GATE_LOW_SNR_THRESHOLD = 22.0 // Issue #201: Multipath Threshold
 
 // Bayesian Uncertainty Growth (R460 / Issue #460)
 const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0 // 54 km/h conservative drift
@@ -274,6 +280,7 @@ const val ANCHOR_VELOCITY_WEIGHT_MPS = 15.0
 const val ANCHOR_DISPLACEMENT_WEIGHT = 8.0 
 const val ANCHOR_IMU_DAMPING_FACTOR = 0.5 
 const val ANCHOR_ACCURACY_PENALTY_LIMIT = 40.0 
+const val ANCHOR_SKEPTICISM_LOW_SNR_FACTOR = 0.5 // Issue #201: Urban Damping
 
 const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 
 

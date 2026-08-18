@@ -25,6 +25,10 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.18.03:
+ * - Issue #198 Performance Audit: Throttled localLocation and trackerLocation 
+ *   collectors to 10Hz (100ms) to prevent UI thread saturation during 
+ *   high-frequency forensic bursts (R198).
  * Aug.17.08:
  * - Issue #191 Validation: Implemented simulateThermalEvent() to trigger 
  *   dynamic polling throttle verification (R191). Fixed 'event.id' reference.
@@ -32,9 +36,6 @@ import javax.inject.Inject
  * - Issue #185 Hardening: Implemented background trail simplification and 
  *   segmentation via trackerTrailSegments and viewerTrailSegments flows. 
  *   Offloads O(N) simplification from the UI thread to eliminate Startup ANR (R185).
- * - Issue #185 Hardening: Offloaded MapTrailSegment checksum computation 
- *   to background thread within computeTrailSegments to eliminate O(N) 
- *   hashCode() calls on the main thread (R185).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -375,8 +376,18 @@ class MainViewModel @Inject constructor(
         stateSubscriptionUseCase.observeGnssDetail().onEach { _gnssDetail.value = it }.flowOn(Dispatchers.Main.immediate).launchIn(viewModelScope)
         stateSubscriptionUseCase.observeGpsIndex().onEach { _gpsIndexData.value = it }.flowOn(Dispatchers.Main.immediate).launchIn(viewModelScope)
 
-        viewModelScope.launch(Dispatchers.Main.immediate) { repository.localLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
-        viewModelScope.launch(Dispatchers.Main.immediate) { repository.trackerLocation.collect { update -> update?.let { handleLocationUpdateInternal(update) } } }
+        // Issue #198: Throttle UI telemetry updates to 10Hz (100ms) to prevent UI thread saturation during bursts.
+        viewModelScope.launch(Dispatchers.Main.immediate) { 
+            repository.localLocation
+                .sample(100L) 
+                .collect { update -> update?.let { handleLocationUpdateInternal(it) } } 
+        }
+        viewModelScope.launch(Dispatchers.Main.immediate) { 
+            repository.trackerLocation
+                .sample(100L)
+                .collect { update -> update?.let { handleLocationUpdateInternal(it) } } 
+        }
+
         viewModelScope.launch(Dispatchers.Main.immediate) { repository.connectedViewers.collect { viewers -> 
             updateDiagnosticState { current ->
                 current.apply {

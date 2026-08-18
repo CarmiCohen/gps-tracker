@@ -5,12 +5,12 @@ import kotlin.math.max
 
 /**
  * AnchorEvaluator: Manages stationary anchor state and breakout logic.
+ * Aug.18.05:
+ * - Issue #201: Urban Edge Case Multipath Mitigation. Integrated IMU-guarded 
+ *   anchor maintenance to prevent drift breakouts during low-SNR urban scenarios (R201).
  * Aug.04.50:
  * - Issue #715: Build Hardening. Applied breakout leniency during accuracy snaps 
  *   to ensure coordinate-snap artifacts don't trigger premature anchor release.
- * Aug.03.37:
- * - Issue #669: Refactored to utilize mutable flyweight patterns for EngineGeoPoint 
- *   to resolve build errors and ensure zero-churn compliance (R668).
  */
 class AnchorEvaluator(
     private val onLog: (String, Double, Double, Double, Double?) -> Unit
@@ -59,13 +59,19 @@ class AnchorEvaluator(
         isSuspicious: Boolean,
         isAdaptationMuzzled: Boolean,
         isAccuracySnap: Boolean,
+        snr: Double = 0.0,
         vibeIndex: Double?
     ): AnchorResult {
         var skipPersistence = false
         var isLockedNow = false
         var finalPoint = point
 
-        if (!isSuspicious && !isAdaptationMuzzled && stationaryProb > ANCHOR_ENGAGEMENT_PROBABILITY) {
+        // Issue #201: Urban Canyon Hardening. If already anchored and physically stationary with low SNR, 
+        // we hold the anchor even if GPS-derived stationaryProb drops below threshold (Multipath Mitigation).
+        val isLowSnr = snr > 0 && snr < JUMP_GATE_LOW_SNR_THRESHOLD
+        val shouldHoldAnchor = isAnchorActive && isPhysicallyStationary && isLowSnr
+        
+        if (!isSuspicious && !isAdaptationMuzzled && (stationaryProb > ANCHOR_ENGAGEMENT_PROBABILITY || shouldHoldAnchor)) {
             // 1. Engagement Logic
             if (!isAnchorActive && isPhysicallyStationary) {
                 parkingAnchorPoint.update(point.lat, point.lng, point.alt, point.ts, point.rt, point.accuracy, point.maxAccuracy)
@@ -118,6 +124,9 @@ class AnchorEvaluator(
                         } else 1.0
 
                         val imuDamping = if (isPhysicallyStationary) ANCHOR_IMU_DAMPING_FACTOR else 1.0
+                        
+                        // Issue #201: Multipath/Urban Damping
+                        val snrDamping = if (isLowSnr) ANCHOR_SKEPTICISM_LOW_SNR_FACTOR else 1.0
 
                         val zoneProgress = (distFromAnchor - transitionZoneStart) / (breakoutThreshold - transitionZoneStart)
                         var increment = (zoneProgress * 25.0).coerceIn(0.0, 50.0)
@@ -125,7 +134,7 @@ class AnchorEvaluator(
 
                         val safetyValveFactor = if (distFromAnchor > breakoutThreshold * 2.0) 2.0 else 1.0
 
-                        anchorEscapeScore += (increment * accuracyPenalty * imuDamping * safetyValveFactor)
+                        anchorEscapeScore += (increment * accuracyPenalty * imuDamping * snrDamping * safetyValveFactor)
                     } else {
                         anchorEscapeScore = (anchorEscapeScore * 0.8).coerceAtLeast(0.0)
                     }

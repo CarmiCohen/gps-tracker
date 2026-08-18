@@ -5,16 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Aug.18.05:
+ * - Issue #201: Urban Edge Case Multipath Mitigation. Dampened stationaryProb 
+ *   decay when physically stationary in low-SNR environments (R201).
  * Aug.14.06:
  * - Issue #172: Viewer-Side State Audit. Finalized forensic parity by adding 
  *   Vz timestamps (sitVzTs, sitVzRt) to loadForensicState (R172).
- * Aug.14.04:
- * - Issue #172: Viewer-Side State Audit. Enhanced loadForensicState to restore 
- *   full SIT telemetry (Vz, Dz, Baro, Tilt, Shock) for mirror parity (R172).
- * Aug.11.14:
- * - Issue #141: Stress Recovery Verification. Refactored runSensorSentinel() 
- *   to checkPhysicalTamper() to allow sensor-only status polling in the 
- *   service tick loop (R141). Corrected parameter names.
  */
 class LocationSentinel {
 
@@ -136,7 +132,18 @@ class LocationSentinel {
             estimatedBearing = PhysicsUtils.smoothBearing(estimatedBearing, bearing, BEARING_EMA_ALPHA)
             
             val prob = if (estimatedSpeedMps < STATIONARY_SPEED_THRESHOLD_MPS) 1.0 else 0.0
-            stationaryProb = PhysicsUtils.smoothCoordinate(stationaryProb, prob, POSITION_EMA_ALPHA_STATIONARY)
+            
+            // Issue #201: Urban Canyon Dampening.
+            // If physically stationary but GPS speed suggests motion in a low-SNR environment,
+            // we dampen the probability decay to avoid rapid anchor release.
+            val isLowSnr = lastSnr > 0 && lastSnr < JUMP_GATE_LOW_SNR_THRESHOLD
+            val alpha = if (isStationary() && isLowSnr && prob < stationaryProb) {
+                POSITION_EMA_ALPHA_STATIONARY * 0.2 // 5x slower decay
+            } else {
+                POSITION_EMA_ALPHA_STATIONARY
+            }
+            
+            stationaryProb = PhysicsUtils.smoothCoordinate(stationaryProb, prob, alpha)
         }
     }
 

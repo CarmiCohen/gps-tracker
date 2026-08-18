@@ -1,4 +1,4 @@
-# Simplify & Optimization Ideas (Aug.18.01)
+# Simplify & Optimization Ideas (Aug.18.04)
 
 ## 1. Tracking Engine & Forensic Pipeline
 1.1. **Flyweight & Pooling**:
@@ -68,6 +68,7 @@
     2.3.5. Unified Rendering Engine: Define sensor ribbons via a data-driven configuration list (e.g., in `AnalyticalRibbons`) to make adding/removing sensors easier.
     2.3.6. Use `PreviewParameterProvider` and a `PreviewPrototyper` to simplify UI testing and mocking.
     2.3.7. Implement `Lambda Stability` (memoization) and parameter bundling (`MarkerData`) to reduce recomposition.
+    2.3.8. **Visual Gating**: Introduce a `MainViewGate` composable that selectively detaches or replaces high-churn UI components when they are not in the viewport, further reducing recomposition costs in dense dashboards.
 2.4. **Reactive Primitives**:
     2.4.1. Use `DashboardPresenter` or `State Reducers` to pre-compute display strings/formatting before they reach Composables.
     2.4.2. Move label formatting (e.g., `standbyBucket` text mapping) from the UI layer into the `DashboardState` mapper to keep presenters "dumb."
@@ -173,7 +174,7 @@
     5.5.2. Database Migration Automation: Enable `exportSchema = true` and use Room `AutoMigration` for simpler schema changes.
     5.5.3. Refactor the Migration Baseline: Set a new "Baseline" version (e.g., version 50) and use `fallbackToDestructiveMigration()` for very old versions.
     5.5.4. Harmonize Type-Safety for Default Values: Use a sealed class or constants (e.g. `PersistenceDefaults.REAL`) for Entity definitions and migration SQL.
-    5.5.5. Protobuf-First Persistence: Use Protobuf BLOBs in Room entities like `HistoryEntity` to avoid frequent schema migrations for new sensors.
+    5.5.5. **Protobuf-First Persistence**: Use Protobuf BLOBs in Room entities like `HistoryEntity` to avoid frequent schema migrations for new sensors.
     5.5.6. Implement batching for log emissions and batching optimizations for Room writes using a bounded queue.
     5.5.7. Pruning Policy: Centralize database pruning logic into a `WorkManager` task rather than triggering inside write operations.
     5.5.8. Bypass JVM heap by binding raw primitive arrays from buffers directly to SQLite `INSERT` statements.

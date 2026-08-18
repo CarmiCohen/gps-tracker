@@ -4,11 +4,12 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: High-performance geospatial and kinematic calculations.
+ * Aug.18.05:
+ * - Issue #201: Urban Edge Case Multipath Mitigation. Incorporated SNR-based 
+ *   weighting into isVisualJump to harden detection against signal bouncing (R201).
  * July.30.52:
  * - Issue #653: Performance: GC Churn Optimization. Refactored isVisualJump 
  *   to accept a mutable flyweight, eliminating per-call allocations (R-HARDWARE-01).
- * July.30.48:
- * - Issue #653: Performance: GC Churn Optimization.
  */
 object PhysicsUtils {
 
@@ -188,6 +189,11 @@ object PhysicsUtils {
         if (speedMps > JUMP_GATE_SPEED_ACCURACY_LOW_MPS && accuracy > JUMP_GATE_ACCURACY_LOW_THRESHOLD) score += JUMP_WEIGHT_ACCURACY_LOW
         if (speedMps > JUMP_GATE_SPEED_ACCURACY_HIGH_MPS && accuracy > JUMP_GATE_ACCURACY_HIGH_THRESHOLD) score += JUMP_WEIGHT_ACCURACY_HIGH
         
+        // Issue #201: Urban Canyon / Multipath SNR Weighting
+        if (snr > 0 && snr < JUMP_GATE_LOW_SNR_THRESHOLD) {
+            score += JUMP_WEIGHT_LOW_SNR
+        }
+
         // Issue #529: Accuracy Recovery Mitigation
         val isAccuracyImproving = lastAccuracy > 0.0 && accuracy < (lastAccuracy * 0.8)
         val isWithinPreviousError = lastAccuracy > 0.0 && dist < lastAccuracy
@@ -209,7 +215,10 @@ object PhysicsUtils {
         result.tier = if (isTier2) 2 else if (isTier3) 3 else 0
         result.reason = when {
             isSnap -> "Suppressed Accuracy Snap"
-            !hasPhysicalMotion && speedMps > mismatchGate -> "Sensor Mismatch Jump (Urban Canyon)"
+            !hasPhysicalMotion && speedMps > mismatchGate -> {
+                if (snr > 0 && snr < JUMP_GATE_LOW_SNR_THRESHOLD) "Multipath Signal Bounce (Low SNR)"
+                else "Sensor Mismatch Jump (Urban Canyon)"
+            }
             isTier2 -> "Security Jump"
             isTier3 -> "Visual Jitter"
             score >= 50 -> "High Confidence Jump"

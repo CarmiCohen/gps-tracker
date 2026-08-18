@@ -6,6 +6,9 @@ import org.junit.Test
 
 /**
  * AnchorEvaluatorTest: Verifies stationary anchor logic (R990c, R990d, R990e).
+ * Aug.18.05:
+ * - Issue #201: Multipath Mitigation Audit. Added test for SNR-based damping 
+ *   to verify urban canyon drift resistance (R201).
  * Aug.03.37:
  * - Issue #669: Refactored to eliminate .copy() usage on EngineGeoPoint 
  *   to resolve build errors following zero-churn transition.
@@ -41,6 +44,7 @@ class AnchorEvaluatorTest {
             isSuspicious = false,
             isAdaptationMuzzled = false,
             isAccuracySnap = false,
+            snr = 30.0,
             vibeIndex = 0.1
         )
 
@@ -60,6 +64,7 @@ class AnchorEvaluatorTest {
                 isSuspicious = false,
                 isAdaptationMuzzled = false,
                 isAccuracySnap = false,
+                snr = 30.0,
                 vibeIndex = 0.1
             )
         }
@@ -73,7 +78,7 @@ class AnchorEvaluatorTest {
     @Test
     fun `test breakout by physical motion`() {
         val basePoint = createPoint(32.7940, 34.9896, 10.0)
-        evaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 0.1)
+        evaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 30.0, 0.1)
         assertTrue(evaluator.isLocked())
 
         val movingPoint = createPoint(32.7945, 34.9896, 10.0) // ~55m away
@@ -86,6 +91,7 @@ class AnchorEvaluatorTest {
             isSuspicious = false,
             isAdaptationMuzzled = false,
             isAccuracySnap = false,
+            snr = 30.0,
             vibeIndex = 0.5
         )
 
@@ -96,14 +102,14 @@ class AnchorEvaluatorTest {
     fun `test safety valve breakout`() {
         val basePoint = createPoint(32.7940, 34.9896, 10.0)
         // Engagement
-        evaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 0.1)
+        evaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 30.0, 0.1)
         
         // Large displacement (25m). Safety valve should accelerate breakout despite IMU damping.
         val farPoint = createPoint(32.7940 + 0.000225, 34.9896, 10.0)
         
         var brokeOut = false
         repeat(20) {
-            val res = evaluator.evaluate(farPoint, true, 0.95, 0.0, 10.0, false, false, false, 0.1)
+            val res = evaluator.evaluate(farPoint, true, 0.95, 0.0, 10.0, false, false, false, 30.0, 0.1)
             if (!res.isLocked) {
                 brokeOut = true
             }
@@ -116,15 +122,55 @@ class AnchorEvaluatorTest {
     @Test
     fun `test accuracy snap suppression`() {
         val basePoint = createPoint(32.7940, 34.9896, 10.0)
-        evaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 0.1)
+        evaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 30.0, 0.1)
         
         val snapPoint = createPoint(32.7940 + 0.00008, 34.9896, 10.0) // ~9m shift
         
         // Simulate Accuracy Snap
         repeat(5) {
-            evaluator.evaluate(snapPoint, true, 0.95, 0.0, 10.0, false, false, true, 0.1)
+            evaluator.evaluate(snapPoint, true, 0.95, 0.0, 10.0, false, false, true, 30.0, 0.1)
         }
         
         assertTrue("Accuracy Snap should delay breakout", evaluator.isLocked())
+    }
+
+    @Test
+    fun `test snr based damping for urban canyon`() {
+        val basePoint = createPoint(32.7940, 34.9896, 10.0)
+        evaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 30.0, 0.1)
+        
+        // Thresholds: accuracy 10m -> threshold 8m. Zone starts at 4m.
+        // Pick a point ~6m away (0.000054 lat). This is IN the scoring zone but BELOW the hard breakout threshold.
+        val driftPoint = createPoint(32.794054, 34.9896, 10.0)
+        
+        // Scenario A: High SNR (Clear Sky) - Should breakout relatively quickly
+        val highSnrEvaluator = AnchorEvaluator { _, _, _, _, _ -> }
+        highSnrEvaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 30.0, 0.1)
+        
+        var highSnrBreakoutIteration = -1
+        for (i in 1..100) {
+            val res = highSnrEvaluator.evaluate(driftPoint, true, 0.95, 0.0, 10.0, false, false, false, 30.0, 0.1)
+            if (!res.isLocked) {
+                highSnrBreakoutIteration = i
+                break
+            }
+        }
+        
+        // Scenario B: Low SNR (Urban Canyon) - Damping should delay breakout significantly
+        val lowSnrEvaluator = AnchorEvaluator { _, _, _, _, _ -> }
+        lowSnrEvaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 30.0, 0.1)
+        
+        var lowSnrBreakoutIteration = -1
+        for (i in 1..100) {
+            val res = lowSnrEvaluator.evaluate(driftPoint, true, 0.95, 0.0, 10.0, false, false, false, 15.0, 0.1) // Low SNR
+            if (!res.isLocked) {
+                lowSnrBreakoutIteration = i
+                break
+            }
+        }
+        
+        assertTrue("High SNR should breakout eventually", highSnrBreakoutIteration > 0)
+        assertTrue("Low SNR ($lowSnrBreakoutIteration) should take longer than High SNR ($highSnrBreakoutIteration) due to damping",
+            lowSnrBreakoutIteration == -1 || lowSnrBreakoutIteration > highSnrBreakoutIteration)
     }
 }

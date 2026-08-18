@@ -20,15 +20,12 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Aug.18.05:
+ * - Issue #201: Urban Edge Case Multipath Mitigation. Integrated SNR-based 
+ *   anchor evaluation to harden stationary state management in urban canyons (R201).
  * Aug.14.06:
  * - Issue #172: Viewer-Side State Audit. Finalized forensic parity by adding 
  *   Vz timestamps (sitVzTs, sitVzRt) to loadState (R172).
- * Aug.14.04:
- * - Issue #172: Viewer-Side State Audit. Expanded loadState to restore full 
- *   SIT forensic parameters (Vz, Dz, Baro, Tilt, Shock) to sentinel (R172).
- * Aug.13.02:
- * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
- *   type inference failures (R146/R151).
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -447,6 +444,7 @@ class LocationProcessor(
                 isSuspicious = isSuspicious || isAdaptationMuzzled,
                 isAdaptationMuzzled = isAdaptationMuzzled,
                 isAccuracySnap = sentinelResult.jumpConfidence?.reason?.contains("Suppressed Accuracy Snap") == true,
+                snr = snr,
                 vibeIndex = sentinel.currentVibrationIndex
             )
 

@@ -1,28 +1,27 @@
-# Handover (Aug.18.02) - Forensic Pipeline Hardened
+# Handover (Aug.18.05) - Urban Multipath Hardened
 
-## 🎯 Next Objective: Issue #198 - Forensic UI Performance & Recomposition Audit
-- **Goal**: Verify that the 100Hz forensic data stream and background pruning/draining tasks do not starve the UI thread or cause redundant recompositions in the `TrackerScreen`.
-- **Status**: 🟢 **READY**.
-- **Context**: The persistence and buffer layers are now hardened (R196, R197). The next bottleneck is likely UI thread contention during peak forensic bursts.
+## 🎯 Next Objective: Issue #202 - Forensic Performance: JNI Memory Pressure Audit
+- **Goal**: Audit the JNI bridge and `LatencyMonitor` for potential memory pressure or allocation hotspots during sustained 100Hz forensic bursts.
+- **Status**: ⚪ **PENDING ANALYSIS**.
+- **Context**: With multipath mitigation and UI throttling resolved, we need to ensure the low-level JNI layer is optimized for long-duration forensic sessions on budget hardware (A15).
 
-## 🧬 System Status (vAug.18.02)
-The forensic logging and storage pipeline is now hardened for sustained 100Hz operation:
+## 🧬 System Status (vAug.18.05)
+The engine is now hardened against urban signal bouncing:
 
-### 1. Storage-Aware Adaptive Pruning (#197)
-*   **Chunked Deletion**: Implemented `pruneForensicByThreshold` in `LogDao` using `LIMIT` to ensure database transactions remain short and non-blocking.
-*   **Adaptive Retention**: Introduced `FORENSIC_PRUNE_LIMIT` constants in `EngineConstants.kt`. Targets scale from 1,000 (Critical Storage) to 50,000 (Charging/Stable) traces.
-*   **Throttled Pruning**: `LogRepository.proactivePruning` now utilizes adaptive delays between chunks to minimize IO contention.
+### 1. Urban Multipath Mitigation (#201) - RESOLVED
+*   **Implementation**: `AnchorEvaluator.kt` now maintains the stationary lock even if GPS `stationaryProb` drops, provided the IMU verifies physical stability and SNR is low (indicating signal bounce).
+*   **Refinement**: `LocationSentinel.kt` dampens `stationaryProb` decay in low-SNR environments to prevent jittery state transitions.
+*   **Result**: Reduced risk of false geofence alerts during pure signal drift in urban canyons.
 
-### 2. Forensic Buffer & Draining (#196)
-*   **Capacity Expansion**: `LOG_BUFFER_CAPACITY` increased to 5000; `LOG_BATCH_SIZE` to 100.
-*   **Emergency Draining**: Prioritizes buffer relief (>90% fill) even under high CPU load (>0.8) to prevent `FORENSIC_OVERFLOW`.
+### 2. UI Telemetry Throttling (#198) - RESOLVED
+*   **Status**: Hardened UI pipeline (10Hz visual vs 100Hz forensic) verified stable.
 
-### 3. Battery & Thermal Hardening (#194)
-*   **Load-Aware Logic**: Battery discharge sensitivity automatically adjusts when 100Hz sampling is active.
+### 3. Documentation & Hygiene
+*   **SOT**: Added R201 to `STATUS/SOT_MASTER_REQUIREMENTS.md`.
+*   **Version**: Incremented to Aug.18.05.
 
-## 🛠️ Execution Sequence for Next Task
-1.  **Profile**: Use Compose Tracing to identify recomposition hotspots in `LogComponents` and `Ribbon` views during a forensic burst.
-2.  **Optimize**: Ensure all 100Hz telemetry flows use `sample()` or `conflate()` before reaching the UI.
-3.  **Validate**: Verify zero "Skipped frames" warnings in Logcat during a `RequestForensicTest` event.
+## 🛠️ Execution Sequence for Next Session
+1.  **Profile JNI Allocations**: Monitor `LatencyMonitor` overhead during a 10-minute 100Hz forensic burst.
+2.  **Audit Buffer Handlers**: Verify JNI string/array management in `GpsManager` (or relevant native components) for leaks.
 
-vAug.18.02
+vAug.18.05
