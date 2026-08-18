@@ -1,25 +1,25 @@
-# Handover (Aug.17.11) - Battery Health Hardened
+# Handover (Aug.18.01) - Forensic Audit Hardened
 
-## 🎯 Next Objective: Issue #196 - Forensic Log Buffer Pressure Audit
-- **Goal**: Analyze log buffer pressure during 100Hz sampling to prevent `FORENSIC_OVERFLOW` violations.
-- **Status**: 🟢 **READY FOR BASELINE**.
-- **Context**: Battery discharge logic is now load-aware (#194), preventing false alarms during stress tests.
+## 🎯 Next Objective: Issue #197 - Forensic Storage-Aware Adaptive Pruning Refinement
+- **Goal**: Optimize `proactivePruning` in `LogRepository` to account for high-frequency forensic trace accumulation rates.
+- **Status**: 🟢 **READY**.
+- **Context**: 100Hz sampling is now stable at the buffer level, but long-term storage pressure requires more aggressive pruning during charging or high-storage-usage states.
 
-## 🧬 System Status (vAug.17.11)
-System integrity hardened with load-aware battery health monitoring:
+## 🧬 System Status (vAug.18.01)
+Forensic logging pipeline hardened against backpressure:
 
-### 1. Battery Health Hardening (#194)
-*   **Load-Aware Thresholds**: Introduced `BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL` (4%) and `HIGH_LOAD` (8%) in `EngineConstants.kt`.
-*   **Dynamic Sensitivity**: Updated `IntegrityMonitor.kt` to select thresholds based on CPU load (>70%) or Thermal Throttling status.
-*   **Diagnostic Logs**: Improved logging in `checkBatteryDischarge()` to include load context (e.g., "High Load: CPU 0.8") when violations occur.
-*   **Verification**: The system now correctly accounts for the increased power consumption of 100Hz forensic sampling.
+### 1. Forensic Buffer Hardening (#196)
+*   **Capacity Expansion**: Increased `LOG_BUFFER_CAPACITY` to 5000 and `LOG_BATCH_SIZE` to 100 to handle peak 100Hz bursts.
+*   **Aggressive Draining**: Lowered `FORENSIC_FILL_THRESHOLD` to 25% (2500 traces) to initiate database flushing earlier.
+*   **Pressure Prioritization**: Modified `LogRepository.startForensicDrainer()` to bypass CPU load throttling when the buffer is at emergency fill levels (>90%) or under high pressure.
+*   **Verification**: 5-minute stress test saturation verified with zero `FORENSIC_OVERFLOW` alerts.
 
-### 2. Migration Hardening (#195)
-*   **Resolved**: Database migration crash loop fixed by dropping legacy indices and forcing schema recovery for `connection_history`.
+### 2. Battery Health Hardening (#194)
+*   **Load-Aware Logic**: Thresholds automatically scale to 8% discharge during high-load forensic sampling.
 
 ## 🛠️ Execution Sequence for Next Task
-1.  **Monitor**: Observe `logManager.isForensicBufferUnderPressure()` during 100Hz sampling.
-2.  **Audit**: Measure time spent in `logForensicTraceOptimized` under peak pressure.
-3.  **Refinement**: Adjust `LOG_BUFFER_CAPACITY` or `LOG_BATCH_SIZE` if necessary.
+1.  **Monitor**: Analyze storage growth rate during sustained 100Hz sampling.
+2.  **Refine**: Adjust `ADAPTIVE_PRUNE_THRESHOLD` values in `EngineConstants.kt`.
+3.  **Optimize**: Implement chunk-based pruning in `LogDao` for forensic-specific types to reduce transaction locking.
 
-vAug.17.11
+vAug.18.01

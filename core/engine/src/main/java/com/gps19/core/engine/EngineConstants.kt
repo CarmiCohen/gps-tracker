@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.18.00:
+ * - Issue #196: Forensic Log Buffer Pressure Audit. Increased LOG_BUFFER_CAPACITY 
+ *   to 5000 and LOG_BATCH_SIZE to 100 to handle 100Hz sampling bursts (R196).
  * Aug.17.11:
  * - Issue #194 Hardening: Refined Battery Steep Discharge logic. Introduced 
  *   load-aware thresholds (NORMAL vs HIGH_LOAD) to account for 100Hz forensic 
@@ -10,15 +13,6 @@ package com.gps19.core.engine
  * - Issue #182 Hardening: Increased STARTUP_SETTLING_DELAY_MS to 10000ms to 
  *   prevent Binder exhaustion and DeadSystemException during heavy startup 
  *   hydration on emulator environments (R182).
- * Aug.15.03:
- * - Issue #182 Hardening: Reduced MAX_HISTORY_POINTS_PER_RIBBONS to 300 
- *   to align with DB retrieval limits and eliminate Interaction ANRs (R182).
- * - Issue #182 Hardening: Increased LANDING_PAGE_PAUSE_MS to 10000ms to 
- *   prevent Startup ANR and GC thrashing caused by early background 
- *   maintenance during Map hydration (R182).
- * - Issue #181 Hardening: Increased STARTUP_SETTLING_DELAY_MS to 5000ms to 
- *   prevent DeadSystemException/Binder exhaustion during heavy DB migration 
- *   v56-v71 on resource-constrained environments (R181).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -46,9 +40,9 @@ const val SILENT_FAILURE_IOW_THRESHOLD = 0.40
 const val SILENT_FAILURE_LATENCY_THRESHOLD_MS = 800L
 
 // Issue #660: Forensic Audit: Log Buffer Pressure
-const val LOG_BATCH_SIZE = 50
+const val LOG_BATCH_SIZE = 100 // Refined for Issue #196
 const val LOG_BATCH_DELAY_MS = 2000L
-const val LOG_BUFFER_CAPACITY = 2000
+const val LOG_BUFFER_CAPACITY = 5000 // Refined for Issue #196
 
 // Issue #669: Forensic Spill-Buffer (MappedByteBuffer)
 const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"

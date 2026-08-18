@@ -19,6 +19,10 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.18.00:
+ * - Issue #196: Forensic Log Buffer Pressure Audit. Lowered FORENSIC_FILL_THRESHOLD 
+ *   to 25% and modified drainer logic to prioritize high-pressure relief even 
+ *   under high CPU load to prevent FORENSIC_OVERFLOW (R196).
  * Aug.15.01:
  * - Issue #179: Forensic Performance Optimization. Removed heap-intensive manual 
  *   signature checking in favor of DB-level UNIQUE constraints (R179).
@@ -54,7 +58,8 @@ class LogRepository @Inject constructor(
         private val COLON_VALUE_REGEX = Regex(""":\s*-?\d+(\.\d+)?\s*[A-Za-z%°]*""")
         private val SPACE_VALUE_REGEX = Regex("""\s+-?\d+(\.\d+)?\s*[A-Za-z%°]*""")
         
-        private const val FORENSIC_FILL_THRESHOLD = FORENSIC_SPILL_CAPACITY / 2
+        // Issue #196: Lowered to 25% to trigger draining earlier.
+        private const val FORENSIC_FILL_THRESHOLD = FORENSIC_SPILL_CAPACITY / 4
         private const val FORENSIC_CONVERGENCE_STALL_LIMIT = 3
         private const val FORENSIC_EMERGENCY_FILL_LEVEL = 0.9
         private const val RELIABILITY_EMA_ALPHA = 0.1 
@@ -128,8 +133,11 @@ class LogRepository @Inject constructor(
                     val pendingAtStart = buffer.getPendingCount()
                     val fillLevel = pendingAtStart.toDouble() / FORENSIC_SPILL_CAPACITY
                     val isEmergency = fillLevel >= FORENSIC_EMERGENCY_FILL_LEVEL
+                    val isHighPressure = buffer.isHighPressure()
                     
+                    // Issue #196: Prioritize high pressure relief even if load is high (>0.8)
                     val shouldDrain = isEmergency || 
+                                    isHighPressure ||
                                     (pendingAtStart >= FORENSIC_FILL_THRESHOLD && loadFactor < 0.8) || 
                                     (pendingAtStart > 0 && now - lastDrainTime >= FORENSIC_DRAIN_INTERVAL_MS)
                     
@@ -137,7 +145,9 @@ class LogRepository @Inject constructor(
                         val baseBatchSize = FORENSIC_BATCH_SIZE_MIN + 
                                           ((FORENSIC_BATCH_SIZE_MAX - FORENSIC_BATCH_SIZE_MIN) * fillLevel).toInt()
                         
-                        val dynamicBatchSize = (baseBatchSize * (1.0 - (loadFactor * 0.4))).toInt()
+                        // Scale batch size based on load, but keep it high if in emergency
+                        val loadImpact = if (isEmergency) 0.1 else 0.4
+                        val dynamicBatchSize = (baseBatchSize * (1.0 - (loadFactor * loadImpact))).toInt()
                             .coerceIn(FORENSIC_BATCH_SIZE_MIN, FORENSIC_BATCH_SIZE_MAX)
 
                         if (performForensicDrain(limit = dynamicBatchSize, isRecovery = false)) {
@@ -164,10 +174,6 @@ class LogRepository @Inject constructor(
         }
 
         return try {
-            // Issue #179 Optimization: Removed getExistingForensicSignatures and HashSet 
-            // creation to eliminate heap exhaustion. We now rely on LogDao UNIQUE constraint
-            // with OnConflictStrategy.IGNORE (R179).
-
             val toInsert = ArrayList<LogEntity>(traces.size)
             for (trace in traces) {
                 val compositeId = if (trace.localId.isNotEmpty()) trace.localId 

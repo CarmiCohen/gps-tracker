@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.17.11 (Battery Health Refined)
+# System Source of Truth (SoT) - Aug.18.00 (Forensic Audit Baseline)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Forensic Log Buffer Resilience (R196)**: (Added Aug.18.00) The system MUST maintain sufficient log buffer headroom to handle 100Hz sampling bursts. `LOG_BUFFER_CAPACITY` MUST be at least 5000 and `LOG_BATCH_SIZE` at least 100. The forensic drainer MUST initiate flushing when the spill-buffer fill level reaches 25% (`FORENSIC_FILL_THRESHOLD`) and MUST prioritize drain operations during high-pressure events regardless of CPU load to prevent `FORENSIC_OVERFLOW`. (Issue #196). **Status: Implemented.**
 *   **Load-Aware Battery Discharge (R194)**: (Added Aug.17.11) The system MUST utilize load-aware thresholds for battery steep discharge detection. When CPU load exceeds 70% or Thermal Throttling is active (e.g., during 100Hz forensic sampling or stress tests), the discharge threshold MUST be increased to `BATTERY_STEEP_DISCHARGE_THRESHOLD_HIGH_LOAD` (8%) to prevent false positives. In normal operation, the threshold MUST be `BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL` (4%). (Issue #194). **Status: Implemented.**
 *   **Forensic Signature Persistence Audit (R193)**: (Added Aug.17.10) The system MUST audit and log the restoration of forensic traces from the memory-mapped `forensic_spill.bin` file during initialization. This ensures that the write/read indices and entry count are correctly recovered after process death or thermal cycles, maintaining zero-data-loss integrity within the forensic sampling window. (Issue #193). **Status: Implemented.**
 *   **Recovery Latency Audit (R192)**: (Added Aug.17.08) The system MUST measure and log the latency between a thermal event recovery (Cooling Mode OFF) and the resumption of high-frequency forensic sampling. This metric ensures that the system returns to peak fidelity within an acceptable temporal window post-throttle. (Issue #192). **Status: Implemented.**
@@ -29,5 +30,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Event & Alert Text Authority (R747)**: Local event prefixing with "**This device:**". (Issue #747)
 
 ### 4. Version Authority
-*   **Current Release**: Aug.17.11.
+*   **Current Release**: Aug.18.00.
 *   **Source of Truth**: app/build.gradle versionName.

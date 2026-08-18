@@ -25,6 +25,8 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.18.00:
+ * - Issue #196: Forensic Log Buffer Pressure Audit baseline initiated.
  * Aug.17.11:
  * - Issue #194 Hardening: Refined checkBatteryDischarge() to use load-aware 
  *   thresholds (R194). Sensitivity is automatically adjusted when thermal 

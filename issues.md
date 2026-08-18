@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.17.11)
+# Project Issues & Hardening Tracking (Aug.18.00)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Clean | 0 |
 | **Validation Tasks** | 🔍 Pending | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 638 |
+| **Resolved (Total)** | 🟢 Progress | 639 |
 
 ---
 
@@ -21,15 +21,17 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.17.11)
+## 🟢 Recently Resolved Issues (Aug.18.00)
+*   **Issue #196: Forensic Log Buffer Pressure Audit**:
+    *   Hardened log buffer resilience for 100Hz sampling by increasing `LOG_BUFFER_CAPACITY` to 5000 and `LOG_BATCH_SIZE` to 100.
+    *   Refined `LogRepository.kt` drainer logic: lowered `FORENSIC_FILL_THRESHOLD` to 25% to trigger earlier flushing.
+    *   Optimized `startForensicDrainer()` to prioritize buffer relief during high-pressure events, even when CPU load is high, reducing `FORENSIC_OVERFLOW` risk.
 *   **Issue #194: Battery Steep Discharge Logic Hardening**:
     *   Refined `checkBatteryDischarge()` to use load-aware thresholds (`NORMAL` vs `HIGH_LOAD`).
-    *   Sensitivity is now automatically adjusted (reduced) when thermal throttling or CPU load > 70% is detected, accounting for 100Hz forensic sampling and stress test saturation.
-    *   Improved log diagnostic details to include the load context when a steep discharge is detected.
+    *   Sensitivity is now automatically adjusted (reduced) when thermal throttling or CPU load > 70% is detected.
 *   **Issue #195: Database Migration Crash Loop**: 
-    *   Hardened `AppDatabase` migrations (`68` through `72`) to explicitly drop legacy indices before creation, resolving `UNIQUE constraint` violations.
+    *   Hardened `AppDatabase` migrations (`68` through `72`) to explicitly drop legacy indices before creation.
     *   Resolved `connection_history` schema mismatch by forcing the addition of `sitVzRt` in a hardened recovery migration (v72).
-    *   Verified successful app startup and UI rendering on physical device.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.17.11)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.18.00)
