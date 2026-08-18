@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.18.01:
+ * - Issue #197: Forensic Storage-Aware Adaptive Pruning. Refined ADAPTIVE_PRUNE 
+ *   thresholds and introduced forensic-specific retention limits to handle 
+ *   100Hz sampling telemetry (R197).
  * Aug.18.00:
  * - Issue #196: Forensic Log Buffer Pressure Audit. Increased LOG_BUFFER_CAPACITY 
  *   to 5000 and LOG_BATCH_SIZE to 100 to handle 100Hz sampling bursts (R196).
@@ -9,10 +13,6 @@ package com.gps19.core.engine
  * - Issue #194 Hardening: Refined Battery Steep Discharge logic. Introduced 
  *   load-aware thresholds (NORMAL vs HIGH_LOAD) to account for 100Hz forensic 
  *   sampling and stress test saturation (R194).
- * Aug.16.00:
- * - Issue #182 Hardening: Increased STARTUP_SETTLING_DELAY_MS to 10000ms to 
- *   prevent Binder exhaustion and DeadSystemException during heavy startup 
- *   hydration on emulator environments (R182).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -62,12 +62,18 @@ const val FORENSIC_BATCH_SIZE_DEFAULT = 100
 const val FORENSIC_RELIABILITY_THRESHOLD = 0.85
 const val FORENSIC_RELIABILITY_DEGRADATION_DURATION_MS = 30000L
 
-// Issue #728: Storage-Aware Adaptive Pruning
+// Issue #728: Storage-Aware Adaptive Pruning (Refined R197)
 const val PRUNE_CHUNK_SIZE = 1000
-const val ADAPTIVE_PRUNE_THRESHOLD_CRITICAL = 2000
-const val ADAPTIVE_PRUNE_THRESHOLD_LOW = 5000  // Reduced from 10000 (R177)
-const val ADAPTIVE_PRUNE_THRESHOLD_NORMAL = 15000 // Reduced from 30000 (R177)
-const val ADAPTIVE_PRUNE_THRESHOLD_CHARGING = 30000 // Reduced from 60000 (R177)
+const val ADAPTIVE_PRUNE_THRESHOLD_CRITICAL = 5000   // Increased to allow forensic bursts
+const val ADAPTIVE_PRUNE_THRESHOLD_LOW = 10000
+const val ADAPTIVE_PRUNE_THRESHOLD_NORMAL = 25000
+const val ADAPTIVE_PRUNE_THRESHOLD_CHARGING = 50000 
+
+// Forensic-specific retention limits (R197)
+const val FORENSIC_PRUNE_LIMIT_CRITICAL = 1000
+const val FORENSIC_PRUNE_LIMIT_LOW = 5000
+const val FORENSIC_PRUNE_LIMIT_NORMAL = 15000
+const val FORENSIC_PRUNE_LIMIT_CHARGING = 30000
 
 // Issue #700: Forensic Sampling Scaling
 const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  // 100Hz (Peak Fidelity)

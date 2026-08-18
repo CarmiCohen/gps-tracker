@@ -8,6 +8,9 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.18.01:
+ * - Issue #197: Forensic Storage-Aware Adaptive Pruning. Added LogDao methods for 
+ *   forensic-specific chunked pruning to handle 100Hz trace accumulation (R197).
  * Aug.17.10:
  * - Issue #195 Hardening: Bumped to v72. Added MIGRATION_71_72 to resolve 
  *   connection_history schema mismatch and force drop legacy UNIQUE indices.
@@ -192,30 +195,36 @@ abstract class LogDao {
     @Query("SELECT timestamp, spillIdx FROM logs WHERE type = 'FORENSIC_TRACE' AND timestamp >= :minTimestamp") 
     abstract suspend fun getExistingForensicSignatures(minTimestamp: Long): List<ForensicSignature>
 
-    // Optimized Pruning Support (R177)
+    // Optimized Pruning Support (R177, R197)
     @Query("SELECT timestamp FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
     abstract suspend fun getHeartbeatPruneThreshold(limit: Int): Long?
 
-    @Query("SELECT timestamp FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND type NOT IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
+    @Query("SELECT timestamp FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND type NOT IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity', 'FORENSIC_TRACE') ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
     abstract suspend fun getGeneralPruneThreshold(limit: Int): Long?
 
-    @Query("SELECT timestamp FROM logs WHERE isImportant = 1 AND isSpecial = 0 ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
+    @Query("SELECT timestamp FROM logs WHERE isImportant = 1 AND isSpecial = 0 AND type != 'FORENSIC_TRACE' ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
     abstract suspend fun getImportantPruneThreshold(limit: Int): Long?
 
-    @Query("SELECT timestamp FROM logs WHERE isSpecial = 1 ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
+    @Query("SELECT timestamp FROM logs WHERE isSpecial = 1 AND type != 'FORENSIC_TRACE' ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
     abstract suspend fun getSpecialPruneThreshold(limit: Int): Long?
+
+    @Query("SELECT timestamp FROM logs WHERE type = 'FORENSIC_TRACE' ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
+    abstract suspend fun getForensicPruneThreshold(limit: Int): Long?
 
     @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') AND timestamp < :threshold LIMIT :chunkSize)")
     abstract suspend fun pruneHeartbeatsByThreshold(threshold: Long, chunkSize: Int): Int
 
-    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND type NOT IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') AND timestamp < :threshold LIMIT :chunkSize)")
+    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isImportant = 0 AND isSpecial = 0 AND type NOT IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity', 'FORENSIC_TRACE') AND timestamp < :threshold LIMIT :chunkSize)")
     abstract suspend fun pruneGeneralByThreshold(threshold: Long, chunkSize: Int): Int
 
-    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isImportant = 1 AND isSpecial = 0 AND timestamp < :threshold LIMIT :chunkSize)")
+    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isImportant = 1 AND isSpecial = 0 AND type != 'FORENSIC_TRACE' AND timestamp < :threshold LIMIT :chunkSize)")
     abstract suspend fun pruneImportantByThreshold(threshold: Long, chunkSize: Int): Int
 
-    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isSpecial = 1 AND timestamp < :threshold LIMIT :chunkSize)")
+    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE isSpecial = 1 AND type != 'FORENSIC_TRACE' AND timestamp < :threshold LIMIT :chunkSize)")
     abstract suspend fun pruneSpecialByThreshold(threshold: Long, chunkSize: Int): Int
+
+    @Query("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE type = 'FORENSIC_TRACE' AND timestamp < :threshold LIMIT :chunkSize)")
+    abstract suspend fun pruneForensicByThreshold(threshold: Long, chunkSize: Int): Int
 }
 
 @Dao

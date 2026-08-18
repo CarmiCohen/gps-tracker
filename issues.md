@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.18.00)
+# Project Issues & Hardening Tracking (Aug.18.02)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Clean | 0 |
 | **Validation Tasks** | 🔍 Pending | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 639 |
+| **Resolved (Total)** | 🟢 Progress | 640 |
 
 ---
 
@@ -21,7 +21,11 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.18.00)
+## 🟢 Recently Resolved Issues (Aug.18.02)
+*   **Issue #197: Forensic Storage-Aware Adaptive Pruning Refinement**:
+    *   Hardened storage management for 100Hz sampling by implementing forensic-specific retention limits in `EngineConstants.kt`.
+    *   Optimized `LogDao` with chunk-based pruning for `FORENSIC_TRACE` entries to minimize transaction lock duration during heavy I/O.
+    *   Refined `proactivePruning` in `LogRepository.kt` to adaptively throttle pruning intensity based on `SystemHealthState` (Storage Critical/Low, Battery Charging/Low).
 *   **Issue #196: Forensic Log Buffer Pressure Audit**:
     *   Hardened log buffer resilience for 100Hz sampling by increasing `LOG_BUFFER_CAPACITY` to 5000 and `LOG_BATCH_SIZE` to 100.
     *   Refined `LogRepository.kt` drainer logic: lowered `FORENSIC_FILL_THRESHOLD` to 25% to trigger earlier flushing.
@@ -34,4 +38,4 @@ This document tracks active issues, technical debt, and pending implementation t
     *   Resolved `connection_history` schema mismatch by forcing the addition of `sitVzRt` in a hardened recovery migration (v72).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.18.00)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.18.02)

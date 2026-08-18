@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 639**
+**Total Unique Resolutions: 640**
+
+## 61. Forensic Storage & Pruning Hardening (Aug.18.02)
+*   **Issue #197: Forensic Storage-Aware Adaptive Pruning Refinement**.
+    - **Resolution**: Hardened storage management for 100Hz sampling by implementing forensic-specific retention limits in `EngineConstants.kt`. Optimized `LogDao` with chunk-based pruning for `FORENSIC_TRACE` entries to minimize transaction lock duration during heavy I/O. Refined `proactivePruning` in `LogRepository.kt` to adaptively throttle pruning intensity based on `SystemHealthState` (Storage Critical/Low, Battery Charging/Low). (R197)
 
 ## 60. Forensic Buffer & Pressure Hardening (Aug.18.00)
 *   **Issue #196: Forensic Log Buffer Pressure Audit**.
@@ -14,7 +18,7 @@ This document contains the unified record of all resolved issues and technical d
 
 ## 58. Migration Recovery & Schema Hardening (Aug.17.10)
 *   **Issue #195: Database Migration Crash Loop**.
-    - **Resolution**: Resolved a critical startup crash caused by `UNIQUE constraint` violations and schema mismatches in `AppDatabase`. Hardened migrations `68` through `72` to explicitly drop legacy indices before recreation. Implemented a recovery migration (v72) to force-fix the `connection_history` table schema (`sitVzRt` column). Registered `MIGRATION_71_72` in `AppModule.kt` to restore system availability. (R195)
+    - **Resolution**: Resolved a critical startup crash caused by `UNIQUE constraint` violations and schema mismatches in `AppDatabase`. Hardened migrations `68` through `72` to explicitly drop legacy indices before creation. Implemented a recovery migration (v72) to force-fix the `connection_history` table schema (`sitVzRt` column). Registered `MIGRATION_71_72` in `AppModule.kt` to restore system availability. (R195)
 
 ## 57. Forensic Persistence & Thermal Recovery (Aug.17.10)
 *   **Issue #193: Forensic Signature Persistence Audit**.

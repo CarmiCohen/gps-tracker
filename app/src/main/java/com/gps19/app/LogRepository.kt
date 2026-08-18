@@ -19,6 +19,10 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.18.01:
+ * - Issue #197: Forensic Storage-Aware Adaptive Pruning. Refined proactivePruning 
+ *   to handle high-frequency forensic traces (100Hz) with chunked deletion and 
+ *   storage-aware retention targets (R197).
  * Aug.18.00:
  * - Issue #196: Forensic Log Buffer Pressure Audit. Lowered FORENSIC_FILL_THRESHOLD 
  *   to 25% and modified drainer logic to prioritize high-pressure relief even 
@@ -429,10 +433,12 @@ class LogRepository @Inject constructor(
                 val health = telemetry.systemHealth.value
                 val count = logDao.getCount()
                 
+                // Issue #197: Refined adaptive selection logic
                 val threshold = when {
                     health.isStorageCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
-                    health.isBatteryCritical -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING 
                     health.isStorageLow -> ADAPTIVE_PRUNE_THRESHOLD_LOW
+                    health.isBatteryCritical -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL // Hardened: Prune at normal level during battery stress
+                    health.isCharging -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING // Allow more when charging
                     else -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
                 }
 
@@ -442,12 +448,21 @@ class LogRepository @Inject constructor(
                     val importantTarget = 2000 
                     val specialTarget = LOG_LIMIT_STANDARD
                     
+                    // Issue #197: Forensic-specific targets
+                    val forensicTarget = when {
+                        health.isStorageCritical -> FORENSIC_PRUNE_LIMIT_CRITICAL
+                        health.isStorageLow -> FORENSIC_PRUNE_LIMIT_LOW
+                        health.isCharging -> FORENSIC_PRUNE_LIMIT_CHARGING
+                        else -> FORENSIC_PRUNE_LIMIT_NORMAL
+                    }
+                    
                     val maxChunks = if (health.isStorageCritical) 30 else 15
                     
                     val heartbeatThreshold = logDao.getHeartbeatPruneThreshold(heartbeatTarget)
                     val generalThreshold = logDao.getGeneralPruneThreshold(generalTarget)
                     val importantThreshold = logDao.getImportantPruneThreshold(importantTarget)
                     val specialThreshold = if (count > LOG_LIMIT_STRICT) logDao.getSpecialPruneThreshold(specialTarget) else null
+                    val forensicThreshold = logDao.getForensicPruneThreshold(forensicTarget)
 
                     var totalPruned = 0
                     repeat(maxChunks) { 
@@ -469,17 +484,25 @@ class LogRepository @Inject constructor(
                             specialThreshold?.let { t ->
                                 chunkPruned += logDao.pruneSpecialByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
                             }
+                            
+                            // Issue #197: Prune forensic traces in chunks
+                            forensicThreshold?.let { t ->
+                                chunkPruned += logDao.pruneForensicByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
+                            }
                         }
                         
                         totalPruned += chunkPruned
                         
                         if (chunkPruned == 0) return@repeat 
                         
-                        delay(if (health.isBatteryLow) 150 else 50)
+                        // Scale delay based on pressure
+                        val baseDelay = if (health.isBatteryLow) 150L else 50L
+                        val adaptiveDelay = if (health.isStorageCritical) baseDelay / 2 else baseDelay
+                        delay(adaptiveDelay)
                     }
                     
                     if (totalPruned > 0) {
-                        Timber.d("Proactive pruning [Count: $count, Pruned: $totalPruned]. Health: [Batt: ${health.batteryLevel}%, Storage: ${health.isStorageLow}]")
+                        Timber.d("Proactive pruning [Count: $count, Pruned: $totalPruned]. Health: [Batt: ${health.batteryLevel}%, StorageLow: ${health.isStorageLow}, Charging: ${health.isCharging}]")
                     }
                 }
             } catch (e: Exception) {
