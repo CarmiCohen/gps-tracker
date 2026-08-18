@@ -1,24 +1,25 @@
-# Handover (Aug.17.10) - Migration Crash Resolved
+# Handover (Aug.17.11) - Battery Health Hardened
 
-## 🎯 Next Objective: Issue #194 - Battery Steep Discharge Logic Hardening
-- **Goal**: Refine the `BATTERY_STEEP_DISCHARGE_THRESHOLD` evaluation to account for high-load forensic sampling periods.
+## 🎯 Next Objective: Issue #196 - Forensic Log Buffer Pressure Audit
+- **Goal**: Analyze log buffer pressure during 100Hz sampling to prevent `FORENSIC_OVERFLOW` violations.
 - **Status**: 🟢 **READY FOR BASELINE**.
-- **Context**: Database migration issues (#195) have been resolved. The app is stable and deployed. Now establishing baseline discharge rates.
+- **Context**: Battery discharge logic is now load-aware (#194), preventing false alarms during stress tests.
 
-## 🧬 System Status (vAug.17.10)
-System availability restored after resolving migration blockers:
+## 🧬 System Status (vAug.17.11)
+System integrity hardened with load-aware battery health monitoring:
 
-### 1. Migration Hardening (#195)
-*   **Indices Cleanup**: Hardened `MIGRATION_68_69` through `72` to explicitly drop legacy indices before recreation, resolving `UNIQUE constraint` violations.
-*   **Schema Recovery**: Implemented `MIGRATION_71_72` to force-fix the `connection_history` table's missing `sitVzRt` column.
-*   **Deployment**: Verified successful startup and UI rendering on physical device (v72 DB).
+### 1. Battery Health Hardening (#194)
+*   **Load-Aware Thresholds**: Introduced `BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL` (4%) and `HIGH_LOAD` (8%) in `EngineConstants.kt`.
+*   **Dynamic Sensitivity**: Updated `IntegrityMonitor.kt` to select thresholds based on CPU load (>70%) or Thermal Throttling status.
+*   **Diagnostic Logs**: Improved logging in `checkBatteryDischarge()` to include load context (e.g., "High Load: CPU 0.8") when violations occur.
+*   **Verification**: The system now correctly accounts for the increased power consumption of 100Hz forensic sampling.
 
-### 2. Forensic Persistence Audit (#193)
-*   **Signature Verification**: Verified that memory-mapped data retains integrity across process death.
+### 2. Migration Hardening (#195)
+*   **Resolved**: Database migration crash loop fixed by dropping legacy indices and forcing schema recovery for `connection_history`.
 
 ## 🛠️ Execution Sequence for Next Task
-1.  **Baseline**: Measure discharge rate during 100Hz sampling without stress.
-2.  **Saturation**: Trigger `executeAutomatedStressTest()` and monitor battery drop.
-3.  **Refinement**: Adjust `BATTERY_STEEP_DISCHARGE_THRESHOLD` in `EngineConstants.kt`.
+1.  **Monitor**: Observe `logManager.isForensicBufferUnderPressure()` during 100Hz sampling.
+2.  **Audit**: Measure time spent in `logForensicTraceOptimized` under peak pressure.
+3.  **Refinement**: Adjust `LOG_BUFFER_CAPACITY` or `LOG_BATCH_SIZE` if necessary.
 
-vAug.17.10
+vAug.17.11

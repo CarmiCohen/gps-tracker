@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 637**
+**Total Unique Resolutions: 638**
+
+## 59. Battery Health & Logic Hardening (Aug.17.11)
+*   **Issue #194: Battery Steep Discharge Logic Hardening**.
+    - **Resolution**: Refined `checkBatteryDischarge()` in `IntegrityMonitor.kt` to utilize load-aware thresholds. Introduced `BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL` (4%) and `BATTERY_STEEP_DISCHARGE_THRESHOLD_HIGH_LOAD` (8%) in `EngineConstants.kt`. The system now dynamically selects the threshold based on CPU load (>70%) and thermal throttling status, preventing false positives during 100Hz forensic sampling and stress tests while maintaining high sensitivity during idle states. (R194)
 
 ## 58. Migration Recovery & Schema Hardening (Aug.17.10)
 *   **Issue #195: Database Migration Crash Loop**.

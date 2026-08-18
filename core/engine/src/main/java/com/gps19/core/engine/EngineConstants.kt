@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.17.11:
+ * - Issue #194 Hardening: Refined Battery Steep Discharge logic. Introduced 
+ *   load-aware thresholds (NORMAL vs HIGH_LOAD) to account for 100Hz forensic 
+ *   sampling and stress test saturation (R194).
  * Aug.16.00:
  * - Issue #182 Hardening: Increased STARTUP_SETTLING_DELAY_MS to 10000ms to 
  *   prevent Binder exhaustion and DeadSystemException during heavy startup 
@@ -300,7 +304,8 @@ const val BATTERY_ALARM_THRESHOLD = 20
 const val CRITICAL_BATTERY_THRESHOLD = 20
 const val MAX_SAFE_TEMPERATURE_CELSIUS = 46.0
 const val MAX_SAFE_TEMPERATURE_RECOVERY = 44.0
-const val BATTERY_STEEP_DISCHARGE_THRESHOLD = 5
+const val BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL = 4 // Refined from 5 for R194
+const val BATTERY_STEEP_DISCHARGE_THRESHOLD_HIGH_LOAD = 8 // Accounts for 100Hz/Stress
 const val BATTERY_STEEP_DISCHARGE_WINDOW_MS = 600000L
 
 // Storage thresholds

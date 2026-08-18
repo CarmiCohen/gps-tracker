@@ -25,6 +25,10 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.17.11:
+ * - Issue #194 Hardening: Refined checkBatteryDischarge() to use load-aware 
+ *   thresholds (R194). Sensitivity is automatically adjusted when thermal 
+ *   throttling or high CPU load is detected.
  * Aug.17.08:
  * - Issue #191 Validation: Implemented simulateCoolingMode() to support dynamic 
  *   polling throttle verification (R191).
@@ -396,11 +400,21 @@ class IntegrityMonitor @Inject constructor(
         val latest = batterySamples.last()
         
         val drop = earliest.second - latest.second
-        val isSteep = drop >= BATTERY_STEEP_DISCHARGE_THRESHOLD
+        
+        // Issue #194: Load-aware threshold selection
+        val isHighLoad = currentHealth.cpuLoad > 0.7 || currentHealth.isThermalThrottling
+        val threshold = if (isHighLoad) {
+            BATTERY_STEEP_DISCHARGE_THRESHOLD_HIGH_LOAD
+        } else {
+            BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL
+        }
+        
+        val isSteep = drop >= threshold
         
         if (isSteep && !currentHealth.isBatterySteepDischarge) {
             val elapsedMin = (nowRt - earliest.first) / 60000
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected on this device ($drop% in ${elapsedMin}m).", true))
+            val loadContext = if (isHighLoad) "(High Load: CPU %.1f)".format(currentHealth.cpuLoad) else "(Normal Load)"
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected on this device $loadContext ($drop% in ${elapsedMin}m).", true))
             _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE))
         }
         return isSteep
