@@ -80,10 +80,11 @@ const val FORENSIC_PRUNE_LIMIT_NORMAL = 15000
 const val FORENSIC_PRUNE_LIMIT_CHARGING = 30000
 
 // Issue #700: Forensic Sampling Scaling
-const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  // 100Hz (Peak Fidelity)
-const val FORENSIC_SAMPLING_INTERVAL_MAX_MS = 100L // 10Hz (Power Aware)
-const val FORENSIC_SAMPLING_INTERVAL_COOLING_MS = 500L // Issue #709: Thermal Safety Floor
-const val FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS = 250L // Issue #145: Pressure Throttling
+// TEMPORARY DIAGNOSTIC DOWN-SAMPLING (R-STRESS-TEST)
+const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 250L  // 4Hz (Down-sampled from 100Hz)
+const val FORENSIC_SAMPLING_INTERVAL_MAX_MS = 500L // 2Hz (Down-sampled from 10Hz)
+const val FORENSIC_SAMPLING_INTERVAL_COOLING_MS = 1000L // Increased for diagnostic
+const val FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS = 1000L // Increased for diagnostic
 
 // Issue #701: Forensic Spatial Quantization
 const val FORENSIC_SPATIAL_GATE_METERS = 0.1
