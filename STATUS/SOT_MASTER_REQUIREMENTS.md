@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.18.06 (Forensic JNI Optimized)
+# System Source of Truth (SoT) - Aug.18.07 (Forensic Alignment Hardened)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Forensic Multi-Session Alignment Authority (R203)**: (Added Aug.18.07) The system MUST guarantee temporal monotonicity and zero-jitter continuity for forensic traces across service restarts and reboots. The `ForensicSpillBuffer` MUST store absolute `Long` timestamps and `Double` coordinates (v3) to eliminate overflow risks and session base-time dependencies. The `LogRepository` drainer MUST implement signature-based deduplication (timestamp + `spillIdx`) before database insertion to ensure idempotency during recovery from "dirty" shutdowns or crashes. (Issue #203). **Status: Implemented.**
 *   **Forensic Allocation Optimization (R202)**: (Added Aug.18.06) The system MUST eliminate intermediate heap allocations during the forensic log draining process. The `ForensicSpillBuffer` MUST provide a direct mapping from the memory-mapped buffer to `LogEntity` objects (`peekToEntities`). The `LogRepository` drainer MUST utilize this zero-churn path to avoid the creation of intermediate `LogEntry` objects, thereby minimizing GC pressure during sustained 100Hz telemetry bursts. (Issue #202). **Status: Implemented.**
 *   **Urban Multipath Mitigation (R201)**: (Added Aug.18.05) The system MUST harden stationary state management against GPS signal bouncing in urban canyons. The `AnchorEvaluator` MUST maintain the stationary anchor even if GPS-derived `stationaryProb` drops below engagement thresholds, provided the IMU confirms the device is physically stationary and SNR is low (`JUMP_GATE_LOW_SNR_THRESHOLD`). The `LocationSentinel` MUST dampen the decay of `stationaryProb` during low-SNR physically stationary events to prevent jittery anchor release. (Issue #201). **Status: Implemented.**
 *   **UI Telemetry Throttling (R198)**: (Added Aug.18.03) The system MUST throttle high-frequency telemetry updates to the UI thread to prevent thread starvation and redundant recompositions during forensic bursts. `localLocation` and `trackerLocation` collectors in the `MainViewModel` MUST utilize sampling (e.g., 10Hz / 100ms) to cap the processing rate of visual state updates, while background forensic logging and persistence MUST remain at full fidelity (up to 100Hz). (Issue #198). **Status: Implemented.**
@@ -34,5 +35,5 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Event & Alert Text Authority (R747)**: Local event prefixing with "**This device:**". (Issue #747)
 
 ### 4. Version Authority
-*   **Current Release**: Aug.18.06.
+*   **Current Release**: Aug.18.07.
 *   **Source of Truth**: app/build.gradle versionName.

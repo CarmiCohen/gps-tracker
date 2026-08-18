@@ -19,13 +19,13 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Aug.18.07:
+ * - Issue #203: Forensic Multi-Session Alignment Audit. Implemented signature-based 
+ *   deduplication in performForensicDrain to ensure zero-jitter continuity and 
+ *   idempotency during session transitions and recovery (R203).
  * Aug.18.06:
  * - Issue #202: Forensic Performance. Updated performForensicDrain to use 
  *   peekToEntities() and eliminated intermediate LogEntry allocations (R202).
- * Aug.18.01:
- * - Issue #197: Forensic Storage-Aware Adaptive Pruning. Refined proactivePruning 
- *   to handle high-frequency forensic traces (100Hz) with chunked deletion and 
- *   storage-aware retention targets (R197).
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -57,7 +57,6 @@ class LogRepository @Inject constructor(
         private val COLON_VALUE_REGEX = Regex(""":\s*-?\d+(\.\d+)?\s*[A-Za-z%°]*""")
         private val SPACE_VALUE_REGEX = Regex("""\s+-?\d+(\.\d+)?\s*[A-Za-z%°]*""")
         
-        // Issue #196: Lowered to 25% to trigger draining earlier.
         private const val FORENSIC_FILL_THRESHOLD = FORENSIC_SPILL_CAPACITY / 4
         private const val FORENSIC_CONVERGENCE_STALL_LIMIT = 3
         private const val FORENSIC_EMERGENCY_FILL_LEVEL = 0.9
@@ -134,7 +133,6 @@ class LogRepository @Inject constructor(
                     val isEmergency = fillLevel >= FORENSIC_EMERGENCY_FILL_LEVEL
                     val isHighPressure = buffer.isHighPressure()
                     
-                    // Issue #196: Prioritize high pressure relief even if load is high (>0.8)
                     val shouldDrain = isEmergency || 
                                     isHighPressure ||
                                     (pendingAtStart >= FORENSIC_FILL_THRESHOLD && loadFactor < 0.8) || 
@@ -144,7 +142,6 @@ class LogRepository @Inject constructor(
                         val baseBatchSize = FORENSIC_BATCH_SIZE_MIN + 
                                           ((FORENSIC_BATCH_SIZE_MAX - FORENSIC_BATCH_SIZE_MIN) * fillLevel).toInt()
                         
-                        // Scale batch size based on load, but keep it high if in emergency
                         val loadImpact = if (isEmergency) 0.1 else 0.4
                         val dynamicBatchSize = (baseBatchSize * (1.0 - (loadFactor * loadImpact))).toInt()
                             .coerceIn(FORENSIC_BATCH_SIZE_MIN, FORENSIC_BATCH_SIZE_MAX)
@@ -165,7 +162,6 @@ class LogRepository @Inject constructor(
         val buffer = forensicSpillBufferProvider.get()
         val pendingAtStart = buffer.getPendingCount()
         
-        // Issue #202: Use peekToEntities to eliminate LogEntry -> LogEntity churn.
         val entities = buffer.peekToEntities(limit)
         if (entities.isEmpty()) {
             if (pendingAtStart > 0) {
@@ -174,17 +170,32 @@ class LogRepository @Inject constructor(
             return false
         }
 
+        // Issue #203: Zero-Jitter Signature Deduplication.
+        // Before inserting, check if these traces already exist to prevent duplicates 
+        // across process restarts if a crash occurred before commitDrain.
+        val minTs = entities.minOf { it.timestamp }
+        val existingSignatures = logDao.getExistingForensicSignatures(minTs - 1000L) // 1s overlap guard
+        
+        val filteredEntities = if (existingSignatures.isEmpty()) {
+            entities
+        } else {
+            entities.filter { entity ->
+                existingSignatures.none { it.timestamp == entity.timestamp && it.spillIdx == entity.spillIdx }
+            }
+        }
+
         return try {
-            if (entities.isNotEmpty()) {
-                logDao.insertAll(entities)
+            if (filteredEntities.isNotEmpty()) {
+                logDao.insertAll(filteredEntities)
             }
             
+            // Always commit the count we peeked, even if some were filtered as duplicates
             buffer.commitDrain(entities.size)
             forensicSuccessCount.incrementAndGet()
             updateReliability(true)
             
-            if (isRecovery && entities.isNotEmpty()) {
-                val msg = "Forensic Recovery Successful: ${entities.size} traces replayed."
+            if (isRecovery && filteredEntities.isNotEmpty()) {
+                val msg = "Forensic Recovery Successful: ${filteredEntities.size} traces replayed."
                 addLog(LogEntry(
                     localId = "RECOVERY-${timeProvider.currentTimeMillis()}",
                     timestamp = timeProvider.currentTimeMillis(),
@@ -199,7 +210,7 @@ class LogRepository @Inject constructor(
             }
 
             logMutex.withLock<Unit> {
-                logWriteCount += entities.size
+                logWriteCount += filteredEntities.size
                 if (logWriteCount >= DB_PRUNE_THRESHOLD) {
                     logWriteCount = 0
                     triggerAsyncPruning()
@@ -409,12 +420,11 @@ class LogRepository @Inject constructor(
                 val health = telemetry.systemHealth.value
                 val count = logDao.getCount()
                 
-                // Issue #197: Refined adaptive selection logic
                 val threshold = when {
                     health.isStorageCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
                     health.isStorageLow -> ADAPTIVE_PRUNE_THRESHOLD_LOW
-                    health.isBatteryCritical -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL // Hardened: Prune at normal level during battery stress
-                    health.isCharging -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING // Allow more when charging
+                    health.isBatteryCritical -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL 
+                    health.isCharging -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING 
                     else -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
                 }
 
@@ -424,7 +434,6 @@ class LogRepository @Inject constructor(
                     val importantTarget = 2000 
                     val specialTarget = LOG_LIMIT_STANDARD
                     
-                    // Issue #197: Forensic-specific targets
                     val forensicTarget = when {
                         health.isStorageCritical -> FORENSIC_PRUNE_LIMIT_CRITICAL
                         health.isStorageLow -> FORENSIC_PRUNE_LIMIT_LOW
@@ -461,7 +470,6 @@ class LogRepository @Inject constructor(
                                 chunkPruned += logDao.pruneSpecialByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
                             }
                             
-                            // Issue #197: Prune forensic traces in chunks
                             forensicThreshold?.let { t ->
                                 chunkPruned += logDao.pruneForensicByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
                             }
@@ -471,7 +479,6 @@ class LogRepository @Inject constructor(
                         
                         if (chunkPruned == 0) return@repeat 
                         
-                        // Scale delay based on pressure
                         val baseDelay = if (health.isBatteryLow) 150L else 50L
                         val adaptiveDelay = if (health.isStorageCritical) baseDelay / 2 else baseDelay
                         delay(adaptiveDelay)

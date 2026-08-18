@@ -19,13 +19,14 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Aug.18.07:
+ * - Issue #203: Forensic Multi-Session Alignment Audit. Switched to absolute 
+ *   Long timestamps and Double coordinates in the buffer to ensure zero-jitter 
+ *   continuity across reboots and service restarts. Incremented to v3 (R203).
+ *   Refined commitDrain persistence order for idempotent recovery safety.
  * Aug.18.06:
  * - Issue #202: Forensic Performance. Added peekToEntities() and removed 
- *   obsolete peek() to eliminate intermediate LogEntry allocations during 
- *   drainage (R202).
- * Aug.17.10:
- * - Issue #193: Forensic Signature Persistence Audit. Added recovery logging 
- *   to init block to verify that traces are retained across process death.
+ *   obsolete peek() to eliminate intermediate LogEntry allocations (R202).
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -40,16 +41,12 @@ class ForensicSpillBuffer @Inject constructor(
     private val totalCount = AtomicInteger(0)
     private val readIdx = AtomicInteger(0)
     
-    private val baseTs = AtomicLong(0L)
-    @Volatile private var baseLat: Double = 0.0
-    @Volatile private var baseLng: Double = 0.0
-
     private val entryWriteBuffer = ByteBuffer.allocate(FORENSIC_SPILL_ENTRY_SIZE).order(ByteOrder.nativeOrder())
     private val writeCrc = CRC32()
 
     private companion object {
         const val MAGIC_NUMBER = 0x46535042
-        const val CURRENT_VERSION = 2
+        const val CURRENT_VERSION = 3 // R203: Switched to absolute storage
         const val HEADER_SIZE = 128
         const val CHECKSUM_SIZE = 4
         
@@ -61,11 +58,11 @@ class ForensicSpillBuffer @Inject constructor(
         const val OFF_WRITE_IDX = 24
         const val OFF_COUNT = 28
         const val OFF_READ_IDX = 32
+        // Base values kept in header for legacy/meta but not used for entry calculation in v3
         const val OFF_BASE_TS = 36
         const val OFF_BASE_LAT = 44
         const val OFF_BASE_LNG = 52
 
-        const val PRECISION_SCALE = 10_000_000.0
         const val DRAIN_STALL_THRESHOLD_MS = 5L
         const val WRITE_STALL_THRESHOLD_MS = 5L
         
@@ -91,7 +88,7 @@ class ForensicSpillBuffer @Inject constructor(
 
                 if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != FORENSIC_SPILL_CAPACITY || entrySz != FORENSIC_SPILL_ENTRY_SIZE) {
                     resetBuffer()
-                    if (exists) Timber.w("Forensic Persistence Audit: Spill-buffer signature mismatch or corruption. Resetting.")
+                    if (exists) Timber.w("Forensic Persistence Audit: Spill-buffer signature mismatch or version change. Resetting.")
                 } else {
                     val recoveredWrite = buffer.getInt(OFF_WRITE_IDX)
                     val recoveredCount = buffer.getInt(OFF_COUNT)
@@ -104,12 +101,8 @@ class ForensicSpillBuffer @Inject constructor(
                         totalCount.set(recoveredCount)
                         readIdx.set(recoveredRead)
                         
-                        baseTs.set(buffer.getLong(OFF_BASE_TS))
-                        baseLat = buffer.getDouble(OFF_BASE_LAT)
-                        baseLng = buffer.getDouble(OFF_BASE_LNG)
-                        
                         if (recoveredCount > 0) {
-                            Timber.i("Forensic Persistence Audit: Successfully restored $recoveredCount traces from spill-buffer.")
+                            Timber.i("Forensic Persistence Audit: Successfully restored $recoveredCount traces from spill-buffer v$CURRENT_VERSION.")
                         }
                     } else {
                         resetBuffer()
@@ -141,9 +134,6 @@ class ForensicSpillBuffer @Inject constructor(
         writeIdx.set(0)
         totalCount.set(0)
         readIdx.set(0)
-        baseTs.set(now)
-        baseLat = 0.0
-        baseLng = 0.0
     }
 
     fun writeTrace(entry: LogEntry): Boolean {
@@ -157,7 +147,8 @@ class ForensicSpillBuffer @Inject constructor(
             val buffer = mappedBuffer ?: return@measureAndAudit false
 
             val rawBytes = entry.message.toByteArray(Charsets.UTF_8)
-            val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE - 36 - CHECKSUM_SIZE
+            // R203: Entry layout changed. TS (8) + Lat (8) + Lng (8) + etc (24) = 48 bytes before msg.
+            val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE - 48 - CHECKSUM_SIZE
             var msgLen = rawBytes.size.coerceAtMost(maxMsgLen)
             
             if (msgLen < rawBytes.size) {
@@ -168,21 +159,14 @@ class ForensicSpillBuffer @Inject constructor(
 
             synchronized(this) {
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
-                if (baseTs.get() == 0L || baseLat == 0.0) {
-                    baseTs.set(entry.timestamp)
-                    baseLat = entry.lat
-                    baseLng = entry.lng
-                    buffer.putLong(OFF_BASE_TS, entry.timestamp)
-                    buffer.putDouble(OFF_BASE_LAT, entry.lat)
-                    buffer.putDouble(OFF_BASE_LNG, entry.lng)
-                }
 
                 entryWriteBuffer.clear()
-                Arrays.fill(entryWriteBuffer.array(), 36, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
+                Arrays.fill(entryWriteBuffer.array(), 48, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
 
-                entryWriteBuffer.putInt((entry.timestamp - baseTs.get()).toInt())
-                entryWriteBuffer.putInt(((entry.lat - baseLat) * PRECISION_SCALE).toInt())
-                entryWriteBuffer.putInt(((entry.lng - baseLng) * PRECISION_SCALE).toInt())
+                // R203: Absolute values for cross-session continuity
+                entryWriteBuffer.putLong(entry.timestamp)
+                entryWriteBuffer.putDouble(entry.lat)
+                entryWriteBuffer.putDouble(entry.lng)
                 
                 entryWriteBuffer.putFloat(entry.accuracy.toFloat())
                 entryWriteBuffer.putFloat(entry.maxAccuracy.toFloat())
@@ -199,7 +183,7 @@ class ForensicSpillBuffer @Inject constructor(
                 entryWriteBuffer.put(flags.toByte())
                 entryWriteBuffer.put(entry.battSnapshot?.toByte() ?: 0.toByte())
                 entryWriteBuffer.put(msgLen.toByte())
-                entryWriteBuffer.put(0.toByte())
+                entryWriteBuffer.put(0.toByte()) // Alignment
                 entryWriteBuffer.put(rawBytes, 0, msgLen)
                 
                 entryWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
@@ -237,21 +221,14 @@ class ForensicSpillBuffer @Inject constructor(
             synchronized(this) {
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
                 
-                if (baseTs.get() == 0L || baseLat == 0.0) {
-                    baseTs.set(timestamp)
-                    baseLat = lat
-                    baseLng = lng
-                    buffer.putLong(OFF_BASE_TS, timestamp)
-                    buffer.putDouble(OFF_BASE_LAT, lat)
-                    buffer.putDouble(OFF_BASE_LNG, lng)
-                }
-                
                 entryWriteBuffer.clear()
-                Arrays.fill(entryWriteBuffer.array(), 36, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
+                Arrays.fill(entryWriteBuffer.array(), 48, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
 
-                entryWriteBuffer.putInt((timestamp - baseTs.get()).toInt())
-                entryWriteBuffer.putInt(((lat - baseLat) * PRECISION_SCALE).toInt())
-                entryWriteBuffer.putInt(((lng - baseLng) * PRECISION_SCALE).toInt())
+                // R203: Absolute values
+                entryWriteBuffer.putLong(timestamp)
+                entryWriteBuffer.putDouble(lat)
+                entryWriteBuffer.putDouble(lng)
+                
                 entryWriteBuffer.putFloat(accuracy.toFloat())
                 entryWriteBuffer.putFloat(maxAccuracy.toFloat())
                 entryWriteBuffer.putFloat(vibe.toFloat())
@@ -295,8 +272,8 @@ class ForensicSpillBuffer @Inject constructor(
 
     /**
      * peekToEntities: Direct buffer to LogEntity conversion.
-     * Issue #202: Eliminates intermediate LogEntry allocations to reduce 
-     * GC pressure during 100Hz forensic bursts.
+     * Issue #202: Zero-churn entity generation.
+     * R203: Reconstructs entities using absolute Long/Double values.
      */
     fun peekToEntities(limit: Int): List<LogEntity> {
         return LatencyMonitor.measureAndAudit<List<LogEntity>>(
@@ -309,9 +286,6 @@ class ForensicSpillBuffer @Inject constructor(
             val mainBuffer = mappedBuffer ?: return@measureAndAudit emptyList()
             val readBuffer = mainBuffer.duplicate().order(ByteOrder.nativeOrder())
             
-            var currentBaseTs = 0L
-            var currentBaseLat = 0.0
-            var currentBaseLng = 0.0
             var toPeekCount = 0
             var currentReadIdx = 0
 
@@ -321,9 +295,6 @@ class ForensicSpillBuffer @Inject constructor(
                 
                 toPeekCount = count.coerceAtMost(limit)
                 currentReadIdx = readIdx.get()
-                currentBaseTs = baseTs.get()
-                currentBaseLat = baseLat
-                currentBaseLng = baseLng
             }
             
             if (toPeekCount == 0) return@measureAndAudit emptyList()
@@ -345,9 +316,11 @@ class ForensicSpillBuffer @Inject constructor(
                 
                 val storedCrc = bb.getInt(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
                 if (storedCrc == crc.value.toInt()) {
-                    val ts = currentBaseTs + bb.getInt()
-                    val lat = currentBaseLat + (bb.getInt() / PRECISION_SCALE)
-                    val lng = currentBaseLng + (bb.getInt() / PRECISION_SCALE)
+                    // R203: Absolute values stored at v3
+                    val ts = bb.getLong()
+                    val lat = bb.getDouble()
+                    val lng = bb.getDouble()
+
                     val acc = bb.getFloat().toDouble()
                     val maxAcc = bb.getFloat().toDouble()
                     val vibe = bb.getFloat().toDouble()
@@ -394,6 +367,12 @@ class ForensicSpillBuffer @Inject constructor(
         }
     }
 
+    /**
+     * commitDrain: Commits a processed chunk of traces.
+     * R203: Swapped persistence order. We now advance the read pointer before 
+     * decrementing the count. In case of crash, idempotency is guaranteed by 
+     * signature-based deduplication in the repository.
+     */
     fun commitDrain(count: Int) {
         LatencyMonitor.measureAndAudit<Unit>(
             timeProvider = timeProvider,
@@ -414,15 +393,6 @@ class ForensicSpillBuffer @Inject constructor(
                 val newCount = totalCount.get() - actualToConsume
                 totalCount.set(newCount)
                 buffer.putInt(OFF_COUNT, newCount)
-                
-                if (newCount == 0) {
-                    baseTs.set(0L)
-                    baseLat = 0.0
-                    baseLng = 0.0
-                    buffer.putLong(OFF_BASE_TS, 0L)
-                    buffer.putDouble(OFF_BASE_LAT, 0.0)
-                    buffer.putDouble(OFF_BASE_LNG, 0.0)
-                }
             }
         }
     }

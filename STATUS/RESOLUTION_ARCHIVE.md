@@ -2,11 +2,23 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 641**
+**Total Unique Resolutions: 645**
 
-## 62. Forensic Performance & JNI Optimization (Aug.18.06)
+## 65. Forensic Alignment & Temporal Hardening (Aug.18.07)
+*   **Issue #203: Forensic Multi-Session Alignment Audit (Temporal Hardening)**.
+    - **Resolution**: Hardened the forensic telemetry pipeline against temporal jitter and duplication across service restarts. Refactored `ForensicSpillBuffer.kt` to store absolute `Long` timestamps and `Double` coordinates (v3) in the memory-mapped buffer, eliminating session base-time dependencies and overflow risks. Implemented signature-based deduplication (timestamp + `spillIdx`) in `LogRepository.kt` before database insertion to ensure idempotency and strict temporal monotonicity during recovery from "dirty" shutdowns or crashes. (R203)
+
+## 64. Forensic Performance & JNI Optimization (Aug.18.06)
 *   **Issue #202: Forensic Performance: JNI Memory Pressure Audit**.
     - **Resolution**: Eliminated intermediate heap allocations in the forensic log draining pipeline. Implemented `peekToEntities` in `ForensicSpillBuffer.kt` to directly map off-heap buffer data to `LogEntity` (Room) objects. Updated `LogRepository.kt` to utilize this zero-churn path, removing the `LogEntry` allocation loop and significantly reducing GC pressure during sustained 100Hz telemetry bursts on budget hardware. (R202)
+
+## 63. Urban Multipath Mitigation (Aug.18.05)
+*   **Issue #201: Urban Edge Case: Multipath Mitigation Audit (Core Hardening)**.
+    - **Resolution**: Hardened stationary state management against GPS signal bouncing in urban canyons (multipath). Modified `AnchorEvaluator.kt` to prevent binary anchor release when GPS-derived confidence drops, provided the IMU confirms the device is physically stationary and SNR is low (indicating signal bounce). Refined `LocationSentinel.kt` to dampen `stationaryProb` decay during low-SNR physically stationary events, preventing jittery state transitions. (R201)
+
+## 62. Forensic UI Performance & Recomposition (Aug.18.03)
+*   **Issue #198: Forensic UI Performance & Recomposition Audit**.
+    - **Resolution**: Hardened the UI telemetry pipeline by implementing `.sample(100L)` on high-frequency `LocationUpdate` collectors in `MainViewModel.kt`. Capped UI processing at 10Hz to prevent Main thread saturation during 100Hz forensic bursts while maintaining fluid visual motion. (R198)
 
 ## 61. Forensic Storage & Pruning Hardening (Aug.18.02)
 *   **Issue #197: Forensic Storage-Aware Adaptive Pruning Refinement**.
@@ -35,5 +47,27 @@ This document contains the unified record of all resolved issues and technical d
     - **Resolution**: Hardened `AppDatabase` by implementing aggressive deduplication in migrations, removing invalid `UNIQUE` constraints on `localId`, and restoring missing columns in `connection_history`. (R190)
 *   **Issue #189: Forensic Stress Test**.
     - **Resolution**: Successfully executed 5-minute CPU/IO saturation routine at 100Hz on API 35. Verified system survival and recovery transition. (R189)
+
+## 56. Sensor Startup Hardening (Aug.16.14)
+*   **Issue #186: Gated Sensor Startup**.
+    - **Resolution**: Implemented a deferred sensor registration mechanism in `AppSensorManager`. High-frequency sensors (Accelerometer, Linear Accel) are now gated by a 2000ms settling delay (`SENSOR_SETTLING_DELAY_MS`) upon service start. This prevents IPC/Binder saturation during the critical first 2 seconds of Tracker/Viewer entry. (R186)
+
+## 55. Viewer Service Stabilization (Aug.17.01)
+*   **Issue #188: Build Regression in ViewerService**.
+    - **Resolution**: Restored build stability by fixing invalid string template escaping and correcting the unresolved reference for forensic telemetry (`peakVibrationShock`). Verified the coordinate alignment between local and remote processors in the Viewer role. (R188)
+
+## 54. Map Hydration & IO Hardening (Aug.16.13)
+*   **Issue #185: Startup ANR during Map Hydration**.
+    - **Resolution**: Eliminated main-thread saturation by offloading trail segment hashing and simplification to background threads. `MapTrailSegment` now carries a pre-computed `checksum` calculated in the `MainViewModel`, allowing `MapOverlayManager.updateTrails` to perform O(1) change detection. (R185)
+*   **Issue #184: Stress Test IO Race Condition**.
+    - **Resolution**: Hardened the forensic stress test `ioJob` in `TrackerService` to use unique timestamps in filenames and internal try-catch blocks. (R184)
+*   **Issue #183: Startup OOM in Tracker Mode**.
+    - **Resolution**: Reduced trail and violation retrieval limits from 10,000 to 2,000 in `Database.kt`. (R183)
+
+## 53. Map & Startup Hardening (Aug.16.00)
+*   **Issue #182: Startup ANR & GC Thrashing**.
+    - **Resolution**: Eliminated the massive allocation churn in the map rendering pipeline. Increased `STARTUP_SETTLING_DELAY_MS` to 10s. (R182)
+*   **Issue #181: DeadSystemException on Startup**.
+    - **Resolution**: Addressed Binder exhaustion by increasing the startup settling delay to 10,000ms. (R181)
 
 ... (rest of archive)
