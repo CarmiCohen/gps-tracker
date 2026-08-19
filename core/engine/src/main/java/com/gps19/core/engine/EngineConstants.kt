@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.18.10:
+ * - Issue #209 Fidelity Restoration: Reverted diagnostic down-sampling (R204). 
+ *   Restored forensic sampling to 100Hz (10ms) and Power Aware to 10Hz (100ms) 
+ *   following successful UI and Main-Thread stabilization (R209).
  * Aug.18.05:
  * - Issue #201 Hardening: Urban Edge Case Multipath Mitigation. Introduced 
  *   JUMP_WEIGHT_LOW_SNR and ANCHOR_SKEPTICISM thresholds to harden the engine 
@@ -80,11 +84,11 @@ const val FORENSIC_PRUNE_LIMIT_NORMAL = 15000
 const val FORENSIC_PRUNE_LIMIT_CHARGING = 30000
 
 // Issue #700: Forensic Sampling Scaling
-// TEMPORARY DIAGNOSTIC DOWN-SAMPLING (R-STRESS-TEST)
-const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 250L  // 4Hz (Down-sampled from 100Hz)
-const val FORENSIC_SAMPLING_INTERVAL_MAX_MS = 500L // 2Hz (Down-sampled from 10Hz)
-const val FORENSIC_SAMPLING_INTERVAL_COOLING_MS = 1000L // Increased for diagnostic
-const val FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS = 1000L // Increased for diagnostic
+// R209: Restored Production Fidelity (Reverted R204 Diagnostic Down-sampling)
+const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  // 100Hz (Production Target)
+const val FORENSIC_SAMPLING_INTERVAL_MAX_MS = 100L // 10Hz (Power Aware Target)
+const val FORENSIC_SAMPLING_INTERVAL_COOLING_MS = 250L 
+const val FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS = 500L
 
 // Issue #701: Forensic Spatial Quantization
 const val FORENSIC_SPATIAL_GATE_METERS = 0.1

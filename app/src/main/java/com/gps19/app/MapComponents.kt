@@ -38,13 +38,16 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Aug.18.09:
+ * - Issue #207/208 Performance Audit: Gated freshness calculations using 
+ *   derivedStateOf to prevent redundant recompositions on every pulse (R207).
+ * - Issue #207/208 Performance Audit: Optimized AndroidView update block 
+ *   to minimize main-thread work during 1Hz map invalidation (R207).
+ * - Issue #208: Fixed compilation error in MapToolsOverlay (R208).
  * Aug.16.12:
  * - Issue #185 Hardening: Updated AppMapContainer and OsmMap to receive 
  *   pre-simplified MapTrailSegments. Moved simplification churn out of 
  *   the UI update block to eliminate Startup ANRs (R185).
- * Aug.16.00:
- * - Issue #179 Hardening: Optimized OsmMap update block by removing redundant 
- *   toList() allocations on the main thread (R179).
  */
 
 @Composable
@@ -97,19 +100,31 @@ fun AppMapContainer(
     showToolsOverlay: Boolean = true
 ) {
     val context = LocalContext.current
-    val now = systemPulse
     
     val isTrackerMode = appMode == "tracker"
 
-    fun calculateFreshness(ts: Long, telemetryTs: Long): Boolean {
-        if (ts <= 0) return false
-        val telemetryAge = if (telemetryTs > 0) now - telemetryTs else Long.MAX_VALUE
-        val sourceGpsAge = if (telemetryTs > 0) maxOf(0L, telemetryTs - ts) else 0L
-        return (telemetryAge + sourceGpsAge) < GPS_UI_FAIL_THRESHOLD_MS
+    // Issue #207: Gate freshness recomposition using derivedStateOf
+    val isTrackerFresh by remember(trackerGpsTs, trackerTelemetryTs, systemPulse) {
+        derivedStateOf {
+            if (trackerGpsTs <= 0) false
+            else {
+                val telemetryAge = if (trackerTelemetryTs > 0) systemPulse - trackerTelemetryTs else Long.MAX_VALUE
+                val sourceGpsAge = if (trackerTelemetryTs > 0) maxOf(0L, trackerTelemetryTs - trackerGpsTs) else 0L
+                (telemetryAge + sourceGpsAge) < GPS_UI_FAIL_THRESHOLD_MS
+            }
+        }
     }
 
-    val isTrackerFresh = calculateFreshness(trackerGpsTs, trackerTelemetryTs)
-    val isViewerFresh = calculateFreshness(viewerGpsTs, viewerTelemetryTs)
+    val isViewerFresh by remember(viewerGpsTs, viewerTelemetryTs, systemPulse) {
+        derivedStateOf {
+            if (viewerGpsTs <= 0) false
+            else {
+                val telemetryAge = if (viewerTelemetryTs > 0) systemPulse - viewerTelemetryTs else Long.MAX_VALUE
+                val sourceGpsAge = if (viewerTelemetryTs > 0) maxOf(0L, viewerTelemetryTs - viewerGpsTs) else 0L
+                (telemetryAge + sourceGpsAge) < GPS_UI_FAIL_THRESHOLD_MS
+            }
+        }
+    }
 
     val initialCenter = remember(trackerLat, viewerLat) {
         when {
@@ -159,7 +174,7 @@ fun AppMapContainer(
             isTrackerFresh = isTrackerFresh,
             isViewerFresh = isViewerFresh,
             initialCenter = initialCenter,
-            systemPulse = now,
+            systemPulse = systemPulse,
             systemPulseRt = systemPulseRt,
             onLockChange = { onLockChange -> onEvent(UiEvent.SetMapLocked(onLockChange)) },
             mapViewRef = mapViewRef
@@ -390,7 +405,8 @@ fun OsmMap(
             })
         } 
     }, update = { view ->
-        // Issue #185: Pass pre-simplified segments to MapOverlayManager.
+        // Issue #207/208: Snapshot.withoutReadObservation ensures pulse updates 
+        // trigger imperative redraw without causing full Compose recomposition.
         Snapshot.withoutReadObservation {
             overlayManager?.let { om ->
                 val h = om.updateHomePoints(homePoints, isFenceVisible, maxDistance, isTrackerMode, geofenceMode, onTap, onRemoveMarker)

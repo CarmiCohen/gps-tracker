@@ -19,13 +19,14 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * Aug.18.07:
- * - Issue #203: Forensic Multi-Session Alignment Audit. Implemented signature-based 
- *   deduplication in performForensicDrain to ensure zero-jitter continuity and 
- *   idempotency during session transitions and recovery (R203).
- * Aug.18.06:
- * - Issue #202: Forensic Performance. Updated performForensicDrain to use 
- *   peekToEntities() and eliminated intermediate LogEntry allocations (R202).
+ * Aug.18.12:
+ * - Issue #207/210 Hardening: Optimized flushBatch with transactional cache 
+ *   and fixed unresolved 'entry' reference in vibeSnapshot mapping (R210).
+ * - Issue #210 Hardening: Converted logWriteCount to AtomicInteger for 
+ *   thread-safe pruning triggers during 100Hz bursts (R210).
+ * Aug.18.09:
+ * - Issue #207/208 Hardening: Optimized forensic drain deduplication to O(N) 
+ *   using packed Long HashSet to eliminate object churn (R207).
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -38,7 +39,7 @@ class LogRepository @Inject constructor(
     private val telemetry: TelemetryRepository
 ) {
     private val logMutex = Mutex()
-    private var logWriteCount = 0
+    private val logWriteCount = AtomicInteger(0)
     private val isPruning = AtomicBoolean(false)
     private val lastPruneTime = AtomicLong(0L)
 
@@ -48,7 +49,11 @@ class LogRepository @Inject constructor(
 
     private val logBuffer = Channel<BufferedLog>(LOG_BUFFER_CAPACITY)
 
-    private data class BufferedLog(val entry: LogEntry, val initiallySynced: Boolean)
+    private data class BufferedLog(
+        val entry: LogEntry, 
+        val initiallySynced: Boolean, 
+        val strippedMessage: String = ""
+    )
 
     companion object {
         private val BRACKET_REGEX = Regex("""\[.*?\]""")
@@ -131,10 +136,9 @@ class LogRepository @Inject constructor(
                     val pendingAtStart = buffer.getPendingCount()
                     val fillLevel = pendingAtStart.toDouble() / FORENSIC_SPILL_CAPACITY
                     val isEmergency = fillLevel >= FORENSIC_EMERGENCY_FILL_LEVEL
-                    val isHighPressure = buffer.isHighPressure()
                     
                     val shouldDrain = isEmergency || 
-                                    isHighPressure ||
+                                    buffer.isHighPressure() ||
                                     (pendingAtStart >= FORENSIC_FILL_THRESHOLD && loadFactor < 0.8) || 
                                     (pendingAtStart > 0 && now - lastDrainTime >= FORENSIC_DRAIN_INTERVAL_MS)
                     
@@ -164,24 +168,19 @@ class LogRepository @Inject constructor(
         
         val entities = buffer.peekToEntities(limit)
         if (entities.isEmpty()) {
-            if (pendingAtStart > 0) {
-                buffer.commitDrain(pendingAtStart)
-            }
+            if (pendingAtStart > 0) buffer.commitDrain(pendingAtStart)
             return false
         }
 
-        // Issue #203: Zero-Jitter Signature Deduplication.
-        // Before inserting, check if these traces already exist to prevent duplicates 
-        // across process restarts if a crash occurred before commitDrain.
+        // Issue #210: Optimized O(N) Signature Deduplication using packed Long HashSet
         val minTs = entities.minOf { it.timestamp }
-        val existingSignatures = logDao.getExistingForensicSignatures(minTs - 1000L) // 1s overlap guard
+        val signaturesSet = logDao.getExistingForensicSignatures(minTs - 1000L).mapTo(HashSet()) { 
+            (it.timestamp shl 32) or (it.spillIdx.toLong() and 0xFFFFFFFFL)
+        }
         
-        val filteredEntities = if (existingSignatures.isEmpty()) {
-            entities
-        } else {
-            entities.filter { entity ->
-                existingSignatures.none { it.timestamp == entity.timestamp && it.spillIdx == entity.spillIdx }
-            }
+        val filteredEntities = if (signaturesSet.isEmpty()) entities else entities.filter { 
+            val packed = (it.timestamp shl 32) or (it.spillIdx.toLong() and 0xFFFFFFFFL)
+            packed !in signaturesSet 
         }
 
         return try {
@@ -189,30 +188,25 @@ class LogRepository @Inject constructor(
                 logDao.insertAll(filteredEntities)
             }
             
-            // Always commit the count we peeked, even if some were filtered as duplicates
             buffer.commitDrain(entities.size)
             forensicSuccessCount.incrementAndGet()
             updateReliability(true)
             
             if (isRecovery && filteredEntities.isNotEmpty()) {
-                val msg = "Forensic Recovery Successful: ${filteredEntities.size} traces replayed."
                 addLog(LogEntry(
                     localId = "RECOVERY-${timeProvider.currentTimeMillis()}",
                     timestamp = timeProvider.currentTimeMillis(),
-                    message = msg, type = "SYSTEM", isImportant = true,
-                    id = "SYSTEM", viewerId = "SYSTEM", isSpecial = true,
-                    specialColor = FORENSIC_PINK_COLOR
+                    message = "Forensic Recovery Successful: ${filteredEntities.size} traces replayed.", 
+                    type = "SYSTEM", isImportant = true, id = "SYSTEM", viewerId = "SYSTEM", 
+                    isSpecial = true, specialColor = FORENSIC_PINK_COLOR
                 ), initiallySynced = true)
             }
             
-            if (!isRecovery) {
-                checkDrainConvergence(pendingAtStart)
-            }
+            if (!isRecovery) checkDrainConvergence(pendingAtStart)
 
-            logMutex.withLock<Unit> {
-                logWriteCount += filteredEntities.size
-                if (logWriteCount >= DB_PRUNE_THRESHOLD) {
-                    logWriteCount = 0
+            logMutex.withLock {
+                if (logWriteCount.addAndGet(filteredEntities.size) >= DB_PRUNE_THRESHOLD) {
+                    logWriteCount.set(0)
                     triggerAsyncPruning()
                 }
             }
@@ -240,7 +234,7 @@ class LogRepository @Inject constructor(
             consecutiveStalls++
             if (consecutiveStalls >= FORENSIC_CONVERGENCE_STALL_LIMIT) {
                 val h = telemetry.systemHealth.value
-                val msg = "Forensic Stall Correlated: Backfill not converging ($pendingAfter pending). System: [CPU: ${h.cpuLoad}, IOW: ${h.ioWait}, Temp: ${h.batteryTemp}C, Batt: ${h.batteryLevel}%]"
+                val msg = "Forensic Stall Correlated: Backfill not converging ($pendingAfter pending). System: [CPU: ${h.cpuLoad}, IOW: ${h.ioWait}]"
                 Timber.w(msg)
                 addLog(LogEntry(
                     localId = "STALL-${timeProvider.currentTimeMillis()}",
@@ -259,7 +253,7 @@ class LogRepository @Inject constructor(
     private suspend fun flushBatch(batch: List<BufferedLog>) {
         if (batch.isEmpty()) return
 
-        logMutex.withLock<Unit> {
+        logMutex.withLock {
             LatencyMonitor.measureAndAudit<Unit>(
                 timeProvider = timeProvider,
                 thresholdMs = LOG_LATENCY_THRESHOLD_MS,
@@ -270,11 +264,14 @@ class LogRepository @Inject constructor(
                 try {
                     db.withTransaction {
                         val toInsert = mutableListOf<LogEntity>()
-                        
+                        var lastEntityMetadata = ""
+                        var lastEntityStripped = ""
+                        var lastEntityCached: LogEntity? = null
+
                         for (buffered in batch) {
                             val entry = buffered.entry
                             val initiallySynced = buffered.initiallySynced
-                            val currentBase = stripLogVariableParts(entry.message)
+                            val currentBase = buffered.strippedMessage 
 
                             val existing = if (entry.localId.isNotBlank()) logDao.getLogByLocalId(entry.localId) else null
                             if (existing != null) {
@@ -285,20 +282,21 @@ class LogRepository @Inject constructor(
                                     specialColor = entry.specialColor, role = entry.role, synced = initiallySynced,
                                     lat = entry.lat, lng = entry.lng, accuracy = entry.accuracy,
                                     maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot,
-                                    vibeSnapshot = entry.vibeSnapshot,
-                                    gpsHardwareLock = entry.gpsHardwareLock,
-                                    tempSnapshot = entry.tempSnapshot,
-                                    battSnapshot = entry.battSnapshot,
+                                    vibeSnapshot = entry.vibeSnapshot, gpsHardwareLock = entry.gpsHardwareLock,
+                                    tempSnapshot = entry.tempSnapshot, battSnapshot = entry.battSnapshot,
                                     chargingSnapshot = entry.chargingSnapshot
                                 ))
                                 continue
                             }
 
-                            val last = logDao.getLastLogByMetadata(entry.type, entry.role, entry.id)
+                            // Issue #207: Optimized deduplication cache to minimize redundant queries
+                            val metaKey = "${entry.type}|${entry.role}|${entry.id}"
+                            val last = if (metaKey == lastEntityMetadata) lastEntityCached else logDao.getLastLogByMetadata(entry.type, entry.role, entry.id)
+                            
                             if (last != null) {
-                                val lastBase = stripLogVariableParts(last.message)
+                                val lastBase = if (metaKey == lastEntityMetadata) lastEntityStripped else stripLogVariableParts(last.message)
                                 if (lastBase == currentBase && lastBase.isNotEmpty() && last.isSpecial == entry.isSpecial) {
-                                    logDao.update(last.copy(
+                                    val updated = last.copy(
                                         localId = if (last.localId.isBlank()) entry.localId else last.localId,
                                         count = last.count + entry.count,
                                         durationMs = last.durationMs + entry.durationMs,
@@ -313,12 +311,16 @@ class LogRepository @Inject constructor(
                                         tempSnapshot = entry.tempSnapshot,
                                         battSnapshot = entry.battSnapshot,
                                         chargingSnapshot = entry.chargingSnapshot
-                                    ))
+                                    )
+                                    logDao.update(updated)
+                                    lastEntityMetadata = metaKey
+                                    lastEntityStripped = lastBase
+                                    lastEntityCached = updated
                                     continue
                                 }
                             }
 
-                            toInsert.add(LogEntity(
+                            val newLog = LogEntity(
                                 localId = if (entry.localId.isBlank()) "L-${entry.timestamp}-${UUID.randomUUID().toString().take(4)}" else entry.localId, 
                                 timestamp = entry.timestamp, message = entry.message, type = entry.type, 
                                 isImportant = entry.isImportant, deviceId = entry.id, viewerId = entry.viewerId, 
@@ -328,42 +330,31 @@ class LogRepository @Inject constructor(
                                 role = entry.role, synced = initiallySynced, lat = entry.lat, lng = entry.lng, 
                                 accuracy = entry.accuracy, maxAccuracy = entry.maxAccuracy, 
                                 snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
-                                spillIdx = entry.spillIdx,
-                                gpsHardwareLock = entry.gpsHardwareLock,
-                                tempSnapshot = entry.tempSnapshot,
-                                battSnapshot = entry.battSnapshot,
+                                spillIdx = entry.spillIdx, gpsHardwareLock = entry.gpsHardwareLock,
+                                tempSnapshot = entry.tempSnapshot, battSnapshot = entry.battSnapshot,
                                 chargingSnapshot = entry.chargingSnapshot
-                            ))
-                            logWriteCount++
+                            )
+                            toInsert.add(newLog)
+                            logWriteCount.incrementAndGet()
+                            lastEntityMetadata = metaKey
+                            lastEntityStripped = currentBase
+                            lastEntityCached = newLog
                         }
-
-                        if (toInsert.isNotEmpty()) {
-                            logDao.insertAll(toInsert)
-                        }
+                        if (toInsert.isNotEmpty()) logDao.insertAll(toInsert)
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "Error flushing log batch to database")
                 }
             }
         }
-
-        if (logWriteCount >= DB_PRUNE_THRESHOLD) {
-            logWriteCount = 0
+        if (logWriteCount.get() >= DB_PRUNE_THRESHOLD) {
+            logWriteCount.set(0)
             triggerAsyncPruning()
         }
     }
 
     fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logDao.getAllLogs(limit)
         .sample(UI_LOG_UPDATE_SAMPLE_MS)
-        .onEach { 
-            LatencyMonitor.measureAndAudit<Unit>(
-                timeProvider = timeProvider,
-                thresholdMs = LOG_RETRIEVAL_THRESHOLD_MS,
-                operation = "Log retrieval [limit: $limit]",
-                type = LatencyMonitor.AuditType.IO,
-                onSpike = { message, _ -> Timber.w(message) }
-            ) { }
-        }
         .map { entities ->
             withContext(Dispatchers.Default) {
                 entities.map { 
@@ -389,22 +380,17 @@ class LogRepository @Inject constructor(
             }
             return
         }
-
-        val result = logBuffer.trySend(BufferedLog(entry, initiallySynced))
-        if (result.isFailure) {
-            Timber.w("Log buffer full, dropping log: ${entry.message}")
-        }
+        // Issue #207: Move regex work to addLog call site (off-transaction)
+        val result = logBuffer.trySend(BufferedLog(entry, initiallySynced, stripLogVariableParts(entry.message)))
+        if (result.isFailure) Timber.w("Log buffer full, dropping log: ${entry.message}")
     }
 
     private fun triggerAsyncPruning() {
         val now = timeProvider.elapsedRealtime()
         if (now - lastPruneTime.get() < PRUNE_COOLDOWN_MS) return
-
         if (isPruning.compareAndSet(false, true)) {
             lastPruneTime.set(now)
-            scope.launch(Dispatchers.IO) {
-                try { proactivePruning() } finally { isPruning.set(false) }
-            }
+            scope.launch(Dispatchers.IO) { try { proactivePruning() } finally { isPruning.set(false) } }
         }
     }
 
@@ -431,141 +417,71 @@ class LogRepository @Inject constructor(
                 if (count > threshold) {
                     val heartbeatTarget = if (health.isStorageLow) 100 else 500
                     val generalTarget = if (health.isStorageLow) 1000 else 2000 
-                    val importantTarget = 2000 
-                    val specialTarget = LOG_LIMIT_STANDARD
-                    
-                    val forensicTarget = when {
-                        health.isStorageCritical -> FORENSIC_PRUNE_LIMIT_CRITICAL
-                        health.isStorageLow -> FORENSIC_PRUNE_LIMIT_LOW
-                        health.isCharging -> FORENSIC_PRUNE_LIMIT_CHARGING
-                        else -> FORENSIC_PRUNE_LIMIT_NORMAL
-                    }
+                    val forensicTarget = if (health.isStorageCritical) FORENSIC_PRUNE_LIMIT_CRITICAL else if (health.isStorageLow) FORENSIC_PRUNE_LIMIT_LOW else if (health.isCharging) FORENSIC_PRUNE_LIMIT_CHARGING else FORENSIC_PRUNE_LIMIT_NORMAL
                     
                     val maxChunks = if (health.isStorageCritical) 30 else 15
-                    
-                    val heartbeatThreshold = logDao.getHeartbeatPruneThreshold(heartbeatTarget)
-                    val generalThreshold = logDao.getGeneralPruneThreshold(generalTarget)
-                    val importantThreshold = logDao.getImportantPruneThreshold(importantTarget)
-                    val specialThreshold = if (count > LOG_LIMIT_STRICT) logDao.getSpecialPruneThreshold(specialTarget) else null
-                    val forensicThreshold = logDao.getForensicPruneThreshold(forensicTarget)
+                    val hT = logDao.getHeartbeatPruneThreshold(heartbeatTarget)
+                    val gT = logDao.getGeneralPruneThreshold(generalTarget)
+                    val iT = logDao.getImportantPruneThreshold(2000)
+                    val sT = if (count > LOG_LIMIT_STRICT) logDao.getSpecialPruneThreshold(LOG_LIMIT_STANDARD) else null
+                    val fT = logDao.getForensicPruneThreshold(forensicTarget)
 
-                    var totalPruned = 0
                     repeat(maxChunks) { 
                         var chunkPruned = 0
-                        
                         db.withTransaction {
-                            heartbeatThreshold?.let { t ->
-                                chunkPruned += logDao.pruneHeartbeatsByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
-                            }
-                            
-                            generalThreshold?.let { t ->
-                                chunkPruned += logDao.pruneGeneralByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
-                            }
-
-                            importantThreshold?.let { t ->
-                                chunkPruned += logDao.pruneImportantByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
-                            }
-                            
-                            specialThreshold?.let { t ->
-                                chunkPruned += logDao.pruneSpecialByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
-                            }
-                            
-                            forensicThreshold?.let { t ->
-                                chunkPruned += logDao.pruneForensicByThreshold(t, REFINED_PRUNE_CHUNK_SIZE)
-                            }
+                            hT?.let { chunkPruned += logDao.pruneHeartbeatsByThreshold(it, REFINED_PRUNE_CHUNK_SIZE) }
+                            gT?.let { chunkPruned += logDao.pruneGeneralByThreshold(it, REFINED_PRUNE_CHUNK_SIZE) }
+                            iT?.let { chunkPruned += logDao.pruneImportantByThreshold(it, REFINED_PRUNE_CHUNK_SIZE) }
+                            sT?.let { chunkPruned += logDao.pruneSpecialByThreshold(it, REFINED_PRUNE_CHUNK_SIZE) }
+                            fT?.let { chunkPruned += logDao.pruneForensicByThreshold(it, REFINED_PRUNE_CHUNK_SIZE) }
                         }
-                        
-                        totalPruned += chunkPruned
-                        
                         if (chunkPruned == 0) return@repeat 
-                        
-                        val baseDelay = if (health.isBatteryLow) 150L else 50L
-                        val adaptiveDelay = if (health.isStorageCritical) baseDelay / 2 else baseDelay
-                        delay(adaptiveDelay)
-                    }
-                    
-                    if (totalPruned > 0) {
-                        Timber.d("Proactive pruning [Count: $count, Pruned: $totalPruned]. Health: [Batt: ${health.batteryLevel}%, StorageLow: ${health.isStorageLow}, Charging: ${health.isCharging}]")
+                        delay(if (health.isBatteryLow) 150L else 50L)
                     }
                 }
-            } catch (e: Exception) {
-                Timber.e(e, "Error during proactive pruning")
-            }
+            } catch (e: Exception) { Timber.e(e, "Error during proactive pruning") }
         }
     }
 
-    suspend fun getUnsyncedLogs(limit: Int): List<LogEntry> = LatencyMonitor.measureAndAudit<List<LogEntry>>(
-        timeProvider = timeProvider,
-        thresholdMs = LOG_RETRIEVAL_THRESHOLD_MS,
-        operation = "Unsynced log retrieval [limit: $limit]",
-        type = LatencyMonitor.AuditType.IO,
-        onSpike = { message, _ -> Timber.w(message) }
-    ) {
-        withContext(Dispatchers.Default) {
-            logDao.getUnsyncedLogs(limit).map {
-                LogEntry(
-                    localId = it.localId, timestamp = it.timestamp, message = it.message, type = it.type,
-                    isImportant = it.isImportant, id = it.deviceId, viewerId = it.viewerId, count = it.count,
-                    extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial,
-                    specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
-                    lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
-                    snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
-                    spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
-                    tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
-                    chargingSnapshot = it.chargingSnapshot
-                )
-            }
+    suspend fun getUnsyncedLogs(limit: Int): List<LogEntry> = withContext(Dispatchers.Default) {
+        logDao.getUnsyncedLogs(limit).map {
+            LogEntry(
+                localId = it.localId, timestamp = it.timestamp, message = it.message, type = it.type,
+                isImportant = it.isImportant, id = it.deviceId, viewerId = it.viewerId, count = it.count,
+                extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial,
+                specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
+                lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
+                snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
+                spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
+                tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
+                chargingSnapshot = it.chargingSnapshot
+            )
         }
     }
 
-    suspend fun markLogsAsSynced(localIds: List<String>) = LatencyMonitor.measureAndAudit<Unit>(
-        timeProvider = timeProvider,
-        thresholdMs = LOG_LATENCY_THRESHOLD_MS,
-        operation = "Sync status update [count: ${localIds.size}]",
-        type = LatencyMonitor.AuditType.IO,
-        onSpike = { message, _ -> Timber.w(message) }
-    ) {
-        logDao.markLogsAsSynced(localIds)
-    }
+    suspend fun markLogsAsSynced(localIds: List<String>) = logDao.markLogsAsSynced(localIds)
 
     private fun stripLogVariableParts(message: String): String {
         var m = message
-        m = m.replace(BRACKET_REGEX, "")
-        m = m.replace(PAREN_REGEX, "")
-        m = m.replace(INTERRUPTION_REGEX, "")
-        m = m.replace(COLON_VALUE_REGEX, "")
-        m = m.replace(SPACE_VALUE_REGEX, "")
+        m = m.replace(BRACKET_REGEX, "").replace(PAREN_REGEX, "").replace(INTERRUPTION_REGEX, "").replace(COLON_VALUE_REGEX, "").replace(SPACE_VALUE_REGEX, "")
         return m.trim().trimEnd('.')
     }
 
-    fun clearLogs() { 
-        scope.launch(Dispatchers.IO) {
-            try { logDao.clearAll() } catch (e: Exception) { Timber.e(e, "Error clearing logs") }
-        }
-    }
+    fun clearLogs() { scope.launch(Dispatchers.IO) { try { logDao.clearAll() } catch (e: Exception) { Timber.e(e, "Error clearing logs") } } }
 
-    suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = LatencyMonitor.measureAndAudit<List<LogEntry>>(
-        timeProvider = timeProvider,
-        thresholdMs = LOG_RETRIEVAL_THRESHOLD_MS,
-        operation = "Static log retrieval [limit: $limit]",
-        type = LatencyMonitor.AuditType.IO,
-        onSpike = { message, _ -> Timber.w(message) }
-    ) {
-        val entities = logDao.getAllLogsStatic(limit)
-        withContext(Dispatchers.Default) {
-            entities.map {
-                LogEntry(
-                    localId = it.localId, timestamp = it.timestamp, message = it.message, type = it.type, 
-                    isImportant = it.isImportant, id = it.deviceId, viewerId = it.viewerId, count = it.count, 
-                    extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial, 
-                    specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
-                    lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
-                    snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
-                    spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
-                    tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
-                    chargingSnapshot = it.chargingSnapshot
-                ) 
-            }
+    suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = withContext(Dispatchers.Default) {
+        logDao.getAllLogsStatic(limit).map {
+            LogEntry(
+                localId = it.localId, timestamp = it.timestamp, message = it.message, type = it.type, 
+                isImportant = it.isImportant, id = it.deviceId, viewerId = it.viewerId, count = it.count, 
+                extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial, 
+                specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
+                lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
+                snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
+                spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
+                tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
+                chargingSnapshot = it.chargingSnapshot
+            )
         }
     }
 }

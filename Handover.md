@@ -1,42 +1,39 @@
-# Handover (Aug.18.08) - Diagnostic Phase: Performance Bottlenecks Isolated
+# Handover (Aug.18.13) - Production Validated & Release Ready
 
-## 🎯 Next Objective: Issue #208 & #207 - UI Layer & Main-Thread Audit
-- **Goal**: Eliminate high-frequency object churn and main-thread hangs in `MainViewModel` and `AppMapContainer`.
-- **Status**: 🔴 **OPEN (HIGH PRIORITY)**.
-- **Context**: Diagnostic monitoring on Samsung A15 (SM-A155F) revealed that 1s+ frame hangs ("Davey" logs) persist even when forensic telemetry is throttled to 4Hz and hardware listeners to 5Hz. Logcat shows near-constant mark-compact GC cycles (~1/sec) taking 100ms+, indicating that the bottleneck is likely redundant list copying or object allocations in the UI state mapping logic (e.g., 1Hz pulses triggering full trail segment re-processing), not the tracking engine itself.
+## 🎯 Next Objective: Issue #212 - Maintenance & Simplification
+- **Goal**: Implement architectural simplifications identified in `Simplify_Ideas2.md` to reduce technical debt before the next feature cycle.
+- **Status**: 🟢 **READY FOR MAINTENANCE**.
+- **Context**: Issue #211 is successfully resolved. Real-world validation on Samsung A15 confirmed that the 100Hz forensic pipeline is stable, thermally efficient, and battery-optimized for production use.
 
-## 🧬 Forensic Pipeline Status (vAug.18.08)
-The forensic telemetry system is architecturally hardened for production but currently runs in a **Diagnostic State** for stress-isolation:
+## 🧬 Forensic Pipeline Deep-Dive (vAug.18.13)
+The system is now fully validated for high-resolution capture:
 
-### 1. Multi-Session Alignment (#203) - VERIFIED
-*   **Buffer v3**: `ForensicSpillBuffer.kt` successfully migrated to absolute `Long` timestamps and `Double` coordinates in the 96-byte entry layout.
-*   **Idempotency**: Signature-based deduplication in `LogRepository.performForensicDrain` verified via 1s lookback window. Monotonicity is guaranteed across service restarts and "dirty" reboots.
+### 1. Persistence: `ForensicSpillBuffer.kt` (v3)
+*   **Architecture**: Memory-Mapped circular buffer (`MappedByteBuffer`) ensuring low-latency, zero-IO-wait persistence.
+*   **Data Layout**: 96-byte entries with CRC32 integrity.
+*   **Validation**: Confirmed zero-churn path during sustained 100Hz capture during moving tests (Issue #211).
 
-### 2. JNI & Memory Optimization (#202) - VERIFIED
-*   **Zero-Churn Path**: `peekToEntities()` directly maps MappedByteBuffer data to Room `LogEntity` objects. 
-*   **Result**: GC pressure from the tracking engine is negligible; current heap pressure (#208) is isolated to the UI/Compose layer mapping logic.
+### 2. Synchronization: `LogRepository.kt`
+*   **Efficiency**: Bit-packed `Long` signatures ensure O(N) deduplication, preventing CPU saturation during massive backfills.
 
-### 3. Diagnostic Stress Isolation (#204) - ACTIVE
-*   **Throttled State**: Intervals in `EngineConstants.kt` are reduced to isolate CPU/IO load:
-    - **Peak Fidelity**: 100Hz -> 4Hz (`250ms`).
-    - **Power Aware**: 10Hz -> 2Hz (`500ms`).
-*   **Hardware Scaling**: `AppSensorManager.kt` listeners (Linear Accel) set to `SENSOR_DELAY_NORMAL` (~5Hz).
-*   **Isolation Finding**: Confirmed that the "stress" causing frame drops is independent of telemetry frequency, focusing the audit on the 1Hz UI pulse.
+### 3. Repository Efficiency: `MainRepository.kt`
+*   **Object Pooling**: `TrailPoint` reuse successfully eliminates allocation churn during UI pulses.
+*   **Thread Safety**: `AtomicInteger` counters provide race-free tracking under high-fidelity pressure.
 
-## 🛡️ Core Hardening (Aug.18.08 Resolutions)
-*   **UI Artifact Remediation (#205)**: Wrapped technical overlays (`PhoneSetupOverlay`, `TrackerDashboard`) in forced LTR `CompositionLocalProvider` to resolve BiDi mirroring and punctuation artifacts (R205).
-*   **Samsung Permission Hardening (#206)**: Implemented fallback in `MainActivity.kt` for `ACTION_MANAGE_OVERLAY_PERMISSION` to handle URI rejections on Samsung A15/API 35 (R206).
+### 4. UI Layer Stabilization: `MapOverlayManager.kt`
+*   **Geometry Cache**: `circleCache` prevents redundant `GeoPoint` allocations. Recomposition gating ensures UI responsiveness at 100Hz.
 
-## 🛠️ Execution Sequence for Resumption
-1.  **Profile UI Pulse**: Audit `MainViewModel` and `AppMapContainer` for O(N) operations or redundant object allocations triggered by the 1Hz `systemPulse`.
-2.  **Optimize Overlays**: Gate marker and poly-line updates in `AppMapContainer` using `derivedStateOf` or stable keys to prevent full recompositions on every pulse.
-3.  **Verify DB Transaction Locks**: Check if `LogRepository` drain operations are holding transaction locks that delay UI-thread database reads.
-4.  **Restore Fidelity**: Once frame stability is achieved and GC pressure (#208) is resolved, revert `EngineConstants.kt` and `AppSensorManager.kt` to production 100Hz fidelity.
+## 🛡️ Core Hardening (Aug.18.13 Resolutions)
+*   **Final Validation (#211)**: Successfully completed real-world moving tests on Samsung A15. Performance and thermal metrics are within production targets.
+*   **Fidelity Restoration (#209)**: Restored 100Hz forensic capture and `SENSOR_DELAY_FASTEST`.
+*   **UI Churn Remediation (#208)**: Multi-layer caching and Repository-level pooling implemented.
+*   **Main-Thread Stabilization (#207)**: Gated recompositions and decoupled regex logic from transactions.
+*   **Field Hardening (#210)**: Thread-safe counters and packed forensic signatures implemented.
 
 ## 📊 Documentation State
-- **RESOLUTION_ARCHIVE.md**: Updated to Section 68. Total unique resolutions: 648.
-- **issues.md**: Synchronized to Aug.18.08. Issues #207 and #208 are primary targets.
-- **SOT_MASTER_REQUIREMENTS.md**: Requirements R204, R205, and R206 added.
-- **build.gradle**: VersionName: Aug.18.08.
+- **RESOLUTION_ARCHIVE.md**: Updated to Section 73. Total unique resolutions: 653.
+- **issues.md**: Synchronized to Aug.18.13. Issue #211 marked RESOLVED.
+- **SOT_MASTER_REQUIREMENTS.md**: Requirement R211 added and verified.
+- **build.gradle**: VersionName: Aug.18.13.
 
-vAug.18.08
+vAug.18.13

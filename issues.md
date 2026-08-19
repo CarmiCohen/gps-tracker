@@ -1,33 +1,30 @@
-# Project Issues & Hardening Tracking (Aug.18.08)
+# Project Issues & Hardening Tracking (Aug.18.13)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 Active | 2 |
-| **Validation Tasks** | 🔍 Pending | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 648 |
+| **Open Technical Issues** | 🟢 STABLE | 0 |
+| **Validation Tasks** | 🟢 COMPLETE | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
+| **Resolved (Total)** | 🟢 Progress | 653 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Concern #204-C1**: Diagnostic down-sampling reduces forensic fidelity (4Hz vs 100Hz). This is a temporary state for stress-isolation and must be reverted before production release.
-*   **Concern #207-C1 (Risk)**: Residual Main Thread Pressure. "Davey" logs (1s+) persist even at 4Hz sampling. (Issue #207)
-*   **Concern #208-C1 (Defect)**: Excessive GC & Heap Fragmentation. Logcat reveals near-constant mark-compact GC cycles (~1/sec) taking 100ms+. This indicates high object churn in the UI layer (ViewModel/Compose) independent of forensic logging frequency. (Issue #208)
+*   **Concern #211-C1**: Sustained 100Hz telemetry capture on budget hardware (Samsung A15) must be monitored for thermal-induced frequency scaling during long-duration sessions. (Issue #211).
 
 ---
 
 ## 🔴 Open Issues
-*   **Issue #208: UI Layer Allocation Audit**: Identify and eliminate high-churn object allocations in `MainViewModel` and `AppMapContainer` that are triggering constant GC cycles.
-*   **Issue #207: Main-Thread Bottleneck Audit**: Identify the root cause of large frame hangs (1s+) that persist during low-frequency sampling. Focus on Map rendering and database contention.
+*   *(No open high-priority issues)*
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.18.08)
-*   **Issue #206: Samsung-Specific Permission Navigation**: Implemented fallback logic in `MainActivity.kt` for `ACTION_MANAGE_OVERLAY_PERMISSION` to handle intent URI rejections on Samsung A15/API 35 (R206).
-*   **Issue #205: UI String Rendering Artifacts**: Forced LTR layout direction in `SettingsComponents.kt` for technical telemetry screens to resolve BiDi mirroring and punctuation artifacts (R205).
-*   **Issue #204: Diagnostic Stress Isolation (Sensor Sampling Rates)**: Implemented temporary diagnostic down-sampling (4Hz/2Hz) to isolate high-frequency overhead (R204).
+## 🟢 Recently Resolved Issues (Aug.18.13)
+*   **Issue #211: Final Release Validation**: Completed final battery and thermal validation on Samsung A15 in a real-world moving environment at 100Hz fidelity. Verified that the performance hardening from R207-R210 provides sufficient headroom for production fidelity without thermal throttling or excessive drain (R211).
+*   **Issue #210: Long-Term Field Hardening**: Converted internal write counters in `MainRepository` to `AtomicInteger` to prevent race conditions during 100Hz bursts. Optimized forensic deduplication logic in `LogRepository` to use bit-packed primitive `Long` signatures (`timestamp << 32 | spillIdx`) in a `HashSet` lookup, eliminating thousands of `Pair` object allocations during O(N) deduplication. Implemented `TrailPoint` object pooling in `MainRepository` to eliminate allocation churn during backfills (R210).
+*   **Issue #209: Production Fidelity Restoration**: Reverted diagnostic down-sampling (R204). Restored forensic sampling to 100Hz and hardware sensor listeners to `SENSOR_DELAY_FASTEST`. Verified stability following R207/R208 UI optimizations (R209).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.18.08)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.18.13)

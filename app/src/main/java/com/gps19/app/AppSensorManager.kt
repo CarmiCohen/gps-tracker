@@ -35,12 +35,13 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * Aug.18.10:
+ * - Issue #209 Fidelity Restoration: Reverted diagnostic down-sampling (R204). 
+ *   Restored Accelerometer, Linear Accel, and Rotation Vector to SENSOR_DELAY_FASTEST 
+ *   in production mode to support 100Hz forensic analysis (R209).
  * Aug.16.13:
  * - Reverted Gated Sensor Start (Issue #186 rollback). Restored immediate 
  *   registration to resolve Startup Black Screen regression.
- * Aug.13.02:
- * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
- *   type inference failures (R146/R151).
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -253,14 +254,17 @@ class AppSensorManager @Inject constructor(
     }
 
     private fun registerSensors() {
+        // Issue #209: Reverted diagnostic scaling. High-fidelity sensors restored to FASTEST.
         val delay = if (powerSaveMode) AndroidSensorManager.SENSOR_DELAY_NORMAL else AndroidSensorManager.SENSOR_DELAY_FASTEST
-        accelerometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
+        
+        accelerometer?.let { sensorManager.registerListener(this, it, delay, sensorHandler) }
         linearAccel?.let { sensorManager.registerListener(this, it, delay, sensorHandler) }
         magnetometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         barometer?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         proximity?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
         light?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
-        rotationVector?.let { sensorManager.registerListener(this, it, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler) }
+        rotationVector?.let { sensorManager.registerListener(this, it, delay, sensorHandler) }
+
         attemptStepDetectorRegistration(); startStepDetectorRecoveryLoop()
     }
 

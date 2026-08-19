@@ -1,28 +1,8 @@
-# Simplify Ideas - Aug.18.06
+# Simplification Ideas (Aug.18.13)
 
-Ideas to reduce complexity and improve maintainability of the GPS Tracker project.
+Ideas to simplify the codebase and improve maintainability:
 
-## 1. Domain-Specific Constant Grouping
-`EngineConstants.kt` has become a "kitchen sink" for all magic numbers. 
-- **Idea**: Group related constants into nested `object` containers or separate files (e.g., `GeofenceConfig`, `MotionThresholds`, `AcousticParams`).
-- **Benefit**: Improves IDE autocomplete discoverability and prevents "constant fatigue".
-
-## 2. Explicit State Machine for Tracking Status
-Currently, the "Stationary" vs "Moving" state is determined by a mix of `stationaryProb`, `isPhysicallyStationary`, and various flags.
-- **Idea**: Implement an explicit `TrackingStateMachine` that handles transitions between `PARKING`, `MOVING`, `SUSPICIOUS`, and `JUMPING`.
-
-## 3. Sentinel Sub-Component Delegation
-`LocationSentinel.kt` handles everything from GNSS filtering to Barometric lift.
-- **Idea**: Decompose `LocationSentinel` into specialized sub-sentinels (e.g., `EnvironmentalSentinel`, `KineticSentinel`).
-
-## 4. Unified Logging Data Path (New - #202)
-Currently, the app uses `LogEntry` for domain logic and `LogEntity` for Room persistence. 
-- **Idea**: Standardize a "LogRecord" interface that both classes implement, or use `LogEntity` directly in the domain layer to eliminate the mapping layer entirely for all log types.
-
-## 5. Forensic Codec Decoupling (New - #202)
-The memory-mapping logic in `ForensicSpillBuffer` is coupled with the binary format.
-- **Idea**: Extract a `ForensicCodec` or `ForensicSerializer` class to allow changing binary formats without touching buffer management logic.
-
-## 6. Logic Optimization: Anchor Score vs Probability
-- **Idea**: Converge `anchorEscapeScore` and `stationaryProb` into a single "Kinetic Certainty" index that factors in both GPS velocity and IMU stability.
-- **Benefit**: Eliminates the "binary release" logic and simplifies the decision logic in `AnchorEvaluator`.
+1. **Unify Buffer Management**: The `ForensicSpillBuffer` and `LogRepository` drain logic are highly optimized but complex. Consider a higher-level abstraction for "Durable Streams" that hides the MappedByteBuffer complexity from the repository layer.
+2. **Atomic Counter Consolidation**: Currently, multiple `AtomicInteger` objects are used in `MainRepository`. These could be grouped into a single `PerformanceMetrics` data class/structure to simplify the repository's state management.
+3. **Compose UI Decoupling**: While `derivedStateOf` has helped, further decoupling the map overlay logic from the main UI thread using a dedicated `MapStateProducer` could reduce the cognitive load of the `AppMapContainer`.
+4. **Remove Legacy Regex Logic**: If forensic signatures now guarantee uniqueness and integrity via CRC32, evaluate if the legacy regex-based deduplication in the persistence layer can be entirely removed to simplify `LogRepository`.

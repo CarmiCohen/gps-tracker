@@ -25,6 +25,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.18.09:
+ * - Issue #208 Performance Audit: Implemented trail segment caching in 
+ *   computeTrailSegments to eliminate redundant O(N) simplification churn (R208).
  * Aug.18.03:
  * - Issue #198 Performance Audit: Throttled localLocation and trackerLocation 
  *   collectors to 10Hz (100ms) to prevent UI thread saturation during 
@@ -165,14 +168,30 @@ class MainViewModel @Inject constructor(
         .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Issue #208: Trail Cache to prevent O(N) churn in computeTrailSegments
+    private var lastTrackerTrailSize = -1
+    private var cachedTrackerSegments = emptyList<MapTrailSegment>()
+    private var lastViewerTrailSize = -1
+    private var cachedViewerSegments = emptyList<MapTrailSegment>()
+
     // Issue #185: Background Trail Simplification
     val trackerTrailSegments: StateFlow<List<MapTrailSegment>> = trackerTrailFlow
-        .map { trail -> computeTrailSegments(trail, BrandJd.toArgb()) }
+        .map { trail -> 
+            if (trail.size == lastTrackerTrailSize) cachedTrackerSegments
+            else computeTrailSegments(trail, BrandJd.toArgb()).also { 
+                cachedTrackerSegments = it; lastTrackerTrailSize = trail.size 
+            }
+        }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val viewerTrailSegments: StateFlow<List<MapTrailSegment>> = viewerTrailFlow
-        .map { trail -> computeTrailSegments(trail, ViewerCyan.toArgb()) }
+        .map { trail -> 
+            if (trail.size == lastViewerTrailSize) cachedViewerSegments
+            else computeTrailSegments(trail, ViewerCyan.toArgb()).also { 
+                cachedViewerSegments = it; lastViewerTrailSize = trail.size 
+            }
+        }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

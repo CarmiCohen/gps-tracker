@@ -11,17 +11,20 @@ import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 import org.osmdroid.util.GeoPoint
 
 /**
  * MainRepository: Centralized data hub for the application.
- * Aug.15.01:
- * - Issue #179: Forensic Performance Optimization. Implemented UI history 
- *   buffering to eliminate 100Hz allocation churn. Live history is now 
- *   batched and emitted at 2Hz to resolve heap exhaustion (R179).
- * - Issue #157: Violation Path Allocations. Optimized violationsFlow (R157).
+ * Aug.18.12:
+ * - Issue #210 Hardening: Converted write counters to AtomicInteger to prevent 
+ *   race-induced pruning delays during high-frequency telemetry (R210).
+ *   Fixed unresolved reference 'wallTs' in addViolation.
+ * Aug.18.11:
+ * - Issue #208 Performance: Implemented TrailPoint object pooling in 
+ *   trail flows to eliminate 2000+ object allocations per pulse (R208).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -48,9 +51,9 @@ class MainRepository @Inject constructor(
 
     private val violationProcessor = ViolationProcessor(timeProvider)
 
-    private var trailWriteCount = 0
-    private var violationWriteCount = 0
-    private var historyWriteCount = 0
+    private val trailWriteCount = AtomicInteger(0)
+    private val violationWriteCount = AtomicInteger(0)
+    private val historyWriteCount = AtomicInteger(0)
     
     private val isPruningActive = AtomicBoolean(false)
 
@@ -76,12 +79,26 @@ class MainRepository @Inject constructor(
 
     fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logRepository.eventLogsFlow(limit)
 
+    // Issue #208: TrailPoint Pooling to prevent allocation churn
+    private val trackerPointPool = mutableMapOf<Long, TrailPoint>()
+    private val viewerPointPool = mutableMapOf<Long, TrailPoint>()
+
     val trackerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(false).map { entities -> 
-        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, SentinelStatus.valueOf(it.status), it.accuracy, it.maxAccuracy) } 
+        if (trackerPointPool.size > 3000) trackerPointPool.clear()
+        entities.map { entity ->
+            trackerPointPool.getOrPut(entity.timestamp) {
+                TrailPoint(entity.lat, entity.lng, entity.timestamp, SentinelStatus.valueOf(entity.status), entity.accuracy, entity.maxAccuracy)
+            }
+        }
     }.flowOn(Dispatchers.Default)
 
     val viewerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(true).map { entities -> 
-        entities.map { TrailPoint(it.lat, it.lng, it.timestamp, SentinelStatus.valueOf(it.status), it.accuracy, it.maxAccuracy) } 
+        if (viewerPointPool.size > 3000) viewerPointPool.clear()
+        entities.map { entity ->
+            viewerPointPool.getOrPut(entity.timestamp) {
+                TrailPoint(entity.lat, entity.lng, entity.timestamp, SentinelStatus.valueOf(entity.status), entity.accuracy, entity.maxAccuracy)
+            }
+        }
     }.flowOn(Dispatchers.Default)
 
     val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> 
@@ -246,9 +263,8 @@ class MainRepository @Inject constructor(
                     maxAccuracy = maxAccuracy
                 ))
                 
-                trailWriteCount++
-                if (force || trailWriteCount >= DB_PRUNE_THRESHOLD_TRAIL) {
-                    trailWriteCount = 0
+                if (force || trailWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
+                    trailWriteCount.set(0)
                     triggerBackgroundPruning()
                 }
             }
@@ -259,6 +275,8 @@ class MainRepository @Inject constructor(
         trailDao.clearTrail(false)
         trailDao.clearTrail(true)
         violationDao.clearAll()
+        trackerPointPool.clear()
+        viewerPointPool.clear()
     }
 
     suspend fun loadTrailStatic(isViewer: Boolean): List<TrailPoint> = trailDao.getTrailStatic(isViewer).map { 
@@ -287,9 +305,8 @@ class MainRepository @Inject constructor(
             ) {
                 violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
                 
-                violationWriteCount++
-                if (violationWriteCount >= DB_PRUNE_THRESHOLD_TRAIL) {
-                    violationWriteCount = 0
+                if (violationWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
+                    violationWriteCount.set(0)
                     triggerBackgroundPruning()
                 }
             }
@@ -458,12 +475,10 @@ class MainRepository @Inject constructor(
             ) {
                 database.withTransaction {
                     historyDao.insertAll(dbPoints)
-                    historyWriteCount += dbPoints.size
-                }
-                
-                if (historyWriteCount >= DB_PRUNE_THRESHOLD_HISTORY) {
-                    historyWriteCount = 0
-                    triggerBackgroundPruning()
+                    if (historyWriteCount.addAndGet(dbPoints.size) >= DB_PRUNE_THRESHOLD_HISTORY) {
+                        historyWriteCount.set(0)
+                        triggerBackgroundPruning()
+                    }
                 }
             }
         }

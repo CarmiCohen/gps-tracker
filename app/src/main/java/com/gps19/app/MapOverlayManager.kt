@@ -17,16 +17,19 @@ import org.osmdroid.views.overlay.*
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.log10
+import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Aug.18.09:
+ * - Issue #208 Performance Audit: Implemented circle geometry caching (R208).
+ * - Issue #208 Performance Audit: Added drift and center quantization to 
+ *   circle cache keys to maximize hit rates during movement (R208).
+ * - Issue #208 Performance Audit: Implemented filtered violations caching 
+ *   to eliminate O(N) churn in updateViolations (R208).
  * Aug.16.12:
  * - Issue #185 Hardening: Refactored updateTrails to accept pre-simplified 
- *   segments, eliminating main-thread simplification and mapping churn 
- *   which caused Startup ANRs (R185).
- * - Issue #185 Hardening: Offloaded segment checksum computation from UI 
- *   thread. updateTrails now uses pre-computed checksums to detect changes, 
- *   eliminating O(N) hashCode() calls on the main thread (R185).
+ *   segments, eliminating main-thread simplification and mapping churn (R185).
  */
 class MapOverlayManager(
     private val context: Context,
@@ -81,7 +84,9 @@ class MapOverlayManager(
     private var lastTrailChecksum = -1
     private var lastViewerTrailChecksum = -1
     private var lastViolationsSize = -1
+    private var lastViolationsRef: List<ViolationPoint>? = null
     private var lastViolationVisibility: Pair<Boolean, Boolean>? = null
+    private var cachedFilteredViolations = emptyList<ViolationPoint>()
     
     private var lastTrackerPos: GeoPoint? = null
     private var lastTrackerDrift: Double = -1.0
@@ -98,6 +103,23 @@ class MapOverlayManager(
     private var lastDriftUpdateTs = 0L
     private var lastViolationUpdateTs = 0L
     private val BUDGET_THROTTLE_MS = 1000L 
+
+    // Issue #208: Circle Geometry Cache with Spatial Quantization
+    private data class CircleKey(val latQ: Long, val lngQ: Long, val radiusQ: Long)
+    private val circleCache = mutableMapOf<CircleKey, List<GeoPoint>>()
+
+    private fun getCachedCircle(center: GeoPoint, radius: Double): List<GeoPoint> {
+        // Issue #208: Quantize center (approx 0.1m) and radius (0.5m) to maximize hit rate
+        val latQ = (center.latitude * 1_000_000).toLong() // Approx 0.11m precision
+        val lngQ = (center.longitude * 1_000_000).toLong()
+        val radiusQ = (round(radius * 2.0)).toLong() // 0.5m steps
+        
+        val key = CircleKey(latQ, lngQ, radiusQ)
+        return circleCache.getOrPut(key) { 
+            if (circleCache.size > 200) circleCache.clear() 
+            Polygon.pointsAsCircle(center, radiusQ / 2.0) 
+        }
+    }
 
     init {
         mapView.overlays.add(trailFolder)
@@ -119,6 +141,10 @@ class MapOverlayManager(
         onTap: (GeoPoint) -> Unit,
         onRemoveMarker: (Int) -> Unit
     ): Boolean {
+        // Issue #208: Reference check first to avoid O(N) list equality
+        if (lastHomeRendered === home && lastFenceState == isFenceVisible && 
+            lastIsTrackerMode == isTrackerMode && lastGeofenceMode == geofenceMode) return false
+            
         if (lastHomeRendered == home && lastFenceState == isFenceVisible && 
             lastIsTrackerMode == isTrackerMode && lastGeofenceMode == geofenceMode) return false
 
@@ -133,7 +159,7 @@ class MapOverlayManager(
         if (isFenceVisible) {
             home.forEachIndexed { idx, p ->
                 fenceFolder.add(Polygon(mapView).apply { 
-                    points = Polygon.pointsAsCircle(p, maxD)
+                    points = getCachedCircle(p, maxD)
                     fillPaint.color = 0x28CBD5E1.toInt(); outlinePaint.color = 0xC8CBD5E1.toInt(); outlinePaint.strokeWidth = 2f; setInfoWindow(null) 
                 })
                 val marker = if (idx < homeMarkerPool.size) homeMarkerPool[idx] else Marker(mapView).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); homeMarkerPool.add(m) }
@@ -151,17 +177,13 @@ class MapOverlayManager(
                 homeMarkersFolder.add(marker)
             }
         }
-        lastHomeRendered = home.toList()
+        lastHomeRendered = home
         lastFenceState = isFenceVisible
         lastIsTrackerMode = isTrackerMode
         lastGeofenceMode = geofenceMode
         return true
     }
 
-    /**
-     * updateTrails: Optimized trail rendering using background-calculated checksums.
-     * Part of Issue #185 ANR mitigation.
-     */
     fun updateTrails(
         trackerSegments: List<MapTrailSegment>, 
         viewerSegments: List<MapTrailSegment>, 
@@ -171,7 +193,6 @@ class MapOverlayManager(
         val canUpdateTracker = (systemPulseRt - lastTrailUpdateTs) > BUDGET_THROTTLE_MS || lastTrailChecksum == -1
         val canUpdateViewer = (systemPulseRt - lastViewerTrailUpdateTs) > BUDGET_THROTTLE_MS || lastViewerTrailChecksum == -1
 
-        // Issue #185: Use fast checksum accumulation instead of O(N) hashCode() on the UI thread.
         val currentTrackerChecksum = trackerSegments.fold(0) { acc, seg -> acc * 31 + seg.checksum }
         if (canUpdateTracker && lastTrailChecksum != currentTrackerChecksum) {
             trailFolder.items.clear()
@@ -206,26 +227,30 @@ class MapOverlayManager(
 
     fun updateViolations(violations: List<ViolationPoint>, isViolationsVisible: Boolean, isGeofenceViolationsVisible: Boolean, systemPulseRt: Long): Boolean {
         val visibilityPair = Pair(isViolationsVisible, isGeofenceViolationsVisible)
+        
+        // Issue #208: Skip filtering and re-rendering if data and visibility are identical
+        if (lastViolationsRef === violations && lastViolationVisibility == visibilityPair) return false
         if (lastViolationsSize == violations.size && lastViolationVisibility == visibilityPair) return false
         if ((systemPulseRt - lastViolationUpdateTs) < BUDGET_THROTTLE_MS && lastViolationsSize != -1) return false
 
         violationMarkersFolder.items.clear()
         violationAccuracyFolder.items.clear()
         
-        val filteredViolations = violations.filter { v -> 
+        // Issue #208: Cache filtered results
+        cachedFilteredViolations = violations.filter { v -> 
             val isJump = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
             val isGeo = v.type == ALERT_ID_TRACKER_GEOFENCE
             (isJump && isViolationsVisible) || (isGeo && isGeofenceViolationsVisible) 
         }
 
-        if (violationMarkerPool.size > filteredViolations.size + MARKER_POOL_PRUNE_THRESHOLD) {
-            while (violationMarkerPool.size > maxOf(filteredViolations.size + 5, MARKER_POOL_PRUNE_THRESHOLD)) { 
+        if (violationMarkerPool.size > cachedFilteredViolations.size + MARKER_POOL_PRUNE_THRESHOLD) {
+            while (violationMarkerPool.size > maxOf(cachedFilteredViolations.size + 5, MARKER_POOL_PRUNE_THRESHOLD)) { 
                 violationMarkerPool.removeAt(violationMarkerPool.size - 1)
                 violationCirclePool.removeAt(violationCirclePool.size - 1) 
             }
         }
 
-        filteredViolations.forEachIndexed { index, v ->
+        cachedFilteredViolations.forEachIndexed { index, v ->
             val m = if (index < violationMarkerPool.size) violationMarkerPool[index] else Marker(mapView).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); violationMarkerPool.add(m) }
             val isJump = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
             val gp = v.toGeoPoint()
@@ -234,12 +259,13 @@ class MapOverlayManager(
             val hAcc = if (v.maxAccuracy > 0.0) v.maxAccuracy else v.accuracy
             if (hAcc > 0.0) {
                 val c = if (index < violationCirclePool.size) violationCirclePool[index] else Polygon(mapView).also { p -> p.fillPaint.color = 0; p.outlinePaint.strokeWidth = 2f; p.setInfoWindow(null); violationCirclePool.add(p) }
-                c.points = Polygon.pointsAsCircle(gp, hAcc)
+                c.points = getCachedCircle(gp, hAcc)
                 c.outlinePaint.color = (if (isJump) 0x60FF00FF else 0x60FF0000).toInt()
                 violationAccuracyFolder.add(c)
             }
         }
         lastViolationsSize = violations.size
+        lastViolationsRef = violations
         lastViolationVisibility = visibilityPair
         lastViolationUpdateTs = systemPulseRt
         return true
@@ -254,7 +280,7 @@ class MapOverlayManager(
             replayMarker.icon = replayIcon
             replayFolder.add(replayMarker)
             
-            replayCircle.points = Polygon.pointsAsCircle(pos, 5.0)
+            replayCircle.points = getCachedCircle(pos, 5.0)
             replayCircle.outlinePaint.color = android.graphics.Color.WHITE
             replayFolder.add(replayCircle)
         }
@@ -293,11 +319,11 @@ class MapOverlayManager(
                 } else baseAcc
                 
                 val posChanged = trackerPos != lastTrackerPos
-                val driftSignificant = abs(drift - lastTrackerDrift) > 2.0
-                
+                val driftSignificant = abs(drift - lastTrackerDrift) > 0.5
+
                 if (canUpdateDrift && (posChanged || driftSignificant)) {
                     accuracyCirclesFolder.items.remove(trackerCircle)
-                    trackerCircle.points = Polygon.pointsAsCircle(trackerPos, drift)
+                    trackerCircle.points = getCachedCircle(trackerPos, drift)
                     trackerCircle.outlinePaint.color = if (isTrackerFresh) BrandJd.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                     accuracyCirclesFolder.add(trackerCircle)
                     lastTrackerPos = trackerPos
@@ -339,11 +365,11 @@ class MapOverlayManager(
                 } else baseMyAcc
                 
                 val posChanged = viewerPos != lastViewerPos
-                val driftSignificant = abs(drift - lastViewerDrift) > 2.0
+                val driftSignificant = abs(drift - lastViewerDrift) > 0.5
 
                 if (canUpdateDrift && (posChanged || driftSignificant)) {
                     accuracyCirclesFolder.items.remove(viewerCircle)
-                    viewerCircle.points = Polygon.pointsAsCircle(viewerPos, drift)
+                    viewerCircle.points = getCachedCircle(viewerPos, drift)
                     viewerCircle.outlinePaint.color = if (isViewerFresh) ViewerCyan.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                     accuracyCirclesFolder.add(viewerCircle)
                     lastViewerPos = viewerPos
