@@ -19,12 +19,12 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * Aug.18.08:
+ * - Issue #206 Hardening: Refined onRequestOverlayPermission with fallback 
+ *   logic to handle Samsung-specific intent URI failures (R206).
  * Aug.13.04:
  * - Issue #150: Samsung A15 R405 Detection Hardening. Removed redundant R405 
  *   trigger logic as it was moved to MainViewModel monitoring loop (R405).
- * July.31.01:
- * - Issue #661: Foreground Service Start Hardening. Hardened onStartService to 
- *   catch ForegroundServiceStartNotAllowedException even if RESUMED check passes.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -69,12 +69,20 @@ class MainActivity : ComponentActivity() {
                 },
                 onRequestBatteryExemption = { launchBatteryExemptionSetting() },
                 onRequestOverlayPermission = {
+                    // Issue #206: Hardened intent for Samsung/API 35 compatibility.
+                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                        data = "package:$cachedPkgName".toUri()
+                    }
                     try {
-                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:$cachedPkgName".toUri())
                         startActivity(intent)
                     } catch (e: Exception) {
-                        Toast.makeText(this, "Could not open overlay settings", Toast.LENGTH_SHORT).show()
-                        Timber.e(e, "Overlay permission launch failure")
+                        try {
+                            // Fallback to general list if specific package URI is rejected
+                            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
+                        } catch (e2: Exception) {
+                            Toast.makeText(this, "Could not open overlay settings", Toast.LENGTH_SHORT).show()
+                            Timber.e(e2, "Overlay permission launch failure")
+                        }
                     }
                 },
                 onRequestAppInfo = {

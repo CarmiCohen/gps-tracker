@@ -1,36 +1,42 @@
-# Handover (Aug.18.08) - Diagnostic Stress Isolation Active
+# Handover (Aug.18.08) - Diagnostic Phase: Performance Bottlenecks Isolated
 
-## 🎯 Next Objective: Issue #204 - Stress-Isolation Validation
-- **Goal**: Verify if the system stabilizes under significantly reduced sensor and telemetry load (4Hz/2Hz).
-- **Status**: 🟢 **IN-PROGRESS (DIAGNOSTIC)**.
-- **Context**: The forensic sampling loop and hardware IMU listeners have been down-sampled to isolate if context-switching and I/O pressure are the root causes of the observed instability.
+## 🎯 Next Objective: Issue #208 & #207 - UI Layer & Main-Thread Audit
+- **Goal**: Eliminate high-frequency object churn and main-thread hangs in `MainViewModel` and `AppMapContainer`.
+- **Status**: 🔴 **OPEN (HIGH PRIORITY)**.
+- **Context**: Diagnostic monitoring on Samsung A15 (SM-A155F) revealed that 1s+ frame hangs ("Davey" logs) persist even when forensic telemetry is throttled to 4Hz and hardware listeners to 5Hz. Logcat shows near-constant mark-compact GC cycles (~1/sec) taking 100ms+, indicating that the bottleneck is likely redundant list copying or object allocations in the UI state mapping logic (e.g., 1Hz pulses triggering full trail segment re-processing), not the tracking engine itself.
 
-## 🧬 System Status (vAug.18.08)
-The system is currently in a **Diagnostic State** for stress-testing:
+## 🧬 Forensic Pipeline Status (vAug.18.08)
+The forensic telemetry system is architecturally hardened for production but currently runs in a **Diagnostic State** for stress-isolation:
 
-### 1. Diagnostic Stress Isolation (#204) - IMPLEMENTED (DIAGNOSTIC)
-*   **Telemetry Down-sampling**: Modified `EngineConstants.kt` to reduce forensic frequency:
-    - Peak Fidelity: 100Hz -> 4Hz (`FORENSIC_SAMPLING_INTERVAL_MIN_MS = 250L`)
-    - Power Aware: 10Hz -> 2Hz (`FORENSIC_SAMPLING_INTERVAL_MAX_MS = 500L`)
-*   **Hardware Down-sampling**: Modified `AppSensorManager.kt` to use `SENSOR_DELAY_NORMAL` (approx 5Hz) for the `linearAccel` sensor instead of `SENSOR_DELAY_FASTEST` (300Hz+).
-*   **Objective**: Confirm if thermal pressure and battery discharge alerts are artifacts of high-frequency processing overhead.
+### 1. Multi-Session Alignment (#203) - VERIFIED
+*   **Buffer v3**: `ForensicSpillBuffer.kt` successfully migrated to absolute `Long` timestamps and `Double` coordinates in the 96-byte entry layout.
+*   **Idempotency**: Signature-based deduplication in `LogRepository.performForensicDrain` verified via 1s lookback window. Monotonicity is guaranteed across service restarts and "dirty" reboots.
 
-### 2. Forensic Multi-Session Alignment (#203) - RESOLVED
-*   **Buffer Upgrade (v3)**: Absolute `Long` timestamps and `Double` coordinates in `ForensicSpillBuffer.kt`.
-*   **Idempotent Draining**: Signature-based deduplication in `LogRepository.performForensicDrain`.
+### 2. JNI & Memory Optimization (#202) - VERIFIED
+*   **Zero-Churn Path**: `peekToEntities()` directly maps MappedByteBuffer data to Room `LogEntity` objects. 
+*   **Result**: GC pressure from the tracking engine is negligible; current heap pressure (#208) is isolated to the UI/Compose layer mapping logic.
 
-### 3. Forensic JNI Memory Optimization (#202) - RESOLVED
-*   **Direct Entity Mapping**: Eliminated allocation churn via `peekToEntities()`.
+### 3. Diagnostic Stress Isolation (#204) - ACTIVE
+*   **Throttled State**: Intervals in `EngineConstants.kt` are reduced to isolate CPU/IO load:
+    - **Peak Fidelity**: 100Hz -> 4Hz (`250ms`).
+    - **Power Aware**: 10Hz -> 2Hz (`500ms`).
+*   **Hardware Scaling**: `AppSensorManager.kt` listeners (Linear Accel) set to `SENSOR_DELAY_NORMAL` (~5Hz).
+*   **Isolation Finding**: Confirmed that the "stress" causing frame drops is independent of telemetry frequency, focusing the audit on the 1Hz UI pulse.
 
-## 🛠️ Execution Sequence for Next Resumption
-1.  **Monitor Stabilized Load**: Compare CPU/IO wait metrics under 4Hz load vs previous 100Hz benchmarks.
-2.  **Evaluate Thermal Recovery**: Observe if `isCoolingModeActive` still triggers under reduced load.
-3.  **Reversion Plan**: Once isolation is confirmed, revert `EngineConstants.kt` and `AppSensorManager.kt` to peak fidelity rates.
+## 🛡️ Core Hardening (Aug.18.08 Resolutions)
+*   **UI Artifact Remediation (#205)**: Wrapped technical overlays (`PhoneSetupOverlay`, `TrackerDashboard`) in forced LTR `CompositionLocalProvider` to resolve BiDi mirroring and punctuation artifacts (R205).
+*   **Samsung Permission Hardening (#206)**: Implemented fallback in `MainActivity.kt` for `ACTION_MANAGE_OVERLAY_PERMISSION` to handle URI rejections on Samsung A15/API 35 (R206).
+
+## 🛠️ Execution Sequence for Resumption
+1.  **Profile UI Pulse**: Audit `MainViewModel` and `AppMapContainer` for O(N) operations or redundant object allocations triggered by the 1Hz `systemPulse`.
+2.  **Optimize Overlays**: Gate marker and poly-line updates in `AppMapContainer` using `derivedStateOf` or stable keys to prevent full recompositions on every pulse.
+3.  **Verify DB Transaction Locks**: Check if `LogRepository` drain operations are holding transaction locks that delay UI-thread database reads.
+4.  **Restore Fidelity**: Once frame stability is achieved and GC pressure (#208) is resolved, revert `EngineConstants.kt` and `AppSensorManager.kt` to production 100Hz fidelity.
 
 ## 📊 Documentation State
-- **RESOLUTION_ARCHIVE.md**: Updated to Section 66. Total resolutions: 646.
-- **issues.md**: Synchronized to Aug.18.08. Added Concern #204-C1 regarding fidelity reduction.
-- **SOT_MASTER_REQUIREMENTS.md**: Requirement R204 added (Diagnostic).
-- **build.gradle**: versionName incremented to Aug.18.08.
+- **RESOLUTION_ARCHIVE.md**: Updated to Section 68. Total unique resolutions: 648.
+- **issues.md**: Synchronized to Aug.18.08. Issues #207 and #208 are primary targets.
+- **SOT_MASTER_REQUIREMENTS.md**: Requirements R204, R205, and R206 added.
+- **build.gradle**: VersionName: Aug.18.08.
 
 vAug.18.08
