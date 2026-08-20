@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 662**
+**Total Unique Resolutions: 663**
+
+## 83. Analytical Index Performance Verification (Aug.20.00)
+*   **Issue #219: Analytical Index Performance Verification**.
+    - **Resolution**: Offloaded the `GpsIndex` calculation in `GpsStatusManager.kt` to `Dispatchers.Default` and implemented a 500ms `sample` throttle. This ensures that weighted averaging of GPS Age, Accuracy, and Satellite count does not induce UI thread jitter during 100Hz forensic bursts, maintaining UI responsiveness (R219).
 
 ## 82. Shadow-Cache Hardening (Aug.20.00)
 *   **Issue #217: Shadow-Cache Hardening**.

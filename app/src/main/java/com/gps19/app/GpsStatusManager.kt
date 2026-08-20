@@ -2,7 +2,9 @@ package com.gps19.app
 
 import com.gps19.core.engine.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
@@ -10,6 +12,10 @@ import javax.inject.Singleton
 
 /**
  * GpsStatusManager: Centralized reactive Flow for the GPS-Index.
+ * Aug.20.00:
+ * - Issue #219 Performance Audit: Implemented flowOn(Dispatchers.Default) 
+ *   and 500ms sampling to prevent UI thread jitter during 100Hz forensic 
+ *   bursts. Offloads weighted averaging math from the UI pulse (R219).
  * July.26.03:
  * - Issue #545c: Flow Architecture Standardization. Refactored to manage a 
  *   SharedFlow pipeline using @ApplicationScope, ensuring all collectors 
@@ -26,10 +32,10 @@ class GpsStatusManager @Inject constructor(
 
     /**
      * gpsIndexFlow: Standardized SharedFlow for GPS Index updates.
-     * July.26.03: Uses WhileSubscribed(5000) to keep the pipeline alive during 
-     * UI transitions while preventing background CPU usage when idle.
+     * Aug.20.00: Throttled to 2Hz (500ms) to ensure smooth UI updates 
+     * during high-frequency sensor telemetry bursts.
      */
-    @OptIn(ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     val gpsIndexFlow: SharedFlow<GpsIndexData> = flow {
         while (true) {
             emit(timeProvider.currentTimeMillis())
@@ -53,7 +59,8 @@ class GpsStatusManager @Inject constructor(
             
             params to now
         }
-    }.scan(GpsIndexData(0.0, 0.0, 0.0, 0.0) to (null as IndexParams?)) { state, (params, now) ->
+    }.sample(500L) // Issue #219: Throttle UI churn during high-frequency bursts
+     .scan(GpsIndexData(0.0, 0.0, 0.0, 0.0) to (null as IndexParams?)) { state, (params, now) ->
         val lastParams = state.second
         val activeParams = if (params != null && (lastParams == null || params.gpsTs >= lastParams.gpsTs)) {
             params
@@ -73,6 +80,7 @@ class GpsStatusManager @Inject constructor(
         }
     }.map { it.first }
      .distinctUntilChanged()
+     .flowOn(Dispatchers.Default) // Issue #219: Ensure math logic runs off-UI
      .shareIn(
         scope = externalScope,
         started = SharingStarted.WhileSubscribed(5000),
