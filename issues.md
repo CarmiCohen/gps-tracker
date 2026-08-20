@@ -1,30 +1,36 @@
-# Project Issues & Hardening Tracking (Aug.18.13)
+# Project Issues & Hardening Tracking (Aug.19.08)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟢 STABLE | 0 |
-| **Validation Tasks** | 🟢 COMPLETE | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 653 |
+| **Open Technical Issues** | 🔴 CRITICAL | 1 |
+| **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
+| **Resolved (Total)** | 🟢 Progress | 656 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Concern #211-C1**: Sustained 100Hz telemetry capture on budget hardware (Samsung A15) must be monitored for thermal-induced frequency scaling during long-duration sessions. (Issue #211).
+*   **Concern #213-C1**: Status Logic Desync. "SIGNAL LOSS" is reported in the UI while GPS coordinates are still being updated on the map.
+*   **Concern #212-C2 (Final Forensic Conclusion)**: Samsung CFMS Trigger is a **Resilient Static Heuristic**.
+    *   **Evidence**: `libmbrainSDK` load attempts persist despite:
+        1. JNI suppression (Aug.19.06).
+        2. Metadata/Keyword rephrasing (Aug.19.06).
+        3. Permission/Service-type stripping (Aug.19.06).
+        4. **Identity Swap** (Package name changed to `com.gps19.forensic`) (Aug.19.08).
+    *   **Implication**: The trigger is likely embedded in the APK resource signatures or internal class structure (e.g., `ViewRootImpl` hooks matching any app with a specific "Tracker" profile or resource manifest). Neutralization via standard manifest/identity changes is not possible.
 
 ---
 
 ## 🔴 Open Issues
-*   *(No open high-priority issues)*
+*   **Issue #213: Signal Loss False-Positive**: Debug the `SystemStatusProvider` and `LocationProcessor` logic that triggers "UNCERTAINTY: SIGNAL LOSS" during active connectivity.
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.18.13)
-*   **Issue #211: Final Release Validation**: Completed final battery and thermal validation on Samsung A15 in a real-world moving environment at 100Hz fidelity. Verified that the performance hardening from R207-R210 provides sufficient headroom for production fidelity without thermal throttling or excessive drain (R211).
-*   **Issue #210: Long-Term Field Hardening**: Converted internal write counters in `MainRepository` to `AtomicInteger` to prevent race conditions during 100Hz bursts. Optimized forensic deduplication logic in `LogRepository` to use bit-packed primitive `Long` signatures (`timestamp << 32 | spillIdx`) in a `HashSet` lookup, eliminating thousands of `Pair` object allocations during O(N) deduplication. Implemented `TrailPoint` object pooling in `MainRepository` to eliminate allocation churn during backfills (R210).
-*   **Issue #209: Production Fidelity Restoration**: Reverted diagnostic down-sampling (R204). Restored forensic sampling to 100Hz and hardware sensor listeners to `SENSOR_DELAY_FASTEST`. Verified stability following R207/R208 UI optimizations (R209).
+## 🟢 Recently Resolved Issues (Aug.19.08)
+*   **Issue #212: Advanced Collision Forensic**: Exhausted all non-destructive methods to neutralize the Samsung CFMS `libmbrainSDK` trigger. Confirmed as a resilient OS-level heuristic. Restored functional state (vAug.19.08) and accepted the "Can't load libmbrainSDK" logcat noise as a benign vendor side-effect.
+*   **Issue #214: System Issue Dashboard Audit**: Confirmed the "1" issue count and automatic setup navigation on Samsung A15 are intentional R405 safety mechanisms for battery exemption validation (R405).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.18.13)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.19.08)

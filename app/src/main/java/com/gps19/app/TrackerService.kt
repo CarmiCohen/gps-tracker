@@ -20,15 +20,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.19.01:
+ * - Issue #212: JNI Vendor Collision Remediation. Transitioned hardware bridge 
+ *   to a neutral namespace to eliminate Samsung framework collisions (R212).
  * Aug.17.08:
  * - Issue #192: Automated Recovery Latency Audit. Added latency measurement 
  *   to startForensicSamplingLoop to log the time taken to resume high-frequency 
  *   sampling post-thermal event (R192).
- * - Issue #191 Validation: Handled CommandEvent.SimulateThermalEvent to 
- *   verify dynamic polling throttle during simulated thermal events (R191).
- * Aug.16.13:
- * - Reverted Gated Sensor Start (Issue #186 rollback). Restored immediate 
- *   sensor registration to resolve Startup Black Screen regression.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -92,10 +90,10 @@ class TrackerService : BaseMonitorService() {
         refreshCapabilitiesInternal()
 
         if (capabilities.isA15Device) {
-             JdMbrainHardwareManager.loadLibrary()
-             if (JdMbrainHardwareManager.isAvailable()) {
-                val res = JdMbrainHardwareManager.initHardware(timeProvider, configManager.deviceId, 0)
-                logManager.logServiceEvent("HARDWARE: libjdMbrain initialized (Result: $res)", isImportant = true)
+             JdHardwareManager.loadLibrary()
+             if (JdHardwareManager.isAvailable()) {
+                val res = JdHardwareManager.initHardware(timeProvider, configManager.deviceId, 0)
+                logManager.logServiceEvent("HARDWARE: libjdHardware initialized (Result: $res)", isImportant = true)
              }
         }
 
@@ -510,9 +508,9 @@ class TrackerService : BaseMonitorService() {
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
         if (capabilities.isA15Device) {
-            if (JdMbrainHardwareManager.isAvailable()) {
+            if (JdHardwareManager.isAvailable()) {
                 val flags = if (health.isPowerSaveMode) 0x01 else 0x00
-                JdMbrainHardwareManager.syncState(timeProvider, serviceTickCounter, flags)
+                JdHardwareManager.syncState(timeProvider, serviceTickCounter, flags)
             } else if (nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
                 lastA15PokeRt = nowRt
                 systemMonitor.acquireWakeLock(force = true)

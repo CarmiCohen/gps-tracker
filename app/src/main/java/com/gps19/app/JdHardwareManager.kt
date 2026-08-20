@@ -15,19 +15,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 
 /**
- * JdMbrainHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
- * Aug.13.02:
- * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
- *   type inference failures (R146/R151).
- * Aug.07.122:
- * - Issue #746: Infrastructure: Fully transitioned to JdMbrain namespace. Renamed 
- *   manager class from MbrainHardwareManager to JdMbrainHardwareManager to 
- *   eliminate legacy libmbrainSDK log noise and system-level collisions (R746).
- * Aug.04.101:
- * - Issue #721: Performance: Renamed native library to jdMbrain to resolve 
- *   collision with Samsung system libraries (libmbrainSDK).
+ * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Aug.19.08:
+ * - Issue #212: Restored functional state after Forensic Phase. 
+ * - JNI Signature Obfuscation (n1-n5) retained as a baseline precaution despite 
+ *   CFMS persistence during Identity Swap.
  */
-object JdMbrainHardwareManager {
+object JdHardwareManager {
 
     private var isLibraryLoaded = false
     private val jniLock = ReentrantLock()
@@ -45,16 +39,15 @@ object JdMbrainHardwareManager {
         jniLock.withLock {
             if (isLibraryLoaded) return
             try {
-                // Renamed to avoid collision with Samsung's internal libmbrainSDK.so
-                System.loadLibrary("jdMbrain")
+                System.loadLibrary("jdHardware")
                 isLibraryLoaded = true
+                n1(sharedStateBuffer)
                 
-                nativeRegisterSharedBuffer(sharedStateBuffer)
-                Timber.i("jdMbrain loaded and shared buffer registered")
+                Timber.i("jdHardware: Native library loaded successfully.")
             } catch (e: UnsatisfiedLinkError) {
-                Timber.e("jdMbrain load failed: ${e.message}")
+                Timber.e("jdHardware load failed: ${e.message}")
             } catch (e: Exception) {
-                Timber.e("Unexpected error loading jdMbrain: ${e.message}")
+                Timber.e("Unexpected error loading jdHardware: ${e.message}")
             }
         }
     }
@@ -64,7 +57,7 @@ object JdMbrainHardwareManager {
             sharedStateBuffer.clear()
             sharedStateBuffer.putInt(heartbeatCount)
             sharedStateBuffer.putInt(flags)
-            nativeSyncState()
+            n2()
         }
     }
 
@@ -121,27 +114,27 @@ object JdMbrainHardwareManager {
 
     fun initHardware(timeProvider: TimeProvider, deviceId: String, flags: Int): Int {
         return executeNativeWithRetry(timeProvider, "Native initHardware") {
-            nativeInit(deviceId, flags)
+            n3(deviceId, flags)
         }
     }
 
     fun punchHardware(timeProvider: TimeProvider): Int {
         return executeNativeWithRetry(timeProvider, "Native punchHardware") {
-            nativePunchHardware()
+            n4()
         }
     }
 
     fun setPowerBudget(timeProvider: TimeProvider, budgetLevel: Int): Int {
         return executeNativeWithRetry(timeProvider, "Native setPowerBudget") {
-            nativeSetPowerBudget(budgetLevel)
+            n5(budgetLevel)
         }
     }
 
     fun isAvailable(): Boolean = isLibraryLoaded
 
-    @JvmStatic private external fun nativeRegisterSharedBuffer(buffer: ByteBuffer): Int
-    @JvmStatic private external fun nativeSyncState(): Int
-    @JvmStatic private external fun nativeInit(deviceId: String, flags: Int): Int
-    @JvmStatic private external fun nativePunchHardware(): Int
-    @JvmStatic private external fun nativeSetPowerBudget(budgetLevel: Int): Int
+    @JvmStatic private external fun n1(buffer: ByteBuffer): Int
+    @JvmStatic private external fun n2(): Int
+    @JvmStatic private external fun n3(deviceId: String, flags: Int): Int
+    @JvmStatic private external fun n4(): Int
+    @JvmStatic private external fun n5(budgetLevel: Int): Int
 }

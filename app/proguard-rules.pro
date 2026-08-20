@@ -13,7 +13,7 @@
 
 # --- Room Persistence ---
 -keep class com.gps19.app.LogEntity { *; }
--keep class com.gps19.app.TrailEntity { *; }
+-keep class com.gps19.app.TrialEntity { *; }
 -keep class com.gps19.app.HistoryEntity { *; }
 -keep class com.gps19.app.ViolationEntity { *; }
 -keep class com.gps19.app.PendingStatusEntity { *; }
@@ -37,10 +37,10 @@
 -keep class com.gps19.app.BatteryState { *; }
 -keep class com.gps19.app.ConnectivityState { *; }
 
-# --- JNI / Native SDK (Issue #746) ---
+# --- JNI / Native SDK (Issue #212) ---
 # Preserve the JNI bridge for vendor hardware stabilization.
-# Renamed from MbrainHardwareManager to eliminate legacy SDK collisions.
--keep class com.gps19.app.JdMbrainHardwareManager { *; }
+# Transitioned to JdHardwareManager to eliminate Samsung framework collisions (R212).
+-keep class com.gps19.app.JdHardwareManager { *; }
 -keepclasseswithmembernames class * {
     native <methods>;
 }

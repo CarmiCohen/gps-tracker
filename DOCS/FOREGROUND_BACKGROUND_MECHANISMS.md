@@ -1,13 +1,13 @@
-# GPS-Tracker: Foreground & Background Mechanisms (vAug.07.06)
+# GPS-Tracker: Foreground & Background Mechanisms (vAug.19.01)
 
-This document provides a comprehensive technical overview of how the GPS-Tracker app maintains its high-persistence state on Android using specialized service roles and a Triple-Lock Watchdog system. As of vAug.07.06, all terminology follows the R747 Locality Authority.
+This document provides a comprehensive technical overview of how the GPS-Tracker app maintains its high-persistence state on Android using specialized service roles and a Triple-Lock Watchdog system. As of vAug.19.01, all terminology follows the R747 Locality Authority and R212 Hardware Neutrality.
 
 ## 1. General Architecture
 The app is designed with a **"Reliability-First"** philosophy. Services operate independently of the Activity lifecycle to ensure forensic continuity.
 
 ### Specialized Service Roles
 The service architecture is split into two role-based services, both extending `BaseMonitorService`:
-*   **TrackerService (Device)**: Optimized for stealth and battery efficiency on the remote device. Focuses on sensor fidelity, JdMbrain stabilization (R746), and location reporting.
+*   **TrackerService (Device)**: Optimized for stealth and battery efficiency on the remote device. Focuses on sensor fidelity, JdHardware stabilization (R212), and location reporting.
 *   **ViewerService**: Optimized for real-time HUD telemetry on this device, analytical ribbons, and remote data synchronization.
 
 ---

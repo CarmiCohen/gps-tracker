@@ -1,11 +1,11 @@
-# GPS Tracker: Technical Overview (vAug.07.06)
+# GPS Tracker: Technical Overview (vAug.19.01)
 
 GPS Tracker is a high-assurance, native Android application designed for asset protection and remote monitoring. Unlike consumer-grade tracking apps, it prioritizes **forensic continuity**, **high availability**, and **physical security** over simple location sharing.
 
-## 1. Core Architecture (vAug.07.06 Baseline)
+## 1. Core Architecture (vAug.19.01 Baseline)
 The application follows a strict modular architecture to ensure logic integrity and prevent side-effect regressions.
 -   **Hardened Engine (:core:engine)**: A pure JVM library module containing all tracking math, jump detection, and physical security logic. It is physically isolated from the Android framework and uses monotonic `TimeProvider` for all internal logic (Issue #441).
--   **Device Service**: The specialized "Black Box" role. Optimizes battery, sensor fidelity, and persistent logging. Features a 10Hz polling mode, **Escalated GPS Revival** (Issue #124), and JdMbrain hardware stabilization (R746).
+-   **Device Service**: The specialized "Black Box" role. Optimizes battery, sensor fidelity, and persistent logging. Features a 10Hz polling mode, **Escalated GPS Revival** (Issue #124), and JdHardware stabilization (R212).
 -   **Viewer Service**: The "Monitoring" role. Handles real-time telemetry sync, HUD rendering, and remote command propagation. Now includes **Background Location Polling** for relative distance calculations.
 -   **Decoupled UI**: The `MainViewModel` is decoupled into domain UseCases (Issue #322), ensuring high maintainability and testability. Includes **Ghost Mode** (R338) visual staleness indicators.
 
@@ -24,7 +24,7 @@ The Physical Sentinel is a zero-lag monitoring engine that detects unauthorized 
 ### C. Geofencing (GtoEngine)
 The **GtoEngine** logic provides a high-confidence geofence gate. It uses a 6-sigma buffer (`GEOFENCE_BUFFER_MULT`) and **Bayesian Uncertainty Expansion** (15m/s moving) to prevent false alarms from fix gaps while providing sub-second projection of fence breaches (Issue #460).
 
-## 3. Forensic Telemetry (vAug.07.06 Enhancements)
+## 3. Forensic Telemetry (vAug.19.01 Enhancements)
 The system is built around "Forensic Continuity." Data is never simply "current"; it is always presented within its historical context via:
 -   **Dual-Metric Spatial Anchor (Issue #325)**: All forensic logs and telemetry are anchored with both raw GPS `accuracy` and authoritative engine `maxAccuracy`.
 -   **Trajectory Forensic Parity**: Points retroactively validated via "Trajectory Promotion" strictly preserve their original forensic metadata, ensuring a contiguous audit trail.
