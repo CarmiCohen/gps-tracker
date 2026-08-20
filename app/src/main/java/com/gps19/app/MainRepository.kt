@@ -17,14 +17,23 @@ import javax.inject.Singleton
 import org.osmdroid.util.GeoPoint
 
 /**
+ * RepositoryMetrics: Consolidated container for repository performance counters.
+ */
+private class RepositoryMetrics {
+    val trailWriteCount = AtomicInteger(0)
+    val violationWriteCount = AtomicInteger(0)
+    val historyWriteCount = AtomicInteger(0)
+    val isPruningActive = AtomicBoolean(false)
+}
+
+/**
  * MainRepository: Centralized data hub for the application.
- * Aug.18.12:
- * - Issue #210 Hardening: Converted write counters to AtomicInteger to prevent 
- *   race-induced pruning delays during high-frequency telemetry (R210).
- *   Fixed unresolved reference 'wallTs' in addViolation.
- * Aug.18.11:
- * - Issue #208 Performance: Implemented TrailPoint object pooling in 
- *   trail flows to eliminate 2000+ object allocations per pulse (R208).
+ * Aug.19.13:
+ * - Issue #217: Shadow-Cache strategy for trail points. Replaced manual clear 
+ *   logic with LRU-based ShadowCache to ensure stable memory footprint (R217).
+ * Aug.19.12:
+ * - Issue #216 Simplification: Consolidated disparate Atomic counters into 
+ *   RepositoryMetrics data structure (R216).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -50,12 +59,11 @@ class MainRepository @Inject constructor(
     private var lastAlarmAckTs: Long = 0L
 
     private val violationProcessor = ViolationProcessor(timeProvider)
+    private val metrics = RepositoryMetrics()
 
-    private val trailWriteCount = AtomicInteger(0)
-    private val violationWriteCount = AtomicInteger(0)
-    private val historyWriteCount = AtomicInteger(0)
-    
-    private val isPruningActive = AtomicBoolean(false)
+    // Issue #217: LRU caches for trail points to prevent memory growth
+    private val trackerPointCache = ShadowCache<Long, TrailPoint>(3000)
+    private val viewerPointCache = ShadowCache<Long, TrailPoint>(3000)
 
     companion object {
         const val DEFAULT_RELAY_URL = SettingsRepository.DEFAULT_RELAY_URL
@@ -65,7 +73,7 @@ class MainRepository @Inject constructor(
         
         private const val DB_PRUNE_THRESHOLD_HISTORY = 500
         private const val DB_PRUNE_THRESHOLD_TRAIL = 100
-        private const val UI_HISTORY_EMIT_INTERVAL_MS = 500L // 2Hz for UI stability
+        private const val UI_HISTORY_EMIT_INTERVAL_MS = 500L 
     }
 
     val isRelayConnected = telemetry.isRelayConnected
@@ -79,23 +87,17 @@ class MainRepository @Inject constructor(
 
     fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logRepository.eventLogsFlow(limit)
 
-    // Issue #208: TrailPoint Pooling to prevent allocation churn
-    private val trackerPointPool = mutableMapOf<Long, TrailPoint>()
-    private val viewerPointPool = mutableMapOf<Long, TrailPoint>()
-
     val trackerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(false).map { entities -> 
-        if (trackerPointPool.size > 3000) trackerPointPool.clear()
         entities.map { entity ->
-            trackerPointPool.getOrPut(entity.timestamp) {
+            trackerPointCache.getOrPut(entity.timestamp) {
                 TrailPoint(entity.lat, entity.lng, entity.timestamp, SentinelStatus.valueOf(entity.status), entity.accuracy, entity.maxAccuracy)
             }
         }
     }.flowOn(Dispatchers.Default)
 
     val viewerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(true).map { entities -> 
-        if (viewerPointPool.size > 3000) viewerPointPool.clear()
         entities.map { entity ->
-            viewerPointPool.getOrPut(entity.timestamp) {
+            viewerPointCache.getOrPut(entity.timestamp) {
                 TrailPoint(entity.lat, entity.lng, entity.timestamp, SentinelStatus.valueOf(entity.status), entity.accuracy, entity.maxAccuracy)
             }
         }
@@ -263,8 +265,8 @@ class MainRepository @Inject constructor(
                     maxAccuracy = maxAccuracy
                 ))
                 
-                if (force || trailWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
-                    trailWriteCount.set(0)
+                if (force || metrics.trailWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
+                    metrics.trailWriteCount.set(0)
                     triggerBackgroundPruning()
                 }
             }
@@ -275,8 +277,8 @@ class MainRepository @Inject constructor(
         trailDao.clearTrail(false)
         trailDao.clearTrail(true)
         violationDao.clearAll()
-        trackerPointPool.clear()
-        viewerPointPool.clear()
+        trackerPointCache.clear()
+        viewerPointCache.clear()
     }
 
     suspend fun loadTrailStatic(isViewer: Boolean): List<TrailPoint> = trailDao.getTrailStatic(isViewer).map { 
@@ -305,8 +307,8 @@ class MainRepository @Inject constructor(
             ) {
                 violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
                 
-                if (violationWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
-                    violationWriteCount.set(0)
+                if (metrics.violationWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
+                    metrics.violationWriteCount.set(0)
                     triggerBackgroundPruning()
                 }
             }
@@ -358,20 +360,14 @@ class MainRepository @Inject constructor(
     )
     val liveHistoryFlow = _liveHistoryFlow.asSharedFlow()
     
-    // Issue #179: Live history buffer to decouple 100Hz telemetry from UI emissions.
     private val liveHistoryBuffer = ConcurrentLinkedQueue<Pair<String, ConnectionPoint>>()
 
     fun addHistoryPoint(ribbonKey: String, point: ConnectionPoint) {
         val health = telemetry.systemHealth.value
-        
-        // 1. Buffer for UI emission (Stable copy)
-        val uiCopy = ConnectionPoint()
-        uiCopy.copyFrom(point)
+        val uiCopy = ConnectionPoint().apply { copyFrom(point) }
         liveHistoryBuffer.add(ribbonKey to uiCopy)
 
         if (!PersistencePolicy.shouldSaveHistoryPoint(health)) return
-
-        // 2. Buffer for DB
         historyBuffer.add(mapToEntity(ribbonKey, point))
 
         val nowRt = timeProvider.elapsedRealtime()
@@ -383,7 +379,6 @@ class MainRepository @Inject constructor(
     }
 
     fun addHistoryPoints(ribbonKey: String, points: List<ConnectionPoint>) {
-        // Batch emission for gaps/recovery
         val uiCopies = points.map { p -> ConnectionPoint().apply { copyFrom(p) } }
         scope.launch { _liveHistoryFlow.emit(ribbonKey to uiCopies) }
         
@@ -402,10 +397,6 @@ class MainRepository @Inject constructor(
         }
     }
 
-    /**
-     * startUiHistoryEmitter: Throttled loop to emit live telemetry at 2Hz.
-     * R179: Eliminates allocation churn caused by 100Hz UI emissions.
-     */
     private fun startUiHistoryEmitter() {
         scope.launch {
             while (isActive) {
@@ -475,8 +466,8 @@ class MainRepository @Inject constructor(
             ) {
                 database.withTransaction {
                     historyDao.insertAll(dbPoints)
-                    if (historyWriteCount.addAndGet(dbPoints.size) >= DB_PRUNE_THRESHOLD_HISTORY) {
-                        historyWriteCount.set(0)
+                    if (metrics.historyWriteCount.addAndGet(dbPoints.size) >= DB_PRUNE_THRESHOLD_HISTORY) {
+                        metrics.historyWriteCount.set(0)
                         triggerBackgroundPruning()
                     }
                 }
@@ -485,12 +476,11 @@ class MainRepository @Inject constructor(
     }
 
     private fun triggerBackgroundPruning() {
-        if (isPruningActive.getAndSet(true)) return
+        if (metrics.isPruningActive.getAndSet(true)) return
         
         val health = telemetry.systemHealth.value
-        // Issue #129: Defer background maintenance during critical battery states
         if (health.isBatteryCritical) {
-            isPruningActive.set(false)
+            metrics.isPruningActive.set(false)
             return
         }
 
@@ -515,7 +505,7 @@ class MainRepository @Inject constructor(
             } catch (e: Exception) {
                 Timber.e(e, "Issue #585: Background pruning failed")
             } finally {
-                isPruningActive.set(false)
+                metrics.isPruningActive.set(false)
             }
         }
     }
@@ -563,9 +553,6 @@ class MainRepository @Inject constructor(
     suspend fun incrementRecoveryStats(blackoutMs: Long) = settings.incrementRecoveryStats(blackoutMs)
     suspend fun getSettingsSnapshot() = settings.getSettingsSnapshot()
 
-    /**
-     * Issue #729: Runs database integrity check and returns status.
-     */
     suspend fun checkDatabaseIntegrity(): String = withContext(Dispatchers.IO) {
         database.checkIntegrity()
     }

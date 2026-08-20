@@ -2,25 +2,14 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.19.10:
+ * - Issue #213: Signal Loss False-Positive Hardening. Increased GPS_GAP and 
+ *   GPS_STALL thresholds to 120s to prevent collisions with the 60s 
+ *   STATIONARY_GPS_POLLING interval caused by OS scheduling jitter (R213).
+ * - Issue #213: UI Staleness Hardening. Increased UI fail thresholds to 90s 
+ *   to allow for background heartbeat headroom.
  * Aug.18.10:
  * - Issue #209 Fidelity Restoration: Reverted diagnostic down-sampling (R204). 
- *   Restored forensic sampling to 100Hz (10ms) and Power Aware to 10Hz (100ms) 
- *   following successful UI and Main-Thread stabilization (R209).
- * Aug.18.05:
- * - Issue #201 Hardening: Urban Edge Case Multipath Mitigation. Introduced 
- *   JUMP_WEIGHT_LOW_SNR and ANCHOR_SKEPTICISM thresholds to harden the engine 
- *   against signal bouncing in urban canyons (R201).
- * Aug.18.01:
- * - Issue #197: Forensic Storage-Aware Adaptive Pruning. Refined ADAPTIVE_PRUNE 
- *   thresholds and introduced forensic-specific retention limits to handle 
- *   100Hz sampling telemetry (R197).
- * Aug.18.00:
- * - Issue #196: Forensic Log Buffer Pressure Audit. Increased LOG_BUFFER_CAPACITY 
- *   to 5000 and LOG_BATCH_SIZE to 100 to handle 100Hz sampling bursts (R196).
- * Aug.17.11:
- * - Issue #194 Hardening: Refined Battery Steep Discharge logic. Introduced 
- *   load-aware thresholds (NORMAL vs HIGH_LOAD) to account for 100Hz forensic 
- *   sampling and stress test saturation (R194).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -39,8 +28,8 @@ const val LATENCY_THRESHOLD_DB_WRITE_MS = 1000L
 const val LATENCY_THRESHOLD_JNI_MS = 100L
 const val LOG_LATENCY_THRESHOLD_MS = 1000L
 const val LOG_RETRIEVAL_THRESHOLD_MS = 500L
-const val LOG_LIMIT_STANDARD = 2000  // Reduced from 5000 (R177)
-const val LOG_LIMIT_STRICT = 5000     // Reduced from 15000 (R177)
+const val LOG_LIMIT_STANDARD = 2000 
+const val LOG_LIMIT_STRICT = 5000     
 
 // Issue #133: Silent Failure Correlation Thresholds
 const val SILENT_FAILURE_CPU_THRESHOLD = 0.85
@@ -48,9 +37,9 @@ const val SILENT_FAILURE_IOW_THRESHOLD = 0.40
 const val SILENT_FAILURE_LATENCY_THRESHOLD_MS = 800L
 
 // Issue #660: Forensic Audit: Log Buffer Pressure
-const val LOG_BATCH_SIZE = 100 // Refined for Issue #196
+const val LOG_BATCH_SIZE = 100 
 const val LOG_BATCH_DELAY_MS = 2000L
-const val LOG_BUFFER_CAPACITY = 5000 // Refined for Issue #196
+const val LOG_BUFFER_CAPACITY = 5000 
 
 // Issue #669: Forensic Spill-Buffer (MappedByteBuffer)
 const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"
@@ -59,7 +48,7 @@ const val FORENSIC_SPILL_CAPACITY = 10000
 const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
 const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 500L
 const val FORENSIC_DRAIN_THROTTLE_MAX_MS = 5000L
-const val FORENSIC_SIGNATURE_LOOKBACK_MS = 600000L // Reduced to 10 min for Issue #178
+const val FORENSIC_SIGNATURE_LOOKBACK_MS = 600000L 
 
 // Issue #727: Dynamic Batching
 const val FORENSIC_BATCH_SIZE_MIN = 50
@@ -70,23 +59,22 @@ const val FORENSIC_BATCH_SIZE_DEFAULT = 100
 const val FORENSIC_RELIABILITY_THRESHOLD = 0.85
 const val FORENSIC_RELIABILITY_DEGRADATION_DURATION_MS = 30000L
 
-// Issue #728: Storage-Aware Adaptive Pruning (Refined R197)
+// Issue #728: Storage-Aware Adaptive Pruning
 const val PRUNE_CHUNK_SIZE = 1000
-const val ADAPTIVE_PRUNE_THRESHOLD_CRITICAL = 5000   // Increased to allow forensic bursts
+const val ADAPTIVE_PRUNE_THRESHOLD_CRITICAL = 5000   
 const val ADAPTIVE_PRUNE_THRESHOLD_LOW = 10000
 const val ADAPTIVE_PRUNE_THRESHOLD_NORMAL = 25000
 const val ADAPTIVE_PRUNE_THRESHOLD_CHARGING = 50000 
 
-// Forensic-specific retention limits (R197)
+// Forensic-specific retention limits
 const val FORENSIC_PRUNE_LIMIT_CRITICAL = 1000
 const val FORENSIC_PRUNE_LIMIT_LOW = 5000
 const val FORENSIC_PRUNE_LIMIT_NORMAL = 15000
 const val FORENSIC_PRUNE_LIMIT_CHARGING = 30000
 
 // Issue #700: Forensic Sampling Scaling
-// R209: Restored Production Fidelity (Reverted R204 Diagnostic Down-sampling)
-const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  // 100Hz (Production Target)
-const val FORENSIC_SAMPLING_INTERVAL_MAX_MS = 100L // 10Hz (Power Aware Target)
+const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  
+const val FORENSIC_SAMPLING_INTERVAL_MAX_MS = 100L 
 const val FORENSIC_SAMPLING_INTERVAL_COOLING_MS = 250L 
 const val FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS = 500L
 
@@ -100,8 +88,8 @@ const val JNI_RET_EINTR = -4
 const val JNI_RET_NOT_INITIALIZED = -5
 
 // Physics & Motion Limits
-const val MAX_PHYSICAL_SPEED_MPS = 33.33 // 120 km/h
-const val OUTLIER_SPEED_CAP_MPS = 83.33 // 300 km/h
+const val MAX_PHYSICAL_SPEED_MPS = 33.33 
+const val OUTLIER_SPEED_CAP_MPS = 83.33 
 const val JUMP_POINT_DISTANCE_THRESHOLD = 100.0 
 const val OUTLIER_DISTANCE_THRESHOLD = 2000.0 
 const val ABSOLUTE_DISTANCE_CAP_METERS = 50000.0
@@ -121,7 +109,7 @@ const val JUMP_WEIGHT_ALTITUDE_DELTA = 30
 const val JUMP_WEIGHT_TRADITIONAL_SPEED = 50
 const val JUMP_WEIGHT_ACCURACY_LOW = 30
 const val JUMP_WEIGHT_ACCURACY_HIGH = 20
-const val JUMP_WEIGHT_LOW_SNR = 40 // Issue #201: Urban Canyon Hardening
+const val JUMP_WEIGHT_LOW_SNR = 40 
 
 const val JUMP_GATE_SENSOR_MISMATCH_MPS = 2.0
 const val JUMP_GATE_SPEED_ACCURACY_LOW_MPS = 22.2
@@ -129,21 +117,21 @@ const val JUMP_GATE_SPEED_ACCURACY_HIGH_MPS = 8.3
 const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0
 const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0
 const val JUMP_GATE_VISUAL_JITTER_METERS = 10.0
-const val JUMP_GATE_LOW_SNR_THRESHOLD = 22.0 // Issue #201: Multipath Threshold
+const val JUMP_GATE_LOW_SNR_THRESHOLD = 22.0 
 
-// Bayesian Uncertainty Growth (R460 / Issue #460)
-const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0 // 54 km/h conservative drift
-const val PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS = 1.5 // Minimal drift when stationary
-const val PENDING_UNCERTAINTY_SPEED_CAP_MPS = 33.3 // 120 km/h cap
+// Bayesian Uncertainty Growth
+const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0 
+const val PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS = 1.5 
+const val PENDING_UNCERTAINTY_SPEED_CAP_MPS = 33.3 
 
-// Position EMA Parameters (Issue #504 Replacement for IMM)
+// Position EMA Parameters 
 const val POSITION_EMA_ALPHA_DEFAULT = 0.3
 const val POSITION_EMA_ALPHA_STATIONARY = 0.1
 const val POSITION_EMA_ALPHA_SUSPICIOUS = 0.05
 const val SPEED_EMA_ALPHA = 0.2
 const val BEARING_EMA_ALPHA = 0.1
 const val STATIONARY_SPEED_THRESHOLD_MPS = 0.5
-const val POSITION_STALL_RECOVERY_DT_SEC = 60.0
+const val POSITION_STALL_RECOVERY_DT_SEC = 120.0 // Adjusted for Issue #213
 
 // Behavioral Sentinel Checks
 const val JUMP_CHECK_MIN_DIST = 5.0
@@ -153,7 +141,7 @@ const val EFFICIENCY_MIN_TOTAL_DIST = 50.0
 const val SCATTER_MIN_SPEED_MPS = 0.5
 const val SCATTER_ANGLE_THRESHOLD = 120.0
 
-// Acoustic Monitoring (R810-L)
+// Acoustic Monitoring
 const val BREACH_THRESHOLD_DB_JUMP = 40.0 
 const val ACOUSTIC_THRESHOLD_DB_JUMP = 40.0 
 const val ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP = 20.0
@@ -171,7 +159,7 @@ const val ACOUSTIC_GENERIC_RECOVERY_DELAY_MS = 2000L
 const val ACOUSTIC_DUTY_CYCLE_ON_MS = 2000L
 const val ACOUSTIC_DUTY_CYCLE_OFF_MS = 8000L
 
-// Physical Security Sentinel (R810-M)
+// Physical Security Sentinel
 const val LIGHT_THRESHOLD_LUX_JUMP = 150.0
 const val TILT_THRESHOLD_DEGREES = 15.0
 const val BARO_LIFT_THRESHOLD_METERS = 0.8
@@ -189,10 +177,10 @@ const val BARO_ZEROING_INTERVAL_MS = 300000L
 const val SPIKE_DEBOUNCE_MS = 5000L
 
 // Issue #601: Kinetic Energy Anomaly Detection
-const val VIBRATION_HPF_ALPHA = 0.9 // DC-removal for Kinetic Energy
-const val VIBRATION_ENERGY_EMA_ALPHA = 0.1 // Kinetic Energy smoothing
+const val VIBRATION_HPF_ALPHA = 0.9 
+const val VIBRATION_ENERGY_EMA_ALPHA = 0.1 
 
-// Sitting Detection: Chair Plunge (R999b)
+// Sitting Detection: Chair Plunge
 const val CHAIR_PLUNGE_PHASE_TIMEOUT_MS = 5000L
 const val CHAIR_PLUNGE_WINDOW_MS = 1000L
 const val CHAIR_PLUNGE_VELOCITY_THRESHOLD = 0.25
@@ -200,7 +188,7 @@ const val CHAIR_PLUNGE_DISTANCE_THRESHOLD = 0.15
 const val SIT_DUPLICATE_GUARD_MS = 10000L
 const val MUZZLE_HYSTERESIS_MS = 2000L
 
-// Filtering Thresholds (R810-P Zero-Lag)
+// Filtering Thresholds
 const val SUSPICIOUS_Q_SCALE = 1000.0
 const val HIGH_ACCURACY_THRESHOLD_METERS = 35.0
 const val TRAJECTORY_REJECTION_ACCURACY_MULT = 3.0
@@ -214,7 +202,7 @@ const val GEOFENCE_HYSTERESIS_METERS = 5.0
 const val GEOFENCE_PREDICTIVE_LOOKAHEAD_S = 2.0
 const val GEOFENCE_PREDICTIVE_MIN_SPEED_MPS = 1.0
 
-// EMA Factors (Issue #263: Corrected Inversion)
+// EMA Factors 
 const val LUX_EMA_SLOW = 0.01
 const val LUX_EMA_FAST = 0.1
 const val LUX_EMA_UP_SLOW = 0.001
@@ -237,12 +225,12 @@ const val BOOTSTRAP_PHASE_MS = 60000L
 const val DISCOVERY_PHASE_MS = 60000L
 const val JUMP_HOLD_DURATION_MS = 180000L
 const val MOVING_HOLD_DURATION_MS = 60000L
-const val GPS_GAP_THRESHOLD_MS = 60000L
-const val GPS_STALL_THRESHOLD_MS = 60000L
+const val GPS_GAP_THRESHOLD_MS = 120000L    // Increased for Issue #213
+const val GPS_STALL_THRESHOLD_MS = 120000L  // Increased for Issue #213
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
 const val LOCATION_RECOVERY_DEBOUNCE_MS = 3000L
 
-// Adaptive Polling Strategy (R406a)
+// Adaptive Polling Strategy
 const val TICK_INTERVAL_MS = 2000L
 const val POWER_SAVE_TICK_INTERVAL_MS = 10000L
 const val UI_PULSE_TIMEOUT_MS = 45000L 
@@ -267,7 +255,7 @@ const val SUSPICIOUS_GPS_POLLING_MS = 10000L
 const val COOLING_GPS_POLLING_MS = 30000L
 const val VIEWER_GPS_POLLING_MS = 10000L
 
-// Hardware Heuristic Recovery (Issue #502)
+// Hardware Heuristic Recovery 
 const val HARDWARE_SUPPRESSION_THRESHOLD_MS = 15000L
 const val HARDWARE_RECOVERY_COOLDOWN_MS = 60000L
 
@@ -285,7 +273,7 @@ const val ANCHOR_VELOCITY_WEIGHT_MPS = 15.0
 const val ANCHOR_DISPLACEMENT_WEIGHT = 8.0 
 const val ANCHOR_IMU_DAMPING_FACTOR = 0.5 
 const val ANCHOR_ACCURACY_PENALTY_LIMIT = 40.0 
-const val ANCHOR_SKEPTICISM_LOW_SNR_FACTOR = 0.5 // Issue #201: Urban Damping
+const val ANCHOR_SKEPTICISM_LOW_SNR_FACTOR = 0.5 
 
 const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 
 
@@ -316,18 +304,18 @@ const val BATTERY_ALARM_THRESHOLD = 20
 const val CRITICAL_BATTERY_THRESHOLD = 20
 const val MAX_SAFE_TEMPERATURE_CELSIUS = 46.0
 const val MAX_SAFE_TEMPERATURE_RECOVERY = 44.0
-const val BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL = 4 // Refined from 5 for R194
-const val BATTERY_STEEP_DISCHARGE_THRESHOLD_HIGH_LOAD = 8 // Accounts for 100Hz/Stress
+const val BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL = 4 
+const val BATTERY_STEEP_DISCHARGE_THRESHOLD_HIGH_LOAD = 8 
 const val BATTERY_STEEP_DISCHARGE_WINDOW_MS = 600000L
 
 // Storage thresholds
 const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB = 10L
 const val SYSTEM_STORAGE_LOW_THRESHOLD_MB = 50L
-const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_PCT = 0.01 // 1%
-const val SYSTEM_STORAGE_LOW_THRESHOLD_PCT = 0.05 // 5%
+const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_PCT = 0.01 
+const val SYSTEM_STORAGE_LOW_THRESHOLD_PCT = 0.05 
 
 // GPS Polling & Filtering
-const val GPS_SEQUENCE_TOLERANCE_MS = 60000L
+const val GPS_SEQUENCE_TOLERANCE_MS = 120000L // Increased for Issue #213
 const val GPS_MIN_UPDATE_DISTANCE_METERS = 2.0
 
 // Analytical Index Thresholds
@@ -374,8 +362,8 @@ const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
 const val GNSS_EXPECTED_INTERVAL_MS = 1000L
 const val GNSS_JITTER_THRESHOLD_MS = 500L
 
-const val TELEMETRY_UI_STALE_THRESHOLD_MS = 35000L
-const val GPS_UI_FAIL_THRESHOLD_MS = 35000L
+const val TELEMETRY_UI_STALE_THRESHOLD_MS = 90000L // Increased for Issue #213
+const val GPS_UI_FAIL_THRESHOLD_MS = 90000L        // Increased for Issue #213
 
 const val NOTIFICATION_THROTTLE_MS = 30000L
 
@@ -406,7 +394,7 @@ const val ALERT_ID_GPS_HARDWARE_LOCK = "GPS_HARDWARE_LOCK"
 const val ALERT_ID_HARDWARE_CONFIGURATION = "HARDWARE_CONFIG_MISSING"
 const val ALERT_ID_PERFORMANCE_SPIKE = "PERFORMANCE_SPIKE"
 
-// Alert Titles (R747 Standardized)
+// Alert Titles 
 const val ALERT_TITLE_LOCAL_INTERNET = "This device: Internet Lost"
 const val ALERT_TITLE_RELAY_OFFLINE = "This device: Relay Lost"
 const val ALERT_TITLE_TRACKER_OFFLINE = "Offline"
@@ -450,8 +438,8 @@ const val FORENSIC_PULSE_INTERVAL_MS = 10000L
 const val WATCH_DOG_UI_GRACE_MS = 15000L 
 const val SENSOR_GRACE_PERIOD_MS = 600000L
 
-const val DB_PRUNE_THRESHOLD = 2000 // Reduced from 3000 (R177)
-const val PRUNE_COOLDOWN_MS = 30000L // Reduced from 60000ms (R177)
+const val DB_PRUNE_THRESHOLD = 2000 
+const val PRUNE_COOLDOWN_MS = 30000L 
 const val LOG_MUZZLE_STARTUP_MS = 60000L
 
 const val FORENSIC_PINK_COLOR = 0xFFFF00FF.toInt()
@@ -480,7 +468,7 @@ const val DAILY_ARCHIVE_MINUTE = 30
 const val HISTORY_BATCH_WRITE_INTERVAL_MS = 5000L
 const val HISTORY_BUFFER_MAX_SIZE = 100
 
-// Maintenance Recovery (Issue #108)
+// Maintenance Recovery
 const val MAINTENANCE_WORK_NAME = "GPS_Maintenance"
 const val RECOVERY_GRACE_PERIOD_MS = 60000L
 const val RECOVERY_THRESHOLD_MS = 180000L

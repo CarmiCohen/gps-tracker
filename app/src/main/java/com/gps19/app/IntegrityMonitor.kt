@@ -25,20 +25,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.19.11:
+ * - Issue #215: Integrity Monitor Flow Audit. Increased locationStalled threshold 
+ *   to 180s (3 * INTEGRITY_HEARTBEAT_INTERVAL_MS) to align with R213 and prevent 
+ *   false stall warnings during 60s background polling cycles (R215).
  * Aug.18.00:
  * - Issue #196: Forensic Log Buffer Pressure Audit baseline initiated.
- * Aug.17.11:
- * - Issue #194 Hardening: Refined checkBatteryDischarge() to use load-aware 
- *   thresholds (R194). Sensitivity is automatically adjusted when thermal 
- *   throttling or high CPU load is detected.
- * Aug.17.08:
- * - Issue #191 Validation: Implemented simulateCoolingMode() to support dynamic 
- *   polling throttle verification (R191).
- * Aug.11.08:
- * - Issue #143: Forensic Integrity Verification. Mapped Thermal Throttling to 
- *   Silent Failure correlation engine (R133). Corrected NetworkCapabilities import.
- * Aug.11.00:
- * - Issue #137: UI Davey/ANR Remediation.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -165,9 +157,11 @@ class IntegrityMonitor @Inject constructor(
 
     private suspend fun performIntegrityHeartbeat() {
         val nowRt = timeProvider.elapsedRealtime()
-        val storageStalled = lastStorageUpdateRt > 0 && (nowRt - lastStorageUpdateRt) > INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
-        val powerStalled = lastPowerUpdateRt > 0 && (nowRt - lastPowerUpdateRt) > INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
-        val locationStalled = lastLocationStatusUpdateRt > 0 && (nowRt - lastLocationStatusUpdateRt) > 30000L
+        val stallThreshold = INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
+        
+        val storageStalled = lastStorageUpdateRt > 0 && (nowRt - lastStorageUpdateRt) > stallThreshold
+        val powerStalled = lastPowerUpdateRt > 0 && (nowRt - lastPowerUpdateRt) > stallThreshold
+        val locationStalled = lastLocationStatusUpdateRt > 0 && (nowRt - lastLocationStatusUpdateRt) > stallThreshold
 
         if (storageStalled || powerStalled || locationStalled) {
             val stalls = mutableListOf<String>()

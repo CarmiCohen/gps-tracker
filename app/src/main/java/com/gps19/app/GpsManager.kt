@@ -23,10 +23,13 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.19.09:
+ * - Issue #213: Signal Loss False-Positive Remediation. Introduced recoveryStartRt 
+ *   to correctly anchor the 3-second stabilization period. Cleared pending reason 
+ *   immediately upon coordinate arrival to prevent UI desync (R213).
  * Aug.11.09:
  * - Issue #141: Stress Recovery Verification. Implemented dynamic polling 
- *   interval adjustment (R406a) via flatMapLatest to ensure hardware 
- *   responsiveness during state transitions. Added ExperimentalCoroutinesApi opt-in.
+ *   interval adjustment (R406a) via flatMapLatest.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -50,6 +53,7 @@ class GpsManager @Inject constructor(
     private var lastGnssStatusRt = 0L
     
     private var pendingEnterRt = 0L
+    private var recoveryStartRt = 0L
     
     private val pollingIntervalFlow = MutableStateFlow(TICK_INTERVAL_MS)
 
@@ -153,7 +157,7 @@ class GpsManager @Inject constructor(
                 } else if (revivalAttemptCount == MAX_REVIVAL_ATTEMPTS) {
                     revivalAttemptCount++ 
                     _revivalEvents.tryEmit(RevivalEvent.HardwareLock)
-                    Timber.e("CRITICAL: GPS_HARDWARE_LOCK - GPS hardware lock confirmed after 3 failed revivals on this device.")
+                    Timber.e("CRITICAL: GPS_HARDWARE_LOCK - GPS hardware lock confirmed after failed revivals.")
                 }
             }
         } else if (!currentStatus.isPending && revivalAttemptCount > 0) {
@@ -163,10 +167,10 @@ class GpsManager @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        Timber.w("R124: Restarting hardware GPS session on this device (Attempt $revivalAttemptCount)")
+        Timber.w("R124: Restarting hardware GPS session (Attempt $revivalAttemptCount)")
         
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Timber.e("R124: Revival aborted on this device - Missing FINE_LOCATION permission")
+            Timber.e("R124: Revival aborted - Missing FINE_LOCATION permission")
             return
         }
 
@@ -179,9 +183,9 @@ class GpsManager @Inject constructor(
                     override fun onLocationResult(p0: LocationResult) {}
                 }, Looper.getMainLooper())
             } catch (e: SecurityException) {
-                Timber.e(e, "R124: SecurityException during revival pulse on this device")
+                Timber.e(e, "R124: SecurityException during revival pulse")
             } catch (e: Exception) {
-                Timber.e(e, "R124: Manual revival pulse failed on this device")
+                Timber.e(e, "R124: Manual revival pulse failed")
             }
         }
     }
@@ -201,15 +205,28 @@ class GpsManager @Inject constructor(
                     satellitesInView >= 4 && satellitesUsed < 4 -> LocationPendingReason.GPS_STALL
                     else -> LocationPendingReason.GPS_GAP
                 }
+                recoveryStartRt = 0L // Reset recovery anchor if we slip back into gap
             } 
             else if (nextPending) {
-                val recoveryDelta = nowRt - lastFixRt
-                if (recoveryDelta < LOCATION_RECOVERY_DEBOUNCE_MS) {
+                // If we have a fresh fix but are still flagged as pending, start the stabilization anchor
+                if (recoveryStartRt == 0L) {
+                    recoveryStartRt = nowRt
+                }
+
+                val recoveryDuration = nowRt - recoveryStartRt
+                if (recoveryDuration < LOCATION_RECOVERY_DEBOUNCE_MS) {
                     if (nowRt - pendingEnterRt > 0) lastPendingDuration = nowRt - pendingEnterRt
+                    // Issue #213: Clear the reason immediately upon coordinate arrival to stop 
+                    // UI false-positives while the Bayesian uncertainty stabilizes.
+                    nextReason = LocationPendingReason.NONE 
                 } else {
                     nextPending = false; nextReason = LocationPendingReason.NONE; recoveryConfirmed = true
+                    recoveryStartRt = 0L
                 }
-            } else { recoveryConfirmed = false }
+            } else { 
+                recoveryConfirmed = false 
+                recoveryStartRt = 0L
+            }
 
             current.copy(isPending = nextPending, reason = nextReason, lastFixRt = lastFixRt, lastPendingDurationMs = lastPendingDuration, recoveryConfirmed = recoveryConfirmed)
         }

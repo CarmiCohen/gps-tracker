@@ -2,22 +2,22 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 656**
+**Total Unique Resolutions: 662**
 
-## 76. Advanced Collision Forensic (Aug.19.08)
-*   **Issue #212: Advanced Collision Forensic**.
-    - **Resolution**: Conducted a deep forensic investigation into the resilient Samsung CFMS `libmbrainSDK` load trigger. Verified through a diagnostic **Identity Swap** (changing `applicationId` to `com.gps19.forensic`) that the trigger is not strictly package-name based, as load attempts persisted. Exhausted non-destructive neutralization methods, including JNI suppression, metadata rephrasing, and permission stripping. Concluded the trigger is a resilient OS-level heuristic (likely matching APK resource signatures or class structures). Restored the project to its functional state (vAug.19.08) and accepted the vendor-specific log noise as a benign side-effect. (R212-F)
+## 82. Shadow-Cache Hardening (Aug.20.00)
+*   **Issue #217: Shadow-Cache Hardening**.
+    - **Resolution**: Finalized the generic `ShadowCache<K, V>` utility in `core:engine`. Hardened thread-safety for atomic `getOrPut` operations using synchronized locks to prevent race conditions during high-frequency telemetry bursts. Integrated the cache into `GpsApplication` and `MainRepository` to ensure stable memory footprints during multi-day tracking sessions. (R217)
 
-## 75. System Issue Dashboard Audit (Aug.19.01)
-*   **Issue #214: System Issue Dashboard Audit**.
-    - **Resolution**: Confirmed the "1" issue count and automatic setup navigation on Samsung A15 are intentional R405 safety mechanisms for battery exemption validation. (R214)
+## 81. Systematic JNI Audit (Aug.19.13)
+*   **Issue #218: Systematic JNI Audit**.
+    - **Resolution**: Conducted a full audit of the native C++ layer. Verified that all internal identifiers, logic, and logs are fully decoupled from neutralized vendor keywords. Exported JNI functions now strictly utilize abstract identifiers (`n1`-`n5`). Library renamed to `jdHardware` and 16KB page-size alignment implemented for Android 15+ stability. (R218)
 
-## 74. JNI Vendor Collision Remediation (Aug.19.01)
-*   **Issue #212: JNI Vendor Collision Remediation**.
-    - **Resolution**: Remediated early-lifecycle JNI failures on Samsung A15 hardware. Forensic analysis identified that Samsung's Custom Frequency Management Service (CFMS) scans APKs for "Mbrain" identifiers to trigger proprietary SDK loads, causing `libmbrainSDK` failures. Transitioned the hardware stabilization bridge to the neutral `JdHardware` namespace. Purged the colliding keyword from all functional source code, comments, and build metadata. Implemented `sourceSets` exclusions in `app/build.gradle` to ensure legacy identifiers are not indexed in the APK. (R212)
+## 80. Shadow-Cache Eviction Strategy (Aug.19.13)
+*   **Issue #217: Shadow-Cache Eviction Strategy**.
+    - **Resolution**: Implemented a generic, thread-safe `ShadowCache<K, V>` utility using an LRU (Least Recently Used) eviction strategy. Integrated the cache into `GpsApplication` for system identifiers and `MainRepository` for trail point pooling. (R217)
 
-## 73. Final Release Validation (Aug.18.13)
-*   **Issue #211: Final Release Validation**.
-    - **Resolution**: Conducted real-world moving validation on Samsung A15 hardware. Verified that the forensic pipeline operates at 100Hz fidelity with acceptable thermal headroom and battery consumption. Confirmed that the architectural optimizations (R207-R210) successfully remediated previous performance bottlenecks, allowing for sustained high-resolution telemetry capture without UI degradation or system instability. (R211)
+## 79. Atomic Counter Consolidation (Aug.19.13)
+*   **Issue #216: Atomic Counter Consolidation**.
+    - **Resolution**: Grouped disparate `AtomicInteger` performance and pruning counters in `MainRepository.kt` into a single private `RepositoryMetrics` data structure, simplifying state management. (R216)
 
-... [Legacy items truncated for brevity]
+... [Legacy items truncated]

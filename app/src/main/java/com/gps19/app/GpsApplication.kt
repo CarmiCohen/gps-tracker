@@ -17,17 +17,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import com.gps19.core.engine.ShadowCache
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Aug.19.13:
+ * - Issue #217: Shadow-Cache Eviction Strategy. Transitioned to LRU-based 
+ *   ShadowCache to prevent unbounded memory growth during multi-day 
+ *   tracking sessions (R217).
  * Aug.04.111:
- * - Issue #721: Logcat Spam Hardening. Added PACKAGE_NAME shadow-cache to prevent
- *   repetitive getPackageName() calls which trigger system-level logcat spam on Samsung A15.
- * Aug.01.00:
- * - Issue #664: Forensic Audit: Startup Davey Stalls. Deferring osmdroid setup by 3s 
- *   to clear the main-thread critical path during first-frame rendering.
- * July.31.00:
- * - Issue #656: userfaultfd mitigation. Added aggressive onTrimMemory handling.
+ * - Issue #721: Logcat Spam Hardening. Added PACKAGE_NAME shadow-cache.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -37,12 +36,20 @@ class GpsApplication : Application(), Configuration.Provider {
     @Inject lateinit var logManager: LogManager
 
     companion object {
+        private val stringCache = ShadowCache<String, String>(100)
+
         /**
          * Shadow-cache for the package name to avoid triggering Samsung's repetitive 
-         * 'getPackageName' logcat spam during high-frequency UI/Background operations.
+         * 'getPackageName' logcat spam.
          */
-        lateinit var PACKAGE_NAME: String
-            private set
+        val PACKAGE_NAME: String by lazy { stringCache.getOrPut("pkg") { "" } }
+        
+        /**
+         * Generic access for high-frequency string lookups that trigger OS diagnostic logs.
+         */
+        fun getCachedString(key: String, provider: () -> String): String {
+            return stringCache.getOrPut(key, provider)
+        }
     }
 
     override val workManagerConfiguration: Configuration
@@ -53,7 +60,7 @@ class GpsApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         
-        PACKAGE_NAME = super.getPackageName()
+        stringCache.put("pkg", super.getPackageName())
 
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
@@ -71,14 +78,9 @@ class GpsApplication : Application(), Configuration.Provider {
             }
         })
 
-        // Issue #664: Startup ANR Hardening - Defer I/O intensive setup to avoid Davey stalls
         applicationScope.launch(Dispatchers.IO) {
             try {
-                // Issue #456: Layer 3 Watchdog - WorkManager persistence
                 MaintenanceWorker.schedule(this@GpsApplication)
-
-                // Issue #664: Defer heavy osmdroid and SharedPreferences access to avoid 
-                // contention with DataStore and Compose initialization.
                 delay(3000)
 
                 val osmConfig = OsmConfig.getInstance()
@@ -96,7 +98,7 @@ class GpsApplication : Application(), Configuration.Provider {
                 osmConfig.isDebugMode = false
                 osmConfig.isDebugTileProviders = false
                 
-                Timber.d("Issue #721: Shadow-cache initialized. Deferred startup complete.")
+                Timber.d("Issue #721: Shadow-cache synchronized with LRU strategy.")
             } catch (e: Exception) {
                 Timber.e(e, "Issue #664: Deferred startup failed")
             }
@@ -125,6 +127,7 @@ class GpsApplication : Application(), Configuration.Provider {
     private fun trimCaches() {
         applicationScope.launch(Dispatchers.IO) {
             try {
+                stringCache.clear()
                 System.gc()
             } catch (e: Exception) {
                 Timber.e(e, "Issue #656: Cache trim failed")
