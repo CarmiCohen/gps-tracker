@@ -45,14 +45,13 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Aug.20.03:
+ * - Issue #223 Release: Removed debug instrumentation (onTriggerForensicTest)
+ *   for production hardening.
  * Aug.20.01:
  * - Issue #222 Performance Audit: Removed redundant RefreshPermissionStatus
  *   trigger from DisposableEffect. This is already handled by MainActivity.onResume,
  *   and double-triggering was contributing to 800ms+ Davy jank (R222).
- * Aug.16.12:
- * - Issue #185 Hardening: Updated to collect and pass pre-simplified 
- *   MapTrailSegments to Tracker/Viewer screens, offloading O(N) mapping 
- *   from the UI thread to eliminate Startup ANR (R185).
  */
 @Composable
 fun MainAppContent(
@@ -83,7 +82,6 @@ fun MainAppContent(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    // Issue #222: Removed redundant viewModel.onEvent(UiEvent.RefreshPermissionStatus)
                     viewModel.onEvent(UiEvent.SetUiVisible(true))
                 }
                 Lifecycle.Event.ON_PAUSE -> viewModel.onEvent(UiEvent.SetUiVisible(false))
@@ -317,7 +315,6 @@ fun MainAppContent(
                             }
                         }
                         composable(Screen.Tracker.route) {
-                            // Issue #185: Collect background-simplified trail segments
                             val trackerSegments by viewModel.trackerTrailSegments.collectAsStateWithLifecycle()
                             val viewerSegments by viewModel.viewerTrailSegments.collectAsStateWithLifecycle()
                             val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -351,7 +348,6 @@ fun MainAppContent(
                             }
                         }
                         composable(Screen.Viewer.route) {
-                            // Issue #185: Collect background-simplified trail segments
                             val trackerSegments by viewModel.trackerTrailSegments.collectAsStateWithLifecycle()
                             val viewerSegments by viewModel.viewerTrailSegments.collectAsStateWithLifecycle()
                             val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -416,7 +412,6 @@ fun MainAppContent(
                         onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, 
                         onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onTestAlarm = { viewModel.onEvent(UiEvent.RequestTestAlarm) },
-                        onTriggerForensicTest = { viewModel.onEvent(UiEvent.RequestForensicTest) },
                         onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
                         permissions = uiState.permissions,
                         homePointsCount = uiState.homePoints.size,

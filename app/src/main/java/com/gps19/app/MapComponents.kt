@@ -38,16 +38,12 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Aug.20.04:
+ * - Issue #224 Hardening: Increased smoothing reset threshold to 100m 
+ *   to eliminate visual coordinate "snaps" during GPS revival (R224).
  * Aug.18.09:
  * - Issue #207/208 Performance Audit: Gated freshness calculations using 
  *   derivedStateOf to prevent redundant recompositions on every pulse (R207).
- * - Issue #207/208 Performance Audit: Optimized AndroidView update block 
- *   to minimize main-thread work during 1Hz map invalidation (R207).
- * - Issue #208: Fixed compilation error in MapToolsOverlay (R208).
- * Aug.16.12:
- * - Issue #185 Hardening: Updated AppMapContainer and OsmMap to receive 
- *   pre-simplified MapTrailSegments. Moved simplification churn out of 
- *   the UI update block to eliminate Startup ANRs (R185).
  */
 
 @Composable
@@ -103,7 +99,6 @@ fun AppMapContainer(
     
     val isTrackerMode = appMode == "tracker"
 
-    // Issue #207: Gate freshness recomposition using derivedStateOf
     val isTrackerFresh by remember(trackerGpsTs, trackerTelemetryTs, systemPulse) {
         derivedStateOf {
             if (trackerGpsTs <= 0) false
@@ -307,7 +302,9 @@ fun OsmMap(
         if (PhysicsUtils.isValidLocation(trackerLat, trackerLng)) {
             val last = smoothedTrackerPos.value
             val alpha = if (trackerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
-            smoothedTrackerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, trackerLat, trackerLng) > 30.0) {
+            // Issue #224: Increased reset threshold from 30m to 100m to allow 
+            // smooth EMA convergence during GPS revival.
+            smoothedTrackerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, trackerLat, trackerLng) > 100.0) {
                 GeoPoint(trackerLat, trackerLng)
             } else {
                 GeoPoint(
@@ -322,7 +319,9 @@ fun OsmMap(
         if (PhysicsUtils.isValidLocation(viewerLat, viewerLng)) {
             val last = smoothedViewerPos.value
             val alpha = if (viewerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
-            smoothedViewerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, viewerLat, viewerLng) > 30.0) {
+            // Issue #224: Increased reset threshold from 30m to 100m to allow 
+            // smooth EMA convergence during GPS revival.
+            smoothedViewerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, viewerLat, viewerLng) > 100.0) {
                 GeoPoint(viewerLat, viewerLng)
             } else {
                 GeoPoint(
@@ -405,8 +404,6 @@ fun OsmMap(
             })
         } 
     }, update = { view ->
-        // Issue #207/208: Snapshot.withoutReadObservation ensures pulse updates 
-        // trigger imperative redraw without causing full Compose recomposition.
         Snapshot.withoutReadObservation {
             overlayManager?.let { om ->
                 val h = om.updateHomePoints(homePoints, isFenceVisible, maxDistance, isTrackerMode, geofenceMode, onTap, onRemoveMarker)
@@ -446,7 +443,7 @@ fun MapToolsOverlay(
     geofenceMode: GeofenceMode, onSetGeofenceMode: (GeofenceMode) -> Unit, showViolations: Boolean = true, onToggleViolations: () -> Unit = {},
     showGeofenceViolations: Boolean = true, onToggleGeofenceViolations: () -> Unit = {}, onClear: () -> Unit, onSave: () -> Unit, 
     onLoad: () -> Unit, onCenterTracker: () -> Unit = {}, onCenterViewer: () -> Unit = {},
-    onZoomIn: () -> Unit = {}, onZoomOut: () -> Unit = {}
+    onZoomIn: () -> Unit = {}, onZoomOut: () -> Unit = { }
 ) {
     val sc = rememberScrollState(); val sp = 16.dp; val prp = Color(0xFF800080)
     val curTrk by rememberUpdatedState(isTrackerMode); val curTrkVal by rememberUpdatedState(trackerValid); val curVwrVal by rememberUpdatedState(viewerValid)

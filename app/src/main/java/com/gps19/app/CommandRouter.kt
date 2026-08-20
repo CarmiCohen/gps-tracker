@@ -17,15 +17,12 @@ import javax.inject.Singleton
 
 /**
  * CommandEvent: Reactive event container for system and UI commands.
+ * Aug.20.03:
+ * - Issue #223 Release: Removed debug instrumentation (SimulateThermalEvent, 
+ *   TriggerForensicTest) for production hardening.
  * Aug.17.08:
  * - Issue #191 Validation: Added SimulateThermalEvent to support dynamic 
  *   polling throttle verification (R191).
- * July.28.22:
- * - Issue #617: Global SharedFlow Audit. Hardened _commandEvents with 
- *   BufferOverflow.DROP_OLDEST to ensure non-blocking command routing (R617).
- * July.26.03:
- * - Issue #545c: Flow Architecture Standardization. Unified all command 
- *   dispatches into a single SharedFlow stream.
  */
 sealed class CommandEvent {
     data class ViewerPulse(val id: String) : CommandEvent()
@@ -35,17 +32,10 @@ sealed class CommandEvent {
     data class TransientDrop(val drop: Boolean) : CommandEvent()
     object ResetTimers : CommandEvent()
     object SyncSensors : CommandEvent()
-    object TriggerForensicTest : CommandEvent()
-    data class SimulateThermalEvent(val active: Boolean) : CommandEvent()
 }
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
- * July.27.00:
- * - Architecture Audit: Updated to use centralized PreferenceKeys.
- * July.26.03:
- * - Issue #545c: Flow Architecture Standardization. Replaced legacy Listener 
- *   with a SharedFlow (commandEvents) for reactive event dispatching.
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -172,12 +162,7 @@ class CommandRouter @Inject constructor(
                                 }
                             }
                         }
-                        is UiCommand.ExecuteForensicTest -> {
-                            _commandEvents.emit(CommandEvent.TriggerForensicTest)
-                        }
-                        is UiCommand.SimulateThermalEvent -> {
-                            _commandEvents.emit(CommandEvent.SimulateThermalEvent(command.active))
-                        }
+                        else -> {}
                     }
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e

@@ -32,14 +32,12 @@ import timber.log.Timber
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Aug.20.03:
+ * - Issue #223 Release: Removed debug instrumentation (onTriggerForensicTest) 
+ *   for production hardening.
  * Aug.20.01:
  * - Issue #221 Hardening: Optimized layout density (20dp padding) and 
  *   increased bottom spacer (56dp) to eliminate UI clipping on SM-A155F (R221).
- * - Issue #222 Performance: Accelerated staggered hydration (50ms) to 
- *   improve perceived responsiveness during permission refreshes (R222).
- * Aug.18.08:
- * - Issue #205 Hardening: Forced LTR layout direction for PhoneSetupOverlay 
- *   to resolve BiDi punctuation mirroring and numbering artifacts (R205).
  */
 
 @Composable
@@ -274,7 +272,6 @@ fun PhoneSetupOverlay(
     onExactAlarm: () -> Unit, onHardwarePermission: () -> Unit, onRefresh: () -> Unit, 
     onToggleManualOverride: () -> Unit = {},
     onTestAlarm: () -> Unit,
-    onTriggerForensicTest: () -> Unit = {},
     onNavigateToDiagnostics: () -> Unit = {},
     permissions: PermissionState,
     homePointsCount: Int, isTrackerMode: Boolean, onGoToMap: () -> Unit = {}
@@ -389,17 +386,6 @@ fun PhoneSetupOverlay(
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = onRefresh, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh)) }
                             Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm)) }
-                        }
-                    }
-
-                    if (visibleCount >= 14) {
-                        if (isTrackerMode) {
-                            Spacer(Modifier.height(8.dp))
-                            Button(onClick = onTriggerForensicTest, modifier = Modifier.fillMaxWidth().height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(FORENSIC_PINK_COLOR).copy(alpha = 0.8f))) {
-                                Icon(Icons.Default.BugReport, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("TRIGGER FORENSIC STRESS TEST", fontSize = 12.sp, fontWeight = FontWeight.Black)
-                            }
                         }
                         Spacer(Modifier.height(56.dp)) // Issue #221: Increased bottom spacer
                     }

@@ -25,20 +25,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.20.03:
+ * - Issue #223 Release: Removed debug instrumentation (simulateThermalEvent, 
+ *   RequestForensicTest) for production hardening.
  * Aug.18.09:
  * - Issue #208 Performance Audit: Implemented trail segment caching in 
  *   computeTrailSegments to eliminate redundant O(N) simplification churn (R208).
- * Aug.18.03:
- * - Issue #198 Performance Audit: Throttled localLocation and trackerLocation 
- *   collectors to 10Hz (100ms) to prevent UI thread saturation during 
- *   high-frequency forensic bursts (R198).
- * Aug.17.08:
- * - Issue #191 Validation: Implemented simulateThermalEvent() to trigger 
- *   dynamic polling throttle verification (R191). Fixed 'event.id' reference.
- * Aug.16.12:
- * - Issue #185 Hardening: Implemented background trail simplification and 
- *   segmentation via trackerTrailSegments and viewerTrailSegments flows. 
- *   Offloads O(N) simplification from the UI thread to eliminate Startup ANR (R185).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -168,13 +160,11 @@ class MainViewModel @Inject constructor(
         .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Issue #208: Trail Cache to prevent O(N) churn in computeTrailSegments
     private var lastTrackerTrailSize = -1
     private var cachedTrackerSegments = emptyList<MapTrailSegment>()
     private var lastViewerTrailSize = -1
     private var cachedViewerSegments = emptyList<MapTrailSegment>()
 
-    // Issue #185: Background Trail Simplification
     val trackerTrailSegments: StateFlow<List<MapTrailSegment>> = trackerTrailFlow
         .map { trail -> 
             if (trail.size == lastTrackerTrailSize) cachedTrackerSegments
@@ -395,7 +385,6 @@ class MainViewModel @Inject constructor(
         stateSubscriptionUseCase.observeGnssDetail().onEach { _gnssDetail.value = it }.flowOn(Dispatchers.Main.immediate).launchIn(viewModelScope)
         stateSubscriptionUseCase.observeGpsIndex().onEach { _gpsIndexData.value = it }.flowOn(Dispatchers.Main.immediate).launchIn(viewModelScope)
 
-        // Issue #198: Throttle UI telemetry updates to 10Hz (100ms) to prevent UI thread saturation during bursts.
         viewModelScope.launch(Dispatchers.Main.immediate) { 
             repository.localLocation
                 .sample(100L) 
@@ -546,8 +535,6 @@ class MainViewModel @Inject constructor(
                 }
             }
             is UiEvent.RequestTestAlarm -> { addPersistentLog("user", "USER ACTION: Test alarm triggered", isImportant = true); repository.sendCommand(UiCommand.ExecuteTestAlarm) }
-            is UiEvent.RequestForensicTest -> { addPersistentLog("user", "USER ACTION: Forensic stress test triggered", isImportant = true); repository.sendCommand(UiCommand.ExecuteForensicTest) }
-            is UiEvent.SimulateThermalEvent -> { addPersistentLog("user", "USER ACTION: Thermal simulation ${if (event.active) "ACTIVATED" else "DEACTIVATED"}", isImportant = true); repository.sendCommand(UiCommand.SimulateThermalEvent(event.active)) }
             is UiEvent.ToggleXiaomiManualOverride -> {
                 val nextValue = !_uiState.value.permissions.isManualOverride
                 updateState { it.copy(permissions = it.permissions.copy(isManualOverride = nextValue)) }
@@ -974,14 +961,6 @@ class MainViewModel @Inject constructor(
     fun clearTrails(context: Context) { viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) { MainFileHelper.manualExportTrails(context, this@MainViewModel, timeProvider); repository.clearTrails(); addPersistentLog("user", "USER ACTION: Trails cleared", isImportant = true); Toast.makeText(context, "Trails exported and cleared", Toast.LENGTH_SHORT).show() } }
 
     /**
-     * simulateThermalEvent: Triggers a simulated thermal event to verify 
-     * dynamic polling throttle (Issue #191).
-     */
-    fun simulateThermalEvent(active: Boolean) {
-        onEvent(UiEvent.SimulateThermalEvent(active))
-    }
-
-    /**
      * computeTrailSegments: Background trail segmentation and simplification.
      * Part of Issue #185 ANR mitigation.
      */
@@ -1006,7 +985,6 @@ class MainViewModel @Inject constructor(
                 val simplified = PhysicsUtils.simplifyTrail(segmentPoints, 1.0, { it.lat }, { it.lng })
                 if (simplified.size > 1) {
                     val geoPoints = simplified.map { it.toGeoPoint() }
-                    // Issue #185: Offload O(N) hashing from UI thread to background computation.
                     segments.add(MapTrailSegment(geoPoints, color, geoPoints.hashCode()))
                 }
             }

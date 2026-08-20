@@ -1,8 +1,10 @@
-# System Source of Truth (SoT) - Aug.20.02 (Production Validated)
+# System Source of Truth (SoT) - Aug.20.04 (Field Monitoring)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Coordinate Stabilization Authority (R224)**: (Added Aug.20.04) The system MUST prevent visual coordinate "snaps" during GPS revival. Following a period of signal loss, the EMA (Exponential Moving Average) filter MUST utilize a weighted transition window to anchor the first valid fix, preventing Bayesian uncertainty expansion from inducing perceived jumps in the UI. (Issue #224). **Status: In Progress.**
+*   **Production Release Hardening (R223)**: (Added Aug.20.03) The system MUST be stripped of all debug instrumentation, thermal simulation hooks, and forensic stress-test UI elements prior to production release. No "Simulate" or "Test" triggers (excluding standard Test Alarm) are permitted in production-bound layouts or ViewModels. (Issue #223). **Status: Implemented.**
 *   **Permission Refresh Performance (R222)**: (Added Aug.20.01) The system MUST avoid redundant permission refresh events during lifecycle transitions. Staggered UI hydration MUST utilize a 50ms inter-frame delay to optimize perceived responsiveness on budget hardware (SM-A155F) while keeping main-thread utilization within the 16ms frame budget. (Issue #222). **Status: Implemented.**
 *   **Analytical Index Performance (R219)**: (Added Aug.20.00) The calculation of the `GpsIndex` MUST be offloaded from the UI thread to `Dispatchers.Default`. The reactive flow MUST be throttled using a `500ms` sampling window to prevent UI jitter and main-thread saturation during 100Hz forensic bursts. (Issue #219). **Status: Implemented.**
 *   **Shadow-Cache Hardening (R217)**: (Updated Aug.20.00) The system MUST utilize a thread-safe, LRU (Least Recently Used) eviction strategy for all shadow-cache implementations to prevent unbounded memory growth. High-frequency lookups and UI object pools MUST utilize the centralized `ShadowCache` utility, which MUST ensure atomic `getOrPut` operations to prevent race conditions during 100Hz forensic bursts. (Issue #217). **Status: Implemented.**

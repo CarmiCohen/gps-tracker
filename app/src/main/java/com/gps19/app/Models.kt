@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.20.03:
+ * - Issue #223 Release: Removed debug instrumentation (SimulateThermalEvent, 
+ *   ExecuteForensicTest) for production hardening.
  * Aug.17.08:
  * - Issue #191 Validation: Added SimulateThermalEvent to UiEvent and UiCommand 
  *   to support dynamic polling throttle verification (R191).
@@ -17,8 +20,6 @@ import java.util.*
  * - Issue #185 Hardening: Added MapTrailSegment to support background trail 
  *   simplification and eliminate Startup ANR (R185). Fixed bad inheritance 
  *   for RequestTestAlarm and RequestForensicTest. Restored missing AlarmInfo (R185).
- * - Issue #185 Hardening: Added checksum to MapTrailSegment to offload O(N) 
- *   hashing from the UI thread to background computation (R185).
  */
 
 sealed class AppSensorEvent {
@@ -792,8 +793,6 @@ sealed class UiEvent {
     object CommitSettings : UiEvent()
     object RefreshPermissionStatus : UiEvent()
     object RequestTestAlarm : UiEvent()
-    object RequestForensicTest : UiEvent()
-    data class SimulateThermalEvent(val active: Boolean) : UiEvent()
     data class ToggleAlertsSetup(val visible: Boolean) : UiEvent()
     data class ToggleAlarmSoundSetup(val visible: Boolean) : UiEvent()
     object ToggleTestSiren : UiEvent()
@@ -836,8 +835,6 @@ sealed class UiCommand {
     object ZoomOut : UiCommand()
     object FullInitializationReset : UiCommand()
     object ExecuteTestAlarm : UiCommand()
-    object ExecuteForensicTest : UiCommand()
-    data class SimulateThermalEvent(val active: Boolean) : UiCommand()
     object MapZoomIn : UiCommand()
     object MapZoomOut : UiCommand()
 }

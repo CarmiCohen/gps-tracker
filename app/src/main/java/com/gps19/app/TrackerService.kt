@@ -20,13 +20,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.20.03:
+ * - Issue #223 Release: Removed debug instrumentation (executeAutomatedStressTest, 
+ *   SimulateThermalEvent) for production hardening.
  * Aug.19.01:
  * - Issue #212: JNI Vendor Collision Remediation. Transitioned hardware bridge 
  *   to a neutral namespace to eliminate Samsung framework collisions (R212).
- * Aug.17.08:
- * - Issue #192: Automated Recovery Latency Audit. Added latency measurement 
- *   to startForensicSamplingLoop to log the time taken to resume high-frequency 
- *   sampling post-thermal event (R192).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -282,74 +281,8 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start() }
-                    is CommandEvent.TriggerForensicTest -> executeAutomatedStressTest()
-                    is CommandEvent.SimulateThermalEvent -> integrityMonitor.simulateCoolingMode(event.active)
                 }
             }
-        }
-    }
-
-    private fun executeAutomatedStressTest() {
-        lifecycleScope.launch(Dispatchers.Default) {
-            val proc = lastProcessedLocation
-            val tLat = proc?.optimizedPoint?.lat ?: 0.0
-            val tLng = proc?.optimizedPoint?.lng ?: 0.0
-            val tAcc = proc?.maxAccuracy ?: 0.0
-            val health = integrityMonitor.currentHealth
-            
-            logManager.logServiceEvent("FORENSIC STRESS TEST: Initiating 5-min CPU/IO saturation (R165)", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = tLat, lng = tLng, accuracy = tAcc)
-            
-            val stressDurationMs = 300_000L // 5 Minutes
-            val startRt = timeProvider.elapsedRealtime()
-            
-            // Background trace job (100Hz)
-            val traceJob = launch(Dispatchers.Default) {
-                while (isActive && timeProvider.elapsedRealtime() - startRt < stressDurationMs) {
-                    logManager.logForensicTraceOptimized(
-                        timestamp = timeProvider.currentTimeMillis(),
-                        lat = tLat, lng = tLng, accuracy = tAcc, maxAccuracy = tAcc, 
-                        vibe = 0.5, snr = 65.0, batteryLevel = health.batteryLevel, 
-                        isCharging = health.isCharging, batteryTemp = health.batteryTemp
-                    )
-                    delay(10) // 100Hz
-                }
-            }
-
-            val cpuJob = launch(Dispatchers.Default) {
-                while (isActive && timeProvider.elapsedRealtime() - startRt < stressDurationMs) {
-                    var x = 1.1
-                    for (i in 0..1000) { x = sin(x) + cos(x) + sqrt(x) }
-                    yield()
-                }
-            }
-
-            val ioJob = launch(Dispatchers.IO) {
-                val stressFile = File(cacheDir, "forensic_stress_${System.currentTimeMillis()}.bin")
-                val buffer = ByteArray(1024 * 1024) { 0xFF.toByte() }
-                try {
-                    while (isActive && timeProvider.elapsedRealtime() - startRt < stressDurationMs) {
-                        try {
-                            stressFile.writeBytes(buffer)
-                            if (stressFile.exists()) {
-                                stressFile.readBytes()
-                            }
-                        } catch (e: Exception) {
-                            // Suppress transient IO errors during stress saturation
-                        }
-                        yield()
-                    }
-                } finally {
-                    try { stressFile.delete() } catch (e: Exception) {}
-                }
-            }
-
-            systemMonitor.jumpStateStartTs = timeProvider.elapsedRealtime() - 31000L
-            systemMonitor.gpsStallStartTs = timeProvider.elapsedRealtime() - 61000L
-
-            joinAll(traceJob, cpuJob, ioJob)
-            
-            systemMonitor.resetSimulatedAnomalies()
-            logManager.logServiceEvent("FORENSIC STRESS TEST: 5-minute saturation routine completed. Recovery initiated.", isImportant = true)
         }
     }
 
@@ -611,8 +544,6 @@ class TrackerService : BaseMonitorService() {
     private fun startForensicSamplingLoop() {
         forensicSamplingJob?.cancel()
         forensicSamplingJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
-            // Issue #182: Initial settling delay to prevent 100Hz allocation 
-            // pressure during Map hydration/UI startup.
             delay(STARTUP_SETTLING_DELAY_MS)
 
             while (isActive) {
@@ -625,7 +556,6 @@ class TrackerService : BaseMonitorService() {
                 val vibe = snapshot.vibration
                 val tilt = snapshot.tiltDegrees
 
-                // Issue #192: Recovery Latency Audit
                 if (lastWasCooling && !health.isCoolingModeActive) {
                     recoveryTriggerRt = timeProvider.elapsedRealtime()
                 }
@@ -662,7 +592,6 @@ class TrackerService : BaseMonitorService() {
                     else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS
                 }
 
-                // Issue #192: Log recovery latency once loop resumes standard/peak frequency
                 if (recoveryTriggerRt > 0 && delayMs < FORENSIC_SAMPLING_INTERVAL_COOLING_MS) {
                     val latency = timeProvider.elapsedRealtime() - recoveryTriggerRt
                     logManager.logServiceEvent("Forensic Performance Audit: Thermal Recovery Latency: ${latency}ms", isImportant = true)
