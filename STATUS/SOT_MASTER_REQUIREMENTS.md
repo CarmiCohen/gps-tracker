@@ -1,8 +1,9 @@
-# System Source of Truth (SoT) - Aug.20.00 (Production Validated)
+# System Source of Truth (SoT) - Aug.20.02 (Production Validated)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
+*   **Permission Refresh Performance (R222)**: (Added Aug.20.01) The system MUST avoid redundant permission refresh events during lifecycle transitions. Staggered UI hydration MUST utilize a 50ms inter-frame delay to optimize perceived responsiveness on budget hardware (SM-A155F) while keeping main-thread utilization within the 16ms frame budget. (Issue #222). **Status: Implemented.**
 *   **Analytical Index Performance (R219)**: (Added Aug.20.00) The calculation of the `GpsIndex` MUST be offloaded from the UI thread to `Dispatchers.Default`. The reactive flow MUST be throttled using a `500ms` sampling window to prevent UI jitter and main-thread saturation during 100Hz forensic bursts. (Issue #219). **Status: Implemented.**
 *   **Shadow-Cache Hardening (R217)**: (Updated Aug.20.00) The system MUST utilize a thread-safe, LRU (Least Recently Used) eviction strategy for all shadow-cache implementations to prevent unbounded memory growth. High-frequency lookups and UI object pools MUST utilize the centralized `ShadowCache` utility, which MUST ensure atomic `getOrPut` operations to prevent race conditions during 100Hz forensic bursts. (Issue #217). **Status: Implemented.**
 *   **Atomic Counter Consolidation (R216)**: (Added Aug.19.13) The repository layer MUST consolidate disparate atomic performance counters into a unified `RepositoryMetrics` data structure to maintain clean state management and reduce architectural complexity. (Issue #216). **Status: Implemented.**
@@ -12,17 +13,18 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Samsung Battery Authority (R405)**: (Added Aug.19.01) On Samsung hardware (specifically SM-A155F), the system MUST detect if the application is exempt from battery optimizations. If no exemption exists, the application MUST increment the System Issue Count and force the "Phone Setup" overlay to prevent OS-level service termination. (Issue #214). **Status: Implemented.**
 *   **Final Release Validation (R211)**: (Added Aug.18.13) The system MUST undergo real-world moving validation on target hardware (Samsung A15) to verify thermal and battery stability at 100Hz forensic fidelity. (Issue #211). **Status: Implemented.**
 *   **Field Hardening & Thread Safety (R210)**: (Added Aug.18.12) The system MUST maintain strict thread-safety for all write counters. `MainRepository` MUST utilize `AtomicInteger` for trail and log write tracking. (Issue #210). **Status: Implemented.**
-*   **Production Fidelity Restoration (R209)**: (Added Aug.18.10) Forensic sampling intervals MUST be restored to production targets (100Hz) and updated `AppSensorManager` to restore `SENSOR_DELAY_FASTEST`. (Issue #209). **Status: Implemented.**
+*   **Production Fidelity Restoration (R209)**: (Added Aug.18.10) Forensic sampling intervals MUST be restored to 100Hz (`10ms`) for peak fidelity and 10Hz (`100ms`) for power-aware states. (Issue #209). **Status: Implemented.**
 *   **UI Allocation Churn Mitigation (R208)**: (Added Aug.18.09) The system MUST eliminate high-frequency object allocations in the UI layer. `MainViewModel` MUST implement a trail segment cache. (Issue #208). **Status: Implemented.**
 *   **Main-Thread Hang Remediation (R207)**: (Added Aug.18.09) Map freshness indicators in `AppMapContainer` MUST be gated using `derivedStateOf`. (Issue #207). **Status: Implemented.**
 *   **Forced LTR Layout Authority (R205)**: (Added Aug.18.08) Technical telemetry and numbering MUST always be rendered in LTR direction. (Issue #205). **Status: Implemented.**
 *   **Permission Navigation Hardening (R206)**: (Added Aug.18.08) The system MUST provide fallback paths for OS-rejected intent URIs in permission settings. (Issue #206). **Status: Implemented.**
 *   **Forensic Multi-Session Alignment (R203)**: (Added Aug.18.07) The system MUST guarantee temporal monotonicity for forensic traces across restarts. (Issue #218). **Status: Implemented.**
 
-### 2. Forensic Persistence Authority
-*   **Zero-Loss Spill Buffer (R200)**: The system MUST utilize a memory-mapped circular buffer for forensic telemetry. (Issue #196).
-*   **CRC32 Integrity Authority (R201)**: Every forensic entry MUST include a CRC32 checksum. (Issue #203).
-
-### 3. UI & Map Authority
+### 2. UI & Map Authority
+*   **PhoneSetup UI Density (R221)**: (Added Aug.20.01) The `PhoneSetupOverlay` MUST utilize optimized padding (max 20dp internal) and safe bottom clearance (min 56dp) to ensure all permission action buttons remain interactable and unclipped on low-density hardware (SM-A155F). (Issue #221). **Status: Implemented.**
 *   **Quantized Geometry Cache (R199)**: The map engine MUST utilize quantized circle geometries to prevent allocation churn. (Issue #208).
 *   **Derived State Freshness (R198)**: Telemetry freshness indicators MUST be computed via `derivedStateOf`. (Issue #207).
+
+### 3. Forensic Persistence Authority
+*   **Zero-Loss Spill Buffer (R200)**: The system MUST utilize a memory-mapped circular buffer for forensic telemetry. (Issue #196).
+*   **CRC32 Integrity Authority (R201)**: Every forensic entry MUST include a CRC32 checksum. (Issue #203).

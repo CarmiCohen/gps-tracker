@@ -45,13 +45,14 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Aug.20.01:
+ * - Issue #222 Performance Audit: Removed redundant RefreshPermissionStatus
+ *   trigger from DisposableEffect. This is already handled by MainActivity.onResume,
+ *   and double-triggering was contributing to 800ms+ Davy jank (R222).
  * Aug.16.12:
  * - Issue #185 Hardening: Updated to collect and pass pre-simplified 
  *   MapTrailSegments to Tracker/Viewer screens, offloading O(N) mapping 
  *   from the UI thread to eliminate Startup ANR (R185).
- * Aug.16.00:
- * - Issue #182 Hardening: Synchronized manual mode selection with 
- *   STARTUP_SETTLING_DELAY_MS (R182).
  */
 @Composable
 fun MainAppContent(
@@ -82,7 +83,7 @@ fun MainAppContent(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    viewModel.onEvent(UiEvent.RefreshPermissionStatus)
+                    // Issue #222: Removed redundant viewModel.onEvent(UiEvent.RefreshPermissionStatus)
                     viewModel.onEvent(UiEvent.SetUiVisible(true))
                 }
                 Lifecycle.Event.ON_PAUSE -> viewModel.onEvent(UiEvent.SetUiVisible(false))

@@ -28,15 +28,18 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import com.gps19.core.engine.*
 import kotlinx.coroutines.delay
+import timber.log.Timber
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Aug.20.01:
+ * - Issue #221 Hardening: Optimized layout density (20dp padding) and 
+ *   increased bottom spacer (56dp) to eliminate UI clipping on SM-A155F (R221).
+ * - Issue #222 Performance: Accelerated staggered hydration (50ms) to 
+ *   improve perceived responsiveness during permission refreshes (R222).
  * Aug.18.08:
  * - Issue #205 Hardening: Forced LTR layout direction for PhoneSetupOverlay 
  *   to resolve BiDi punctuation mirroring and numbering artifacts (R205).
- * Aug.13.14:
- * - Issue #166: Settings Overlay ANR. Implemented staggered hydration 
- *   to reduce initial composition load on the main thread (R166).
  */
 
 @Composable
@@ -66,23 +69,22 @@ fun SettingsOverlay(
     onShowPhoneSetup: () -> Unit = {}, 
     onEvent: (UiEvent) -> Unit
 ) { 
-    // Issue #166: Staggered hydration to prevent ANR during heavy composition
     var isHydrated by remember { mutableStateOf(false) }
     var visibleCount by remember { mutableIntStateOf(0) }
     
     LaunchedEffect(Unit) {
-        delay(150) 
+        delay(100) 
         isHydrated = true
         repeat(10) { 
             visibleCount++
-            delay(60) 
+            delay(50) 
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Card(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), colors = CardDefaults.cardColors(containerColor = Slate900), shape = androidx.compose.ui.graphics.RectangleShape) { 
+        Card(modifier = Modifier.fillMaxSize(), colors = CardDefaults.cardColors(containerColor = Slate900), shape = androidx.compose.ui.graphics.RectangleShape) { 
             if (isHydrated && visibleCount > 0) {
-                Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) { 
+                Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) { 
                     if (visibleCount >= 1) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.settings_title), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
                         Spacer(Modifier.height(16.dp))
@@ -166,7 +168,7 @@ fun SettingsOverlay(
 
                     if (visibleCount >= 8) {
                         OutlinedTextField(value = draftRelayUrl, onValueChange = onUpdateRelayUrl, label = { Text(stringResource(R.string.settings_label_relay_url)) }, modifier = Modifier.fillMaxWidth())
-                        Spacer(Modifier.height(48.dp))
+                        Spacer(Modifier.height(56.dp))
                     }
                 } 
             } else {
@@ -188,8 +190,8 @@ fun SettingsOverlay(
 
 @Composable
 fun CleanSetupOverlay(onClear: (() -> Unit)?, onReset: (() -> Unit)?, onFullInitialization: () -> Unit, onClose: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate900) {
-        Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Slate900) {
+        Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.clean_init_title), color = Rose500, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.height(16.dp)); SettingsGroupHeader(stringResource(R.string.clean_group_maintenance), Rose500)
             if (onClear != null) { Button(onClick = { onClear(); onClose() }, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteForever, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clear_home)) }; Spacer(Modifier.height(16.dp)) }
@@ -201,8 +203,8 @@ fun CleanSetupOverlay(onClear: (() -> Unit)?, onReset: (() -> Unit)?, onFullInit
 
 @Composable
 fun AlertManagementOverlay(draftAlertSettings: AlertSettings, onUpdateAlertSettings: (AlertSettings) -> Unit, onClose: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate900) {
-        Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Slate900) {
+        Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.alert_mgmt_title), color = ViewerCyan, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.height(16.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.alert_group_toggles), color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp); Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) { TextButton(onClick = { onUpdateAlertSettings(draftAlertSettings.copy(localInternet = true, serverConnection = true, relayConnection = true, jammerDetection = true, signalLoss = true, gpsStalling = true, distance = true, power = true, lowBattery = true, batteryHealth = true, highTemperature = true, longTimeGap = true, tamperAlert = true, tiltAlert = true, acousticAlert = true, liftAlert = true, systemStorageLow = true)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_all_on), fontSize = 7.5.sp, color = BrandJd) }; TextButton(onClick = { onUpdateAlertSettings(draftAlertSettings.copy(localInternet = false, serverConnection = false, relayConnection = false, jammerDetection = false, signalLoss = false, gpsStalling = false, distance = false, power = false, lowBattery = false, batteryHealth = false, highTemperature = false, longTimeGap = false, tamperAlert = false, tiltAlert = false, acousticAlert = false, liftAlert = false, systemStorageLow = false)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_reset), fontSize = 7.5.sp, color = Rose500) } } }
             
@@ -242,7 +244,7 @@ fun AlertManagementOverlay(draftAlertSettings: AlertSettings, onUpdateAlertSetti
 
             AlarmToggle(ALERT_TITLE_TRACKER_LIFT, draftAlertSettings.liftAlert) { onUpdateAlertSettings(draftAlertSettings.copy(liftAlert = it)) }
             
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(56.dp))
         }
     }
 }
@@ -250,8 +252,8 @@ fun AlertManagementOverlay(draftAlertSettings: AlertSettings, onUpdateAlertSetti
 @Composable
 fun AlarmSoundOverlay(draftAlertSettings: AlertSettings, selectedSirenType: String, isSirenPlaying: Boolean, onUpdateAlertSettings: (AlertSettings) -> Unit, onUpdateSirenType: (String) -> Unit, onUpdateAlarmVolume: (Float) -> Unit, onTestSiren: () -> Unit, onClose: () -> Unit) {
     val sirenOptions = listOf("Siren", "Chimes", "Pulse")
-    Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate900) {
-        Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Slate900) {
+        Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.sound_title), color = Violet500, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.height(24.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.sound_label_test_audio), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium); Button(onClick = onTestSiren, colors = ButtonDefaults.buttonColors(containerColor = BrandJd)) { Icon(if (isSirenPlaying) Icons.Default.Stop else Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(if (isSirenPlaying) stringResource(R.string.btn_test_audio_stop) else stringResource(R.string.btn_test_audio_test)) } }
             Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_type), Amber500); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { sirenOptions.forEach { type -> FilterChip(selected = selectedSirenType == type, onClick = { onUpdateSirenType(type) }, label = { Text(type) }) } }
@@ -261,7 +263,7 @@ fun AlarmSoundOverlay(draftAlertSettings: AlertSettings, selectedSirenType: Stri
             AlarmToggle(stringResource(R.string.sound_label_force_max), draftAlertSettings.useMaxVolume) { onUpdateAlertSettings(draftAlertSettings.copy(overrideSilence = true, useMaxVolume = it)) }
             Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_volume_mode), ViewerCyan); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { FilterChip(selected = !draftAlertSettings.useCustomVolume, onClick = { onUpdateAlertSettings(draftAlertSettings.copy(useCustomVolume = false)) }, label = { Text(stringResource(R.string.sound_val_system_control)) }); FilterChip(selected = draftAlertSettings.useCustomVolume, onClick = { onUpdateAlertSettings(draftAlertSettings.copy(useCustomVolume = true)) }, label = { Text(stringResource(R.string.sound_val_app_control)) }) }
             if (draftAlertSettings.useCustomVolume) { Spacer(Modifier.height(16.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_app_volume), Rose500); Slider(value = draftAlertSettings.alarmVolume, onValueChange = onUpdateAlarmVolume, valueRange = 0f..1f, modifier = Modifier.padding(horizontal = 8.dp), colors = SliderDefaults.colors(thumbColor = Rose500, activeTrackColor = Rose500)); Text(stringResource(R.string.sound_desc_app_volume, (draftAlertSettings.alarmVolume * 100).toInt(), if (draftAlertSettings.useMaxVolume) "(Max Overridden)" else ""), color = Slate500, fontSize = 11.sp) } else { Spacer(Modifier.height(8.dp)); Text(stringResource(R.string.sound_desc_system_volume), color = Slate500, fontSize = 11.sp) }
-            Spacer(Modifier.height(48.dp))
+            Spacer(Modifier.height(56.dp))
         }
     }
 }
@@ -277,20 +279,19 @@ fun PhoneSetupOverlay(
     permissions: PermissionState,
     homePointsCount: Int, isTrackerMode: Boolean, onGoToMap: () -> Unit = {}
 ) {
-    // Issue #162: Hardened hydration gate.
     var isHydrated by remember { mutableStateOf(false) }
     var visibleCount by remember { mutableIntStateOf(0) }
     
     LaunchedEffect(Unit) {
-        delay(150) // Issue #162: Increased initial delay to allow container transition to settle
+        Timber.d("PhoneSetupOverlay: Initializing hydration sequence")
+        delay(100) 
         isHydrated = true
-        repeat(15) { // Up to 15 sections/spacers
+        repeat(15) { 
             visibleCount++
-            delay(80) // Issue #162: Increased delay to 80ms to provide more breathing room per frame
+            delay(50) 
         }
     }
 
-    // Issue #162: Memoize static descriptions to avoid redundant lookups during heartbeats
     val manufacturer = remember { Build.MANUFACTURER.uppercase() }
     val model = remember { Build.MODEL.uppercase() }
     val recentsLockDesc = remember { getRecentsLockDescription() }
@@ -298,9 +299,9 @@ fun PhoneSetupOverlay(
     val autoStartDesc = remember { getAutoStartDescription() }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Card(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().navigationBarsPadding(), colors = CardDefaults.cardColors(containerColor = Slate950)) {
+        Card(modifier = Modifier.fillMaxSize().padding(16.dp), colors = CardDefaults.cardColors(containerColor = Slate950)) {
             if (isHydrated && visibleCount > 0) {
-                Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
+                Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column { Text("Phone Setup", color = BrandJd, fontSize = 24.sp, fontWeight = FontWeight.Bold); Text(stringResource(R.string.setup_detected_device, manufacturer, model), color = Slate500, fontSize = 10.sp) } }
                     
                     if (visibleCount >= 1) {
@@ -400,7 +401,7 @@ fun PhoneSetupOverlay(
                                 Text("TRIGGER FORENSIC STRESS TEST", fontSize = 12.sp, fontWeight = FontWeight.Black)
                             }
                         }
-                        Spacer(Modifier.height(24.dp))
+                        Spacer(Modifier.height(56.dp)) // Issue #221: Increased bottom spacer
                     }
                 }
             } else {

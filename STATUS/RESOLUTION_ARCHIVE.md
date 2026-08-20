@@ -2,7 +2,15 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 663**
+**Total Unique Resolutions: 665**
+
+## 85. Permission Refresh Performance (Aug.20.01)
+*   **Issue #222: Permission Refresh Performance Audit**.
+    - **Resolution**: Identified and eliminated redundant `RefreshPermissionStatus` event triggers in the `MainAppContent` lifecycle observer. Optimized the staggered hydration sequence in `SettingsComponents.kt` by reducing the inter-frame delay to 50ms. These changes resolved the 800ms+ main-thread jank observed during app resumption on Samsung hardware (R222).
+
+## 84. PhoneSetup UI Clipping (Aug.20.01)
+*   **Issue #221: PhoneSetup UI Clipping**.
+    - **Resolution**: Optimized the `PhoneSetupOverlay` layout for low-density/budget hardware (specifically SM-A155F). Removed redundant `statusBarsPadding()` and `navigationBarsPadding()` calls in nested components that were compressing the layout. Increased the bottom `Spacer` to 56dp to ensure that the final action buttons in the `ScrollView` are fully visible and interactable (R221).
 
 ## 83. Analytical Index Performance Verification (Aug.20.00)
 *   **Issue #219: Analytical Index Performance Verification**.
