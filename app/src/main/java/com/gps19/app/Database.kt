@@ -8,17 +8,15 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.20.06:
+ * - Issue #224 Forensic Audit: Bumped to v73. Added MIGRATION_72_73 to include 
+ *   sitVzRt in pending_status_updates for vertical velocity parity (R224).
  * Aug.18.01:
  * - Issue #197: Forensic Storage-Aware Adaptive Pruning. Added LogDao methods for 
  *   forensic-specific chunked pruning to handle 100Hz trace accumulation (R197).
  * Aug.17.10:
  * - Issue #195 Hardening: Bumped to v72. Added MIGRATION_71_72 to resolve 
  *   connection_history schema mismatch and force drop legacy UNIQUE indices.
- * Aug.17.07:
- * - Issue #190 Hardening: Added missing sitVzRt column to connection_history 
- *   in MIGRATION_70_71 to resolve IllegalStateException on startup (R190e).
- * Aug.17.06:
- * - Issue #190 Hardening: Removed unique constraint from localId in @Entity.
  */
 @Entity(
     tableName = "logs", 
@@ -158,6 +156,7 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val isSitActive: Boolean = false,
     @ColumnInfo(defaultValue = "0") val sitVz: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val sitVzTs: Long = 0L,
+    @ColumnInfo(defaultValue = "0") val sitVzRt: Long = 0L,
     @ColumnInfo(defaultValue = "0") val sitDz: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val verticalVelocity: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val sitBaro: Double = 0.0,
@@ -266,7 +265,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 72, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 73, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -290,6 +289,15 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_72_73 = object : Migration(72, 73) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // R224: Synchronizing sitVzRt in pending_status_updates for forensic parity
+                try {
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN sitVzRt INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_71_72 = object : Migration(71, 72) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // R195: Hardened recovery for connection_history schema mismatch

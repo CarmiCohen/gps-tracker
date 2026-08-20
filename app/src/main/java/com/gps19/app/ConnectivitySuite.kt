@@ -33,6 +33,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Aug.20.06:
+ * - Issue #224 Forensic Audit: Synchronized vertical velocity and sensor indices 
+ *   in PendingStatusEntity persistence path for offline forensic parity (R224).
  * Aug.14.04:
  * - Issue #173: Multi-Stream Contention. Added updateRemoteProcessor() to 
  *   support decoupled processor instances in ViewerService (R173).
@@ -372,7 +375,14 @@ class ConnectivitySuite @Inject constructor(
                 trackerState = try { TrackerState.valueOf(entity.trackerState) } catch(e: Exception) { TrackerState.UNKNOWN },
                 isStorageLow = entity.isStorageLow, isStorageCritical = entity.isStorageCritical,
                 isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface,
-                kineticEnergy = 0.0, isBatteryLow = entity.isBatteryLow, isBatteryCritical = entity.isBatteryCritical
+                kineticEnergy = 0.0, isBatteryLow = entity.isBatteryLow, isBatteryCritical = entity.isBatteryCritical,
+                // R224: Restore missing forensic fields during sync
+                snrIdx = entity.snrIdx, noiseIdx = entity.noiseIdx, luxIdx = entity.luxIdx, vibeIdx = entity.vibeIdx,
+                liftIdx = entity.liftIdx, tiltIdx = entity.tiltIdx, baroIdx = entity.baroIdx,
+                isSitDetected = entity.isSitDetected, isSitActive = entity.isSitActive,
+                sitVz = entity.sitVz, sitVzTs = entity.sitVzTs, sitVzRt = entity.sitVzRt, sitDz = entity.sitDz,
+                sitBaro = entity.sitBaro, sitTilt = entity.sitTilt, sitShock = entity.sitShock,
+                verticalVelocity = entity.verticalVelocity
             )
             // Issue #596: Flushed updates use NORMAL to avoid blocking live traffic.
             if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) offlineRepository.deletePendingStatusUpdate(entity.id)
@@ -396,7 +406,14 @@ class ConnectivitySuite @Inject constructor(
                     isPowerSaveMode = status.isPowerSaveMode, standbyBucket = status.standbyBucket,
                     netInterface = status.netInterface, lastValidFixRt = status.lastValidFixRt,
                     locationPendingReason = status.locationPendingReason.name, trackerState = status.trackerState.name, status = status.status.name,
-                    isBatteryLow = status.isBatteryLow, isBatteryCritical = status.isBatteryCritical
+                    isBatteryLow = status.isBatteryLow, isBatteryCritical = status.isBatteryCritical,
+                    // R224: Persist missing forensic fields during network loss
+                    snrIdx = status.snrIdx, noiseIdx = status.noiseIdx, luxIdx = status.luxIdx, vibeIdx = status.vibeIdx,
+                    liftIdx = status.liftIdx, tiltIdx = status.tiltIdx, baroIdx = status.baroIdx,
+                    isSitDetected = status.isSitDetected, isSitActive = status.isSitActive,
+                    sitVz = status.sitVz, sitVzTs = status.sitVzTs, sitVzRt = status.sitVzRt, sitDz = status.sitDz,
+                    sitBaro = status.sitBaro, sitTilt = status.sitTilt, sitShock = status.sitShock,
+                    verticalVelocity = status.verticalVelocity
                 ))
             }
         }
@@ -767,6 +784,7 @@ class ConnectivitySuite @Inject constructor(
                     sitVz = data.optDouble("sit_vz", current.sitVz), sitVzTs = data.optLong("sit_vz_ts", 0L), sitVzRt = data.optLong("sit_vz_rt", 0L),
                     sitDz = data.optDouble("sit_dz", current.sitDz),
                     sitBaro = data.optDouble("sit_baro", current.sitBaro), sitTilt = data.optDouble("sit_tilt", current.sitTilt), sitShock = data.optDouble("sit_shock", current.sitShock),
+                    isSitActive = data.optBoolean("is_sit_active", current.isSitActive),
                     kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy),
                     isAdaptiveJump = data.optBoolean("is_adaptive_jump", current.isAdaptiveJump)
                 )

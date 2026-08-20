@@ -28,6 +28,9 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Aug.20.05:
+ * - Issue #224 Forensic Audit: Synchronized sitVzTs, sitVzRt, and verticalVelocity 
+ *   mapping in getHistoryFlow and mapToEntity to ensure forensic parity (R224).
  * Aug.19.13:
  * - Issue #217: Shadow-Cache strategy for trail points. Replaced manual clear 
  *   logic with LRU-based ShadowCache to ensure stable memory footprint (R217).
@@ -341,7 +344,10 @@ class MainRepository @Inject constructor(
                 baroIdx = entity.baroIdx
                 isSitDetected = entity.isSitDetected
                 isSitActive = entity.isSitActive
+                verticalVelocity = entity.verticalVelocity
                 sitVz = entity.sitVz
+                sitVzTs = entity.sitVzTs
+                sitVzRt = entity.sitVzRt
                 sitDz = entity.sitDz
                 sitBaro = entity.sitBaro
                 sitTilt = entity.sitTilt
@@ -442,6 +448,11 @@ class MainRepository @Inject constructor(
         baroIdx = point.baroIdx,
         isSitDetected = point.isSitDetected,
         isSitActive = point.isSitActive,
+        verticalVelocity = point.verticalVelocity,
+        sitVz = point.sitVz,
+        sitVzTs = point.sitVzTs,
+        sitVzRt = point.sitVzRt,
+        sitDz = point.sitDz,
         sitBaro = point.sitBaro,
         sitTilt = point.sitTilt,
         sitShock = point.sitShock

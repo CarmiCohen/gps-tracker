@@ -2,7 +2,11 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 666**
+**Total Unique Resolutions: 667**
+
+## 87. Field Monitoring & Forensic Parity (Aug.20.06)
+*   **Issue #224: Field Monitoring & Maintenance**.
+    - **Resolution**: Validated coordinate stabilization (R224) with 100m threshold. Implemented full forensic parity for high-frequency vertical velocity metadata across the telemetry pipeline. Synchronized `MainRepository.kt` mapping for `sitVzTs`, `sitVzRt`, and `verticalVelocity`. Bumped database to **v73** with `MIGRATION_72_73` to preserve these fields in `pending_status_updates` during network loss. Hardened `ConnectivitySuite.kt` to ensure offline forensic continuity (R224).
 
 ## 86. Production Release Packaging (Aug.20.03)
 *   **Issue #223: Production Release Packaging**.
