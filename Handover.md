@@ -1,27 +1,27 @@
-# Handover (Aug.20.06) - Issue #224 Resolved
+# Handover (Aug.20.08) - UI Hardening: RESOLVED
 
-## 🎯 Next Objective: Monitoring & Performance Scaling
-- **Goal**: Monitor production telemetry for the v73 migration and assess I/O pressure on SM-A155F during prolonged 100Hz bursts.
-- **Next Issue**: TBD (Maintain current stability).
-- **Status**: 🟢 **STABLE**.
+## 🎯 Next Objective: Issue #226 - HUD State Centralization
+- **Goal**: Centralize HUD state management to prevent reactive drift between technical telemetry and status badges.
+- **Issue Reference**: Issue #226
+- **Status**: 🟢 **READY**
 
-## 🛠️ Summary of Recently Addressed Hardening (vAug.20.06)
+## 🕵️ Comprehensive Forensic State Snapshot
 
-### 1. Forensic Parity & Integrity (Issue #224) - ✅ RESOLVED
-- **Sync Remediation**: Fully synchronized vertical velocity metadata across Repository, Database (v73), and Connectivity layers. Fixed a gap where offline telemetry was losing vertical velocity fidelity (R224).
-- **Schema**: Database version bumped to **73** with `MIGRATION_72_73` for parity in `pending_status_updates`.
-- **Coordinate Stability**: Confirmed visual continuity via 100m reset threshold and 3s Bayesian debounce.
+### 1. UI Hardening (R232) - ✅ ARCHIVED
+- **Resolution**: Converted fixed `height()` to `heightIn(min = ...)` for action buttons in `SettingsComponents.kt`. Reduced button font sizes to `13.sp`.
+- **UI**: Verified that buttons in `PhoneSetupOverlay` and `CleanSetupOverlay` wrap correctly without truncation on SM-A155F.
+- **Verification**: Internal layout audit confirms flexible height scaling.
 
-### 2. Architectural Simplification - 🟢 IDEAS LOGGED
-- **Consolidation**: Identified redundant telemetry mapping blocks in `ConnectivitySuite` and `MainRepository` as a target for unification in `Simplify_Ideas2.md`.
+### 2. Versioning & UI Hardening (R227, R228) - ✅ ARCHIVED
+- **Resolution**: Synchronized versioning and improved vertical rhythm in `GuideSection`.
 
 ## 📂 Status Tracking & Integrity
-- **Issues**: `issues.md` updated (667 Resolutions | 0 Active).
-- **Requirements**: `SOT_MASTER_REQUIREMENTS.md` updated to Aug.20.05/06 (R224 Implemented).
-- **Ideas**: `Simplify_Ideas2.md` populated with mapping consolidation strategy.
+- **Issues**: `issues.md` (671 Resolved | 0 Active).
+- **Requirements**: `SOT_MASTER_REQUIREMENTS.md` updated to vAug.20.08 (R232 added).
+- **Archive**: `RESOLUTION_ARCHIVE.md` updated with R232.
 
 ## 🧬 Resumption Path
-1.  **Release**: Stage and commit changes as `vAug.20.06`.
-2.  **Telemetry**: Observe `sitVzRt` consistency in remote logs.
+1.  **Start Issue #226**: Begin consolidation of HUD state variables into a unified `HudState` data class within the engine.
+2.  **Telemetry Sync**: Ensure forensic ribbon updates and HUD badges pull from the same source of truth.
 
-vAug.20.06
+vAug.20.08

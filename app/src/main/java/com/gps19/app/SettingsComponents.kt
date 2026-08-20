@@ -32,12 +32,11 @@ import timber.log.Timber
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
- * Aug.20.03:
- * - Issue #223 Release: Removed debug instrumentation (onTriggerForensicTest) 
- *   for production hardening.
- * Aug.20.01:
- * - Issue #221 Hardening: Optimized layout density (20dp padding) and 
- *   increased bottom spacer (56dp) to eliminate UI clipping on SM-A155F (R221).
+ * Aug.20.08:
+ * - Issue #232 Hardening: Converted fixed button heights to heightIn(min=...) 
+ *   and optimized font sizes to 13.sp to prevent clipping (R232).
+ * - Issue #228 Hardening: Final refinement of GuideSection spacing and 
+ *   line height to eliminate visual clipping on budget hardware (R228).
  */
 
 @Composable
@@ -192,9 +191,9 @@ fun CleanSetupOverlay(onClear: (() -> Unit)?, onReset: (() -> Unit)?, onFullInit
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.clean_init_title), color = Rose500, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.height(16.dp)); SettingsGroupHeader(stringResource(R.string.clean_group_maintenance), Rose500)
-            if (onClear != null) { Button(onClick = { onClear(); onClose() }, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteForever, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clear_home)) }; Spacer(Modifier.height(16.dp)) }
-            if (onReset != null) { Button(onClick = { onReset(); onClose() }, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.History, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_reset_stats)) }; Spacer(Modifier.height(16.dp)) }
-            Button(onClick = { onFullInitialization(); onClose() }, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500.copy(alpha = 0.8f))) { Icon(Icons.Default.Warning, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_full_init)) }; Spacer(Modifier.weight(1f))
+            if (onClear != null) { Button(onClick = { onClear(); onClose() }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteForever, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clear_home), fontSize = 13.sp) }; Spacer(Modifier.height(16.dp)) }
+            if (onReset != null) { Button(onClick = { onReset(); onClose() }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.History, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_reset_stats), fontSize = 13.sp) }; Spacer(Modifier.height(16.dp)) }
+            Button(onClick = { onFullInitialization(); onClose() }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500.copy(alpha = 0.8f))) { Icon(Icons.Default.Warning, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_full_init), fontSize = 13.sp) }; Spacer(Modifier.weight(1f))
         }
     }
 }
@@ -372,22 +371,22 @@ fun PhoneSetupOverlay(
                         Spacer(Modifier.height(32.dp))
                         Button(
                             onClick = onNavigateToDiagnostics,
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Slate700)
                         ) {
                             Icon(Icons.Default.HealthAndSafety, null)
                             Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.btn_view_diagnostics), fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.btn_view_diagnostics), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
 
                     if (visibleCount >= 13) {
                         Spacer(Modifier.height(16.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = onRefresh, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh)) }
-                            Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm)) }
+                            Button(onClick = onRefresh, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh), fontSize = 13.sp) }
+                            Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm), fontSize = 13.sp) }
                         }
-                        Spacer(Modifier.height(56.dp)) // Issue #221: Increased bottom spacer
+                        Spacer(Modifier.height(88.dp)) // Issue #228: Final increase for safe scrolling buffer
                     }
                 }
             } else {
@@ -409,14 +408,19 @@ fun AlarmToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> U
 fun GuideSection(title: String, description: String, onClick: () -> Unit, buttonText: String, isCompleted: Boolean?, icon: androidx.compose.ui.graphics.vector.ImageVector, reason: String? = null) {
     val statusIcon = when(isCompleted) { true -> Icons.Default.CheckCircle; false -> Icons.Default.Warning; null -> Icons.Default.Info }; 
     val statusColor = when(isCompleted) { true -> BrandJd; false -> Amber500; null -> Slate500 }
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) { // Issue #228: Increased item spacing
         Row(verticalAlignment = Alignment.CenterVertically) { Icon(statusIcon, null, tint = statusColor, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Icon(icon, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp) }
         if (isCompleted == false && !reason.isNullOrEmpty()) { Text("Reason: $reason", color = Amber500, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 28.dp, top = 2.dp)) }
-        Text(description, color = Slate500, fontSize = 12.sp, modifier = Modifier.padding(start = 28.dp)); if (isCompleted != true && buttonText.isNotEmpty() && buttonText != stringResource(R.string.setup_info_only)) { Spacer(Modifier.height(4.dp)); Button(onClick = onClick, modifier = Modifier.padding(start = 28.dp).height(32.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)) { Text(buttonText, fontSize = 11.sp) } }
+        // Issue #228: Added line height and increased top padding for text separation
+        Text(text = description, color = Slate500, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(start = 28.dp, top = 4.dp), softWrap = true)
+        if (isCompleted != true && buttonText.isNotEmpty() && buttonText != stringResource(R.string.setup_info_only)) { 
+            Spacer(Modifier.height(10.dp)) // Issue #228: Increased spacing before button
+            Button(onClick = onClick, modifier = Modifier.padding(start = 28.dp).heightIn(min = 36.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)) { Text(buttonText, fontSize = 11.sp) }
+        }
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0F172A)
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 fun SettingsOverlayPreview() {
     SettingsOverlay(

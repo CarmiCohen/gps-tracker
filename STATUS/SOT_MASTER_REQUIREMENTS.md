@@ -1,9 +1,10 @@
-# System Source of Truth (SoT) - Aug.20.05 (Forensic Parity)
+# System Source of Truth (SoT) - Aug.20.08 (UI Hardening Release)
 
 This document serves as the definitive operational specification. All Issue IDs are Authoritative.
 
 ### 1. Performance & Startup Authority
-*   **Coordinate Stabilization Authority (R224)**: (Updated Aug.20.05) The system MUST prevent visual coordinate "snaps" during GPS revival. Following a period of signal loss, the EMA (Exponential Moving Average) filter MUST utilize a weighted transition window to anchor the first valid fix, preventing Bayesian uncertainty expansion from inducing perceived jumps in the UI. Reset threshold is set to 100m. Forensic vertical velocity metadata (sitVzRt, etc.) MUST be preserved across persistence and network boundaries. (Issue #224). **Status: Implemented.**
+*   **Telemetry Mapping Consolidation (R225)**: (Added Aug.20.07) The system MUST utilize a unified `ForensicMapper` for all 1:1 parity transformations of high-frequency metadata (sitVzTs, sitVzRt, verticalVelocity, etc.). This consolidation MUST eliminate redundant translation logic across the repository, history management, and connectivity layers to ensure absolute data integrity and reduce object allocation churn during 100Hz tracking sessions. (Issue #225). **Status: Implemented.**
+*   **Coordinate Stabilization Authority (R224)**: (Updated Aug.20.06) The system MUST prevent visual coordinate "snaps" during GPS revival. Following a period of signal loss, the EMA (Exponential Moving Average) filter MUST utilize a weighted transition window to anchor the first valid fix, preventing Bayesian uncertainty expansion from inducing perceived jumps in the UI. Reset threshold is set to 100m. Forensic vertical velocity metadata (sitVzRt, etc.) MUST be preserved across persistence and network boundaries. (Issue #224). **Status: Implemented.**
 *   **Production Release Hardening (R223)**: (Added Aug.20.03) The system MUST be stripped of all debug instrumentation, thermal simulation hooks, and forensic stress-test UI elements prior to production release. No "Simulate" or "Test" triggers (excluding standard Test Alarm) are permitted in production-bound layouts or ViewModels. (Issue #223). **Status: Implemented.**
 *   **Permission Refresh Performance (R222)**: (Added Aug.20.01) The system MUST avoid redundant permission refresh events during lifecycle transitions. Staggered UI hydration MUST utilize a 50ms inter-frame delay to optimize perceived responsiveness on budget hardware (SM-A155F) while keeping main-thread utilization within the 16ms frame budget. (Issue #222). **Status: Implemented.**
 *   **Analytical Index Performance (R219)**: (Added Aug.20.00) The calculation of the `GpsIndex` MUST be offloaded from the UI thread to `Dispatchers.Default`. The reactive flow MUST be throttled using a `500ms` sampling window to prevent UI jitter and main-thread saturation during 100Hz forensic bursts. (Issue #219). **Status: Implemented.**
@@ -23,7 +24,8 @@ This document serves as the definitive operational specification. All Issue IDs 
 *   **Forensic Multi-Session Alignment (R203)**: (Added Aug.18.07) The system MUST guarantee temporal monotonicity for forensic traces across restarts. (Issue #218). **Status: Implemented.**
 
 ### 2. UI & Map Authority
-*   **PhoneSetup UI Density (R221)**: (Added Aug.20.01) The `PhoneSetupOverlay` MUST utilize optimized padding (max 20dp internal) and safe bottom clearance (min 56dp) to ensure all permission action buttons remain interactable and unclipped on low-density hardware (SM-A155F). (Issue #221). **Status: Implemented.**
+*   **UI Hardening: Button Clipping (R232)**: (Added Aug.20.08) The system MUST utilize flexible heights (`heightIn(min=...)`) and optimized font sizes (`13.sp`) for action buttons in `PhoneSetupOverlay` and `CleanSetupOverlay` to ensure text legibility and prevent clipping on low-density hardware (SM-A155F). (Issue #232). **Status: Implemented.**
+*   **PhoneSetup UI Density (R221)**: (Added Aug.20.06) The `PhoneSetupOverlay` MUST utilize optimized padding (max 20dp internal) and safe bottom clearance (min 56dp) to ensure all permission action buttons remain interactable and unclipped on low-density hardware (SM-A155F). (Issue #221). **Status: Implemented.**
 *   **Quantized Geometry Cache (R199)**: The map engine MUST utilize quantized circle geometries to prevent allocation churn. (Issue #208).
 *   **Derived State Freshness (R198)**: Telemetry freshness indicators MUST be computed via `derivedStateOf`. (Issue #207).
 

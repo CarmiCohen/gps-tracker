@@ -2,7 +2,15 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 667**
+**Total Unique Resolutions: 669**
+
+## 89. UI Hardening: Action Button Clipping (Aug.20.08)
+*   **Issue #232: PhoneSetup Action Button Clipping**.
+    - **Resolution**: Refined the button layout in `PhoneSetupOverlay` and `CleanSetupOverlay` to prevent text truncation on low-density hardware (SM-A155F). Converted fixed `height()` modifiers to flexible `heightIn(min = ...)` to allow for vertical expansion. Optimized action button font sizes to `13.sp` to ensure text wrapping remains legible and unclipped under various display scales. (R232).
+
+## 88. Analytical Telemetry Optimization (Aug.20.07)
+*   **Issue #225: Analytical Telemetry Optimization**.
+    - **Resolution**: Consolidated the 1:1 parity transformation for forensic metadata into a unified `ForensicMapper.kt`. Refactored `MainRepository.kt`, `HistoryManager.kt`, and `ConnectivitySuite.kt` to utilize this master translator. Added `isBatteryLow` and `isBatteryCritical` to `EngineConnectionPoint` to ensure full architectural parity across engine, persistence, and UI models. This optimization reduces object allocation churn in the 100Hz telemetry hot-path and eliminates redundant translation logic (R225).
 
 ## 87. Field Monitoring & Forensic Parity (Aug.20.06)
 *   **Issue #224: Field Monitoring & Maintenance**.
