@@ -4,10 +4,24 @@ This document serves as the definitive operational specification. All Issue IDs 
 
 ### 1. Performance & Startup Authority
 *   **Shadow-Cache Hardening (R217)**: (Updated Aug.20.00) The system MUST utilize a thread-safe, LRU (Least Recently Used) eviction strategy for all shadow-cache implementations to prevent unbounded memory growth. High-frequency lookups and UI object pools MUST utilize the centralized `ShadowCache` utility, which MUST ensure atomic `getOrPut` operations to prevent race conditions during 100Hz forensic bursts. (Issue #217). **Status: Implemented.**
-*   **Atomic Counter Consolidation (R216)**: (Added Aug.19.13) The repository layer MUST consolidate disparate atomic performance counters into a unified `RepositoryMetrics` structure to maintain clean state management and reduce architectural complexity. (Issue #216). **Status: Implemented.**
+*   **Atomic Counter Consolidation (R216)**: (Added Aug.19.13) The repository layer MUST consolidate disparate atomic performance counters into a unified `RepositoryMetrics` data structure to maintain clean state management and reduce architectural complexity. (Issue #216). **Status: Implemented.**
 *   **Integrity Monitor Flow Authority (R215)**: (Added Aug.19.11) The system MUST maintain reactive flow vital-sign thresholds that are at least 1.5x the maximum expected hardware polling interval. The `locationStalled` threshold MUST be set to 180s to prevent false "Reactive flow stall" warnings during 60s background stationary polling cycles. (Issue #215). **Status: Implemented.**
 *   **Signal Loss Recovery Authority (R213)**: (Added Aug.19.09) The system MUST utilize a stable `recoveryStartRt` anchor to calculate the 3-second stabilization period following a GPS gap. The system MUST NOT measure recovery against a moving last-fix timestamp. The `SIGNAL_LOSS` pending reason MUST be cleared immediately upon receipt of the first valid coordinate to prevent UI false-positives while Bayesian uncertainty stabilizes. (Issue #213). **Status: Implemented.**
-*   **JNI Vendor Collision Remediation (R212)**: (Added Aug.19.01) The system MUST NOT utilize proprietary vendor keywords in any JNI identifiers, filenames, or class names to prevent framework-level collisions on Samsung devices (specifically SM-A155F). The hardware stabilization bridge MUST utilize a neutral namespace (`JdHardware`). (Issue #212). **Status: Implemented (Forensic complete; trigger identified as resilient OS heuristic).**
+*   **JNI Vendor Collision Remediation (R212)**: (Added Aug.19.01) The system MUST NOT utilize proprietary vendor keywords in any JNI identifiers, filenames, or class names to prevent framework-level collisions on Samsung devices (specifically SM-A155F). The hardware stabilization bridge MUST utilize a neutral namespace (`JdHardware`). (Issue #212). **Status: Implemented.**
 *   **Samsung Battery Authority (R405)**: (Added Aug.19.01) On Samsung hardware (specifically SM-A155F), the system MUST detect if the application is exempt from battery optimizations. If no exemption exists, the application MUST increment the System Issue Count and force the "Phone Setup" overlay to prevent OS-level service termination. (Issue #214). **Status: Implemented.**
+*   **Final Release Validation (R211)**: (Added Aug.18.13) The system MUST undergo real-world moving validation on target hardware (Samsung A15) to verify thermal and battery stability at 100Hz forensic fidelity. (Issue #211). **Status: Implemented.**
+*   **Field Hardening & Thread Safety (R210)**: (Added Aug.18.12) The system MUST maintain strict thread-safety for all write counters. `MainRepository` MUST utilize `AtomicInteger` for trail and log write tracking. (Issue #210). **Status: Implemented.**
+*   **Production Fidelity Restoration (R209)**: (Added Aug.18.10) Forensic sampling intervals MUST be restored to 100Hz (`10ms`) for peak fidelity and 10Hz (`100ms`) for power-aware states. (Issue #209). **Status: Implemented.**
+*   **UI Allocation Churn Mitigation (R208)**: (Added Aug.18.09) The system MUST eliminate high-frequency object allocations in the UI layer. `MainViewModel` MUST implement a trail segment cache. (Issue #208). **Status: Implemented.**
+*   **Main-Thread Hang Remediation (R207)**: (Added Aug.18.09) Map freshness indicators in `AppMapContainer` MUST be gated using `derivedStateOf`. (Issue #207). **Status: Implemented.**
+*   **Forced LTR Layout Authority (R205)**: (Added Aug.18.08) Technical telemetry and numbering MUST always be rendered in LTR direction. (Issue #205). **Status: Implemented.**
+*   **Permission Navigation Hardening (R206)**: (Added Aug.18.08) The system MUST provide fallback paths for OS-rejected intent URIs in permission settings. (Issue #206). **Status: Implemented.**
+*   **Forensic Multi-Session Alignment (R203)**: (Added Aug.18.07) The system MUST guarantee temporal monotonicity for forensic traces across restarts. (Issue #218). **Status: Implemented.**
 
-... [Legacy items truncated]
+### 2. Forensic Persistence Authority
+*   **Zero-Loss Spill Buffer (R200)**: The system MUST utilize a memory-mapped circular buffer for forensic telemetry. (Issue #196).
+*   **CRC32 Integrity Authority (R201)**: Every forensic entry MUST include a CRC32 checksum. (Issue #203).
+
+### 3. UI & Map Authority
+*   **Quantized Geometry Cache (R199)**: The map engine MUST utilize quantized circle geometries to prevent allocation churn. (Issue #208).
+*   **Derived State Freshness (R198)**: Telemetry freshness indicators MUST be computed via `derivedStateOf`. (Issue #207).
