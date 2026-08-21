@@ -8,15 +8,16 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.21.05:
+ * - Issue #196 Hardening: Added getExistingForensicSignaturesInRange to LogDao 
+ *   to support optimized range-based deduplication during 100Hz forensic 
+ *   bursts on budget hardware (R197).
  * Aug.20.06:
  * - Issue #224 Forensic Audit: Bumped to v73. Added MIGRATION_72_73 to include 
  *   sitVzRt in pending_status_updates for vertical velocity parity (R224).
  * Aug.18.01:
  * - Issue #197: Forensic Storage-Aware Adaptive Pruning. Added LogDao methods for 
  *   forensic-specific chunked pruning to handle 100Hz trace accumulation (R197).
- * Aug.17.10:
- * - Issue #195 Hardening: Bumped to v72. Added MIGRATION_71_72 to resolve 
- *   connection_history schema mismatch and force drop legacy UNIQUE indices.
  */
 @Entity(
     tableName = "logs", 
@@ -193,6 +194,9 @@ abstract class LogDao {
     
     @Query("SELECT timestamp, spillIdx FROM logs WHERE type = 'FORENSIC_TRACE' AND timestamp >= :minTimestamp") 
     abstract suspend fun getExistingForensicSignatures(minTimestamp: Long): List<ForensicSignature>
+
+    @Query("SELECT timestamp, spillIdx FROM logs WHERE type = 'FORENSIC_TRACE' AND timestamp >= :minTs AND timestamp <= :maxTs") 
+    abstract suspend fun getExistingForensicSignaturesInRange(minTs: Long, maxTs: Long): List<ForensicSignature>
 
     // Optimized Pruning Support (R177, R197)
     @Query("SELECT timestamp FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")

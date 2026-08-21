@@ -9,6 +9,10 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Aug.21.05:
+ * - Issue #196 Hardening: Implemented overflow hysteresis. Alerts now only reset 
+ *   when buffer pressure drops below 50% to prevent notification spam during 
+ *   high-frequency (100Hz) bursts on budget hardware (R196).
  * Aug.13.12:
  * - Issue #164: Forensic Log Buffer Audit. Removed the AtomicBoolean guard in 
  *   submitToLogSink to prevent non-deterministic log drops under high-frequency 
@@ -39,6 +43,7 @@ class LogManager @Inject constructor(
      * logForensicTrace: Routes high-frequency traces to the off-heap spill-buffer.
      */
     fun logForensicTrace(message: String, lat: Double = 0.0, lng: Double = 0.0, accuracy: Double = 0.0) {
+        val buffer = forensicSpillBufferProvider.get()
         val now = timeProvider.currentTimeMillis()
         val log = LogEntry(
             localId = "", 
@@ -54,10 +59,13 @@ class LogManager @Inject constructor(
             accuracy = accuracy
         )
         
-        if (!forensicSpillBufferProvider.get().writeTrace(log)) {
+        if (!buffer.writeTrace(log)) {
             handleOverflow()
         } else {
-            isOverflowLogged.set(false)
+            // R196: Hysteresis reset to avoid alert oscillation
+            if (isOverflowLogged.get() && buffer.getFillLevel() < 0.5) {
+                isOverflowLogged.set(false)
+            }
         }
     }
 
@@ -68,13 +76,17 @@ class LogManager @Inject constructor(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
         vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double
     ) {
-        if (!forensicSpillBufferProvider.get().writeTraceOptimized(
+        val buffer = forensicSpillBufferProvider.get()
+        if (!buffer.writeTraceOptimized(
             timestamp, lat, lng, accuracy, maxAccuracy, vibe, snr, 
             batteryTemp, batteryLevel, isCharging
         )) {
             handleOverflow()
         } else {
-            isOverflowLogged.set(false)
+            // R196: Hysteresis reset to avoid alert oscillation
+            if (isOverflowLogged.get() && buffer.getFillLevel() < 0.5) {
+                isOverflowLogged.set(false)
+            }
         }
     }
 

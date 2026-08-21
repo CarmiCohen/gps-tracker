@@ -26,12 +26,13 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.21.07:
+ * - Issue #196 Hardening: Integrated SetForensicSimulation event to allow 
+ *   urban multipath validation via UI diagnostics (R196-V).
  * Aug.20.09:
  * - Issue #226: HUD State Centralization. Added hudState StateFlow to 
  *   consolidate telemetry for status badges and ribbons (R226). Fixed 
  *   lambda parameter inference for Samsung A15 compiler stability.
- * - Issue #239: Restored addPersistentLog, clearTrails, and fullInitialization.
- * - Issue #241: Fixed combine lambda argument count mismatch for dashboardState/hudState.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -606,6 +607,10 @@ class MainViewModel @Inject constructor(
                         }
                     }
                 }
+            }
+            is UiEvent.SetForensicSimulation -> {
+                repository.setForensicStallSimulation(event.active)
+                updateState { it.copy(isForensicStallSimulated = event.active) }
             }
             else -> {}
         }

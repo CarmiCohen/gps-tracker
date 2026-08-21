@@ -32,14 +32,15 @@ import timber.log.Timber
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Aug.21.03:
+ * - Issue #246 Optimization: Consolidated hydration sequence from 10+ steps 
+ *   to 3 broader phases to reduce recomposition overhead and Davey stalls 
+ *   on budget hardware (R246).
+ * - Refactor: Extracted SensitivitySlider into a reusable component to simplify 
+ *   AlertManagementOverlay (Simplify Idea #1).
  * Aug.21.00:
  * - Issue #247 Hardening: Restored vibration and tilt sensitivity sliders 
  *   to AlertManagementOverlay to support manual sensor calibration (R247).
- * Aug.20.08:
- * - Issue #232 Hardening: Converted fixed button heights to heightIn(min=...) 
- *   and optimized font sizes to 13.sp to prevent clipping (R232).
- * - Issue #228 Hardening: Final refinement of GuideSection spacing and 
- *   line height to eliminate visual clipping on budget hardware (R228).
  */
 
 @Composable
@@ -75,9 +76,10 @@ fun SettingsOverlay(
     LaunchedEffect(Unit) {
         delay(100) 
         isHydrated = true
-        repeat(10) { 
+        // Consolidated to 3 phases to reduce main-thread churn on budget hardware (R246)
+        repeat(3) { 
             visibleCount++
-            delay(50) 
+            delay(100) 
         }
     }
 
@@ -88,9 +90,7 @@ fun SettingsOverlay(
                     if (visibleCount >= 1) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.settings_title), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
                         Spacer(Modifier.height(16.dp))
-                    }
 
-                    if (visibleCount >= 2) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedTextField(
                                 value = draftDeviceId, 
@@ -132,20 +132,16 @@ fun SettingsOverlay(
                         Spacer(Modifier.height(16.dp))
                     }
 
-                    if (visibleCount >= 3) {
+                    if (visibleCount >= 2) {
                         OutlinedTextField(value = draftMaxDistance, onValueChange = onUpdateMaxDistance, label = { Text(stringResource(R.string.settings_label_geofence), fontSize = 12.sp) }, placeholder = { Text(stringResource(R.string.settings_placeholder_radius), color = Slate500) }, leadingIcon = { Icon(Icons.Default.RadioButtonChecked, null, tint = Color.White, modifier = Modifier.size(18.dp)) }, trailingIcon = { Text(stringResource(R.string.settings_unit_meters), color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(end = 8.dp)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = 0.3f), focusedLabelColor = Color.White, unfocusedLabelColor = Slate500, focusedTextColor = Color.White, unfocusedTextColor = Color.White), singleLine = true, textStyle = LocalTextStyle.current.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
                         Spacer(Modifier.height(24.dp))
-                    }
 
-                    if (visibleCount >= 4) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.CLEAN)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteSweep, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clean)) }
                             Button(onClick = onShowPhoneSetup, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.HelpCenter, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_phone_setup)) }
                         }
                         Spacer(Modifier.height(16.dp))
-                    }
 
-                    if (visibleCount >= 5) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
                             Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.Default.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
@@ -153,20 +149,16 @@ fun SettingsOverlay(
                         Spacer(Modifier.height(16.dp))
                     }
 
-                    if (visibleCount >= 6) {
+                    if (visibleCount >= 3) {
                         Button(onClick = { onEvent(UiEvent.NavigateToDiagnostics(true)) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
                         Spacer(Modifier.height(24.dp))
-                    }
 
-                    if (visibleCount >= 7) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = onImportConfig, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_load_config), fontSize = 11.sp) }
                             if (onExport != null) { Button(onClick = onExport, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_save_logs), fontSize = 11.sp) } }
                         }
                         Spacer(Modifier.height(24.dp))
-                    }
 
-                    if (visibleCount >= 8) {
                         OutlinedTextField(value = draftRelayUrl, onValueChange = onUpdateRelayUrl, label = { Text(stringResource(R.string.settings_label_relay_url)) }, modifier = Modifier.fillMaxWidth())
                         Spacer(Modifier.height(56.dp))
                     }
@@ -177,7 +169,7 @@ fun SettingsOverlay(
                 }
             }
         }
-        if (isHydrated && visibleCount >= 9) {
+        if (isHydrated && visibleCount >= 3) {
             when (activeSubSettings) {
                 SubSettings.CLEAN -> CleanSetupOverlay(onClear = onClear, onReset = onReset, onFullInitialization = onFullInitialization, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
                 SubSettings.ALERTS -> AlertManagementOverlay(draftAlertSettings = draftAlertSettings, onUpdateAlertSettings = onUpdateAlertSettings, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
@@ -236,28 +228,20 @@ fun AlertManagementOverlay(draftAlertSettings: AlertSettings, onUpdateAlertSetti
             SettingsGroupHeader(stringResource(R.string.alert_group_sentinel), BrandJd)
             AlarmToggle(ALERT_TITLE_TRACKER_TAMPER, draftAlertSettings.tamperAlert) { onUpdateAlertSettings(draftAlertSettings.copy(tamperAlert = it)) }
             if (draftAlertSettings.tamperAlert) {
-                Column(modifier = Modifier.padding(horizontal = 8.dp)) {
-                    Text(stringResource(R.string.alert_label_vibration_sensitivity) + ": ${(draftAlertSettings.vibrationSensitivity * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
-                    Slider(
-                        value = draftAlertSettings.vibrationSensitivity,
-                        onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(vibrationSensitivity = it)) },
-                        valueRange = 0f..1f,
-                        colors = SliderDefaults.colors(thumbColor = BrandJd, activeTrackColor = BrandJd)
-                    )
-                }
+                SensitivitySlider(
+                    label = stringResource(R.string.alert_label_vibration_sensitivity),
+                    value = draftAlertSettings.vibrationSensitivity,
+                    onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(vibrationSensitivity = it)) }
+                )
             }
 
             AlarmToggle(ALERT_TITLE_TRACKER_TILT, draftAlertSettings.tiltAlert) { onUpdateAlertSettings(draftAlertSettings.copy(tiltAlert = it)) }
             if (draftAlertSettings.tiltAlert) {
-                Column(modifier = Modifier.padding(horizontal = 8.dp)) {
-                    Text(stringResource(R.string.alert_label_tilt_sensitivity) + ": ${(draftAlertSettings.tiltSensitivity * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
-                    Slider(
-                        value = draftAlertSettings.tiltSensitivity,
-                        onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(tiltSensitivity = it)) },
-                        valueRange = 0f..1f,
-                        colors = SliderDefaults.colors(thumbColor = BrandJd, activeTrackColor = BrandJd)
-                    )
-                }
+                SensitivitySlider(
+                    label = stringResource(R.string.alert_label_tilt_sensitivity),
+                    value = draftAlertSettings.tiltSensitivity,
+                    onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(tiltSensitivity = it)) }
+                )
             }
 
             AlarmToggle(ALERT_TITLE_TRACKER_ACOUSTIC, draftAlertSettings.acousticAlert) { onUpdateAlertSettings(draftAlertSettings.copy(acousticAlert = it)) }
@@ -309,9 +293,10 @@ fun PhoneSetupOverlay(
         Timber.d("PhoneSetupOverlay: Initializing hydration sequence")
         delay(100) 
         isHydrated = true
-        repeat(15) { 
+        // Consolidated to 3 phases to reduce main-thread churn on budget hardware (R246)
+        repeat(3) { 
             visibleCount++
-            delay(50) 
+            delay(100) 
         }
     }
 
@@ -329,41 +314,25 @@ fun PhoneSetupOverlay(
                     
                     if (visibleCount >= 1) {
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step1_title), recentsLockDesc, {}, stringResource(R.string.setup_info_only), if (permissions.requiresWakeLockRenewal) true else null, Icons.Default.Lock)
-                    }
-                    if (visibleCount >= 2) {
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), batteryOptDesc, onWhitelist, stringResource(R.string.btn_open_settings), permissions.isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!permissions.isBatteryWhitelisted) "Battery Optimization: Unrestricted mode NOT active" else null)
-                    }
-                    if (visibleCount >= 3) {
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step3_title), stringResource(R.string.setup_step3_desc), onOverlay, stringResource(R.string.btn_authorize), permissions.isOverlayGranted, Icons.Default.Layers, reason = if (!permissions.isOverlayGranted) "Appear on Top: Permission NOT granted" else null)
-                    }
-                    if (visibleCount >= 4) {
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step4_title), stringResource(R.string.setup_step4_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isMicrophoneGranted, Icons.Default.Mic, reason = if (!permissions.isMicrophoneGranted) "Microphone: Permission NOT granted" else null)
-                    }
-                    if (visibleCount >= 5) {
                         Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step5_title), description = autoStartDesc, onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBatteryWhitelisted, icon = Icons.Default.PlayCircle, reason = if (!permissions.isBatteryWhitelisted) "Manual verification required: Ensure 'Unrestricted' battery mode and 'Background activity' are allowed in system settings." else null)
                     }
-                    if (visibleCount >= 6) {
+
+                    if (visibleCount >= 2) {
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step6_title), stringResource(R.string.setup_step6_desc), {}, stringResource(R.string.setup_info_only), null, Icons.Default.Wifi)
-                    }
-                    
-                    if (visibleCount >= 7) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step7_title), stringResource(R.string.setup_step7_desc), onExactAlarm, stringResource(R.string.btn_authorize), permissions.isExactAlarmGranted, Icons.Default.Alarm, reason = if (!permissions.isExactAlarmGranted) "Exact Alarms: Permission NOT granted" else null) }
-                    }
-                    
-                    if (visibleCount >= 8) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             Spacer(Modifier.height(16.dp)); GuideSection(title = "Notification Alerts", description = "Required to show status and critical alerts in the notification shade.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isPostNotificationsGranted, icon = Icons.Default.Notifications, reason = if (!permissions.isPostNotificationsGranted) "Notifications: Permission NOT granted" else null)
                         }
-                    }
-                    
-                    if (visibleCount >= 9) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                             Spacer(Modifier.height(16.dp)); GuideSection(title = "Background Location", description = "Allows tracking and geofencing to work while the screen is off or app is in background.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, reason = if (!permissions.isBackgroundLocationGranted) "Background Location: Set to 'Allow all the time' in system settings" else null)
                             Spacer(Modifier.height(16.dp)); GuideSection(title = "Physical Activity", description = "Required for Step Detector and stay-alive pulsing to stabilize background performance.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isActivityRecognitionGranted, icon = Icons.AutoMirrored.Filled.DirectionsRun, reason = if (!permissions.isActivityRecognitionGranted) "Physical Activity: Permission NOT granted" else null)
                         }
                     }
 
-                    if (visibleCount >= 10) {
+                    if (visibleCount >= 3) {
                         if (permissions.hasBackgroundRestriction) { 
                             Spacer(Modifier.height(16.dp))
                             val isCompleted = when(permissions.backgroundStatus) {
@@ -388,13 +357,8 @@ fun PhoneSetupOverlay(
                                 }
                             }
                         }
-                    }
-
-                    if (visibleCount >= 11) {
                         if (!isTrackerMode) { Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step9_title), description = stringResource(R.string.setup_step9_desc), onClick = onGoToMap, buttonText = stringResource(R.string.btn_open_map), isCompleted = homePointsCount > 0, icon = Icons.Default.Map, reason = if (homePointsCount == 0) "Geofence: No Home Points defined" else null) }
-                    }
-                    
-                    if (visibleCount >= 12) {
+                        
                         Spacer(Modifier.height(32.dp))
                         Button(
                             onClick = onNavigateToDiagnostics,
@@ -405,15 +369,13 @@ fun PhoneSetupOverlay(
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.btn_view_diagnostics), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
-                    }
 
-                    if (visibleCount >= 13) {
                         Spacer(Modifier.height(16.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = onRefresh, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh), fontSize = 13.sp) }
                             Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm), fontSize = 13.sp) }
                         }
-                        Spacer(Modifier.height(88.dp)) // Issue #228: Final increase for safe scrolling buffer
+                        Spacer(Modifier.height(88.dp)) 
                     }
                 }
             } else {
@@ -432,16 +394,28 @@ fun SettingsGroupHeader(title: String, color: Color) { Column(modifier = Modifie
 fun AlarmToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(label, color = Color.White, fontSize = 15.sp); Switch(checked = checked, onCheckedChange = onCheckedChange) } }
 
 @Composable
+fun SensitivitySlider(label: String, value: Float, onValueChange: (Float) -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+        Text(label + ": ${(value * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = 0f..1f,
+            colors = SliderDefaults.colors(thumbColor = BrandJd, activeTrackColor = BrandJd)
+        )
+    }
+}
+
+@Composable
 fun GuideSection(title: String, description: String, onClick: () -> Unit, buttonText: String, isCompleted: Boolean?, icon: androidx.compose.ui.graphics.vector.ImageVector, reason: String? = null) {
     val statusIcon = when(isCompleted) { true -> Icons.Default.CheckCircle; false -> Icons.Default.Warning; null -> Icons.Default.Info }; 
     val statusColor = when(isCompleted) { true -> BrandJd; false -> Amber500; null -> Slate500 }
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) { // Issue #228: Increased item spacing
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) { 
         Row(verticalAlignment = Alignment.CenterVertically) { Icon(statusIcon, null, tint = statusColor, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Icon(icon, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp) }
         if (isCompleted == false && !reason.isNullOrEmpty()) { Text("Reason: $reason", color = Amber500, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 28.dp, top = 2.dp)) }
-        // Issue #228: Added line height and increased top padding for text separation
         Text(text = description, color = Slate500, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(start = 28.dp, top = 4.dp), softWrap = true)
         if (isCompleted != true && buttonText.isNotEmpty() && buttonText != stringResource(R.string.setup_info_only)) { 
-            Spacer(Modifier.height(10.dp)) // Issue #228: Increased spacing before button
+            Spacer(Modifier.height(10.dp)) 
             Button(onClick = onClick, modifier = Modifier.padding(start = 28.dp).heightIn(min = 36.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)) { Text(buttonText, fontSize = 11.sp) }
         }
     }

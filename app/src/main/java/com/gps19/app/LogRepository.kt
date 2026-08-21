@@ -19,14 +19,13 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * Aug.18.12:
- * - Issue #207/210 Hardening: Optimized flushBatch with transactional cache 
- *   and fixed unresolved 'entry' reference in vibeSnapshot mapping (R210).
- * - Issue #210 Hardening: Converted logWriteCount to AtomicInteger for 
- *   thread-safe pruning triggers during 100Hz bursts (R210).
- * Aug.18.09:
- * - Issue #207/208 Hardening: Optimized forensic drain deduplication to O(N) 
- *   using packed Long HashSet to eliminate object churn (R207).
+ * Aug.21.06:
+ * - Issue #196 Hardening: Added setForensicStallSimulation for urban multipath 
+ *   validation. performForensicDrain now supports simulated failures to verify 
+ *   EMA reliability degradation and alarm triggers (R196-V).
+ * Aug.21.05:
+ * - Issue #196 Hardening: Implemented range-based signature deduplication in 
+ *   performForensicDrain to reduce query overhead during 100Hz bursts (R197).
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -46,6 +45,7 @@ class LogRepository @Inject constructor(
     private val forensicSuccessCount = AtomicInteger(0)
     private val forensicFailureCount = AtomicInteger(0)
     private var liveReliability = 1.0
+    private val isForensicStallSimulated = AtomicBoolean(false)
 
     private val logBuffer = Channel<BufferedLog>(LOG_BUFFER_CAPACITY)
 
@@ -75,6 +75,11 @@ class LogRepository @Inject constructor(
         startBatchProcessor()
         recoverAbandonedTraces()
         startForensicDrainer()
+    }
+
+    fun setForensicStallSimulation(active: Boolean) {
+        isForensicStallSimulated.set(active)
+        Timber.i("Forensic Audit: Simulation mode ${if (active) "ENABLED" else "DISABLED"}")
     }
 
     private fun startBatchProcessor() {
@@ -140,7 +145,8 @@ class LogRepository @Inject constructor(
                     val shouldDrain = isEmergency || 
                                     buffer.isHighPressure() ||
                                     (pendingAtStart >= FORENSIC_FILL_THRESHOLD && loadFactor < 0.8) || 
-                                    (pendingAtStart > 0 && now - lastDrainTime >= FORENSIC_DRAIN_INTERVAL_MS)
+                                    (pendingAtStart > 0 && now - lastDrainTime >= FORENSIC_DRAIN_INTERVAL_MS) ||
+                                    isForensicStallSimulated.get()
                     
                     if (shouldDrain) {
                         val baseBatchSize = FORENSIC_BATCH_SIZE_MIN + 
@@ -163,6 +169,12 @@ class LogRepository @Inject constructor(
     }
 
     private suspend fun performForensicDrain(limit: Int, isRecovery: Boolean): Boolean {
+        if (isForensicStallSimulated.get() && !isRecovery) {
+            forensicFailureCount.incrementAndGet()
+            updateReliability(false)
+            return false
+        }
+
         val buffer = forensicSpillBufferProvider.get()
         val pendingAtStart = buffer.getPendingCount()
         
@@ -172,9 +184,11 @@ class LogRepository @Inject constructor(
             return false
         }
 
-        // Issue #210: Optimized O(N) Signature Deduplication using packed Long HashSet
+        // Issue #196: Optimized range-based deduplication (R197)
         val minTs = entities.minOf { it.timestamp }
-        val signaturesSet = logDao.getExistingForensicSignatures(minTs - 1000L).mapTo(HashSet()) { 
+        val maxTs = entities.maxOf { it.timestamp }
+        
+        val signaturesSet = logDao.getExistingForensicSignaturesInRange(minTs, maxTs).mapTo(HashSet()) {
             (it.timestamp shl 32) or (it.spillIdx.toLong() and 0xFFFFFFFFL)
         }
         

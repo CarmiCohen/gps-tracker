@@ -28,12 +28,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Aug.21.07:
+ * - Issue #196 Hardening: Exposed setForensicStallSimulation for urban 
+ *   multipath validation (R196-V). Fixed duplicate saveSettingsBulk method.
  * Aug.20.07:
  * - Issue #225 Analytical Telemetry Optimization: Refactored history mapping 
  *   to use ForensicMapper for 1:1 parity (R225).
- * Aug.20.05:
- * - Issue #224 Forensic Audit: Synchronized sitVzTs, sitVzRt, and verticalVelocity 
- *   mapping in getHistoryFlow and mapToEntity to ensure forensic parity (R224).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -507,5 +507,9 @@ class MainRepository @Inject constructor(
 
     suspend fun checkDatabaseIntegrity(): String = withContext(Dispatchers.IO) {
         database.checkIntegrity()
+    }
+
+    fun setForensicStallSimulation(active: Boolean) {
+        logRepository.setForensicStallSimulation(active)
     }
 }

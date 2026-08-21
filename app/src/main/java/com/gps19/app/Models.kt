@@ -10,21 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.21.06:
+ * - Issue #196 Hardening: Added SetForensicSimulation to UiEvent to support 
+ *   urban multipath validation (R196-V). Fixed typo in TrackerStatus.toMap (violationUptimeMs).
  * Aug.21.00:
  * - Issue #247: Sensor Sensitivity Restoration. Added vibrationSensitivity 
  *   and tiltSensitivity to AlertSettings to support manual calibration (R247).
- * Aug.20.09:
- * - Issue #226: HUD State Centralization. Removed duplicate AlarmInfo (R226).
- * Aug.20.03:
- * - Issue #223 Release: Removed debug instrumentation (SimulateThermalEvent, 
- *   ExecuteForensicTest) for production hardening.
- * Aug.17.08:
- * - Issue #191 Validation: Added SimulateThermalEvent to UiEvent and UiCommand 
- *   to support dynamic polling throttle verification (R191).
- * Aug.16.12:
- * - Issue #185 Hardening: Added MapTrailSegment to support background trail 
- *   simplification and eliminate Startup ANR (R185). Fixed bad inheritance 
- *   for RequestTestAlarm and RequestForensicTest. Restored missing AlarmInfo (R185).
  */
 
 sealed class AppSensorEvent {
@@ -278,7 +269,6 @@ data class LogEntry(
     val vibeSnapshot: Double? = null,
     val spillIdx: Int = -1,
     val gpsHardwareLock: Boolean = false,
-    // R164: Forensic snapshots to eliminate string churn in high-frequency drainage.
     val tempSnapshot: Double? = null,
     val battSnapshot: Int? = null,
     val chargingSnapshot: Boolean? = null
@@ -820,6 +810,7 @@ sealed class UiEvent {
     object TriggerRecovery : UiEvent()
     data class SetRecoveryPending(val pending: Boolean) : UiEvent()
     data class SetReplayCursor(val ts: Long?) : UiEvent()
+    data class SetForensicSimulation(val active: Boolean) : UiEvent()
 }
 
 sealed class UiCommand {

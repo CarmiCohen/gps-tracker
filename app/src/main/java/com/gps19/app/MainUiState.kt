@@ -5,12 +5,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Aug.21.07:
+ * - Issue #196 Hardening: Added isForensicStallSimulated to support 
+ *   urban multipath validation tracking in UI (R196-V).
  * Aug.14.02:
  * - Issue #170: Forensic Replay UI Audit. Added replayCursorTs to NavigationState 
  *   to support coordinate-aware scrubbing across ribbons and map.
- * Aug.13.05:
- * - Issue #153: Startup Davey Stalls. Introduced hydrationLevel to support 
- *   staggered UI initialization (R153).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -41,7 +41,8 @@ data class MainUiState(
     val mapFollowMode: MapFollowMode = MapFollowMode.AUTO,
     val draftSettings: DraftSettings = DraftSettings(),
     val isIdentitySanitized: Boolean = false,
-    val isRecoveryPending: Boolean = false
+    val isRecoveryPending: Boolean = false,
+    val isForensicStallSimulated: Boolean = false
 ) {
     val isFullyHydrated: Boolean get() = hydrationLevel >= 3
 
