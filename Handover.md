@@ -1,27 +1,34 @@
-# Handover (Aug.20.10) - Anchor & Build Hardening: RESOLVED
+# Handover (Aug.21.01) - Sensor Calibration Restoration Verified
 
-## 🎯 Next Objective: Issue #226 - Final UI Polish
-- **Goal**: Finalize any remaining reactive drift edge cases in the HUD components.
-- **Status**: 🟢 **CLEAN**
+## 🎯 Current Status
+- **Goal**: Execute and verify Test Procedure Chapter 1 & 2.
+- **Status**: 🟢 **CHAPTER 1 PASSED | CHAPTER 2 PASSED**
+- **Version**: `Aug.21.01`
+- **Database**: v73
+- **Hardware**: Samsung A15 (SM-A155F) verified.
 
 ## 🕵️ Comprehensive Forensic State Snapshot
 
-### 1. Anchor Hardening (R238) - ✅ ARCHIVED
-- **Resolution**: Restricted coordinate-averaging to the 50% "dead zone" of the breakout threshold in `AnchorEvaluator.kt`.
-- **Verification**: `AnchorEvaluatorTest` passes with high-SNR drift breakout now functioning correctly.
+### 1. Test Procedure Progress (`DOCS/TEST_PROCEDURE.md`)
+- **Chapter 1: Deployment & Initial Launch**: ✅ **FULL PASS**.
+- **Chapter 2: Setup and Configuration**: ✅ **FULL PASS**.
+    - **2.1 Enter Tracker Mode**: Verified.
+    - **2.2 Exercise Setup Options**: Verified.
+    - **2.3 Sensor Calibration**: ✅ **PASS**. Sensitivity sliders for Vibration and Tilt are restored in `AlertManagementOverlay` and mapped to `AlertSettings` (R247). Verified linear scaling (0-100%) and persistence.
 
-### 2. Build Restoration (R239, R240, R241) - ✅ ARCHIVED
-- **Resolution**: Restored `addPersistentLog`, fixed dependency declarations in `app/build.gradle`, and synchronized `HudState` across UI screens.
-- **Build**: `:app` and `:core:engine` are passing all tests and compiling without errors.
+### 2. Issues & Remediations (`issues.md`)
+- **Issue #247 (Resolved)**: Restored UI sliders for Vibration and Tilt sensitivity in `SettingsComponents.kt`. Updated `strings.xml` with labels `alert_label_vibration_sensitivity` and `alert_label_tilt_sensitivity`.
+- **Issue #244 (Open)**: `libjdHardware.so` and `libmbrainSDK` load failures detected. Still pending native binary audit.
+- **Issue #246 (Open)**: Davey stalls (~700ms) observed during UI hydration. Investigation into UI thread optimization needed.
 
-## 📂 Status Tracking & Integrity
-- **Issues**: `issues.md` (676 Resolved | 0 Active).
-- **Requirements**: `SOT_MASTER_REQUIREMENTS.md` updated to vAug.20.10.
-- **Archive**: `RESOLUTION_ARCHIVE.md` updated with R238-R241.
-- **Version**: Bumped to `Aug.20.10`.
+### 3. File Integrity Audit
+- **SettingsComponents.kt**: Restored `AlertManagementOverlay` sliders. Verified hydration sequence and button scaling (R232).
+- **strings.xml**: Added sensitivity labels. Fixed "Inside Tractor" typo (R245).
+- **SOT_MASTER_REQUIREMENTS.md**: Added Sensor Sensitivity Authority (R247).
 
 ## 🧬 Resumption Path
-1.  **Smoke Test**: Perform a manual walkthrough of the UI to ensure no visual regressions after the `HudState` migration.
-2.  **Telemetry Audit**: Verify that the forensic ribbons update in sync with the HUD status badges.
+1.  **Audit Native Libraries**: Investigate `dlopen` failures for hardware abstraction libraries (Issue #244).
+2.  **UI Thread Optimization**: Profile `SettingsOverlay` and `PhoneSetupOverlay` to reduce Davey stalls on Samsung A15 (Issue #246).
+3.  **Refactor Sliders**: Consider extracting `SensitivitySlider` into a reusable component to simplify `SettingsComponents.kt` (Simplify Idea #1).
 
-vAug.20.10
+vAug.21.01

@@ -45,13 +45,12 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Aug.21.00:
+ * - Issue #243: Hardened Navigation Settling. Introduced isSettlingActive to 
+ *   defer automatic restoration navigation until STARTUP_SETTLING_DELAY_MS 
+ *   completes, ensuring landing page stability verification (R243).
  * Aug.20.03:
- * - Issue #223 Release: Removed debug instrumentation (onTriggerForensicTest)
- *   for production hardening.
- * Aug.20.01:
- * - Issue #222 Performance Audit: Removed redundant RefreshPermissionStatus
- *   trigger from DisposableEffect. This is already handled by MainActivity.onResume,
- *   and double-triggering was contributing to 800ms+ Davy jank (R222).
+ * - Issue #223 Release: Removed debug instrumentation for production hardening.
  */
 @Composable
 fun MainAppContent(
@@ -94,10 +93,12 @@ fun MainAppContent(
 
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
     var isManualSelectionInProgress by remember { mutableStateOf(false) }
+    var isSettlingActive by remember { mutableStateOf(true) }
     val startupTime = remember { System.currentTimeMillis() }
 
     fun proceedToMode(mode: String) {
         isManualSelectionInProgress = true
+        isSettlingActive = false
         viewModel.onEvent(UiEvent.SetAppMode(mode))
         
         val elapsed = System.currentTimeMillis() - startupTime
@@ -176,7 +177,7 @@ fun MainAppContent(
         return fineLocation && audio && notification && activityRec
     }
 
-    LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible, isManualSelectionInProgress) {
+    LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible, isManualSelectionInProgress, isSettlingActive) {
         if (!uiState.isInitialized) return@LaunchedEffect
         
         val mode = uiState.appMode
@@ -189,11 +190,13 @@ fun MainAppContent(
             return@LaunchedEffect
         }
 
-        if (mode != null) {
-            if (navController.currentDestination?.route == Screen.Landing.route && !isManualSelectionInProgress) {
+        if (mode != null && isSettlingActive && !isManualSelectionInProgress) {
+            if (navController.currentDestination?.route == Screen.Landing.route) {
+                Timber.d("Issue #243: Deferring restoration navigation for ${STARTUP_SETTLING_DELAY_MS}ms settling")
+                delay(STARTUP_SETTLING_DELAY_MS)
+                isSettlingActive = false
+                
                 if (hasRequiredPermissions(mode)) {
-                    Timber.d("Automatic restoration: waiting ${STARTUP_SETTLING_DELAY_MS}ms")
-                    delay(STARTUP_SETTLING_DELAY_MS)
                     onStartService(mode)
                 } else {
                     Timber.i("Automatic restoration: Missing permissions for mode $mode. Triggering request flow.")
@@ -201,6 +204,8 @@ fun MainAppContent(
                 }
             }
         }
+
+        if (isSettlingActive && mode != null) return@LaunchedEffect
 
         when (mode) {
             "tracker" -> {

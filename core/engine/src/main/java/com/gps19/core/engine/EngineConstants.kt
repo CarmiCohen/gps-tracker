@@ -2,14 +2,14 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.21.00:
+ * - Issue #243 SOT Alignment: Reduced STARTUP_SETTLING_DELAY_MS and 
+ *   LANDING_PAGE_PAUSE_MS to 2000ms to match SOT requirements for 
+ *   automated recovery speed (R243).
  * Aug.19.10:
  * - Issue #213: Signal Loss False-Positive Hardening. Increased GPS_GAP and 
  *   GPS_STALL thresholds to 120s to prevent collisions with the 60s 
- *   STATIONARY_GPS_POLLING interval caused by OS scheduling jitter (R213).
- * - Issue #213: UI Staleness Hardening. Increased UI fail thresholds to 90s 
- *   to allow for background heartbeat headroom.
- * Aug.18.10:
- * - Issue #209 Fidelity Restoration: Reverted diagnostic down-sampling (R204). 
+ *   STATIONARY_GPS_POLLING interval (R213).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -131,7 +131,7 @@ const val POSITION_EMA_ALPHA_SUSPICIOUS = 0.05
 const val SPEED_EMA_ALPHA = 0.2
 const val BEARING_EMA_ALPHA = 0.1
 const val STATIONARY_SPEED_THRESHOLD_MPS = 0.5
-const val POSITION_STALL_RECOVERY_DT_SEC = 120.0 // Adjusted for Issue #213
+const val POSITION_STALL_RECOVERY_DT_SEC = 120.0 
 
 // Behavioral Sentinel Checks
 const val JUMP_CHECK_MIN_DIST = 5.0
@@ -225,8 +225,8 @@ const val BOOTSTRAP_PHASE_MS = 60000L
 const val DISCOVERY_PHASE_MS = 60000L
 const val JUMP_HOLD_DURATION_MS = 180000L
 const val MOVING_HOLD_DURATION_MS = 60000L
-const val GPS_GAP_THRESHOLD_MS = 120000L    // Increased for Issue #213
-const val GPS_STALL_THRESHOLD_MS = 120000L  // Increased for Issue #213
+const val GPS_GAP_THRESHOLD_MS = 120000L    
+const val GPS_STALL_THRESHOLD_MS = 120000L  
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
 const val LOCATION_RECOVERY_DEBOUNCE_MS = 3000L
 
@@ -243,8 +243,8 @@ const val ADAPTATION_SETTLING_MS = 5000L
 const val GPS_REVIVAL_RETRY_INTERVAL_MS = 120000L
 const val MAX_REVIVAL_ATTEMPTS = 3
 const val HARDWARE_BOOT_GRACE_MS = 30000L
-const val LANDING_PAGE_PAUSE_MS = 10000L
-const val STARTUP_SETTLING_DELAY_MS = 10000L
+const val LANDING_PAGE_PAUSE_MS = 2000L
+const val STARTUP_SETTLING_DELAY_MS = 2000L
 
 // GPS Polling Intervals (Central Authority)
 const val HIGH_FREQUENCY_GPS_POLLING_MS = 2000L
@@ -315,7 +315,7 @@ const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_PCT = 0.01
 const val SYSTEM_STORAGE_LOW_THRESHOLD_PCT = 0.05 
 
 // GPS Polling & Filtering
-const val GPS_SEQUENCE_TOLERANCE_MS = 120000L // Increased for Issue #213
+const val GPS_SEQUENCE_TOLERANCE_MS = 120000L 
 const val GPS_MIN_UPDATE_DISTANCE_METERS = 2.0
 
 // Analytical Index Thresholds
@@ -362,8 +362,8 @@ const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
 const val GNSS_EXPECTED_INTERVAL_MS = 1000L
 const val GNSS_JITTER_THRESHOLD_MS = 500L
 
-const val TELEMETRY_UI_STALE_THRESHOLD_MS = 90000L // Increased for Issue #213
-const val GPS_UI_FAIL_THRESHOLD_MS = 90000L        // Increased for Issue #213
+const val TELEMETRY_UI_STALE_THRESHOLD_MS = 90000L 
+const val GPS_UI_FAIL_THRESHOLD_MS = 90000L
 
 const val NOTIFICATION_THROTTLE_MS = 30000L
 

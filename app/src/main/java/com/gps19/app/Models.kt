@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.21.00:
+ * - Issue #247: Sensor Sensitivity Restoration. Added vibrationSensitivity 
+ *   and tiltSensitivity to AlertSettings to support manual calibration (R247).
  * Aug.20.09:
  * - Issue #226: HUD State Centralization. Removed duplicate AlarmInfo (R226).
  * Aug.20.03:
@@ -93,11 +96,14 @@ data class AlertSettings(
     val liftAlert: Boolean = true,
     val tamperAlert: Boolean = true,
     val globalMute: Boolean = false,
-    val systemStorageLow: Boolean = true
+    val systemStorageLow: Boolean = true,
+    // Issue #247: Sensitivity fields
+    val vibrationSensitivity: Float = 0.5f,
+    val tiltSensitivity: Float = 0.5f
 )
 
 /**
- * Issue #152: Refactored to mutable class for zero-churn telemetry.
+ * ConnectionPoint: Mutable flyweight for zero-churn telemetry.
  */
 class ConnectionPoint(
     var localId: String = "",
@@ -731,13 +737,9 @@ data class DashboardState(
     val trackerCurrentMa: Int = 0,
     val isBatteryLow: Boolean = false,
     val isBatteryCritical: Boolean = false,
-    
-    // Issue #132: Forensic UI Dashboard Refinement
     val cpuLoad: Double = 0.0,
     val ioWait: Double = 0.0,
     val maxIoLatencyMs: Long = 0L,
-
-    // Issue #133: Forensic Anomaly Correlation
     val isSilentFailure: Boolean = false
 )
 
@@ -815,12 +817,8 @@ sealed class UiEvent {
     object ToggleXiaomiManualOverride : UiEvent()
     object DismissIdentitySanitization : UiEvent()
     data class NavigateToDiagnostics(val visible: Boolean) : UiEvent()
-    
-    // Issue #626/634: Foreground Service Start Hardening
     object TriggerRecovery : UiEvent()
     data class SetRecoveryPending(val pending: Boolean) : UiEvent()
-
-    // Issue #170: Forensic Replay UI Audit
     data class SetReplayCursor(val ts: Long?) : UiEvent()
 }
 

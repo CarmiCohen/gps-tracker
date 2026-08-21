@@ -5,7 +5,7 @@
 
     <!-- Landing Screen -->
     <string name="landing_tracker_title">TRACKER MODE</string>
-    <string name="landing_tracker_subtitle">Inside Tractor</string>
+    <string name="landing_tracker_subtitle">Inside Tracker</string>
     <string name="landing_viewer_title">VIEWER MODE</string>
     <string name="landing_viewer_subtitle">In Pocket</string>
 
@@ -86,6 +86,8 @@
     <string name="alert_group_device">Device Status</string>
     <string name="alert_group_integrity">System Integrity</string>
     <string name="alert_group_sentinel">Physical Sentinel</string>
+    <string name="alert_label_vibration_sensitivity">Vibration Sensitivity</string>
+    <string name="alert_label_tilt_sensitivity">Tilt Sensitivity</string>
     <string name="alert_desc_mic_hysteresis">Note: System \'Mic Active\' icon may linger for 45s after closing the app due to a safety hysteresis.</string>
     <string name="btn_calibrate_chair">Calibrate Empty Chair</string>
 
@@ -114,10 +116,10 @@
     <string name="setup_step3_desc">Enable \'Appear on top\' to allow the emergency alert screen to bypass lockscreens.</string>
     <string name="setup_step4_title">4. Microphone Access</string>
     <string name="setup_step4_desc">Critical for Acoustic Tamper alerts. Please ensure microphone permission is granted. NOTE: System \'Mic Active\' icon may linger for 45s after closing the app to ensure stable transitions.</string>
+    <string name="setup_info_only">Info Only</string>
     <string name="setup_step5_title">5. Auto-start \u0026 Activity</string>
     <string name="setup_step6_title">6. Wi-Fi Power Saving</string>
     <string name="setup_step6_desc">Disable \'Wi-Fi power saving mode\' in system settings to prevent network idling during sleep.</string>
-    <string name="setup_info_only">Info Only</string>
     <string name="setup_step7_title">7. Exact Alarms</string>
     <string name="setup_step7_desc">Critical for system watchdog reliability. Allow the app to schedule exact alarms to ensure it wakes up even in deep sleep.</string>
     <string name="setup_step8_title">8. MIUI Special Permissions</string>

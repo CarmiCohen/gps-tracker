@@ -32,6 +32,9 @@ import timber.log.Timber
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Aug.21.00:
+ * - Issue #247 Hardening: Restored vibration and tilt sensitivity sliders 
+ *   to AlertManagementOverlay to support manual sensor calibration (R247).
  * Aug.20.08:
  * - Issue #232 Hardening: Converted fixed button heights to heightIn(min=...) 
  *   and optimized font sizes to 13.sp to prevent clipping (R232).
@@ -232,7 +235,31 @@ fun AlertManagementOverlay(draftAlertSettings: AlertSettings, onUpdateAlertSetti
 
             SettingsGroupHeader(stringResource(R.string.alert_group_sentinel), BrandJd)
             AlarmToggle(ALERT_TITLE_TRACKER_TAMPER, draftAlertSettings.tamperAlert) { onUpdateAlertSettings(draftAlertSettings.copy(tamperAlert = it)) }
+            if (draftAlertSettings.tamperAlert) {
+                Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+                    Text(stringResource(R.string.alert_label_vibration_sensitivity) + ": ${(draftAlertSettings.vibrationSensitivity * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
+                    Slider(
+                        value = draftAlertSettings.vibrationSensitivity,
+                        onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(vibrationSensitivity = it)) },
+                        valueRange = 0f..1f,
+                        colors = SliderDefaults.colors(thumbColor = BrandJd, activeTrackColor = BrandJd)
+                    )
+                }
+            }
+
             AlarmToggle(ALERT_TITLE_TRACKER_TILT, draftAlertSettings.tiltAlert) { onUpdateAlertSettings(draftAlertSettings.copy(tiltAlert = it)) }
+            if (draftAlertSettings.tiltAlert) {
+                Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+                    Text(stringResource(R.string.alert_label_tilt_sensitivity) + ": ${(draftAlertSettings.tiltSensitivity * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
+                    Slider(
+                        value = draftAlertSettings.tiltSensitivity,
+                        onValueChange = { onUpdateAlertSettings(draftAlertSettings.copy(tiltSensitivity = it)) },
+                        valueRange = 0f..1f,
+                        colors = SliderDefaults.colors(thumbColor = BrandJd, activeTrackColor = BrandJd)
+                    )
+                }
+            }
+
             AlarmToggle(ALERT_TITLE_TRACKER_ACOUSTIC, draftAlertSettings.acousticAlert) { onUpdateAlertSettings(draftAlertSettings.copy(acousticAlert = it)) }
 
             if (draftAlertSettings.acousticAlert) {

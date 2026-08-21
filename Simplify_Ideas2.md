@@ -1,17 +1,36 @@
-# Architectural Simplification Ideas (vAug.20.07)
+# Architectural Simplification Ideas (Aug.21.01)
 
-## 1. Telemetry Mapping Consolidation (Issue #225)
-- **Current State**: Mapping between `HistoryEntity`, `PendingStatusEntity`, and `ConnectionPoint` is duplicated across several extension functions and repository methods.
-- **Idea**: Create a unified `ForensicMapper` interface or utility object that handles the 1:1 parity transformation for all high-frequency metadata (sitVzTs, sitVzRt, etc.). This ensures that adding a new forensic field only requires a change in one location.
+Following the production hardening of the forensic pipeline and the HUD centralization, here are updated recommendations to further simplify the codebase:
 
-## 2. HUD State Centralization
-- **Current State**: Freshness and validity states for GPS and IMU are derived in multiple ViewModels.
-- **Idea**: Centralize the "System Health" logic into a single `ForensicStateMonitor` that emits a unified `TelemetryHealth` object. This would allow `derivedStateOf` to act on a single source of truth, reducing recomposition triggers in the HUD.
+## 1. Reusable Sensitivity Slider (New Aug.21.01)
+- **Observation**: `AlertManagementOverlay` now contains duplicate `Column`+`Slider` logic for Vibration and Tilt sensitivity.
+- **Simplification**: Extract this into a reusable `SensitivitySlider` composable in `SettingsComponents.kt` or `SharedUiComponents.kt`. This would centralize the styling (BrandJd colors, padding, percentage text) and make future sensor calibrations (e.g., Acoustic) trivial to implement.
 
-## 3. Room Database Migration Automation
-- **Current State**: Manual migration scripts (`MIGRATION_72_73`) are becoming complex.
-- **Idea**: Evaluate the use of `AutoMigration` for simple field additions, keeping manual scripts only for complex index reconstructions or data sanitization.
+## 2. UI State Aggregation (Aug.20.10)
+- **Problem**: The `combine` blocks in `MainViewModel.kt` for `dashboardState` and `hudState` are reaching the 7-parameter limit and becoming difficult to maintain.
+- **Simplification**: Extract state aggregation logic into a dedicated `UiStateAggregator` service.
 
-## 4. Shadow-Cache Primitive Pooling
-- **Current State**: `ShadowCache` stores `TrailPoint` objects.
-- **Idea**: Explore using primitive arrays for coordinate history to further reduce heap pressure and GC churn during 100Hz tracking sessions.
+## 3. HUD Parameter Decoupling (Aug.20.10)
+- **Observation**: The migration to `HudState` (R240) improved component signatures, but `GlobalStatusBar` still has many individual parameters.
+- **Simplification**: Further flatten the `StatusBar` hierarchy so child components consume sub-sections of `HudState` directly.
+
+## 4. Dependency Management (Aug.20.10)
+- **Simplification**: Move common dependencies into a `Version Catalog` (libs.versions.toml) for consistency across modules.
+
+## 5. Telemetry Mapping Consolidation
+- **Simplification**: Implement a unified `TelemetryMapper` to eliminate redundant manual mapping blocks across the repository and service layers.
+
+## 6. UI Refresh Throttling
+- **Simplification**: Centralize UI state sampling into a single `UiState` pulse to ensure consistency and reduce coroutine overhead.
+
+## 7. Unified Event Bus Reduction
+- **Simplification**: Consolidate `UiEvent`, `UiCommand`, and `CommandEvent` into a single reactive `SystemEvent` stream.
+
+## 8. Forensic Sampling State Machine
+- **Simplification**: Move sampling interval logic into a dedicated `ForensicSamplingStrategy` class to decouple `TrackerService.kt` from specific interval math.
+
+## 9. Redundant Lifecycle Observers
+- **Simplification**: Centralize lifecycle-dependent state updates into the `MainViewModel` using `lifecycle.repeatOnLifecycle`.
+
+## 10. ShadowCache Utility Standardisation
+- **Simplification**: Refactor all high-frequency lookups to use the centralized `ShadowCache` to eliminate custom synchronization logic.
