@@ -4,12 +4,16 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Aug.20.09:
+ * - Issue #226: HUD State Centralization. Added HudState and moved 
+ *   AlarmInfo here to prevent reactive drift (R226). Added isGpsFresh 
+ *   and isTelemetryFresh to HudState for UI parity.
+ * Aug.20.07:
+ * - Issue #225: Forensic Audit. Added isBatteryLow and isBatteryCritical to 
+ *   EngineConnectionPoint for total parity in consolidated mapper (R225).
  * Aug.11.09:
  * - Issue #141: Stress Recovery Verification. Added requiresAdaptationMuzzle 
  *   to HardwareCapabilities for budget hardware state management (R141).
- * Aug.10.27:
- * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure 
- *   to EngineConnectionPoint for load-correlated stall tracking (R133).
  */
 
 @Serializable
@@ -116,7 +120,9 @@ class EngineConnectionPoint(
     var maxIoLatency: Long = 0L,
 
     // Anomaly Correlation (Issue #133)
-    var isSilentFailure: Boolean = false
+    var isSilentFailure: Boolean = false,
+    var isBatteryLow: Boolean = false,
+    var isBatteryCritical: Boolean = false
 ) {
     fun copyFrom(other: EngineConnectionPoint) {
         this.ts = other.ts
@@ -161,6 +167,8 @@ class EngineConnectionPoint(
         this.ioWait = other.ioWait
         this.maxIoLatency = other.maxIoLatency
         this.isSilentFailure = other.isSilentFailure
+        this.isBatteryLow = other.isBatteryLow
+        this.isBatteryCritical = other.isBatteryCritical
     }
 }
 
@@ -521,3 +529,62 @@ class ProcessedLocation(
         kineticEnergy = 0.0
     }
 }
+
+@Serializable
+data class AlarmInfo(
+    val title: String, 
+    val subtitle: String, 
+    val type: String = "", 
+    val isResolved: Boolean = false, 
+    val isSirenDisabled: Boolean = false
+)
+
+/**
+ * HudState: Unified state for HUD and status badges.
+ * Issue #226: Centralized management to prevent reactive drift.
+ */
+@Serializable
+data class HudState(
+    val appMode: String? = null,
+    val isInternet: Boolean = false,
+    val isRelayConnected: Boolean = false,
+    val isTelemetryFresh: Boolean = false,
+    val isDataHealthy: Boolean = false,
+    val isLocalGpsActive: Boolean = false,
+    val isGpsFresh: Boolean = false,
+    val battery: Int = 100,
+    val remoteBattery: Int = -1,
+    val isCharging: Boolean = false,
+    val remoteCharging: Boolean = false,
+    val speedMps: Float = 0f,
+    val trackerAccuracy: Float = 0f,
+    val maxTrackerAccuracy: Float = 0f,
+    val viewerAccuracy: Float = 0f,
+    val maxViewerAccuracy: Float = 0f,
+    val satsUsed: Int = 0,
+    val satsView: Int = 0,
+    val viewerSatsUsed: Int = 0,
+    val viewerSatsView: Int = 0,
+    val trackerTemp: Float = 0f,
+    val viewerTemp: Float = 0f,
+    val distToHome: Double? = null,
+    val distToViewer: Double? = null,
+    val trackerId: String = "TRK",
+    val viewerId: String = "VIEW",
+    val watchdogOk: Boolean = true,
+    val trackerState: TrackerState = TrackerState.UNKNOWN,
+    val hasActiveAlarms: Boolean = false,
+    val isRedScreenSuppressed: Boolean = false,
+    val isSirenPlaying: Boolean = false,
+    val isTrackerLocPending: Boolean = false,
+    val trackerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    val isViewerLocPending: Boolean = false,
+    val viewerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    val commIndex: Int = 0,
+    val remoteCommIndex: Int = 0,
+    val lastGpsTs: Long = 0L,
+    val viewerGpsTs: Long = 0L,
+    val progressPulse: Float = 0f,
+    val systemPulse: Long = 0L,
+    val activeAlarms: List<AlarmInfo> = emptyList()
+)

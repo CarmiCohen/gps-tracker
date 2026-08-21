@@ -5,12 +5,13 @@ import kotlin.math.max
 
 /**
  * AnchorEvaluator: Manages stationary anchor state and breakout logic.
+ * Aug.20.09:
+ * - Issue #238: Coordinate Leak Hardening. Restricted coordinate averaging 
+ *   to points below the transition zone to prevent anchor "drift" from 
+ *   absorbing multipath noise and inhibiting breakouts (R238).
  * Aug.18.05:
  * - Issue #201: Urban Edge Case Multipath Mitigation. Integrated IMU-guarded 
  *   anchor maintenance to prevent drift breakouts during low-SNR urban scenarios (R201).
- * Aug.04.50:
- * - Issue #715: Build Hardening. Applied breakout leniency during accuracy snaps 
- *   to ensure coordinate-snap artifacts don't trigger premature anchor release.
  */
 class AnchorEvaluator(
     private val onLog: (String, Double, Double, Double, Double?) -> Unit
@@ -96,9 +97,12 @@ class AnchorEvaluator(
                 // 2. Score Calculation & Breakout Threshold
                 val breakoutThreshold = max(PARKING_ANCHOR_MIN_DIST, maxAccuracy * PARKING_ANCHOR_FACTOR)
                 val distFromAnchor = PhysicsUtils.calculateDistance(parkingAnchorPoint.lat, parkingAnchorPoint.lng, point.lat, point.lng)
+                val transitionZoneStart = breakoutThreshold * ANCHOR_TRANSITION_ZONE_START
 
                 // 3. Coordinate-averaging convergence (R990c Hardening)
-                if (distFromAnchor < breakoutThreshold) {
+                // Issue #238: Only average if the point is within the "dead zone" (below transition start).
+                // This prevents the anchor from "chasing" drift into the scoring zone.
+                if (distFromAnchor < transitionZoneStart) {
                     val p = anchorAveragingBuffer[averageIdx]
                     p.update(point.lat, point.lng, point.alt, point.ts, point.rt, point.accuracy, point.maxAccuracy)
                     averageIdx = (averageIdx + 1) % ANCHOR_AVERAGING_WINDOW_SIZE
@@ -117,7 +121,6 @@ class AnchorEvaluator(
                 if (!isPhysicallyStationary) {
                     anchorEscapeScore = ANCHOR_ESCAPE_SCORE_THRESHOLD
                 } else {
-                    val transitionZoneStart = breakoutThreshold * ANCHOR_TRANSITION_ZONE_START
                     if (distFromAnchor > transitionZoneStart) {
                         val accuracyPenalty = if (point.accuracy > ANCHOR_ACCURACY_PENALTY_LIMIT) {
                             (ANCHOR_ACCURACY_PENALTY_LIMIT / point.accuracy).coerceIn(0.2, 1.0)

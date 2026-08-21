@@ -6,12 +6,13 @@ import org.junit.Test
 
 /**
  * AnchorEvaluatorTest: Verifies stationary anchor logic (R990c, R990d, R990e).
+ * Aug.20.09:
+ * - Issue #238: Updated coordinate averaging test to use a smaller shift (2m) 
+ *   to stay within the "dead zone" (below transition start) now that 
+ *   averaging is restricted to prevent drift-chasing.
  * Aug.18.05:
  * - Issue #201: Multipath Mitigation Audit. Added test for SNR-based damping 
  *   to verify urban canyon drift resistance (R201).
- * Aug.03.37:
- * - Issue #669: Refactored to eliminate .copy() usage on EngineGeoPoint 
- *   to resolve build errors following zero-churn transition.
  */
 class AnchorEvaluatorTest {
 
@@ -34,7 +35,7 @@ class AnchorEvaluatorTest {
     fun `test engagement and coordinate averaging`() {
         val basePoint = createPoint(32.7940, 34.9896, 10.0)
         
-        // 1. Engage anchor (accuracy 10m -> threshold 8m)
+        // 1. Engage anchor (accuracy 10m -> threshold 8m. Dead zone < 4m)
         val res1 = evaluator.evaluate(
             point = basePoint,
             isPhysicallyStationary = true,
@@ -51,8 +52,8 @@ class AnchorEvaluatorTest {
         assertTrue("Should be locked", res1.isLocked)
 
         // 2. Add slightly shifted points (R990c)
-        // Shift ~4.4m (0.00004 lat) - well within 8m threshold
-        val shiftedPoint = createPoint(32.79404, 34.9896, 10.0)
+        // Shift ~2.0m (0.000018 lat) - within 4m dead-zone threshold
+        val shiftedPoint = createPoint(32.794018, 34.9896, 10.0)
         
         repeat(5) {
             evaluator.evaluate(
@@ -71,8 +72,8 @@ class AnchorEvaluatorTest {
 
         val anchor = evaluator.getAnchorPoint()
         assertNotNull(anchor)
-        // Average should be between 32.7940 and 32.79404
-        assertTrue("Lat should be averaged: ${anchor!!.lat}", anchor.lat > 32.7940 && anchor.lat < 32.79404)
+        // Average should be between 32.7940 and 32.794018
+        assertTrue("Lat should be averaged: ${anchor!!.lat}", anchor.lat > 32.7940 && anchor.lat < 32.794018)
     }
 
     @Test
@@ -143,7 +144,7 @@ class AnchorEvaluatorTest {
         // Pick a point ~6m away (0.000054 lat). This is IN the scoring zone but BELOW the hard breakout threshold.
         val driftPoint = createPoint(32.794054, 34.9896, 10.0)
         
-        // Scenario A: High SNR (Clear Sky) - Should breakout relatively quickly
+        // Scenario A: High SNR (Clear Sky) - Should breakout eventually
         val highSnrEvaluator = AnchorEvaluator { _, _, _, _, _ -> }
         highSnrEvaluator.evaluate(basePoint, true, 0.95, 0.0, 10.0, false, false, false, 30.0, 0.1)
         

@@ -49,13 +49,11 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Aug.20.09:
+ * - Issue #226: HUD State Centralization. Refactored GlobalStatusBar and 
+ *   StatusBar to consume unified HudState (R226).
  * Aug.14.05:
- * - Issue #174: Forensic Replay Latency Audit. Optimized replay cursor lookup 
- *   using O(log N) binary search in ForensicRibbonContainer, ensuring 
- *   smooth 60fps scrubbing with 10,000+ data points (R174).
- *   Fixed property access typos in sensor selectors.
- * Aug.14.02:
- * - Issue #170: Forensic Replay UI Audit.
+ * - Issue #174: Forensic Replay Latency Audit.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -341,7 +339,6 @@ fun ForensicRibbonContainer(
 
                     replayCursorTs?.let { cursorTs ->
                         val startOffset = totalPoints - history.size
-                        // Issue #174: Optimized O(log N) binary search for replay cursor position.
                         val rawIndex = history.binarySearch { it.ts.compareTo(cursorTs) }
                         val index = if (rawIndex >= 0) rawIndex else -(rawIndex + 1)
                         
@@ -565,72 +562,62 @@ fun HeaderBar(
 
 @Composable
 fun GlobalStatusBar(
-    appMode: String?, isSystemActive: Boolean, deviceId: String, viewerId: String, isLocalOnline: Boolean, isRelayConnected: Boolean, 
-    lastRemoteActivityTs: Long, isRedScreenVisible: Boolean, batteryLevel: Int, trackerBatteryLevel: Int, isChargingStable: Boolean, 
-    trackerChargingStable: Boolean, activeAlarms: List<AlarmInfo>, trackerSatsView: Int, trackerSatsUsed: Int, trackerBatteryTemp: Double, 
-    viewerBatteryTemp: Double, viewerSatsUsed: Int, viewerSatsView: Int, isSirenPlaying: Boolean, trackerGpsTs: Long, trackerTelemetryTs: Long, 
-    trackerSpeedMps: Double, trackerAccuracy: Double, trackerMaxAccuracy: Double, localGpsTs: Long, localAccuracy: Double, 
-    localMaxAccuracy: Double, localLat: Double, trackerLocPending: Boolean, trackerLocPendingReason: LocationPendingReason, 
-    localLocPending: Boolean, localLocPendingReason: LocationPendingReason, distanceTrackerToHome: Double?, 
-    distanceTrackerToViewer: Double?, isTelemetryFresh: Boolean, isGpsFresh: Boolean, watchdogOk: Boolean, trackerState: TrackerState, 
-    systemPulse: Long, rttFlow: StateFlow<Int>, remoteSignalFlow: StateFlow<Int>, modifier: Modifier = Modifier
+    hudState: HudState,
+    isSystemActive: Boolean,
+    modifier: Modifier = Modifier
 ) {
-    val mode = appMode ?: return
-    val rtt by rttFlow.collectAsStateWithLifecycle()
-    val remoteSignal by remoteSignalFlow.collectAsStateWithLifecycle()
-    val commIndex = if (isSystemActive && isRelayConnected) TelemetryUtils.calculateCommIndex(rtt, 10, 10) else 0
-    val remoteCommIndex = if (mode == "viewer" && isTelemetryFresh) TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10) else 0
-    val lastGpsTs = if (mode == "viewer") trackerGpsTs else localGpsTs
-    val isLocalGpsActive = if (mode == "tracker") isGpsFresh else (systemPulse - localGpsTs < GPS_UI_FAIL_THRESHOLD_MS)
-    val lastTelemetryTs = if (mode == "viewer") maxOf(trackerGpsTs, trackerTelemetryTs) else localGpsTs
-    val progressPulse = if (mode == "tracker") lastRemoteActivityTs else lastTelemetryTs
-    val hasUnresolved = activeAlarms.any { !it.isResolved }
+    val mode = hudState.appMode ?: return
+    val lastGpsTs = if (mode == "viewer") hudState.lastGpsTs else hudState.viewerGpsTs
+    
+    // In Tracker mode, "Peer" is the Viewer. In Viewer mode, "Peer" is the Tracker.
+    val isPeerActive = hudState.isTelemetryFresh
+    val isTrackerGpsActive = if (mode == "viewer") hudState.isGpsFresh else hudState.isLocalGpsActive
 
     StatusBar(
         modifier = modifier, 
-        isInternet = isLocalOnline, 
-        isRelay = isRelayConnected, 
-        isPeerActive = isTelemetryFresh, 
-        isDataHealthy = isTelemetryFresh && isLocalOnline && isRelayConnected, 
-        isLocalGpsActive = isLocalGpsActive, 
-        isTrackerGpsActive = isGpsFresh, 
+        isInternet = hudState.isInternet, 
+        isRelay = hudState.isRelayConnected, 
+        isPeerActive = isPeerActive, 
+        isDataHealthy = hudState.isDataHealthy, 
+        isLocalGpsActive = hudState.isLocalGpsActive, 
+        isTrackerGpsActive = isTrackerGpsActive, 
         mode = mode, 
-        battery = batteryLevel, 
-        lastP = progressPulse, 
-        commIndex = commIndex, 
-        remoteCommIndex = remoteCommIndex, 
-        remoteBattery = if (mode == "viewer") trackerBatteryLevel else -1, 
-        isCharging = isChargingStable, 
-        remoteCharging = if (mode == "viewer") trackerChargingStable else false, 
-        speedMps = (if (mode == "viewer") trackerSpeedMps else 0.0).toFloat(), 
-        trackerAccuracy = trackerAccuracy.toFloat(), 
-        maxTrackerAccuracy = trackerMaxAccuracy.toFloat(), 
-        viewerAccuracy = (if (localLat != 0.0) localAccuracy.toFloat() else 0f), 
-        maxViewerAccuracy = localMaxAccuracy.toFloat(), 
-        now = systemPulse, 
-        satsView = trackerSatsView, 
-        satsUsed = trackerSatsUsed, 
-        trackerTemp = trackerBatteryTemp.toFloat(), 
-        viewerTemp = viewerBatteryTemp.toFloat(), 
-        distToHome = distanceTrackerToHome, 
-        distToViewer = distanceTrackerToViewer, 
-        viewerSatsUsed = viewerSatsUsed, 
-        viewerSatsView = viewerSatsView, 
-        viewerGpsTs = localGpsTs, 
-        trackerId = deviceId, 
-        viewerId = viewerId, 
-        watchdogOk = watchdogOk, 
-        trackerState = trackerState, 
-        hasActiveAlarms = hasUnresolved, 
-        isRedScreenSuppressed = (hasUnresolved && !isRedScreenVisible), 
-        isSirenPlaying = isSirenPlaying, 
-        isTrackerLocPending = trackerLocPending, 
-        trackerLocPendingReason = trackerLocPendingReason, 
-        isViewerLocPending = localLocPending, 
-        viewerLocPendingReason = localLocPendingReason, 
+        battery = hudState.battery, 
+        lastP = (hudState.progressPulse * TELEMETRY_UI_STALE_THRESHOLD_MS).toLong(), // Reconstruct relative p for legacy StatusBar logic if needed, or pass absolute
+        commIndex = hudState.commIndex, 
+        remoteCommIndex = hudState.remoteCommIndex, 
+        remoteBattery = if (mode == "viewer") hudState.remoteBattery else -1, 
+        isCharging = hudState.isCharging, 
+        remoteCharging = if (mode == "viewer") hudState.remoteCharging else false, 
+        speedMps = hudState.speedMps, 
+        trackerAccuracy = hudState.trackerAccuracy, 
+        maxTrackerAccuracy = hudState.maxTrackerAccuracy, 
+        viewerAccuracy = hudState.viewerAccuracy, 
+        maxViewerAccuracy = hudState.maxViewerAccuracy, 
+        now = hudState.systemPulse, 
+        satsView = hudState.satsView, 
+        satsUsed = hudState.satsUsed, 
+        trackerTemp = hudState.trackerTemp, 
+        viewerTemp = hudState.viewerTemp, 
+        distToHome = hudState.distToHome, 
+        distToViewer = hudState.distToViewer, 
+        viewerSatsUsed = hudState.viewerSatsUsed, 
+        viewerSatsView = hudState.viewerSatsView, 
+        viewerGpsTs = hudState.viewerGpsTs, 
+        trackerId = hudState.trackerId, 
+        viewerId = hudState.viewerId, 
+        watchdogOk = hudState.watchdogOk, 
+        trackerState = hudState.trackerState, 
+        hasActiveAlarms = hudState.hasActiveAlarms, 
+        isRedScreenSuppressed = hudState.isRedScreenSuppressed, 
+        isSirenPlaying = hudState.isSirenPlaying, 
+        isTrackerLocPending = hudState.isTrackerLocPending, 
+        trackerLocPendingReason = hudState.trackerLocPendingReason, 
+        isViewerLocPending = hudState.isViewerLocPending, 
+        viewerLocPendingReason = hudState.viewerLocPendingReason, 
         lastGpsTs = lastGpsTs, 
-        isTelemetryFresh = isTelemetryFresh, 
-        isGpsFresh = isGpsFresh
+        isTelemetryFresh = isPeerActive, 
+        isGpsFresh = isTrackerGpsActive
     )
 }
 
@@ -653,8 +640,10 @@ fun StatusBar(
     isTelemetryFresh: Boolean = true,
     isGpsFresh: Boolean = true
 ) {
-    val age = if (lastP > 0) now - lastP else Long.MAX_VALUE 
-    val progressValue = if (lastP > 0) maxOf(0f, minOf(1f, (TELEMETRY_UI_STALE_THRESHOLD_MS - age).toFloat() / TELEMETRY_UI_STALE_THRESHOLD_MS)) else 0f
+    // Legacy mapping: lastP was treated as "last packet timestamp", but in GlobalStatusBar we passed a value derived from progressPulse.
+    // We adjust here to maintain consistent visual progress.
+    val progressValue = if (lastP > 0) maxOf(0f, minOf(1f, lastP.toFloat() / TELEMETRY_UI_STALE_THRESHOLD_MS)) else 0f
+
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val trkIdLabel = trackerId.take(6).uppercase()

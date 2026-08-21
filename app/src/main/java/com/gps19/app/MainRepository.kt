@@ -28,15 +28,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Aug.20.07:
+ * - Issue #225 Analytical Telemetry Optimization: Refactored history mapping 
+ *   to use ForensicMapper for 1:1 parity (R225).
  * Aug.20.05:
  * - Issue #224 Forensic Audit: Synchronized sitVzTs, sitVzRt, and verticalVelocity 
  *   mapping in getHistoryFlow and mapToEntity to ensure forensic parity (R224).
- * Aug.19.13:
- * - Issue #217: Shadow-Cache strategy for trail points. Replaced manual clear 
- *   logic with LRU-based ShadowCache to ensure stable memory footprint (R217).
- * Aug.19.12:
- * - Issue #216 Simplification: Consolidated disparate Atomic counters into 
- *   RepositoryMetrics data structure (R216).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -64,7 +61,6 @@ class MainRepository @Inject constructor(
     private val violationProcessor = ViolationProcessor(timeProvider)
     private val metrics = RepositoryMetrics()
 
-    // Issue #217: LRU caches for trail points to prevent memory growth
     private val trackerPointCache = ShadowCache<Long, TrailPoint>(3000)
     private val viewerPointCache = ShadowCache<Long, TrailPoint>(3000)
 
@@ -326,32 +322,12 @@ class MainRepository @Inject constructor(
                 isConnected = entity.isConnected; isGap = entity.isGap; isRecoveryEvent = entity.isRecoveryEvent
                 gpsAccuracy = entity.accuracy; maxAccuracy = entity.maxAccuracy; isTick = entity.isTick 
                 hasGps = entity.hasGps
-                isBatterySteepDischarge = entity.isBatterySteepDischarge
-                isCoolingModeActive = entity.isCoolingModeActive
-                isBatteryLow = entity.isBatteryLow
-                isBatteryCritical = entity.isBatteryCritical
                 speed = entity.speed; bearing = entity.bearing
                 currentMa = entity.currentMa
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
-                gpsIndex = entity.gpsIndex
-                noiseIdx = entity.noiseIdx
-                luxIdx = entity.luxIdx
-                vibeIdx = entity.vibeIdx
-                proxIdx = entity.proxIdx
-                liftIdx = entity.liftIdx
-                snrIdx = entity.snrIdx
-                tiltIdx = entity.tiltIdx
-                baroIdx = entity.baroIdx
-                isSitDetected = entity.isSitDetected
-                isSitActive = entity.isSitActive
-                verticalVelocity = entity.verticalVelocity
-                sitVz = entity.sitVz
-                sitVzTs = entity.sitVzTs
-                sitVzRt = entity.sitVzRt
-                sitDz = entity.sitDz
-                sitBaro = entity.sitBaro
-                sitTilt = entity.sitTilt
-                sitShock = entity.sitShock
+                
+                // R225: Consolidated forensic mapping
+                ForensicMapper.mapEntityToApp(entity, this)
             }
             cp
         }
@@ -374,7 +350,7 @@ class MainRepository @Inject constructor(
         liveHistoryBuffer.add(ribbonKey to uiCopy)
 
         if (!PersistencePolicy.shouldSaveHistoryPoint(health)) return
-        historyBuffer.add(mapToEntity(ribbonKey, point))
+        historyBuffer.add(ForensicMapper.mapAppToEntity(point, ribbonKey))
 
         val nowRt = timeProvider.elapsedRealtime()
         val shouldWrite = (nowRt - lastBatchWriteRealtime > HISTORY_BATCH_WRITE_INTERVAL_MS) || (historyBuffer.size >= HISTORY_BUFFER_MAX_SIZE)
@@ -392,7 +368,7 @@ class MainRepository @Inject constructor(
         if (!PersistencePolicy.shouldSaveHistoryPoint(health)) return
 
         points.forEach { point ->
-            historyBuffer.add(mapToEntity(ribbonKey, point))
+            historyBuffer.add(ForensicMapper.mapAppToEntity(point, ribbonKey))
         }
 
         val nowRt = timeProvider.elapsedRealtime()
@@ -422,41 +398,6 @@ class MainRepository @Inject constructor(
             }
         }
     }
-
-    private fun mapToEntity(ribbonKey: String, point: ConnectionPoint) = HistoryEntity(
-        ts = point.ts, rt = point.rt, rtt = point.rtt, isConnected = point.isConnected, isGap = point.isGap, 
-        isRecoveryEvent = point.isRecoveryEvent,
-        hasGps = point.hasGps, isTick = point.isTick, ribbonKey = ribbonKey,
-        isBatterySteepDischarge = point.isBatterySteepDischarge,
-        remoteSig = point.remoteSig,
-        isCoolingModeActive = point.isCoolingModeActive,
-        isBatteryLow = point.isBatteryLow,
-        isBatteryCritical = point.isBatteryCritical,
-        speed = point.speed, bearing = point.bearing,
-        currentMa = point.currentMa,
-        locationPendingReason = point.locationPendingReason.name,
-        accuracy = point.gpsAccuracy,
-        maxAccuracy = point.maxAccuracy,
-        gpsIndex = point.gpsIndex,
-        noiseIdx = point.noiseIdx,
-        luxIdx = point.luxIdx,
-        vibeIdx = point.vibeIdx,
-        proxIdx = point.proxIdx,
-        liftIdx = point.liftIdx,
-        snrIdx = point.snrIdx,
-        tiltIdx = point.tiltIdx,
-        baroIdx = point.baroIdx,
-        isSitDetected = point.isSitDetected,
-        isSitActive = point.isSitActive,
-        verticalVelocity = point.verticalVelocity,
-        sitVz = point.sitVz,
-        sitVzTs = point.sitVzTs,
-        sitVzRt = point.sitVzRt,
-        sitDz = point.sitDz,
-        sitBaro = point.sitBaro,
-        sitTilt = point.sitTilt,
-        sitShock = point.sitShock
-    )
 
     suspend fun flushHistory() {
         flushHistoryBufferInternal(timeProvider.elapsedRealtime())

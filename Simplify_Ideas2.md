@@ -1,27 +1,17 @@
-# Architectural Simplification Ideas (Aug.20.06)
+# Architectural Simplification Ideas (vAug.20.07)
 
-Following the production hardening of the forensic pipeline, here are recommendations to further simplify the codebase and improve maintainability:
+## 1. Telemetry Mapping Consolidation (Issue #225)
+- **Current State**: Mapping between `HistoryEntity`, `PendingStatusEntity`, and `ConnectionPoint` is duplicated across several extension functions and repository methods.
+- **Idea**: Create a unified `ForensicMapper` interface or utility object that handles the 1:1 parity transformation for all high-frequency metadata (sitVzTs, sitVzRt, etc.). This ensures that adding a new forensic field only requires a change in one location.
 
-## 1. Telemetry Mapping Consolidation
-- **Problem**: `MainRepository.kt`, `ConnectivitySuite.kt`, and `TelemetryUseCase.kt` contain redundant, manual mapping blocks between `HistoryEntity`, `PendingStatusEntity`, `TrackerStatus`, and `ConnectionPoint`.
-- **Simplification**: Implement a unified `TelemetryMapper` or use Kotlin reflection/serialization to automate the transfer of common forensic fields. This reduces the risk of field-omission bugs (like the one fixed in R224).
+## 2. HUD State Centralization
+- **Current State**: Freshness and validity states for GPS and IMU are derived in multiple ViewModels.
+- **Idea**: Centralize the "System Health" logic into a single `ForensicStateMonitor` that emits a unified `TelemetryHealth` object. This would allow `derivedStateOf` to act on a single source of truth, reducing recomposition triggers in the HUD.
 
-## 2. UI Refresh Throttling
-- **Problem**: `MainViewModel` uses multiple `sample()` and `combine()` blocks for dashboard and log states.
-- **Simplification**: Centralize UI state sampling into a single `UiState` pulse to ensure consistency and reduce coroutine overhead.
+## 3. Room Database Migration Automation
+- **Current State**: Manual migration scripts (`MIGRATION_72_73`) are becoming complex.
+- **Idea**: Evaluate the use of `AutoMigration` for simple field additions, keeping manual scripts only for complex index reconstructions or data sanitization.
 
-## 3. Unified Event Bus Reduction
-- **Observation**: The app currently uses `UiEvent`, `UiCommand`, and `CommandEvent` across multiple layers.
-- **Simplification**: Consolidate into a single reactive `SystemEvent` stream. Many "UI Commands" are essentially service-layer actions that could be handled via a unified `ActionHandler` instead of passing through multiple sealed class translations.
-
-## 4. Forensic Sampling State Machine
-- **Observation**: `TrackerService.kt` contains manual logic for switching sampling intervals based on battery, thermal, and buffer pressure.
-- **Simplification**: Move this logic into a dedicated `ForensicSamplingStrategy` class. This would decouple the background service from the specific interval math, making the core service loop easier to read and test.
-
-## 5. Redundant Lifecycle Observers
-- **Observation**: `MainActivity`, `MainAppContent`, and various Composables all have their own lifecycle listeners to refresh permissions or UI state.
-- **Simplification**: Centralize lifecycle-dependent state updates into the `MainViewModel`. Using `lifecycle.repeatOnLifecycle` within the ViewModel can eliminate the need for multiple `DisposableEffect` observers in the UI layer.
-
-## 6. ShadowCache Utility Standardisation
-- **Observation**: With the introduction of `ShadowCache`, some legacy manual caching in `MainRepository` and `GpsApplication` remains.
-- **Simplification**: Refactor all high-frequency lookups to use the centralized `ShadowCache`. This would eliminate custom synchronization logic scattered throughout the repository layer.
+## 4. Shadow-Cache Primitive Pooling
+- **Current State**: `ShadowCache` stores `TrailPoint` objects.
+- **Idea**: Explore using primitive arrays for coordinate history to further reduce heap pressure and GC churn during 100Hz tracking sessions.

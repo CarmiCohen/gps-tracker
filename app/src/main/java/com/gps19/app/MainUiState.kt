@@ -1,7 +1,6 @@
 package com.gps19.app
 
-import com.gps19.core.engine.CapabilityStatus
-import com.gps19.core.engine.SystemHealthState
+import com.gps19.core.engine.*
 import org.osmdroid.util.GeoPoint
 
 /**

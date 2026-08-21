@@ -10,6 +10,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.20.09:
+ * - Issue #226: HUD State Centralization. Removed duplicate AlarmInfo (R226).
  * Aug.20.03:
  * - Issue #223 Release: Removed debug instrumentation (SimulateThermalEvent, 
  *   ExecuteForensicTest) for production hardening.
@@ -600,8 +602,6 @@ data class TrackerStatus(
         }
     }
 }
-
-data class AlarmInfo(val title: String, val subtitle: String, val type: String = "", val isResolved: Boolean = false, val isSirenDisabled: Boolean = false)
 
 /**
  * LocationState: Pure position data. Hardware/Health metadata moved to SystemHealthState.

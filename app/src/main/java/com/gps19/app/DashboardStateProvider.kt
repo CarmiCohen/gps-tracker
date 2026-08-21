@@ -5,14 +5,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * DashboardStateProvider: Dedicated provider for UI-ready dashboard states.
+ * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Aug.20.09:
+ * - Issue #226: HUD State Centralization. Added buildHudState to consolidate 
+ *   telemetry logic for status badges and ribbons (R226). Fixed lambda 
+ *   parameter inference for Samsung A15 compiler stability.
  * Aug.13.11:
- * - Issue #163: 1Hz Telemetry Path Optimization. Refactored to pass raw 
- *   primitive values instead of pre-formatted strings to eliminate object 
- *   churn in the 1Hz heartbeat (R163).
- * Aug.10.28:
- * - Issue #133: Forensic Anomaly Correlation Engine. Populated isSilentFailure 
- *   into DashboardState for load-correlated anomaly tracking (R133).
+ * - Issue #163: 1Hz Telemetry Path Optimization.
  */
 interface DashboardStateProvider {
     fun buildDashboardState(
@@ -24,6 +23,16 @@ interface DashboardStateProvider {
         localMaxTemp: Double,
         trackerMaxTemp: Double
     ): DashboardState
+
+    fun buildHudState(
+        uiState: MainUiState,
+        kinematicState: KinematicState,
+        diagnosticState: DiagnosticState,
+        systemPulse: Long,
+        trackerState: TrackerState,
+        rtt: Int,
+        remoteSignal: Int
+    ): HudState
 }
 
 @Singleton
@@ -144,6 +153,89 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             ioWait = health.ioWait,
             maxIoLatencyMs = health.maxIoLatency,
             isSilentFailure = health.isSilentFailure
+        )
+    }
+
+    override fun buildHudState(
+        uiState: MainUiState,
+        kinematicState: KinematicState,
+        diagnosticState: DiagnosticState,
+        systemPulse: Long,
+        trackerState: TrackerState,
+        rtt: Int,
+        remoteSignal: Int
+    ): HudState {
+        val mode = uiState.appMode
+        
+        // Freshness Logic
+        val loc = if (mode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
+        val telemetryAge = if (loc.telemetryTs > 0) systemPulse - loc.telemetryTs else Long.MAX_VALUE
+        val sourceGpsAge = if (loc.telemetryTs > 0 && loc.timestamp > 0) maxOf(0L, loc.telemetryTs - loc.timestamp) else 0L
+        val totalGpsAge = telemetryAge + sourceGpsAge
+
+        val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
+        val isGpsFresh = totalGpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
+
+        val commIndex = if (uiState.isSystemActive && diagnosticState.connectivity.isRelayConnected) {
+            TelemetryUtils.calculateCommIndex(rtt, 10, 10)
+        } else 0
+
+        val remoteCommIndex = if (mode == "viewer" && isTelemetryFresh) {
+            TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10)
+        } else 0
+
+        val lastGpsTs = if (mode == "viewer") kinematicState.trackerLocation.timestamp else kinematicState.localLocation.timestamp
+        val lastTelemetryTs = if (mode == "viewer") maxOf(kinematicState.trackerLocation.timestamp, kinematicState.trackerLocation.telemetryTs) else kinematicState.localLocation.timestamp
+        val rawPulse = if (mode == "tracker") diagnosticState.connectivity.lastRemoteActivityTs else lastTelemetryTs
+        
+        val age = if (rawPulse > 0) systemPulse - rawPulse else Long.MAX_VALUE
+        val progressValue = if (rawPulse > 0) {
+            maxOf(0f, minOf(1f, (TELEMETRY_UI_STALE_THRESHOLD_MS - age).toFloat() / TELEMETRY_UI_STALE_THRESHOLD_MS))
+        } else 0f
+
+        return HudState(
+            appMode = mode,
+            isInternet = diagnosticState.connectivity.isLocalOnline,
+            isRelayConnected = diagnosticState.connectivity.isRelayConnected,
+            isTelemetryFresh = isTelemetryFresh,
+            isDataHealthy = isTelemetryFresh && diagnosticState.connectivity.isLocalOnline && diagnosticState.connectivity.isRelayConnected,
+            isLocalGpsActive = if (mode == "tracker") isGpsFresh else (systemPulse - kinematicState.localLocation.timestamp < GPS_UI_FAIL_THRESHOLD_MS),
+            isGpsFresh = isGpsFresh,
+            battery = diagnosticState.battery.level,
+            remoteBattery = if (mode == "viewer") diagnosticState.trackerBattery.level else -1,
+            isCharging = diagnosticState.battery.isChargingStable,
+            remoteCharging = if (mode == "viewer") diagnosticState.trackerBattery.isChargingStable else false,
+            speedMps = (if (mode == "viewer") kinematicState.trackerLocation.speed else 0.0).toFloat(),
+            trackerAccuracy = kinematicState.trackerLocation.accuracy.toFloat(),
+            maxTrackerAccuracy = kinematicState.trackerLocation.maxAccuracy.toFloat(),
+            viewerAccuracy = (if (kinematicState.localLocation.lat != 0.0) kinematicState.localLocation.accuracy.toFloat() else 0f),
+            maxViewerAccuracy = kinematicState.localLocation.maxAccuracy.toFloat(),
+            satsUsed = diagnosticState.trackerSatsUsed,
+            satsView = diagnosticState.trackerSatsView,
+            viewerSatsUsed = diagnosticState.viewerSatsUsed,
+            viewerSatsView = diagnosticState.viewerSatsView,
+            trackerTemp = diagnosticState.trackerBattery.temp.toFloat(),
+            viewerTemp = diagnosticState.battery.temp.toFloat(),
+            distToHome = kinematicState.distanceTrackerToHome,
+            distToViewer = kinematicState.distanceTrackerToViewer,
+            trackerId = uiState.deviceId,
+            viewerId = uiState.viewerId,
+            watchdogOk = if (mode == "viewer") (isTelemetryFresh || (systemPulse - diagnosticState.connectivity.lastRemoteActivityTs < WATCH_DOG_UI_GRACE_MS)) else true,
+            trackerState = trackerState,
+            hasActiveAlarms = diagnosticState.activeAlarms.any { alarm -> !alarm.isResolved },
+            isRedScreenSuppressed = (diagnosticState.activeAlarms.any { alarm -> !alarm.isResolved } && !diagnosticState.isRedScreenVisible),
+            isSirenPlaying = diagnosticState.isSirenPlaying,
+            isTrackerLocPending = kinematicState.trackerHealth.isLocationPending,
+            trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
+            isViewerLocPending = kinematicState.localHealth.isLocationPending,
+            viewerLocPendingReason = kinematicState.localHealth.locationPendingReason,
+            commIndex = commIndex,
+            remoteCommIndex = remoteCommIndex,
+            lastGpsTs = lastGpsTs,
+            viewerGpsTs = kinematicState.localLocation.timestamp,
+            progressPulse = progressValue,
+            systemPulse = systemPulse,
+            activeAlarms = diagnosticState.activeAlarms
         )
     }
 }

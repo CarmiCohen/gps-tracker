@@ -10,19 +10,12 @@ The following rules MUST be followed strictly for every task:
 6. **Transparency**: Briefly explain each action before executing it.
 
 ## 🏁 Completion Sequence
-Perform the full sequence once the specific issue is resolved:
+Perform the following steps in order once an issue is resolved:
 
-- **a.** Rebuild the app.
-- **b.** Verify that ALL fixed issues are updated in `issues.md` or another status tracking md file.
-- **c.** Check that no `*.md` or `*.xml` file was accidentally truncated.
-- **d.** Verify that there is no inconsistency with this change of the app and other code portions or documentation.
-- **e.** Verify that new requirements are added to `STATUS/SOT_MASTER_REQUIREMENTS.md`.
-- **f.** Prepare a block of Git commands to stage the changes and to commit them as a new release with a tag the version and to push everything to the remote repository. The subversion number will be incremented automatically.
-- **g.** Please verify that `Handover.md` is updated and ready for new fresh chat.
-- **h.** Documentation integrity: Is there anything else we should do in order to fix the Status tracking md files and keep the integrity?
-- **i.** Please always set issue number to all "Newly Identified Risks & Concerns" in `issues.md`, and "Next Objective" in `Handover.md`.
-- **j.** After completing the fix for the issue, stop the chat and do not attempt to fix any other issues.
-- **k.** Recheck `issues.md`, `sot_master_requirements.md`, `resolution_archive.md`, and `handover.md`.
-- **l.** Do not fix more than one issue, do not continue to the next issue: after completing the issue - stop this chat.
-- **m.** Please verify that the removal of the lines from issues.md, sot_master_requirements.md, resolution_archive.md, and build.gradle is correct.
-- **n.** Suggest your ideas, if you have, how to simplify the code and the app, so that it will be easier to work with. Save your ideas in Simplify_Ideas2.md
+1. **Integrity Audit**: Verify that no `*.md` or `*.xml` files were accidentally truncated and ensure the change is consistent with existing code and documentation.
+2. **State Tracking Update**: Update `issues.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, and `STATUS/RESOLUTION_ARCHIVE.md`. Record all fixed issues and verify that new concerns have issue numbers assigned.
+3. **App Build & Versioning**: Rebuild the app and update the `versionName` in `app/build.gradle`.
+4. **Git Release Block**: Prepare a Git command block to stage, commit, tag the version, and push to the remote repository.
+5. **Simplicity Audit**: Evaluate if the code or app architecture can be further simplified. Save these ideas in `Simplify_Ideas2.md`.
+6. **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot to prepare for a fresh chat session.
+7. **Session Termination**: Stop the chat immediately. Do not attempt to fix any other issues or continue work.

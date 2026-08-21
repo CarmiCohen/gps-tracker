@@ -32,12 +32,13 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Aug.20.09:
+ * - Issue #226: HUD State Centralization. Refactored GlobalStatusBar call 
+ *   to consume unified HudState (R226).
  * Aug.16.12:
  * - Issue #185 Hardening: Updated to collect and pass pre-simplified 
  *   MapTrailSegments to AppMapContainer, eliminating main-thread 
  *   simplification churn during startup hydration (R185).
- * Aug.15.03:
- * - Issue #182 Hardening: Gated AppMapContainer by overlay visibility (R182).
  */
 
 @Composable
@@ -76,6 +77,7 @@ fun ViewerScreen(
     val context = LocalContext.current
 
     val dashboardState by viewModel.dashboardState.collectAsStateWithLifecycle()
+    val hudState by viewModel.hudState.collectAsStateWithLifecycle()
     val gpsIndexData by viewModel.gpsIndexData.collectAsStateWithLifecycle()
     val rtt by viewModel.rtt.collectAsStateWithLifecycle()
     val trackerCurrentMa by viewModel.trackerCurrentMa.collectAsStateWithLifecycle()
@@ -108,48 +110,8 @@ fun ViewerScreen(
 
     val statusBar = @Composable {
         GlobalStatusBar(
-            appMode = uiState.appMode,
+            hudState = hudState,
             isSystemActive = uiState.isSystemActive,
-            deviceId = uiState.deviceId,
-            viewerId = uiState.viewerId,
-            isLocalOnline = diagnosticState.connectivity.isLocalOnline,
-            isRelayConnected = diagnosticState.connectivity.isRelayConnected,
-            lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
-            isRedScreenVisible = diagnosticState.isRedScreenVisible,
-            batteryLevel = diagnosticState.battery.level,
-            trackerBatteryLevel = diagnosticState.trackerBattery.level,
-            isChargingStable = diagnosticState.battery.isChargingStable,
-            trackerChargingStable = diagnosticState.trackerBattery.isChargingStable,
-            activeAlarms = diagnosticState.activeAlarms,
-            trackerSatsView = diagnosticState.trackerSatsView,
-            trackerSatsUsed = diagnosticState.trackerSatsUsed,
-            trackerBatteryTemp = diagnosticState.trackerBattery.temp,
-            viewerBatteryTemp = diagnosticState.battery.temp,
-            viewerSatsUsed = diagnosticState.viewerSatsUsed,
-            viewerSatsView = diagnosticState.viewerSatsView,
-            isSirenPlaying = diagnosticState.isSirenPlaying,
-            trackerGpsTs = kinematicState.trackerLocation.timestamp,
-            trackerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
-            trackerSpeedMps = kinematicState.trackerLocation.speed,
-            trackerAccuracy = kinematicState.trackerLocation.accuracy,
-            trackerMaxAccuracy = kinematicState.trackerLocation.maxAccuracy,
-            localGpsTs = kinematicState.localLocation.timestamp,
-            localAccuracy = kinematicState.localLocation.accuracy,
-            localMaxAccuracy = kinematicState.localLocation.maxAccuracy,
-            localLat = kinematicState.localLocation.lat,
-            trackerLocPending = kinematicState.trackerHealth.isLocationPending,
-            trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
-            localLocPending = kinematicState.localHealth.isLocationPending,
-            localLocPendingReason = kinematicState.localHealth.locationPendingReason,
-            distanceTrackerToHome = kinematicState.distanceTrackerToHome,
-            distanceTrackerToViewer = kinematicState.distanceTrackerToViewer,
-            isTelemetryFresh = dashboardState.isTelemetryFresh,
-            isGpsFresh = dashboardState.isGpsFresh,
-            watchdogOk = dashboardState.watchdogOk,
-            trackerState = dashboardState.trackerState,
-            systemPulse = systemPulse,
-            rttFlow = viewModel.rtt,
-            remoteSignalFlow = viewModel.remoteSignal,
             modifier = Modifier.pointerInput(Unit) {
                 detectTapGestures(onTap = { viewModel.onEvent(UiEvent.SetRedScreenVisible(true)) })
             }

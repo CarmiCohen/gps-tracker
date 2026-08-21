@@ -412,7 +412,10 @@ fun MainAppContent(
                         onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, 
                         onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onTestAlarm = { viewModel.onEvent(UiEvent.RequestTestAlarm) },
-                        onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
+                        onNavigateToDiagnostics = { 
+                            viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
+                            viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) 
+                        },
                         permissions = uiState.permissions,
                         homePointsCount = uiState.homePoints.size,
                         isTrackerMode = uiState.appMode == "tracker",

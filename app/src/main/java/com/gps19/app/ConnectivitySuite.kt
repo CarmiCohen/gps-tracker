@@ -33,15 +33,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Aug.20.07:
+ * - Issue #225 Analytical Telemetry Optimization: Refactored status mapping 
+ *   to use ForensicMapper for 1:1 parity (R225).
  * Aug.20.06:
  * - Issue #224 Forensic Audit: Synchronized vertical velocity and sensor indices 
  *   in PendingStatusEntity persistence path for offline forensic parity (R224).
- * Aug.14.04:
- * - Issue #173: Multi-Stream Contention. Added updateRemoteProcessor() to 
- *   support decoupled processor instances in ViewerService (R173).
- * Aug.10.24:
- * - Issue #130: Proto Health Parity. Integrated isBatteryLow and isBatteryCritical 
- *   into binary and JSON telemetry pipelines (R130).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -363,7 +360,7 @@ class ConnectivitySuite @Inject constructor(
         val pending = offlineRepository.getPendingStatusUpdates(100)
         if (pending.isEmpty()) return
         pending.forEach { entity ->
-            val status = TrackerStatus(
+            val statusTemplate = TrackerStatus(
                 deviceId = deviceId, viewerId = viewerId, ts = entity.timestamp, lat = entity.lat, lng = entity.lng, alt = 0.0, 
                 accuracy = entity.accuracy, maxAccuracy = entity.maxAccuracy, speed = entity.speed, bearing = entity.bearing,
                 vibration = 0.0, heading = 0.0, baroAlt = 0.0, lux = 0.0, isNear = true, tiltDegrees = 0.0, acousticDb = 0.0,
@@ -376,26 +373,21 @@ class ConnectivitySuite @Inject constructor(
                 isStorageLow = entity.isStorageLow, isStorageCritical = entity.isStorageCritical,
                 isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface,
                 kineticEnergy = 0.0, isBatteryLow = entity.isBatteryLow, isBatteryCritical = entity.isBatteryCritical,
-                // R224: Restore missing forensic fields during sync
-                snrIdx = entity.snrIdx, noiseIdx = entity.noiseIdx, luxIdx = entity.luxIdx, vibeIdx = entity.vibeIdx,
-                liftIdx = entity.liftIdx, tiltIdx = entity.tiltIdx, baroIdx = entity.baroIdx,
-                isSitDetected = entity.isSitDetected, isSitActive = entity.isSitActive,
-                sitVz = entity.sitVz, sitVzTs = entity.sitVzTs, sitVzRt = entity.sitVzRt, sitDz = entity.sitDz,
-                sitBaro = entity.sitBaro, sitTilt = entity.sitTilt, sitShock = entity.sitShock,
                 verticalVelocity = entity.verticalVelocity
             )
-            // Issue #596: Flushed updates use NORMAL to avoid blocking live traffic.
+            // R225: Consolidated forensic restoration during sync
+            val status = ForensicMapper.mapPendingToStatus(entity, statusTemplate)
+
             if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) offlineRepository.deletePendingStatusUpdate(entity.id)
         }
     }
 
     suspend fun sendTelemetry(status: TrackerStatus): Boolean {
-        // Issue #596: Live telemetry uses HIGH priority to bypass forensic log queue.
         val success = sendTelemetryInternal(status, SignalingPriority.HIGH)
         if (isTrackerMode) {
             mainRepository.saveTrackerState(status)
             if (!success) {
-                offlineRepository.addPendingStatusUpdate(PendingStatusEntity(
+                val entityTemplate = PendingStatusEntity(
                     lat = status.lat, lng = status.lng, speed = status.speed, accuracy = status.accuracy, bearing = status.bearing,
                     battery = status.battery, temp = status.temp, isCharging = status.isCharging, timestamp = status.ts,
                     gpsTs = status.gpsTs, satsView = status.gnssDetail?.satellites?.size ?: 0,
@@ -407,14 +399,11 @@ class ConnectivitySuite @Inject constructor(
                     netInterface = status.netInterface, lastValidFixRt = status.lastValidFixRt,
                     locationPendingReason = status.locationPendingReason.name, trackerState = status.trackerState.name, status = status.status.name,
                     isBatteryLow = status.isBatteryLow, isBatteryCritical = status.isBatteryCritical,
-                    // R224: Persist missing forensic fields during network loss
-                    snrIdx = status.snrIdx, noiseIdx = status.noiseIdx, luxIdx = status.luxIdx, vibeIdx = status.vibeIdx,
-                    liftIdx = status.liftIdx, tiltIdx = status.tiltIdx, baroIdx = status.baroIdx,
-                    isSitDetected = status.isSitDetected, isSitActive = status.isSitActive,
-                    sitVz = status.sitVz, sitVzTs = status.sitVzTs, sitVzRt = status.sitVzRt, sitDz = status.sitDz,
-                    sitBaro = status.sitBaro, sitTilt = status.sitTilt, sitShock = status.sitShock,
                     verticalVelocity = status.verticalVelocity
-                ))
+                )
+                // R225: Consolidated forensic persistence
+                val entity = ForensicMapper.mapStatusToPending(status, entityTemplate)
+                offlineRepository.addPendingStatusUpdate(entity)
             }
         }
         return success
@@ -425,7 +414,6 @@ class ConnectivitySuite @Inject constructor(
         if (!isConnected()) return false
         if (isTrackerMode) {
             status.writeTo(statusBuilder, false)
-            // Issue #601: Carry kinetic energy in binary payloads
             statusBuilder.setKineticEnergy(status.kineticEnergy)
             
             val message = statusBuilder.buildPartial()

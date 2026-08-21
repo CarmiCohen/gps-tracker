@@ -9,6 +9,7 @@ import android.os.SystemClock
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.gps19.core.engine.*
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
@@ -18,16 +19,13 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Aug.20.09:
+ * - Build Hardening: Added @AndroidEntryPoint to base class to resolve 
+ *   Hilt compilation regression.
  * July.28.15:
- * - Issue #610: Forensic Heartbeat Decoupling. Introduced a dedicated, 
- *   low-frequency heartbeat loop for notification updates to reduce pressure 
- *   on the high-frequency tick loop. Removed obsolete lastNotificationUpdateTs.
- * July.27.12:
- * - Issue #607: Foreground Service Startup Race Condition. Moved startForeground 
- *   to onCreate() (Main thread) and added onServicePreInit() for early configuration.
- * July.26.04:
- * - Issue #589: Performance Audit. Integrated reactive Watchdog monitoring.
+ * - Issue #610: Forensic Heartbeat Decoupling.
  */
+@AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
 
     @Inject lateinit var configManager: ConfigManager

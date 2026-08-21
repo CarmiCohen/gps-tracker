@@ -21,16 +21,17 @@ import kotlinx.coroutines.withContext
 import org.osmdroid.util.GeoPoint
 import timber.log.Timber
 import java.util.Locale
+import java.util.UUID
 import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * Aug.20.03:
- * - Issue #223 Release: Removed debug instrumentation (simulateThermalEvent, 
- *   RequestForensicTest) for production hardening.
- * Aug.18.09:
- * - Issue #208 Performance Audit: Implemented trail segment caching in 
- *   computeTrailSegments to eliminate redundant O(N) simplification churn (R208).
+ * Aug.20.09:
+ * - Issue #226: HUD State Centralization. Added hudState StateFlow to 
+ *   consolidate telemetry for status badges and ribbons (R226). Fixed 
+ *   lambda parameter inference for Samsung A15 compiler stability.
+ * - Issue #239: Restored addPersistentLog, clearTrails, and fullInitialization.
+ * - Issue #241: Fixed combine lambda argument count mismatch for dashboardState/hudState.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -114,7 +115,7 @@ class MainViewModel @Inject constructor(
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val dashboardState: StateFlow<DashboardState> = combine(
-        _uiState.map { it.appMode }.distinctUntilChanged(),
+        _uiState,
         _kinematicState,
         _diagnosticState,
         _systemPulse,
@@ -122,19 +123,40 @@ class MainViewModel @Inject constructor(
         _localMaxTemp,
         _trackerMaxTemp
     ) { args ->
-        val mode = args[0] as String?
+        val ui = args[0] as MainUiState
         val kin = args[1] as KinematicState
         val diag = args[2] as DiagnosticState
         val pulse = args[3] as Long
         val trkState = args[4] as TrackerState
         val lMax = args[5] as Double
         val tMax = args[6] as Double
-        
-        dashboardStateProvider.buildDashboardState(mode, kin, diag, pulse, trkState, lMax, tMax)
+        dashboardStateProvider.buildDashboardState(ui.appMode, kin, diag, pulse, trkState, lMax, tMax)
     }
     .flowOn(Dispatchers.Default)
     .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L) 
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
+
+    val hudState: StateFlow<HudState> = combine(
+        _uiState,
+        _kinematicState,
+        _diagnosticState,
+        _systemPulse,
+        _trackerState,
+        _rtt,
+        _remoteSignal
+    ) { args ->
+        val ui = args[0] as MainUiState
+        val kin = args[1] as KinematicState
+        val diag = args[2] as DiagnosticState
+        val pulse = args[3] as Long
+        val trkState = args[4] as TrackerState
+        val rttVal = args[5] as Int
+        val sig = args[6] as Int
+        dashboardStateProvider.buildHudState(ui, kin, diag, pulse, trkState, rttVal, sig)
+    }
+    .flowOn(Dispatchers.Default)
+    .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState())
 
     val eventLogsFlow: StateFlow<List<LogEntry>> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
@@ -936,34 +958,44 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun addPersistentLog(type: String, message: String, isImportant: Boolean = false, isSpecial: Boolean = false, specialColor: Int? = null) { logManager.submitToLogSink(message = message, type = type, isImportant = isImportant, isSpecial = isSpecial, specialColor = specialColor) }
+    fun addPersistentLog(
+        type: String,
+        message: String,
+        isImportant: Boolean = false,
+        isSpecial: Boolean = false,
+        specialColor: Int? = null
+    ) {
+        val entry = LogEntry(
+            localId = UUID.randomUUID().toString(),
+            timestamp = timeProvider.currentTimeMillis(),
+            message = message,
+            type = type.uppercase(),
+            isImportant = isImportant,
+            isSpecial = isSpecial,
+            specialColor = specialColor,
+            role = _uiState.value.appMode ?: "system"
+        )
+        repository.addLog(entry)
+    }
 
-    fun fullInitialization(context: Context) {
-        viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
-            appStartTime = settingsUseCase.fullInitialization(context)
-            remoteStatusRepository.reset()
-            updateState { state -> state.copy(appStartTime = appStartTime, geofenceMode = GeofenceMode.IDLE, draftSettings = DraftSettings(), isIdentitySanitized = false) }
-            updateKinematicState { it.apply {
-                localLocation.reset(); trackerLocation.reset()
-                localHealth.reset(); trackerHealth.reset()
-                pulse = timeProvider.elapsedRealtime()
-            }}
-            updateDiagnosticState { it.apply {
-                battery.level = 100; stats.uptimeMs = 0; trackerStats.uptimeMs = 0
-                pulse = timeProvider.elapsedRealtime()
-            }}
-            _trackerState.value = TrackerState.UNKNOWN; _localMaxTemp.value = 0.0; _trackerMaxTemp.value = 0.0; _trackerCurrentMa.value = 0; stateSubscriptionUseCase.clearHistory()
-            val initial = settingsUseCase.loadAllSettings()
-            applyInitialSettings(initial)
+    fun clearTrails(context: Context) {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            repository.clearTrails()
+            withContext(Dispatchers.Main.immediate) {
+                Toast.makeText(context, "Trail data cleared", Toast.LENGTH_SHORT).show()
+            }
         }
     }
-    
-    fun clearTrails(context: Context) { viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) { MainFileHelper.manualExportTrails(context, this@MainViewModel, timeProvider); repository.clearTrails(); addPersistentLog("user", "USER ACTION: Trails cleared", isImportant = true); Toast.makeText(context, "Trails exported and cleared", Toast.LENGTH_SHORT).show() } }
 
-    /**
-     * computeTrailSegments: Background trail segmentation and simplification.
-     * Part of Issue #185 ANR mitigation.
-     */
+    fun fullInitialization(context: Context) {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            repository.sendCommand(UiCommand.FullInitializationReset)
+            withContext(Dispatchers.Main.immediate) {
+                Toast.makeText(context, "System Re-initialized", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun computeTrailSegments(trailPoints: List<TrailPoint>, color: Int): List<MapTrailSegment> {
         if (trailPoints.isEmpty()) return emptyList()
         val segments = mutableListOf<MapTrailSegment>()

@@ -27,12 +27,12 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Aug.20.07:
+ * - Issue #225 Analytical Telemetry Optimization: Refactored to use 
+ *   ForensicMapper for engine-to-app parity (R225).
  * Aug.13.06:
  * - Issue #152: Excessive GC Pressure. Implemented ConnectionPoint pooling and 
  *   flyweight mapping to eliminate allocation churn in the 1Hz telemetry hot-path (R152).
- * Aug.10.28:
- * - Issue #133: Forensic Anomaly Correlation Engine. Updated mapToAppPoint to 
- *   include isSilentFailure for load-correlated anomaly tracking (R133).
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -103,7 +103,9 @@ class HistoryManager @Inject constructor(
         cpuLoad: Double = 0.0,
         ioWait: Double = 0.0,
         maxIoLatency: Long = 0L,
-        isSilentFailure: Boolean = false
+        isSilentFailure: Boolean = false,
+        isBatteryLow: Boolean = false,
+        isBatteryCritical: Boolean = false
     ) {
         detectClockTampering(now)
         val deltaRt = if (lastTickRt > 0) nowRt - lastTickRt else 0L
@@ -125,17 +127,14 @@ class HistoryManager @Inject constructor(
                 verticalVelocity, sitVz, sitVzTs, sitVzRt, sitDz, sitBaro, sitTilt, sitShock,
                 isBatterySteepDischarge, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive,
                 currentMa, locationPendingReason, kineticEnergy, isRecoveryEvent,
-                cpuLoad, ioWait, maxIoLatency, isSilentFailure
+                cpuLoad, ioWait, maxIoLatency, isSilentFailure, isBatteryLow, isBatteryCritical
             )
         }
 
-        // Issue #668/152: Reusing flyweight
         currentPointFlyweight.apply {
             ts = now; rt = nowRt; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; isGap = false
             this.isRecoveryEvent = isRecoveryEvent
-            this.hasGps = hasGps; this.accuracy = accuracy; this.maxAccuracy = maxAccuracy; gpsIndex = 0.0
-            this.noiseIdx = noiseIdx; this.luxIdx = luxIdx; this.vibeIdx = vibeIdx; this.proxIdx = proxIdx
-            this.liftIdx = liftIdx; this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
+            this.hasGps = hasGps; this.accuracy = accuracy; this.maxAccuracy = maxAccuracy
             this.isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt)
             this.isSitActive = isSitActive; this.verticalVelocity = verticalVelocity; this.sitVz = sitVz
             this.sitVzTs = sitVzTs; this.sitVzRt = sitVzRt; this.sitDz = sitDz; this.sitBaro = sitBaro
@@ -143,6 +142,10 @@ class HistoryManager @Inject constructor(
             this.isCoolingModeActive = isCoolingModeActive; this.speed = speed; this.bearing = bearing; isTick = false
             this.currentMa = currentMa; this.locationPendingReason = locationPendingReason; this.kineticEnergy = kineticEnergy
             this.cpuLoad = cpuLoad; this.ioWait = ioWait; this.maxIoLatency = maxIoLatency; this.isSilentFailure = isSilentFailure
+            this.isBatteryLow = isBatteryLow; this.isBatteryCritical = isBatteryCritical
+            // Issue #225: Ensure all forensic indices are set for aggregator
+            this.noiseIdx = noiseIdx; this.luxIdx = luxIdx; this.vibeIdx = vibeIdx; this.proxIdx = proxIdx
+            this.liftIdx = liftIdx; this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
         }
         
         aggregator.processPoint(currentPointFlyweight) { scale, point ->
@@ -174,32 +177,30 @@ class HistoryManager @Inject constructor(
         isSitDetected: Boolean, isSitActive: Boolean, currentMa: Int,
         locationPendingReason: LocationPendingReason, kineticEnergy: Double,
         isRecoveryEvent: Boolean, cpuLoad: Double, ioWait: Double, maxIoLatency: Long,
-        isSilentFailure: Boolean
+        isSilentFailure: Boolean, isBatteryLow: Boolean, isBatteryCritical: Boolean
     ) {
         val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
         val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
         
-        // Issue #668/152: Reusing baseTemplate flyweight
         baseTemplateFlyweight.apply {
             ts = 0L; rt = 0L; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; this.hasGps = hasGps
             this.isRecoveryEvent = isRecoveryEvent
-            this.accuracy = accuracy; this.maxAccuracy = maxAccuracy; this.noiseIdx = noiseIdx; this.luxIdx = luxIdx
-            this.vibeIdx = vibeIdx; this.proxIdx = proxIdx; this.liftIdx = liftIdx; this.snrIdx = snrIdx; this.tiltIdx = tiltIdx
-            this.baroIdx = baroIdx; this.verticalVelocity = verticalVelocity; this.sitVz = sitVz; this.sitVzTs = sitVzTs
-            this.sitVzRt = sitVzRt; this.sitDz = sitDz; this.sitBaro = sitBaro; this.sitTilt = sitTilt; this.sitShock = sitShock
+            this.accuracy = accuracy; this.maxAccuracy = maxAccuracy
             this.isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt)
             this.isSitActive = isSitActive; this.isBatterySteepDischarge = isBatterySteepDischarge
             this.isCoolingModeActive = isCoolingModeActive; this.speed = speed; this.bearing = bearing
             this.currentMa = currentMa; this.locationPendingReason = locationPendingReason; this.kineticEnergy = kineticEnergy
             this.cpuLoad = cpuLoad; this.ioWait = ioWait; this.maxIoLatency = maxIoLatency; this.isSilentFailure = isSilentFailure
+            this.isBatteryLow = isBatteryLow; this.isBatteryCritical = isBatteryCritical
+            this.noiseIdx = noiseIdx; this.luxIdx = luxIdx; this.vibeIdx = vibeIdx; this.proxIdx = proxIdx
+            this.liftIdx = liftIdx; this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
+            this.sitVz = sitVz; this.sitVzTs = sitVzTs; this.sitVzRt = sitVzRt; this.sitDz = sitDz
+            this.sitBaro = sitBaro; this.sitTilt = sitTilt; this.sitShock = sitShock; this.verticalVelocity = verticalVelocity
         }
         
-        // Issue #152: Use a managed list of points for batch insertion to avoid list-growth allocations
         val backfillBuffer = ArrayList<ConnectionPoint>(60) 
         
         aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplateFlyweight) { scale, point ->
-            // For backfill, we allocate because these points must survive the callback to be batched.
-            // However, this happens rarely (only on gaps).
             val appPoint = ConnectionPoint()
             mapToAppPoint(point, appPoint)
             
@@ -263,13 +264,10 @@ class HistoryManager @Inject constructor(
         out.apply {
             ts = p.ts; rt = p.rt; rtt = p.rtt; localSig = 10; remoteSig = p.remoteSig; isConnected = p.isConnected
             isGap = p.isGap; isRecoveryEvent = p.isRecoveryEvent; hasGps = p.hasGps; isTick = p.isTick; gpsAccuracy = p.accuracy; maxAccuracy = p.maxAccuracy
-            isBatterySteepDischarge = p.isBatterySteepDischarge; isCoolingModeActive = p.isCoolingModeActive
             speed = p.speed; bearing = p.bearing; currentMa = p.currentMa; locationPendingReason = p.locationPendingReason
-            gpsIndex = p.gpsIndex; snrIdx = p.snrIdx; noiseIdx = p.noiseIdx; luxIdx = p.luxIdx; vibeIdx = p.vibeIdx; proxIdx = p.proxIdx
-            liftIdx = p.liftIdx; snrIdx = p.snrIdx; tiltIdx = p.tiltIdx; baroIdx = p.baroIdx; isSitDetected = p.isSitDetected
-            isSitActive = p.isSitActive; sitVz = p.sitVz; sitVzTs = p.sitVzTs; sitVzRt = p.sitVzRt; sitDz = p.sitDz
-            sitBaro = p.sitBaro; sitTilt = p.sitTilt; sitShock = p.sitShock; kineticEnergy = p.kineticEnergy
-            cpuLoad = p.cpuLoad; ioWait = p.ioWait; maxIoLatency = p.maxIoLatency; isSilentFailure = p.isSilentFailure
+            
+            // R225: Consolidated forensic mapping
+            ForensicMapper.mapEngineToApp(p, this)
         }
     }
 
