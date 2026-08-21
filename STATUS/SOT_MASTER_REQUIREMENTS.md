@@ -1,15 +1,22 @@
-# System Source of Truth (SoT) - Aug.21.08 (Validation & Refactor Release)
+# SOT Master Requirements - GPS Tracker
 
-This document serves as the definitive operational specification. All Issue IDs are Authoritative.
+This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-### 1. Performance & Startup Authority
-*   **UI State Aggregation Authority (R240)**: (Added Aug.21.08) The system MUST utilize a dedicated `UiStateAggregator` service to transform raw domain flows into UI-ready models (`DashboardState`, `HudState`). This extraction resolves the parameter limit constraints of the `combine` operator in `MainViewModel` and ensures state derivation logic is testable and isolated from UI event orchestration. (Issue #240). **Status: Implemented.**
-*   **Forensic Validation Authority (R196-V)**: (Added Aug.21.08) The system MUST provide a `SetForensicSimulation` hook accessible via the Diagnostics interface. This hook MUST allow developers to simulate forensic pipeline failures (drain stalls) to verify EMA reliability degradation and the subsequent triggering of the `PERFORMANCE_SPIKE` alarm. This simulation logic MUST be strictly isolated from standard telemetry paths. (Issue #196-V). **Status: Implemented.**
-*   **Forensic Range-Deduplication Authority (R197)**: (Added Aug.21.06) The system MUST utilize range-based signature queries (`getExistingForensicSignaturesInRange`) during forensic drains. This optimization restricts deduplication lookups to the specific time window of the current batch, eliminating full-history table scans and reducing CPU/Memory pressure on budget hardware (SM-A155F) during 100Hz bursts. (Issue #196). **Status: Implemented.**
-*   **Forensic Overflow Hysteresis (R196)**: (Added Aug.21.06) The `LogManager` MUST implement hysteresis for buffer overflow alerts. The overflow state MUST only be reset when the off-heap `ForensicSpillBuffer` fill level drops below 50%. This prevents alert oscillation and notification spam during periods of sustained high-frequency sampling. (Issue #196). **Status: Implemented.**
-*   **UI Thread Authority (R246)**: (Updated Aug.21.04) The system MUST consolidate UI hydration sequences into no more than 3 broad phases on budget hardware (SM-A155F) to minimize recomposition overhead and prevent Davey stalls (>700ms). Heavy system state observation (e.g., permission refreshes) MUST be throttled to no more than 1Hz during setup and 0.2Hz during background execution. (Issue #246). **Status: Implemented.**
-*   **HUD State Centralization (R226)**: (Updated Aug.21.08) The system MUST utilize a unified `HudState` data class for all UI status indicators. Transformation MUST be handled by the `UiStateAggregator` using `Dispatchers.Default`, and all UI components MUST consume the centralized object to prevent reactive drift. (Issue #226/240). **Status: Implemented.**
-*   **Telemetry Mapping Consolidation (R225)**: (Added Aug.20.07) The system MUST utilize a unified `ForensicMapper` for all 1:1 parity transformations of high-frequency metadata. (Issue #225). **Status: Implemented.**
-*   **Production Release Hardening (R223)**: (Added Aug.20.03) The system MUST be stripped of all debug instrumentation, thermal simulation hooks, and forensic stress-test UI elements prior to production release. No "Simulate" triggers (excluding standard Test Alarm and verified Validation Hooks) are permitted in production-bound layouts. (Issue #223). **Status: Implemented.**
+## 1. Architectural Authority
+*   **1.1 Dependency Injection**: Hilt is the sole authority for dependency management. Manual instantiation of repositories or DAOs is prohibited.
+*   **1.2 State Flow**: UI state must be exposed via `StateFlow` from ViewModels. `UiStateAggregator` is the central authority for consolidating telemetry and diagnostic flows (R240).
+*   **1.3 Foreground Persistence**: `TrackerService` must maintain a foreground notification. Termination of the service is a violation of SOT.
 
-*(Remaining requirements R222 through R799e preserved as of Aug.21.06 baseline)*
+## 2. Forensic & Performance Requirements
+*   **2.1 Sampling Frequency**: Forensic sampling must operate between 10ms and 100ms based on system load (R700).
+*   **2.2 Reliability Threshold**: `ALERT_ID_PERFORMANCE_SPIKE` must trigger if `forensicReliability` (EMA) drops below 0.85 for >30s (R715).
+*   **2.3 UI Fluidity**: UI stalls (Davey) must not exceed 700ms on target hardware (SM-A155F).
+    *   **Status (Aug.21.08)**: 🔴 DEGRADED. 1070ms stall detected (#248).
+
+## 3. Test & Validation Authority
+*   **3.1 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`) to verify alarm triggers under simulated stress (R196-V).
+*   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
+
+## 4. History of Changes (Recent)
+*   **Aug.21.08**: Integrated `UiStateAggregator` (R240) and validation hooks (R196-V).
+*   **Aug.21.00**: SOT Alignment for recovery timing (R243).

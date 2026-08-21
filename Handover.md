@@ -1,38 +1,41 @@
-# Handover (Aug.21.08) - Validation Hooks & State Aggregation Implemented
+# Handover (Aug.21.08) - Forensic Audit & Test Procedure Baseline
 
 ## 🎯 Current Status
-- **Goal**: Implement validation hooks for forensic testing and refactor state management.
-- **Status**: 🟢 **FORENSIC VALIDATION HOOKS ACTIVE | VIEWMODEL REFACTORED**
+- **Goal**: Restore 100-Chapter Test Procedure and audit version `Aug.21.08` on target hardware (Samsung A15).
+- **Status**: 🔴 **DEGRADED | QA VALIDATION FAILED**
 - **Version**: `Aug.21.08`
 - **Database**: v73
-- **Hardware**: Samsung A15 (SM-A155F) verified.
+- **Hardware**: Samsung A15 (SM-A155F).
+- **Audit Baseline**: SOT: 154, issues: 752 (65 open), Testing: 100 chapters, 41 sub-items, Simplifications ideas: 178, and QA_VALIDATION_STATUS: 185 (93 active in cycle)
 
 ## 🕵️ Comprehensive Forensic State Snapshot
 
-### 1. Issue Resolutions (`issues.md`)
-- **Issue #196-V (Resolved)**: **Forensic Validation Hook UI**.
-    - Added a "Forensic Stall Simulation" toggle in `DiagnosticsScreen.kt` under a new "Validation Hooks" section.
-    - Connected the hook to the `LogRepository` simulation logic, allowing verification of EMA reliability degradation and `ALERT_ID_PERFORMANCE_SPIKE` alarms.
-- **Issue #240 (Resolved)**: **MainViewModel Refactor**.
-    - Implemented `UiStateAggregator` to resolve the parameter limit risk in `dashboardState` and `hudState` combine blocks.
-    - Isolated state transformation logic from event orchestration, improving maintainability and testability (R240).
+### 1. Test Procedure Baseline (`DOCS/TEST_PROCEDURE.md`)
+- **Restored to 100 Chapters** covering the full scope of high-assurance tracking: urban multipath stress, native resource lifecycle, and forensic continuity.
+- **Detailed Sub-items restored**: All original verification steps (1.1 through 10.1) are preserved in the documentation.
+- **Field Test Results (Aug.21.08)**: 
+    - **Chapters 1-7**: ✅ PASSED.
+    - **Chapter 8 (Validation Hooks)**: 🔴 FAILED. Detected 1070ms UI thread stall during initial telemetry hydration.
+    - **Chapter 10 (Native Lifecycle)**: 🔴 FAILED. Logcat reported `BaseEventQueue.dispose` failed call; confirmed native resource leak.
+    - **Chapters 9, 11-100**: 🟡 PENDING REMEDIATION.
 
-### 2. State Tracking & SOT Updates
-- **SOT_MASTER_REQUIREMENTS.md**: Added UI State Aggregation Authority (R240) and Forensic Validation Authority (R196-V).
-- **RESOLUTION_ARCHIVE.md**: Recorded Issue #196-V and #240.
-- **Simplify_Ideas2.md**: Marked Simplify Idea #1 (Aggregation) as RESOLVED.
+### 2. Open Technical Issues (`issues.md`)
+- **Total Open Issues**: 65 (Issues #248 through #312).
+- **Critical Forensic Regressions**:
+    - **#248 (Davey Stall)**: 1070ms UI Thread Stall during telemetry hydration on A15 hardware.
+    - **#249 (Native Leak)**: `BaseEventQueue.dispose` failed call detected in Logcat; risks native memory exhaustion.
+    - **#265 (JNI Block)**: `System.loadLibrary` blocking UI thread for 81 frames during bootstrap.
+    - **#301 (Watchdog)**: Missing ANR Watchdog for JNI; engine stalls if native hardware sync hangs.
+    - **#255 (Compose)**: Lock verification failure in `SnapshotStateList` impacting UI fluidity.
+    - **#282 (Native hazard)**: Direct `ByteBuffer` allocation in JdHardwareManager risks heap leakage across mode swaps.
 
-### 3. File Integrity Audit
-- **DiagnosticsScreen.kt**: Added validation section and simulation toggle.
-- **MainAppContent.kt**: Established wiring for the forensic simulation state and event.
-- **MainViewModel.kt**: Constructor updated to inject `UiStateAggregator`; state blocks simplified.
-- **UiStateAggregator.kt**: New service created for state transformation.
-- **AppModule.kt**: Bound `UiStateAggregator` for Hilt injection.
-- **app/build.gradle**: Bumped version to `Aug.21.08`.
+### 3. Source of Truth (`STATUS/SOT_MASTER_REQUIREMENTS.md`)
+- Updated Section 2.3 to reflect the 1070ms performance violation. The system is officially in a **DEGRADED** state until hydration is segmented and JNI load is offloaded.
 
 ## 🧬 Resumption Path
-1.  **Field Validation**: Use the new "Forensic Stall Simulation" toggle on target hardware to verify that reliability drops trigger the performance alarm as expected.
-2.  **HUD Flattening**: Evaluate Simplify Idea #2: Further flatten the `StatusBar` hierarchy so child components consume sub-sections of `HudState` directly.
-3.  **Dependency Versioning**: Begin migration of common dependencies to a Version Catalog (`libs.versions.toml`) as per Simplify Idea #3.
+1.  **Remediate Issue #265**: Move `System.loadLibrary` to a background thread to eliminate the 81-frame startup stall.
+2.  **Fix Issue #249/262/305**: Audit native resource cleanup in `TrackerService.onDestroy` and `JdHardwareManager` to ensure all handles and buffers are disposed.
+3.  **Optimize Hydration (#248)**: Segment the `HudState` aggregation in `UiStateAggregator` to reduce the blocking load on budget hardware.
+4.  **Samsung OS Noise (#257/271)**: Implement IO pressure mitigation to counter aggressive Kumiho package auditing during the 2s launch window.
 
 vAug.21.08

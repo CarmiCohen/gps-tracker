@@ -8,22 +8,24 @@ import com.gps19.core.engine.TimeProvider
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
- * Aug.19.08:
- * - Issue #212: Restored functional state after Forensic Phase. 
- * - JNI Signature Obfuscation (n1-n5) retained as a baseline precaution despite 
- *   CFMS persistence during Identity Swap.
+ * Aug.21.09:
+ * - Issue #265 Remediation: Transitioned native library loading to a background 
+ *   thread (Dispatchers.IO) to eliminate the 80+ frame UI stall during bootstrap.
+ * - Issue #282/285 Hardening: Replaced direct GlobalScope usage with a managed 
+ *   initialization pattern and AtomicBoolean for state tracking.
  */
 object JdHardwareManager {
 
-    private var isLibraryLoaded = false
+    private val isLibraryLoaded = AtomicBoolean(false)
     private val jniLock = ReentrantLock()
     private const val MAX_JNI_RETRIES = 3
 
@@ -32,18 +34,24 @@ object JdHardwareManager {
     }
 
     /**
-     * loadLibrary: Explicitly load the native SDK.
+     * loadLibraryAsync: Load the native SDK off the main thread.
      */
-    fun loadLibrary() {
-        if (isLibraryLoaded) return
+    fun loadLibraryAsync(scope: CoroutineScope) {
+        if (isLibraryLoaded.get()) return
+        scope.launch(Dispatchers.IO) {
+            loadLibrarySync()
+        }
+    }
+
+    private fun loadLibrarySync() {
+        if (isLibraryLoaded.get()) return
         jniLock.withLock {
-            if (isLibraryLoaded) return
+            if (isLibraryLoaded.get()) return
             try {
                 System.loadLibrary("jdHardware")
-                isLibraryLoaded = true
                 n1(sharedStateBuffer)
-                
-                Timber.i("jdHardware: Native library loaded successfully.")
+                isLibraryLoaded.set(true)
+                Timber.i("jdHardware: Native library loaded successfully in background.")
             } catch (e: UnsatisfiedLinkError) {
                 Timber.e("jdHardware load failed: ${e.message}")
             } catch (e: Exception) {
@@ -66,8 +74,7 @@ object JdHardwareManager {
         operation: String,
         crossinline block: () -> Int
     ): Int {
-        if (!isLibraryLoaded) {
-            triggerBackgroundReinit()
+        if (!isLibraryLoaded.get()) {
             return JNI_RET_NOT_INITIALIZED
         }
         
@@ -86,9 +93,8 @@ object JdHardwareManager {
                     result = try {
                         block()
                     } catch (e: UnsatisfiedLinkError) {
-                        Timber.e("Native method for $operation not found. Triggering re-init.")
-                        isLibraryLoaded = false
-                        triggerBackgroundReinit()
+                        Timber.e("Native method for $operation not found.")
+                        isLibraryLoaded.set(false)
                         return@measureAndAudit JNI_RET_NOT_INITIALIZED
                     } catch (e: Exception) {
                         Timber.e(e, "Unexpected native error in $operation")
@@ -102,13 +108,6 @@ object JdHardwareManager {
                 }
                 result
             }
-        }
-    }
-
-    private fun triggerBackgroundReinit() {
-        @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
-        GlobalScope.launch(Dispatchers.IO) {
-            loadLibrary()
         }
     }
 
@@ -130,7 +129,7 @@ object JdHardwareManager {
         }
     }
 
-    fun isAvailable(): Boolean = isLibraryLoaded
+    fun isAvailable(): Boolean = isLibraryLoaded.get()
 
     @JvmStatic private external fun n1(buffer: ByteBuffer): Int
     @JvmStatic private external fun n2(): Int
