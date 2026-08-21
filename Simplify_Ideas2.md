@@ -1,10 +1,9 @@
-# Architectural Simplification Ideas (Aug.21.06)
+# Architectural Simplification Ideas (Aug.21.08)
 
-Following the implementation of range-based forensic deduplication and UI hydration optimizations, here are remaining recommendations:
+Following the implementation of UiStateAggregator and Forensic Validation Hooks, here are remaining recommendations:
 
-## 1. UI State Aggregation (Aug.20.10)
-- **Problem**: The `combine` blocks in `MainViewModel.kt` for `dashboardState` and `hudState` are reaching the 7-parameter limit.
-- **Simplification**: Extract state aggregation logic into a dedicated `UiStateAggregator` service.
+## 1. UI State Aggregation (Aug.21.08)
+- **Status**: ✅ **RESOLVED**. Extracted to `UiStateAggregator` (Issue #240).
 
 ## 2. HUD Parameter Decoupling (Aug.20.10)
 - **Simplification**: Further flatten the `StatusBar` hierarchy so child components consume sub-sections of `HudState` directly.

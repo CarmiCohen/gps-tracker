@@ -21,6 +21,9 @@ import com.gps19.core.engine.CapabilityStatus
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Aug.21.08:
+ * - Issue #196-V: Added Forensic Stall Simulation toggle to support urban multipath 
+ *   validation and performance spike auditing (R196-V).
  * Aug.10.31:
  * - Issue #135: UI Davey/ANR Mitigation. Refactored to use decomposed primitive 
  *   parameters to prevent high-frequency telemetry recomposition stalls (R135).
@@ -31,9 +34,11 @@ fun DiagnosticsScreen(
     permissions: PermissionState,
     recoveryCount: Int,
     cumulativeRecoveryBlackoutMs: Long,
+    isForensicStallSimulated: Boolean,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onToggleManualOverride: () -> Unit,
+    onToggleForensicSimulation: (Boolean) -> Unit,
     onRequestBatteryExemption: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onRequestAppInfo: () -> Unit,
@@ -167,6 +172,36 @@ fun DiagnosticsScreen(
                     text = "Hardware Tuning: WAKELOCK_RENEWAL active",
                     color = Color.Cyan,
                     fontSize = 12.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Validation Hooks (Temporary)",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.Gray,
+                fontWeight = FontWeight.Bold
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Forensic Stall Simulation", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Simulates Urban Multipath / IO Latency",
+                        color = if (isForensicStallSimulated) Color.Yellow else Color.Gray,
+                        fontSize = 12.sp
+                    )
+                }
+                Switch(
+                    checked = isForensicStallSimulated,
+                    onCheckedChange = { onToggleForensicSimulation(it) }
                 )
             }
 

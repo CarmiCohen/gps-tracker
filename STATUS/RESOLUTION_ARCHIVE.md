@@ -2,7 +2,12 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 686**
+**Total Unique Resolutions: 687**
+
+## 96. Forensic Validation & UI Integration (Aug.21.08)
+*   **Issue #196-V: Forensic Validation Hook UI**.
+    - **Resolution**: Integrated the `SetForensicSimulation` toggle into the `DiagnosticsScreen`. This provides a manual trigger for simulating urban multipath and IO latency spikes, enabling verification of EMA reliability degradation and performance alarms (R196-V).
+    - **UI Linkage**: Connected `isForensicStallSimulated` state to `MainAppContent` and established the event path from `DiagnosticsScreen` to `MainRepository`.
 
 ## 95. Forensic Hardening & Simulation Path (Aug.21.06)
 *   **Issue #196: Forensic Pipeline Hardening**.

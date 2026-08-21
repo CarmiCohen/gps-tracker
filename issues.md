@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.21.06)
+# Project Issues & Hardening Tracking (Aug.21.08)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 STABLE | 0 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 686 |
+| **Resolved (Total)** | 🟢 Progress | 687 |
 
 ---
 
@@ -21,12 +21,13 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.21.06)
-*   **Issue #196**: **Forensic Pipeline Hardening**: Implemented range-based signature deduplication (R197) and overflow hysteresis (R196) to handle 100Hz pressure on budget hardware. Added `SetForensicSimulation` hook for validation (R196-V).
-*   **Issue #570**: **TrackerStatus Typo**: Fixed `violationUptimeMs` mapping in `toMap()` to ensure correct telemetry parity.
-*   **Issue #246**: **UI Thread Optimization**: Mitigated Davey stalls (>700ms) on Samsung A15 by consolidating UI hydration to 3 phases and refactoring sensitivity sliders into a reusable component (R246).
-*   **Issue #244**: **Native Library Audit**: Verified successful runtime loading and initialization of `libjdHardware.so` on target hardware (R244).
-*   **Issue #247**: **UI Component Regression**: Restored sensitivity sliders for Vibration and Tilt in `AlertManagementOverlay` (R247).
+## 🟢 Recently Resolved Issues (Aug.21.08)
+*   **Issue #196-V**: **Forensic Validation Hook UI**: Integrated the `SetForensicSimulation` toggle into the `DiagnosticsScreen`. This allows for manual verification of EMA reliability degradation and `ALERT_ID_PERFORMANCE_SPIKE` alarm triggers (R196-V).
+*   **Issue #196**: **Forensic Pipeline Hardening**: Implemented range-based signature deduplication (R197) and overflow hysteresis (R196).
+*   **Issue #570**: **TrackerStatus Typo**: Fixed `violationUptimeMs` mapping in `toMap()`.
+*   **Issue #246**: **UI Thread Optimization**: Mitigated Davey stalls on Samsung A15 via 3-phase hydration (R246).
+*   **Issue #244**: **Native Library Audit**: Verified `libjdHardware.so` runtime initialization on SM-A155F.
+*   **Issue #247**: **UI Component Regression**: Restored sensitivity sliders (R247).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.21.06)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.21.08)

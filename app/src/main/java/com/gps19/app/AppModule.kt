@@ -41,6 +41,10 @@ abstract class AppModule {
     @Singleton
     abstract fun bindDashboardStateProvider(impl: DashboardStateProviderImpl): DashboardStateProvider
 
+    @Binds
+    @Singleton
+    abstract fun bindUiStateAggregator(impl: UiStateAggregatorImpl): UiStateAggregator
+
     companion object {
         @Provides
         @Singleton

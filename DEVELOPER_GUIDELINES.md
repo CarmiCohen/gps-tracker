@@ -19,3 +19,5 @@ Perform the following steps in order once an issue is resolved:
 5. **Simplicity Audit**: Evaluate if the code or app architecture can be further simplified. Save these ideas in `Simplify_Ideas2.md`.
 6. **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot to prepare for a fresh chat session.
 7. **Session Termination**: Stop the chat immediately. Do not attempt to fix any other issues or continue work.
+
+**Current Audit Baseline (Aug.21.06)**: We have: SOT:154, issues: 686, Testing: 45, Simplifications ideas: 174, and QA_VALIDATION_STATUS: 185 (46 active in cycle)

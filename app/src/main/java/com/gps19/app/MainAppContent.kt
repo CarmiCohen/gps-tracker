@@ -45,12 +45,13 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Aug.21.08:
+ * - Issue #196-V: Connected Forensic Stall Simulation state and toggle to 
+ *   DiagnosticsScreen for urban multipath validation (R196-V).
  * Aug.21.00:
  * - Issue #243: Hardened Navigation Settling. Introduced isSettlingActive to 
  *   defer automatic restoration navigation until STARTUP_SETTLING_DELAY_MS 
  *   completes, ensuring landing page stability verification (R243).
- * Aug.20.03:
- * - Issue #223 Release: Removed debug instrumentation for production hardening.
  */
 @Composable
 fun MainAppContent(
@@ -392,9 +393,11 @@ fun MainAppContent(
                                     permissions = uiState.permissions,
                                     recoveryCount = diagnosticState.recoveryCount,
                                     cumulativeRecoveryBlackoutMs = diagnosticState.cumulativeRecoveryBlackoutMs,
+                                    isForensicStallSimulated = uiState.isForensicStallSimulated,
                                     onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
                                     onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
                                     onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
+                                    onToggleForensicSimulation = { active -> viewModel.onEvent(UiEvent.SetForensicSimulation(active)) },
                                     onRequestBatteryExemption = onRequestBatteryExemption,
                                     onRequestOverlayPermission = onRequestOverlayPermission,
                                     onRequestAppInfo = onRequestAppInfo,

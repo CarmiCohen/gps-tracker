@@ -26,13 +26,10 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * Aug.21.07:
- * - Issue #196 Hardening: Integrated SetForensicSimulation event to allow 
- *   urban multipath validation via UI diagnostics (R196-V).
- * Aug.20.09:
- * - Issue #226: HUD State Centralization. Added hudState StateFlow to 
- *   consolidate telemetry for status badges and ribbons (R226). Fixed 
- *   lambda parameter inference for Samsung A15 compiler stability.
+ * Aug.21.08:
+ * - Issue #240: Refactored dashboardState and hudState to use UiStateAggregator. 
+ *   Resolved parameter limit concerns and improved state isolation (Simplify Idea #1).
+ * - Issue #196-V: Integrated SetForensicSimulation event for urban multipath validation.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -41,7 +38,7 @@ class MainViewModel @Inject constructor(
     private val logManager: LogManager,
     private val systemStatusProvider: SystemStatusProvider,
     private val homePointUseCase: HomePointUseCase,
-    private val dashboardStateProvider: DashboardStateProvider,
+    private val aggregator: UiStateAggregator,
     private val navigationUseCase: NavigationUseCase,
     private val settingsUseCase: SettingsUseCase,
     private val telemetryUseCase: TelemetryUseCase,
@@ -124,14 +121,15 @@ class MainViewModel @Inject constructor(
         _localMaxTemp,
         _trackerMaxTemp
     ) { args ->
-        val ui = args[0] as MainUiState
-        val kin = args[1] as KinematicState
-        val diag = args[2] as DiagnosticState
-        val pulse = args[3] as Long
-        val trkState = args[4] as TrackerState
-        val lMax = args[5] as Double
-        val tMax = args[6] as Double
-        dashboardStateProvider.buildDashboardState(ui.appMode, kin, diag, pulse, trkState, lMax, tMax)
+        aggregator.aggregateDashboard(
+            ui = args[0] as MainUiState,
+            kin = args[1] as KinematicState,
+            diag = args[2] as DiagnosticState,
+            pulse = args[3] as Long,
+            trkState = args[4] as TrackerState,
+            lMax = args[5] as Double,
+            tMax = args[6] as Double
+        )
     }
     .flowOn(Dispatchers.Default)
     .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L) 
@@ -146,14 +144,15 @@ class MainViewModel @Inject constructor(
         _rtt,
         _remoteSignal
     ) { args ->
-        val ui = args[0] as MainUiState
-        val kin = args[1] as KinematicState
-        val diag = args[2] as DiagnosticState
-        val pulse = args[3] as Long
-        val trkState = args[4] as TrackerState
-        val rttVal = args[5] as Int
-        val sig = args[6] as Int
-        dashboardStateProvider.buildHudState(ui, kin, diag, pulse, trkState, rttVal, sig)
+        aggregator.aggregateHud(
+            ui = args[0] as MainUiState,
+            kin = args[1] as KinematicState,
+            diag = args[2] as DiagnosticState,
+            pulse = args[3] as Long,
+            trkState = args[4] as TrackerState,
+            rtt = args[5] as Int,
+            sig = args[6] as Int
+        )
     }
     .flowOn(Dispatchers.Default)
     .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
