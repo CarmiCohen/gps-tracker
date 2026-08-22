@@ -20,12 +20,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * Aug.20.03:
- * - Issue #223 Release: Removed debug instrumentation (executeAutomatedStressTest, 
- *   SimulateThermalEvent) for production hardening.
- * Aug.19.01:
- * - Issue #212: JNI Vendor Collision Remediation. Transitioned hardware bridge 
- *   to a neutral namespace to eliminate Samsung framework collisions (R212).
+ * Aug.21.09:
+ * - Issue #265 Remediation: Migrated to JdHardwareManager.initialize() suspend 
+ *   pattern to eliminate UI thread stalls during service bootstrap (R265).
+ * - Issue #249/262 Remediation: Added JdHardwareManager.releaseHardware() to 
+ *   onDestroy to ensure native global references and hardware handles are 
+ *   disposed, preventing memory leaks and BaseEventQueue failures.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -89,10 +89,13 @@ class TrackerService : BaseMonitorService() {
         refreshCapabilitiesInternal()
 
         if (capabilities.isA15Device) {
-             JdHardwareManager.loadLibrary()
-             if (JdHardwareManager.isAvailable()) {
-                val res = JdHardwareManager.initHardware(timeProvider, configManager.deviceId, 0)
-                logManager.logServiceEvent("HARDWARE: libjdHardware initialized (Result: $res)", isImportant = true)
+             lifecycleScope.launch(Dispatchers.Default) {
+                 val success = JdHardwareManager.initialize(timeProvider, configManager.deviceId)
+                 if (success) {
+                    logManager.logServiceEvent("HARDWARE: libjdHardware initialized successfully.", isImportant = true)
+                 } else {
+                    logManager.logServiceEvent("HARDWARE: libjdHardware initialization failed.", isImportant = true)
+                 }
              }
         }
 
@@ -648,6 +651,10 @@ class TrackerService : BaseMonitorService() {
     }
 
     override fun onDestroy() {
+        // Issue #249/262: Release native hardware resources and stop jobs.
+        if (capabilities.isA15Device) {
+            JdHardwareManager.releaseHardware(timeProvider)
+        }
         gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
         super.onDestroy()
     }

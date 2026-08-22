@@ -16,6 +16,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Aug.21.09:
+ * - Issue #249/262 Remediation: Added JdHardwareManager.releaseHardware() to 
+ *   onDestroy to ensure native resources are disposed during role swaps (R249).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -463,6 +466,10 @@ class ViewerService : BaseMonitorService() {
     }
 
     override fun onDestroy() {
+        // Issue #249/262: Release native hardware resources during role swaps.
+        if (capabilities.isA15Device) {
+            JdHardwareManager.releaseHardware(timeProvider)
+        }
         gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel()
         super.onDestroy()
     }

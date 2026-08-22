@@ -2,14 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.21.09:
+ * - Issue #257/271 Optimization: Added STAGGERED_IO_PRUNING_DELAY_MS to 
+ *   mitigate Samsung A15 Kumiho auditing pressure during launch.
  * Aug.21.00:
  * - Issue #243 SOT Alignment: Reduced STARTUP_SETTLING_DELAY_MS and 
- *   LANDING_PAGE_PAUSE_MS to 2000ms to match SOT requirements for 
- *   automated recovery speed (R243).
- * Aug.19.10:
- * - Issue #213: Signal Loss False-Positive Hardening. Increased GPS_GAP and 
- *   GPS_STALL thresholds to 120s to prevent collisions with the 60s 
- *   STATIONARY_GPS_POLLING interval (R213).
+ *   LANDING_PAGE_PAUSE_MS to 2000ms.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -20,7 +18,7 @@ const val GRAVITY_EARTH = 9.80665
 const val DEFAULT_LAT = 32.7940
 const val DEFAULT_LNG = 34.9896
 
-// Performance & Latency Thresholds (Issue #589, #600)
+// Performance & Latency Thresholds
 const val LATENCY_THRESHOLD_GPS_PROCESS_MS = 100L
 const val LATENCY_THRESHOLD_SENSOR_PROCESS_MS = 50L
 const val LATENCY_THRESHOLD_ALARM_LOGIC_MS = 100L
@@ -245,6 +243,7 @@ const val MAX_REVIVAL_ATTEMPTS = 3
 const val HARDWARE_BOOT_GRACE_MS = 30000L
 const val LANDING_PAGE_PAUSE_MS = 2000L
 const val STARTUP_SETTLING_DELAY_MS = 2000L
+const val STAGGERED_IO_PRUNING_DELAY_MS = 15000L
 
 // GPS Polling Intervals (Central Authority)
 const val HIGH_FREQUENCY_GPS_POLLING_MS = 2000L
@@ -456,6 +455,7 @@ const val PROXIMITY_DEBOUNCE_STATIONARY_MS = 5000L
 const val PROXIMITY_DEBOUNCE_MOVING_MS = 1000L
 const val PROXIMITY_STRESS_SCALING_MULTIPLIER = 2.0
 const val PROXIMITY_DEBOUNCE_MAX_MS = 15000L
+const val PROXIMITY_STRESS_THRESHOLD_DB = 80.0
 const val PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR = 2000L
 
 // History & Persistence Logic

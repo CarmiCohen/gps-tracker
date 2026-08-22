@@ -10,53 +10,68 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
  * Aug.21.09:
- * - Issue #265 Remediation: Transitioned native library loading to a background 
- *   thread (Dispatchers.IO) to eliminate the 80+ frame UI stall during bootstrap.
- * - Issue #282/285 Hardening: Replaced direct GlobalScope usage with a managed 
- *   initialization pattern and AtomicBoolean for state tracking.
+ * - Issue #265 Remediation: Replaced callback-based loadLibraryAsync with 
+ *   suspend initialize() and switched to Mutex to avoid thread-blocking 
+ *   stalls during bootstrap (R265).
+ * - Issue #249/301 Remediation: Hardened JNI Watchdog and ensured native 
+ *   resource lifecycle hooks are available.
  */
 object JdHardwareManager {
 
     private val isLibraryLoaded = AtomicBoolean(false)
+    private val initializationMutex = Mutex()
     private val jniLock = ReentrantLock()
     private const val MAX_JNI_RETRIES = 3
+    private const val JNI_WATCHDOG_TIMEOUT_MS = 2000L
 
     private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(64).apply {
         order(ByteOrder.nativeOrder())
     }
 
     /**
-     * loadLibraryAsync: Load the native SDK off the main thread.
+     * initialize: Load and initialize the native SDK off the main thread.
+     * Ensures class loading and native init are fully offloaded to Dispatchers.IO.
      */
-    fun loadLibraryAsync(scope: CoroutineScope) {
-        if (isLibraryLoaded.get()) return
-        scope.launch(Dispatchers.IO) {
-            loadLibrarySync()
-        }
-    }
-
-    private fun loadLibrarySync() {
-        if (isLibraryLoaded.get()) return
-        jniLock.withLock {
-            if (isLibraryLoaded.get()) return
+    suspend fun initialize(timeProvider: TimeProvider, deviceId: String): Boolean = withContext(Dispatchers.IO) {
+        if (isLibraryLoaded.get()) return@withContext true
+        
+        val loaded = initializationMutex.withLock {
+            if (isLibraryLoaded.get()) return@withLock true
             try {
-                System.loadLibrary("jdHardware")
-                n1(sharedStateBuffer)
-                isLibraryLoaded.set(true)
-                Timber.i("jdHardware: Native library loaded successfully in background.")
-            } catch (e: UnsatisfiedLinkError) {
+                withTimeout(JNI_WATCHDOG_TIMEOUT_MS) {
+                    System.loadLibrary("jdHardware")
+                    n1(sharedStateBuffer)
+                    isLibraryLoaded.set(true)
+                    Timber.i("jdHardware: Native library loaded successfully.")
+                    true
+                }
+            } catch (e: TimeoutCancellationException) {
+                Timber.e("jdHardware: Load timed out (Watchdog)")
+                false
+            } catch (e: Throwable) {
                 Timber.e("jdHardware load failed: ${e.message}")
-            } catch (e: Exception) {
-                Timber.e("Unexpected error loading jdHardware: ${e.message}")
+                false
             }
+        }
+
+        if (loaded) {
+            val res = initHardware(timeProvider, deviceId, 0)
+            if (res == 0) {
+                Timber.i("jdHardware: Native SDK initialized successfully.")
+                true
+            } else {
+                Timber.e("jdHardware: Native SDK init failed (Code: $res)")
+                false
+            }
+        } else {
+            false
         }
     }
 
@@ -74,15 +89,24 @@ object JdHardwareManager {
         operation: String,
         crossinline block: () -> Int
     ): Int {
-        if (!isLibraryLoaded.get()) {
-            return JNI_RET_NOT_INITIALIZED
-        }
+        if (!isLibraryLoaded.get()) return JNI_RET_NOT_INITIALIZED
         
-        return jniLock.withLock {
+        val acquired = try {
+            jniLock.tryLock(JNI_WATCHDOG_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+        } catch (e: InterruptedException) {
+            false
+        }
+
+        if (!acquired) {
+            Timber.e("jdHardware: Watchdog triggered for $operation (Lock contention/Hang)")
+            return -1
+        }
+
+        try {
             var result: Int
             var attempts = 0
             
-            LatencyMonitor.measureAndAudit<Int>(
+            return LatencyMonitor.measureAndAudit<Int>(
                 timeProvider = timeProvider,
                 thresholdMs = LATENCY_THRESHOLD_JNI_MS,
                 operation = operation,
@@ -92,22 +116,16 @@ object JdHardwareManager {
                 do {
                     result = try {
                         block()
-                    } catch (e: UnsatisfiedLinkError) {
-                        Timber.e("Native method for $operation not found.")
-                        isLibraryLoaded.set(false)
-                        return@measureAndAudit JNI_RET_NOT_INITIALIZED
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         Timber.e(e, "Unexpected native error in $operation")
-                        return@measureAndAudit -1
+                        -1
                     }
                     attempts++
                 } while (result == JNI_RET_EINTR && attempts < MAX_JNI_RETRIES)
-                
-                if (result == JNI_RET_EINTR) {
-                    Timber.e("Native operation $operation failed after maximum retries due to EINTR")
-                }
                 result
             }
+        } finally {
+            jniLock.unlock()
         }
     }
 
@@ -117,15 +135,15 @@ object JdHardwareManager {
         }
     }
 
-    fun punchHardware(timeProvider: TimeProvider): Int {
-        return executeNativeWithRetry(timeProvider, "Native punchHardware") {
-            n4()
+    fun releaseHardware(timeProvider: TimeProvider): Int {
+        return executeNativeWithRetry(timeProvider, "Native releaseHardware") {
+            n6()
         }
     }
 
-    fun setPowerBudget(timeProvider: TimeProvider, budgetLevel: Int): Int {
-        return executeNativeWithRetry(timeProvider, "Native setPowerBudget") {
-            n5(budgetLevel)
+    fun punchHardware(timeProvider: TimeProvider): Int {
+        return executeNativeWithRetry(timeProvider, "Native punchHardware") {
+            n4()
         }
     }
 
@@ -136,4 +154,5 @@ object JdHardwareManager {
     @JvmStatic private external fun n3(deviceId: String, flags: Int): Int
     @JvmStatic private external fun n4(): Int
     @JvmStatic private external fun n5(budgetLevel: Int): Int
+    @JvmStatic private external fun n6(): Int
 }

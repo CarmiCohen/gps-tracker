@@ -80,4 +80,15 @@ Java_com_gps19_app_JdHardwareManager_n5(JNIEnv* env, jclass clazz, jint budgetLe
     return 0;
 }
 
+/**
+ * n6: nativeRelease (Issue #249 Remediation)
+ */
+JNIEXPORT jint JNICALL
+Java_com_gps19_app_JdHardwareManager_n6(JNIEnv* env, jclass clazz) {
+    LOGI("jdHardware: n6 release triggered. Clearing native pointers.");
+    g_sharedBufferPtr = nullptr;
+    g_sharedBufferSize = 0;
+    return 0;
+}
+
 }

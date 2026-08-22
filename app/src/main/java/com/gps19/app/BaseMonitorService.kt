@@ -19,11 +19,10 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * Aug.20.09:
- * - Build Hardening: Added @AndroidEntryPoint to base class to resolve 
- *   Hilt compilation regression.
- * July.28.15:
- * - Issue #610: Forensic Heartbeat Decoupling.
+ * Aug.21.09:
+ * - Issue #249 Hardening: Added explicit appSensorManager.stop() to onDestroy to 
+ *   ensure sensor listeners are unregistered and native event queues are disposed.
+ * - Issue #299: Ensure WakeLock and Watchdog cleanup is robust during service termination.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -210,6 +209,9 @@ abstract class BaseMonitorService : LifecycleService() {
         heartbeatJob?.cancel()
         fgsUpdateJob?.cancel()
         
+        // Issue #249: Unregister sensors to prevent BaseEventQueue disposal failures.
+        appSensorManager.stop()
+
         runBlocking {
             withTimeoutOrNull(1000) {
                 repository.flushHistory()

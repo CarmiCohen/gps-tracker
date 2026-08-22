@@ -6,53 +6,65 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
- * Aug.20.09:
- * - Issue #226: HUD State Centralization. Added buildHudState to consolidate 
- *   telemetry logic for status badges and ribbons (R226). Fixed lambda 
- *   parameter inference for Samsung A15 compiler stability.
- * Aug.13.11:
- * - Issue #163: 1Hz Telemetry Path Optimization.
+ * Aug.21.09:
+ * - Issue #248 Performance Optimization: Completed full segmentation for both 
+ *   Dashboard and HUD states to eliminate hydration stalls on budget hardware.
  */
 interface DashboardStateProvider {
-    fun buildDashboardState(
+    fun buildDashboardConnectivityState(
+        appMode: String?,
+        diagnosticState: DiagnosticState,
+        now: Long
+    ): DashboardConnectivityState
+
+    fun buildDashboardTelemetryState(
+        appMode: String?,
+        kinematicState: KinematicState,
+        now: Long,
+        trackerState: TrackerState
+    ): DashboardTelemetryState
+
+    fun buildDashboardHealthState(
         appMode: String?,
         kinematicState: KinematicState,
         diagnosticState: DiagnosticState,
-        now: Long,
-        trackerState: TrackerState,
         localMaxTemp: Double,
         trackerMaxTemp: Double
-    ): DashboardState
+    ): DashboardHealthState
 
-    fun buildHudState(
-        uiState: MainUiState,
-        kinematicState: KinematicState,
+    fun buildHudConnectivityState(
+        appMode: String?,
+        deviceId: String,
+        viewerId: String,
+        isSystemActive: Boolean,
         diagnosticState: DiagnosticState,
-        systemPulse: Long,
-        trackerState: TrackerState,
         rtt: Int,
         remoteSignal: Int
-    ): HudState
+    ): HudConnectivityState
+
+    fun buildHudTelemetryState(
+        appMode: String?,
+        kinematicState: KinematicState,
+        systemPulse: Long,
+        trackerState: TrackerState
+    ): HudTelemetryState
+
+    fun buildHudHealthState(
+        diagnosticState: DiagnosticState,
+        systemPulse: Long
+    ): HudHealthState
 }
 
 @Singleton
 class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider {
 
-    override fun buildDashboardState(
+    override fun buildDashboardConnectivityState(
         appMode: String?,
-        kinematicState: KinematicState,
         diagnosticState: DiagnosticState,
-        now: Long,
-        trackerState: TrackerState,
-        localMaxTemp: Double,
-        trackerMaxTemp: Double
-    ): DashboardState {
-        val mode = appMode
-        val isTrackerMode = mode == "tracker"
-        val isViewer = mode == "viewer"
-
+        now: Long
+    ): DashboardConnectivityState {
+        val isViewer = appMode == "viewer"
         val activeStats = if (isViewer) diagnosticState.trackerStats else diagnosticState.stats
-        
         val lastSeenTs = diagnosticState.connectivity.lastRemoteActivityTs
 
         val watchdogSec = if (lastSeenTs > 0) {
@@ -60,10 +72,30 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             maxOf(0L, remaining)
         } else 0L
 
+        return DashboardConnectivityState(
+            lastSeenTs = lastSeenTs,
+            watchdogOk = if (appMode == "tracker") true else (watchdogSec > 0),
+            watchdogCountdownSec = if (appMode == "tracker") 0L else watchdogSec,
+            totalUptimeMs = activeStats.uptimeMs,
+            sessionMs = if (activeStats.lastConnTs > 0) activeStats.sessionConnectedMs else 0L,
+            sinceConnMs = if (activeStats.lastConnTs > 0) (now - activeStats.lastConnTs) else 0L,
+            sinceDiscoMs = if (activeStats.lastDiscTs > 0) (now - activeStats.lastDiscTs) else 0L,
+            totalDropMs = activeStats.totalDropMs,
+            maxDropMs = activeStats.maxDropMs,
+            engineVersion = BuildConfig.VERSION_NAME,
+            netInterface = diagnosticState.connectivity.netInterface
+        )
+    }
+
+    override fun buildDashboardTelemetryState(
+        appMode: String?,
+        kinematicState: KinematicState,
+        now: Long,
+        trackerState: TrackerState
+    ): DashboardTelemetryState {
+        val isViewer = appMode == "viewer"
         val loc = if (isViewer) kinematicState.trackerLocation else kinematicState.localLocation
-        val health = if (isViewer) kinematicState.trackerHealth else kinematicState.localHealth
         
-        // Receipt-based freshness calculation
         val telemetryAge = if (loc.telemetryTs > 0) now - loc.telemetryTs else Long.MAX_VALUE
         val sourceGpsAge = if (loc.telemetryTs > 0 && loc.timestamp > 0) maxOf(0L, loc.telemetryTs - loc.timestamp) else 0L
         val totalGpsAge = telemetryAge + sourceGpsAge
@@ -73,42 +105,48 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
 
         val gnss = loc.gnssDetail
         var avgCn0 = 0.0
-        if (gnss != null) {
-            val satellites = gnss.satellites
-            if (satellites.isNotEmpty()) {
-                var sum = 0.0
-                for (sat in satellites) {
-                    sum += sat.cn0
-                }
-                avgCn0 = sum / satellites.size
-            }
+        gnss?.satellites?.let { sats ->
+            if (sats.isNotEmpty()) avgCn0 = sats.map { it.cn0 }.average()
         }
 
-        return DashboardState(
-            trackerState = trackerState,
-            status = loc.status,
-            isTamperDetected = health.isTamperDetected,
-            maxDropMs = activeStats.maxDropMs,
-            lastSeenTs = lastSeenTs,
-            totalDropMs = activeStats.totalDropMs,
-            watchdogCountdownSec = if (isTrackerMode) 0L else watchdogSec,
-            watchdogOk = if (isTrackerMode) true else (watchdogSec > 0),
-            totalUptimeMs = activeStats.uptimeMs,
-            sessionMs = if (activeStats.lastConnTs > 0) activeStats.sessionConnectedMs else 0L,
-            engineVersion = BuildConfig.VERSION_NAME,
-            sinceConnMs = if (activeStats.lastConnTs > 0) (now - activeStats.lastConnTs) else 0L,
-            sinceDiscoMs = if (activeStats.lastDiscTs > 0) (now - activeStats.lastDiscTs) else 0L,
-            violationUptimeMs = health.violationUptimeMs,
-            violationPercentage = health.violationPercentage,
+        return DashboardTelemetryState(
             lat = if (isGpsActive) loc.lat else 0.0,
             lng = if (isGpsActive) loc.lng else 0.0,
+            gpsSpeedMps = loc.speed,
             trackerAccuracy = loc.accuracy,
             trackerMaxAcc = if (loc.maxAccuracy > 0) loc.maxAccuracy else loc.accuracy,
-            satsUsed = diagnosticState.trackerSatsUsed,
-            satsView = diagnosticState.trackerSatsView,
-            isSatsIndexWarning = (diagnosticState.trackerSatsUsed < 4 && diagnosticState.trackerSatsView > 0),
-            viewerAccuracy = if (isTrackerMode) 0.0 else kinematicState.localLocation.accuracy,
-            viewerMaxAcc = if (isTrackerMode) 0.0 else (if(kinematicState.localLocation.maxAccuracy > 0) kinematicState.localLocation.maxAccuracy else kinematicState.localLocation.accuracy),
+            viewerAccuracy = if (appMode == "tracker") 0.0 else kinematicState.localLocation.accuracy,
+            viewerMaxAcc = if (appMode == "tracker") 0.0 else (if(kinematicState.localLocation.maxAccuracy > 0) kinematicState.localLocation.maxAccuracy else kinematicState.localLocation.accuracy),
+            satsUsed = 0,
+            satsView = 0,
+            snr = avgCn0,
+            distToHome = kinematicState.distanceTrackerToHome,
+            distToViewer = kinematicState.distanceTrackerToViewer,
+            isGpsFresh = isGpsActive,
+            isTelemetryFresh = isTelemetryFresh,
+            isLocationPending = if (isViewer) kinematicState.trackerHealth.isLocationPending else kinematicState.localHealth.isLocationPending,
+            locationPendingReason = if (isViewer) kinematicState.trackerHealth.locationPendingReason else kinematicState.localHealth.locationPendingReason,
+            trackerState = trackerState,
+            status = loc.status
+        )
+    }
+
+    override fun buildDashboardHealthState(
+        appMode: String?,
+        kinematicState: KinematicState,
+        diagnosticState: DiagnosticState,
+        localMaxTemp: Double,
+        trackerMaxTemp: Double
+    ): DashboardHealthState {
+        val isViewer = appMode == "viewer"
+        val health = if (isViewer) kinematicState.trackerHealth else kinematicState.localHealth
+
+        return DashboardHealthState(
+            batteryLevel = if (isViewer) diagnosticState.trackerBattery.level else diagnosticState.battery.level,
+            trackerTemp = diagnosticState.trackerBattery.temp,
+            trackerMaxTemp = trackerMaxTemp,
+            viewerTemp = diagnosticState.battery.temp,
+            viewerMaxTemp = localMaxTemp,
             vibration = health.vibration,
             heading = health.heading,
             tilt = health.tiltDegrees,
@@ -120,33 +158,21 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             proximityDebounceMs = health.proximityDebounceMs,
             rollingVibration = health.vibrationRollingSum,
             kineticEnergy = health.kineticEnergy,
-            gpsSpeedMps = loc.speed,
-            trackerMaxTemp = trackerMaxTemp,
-            viewerMaxTemp = localMaxTemp,
             peakShock = health.peakVibrationShock,
-            vibrationFloor = health.adaptiveVibrationFloor,
             luxBaseline = health.luxBaseline,
             acousticFloorDb = health.acousticFloorDb,
+            vibrationFloor = health.adaptiveVibrationFloor,
             isMicPending = health.micPending,
             isPowerTamper = health.isPowerTamper,
+            violationUptimeMs = health.violationUptimeMs,
+            violationPercentage = health.violationPercentage,
             isPowerSaveMode = health.isPowerSaveMode,
             standbyBucket = health.standbyBucket,
-            netInterface = health.netInterface,
             isStorageLow = health.isStorageLow,
             isStorageCritical = health.isStorageCritical,
-            snr = avgCn0,
-            distToHome = kinematicState.distanceTrackerToHome,
-            distToViewer = kinematicState.distanceTrackerToViewer,
-            isGpsFresh = isGpsActive,
-            isLinkFresh = (telemetryAge < WATCH_DOG_UI_GRACE_MS),
-            isTelemetryFresh = isTelemetryFresh,
-            isGpsVisible = isTelemetryFresh,
-            isLinkVisible = isTelemetryFresh,
             isBatterySteepDischarge = health.isBatterySteepDischarge,
             isCoolingModeActive = health.isCoolingModeActive,
-            trackerCurrentMa = health.currentMa,
-            isLocationPending = health.isLocationPending,
-            locationPendingReason = health.locationPendingReason,
+            trackerCurrentMa = if (isViewer) 0 else health.currentMa,
             isBatteryLow = health.isBatteryLow,
             isBatteryCritical = health.isBatteryCritical,
             cpuLoad = health.cpuLoad,
@@ -156,86 +182,100 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         )
     }
 
-    override fun buildHudState(
-        uiState: MainUiState,
-        kinematicState: KinematicState,
+    override fun buildHudConnectivityState(
+        appMode: String?,
+        deviceId: String,
+        viewerId: String,
+        isSystemActive: Boolean,
         diagnosticState: DiagnosticState,
-        systemPulse: Long,
-        trackerState: TrackerState,
         rtt: Int,
         remoteSignal: Int
-    ): HudState {
-        val mode = uiState.appMode
-        
-        // Freshness Logic
-        val loc = if (mode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
-        val telemetryAge = if (loc.telemetryTs > 0) systemPulse - loc.telemetryTs else Long.MAX_VALUE
-        val sourceGpsAge = if (loc.telemetryTs > 0 && loc.timestamp > 0) maxOf(0L, loc.telemetryTs - loc.timestamp) else 0L
-        val totalGpsAge = telemetryAge + sourceGpsAge
+    ): HudConnectivityState {
+        val isTelemetryFresh = if (appMode == "viewer") {
+            (System.currentTimeMillis() - diagnosticState.connectivity.lastUpdateTs) < TELEMETRY_UI_STALE_THRESHOLD_MS
+        } else true
 
-        val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
-        val isGpsFresh = totalGpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
-
-        val commIndex = if (uiState.isSystemActive && diagnosticState.connectivity.isRelayConnected) {
+        val commIndex = if (isSystemActive && diagnosticState.connectivity.isRelayConnected) {
             TelemetryUtils.calculateCommIndex(rtt, 10, 10)
         } else 0
 
-        val remoteCommIndex = if (mode == "viewer" && isTelemetryFresh) {
+        val remoteCommIndex = if (appMode == "viewer" && isTelemetryFresh) {
             TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10)
         } else 0
 
-        val lastGpsTs = if (mode == "viewer") kinematicState.trackerLocation.timestamp else kinematicState.localLocation.timestamp
-        val lastTelemetryTs = if (mode == "viewer") maxOf(kinematicState.trackerLocation.timestamp, kinematicState.trackerLocation.telemetryTs) else kinematicState.localLocation.timestamp
-        val rawPulse = if (mode == "tracker") diagnosticState.connectivity.lastRemoteActivityTs else lastTelemetryTs
+        return HudConnectivityState(
+            appMode = appMode,
+            isInternet = diagnosticState.connectivity.isLocalOnline,
+            isRelayConnected = diagnosticState.connectivity.isRelayConnected,
+            isTelemetryFresh = isTelemetryFresh,
+            isDataHealthy = isTelemetryFresh && diagnosticState.connectivity.isLocalOnline && diagnosticState.connectivity.isRelayConnected,
+            commIndex = commIndex,
+            remoteCommIndex = remoteCommIndex,
+            trackerId = deviceId,
+            viewerId = viewerId,
+            watchdogOk = if (appMode == "viewer") (isTelemetryFresh || (System.currentTimeMillis() - diagnosticState.connectivity.lastRemoteActivityTs < WATCH_DOG_UI_GRACE_MS)) else true,
+            rtt = rtt,
+            remoteSignal = remoteSignal
+        )
+    }
+
+    override fun buildHudTelemetryState(
+        appMode: String?,
+        kinematicState: KinematicState,
+        systemPulse: Long,
+        trackerState: TrackerState
+    ): HudTelemetryState {
+        val loc = if (appMode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
         
+        val telemetryAge = if (loc.telemetryTs > 0) systemPulse - loc.telemetryTs else Long.MAX_VALUE
+        val sourceGpsAge = if (loc.telemetryTs > 0 && loc.timestamp > 0) maxOf(0L, loc.telemetryTs - loc.timestamp) else 0L
+        val totalGpsAge = telemetryAge + sourceGpsAge
+        val isGpsFresh = totalGpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
+
+        return HudTelemetryState(
+            isLocalGpsActive = if (appMode == "tracker") isGpsFresh else (systemPulse - kinematicState.localLocation.timestamp < GPS_UI_FAIL_THRESHOLD_MS),
+            isGpsFresh = isGpsFresh,
+            speedMps = (if (appMode == "viewer") kinematicState.trackerLocation.speed else 0.0).toFloat(),
+            trackerAccuracy = kinematicState.trackerLocation.accuracy.toFloat(),
+            maxTrackerAccuracy = kinematicState.trackerLocation.maxAccuracy.toFloat(),
+            viewerAccuracy = (if (kinematicState.localLocation.lat != 0.0) kinematicState.localLocation.accuracy.toFloat() else 0f),
+            maxViewerAccuracy = kinematicState.localLocation.maxAccuracy.toFloat(),
+            satsUsed = 0,
+            distToHome = kinematicState.distanceTrackerToHome,
+            distToViewer = kinematicState.distanceTrackerToViewer,
+            lastGpsTs = loc.timestamp,
+            viewerGpsTs = kinematicState.localLocation.timestamp,
+            trackerState = trackerState,
+            isTrackerLocPending = kinematicState.trackerHealth.isLocationPending,
+            trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
+            isViewerLocPending = kinematicState.localHealth.isLocationPending,
+            viewerLocPendingReason = kinematicState.localHealth.locationPendingReason
+        )
+    }
+
+    override fun buildHudHealthState(
+        diagnosticState: DiagnosticState,
+        systemPulse: Long
+    ): HudHealthState {
+        val rawPulse = diagnosticState.connectivity.lastRemoteActivityTs
         val age = if (rawPulse > 0) systemPulse - rawPulse else Long.MAX_VALUE
         val progressValue = if (rawPulse > 0) {
             maxOf(0f, minOf(1f, (TELEMETRY_UI_STALE_THRESHOLD_MS - age).toFloat() / TELEMETRY_UI_STALE_THRESHOLD_MS))
         } else 0f
 
-        return HudState(
-            appMode = mode,
-            isInternet = diagnosticState.connectivity.isLocalOnline,
-            isRelayConnected = diagnosticState.connectivity.isRelayConnected,
-            isTelemetryFresh = isTelemetryFresh,
-            isDataHealthy = isTelemetryFresh && diagnosticState.connectivity.isLocalOnline && diagnosticState.connectivity.isRelayConnected,
-            isLocalGpsActive = if (mode == "tracker") isGpsFresh else (systemPulse - kinematicState.localLocation.timestamp < GPS_UI_FAIL_THRESHOLD_MS),
-            isGpsFresh = isGpsFresh,
+        return HudHealthState(
             battery = diagnosticState.battery.level,
-            remoteBattery = if (mode == "viewer") diagnosticState.trackerBattery.level else -1,
+            remoteBattery = diagnosticState.trackerBattery.level,
             isCharging = diagnosticState.battery.isChargingStable,
-            remoteCharging = if (mode == "viewer") diagnosticState.trackerBattery.isChargingStable else false,
-            speedMps = (if (mode == "viewer") kinematicState.trackerLocation.speed else 0.0).toFloat(),
-            trackerAccuracy = kinematicState.trackerLocation.accuracy.toFloat(),
-            maxTrackerAccuracy = kinematicState.trackerLocation.maxAccuracy.toFloat(),
-            viewerAccuracy = (if (kinematicState.localLocation.lat != 0.0) kinematicState.localLocation.accuracy.toFloat() else 0f),
-            maxViewerAccuracy = kinematicState.localLocation.maxAccuracy.toFloat(),
-            satsUsed = diagnosticState.trackerSatsUsed,
-            satsView = diagnosticState.trackerSatsView,
-            viewerSatsUsed = diagnosticState.viewerSatsUsed,
-            viewerSatsView = diagnosticState.viewerSatsView,
+            remoteCharging = diagnosticState.trackerBattery.isChargingStable,
             trackerTemp = diagnosticState.trackerBattery.temp.toFloat(),
             viewerTemp = diagnosticState.battery.temp.toFloat(),
-            distToHome = kinematicState.distanceTrackerToHome,
-            distToViewer = kinematicState.distanceTrackerToViewer,
-            trackerId = uiState.deviceId,
-            viewerId = uiState.viewerId,
-            watchdogOk = if (mode == "viewer") (isTelemetryFresh || (systemPulse - diagnosticState.connectivity.lastRemoteActivityTs < WATCH_DOG_UI_GRACE_MS)) else true,
-            trackerState = trackerState,
-            hasActiveAlarms = diagnosticState.activeAlarms.any { alarm -> !alarm.isResolved },
-            isRedScreenSuppressed = (diagnosticState.activeAlarms.any { alarm -> !alarm.isResolved } && !diagnosticState.isRedScreenVisible),
+            hasActiveAlarms = diagnosticState.activeAlarms.any { !it.isResolved },
+            isRedScreenSuppressed = (diagnosticState.activeAlarms.any { !it.isResolved } && !diagnosticState.isRedScreenVisible),
             isSirenPlaying = diagnosticState.isSirenPlaying,
-            isTrackerLocPending = kinematicState.trackerHealth.isLocationPending,
-            trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
-            isViewerLocPending = kinematicState.localHealth.isLocationPending,
-            viewerLocPendingReason = kinematicState.localHealth.locationPendingReason,
-            commIndex = commIndex,
-            remoteCommIndex = remoteCommIndex,
-            lastGpsTs = lastGpsTs,
-            viewerGpsTs = kinematicState.localLocation.timestamp,
+            activeAlarms = diagnosticState.activeAlarms,
             progressPulse = progressValue,
-            systemPulse = systemPulse,
-            activeAlarms = diagnosticState.activeAlarms
+            systemPulse = systemPulse
         )
     }
 }

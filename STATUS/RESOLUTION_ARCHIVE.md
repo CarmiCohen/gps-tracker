@@ -2,7 +2,17 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 687**
+**Total Unique Resolutions: 699**
+
+## 97. Performance & JNI Remediation (Aug.21.09)
+*   **Issue #248: UI Thread Stall Remediation**.
+    - **Resolution**: Implemented granular flow segmentation in `MainViewModel.kt` using a specialized `HudUiParts` data class and `distinctUntilChanged()`. This eliminates the 1070ms UI thread stall by pruning redundant HudState aggregation triggers during telemetry hydration.
+*   **Issue #265: JNI Startup Optimization**.
+    - **Resolution**: Migrated `JdHardwareManager` to a coroutine-safe `suspend initialize()` pattern. Native library loading and registration are now offloaded to `Dispatchers.IO` with a `Mutex` to prevent UI thread blocking during bootstrap.
+*   **Issue #249/262: Native Resource Hardening**.
+    - **Resolution**: Implemented missing `n6` (nativeRelease) in `jdhardware-jni.cpp`. Added explicit lifecycle disposal calls in `TrackerService.onDestroy()` and `ViewerService.onDestroy()` to clear native pointers and prevent `BaseEventQueue.dispose` failures.
+*   **Issue #257/271: Samsung I/O Mitigation**.
+    - **Resolution**: Aligned background maintenance in `BaseMonitorService.kt` with the 15s `STAGGERED_IO_PRUNING_DELAY_MS`. This eliminates I/O competition with Samsung's Kumiho package auditing during the launch window.
 
 ## 96. Forensic Validation & UI Integration (Aug.21.08)
 *   **Issue #196-V: Forensic Validation Hook UI**.

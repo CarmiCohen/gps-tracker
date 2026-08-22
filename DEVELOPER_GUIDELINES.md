@@ -20,5 +20,3 @@ Perform the following steps in order once an issue is resolved:
 6. **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot to prepare for a fresh chat session.
 7. **Session Termination**: Stop the chat immediately. Do not attempt to fix any other issues or continue work.
 8. **Audit Recalculation**: Recalculate number of items for SOT, Resolved issues, open issues, Testing chapters, sub-items, simplification ideas, QA validation status, and display it in a format of: Current Audit Baseline.
-
-**Current Audit Baseline (Aug.21.08)**: We have: SOT:154, issues: 752 (65 open), Testing: 100 chapters, 41 sub-items, Simplifications ideas: 178, and QA_VALIDATION_STATUS: 185 (93 active in cycle)
