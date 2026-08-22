@@ -8,6 +8,7 @@ The following rules MUST be followed strictly for every task:
 4. **Mark Resolved**: Record all fixed issues in the relevant status tracking file and mark them as resolved.
 5. **Continuous Handover**: Update `Handover.md` after each modification to any `.kt` file.
 6. **Transparency**: Briefly explain each action before executing it.
+7. **Handover Trigger**: Bring the current work to a safe stopping point so we can update `Handover.md` and preserve everything completed so far, whenever the number of agent calls reaches about 90. Then stop the implementation and start a new fresh chat.
 
 ## 🏁 Completion Sequence
 Perform the following steps in order once an issue is resolved:

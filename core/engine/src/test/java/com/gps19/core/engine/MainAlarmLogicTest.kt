@@ -8,6 +8,9 @@ import java.util.*
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
+ * Aug.22.01:
+ * - Chapter 11.2 Audit: Added `Verify Geofence Recovery Hysteresis` to validate 
+ *   alarm clearing logic (R460).
  * Aug.11.14:
  * - Issue #144: Geofence Uncertainty Growth Validation. Added test case for 
  *   Bayesian Drift protection during GPS gaps.
@@ -177,6 +180,45 @@ class MainAlarmLogicTest {
         MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
         
         assertTrue("Violation should persist during GPS gap uncertainty expansion", state.wasDistanceViolated)
+    }
+
+    @Test
+    fun `Verify Geofence Recovery Hysteresis`() {
+        val now = 1700000000000L
+        val baseNowRt = 100000L
+        
+        // threshold = 100 + (5 * 6) = 130m.
+        // hysteresis_zone = 130 - 5 = 125m.
+        
+        val state = createDefaultState(now).apply {
+            this.nowRt = baseNowRt
+            trackerLat = 10.0012 // ~133m away (Just outside threshold)
+            wasDistanceViolated = true
+            distanceViolationCounter = DISTANCE_ALARM_SAMPLES_REQUIRED
+            maxTrackerAccuracy = 5.0
+            lastGpsPacketRt = baseNowRt
+        }
+
+        // 1. Return within threshold but outside hysteresis (e.g., 127m)
+        state.trackerLat = 10.00114 // ~127m away
+        val report1 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, spikeLogger)
+        assertTrue("Violation should persist in hysteresis zone", state.wasDistanceViolated)
+
+        // 2. Return within hysteresis zone (e.g., 120m)
+        state.trackerLat = 10.00108 // ~120m away
+        val report2 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, spikeLogger)
+        assertFalse("Violation should clear inside hysteresis zone", state.wasDistanceViolated)
+
+        // 3. Return with poor accuracy (e.g., 25m) - should NOT clear
+        state.wasDistanceViolated = true
+        state.maxTrackerAccuracy = 25.0 // Limit is 20.0
+        // threshold = 100 + (25 * 6) = 250m.
+        // 120m is well within 250 - 5 = 245m.
+        val report3 = SystemHealthReport()
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report3, spikeLogger)
+        assertTrue("Violation should NOT clear if accuracy is poor (>20m)", state.wasDistanceViolated)
     }
 
     @Test

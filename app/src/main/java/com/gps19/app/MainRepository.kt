@@ -28,12 +28,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Aug.22.04:
+ * - Issue #197 Standardization: Aligned triggerBackgroundPruning with R197 
+ *   chunked standards for connection_history, violations, and trail_points.
  * Aug.21.07:
  * - Issue #196 Hardening: Exposed setForensicStallSimulation for urban 
- *   multipath validation (R196-V). Fixed duplicate saveSettingsBulk method.
- * Aug.20.07:
- * - Issue #225 Analytical Telemetry Optimization: Refactored history mapping 
- *   to use ForensicMapper for 1:1 parity (R225).
+ *   multipath validation (R196-V).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -64,7 +64,7 @@ class MainRepository @Inject constructor(
     private val trackerPointCache = ShadowCache<Long, TrailPoint>(3000)
     private val viewerPointCache = ShadowCache<Long, TrailPoint>(3000)
 
-    companion object {
+    private companion object {
         const val DEFAULT_RELAY_URL = SettingsRepository.DEFAULT_RELAY_URL
         const val DEFAULT_TRACKER_ID = SettingsRepository.DEFAULT_TRACKER_ID
         const val DEFAULT_VIEWER_ID = SettingsRepository.DEFAULT_VIEWER_ID
@@ -73,6 +73,11 @@ class MainRepository @Inject constructor(
         private const val DB_PRUNE_THRESHOLD_HISTORY = 500
         private const val DB_PRUNE_THRESHOLD_TRAIL = 100
         private const val UI_HISTORY_EMIT_INTERVAL_MS = 500L 
+
+        private const val PRUNE_LIMIT_HISTORY = 300
+        private const val PRUNE_LIMIT_TRAIL = 2000
+        private const val PRUNE_LIMIT_VIOLATIONS = 1000
+        private const val PRUNE_CHUNK_SIZE = 500
     }
 
     val isRelayConnected = telemetry.isRelayConnected
@@ -326,7 +331,6 @@ class MainRepository @Inject constructor(
                 currentMa = entity.currentMa
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
                 
-                // R225: Consolidated forensic mapping
                 ForensicMapper.mapEntityToApp(entity, this)
             }
             cp
@@ -446,12 +450,19 @@ class MainRepository @Inject constructor(
                     onSpike = { message, _ -> logLatencySpike(message) }
                 ) {
                     database.withTransaction {
+                        // R197: Standardized Chunked Pruning
                         listOf("4M", "16M", "1H", "4H", "24H", "7D").forEach { key ->
-                            historyDao.pruneHistory(key)
+                            val threshold = historyDao.getPruneThreshold(key, PRUNE_LIMIT_HISTORY)
+                            threshold?.let { historyDao.pruneByThreshold(key, it, PRUNE_CHUNK_SIZE) }
                         }
-                        trailDao.pruneTrail(false)
-                        trailDao.pruneTrail(true)
-                        violationDao.prune()
+                        
+                        listOf(false, true).forEach { isViewer ->
+                            val threshold = trailDao.getPruneThreshold(isViewer, PRUNE_LIMIT_TRAIL)
+                            threshold?.let { trailDao.pruneByThreshold(isViewer, it, PRUNE_CHUNK_SIZE) }
+                        }
+                        
+                        val vThreshold = violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)
+                        vThreshold?.let { violationDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE) }
                     }
                 }
             } catch (e: Exception) {

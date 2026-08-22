@@ -1,6 +1,6 @@
-# Architectural Simplification Ideas (Aug.21.08)
+# Architectural Simplification Ideas (Aug.22.03)
 
-Following the implementation of UiStateAggregator and Forensic Validation Hooks, here are remaining recommendations:
+Following the implementation of UiStateAggregator, Forensic Validation Hooks, and JNI Watchdog hardening, here are remaining recommendations:
 
 ## 1. UI State Aggregation (Aug.21.08)
 - **Status**: ✅ **RESOLVED**. Extracted to `UiStateAggregator` (Issue #240).
@@ -28,3 +28,10 @@ Following the implementation of UiStateAggregator and Forensic Validation Hooks,
 
 ## 9. Parallel Aggregation Engine (Aug.21.08)
 - **Idea #178**: Parallelize JNI hardware synchronization and HUD state aggregation to mitigate the 1000ms Logic/UI overlap stall identified on A15 hardware.
+
+## 10. Navigation & Native Hardening (Aug.22.00)
+- **Idea #179**: Consolidate `MainAppContent` navigation `LaunchedEffect` into a dedicated `AppNavigator` component to reduce Composable complexity and centralize backstack management (Ref: Issue #250).
+- **Idea #180**: Extract the JNI execution wrapper (with `withTimeout` and `Mutex` logic) into a generic `NativeSafeExecutor` utility to reuse the watchdog logic across other native modules and reduce boilerplate in `JdHardwareManager` (Ref: Issue #301).
+
+## 11. Unified Database Pruning (Aug.22.03)
+- **Idea #181**: Standardize all remaining data tables (`connection_history`, `violations`, `trail_points`) to use the R197 chunked pruning standard. Currently, only `logs` and `pending_status_updates` are fully hardened against I/O stalls.

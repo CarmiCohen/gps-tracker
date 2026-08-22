@@ -2,7 +2,17 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 701**
+**Total Unique Resolutions: 703**
+
+## 100. Offline Storage Hardening & R197 Compliance (Aug.22.03)
+*   **Issue #197: Offline Storage Hardening**.
+    - **Resolution**: Aligned `PendingStatusDao` and `OfflineRepository` with R197 chunked pruning standards. Replaced monolithic `prune()` with `getPruneThreshold` and `pruneByThreshold` calls.
+    - **Verification**: Verified logic via source audit. Prevents I/O stalls during large accumulation recovery on budget hardware (Samsung A15).
+
+## 99. Core Engine Integrity & Geofence Hysteresis (Aug.22.02)
+*   **Issue #308: Restored Core Engine Definitions**.
+    - **Resolution**: Re-implemented the missing core data structures (`AlarmEvaluationState`, `ProcessedLocation`, `SpatialAnchor`, and `RejectedPoint`) in `EngineModels.kt`. This resolved the critical build blocker and enabled verification of Chapter 11.2 (Geofence Recovery Hysteresis).
+    - **Verification**: Verified via `MainAlarmLogicTest` and `GeofenceBatteryAuditTest` (33 tests passing).
 
 ## 98. Navigation & JNI Hardening (Aug.22.00)
 *   **Issue #250: Navigation Backstack Inconsistency**.
@@ -19,9 +29,5 @@ This document contains the unified record of all resolved issues and technical d
     - **Resolution**: Implemented missing `n6` (nativeRelease) in `jdhardware-jni.cpp`. Added explicit lifecycle disposal calls in `TrackerService.onDestroy()` and `ViewerService.onDestroy()` to clear native pointers and prevent `BaseEventQueue.dispose` failures.
 *   **Issue #257/271: Samsung I/O Mitigation**.
     - **Resolution**: Aligned background maintenance in `BaseMonitorService.kt` with the 15s `STAGGERED_IO_PRUNING_DELAY_MS`. This eliminates I/O competition with Samsung's Kumiho package auditing during the launch window.
-
-## 96. Forensic Validation & UI Integration (Aug.21.08)
-*   **Issue #196-V: Forensic Validation Hook UI**.
-    - **Resolution**: Integrated the `SetForensicSimulation` toggle into the `DiagnosticsScreen`. This provides a manual trigger for simulating urban multipath and IO latency spikes, enabling verification of EMA reliability degradation and performance alarms (R196-V).
 
 *(Older resolutions preserved in Git history)*

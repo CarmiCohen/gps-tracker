@@ -4,6 +4,10 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Aug.22.02:
+ * - Issue #308 Hardening: Restored full AlarmEvaluationState, ProcessedLocation, 
+ *   SpatialAnchor, and RejectedPoint definitions to resolve build blockers and 
+ *   unit test compilation failures.
  * Aug.21.09:
  * - Issue #248 Performance Optimization: Segmented HudState into Connectivity, 
  *   Telemetry, and Health components to eliminate UI thread stalls during 
@@ -128,6 +132,199 @@ class EngineConnectionPoint(
         this.kineticEnergy = other.kineticEnergy; this.gpsHardwareLock = other.gpsHardwareLock
         this.cpuLoad = other.cpuLoad; this.ioWait = other.ioWait; this.maxIoLatency = other.maxIoLatency
         this.isSilentFailure = other.isSilentFailure; this.isBatteryLow = other.isBatteryLow; this.isBatteryCritical = other.isBatteryCritical
+    }
+}
+
+@Serializable
+data class SpatialAnchor(
+    val lat: Double = 0.0,
+    val lng: Double = 0.0,
+    val alt: Double = 0.0,
+    val gpsTs: Long = 0L
+)
+
+@Serializable
+data class RejectedPoint(
+    val lat: Double,
+    val lng: Double,
+    val alt: Double,
+    val accuracy: Double,
+    val bearing: Double,
+    val speedMps: Double,
+    val ts: Long,
+    val rt: Long
+)
+
+@Serializable
+class ProcessedLocation {
+    var rawPoint: EngineGeoPoint = EngineGeoPoint()
+    var optimizedPoint: EngineGeoPoint = EngineGeoPoint()
+    var status: SentinelStatus = SentinelStatus.VALID
+    var maxAccuracy: Double = 0.0
+    var currentAccuracy: Double = 0.0
+    var filteredSpeed: Double = 0.0
+    var timestamp: Long = 0L
+    var rt: Long = 0L
+    var isStalled: Boolean = false
+    var isClockRegression: Boolean = false
+    var receiptRt: Long = 0L
+    var isTrajectoryPromoted: Boolean = false
+    var jumpTier: Int = 0
+    var isAdaptiveJump: Boolean = false
+    var distToHome: Double? = null
+    var isSpatiallyValid: Boolean = false
+    var geofenceViolationDetected: Boolean = false
+    var tamperDetected: Boolean = false
+    var jammerDetected: Boolean = false
+    var isAnchorLocked: Boolean = false
+    var suppressionNote: String? = null
+    var kineticEnergy: Double = 0.0
+
+    fun reset() {
+        status = SentinelStatus.VALID
+        maxAccuracy = 0.0
+        currentAccuracy = 0.0
+        filteredSpeed = 0.0
+        timestamp = 0L
+        rt = 0L
+        isStalled = false
+        isClockRegression = false
+        receiptRt = 0L
+        isTrajectoryPromoted = false
+        jumpTier = 0
+        isAdaptiveJump = false
+        distToHome = null
+        isSpatiallyValid = false
+        geofenceViolationDetected = false
+        tamperDetected = false
+        jammerDetected = false
+        isAnchorLocked = false
+        suppressionNote = null
+        kineticEnergy = 0.0
+    }
+}
+
+@Serializable
+class AlarmEvaluationState {
+    var now: Long = 0L
+    var nowRt: Long = 0L
+    var health: SystemHealthState = SystemHealthState()
+    var discoveryPhase: DiscoveryPhase = DiscoveryPhase.BOOTSTRAP
+    var isTrackerMode: Boolean = true
+    var isRelayConnected: Boolean = false
+    var isTrackerConnected: Boolean = false
+    var jumpTier: Int = 0
+    var isGpsGap: Boolean = false
+    var trackerBaroAltEma: Double = -1000.0
+    var trackerLat: Double = 0.0
+    var trackerLng: Double = 0.0
+    var trackerGpsAccuracy: Double = 0.0
+    var maxTrackerAccuracy: Double = 0.0
+    var trackerLastValidFixTs: Long = 0L
+    var trackerLastValidFixRt: Long = 0L
+    var trackerSpeed: Double = 0.0
+    var trackerBattery: Int = 0
+    var trackerTemp: Double = 0.0
+    var firstViolationTs: Long = 0L
+    var firstViolationRt: Long = 0L
+    var firstViolationWasJump: Boolean = false
+    var wasDistanceViolated: Boolean = false
+    var distanceViolationCounter: Int = 0
+    var isAdaptiveJump: Boolean = false
+    var lastGpsPacketTs: Long = 0L
+    var lastGpsPacketRt: Long = 0L
+    var serviceStartTime: Long = 0L
+    var serviceStartRt: Long = 0L
+    var lastAlarmAckTs: Long = 0L
+    var appStartTime: Long = 0L
+    var capabilities: HardwareCapabilities = HardwareCapabilities()
+    var forensicReliabilityDegradationStartRt: Long = 0L
+    
+    var homePoints: MutableList<EngineGeoPoint> = mutableListOf()
+    var maxDistance: Double = 0.0
+    var distToHomeAuthority: Double? = null
+
+    fun getOrCreateHomePoint(index: Int): EngineGeoPoint {
+        while (homePoints.size <= index) {
+            homePoints.add(EngineGeoPoint())
+        }
+        return homePoints[index]
+    }
+
+    fun truncateHomePoints(size: Int) {
+        while (homePoints.size > size) {
+            homePoints.removeAt(homePoints.size - 1)
+        }
+    }
+
+    fun update(
+        now: Long,
+        nowRt: Long,
+        serviceStartTime: Long,
+        serviceStartRt: Long,
+        lastAlarmAckTs: Long,
+        appStartTime: Long,
+        isRelayConnected: Boolean,
+        isTrackerConnected: Boolean,
+        discoveryPhase: DiscoveryPhase,
+        trackerLat: Double,
+        trackerLng: Double,
+        trackerGpsAccuracy: Double,
+        maxTrackerAccuracy: Double,
+        lastGpsPacketTs: Long,
+        lastGpsPacketRt: Long,
+        trackerLastValidFixTs: Long,
+        trackerLastValidFixRt: Long,
+        trackerSpeed: Double,
+        jumpTier: Int,
+        isAdaptiveJump: Boolean,
+        trackerBattery: Int,
+        trackerTemp: Double,
+        wasDistanceViolated: Boolean,
+        distanceViolationCounter: Int,
+        firstViolationTs: Long,
+        firstViolationRt: Long,
+        firstViolationWasJump: Boolean,
+        maxDistance: Double,
+        distToHomeAuthority: Double?,
+        isGpsGap: Boolean,
+        trackerBaroAltEma: Double,
+        isTrackerMode: Boolean,
+        capabilities: HardwareCapabilities
+    ) {
+        this.now = now
+        this.nowRt = nowRt
+        this.serviceStartTime = serviceStartTime
+        this.serviceStartRt = serviceStartRt
+        this.lastAlarmAckTs = lastAlarmAckTs
+        this.appStartTime = appStartTime
+        this.isRelayConnected = isRelayConnected
+        this.isTrackerConnected = isTrackerConnected
+        this.discoveryPhase = discoveryPhase
+        this.trackerLat = trackerLat
+        this.trackerLng = trackerLng
+        this.trackerGpsAccuracy = trackerGpsAccuracy
+        this.maxTrackerAccuracy = maxTrackerAccuracy
+        this.lastGpsPacketTs = lastGpsPacketTs
+        this.lastGpsPacketRt = lastGpsPacketRt
+        this.trackerLastValidFixTs = trackerLastValidFixTs
+        this.trackerLastValidFixRt = trackerLastValidFixRt
+        this.trackerSpeed = trackerSpeed
+        this.jumpTier = jumpTier
+        this.isAdaptiveJump = isAdaptiveJump
+        this.trackerBattery = trackerBattery
+        this.trackerTemp = trackerTemp
+        this.wasDistanceViolated = wasDistanceViolated
+        this.distanceViolationCounter = distanceViolationCounter
+        this.firstViolationTs = firstViolationTs
+        this.firstViolationRt = firstViolationRt
+        this.firstViolationWasJump = firstViolationWasJump
+        this.maxDistance = maxDistance
+        this.distToHomeAuthority = distToHomeAuthority
+        this.isGpsGap = isGpsGap
+        this.trackerBaroAltEma = trackerBaroAltEma
+        this.isTrackerMode = isTrackerMode
+        this.capabilities = capabilities
     }
 }
 
