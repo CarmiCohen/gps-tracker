@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (Aug.21.09)
+# Project Issues & Hardening Tracking (Aug.22.00)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟡 MONITORING | 55 |
+| **Open Technical Issues** | 🟡 MONITORING | 53 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 699 |
+| **Resolved (Total)** | 🟢 Progress | 701 |
 
 ---
 
@@ -17,7 +17,6 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🔴 Open Issues
-*   **Issue #250**: **Navigation Backstack Inconsistency**: `Ignoring popBackStack to route landing` warning.
 *   **Issue #251**: **Integration Failure (mbrainSDK)**: Logcat reported `Can't load libmbrainSDK`.
 *   **Issue #252**: **JobService Foreground Flag Warning**: WorkManager job 33 ignoring `important-while-foreground`.
 *   **Issue #253**: **Redundant Network Registration Traces**: Redundant calls in `ConnectivitySuite`.
@@ -62,7 +61,6 @@ This document tracks active issues, technical debt, and pending implementation t
 *   **Issue #297**: **CPU Spike: Reconnection Storm**: Rapid socket reconnection attempts.
 *   **Issue #299**: **Unreleased WakeLocks on Rapid Restart**: WakeLock acquisition logic lacks explicit lifecycle binding.
 *   **Issue #300**: **Forensic PINK_COLOR Contrast Ratio**: Accessibility violation on Light Theme.
-*   **Issue #301**: **Missing ANR Watchdog for JNI**: Engine stalls if native hardware sync hangs.
 *   **Issue #302**: **State Race in Location Update**: `lastKnownLocation` updated mid-tick.
 *   **Issue #303**: **Redundant Battery Polling**: Both monitors poll battery.
 *   **Issue #304**: **Inconsistent GNSS Jitter Threshold**: `GNSS_JITTER_THRESHOLD_MS` too sensitive for A15.
@@ -71,13 +69,9 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.21.09)
-*   **Issue #248**: **UI Thread Stall Remediation**. Implemented granular flow segmentation and `HudUiParts` pruning to eliminate 1070ms Davey stalls.
-*   **Issue #265**: **JNI Startup Optimization**. Migrated `JdHardwareManager` to `suspend initialize()` pattern on Dispatchers.IO.
-*   **Issue #249**: **Native Resource Hardening**. Implemented missing `n6` native release and added explicit lifecycle disposal in Services.
-*   **Issue #262**: **JNI Global Reference Cleanup**. Integrated explicit resource release in roles.
-*   **Issue #305**: **State Buffer Memory Barrier**. Added Mutex/Locking to `sharedStateBuffer` paths.
-*   **Issue #257/271**: **Samsung I/O Mitigation**. Aligned background maintenance with 15s staggered delay to eliminate launch window competition.
+## 🟢 Recently Resolved Issues (Aug.22.00)
+*   **Issue #250**: **Navigation Backstack Inconsistency**. Hardened backstack logic using explicit `popUpTo` and `launchSingleTop` to eliminate "Ignoring popBackStack to route landing" warnings.
+*   **Issue #301**: **JNI Watchdog Implementation**. Integrated `withTimeout(Dispatchers.IO)` in `JdHardwareManager` and updated engine calls to prevent native hangs from stalling the UI or Service.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.21.09)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.22.00)

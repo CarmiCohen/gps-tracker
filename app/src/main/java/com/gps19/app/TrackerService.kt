@@ -26,6 +26,9 @@ import kotlin.math.*
  * - Issue #249/262 Remediation: Added JdHardwareManager.releaseHardware() to 
  *   onDestroy to ensure native global references and hardware handles are 
  *   disposed, preventing memory leaks and BaseEventQueue failures.
+ * Aug.22.00:
+ * - Issue #301: Integrated JNI Watchdog in processTick by awaiting the 
+ *   now-suspending JdHardwareManager.syncState call (R301).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -446,6 +449,7 @@ class TrackerService : BaseMonitorService() {
         if (capabilities.isA15Device) {
             if (JdHardwareManager.isAvailable()) {
                 val flags = if (health.isPowerSaveMode) 0x01 else 0x00
+                // Issue #301: Await the suspending syncState call to ensure watchdog protection.
                 JdHardwareManager.syncState(timeProvider, serviceTickCounter, flags)
             } else if (nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
                 lastA15PokeRt = nowRt

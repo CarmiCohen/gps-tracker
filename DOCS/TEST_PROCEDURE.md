@@ -98,23 +98,23 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   Verify EMA reliability degradation and `ALERT_ID_PERFORMANCE_SPIKE` alarm triggers under load using the `SetForensicSimulation` hook.
     *   **Verification:** Ensure range-based deduplication eliminates IO spikes during 100Hz bursts.
 
-## Chapter 8 - Validation Hooks & Aggregation (vAug.21.08)
+## Chapter 8 - Validation Hooks & Aggregation (vAug.21.09)
 **Goal:** Verify the new simulation hooks and UI state aggregation logic.
 *   **8.1 Forensic Stall Simulation:** Toggle simulation in Diagnostics.
     *   **Verification:** Observe Logcat for `Forensic Audit: Simulation mode ENABLED` and verify `ALERT_ID_PERFORMANCE_SPIKE` triggers if EMA reliability drops below 0.85.
 *   **8.2 State Aggregation Stability:** Navigate between HUD layers and modes.
     *   **Verification:** Ensure no UI flickers or flow-race conditions occur during rapid state transitions.
-*   **Status (Aug.21.08):** 🔴 FAILED - Detected 1070ms Davey stall and native regressions.
+*   **Status (Aug.21.09):** ✅ PASSED. Granular flow segmentation (#248) eliminates Davey stalls.
 
 ## Chapter 9 - Audio, Alerts, and Notification Latency
 **Goal:** Verify alert delivery speed and audio hardware stability.
 *   **9.1 Siren Validation:** Trigger "Test Siren" in Sound settings and verify immediate, unclipped playback.
 *   **9.2 Notification Latency:** Measure delay between violation and foreground notification update (<1s).
 
-## Chapter 10 - Native Resource Lifecycle (Issue #249)
+## Chapter 10 - Native Resource Lifecycle (vAug.21.09)
 **Goal:** Verify clean disposal of native and sensor resources.
 *   **10.1 Bridge Disposal:** Toggle mode 5 times and monitor for `BaseEventQueue.dispose` failures.
-*   **Status (Aug.21.08):** 🔴 FAILED - Logcat reported `BaseEventQueue.dispose` failure.
+*   **Status (Aug.21.09):** ✅ PASSED. Migrated JNI to suspend initialize (#265) and implemented missing native release (#249).
 
 ## Chapter 11 - Geofence Edge Cases & Uncertainty
 **Goal:** Verify geofence stability under signal degradation.
@@ -259,8 +259,8 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **100:** Final Forensic Trace Continuity Audit (48h).
 
 ---
-## Test Log: Aug.21.08
+## Test Log: Aug.21.09
 *   **Chapters 1-7:** ✅ PASSED.
-*   **Chapter 8 (Validation Hooks):** 🔴 FAILED - Detected 1070ms Davey stall and native regressions.
-*   **Chapter 10 (Native Lifecycle):** 🔴 FAILED - Logcat reported `BaseEventQueue.dispose` failure.
-*   **Chapters 9, 11-100:** 🟡 PENDING REMEDIATION.
+*   **Chapter 8 (Validation Hooks):** ✅ PASSED.
+*   **Chapter 10 (Native Lifecycle):** ✅ PASSED.
+*   **Chapters 9, 11-100:** 🟡 PENDING AUDIT.

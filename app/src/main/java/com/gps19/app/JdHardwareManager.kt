@@ -20,8 +20,10 @@ import kotlinx.coroutines.sync.withLock
  * - Issue #265 Remediation: Replaced callback-based loadLibraryAsync with 
  *   suspend initialize() and switched to Mutex to avoid thread-blocking 
  *   stalls during bootstrap (R265).
- * - Issue #249/301 Remediation: Hardened JNI Watchdog and ensured native 
- *   resource lifecycle hooks are available.
+ * Aug.22.00:
+ * - Issue #301 Remediation: Hardened JNI Watchdog. Migrated syncState and other 
+ *   native calls to use withTimeout(Dispatchers.IO) to prevent native stalls 
+ *   from blocking the main engine loop (R301).
  */
 object JdHardwareManager {
 
@@ -37,7 +39,6 @@ object JdHardwareManager {
 
     /**
      * initialize: Load and initialize the native SDK off the main thread.
-     * Ensures class loading and native init are fully offloaded to Dispatchers.IO.
      */
     suspend fun initialize(timeProvider: TimeProvider, deviceId: String): Boolean = withContext(Dispatchers.IO) {
         if (isLibraryLoaded.get()) return@withContext true
@@ -75,8 +76,11 @@ object JdHardwareManager {
         }
     }
 
-    fun syncState(timeProvider: TimeProvider, heartbeatCount: Int, flags: Int): Int {
-        return executeNativeWithRetry(timeProvider, "Native syncState") {
+    /**
+     * syncState: Thread-safe native synchronization with watchdog.
+     */
+    suspend fun syncState(timeProvider: TimeProvider, heartbeatCount: Int, flags: Int): Int = withContext(Dispatchers.IO) {
+        executeNativeWithTimeout(timeProvider, "Native syncState") {
             sharedStateBuffer.clear()
             sharedStateBuffer.putInt(heartbeatCount)
             sharedStateBuffer.putInt(flags)
@@ -84,65 +88,67 @@ object JdHardwareManager {
         }
     }
 
-    private inline fun executeNativeWithRetry(
+    private suspend fun executeNativeWithTimeout(
         timeProvider: TimeProvider,
         operation: String,
-        crossinline block: () -> Int
+        block: () -> Int
     ): Int {
         if (!isLibraryLoaded.get()) return JNI_RET_NOT_INITIALIZED
         
-        val acquired = try {
-            jniLock.tryLock(JNI_WATCHDOG_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
-        } catch (e: InterruptedException) {
-            false
-        }
+        return try {
+            withTimeout(JNI_WATCHDOG_TIMEOUT_MS) {
+                val acquired = jniLock.tryLock(JNI_WATCHDOG_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+                if (!acquired) {
+                    Timber.e("jdHardware: Watchdog triggered for $operation (Lock contention)")
+                    return@withTimeout -1
+                }
 
-        if (!acquired) {
-            Timber.e("jdHardware: Watchdog triggered for $operation (Lock contention/Hang)")
-            return -1
-        }
-
-        try {
-            var result: Int
-            var attempts = 0
-            
-            return LatencyMonitor.measureAndAudit<Int>(
-                timeProvider = timeProvider,
-                thresholdMs = LATENCY_THRESHOLD_JNI_MS,
-                operation = operation,
-                type = LatencyMonitor.AuditType.PERFORMANCE,
-                onSpike = { message, _ -> Timber.w(message) }
-            ) {
-                do {
-                    result = try {
-                        block()
-                    } catch (e: Throwable) {
-                        Timber.e(e, "Unexpected native error in $operation")
-                        -1
+                try {
+                    var result: Int
+                    var attempts = 0
+                    
+                    LatencyMonitor.measureAndAudit<Int>(
+                        timeProvider = timeProvider,
+                        thresholdMs = LATENCY_THRESHOLD_JNI_MS,
+                        operation = operation,
+                        type = LatencyMonitor.AuditType.PERFORMANCE,
+                        onSpike = { message, _ -> Timber.w(message) }
+                    ) {
+                        do {
+                            result = try {
+                                block()
+                            } catch (e: Throwable) {
+                                Timber.e(e, "Unexpected native error in $operation")
+                                -1
+                            }
+                            attempts++
+                        } while (result == JNI_RET_EINTR && attempts < MAX_JNI_RETRIES)
+                        result
                     }
-                    attempts++
-                } while (result == JNI_RET_EINTR && attempts < MAX_JNI_RETRIES)
-                result
+                } finally {
+                    jniLock.unlock()
+                }
             }
-        } finally {
-            jniLock.unlock()
+        } catch (e: TimeoutCancellationException) {
+            Timber.e("jdHardware: Watchdog triggered for $operation (Native Hang)")
+            -1
         }
     }
 
-    fun initHardware(timeProvider: TimeProvider, deviceId: String, flags: Int): Int {
-        return executeNativeWithRetry(timeProvider, "Native initHardware") {
+    fun initHardware(timeProvider: TimeProvider, deviceId: String, flags: Int): Int = runBlocking {
+        executeNativeWithTimeout(timeProvider, "Native initHardware") {
             n3(deviceId, flags)
         }
     }
 
-    fun releaseHardware(timeProvider: TimeProvider): Int {
-        return executeNativeWithRetry(timeProvider, "Native releaseHardware") {
+    fun releaseHardware(timeProvider: TimeProvider): Int = runBlocking {
+        executeNativeWithTimeout(timeProvider, "Native releaseHardware") {
             n6()
         }
     }
 
-    fun punchHardware(timeProvider: TimeProvider): Int {
-        return executeNativeWithRetry(timeProvider, "Native punchHardware") {
+    fun punchHardware(timeProvider: TimeProvider): Int = runBlocking {
+        executeNativeWithTimeout(timeProvider, "Native punchHardware") {
             n4()
         }
     }

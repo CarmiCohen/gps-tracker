@@ -52,6 +52,10 @@ import timber.log.Timber
  * - Issue #243: Hardened Navigation Settling. Introduced isSettlingActive to 
  *   defer automatic restoration navigation until STARTUP_SETTLING_DELAY_MS 
  *   completes, ensuring landing page stability verification (R243).
+ * Aug.22.00:
+ * - Issue #250 Remediation: Hardened Backstack logic to eliminate 
+ *   "Ignoring popBackStack to route landing" warnings by using explicit 
+ *   graph-relative popUpTo and launchSingleTop flags (R250).
  */
 @Composable
 fun MainAppContent(
@@ -186,7 +190,9 @@ fun MainAppContent(
 
         if (isDiagnostics) {
             if (navController.currentDestination?.route != Screen.Diagnostics.route) {
-                navController.navigate(Screen.Diagnostics.route)
+                navController.navigate(Screen.Diagnostics.route) {
+                    launchSingleTop = true
+                }
             }
             return@LaunchedEffect
         }
@@ -211,12 +217,18 @@ fun MainAppContent(
         when (mode) {
             "tracker" -> {
                 if (navController.currentDestination?.route != Screen.Tracker.route) {
-                    navController.navigate(Screen.Tracker.route) { popUpTo(Screen.Landing.route) { inclusive = true } }
+                    navController.navigate(Screen.Tracker.route) { 
+                        popUpTo(Screen.Landing.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
                 }
             }
             "viewer" -> {
                 if (navController.currentDestination?.route != Screen.Viewer.route) {
-                    navController.navigate(Screen.Viewer.route) { popUpTo(Screen.Landing.route) { inclusive = true } }
+                    navController.navigate(Screen.Viewer.route) { 
+                        popUpTo(Screen.Landing.route) { inclusive = true } 
+                        launchSingleTop = true
+                    }
                 }
             }
             null -> {
@@ -224,7 +236,10 @@ fun MainAppContent(
                     isManualSelectionInProgress = false
                 }
                 if (navController.currentDestination?.route != Screen.Landing.route) {
-                    navController.navigate(Screen.Landing.route) { popUpTo(0) { inclusive = true } }
+                    navController.navigate(Screen.Landing.route) { 
+                        popUpTo(Screen.Landing.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
                 }
             }
         }
