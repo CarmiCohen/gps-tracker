@@ -16,9 +16,9 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Aug.22.04"
+        versionName "Aug.22.05"
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
             useSupportLibrary true
         }
@@ -143,6 +143,11 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
     androidTestImplementation platform('androidx.compose:compose-bom:2024.04.01')
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+    
+    // Hilt Testing
+    androidTestImplementation "com.google.dagger:hilt-android-testing:2.51.1"
+    kaptAndroidTest "com.google.dagger:hilt-compiler:2.51.1"
+
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
 }

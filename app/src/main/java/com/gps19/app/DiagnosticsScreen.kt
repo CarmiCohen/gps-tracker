@@ -21,12 +21,12 @@ import com.gps19.core.engine.CapabilityStatus
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Aug.22.05:
+ * - Audit Chapter 12.3: Added Storage Pressure simulation toggles to verify 
+ *   PersistencePolicy prioritization (R197).
  * Aug.21.08:
  * - Issue #196-V: Added Forensic Stall Simulation toggle to support urban multipath 
  *   validation and performance spike auditing (R196-V).
- * Aug.10.31:
- * - Issue #135: UI Davey/ANR Mitigation. Refactored to use decomposed primitive 
- *   parameters to prevent high-frequency telemetry recomposition stalls (R135).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,10 +35,13 @@ fun DiagnosticsScreen(
     recoveryCount: Int,
     cumulativeRecoveryBlackoutMs: Long,
     isForensicStallSimulated: Boolean,
+    isStorageSimulated: Boolean,
+    isStorageCriticalSimulated: Boolean,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onToggleManualOverride: () -> Unit,
     onToggleForensicSimulation: (Boolean) -> Unit,
+    onToggleStorageSimulation: (Boolean, Boolean) -> Unit,
     onRequestBatteryExemption: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onRequestAppInfo: () -> Unit,
@@ -183,6 +186,7 @@ fun DiagnosticsScreen(
                 fontWeight = FontWeight.Bold
             )
 
+            // Forensic Stall Simulation
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -203,6 +207,38 @@ fun DiagnosticsScreen(
                     checked = isForensicStallSimulated,
                     onCheckedChange = { onToggleForensicSimulation(it) }
                 )
+            }
+
+            // Storage Pressure Simulation
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Storage Pressure Simulation", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (isStorageSimulated) (if (isStorageCriticalSimulated) "CRITICAL (99% full)" else "LOW (95% full)") else "Simulate Disk Exhaustion",
+                        color = if (isStorageSimulated) Color.Yellow else Color.Gray,
+                        fontSize = 12.sp
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isStorageSimulated) {
+                        Text("CRIT", color = if (isStorageCriticalSimulated) Color.Red else Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(end = 4.dp))
+                        Checkbox(
+                            checked = isStorageCriticalSimulated,
+                            onCheckedChange = { onToggleStorageSimulation(true, it) }
+                        )
+                    }
+                    Switch(
+                        checked = isStorageSimulated,
+                        onCheckedChange = { onToggleStorageSimulation(it, isStorageCriticalSimulated) }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))

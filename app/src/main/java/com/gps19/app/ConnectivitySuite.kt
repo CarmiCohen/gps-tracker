@@ -33,12 +33,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Aug.22.04:
+ * - Build Fix: Corrected Protobuf enum mapping logic to handle .name conversion 
+ *   for LocationPendingReason and TrackerState.
  * Aug.20.07:
  * - Issue #225 Analytical Telemetry Optimization: Refactored status mapping 
  *   to use ForensicMapper for 1:1 parity (R225).
- * Aug.20.06:
- * - Issue #224 Forensic Audit: Synchronized vertical velocity and sensor indices 
- *   in PendingStatusEntity persistence path for offline forensic parity (R224).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -538,7 +538,7 @@ class ConnectivitySuite @Inject constructor(
             remoteStatusRepository.setPeerSignal((statusProto.snrIdx * 10.0).toInt().coerceIn(0, 10))
 
             remoteStatusRepository.updateStatusAtomic { current ->
-                val trackerLocationPendingReason = TrackerStatus.mapProtoToPendingReason(statusProto.pendingReason)
+                val trackerLocationPendingReason = TrackerStatus.mapProtoToPendingReason(statusProto.pendingReason.name)
                 
                 var lat = current.lat; var lng = current.lng; var gpsTs = current.gpsTs; var filteredSpeed = current.speed; var lastFixRt = statusProto.lastValidFixRt
                 var isClockReg = current.isClockRegression; var isVisualJump = current.isJump
@@ -575,7 +575,7 @@ class ConnectivitySuite @Inject constructor(
                     isLocationPending = statusProto.isLocationPending, locationPendingReason = trackerLocationPendingReason,
                     lastValidFixRt = lastFixRt, isBatterySteepDischarge = statusProto.isBatterySteepDischarge, isCoolingModeActive = statusProto.isCoolingModeActive,
                     isBatteryLow = statusProto.isBatteryLow, isBatteryCritical = statusProto.isBatteryCritical,
-                    trackerState = TrackerStatus.mapProtoToTrackerState(statusProto.state),
+                    trackerState = TrackerStatus.mapProtoToTrackerState(statusProto.state.name),
                     ts = now,
                     snrIdx = statusProto.snrIdx, noiseIdx = statusProto.noiseIdx, 
                     luxIdx = statusProto.luxIdx, vibeIdx = statusProto.vibeIdx, 

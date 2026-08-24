@@ -17,12 +17,11 @@ import javax.inject.Singleton
 
 /**
  * CommandEvent: Reactive event container for system and UI commands.
- * Aug.20.03:
- * - Issue #223 Release: Removed debug instrumentation (SimulateThermalEvent, 
- *   TriggerForensicTest) for production hardening.
- * Aug.17.08:
- * - Issue #191 Validation: Added SimulateThermalEvent to support dynamic 
- *   polling throttle verification (R191).
+ * Aug.22.05:
+ * - Audit Chapter 12.3: Added SimulateStoragePressure support (R197).
+ * Aug.22.04:
+ * - Issue #140 Restoration: Re-added ExecuteStressTest to support Chapter 12.2 
+ *   Database Stress Audit (R140/R196-V).
  */
 sealed class CommandEvent {
     data class ViewerPulse(val id: String) : CommandEvent()
@@ -32,6 +31,8 @@ sealed class CommandEvent {
     data class TransientDrop(val drop: Boolean) : CommandEvent()
     object ResetTimers : CommandEvent()
     object SyncSensors : CommandEvent()
+    object ExecuteStressTest : CommandEvent()
+    data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : CommandEvent()
 }
 
 /**
@@ -162,7 +163,12 @@ class CommandRouter @Inject constructor(
                                 }
                             }
                         }
-                        else -> {}
+                        is UiCommand.ExecuteStressTest -> {
+                            _commandEvents.emit(CommandEvent.ExecuteStressTest)
+                        }
+                        is UiCommand.SimulateStoragePressure -> {
+                            integrityMonitor.simulateStoragePressure(command.active, command.isCritical)
+                        }
                     }
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e

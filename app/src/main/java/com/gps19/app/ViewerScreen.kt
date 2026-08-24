@@ -32,6 +32,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Aug.22.04:
+ * - Build Fix: Renamed maxIoLatencyMs to maxIoLatency in TelemetryBox call.
  * Aug.20.09:
  * - Issue #226: HUD State Centralization. Refactored GlobalStatusBar call 
  *   to consume unified HudState (R226).
@@ -476,7 +478,7 @@ fun ViewerDashboard(
                         rttValue = rttValue,
                         cpuLoad = dashboardState.cpuLoad,
                         ioWait = dashboardState.ioWait,
-                        maxIoLatencyMs = dashboardState.maxIoLatencyMs,
+                        maxIoLatency = dashboardState.maxIoLatency,
                         onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                     )
                     DebugTable(

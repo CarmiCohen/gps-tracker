@@ -25,14 +25,10 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Aug.22.04:
+ * - Issue #140 Restoration Build Fix: Unified naming to maxIoLatency.
  * Aug.17.02:
- * - Issue #187: Dashboard Layout Jitter. Stabilized InfoRow with fixed height, 
- *   maxLines=1, and disabled font padding to eliminate vertical jumping during 
- *   telemetry hydration (R187).
- * Aug.13.11:
- * - Issue #163: 1Hz Telemetry Path Optimization. Refactored all dashboard 
- *   components to handle primitive types and utilized memoized formatting 
- *   to eliminate object churn during 1Hz telemetry updates (R163).
+ * - Issue #187: Dashboard Layout Jitter.
  */
 
 @Composable
@@ -43,7 +39,6 @@ fun MainDashboardGrid(
     isRelayConnected: Boolean,
     lastRemoteActivityTs: Long,
     systemPulse: Long,
-    // Decomposed DashboardState fields
     isGpsFresh: Boolean,
     isTelemetryFresh: Boolean,
     isLinkFresh: Boolean,
@@ -104,7 +99,7 @@ fun MainDashboardGrid(
     rttValue: Int,
     cpuLoad: Double,
     ioWait: Double,
-    maxIoLatencyMs: Long,
+    maxIoLatency: Long,
     onShowGnssDetail: () -> Unit = {}
 ) {
     val isViewer = appMode == "viewer"
@@ -136,76 +131,29 @@ fun MainDashboardGrid(
             Spacer(Modifier.height(4.dp))
 
             SystemHealthSection(
-                maxDropMs = maxDropMs,
-                lastSeenTs = lastSeenTs,
-                totalDropMs = totalDropMs,
-                totalUptimeMs = totalUptimeMs,
-                sessionMs = sessionMs,
-                engineVersion = engineVersion,
-                sinceConnMs = sinceConnMs,
-                sinceDiscoMs = sinceDiscoMs,
-                violationUptimeMs = violationUptimeMs,
-                watchdogCountdownSec = watchdogCountdownSec,
-                watchdogOk = watchdogOk,
-                standbyBucket = standbyBucket,
-                netInterface = netInterface,
-                isStorageLow = isStorageLow,
-                isStorageCritical = isStorageCritical,
-                isBatteryWhitelisted = isBatteryWhitelisted,
-                isTelemetryFresh = isTelemetryFresh,
+                maxDropMs = maxDropMs, lastSeenTs = lastSeenTs, totalDropMs = totalDropMs, totalUptimeMs = totalUptimeMs,
+                sessionMs = sessionMs, engineVersion = engineVersion, sinceConnMs = sinceConnMs, sinceDiscoMs = sinceDiscoMs,
+                violationUptimeMs = violationUptimeMs, watchdogCountdownSec = watchdogCountdownSec, watchdogOk = watchdogOk,
+                standbyBucket = standbyBucket, netInterface = netInterface, isStorageLow = isStorageLow, isStorageCritical = isStorageCritical,
+                isBatteryWhitelisted = isBatteryWhitelisted, isTelemetryFresh = isTelemetryFresh,
                 isConnStale = isViewer && (lastRemoteActivityTs <= 0 || (systemPulse - lastRemoteActivityTs >= TELEMETRY_UI_STALE_THRESHOLD_MS)),
-                relayColor = relayColor,
-                masterColor = masterColor,
-                rttValue = rttValue,
-                isPowerSaveMode = isPowerSaveMode,
-                systemPulse = systemPulse
+                relayColor = relayColor, masterColor = masterColor, rttValue = rttValue, isPowerSaveMode = isPowerSaveMode, systemPulse = systemPulse
             )
             SectionDivider()
             PositionSection(
-                distToHome = distToHome,
-                distToViewer = distToViewer,
-                lat = lat,
-                lng = lng,
-                gpsSpeedMps = gpsSpeedMps,
-                trackerAccuracy = trackerAccuracy,
-                trackerMaxAcc = trackerMaxAcc,
-                viewerAccuracy = viewerAccuracy,
-                viewerMaxAcc = viewerMaxAcc,
-                satsUsed = satsUsed,
-                satsView = satsView,
-                isSatsIndexWarning = isSatsIndexWarning,
-                snr = snr,
-                isGpsFresh = isGpsFresh,
-                gpsIdx = gpsIdx,
-                isViewer = isViewer,
-                isLocalOnline = isLocalOnline,
-                gpsColor = gpsColor,
-                onShowGnssDetail = onShowGnssDetail
+                distToHome = distToHome, distToViewer = distToViewer, lat = lat, lng = lng, gpsSpeedMps = gpsSpeedMps,
+                trackerAccuracy = trackerAccuracy, trackerMaxAcc = trackerMaxAcc, viewerAccuracy = viewerAccuracy, viewerMaxAcc = viewerMaxAcc,
+                satsUsed = satsUsed, satsView = satsView, isSatsIndexWarning = isSatsIndexWarning, snr = snr, isGpsFresh = isGpsFresh,
+                gpsIdx = gpsIdx, isViewer = isViewer, isLocalOnline = isLocalOnline, gpsColor = gpsColor, onShowGnssDetail = onShowGnssDetail
             )
             SectionDivider()
             ForensicSection(
-                vibration = vibration,
-                heading = heading,
-                tilt = tilt,
-                acousticDb = acousticDb,
-                baroAlt = baroAlt,
-                lux = lux,
-                proximityCm = proximityCm,
-                proximityDebounceMs = proximityDebounceMs,
-                rollingVibration = rollingVibration,
-                trackerMaxTemp = trackerMaxTemp,
-                viewerMaxTemp = viewerMaxTemp,
-                peakShock = peakShock,
-                vibrationFloor = vibrationFloor,
-                luxBaseline = luxBaseline,
-                acousticFloorDb = acousticFloorDb,
-                trackerCurrentMa = trackerCurrentMa,
-                isTelemetryFresh = isTelemetryFresh,
-                isViewer = isViewer,
-                isLocalOnline = isLocalOnline,
-                cpuLoad = cpuLoad,
-                ioWait = ioWait,
-                maxIoLatencyMs = maxIoLatencyMs
+                vibration = vibration, heading = heading, tilt = tilt, acousticDb = acousticDb, baroAlt = baroAlt,
+                lux = lux, proximityCm = proximityCm, proximityDebounceMs = proximityDebounceMs, rollingVibration = rollingVibration,
+                trackerMaxTemp = trackerMaxTemp, viewerMaxTemp = viewerMaxTemp, peakShock = peakShock, vibrationFloor = vibrationFloor,
+                luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb, trackerCurrentMa = trackerCurrentMa,
+                isTelemetryFresh = isTelemetryFresh, isViewer = isViewer, isLocalOnline = isLocalOnline,
+                cpuLoad = cpuLoad, ioWait = ioWait, maxIoLatency = maxIoLatency
             )
         }
     }
@@ -269,29 +217,11 @@ private fun DashboardHeader(
 
 @Composable
 private fun SystemHealthSection(
-    maxDropMs: Long,
-    lastSeenTs: Long,
-    totalDropMs: Long,
-    totalUptimeMs: Long,
-    sessionMs: Long,
-    engineVersion: String,
-    sinceConnMs: Long,
-    sinceDiscoMs: Long,
-    violationUptimeMs: Long,
-    watchdogCountdownSec: Long,
-    watchdogOk: Boolean,
-    standbyBucket: Int,
-    netInterface: String,
-    isStorageLow: Boolean,
-    isStorageCritical: Boolean,
-    isBatteryWhitelisted: Boolean,
-    isTelemetryFresh: Boolean,
-    isConnStale: Boolean,
-    relayColor: Color,
-    masterColor: Color,
-    rttValue: Int,
-    isPowerSaveMode: Boolean,
-    systemPulse: Long
+    maxDropMs: Long, lastSeenTs: Long, totalDropMs: Long, totalUptimeMs: Long, sessionMs: Long, engineVersion: String,
+    sinceConnMs: Long, sinceDiscoMs: Long, violationUptimeMs: Long, watchdogCountdownSec: Long, watchdogOk: Boolean,
+    standbyBucket: Int, netInterface: String, isStorageLow: Boolean, isStorageCritical: Boolean,
+    isBatteryWhitelisted: Boolean, isTelemetryFresh: Boolean, isConnStale: Boolean,
+    relayColor: Color, masterColor: Color, rttValue: Int, isPowerSaveMode: Boolean, systemPulse: Long
 ) {
     val maxDropStr = remember(maxDropMs) { formatDuration(maxDropMs) }
     val lastSeenStr = remember(lastSeenTs, systemPulse) { 
@@ -329,8 +259,8 @@ private fun SystemHealthSection(
     val sessionStr = remember(sessionMs) { formatDuration(sessionMs) }
     InfoRow(leftVal = totalUptimeStr, leftLabel = "Uptime", leftColor = masterColor, rightVal = sessionStr, rightLabel = stringResource(R.string.label_session), rightColor = masterColor)
     
-    val sinceConnStr = remember(sinceConnMs) { if (sinceConnMs > 0) formatDuration(sinceConnMs) else "--" }
-    InfoRow(leftVal = engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = sinceConnStr, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else BrandJd)
+    val sinceConnMsStr = remember(sinceConnMs) { if (sinceConnMs > 0) formatDuration(sinceConnMs) else "--" }
+    InfoRow(leftVal = engineVersion, leftLabel = "Engine Ver", leftColor = if(isConnStale) Slate500 else BrandJd, rightVal = sinceConnMsStr, rightLabel = stringResource(R.string.label_since_conn), rightColor = if(isConnStale) Slate500 else BrandJd)
     
     val sinceDiscoStr = remember(sinceDiscoMs) { if (sinceDiscoMs > 0) formatDuration(sinceDiscoMs) else "--" }
     val violationUptimeStr = remember(violationUptimeMs) { formatDuration(violationUptimeMs) }
@@ -339,25 +269,10 @@ private fun SystemHealthSection(
 
 @Composable
 private fun PositionSection(
-    distToHome: Double?,
-    distToViewer: Double?,
-    lat: Double,
-    lng: Double,
-    gpsSpeedMps: Double,
-    trackerAccuracy: Double,
-    trackerMaxAcc: Double,
-    viewerAccuracy: Double,
-    viewerMaxAcc: Double,
-    satsUsed: Int,
-    satsView: Int,
-    isSatsIndexWarning: Boolean,
-    snr: Double,
-    isGpsFresh: Boolean,
-    gpsIdx: GpsIndexData,
-    isViewer: Boolean,
-    isLocalOnline: Boolean,
-    gpsColor: Color,
-    onShowGnssDetail: () -> Unit
+    distToHome: Double?, distToViewer: Double?, lat: Double, lng: Double, gpsSpeedMps: Double,
+    trackerAccuracy: Double, trackerMaxAcc: Double, viewerAccuracy: Double, viewerMaxAcc: Double,
+    satsUsed: Int, satsView: Int, isSatsIndexWarning: Boolean, snr: Double, isGpsFresh: Boolean,
+    gpsIdx: GpsIndexData, isViewer: Boolean, isLocalOnline: Boolean, gpsColor: Color, onShowGnssDetail: () -> Unit
 ) {
     val distToHomeStr = remember(distToHome) { formatDist(distToHome) }
     val distToViewerStr = remember(distToViewer) { formatDist(distToViewer) }
@@ -386,28 +301,10 @@ private fun PositionSection(
 
 @Composable
 private fun ForensicSection(
-    vibration: Double,
-    heading: Double,
-    tilt: Double,
-    acousticDb: Double,
-    baroAlt: Double,
-    lux: Double,
-    proximityCm: Double,
-    proximityDebounceMs: Long,
-    rollingVibration: Double,
-    trackerMaxTemp: Double,
-    viewerMaxTemp: Double,
-    peakShock: Double,
-    vibrationFloor: Double,
-    luxBaseline: Double,
-    acousticFloorDb: Double,
-    trackerCurrentMa: Int,
-    isTelemetryFresh: Boolean,
-    isViewer: Boolean,
-    isLocalOnline: Boolean,
-    cpuLoad: Double,
-    ioWait: Double,
-    maxIoLatencyMs: Long
+    vibration: Double, heading: Double, tilt: Double, acousticDb: Double, baroAlt: Double, lux: Double, proximityCm: Double,
+    proximityDebounceMs: Long, rollingVibration: Double, trackerMaxTemp: Double, viewerMaxTemp: Double, peakShock: Double,
+    vibrationFloor: Double, luxBaseline: Double, acousticFloorDb: Double, trackerCurrentMa: Int,
+    isTelemetryFresh: Boolean, isViewer: Boolean, isLocalOnline: Boolean, cpuLoad: Double, ioWait: Double, maxIoLatency: Long
 ) {
     val staleColor = Slate500
     val tFresh = isTelemetryFresh
@@ -450,9 +347,9 @@ private fun ForensicSection(
     val ioWaitStr = remember(ioWait, tFresh) { if (tFresh) "%.1f%%".format(Locale.getDefault(), ioWait * 100.0) else "--" }
     InfoRow(leftVal = cpuLoadStr, leftLabel = "CPU Load", leftColor = if (!tFresh) staleColor else Color.White, rightVal = ioWaitStr, rightLabel = "I/O Wait", rightColor = if (!tFresh) staleColor else Amber500)
     
-    val maxLatencyStr = remember(maxIoLatencyMs, tFresh) { if (tFresh) "${maxIoLatencyMs}ms" else "--" }
+    val maxIoLatencyStr = remember(maxIoLatency, tFresh) { if (tFresh) "${maxIoLatency}ms" else "--" }
     val currentMaStr = remember(trackerCurrentMa, tFresh) { if (tFresh) "${trackerCurrentMa}mA" else "--" }
-    InfoRow(leftVal = maxLatencyStr, leftLabel = "Max Latency", leftColor = if (!tFresh) staleColor else Rose500, rightVal = currentMaStr, rightLabel = stringResource(R.string.log_diag_battery), rightColor = if(!tFresh) staleColor else Color.White)
+    InfoRow(leftVal = maxIoLatencyStr, leftLabel = "Max Latency", leftColor = if (!tFresh) staleColor else Rose500, rightVal = currentMaStr, rightLabel = stringResource(R.string.log_diag_battery), rightColor = if(!tFresh) staleColor else Color.White)
 }
 
 @Composable
@@ -544,145 +441,34 @@ private fun InfoRow(
 
 @Composable
 fun TelemetryBox(
-    appMode: String,
-    isBatteryWhitelisted: Boolean,
-    isLocalOnline: Boolean,
-    isRelayConnected: Boolean,
-    lastRemoteActivityTs: Long,
-    systemPulse: Long,
-    // Decomposed DashboardState fields
-    isGpsFresh: Boolean,
-    isTelemetryFresh: Boolean,
-    isLinkFresh: Boolean,
-    trackerState: TrackerState,
-    isLocationPending: Boolean,
-    locationPendingReason: LocationPendingReason,
-    status: SentinelStatus,
-    isTamperDetected: Boolean,
-    isBatterySteepDischarge: Boolean,
-    isBatteryLow: Boolean,
-    isBatteryCritical: Boolean,
-    maxDropMs: Long,
-    lastSeenTs: Long,
-    totalDropMs: Long,
-    totalUptimeMs: Long,
-    sessionMs: Long,
-    engineVersion: String,
-    sinceConnMs: Long,
-    sinceDiscoMs: Long,
-    violationUptimeMs: Long,
-    watchdogCountdownSec: Long,
-    watchdogOk: Boolean,
-    isPowerSaveMode: Boolean,
-    standbyBucket: Int,
-    netInterface: String,
-    isStorageLow: Boolean,
-    isStorageCritical: Boolean,
-    distToHome: Double?,
-    distToViewer: Double?,
-    lat: Double,
-    lng: Double,
-    gpsSpeedMps: Double,
-    trackerAccuracy: Double,
-    trackerMaxAcc: Double,
-    viewerAccuracy: Double,
-    viewerMaxAcc: Double,
-    satsUsed: Int,
-    satsView: Int,
-    isSatsIndexWarning: Boolean,
-    snr: Double,
-    vibration: Double,
-    heading: Double,
-    tilt: Double,
-    acousticDb: Double,
-    baroAlt: Double,
-    lux: Double,
-    proximityCm: Double,
-    proximityDebounceMs: Long,
-    rollingVibration: Double,
-    trackerMaxTemp: Double,
-    viewerMaxTemp: Double,
-    peakShock: Double,
-    vibrationFloor: Double,
-    luxBaseline: Double,
-    acousticFloorDb: Double,
-    trackerCurrentMa: Int,
-    gpsIdx: GpsIndexData,
-    rttValue: Int,
-    cpuLoad: Double,
-    ioWait: Double,
-    maxIoLatencyMs: Long,
+    appMode: String, isBatteryWhitelisted: Boolean, isLocalOnline: Boolean, isRelayConnected: Boolean, lastRemoteActivityTs: Long, systemPulse: Long,
+    isGpsFresh: Boolean, isTelemetryFresh: Boolean, isLinkFresh: Boolean, trackerState: TrackerState, isLocationPending: Boolean,
+    locationPendingReason: LocationPendingReason, status: SentinelStatus, isTamperDetected: Boolean, isBatterySteepDischarge: Boolean,
+    isBatteryLow: Boolean, isBatteryCritical: Boolean, maxDropMs: Long, lastSeenTs: Long, totalDropMs: Long, totalUptimeMs: Long,
+    sessionMs: Long, engineVersion: String, sinceConnMs: Long, sinceDiscoMs: Long, violationUptimeMs: Long, watchdogCountdownSec: Long,
+    watchdogOk: Boolean, isPowerSaveMode: Boolean, standbyBucket: Int, netInterface: String, isStorageLow: Boolean, isStorageCritical: Boolean,
+    distToHome: Double?, distToViewer: Double?, lat: Double, lng: Double, gpsSpeedMps: Double, trackerAccuracy: Double, trackerMaxAcc: Double,
+    viewerAccuracy: Double, viewerMaxAcc: Double, satsUsed: Int, satsView: Int, isSatsIndexWarning: Boolean, snr: Double, vibration: Double,
+    heading: Double, tilt: Double, acousticDb: Double, baroAlt: Double, lux: Double, proximityCm: Double, proximityDebounceMs: Long,
+    rollingVibration: Double, trackerMaxTemp: Double, viewerMaxTemp: Double, peakShock: Double, vibrationFloor: Double, luxBaseline: Double,
+    acousticFloorDb: Double, trackerCurrentMa: Int, gpsIdx: GpsIndexData, rttValue: Int, cpuLoad: Double, ioWait: Double, maxIoLatency: Long,
     onShowGnssDetail: () -> Unit = {}
 ) {
     MainDashboardGrid(
-        appMode = appMode,
-        isBatteryWhitelisted = isBatteryWhitelisted,
-        isLocalOnline = isLocalOnline,
-        isRelayConnected = isRelayConnected,
-        lastRemoteActivityTs = lastRemoteActivityTs,
-        systemPulse = systemPulse,
-        isGpsFresh = isGpsFresh,
-        isTelemetryFresh = isTelemetryFresh,
-        isLinkFresh = isLinkFresh,
-        trackerState = trackerState,
-        isLocationPending = isLocationPending,
-        locationPendingReason = locationPendingReason,
-        status = status,
-        isTamperDetected = isTamperDetected,
-        isBatterySteepDischarge = isBatterySteepDischarge,
-        isBatteryLow = isBatteryLow,
-        isBatteryCritical = isBatteryCritical,
-        maxDropMs = maxDropMs,
-        lastSeenTs = lastSeenTs,
-        totalDropMs = totalDropMs,
-        totalUptimeMs = totalUptimeMs,
-        sessionMs = sessionMs,
-        engineVersion = engineVersion,
-        sinceConnMs = sinceConnMs,
-        sinceDiscoMs = sinceDiscoMs,
-        violationUptimeMs = violationUptimeMs,
-        watchdogCountdownSec = watchdogCountdownSec,
-        watchdogOk = watchdogOk,
-        isPowerSaveMode = isPowerSaveMode,
-        standbyBucket = standbyBucket,
-        netInterface = netInterface,
-        isStorageLow = isStorageLow,
-        isStorageCritical = isStorageCritical,
-        distToHome = distToHome,
-        distToViewer = distToViewer,
-        lat = lat,
-        lng = lng,
-        gpsSpeedMps = gpsSpeedMps,
-        trackerAccuracy = trackerAccuracy,
-        trackerMaxAcc = trackerMaxAcc,
-        viewerAccuracy = viewerAccuracy,
-        viewerMaxAcc = viewerMaxAcc,
-        satsUsed = satsUsed,
-        satsView = satsView,
-        isSatsIndexWarning = isSatsIndexWarning,
-        snr = snr,
-        vibration = vibration,
-        heading = heading,
-        tilt = tilt,
-        acousticDb = acousticDb,
-        baroAlt = baroAlt,
-        lux = lux,
-        proximityCm = proximityCm,
-        proximityDebounceMs = proximityDebounceMs,
-        rollingVibration = rollingVibration,
-        trackerMaxTemp = trackerMaxTemp,
-        viewerMaxTemp = viewerMaxTemp,
-        peakShock = peakShock,
-        vibrationFloor = vibrationFloor,
-        luxBaseline = luxBaseline,
-        acousticFloorDb = acousticFloorDb,
-        trackerCurrentMa = trackerCurrentMa,
-        gpsIdx = gpsIdx,
-        rttValue = rttValue,
-        cpuLoad = cpuLoad,
-        ioWait = ioWait,
-        maxIoLatencyMs = maxIoLatencyMs,
-        onShowGnssDetail = onShowGnssDetail
+        appMode = appMode, isBatteryWhitelisted = isBatteryWhitelisted, isLocalOnline = isLocalOnline, isRelayConnected = isRelayConnected,
+        lastRemoteActivityTs = lastRemoteActivityTs, systemPulse = systemPulse, isGpsFresh = isGpsFresh, isTelemetryFresh = isTelemetryFresh,
+        isLinkFresh = isLinkFresh, trackerState = trackerState, isLocationPending = isLocationPending, locationPendingReason = locationPendingReason,
+        status = status, isTamperDetected = isTamperDetected, isBatterySteepDischarge = isBatterySteepDischarge, isBatteryLow = isBatteryLow,
+        isBatteryCritical = isBatteryCritical, maxDropMs = maxDropMs, lastSeenTs = lastSeenTs, totalDropMs = totalDropMs, totalUptimeMs = totalUptimeMs,
+        sessionMs = sessionMs, engineVersion = engineVersion, sinceConnMs = sinceConnMs, sinceDiscoMs = sinceDiscoMs, violationUptimeMs = violationUptimeMs,
+        watchdogCountdownSec = watchdogCountdownSec, watchdogOk = watchdogOk, isPowerSaveMode = isPowerSaveMode, standbyBucket = standbyBucket,
+        netInterface = netInterface, isStorageLow = isStorageLow, isStorageCritical = isStorageCritical, distToHome = distToHome, distToViewer = distToViewer,
+        lat = lat, lng = lng, gpsSpeedMps = gpsSpeedMps, trackerAccuracy = trackerAccuracy, trackerMaxAcc = trackerMaxAcc, viewerAccuracy = viewerAccuracy,
+        viewerMaxAcc = viewerMaxAcc, satsUsed = satsUsed, satsView = satsView, isSatsIndexWarning = isSatsIndexWarning, snr = snr, vibration = vibration,
+        heading = heading, tilt = tilt, acousticDb = acousticDb, baroAlt = baroAlt, lux = lux, proximityCm = proximityCm, proximityDebounceMs = proximityDebounceMs,
+        rollingVibration = rollingVibration, trackerMaxTemp = trackerMaxTemp, viewerMaxTemp = viewerMaxTemp, peakShock = peakShock, vibrationFloor = vibrationFloor,
+        luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb, trackerCurrentMa = trackerCurrentMa, gpsIdx = gpsIdx, rttValue = rttValue,
+        cpuLoad = cpuLoad, ioWait = ioWait, maxIoLatency = maxIoLatency, onShowGnssDetail = onShowGnssDetail
     )
 }
 

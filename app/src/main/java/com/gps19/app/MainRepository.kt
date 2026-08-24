@@ -31,9 +31,8 @@ private class RepositoryMetrics {
  * Aug.22.04:
  * - Issue #197 Standardization: Aligned triggerBackgroundPruning with R197 
  *   chunked standards for connection_history, violations, and trail_points.
- * Aug.21.07:
- * - Issue #196 Hardening: Exposed setForensicStallSimulation for urban 
- *   multipath validation (R196-V).
+ * - Build Fix: Restored public visibility for DEFAULT constants to resolve 
+ *   MainUiState compilation failure.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -64,7 +63,7 @@ class MainRepository @Inject constructor(
     private val trackerPointCache = ShadowCache<Long, TrailPoint>(3000)
     private val viewerPointCache = ShadowCache<Long, TrailPoint>(3000)
 
-    private companion object {
+    companion object {
         const val DEFAULT_RELAY_URL = SettingsRepository.DEFAULT_RELAY_URL
         const val DEFAULT_TRACKER_ID = SettingsRepository.DEFAULT_TRACKER_ID
         const val DEFAULT_VIEWER_ID = SettingsRepository.DEFAULT_VIEWER_ID

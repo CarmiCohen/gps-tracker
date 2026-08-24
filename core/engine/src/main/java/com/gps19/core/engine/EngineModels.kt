@@ -4,16 +4,13 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Aug.22.04:
+ * - Issue #308/Build Fix: Converted SpatialAnchor to an interface and added 
+ *   missing ts/rt properties to resolve inheritance failure in TrackerStatus (R308).
  * Aug.22.02:
  * - Issue #308 Hardening: Restored full AlarmEvaluationState, ProcessedLocation, 
  *   SpatialAnchor, and RejectedPoint definitions to resolve build blockers and 
  *   unit test compilation failures.
- * Aug.21.09:
- * - Issue #248 Performance Optimization: Segmented HudState into Connectivity, 
- *   Telemetry, and Health components to eliminate UI thread stalls during 
- *   initial hydration on budget hardware (Samsung A15).
- * Aug.20.09:
- * - Issue #226: HUD State Centralization.
  */
 
 @Serializable
@@ -135,13 +132,17 @@ class EngineConnectionPoint(
     }
 }
 
-@Serializable
-data class SpatialAnchor(
-    val lat: Double = 0.0,
-    val lng: Double = 0.0,
-    val alt: Double = 0.0,
-    val gpsTs: Long = 0L
-)
+/**
+ * SpatialAnchor: Polymorphic base for coordinate-aware telemetry.
+ */
+interface SpatialAnchor {
+    val lat: Double
+    val lng: Double
+    val alt: Double
+    val gpsTs: Long
+    val ts: Long
+    val rt: Long
+}
 
 @Serializable
 data class RejectedPoint(

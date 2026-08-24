@@ -5,12 +5,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Aug.22.05:
+ * - Audit Chapter 12.3: Added isStorageSimulated and isStorageCriticalSimulated 
+ *   to track storage pressure simulation state (R197).
  * Aug.21.07:
  * - Issue #196 Hardening: Added isForensicStallSimulated to support 
  *   urban multipath validation tracking in UI (R196-V).
- * Aug.14.02:
- * - Issue #170: Forensic Replay UI Audit. Added replayCursorTs to NavigationState 
- *   to support coordinate-aware scrubbing across ribbons and map.
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -42,7 +42,9 @@ data class MainUiState(
     val draftSettings: DraftSettings = DraftSettings(),
     val isIdentitySanitized: Boolean = false,
     val isRecoveryPending: Boolean = false,
-    val isForensicStallSimulated: Boolean = false
+    val isForensicStallSimulated: Boolean = false,
+    val isStorageSimulated: Boolean = false,
+    val isStorageCriticalSimulated: Boolean = false
 ) {
     val isFullyHydrated: Boolean get() = hydrationLevel >= 3
 
@@ -88,11 +90,6 @@ data class MainUiState(
 
 /**
  * KinematicState: High-frequency transient state.
- * Aug.14.02:
- * - Issue #170: Added replayCursorPos to support map visualization during scrubbing.
- * Aug.01.10: 
- * - Issue #668: Performance: Object Churn. Converted to mutable class with 
- *   double-buffering support for zero-allocation telemetry (R-HARDWARE-01).
  */
 class KinematicState(
     var localLocation: LocationState = LocationState(),
@@ -135,9 +132,6 @@ class KinematicState(
 
 /**
  * DiagnosticState: Low-frequency scalar state.
- * Aug.01.10: 
- * - Issue #668: Performance: Object Churn. Converted to mutable class with 
- *   double-buffering support for zero-allocation telemetry (R-HARDWARE-01).
  */
 class DiagnosticState(
     var battery: BatteryState = BatteryState(),
@@ -253,41 +247,3 @@ data class NavigationState(
 )
 
 enum class SubSettings { ALERTS, SOUND, CLEAN }
-
-/**
- * ConnectivityState: Mutable flyweight for zero-churn telemetry updates.
- * Aug.01.10: Refactored to mutable class.
- */
-class ConnectivityState(
-    var isLocalOnline: Boolean = true,
-    var isRelayConnected: Boolean = false,
-    var isTrackerConnected: Boolean = false,
-    var lastUpdateTs: Long = 0L,
-    var lastRemoteActivityTs: Long = 0L,
-    var connectedViewers: List<String> = emptyList()
-) {
-    fun copyFrom(other: ConnectivityState) {
-        this.isLocalOnline = other.isLocalOnline
-        this.isRelayConnected = other.isRelayConnected
-        this.isTrackerConnected = other.isTrackerConnected
-        this.lastUpdateTs = other.lastUpdateTs
-        this.lastRemoteActivityTs = other.lastRemoteActivityTs
-        this.connectedViewers = other.connectedViewers
-    }
-
-    fun update(
-        isLocalOnline: Boolean, isRelayConnected: Boolean, isTrackerConnected: Boolean,
-        lastUpdateTs: Long, lastRemoteActivityTs: Long, connectedViewers: List<String>
-    ) {
-        this.isLocalOnline = isLocalOnline
-        this.isRelayConnected = isRelayConnected
-        this.isTrackerConnected = isTrackerConnected
-        this.lastUpdateTs = lastUpdateTs
-        this.lastRemoteActivityTs = lastRemoteActivityTs
-        this.connectedViewers = connectedViewers
-    }
-
-    fun reset() {
-        update(true, false, false, 0L, 0L, emptyList())
-    }
-}

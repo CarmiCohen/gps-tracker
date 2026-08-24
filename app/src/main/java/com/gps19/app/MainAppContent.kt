@@ -45,17 +45,9 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
- * Aug.21.08:
- * - Issue #196-V: Connected Forensic Stall Simulation state and toggle to 
- *   DiagnosticsScreen for urban multipath validation (R196-V).
- * Aug.21.00:
- * - Issue #243: Hardened Navigation Settling. Introduced isSettlingActive to 
- *   defer automatic restoration navigation until STARTUP_SETTLING_DELAY_MS 
- *   completes, ensuring landing page stability verification (R243).
- * Aug.22.00:
- * - Issue #250 Remediation: Hardened Backstack logic to eliminate 
- *   "Ignoring popBackStack to route landing" warnings by using explicit 
- *   graph-relative popUpTo and launchSingleTop flags (R250).
+ * Aug.22.05:
+ * - Audit Chapter 12.3: Connected Storage Pressure simulation state to 
+ *   DiagnosticsScreen for storage prioritization audit (R197).
  */
 @Composable
 fun MainAppContent(
@@ -409,10 +401,13 @@ fun MainAppContent(
                                     recoveryCount = diagnosticState.recoveryCount,
                                     cumulativeRecoveryBlackoutMs = diagnosticState.cumulativeRecoveryBlackoutMs,
                                     isForensicStallSimulated = uiState.isForensicStallSimulated,
+                                    isStorageSimulated = uiState.isStorageSimulated,
+                                    isStorageCriticalSimulated = uiState.isStorageCriticalSimulated,
                                     onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
                                     onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
                                     onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                                     onToggleForensicSimulation = { active -> viewModel.onEvent(UiEvent.SetForensicSimulation(active)) },
+                                    onToggleStorageSimulation = { active, critical -> viewModel.onEvent(UiEvent.SetStorageSimulation(active, critical)) },
                                     onRequestBatteryExemption = onRequestBatteryExemption,
                                     onRequestOverlayPermission = onRequestOverlayPermission,
                                     onRequestAppInfo = onRequestAppInfo,

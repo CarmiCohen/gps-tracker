@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 
 // Forensic Authority: Standardized to DeepPink for high-visibility event marking.
 const val FORENSIC_PINK_COLOR = 0xFFFF1493.toInt()
+val ForensicPink = Color(FORENSIC_PINK_COLOR)
 
 // Brand Colors
 val BrandJdVivid = Color(0xFF78BE20) // JD Vivid Green (R799e)

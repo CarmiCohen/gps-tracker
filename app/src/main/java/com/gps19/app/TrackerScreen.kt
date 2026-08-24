@@ -33,14 +33,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * TrackerScreen: Tracker-mode UI.
- * Aug.20.09:
- * - Issue #226: HUD State Centralization. Refactored GlobalStatusBar call 
- *   to consume unified HudState (R226).
- * Aug.16.12:
- * - Issue #185 Hardening: Updated to collect and pass pre-simplified 
- *   MapTrailSegments to AppMapContainer, eliminating main-thread 
- *   simplification churn during startup hydration (R185). Fixed 
- *   dashboardState and currentMa parameter mismatches.
+ * Aug.22.04:
+ * - Issue #140 Restoration Build Fix: Unified naming to maxIoLatency. 
+ *   De-duplicated currentMa in TrackerDashboard signature and fixed 
+ *   TelemetryBox parameter binding.
  */
 
 @Composable
@@ -260,11 +256,11 @@ fun TrackerScreen(
                                     trackerCurrentMa = dashboardState.trackerCurrentMa,
                                     gpsIdx = gpsIndexData,
                                     rttValue = rtt,
-                                    currentMa = currentMa,
+                                    currentMaValue = currentMa,
                                     systemPulse = systemPulse,
                                     cpuLoad = dashboardState.cpuLoad,
                                     ioWait = dashboardState.ioWait,
-                                    maxIoLatencyMs = dashboardState.maxIoLatencyMs,
+                                    maxIoLatency = dashboardState.maxIoLatency,
                                     onEvent = { viewModel.onEvent(it) }
                                 )
                             }
@@ -303,7 +299,7 @@ fun TrackerScreen(
                         viewerSpeed = kinematicState.trackerLocation.speed,
                         viewerAccuracy = kinematicState.trackerLocation.accuracy,
                         viewerMaxAcc = kinematicState.trackerLocation.maxAccuracy,
-                        viewerGpsTs = kinematicState.trackerLocation.timestamp,
+                        viewerGpsTs = kinematicState.localLocation.timestamp,
                         viewerTelemetryTs = 0L,
                         viewerLocPending = kinematicState.trackerHealth.isLocationPending,
                         viewerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
@@ -438,11 +434,11 @@ fun TrackerScreen(
                                 trackerCurrentMa = dashboardState.trackerCurrentMa,
                                 gpsIdx = gpsIndexData,
                                 rttValue = rtt,
-                                currentMa = currentMa,
+                                currentMaValue = currentMa,
                                 systemPulse = systemPulse,
                                 cpuLoad = dashboardState.cpuLoad,
                                 ioWait = dashboardState.ioWait,
-                                maxIoLatencyMs = dashboardState.maxIoLatencyMs,
+                                maxIoLatency = dashboardState.maxIoLatency,
                                 onEvent = { viewModel.onEvent(it) }
                             )
                         }
@@ -453,7 +449,7 @@ fun TrackerScreen(
 
         if (isSettingsOpen) {
             SettingsOverlay(
-                activeSubSettings = uiState.navigation.activeSubSettings,
+                activeSubSettings = nav.activeSubSettings,
                 draftDeviceId = uiState.draftSettings.deviceId,
                 draftViewerId = uiState.draftSettings.viewerId,
                 draftRelayUrl = uiState.draftSettings.relayUrl,
@@ -592,11 +588,11 @@ fun TrackerDashboard(
     trackerCurrentMa: Int,
     gpsIdx: GpsIndexData,
     rttValue: Int,
-    currentMa: Int,
+    currentMaValue: Int,
     systemPulse: Long,
     cpuLoad: Double,
     ioWait: Double,
-    maxIoLatencyMs: Long,
+    maxIoLatency: Long,
     onEvent: (UiEvent) -> Unit
 ) {
     val gpsAge = if (localLocationTs > 0) systemPulse - localLocationTs else Long.MAX_VALUE
@@ -676,7 +672,7 @@ fun TrackerDashboard(
                     rttValue = rttValue,
                     cpuLoad = cpuLoad,
                     ioWait = ioWait,
-                    maxIoLatencyMs = maxIoLatencyMs,
+                    maxIoLatency = maxIoLatency,
                     onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                 )
                 DebugTable(
@@ -686,7 +682,7 @@ fun TrackerDashboard(
                     trackerStateName = trackerState.name,
                     gpsAgeSec = if (gpsAge != Long.MAX_VALUE) gpsAge / 1000 else -1L,
                     rtt = rttValue,
-                    currentMa = currentMa
+                    currentMa = currentMaValue
                 )
                 
                 Spacer(Modifier.height(16.dp))

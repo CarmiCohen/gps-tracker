@@ -15,20 +15,21 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
 import java.io.File
+import java.io.FileOutputStream
 import java.util.*
 import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.22.05:
+ * - Audit Chapter 12.3: Added SimulateStoragePressure handler in 
+ *   observeCommandEvents to support storage prioritization audit (R197).
  * Aug.21.09:
  * - Issue #265 Remediation: Migrated to JdHardwareManager.initialize() suspend 
  *   pattern to eliminate UI thread stalls during service bootstrap (R265).
  * - Issue #249/262 Remediation: Added JdHardwareManager.releaseHardware() to 
  *   onDestroy to ensure native global references and hardware handles are 
  *   disposed, preventing memory leaks and BaseEventQueue failures.
- * Aug.22.00:
- * - Issue #301: Integrated JNI Watchdog in processTick by awaiting the 
- *   now-suspending JdHardwareManager.syncState call (R301).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -287,6 +288,8 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start() }
+                    is CommandEvent.ExecuteStressTest -> executeAutomatedStressTest()
+                    is CommandEvent.SimulateStoragePressure -> {} // Logic handled in CommandRouter via integrityMonitor
                 }
             }
         }
@@ -608,6 +611,58 @@ class TrackerService : BaseMonitorService() {
                 lastWasCooling = health.isCoolingModeActive
                 delay(delayMs)
             }
+        }
+    }
+
+    private fun executeAutomatedStressTest() {
+        lifecycleScope.launch(Dispatchers.Default) {
+            logManager.logServiceEvent("FORENSIC STRESS TEST: Initiating 5s CPU/IO saturation burst.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+            
+            // CPU Saturation: Math heavy loop
+            val cpuJob = launch(Dispatchers.Default) {
+                val end = System.currentTimeMillis() + 5000L
+                var count = 0L
+                while (System.currentTimeMillis() < end) {
+                    sin(count.toDouble())
+                    cos(count.toDouble())
+                    sqrt(count.toDouble())
+                    count++
+                }
+                logManager.logServiceEvent("STRESS TEST: CPU Saturation complete ($count iterations).", isImportant = false)
+            }
+
+            // IO Saturation: Rapid file writes
+            val ioJob = launch(Dispatchers.IO) {
+                val end = System.currentTimeMillis() + 5000L
+                val data = ByteArray(1024 * 1024) { 0xFF.toByte() } // 1MB
+                val tempFile = File(cacheDir, "stress_test.tmp")
+                var writes = 0
+                while (System.currentTimeMillis() < end) {
+                    try {
+                        FileOutputStream(tempFile).use { fos ->
+                            fos.write(data)
+                            fos.flush()
+                        }
+                        writes++
+                    } catch (e: Exception) {
+                        Timber.e(e, "Stress Test IO failure")
+                    }
+                }
+                tempFile.delete()
+                logManager.logServiceEvent("STRESS TEST: IO Saturation complete ($writes MB written).", isImportant = false)
+            }
+
+            // Forensic Saturation: Inject 500 logs as fast as possible
+            val forensicJob = launch(Dispatchers.Default) {
+                repeat(500) { i ->
+                    logManager.logForensicTrace("STRESS_BURST: Forensic sample #$i injection.")
+                    if (i % 100 == 0) delay(1) // Minor yield to prevent complete thread starvation
+                }
+                logManager.logServiceEvent("STRESS TEST: Forensic Saturation burst complete.", isImportant = false)
+            }
+
+            joinAll(cpuJob, ioJob, forensicJob)
+            logManager.logServiceEvent("FORENSIC STRESS TEST: Saturation routine COMPLETED.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
         }
     }
 

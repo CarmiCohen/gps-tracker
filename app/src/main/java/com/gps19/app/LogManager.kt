@@ -9,14 +9,14 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Aug.22.05:
+ * - Audit Chapter 12.3: Hardened startup muzzle logic to allow isSpecial logs 
+ *   to bypass the suppression window, ensuring stress audit traces are 
+ *   persisted during the initial 60s (R197).
  * Aug.21.05:
  * - Issue #196 Hardening: Implemented overflow hysteresis. Alerts now only reset 
  *   when buffer pressure drops below 50% to prevent notification spam during 
  *   high-frequency (100Hz) bursts on budget hardware (R196).
- * Aug.13.12:
- * - Issue #164: Forensic Log Buffer Audit. Removed the AtomicBoolean guard in 
- *   submitToLogSink to prevent non-deterministic log drops under high-frequency 
- *   load. Relying on LogRepository's Channel for thread-safe backpressure (R164).
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -37,6 +37,13 @@ class LogManager @Inject constructor(
     fun startNewSession() {
         sessionStartTs = timeProvider.currentTimeMillis()
         isOverflowLogged.set(false)
+    }
+
+    /**
+     * setForensicStallSimulation: Proxies simulation state to LogRepository (R196-V).
+     */
+    fun setForensicStallSimulation(active: Boolean) {
+        logRepository.setForensicStallSimulation(active)
     }
 
     /**
@@ -107,8 +114,6 @@ class LogManager @Inject constructor(
 
     /**
      * submitToLogSink: Unified entry for all standard system logs.
-     * R164: Removed AtomicBoolean lock. All logs are now passed to LogRepository 
-     * which handles buffering and persistence in a thread-safe manner.
      */
     fun submitToLogSink(
         message: String, 
@@ -132,7 +137,9 @@ class LogManager @Inject constructor(
         // Critical safety checks (storage/startup)
         if (health.isStorageCritical && !isSpecial) return
         if (health.isStorageLow && !isImportant && !isSpecial) return
-        if (type == "system" && !isImportant && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
+        
+        // R197: isSpecial logs bypass the startup muzzle window
+        if (type == "system" && !isImportant && !isSpecial && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
             return
         }
 

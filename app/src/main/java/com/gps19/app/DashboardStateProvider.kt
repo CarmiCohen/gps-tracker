@@ -172,12 +172,12 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             isStorageCritical = health.isStorageCritical,
             isBatterySteepDischarge = health.isBatterySteepDischarge,
             isCoolingModeActive = health.isCoolingModeActive,
-            trackerCurrentMa = if (isViewer) 0 else health.currentMa,
+            trackerCurrentMa = health.currentMa,
             isBatteryLow = health.isBatteryLow,
             isBatteryCritical = health.isBatteryCritical,
             cpuLoad = health.cpuLoad,
             ioWait = health.ioWait,
-            maxIoLatencyMs = health.maxIoLatency,
+            maxIoLatency = health.maxIoLatency,
             isSilentFailure = health.isSilentFailure
         )
     }

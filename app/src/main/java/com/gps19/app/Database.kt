@@ -12,9 +12,8 @@ import com.gps19.core.engine.*
  * - Issue #197 Standardization: Aligned ViolationDao, TrailDao, and HistoryDao 
  *   with R197 chunked pruning standards. Fixed SQLite DELETE syntax to use 
  *   subqueries for LIMIT support.
- * Aug.22.03:
- * - Issue #197 Hardening: Aligned PendingStatusDao with R197 chunked pruning 
- *   standards to prevent I/O stalls during high-frequency accumulation (R197).
+ * - Refactor: Cleaned up redundant 'abstract' keywords in interface DAOs to 
+ *   prevent Kapt processing stalls.
  */
 @Entity(
     tableName = "logs", 
@@ -246,7 +245,7 @@ interface TrailDao {
 @Dao
 interface HistoryDao {
     @Insert suspend fun insert(point: HistoryEntity)
-    @Insert abstract suspend fun insertAll(points: List<HistoryEntity>)
+    @Insert suspend fun insertAll(points: List<HistoryEntity>)
     @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 300") fun getHistoryFlow(ribbonKey: String): Flow<List<HistoryEntity>>
     @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 300") suspend fun getHistory(ribbonKey: String): List<HistoryEntity>
     @Query("DELETE FROM connection_history WHERE ribbonKey = :ribbonKey") suspend fun clearHistory(ribbonKey: String)
@@ -285,10 +284,10 @@ interface PendingStatusDao {
     @Query("SELECT COUNT(*) FROM pending_status_updates") suspend fun getCount(): Int
     
     @Query("SELECT timestamp FROM pending_status_updates ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
-    abstract suspend fun getPruneThreshold(limit: Int): Long?
+    suspend fun getPruneThreshold(limit: Int): Long?
 
     @Query("DELETE FROM pending_status_updates WHERE id IN (SELECT id FROM pending_status_updates WHERE timestamp < :threshold LIMIT :chunkSize)")
-    abstract suspend fun pruneByThreshold(threshold: Long, chunkSize: Int): Int
+    suspend fun pruneByThreshold(threshold: Long, chunkSize: Int): Int
 
     @Query("DELETE FROM pending_status_updates WHERE timestamp < (SELECT timestamp FROM pending_status_updates ORDER BY timestamp DESC LIMIT 1 OFFSET 1999)") suspend fun prune()
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()

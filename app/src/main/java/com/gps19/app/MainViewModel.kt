@@ -36,12 +36,12 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * Aug.21.09:
- * - Issue #248 Performance Optimization: Completed full segmentation of Dashboard 
- *   and HUD flows. Replaced monolithic combine blocks with logical slices and 
- *   granular UI state mapping to eliminate 1070ms hydration stalls (R248).
- * - Issue #257: Integrated STAGGERED_IO_PRUNING_DELAY_MS to prevent launch window 
- *   IO competition.
+ * Aug.22.05:
+ * - Audit Chapter 12.3: Added SetStorageSimulation handling to onEvent (R197).
+ * Aug.22.04:
+ * - Issue #140 Restoration Build Fix: Restored violationPointsFlow, historyFlows, 
+ *   activeGnssDetail and maintenance methods (clearTrails, fullInitialization) 
+ *   to resolve UI compilation failures.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -225,6 +225,19 @@ class MainViewModel @Inject constructor(
         .flatMapLatest { mode -> if (mode != null) repository.viewerTrailFlow else flowOf(emptyList()) }
         .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val violationPointsFlow: Flow<List<ViolationPoint>> = repository.violationsFlow
+
+    // Forensic Ribbon Flows
+    val history4MFlow = repository.getHistoryFlow("4M").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val history16MFlow = repository.getHistoryFlow("16M").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val history1HFlow = repository.getHistoryFlow("1H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val history4HFlow = repository.getHistoryFlow("4H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val history24HFlow = repository.getHistoryFlow("24H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val history7DFlow = repository.getHistoryFlow("7D").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val activeGnssDetail: StateFlow<GnssDetail?> = repository.gnssDetail
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private var lastTrackerTrailSize = -1
     private var cachedTrackerSegments = emptyList<MapTrailSegment>()
@@ -448,7 +461,36 @@ class MainViewModel @Inject constructor(
             is UiEvent.UpdateDraftDeviceId, is UiEvent.UpdateDraftViewerId, is UiEvent.UpdateDraftRelayUrl, 
             is UiEvent.UpdateDraftMaxDistance, is UiEvent.UpdateDraftAlertSettings, is UiEvent.UpdateDraftAlarmVolume, 
             is UiEvent.CommitSettings -> handleDraftEvent(event)
+            is UiEvent.SetForensicSimulation -> {
+                updateState { it.copy(isForensicStallSimulated = event.active) }
+                logManager.setForensicStallSimulation(event.active)
+            }
+            is UiEvent.ExecuteStressTest -> {
+                repository.sendCommand(UiCommand.ExecuteStressTest)
+            }
+            is UiEvent.SetStorageSimulation -> {
+                repository.sendCommand(UiCommand.SimulateStoragePressure(event.active, event.isCritical))
+            }
             else -> {}
+        }
+    }
+
+    fun clearTrails(context: Context) {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            repository.clearTrails()
+            withContext(Dispatchers.Main.immediate) {
+                Toast.makeText(context, context.getString(R.string.log_msg_trails_cleared), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun fullInitialization(context: Context) {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            repository.resetStats()
+            repository.sendCommand(UiCommand.FullInitializationReset)
+            withContext(Dispatchers.Main.immediate) {
+                Toast.makeText(context, context.getString(R.string.log_msg_full_init), Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

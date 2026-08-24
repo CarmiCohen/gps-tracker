@@ -32,15 +32,13 @@ import timber.log.Timber
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Aug.22.04:
+ * - Issue #140 Restoration: Re-added TRIGGER FORENSIC STRESS TEST button 
+ *   to PhoneSetupOverlay to support Chapter 12.2 Database Stress Audit (R140).
  * Aug.21.03:
  * - Issue #246 Optimization: Consolidated hydration sequence from 10+ steps 
  *   to 3 broader phases to reduce recomposition overhead and Davey stalls 
  *   on budget hardware (R246).
- * - Refactor: Extracted SensitivitySlider into a reusable component to simplify 
- *   AlertManagementOverlay (Simplify Idea #1).
- * Aug.21.00:
- * - Issue #247 Hardening: Restored vibration and tilt sensitivity sliders 
- *   to AlertManagementOverlay to support manual sensor calibration (R247).
  */
 
 @Composable
@@ -283,6 +281,7 @@ fun PhoneSetupOverlay(
     onToggleManualOverride: () -> Unit = {},
     onTestAlarm: () -> Unit,
     onNavigateToDiagnostics: () -> Unit = {},
+    onExecuteStressTest: () -> Unit = {},
     permissions: PermissionState,
     homePointsCount: Int, isTrackerMode: Boolean, onGoToMap: () -> Unit = {}
 ) {
@@ -359,7 +358,20 @@ fun PhoneSetupOverlay(
                         }
                         if (!isTrackerMode) { Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step9_title), description = stringResource(R.string.setup_step9_desc), onClick = onGoToMap, buttonText = stringResource(R.string.btn_open_map), isCompleted = homePointsCount > 0, icon = Icons.Default.Map, reason = if (homePointsCount == 0) "Geofence: No Home Points defined" else null) }
                         
-                        Spacer(Modifier.height(32.dp))
+                        if (isTrackerMode) {
+                            Spacer(Modifier.height(16.dp))
+                            Button(
+                                onClick = onExecuteStressTest,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ForensicPink)
+                            ) {
+                                Icon(Icons.Default.Speed, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("TRIGGER FORENSIC STRESS TEST", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                        }
+
+                        Spacer(Modifier.height(16.dp))
                         Button(
                             onClick = onNavigateToDiagnostics,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),

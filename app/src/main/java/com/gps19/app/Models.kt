@@ -10,9 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * Aug.21.09:
- * - Issue #248 Performance Optimization: Completed segmentation of DashboardState.
- *   Fixed netInterface mapping to reside exclusively in DashboardHealthState.
+ * Aug.22.05:
+ * - Audit Chapter 12.3: Restored ViolationPoint and MapTrailSegment to resolve 
+ *   unresolved reference errors. Added storage simulation events (R197).
  */
 
 sealed class AppSensorEvent {
@@ -50,6 +50,9 @@ data class TrailPoint(
     }
 }
 
+/**
+ * MapTrailSegment: Used for optimized map rendering of trail chunks.
+ */
 data class MapTrailSegment(
     val points: List<GeoPoint>,
     val color: Int,
@@ -167,6 +170,9 @@ class ConnectionPoint(
     }
 }
 
+/**
+ * ViolationPoint: Represents a geofence or sensor violation on the map.
+ */
 class ViolationPoint(
     var localId: String = "",
     var lat: Double = 0.0,
@@ -298,6 +304,65 @@ data class TrackerStatus(
     val kineticEnergy: Double = 0.0, val isAdaptiveJump: Boolean = false,
     val isBatteryLow: Boolean = false, val isBatteryCritical: Boolean = false, val isSilentFailure: Boolean = false
 ) : SpatialAnchor {
+    
+    fun writeTo(builder: RealtimeStatus.Builder, fromViewer: Boolean) {
+        builder.setId(deviceId)
+               .setViewerId(viewerId)
+               .setFromViewer(fromViewer)
+               .setLat(lat)
+               .setLng(lng)
+               .setAlt(alt)
+               .setSpeed(speed)
+               .setBearing(bearing)
+               .setAccuracy(accuracy)
+               .setMaxAccuracy(maxAccuracy)
+               .setGpsTs(gpsTs)
+               .setBattery(battery)
+               .setTemp(temp)
+               .setIsCharging(isCharging)
+               .setSatsView(satsView)
+               .setSatsUsed(satsUsed)
+               .setIsJammer(isJammer)
+               .setIsStalled(isStalled)
+               .setIsTamperDetected(isTamperDetected)
+               .setJumpTier(jumpTier)
+               .setIsLocationPending(isLocationPending)
+               .setLastValidFixRt(lastValidFixRt)
+               .setIsBatterySteepDischarge(isBatterySteepDischarge)
+               .setIsCoolingModeActive(isCoolingModeActive)
+               .setState(TrackerStateProto.valueOf("TS_" + trackerState.name))
+               .setSnrIdx(snrIdx)
+               .setNoiseIdx(noiseIdx)
+               .setLuxIdx(luxIdx)
+               .setVibeIdx(vibeIdx)
+               .setLiftIdx(liftIdx)
+               .setTiltIdx(tiltIdx)
+               .setBaroIdx(baroIdx)
+               .setIsSitDetected(isSitDetected)
+               .setLastSitTs(lastSitTs)
+               .setVerticalVelocity(verticalVelocity)
+               .setSitVz(sitVz)
+               .setSitVzTs(sitVzTs)
+               .setSitVzRt(sitVzRt)
+               .setSitDz(sitDz)
+               .setSitBaro(sitBaro)
+               .setSitTilt(sitTilt)
+               .setSitShock(sitShock)
+               .setIsSitActive(isSitActive)
+               .setUptimeMs(uptimeMs)
+               .setTotalConnectedMs(totalConnectedMs)
+               .setSessionConnectedMs(sessionConnectedMs)
+               .setTotalDropMs(totalDropMs)
+               .setMaxDropMs(maxDropMs)
+               .setLastConnTs(lastConnTs)
+               .setLastDiscTs(lastDiscTs)
+               .setIsClockRegression(isClockRegression)
+               .setIsAdaptiveJump(isAdaptiveJump)
+               .setIsBatteryLow(isBatteryLow)
+               .setIsBatteryCritical(isBatteryCritical)
+               .setIsSilentFailure(isSilentFailure)
+    }
+
     fun toMap(fromViewer: Boolean): Map<String, Any?> = mutableMapOf<String, Any?>().apply {
         put("id", SignalingConstants.getTransmissionId(deviceId)); put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
         put("from_viewer", fromViewer); put("lat", lat); put("lng", lng); put("alt", alt)
@@ -319,7 +384,7 @@ data class TrackerStatus(
         put("last_valid_fix_rt", lastValidFixRt); put("is_power_save_mode", isPowerSaveMode)
         put("standby_bucket", standbyBucket); put("net_interface", netInterface)
         put("is_storage_low", isStorageLow); put("is_storage_critical", isStorageCritical)
-        put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_mode_active", isCoolingModeActive)
+        put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_modeActive", isCoolingModeActive)
         put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
         put("is_jump", isJump); put("mic_pending", micPending); put("snr_idx", snrIdx); put("noise_idx", noiseIdx)
         put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)
@@ -329,6 +394,15 @@ data class TrackerStatus(
         put("vertical_velocity", verticalVelocity); put("kinetic_energy", kineticEnergy)
         put("is_adaptive_jump", isAdaptiveJump); put("is_battery_low", isBatteryLow)
         put("is_battery_critical", isBatteryCritical); put("is_silent_failure", isSilentFailure)
+    }
+
+    companion object {
+        fun mapProtoToPendingReason(proto: String): LocationPendingReason {
+            return try { LocationPendingReason.valueOf(proto) } catch (e: Exception) { LocationPendingReason.NONE }
+        }
+        fun mapProtoToTrackerState(proto: String): TrackerState {
+            return try { TrackerState.valueOf(proto) } catch (e: Exception) { TrackerState.UNKNOWN }
+        }
     }
 }
 
@@ -340,6 +414,15 @@ class LocationState(
     var trackerState: TrackerState = TrackerState.UNKNOWN,
     var gnssDetail: GnssDetail? = null
 ) {
+    fun update(
+        lat: Double, lng: Double, speed: Double, accuracy: Double, maxAccuracy: Double, bearing: Double,
+        timestamp: Long, telemetryTs: Long, status: SentinelStatus, trackerState: TrackerState, gnssDetail: GnssDetail?
+    ) {
+        this.lat = lat; this.lng = lng; this.speed = speed; this.accuracy = accuracy; this.maxAccuracy = maxAccuracy
+        this.bearing = bearing; this.timestamp = timestamp; this.telemetryTs = telemetryTs
+        this.status = status; this.trackerState = trackerState; this.gnssDetail = gnssDetail
+    }
+
     fun copyFrom(other: LocationState) {
         this.lat = other.lat; this.lng = other.lng; this.speed = other.speed; this.accuracy = other.accuracy
         this.maxAccuracy = other.maxAccuracy; this.bearing = other.bearing; this.timestamp = other.timestamp
@@ -369,7 +452,8 @@ data class DashboardConnectivityState(
     val maxDropMs: Long = 0L,
     val engineVersion: String = "--",
     val trackerConnIndex: Int = 0,
-    val viewerConnIndex: Int = 0
+    val viewerConnIndex: Int = 0,
+    val netInterface: String = "UNKNOWN"
 )
 
 @Serializable
@@ -389,6 +473,7 @@ data class DashboardTelemetryState(
     val distToViewer: Double? = null,
     val isGpsFresh: Boolean = true,
     val isTelemetryFresh: Boolean = true,
+    val isLinkFresh: Boolean = true,
     val isLocationPending: Boolean = false,
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val trackerState: TrackerState = TrackerState.UNKNOWN,
@@ -412,7 +497,7 @@ data class DashboardHealthState(
     val isNear: Boolean = true,
     val proximityCm: Double = -1.0,
     val proximityDebounceMs: Long = 0L,
-    val vibrationRollingSum: Double = 0.0,
+    val rollingVibration: Double = 0.0,
     val kineticEnergy: Double = 0.0,
     val peakShock: Double = 0.0,
     val luxBaseline: Double = 0.0,
@@ -434,7 +519,7 @@ data class DashboardHealthState(
     val isBatteryCritical: Boolean = false,
     val cpuLoad: Double = 0.0,
     val ioWait: Double = 0.0,
-    val maxIoLatencyMs: Long = 0L,
+    val maxIoLatency: Long = 0L,
     val isSilentFailure: Boolean = false
 )
 
@@ -457,6 +542,7 @@ data class DashboardState(
     val sinceConnMs get() = connectivity.sinceConnMs
     val sinceDiscoMs get() = connectivity.sinceDiscoMs
     val engineVersion get() = connectivity.engineVersion
+    val netInterface get() = connectivity.netInterface
     
     val lat get() = telemetry.lat
     val lng get() = telemetry.lng
@@ -473,6 +559,7 @@ data class DashboardState(
     val distToViewer get() = telemetry.distToViewer
     val isGpsFresh get() = telemetry.isGpsFresh
     val isTelemetryFresh get() = telemetry.isTelemetryFresh
+    val isLinkFresh get() = telemetry.isLinkFresh
     val isLocationPending get() = telemetry.isLocationPending
     val locationPendingReason get() = telemetry.locationPendingReason
     val trackerState get() = telemetry.trackerState
@@ -488,7 +575,7 @@ data class DashboardState(
     val isNear get() = health.isNear
     val proximityCm get() = health.proximityCm
     val proximityDebounceMs get() = health.proximityDebounceMs
-    val rollingVibration get() = health.vibrationRollingSum
+    val rollingVibration get() = health.rollingVibration
     val kineticEnergy get() = health.kineticEnergy
     val trackerMaxTemp get() = health.trackerMaxTemp
     val viewerMaxTemp get() = health.viewerMaxTemp
@@ -502,7 +589,6 @@ data class DashboardState(
     val violationPercentage get() = health.violationPercentage
     val isPowerSaveMode get() = health.isPowerSaveMode
     val standbyBucket get() = health.standbyBucket
-    val netInterface get() = health.netInterface
     val isStorageLow get() = health.isStorageLow
     val isStorageCritical get() = health.isStorageCritical
     val isBatterySteepDischarge get() = health.isBatterySteepDischarge
@@ -512,7 +598,7 @@ data class DashboardState(
     val isBatteryCritical get() = health.isBatteryCritical
     val cpuLoad get() = health.cpuLoad
     val ioWait get() = health.ioWait
-    val maxIoLatencyMs get() = health.maxIoLatency
+    val maxIoLatency get() = health.maxIoLatency
     val isSilentFailure get() = health.isSilentFailure
 }
 
@@ -594,6 +680,8 @@ sealed class UiEvent {
     data class SetRecoveryPending(val pending: Boolean) : UiEvent()
     data class SetReplayCursor(val ts: Long?) : UiEvent()
     data class SetForensicSimulation(val active: Boolean) : UiEvent()
+    object ExecuteStressTest : UiEvent()
+    data class SetStorageSimulation(val active: Boolean, val isCritical: Boolean) : UiEvent()
 }
 
 sealed class UiCommand {
@@ -609,6 +697,8 @@ sealed class UiCommand {
     object ExecuteTestAlarm : UiCommand()
     object MapZoomIn : UiCommand()
     object MapZoomOut : UiCommand()
+    object ExecuteStressTest : UiCommand()
+    data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : UiCommand()
 }
 
 class StatsState(
@@ -619,8 +709,8 @@ class StatsState(
 ) {
     fun copyFrom(other: StatsState) {
         this.totalConnectedMs = other.totalConnectedMs; this.sessionConnectedMs = other.sessionConnectedMs
-        this.maxDropMs = other.maxDropMs; this.maxDropTs = other.maxDropTs; this.totalDropMs = other.totalDropMs
-        this.uptimeMs = other.uptimeMs; this.lastConnTs = other.lastConnTs; this.lastDiscTs = other.lastDiscTs
+        this.maxDropMs = other.maxDropMs; this.maxDropTs = other.maxDropTs; this.totalDropMs = totalDropMs
+        this.uptimeMs = other.uptimeMs; this.lastConnTs = lastConnTs; this.lastDiscTs = lastDiscTs
         this.violationUptimeMs = other.violationUptimeMs; this.violationPercentage = other.violationPercentage
     }
     fun update(totalConnectedMs: Long, sessionConnectedMs: Long, maxDropMs: Long, maxDropTs: Long, totalDropMs: Long, uptimeMs: Long, lastConnTs: Long, lastDiscTs: Long) {
@@ -629,6 +719,44 @@ class StatsState(
         this.uptimeMs = uptimeMs; this.lastConnTs = lastConnTs; this.lastDiscTs = lastDiscTs
     }
     fun reset() { update(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L); violationUptimeMs = 0L; violationPercentage = 0.0 }
+}
+
+class ConnectivityState(
+    var isLocalOnline: Boolean = true,
+    var isRelayConnected: Boolean = false,
+    var isTrackerConnected: Boolean = false,
+    var lastUpdateTs: Long = 0L,
+    var lastRemoteActivityTs: Long = 0L,
+    var connectedViewers: List<String> = emptyList(),
+    var netInterface: String = "UNKNOWN"
+) {
+    fun copyFrom(other: ConnectivityState) {
+        this.isLocalOnline = other.isLocalOnline
+        this.isRelayConnected = other.isRelayConnected
+        this.isTrackerConnected = other.isTrackerConnected
+        this.lastUpdateTs = other.lastUpdateTs
+        this.lastRemoteActivityTs = other.lastRemoteActivityTs
+        this.connectedViewers = other.connectedViewers
+        this.netInterface = other.netInterface
+    }
+
+    fun update(
+        isLocalOnline: Boolean, isRelayConnected: Boolean, isTrackerConnected: Boolean,
+        lastUpdateTs: Long, lastRemoteActivityTs: Long, connectedViewers: List<String>,
+        netInterface: String
+    ) {
+        this.isLocalOnline = isLocalOnline
+        this.isRelayConnected = isRelayConnected
+        this.isTrackerConnected = isTrackerConnected
+        this.lastUpdateTs = lastUpdateTs
+        this.lastRemoteActivityTs = lastRemoteActivityTs
+        this.connectedViewers = connectedViewers
+        this.netInterface = netInterface
+    }
+
+    fun reset() {
+        update(true, false, false, 0L, 0L, emptyList(), "UNKNOWN")
+    }
 }
 
 class BatteryState(

@@ -12,20 +12,16 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **2.1 Sampling Frequency**: Forensic sampling must operate between 10ms and 100ms based on system load (R700).
 *   **2.2 Reliability Threshold**: `ALERT_ID_PERFORMANCE_SPIKE` must trigger if `forensicReliability` (EMA) drops below 0.85 for >30s (R715).
 *   **2.3 UI Fluidity**: UI stalls (Davey) must not exceed 700ms on target hardware (SM-A155F).
-    *   **Status (Aug.21.09)**: 🟢 OPERATIONAL. Segmented hydration and HudUiParts pruning implemented (#248).
-*   **2.4 Native Watchdog**: All JNI/native calls must be wrapped in a watchdog timer (2000ms) on `Dispatchers.IO` to prevent hardware hangs from stalling the engine or UI (R301).
-*   **2.5 Geofence Recovery Hysteresis**: Alarms must clear only when the device returns within the safe range minus a hysteresis buffer (`GEOFENCE_HYSTERESIS_METERS`) and accuracy is within safe limits (R460).
-*   **2.6 Chunked Database Pruning**: All database pruning operations (Logs, Offline Status, connection history, violations, and trail points) must be chunked and staggered to prevent I/O-related ANRs during high-frequency telemetry bursts (R197).
+*   **2.4 Native Watchdog**: All JNI/native calls must be wrapped in a watchdog timer (2000ms) on `Dispatchers.IO` to prevent hardware hangs (R301).
+*   **2.5 Shadow-Cache Stability**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` and optimized initial capacity to prevent race conditions and structural re-hashing during 100Hz bursts (R280).
+*   **2.6 Chunked Database Pruning**: All database pruning operations (Logs, Offline Status, connection history, violations, and trail points) must be chunked and staggered (R197).
 
 ## 3. Test & Validation Authority
 *   **3.1 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`) to verify alarm triggers under simulated stress (R196-V).
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
-*   **Aug.22.04**: Standardized R197 chunked pruning for all high-frequency data tables.
+*   **Aug.22.04**: Hardened `ShadowCache` (R280) and verified Chapter 12.2 Database Stress stability. Standardized R197 chunked pruning for all high-frequency data tables.
 *   **Aug.22.03**: Aligned `OfflineRepository` with R197 chunked pruning standards (#197).
-*   **Aug.22.02**: Restored Core Engine Definitions (#308) and verified Geofence Recovery Hysteresis logic (R460).
-*   **Aug.22.00**: Hardened Navigation Backstack logic (#250) and implemented JNI Watchdog for native synchronization (#301).
-*   **Aug.21.09**: Implemented segmented HUD hydration (#248), background JNI loading (#265), and native resource hardening (#249).
-*   **Aug.21.08**: Integrated `UiStateAggregator` (R240) and validation hooks (R196-V).
-*   **Aug.21.00**: SOT Alignment for recovery timing (R243).
+*   **Aug.22.02**: Restored Core Engine Definitions (#308).
+*   **Aug.22.00**: Hardened Navigation Backstack logic (#250) and implemented JNI Watchdog (R301).

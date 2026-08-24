@@ -11,6 +11,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,12 +26,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * Aug.19.11:
- * - Issue #215: Integrity Monitor Flow Audit. Increased locationStalled threshold 
- *   to 180s (3 * INTEGRITY_HEARTBEAT_INTERVAL_MS) to align with R213 and prevent 
- *   false stall warnings during 60s background polling cycles (R215).
- * Aug.18.00:
- * - Issue #196: Forensic Log Buffer Pressure Audit baseline initiated.
+ * Aug.22.05:
+ * - Audit Chapter 12.3: Added simulateStoragePressure to verify log and trail 
+ *   prioritization under simulated storage exhaustion (R197).
+ * Aug.22.04:
+ * - Issue #266 Audit: Integrated Mali Driver "Meow" failure detection during 
+ *   high-frequency DB writes on Samsung A15 (R266).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -54,6 +55,9 @@ class IntegrityMonitor @Inject constructor(
     private val batterySamples = ConcurrentLinkedQueue<Pair<Long, Int>>()
     private var lastBatteryCheckTs = 0L
     private var lastPowerDisconnectTs = 0L
+
+    private val isStorageSimulated = AtomicBoolean(false)
+    private val isStorageCriticalSimulated = AtomicBoolean(false)
 
     // Vitality Tracking
     private var lastInternetUpdateRt = 0L
@@ -93,7 +97,9 @@ class IntegrityMonitor @Inject constructor(
             systemStatusProvider.observeStorageStatus()
                 .onEach { status -> 
                     lastStorageUpdateRt = timeProvider.elapsedRealtime()
-                    handleStorageUpdate(status) 
+                    if (!isStorageSimulated.get()) {
+                        handleStorageUpdate(status)
+                    }
                 }
                 .collect()
         }
@@ -177,10 +183,15 @@ class IntegrityMonitor @Inject constructor(
         val iow = systemStatusProvider.getIoWait()
         val maxIo = LatencyMonitor.consumeMaxIoLatency()
 
-        if (maxIo > LATENCY_THRESHOLD_DB_WRITE_MS && systemStatusProvider.isA15Hardware()) {
-            val msg = "PERFORMANCE WARNING: Critical I/O Spike detected on budget hardware (%dms). System stress: [CPU: %.1f, IOW: %.1f]".format(maxIo, cpu, iow)
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
-            _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_PERFORMANCE_SPIKE))
+        if (systemStatusProvider.isA15Hardware()) {
+            if (maxIo > LATENCY_THRESHOLD_DB_WRITE_MS) {
+                val msg = "PERFORMANCE WARNING: Critical I/O Spike detected on budget hardware (%dms). System stress: [CPU: %.1f, IOW: %.1f]".format(maxIo, cpu, iow)
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
+                _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_PERFORMANCE_SPIKE))
+            }
+            
+            // Issue #266: Mali Driver "Meow" configuration failures
+            auditMaliDriverPerformance(maxIo, cpu, iow)
         }
 
         updateHealth { h ->
@@ -205,6 +216,17 @@ class IntegrityMonitor @Inject constructor(
                 _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_SILENT_FAILURE))
             }
             h.isSilentFailure = isSilent
+        }
+    }
+
+    private fun auditMaliDriverPerformance(maxIo: Long, cpu: Double, iow: Double) {
+        if (maxIo > 500 && cpu > 6.0) {
+            Timber.w("Forensic Audit (R266): Potential Mali driver configuration failure suspected. [IO: %dms, CPU: %.1f]", maxIo, cpu)
+            
+            _integrityEvents.tryEmit(IntegrityEvent.LogEvent(
+                "STRESS AUDIT: Mali Driver Anomaly detected on this device (High I/O correlation). Verify graphics layer stability.",
+                isImportant = true
+            ))
         }
     }
 
@@ -283,7 +305,7 @@ class IntegrityMonitor @Inject constructor(
             h.maxTemp = maxTemp
             h.isCharging = isCharging
             h.isCoolingModeActive = isCooling
-            h.isThermalThrottling = isCooling // R133: Link thermal state to throttling flag
+            h.isThermalThrottling = isCooling 
             h.isBatterySteepDischarge = isSteepDischarge
             h.currentMa = status.currentMa
             h.isBatteryLow = status.isLow
@@ -397,7 +419,6 @@ class IntegrityMonitor @Inject constructor(
         
         val drop = earliest.second - latest.second
         
-        // Issue #194: Load-aware threshold selection
         val isHighLoad = currentHealth.cpuLoad > 0.7 || currentHealth.isThermalThrottling
         val threshold = if (isHighLoad) {
             BATTERY_STEEP_DISCHARGE_THRESHOLD_HIGH_LOAD
@@ -433,6 +454,35 @@ class IntegrityMonitor @Inject constructor(
         updateHealth { h ->
             h.isCoolingModeActive = active
             h.isThermalThrottling = active
+        }
+    }
+
+    /**
+     * simulateStoragePressure: Simulation hook for Chapter 12.3 audit (R197).
+     */
+    fun simulateStoragePressure(active: Boolean, critical: Boolean) {
+        isStorageSimulated.set(active)
+        isStorageCriticalSimulated.set(critical)
+        
+        val msg = when {
+            !active -> "System Info: Simulated Storage pressure recovered."
+            critical -> "SYSTEM EMERGENCY: Simulated Internal storage is CRITICAL."
+            else -> "SYSTEM WARNING: Simulated Internal storage is low."
+        }
+        
+        _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, active))
+        
+        if (active) {
+            if (critical) _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL))
+            else _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW))
+        } else {
+            _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_SYSTEM_STORAGE_CRITICAL))
+            _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_SYSTEM_STORAGE_LOW))
+        }
+
+        updateHealth { h ->
+            h.isStorageLow = active
+            h.isStorageCritical = active && critical
         }
     }
 
@@ -514,6 +564,8 @@ class IntegrityMonitor @Inject constructor(
         batterySamples.clear()
         lastFullPollTs = 0L
         lastInternetCheckRt = 0L
+        isStorageSimulated.set(false)
+        isStorageCriticalSimulated.set(false)
     }
 
     fun getBatteryLevel(): Int = currentHealth.batteryLevel
