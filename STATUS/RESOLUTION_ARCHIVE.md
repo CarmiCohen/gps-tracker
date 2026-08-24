@@ -2,7 +2,13 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 709**
+**Total Unique Resolutions: 710**
+
+## 105. Monotonic Authority & Maintenance Uptime Hardening (Aug.24.01)
+*   **Issue #307: Inconsistent Maintenance Uptime Logging**.
+    - **Resolution**: Standardized the system's time authority for health-check durations by migrating `MaintenanceWorker` silence detection and uptime calculations from wall-clock time (`currentTimeMillis`) to monotonic time (`elapsedRealtime`).
+    - **Action**: Implemented `LAST_SERVICE_TICK_REALTIME_KEY` persistence in `TrackerService.kt` and `ViewerService.kt`. Updated `MaintenanceWorker.kt` to prioritize the monotonic reference for duration checks, preventing anomalous ~56-year "Ghost Silence" logs caused by uninitialized wall-clock keys or system reboots.
+    - **Verification**: Logcat audit confirmed accurate silence reporting (e.g., "Silence: NEVER" or small delta seconds) post-fix.
 
 ## 104. Compose Lock Verification Hardening (Aug.24.00)
 *   **Issue #255: Compose Lock Failure**.
@@ -27,10 +33,5 @@ This document contains the unified record of all resolved issues and technical d
     - **Verification**: Verified via `ShadowCacheTest` and `ForensicStressAuditTest`.
 *   **Issue #140/12.2**: **Database Stress Audit (100Hz)**. Restored stress hooks and verified `ForensicSpillBuffer` stability. Resolved build blockers in `Models.kt` and `ViewerScreen.kt` related to unified telemetry naming.
 *   **Issue #308**: **Restored Core Engine Definitions**. Re-implemented `AlarmEvaluationState`, `ProcessedLocation`, `SpatialAnchor`, and `RejectedPoint` in `EngineModels.kt`, unblocking the build and verifying Chapter 11.2 tests.
-
-## 100. Offline Storage Hardening & R197 Compliance (Aug.22.03)
-*   **Issue #197: Offline Storage Hardening**.
-    - **Resolution**: Aligned `PendingStatusDao` and `OfflineRepository` with R197 chunked pruning standards. Replaced monolithic `prune()` with `getPruneThreshold` and `pruneByThreshold` calls.
-    - **Verification**: Verified logic via source audit. Prevents I/O stalls during large accumulation recovery on budget hardware (Samsung A15).
 
 *(Older resolutions preserved in Git history)*

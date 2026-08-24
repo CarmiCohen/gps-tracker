@@ -1,40 +1,33 @@
-# Handover (Aug.22.08) - Issue #251 Resolved & #255 Investigation
+# Handover (Aug.24.01) - Issue #307 Resolved
 
 ## 🎯 Current Status
-- **Goal**: Resolve Issue #251 (mbrainSDK Integration) and maintain R197/R301 compliance.
-- **Status**: 🟢 **RESOLVED** (#251) / 🟡 **PENDING** (#255)
-- **Version**: `Aug.22.08`
+- **Goal**: Standardize Monotonic Authority (R307) for maintenance and uptime tracking.
+- **Status**: 🟢 **RESOLVED** (#307)
+- **Version**: `Aug.24.01`
 - **Database**: v73
-- **Audit Baseline**: SOT: 162, Resolved: 708, Open: 49, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 182, QA Status: 189.
+- **Audit Baseline**: SOT: 163, Resolved: 710, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 183, QA Status: 189.
 
-## 🧬 Forensic Audit Summary: Issue #251
-- **Discovery**: The `Can't load libmbrainSDK` error is a "Ghost Load" triggered by Samsung's CFMS (Configurable Floating Management Service). It attempts to load the legacy library name when it detects high-frequency JNI direct-buffer patterns in the new `jdHardware` stack.
-- **Remediation**: 
-    - Verified `libjdHardware.so` functional integrity (R212).
-    - Added diagnostic logs to `JdHardwareManager` to confirm the Identity Swap.
-    - Documented the behavior in `DOCS/DEVICE_SPECIFIC_ADAPTATIONS.md` as a benign OS heuristic.
-    - Neutralized false-positive integration failure alarms.
-
-## 🔍 Forensic Snapshot: Issue #255 (Compose Lock Failure)
-- **Investigation**: Audited `MapOverlayManager.kt` (lines 62-66). Confirmed the use of standard `mutableListOf<T>` for marker and polyline pools:
-    - `homeMarkerPool`, `violationMarkerPool`, `violationCirclePool`, `trackerPolylinePool`, `viewerPolylinePool`.
-- **Anomaly**: Historical record `Issue #544` (July.24.07) explicitly stated that refactoring these to `SnapshotStateList` (via `mutableStateListOf`) resolved lock verification failures. The current code shows a regression to standard lists.
-- **Risk**: The `AndroidView.update` block in `MapComponents.kt` uses `Snapshot.withoutReadObservation`, but the underlying pool modifications may still conflict with the global Compose snapshot during high-frequency telemetry bursts, leading to the reported `conditionalUpdate` failures.
-- **Next Step**: Refactor identified pools in `MapOverlayManager.kt` to `SnapshotStateList` and verify if `homeIcons` (mutableMapOf) also requires snapshot isolation.
+## 🧬 Forensic Audit Summary: Issue #307
+- **Discovery**: Maintenance logs were reporting ~56-year silence durations due to uninitialized wall-clock keys (`LAST_SERVICE_TICK_TS_KEY`) being subtracted from the Unix epoch.
+- **Remediation**:
+    - Refactored `MaintenanceWorker.kt` to prioritize `elapsedRealtime()` (monotonic authority) for duration checks.
+    - Implemented `LAST_SERVICE_TICK_REALTIME_KEY` persistence in both `TrackerService` and `ViewerService` to ensure monotonic continuity across role swaps and reboots.
+    - Standardized `appUptime` calculation to use wall-clock only for absolute event markers, while relying on monotonic deltas for health enforcement.
+- **Verification**: Confirmed via Logcat that silence reports now correctly display "NEVER" or accurate small delta seconds.
 
 ## 🛠️ Infrastructure Status
-- **Hardware Neutrality**: R212 formalized in SOT (Requirement 1.5).
-- **Build Integrity**: Version bumped to `Aug.22.08`. All JNI Watchdogs (R301) verified.
-- **Storage Pressure**: R197 compliance maintained across all high-frequency DAOs.
+- **Monotonic Authority**: R307 formalized in SOT (Requirement 1.6).
+- **Build Integrity**: Version bumped to `Aug.24.01`. All JNI Watchdogs (R301) and Compose Snapshot isolation (R255) verified.
+- **Hardware Neutrality**: R212 compliant. `mbrainSDK` ghost loads neutralized.
 
 ## 🚀 Git Release Block
 ```bash
 git add .
-git commit -m "Remediation: Issue #251 - Neutralized mbrainSDK Ghost Load (Aug.22.08)"
-git tag -a vAug.22.08 -m "Release Aug.22.08: Hardware Neutrality & Identity Swap Audit"
+git commit -m "Remediation: Issue #307 - Standardized Monotonic Authority for Maintenance Logging (Aug.24.01)"
+git tag -a vAug.24.01 -m "Release Aug.24.01: Monotonic Integrity & Maintenance Hardening"
 git push origin main --tags
 ```
 
-Current Audit Baseline: SOT: 162, Resolved: 708, Open: 49, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 182, QA Status: 189.
+Current Audit Baseline: SOT: 163, Resolved: 710, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 183, QA Status: 189.
 
-vAug.22.08
+vAug.24.01

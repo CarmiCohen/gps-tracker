@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (Aug.24.00)
+# Project Issues & Hardening Tracking (Aug.24.01)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 CRITICAL | 48 |
+| **Open Technical Issues** | 🔴 CRITICAL | 47 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 709 |
+| **Resolved (Total)** | 🟢 Progress | 710 |
 
 ---
 
@@ -17,11 +17,12 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🔴 Open Issues
-*   **Issue #307**: **Inconsistent Maintenance Uptime Logging**: Requires verification of monotonic authority.
+*   (None)
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.24.00)
+## 🟢 Recently Resolved Issues (Aug.24.01)
+*   **Issue #307**: **Inconsistent Maintenance Uptime Logging**. Standardized Monotonic Authority by migrating `MaintenanceWorker` silence detection to `elapsedRealtime()`. Implemented `LAST_SERVICE_TICK_REALTIME_KEY` persistence in `TrackerService` and `ViewerService` to ensure duration-check integrity across service restarts and system time jumps.
 *   **Issue #255**: **Compose Lock Verification Failure**. Refactored `MapOverlayManager` pools and icon caches to `SnapshotStateList` and `SnapshotStateMap`. This ensures proper snapshot isolation during high-frequency telemetry updates, eliminating `conditionalUpdate` lock verification failures within the `AndroidView.update` block.
 *   **Issue #251**: **Integration Failure (mbrainSDK)**. Identified the `libmbrainSDK` Logcat error as a "Ghost Load" triggered by Samsung's CFMS detecting JNI patterns formerly associated with the legacy name. Documented the R212 Identity Swap in `JdHardwareManager` and `DEVICE_SPECIFIC_ADAPTATIONS.md` to silence forensic false positives.
 *   **Audit Chapter 12.3**: **Sustained Storage Pressure**. Implemented simulation hooks and verified `PersistencePolicy` prioritization. Confirmed that normal logs/trails are gated while `isSpecial` forensic data persists under 99% fill levels (R197).
@@ -32,4 +33,4 @@ This document tracks active issues, technical debt, and pending implementation t
 *   **Issue #308**: **Restored Core Engine Definitions**. Re-implemented `AlarmEvaluationState`, `ProcessedLocation`, `SpatialAnchor`, and `RejectedPoint` in `EngineModels.kt`, unblocking the build and verifying Chapter 11.2 tests.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.24.00)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.24.01)

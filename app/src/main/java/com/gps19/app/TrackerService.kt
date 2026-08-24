@@ -21,6 +21,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.24.01:
+ * - Issue #307 Remediation: Standardized monotonic authority for maintenance 
+ *   uptime logging. Persisting LAST_SERVICE_TICK_REALTIME_KEY to ensure 
+ *   accurate silence detection in MaintenanceWorker (R307).
  * Aug.22.05:
  * - Audit Chapter 12.3: Added SimulateStoragePressure handler in 
  *   observeCommandEvents to support storage prioritization audit (R197).
@@ -84,6 +88,7 @@ class TrackerService : BaseMonitorService() {
 
     override suspend fun onServiceInitialize() {
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        repository.saveLongSync(LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
 
         configManager.deviceId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
         configManager.viewerId = repository.getString(VIEWER_ID_KEY, SettingsRepository.DEFAULT_VIEWER_ID)
@@ -548,6 +553,7 @@ class TrackerService : BaseMonitorService() {
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, now)
+        repository.saveLongSync(LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
         serviceTickCounter++
     }
 

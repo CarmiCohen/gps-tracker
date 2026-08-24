@@ -16,12 +16,13 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * Aug.24.01:
+ * - Issue #307 Remediation: Standardized monotonic authority for maintenance 
+ *   uptime logging. Refactored silence detection to use elapsedRealtime() with 
+ *   wall-clock fallbacks to prevent 56-year "Ghost Silence" logs (R307).
  * Aug.04.115:
  * - Issue #729: Forensic Audit: Automated Database Integrity Validation. 
  *   Integrated checkDatabaseIntegrity() with charging-aware execution.
- * JAug.04.111:
- * - Issue #721: Performance Hardening. Refactored to use GpsApplication.PACKAGE_NAME 
- *   shadow-cache to eliminate repetitive getPackageName() calls on Samsung A15.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -63,21 +64,32 @@ class MaintenanceWorker @AssistedInject constructor(
         val isSystemActive = repository.isSystemActiveFlow.firstOrNull() ?: repository.getBoolean(IS_SYSTEM_ACTIVE_KEY, false)
         
         val now = timeProvider.currentTimeMillis()
+        val nowRt = timeProvider.elapsedRealtime()
+        
         val lastTick = repository.getLong(LAST_SERVICE_TICK_TS_KEY, 0L)
+        val lastTickRt = repository.getLong(LAST_SERVICE_TICK_REALTIME_KEY, 0L)
         val appStartTime = repository.getLong(APP_START_TIME_KEY, 0L)
         
-        val silenceDurationMs = now - lastTick
-        val appUptimeMs = now - appStartTime
+        // Monotonic Authority (Issue #307): Prioritize elapsedRealtime for duration checks.
+        // If lastTickRt is 0 or exceeds nowRt (reboot), fall back to wall-clock with safety gating.
+        val silenceDurationMs = when {
+            lastTickRt > 0 && nowRt >= lastTickRt -> nowRt - lastTickRt
+            lastTick > 0 && now >= lastTick -> now - lastTick
+            else -> 0L
+        }
+
+        val appUptimeMs = if (appStartTime > 0 && now >= appStartTime) now - appStartTime else 0L
         
         val isNetworkAlive = systemStatusProvider.isLocalOnline()
         val networkStatus = if (isNetworkAlive) "ALIVE" else "DEAD"
 
-        Log.d("GPS19", "MAINTENANCE: Periodic check. Mode: $savedMode, Active: $isSystemActive, Silence: ${silenceDurationMs/1000}s, Uptime: ${appUptimeMs/1000}s, Net: $networkStatus")
+        val silenceDisplay = if (lastTick == 0L) "NEVER" else "${silenceDurationMs/1000}s"
+        Log.d("GPS19", "MAINTENANCE: Periodic check. Mode: $savedMode, Active: $isSystemActive, Silence: $silenceDisplay, Uptime: ${appUptimeMs/1000}s, Net: $networkStatus")
 
         // Issue #729: Automated Database Integrity Check
         performIntegrityAudit(now)
 
-        if (appUptimeMs < RECOVERY_GRACE_PERIOD_MS) {
+        if (appUptimeMs < RECOVERY_GRACE_PERIOD_MS && appStartTime > 0) {
             Log.d("GPS19", "MAINTENANCE: Within startup grace period (${appUptimeMs/1000}s). Skipping recovery check.")
             return Result.success()
         }
@@ -107,7 +119,7 @@ class MaintenanceWorker @AssistedInject constructor(
                     return Result.success()
                 }
 
-                val recoveryMsg = "MAINTENANCE: Service RECOVERY triggered ($savedMode). Silence: ${silenceDurationMs/1000}s"
+                val recoveryMsg = "MAINTENANCE: Service RECOVERY triggered ($savedMode). Silence: $silenceDisplay"
                 Log.w("GPS19", recoveryMsg)
                 
                 repository.addLog(LogEntry(

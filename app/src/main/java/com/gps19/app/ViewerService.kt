@@ -16,6 +16,10 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Aug.24.01:
+ * - Issue #307 Remediation: Standardized monotonic authority for maintenance 
+ *   uptime logging. Persisting LAST_SERVICE_TICK_REALTIME_KEY to ensure 
+ *   accurate silence detection in MaintenanceWorker (R307).
  * Aug.21.09:
  * - Issue #249/262 Remediation: Added JdHardwareManager.releaseHardware() to 
  *   onDestroy to ensure native resources are disposed during role swaps (R249).
@@ -58,6 +62,7 @@ class ViewerService : BaseMonitorService() {
 
     override suspend fun onServiceInitialize() {
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        repository.saveLongSync(LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
 
         val trackerId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
         val viewerId = repository.getString(VIEWER_ID_KEY, SettingsRepository.DEFAULT_VIEWER_ID)
@@ -434,6 +439,7 @@ class ViewerService : BaseMonitorService() {
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, now)
+        repository.saveLongSync(LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
         serviceTickCounter++
     }
 
