@@ -16,12 +16,14 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **2.4 Native Watchdog**: All JNI/native calls must be wrapped in a watchdog timer (2000ms) on `Dispatchers.IO` to prevent hardware hangs (R301).
 *   **2.5 Shadow-Cache Stability**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` and optimized initial capacity to prevent race conditions and structural re-hashing during 100Hz bursts (R280).
 *   **2.6 Chunked Database Pruning**: All database pruning operations (Logs, Offline Status, connection history, violations, and trail points) must be chunked and staggered (R197).
+*   **2.7 Snapshot Isolation (R255)**: All imperative map overlay pools and caches must utilize `SnapshotStateList` and `SnapshotStateMap` to ensure thread-safe integration with the Compose snapshot system during high-frequency telemetry (Issue #255).
 
 ## 3. Test & Validation Authority
 *   **3.1 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`) to verify alarm triggers under simulated stress (R196-V).
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.24.00**: Resolved Issue #255 (Compose Lock Failure) via SnapshotState isolation.
 *   **Aug.22.08**: Neutralized `mbrainSDK` Ghost Load false positives (Issue #251) and formalized Hardware Neutrality (R212).
 *   **Aug.22.04**: Hardened `ShadowCache` (R280) and verified Chapter 12.2 Database Stress stability. Standardized R197 chunked pruning for all high-frequency data tables.
 *   **Aug.22.03**: Aligned `OfflineRepository` with R197 chunked pruning standards (#197).

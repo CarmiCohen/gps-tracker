@@ -2,7 +2,13 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 708**
+**Total Unique Resolutions: 709**
+
+## 104. Compose Lock Verification Hardening (Aug.24.00)
+*   **Issue #255: Compose Lock Failure**.
+    - **Resolution**: Refactored imperative pools (`homeMarkerPool`, `violationMarkerPool`, `violationCirclePool`, `trackerPolylinePool`, `viewerPolylinePool`) and the `homeIcons` cache in `MapOverlayManager.kt` from standard mutable collections to `SnapshotStateList` and `SnapshotStateMap`.
+    - **Action**: This ensures that modifications to map overlays during high-frequency telemetry bursts (up to 100Hz) are properly isolated within the Compose snapshot system, eliminating `conditionalUpdate` failures and state-read consistency errors in the `AndroidView.update` block.
+    - **Verification**: Logic audit confirms transition to snapshot-aware collections.
 
 ## 103. MbrainSDK Integration & Ghost Load Neutralization (Aug.22.08)
 *   **Issue #251: Integration Failure (mbrainSDK)**.
