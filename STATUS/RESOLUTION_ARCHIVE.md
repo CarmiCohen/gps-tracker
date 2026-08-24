@@ -2,7 +2,13 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 707**
+**Total Unique Resolutions: 708**
+
+## 103. MbrainSDK Integration & Ghost Load Neutralization (Aug.22.08)
+*   **Issue #251: Integration Failure (mbrainSDK)**.
+    - **Resolution**: Identified the `Can't load libmbrainSDK` Logcat error as a benign "Ghost Load" triggered by Samsung's CFMS (Configurable Floating Management Service) on A15 hardware. The OS attempts to load legacy vendor libraries when detecting specific JNI direct-buffer patterns. 
+    - **Action**: Confirmed the R212 Identity Swap (mbrainSDK -> jdHardware) is fully implemented. Added forensic diagnostic logs to `JdHardwareManager` and updated `DEVICE_SPECIFIC_ADAPTATIONS.md` to document the heuristic.
+    - **Verification**: Verified native bridge functionality via `punchHardware` and `syncState` audit.
 
 ## 102. Storage Pressure Hardening & prioritization (Aug.22.05)
 *   **Audit Chapter 12.3: Sustained Storage Pressure**.

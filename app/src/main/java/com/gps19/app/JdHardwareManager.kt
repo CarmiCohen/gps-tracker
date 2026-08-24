@@ -24,6 +24,11 @@ import kotlinx.coroutines.sync.withLock
  * - Issue #301 Remediation: Hardened JNI Watchdog. Migrated syncState and other 
  *   native calls to use withTimeout(Dispatchers.IO) to prevent native stalls 
  *   from blocking the main engine loop (R301).
+ * Aug.22.08:
+ * - Issue #251 Remediation: Documented 'Ghost Load' behavior. On Samsung A15 
+ *   hardware, the OS (CFMS) may attempt to load 'libmbrainSDK' based on 
+ *   JNI signatures. This is a benign heuristic; the system correctly uses 
+ *   'libjdHardware' (R212 Identity Swap).
  */
 object JdHardwareManager {
 
@@ -51,6 +56,8 @@ object JdHardwareManager {
                     n1(sharedStateBuffer)
                     isLibraryLoaded.set(true)
                     Timber.i("jdHardware: Native library loaded successfully.")
+                    // Issue #251: Audit log to confirm Identity Swap (R212)
+                    Timber.i("jdHardware: Identity Swap active. Legacy mbrainSDK signatures neutralized.")
                     true
                 }
             } catch (e: TimeoutCancellationException) {

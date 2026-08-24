@@ -35,3 +35,6 @@ Following the implementation of UiStateAggregator, Forensic Validation Hooks, an
 
 ## 11. Unified Database Pruning (Aug.22.03)
 - **Idea #181**: Standardize all remaining data tables (`connection_history`, `violations`, `trail_points`) to use the R197 chunked pruning standard. Currently, only `logs` and `pending_status_updates` are fully hardened against I/O stalls.
+
+## 12. Heuristic Muzzling & Identity Trace (Aug.22.08)
+- **Idea #182**: Formalize the documentation and diagnostic suppression of OS-level library load heuristics (Ghost Loads) to prevent false-positive forensic investigations (Ref: Issue #251).

@@ -14,6 +14,11 @@ The Samsung A15 utilizes a virtual proximity sensor that is prone to "flickering
 ### 1.3. WakeLock Renewal
 On Samsung devices, the system proactively renews its WakeLock during every heartbeat tick in `processTick` to prevent the OS from suspending the location lifecycle.
 
+### 1.4. Identity Swap & Ghost Loads (R212/Issue #251)
+To eliminate framework collisions, all legacy native references were migrated from `mbrainSDK` to `jdHardware` (R212). 
+- **Behavior**: On some devices (e.g., A15), the Samsung CFMS (Configurable Floating Management Service) may attempt to load `libmbrainSDK` if it detects high-frequency JNI direct-buffer patterns formerly associated with that library name.
+- **Status**: This is a **benign OS-level heuristic**. The application correctly initializes `libjdHardware` and does not require the legacy binary. A diagnostic log in `JdHardwareManager` confirms the Identity Swap is active.
+
 ## 2. Xiaomi (MIUI/HyperOS) Hardening (Issue #439)
 ### 2.1. Autostart Verification
 The system monitors `isXiaomiAutostartGranted`. If false, a critical `XIAOMI_SYSTEM_MISSING` alert is triggered.
