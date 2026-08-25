@@ -2,7 +2,13 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 715**
+**Total Unique Resolutions: 716**
+
+## 110. GPS Stabilization & Warm-up Hardening (Aug.25.01)
+*   **Issue #315: Immediate Signal Loss False Positive**.
+    - **Resolution**: Implemented GPS_WARMUP_GRACE_MS (30s) to suppress false alerts during provider stabilization (R315).
+    - **Action**: Modified `EngineConstants.kt` to define the 30s grace period and updated `MainAlarmLogic.kt` to gate `SIGNAL_LOSS`, `GPS_STALL`, and `GPS_GAP` alerts against this grace period relative to service start time.
+    - **Result**: False positives during app startup and provider warm-up are eliminated.
 
 ## 109. Startup Fluidity & Budget Hardware Hardening (Aug.25.00)
 *   **Issue #314: Startup UI Stall (Davey)**.
@@ -22,7 +28,7 @@ This document contains the unified record of all resolved issues and technical d
     - **Action**: Implemented `SetManualSelection` and `SetSettlingActive` events in `MainViewModel`. Updated `MainAppContent.kt` to utilize these persistent fields. This prevents the app from reverting to the Landing screen when returning from system permission dialogs (e.g., Background Location request) on devices with aggressive Activity destruction.
     - **Verification**: UI audit confirms navigation continuity across Activity recreation.
 
-## 106. Imperative Map Isolation & Ghost Load Neutralization (Aug.25.00)
+## 106. Imperative Map Isolation & Compose Pressure Mitigation (Aug.25.00)
 *   **Issue #309: Compose Lock Verification Persistent Warnings**.
     - **Resolution**: Replaced `SnapshotStateList` and `SnapshotStateMap` in `MapOverlayManager.kt` with standard `ArrayList` and `HashMap` collections. 
     - **Action**: High-frequency map updates are performed imperatively within `AndroidView.update`. Using standard collections eliminates lock contention and frame skips on A15 hardware.

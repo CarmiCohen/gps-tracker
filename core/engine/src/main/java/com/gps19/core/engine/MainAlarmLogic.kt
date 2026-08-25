@@ -5,18 +5,15 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Aug.25.01:
+ * - Issue #315: Integrated GPS_WARMUP_GRACE_MS (30s) to suppress Signal Loss 
+ *   and GPS Stall false positives during provider stabilization (R315).
  * Aug.13.02:
  * - Build Fix: Explicitly typed LatencyMonitor.measureAndAudit calls to resolve 
  *   type inference failures (R146/R151).
  * Aug.11.16:
  * - Issue #144: Geofence Uncertainty Growth Validation. Fixed "Return to Safe Range" 
  *   logic to use drifted uncertainty (acc) instead of static accuracy (R460).
- * Aug.11.08:
- * - Issue #143: Forensic Integrity Verification. Updated Silent Failure 
- *   detection to include thermal throttling in correlation logic (R133).
- * Aug.10.30:
- * - Issue #133: Forensic Anomaly Correlation Engine. Integrated ALERT_ID_SILENT_FAILURE 
- *   into violation engine via SentinelValidator.isSilentFailure (R133).
  */
 object MainAlarmLogic {
 
@@ -48,6 +45,10 @@ object MainAlarmLogic {
             val phase = state.discoveryPhase
             val isTracker = state.isTrackerMode
             val canCheckPeerErrors = phase == DiscoveryPhase.MONITORING
+            
+            val uptimeRt = nowRt - state.serviceStartRt
+            val isBootGraceActive = uptimeRt < HARDWARE_BOOT_GRACE_MS
+            val isGpsWarmupActive = uptimeRt < GPS_WARMUP_GRACE_MS || isWarmup
             
             val isDistanceGraceActive = phase == DiscoveryPhase.BOOTSTRAP
             
@@ -101,14 +102,14 @@ object MainAlarmLogic {
                 type = ALERT_ID_SIGNAL_LOSS,
                 title = getTrackerTitleCached(isTracker, if (isTracker) ALERT_TITLE_VIEWER_SIGNAL_LOSS else ALERT_TITLE_SIGNAL_LOSS),
                 subtitle = "Communication with device was lost", 
-                conditionMet = canCheckPeerErrors && health.signalLoss && !shouldSuppressPeerErrors
+                conditionMet = canCheckPeerErrors && health.signalLoss && !shouldSuppressPeerErrors && !isGpsWarmupActive
             )
             
             report.getOrCreate(reportIdx++).update(
                 type = ALERT_ID_GPS_STALL,
                 title = getTrackerTitleCached(isTracker, ALERT_TITLE_GPS_STALL),
                 subtitle = "Device GPS location has not updated",
-                conditionMet = canCheckPeerErrors && health.gpsStalled && !health.gpsHardwareLock && !shouldSuppressPeerErrors
+                conditionMet = canCheckPeerErrors && health.gpsStalled && !health.gpsHardwareLock && !shouldSuppressPeerErrors && !isGpsWarmupActive
             )
 
             report.getOrCreate(reportIdx++).update(
@@ -122,7 +123,7 @@ object MainAlarmLogic {
                 type = ALERT_ID_TRACKER_GAP,
                 title = getTrackerTitleCached(isTracker, if (isTracker) ALERT_TITLE_VIEWER_GAP else ALERT_TITLE_TRACKER_GAP),
                 subtitle = "No data received from device for >180s",
-                conditionMet = canCheckPeerErrors && state.isGpsGap && !shouldSuppressPeerErrors
+                conditionMet = canCheckPeerErrors && state.isGpsGap && !shouldSuppressPeerErrors && !isGpsWarmupActive
             )
 
             // 4. STATUS ALERTS
@@ -417,8 +418,6 @@ object MainAlarmLogic {
             )
 
             // 7. HARDWARE CONFIGURATION GATING
-            val uptimeRt = nowRt - state.serviceStartRt
-            val isBootGraceActive = uptimeRt < HARDWARE_BOOT_GRACE_MS
             val caps = state.capabilities
             
             val isExplicitlyDenied = caps.backgroundStatus == CapabilityStatus.DENIED || 

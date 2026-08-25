@@ -1,28 +1,23 @@
-# Handover (Aug.25.00) - Startup Hardening & Performance Baseline
+# Handover (Aug.25.01) - GPS Stabilization & Warm-up Hardening
 
 ## 🎯 Current Status
-- **Goal**: Resolve Startup Davey Stalls on Budget Hardware.
-- **Status**: 🟢 **STABLE** (Startup)
-- **Version**: `Aug.25.00`
+- **Goal**: Suppress false alerts during GPS provider stabilization.
+- **Status**: 🟢 **STABLE**
+- **Version**: `Aug.25.01`
 - **Database**: v73
-- **Audit Baseline**: SOT: 166, Resolved: 715, Open: 51, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 187, QA Status: 189.
+- **Audit Baseline**: SOT: 167, Resolved: 716, Open: 50, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 191, QA Status: 189.
 
-## 🧬 Forensic Audit Summary: Aug.25.00
-- **Issue #314 (Davey) Resolved**: Implemented Staggered Hydration (R314). Logcat confirms UI remains responsive during first-frame rendering on SM-A155F.
-- **Verification**: Hydration levels (1: Surface, 2: Core/Nav, 3: Full) now utilize 300ms/500ms gaps. Heavy observations are delayed by an additional 1000ms on detected A15 hardware.
-- **Pending Regression #315**: Alarm still triggers prematurely during GPS stabilization. A 30s grace period (R315) is the next priority.
-- **Snap-Isolation (R312)**: Verified parity across list-based flows; no lock verification failures detected post-R314 implementation.
-
-## 🛠️ Infrastructure Status
-- **Requirement 2.9 (R314)**: STAGGERED_HYDRATION is now the authority for ViewModel initialization.
-- **Requirement 2.10 (R315)**: GPS_WARMUP_GRACE (30s) is formalized but pending implementation in `MainAlarmLogic`.
+## 🧬 Forensic Audit Summary: Aug.25.01
+- **Issue #315 (Signal Loss) Resolved**: Implemented `GPS_WARMUP_GRACE_MS` (30s) in `MainAlarmLogic`. Logcat confirms `SIGNAL_LOSS` and `GPS_STALL` alerts are suppressed until provider stabilization.
+- **Issue #314 (Davey) Resolved**: Staggered Hydration verified; UI remains fluid on SM-A155F.
+- **Requirement 2.10 (R315)**: `GPS_WARMUP_GRACE_MS` is now the authority for provider warm-up gating.
 
 ## 🚀 Git Release Block
 ```bash
 git add .
-git commit -m "Hardening: Resolved Issue #314 (Startup Davey Stall) via Staggered Hydration (R314) - vAug.25.00"
-git tag -a vAug.25.00 -m "Release Aug.25.00: Startup Performance Hardening for A15 Hardware"
+git commit -m "Hardening: Resolved Issue #315 (Immediate Signal Loss False Positive) via GPS_WARMUP_GRACE_MS (R315) - vAug.25.01"
+git tag -a vAug.25.01 -m "Release Aug.25.01: GPS Stabilization & Warm-up Hardening"
 git push origin main --tags
 ```
 
-vAug.25.00
+vAug.25.01

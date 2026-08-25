@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Aug.25.01:
+ * - Issue #315: Added GPS_WARMUP_GRACE_MS (30s) to prevent immediate false 
+ *   positives during GPS stabilization (R315).
  * Aug.21.09:
  * - Issue #257/271 Optimization: Added STAGGERED_IO_PRUNING_DELAY_MS to 
  *   mitigate Samsung A15 Kumiho auditing pressure during launch.
@@ -244,6 +247,7 @@ const val HARDWARE_BOOT_GRACE_MS = 30000L
 const val LANDING_PAGE_PAUSE_MS = 2000L
 const val STARTUP_SETTLING_DELAY_MS = 2000L
 const val STAGGERED_IO_PRUNING_DELAY_MS = 15000L
+const val GPS_WARMUP_GRACE_MS = 30000L
 
 // GPS Polling Intervals (Central Authority)
 const val HIGH_FREQUENCY_GPS_POLLING_MS = 2000L
