@@ -44,3 +44,6 @@ Following the implementation of Imperative Map Isolation and Ghost Load Neutrali
 
 ## 14. Off-Thread Map Geometry (Aug.25.00)
 - **Idea #184**: Offload `CircleKey` quantization and `Polygon.pointsAsCircle` generation to a background worker. While R309 isolated the pools, pre-calculating complex geometry off the UI thread would further eliminate potential micro-stalls during 100Hz telemetry (Ref: Issue #309).
+
+## 15. Reactive State Offloading (Aug.25.02)
+- **Idea #185**: Offload high-frequency telemetry and status aggregation from the Compose reactive loop to a background Flow-processor. This would eliminate the `SnapshotStateList.conditionalUpdate` lock verification failures and performance degradation observed on Samsung SM-G990E and SM-A155F hardware (Ref: Issue #312).

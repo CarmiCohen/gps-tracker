@@ -24,6 +24,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.25.01**: Verified SM-G990E (S21 FE) hardware compatibility. Identified Issue #312 (Persistent Compose Lock warnings) and Issue #313 (A15 Detection Failure) during multi-device deployment.
 *   **Aug.25.00**: Resolved Issue #309 (Imperative Map Isolation) and Issue #310 (Ghost Load Neutralization).
 *   **Aug.24.01**: Standardized Monotonic Authority (#307) for maintenance uptime logging.
 *   **Aug.24.00**: Resolved Issue #255 (Compose Lock Failure) via SnapshotState isolation. (Superseded by R309).
