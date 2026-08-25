@@ -37,13 +37,13 @@ private data class HudUiParts(
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
  * Aug.25.04:
+ * - Issue #314 Remediation: Implemented Staggered Hydration (R314). Increased 
+ *   delays in init and added specific A15 offset for heavy observations to 
+ *   eliminate 1.5s Davey stall.
  * - Issue #312 Remediation: Implemented Snap-Isolation (Idea #185). Added 
  *   listContentEquals and deep-parity distinctUntilChanged to high-frequency 
  *   flows (Logs, Trails, Violations, History) to eliminate lock verification 
  *   failures on Samsung A15/S21 hardware (R312).
- * Aug.25.01:
- * - Issue #311: Fixed navigation regression by handling SetPendingMode, 
- *   SetManualSelection, and SetSettlingActive.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -314,15 +314,16 @@ class MainViewModel @Inject constructor(
             
             withContext(Dispatchers.Main.immediate) {
                 applyInitialSettings(initialSettings)
+                // Issue #314: Increased hydration delays to ensure UI responsiveness.
                 updateState { it.copy(hydrationLevel = 1) }
-                delay(150) 
+                delay(300) // Surface
                 updateState { it.copy(hydrationLevel = 2) }
-                delay(300) 
+                delay(500) // Core/Nav
                 updateState { it.copy(hydrationLevel = 3, isInitialized = true) }
             }
             
             launch(Dispatchers.IO) { 
-                delay(STAGGERED_IO_PRUNING_DELAY_MS)
+                delay(STAGGERED_IO_PRUNING_DELAY_MS + 1000) // Extended delay for DB pruning
                 repository.proactivePruning() 
             }
             
@@ -332,7 +333,14 @@ class MainViewModel @Inject constructor(
             }
             
             launch(Dispatchers.Main.immediate) {
-                _uiState.filter { it.appMode != null }.first()
+                // Wait for full hydration and app mode selection
+                _uiState.filter { it.isFullyHydrated && it.appMode != null }.first()
+                
+                // Issue #314: Additional delay for A15 hardware before heavy observations.
+                if (systemStatusProvider.isA15Hardware()) {
+                    delay(1000)
+                }
+                
                 startHeavyObservations()
             }
 
@@ -485,7 +493,13 @@ class MainViewModel @Inject constructor(
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { sessionUseCase.setSystemActive(event.active) }
             }
             is UiEvent.SetAppMode -> {
-                if (event.mode != null) startHeavyObservations()
+                if (event.mode != null) {
+                    // Start heavy observations after a slight delay if not already started
+                    viewModelScope.launch(Dispatchers.Main.immediate) {
+                        if (systemStatusProvider.isA15Hardware()) delay(500)
+                        startHeavyObservations()
+                    }
+                }
                 viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
                     val newStartTime = sessionUseCase.setAppMode(event.mode)
                     updateState { it.copy(appMode = event.mode, appStartTime = newStartTime ?: it.appStartTime) }

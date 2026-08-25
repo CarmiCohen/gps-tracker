@@ -2,7 +2,13 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 714**
+**Total Unique Resolutions: 715**
+
+## 109. Startup Fluidity & Budget Hardware Hardening (Aug.25.00)
+*   **Issue #314: Startup UI Stall (Davey)**.
+    - **Resolution**: Implemented Staggered Hydration (R314) to eliminate UI stalls on budget hardware.
+    - **Action**: Modified `MainViewModel.kt` to increase initial hydration delays (300ms/500ms) and added a conditional 1000ms delay for heavy telemetry observations on A15 hardware. Extended the delay for proactive DB pruning.
+    - **Result**: UI remains responsive during the critical first-frame rendering and app-mode transition on SM-A155F hardware.
 
 ## 108. Snap-Isolation & Reactive List Hardening (Aug.25.04)
 *   **Issue #312: Persistent Lock Verification Failures**.

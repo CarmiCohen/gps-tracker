@@ -1,32 +1,28 @@
-# Handover (Aug.25.04) - Post-Deployment Audit & A15 Hardening
+# Handover (Aug.25.00) - Startup Hardening & Performance Baseline
 
 ## 🎯 Current Status
-- **Goal**: Verify Snap-Isolation and Audit SM-A155F Performance.
-- **Status**: 🟡 **HARDENING**
-- **Version**: `Aug.25.04`
+- **Goal**: Resolve Startup Davey Stalls on Budget Hardware.
+- **Status**: 🟢 **STABLE** (Startup)
+- **Version**: `Aug.25.00`
 - **Database**: v73
-- **Audit Baseline**: SOT: 166, Resolved: 714, Open: 52, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 187, QA Status: 189.
+- **Audit Baseline**: SOT: 166, Resolved: 715, Open: 51, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 187, QA Status: 189.
 
-## 🧬 Forensic Audit Summary: Aug.25.04 Deployment
-- **Verification**: Snap-Isolation (Issue #312) successfully eliminated lock verification failures on A15/S21 hardware. UI parity for telemetry flows confirmed.
-- **Regression #314 (Davey)**: 1.5s UI stall detected during startup on A15. Staggered hydration (R314) is now required.
-- **Regression #315 (Signal False Positive)**: Alarm triggered during GPS stabilization. A 30s grace period (R315) is required.
-- **Issue #316 (Shadow-Cache)**: LRU strategy implemented (Issue #721) was undocumented. Formalized in R280.
-- **Setup Blockers**: Identified Battery Unrestricted and Overlay permissions as critical blockers for system readiness on Samsung firmware.
+## 🧬 Forensic Audit Summary: Aug.25.00
+- **Issue #314 (Davey) Resolved**: Implemented Staggered Hydration (R314). Logcat confirms UI remains responsive during first-frame rendering on SM-A155F.
+- **Verification**: Hydration levels (1: Surface, 2: Core/Nav, 3: Full) now utilize 300ms/500ms gaps. Heavy observations are delayed by an additional 1000ms on detected A15 hardware.
+- **Pending Regression #315**: Alarm still triggers prematurely during GPS stabilization. A 30s grace period (R315) is the next priority.
+- **Snap-Isolation (R312)**: Verified parity across list-based flows; no lock verification failures detected post-R314 implementation.
 
 ## 🛠️ Infrastructure Status
-- **Requirement 2.9**: Staggered Hydration (R314) formally established in `SOT_MASTER_REQUIREMENTS.md`.
-- **Requirement 2.10**: GPS Warm-up Grace Period (R315) formally established in `SOT_MASTER_REQUIREMENTS.md`.
-- **Simplification**: Added Idea #187 (Delayed Telemetry Subscription) to remediate startup stalls.
+- **Requirement 2.9 (R314)**: STAGGERED_HYDRATION is now the authority for ViewModel initialization.
+- **Requirement 2.10 (R315)**: GPS_WARMUP_GRACE (30s) is formalized but pending implementation in `MainAlarmLogic`.
 
 ## 🚀 Git Release Block
 ```bash
 git add .
-git commit -m "Deployment Audit: Verified Snap-Isolation; Identified Issue #314 (Davey) and Issue #315 (GPS Grace) - vAug.25.04"
-git tag -a vAug.25.04-audit -m "Audit Aug.25.04: Performance & Alarm Baseline for Samsung Hardware"
+git commit -m "Hardening: Resolved Issue #314 (Startup Davey Stall) via Staggered Hydration (R314) - vAug.25.00"
+git tag -a vAug.25.00 -m "Release Aug.25.00: Startup Performance Hardening for A15 Hardware"
 git push origin main --tags
 ```
 
-Current Audit Baseline: SOT: 166, Resolved: 714, Open: 52, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 187, QA Status: 189.
-
-vAug.25.04
+vAug.25.00

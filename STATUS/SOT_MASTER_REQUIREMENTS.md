@@ -27,9 +27,10 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.25.00**: Resolved Issue #314 (Startup Davey Stall). Implemented Staggered Hydration (R314) with A15-specific observation offsets.
 *   **Aug.25.04**: Resolved Issue #312 (Compose Lock Verification). Verified SM-A155F deployment. Identified Issue #314 (Startup Davey), Issue #315 (GPS Settling), and formalized R280/LRU Cache (Issue #721).
 *   **Aug.25.01**: Verified SM-G990E (S21 FE) hardware compatibility. Identified Issue #312 (Persistent Compose Lock warnings) and Issue #313 (A15 Detection Failure) during multi-device deployment.
-*   **Aug.25.00**: Resolved Issue #309 (Imperative Map Isolation) and Issue #310 (Ghost Load Neutralization).
+*   **Aug.25.00 (Old)**: Resolved Issue #309 (Imperative Map Isolation) and Issue #310 (Ghost Load Neutralization).
 *   **Aug.24.01**: Standardized Monotonic Authority (#307) for maintenance uptime logging.
 *   **Aug.24.00**: Resolved Issue #255 (Compose Lock Failure) via SnapshotState isolation. (Superseded by R309).
 *   **Aug.22.08**: Neutralized `mbrainSDK` Ghost Load false positives (Issue #251) and formalized Hardware Neutrality (R212).
