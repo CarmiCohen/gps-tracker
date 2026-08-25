@@ -21,7 +21,7 @@ Following the implementation of UiStateAggregator, Forensic Validation Hooks, an
 - **Idea #175**: Implement a "Hydration Trace" in the Log Overlay to pinpoint which UI component causes the 1000ms stall on budget hardware (Ref: Issue #248).
 
 ## 7. Network Lifecycle Consolidation (Aug.21.08)
-- **Idea #176**: Consolidate `ConnectivitySuite` and `SystemStatusProvider` network registrations into a single manager to resolve Issue #253 and reduce OS log noise.
+- **Idea #176**: Consolidate `ConnectivitySuite` and `SystemStatusProvider` network registrations into a single manager to reduce OS log noise.
 
 ## 8. JNI Background Preload (Aug.21.08)
 - **Idea #177**: Use `ZygotePreload` or an async initialization worker for `libjdHardware.so` to move the 81-frame load stall out of the critical startup path (Ref: Issue #265).
@@ -38,3 +38,6 @@ Following the implementation of UiStateAggregator, Forensic Validation Hooks, an
 
 ## 12. Heuristic Muzzling & Identity Trace (Aug.22.08)
 - **Idea #182**: Formalize the documentation and diagnostic suppression of OS-level library load heuristics (Ghost Loads) to prevent false-positive forensic investigations (Ref: Issue #251).
+
+## 13. Automated Permission Recovery (Aug.24.01)
+- **Idea #183**: The `PhoneSetupOverlay` requires manual intervention for critical settings (Battery/Overlay). Implement an "Auto-Fix" sequence that sequentially launches the fallback intents identified in `MainActivity.kt` to improve system readiness latency (Ref: Issue #309).

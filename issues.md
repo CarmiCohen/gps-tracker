@@ -5,19 +5,21 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 CRITICAL | 47 |
+| **Open Technical Issues** | 🔴 CRITICAL | 49 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
 | **Resolved (Total)** | 🟢 Progress | 710 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   (None)
+*   **Samsung A15 Setup Blocker**: Initial deployment on SM-A155F identifies "Unrestricted" battery mode and "Appear on Top" permissions as hard blockers for system readiness. The `PhoneSetupOverlay` correctly intercepts mode entry, but automated recovery may be needed if users bypass these settings.
+*   **Persistent Compose Lock Verification**: Logcat identifies `SnapshotStateList.conditionalUpdate` failures on A15 hardware despite Issue #255 refactoring. This suggests further optimization of high-frequency telemetry observers is required to eliminate main-thread frame skips (39+ frames).
 
 ---
 
 ## 🔴 Open Issues
-*   (None)
+*   **Issue #309**: **Compose Lock Verification Persistent Warnings**. Investigate why `SnapshotStateList` continues to trigger lock verification failures on non-generational GCs (Samsung A15). Potential need for `mutative` state aggregation or moving more UI logic to `Default` dispatcher.
+*   **Issue #310**: **libmbrainSDK Ghost Load Persistence**. Even after Issue #251 "Identity Swap", the logcat continues to report `Can't load libmbrainSDK` on boot. Investigate deeper into CFMS (Custom Frequency Manager Service) triggers on Samsung devices to fully silence this forensic noise.
 
 ---
 
