@@ -16,6 +16,9 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Aug.25.00:
+ * - Issue #310 Remediation: Neutralized literal legacy SDK strings in log messages 
+ *   to prevent CFMS string-pool scanning from triggering Ghost Loads (R212).
  * Aug.21.09:
  * - Issue #265 Remediation: Replaced callback-based loadLibraryAsync with 
  *   suspend initialize() and switched to Mutex to avoid thread-blocking 
@@ -26,7 +29,7 @@ import kotlinx.coroutines.sync.withLock
  *   from blocking the main engine loop (R301).
  * Aug.22.08:
  * - Issue #251 Remediation: Documented 'Ghost Load' behavior. On Samsung A15 
- *   hardware, the OS (CFMS) may attempt to load 'libmbrainSDK' based on 
+ *   hardware, the OS (CFMS) may attempt to load legacy native libraries based on 
  *   JNI signatures. This is a benign heuristic; the system correctly uses 
  *   'libjdHardware' (R212 Identity Swap).
  */
@@ -56,8 +59,8 @@ object JdHardwareManager {
                     n1(sharedStateBuffer)
                     isLibraryLoaded.set(true)
                     Timber.i("jdHardware: Native library loaded successfully.")
-                    // Issue #251: Audit log to confirm Identity Swap (R212)
-                    Timber.i("jdHardware: Identity Swap active. Legacy mbrainSDK signatures neutralized.")
+                    // Issue #251/310: Identity Swap (R212) - Strings neutralized for A15 CFMS.
+                    Timber.i("jdHardware: Identity Swap active. Legacy signatures neutralized.")
                     true
                 }
             } catch (e: TimeoutCancellationException) {

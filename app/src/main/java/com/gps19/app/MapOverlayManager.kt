@@ -6,8 +6,6 @@ import android.graphics.Paint
 import android.graphics.drawable.BitmapDrawable
 import android.view.HapticFeedbackConstants
 import android.widget.Toast
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.applyCanvas
 import androidx.core.graphics.drawable.toDrawable
@@ -17,12 +15,18 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.*
 import java.util.*
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 import kotlin.math.abs
 import kotlin.math.log10
 import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Aug.25.00:
+ * - Issue #309 Remediation: Replaced SnapshotStateList/Map with standard 
+ *   ArrayList/HashMap. These pools are imperative and used within AndroidView.update, 
+ *   eliminating Compose lock verification failures on A15 hardware (R309).
  * Aug.24.00:
  * - Issue #255 Hardening: Refactored pools to SnapshotStateList and SnapshotStateMap 
  *   to resolve Compose lock verification failures during high-frequency telemetry (R255).
@@ -60,12 +64,12 @@ class MapOverlayManager(
     private val replayMarker = Marker(mapView).apply { setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); setInfoWindow(null) }
     private val replayCircle = Polygon(mapView).apply { fillPaint.color = 0; outlinePaint.strokeWidth = 2f; setInfoWindow(null) }
 
-    // Pools: Issue #255 Refactored to SnapshotStateList
-    private val homeMarkerPool = mutableStateListOf<Marker>()
-    private val violationMarkerPool = mutableStateListOf<Marker>()
-    private val violationCirclePool = mutableStateListOf<Polygon>()
-    private val trackerPolylinePool = mutableStateListOf<Polyline>()
-    private val viewerPolylinePool = mutableStateListOf<Polyline>()
+    // Pools: Issue #309 Replaced SnapshotStateList with ArrayList
+    private val homeMarkerPool = ArrayList<Marker>()
+    private val violationMarkerPool = ArrayList<Marker>()
+    private val violationCirclePool = ArrayList<Polygon>()
+    private val trackerPolylinePool = ArrayList<Polyline>()
+    private val viewerPolylinePool = ArrayList<Polyline>()
 
     // Icons
     private val trackerIconFresh = createTrackerBitmap(density, true).toDrawable(resources)
@@ -76,8 +80,8 @@ class MapOverlayManager(
     private val geofenceIcon = createGeofenceViolationBitmap(density).toDrawable(resources)
     private val replayIcon = createReplayMarkerBitmap(density).toDrawable(resources)
     
-    // Issue #255 Refactored to SnapshotStateMap
-    private val homeIcons = mutableStateMapOf<Int, BitmapDrawable>()
+    // Issue #309 Replaced SnapshotStateMap with HashMap
+    private val homeIcons = HashMap<Int, BitmapDrawable>()
 
     // State Caches
     private var lastHomeRendered: List<GeoPoint>? = null

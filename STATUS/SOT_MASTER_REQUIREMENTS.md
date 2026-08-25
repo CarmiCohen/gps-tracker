@@ -7,7 +7,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.2 State Flow**: UI state must be exposed via `StateFlow` from ViewModels. `UiStateAggregator` is the central authority for consolidating telemetry and diagnostic flows (R240). Segmented hydration flows (R248) are required for budget hardware performance.
 *   **1.3 Foreground Persistence**: `TrackerService` must maintain a foreground notification. Termination of the service is a violation of SOT.
 *   **1.4 Navigation Continuity**: Navigation backstack must be managed to prevent redundant route injection or invalid pop operations. Explicit graph-relative `popUpTo` and `launchSingleTop` are required for all mode transitions (R250).
-*   **1.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized and documented as benign OS heuristics (Issue #251).
+*   **1.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (Issue #310).
 *   **1.6 Monotonic Authority (R307)**: All maintenance durations and health-check silence detections must prioritize monotonic references (`elapsedRealtime`) to prevent wall-clock corruption during reboots or system time jumps (Issue #307).
 
 ## 2. Forensic & Performance Requirements
@@ -17,15 +17,16 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **2.4 Native Watchdog**: All JNI/native calls must be wrapped in a watchdog timer (2000ms) on `Dispatchers.IO` to prevent hardware hangs (R301).
 *   **2.5 Shadow-Cache Stability**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` and optimized initial capacity to prevent race conditions and structural re-hashing during 100Hz bursts (R280).
 *   **2.6 Chunked Database Pruning**: All database pruning operations (Logs, Offline Status, connection history, violations, and trail points) must be chunked and staggered (R197).
-*   **2.7 Snapshot Isolation (R255)**: All imperative map overlay pools and caches must utilize `SnapshotStateList` and `SnapshotStateMap` to ensure thread-safe integration with the Compose snapshot system during high-frequency telemetry (Issue #255).
+*   **2.7 Imperative Map Isolation (R309)**: High-frequency map overlay pools and icon caches must use standard collections (`ArrayList`/`HashMap`) and be isolated from Compose `Snapshot` observation. Since these are updated imperatively via `AndroidView.update`, standard collections eliminate lock verification failures and frame skips on non-generational GCs (Issue #309).
 
 ## 3. Test & Validation Authority
 *   **3.1 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`) to verify alarm triggers under simulated stress (R196-V).
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.25.00**: Resolved Issue #309 (Imperative Map Isolation) and Issue #310 (Ghost Load Neutralization).
 *   **Aug.24.01**: Standardized Monotonic Authority (#307) for maintenance uptime logging.
-*   **Aug.24.00**: Resolved Issue #255 (Compose Lock Failure) via SnapshotState isolation.
+*   **Aug.24.00**: Resolved Issue #255 (Compose Lock Failure) via SnapshotState isolation. (Superseded by R309).
 *   **Aug.22.08**: Neutralized `mbrainSDK` Ghost Load false positives (Issue #251) and formalized Hardware Neutrality (R212).
 *   **Aug.22.04**: Hardened `ShadowCache` (R280) and verified Chapter 12.2 Database Stress stability. Standardized R197 chunked pruning for all high-frequency data tables.
 *   **Aug.22.03**: Aligned `OfflineRepository` with R197 chunked pruning standards (#197).

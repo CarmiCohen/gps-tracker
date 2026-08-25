@@ -1,6 +1,6 @@
-# Architectural Simplification Ideas (Aug.22.03)
+# Architectural Simplification Ideas (Aug.25.00)
 
-Following the implementation of UiStateAggregator, Forensic Validation Hooks, and JNI Watchdog hardening, here are remaining recommendations:
+Following the implementation of Imperative Map Isolation and Ghost Load Neutralization:
 
 ## 1. UI State Aggregation (Aug.21.08)
 - **Status**: ✅ **RESOLVED**. Extracted to `UiStateAggregator` (Issue #240).
@@ -41,3 +41,6 @@ Following the implementation of UiStateAggregator, Forensic Validation Hooks, an
 
 ## 13. Automated Permission Recovery (Aug.24.01)
 - **Idea #183**: The `PhoneSetupOverlay` requires manual intervention for critical settings (Battery/Overlay). Implement an "Auto-Fix" sequence that sequentially launches the fallback intents identified in `MainActivity.kt` to improve system readiness latency (Ref: Issue #309).
+
+## 14. Off-Thread Map Geometry (Aug.25.00)
+- **Idea #184**: Offload `CircleKey` quantization and `Polygon.pointsAsCircle` generation to a background worker. While R309 isolated the pools, pre-calculating complex geometry off the UI thread would further eliminate potential micro-stalls during 100Hz telemetry (Ref: Issue #309).
