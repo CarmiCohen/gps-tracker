@@ -4,6 +4,9 @@ import javax.inject.Inject
 
 /**
  * NavigationUseCase: Logic for handling UI navigation state transitions.
+ * Aug.25.01:
+ * - Issue #311: Fixed navigation regression by adding handler for SetPendingMode.
+ *   This ensures the app preserves the target mode during permission lifecycle interruptions.
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor.
  * v9.5.0:
@@ -23,6 +26,7 @@ class NavigationUseCase @Inject constructor() {
             is UiEvent.SetSubSettings -> nav.copy(activeSubSettings = event.sub)
             is UiEvent.ShowStopTrackingConfirmation -> nav.copy(isStopTrackingConfirmationVisible = event.show)
             is UiEvent.NavigateToDiagnostics -> nav.copy(isDiagnosticsVisible = event.visible)
+            is UiEvent.SetPendingMode -> nav.copy(pendingMode = event.mode)
             else -> nav
         }
     }

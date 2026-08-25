@@ -5,12 +5,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Aug.25.01:
+ * - Issue #311 Hardening: Added isManualSelectionInProgress and isSettlingActive 
+ *   to ensure navigation state survives activity destruction during permission flows.
  * Aug.22.05:
  * - Audit Chapter 12.3: Added isStorageSimulated and isStorageCriticalSimulated 
  *   to track storage pressure simulation state (R197).
- * Aug.21.07:
- * - Issue #196 Hardening: Added isForensicStallSimulated to support 
- *   urban multipath validation tracking in UI (R196-V).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -44,7 +44,9 @@ data class MainUiState(
     val isRecoveryPending: Boolean = false,
     val isForensicStallSimulated: Boolean = false,
     val isStorageSimulated: Boolean = false,
-    val isStorageCriticalSimulated: Boolean = false
+    val isStorageCriticalSimulated: Boolean = false,
+    val isManualSelectionInProgress: Boolean = false,
+    val isSettlingActive: Boolean = true
 ) {
     val isFullyHydrated: Boolean get() = hydrationLevel >= 3
 

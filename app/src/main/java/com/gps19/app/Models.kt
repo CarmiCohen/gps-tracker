@@ -10,6 +10,8 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.25.01:
+ * - Issue #311 Hardening: Added SetManualSelection and SetSettlingActive events.
  * Aug.22.05:
  * - Audit Chapter 12.3: Restored ViolationPoint and MapTrailSegment to resolve 
  *   unresolved reference errors. Added storage simulation events (R197).
@@ -682,6 +684,8 @@ sealed class UiEvent {
     data class SetForensicSimulation(val active: Boolean) : UiEvent()
     object ExecuteStressTest : UiEvent()
     data class SetStorageSimulation(val active: Boolean, val isCritical: Boolean) : UiEvent()
+    data class SetManualSelection(val active: Boolean) : UiEvent()
+    data class SetSettlingActive(val active: Boolean) : UiEvent()
 }
 
 sealed class UiCommand {

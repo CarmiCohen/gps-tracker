@@ -45,6 +45,10 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Aug.25.01:
+ * - Issue #311 Hardening: Migrated isManualSelectionInProgress and isSettlingActive 
+ *   to MainUiState to ensure navigation state survives Activity destruction during 
+ *   Samsung A15 permission flows.
  * Aug.22.05:
  * - Audit Chapter 12.3: Connected Storage Pressure simulation state to 
  *   DiagnosticsScreen for storage prioritization audit (R197).
@@ -89,13 +93,11 @@ fun MainAppContent(
     }
 
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
-    var isManualSelectionInProgress by remember { mutableStateOf(false) }
-    var isSettlingActive by remember { mutableStateOf(true) }
     val startupTime = remember { System.currentTimeMillis() }
 
     fun proceedToMode(mode: String) {
-        isManualSelectionInProgress = true
-        isSettlingActive = false
+        viewModel.onEvent(UiEvent.SetManualSelection(true))
+        viewModel.onEvent(UiEvent.SetSettlingActive(false))
         viewModel.onEvent(UiEvent.SetAppMode(mode))
         
         val elapsed = System.currentTimeMillis() - startupTime
@@ -122,7 +124,7 @@ fun MainAppContent(
                 viewModel.onEvent(UiEvent.SetPendingMode(null))
             }
         } else {
-            isManualSelectionInProgress = false
+            viewModel.onEvent(UiEvent.SetManualSelection(false))
             Toast.makeText(activity, context.getString(R.string.perm_background_denied_toast), Toast.LENGTH_LONG).show()
         }
     }
@@ -140,7 +142,7 @@ fun MainAppContent(
                 }
             }
         } else {
-            isManualSelectionInProgress = false
+            viewModel.onEvent(UiEvent.SetManualSelection(false))
             uiState.navigation.pendingMode?.let { mode ->
                 proceedToMode(mode)
                 viewModel.onEvent(UiEvent.SetPendingMode(null))
@@ -174,7 +176,7 @@ fun MainAppContent(
         return fineLocation && audio && notification && activityRec
     }
 
-    LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible, isManualSelectionInProgress, isSettlingActive) {
+    LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible, uiState.isManualSelectionInProgress, uiState.isSettlingActive) {
         if (!uiState.isInitialized) return@LaunchedEffect
         
         val mode = uiState.appMode
@@ -189,11 +191,11 @@ fun MainAppContent(
             return@LaunchedEffect
         }
 
-        if (mode != null && isSettlingActive && !isManualSelectionInProgress) {
+        if (mode != null && uiState.isSettlingActive && !uiState.isManualSelectionInProgress) {
             if (navController.currentDestination?.route == Screen.Landing.route) {
                 Timber.d("Issue #243: Deferring restoration navigation for ${STARTUP_SETTLING_DELAY_MS}ms settling")
                 delay(STARTUP_SETTLING_DELAY_MS)
-                isSettlingActive = false
+                viewModel.onEvent(UiEvent.SetSettlingActive(false))
                 
                 if (hasRequiredPermissions(mode)) {
                     onStartService(mode)
@@ -204,7 +206,7 @@ fun MainAppContent(
             }
         }
 
-        if (isSettlingActive && mode != null) return@LaunchedEffect
+        if (uiState.isSettlingActive && mode != null) return@LaunchedEffect
 
         when (mode) {
             "tracker" -> {
@@ -225,7 +227,7 @@ fun MainAppContent(
             }
             null -> {
                 if (uiState.navigation.pendingMode == null) {
-                    isManualSelectionInProgress = false
+                    viewModel.onEvent(UiEvent.SetManualSelection(false))
                 }
                 if (navController.currentDestination?.route != Screen.Landing.route) {
                     navController.navigate(Screen.Landing.route) { 
@@ -258,7 +260,7 @@ fun MainAppContent(
 
     if (showBackgroundDisclosure) {
         AlertDialog(
-            onDismissRequest = { showBackgroundDisclosure = false; isManualSelectionInProgress = false },
+            onDismissRequest = { showBackgroundDisclosure = false; viewModel.onEvent(UiEvent.SetManualSelection(false)) },
             title = { Text(stringResource(R.string.perm_background_title)) },
             text = { Text(stringResource(R.string.perm_background_desc)) },
             confirmButton = {
@@ -272,7 +274,7 @@ fun MainAppContent(
             dismissButton = { 
                 Button(onClick = { 
                     showBackgroundDisclosure = false
-                    isManualSelectionInProgress = false
+                    viewModel.onEvent(UiEvent.SetManualSelection(false))
                     uiState.navigation.pendingMode?.let { proceedToMode(it) }
                     viewModel.onEvent(UiEvent.SetPendingMode(null))
                 }) { Text(stringResource(R.string.perm_background_btn_reject)) } 

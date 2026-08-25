@@ -36,6 +36,9 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.25.01:
+ * - Issue #311: Fixed navigation regression by handling SetPendingMode, 
+ *   SetManualSelection, and SetSettlingActive.
  * Aug.22.05:
  * - Audit Chapter 12.3: Added SetStorageSimulation handling to onEvent (R197).
  * Aug.22.04:
@@ -431,7 +434,7 @@ class MainViewModel @Inject constructor(
             is UiEvent.ToggleMap, is UiEvent.ToggleLog, is UiEvent.ToggleSettings, 
             is UiEvent.TogglePhoneSetup, is UiEvent.ToggleRibbons, is UiEvent.SetDashboardExpanded,
             is UiEvent.ToggleGnssDetail, is UiEvent.SetSubSettings, is UiEvent.ShowStopTrackingConfirmation,
-            is UiEvent.NavigateToDiagnostics -> {
+            is UiEvent.NavigateToDiagnostics, is UiEvent.SetPendingMode -> {
                 if (event is UiEvent.ToggleSettings) {
                     if (event.visible) updateState { it.copy(draftSettings = settingsUseCase.prepareDraft(it)) }
                     else commitDraft()
@@ -454,7 +457,7 @@ class MainViewModel @Inject constructor(
                     updateState { it.copy(appMode = event.mode, appStartTime = newStartTime ?: it.appStartTime) }
                 }
             }
-            is UiEvent.LogAction -> addPersistentLog(event.type, event.message, event.isImportant, event.isSpecial, event.specialColor)
+            is UiEvent.LogAction -> addPersistentLog(event.type, message = event.message, isImportant = event.isImportant, isSpecial = event.isSpecial, specialColor = event.specialColor)
             is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
                 systemStatusProvider.getPermissionState(forceRefresh = true)
             }
@@ -471,6 +474,8 @@ class MainViewModel @Inject constructor(
             is UiEvent.SetStorageSimulation -> {
                 repository.sendCommand(UiCommand.SimulateStoragePressure(event.active, event.isCritical))
             }
+            is UiEvent.SetManualSelection -> updateState { it.copy(isManualSelectionInProgress = event.active) }
+            is UiEvent.SetSettlingActive -> updateState { it.copy(isSettlingActive = event.active) }
             else -> {}
         }
     }
