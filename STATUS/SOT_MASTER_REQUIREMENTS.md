@@ -27,6 +27,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.25.02**: Resolved Issue #316 (Shadow-Cache LRU Documentation Gap). Verified R280 logic via unit tests in `ShadowCacheTest.kt`.
 *   **Aug.25.01**: Resolved Issue #315 (Immediate Signal Loss False Positive). Implemented GPS_WARMUP_GRACE_MS (30s) in `MainAlarmLogic` (R315).
 *   **Aug.25.00**: Resolved Issue #314 (Startup Davey Stall). Implemented Staggered Hydration (R314) with A15-specific observation offsets.
 *   **Aug.25.04**: Resolved Issue #312 (Compose Lock Verification). Verified SM-A155F deployment. Identified Issue #314 (Startup Davey), Issue #315 (GPS Settling), and formalized R280/LRU Cache (Issue #721).

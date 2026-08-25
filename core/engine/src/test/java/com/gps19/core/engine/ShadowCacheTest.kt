@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -52,5 +53,25 @@ class ShadowCacheTest {
         jobs.forEach { it.join() }
         
         assert(cache.size() <= 5)
+    }
+
+    @Test
+    fun testLruEvictionOrder() {
+        val cache = ShadowCache<Int, String>(3)
+        
+        cache.put(1, "A")
+        cache.put(2, "B")
+        cache.put(3, "C")
+        
+        // Access 1 to move it to the end (most recent)
+        cache.get(1)
+        
+        // Add 4, should evict 2 (least recently used)
+        cache.put(4, "D")
+        
+        assertEquals("A", cache.get(1))
+        assertNull(cache.get(2))
+        assertEquals("C", cache.get(3))
+        assertEquals("D", cache.get(4))
     }
 }

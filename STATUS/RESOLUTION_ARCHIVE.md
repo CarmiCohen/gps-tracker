@@ -2,7 +2,13 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 716**
+**Total Unique Resolutions: 717**
+
+## 111. Shadow-Cache LRU & Forensic Hardening (Aug.25.02)
+*   **Issue #316: Shadow-Cache LRU Documentation Gap (#721)**.
+    - **Resolution**: Formalized R280 logic for `ShadowCache` and verified LRU eviction strategy.
+    - **Action**: Verified `ShadowCache.kt` implementation of `accessOrder = true` via `LinkedHashMap`. Added `testLruEvictionOrder` to `ShadowCacheTest.kt` to ensure Least Recently Used entries are evicted first under capacity pressure. Updated `SOT_MASTER_REQUIREMENTS.md` to formalize Issue #721 as R280.
+    - **Result**: Shadow-Cache stability is now formally documented and verified, preventing race conditions and ensuring deterministic resource cleanup during high-frequency bursts.
 
 ## 110. GPS Stabilization & Warm-up Hardening (Aug.25.01)
 *   **Issue #315: Immediate Signal Loss False Positive**.
