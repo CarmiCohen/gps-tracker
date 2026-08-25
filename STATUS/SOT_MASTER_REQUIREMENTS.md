@@ -15,23 +15,22 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **2.2 Reliability Threshold**: `ALERT_ID_PERFORMANCE_SPIKE` must trigger if `forensicReliability` (EMA) drops below 0.85 for >30s (R715).
 *   **2.3 UI Fluidity**: UI stalls (Davey) must not exceed 700ms on target hardware (SM-A155F).
 *   **2.4 Native Watchdog**: All JNI/native calls must be wrapped in a watchdog timer (2000ms) on `Dispatchers.IO` to prevent hardware hangs (R301).
-*   **2.5 Shadow-Cache Stability**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` and optimized initial capacity to prevent race conditions and structural re-hashing during 100Hz bursts (R280).
+*   **2.5 Shadow-Cache Stability (R280)**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` and optimized initial capacity to prevent race conditions. All caches must implement an LRU strategy for long-term stability (Issue #721).
 *   **2.6 Chunked Database Pruning**: All database pruning operations (Logs, Offline Status, connection history, violations, and trail points) must be chunked and staggered (R197).
 *   **2.7 Imperative Map Isolation (R309)**: High-frequency map overlay pools and icon caches must use standard collections (`ArrayList`/`HashMap`) and be isolated from Compose `Snapshot` observation. Since these are updated imperatively via `AndroidView.update`, standard collections eliminate lock verification failures and frame skips on non-generational GCs (Issue #309).
 *   **2.8 Snap-Isolation Throttling (R312)**: High-frequency telemetry flows (Logs, Trails, Violations, History) must utilize Snap-Isolation via deep-parity throttling (`contentEquals` + `distinctUntilChanged`). This prevents the Compose Recomposer from performing redundant snapshot reconciliation cycles, eliminating lock verification failures and thread synchronization contention on Samsung hardware (Issue #312).
+*   **2.9 Staggered Hydration & Observation (R314)**: To prevent Davey stalls during app launch, ViewModel initialization must be staggered. Base observations must start immediately, while heavy telemetry and list-based flows must be delayed by at least 500ms or until the first frame is rendered (Issue #314).
+*   **2.10 GPS Warm-up Grace Period (R315)**: Signal loss and accuracy violations must be suppressed for the first 30 seconds after system activation or mode transition to allow GPS provider stabilization (Issue #315).
 
 ## 3. Test & Validation Authority
 *   **3.1 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`) to verify alarm triggers under simulated stress (R196-V).
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
-*   **Aug.25.04**: Resolved Issue #312 (Compose Lock Verification) via Snap-Isolation hardening in `MainViewModel`.
+*   **Aug.25.04**: Resolved Issue #312 (Compose Lock Verification). Verified SM-A155F deployment. Identified Issue #314 (Startup Davey), Issue #315 (GPS Settling), and formalized R280/LRU Cache (Issue #721).
 *   **Aug.25.01**: Verified SM-G990E (S21 FE) hardware compatibility. Identified Issue #312 (Persistent Compose Lock warnings) and Issue #313 (A15 Detection Failure) during multi-device deployment.
 *   **Aug.25.00**: Resolved Issue #309 (Imperative Map Isolation) and Issue #310 (Ghost Load Neutralization).
 *   **Aug.24.01**: Standardized Monotonic Authority (#307) for maintenance uptime logging.
 *   **Aug.24.00**: Resolved Issue #255 (Compose Lock Failure) via SnapshotState isolation. (Superseded by R309).
 *   **Aug.22.08**: Neutralized `mbrainSDK` Ghost Load false positives (Issue #251) and formalized Hardware Neutrality (R212).
 *   **Aug.22.04**: Hardened `ShadowCache` (R280) and verified Chapter 12.2 Database Stress stability. Standardized R197 chunked pruning for all high-frequency data tables.
-*   **Aug.22.03**: Aligned `OfflineRepository` with R197 chunked pruning standards (#197).
-*   **Aug.22.02**: Restored Core Engine Definitions (#308).
-*   **Aug.22.00**: Hardened Navigation Backstack logic (#250) and implemented JNI Watchdog (R301).

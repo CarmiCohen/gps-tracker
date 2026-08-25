@@ -5,20 +5,25 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟡 HARDENING | 49 |
+| **Open Technical Issues** | 🟡 HARDENING | 52 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
 | **Resolved (Total)** | 🟢 Progress | 714 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Issue #313: Device Detection Failure**: The deployment tool fails to recognize the SM-A155F (A15) despite it being connected, preventing multi-device connection testing in the current environment.
-*   **Samsung Setup Blockers (A15 & S21 FE)**: Deployment on SM-A155F and SM-G990E identifies "Unrestricted" battery mode and "Appear on Top" permissions as hard blockers for system readiness.
+*   **Issue #314: Startup UI Stall (Davey)**: Initialization sequence triggers a 1.5s UI stall on A15 hardware. Need to further offload `init` blocks and stagger heavy observations (R314).
+*   **Issue #315: Immediate Signal Loss False Positive**: Alarm triggers before GPS provider stabilization. A 30s "settling" grace period is required (R315).
+*   **Issue #316: Shadow-Cache LRU Trace (#721)**: Logcat confirms existence of `Issue #721` hardening logic which was missing from documentation. Formalized as R280.
+*   **Samsung Setup Blockers (A15 & S21 FE)**: Deployment on SM-A155F identifies "Unrestricted" battery mode and "Appear on Top" permissions as hard blockers.
 
 ---
 
 ## 🔴 Open Issues
 *   **Issue #313**: **Multi-Device Deployment Failure**. (A15 Detection)
+*   **Issue #314**: **Startup UI Stall (Davey)**.
+*   **Issue #315**: **Immediate Signal Loss False Positive**.
+*   **Issue #316**: **Shadow-Cache LRU Documentation Gap (#721)**.
 
 ---
 

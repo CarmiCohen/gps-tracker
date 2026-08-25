@@ -186,8 +186,8 @@ class ConnectionPoint(
         maxAccuracy = 0.0; isTick = false; hasGps = false; isBatterySteepDischarge = false
         isCoolingModeActive = false; isBatteryLow = false; isBatteryCritical = false
         speed = 0.0; bearing = 0.0; currentMa = 0; status = SentinelStatus.VALID
-        locationPendingReason = LocationPendingReason.NONE; gpsIndex = 0.0; snrIdx = 0.0
-        noiseIdx = 0.0; luxIdx = 0.0; vibeIdx = 0.0; proxIdx = 1.0; liftIdx = 0.0
+        locationPendingReason = LocationPendingReason.NONE; gpsIndex = 0.0
+        snrIdx = 0.0; noiseIdx = 0.0; luxIdx = 0.0; vibeIdx = 0.0; proxIdx = 1.0; liftIdx = 0.0
         tiltIdx = 0.0; baroIdx = 0.0; isSitDetected = false; isSitActive = false
         sitVz = 0.0; sitVzTs = 0L; sitVzRt = 0L; sitDz = 0.0; sitBaro = 0.0; sitTilt = 0.0
         sitShock = 0.0; kineticEnergy = 0.0; cpuLoad = 0.0; ioWait = 0.0; maxIoLatency = 0L
@@ -723,7 +723,7 @@ sealed class UiEvent {
     data class SetRecoveryPending(val pending: Boolean) : UiEvent()
     data class SetReplayCursor(val ts: Long?) : UiEvent()
     data class SetForensicSimulation(val active: Boolean) : UiEvent()
-    object ExecuteStressTest : UiCommand() // Fix: Exec Stress Test should be UiCommand but here it's listed under events
+    object ExecuteStressTest : UiEvent()
     data class SetStorageSimulation(val active: Boolean, val isCritical: Boolean) : UiEvent()
     data class SetManualSelection(val active: Boolean) : UiEvent()
     data class SetSettlingActive(val active: Boolean) : UiEvent()

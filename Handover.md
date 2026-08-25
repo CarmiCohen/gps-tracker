@@ -1,32 +1,32 @@
-# Handover (Aug.25.04) - Snap-Isolation Hardening & Lock Contention Resolution
+# Handover (Aug.25.04) - Post-Deployment Audit & A15 Hardening
 
 ## 🎯 Current Status
-- **Goal**: Resolve Issue #312 (Persistent Lock Verification Failures).
-- **Status**: 🟢 **RESOLVED**
+- **Goal**: Verify Snap-Isolation and Audit SM-A155F Performance.
+- **Status**: 🟡 **HARDENING**
 - **Version**: `Aug.25.04`
 - **Database**: v73
-- **Audit Baseline**: SOT: 164, Resolved: 714, Open: 49, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 186, QA Status: 189.
+- **Audit Baseline**: SOT: 166, Resolved: 714, Open: 52, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 187, QA Status: 189.
 
-## 🧬 Forensic Audit Summary: Issue #312
-- **Root Cause**: High-frequency emission of large immutable lists (Logs, Trails, History) via `StateFlow` was triggering excessive Compose snapshot reconciliation on Samsung hardware (SM-G990E/A15). The Recomposer's attempt to sync these lists at >1Hz caused lock contention in the snapshot system.
-- **Remediation (Snap-Isolation)**: 
-  - Implemented `contentEquals` deep-parity utilities in `Models.kt` for `TrailPoint`, `LogEntry`, `ViolationPoint`, and `ConnectionPoint`.
-  - Hardened `MainViewModel.kt` with `distinctUntilChanged` using these parity checks to suppress redundant emissions.
-  - Decoupled high-frequency `systemPulse` from list aggregation to minimize recomposition work.
-- **Result**: Lock verification failures eliminated; UI fluidity restored on Samsung hardware.
+## 🧬 Forensic Audit Summary: Aug.25.04 Deployment
+- **Verification**: Snap-Isolation (Issue #312) successfully eliminated lock verification failures on A15/S21 hardware. UI parity for telemetry flows confirmed.
+- **Regression #314 (Davey)**: 1.5s UI stall detected during startup on A15. Staggered hydration (R314) is now required.
+- **Regression #315 (Signal False Positive)**: Alarm triggered during GPS stabilization. A 30s grace period (R315) is required.
+- **Issue #316 (Shadow-Cache)**: LRU strategy implemented (Issue #721) was undocumented. Formalized in R280.
+- **Setup Blockers**: Identified Battery Unrestricted and Overlay permissions as critical blockers for system readiness on Samsung firmware.
 
 ## 🛠️ Infrastructure Status
-- **Requirement 2.8**: Formally established Snap-Isolation as the standard for high-frequency list aggregation in `SOT_MASTER_REQUIREMENTS.md`.
-- **Simplification**: Added Idea #186 (Delta-Log emissions) to further optimize forensic log rendering.
+- **Requirement 2.9**: Staggered Hydration (R314) formally established in `SOT_MASTER_REQUIREMENTS.md`.
+- **Requirement 2.10**: GPS Warm-up Grace Period (R315) formally established in `SOT_MASTER_REQUIREMENTS.md`.
+- **Simplification**: Added Idea #187 (Delayed Telemetry Subscription) to remediate startup stalls.
 
 ## 🚀 Git Release Block
 ```bash
 git add .
-git commit -m "Snap-Isolation: Resolved Issue #312 (Lock Contention) via deep-parity flow throttling - vAug.25.04"
-git tag -a vAug.25.04 -m "Release Aug.25.04: Snap-Isolation Hardening for Samsung Hardware"
+git commit -m "Deployment Audit: Verified Snap-Isolation; Identified Issue #314 (Davey) and Issue #315 (GPS Grace) - vAug.25.04"
+git tag -a vAug.25.04-audit -m "Audit Aug.25.04: Performance & Alarm Baseline for Samsung Hardware"
 git push origin main --tags
 ```
 
-Current Audit Baseline: SOT: 164, Resolved: 714, Open: 49, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 186, QA Status: 189.
+Current Audit Baseline: SOT: 166, Resolved: 714, Open: 52, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 187, QA Status: 189.
 
 vAug.25.04
