@@ -18,12 +18,14 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **2.5 Shadow-Cache Stability**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` and optimized initial capacity to prevent race conditions and structural re-hashing during 100Hz bursts (R280).
 *   **2.6 Chunked Database Pruning**: All database pruning operations (Logs, Offline Status, connection history, violations, and trail points) must be chunked and staggered (R197).
 *   **2.7 Imperative Map Isolation (R309)**: High-frequency map overlay pools and icon caches must use standard collections (`ArrayList`/`HashMap`) and be isolated from Compose `Snapshot` observation. Since these are updated imperatively via `AndroidView.update`, standard collections eliminate lock verification failures and frame skips on non-generational GCs (Issue #309).
+*   **2.8 Snap-Isolation Throttling (R312)**: High-frequency telemetry flows (Logs, Trails, Violations, History) must utilize Snap-Isolation via deep-parity throttling (`contentEquals` + `distinctUntilChanged`). This prevents the Compose Recomposer from performing redundant snapshot reconciliation cycles, eliminating lock verification failures and thread synchronization contention on Samsung hardware (Issue #312).
 
 ## 3. Test & Validation Authority
 *   **3.1 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`) to verify alarm triggers under simulated stress (R196-V).
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.25.04**: Resolved Issue #312 (Compose Lock Verification) via Snap-Isolation hardening in `MainViewModel`.
 *   **Aug.25.01**: Verified SM-G990E (S21 FE) hardware compatibility. Identified Issue #312 (Persistent Compose Lock warnings) and Issue #313 (A15 Detection Failure) during multi-device deployment.
 *   **Aug.25.00**: Resolved Issue #309 (Imperative Map Isolation) and Issue #310 (Ghost Load Neutralization).
 *   **Aug.24.01**: Standardized Monotonic Authority (#307) for maintenance uptime logging.

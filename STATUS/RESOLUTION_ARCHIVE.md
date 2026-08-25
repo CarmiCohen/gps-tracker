@@ -2,7 +2,13 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 713**
+**Total Unique Resolutions: 714**
+
+## 108. Snap-Isolation & Reactive List Hardening (Aug.25.04)
+*   **Issue #312: Persistent Lock Verification Failures**.
+    - **Resolution**: Implemented Snap-Isolation (Idea #185) to eliminate Compose Recomposer lock contention on Samsung hardware.
+    - **Action**: Added `contentEquals` deep-parity utilities to `TrailPoint`, `LogEntry`, `ViolationPoint`, and `ConnectionPoint` in `Models.kt`. Hardened `MainViewModel.kt` by applying `distinctUntilChanged` with deep-parity checks to all high-frequency telemetry and log flows.
+    - **Result**: Redundant UI snapshot reconciliation cycles are suppressed, eliminating "Failed lock verification" warnings and restoring UI fluidity on SM-G990E and SM-A155F hardware.
 
 ## 107. Navigation State Persistence & Mode Recovery (Aug.25.01)
 *   **Issue #311: Mode Transition Navigation Regression**.

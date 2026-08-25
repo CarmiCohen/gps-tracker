@@ -36,15 +36,14 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.25.04:
+ * - Issue #312 Remediation: Implemented Snap-Isolation (Idea #185). Added 
+ *   listContentEquals and deep-parity distinctUntilChanged to high-frequency 
+ *   flows (Logs, Trails, Violations, History) to eliminate lock verification 
+ *   failures on Samsung A15/S21 hardware (R312).
  * Aug.25.01:
  * - Issue #311: Fixed navigation regression by handling SetPendingMode, 
  *   SetManualSelection, and SetSettlingActive.
- * Aug.22.05:
- * - Audit Chapter 12.3: Added SetStorageSimulation handling to onEvent (R197).
- * Aug.22.04:
- * - Issue #140 Restoration Build Fix: Restored violationPointsFlow, historyFlows, 
- *   activeGnssDetail and maintenance methods (clearTrails, fullInitialization) 
- *   to resolve UI compilation failures.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -155,6 +154,7 @@ class MainViewModel @Inject constructor(
     ) { conn, tel, health ->
         DashboardState(conn, tel, health)
     }
+    .distinctUntilChanged()
     .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
 
@@ -201,8 +201,20 @@ class MainViewModel @Inject constructor(
     ) { conn, tel, health ->
         HudState(conn, tel, health)
     }
+    .distinctUntilChanged()
     .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState())
+
+    // Snap-Isolation: Deep parity check for list-based flows (R312)
+    private fun <T> listContentEquals(a: List<T>?, b: List<T>?, itemCompare: (T, T) -> Boolean): Boolean {
+        if (a === b) return true
+        if (a == null || b == null) return false
+        if (a.size != b.size) return false
+        for (i in a.indices) {
+            if (!itemCompare(a[i], b[i])) return false
+        }
+        return true
+    }
 
     // Logic and Event Handlers
     val eventLogsFlow: StateFlow<List<LogEntry>> = combine(
@@ -216,28 +228,50 @@ class MainViewModel @Inject constructor(
             repository.eventLogsFlow(limit)
         } else flowOf(emptyList()) 
     }
+    .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
     .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val trackerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
         .flatMapLatest { mode -> if (mode != null) repository.trackerTrailFlow else flowOf(emptyList()) }
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
         .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val viewerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
         .flatMapLatest { mode -> if (mode != null) repository.viewerTrailFlow else flowOf(emptyList()) }
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
         .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val violationPointsFlow: Flow<List<ViolationPoint>> = repository.violationsFlow
+    val violationPointsFlow: StateFlow<List<ViolationPoint>> = repository.violationsFlow
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Forensic Ribbon Flows
-    val history4MFlow = repository.getHistoryFlow("4M").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    val history16MFlow = repository.getHistoryFlow("16M").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    val history1HFlow = repository.getHistoryFlow("1H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    val history4HFlow = repository.getHistoryFlow("4H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    val history24HFlow = repository.getHistoryFlow("24H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    val history7DFlow = repository.getHistoryFlow("7D").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    // Forensic Ribbon Flows with Snap-Isolation Parity (R312)
+    val history4MFlow = repository.getHistoryFlow("4M")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        
+    val history16MFlow = repository.getHistoryFlow("16M")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        
+    val history1HFlow = repository.getHistoryFlow("1H")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        
+    val history4HFlow = repository.getHistoryFlow("4H")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        
+    val history24HFlow = repository.getHistoryFlow("24H")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        
+    val history7DFlow = repository.getHistoryFlow("7D")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val activeGnssDetail: StateFlow<GnssDetail?> = repository.gnssDetail
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)

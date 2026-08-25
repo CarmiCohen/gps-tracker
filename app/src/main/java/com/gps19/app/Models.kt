@@ -10,11 +10,14 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.25.04:
+ * - Issue #312 Hardening: Added contentEquals extensions for ViolationPoint 
+ *   and ConnectionPoint to complete Snap-Isolation implementation.
+ * Aug.25.03:
+ * - Issue #312 Hardening: Added contentEquals extensions for LogEntry and TrailPoint 
+ *   to support Snap-Isolation aggregation in MainViewModel.
  * Aug.25.01:
  * - Issue #311 Hardening: Added SetManualSelection and SetSettlingActive events.
- * Aug.22.05:
- * - Audit Chapter 12.3: Restored ViolationPoint and MapTrailSegment to resolve 
- *   unresolved reference errors. Added storage simulation events (R197).
  */
 
 sealed class AppSensorEvent {
@@ -49,6 +52,14 @@ data class TrailPoint(
         val newPoint = GeoPoint(lat, lng)
         _cachedGeoPoint = newPoint
         return newPoint
+    }
+
+    /**
+     * contentEquals: Deep parity check to prevent redundant UI snapshot updates (R312).
+     */
+    fun contentEquals(other: TrailPoint): Boolean {
+        return lat == other.lat && lng == other.lng && status == other.status && 
+               accuracy == other.accuracy && maxAccuracy == other.maxAccuracy
     }
 }
 
@@ -157,6 +168,18 @@ class ConnectionPoint(
         this.ioWait = other.ioWait; this.maxIoLatency = other.maxIoLatency; this.isSilentFailure = other.isSilentFailure
     }
 
+    /**
+     * contentEquals: Deep parity check for history ribbon points (R312).
+     */
+    fun contentEquals(other: ConnectionPoint): Boolean {
+        return ts == other.ts && rtt == other.rtt && remoteSig == other.remoteSig && 
+               isConnected == other.isConnected && isGap == other.isGap && 
+               isRecoveryEvent == other.isRecoveryEvent && hasGps == other.hasGps &&
+               gpsIndex == other.gpsIndex && snrIdx == other.snrIdx && vibeIdx == other.vibeIdx &&
+               luxIdx == other.luxIdx && noiseIdx == other.noiseIdx && liftIdx == other.liftIdx &&
+               tiltIdx == other.tiltIdx && baroIdx == other.baroIdx && isSitActive == other.isSitActive
+    }
+
     fun reset() {
         localId = ""; ts = 0; rt = 0; rtt = 0; localSig = 10; remoteSig = 0
         isConnected = false; isGap = false; isRecoveryEvent = false; gpsAccuracy = 0.0
@@ -194,6 +217,13 @@ class ViolationPoint(
         this.localId = other.localId; this.lat = other.lat; this.lng = other.lng; this.type = other.type
         this.ts = other.ts; this.accuracy = other.accuracy; this.maxAccuracy = other.maxAccuracy
     }
+
+    /**
+     * contentEquals: Deep parity check for map violation points (R312).
+     */
+    fun contentEquals(other: ViolationPoint): Boolean {
+        return lat == other.lat && lng == other.lng && type == other.type && ts == other.ts
+    }
 }
 
 @Serializable
@@ -219,6 +249,14 @@ data class LogEntry(
     val battSnapshot: Int? = null,
     val chargingSnapshot: Boolean? = null
 ) {
+    /**
+     * contentEquals: Deep parity check to suppress redundant Logcat/UI noise (R312).
+     */
+    fun contentEquals(other: LogEntry): Boolean {
+        return timestamp == other.timestamp && message == other.message && 
+               count == other.count && durationMs == other.durationMs
+    }
+
     fun toJSONObject(): JSONObject {
         return JSONObject().apply {
             put("localId", localId); put("timestamp", timestamp)

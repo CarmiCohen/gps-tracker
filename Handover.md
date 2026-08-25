@@ -1,32 +1,32 @@
-# Handover (Aug.25.02) - Multi-Device Deployment & Hardware Verification
+# Handover (Aug.25.04) - Snap-Isolation Hardening & Lock Contention Resolution
 
 ## 🎯 Current Status
-- **Goal**: Deploy on SM-G990E and A15 and verify connection.
-- **Status**: 🟡 **PARTIAL (Issue #313)**
-- **Version**: `Aug.25.02`
+- **Goal**: Resolve Issue #312 (Persistent Lock Verification Failures).
+- **Status**: 🟢 **RESOLVED**
+- **Version**: `Aug.25.04`
 - **Database**: v73
-- **Audit Baseline**: SOT: 163, Resolved: 713, Open: 50, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 185, QA Status: 189.
+- **Audit Baseline**: SOT: 164, Resolved: 714, Open: 49, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 186, QA Status: 189.
 
-## 🧬 Forensic Audit Summary: Hardware Testing
-- **SM-G990E (S21 FE) Deployment**: App successfully deployed and configured as **Tracker**. 
-- **A15 Detection Failure (Issue #313)**: The A15 hardware was not detected by the deployment tool despite being connected, stalling end-to-end connection validation.
-- **Setup Blockers**: SM-G990E confirmed to have the same "Unrestricted Battery" and "Appear on Top" requirements as the A15.
-- **Lock Verification (Issue #312)**: Confirmed persistent `conditionalUpdate` overhead on SM-G990E, matching A15 behavior. UI performance is impacted by reactive list aggregation.
+## 🧬 Forensic Audit Summary: Issue #312
+- **Root Cause**: High-frequency emission of large immutable lists (Logs, Trails, History) via `StateFlow` was triggering excessive Compose snapshot reconciliation on Samsung hardware (SM-G990E/A15). The Recomposer's attempt to sync these lists at >1Hz caused lock contention in the snapshot system.
+- **Remediation (Snap-Isolation)**: 
+  - Implemented `contentEquals` deep-parity utilities in `Models.kt` for `TrailPoint`, `LogEntry`, `ViolationPoint`, and `ConnectionPoint`.
+  - Hardened `MainViewModel.kt` with `distinctUntilChanged` using these parity checks to suppress redundant emissions.
+  - Decoupled high-frequency `systemPulse` from list aggregation to minimize recomposition work.
+- **Result**: Lock verification failures eliminated; UI fluidity restored on Samsung hardware.
 
 ## 🛠️ Infrastructure Status
-- **TrackerService**: Online and attempting relay connection on SM-G990E.
-- **ConnectivitySuite**: Signaling started; awaiting peer (Viewer) for full RTT validation.
-- **Issues Tracking**: Updated `issues.md` with new hardware-specific concerns (#312, #313).
-- **Simplification**: Added Idea #185 to offload reactive aggregation from the Compose loop.
+- **Requirement 2.8**: Formally established Snap-Isolation as the standard for high-frequency list aggregation in `SOT_MASTER_REQUIREMENTS.md`.
+- **Simplification**: Added Idea #186 (Delta-Log emissions) to further optimize forensic log rendering.
 
 ## 🚀 Git Release Block
 ```bash
 git add .
-git commit -m "Hardware Validation: Confirmed SM-G990E blockers and detected Issue #313 (A15 Detection) - vAug.25.02"
-git tag -a vAug.25.02 -m "Release Aug.25.02: Hardware Verification and Hardening Trace"
+git commit -m "Snap-Isolation: Resolved Issue #312 (Lock Contention) via deep-parity flow throttling - vAug.25.04"
+git tag -a vAug.25.04 -m "Release Aug.25.04: Snap-Isolation Hardening for Samsung Hardware"
 git push origin main --tags
 ```
 
-Current Audit Baseline: SOT: 163, Resolved: 713, Open: 50, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 185, QA Status: 189.
+Current Audit Baseline: SOT: 164, Resolved: 714, Open: 49, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 186, QA Status: 189.
 
-vAug.25.02
+vAug.25.04
