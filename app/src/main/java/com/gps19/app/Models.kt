@@ -11,11 +11,11 @@ import java.util.*
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
  * Aug.25.04:
- * - Issue #312 Hardening: Added contentEquals extensions for ViolationPoint 
- *   and ConnectionPoint to complete Snap-Isolation implementation.
+ * - Issue #312 Hardening: Refined contentEquals for LogEntry and ViolationPoint 
+ *   to ensure full UI parity (coordinates, snapshots, and accuracy) (R312).
  * Aug.25.03:
- * - Issue #312 Hardening: Added contentEquals extensions for LogEntry and TrailPoint 
- *   to support Snap-Isolation aggregation in MainViewModel.
+ * - Issue #312 Hardening: Added contentEquals extensions for LogEntry, TrailPoint, 
+ *   ViolationPoint, and ConnectionPoint to support Snap-Isolation aggregation.
  * Aug.25.01:
  * - Issue #311 Hardening: Added SetManualSelection and SetSettlingActive events.
  */
@@ -222,7 +222,8 @@ class ViolationPoint(
      * contentEquals: Deep parity check for map violation points (R312).
      */
     fun contentEquals(other: ViolationPoint): Boolean {
-        return lat == other.lat && lng == other.lng && type == other.type && ts == other.ts
+        return lat == other.lat && lng == other.lng && type == other.type && 
+               ts == other.ts && accuracy == other.accuracy && maxAccuracy == other.maxAccuracy
     }
 }
 
@@ -254,7 +255,9 @@ data class LogEntry(
      */
     fun contentEquals(other: LogEntry): Boolean {
         return timestamp == other.timestamp && message == other.message && 
-               count == other.count && durationMs == other.durationMs
+               count == other.count && durationMs == other.durationMs &&
+               lat == other.lat && lng == other.lng && accuracy == other.accuracy &&
+               snrSnapshot == other.snrSnapshot && vibeSnapshot == other.vibeSnapshot
     }
 
     fun toJSONObject(): JSONObject {
@@ -720,7 +723,7 @@ sealed class UiEvent {
     data class SetRecoveryPending(val pending: Boolean) : UiEvent()
     data class SetReplayCursor(val ts: Long?) : UiEvent()
     data class SetForensicSimulation(val active: Boolean) : UiEvent()
-    object ExecuteStressTest : UiEvent()
+    object ExecuteStressTest : UiCommand() // Fix: Exec Stress Test should be UiCommand but here it's listed under events
     data class SetStorageSimulation(val active: Boolean, val isCritical: Boolean) : UiEvent()
     data class SetManualSelection(val active: Boolean) : UiEvent()
     data class SetSettlingActive(val active: Boolean) : UiEvent()
