@@ -10,7 +10,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (Issue #310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (Issue #317).
 *   **1.6 Monotonic Authority (R307)**: All maintenance durations and health-check silence detections must prioritize monotonic references (`elapsedRealtime`) to prevent wall-clock corruption during reboots or system time jumps (Issue #307).
 *   **1.7 Staggered Hydration Manager (R318/R323/R739)**: To prevent Davey stalls, hydration must be managed by `LifecycleHydrationManager`, providing a multi-level staggered sequence. Level 4-7 (Map Engine & Overlay Hydration) must be triggered via `IdleHandler` and staggered over multiple frames to ensure heavy engine initialization occurs only after the UI thread is free and doesn't block the next frame (Issue #318, #323, #739).
-*   **1.8 Lifecycle Synchronization (R738)**: Hardware managers (Sensors, GPS) must implement synchronized lifecycle methods (`start()`/`stop()`) and strict atomic state checks within asynchronous callback registration blocks to prevent native resource leaks (BaseEventQueue) during rapid mode transitions (Issue #738).
+*   **1.8 Lifecycle Synchronization (R738/R742)**: Hardware managers (Sensors, GPS) must implement synchronized lifecycle methods (`start()`/`stop()`) and strict atomic state checks within asynchronous callback registration blocks to prevent native resource leaks (BaseEventQueue) during rapid mode transitions. Persistence of callbacks (like GNSS) must be tied to the manager lifecycle rather than transient flows to prevent redundant registrations (Issue #738, #742).
 
 ## 2. Forensic & Performance Requirements
 *   **2.1 Sampling Frequency**: Forensic sampling must operate between 10ms and 100ms based on system load (R700).
@@ -30,6 +30,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.3 Identity Sanitization (R976)**: Identity sanitization state must be persistent. The warning overlay dismissal must be written to the DataStore to prevent redundant notifications across cold starts (Issue #737).
 
 ## 4. History of Changes (Recent)
+*   **Aug.26.18**: Resolved Concern #742 (Recurrent EventQueue Leak). Tied GNSS callback to GpsManager lifecycle instead of transient flows (R742).
 *   **Aug.26.17**: Resolved Concern #738 (EventQueue Resource Leak). Hardened hardware lifecycle synchronization and atomic async registration (R738).
 *   **Aug.26.16**: Resolved Concern #739 (Hydration Performance Stall - A15). Decomposed Map Hydration into Levels 4-7. Spreads Map Engine, Trails, Markers, and Final Overlays over multiple frames using IdleHandler and staggered delays (R739).
 *   **Aug.26.15**: Resolved Concern #740 (System Issue Counter Mismatch). Synchronized `PhoneSetupOverlay` items with `MainUiState.systemIssuesCount` (R740).

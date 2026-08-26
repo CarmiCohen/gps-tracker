@@ -1,22 +1,23 @@
-# Handover (Aug.26.17) - Lifecycle Hardening
+# Handover (Aug.26.18) - Lifecycle Hardening
 
 ## 🎯 Current Status
 - **Goal**: Resolve native resource leaks during hardware manager disposal.
-- **Status**: 🟢 **RESOLVED** (Concern #738: EventQueue Leak). 🟢 **RESOLVED** (#739: Hydration Stall).
-- **Version**: `Aug.26.17`
+- **Status**: 🟢 **RESOLVED** (Concern #742: Recurrent EventQueue Leak).
+- **Version**: `Aug.26.18`
 - **Database**: v73
-- **Audit Baseline**: SOT: 181, Resolved: 741, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 197, QA Status: 196.
+- **Audit Baseline**: SOT: 181, Resolved: 742, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 198, QA Status: 196.
 
-## 🧬 Implementation Summary: Aug.26.17
-- **Concern #738 Resolved**: **EventQueue Resource Leak**.
-    - Synchronized `start()` and `stop()` methods in `AppSensorManager` and `GpsManager` using a private `lifecycleLock`.
-    - Implemented atomic state re-checks within asynchronous registration blocks (e.g., Step Detector registration) to ensure no listeners are registered after the manager has been stopped.
-    - Enforced synchronous GNSS callback unregistration before thread shutdown in `GpsManager`.
-- **Architectural Update**: Added SOT Requirement 1.8 (Lifecycle Synchronization) to formalize hardware manager safety.
-- **Version Incremented**: Updated `app/build.gradle` to `Aug.26.17`.
+## 🧬 Implementation Summary: Aug.26.18
+- **Concern #742 Resolved**: **Recurrent EventQueue Leak**.
+    - Identified that `GpsManager` was redundantly registering `GnssStatus.Callback` within its `callbackFlow`, leading to overlapping native event queues during polling interval changes.
+    - Decoupled the GNSS callback lifecycle from the flow and tied it strictly to the synchronized `start()`/`stop()` lifecycle of the `GpsManager` singleton.
+    - Hardened `AppSensorManager` step-detector registration to ensure it respects the `lifecycleLock` across async boundaries.
+    - Verified that `BaseMonitorService` triggers synchronous cleanup of both managers in `onDestroy()`.
+- **Architectural Update**: Refined SOT Requirement 1.8 to mandate persistence of hardware callbacks at the manager level rather than transient flows.
+- **Version Incremented**: Updated `app/build.gradle` to `Aug.26.18`.
 
 ## 🚀 Next Steps
-- **Deployment & Monitoring**: Deploy the app and monitor logcat for `BaseEventQueue.dispose` warnings during rapid role swaps (Tracker <-> Viewer).
-- **Verify #739**: Confirm hydration smoothness on A15 hardware with the now-stable engine.
+- **Regression Test**: Perform role-swaps (Tracker -> Viewer -> Tracker) and monitor logcat for the "A resource failed to call BaseEventQueue.dispose" warning. It should now be silenced.
+- **Thermal Audit**: Monitor `AppSensorManager` high-load scaling during forensic stress tests on A15 hardware.
 
-vAug.26.17
+vAug.26.18

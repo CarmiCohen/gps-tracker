@@ -23,13 +23,14 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.26.18:
+ * - Issue #742 Remediation: Decoupled GNSS callback from callbackFlow to 
+ *   prevent redundant/leaking registrations during polling changes. GNSS 
+ *   lifecycle is now strictly tied to start()/stop() sync blocks. Added 
+ *   explicit permission checks in start() to ensure safety (R742).
  * Aug.26.17:
  * - Issue #738 Remediation: Hardened lifecycle with synchronized start/stop 
- *   to ensure deterministic GNSS/Location callback unregistration and 
- *   prevent BaseEventQueue leaks (R738).
- * Aug.26.03:
- * - Issue #320 Remediation: Implemented explicit stop() and synchronous 
- *   unregistration of GNSS/Location callbacks to prevent BaseEventQueue leak (R320).
+ *   to ensure deterministic GNSS/Location callback unregistration (R738).
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -150,17 +151,22 @@ class GpsManager @Inject constructor(
                 gpsThread = HandlerThread("GpsHardwareThread").apply { start() }
                 gpsHandler = Handler(gpsThread!!.looper)
             }
+            
+            val handler = gpsHandler
+            if (handler != null && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                try {
+                    locationManager.registerGnssStatusCallback(gnssStatusCallback, handler)
+                } catch (e: Exception) {
+                    Timber.e(e, "GPS: Failed to register GNSS callback in start()")
+                }
+            }
         }
     }
 
-    /**
-     * stop: Synchronous cleanup for Issue #738.
-     */
     fun stop() {
         synchronized(lifecycleLock) {
             if (!isStarted.getAndSet(false)) return
             
-            // Unregister GNSS callback before thread shutdown.
             try {
                 locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
             } catch (e: Exception) {
@@ -202,7 +208,6 @@ class GpsManager @Inject constructor(
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
 
         externalScope.launch(Dispatchers.Main) {
-            // Issue #738: Verify lifecycle state before registering in async block.
             if (!isStarted.get()) return@launch
             
             val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
@@ -258,12 +263,7 @@ class GpsManager @Inject constructor(
     @SuppressLint("MissingPermission")
     private val hardwareObservationFlow = pollingIntervalFlow.flatMapLatest { interval ->
         callbackFlow<GpsUpdate> {
-            start() // Ensure thread is active
-            
-            val handler = synchronized(lifecycleLock) { gpsHandler }
-            if (handler != null) {
-                try { locationManager.registerGnssStatusCallback(gnssStatusCallback, handler) } catch (e: Exception) { Timber.e(e, "GPS: Callback error") }
-            }
+            start() 
             
             fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
             val fusedCallback = object : LocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
@@ -283,7 +283,6 @@ class GpsManager @Inject constructor(
                 internalJob.cancel()
                 try { 
                     fusedLocationClient.removeLocationUpdates(fusedCallback)
-                    locationManager.unregisterGnssStatusCallback(gnssStatusCallback) 
                 } catch (e: Exception) {} 
             }
         }

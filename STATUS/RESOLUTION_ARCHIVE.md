@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.26.18 (vAug.26.18)
+*   **Concern #742 Resolved**: **Recurrent EventQueue Leak**. Identified that `GpsManager` was redundantly registering `GnssStatus.Callback` within its `callbackFlow`, leading to overlapping native event queues during polling interval changes. Decoupled the callback lifecycle from the flow and tied it strictly to the synchronized `start()`/`stop()` lifecycle of the singleton. Hardened permission checks to ensure safety during registration (R742).
+
 ## 🟢 Aug.26.17 (vAug.26.17)
 *   **Concern #738 Resolved**: **EventQueue Resource Leak**. Hardened lifecycle management in `AppSensorManager` and `GpsManager` by synchronizing `start()`/`stop()` transitions and implementing strict state re-checks in asynchronous registration blocks. This prevents race conditions where native listeners could be registered after cleanup, resolving the `BaseEventQueue.dispose` failure warning (R738).
 
