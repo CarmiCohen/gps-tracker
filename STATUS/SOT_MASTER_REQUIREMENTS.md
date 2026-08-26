@@ -27,6 +27,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.25.06**: Deployment Verification on SM-A155F. Hardware SOT verified. Identified Issue #318 (Startup Davey) and Issue #319 (Monitor Inflation).
 *   **Aug.25.05**: Resolved Issue #317 (Hardware SOT Architectural Decoupling). Migrated detection signatures to `:core:engine:HardwareSot.kt` (R313/R212).
 *   **Aug.25.04**: Resolved Issue #313 (Multi-Device Deployment Failure). Unified and hardened hardware detection signatures in `Utils.kt` (R313).
 *   **Aug.25.03**: Resolved Issue #316 (Shadow-Cache LRU Documentation Gap). Verified R280 logic via unit tests in `ShadowCacheTest.kt`.

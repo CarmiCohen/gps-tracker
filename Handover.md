@@ -1,24 +1,20 @@
-# Handover (Aug.25.05) - Hardware SOT Architectural Decoupling
+# Handover (Aug.25.06) - Deployment Verification & Performance Audit
 
 ## 🎯 Current Status
-- **Goal**: Decouple hardware detection logic from the application layer to the core engine.
-- **Status**: 🟢 **STABLE**
-- **Version**: `Aug.25.05`
+- **Goal**: Verify Hardware SOT Decoupling on physical devices and audit budget hardware performance.
+- **Status**: 🟢 **STABLE** (Architectural), 🟡 **HARDENING** (Performance)
+- **Version**: `Aug.25.06`
 - **Database**: v73
-- **Audit Baseline**: SOT: 168, Resolved: 719, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 193, QA Status: 189.
+- **Audit Baseline**: SOT: 170, Resolved: 720, Open: 49, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 195, QA Status: 189.
 
-## 🧬 Forensic Audit Summary: Aug.25.05
-- **Issue #317 (Hardware SOT Decoupling) Resolved**: Successfully migrated hardware detection signatures from `:app:Utils.kt` to `:core:engine:HardwareSot.kt`.
-- **Architectural Alignment**: Core engine and background services (Tracker/Viewer) are now "Hardware Neutral" (R212) and independently aware of their execution environment via `HardwareSot`.
-- **Refactoring**: `Utils.kt` and `SystemStatusProviderImpl.kt` refactored to delegate identification to the engine-level Source of Truth.
-- **Requirement 1.5 Update**: Formalized Issue #317 in `SOT_MASTER_REQUIREMENTS.md` as part of the Architectural Authority for hardware neutrality.
+## 🧬 Forensic Audit Summary: Aug.25.06
+- **Issue #317 Verified**: Hardware decoupling confirmed on SM-A155F. `jdHardware` native library successfully neutralizes vendor signatures in the core engine.
+- **Issue #318 Identified**: Critical startup lag (70+ frames) on A15 during hydration. Requires R314 optimization.
+- **Issue #319 Identified**: `Monitor::Inflate` installation failures detected in background service logs.
+- **Hardware SOT**: Core engine is now independently aware of the execution environment without `:app` dependencies.
 
-## 🚀 Git Release Block
-```bash
-git add .
-git commit -m "Hardening: Resolved Issue #317 (Hardware SOT Architectural Decoupling) - vAug.25.05"
-git tag -a vAug.25.05 -m "Release Aug.25.05: Hardware SOT Architectural Decoupling"
-git push origin main --tags
-```
+## 🚀 Next Steps
+- Implement `LifecycleHydrationManager` to further stagger startup sequences (Issue #318).
+- Debug and resolve `Monitor::Inflate` failures in `TrackerService` (Issue #319).
 
-vAug.25.05
+vAug.25.06
