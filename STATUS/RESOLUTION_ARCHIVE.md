@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.26.15 (vAug.26.15)
+*   **Concern #740 Resolved**: **System Issue Counter Mismatch**. Synchronized `PhoneSetupOverlay` items with `MainUiState.systemIssuesCount`. Added Step 0 (Precise Location) and corrected completion flag for Step 5 (Auto-start) to ensure UI parity (R740).
+
 ## 🟢 Aug.26.14 (vAug.26.14)
 *   **Concern #737 Resolved**: **Identity Sanitization Persistence**. Verified fix on `Aug.26.14`. The dismissal state now correctly persists through cold starts, eliminating redundant UI prompts (R976).
 

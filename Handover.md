@@ -1,21 +1,20 @@
-# Handover (Aug.26.14) - Persistence Verified, A15 Stall Detected
+# Handover (Aug.26.15) - Overlay Mismatch Resolved
 
 ## 🎯 Current Status
-- **Goal**: Verify identity sanitization persistence and monitor A15 soak stability.
-- **Status**: 🟢 **RESOLVED** (Concern #737: Persistence Verified). 🔴 **NEW CONCERNS** (#738, #739, #740).
-- **Version**: `Aug.26.14`
+- **Goal**: Synchronize Phone Setup logic and prepare for A15 Davey stall remediation.
+- **Status**: 🟢 **RESOLVED** (Concern #740: UI Logic Mismatch). 🔴 **OPEN** (#738, #739).
+- **Version**: `Aug.26.15`
 - **Database**: v73
-- **Audit Baseline**: SOT: 179, Resolved: 738, Open: 50, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 194, QA Status: 195.
+- **Audit Baseline**: SOT: 180, Resolved: 739, Open: 49, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 195, QA Status: 195.
 
-## 🧬 Implementation Summary: Aug.26.14
-- **Concern #737 Verified**: Formally verified that the Identity Sanitization warning dismissal is persisted correctly across cold starts.
-- **Concern #739 Identified**: Detected 1482ms "Davey!" stall during Level 4 Map hydration on A15 hardware, suggesting the `IdleHandler` trigger is still too heavy for the UI thread during initial frame rendering.
-- **Concern #740 Identified**: Setup Overlay issue counter mismatch (Counter: 4, Items: 5).
-- **Concern #738 Identified**: Potential resource leak in `BaseEventQueue.dispose`.
+## 🧬 Implementation Summary: Aug.26.15
+- **Concern #740 Resolved**: Synchronized `PhoneSetupOverlay` with `systemIssuesCount`.
+    - Added missing "Precise Location" (Step 0) to the guide.
+    - Fixed Step 5 (Auto-start) completion flag which was incorrectly pointing to battery whitelisting.
+- **Version Incremented**: Updated `app/build.gradle` to `Aug.26.15`.
 
 ## 🚀 Next Steps
-- **Remediate #739**: Further decompose Map Level 4 hydration to offload marker/overlay initialization or utilize `Choreographer` frame callbacks to spread the load.
-- **Fix #740**: Synchronize `UiStateAggregator` logic with `PhoneSetupOverlay` itemization.
-- **Address #738**: Audit `BaseEventQueue` lifecycle in core engine.
+- **Remediate #739**: Decompose Map Level 4 hydration. Markers and overlays should be initialized over multiple frames using `IdleHandler` or `Choreographer` to eliminate the 1.4s Davey stall on A15 hardware.
+- **Address #738**: Investigate `BaseEventQueue.dispose` warning in core engine.
 
-vAug.26.14
+vAug.26.15

@@ -23,7 +23,6 @@
 
     <!-- Permission Dialogs -->
     <string name="perm_background_title">Background Location Access</string>
-    <string name="requested_location_permission">GPS-Tracker collects location data to enable tracking your device even when the app is closed.</string>
     <string name="perm_background_desc">GPS-Tracker collects location data to enable tracking your device even when the app is closed.</string>
     <string name="perm_background_btn_accept">Accept \u0026 Continue</string>
     <string name="perm_background_btn_reject">No Thanks</string>
@@ -107,6 +106,7 @@
     <string name="sound_val_app_control">App Control</string>
     <string name="sound_group_app_volume">App Volume Level</string>
     <string name="sound_desc_app_volume">App Volume: %1$d%% %2$s</string>
+    <string name="sound_desc_app_volume_res">App Volume: %1$d%% %2$s</string>
     <string name="sound_desc_system_volume">Using device\'s media volume buttons</string>
 
     <!-- Phone Setup Guide -->

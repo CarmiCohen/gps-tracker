@@ -33,11 +33,12 @@ import timber.log.Timber
 /**
  * SettingsComponents: UI for app configuration and permissions.
  * Aug.26.15:
+ * - Issue #740 Logic Fix: Synchronized PhoneSetupOverlay items with 
+ *   MainUiState.systemIssuesCount. Added Step 0 (Precise Location) and corrected 
+ *   Auto-start completion flag to resolve counter mismatch (R740).
+ * Aug.26.14:
  * - Issue #735 Hardening: Added isSetupBypassActive to PhoneSetupOverlay to 
  *   support automated soak test execution and provide visual bypass status (R735).
- * Aug.22.04:
- * - Issue #140 Restoration: Re-added TRIGGER FORENSIC STRESS TEST button 
- *   to PhoneSetupOverlay to support Chapter 12.2 Database Stress Audit (R140).
  */
 
 @Composable
@@ -322,11 +323,12 @@ fun PhoneSetupOverlay(
                     }
                     
                     if (visibleCount >= 1) {
+                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step0_title), stringResource(R.string.setup_step0_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isFineLocationGranted, Icons.Default.MyLocation, reason = if (!permissions.isFineLocationGranted) "Precise Location: Permission NOT granted" else null)
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step1_title), recentsLockDesc, {}, stringResource(R.string.setup_info_only), if (permissions.requiresWakeLockRenewal) true else null, Icons.Default.Lock)
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), batteryOptDesc, onWhitelist, stringResource(R.string.btn_open_settings), permissions.isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!permissions.isBatteryWhitelisted) "Battery Optimization: Unrestricted mode NOT active" else null)
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step3_title), stringResource(R.string.setup_step3_desc), onOverlay, stringResource(R.string.btn_authorize), permissions.isOverlayGranted, Icons.Default.Layers, reason = if (!permissions.isOverlayGranted) "Appear on Top: Permission NOT granted" else null)
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step4_title), stringResource(R.string.setup_step4_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isMicrophoneGranted, Icons.Default.Mic, reason = if (!permissions.isMicrophoneGranted) "Microphone: Permission NOT granted" else null)
-                        Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step5_title), description = autoStartDesc, onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBatteryWhitelisted, icon = Icons.Default.PlayCircle, reason = if (!permissions.isBatteryWhitelisted) "Manual verification required: Ensure 'Unrestricted' battery mode and 'Background activity' are allowed in system settings." else null)
+                        Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step5_title), description = autoStartDesc, onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isAutoStartGranted, icon = Icons.Default.PlayCircle, reason = if (!permissions.isAutoStartGranted) "Manual verification required: Ensure 'Unrestricted' battery mode and 'Background activity' are allowed in system settings." else null)
                     }
 
                     if (visibleCount >= 2) {
