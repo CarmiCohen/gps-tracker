@@ -36,16 +36,13 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.26.11:
+ * - Issue #735 Hardening: Added ToggleSetupBypass handler to set 
+ *   isSetupBypassActive in MainUiState, enabling automated soak test 
+ *   execution (R735).
  * Aug.26.00:
  * - Issue #318 Remediation: Integrated LifecycleHydrationManager to stagger 
  *   startup sequences and optimize hydration for low-tier CPU scaling (R318).
- * - Issue #314 Remediation: Implemented Staggered Hydration (R314). Increased 
- *   delays in init and added specific A15 offset for heavy observations to 
- *   eliminate 1.5s Davey stall.
- * - Issue #312 Remediation: Implemented Snap-Isolation (Idea #185). Added 
- *   listContentEquals and deep-parity distinctUntilChanged to high-frequency 
- *   flows (Logs, Trails, Violations, History) to eliminate lock verification 
- *   failures on Samsung A15/S21 hardware (R312).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -531,6 +528,7 @@ class MainViewModel @Inject constructor(
             }
             is UiEvent.SetManualSelection -> updateState { it.copy(isManualSelectionInProgress = event.active) }
             is UiEvent.SetSettlingActive -> updateState { it.copy(isSettlingActive = event.active) }
+            is UiEvent.ToggleSetupBypass -> updateState { it.copy(isSetupBypassActive = event.active) }
             else -> {}
         }
     }

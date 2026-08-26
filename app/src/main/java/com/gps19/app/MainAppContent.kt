@@ -45,13 +45,13 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Aug.26.13:
+ * - Issue #735 Hardening: Connected isSetupBypassActive and ToggleSetupBypass 
+ *   to DiagnosticsScreen to support automated soak test execution (R735).
  * Aug.25.01:
  * - Issue #311 Hardening: Migrated isManualSelectionInProgress and isSettlingActive 
  *   to MainUiState to ensure navigation state survives Activity destruction during 
  *   Samsung A15 permission flows.
- * Aug.22.05:
- * - Audit Chapter 12.3: Connected Storage Pressure simulation state to 
- *   DiagnosticsScreen for storage prioritization audit (R197).
  */
 @Composable
 fun MainAppContent(
@@ -405,11 +405,13 @@ fun MainAppContent(
                                     isForensicStallSimulated = uiState.isForensicStallSimulated,
                                     isStorageSimulated = uiState.isStorageSimulated,
                                     isStorageCriticalSimulated = uiState.isStorageCriticalSimulated,
+                                    isSetupBypassActive = uiState.isSetupBypassActive,
                                     onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
                                     onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
                                     onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                                     onToggleForensicSimulation = { active -> viewModel.onEvent(UiEvent.SetForensicSimulation(active)) },
                                     onToggleStorageSimulation = { active, critical -> viewModel.onEvent(UiEvent.SetStorageSimulation(active, critical)) },
+                                    onToggleSetupBypass = { active -> viewModel.onEvent(UiEvent.ToggleSetupBypass(active)) },
                                     onRequestBatteryExemption = onRequestBatteryExemption,
                                     onRequestOverlayPermission = onRequestOverlayPermission,
                                     onRequestAppInfo = onRequestAppInfo,
@@ -436,6 +438,7 @@ fun MainAppContent(
                             viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
                             viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) 
                         },
+                        isSetupBypassActive = uiState.isSetupBypassActive,
                         permissions = uiState.permissions,
                         homePointsCount = uiState.homePoints.size,
                         isTrackerMode = uiState.appMode == "tracker",

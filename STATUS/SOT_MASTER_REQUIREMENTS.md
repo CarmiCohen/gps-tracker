@@ -24,15 +24,11 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **2.10 GPS Warm-up Grace Period (R315)**: Signal loss and accuracy violations must be suppressed for the first 30 seconds after system activation or mode transition to allow GPS provider stabilization (Issue #315).
 
 ## 3. Test & Validation Authority
-*   **3.1 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`) to verify alarm triggers under simulated stress (R196-V).
+*   **3.1 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`, `ToggleSetupBypass`) to verify alarm triggers and facilitate automated soak tests under simulated stress (R196-V, R735).
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.26.11**: Resolved Issue #735 Hardening (Setup Overlay Bypass). Implemented developer-mode bypass to enable automated soak tests on remote hardware (R735).
 *   **Aug.26.10**: Deployment Verification. Verified Issue #723 (StackLog Leak) and Issue #320 (Hardware Handshake) on Samsung A15 hardware. Identified Issue #735 (Setup Overlay Modal Block).
 *   **Aug.26.09**: Resolved Issue #320 Hardening (Hardware Handshake). Replaced 200ms magic delay with deterministic native round-trip (R320).
 *   **Aug.26.08**: Resolved Issue #723 (Diagnostic Log Leak / StackLog). Transitioned internet observation to Eagerly sharing to prevent platform callback noise (R723).
-*   **Aug.26.07**: Deployment Verification. Verified Issue #323 (Startup Fluidity) and Issue #324 (Mali Audit) on hardware. Identified Issue #723 (StackLog leak).
-*   **Aug.26.06**: Resolved Issue #323 (Startup Davey Stall). Implemented Level 4 Idle-based Map Hydration (R323).
-*   **Aug.26.05**: Hardening verification. 
-*   **Aug.26.04**: Resolved Issue #322 (Compilation Regression). Validated Chapter 12.2 Stress Audit (R197, R700) and Hardening (R133, R191, R192). Verified Native Cleanup (R320) stability post-service destruction.
-*   **Aug.26.03**: Resolved Issue #320 (Native Leak Persistence) via explicit GpsManager lifecycle and Issue #321 (UI Regression) via expanded 1000ms hydration gaps.

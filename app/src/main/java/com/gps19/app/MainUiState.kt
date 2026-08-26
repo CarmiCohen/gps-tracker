@@ -5,16 +5,13 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Aug.26.06:
+ * - Issue #735 Hardening: Added isSetupBypassActive to allow developer-mode 
+ *   bypass of the PhoneSetupOverlay for automated soak tests (R735).
  * Aug.26.05:
  * - Issue #323 Hardening: Added Level 4 to hydrationLevel (Idle Map Hydration) 
  *   to ensure heavy OSM engine initialization only occurs when the main 
  *   thread is free (R323).
- * Aug.25.01:
- * - Issue #311 Hardening: Added isManualSelectionInProgress and isSettlingActive 
- *   to ensure navigation state survives activity destruction during permission flows.
- * Aug.22.05:
- * - Audit Chapter 12.3: Added isStorageSimulated and isStorageCriticalSimulated 
- *   to track storage pressure simulation state (R197).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -50,13 +47,15 @@ data class MainUiState(
     val isStorageSimulated: Boolean = false,
     val isStorageCriticalSimulated: Boolean = false,
     val isManualSelectionInProgress: Boolean = false,
-    val isSettlingActive: Boolean = true
+    val isSettlingActive: Boolean = true,
+    val isSetupBypassActive: Boolean = false
 ) {
     val isFullyHydrated: Boolean get() = hydrationLevel >= 3
     val isMapHydrated: Boolean get() = hydrationLevel >= 4
 
     val isSystemReady: Boolean
-        get() = permissions.isFineLocationGranted &&
+        get() = isSetupBypassActive || (
+                permissions.isFineLocationGranted &&
                 permissions.isBatteryWhitelisted && 
                 permissions.isAutoStartGranted &&
                 permissions.isExactAlarmGranted && 
@@ -69,10 +68,11 @@ data class MainUiState(
                 (appMode == "tracker" || homePoints.isNotEmpty()) &&
                 (!permissions.hasBackgroundRestriction || 
                  (permissions.backgroundStatus == CapabilityStatus.GRANTED && permissions.autostartStatus == CapabilityStatus.GRANTED) || 
-                 (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride))
+                 (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)))
 
     val systemIssuesCount: Int
         get() {
+            if (isSetupBypassActive) return 0
             var count = 0
             if (!permissions.isFineLocationGranted) count++
             if (!permissions.isBatteryWhitelisted) count++

@@ -32,13 +32,12 @@ import timber.log.Timber
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Aug.26.15:
+ * - Issue #735 Hardening: Added isSetupBypassActive to PhoneSetupOverlay to 
+ *   support automated soak test execution and provide visual bypass status (R735).
  * Aug.22.04:
  * - Issue #140 Restoration: Re-added TRIGGER FORENSIC STRESS TEST button 
  *   to PhoneSetupOverlay to support Chapter 12.2 Database Stress Audit (R140).
- * Aug.21.03:
- * - Issue #246 Optimization: Consolidated hydration sequence from 10+ steps 
- *   to 3 broader phases to reduce recomposition overhead and Davey stalls 
- *   on budget hardware (R246).
  */
 
 @Composable
@@ -282,6 +281,7 @@ fun PhoneSetupOverlay(
     onTestAlarm: () -> Unit,
     onNavigateToDiagnostics: () -> Unit = {},
     onExecuteStressTest: () -> Unit = {},
+    isSetupBypassActive: Boolean = false,
     permissions: PermissionState,
     homePointsCount: Int, isTrackerMode: Boolean, onGoToMap: () -> Unit = {}
 ) {
@@ -309,7 +309,17 @@ fun PhoneSetupOverlay(
         Card(modifier = Modifier.fillMaxSize().padding(16.dp), colors = CardDefaults.cardColors(containerColor = Slate950)) {
             if (isHydrated && visibleCount > 0) {
                 Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column { Text("Phone Setup", color = BrandJd, fontSize = 24.sp, fontWeight = FontWeight.Bold); Text(stringResource(R.string.setup_detected_device, manufacturer, model), color = Slate500, fontSize = 10.sp) } }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { 
+                        Column { 
+                            Text("Phone Setup", color = BrandJd, fontSize = 24.sp, fontWeight = FontWeight.Bold); 
+                            Text(stringResource(R.string.setup_detected_device, manufacturer, model), color = Slate500, fontSize = 10.sp) 
+                        } 
+                        if (isSetupBypassActive) {
+                            Card(colors = CardDefaults.cardColors(containerColor = Color.Green.copy(alpha = 0.2f))) {
+                                Text("BYPASS ACTIVE", color = Color.Green, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                            }
+                        }
+                    }
                     
                     if (visibleCount >= 1) {
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step1_title), recentsLockDesc, {}, stringResource(R.string.setup_info_only), if (permissions.requiresWakeLockRenewal) true else null, Icons.Default.Lock)
@@ -387,6 +397,20 @@ fun PhoneSetupOverlay(
                             Button(onClick = onRefresh, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh), fontSize = 13.sp) }
                             Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm), fontSize = 13.sp) }
                         }
+                        
+                        if (isSetupBypassActive) {
+                            Spacer(Modifier.height(16.dp))
+                            Button(
+                                onClick = onClose,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Green.copy(alpha = 0.6f))
+                            ) {
+                                Icon(Icons.Default.Close, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("DISMISS (BYPASS ACTIVE)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                        }
+
                         Spacer(Modifier.height(88.dp)) 
                     }
                 }

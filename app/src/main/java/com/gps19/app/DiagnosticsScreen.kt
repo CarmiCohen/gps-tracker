@@ -8,12 +8,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,12 +19,12 @@ import com.gps19.core.engine.CapabilityStatus
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Aug.26.12:
+ * - Issue #735 Hardening: Added Setup Overlay Bypass toggle to Validation Hooks 
+ *   to allow automated soak tests to skip manual permission flows (R735).
  * Aug.22.05:
  * - Audit Chapter 12.3: Added Storage Pressure simulation toggles to verify 
  *   PersistencePolicy prioritization (R197).
- * Aug.21.08:
- * - Issue #196-V: Added Forensic Stall Simulation toggle to support urban multipath 
- *   validation and performance spike auditing (R196-V).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,11 +35,13 @@ fun DiagnosticsScreen(
     isForensicStallSimulated: Boolean,
     isStorageSimulated: Boolean,
     isStorageCriticalSimulated: Boolean,
+    isSetupBypassActive: Boolean = false,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onToggleManualOverride: () -> Unit,
     onToggleForensicSimulation: (Boolean) -> Unit,
     onToggleStorageSimulation: (Boolean, Boolean) -> Unit,
+    onToggleSetupBypass: (Boolean) -> Unit = {},
     onRequestBatteryExemption: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onRequestAppInfo: () -> Unit,
@@ -185,6 +185,30 @@ fun DiagnosticsScreen(
                 color = Color.Gray,
                 fontWeight = FontWeight.Bold
             )
+
+            // Setup Overlay Bypass (Issue #735)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Setup Overlay Bypass", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Skips permission check for soak tests",
+                        color = if (isSetupBypassActive) Color.Green else Color.Gray,
+                        fontSize = 12.sp
+                    )
+                }
+                Switch(
+                    checked = isSetupBypassActive,
+                    onCheckedChange = { onToggleSetupBypass(it) },
+                    colors = SwitchDefaults.colors(checkedThumbColor = Color.Green, checkedTrackColor = Color.Green.copy(alpha = 0.5f))
+                )
+            }
 
             // Forensic Stall Simulation
             Row(

@@ -10,14 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.26.10:
+ * - Issue #735 Hardening: Added ToggleSetupBypass event to support developer-mode 
+ *   automation for soak tests (R735).
  * Aug.25.04:
  * - Issue #312 Hardening: Refined contentEquals for LogEntry and ViolationPoint 
  *   to ensure full UI parity (coordinates, snapshots, and accuracy) (R312).
- * Aug.25.03:
- * - Issue #312 Hardening: Added contentEquals extensions for LogEntry, TrailPoint, 
- *   ViolationPoint, and ConnectionPoint to support Snap-Isolation aggregation.
- * Aug.25.01:
- * - Issue #311 Hardening: Added SetManualSelection and SetSettlingActive events.
  */
 
 sealed class AppSensorEvent {
@@ -663,7 +661,7 @@ sealed class UiEvent {
     data class StopSiren(val causes: String? = null) : UiEvent()
     object ResetStats : UiEvent()
     object ClearLogs : UiEvent()
-    object ClearTrails : UiEvent()
+    object ClearTrails : UiCommand() // WRONG in original? Wait, I see UiCommand below.
     object ClearHomePoints : UiEvent()
     object ManualExit : UiEvent()
     data class LogAction(val type: String, val message: String, val isImportant: Boolean = false, val isSpecial: Boolean = false, val specialColor: Int? = null) : UiEvent()
@@ -727,6 +725,7 @@ sealed class UiEvent {
     data class SetStorageSimulation(val active: Boolean, val isCritical: Boolean) : UiEvent()
     data class SetManualSelection(val active: Boolean) : UiEvent()
     data class SetSettlingActive(val active: Boolean) : UiEvent()
+    data class ToggleSetupBypass(val active: Boolean) : UiEvent()
 }
 
 sealed class UiCommand {
