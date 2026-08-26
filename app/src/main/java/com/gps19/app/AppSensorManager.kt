@@ -35,13 +35,12 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * Aug.18.10:
- * - Issue #209 Fidelity Restoration: Reverted diagnostic down-sampling (R204). 
- *   Restored Accelerometer, Linear Accel, and Rotation Vector to SENSOR_DELAY_FASTEST 
- *   in production mode to support 100Hz forensic analysis (R209).
- * Aug.16.13:
- * - Reverted Gated Sensor Start (Issue #186 rollback). Restored immediate 
- *   registration to resolve Startup Black Screen regression.
+ * Aug.26.04:
+ * - Issue #320 Deep Hardening: Switched to strictly synchronous unregistration 
+ *   on the calling thread in stop() to ensure BaseEventQueue disposal before 
+ *   thread joining (R320).
+ * Aug.26.02:
+ * - Issue #320 Remediation: Hardened stop() sequence with thread joining.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -133,7 +132,6 @@ class AppSensorManager @Inject constructor(
     var vibrationRollingSum = 0.0; private set
     private var vibrationBufferCount = 0
 
-    // Logic Accumulators (2s Tick)
     private var logicPeakDb = 0.0
     private var logicMinDb = 100.0
     private var logicPeakVibration = 0.0
@@ -142,7 +140,6 @@ class AppSensorManager @Inject constructor(
     private var logicPeakVerticalVelocityRt = 0L
     private var logicPeakVerticalDisplacement = 0.0
     
-    // Forensic Accumulators (10ms-100ms Loop)
     private var forensicPeakDb = 0.0
     private var forensicMinDb = 100.0
     private var forensicPeakVibration = 0.0
@@ -162,7 +159,6 @@ class AppSensorManager @Inject constructor(
     @Volatile private var isHighLoad = false
     @Volatile private var powerSaveMode = false
 
-    // Issue #668: Object Pool for zero-churn telemetry
     class ForensicSnapshot {
         var vibration = 0.0; var heading = 0.0; var baroAlt = 0.0; var lux = 0.0
         var isNear = true; var tiltDegrees = 0.0; var acousticDb = 0.0; var peakShock = 0.0
@@ -254,7 +250,6 @@ class AppSensorManager @Inject constructor(
     }
 
     private fun registerSensors() {
-        // Issue #209: Reverted diagnostic scaling. High-fidelity sensors restored to FASTEST.
         val delay = if (powerSaveMode) AndroidSensorManager.SENSOR_DELAY_NORMAL else AndroidSensorManager.SENSOR_DELAY_FASTEST
         
         accelerometer?.let { sensorManager.registerListener(this, it, delay, sensorHandler) }
@@ -268,12 +263,35 @@ class AppSensorManager @Inject constructor(
         attemptStepDetectorRegistration(); startStepDetectorRecoveryLoop()
     }
 
+    /**
+     * stop: Synchronous unregistration to prevent BaseEventQueue leaks (Issue #320).
+     */
     fun stop() {
         if (!isStarted.getAndSet(false)) return
         recoveryJob?.cancel(); recoveryJob = null; stopAcousticMonitoring()
-        sensorManager.unregisterListener(this); displayManager.unregisterDisplayListener(displayListener)
-        proximityJob?.cancel(); sensorThread?.quitSafely(); sensorThread = null; sensorHandler = null
+        
+        // Strictly synchronous unregistration on calling thread to ensure binder call finishes.
+        try {
+            sensorManager.unregisterListener(this)
+            displayManager.unregisterDisplayListener(displayListener)
+        } catch (e: Exception) {
+            Timber.e(e, "Error during synchronous sensor unregistration")
+        }
+
+        proximityJob?.cancel()
+        sensorThread?.quitSafely()
+        
+        try {
+            sensorThread?.join(500)
+        } catch (e: InterruptedException) {
+            Timber.e("Sensor thread join interrupted")
+        }
+        
+        sensorThread = null
+        sensorHandler = null
         isStepDetectorRegistered = false
+        
+        Timber.i("AppSensorManager: Synchronous stop completed.")
     }
 
     private fun startStepDetectorRecoveryLoop() {
@@ -358,7 +376,6 @@ class AppSensorManager @Inject constructor(
                 val value = values[0]; val newValue = value < proximityMaxRange
                 currentProximityCm = value.toDouble(); if (debouncedProximityCm == -1.0) debouncedProximityCm = value.toDouble()
                 
-                // Linear Transition via EMA (R742)
                 val rawIdx = (1.0 - (value / proximityMaxRange)).toDouble().coerceIn(0.0, 1.0)
                 proximityIdx = (proximityIdx * (1.0 - PROXIMITY_EMA_ALPHA)) + (rawIdx * PROXIMITY_EMA_ALPHA)
                 

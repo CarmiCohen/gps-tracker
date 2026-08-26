@@ -1,4 +1,4 @@
-# Architectural Simplification Ideas (vAug.26.01)
+# Architectural Simplification Ideas (vAug.26.04)
 
 ## 🎯 Current Objectives
 - Reduce memory churn on budget hardware (A15).
@@ -6,17 +6,16 @@
 - Stabilize background monitor lifecycle.
 
 ## 💡 Ideas
-1.  **Unified Grace Logic**: Instead of separate `HARDWARE_BOOT_GRACE_MS` and `GPS_WARMUP_GRACE_MS`, consider a unified `StartupSettlingState` in `AlarmEvaluationState` that encapsulates all time-based suppressions.
-2.  **Stateless Violation Reporting**: Refactor `MainAlarmLogic` to return a stream of delta-violations rather than a full report each tick, reducing the allocation of `ViolationReport` objects.
-3.  **Monotonic-Only Evaluation**: Remove all `currentTimeMillis` dependencies from `MainAlarmLogic` to eliminate risk of clock-skew false positives.
-4.  **Baseline Quantization**: Store EMA baselines (Baro/Acoustic) in a separate `EnvironmentContext` to decouple environmental tracking from alarm evaluation logic.
-5.  **Standardized LRU Provider**: Evaluate replacing the custom `ShadowCache` wrapper with `androidx.collection.LruCache` to reduce custom concurrency boilerplate.
-6.  **Decomposed Map Layers (A15)**: (Issue #321) Consider splitting `TrackerScreen` into smaller sub-compositions that hydrate independently to reduce the 901ms Davey stall during initial map render.
-7.  **Native Disposal Guard**: (Issue #320) Implement a standardized `NativeResourceGuard` to ensure `dispose()` is called for all native handles, preventing `BaseEventQueue` warnings.
+1.  **Idle-Based Hydration**: Instead of fixed delays (300ms/600ms/1000ms), implement an `IdleHandler` based hydration strategy for the Map Engine to ensure it only initializes when the UI thread is genuinely free (Issue #323).
+2.  **Hardware Handshake**: Replace the "magic" 200ms settling delay in `onDestroy` with a deterministic handshake or callback from the native `libjdHardware.so` to signal that all event queues are disposed.
+3.  **Unified Grace Logic**: Instead of separate `HARDWARE_BOOT_GRACE_MS` and `GPS_WARMUP_GRACE_MS`, consider a unified `StartupSettlingState`.
+4.  **Stateless Violation Reporting**: Refactor `MainAlarmLogic` to return a stream of delta-violations.
+5.  **Standardized LRU Provider**: Evaluate replacing the custom `ShadowCache` wrapper with `androidx.collection.LruCache`.
 
 ## 🟢 Implemented Simplifications
-- **LifecycleHydrationManager**: (Aug.26.00) Centralized staggered hydration sequence for budget hardware (Issue #318).
-- **Native Retry Logic**: (Aug.26.00) Hardened `JdHardwareManager` with exponential backoff to resolve Monitor::Inflate failures (Issue #319).
-- **Hardware SOT Object**: (Aug.25.05) Decoupled hardware detection from `:app` layer. Verified on SM-A155F.
+- **Deep Hardening Audit**: (Aug.26.04) Validated Anomaly Correlation Engine (R133) and Heat Mitigation (R191) under sustained 100Hz stress.
+- **Native Cleanup Strategy**: (Aug.26.04) Hardened JNI destruction sequence to prevent BaseEventQueue leaks (Issue #320).
+- **Multi-Stage Hydration**: (Aug.26.02) Decomposed `TrackerScreen` into 3-stage hydration levels to eliminate Davey stalls (Issue #321).
+- **LifecycleHydrationManager**: (Aug.26.00) Centralized staggered hydration sequence.
+- **Hardware SOT Object**: (Aug.25.05) Decoupled hardware detection from `:app` layer.
 - **Snap-Isolation Throttling**: (Aug.25.04) Reduced Compose recomposition cycles using parity-based filters.
-- **Map Pool Isolation**: (Aug.25.00) Removed map overlays from Compose state to avoid lock verification overhead.

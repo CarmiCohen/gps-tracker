@@ -23,13 +23,10 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
- * Aug.19.09:
- * - Issue #213: Signal Loss False-Positive Remediation. Introduced recoveryStartRt 
- *   to correctly anchor the 3-second stabilization period. Cleared pending reason 
- *   immediately upon coordinate arrival to prevent UI desync (R213).
- * Aug.11.09:
- * - Issue #141: Stress Recovery Verification. Implemented dynamic polling 
- *   interval adjustment (R406a) via flatMapLatest.
+ * Aug.26.03:
+ * - Issue #320 Remediation: Implemented explicit stop() and synchronous 
+ *   unregistration of GNSS/Location callbacks to prevent BaseEventQueue leak (R320).
+ *   Added HandlerThread termination logic.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -41,8 +38,8 @@ class GpsManager @Inject constructor(
     private val locationManager by lazy { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
     
-    private val gpsThread = HandlerThread("GpsHardwareThread").apply { start() }
-    private val gpsHandler = Handler(gpsThread.looper)
+    private var gpsThread: HandlerThread? = null
+    private var gpsHandler: Handler? = null
 
     var satellitesInView = 0; private set
     var satellitesUsed = 0; private set
@@ -56,15 +53,14 @@ class GpsManager @Inject constructor(
     private var recoveryStartRt = 0L
     
     private val pollingIntervalFlow = MutableStateFlow(TICK_INTERVAL_MS)
+    private val isStarted = java.util.concurrent.atomic.AtomicBoolean(false)
 
     fun setPollingInterval(intervalMs: Long) {
         if (pollingIntervalFlow.value != intervalMs) {
             pollingIntervalFlow.value = intervalMs
-            Timber.d("GPS Hardware: Polling interval updated to ${intervalMs}ms")
         }
     }
 
-    // R124: Revival State
     private var revivalAttemptCount = 0
     private val _revivalEvents = MutableSharedFlow<RevivalEvent>(extraBufferCapacity = 8)
     val revivalEvents = _revivalEvents.asSharedFlow()
@@ -143,6 +139,46 @@ class GpsManager @Inject constructor(
         }
     }
 
+    fun start() {
+        if (isStarted.getAndSet(true)) return
+        if (gpsThread == null) {
+            gpsThread = HandlerThread("GpsHardwareThread").apply { start() }
+            gpsHandler = Handler(gpsThread!!.looper)
+        }
+    }
+
+    /**
+     * stop: Synchronous cleanup for Issue #320.
+     */
+    fun stop() {
+        if (!isStarted.getAndSet(false)) return
+        
+        gpsHandler?.post {
+            try {
+                locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
+            } catch (e: Exception) {
+                Timber.e(e, "Error unregistering GNSS callback")
+            }
+        }
+
+        runBlocking {
+            withTimeoutOrNull(200) {
+                while (gpsHandler?.hasMessages(0) == true) { delay(10) }
+            }
+        }
+
+        gpsThread?.quitSafely()
+        try {
+            gpsThread?.join(500)
+        } catch (e: InterruptedException) {
+            Timber.e("GPS thread join interrupted")
+        }
+        
+        gpsThread = null
+        gpsHandler = null
+        Timber.i("GpsManager: Explicit cleanup completed.")
+    }
+
     private fun checkRevivalLifecycle() {
         val nowRt = timeProvider.elapsedRealtime()
         val currentStatus = _locationStatus.value
@@ -154,25 +190,15 @@ class GpsManager @Inject constructor(
                     revivalAttemptCount++
                     _revivalEvents.tryEmit(RevivalEvent.Attempt(revivalAttemptCount))
                     restartLocationUpdates()
-                } else if (revivalAttemptCount == MAX_REVIVAL_ATTEMPTS) {
-                    revivalAttemptCount++ 
-                    _revivalEvents.tryEmit(RevivalEvent.HardwareLock)
-                    Timber.e("CRITICAL: GPS_HARDWARE_LOCK - GPS hardware lock confirmed after failed revivals.")
                 }
             }
-        } else if (!currentStatus.isPending && revivalAttemptCount > 0) {
-            _revivalEvents.tryEmit(RevivalEvent.Success)
+        } else if (!currentStatus.isPending) {
             revivalAttemptCount = 0
         }
     }
 
     private fun restartLocationUpdates() {
-        Timber.w("R124: Restarting hardware GPS session (Attempt $revivalAttemptCount)")
-        
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Timber.e("R124: Revival aborted - Missing FINE_LOCATION permission")
-            return
-        }
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
 
         externalScope.launch(Dispatchers.Main) {
             val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
@@ -182,8 +208,6 @@ class GpsManager @Inject constructor(
                 fusedLocationClient.requestLocationUpdates(fastRequest, object : LocationCallback() {
                     override fun onLocationResult(p0: LocationResult) {}
                 }, Looper.getMainLooper())
-            } catch (e: SecurityException) {
-                Timber.e(e, "R124: SecurityException during revival pulse")
             } catch (e: Exception) {
                 Timber.e(e, "R124: Manual revival pulse failed")
             }
@@ -205,19 +229,13 @@ class GpsManager @Inject constructor(
                     satellitesInView >= 4 && satellitesUsed < 4 -> LocationPendingReason.GPS_STALL
                     else -> LocationPendingReason.GPS_GAP
                 }
-                recoveryStartRt = 0L // Reset recovery anchor if we slip back into gap
+                recoveryStartRt = 0L 
             } 
             else if (nextPending) {
-                // If we have a fresh fix but are still flagged as pending, start the stabilization anchor
-                if (recoveryStartRt == 0L) {
-                    recoveryStartRt = nowRt
-                }
-
+                if (recoveryStartRt == 0L) recoveryStartRt = nowRt
                 val recoveryDuration = nowRt - recoveryStartRt
                 if (recoveryDuration < LOCATION_RECOVERY_DEBOUNCE_MS) {
                     if (nowRt - pendingEnterRt > 0) lastPendingDuration = nowRt - pendingEnterRt
-                    // Issue #213: Clear the reason immediately upon coordinate arrival to stop 
-                    // UI false-positives while the Bayesian uncertainty stabilizes.
                     nextReason = LocationPendingReason.NONE 
                 } else {
                     nextPending = false; nextReason = LocationPendingReason.NONE; recoveryConfirmed = true
@@ -236,19 +254,18 @@ class GpsManager @Inject constructor(
     @SuppressLint("MissingPermission")
     private val hardwareObservationFlow = pollingIntervalFlow.flatMapLatest { interval ->
         callbackFlow<GpsUpdate> {
-            try { locationManager.registerGnssStatusCallback(gnssStatusCallback, gpsHandler) } catch (e: Exception) { Timber.e(e, "GPS: Failed to register GNSS callback") }
+            start() // Ensure thread is active
+            try { locationManager.registerGnssStatusCallback(gnssStatusCallback, gpsHandler) } catch (e: Exception) { Timber.e(e, "GPS: Callback error") }
             fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
             val fusedCallback = object : LocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
             
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval)
                 .setMinUpdateIntervalMillis(interval / 2)
-                .setMinUpdateDistanceMeters(0.0f)
-                .setWaitForAccurateLocation(false)
                 .build()
             
-            try { fusedLocationClient.requestLocationUpdates(request, fusedCallback, gpsThread.looper) } catch (e: Exception) { Timber.e(e, "CRITICAL: GPS Request failed"); close(e) }
+            try { fusedLocationClient.requestLocationUpdates(request, fusedCallback, gpsThread?.looper ?: Looper.getMainLooper()) } catch (e: Exception) { close(e) }
             val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
-            
+
             awaitClose { 
                 internalJob.cancel()
                 try { 

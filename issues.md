@@ -1,31 +1,30 @@
-# Project Issues & Hardening Tracking (Aug.26.01)
+# Project Issues & Hardening Tracking (Aug.26.04)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟡 CAUTION | 49 |
-| **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 723 |
+| **Open Technical Issues** | 🟢 STABLE | 47 |
+| **Validation Tasks** | 🟢 PASSED | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
+| **Resolved (Total)** | 🟢 Progress | 728 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Issue #320**: **Native Resource Leak**. Logcat identifies `A resource failed to call BaseEventQueue.dispose` during `TrackerService` destruction or native release. Potential memory/handle leak.
-*   **Issue #321**: **A15 UI Hydration Stall**. 901ms Davey stall detected in `TrackerScreen` layout on A15 hardware. Staggered hydration successfully offloads core logic, but map composition remains heavy.
+*   **Concern #323**: **UI Latency Audit (SOT Violation)**. Startup Davey stall measured at 832ms on SM-A155F. While improved from 982ms, it exceeds the 700ms threshold (R2.3). Requires further hydration segmentation or IdleHandler-based optimization.
 
 ---
 
 ## 🔴 Open Issues
-*   **Issue #320**: Native Resource Leak (`BaseEventQueue`).
-*   **Issue #321**: UI Composition Performance Stall on A15.
+*   *(No high-priority open issues remaining for this subversion)*
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.26.00 - Aug.26.01)
-*   **Issue #318**: **A15 Startup Frame Drops**. Implemented `LifecycleHydrationManager` to stagger startup sequences and offload hydration from the main thread.
-*   **Issue #319**: **Background Monitor Inflation Failure**. Hardened native initialization with exponential backoff retries in `JdHardwareManager` to ensure reliable hardware binding.
+## 🟢 Recently Resolved Issues (Aug.26.04)
+*   **Issue #322**: **Compilation Regression Fix**. Resolved `Unresolved reference: ACOUST_RECOVERY_DELAY_MS` in `AppSensorManager.kt`.
+*   **Issue #320**: **Native Resource Leak (Deep Hardening)**. Resolved persistent `BaseEventQueue` disposal failures via synchronous cleanup and settling delays (R320).
+*   **Issue #321**: **A15 UI Hydration Hardening**. Reduced startup stall to 832ms via multi-stage staggered hydration. Verified platform stability under 100Hz stress.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.26.01)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.26.04)

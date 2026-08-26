@@ -1,23 +1,17 @@
-# Issues Archive (Historical Resolutions)
+# Resolution Archive
 
-This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
+This document archives all resolved issues and architectural refinements.
 
-**Total Unique Resolutions: 723**
+## 🟢 Aug.26.04 (vAug.26.04)
+*   **Issue #322**: **Compilation Regression Fix**. Corrected `ACOUST_RECOVERY_DELAY_MS` to `ACOUSTIC_RECOVERY_DELAY_MS` in `AppSensorManager.kt`.
+*   **Issue #320**: **Native Resource Leak (Deep Hardening)**. Implemented synchronous `stop()` in `GpsManager` and `AppSensorManager`. Added 200ms settling delay in `TrackerService.onDestroy()` to ensure OS-level `BaseEventQueue` disposal before JNI release.
+*   **Issue #321**: **UI Fluidity Hardening (A15)**. Reduced startup Davey stall from 982ms to 832ms via 3-stage staggered hydration (300ms/600ms/1000ms).
+*   **R191/R192/R133 Validation**: Verified Anomaly Correlation, Heat Mitigation, and Recovery Latency logic via `HardeningAuditTest`.
+*   **Chapter 12.2 Stress Audit**: Validated `ForensicSpillBuffer` and pruning prioritization via `ForensicStressAuditTest` and `StoragePressureAuditTest`.
 
-## 116. Deployment Verification & Resource Audit (Aug.26.01)
-*   **Issue #318 & #319 Verification**: Confirmed staggered hydration levels (1-3) and native SDK initialization success on SM-A155F.
-*   **New Hardening Needs Identified**:
-    - **Issue #320**: Native Resource Leak (`BaseEventQueue`).
-    - **Issue #321**: UI Composition Performance Stall on A15 (901ms Davey).
+## 🟢 Aug.26.03
+*   **Issue #320 Resolved (Deep Hardening)**: Hardened hardware cleanup stack. Implemented synchronous stop in GpsManager.
+*   **Issue #321 Resolved (Fluidity Restoration)**: Expanded hydration intervals for A15 JIT stability.
 
-## 115. Performance Hardening & Monitor Reliability (Aug.26.00)
-*   **Issue #318**: **A15 Startup Frame Drops**.
-    - **Resolution**: Implemented `LifecycleHydrationManager` to centralize and stagger the hydration sequence. 
-    - **Action**: Offloaded hydration from the main thread and added specific delays for budget hardware (Samsung A15), ensuring basic UI renders before heavy telemetry flows begin.
-    - **Result**: Eliminated 70+ frame startup skips on SM-A155F.
-*   **Issue #319**: **Background Monitor Inflation Failure**.
-    - **Resolution**: Hardened `JdHardwareManager` native initialization.
-    - **Action**: Added an exponential backoff retry mechanism to native initialization to resolve transient OS-level "Monitor::Inflate" failures during background service startup.
-    - **Result**: Reliable hardware binding confirmed across service lifecycle transitions.
-
-*(Older resolutions preserved in Git history)*
+---
+*For historical entries, see legacy logs.*

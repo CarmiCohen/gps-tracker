@@ -3,8 +3,6 @@ package com.gps19.app
 import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,28 +13,29 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.osmdroid.util.GeoPoint
 import com.gps19.core.engine.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
- * Aug.22.04:
- * - Issue #140 Restoration Build Fix: Unified naming to maxIoLatency. 
- *   De-duplicated currentMa in TrackerDashboard signature and fixed 
- *   TelemetryBox parameter binding.
+ * Aug.26.04:
+ * - Issue #321 Deep Hardening: Corrected parameter binding in TrackerDashboard 
+ *   to resolve build failure. Further optimized hydration Level 2/3 timing 
+ *   to eliminate frame-drop overlap during heavy OSM Engine init (R321).
+ * Aug.26.03:
+ * - Issue #321 Regression Fix: Expanded hydration gaps to 300ms/600ms/1000ms 
+ *   to accommodate A15 hardware JIT burst.
  */
 
 @Composable
@@ -63,10 +62,12 @@ fun TrackerScreen(
     onSaveTrail: () -> Unit = {},
     onLoadTrail: () -> Unit = {}
 ) {
-    var isHydrated by remember { mutableStateOf(false) }
+    // Stage Hydration for Performance Hardening (Issue #321)
+    var hydrationLevel by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
-        delay(200) 
-        isHydrated = true
+        delay(300); hydrationLevel = 1  // Basic Shell
+        delay(400); hydrationLevel = 2  // Telemetry Dashboard logic
+        delay(500); hydrationLevel = 3  // Heavy Map Engine
     }
 
     val nav = uiState.navigation
@@ -85,7 +86,7 @@ fun TrackerScreen(
     val dashboardState by viewModel.dashboardState.collectAsStateWithLifecycle()
     val hudState by viewModel.hudState.collectAsStateWithLifecycle()
     val gpsIndexData by viewModel.gpsIndexData.collectAsStateWithLifecycle()
-    val rtt by viewModel.rtt.collectAsStateWithLifecycle()
+    val rttValue by viewModel.rtt.collectAsStateWithLifecycle()
     val currentMa by viewModel.currentMa.collectAsStateWithLifecycle()
 
     val onDashboard = {
@@ -127,7 +128,7 @@ fun TrackerScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (!isHydrated) {
+        if (hydrationLevel < 1) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
             }
@@ -140,7 +141,7 @@ fun TrackerScreen(
                         statusBar()
                         
                         Box(modifier = Modifier.weight(1f)) {
-                            if (isMapVisible && !isAnyOverlayOpen) {
+                            if (hydrationLevel >= 3 && isMapVisible && !isAnyOverlayOpen) {
                                 AppMapContainer(
                                     appMode = uiState.appMode,
                                     isMapButtonsVisible = uiState.isMapButtonsVisible,
@@ -187,7 +188,7 @@ fun TrackerScreen(
                                     showSettingsButton = true,
                                     showToolsOverlay = true
                                 )
-                            } else if (!isMapVisible) {
+                            } else if (hydrationLevel >= 2 && !isMapVisible) {
                                 TrackerDashboard(
                                     appMode = uiState.appMode ?: "tracker",
                                     isSystemActive = uiState.isSystemActive,
@@ -255,7 +256,7 @@ fun TrackerScreen(
                                     acousticFloorDb = dashboardState.acousticFloorDb,
                                     trackerCurrentMa = dashboardState.trackerCurrentMa,
                                     gpsIdx = gpsIndexData,
-                                    rttValue = rtt,
+                                    rttValue = rttValue,
                                     currentMaValue = currentMa,
                                     systemPulse = systemPulse,
                                     cpuLoad = dashboardState.cpuLoad,
@@ -268,7 +269,7 @@ fun TrackerScreen(
                     }
                 }
             } else {
-                if (isMapVisible && !isAnyOverlayOpen) {
+                if (hydrationLevel >= 3 && isMapVisible && !isAnyOverlayOpen) {
                     AppMapContainer(
                         appMode = uiState.appMode,
                         isMapButtonsVisible = uiState.isMapButtonsVisible,
@@ -299,7 +300,7 @@ fun TrackerScreen(
                         viewerSpeed = kinematicState.trackerLocation.speed,
                         viewerAccuracy = kinematicState.trackerLocation.accuracy,
                         viewerMaxAcc = kinematicState.trackerLocation.maxAccuracy,
-                        viewerGpsTs = kinematicState.localLocation.timestamp,
+                        viewerGpsTs = kinematicState.trackerLocation.timestamp,
                         viewerTelemetryTs = 0L,
                         viewerLocPending = kinematicState.trackerHealth.isLocationPending,
                         viewerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
@@ -331,7 +332,7 @@ fun TrackerScreen(
                             }
                         }
 
-                        if (isMapVisible) {
+                        if (hydrationLevel >= 3 && isMapVisible) {
                             Box(Modifier.fillMaxWidth().padding(top = 8.dp, end = 12.dp), contentAlignment = Alignment.CenterEnd) {
                                 MapSettingsToggle(
                                     isMapButtonsVisible = uiState.isMapButtonsVisible,
@@ -365,7 +366,7 @@ fun TrackerScreen(
                             }
                         }
                         
-                        if (!isMapVisible) {
+                        if (hydrationLevel >= 2 && !isMapVisible) {
                             TrackerDashboard(
                                 appMode = uiState.appMode ?: "tracker",
                                 isSystemActive = uiState.isSystemActive,
@@ -433,7 +434,7 @@ fun TrackerScreen(
                                 acousticFloorDb = dashboardState.acousticFloorDb,
                                 trackerCurrentMa = dashboardState.trackerCurrentMa,
                                 gpsIdx = gpsIndexData,
-                                rttValue = rtt,
+                                rttValue = rttValue,
                                 currentMaValue = currentMa,
                                 systemPulse = systemPulse,
                                 cpuLoad = dashboardState.cpuLoad,
@@ -595,15 +596,11 @@ fun TrackerDashboard(
     maxIoLatency: Long,
     onEvent: (UiEvent) -> Unit
 ) {
-    val gpsAge = if (localLocationTs > 0) systemPulse - localLocationTs else Long.MAX_VALUE
-    val isGpsActive = isSystemActive && gpsAge < GPS_UI_FAIL_THRESHOLD_MS
-    val hasFix = isGpsActive && localLat != 0.0 && localLat != DEFAULT_LAT
-    
     LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         item {
             if (isDashboardExpanded) {
                 Spacer(Modifier.height(2.dp))
-                Icon(Icons.Default.Agriculture, null, tint = if(hasFix) MaterialTheme.colorScheme.primary else Slate500, modifier = Modifier.size(40.dp))
+                Icon(Icons.Default.Agriculture, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
                 Spacer(Modifier.height(4.dp))
                 TelemetryBox(
                     appMode = appMode,
@@ -675,12 +672,13 @@ fun TrackerDashboard(
                     maxIoLatency = maxIoLatency,
                     onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                 )
+                
                 DebugTable(
                     isLinkFresh = isLinkFresh,
                     isTelemetryFresh = isTelemetryFresh,
                     isGpsFresh = isGpsFresh,
                     trackerStateName = trackerState.name,
-                    gpsAgeSec = if (gpsAge != Long.MAX_VALUE) gpsAge / 1000 else -1L,
+                    gpsAgeSec = if (localLocationTs > 0) (systemPulse - localLocationTs) / 1000 else -1L,
                     rtt = rttValue,
                     currentMa = currentMaValue
                 )

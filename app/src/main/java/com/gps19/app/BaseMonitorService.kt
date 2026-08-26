@@ -19,10 +19,12 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Aug.26.03:
+ * - Issue #320 Remediation: Hardened cleanup sequence. Added explicit 
+ *   gpsManager.stop() and ensured all hardware listeners are unregistered 
+ *   synchronously before service destruction (R320).
  * Aug.21.09:
- * - Issue #249 Hardening: Added explicit appSensorManager.stop() to onDestroy to 
- *   ensure sensor listeners are unregistered and native event queues are disposed.
- * - Issue #299: Ensure WakeLock and Watchdog cleanup is robust during service termination.
+ * - Issue #249 Hardening: Added explicit appSensorManager.stop() to onDestroy.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -53,10 +55,10 @@ abstract class BaseMonitorService : LifecycleService() {
     
     protected val cachedPkgName by lazy { packageName }
 
-    protected var serviceStartRealtime = 0L // Monotonic
-    protected var serviceStartWall = 0L // Wall-clock
-    protected var lastServiceTickTs = 0L // Wall-clock
-    protected var lastServiceTickRealtime = 0L // Monotonic
+    protected var serviceStartRealtime = 0L 
+    protected var serviceStartWall = 0L 
+    protected var lastServiceTickTs = 0L 
+    protected var lastServiceTickRealtime = 0L 
     protected var serviceTickCounter = 0
     
     protected val isUiForeground = AtomicBoolean(false)
@@ -86,29 +88,24 @@ abstract class BaseMonitorService : LifecycleService() {
         serviceStartRealtime = timeProvider.elapsedRealtime()
         serviceStartWall = timeProvider.currentTimeMillis()
         
-        // Issue #607: Ensure notification channels and role configuration are set BEFORE startForeground.
         onServicePreInit()
         startServiceForeground()
         
         lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
-            // 2. Active State Sync
             launch {
                 repository.isSystemActiveFlow.collectLatest { active ->
                     isSystemActive = active
                 }
             }
             
-            // 3. Sub-class Initialization (Coordinated)
             onServiceInitialize()
 
-            // 4. Deferred Background Maintenance (Issue #120b)
             launch(Dispatchers.IO) {
                 systemMonitor.acquireWakeLock()
                 
                 delay(LANDING_PAGE_PAUSE_MS) 
                 repository.proactivePruning()
                 
-                // Reactive Watchdog Monitoring
                 systemMonitor.systemMonitorEvents.collect { event ->
                     if (event is SystemMonitorEvent.WatchdogScheduled) {
                         logManager.logWatchdogPulse(event.success, event.skippedCount)
@@ -123,20 +120,8 @@ abstract class BaseMonitorService : LifecycleService() {
     abstract suspend fun processTick(now: Long, nowRt: Long)
     abstract fun getRequiredTickInterval(): Long
 
-    /**
-     * onHeartbeat: Low-frequency (30s) hook for UI/Notification updates.
-     */
     protected abstract suspend fun onHeartbeat(now: Long, nowRt: Long)
-
-    /**
-     * onServicePreInit: Synchronous startup hook for immediate configuration (e.g. notifications).
-     */
     protected abstract fun onServicePreInit()
-    
-    /**
-     * onServiceInitialize: Event-driven startup hook for subclasses.
-     * July.26.03: Replace arbitrary delay() calls with deterministic coordination.
-     */
     protected abstract suspend fun onServiceInitialize()
 
     protected fun startTickLoop() {
@@ -164,9 +149,7 @@ abstract class BaseMonitorService : LifecycleService() {
             while (isActive) {
                 val now = timeProvider.currentTimeMillis()
                 val nowRt = timeProvider.elapsedRealtime()
-                
                 onHeartbeat(now, nowRt)
-                
                 delay(NOTIFICATION_THROTTLE_MS)
             }
         }
@@ -209,8 +192,10 @@ abstract class BaseMonitorService : LifecycleService() {
         heartbeatJob?.cancel()
         fgsUpdateJob?.cancel()
         
-        // Issue #249: Unregister sensors to prevent BaseEventQueue disposal failures.
+        // Issue #320/249: Hardened cleanup sequence.
+        // 1. Unregister all hardware callbacks synchronously.
         appSensorManager.stop()
+        gpsManager.stop()
 
         runBlocking {
             withTimeoutOrNull(1000) {

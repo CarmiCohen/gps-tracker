@@ -21,19 +21,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * Aug.24.01:
- * - Issue #307 Remediation: Standardized monotonic authority for maintenance 
- *   uptime logging. Persisting LAST_SERVICE_TICK_REALTIME_KEY to ensure 
- *   accurate silence detection in MaintenanceWorker (R307).
- * Aug.22.05:
- * - Audit Chapter 12.3: Added SimulateStoragePressure handler in 
- *   observeCommandEvents to support storage prioritization audit (R197).
- * Aug.21.09:
- * - Issue #265 Remediation: Migrated to JdHardwareManager.initialize() suspend 
- *   pattern to eliminate UI thread stalls during service bootstrap (R265).
- * - Issue #249/262 Remediation: Added JdHardwareManager.releaseHardware() to 
- *   onDestroy to ensure native global references and hardware handles are 
- *   disposed, preventing memory leaks and BaseEventQueue failures.
+ * Aug.26.03:
+ * - Issue #320 Regression Fix: Hardened destruction sequence. Reordered 
+ *   hardware unregistration to occur before the native JNI bridge release, 
+ *   and added a 200ms settling delay to allow the OS to dispose of the 
+ *   BaseEventQueue correctly (R320).
+ * - Issue #321 Regression Fix: Integrated with refined multi-stage hydration 
+ *   in TrackerScreen.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -294,7 +288,7 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start() }
                     is CommandEvent.ExecuteStressTest -> executeAutomatedStressTest()
-                    is CommandEvent.SimulateStoragePressure -> {} // Logic handled in CommandRouter via integrityMonitor
+                    is CommandEvent.SimulateStoragePressure -> {} 
                 }
             }
         }
@@ -422,7 +416,6 @@ class TrackerService : BaseMonitorService() {
 
         appSensorManager.setHighLoad(health.isCoolingModeActive)
         
-        // Issue #141: Dynamic GPS Polling Adjustment (R406a)
         isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(
             currentSuspicious = isSuspiciousMode,
             isPhysicalViolation = locationProcessor.sentinel.checkPhysicalTamper(nowRt, false) == SentinelStatus.TAMPER,
@@ -430,7 +423,6 @@ class TrackerService : BaseMonitorService() {
             nowRt = nowRt
         )
         
-        // Issue #169: Pass isGeofenceActive to polling logic.
         val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(
             isCoolingMode = health.isCoolingModeActive,
             isSuspiciousMode = isSuspiciousMode,
@@ -457,7 +449,6 @@ class TrackerService : BaseMonitorService() {
         if (capabilities.isA15Device) {
             if (JdHardwareManager.isAvailable()) {
                 val flags = if (health.isPowerSaveMode) 0x01 else 0x00
-                // Issue #301: Await the suspending syncState call to ensure watchdog protection.
                 JdHardwareManager.syncState(timeProvider, serviceTickCounter, flags)
             } else if (nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
                 lastA15PokeRt = nowRt
@@ -624,7 +615,6 @@ class TrackerService : BaseMonitorService() {
         lifecycleScope.launch(Dispatchers.Default) {
             logManager.logServiceEvent("FORENSIC STRESS TEST: Initiating 5s CPU/IO saturation burst.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
             
-            // CPU Saturation: Math heavy loop
             val cpuJob = launch(Dispatchers.Default) {
                 val end = System.currentTimeMillis() + 5000L
                 var count = 0L
@@ -637,10 +627,9 @@ class TrackerService : BaseMonitorService() {
                 logManager.logServiceEvent("STRESS TEST: CPU Saturation complete ($count iterations).", isImportant = false)
             }
 
-            // IO Saturation: Rapid file writes
             val ioJob = launch(Dispatchers.IO) {
                 val end = System.currentTimeMillis() + 5000L
-                val data = ByteArray(1024 * 1024) { 0xFF.toByte() } // 1MB
+                val data = ByteArray(1024 * 1024) { 0xFF.toByte() } 
                 val tempFile = File(cacheDir, "stress_test.tmp")
                 var writes = 0
                 while (System.currentTimeMillis() < end) {
@@ -658,11 +647,10 @@ class TrackerService : BaseMonitorService() {
                 logManager.logServiceEvent("STRESS TEST: IO Saturation complete ($writes MB written).", isImportant = false)
             }
 
-            // Forensic Saturation: Inject 500 logs as fast as possible
             val forensicJob = launch(Dispatchers.Default) {
                 repeat(500) { i ->
                     logManager.logForensicTrace("STRESS_BURST: Forensic sample #$i injection.")
-                    if (i % 100 == 0) delay(1) // Minor yield to prevent complete thread starvation
+                    if (i % 100 == 0) delay(1) 
                 }
                 logManager.logServiceEvent("STRESS TEST: Forensic Saturation burst complete.", isImportant = false)
             }
@@ -710,17 +698,24 @@ class TrackerService : BaseMonitorService() {
             alarmManager.evaluateAlarms(
                 now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = true, isRelayConnected = isSocketConnected, isTrackerConnected = true, status = processed.status, isJammer = processed.jammerDetected, jumpTier = processed.jumpTier, 
                 isAdaptiveJump = processed.isAdaptiveJump,
-                trackerLat = processed.optimizedPoint.lat, trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy, maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = lastKnownLocation?.time ?: 0L, trackerLastGpsRt = lastGpsFixRealtime, trackerLastValidFixTs = 0L, trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed, trackerBattery = health.batteryLevel, trackerTemp = health.batteryTemp, isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss, isSignalLoss = health.signalLoss, isGpsStalling = health.gpsStalled, isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = health.locationPendingReason == LocationPendingReason.GPS_GAP, isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees, trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt, trackerBaroAltEma = locationProcessor.getBaroBaseline(), trackerLux = snapshot.lux, isNear = snapshot.isNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = snapshot.peakShock, trackerCurrentMa = health.currentMa, capabilities = capabilities
+                trackerLat = processed.optimizedPoint.lat, trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy, maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = lastKnownLocation?.time ?: 0L, trackerLastGpsRt = lastGpsFixRealtime, trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed, trackerBattery = health.batteryLevel, trackerTemp = health.batteryTemp, isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss, isSignalLoss = health.signalLoss, isGpsStalling = health.gpsStalled, isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = health.locationPendingReason == LocationPendingReason.GPS_GAP, isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees, trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt, trackerBaroAltEma = locationProcessor.getBaroBaseline(), trackerLux = snapshot.lux, isNear = snapshot.isNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = snapshot.peakShock, trackerCurrentMa = health.currentMa, capabilities = capabilities
             )
         }
     }
 
     override fun onDestroy() {
-        // Issue #249/262: Release native hardware resources and stop jobs.
-        if (capabilities.isA15Device) {
-            JdHardwareManager.releaseHardware(timeProvider)
-        }
         gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
+        
+        // super.onDestroy() will trigger synchronous stop() for AppSensorManager and GpsManager.
         super.onDestroy()
+
+        // Issue #320/262: Added a deterministic settling delay before 
+        // releasing the native bridge to prevent BaseEventQueue disposal race.
+        if (capabilities.isA15Device) {
+            runBlocking {
+                delay(200) 
+                JdHardwareManager.releaseHardware(timeProvider)
+            }
+        }
     }
 }
