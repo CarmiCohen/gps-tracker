@@ -1,20 +1,20 @@
-# Handover (Aug.26.06) - Hardening Finalization (R323, R266)
+# Handover (Aug.26.07) - Hardware Deployment Verified
 
 ## 🎯 Current Status
-- **Goal**: Finalize Startup Fluidity (#323) and Mali Driver Audit (#324).
-- **Status**: 🟢 **STABLE** (Startup Fluidity), 🟢 **STABLE** (Forensic Correlation), 🟢 **STABLE** (Native disposal)
-- **Version**: `Aug.26.06`
+- **Goal**: Verify stable hardware deployment of vAug.26.06 fixes.
+- **Status**: 🟢 **STABLE** (Startup Fluidity), 🟢 **STABLE** (Mali Audit), 🟡 **CONCERN** (Issue #723: StackLog Leak)
+- **Version**: `Aug.26.07`
 - **Database**: v73
-- **Audit Baseline**: SOT: 173, Resolved: 732, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 194, QA Status: 194.
+- **Audit Baseline**: SOT: 173, Resolved: 732, Open: 48, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 195, QA Status: 195.
 
-## 🧬 Forensic Audit Summary: Aug.26.06
-- **Issue #323 Resolved (Startup Fluidity)**: Migrated Map Engine initialization to Level 4 (Idle Map Hydration) using `IdleHandler`. This ensures the UI shell renders first without frame drops. Verified integration in `TrackerScreen` and `ViewerScreen`.
-- **Issue #324 Resolved (Mali Audit)**: Implemented `simulateMaliAnomaly` in `IntegrityMonitor.kt` to verify R266 logic. Fixed compilation regression regarding `lastLocationPendingDurationMs`.
-- **R323/R266 Compliance**: Formally updated `SOT_MASTER_REQUIREMENTS.md` to reflect idle-based hydration and GPU-specific correlation requirements.
+## 🧬 Forensic Audit Summary: Aug.26.07
+- **Deployment Verification**: Verified **Issue #323 (Idle Hydration)** and **Issue #324 (Mali Audit)** on SM-A155F. Logcat confirms Level 4 Map hydration occurs via `IdleHandler` after the UI thread is free, eliminating Davey stalls.
+- **Issue #723 Identified**: Logcat monitoring revealed `StackLog` traces leaking from `SystemStatusProvider.kt` during network callback registration. This diagnostic noise must be remediated.
+- **Versioning**: Incremented subversion to `Aug.26.07` and updated all status tracking files.
 
 ## 🚀 Next Steps
-- Perform a 48-hour continuous soak test to verify forensic trace continuity (Ch 100).
-- Monitor `Mali Driver Anomaly` logs during actual navigation on budget hardware to verify sensitivity.
-- Verify `Hardware Handshake` idea in next session to replace 200ms settling delay.
+- **Remediate Issue #723**: Remove redundant `StackLog` / `println` traces from `SystemStatusProvider.kt`.
+- **Hardware Handshake**: Implement the deterministic handshake to replace the 200ms settling delay in service destruction.
+- **Soak Test**: Continue 48-hour soak test for forensic trace continuity.
 
-vAug.26.06
+vAug.26.07

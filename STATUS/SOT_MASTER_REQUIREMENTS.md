@@ -28,9 +28,8 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
-*   **Aug.26.05**: Resolved Issue #323 (Startup Davey Stall). Implemented Level 4 Idle-based Map Hydration (R323).
+*   **Aug.26.07**: Deployment Verification. Verified Issue #323 (Startup Fluidity) and Issue #324 (Mali Audit) on hardware. Identified Issue #723 (StackLog leak).
+*   **Aug.26.06**: Resolved Issue #323 (Startup Davey Stall). Implemented Level 4 Idle-based Map Hydration (R323).
+*   **Aug.26.05**: Hardening verification. 
 *   **Aug.26.04**: Resolved Issue #322 (Compilation Regression). Validated Chapter 12.2 Stress Audit (R197, R700) and Hardening (R133, R191, R192). Verified Native Cleanup (R320) stability post-service destruction.
 *   **Aug.26.03**: Resolved Issue #320 (Native Leak Persistence) via explicit GpsManager lifecycle and Issue #321 (UI Regression) via expanded 1000ms hydration gaps.
-*   **Aug.26.02**: Resolved Issue #320 (Native Leak) via hardened cleanup and Issue #321 (UI Davey) via 3-stage hydration.
-*   **Aug.26.01**: Deployment Verification. Confirmed hydration and native binding stability. Identified Issue #320 (Native Leak) and Issue #321 (Composition Davey).
-*   **Aug.26.00**: Resolved Issue #318 (A15 Startup Frame Drops) via `LifecycleHydrationManager` and Issue #319 (Monitor Inflation Failure) via native retry logic.

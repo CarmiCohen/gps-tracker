@@ -1,18 +1,18 @@
-# Project Issues & Hardening Tracking (Aug.26.06)
+# Project Issues & Hardening Tracking (Aug.26.07)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟢 STABLE | 47 |
+| **Open Technical Issues** | 🟢 STABLE | 48 |
 | **Validation Tasks** | 🟢 PASSED | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 730 |
+| **Resolved (Total)** | 🟢 Progress | 732 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   *(No new concerns identified in this subversion)*
+*   **Issue #723**: **Diagnostic Log Leak (StackLog)**. `SystemStatusProvider.kt` is emitting verbose `StackLog` traces during network callback registration. These traces flood Logcat and should be removed before wide deployment.
 
 ---
 
@@ -21,11 +21,8 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.26.06)
-*   **Issue #324**: **Mali Driver Audit Integration**. Implemented `simulateMaliAnomaly` hook in `IntegrityMonitor.kt` to verify forensic correlation of I/O spikes and CPU load on SM-A155F hardware (R266).
-*   **Issue #323**: **Startup Davey Stall (SOT Violation)**. Resolved startup latency violation by implementing Level 4 Idle-based Map Hydration. The heavy Map Engine now initializes via `IdleHandler` only after the UI thread is free, ensuring fluid navigation shell rendering (R323).
-*   **Issue #322**: **Compilation Regression Fix**. Resolved `Unresolved reference: ACOUST_RECOVERY_DELAY_MS` in `AppSensorManager.kt`.
-*   **Issue #320**: **Native Resource Leak (Deep Hardening)**. Resolved persistent `BaseEventQueue` disposal failures via synchronous cleanup and settling delays (R320).
+## 🟢 Recently Resolved Issues (Aug.26.07)
+*   **Deployment Verification**: Verified **Issue #323 (Idle Hydration)** and **Issue #324 (Mali Audit)** on SM-A155F hardware. Logcat confirms Level 4 Map hydration occurs after UI stabilization, and forensic correlation hooks are active.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.26.06)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.26.07)
