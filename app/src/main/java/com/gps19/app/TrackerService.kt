@@ -21,6 +21,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.26.09:
+ * - Issue #320 Hardening: Replaced 200ms magic delay in onDestroy with a 
+ *   deterministic hardware handshake using punchHardware() to ensure 
+ *   native event drainage before bridge release.
  * Aug.26.03:
  * - Issue #320 Regression Fix: Hardened destruction sequence. Reordered 
  *   hardware unregistration to occur before the native JNI bridge release, 
@@ -709,13 +713,14 @@ class TrackerService : BaseMonitorService() {
         // super.onDestroy() will trigger synchronous stop() for AppSensorManager and GpsManager.
         super.onDestroy()
 
-        // Issue #320/262: Added a deterministic settling delay before 
-        // releasing the native bridge to prevent BaseEventQueue disposal race.
-        if (capabilities.isA15Device) {
-            runBlocking {
-                delay(200) 
-                JdHardwareManager.releaseHardware(timeProvider)
+        // Issue #320/262: Replaced legacy 200ms settling delay with deterministic hardware handshake.
+        // This ensures the native event queue is drained and the bridge is responsive before release.
+        if (capabilities.isA15Device && JdHardwareManager.isAvailable()) {
+            val punchResult = JdHardwareManager.punchHardware(timeProvider)
+            if (punchResult != 0) {
+                logManager.logServiceEvent("HARDWARE: Handshake failed (Code: $punchResult). Forcing release.", isImportant = true)
             }
+            JdHardwareManager.releaseHardware(timeProvider)
         }
     }
 }

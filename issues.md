@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.26.08)
+# Project Issues & Hardening Tracking (Aug.26.09)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 STABLE | 47 |
 | **Validation Tasks** | 🟢 PASSED | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 733 |
+| **Resolved (Total)** | 🟢 Progress | 734 |
 
 ---
 
@@ -21,9 +21,9 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.26.08)
+## 🟢 Recently Resolved Issues (Aug.26.09)
+*   **Issue #320 Hardening**: **Hardware Handshake**. Replaced the 200ms "magic" settling delay in `TrackerService.onDestroy()` with a deterministic native round-trip (`punchHardware`). This ensures the native event queue is drained and the JNI bridge is responsive before release, preventing race conditions during service destruction on budget hardware (A15).
 *   **Issue #723**: **Diagnostic Log Leak (StackLog)**. Resolved platform-level diagnostic noise in `SystemStatusProvider.kt`. By transitioning `sharedInternetStatusFlow` to `SharingStarted.Eagerly`, we eliminated redundant `ConnectivityManager` callback registration cycles that triggered verbose `StackLog` traces on Samsung A15 hardware.
-*   **Deployment Verification**: Verified **Issue #323 (Idle Hydration)** and **Issue #324 (Mali Audit)** on SM-A155F hardware. Logcat confirms Level 4 Map hydration occurs after UI stabilization, and forensic correlation hooks are active.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.26.08)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.26.09)

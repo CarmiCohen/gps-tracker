@@ -1,20 +1,19 @@
-# Handover (Aug.26.08) - StackLog Leak Remediated
+# Handover (Aug.26.09) - Hardware Handshake Hardened
 
 ## 🎯 Current Status
-- **Goal**: Remediate diagnostic log leaks and finalize versioning for soak testing.
-- **Status**: 🟢 **STABLE** (Startup Fluidity), 🟢 **STABLE** (Mali Audit), 🟢 **STABLE** (Issue #723: StackLog Leak)
-- **Version**: `Aug.26.08`
+- **Goal**: Hardening service destruction and native bridge release.
+- **Status**: 🟢 **STABLE** (Startup Fluidity), 🟢 **STABLE** (Issue #320: Hardware Handshake), 🟢 **STABLE** (Issue #723: StackLog Leak)
+- **Version**: `Aug.26.09`
 - **Database**: v73
-- **Audit Baseline**: SOT: 174, Resolved: 733, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 196, QA Status: 195.
+- **Audit Baseline**: SOT: 175, Resolved: 734, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 195, QA Status: 195.
 
-## 🧬 Forensic Audit Summary: Aug.26.08
-- **Issue #723 Resolved**: Remedied platform-level diagnostic noise in `SystemStatusProvider.kt`. The `sharedInternetStatusFlow` was transitioned to `SharingStarted.Eagerly`. This ensures the `ConnectivityManager` callback remains active for the singleton's lifetime, preventing the Samsung A15 platform from emitting `StackLog` traces during frequent UI subscriber transitions.
-- **Versioning**: Incremented subversion to `Aug.26.08`. All status tracking files updated.
-- **Simplicity Audit**: Implementation of eager sharing simplifies lifecycle management by removing redundant on-demand registration logic.
+## 🧬 Forensic Audit Summary: Aug.26.09
+- **Issue #320 Resolved**: Implemented deterministic hardware handshake. Replaced the 200ms "magic" settling delay in `TrackerService.onDestroy()` with a synchronous native round-trip call (`JdHardwareManager.punchHardware`). This ensures the native event queue is drained and the JNI bridge is responsive before release, preventing race conditions on Samsung A15 hardware.
+- **Versioning**: Incremented subversion to `Aug.26.09`. All status tracking files (`issues.md`, `SOT`, `Archive`) updated.
+- **Simplicity Audit**: Implementation of deterministic logic reduces technical debt by removing heuristic-based delays.
 
 ## 🚀 Next Steps
-- **Hardware Handshake**: Implement the deterministic handshake to replace the 200ms settling delay in service destruction.
-- **Soak Test**: Continue 48-hour soak test for forensic trace continuity on SM-A155F.
-- **Forensic Correlation**: Verify that no new diagnostic noise is introduced during deep-sleep transitions.
+- **Soak Test**: Continue 48-hour soak test for forensic trace continuity on SM-A155F, specifically monitoring for stability during repeated service start/stop cycles.
+- **Forensic Correlation**: Verify that the new handshake logic maintains trace continuity during deep-sleep transitions and thermal recovery.
 
-vAug.26.08
+vAug.26.09

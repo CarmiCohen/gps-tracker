@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.26.09 (vAug.26.09)
+*   **Issue #320**: **Hardware Handshake**. Replaced the 200ms "magic" settling delay in `TrackerService.onDestroy()` with a deterministic native round-trip (`punchHardware`). This ensures the native event queue is drained and the JNI bridge is responsive before release, preventing race conditions during service destruction on budget hardware (A15).
+
 ## 🟢 Aug.26.08 (vAug.26.08)
 *   **Issue #723**: **Diagnostic Log Leak (StackLog)**. Remedied platform-level diagnostic noise in `SystemStatusProvider.kt`. Transitioned `sharedInternetStatusFlow` from `WhileSubscribed(5000)` to `SharingStarted.Eagerly`. This ensures the `ConnectivityManager` callback is registered exactly once for the application's lifecycle, eliminating the verbose `StackLog` traces emitted by the Samsung A15 connectivity stack during frequent UI/subscriber transitions (R723).
 
