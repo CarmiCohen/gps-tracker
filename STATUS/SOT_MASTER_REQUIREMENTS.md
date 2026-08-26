@@ -28,6 +28,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.26.12**: Resolved Issue #736 (Compilation Error). Fixed non-exhaustive when expression in CommandRouter due to redundant ClearTrails declaration in Models.kt.
 *   **Aug.26.11**: Resolved Issue #735 Hardening (Setup Overlay Bypass). Implemented developer-mode bypass to enable automated soak tests on remote hardware (R735).
 *   **Aug.26.10**: Deployment Verification. Verified Issue #723 (StackLog Leak) and Issue #320 (Hardware Handshake) on Samsung A15 hardware. Identified Issue #735 (Setup Overlay Modal Block).
 *   **Aug.26.09**: Resolved Issue #320 Hardening (Hardware Handshake). Replaced 200ms magic delay with deterministic native round-trip (R320).

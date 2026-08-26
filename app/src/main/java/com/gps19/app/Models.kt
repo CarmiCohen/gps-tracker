@@ -661,7 +661,6 @@ sealed class UiEvent {
     data class StopSiren(val causes: String? = null) : UiEvent()
     object ResetStats : UiEvent()
     object ClearLogs : UiEvent()
-    object ClearTrails : UiCommand() // WRONG in original? Wait, I see UiCommand below.
     object ClearHomePoints : UiEvent()
     object ManualExit : UiEvent()
     data class LogAction(val type: String, val message: String, val isImportant: Boolean = false, val isSpecial: Boolean = false, val specialColor: Int? = null) : UiEvent()

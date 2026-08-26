@@ -1,22 +1,21 @@
-# Handover (Aug.26.11) - Setup Overlay Bypass Resolved
+# Handover (Aug.26.12) - Compilation Error Resolved
 
 ## 🎯 Current Status
-- **Goal**: Resolve automated testing blocker (Issue #735).
-- **Status**: 🟢 **RESOLVED** (Issue #735: Setup Overlay Bypass), 🟢 **VERIFIED** (Issue #320: Hardware Handshake), 🟢 **VERIFIED** (Issue #723: StackLog Leak).
-- **Version**: `Aug.26.11`
+- **Goal**: Resolve build failure and proceed with deployment.
+- **Status**: 🟢 **RESOLVED** (Issue #736: Compilation Error), 🟢 **RESOLVED** (Issue #735: Setup Overlay Bypass).
+- **Version**: `Aug.26.12`
 - **Database**: v73
-- **Audit Baseline**: SOT: 176, Resolved: 735, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 195, QA Status: 195.
+- **Audit Baseline**: SOT: 177, Resolved: 736, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 195, QA Status: 195.
 
-## 🧬 Implementation Summary: Aug.26.11
-- **Issue #735 Resolved**: Implemented a developer-mode bypass for the `PhoneSetupOverlay`.
-    - **State Management**: Added `isSetupBypassActive` to `MainUiState`. Modified `isSystemReady` and `systemIssuesCount` to allow bypass.
-    - **UI Integration**: Added a "Setup Overlay Bypass" toggle in the `DiagnosticsScreen` under Validation Hooks.
-    - **Overlay Hardening**: Updated `PhoneSetupOverlay` to display a "BYPASS ACTIVE" banner and provide a "DISMISS" button when the flag is set, even if mandatory permissions are missing. This unblocks automated soak tests on remote/headless devices.
-- **Versioning**: Incremented subversion to `Aug.26.11`. All status tracking files (`issues.md`, `SOT_MASTER_REQUIREMENTS.md`, `RESOLUTION_ARCHIVE.md`) updated.
-- **Simplicity Audit**: Moved "Setup Overlay Bypass" from Ideas to Implemented in `Simplify_Ideas2.md`.
+## 🧬 Implementation Summary: Aug.26.12
+- **Issue #736 Resolved**: Fixed non-exhaustive `when` expression in `CommandRouter.kt`.
+    - **Root-Cause**: Found that `ClearTrails` was redundantly defined in `Models.kt` within `UiEvent` while also inheriting from `UiCommand`.
+    - **Remediation**: Removed the redundant declaration in `UiEvent`, making `UiCommand.ClearTrails` the unique source of truth for the router.
+- **Concern #737 Identified**: Noted `IDS count updated to 1` in Logcat on cold start. This suggests potential non-persistence of Identity Sanitization training state.
+- **Versioning**: Incremented subversion to `Aug.26.12`.
 
 ## 🚀 Next Steps
-- **Deployment & Soak Test**: Deploy `Aug.26.11` to the Samsung A15 farm. Activate the bypass on remote units and monitor forensic trace continuity for 48 hours.
-- **Mali Audit**: Investigate long-term stability of the Mali-anomaly detection hook during high-load scenarios.
+- **Soak Test Monitoring**: Continue monitoring `Aug.26.11` (currently deployed) for bypass stability.
+- **IDS Investigation**: Verify why Identity Sanitization (Concern #737) re-initializes on startup.
 
-vAug.26.11
+vAug.26.12

@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.26.11)
+# Project Issues & Hardening Tracking (Aug.26.12)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,12 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 STABLE | 47 |
 | **Validation Tasks** | 🟢 PASSED | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 735 |
+| **Resolved (Total)** | 🟢 Progress | 736 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   *(No new concerns identified in this subversion)*
+*   **Concern #737**: **Identity Sanitization Re-init**. Logcat shows `IDS count updated to 1` on cold start, which might indicate that the identity training/sanitization state is not persisting as expected across sessions.
 
 ---
 
@@ -21,8 +21,9 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.26.11)
-*   **Issue #735 Hardening**: **Setup Overlay Bypass**. Implemented a developer-mode bypass for the `PhoneSetupOverlay`. Added `isSetupBypassActive` to `MainUiState` and a corresponding toggle in the `DiagnosticsScreen`. This allows automated soak tests to proceed by skipping mandatory permission checks and providing a "Dismiss" button even when system permissions are missing (R735).
+## 🟢 Recently Resolved Issues (Aug.26.12)
+*   **Issue #736 Hardening**: **Compilation Error Remediation**. Fixed a non-exhaustive `when` expression in `CommandRouter.kt` caused by a redundant `ClearTrails` declaration in `Models.kt`. Removed the misplaced inheritance from `UiCommand` in the `UiEvent` class (R736).
+*   **Issue #735 Hardening**: **Setup Overlay Bypass**. Implemented a developer-mode bypass for the `PhoneSetupOverlay` to unblock automated soak tests (R735).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.26.11)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.26.12)
