@@ -29,15 +29,14 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Aug.26.16:
+ * - Issue #739 Remediation: Passed hydrationLevel to AppMapContainer and fixed 
+ *   unresolved reference in TrackerDashboard and MapToolsOverlay (R739).
  * Aug.26.05:
  * - Issue #323 Hardening: Removed redundant internal hydration logic. 
  *   Synchronized with LifecycleHydrationManager Level 4 (Idle Map) to 
  *   ensure Map Engine initialization doesn't compete with startup frame 
  *   rendering (R323).
- * Aug.26.04:
- * - Issue #321 Deep Hardening: Corrected parameter binding in TrackerDashboard 
- *   to resolve build failure. Further optimized hydration Level 2/3 timing 
- *   to eliminate frame-drop overlap during heavy OSM Engine init (R321).
  */
 
 @Composable
@@ -138,6 +137,7 @@ fun TrackerScreen(
                             if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen) {
                                 AppMapContainer(
                                     appMode = uiState.appMode,
+                                    hydrationLevel = uiState.hydrationLevel,
                                     isMapButtonsVisible = uiState.isMapButtonsVisible,
                                     isFenceVisible = uiState.isFenceVisible,
                                     geofenceMode = uiState.geofenceMode,
@@ -266,6 +266,7 @@ fun TrackerScreen(
                 if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen) {
                     AppMapContainer(
                         appMode = uiState.appMode,
+                        hydrationLevel = uiState.hydrationLevel,
                         isMapButtonsVisible = uiState.isMapButtonsVisible,
                         isFenceVisible = uiState.isFenceVisible,
                         geofenceMode = uiState.geofenceMode,

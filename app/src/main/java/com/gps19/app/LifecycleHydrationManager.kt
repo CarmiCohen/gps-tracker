@@ -10,9 +10,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * LifecycleHydrationManager (Issue #318/323):
+ * LifecycleHydrationManager (Issue #318/323/739):
  * Centralizes and staggers the app hydration sequence to prevent Davey stalls
  * on budget hardware (SM-A155F).
+ * Aug.26.16:
+ * - Issue #739 Remediation: Decomposed Map Hydration into 4 distinct phases 
+ *   (Levels 4-7). This spreads Map Engine, Trails, Markers, and Final Overlays 
+ *   over multiple frames using IdleHandler and staggered delays to eliminate 
+ *   the 1.4s main-thread stall on A15 hardware (R739).
  * Aug.26.05:
  * - Issue #323 Hardening: Added Level 4 (Idle Map Hydration) using IdleHandler 
  *   to ensure heavy OSM engine initialization only occurs when the main 
@@ -49,11 +54,29 @@ class LifecycleHydrationManager @Inject constructor() {
             
             onComplete()
 
-            // Level 4: Map Engine (Idle-based to prevent Davey stalls during startup)
-            // We use IdleHandler to wait for the first frames to finish rendering.
+            // Map Hydration Sequence (Levels 4-7)
+            // Use IdleHandler to wait for initial rendering to finish.
             Looper.myQueue().addIdleHandler {
-                _hydrationLevel.value = 4
-                Timber.d("Hydration: Level 4 (Map - Idle Triggered)")
+                scope.launch(Dispatchers.Main.immediate) {
+                    // Level 4: Map Engine Base
+                    _hydrationLevel.value = 4
+                    Timber.d("Hydration: Level 4 (Map Engine Base)")
+                    
+                    // Stagger subsequent map overlays to avoid frame drops
+                    val mapDelay = if (isA15) 300L else 100L
+                    
+                    delay(mapDelay)
+                    _hydrationLevel.value = 5
+                    Timber.d("Hydration: Level 5 (Map Trails)")
+                    
+                    delay(mapDelay)
+                    _hydrationLevel.value = 6
+                    Timber.d("Hydration: Level 6 (Map Markers & Circles)")
+                    
+                    delay(mapDelay)
+                    _hydrationLevel.value = 7
+                    Timber.d("Hydration: Level 7 (Map Fully Hydrated)")
+                }
                 false // One-shot
             }
         }

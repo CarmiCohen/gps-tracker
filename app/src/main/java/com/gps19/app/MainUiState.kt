@@ -5,6 +5,10 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Aug.26.16:
+ * - Issue #739 Remediation: Expanded hydrationLevel to 7 levels to decompose 
+ *   Map Engine initialization. Level 4 (Base), 5 (Trails), 6 (Markers/Circles), 
+ *   7 (Full Map Hydration) allows staggered O(N) overlay creation (R739).
  * Aug.26.06:
  * - Issue #735 Hardening: Added isSetupBypassActive to allow developer-mode 
  *   bypass of the PhoneSetupOverlay for automated soak tests (R735).
@@ -15,7 +19,7 @@ import org.osmdroid.util.GeoPoint
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
-    val hydrationLevel: Int = 0, // 0: Cold, 1: Surface, 2: Core/Nav, 3: Full, 4: Idle Map
+    val hydrationLevel: Int = 0, // 0:Cold, 1:Surface, 2:Core, 3:Full, 4:MapBase, 5:MapTrails, 6:MapMarkers, 7:MapReady
     val appMode: String? = null,
     val isSystemActive: Boolean = false,
     val deviceId: String = MainRepository.DEFAULT_TRACKER_ID,
@@ -51,7 +55,7 @@ data class MainUiState(
     val isSetupBypassActive: Boolean = false
 ) {
     val isFullyHydrated: Boolean get() = hydrationLevel >= 3
-    val isMapHydrated: Boolean get() = hydrationLevel >= 4
+    val isMapHydrated: Boolean get() = hydrationLevel >= 4 // Map is visible but may still be adding overlays
 
     val isSystemReady: Boolean
         get() = isSetupBypassActive || (

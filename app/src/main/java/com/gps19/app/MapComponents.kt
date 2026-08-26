@@ -38,17 +38,20 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Aug.26.16:
+ * - Issue #739 Remediation: Integrated hydrationLevel gating into OsmMap 
+ *   AndroidView update block. This ensures that heavy overlay initialization 
+ *   (trails, markers, circles) is staggered across multiple frames, 
+ *   eliminating the 1.4s Davey stall on A15 hardware (R739).
  * Aug.20.04:
  * - Issue #224 Hardening: Increased smoothing reset threshold to 100m 
  *   to eliminate visual coordinate "snaps" during GPS revival (R224).
- * Aug.18.09:
- * - Issue #207/208 Performance Audit: Gated freshness calculations using 
- *   derivedStateOf to prevent redundant recompositions on every pulse (R207).
  */
 
 @Composable
 fun AppMapContainer(
     appMode: String?,
+    hydrationLevel: Int,
     isMapButtonsVisible: Boolean,
     isFenceVisible: Boolean,
     geofenceMode: GeofenceMode,
@@ -134,6 +137,7 @@ fun AppMapContainer(
     Box(modifier = Modifier.fillMaxSize()) {
         OsmMap(
             appMode = appMode,
+            hydrationLevel = hydrationLevel,
             isMapLocked = isMapLocked,
             mapFollowMode = mapFollowMode,
             centeringTrackerTrigger = centeringTrackerTrigger,
@@ -246,6 +250,7 @@ fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifi
 @Composable
 fun OsmMap(
     appMode: String?,
+    hydrationLevel: Int,
     isMapLocked: Boolean,
     mapFollowMode: MapFollowMode,
     centeringTrackerTrigger: Int,
@@ -302,8 +307,6 @@ fun OsmMap(
         if (PhysicsUtils.isValidLocation(trackerLat, trackerLng)) {
             val last = smoothedTrackerPos.value
             val alpha = if (trackerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
-            // Issue #224: Increased reset threshold from 30m to 100m to allow 
-            // smooth EMA convergence during GPS revival.
             smoothedTrackerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, trackerLat, trackerLng) > 100.0) {
                 GeoPoint(trackerLat, trackerLng)
             } else {
@@ -319,8 +322,6 @@ fun OsmMap(
         if (PhysicsUtils.isValidLocation(viewerLat, viewerLng)) {
             val last = smoothedViewerPos.value
             val alpha = if (viewerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
-            // Issue #224: Increased reset threshold from 30m to 100m to allow 
-            // smooth EMA convergence during GPS revival.
             smoothedViewerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, viewerLat, viewerLng) > 100.0) {
                 GeoPoint(viewerLat, viewerLng)
             } else {
@@ -406,30 +407,45 @@ fun OsmMap(
     }, update = { view ->
         Snapshot.withoutReadObservation {
             overlayManager?.let { om ->
-                val h = om.updateHomePoints(homePoints, isFenceVisible, maxDistance, isTrackerMode, geofenceMode, onTap, onRemoveMarker)
-                val t = om.updateTrails(trackerSegments, viewerSegments, systemPulseRt)
-                val v = om.updateViolations(violations, isViolationsVisible, isGeofenceViolationsVisible, systemPulseRt)
-                val r = om.updateReplayCursor(replayCursorPos)
-                val p = om.updateCurrentPositions(
-                    trackerValid = smoothedTrackerPos.value != null,
-                    trackerPos = smoothedTrackerPos.value,
-                    isTrackerFresh = isTrackerFresh,
-                    trackerAccuracy = trackerAccuracy,
-                    maxTrackerAccuracy = trackerMaxAccuracy,
-                    trackerSpeed = trackerSpeed,
-                    isTrackerPending = trackerLocPending,
-                    trackerLastValidFixRt = trackerLastValidFixRt,
-                    viewerValid = smoothedViewerPos.value != null,
-                    viewerPos = smoothedViewerPos.value,
-                    isViewerFresh = isViewerFresh,
-                    viewerAccuracy = viewerAccuracy,
-                    viewerMaxAcc = viewerMaxAcc,
-                    viewerSpeed = viewerSpeed,
-                    isViewerPending = viewerLocPending,
-                    viewerLastValidFixRt = viewerLastValidFixRt,
-                    systemPulseRt = systemPulseRt
-                )
-                if (h || t || v || r || p) {
+                var changed = false
+                
+                // Issue #739: Hydration-level gating to stagger overlay initialization
+                if (hydrationLevel >= 4) {
+                    changed = om.updateHomePoints(homePoints, isFenceVisible, maxDistance, isTrackerMode, geofenceMode, onTap, onRemoveMarker) || changed
+                }
+                
+                if (hydrationLevel >= 5) {
+                    changed = om.updateTrails(trackerSegments, viewerSegments, systemPulseRt) || changed
+                }
+                
+                if (hydrationLevel >= 6) {
+                    changed = om.updateViolations(violations, isViolationsVisible, isGeofenceViolationsVisible, systemPulseRt) || changed
+                    changed = om.updateCurrentPositions(
+                        trackerValid = smoothedTrackerPos.value != null,
+                        trackerPos = smoothedTrackerPos.value,
+                        isTrackerFresh = isTrackerFresh,
+                        trackerAccuracy = trackerAccuracy,
+                        maxTrackerAccuracy = trackerMaxAccuracy,
+                        trackerSpeed = trackerSpeed,
+                        isTrackerPending = trackerLocPending,
+                        trackerLastValidFixRt = trackerLastValidFixRt,
+                        viewerValid = smoothedViewerPos.value != null,
+                        viewerPos = smoothedViewerPos.value,
+                        isViewerFresh = isViewerFresh,
+                        viewerAccuracy = viewerAccuracy,
+                        viewerMaxAcc = viewerMaxAcc,
+                        viewerSpeed = viewerSpeed,
+                        isViewerPending = viewerLocPending,
+                        viewerLastValidFixRt = viewerLastValidFixRt,
+                        systemPulseRt = systemPulseRt
+                    ) || changed
+                }
+                
+                if (hydrationLevel >= 7) {
+                    changed = om.updateReplayCursor(replayCursorPos) || changed
+                }
+                
+                if (changed) {
                     view.invalidate()
                 }
             }

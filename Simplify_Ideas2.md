@@ -1,6 +1,7 @@
-# Simplicity Ideas (Aug.26.14)
+# Simplicity Ideas (Aug.26.16)
 
 ## 🏗️ Architectural Simplification
-1.  **Unified Issue Model**: Replace separate boolean flags for system issues in `UiStateAggregator` with a `List<SystemIssue>` to ensure counter-to-UI parity and simplify rendering in `PhoneSetupOverlay` (Ref: Concern #740).
-2.  **Map Lazy-Loading**: Defer OsmDroid tile source initialization until after the first frame is rendered and the camera position is stable to reduce A15 hydration pressure (Ref: Concern #739).
-3.  **EventQueue Auto-Dispose**: Implement a scoped lifecycle observer for `BaseEventQueue` within the core engine to prevent manual disposal failures (Ref: Concern #738).
+1.  **Unified Issue Model**: Replace separate boolean flags for system issues in `UiStateAggregator` with a `List<SystemIssue>` to ensure counter-to-UI parity (Ref: Concern #740).
+2.  **Map Lazy-Loading**: Defer OsmDroid tile source initialization until after the first frame is rendered to reduce A15 hydration pressure (Ref: Concern #739).
+3.  **EventQueue Auto-Dispose**: Implement a scoped lifecycle observer for `BaseEventQueue` to prevent manual disposal failures (Ref: Concern #738).
+4.  **Hydration Component Abstraction**: Create a higher-order `StaggeredHydrator` component to encapsulate the delay/IdleHandler logic for all heavy UI components, removing the manual `hydrationLevel` gating from screen-level code (Ref: Issue #739).

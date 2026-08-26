@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.26.16 (vAug.26.16)
+*   **Concern #739 Resolved**: **Hydration Performance Stall (A15)**. Decomposed Map Hydration into 4 distinct phases (Levels 4-7). This spreads Map Engine, Trails, Markers, and Final Overlays over multiple frames using IdleHandler and staggered delays, eliminating the 1.4s main-thread stall on A15 hardware (R739).
+
 ## 🟢 Aug.26.15 (vAug.26.15)
 *   **Concern #740 Resolved**: **System Issue Counter Mismatch**. Synchronized `PhoneSetupOverlay` items with `MainUiState.systemIssuesCount`. Added Step 0 (Precise Location) and corrected completion flag for Step 5 (Auto-start) to ensure UI parity (R740).
 

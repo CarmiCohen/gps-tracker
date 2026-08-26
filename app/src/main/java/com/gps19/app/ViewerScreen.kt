@@ -32,12 +32,13 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Aug.26.16:
+ * - Issue #739 Remediation: Passed hydrationLevel to AppMapContainer to enable 
+ *   staggered Map Engine initialization and overlay creation (R739).
  * Aug.26.05:
  * - Issue #323 Hardening: Synchronized with LifecycleHydrationManager Level 4 
  *   (Idle Map) to ensure Map Engine initialization doesn't compete with 
  *   startup frame rendering (R323).
- * Aug.22.04:
- * - Build Fix: Renamed maxIoLatencyMs to maxIoLatency in TelemetryBox call.
  */
 
 @Composable
@@ -134,6 +135,7 @@ fun ViewerScreen(
                             if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen) {
                                 AppMapContainer(
                                     appMode = uiState.appMode,
+                                    hydrationLevel = uiState.hydrationLevel,
                                     isMapButtonsVisible = uiState.isMapButtonsVisible,
                                     isFenceVisible = uiState.isFenceVisible,
                                     geofenceMode = uiState.geofenceMode,
@@ -202,6 +204,7 @@ fun ViewerScreen(
                 if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen) {
                     AppMapContainer(
                         appMode = uiState.appMode,
+                        hydrationLevel = uiState.hydrationLevel,
                         isMapButtonsVisible = uiState.isMapButtonsVisible,
                         isFenceVisible = uiState.isFenceVisible,
                         geofenceMode = uiState.geofenceMode,
