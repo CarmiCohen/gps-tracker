@@ -1,4 +1,4 @@
-# Architectural Simplification Ideas (vAug.26.09)
+# Architectural Simplification Ideas (vAug.26.10)
 
 ## 🎯 Current Objectives
 - Reduce memory churn on budget hardware (A15).
@@ -9,6 +9,7 @@
 1.  **Diagnostic Interceptor**: Centralize all forensic "StackLog" style traces into a single toggle-able interceptor within `IntegrityMonitor`. This would prevent direct `println` or manual stack-trace logging in providers like `SystemStatusProvider`.
 2.  **Unified Grace Logic**: Combine `HARDWARE_BOOT_GRACE_MS` and `GPS_WARMUP_GRACE_MS` into a unified `StartupSettlingState`.
 3.  **Stateless Violation Reporting**: Refactor `MainAlarmLogic` to return a stream of delta-violations.
+4.  **Setup Overlay Bypass**: Implement a developer-mode bypass for the `PhoneSetupOverlay` to allow automated testing and soak tests on headless or remote devices without manual permission configuration (Issue #735).
 
 ## 🟢 Implemented Simplifications
 - **Hardware Handshake**: (Aug.26.09) Replaced the 200ms "magic" settling delay in `onDestroy` with a deterministic native round-trip (`punchHardware`). This ensures the native event queue is drained and the JNI bridge is responsive before release (Issue #320).
