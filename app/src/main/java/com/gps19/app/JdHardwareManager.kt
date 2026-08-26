@@ -16,6 +16,10 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Aug.26.00:
+ * - Issue #319 Remediation: Added robust retry mechanism with exponential backoff 
+ *   to native initialization to resolve Monitor::Inflate installation failures 
+ *   during background service startup (R319).
  * Aug.25.00:
  * - Issue #310 Remediation: Neutralized literal legacy SDK strings in log messages 
  *   to prevent CFMS string-pool scanning from triggering Ghost Loads (R212).
@@ -23,15 +27,6 @@ import kotlinx.coroutines.sync.withLock
  * - Issue #265 Remediation: Replaced callback-based loadLibraryAsync with 
  *   suspend initialize() and switched to Mutex to avoid thread-blocking 
  *   stalls during bootstrap (R265).
- * Aug.22.00:
- * - Issue #301 Remediation: Hardened JNI Watchdog. Migrated syncState and other 
- *   native calls to use withTimeout(Dispatchers.IO) to prevent native stalls 
- *   from blocking the main engine loop (R301).
- * Aug.22.08:
- * - Issue #251 Remediation: Documented 'Ghost Load' behavior. On Samsung A15 
- *   hardware, the OS (CFMS) may attempt to load legacy native libraries based on 
- *   JNI signatures. This is a benign heuristic; the system correctly uses 
- *   'libjdHardware' (R212 Identity Swap).
  */
 object JdHardwareManager {
 
@@ -40,48 +35,63 @@ object JdHardwareManager {
     private val jniLock = ReentrantLock()
     private const val MAX_JNI_RETRIES = 3
     private const val JNI_WATCHDOG_TIMEOUT_MS = 2000L
+    
+    // Issue #319: Initialization retry parameters
+    private const val MAX_INIT_RETRIES = 5
+    private const val INITIAL_RETRY_DELAY_MS = 1000L
 
     private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(64).apply {
         order(ByteOrder.nativeOrder())
     }
 
     /**
-     * initialize: Load and initialize the native SDK off the main thread.
+     * initialize: Load and initialize the native SDK off the main thread with retries (Issue #319).
      */
     suspend fun initialize(timeProvider: TimeProvider, deviceId: String): Boolean = withContext(Dispatchers.IO) {
         if (isLibraryLoaded.get()) return@withContext true
         
-        val loaded = initializationMutex.withLock {
+        initializationMutex.withLock {
             if (isLibraryLoaded.get()) return@withLock true
-            try {
-                withTimeout(JNI_WATCHDOG_TIMEOUT_MS) {
-                    System.loadLibrary("jdHardware")
-                    n1(sharedStateBuffer)
-                    isLibraryLoaded.set(true)
-                    Timber.i("jdHardware: Native library loaded successfully.")
-                    // Issue #251/310: Identity Swap (R212) - Strings neutralized for A15 CFMS.
-                    Timber.i("jdHardware: Identity Swap active. Legacy signatures neutralized.")
-                    true
+            
+            var attempt = 0
+            var delayMs = INITIAL_RETRY_DELAY_MS
+            
+            while (attempt < MAX_INIT_RETRIES) {
+                try {
+                    val success = withTimeout(JNI_WATCHDOG_TIMEOUT_MS) {
+                        if (!isLibraryLoaded.get()) {
+                            System.loadLibrary("jdHardware")
+                            n1(sharedStateBuffer)
+                            isLibraryLoaded.set(true)
+                            Timber.i("jdHardware: Native library loaded successfully.")
+                        }
+                        
+                        val res = n3(deviceId, 0)
+                        if (res == 0) {
+                            Timber.i("jdHardware: Native SDK initialized successfully on attempt ${attempt + 1}.")
+                            true
+                        } else {
+                            Timber.e("jdHardware: Native SDK init failed (Code: $res, Attempt: ${attempt + 1})")
+                            false
+                        }
+                    }
+                    
+                    if (success) return@withLock true
+                    
+                } catch (e: TimeoutCancellationException) {
+                    Timber.e("jdHardware: Load/Init timed out (Attempt: ${attempt + 1})")
+                } catch (e: Throwable) {
+                    Timber.e("jdHardware load/init failed: ${e.message} (Attempt: ${attempt + 1})")
                 }
-            } catch (e: TimeoutCancellationException) {
-                Timber.e("jdHardware: Load timed out (Watchdog)")
-                false
-            } catch (e: Throwable) {
-                Timber.e("jdHardware load failed: ${e.message}")
-                false
+                
+                attempt++
+                if (attempt < MAX_INIT_RETRIES) {
+                    delay(delayMs)
+                    delayMs *= 2 // Exponential backoff
+                }
             }
-        }
-
-        if (loaded) {
-            val res = initHardware(timeProvider, deviceId, 0)
-            if (res == 0) {
-                Timber.i("jdHardware: Native SDK initialized successfully.")
-                true
-            } else {
-                Timber.e("jdHardware: Native SDK init failed (Code: $res)")
-                false
-            }
-        } else {
+            
+            Timber.e("jdHardware: Native SDK failed to initialize after $MAX_INIT_RETRIES attempts.")
             false
         }
     }

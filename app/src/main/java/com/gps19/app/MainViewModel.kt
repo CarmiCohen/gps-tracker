@@ -36,7 +36,9 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * Aug.25.04:
+ * Aug.26.00:
+ * - Issue #318 Remediation: Integrated LifecycleHydrationManager to stagger 
+ *   startup sequences and optimize hydration for low-tier CPU scaling (R318).
  * - Issue #314 Remediation: Implemented Staggered Hydration (R314). Increased 
  *   delays in init and added specific A15 offset for heavy observations to 
  *   eliminate 1.5s Davey stall.
@@ -63,6 +65,7 @@ class MainViewModel @Inject constructor(
     private val mapUseCase: MapUseCase,
     val timeProvider: TimeProvider,
     private val remoteStatusRepository: RemoteStatusRepository,
+    private val hydrationManager: LifecycleHydrationManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -314,12 +317,16 @@ class MainViewModel @Inject constructor(
             
             withContext(Dispatchers.Main.immediate) {
                 applyInitialSettings(initialSettings)
-                // Issue #314: Increased hydration delays to ensure UI responsiveness.
-                updateState { it.copy(hydrationLevel = 1) }
-                delay(300) // Surface
-                updateState { it.copy(hydrationLevel = 2) }
-                delay(500) // Core/Nav
-                updateState { it.copy(hydrationLevel = 3, isInitialized = true) }
+                
+                // Issue #318 Remediation: Delegate hydration to LifecycleHydrationManager
+                hydrationManager.hydrationLevel.onEach { level ->
+                    updateState { it.copy(hydrationLevel = level) }
+                }.launchIn(viewModelScope)
+
+                val isA15 = systemStatusProvider.isA15Hardware()
+                hydrationManager.startHydration(viewModelScope, isA15) {
+                    updateState { it.copy(isInitialized = true) }
+                }
             }
             
             launch(Dispatchers.IO) { 

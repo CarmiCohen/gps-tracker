@@ -1,4 +1,4 @@
-# Architectural Simplification Ideas (vAug.25.06)
+# Architectural Simplification Ideas (vAug.26.00)
 
 ## 🎯 Current Objectives
 - Reduce memory churn on budget hardware (A15).
@@ -11,10 +11,10 @@
 3.  **Monotonic-Only Evaluation**: Remove all `currentTimeMillis` dependencies from `MainAlarmLogic` to eliminate risk of clock-skew false positives.
 4.  **Baseline Quantization**: Store EMA baselines (Baro/Acoustic) in a separate `EnvironmentContext` to decouple environmental tracking from alarm evaluation logic.
 5.  **Standardized LRU Provider**: Evaluate replacing the custom `ShadowCache` wrapper with `androidx.collection.LruCache` to reduce custom concurrency boilerplate.
-6.  **LifecycleHydrationManager**: (New) Staggered hydration (R314) is currently scattered in ViewModels. A dedicated manager could centralize the staggered launch sequence for budget hardware (Issue #318).
-7.  **Component Composition for Services**: (New) Simplify `TrackerService` and `ViewerService` by delegating monitor setup to a shared `MonitorLifecycleDelegate` to address Issue #319.
 
 ## 🟢 Implemented Simplifications
+- **LifecycleHydrationManager**: (Aug.26.00) Centralized staggered hydration sequence for budget hardware (Issue #318).
+- **Native Retry Logic**: (Aug.26.00) Hardened `JdHardwareManager` with exponential backoff to resolve Monitor::Inflate failures (Issue #319).
 - **Hardware SOT Object**: (Aug.25.05) Decoupled hardware detection from `:app` layer. Verified on SM-A155F.
 - **Snap-Isolation Throttling**: (Aug.25.04) Reduced Compose recomposition cycles using parity-based filters.
 - **Map Pool Isolation**: (Aug.25.00) Removed map overlays from Compose state to avoid lock verification overhead.

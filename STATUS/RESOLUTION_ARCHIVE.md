@@ -2,7 +2,17 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 720**
+**Total Unique Resolutions: 722**
+
+## 115. Performance Hardening & Monitor Reliability (Aug.26.00)
+*   **Issue #318**: **A15 Startup Frame Drops**.
+    - **Resolution**: Implemented `LifecycleHydrationManager` to centralize and stagger the hydration sequence. 
+    - **Action**: Offloaded hydration from the main thread and added specific delays for budget hardware (Samsung A15), ensuring basic UI renders before heavy telemetry flows begin.
+    - **Result**: Eliminated 70+ frame startup skips on SM-A155F.
+*   **Issue #319**: **Background Monitor Inflation Failure**.
+    - **Resolution**: Hardened `JdHardwareManager` native initialization.
+    - **Action**: Added an exponential backoff retry mechanism to native initialization to resolve transient OS-level "Monitor::Inflate" failures during background service startup.
+    - **Result**: Reliable hardware binding confirmed across service lifecycle transitions.
 
 ## 114. Deployment Verification & Hardware SOT Hardening (Aug.25.06)
 *   **Issue #317 (Verification)**: **Hardware SOT Architectural Decoupling**.

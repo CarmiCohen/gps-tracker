@@ -9,12 +9,13 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.4 Navigation Continuity**: Navigation backstack must be managed to prevent redundant route injection or invalid pop operations. Explicit graph-relative `popUpTo` and `launchSingleTop` are required for all mode transitions (R250).
 *   **1.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (Issue #310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (Issue #317).
 *   **1.6 Monotonic Authority (R307)**: All maintenance durations and health-check silence detections must prioritize monotonic references (`elapsedRealtime`) to prevent wall-clock corruption during reboots or system time jumps (Issue #307).
+*   **1.7 Staggered Hydration Manager (R318)**: To prevent Davey stalls, hydration must be managed by `LifecycleHydrationManager`, providing a multi-level staggered sequence (Surface, Core, Full) with environment-specific delays for budget hardware (Issue #318).
 
 ## 2. Forensic & Performance Requirements
 *   **2.1 Sampling Frequency**: Forensic sampling must operate between 10ms and 100ms based on system load (R700).
 *   **2.2 Reliability Threshold**: `ALERT_ID_PERFORMANCE_SPIKE` must trigger if `forensicReliability` (EMA) drops below 0.85 for >30s (R715).
 *   **2.3 UI Fluidity**: UI stalls (Davey) must not exceed 700ms on target hardware (SM-A155F).
-*   **2.4 Native Watchdog**: All JNI/native calls must be wrapped in a watchdog timer (2000ms) on `Dispatchers.IO` to prevent hardware hangs (R301).
+*   **2.4 Native Watchdog & Retry (R301/R319)**: All JNI/native calls must be wrapped in a watchdog timer (2000ms). Native initialization must implement exponential backoff retries to ensure reliable binding during background service startup (Issue #319).
 *   **2.5 Shadow-Cache Stability (R280)**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` and optimized initial capacity to prevent race conditions. All caches must implement an LRU strategy for long-term stability (Issue #721).
 *   **2.6 Chunked Database Pruning**: All database pruning operations (Logs, Offline Status, connection history, violations, and trail points) must be chunked and staggered (R197).
 *   **2.7 Imperative Map Isolation (R309)**: High-frequency map overlay pools and icon caches must use standard collections (`ArrayList`/`HashMap`) and be isolated from Compose `Snapshot` observation. Since these are updated imperatively via `AndroidView.update`, standard collections eliminate lock verification failures and frame skips on non-generational GCs (Issue #309).
@@ -27,6 +28,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.26.00**: Resolved Issue #318 (A15 Startup Frame Drops) via `LifecycleHydrationManager` and Issue #319 (Monitor Inflation Failure) via native retry logic.
 *   **Aug.25.06**: Deployment Verification on SM-A155F. Hardware SOT verified. Identified Issue #318 (Startup Davey) and Issue #319 (Monitor Inflation).
 *   **Aug.25.05**: Resolved Issue #317 (Hardware SOT Architectural Decoupling). Migrated detection signatures to `:core:engine:HardwareSot.kt` (R313/R212).
 *   **Aug.25.04**: Resolved Issue #313 (Multi-Device Deployment Failure). Unified and hardened hardware detection signatures in `Utils.kt` (R313).
@@ -34,4 +36,3 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **Aug.25.02**: Hardware Verification and Hardening Trace. Identified Issue #313 (A15 Detection Failure).
 *   **Aug.25.01**: Resolved Issue #315 (Immediate Signal Loss False Positive). Implemented GPS_WARMUP_GRACE_MS (30s) in `MainAlarmLogic` (R315).
 *   **Aug.25.00**: Resolved Issue #314 (Startup Davey Stall). Implemented Staggered Hydration (R314) with A15-specific observation offsets.
-*   **Aug.22.04**: Hardened `ShadowCache` (R280) and verified Chapter 12.2 Database Stress stability. Standardized R197 chunked pruning for all high-frequency data tables.
