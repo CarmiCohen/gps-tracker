@@ -1,22 +1,22 @@
-# Handover (Aug.26.16) - Map Hydration Staggered
+# Handover (Aug.26.17) - Lifecycle Hardening
 
 ## 🎯 Current Status
-- **Goal**: Eliminate main-thread Davey stalls on A15 hardware during map initialization.
-- **Status**: 🟢 **RESOLVED** (Concern #739: Hydration Stall). 🔴 **OPEN** (#738: EventQueue Leak).
-- **Version**: `Aug.26.16`
+- **Goal**: Resolve native resource leaks during hardware manager disposal.
+- **Status**: 🟢 **RESOLVED** (Concern #738: EventQueue Leak). 🟢 **RESOLVED** (#739: Hydration Stall).
+- **Version**: `Aug.26.17`
 - **Database**: v73
-- **Audit Baseline**: SOT: 180, Resolved: 740, Open: 48, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 196, QA Status: 196.
+- **Audit Baseline**: SOT: 181, Resolved: 741, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 197, QA Status: 196.
 
-## 🧬 Implementation Summary: Aug.26.16
-- **Concern #739 Resolved**: **Hydration Performance Stall (A15)**.
-    - Decomposed Map Hydration into 4 distinct, staggered levels (4: Base, 5: Trails, 6: Markers/Circles, 7: Final Overlays).
-    - Integrated `hydrationLevel` gating into the `AndroidView.update` block in `MapComponents.kt`.
-    - Spread O(N) overlay creation over multiple frames using `IdleHandler` and 300ms delays (for A15) to ensure sub-700ms UI responsiveness.
-- **Unified Hydration Logic**: Synchronized `TrackerScreen` and `ViewerScreen` with the new staggered sequence.
-- **Version Incremented**: Updated `app/build.gradle` to `Aug.26.16`.
+## 🧬 Implementation Summary: Aug.26.17
+- **Concern #738 Resolved**: **EventQueue Resource Leak**.
+    - Synchronized `start()` and `stop()` methods in `AppSensorManager` and `GpsManager` using a private `lifecycleLock`.
+    - Implemented atomic state re-checks within asynchronous registration blocks (e.g., Step Detector registration) to ensure no listeners are registered after the manager has been stopped.
+    - Enforced synchronous GNSS callback unregistration before thread shutdown in `GpsManager`.
+- **Architectural Update**: Added SOT Requirement 1.8 (Lifecycle Synchronization) to formalize hardware manager safety.
+- **Version Incremented**: Updated `app/build.gradle` to `Aug.26.17`.
 
 ## 🚀 Next Steps
-- **Address #738**: Investigate `BaseEventQueue.dispose` resource leak in the core engine.
-- **Monitor #739**: Verify hydration smoothness on broader hardware variants (A13/A14).
+- **Deployment & Monitoring**: Deploy the app and monitor logcat for `BaseEventQueue.dispose` warnings during rapid role swaps (Tracker <-> Viewer).
+- **Verify #739**: Confirm hydration smoothness on A15 hardware with the now-stable engine.
 
-vAug.26.16
+vAug.26.17

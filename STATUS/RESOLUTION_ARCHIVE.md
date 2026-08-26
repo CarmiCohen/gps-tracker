@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.26.17 (vAug.26.17)
+*   **Concern #738 Resolved**: **EventQueue Resource Leak**. Hardened lifecycle management in `AppSensorManager` and `GpsManager` by synchronizing `start()`/`stop()` transitions and implementing strict state re-checks in asynchronous registration blocks. This prevents race conditions where native listeners could be registered after cleanup, resolving the `BaseEventQueue.dispose` failure warning (R738).
+
 ## 🟢 Aug.26.16 (vAug.26.16)
 *   **Concern #739 Resolved**: **Hydration Performance Stall (A15)**. Decomposed Map Hydration into 4 distinct phases (Levels 4-7). This spreads Map Engine, Trails, Markers, and Final Overlays over multiple frames using IdleHandler and staggered delays, eliminating the 1.4s main-thread stall on A15 hardware (R739).
 

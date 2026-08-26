@@ -35,12 +35,10 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
- * Aug.26.04:
- * - Issue #320 Deep Hardening: Switched to strictly synchronous unregistration 
- *   on the calling thread in stop() to ensure BaseEventQueue disposal before 
- *   thread joining (R320).
- * Aug.26.02:
- * - Issue #320 Remediation: Hardened stop() sequence with thread joining.
+ * Aug.26.17:
+ * - Issue #738 Remediation: Hardened lifecycle with synchronized start/stop 
+ *   blocks and atomic state checks in async step-detector registration to 
+ *   prevent BaseEventQueue leaks (R738).
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -76,6 +74,7 @@ class AppSensorManager @Inject constructor(
     private var sensorHandler: Handler? = null
     private val hasLoggedThreadInfo = AtomicBoolean(false)
     private val isStarted = AtomicBoolean(false)
+    private val lifecycleLock = Any()
 
     private var lastDisplayState = Display.STATE_UNKNOWN
     private var lastDisplayTransitionRt = 0L
@@ -232,21 +231,23 @@ class AppSensorManager @Inject constructor(
     private var plungePhase = 0; private var plungeMatched = false; private var lastPlungePhaseRt = 0L
 
     fun start() {
-        if (isStarted.getAndSet(true)) return
-        sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt
-        hasLoggedThreadInfo.set(false); proximityMaxRange = proximity?.maximumRange ?: 5f
-        
-        if (sensorThread == null) {
-            sensorThread = HandlerThread("AppSensorThread").apply { start() }
-            sensorHandler = Handler(sensorThread!!.looper)
+        synchronized(lifecycleLock) {
+            if (isStarted.getAndSet(true)) return
+            sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt
+            hasLoggedThreadInfo.set(false); proximityMaxRange = proximity?.maximumRange ?: 5f
+            
+            if (sensorThread == null) {
+                sensorThread = HandlerThread("AppSensorThread").apply { start() }
+                sensorHandler = Handler(sensorThread!!.looper)
+            }
+
+            displayManager.registerDisplayListener(displayListener, sensorHandler)
+            val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
+            if (display != null) lastDisplayState = display.state
+
+            registerSensors()
+            startAcousticMonitoring()
         }
-
-        displayManager.registerDisplayListener(displayListener, sensorHandler)
-        val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
-        if (display != null) lastDisplayState = display.state
-
-        registerSensors()
-        startAcousticMonitoring()
     }
 
     private fun registerSensors() {
@@ -267,31 +268,33 @@ class AppSensorManager @Inject constructor(
      * stop: Synchronous unregistration to prevent BaseEventQueue leaks (Issue #320).
      */
     fun stop() {
-        if (!isStarted.getAndSet(false)) return
-        recoveryJob?.cancel(); recoveryJob = null; stopAcousticMonitoring()
-        
-        // Strictly synchronous unregistration on calling thread to ensure binder call finishes.
-        try {
-            sensorManager.unregisterListener(this)
-            displayManager.unregisterDisplayListener(displayListener)
-        } catch (e: Exception) {
-            Timber.e(e, "Error during synchronous sensor unregistration")
-        }
+        synchronized(lifecycleLock) {
+            if (!isStarted.getAndSet(false)) return
+            recoveryJob?.cancel(); recoveryJob = null; stopAcousticMonitoring()
+            
+            // Strictly synchronous unregistration on calling thread to ensure binder call finishes.
+            try {
+                sensorManager.unregisterListener(this)
+                displayManager.unregisterDisplayListener(displayListener)
+            } catch (e: Exception) {
+                Timber.e(e, "Error during synchronous sensor unregistration")
+            }
 
-        proximityJob?.cancel()
-        sensorThread?.quitSafely()
-        
-        try {
-            sensorThread?.join(500)
-        } catch (e: InterruptedException) {
-            Timber.e("Sensor thread join interrupted")
+            proximityJob?.cancel()
+            sensorThread?.quitSafely()
+            
+            try {
+                sensorThread?.join(500)
+            } catch (e: InterruptedException) {
+                Timber.e("Sensor thread join interrupted")
+            }
+            
+            sensorThread = null
+            sensorHandler = null
+            isStepDetectorRegistered = false
+            
+            Timber.i("AppSensorManager: Synchronous stop completed.")
         }
-        
-        sensorThread = null
-        sensorHandler = null
-        isStepDetectorRegistered = false
-        
-        Timber.i("AppSensorManager: Synchronous stop completed.")
     }
 
     private fun startStepDetectorRecoveryLoop() {
@@ -313,9 +316,20 @@ class AppSensorManager @Inject constructor(
                 isStepDetectorRegistered = false
                 return@launch
             }
-            withContext(sensorHandler?.asCoroutineDispatcher("AppSensorThread") ?: Dispatchers.Main) {
+            // Issue #738: Verify lifecycle state before registering in async block.
+            val targetHandler = synchronized(lifecycleLock) {
+                if (!isStarted.get()) return@launch
+                sensorHandler
+            } ?: return@launch
+
+            withContext(targetHandler.asCoroutineDispatcher()) {
                 sensorManager.unregisterListener(this@AppSensorManager, detector)
-                isStepDetectorRegistered = sensorManager.registerListener(this@AppSensorManager, detector, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler)
+                // Final re-check under lock for atomic registration
+                synchronized(lifecycleLock) {
+                    if (isStarted.get()) {
+                        isStepDetectorRegistered = sensorManager.registerListener(this@AppSensorManager, detector, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler)
+                    }
+                }
             }
         }
     }
@@ -342,11 +356,13 @@ class AppSensorManager @Inject constructor(
     fun setHighLoad(high: Boolean) { this.isHighLoad = high }
 
     fun setPowerSaveMode(active: Boolean) {
-        if (this.powerSaveMode != active) {
-            this.powerSaveMode = active
-            if (isStarted.get() && sensorHandler != null) { 
-                sensorManager.unregisterListener(this)
-                registerSensors() 
+        synchronized(lifecycleLock) {
+            if (this.powerSaveMode != active) {
+                this.powerSaveMode = active
+                if (isStarted.get() && sensorHandler != null) { 
+                    sensorManager.unregisterListener(this)
+                    registerSensors() 
+                }
             }
         }
     }
@@ -386,7 +402,7 @@ class AppSensorManager @Inject constructor(
                     if (!newValue && isDisplayFlickering.get() && isStationary()) return
                     rawProximityNear = newValue; proximityJob?.cancel()
                     var calcDebounceMs = if (isStationary()) PROXIMITY_DEBOUNCE_STATIONARY_MS else PROXIMITY_DEBOUNCE_MOVING_MS
-                    if (isStationary() && stationaryStartRt > 0) {
+                    if (isStationary() && stationaryStartRt > 0L) {
                         calcDebounceMs += (((nowRt - stationaryStartRt) / 3600000.0) * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR).toLong()
                     }
                     if (isHighLoad) calcDebounceMs = (calcDebounceMs * PROXIMITY_STRESS_SCALING_MULTIPLIER).toLong()

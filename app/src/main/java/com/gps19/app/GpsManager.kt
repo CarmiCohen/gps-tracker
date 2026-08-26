@@ -23,10 +23,13 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.26.17:
+ * - Issue #738 Remediation: Hardened lifecycle with synchronized start/stop 
+ *   to ensure deterministic GNSS/Location callback unregistration and 
+ *   prevent BaseEventQueue leaks (R738).
  * Aug.26.03:
  * - Issue #320 Remediation: Implemented explicit stop() and synchronous 
  *   unregistration of GNSS/Location callbacks to prevent BaseEventQueue leak (R320).
- *   Added HandlerThread termination logic.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -40,6 +43,7 @@ class GpsManager @Inject constructor(
     
     private var gpsThread: HandlerThread? = null
     private var gpsHandler: Handler? = null
+    private val lifecycleLock = Any()
 
     var satellitesInView = 0; private set
     var satellitesUsed = 0; private set
@@ -140,43 +144,40 @@ class GpsManager @Inject constructor(
     }
 
     fun start() {
-        if (isStarted.getAndSet(true)) return
-        if (gpsThread == null) {
-            gpsThread = HandlerThread("GpsHardwareThread").apply { start() }
-            gpsHandler = Handler(gpsThread!!.looper)
+        synchronized(lifecycleLock) {
+            if (isStarted.getAndSet(true)) return
+            if (gpsThread == null) {
+                gpsThread = HandlerThread("GpsHardwareThread").apply { start() }
+                gpsHandler = Handler(gpsThread!!.looper)
+            }
         }
     }
 
     /**
-     * stop: Synchronous cleanup for Issue #320.
+     * stop: Synchronous cleanup for Issue #738.
      */
     fun stop() {
-        if (!isStarted.getAndSet(false)) return
-        
-        gpsHandler?.post {
+        synchronized(lifecycleLock) {
+            if (!isStarted.getAndSet(false)) return
+            
+            // Unregister GNSS callback before thread shutdown.
             try {
                 locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
             } catch (e: Exception) {
                 Timber.e(e, "Error unregistering GNSS callback")
             }
-        }
 
-        runBlocking {
-            withTimeoutOrNull(200) {
-                while (gpsHandler?.hasMessages(0) == true) { delay(10) }
+            gpsThread?.quitSafely()
+            try {
+                gpsThread?.join(500)
+            } catch (e: InterruptedException) {
+                Timber.e("GPS thread join interrupted")
             }
+            
+            gpsThread = null
+            gpsHandler = null
+            Timber.i("GpsManager: Synchronous cleanup completed.")
         }
-
-        gpsThread?.quitSafely()
-        try {
-            gpsThread?.join(500)
-        } catch (e: InterruptedException) {
-            Timber.e("GPS thread join interrupted")
-        }
-        
-        gpsThread = null
-        gpsHandler = null
-        Timber.i("GpsManager: Explicit cleanup completed.")
     }
 
     private fun checkRevivalLifecycle() {
@@ -201,6 +202,9 @@ class GpsManager @Inject constructor(
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
 
         externalScope.launch(Dispatchers.Main) {
+            // Issue #738: Verify lifecycle state before registering in async block.
+            if (!isStarted.get()) return@launch
+            
             val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
                 .setMaxUpdates(1)
                 .build()
@@ -255,7 +259,12 @@ class GpsManager @Inject constructor(
     private val hardwareObservationFlow = pollingIntervalFlow.flatMapLatest { interval ->
         callbackFlow<GpsUpdate> {
             start() // Ensure thread is active
-            try { locationManager.registerGnssStatusCallback(gnssStatusCallback, gpsHandler) } catch (e: Exception) { Timber.e(e, "GPS: Callback error") }
+            
+            val handler = synchronized(lifecycleLock) { gpsHandler }
+            if (handler != null) {
+                try { locationManager.registerGnssStatusCallback(gnssStatusCallback, handler) } catch (e: Exception) { Timber.e(e, "GPS: Callback error") }
+            }
+            
             fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
             val fusedCallback = object : LocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
             
@@ -263,7 +272,11 @@ class GpsManager @Inject constructor(
                 .setMinUpdateIntervalMillis(interval / 2)
                 .build()
             
-            try { fusedLocationClient.requestLocationUpdates(request, fusedCallback, gpsThread?.looper ?: Looper.getMainLooper()) } catch (e: Exception) { close(e) }
+            try { 
+                val looper = synchronized(lifecycleLock) { gpsThread?.looper } ?: Looper.getMainLooper()
+                fusedLocationClient.requestLocationUpdates(request, fusedCallback, looper) 
+            } catch (e: Exception) { close(e) }
+
             val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
 
             awaitClose { 
