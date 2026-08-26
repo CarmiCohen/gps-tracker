@@ -1,4 +1,4 @@
-# Architectural Simplification Ideas (vAug.26.07)
+# Architectural Simplification Ideas (vAug.26.08)
 
 ## 🎯 Current Objectives
 - Reduce memory churn on budget hardware (A15).
@@ -12,6 +12,7 @@
 4.  **Stateless Violation Reporting**: Refactor `MainAlarmLogic` to return a stream of delta-violations.
 
 ## 🟢 Implemented Simplifications
+- **Eager Internet Observation**: (Aug.26.08) Transitioned `SystemStatusProvider` to `SharingStarted.Eagerly` for internet status. This simplifies the lifecycle by ensuring the `ConnectivityManager` callback is registered once, eliminating the complexity and platform noise of on-demand re-registration (Issue #723).
 - **Idle-Based Map Hydration**: (Aug.26.05) Migrated Map Engine init to Level 4 (IdleHandler) in `LifecycleHydrationManager` (Issue #323).
 - **Deep Hardening Audit**: (Aug.26.04) Validated Anomaly Correlation Engine (R133) and Heat Mitigation (R191).
 - **Native Cleanup Strategy**: (Aug.26.04) Hardened JNI destruction sequence (Issue #320).

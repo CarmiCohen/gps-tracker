@@ -28,6 +28,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.26.08**: Resolved Issue #723 (Diagnostic Log Leak / StackLog). Transitioned internet observation to Eagerly sharing to prevent platform callback noise (R723).
 *   **Aug.26.07**: Deployment Verification. Verified Issue #323 (Startup Fluidity) and Issue #324 (Mali Audit) on hardware. Identified Issue #723 (StackLog leak).
 *   **Aug.26.06**: Resolved Issue #323 (Startup Davey Stall). Implemented Level 4 Idle-based Map Hydration (R323).
 *   **Aug.26.05**: Hardening verification. 

@@ -62,6 +62,10 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Aug.26.07:
+ * - Issue #723: Diagnostic Log Leak (StackLog). Transitioned sharedInternetStatusFlow 
+ *   to SharingStarted.Eagerly to prevent platform-level diagnostic noise triggered 
+ *   by frequent ConnectivityManager callback re-registrations (R723).
  * Aug.25.05:
  * - Issue #317 Hardening: Hardware SOT Architectural Decoupling. Refactored to use 
  *   HardwareSot from core:engine directly, removing dependency on app:Utils.kt 
@@ -265,6 +269,11 @@ class SystemStatusProviderImpl @Inject constructor(
         }
     }
 
+    /**
+     * Issue #723: Transitioned to SharingStarted.Eagerly.
+     * Prevents redundant callback registrations that trigger platform StackLog noise 
+     * on Samsung A15 hardware when UI subscribers cycle.
+     */
     private val sharedInternetStatusFlow = callbackFlow<Boolean> {
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) { trySend(true) }
@@ -288,7 +297,7 @@ class SystemStatusProviderImpl @Inject constructor(
      .conflate()
      .shareIn(
         scope = externalScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Eagerly,
         replay = 1
      )
 
