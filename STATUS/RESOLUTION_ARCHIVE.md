@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.26.14 (vAug.26.14)
+*   **Concern #737 Resolved**: **Identity Sanitization Persistence**. Verified fix on `Aug.26.14`. The dismissal state now correctly persists through cold starts, eliminating redundant UI prompts (R976).
+
 ## 🟢 Aug.26.13 (vAug.26.13)
 *   **Concern #737 Resolved**: **Identity Sanitization Persistence**. Hardened the identity sanitization lifecycle by persisting the warning dismissal state. This eliminates "re-init" noise where the sanitization overlay would reappear on every cold start even after being dismissed (R976).
 
