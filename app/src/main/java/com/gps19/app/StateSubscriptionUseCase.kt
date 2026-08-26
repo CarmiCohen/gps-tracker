@@ -11,12 +11,13 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * Aug.26.13:
+ * - Concern #737 Remediation: Integrated identitySanitizedFlow into 
+ *   observeRepositorySettings to support persistent dismissal of sanitization 
+ *   warnings (R976).
  * Aug.15.03:
  * - Issue #182 Hardening: Offloaded history merging to Dispatchers.Default 
  *   to prevent Main-thread stalls and Startup ANRs (R182).
- * Aug.14.05:
- * - Issue #174: Forensic Replay Latency Audit. Implemented high-performance 
- *   binary search lookup for trail synchronization.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -128,7 +129,8 @@ class StateSubscriptionUseCase @Inject constructor(
             repository.isXiaomiManualOverrideFlow,
             repository.lastAlarmAckTsFlow,
             repository.appModeFlow,
-            repository.isSystemActiveFlow
+            repository.isSystemActiveFlow,
+            repository.identitySanitizedFlow
         ) { args: Array<Any?> ->
             SettingsUpdate(
                 trackerId = args[0] as String,
@@ -139,7 +141,8 @@ class StateSubscriptionUseCase @Inject constructor(
                 isXiaomiManualOverride = args[5] as Boolean,
                 lastAlarmAckTs = args[6] as Long,
                 appMode = args[7] as String?,
-                isSystemActive = args[8] as Boolean
+                isSystemActive = args[8] as Boolean,
+                identitySanitized = args[9] as Boolean
             )
         }
         .distinctUntilChanged()
@@ -204,7 +207,8 @@ class StateSubscriptionUseCase @Inject constructor(
         val trackerId: String, val viewerId: String, val relayUrl: String,
         val maxDistance: Double, val homePoints: List<GeoPoint>,
         val isXiaomiManualOverride: Boolean, val lastAlarmAckTs: Long,
-        val appMode: String?, val isSystemActive: Boolean
+        val appMode: String?, val isSystemActive: Boolean,
+        val identitySanitized: Boolean
     )
 
     data class ConnectivityUpdate(

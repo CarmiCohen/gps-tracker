@@ -26,10 +26,10 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 ## 3. Test & Validation Authority
 *   **3.1 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`, `ToggleSetupBypass`) to verify alarm triggers and facilitate automated soak tests under simulated stress (R196-V, R735).
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
+*   **3.3 Identity Sanitization (R976)**: Identity sanitization state must be persistent. The warning overlay dismissal must be written to the DataStore to prevent redundant notifications across cold starts (Issue #737).
 
 ## 4. History of Changes (Recent)
+*   **Aug.26.13**: Resolved Concern #737 (Identity Sanitization Persistence). Persisted the dismissal of the sanitization warning to prevent re-init noise on cold starts (R976).
 *   **Aug.26.12**: Resolved Issue #736 (Compilation Error). Fixed non-exhaustive when expression in CommandRouter due to redundant ClearTrails declaration in Models.kt.
 *   **Aug.26.11**: Resolved Issue #735 Hardening (Setup Overlay Bypass). Implemented developer-mode bypass to enable automated soak tests on remote hardware (R735).
 *   **Aug.26.10**: Deployment Verification. Verified Issue #723 (StackLog Leak) and Issue #320 (Hardware Handshake) on Samsung A15 hardware. Identified Issue #735 (Setup Overlay Modal Block).
-*   **Aug.26.09**: Resolved Issue #320 Hardening (Hardware Handshake). Replaced 200ms magic delay with deterministic native round-trip (R320).
-*   **Aug.26.08**: Resolved Issue #723 (Diagnostic Log Leak / StackLog). Transitioned internet observation to Eagerly sharing to prevent platform callback noise (R723).

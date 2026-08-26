@@ -36,6 +36,10 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.26.13:
+ * - Concern #737 Remediation: Added DismissIdentitySanitization handler to 
+ *   persist the dismissal of the identity warning. This prevents the warning 
+ *   from re-initializing on every cold start (R976).
  * Aug.26.11:
  * - Issue #735 Hardening: Added ToggleSetupBypass handler to set 
  *   isSetupBypassActive in MainUiState, enabling automated soak test 
@@ -375,7 +379,8 @@ class MainViewModel @Inject constructor(
                     deviceId = update.trackerId, viewerId = update.viewerId, relayUrl = update.relayUrl,
                     maxDistance = update.maxDistance, homePoints = update.homePoints, lastAlarmAckTs = update.lastAlarmAckTs,
                     appMode = update.appMode, isSystemActive = update.isSystemActive,
-                    permissions = it.permissions.copy(isManualOverride = update.isXiaomiManualOverride)
+                    permissions = it.permissions.copy(isManualOverride = update.isXiaomiManualOverride),
+                    isIdentitySanitized = update.identitySanitized
                 )}
             }
             .flowOn(Dispatchers.Main.immediate)
@@ -529,6 +534,12 @@ class MainViewModel @Inject constructor(
             is UiEvent.SetManualSelection -> updateState { it.copy(isManualSelectionInProgress = event.active) }
             is UiEvent.SetSettlingActive -> updateState { it.copy(isSettlingActive = event.active) }
             is UiEvent.ToggleSetupBypass -> updateState { it.copy(isSetupBypassActive = event.active) }
+            is UiEvent.DismissIdentitySanitization -> {
+                updateState { it.copy(isIdentitySanitized = false) }
+                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+                    repository.saveBoolean(IDENTITY_SANITIZED_KEY, false)
+                }
+            }
             else -> {}
         }
     }
@@ -619,7 +630,8 @@ class MainViewModel @Inject constructor(
         updateState { it.copy(
             deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, 
             appMode = initial.appMode, isSystemActive = initial.isSystemActive,
-            draftSettings = initial.draftSettings ?: it.draftSettings
+            draftSettings = initial.draftSettings ?: it.draftSettings,
+            isIdentitySanitized = initial.identitySanitized
         )}
         _localMaxTemp.value = initial.maxTemp
     }
