@@ -37,8 +37,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Data classes for SystemStatusProvider. Moved to top to resolve tool-specific 
- * compilation stalls and unresolved reference issues (R745).
+ * Data classes for SystemStatusProvider.
  */
 data class BatteryStatus(
     val level: Int,
@@ -63,16 +62,10 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
- * Aug.13.10:
- * - Issue #159: SELinux LoadAvg Remediation. Disabled /proc/loadavg and /proc/stat 
- *   access on SDK 29+ to prevent SELinux denials. Stress monitoring now falls back 
- *   to I/O latency and thermal throttling on modern Android versions (R159).
- * Aug.13.03:
- * - Issue #150: Samsung A15 Detection Hardening. Broadened detection logic to 
- *   include Build.DEVICE and Build.BRAND to ensure R405 triggers reliably (R405).
- * Aug.11.13:
- * - Issue #141: Stress Recovery Verification. Correctly populating 
- *   requiresAdaptationMuzzle in PermissionState for budget hardware (R141).
+ * Aug.25.05:
+ * - Issue #317 Hardening: Hardware SOT Architectural Decoupling. Refactored to use 
+ *   HardwareSot from core:engine directly, removing dependency on app:Utils.kt 
+ *   for identification logic (R313/R212).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -134,10 +127,11 @@ class SystemStatusProviderImpl @Inject constructor(
     private val refreshMutex = Mutex()
     private val internetMutex = Mutex()
     
-    private val isXiaomi by lazy { isXiaomiDevice() }
-    private val isSamsung by lazy { isSamsungDevice() }
-    private val isS21FE by lazy { isS21FEDevice() }
-    private val isA15 by lazy { isA15Device() }
+    // Issue #317: Unified detection via engine:HardwareSot
+    private val isXiaomi by lazy { HardwareSot.isXiaomi(Build.MANUFACTURER) }
+    private val isSamsung by lazy { HardwareSot.isSamsung(Build.MANUFACTURER, Build.BRAND) }
+    private val isS21FE by lazy { HardwareSot.isS21FE(Build.MANUFACTURER, Build.BRAND, Build.MODEL) }
+    private val isA15 by lazy { HardwareSot.isA15(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.PRODUCT, Build.DEVICE) }
     
     private val PERMISSION_TTL_MS = 30000L 
     private val FORCED_REFRESH_COOLDOWN_MS = 1000L 
@@ -269,24 +263,6 @@ class SystemStatusProviderImpl @Inject constructor(
             XiaomiPermissionStatus.DENIED -> CapabilityStatus.DENIED
             XiaomiPermissionStatus.UNKNOWN -> CapabilityStatus.UNKNOWN
         }
-    }
-
-    private fun isXiaomiDevice(): Boolean = Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)
-    private fun isSamsungDevice(): Boolean = Build.MANUFACTURER.equals("Samsung", ignoreCase = true) || Build.BRAND.equals("Samsung", ignoreCase = true)
-    private fun isS21FEDevice(): Boolean = Build.MODEL.contains("G990", ignoreCase = true)
-    
-    /**
-     * Issue #150: Hardened Samsung A15 detection.
-     * Uses Model, Product, and Device strings to catch all variants of SM-A155/SM-A156.
-     */
-    private fun isA15Device(): Boolean {
-        if (!isSamsung) return false
-        val model = Build.MODEL ?: ""
-        val product = Build.PRODUCT ?: ""
-        val device = Build.DEVICE ?: ""
-        return model.contains("A15", ignoreCase = true) || 
-               product.contains("A15", ignoreCase = true) || 
-               device.contains("a15", ignoreCase = true)
     }
 
     private val sharedInternetStatusFlow = callbackFlow<Boolean> {

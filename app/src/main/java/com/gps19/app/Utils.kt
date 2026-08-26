@@ -12,11 +12,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
- * v9.4.0:
- * - Issue #502: Device Independency. Added openHardwareSettings to encapsulate vendor quirks.
- * v9.3.11:
- * - Issue #068 Hardening: Enforced use of cachedPackageName in Xiaomi permission 
- *   checkers to eliminate repetitive getPackageName() logcat spam on Samsung G990/A155.
+ * Aug.25.05:
+ * - Issue #317: Hardware SOT Architectural Decoupling. Delegated hardware 
+ *   detection to HardwareSot in core:engine (R313/R212).
  */
 
 enum class XiaomiPermissionStatus {
@@ -45,10 +43,13 @@ fun getConstellationName(type: Int): String {
     }
 }
 
-fun isXiaomiDevice(): Boolean {
-    val m = Build.MANUFACTURER.uppercase()
-    return m.contains("XIAOMI") || m.contains("REDMI") || m.contains("POCO")
-}
+fun isXiaomiDevice(): Boolean = HardwareSot.isXiaomi(Build.MANUFACTURER)
+
+fun isSamsungDevice(): Boolean = HardwareSot.isSamsung(Build.MANUFACTURER, Build.BRAND)
+
+fun isS21FEDevice(): Boolean = HardwareSot.isS21FE(Build.MANUFACTURER, Build.BRAND, Build.MODEL)
+
+fun isA15Device(): Boolean = HardwareSot.isA15(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.PRODUCT, Build.DEVICE)
 
 /**
  * v9.3.11: Now requires non-null pkgName to prevent logcat spillage.
@@ -86,7 +87,6 @@ fun getXiaomiAutostartStatus(context: Context, pkgName: String): XiaomiPermissio
 
 /**
  * openHardwareSettings: Brand-agnostic entry point for hardware-specific permission managers.
- * v9.4.0 (Issue #502)
  */
 fun openHardwareSettings(context: Context, pkgName: String) {
     if (isXiaomiDevice()) {
@@ -143,22 +143,6 @@ fun openXiaomiAutostartSettings(context: Context, pkgName: String) {
 
 fun isXiaomiAutostartGranted(context: Context, pkgName: String): Boolean {
     return getXiaomiAutostartStatus(context, pkgName) == XiaomiPermissionStatus.GRANTED
-}
-
-fun isSamsungDevice(): Boolean {
-    return Build.MANUFACTURER.uppercase().contains("SAMSUNG")
-}
-
-fun isS21FEDevice(): Boolean {
-    if (!isSamsungDevice()) return false
-    val m = Build.MODEL.uppercase()
-    return m.contains("G990B") || m.contains("G990E") || m.contains("S21FE")
-}
-
-fun isA15Device(): Boolean {
-    val m = Build.MODEL.uppercase()
-    val p = Build.PRODUCT.uppercase()
-    return m.contains("A15") || p.contains("A15")
 }
 
 fun getRecentsLockDescription(): String {

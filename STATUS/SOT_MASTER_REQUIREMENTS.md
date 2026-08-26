@@ -7,7 +7,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.2 State Flow**: UI state must be exposed via `StateFlow` from ViewModels. `UiStateAggregator` is the central authority for consolidating telemetry and diagnostic flows (R240). Segmented hydration flows (R248) are required for budget hardware performance.
 *   **1.3 Foreground Persistence**: `TrackerService` must maintain a foreground notification. Termination of the service is a violation of SOT.
 *   **1.4 Navigation Continuity**: Navigation backstack must be managed to prevent redundant route injection or invalid pop operations. Explicit graph-relative `popUpTo` and `launchSingleTop` are required for all mode transitions (R250).
-*   **1.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (Issue #310).
+*   **1.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (Issue #310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (Issue #317).
 *   **1.6 Monotonic Authority (R307)**: All maintenance durations and health-check silence detections must prioritize monotonic references (`elapsedRealtime`) to prevent wall-clock corruption during reboots or system time jumps (Issue #307).
 
 ## 2. Forensic & Performance Requirements
@@ -27,13 +27,10 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
-*   **Aug.25.02**: Resolved Issue #316 (Shadow-Cache LRU Documentation Gap). Verified R280 logic via unit tests in `ShadowCacheTest.kt`.
+*   **Aug.25.05**: Resolved Issue #317 (Hardware SOT Architectural Decoupling). Migrated detection signatures to `:core:engine:HardwareSot.kt` (R313/R212).
+*   **Aug.25.04**: Resolved Issue #313 (Multi-Device Deployment Failure). Unified and hardened hardware detection signatures in `Utils.kt` (R313).
+*   **Aug.25.03**: Resolved Issue #316 (Shadow-Cache LRU Documentation Gap). Verified R280 logic via unit tests in `ShadowCacheTest.kt`.
+*   **Aug.25.02**: Hardware Verification and Hardening Trace. Identified Issue #313 (A15 Detection Failure).
 *   **Aug.25.01**: Resolved Issue #315 (Immediate Signal Loss False Positive). Implemented GPS_WARMUP_GRACE_MS (30s) in `MainAlarmLogic` (R315).
 *   **Aug.25.00**: Resolved Issue #314 (Startup Davey Stall). Implemented Staggered Hydration (R314) with A15-specific observation offsets.
-*   **Aug.25.04**: Resolved Issue #312 (Compose Lock Verification). Verified SM-A155F deployment. Identified Issue #314 (Startup Davey), Issue #315 (GPS Settling), and formalized R280/LRU Cache (Issue #721).
-*   **Aug.25.01 (Old)**: Verified SM-G990E (S21 FE) hardware compatibility. Identified Issue #312 (Persistent Compose Lock warnings) and Issue #313 (A15 Detection Failure) during multi-device deployment.
-*   **Aug.25.00 (Old)**: Resolved Issue #309 (Imperative Map Isolation) and Issue #310 (Ghost Load Neutralization).
-*   **Aug.24.01**: Standardized Monotonic Authority (#307) for maintenance uptime logging.
-*   **Aug.24.00**: Resolved Issue #255 (Compose Lock Failure) via SnapshotState isolation. (Superseded by R309).
-*   **Aug.22.08**: Neutralized `mbrainSDK` Ghost Load false positives (Issue #251) and formalized Hardware Neutrality (R212).
 *   **Aug.22.04**: Hardened `ShadowCache` (R280) and verified Chapter 12.2 Database Stress stability. Standardized R197 chunked pruning for all high-frequency data tables.

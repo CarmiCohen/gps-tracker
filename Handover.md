@@ -1,24 +1,24 @@
-# Handover (Aug.25.02) - Shadow-Cache LRU & Forensic Hardening
+# Handover (Aug.25.05) - Hardware SOT Architectural Decoupling
 
 ## 🎯 Current Status
-- **Goal**: Formalize and verify Shadow-Cache LRU eviction logic (R280).
+- **Goal**: Decouple hardware detection logic from the application layer to the core engine.
 - **Status**: 🟢 **STABLE**
-- **Version**: `Aug.25.02`
+- **Version**: `Aug.25.05`
 - **Database**: v73
-- **Audit Baseline**: SOT: 167, Resolved: 717, Open: 49, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 192, QA Status: 189.
+- **Audit Baseline**: SOT: 168, Resolved: 719, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 193, QA Status: 189.
 
-## 🧬 Forensic Audit Summary: Aug.25.02
-- **Issue #316 (Shadow-Cache) Resolved**: Formalized R280 logic. Verified that `ShadowCache` correctly implements LRU eviction via `LinkedHashMap(accessOrder = true)`.
-- **Unit Testing**: Added `testLruEvictionOrder` to `ShadowCacheTest.kt`. Confirmed Least Recently Used entries are evicted first under capacity pressure. All 36 engine tests passed.
-- **Requirement 2.5 (R280)**: `SOT_MASTER_REQUIREMENTS.md` updated to formalize Issue #721 as the authority for cache stability and LRU strategy.
-- **Simplicity Audit**: Added Idea #5 to `Simplify_Ideas2.md` to evaluate standardizing on `androidx.collection.LruCache` to reduce boilerplate while maintaining thread-safety.
+## 🧬 Forensic Audit Summary: Aug.25.05
+- **Issue #317 (Hardware SOT Decoupling) Resolved**: Successfully migrated hardware detection signatures from `:app:Utils.kt` to `:core:engine:HardwareSot.kt`.
+- **Architectural Alignment**: Core engine and background services (Tracker/Viewer) are now "Hardware Neutral" (R212) and independently aware of their execution environment via `HardwareSot`.
+- **Refactoring**: `Utils.kt` and `SystemStatusProviderImpl.kt` refactored to delegate identification to the engine-level Source of Truth.
+- **Requirement 1.5 Update**: Formalized Issue #317 in `SOT_MASTER_REQUIREMENTS.md` as part of the Architectural Authority for hardware neutrality.
 
 ## 🚀 Git Release Block
 ```bash
 git add .
-git commit -m "Hardening: Resolved Issue #316 (Shadow-Cache LRU Documentation Gap) via R280 formalization - vAug.25.02"
-git tag -a vAug.25.02 -m "Release Aug.25.02: Shadow-Cache LRU & Forensic Hardening"
+git commit -m "Hardening: Resolved Issue #317 (Hardware SOT Architectural Decoupling) - vAug.25.05"
+git tag -a vAug.25.05 -m "Release Aug.25.05: Hardware SOT Architectural Decoupling"
 git push origin main --tags
 ```
 
-vAug.25.02
+vAug.25.05

@@ -2,47 +2,32 @@
 
 This document contains the unified record of all resolved issues and technical debt for the GPS-Tracker system.
 
-**Total Unique Resolutions: 717**
+**Total Unique Resolutions: 719**
 
-## 111. Shadow-Cache LRU & Forensic Hardening (Aug.25.02)
+## 113. Hardware SOT Architectural Decoupling (Aug.25.05)
+*   **Issue #317: Hardware SOT Architectural Decoupling**.
+    - **Resolution**: Migrated hardware detection signatures from `:app:Utils.kt` to `:core:engine:HardwareSot.kt` (R313/R212).
+    - **Action**: Established `HardwareSot` object in the engine module as the central authority for environment identification. Refactored `SystemStatusProviderImpl.kt`, `TrackerService.kt`, and `ViewerService.kt` to consume this decoupled source directly.
+    - **Result**: Core engine and background services are now "Hardware Neutral" and independently aware of their execution environment, eliminating architectural leaks and dependency on application-layer utilities for critical gating logic.
+
+## 112. Hardware Detection SOT & Deployment Hardening (Aug.25.04)
+*   **Issue #313: Multi-Device Deployment Failure**.
+    - **Resolution**: Unified and hardened hardware detection signatures (R313).
+    - **Action**: Consolidated detection logic for Samsung and budget A15 variants using `MODEL`, `PRODUCT`, and `DEVICE` strings. 
+    - **Result**: Ensures consistent A15-specific optimizations (R314/R312) across all system layers.
+
+## 111. Shadow-Cache LRU & Forensic Hardening (Aug.25.03)
 *   **Issue #316: Shadow-Cache LRU Documentation Gap (#721)**.
     - **Resolution**: Formalized R280 logic for `ShadowCache` and verified LRU eviction strategy.
-    - **Action**: Verified `ShadowCache.kt` implementation of `accessOrder = true` via `LinkedHashMap`. Added `testLruEvictionOrder` to `ShadowCacheTest.kt` to ensure Least Recently Used entries are evicted first under capacity pressure. Updated `SOT_MASTER_REQUIREMENTS.md` to formalize Issue #721 as R280.
-    - **Result**: Shadow-Cache stability is now formally documented and verified, preventing race conditions and ensuring deterministic resource cleanup during high-frequency bursts.
+    - **Action**: Verified `ShadowCache.kt` implementation of `accessOrder = true`. Added `testLruEvictionOrder` to `ShadowCacheTest.kt`.
+    - **Result**: Shadow-Cache stability is now formally documented and verified.
 
 ## 110. GPS Stabilization & Warm-up Hardening (Aug.25.01)
 *   **Issue #315: Immediate Signal Loss False Positive**.
-    - **Resolution**: Implemented GPS_WARMUP_GRACE_MS (30s) to suppress false alerts during provider stabilization (R315).
-    - **Action**: Modified `EngineConstants.kt` to define the 30s grace period and updated `MainAlarmLogic.kt` to gate `SIGNAL_LOSS`, `GPS_STALL`, and `GPS_GAP` alerts against this grace period relative to service start time.
-    - **Result**: False positives during app startup and provider warm-up are eliminated.
+    - **Resolution**: Implemented GPS_WARMUP_GRACE_MS (30s) in `MainAlarmLogic` (R315).
 
 ## 109. Startup Fluidity & Budget Hardware Hardening (Aug.25.00)
 *   **Issue #314: Startup UI Stall (Davey)**.
-    - **Resolution**: Implemented Staggered Hydration (R314) to eliminate UI stalls on budget hardware.
-    - **Action**: Modified `MainViewModel.kt` to increase initial hydration delays (300ms/500ms) and added a conditional 1000ms delay for heavy telemetry observations on A15 hardware. Extended the delay for proactive DB pruning.
-    - **Result**: UI remains responsive during the critical first-frame rendering and app-mode transition on SM-A155F hardware.
-
-## 108. Snap-Isolation & Reactive List Hardening (Aug.25.04)
-*   **Issue #312: Persistent Lock Verification Failures**.
-    - **Resolution**: Implemented Snap-Isolation (Idea #185) to eliminate Compose Recomposer lock contention on Samsung hardware.
-    - **Action**: Added `contentEquals` deep-parity utilities to `TrailPoint`, `LogEntry`, `ViolationPoint`, and `ConnectionPoint` in `Models.kt`. Hardened `MainViewModel.kt` by applying `distinctUntilChanged` with deep-parity checks to all high-frequency telemetry and log flows.
-    - **Result**: Redundant UI snapshot reconciliation cycles are suppressed, eliminating "Failed lock verification" warnings and restoring UI fluidity on SM-G990E and SM-A155F hardware.
-
-## 107. Navigation State Persistence & Mode Recovery (Aug.25.01)
-*   **Issue #311: Mode Transition Navigation Regression**.
-    - **Resolution**: Migrated navigation selection state (`isManualSelectionInProgress`, `isSettlingActive`) from local `remember`ed variables to the centralized `MainUiState`.
-    - **Action**: Implemented `SetManualSelection` and `SetSettlingActive` events in `MainViewModel`. Updated `MainAppContent.kt` to utilize these persistent fields. This prevents the app from reverting to the Landing screen when returning from system permission dialogs (e.g., Background Location request) on devices with aggressive Activity destruction.
-    - **Verification**: UI audit confirms navigation continuity across Activity recreation.
-
-## 106. Imperative Map Isolation & Compose Pressure Mitigation (Aug.25.00)
-*   **Issue #309: Compose Lock Verification Persistent Warnings**.
-    - **Resolution**: Replaced `SnapshotStateList` and `SnapshotStateMap` in `MapOverlayManager.kt` with standard `ArrayList` and `HashMap` collections. 
-    - **Action**: High-frequency map updates are performed imperatively within `AndroidView.update`. Using standard collections eliminates lock contention and frame skips on A15 hardware.
-*   **Issue #310: libmbrainSDK Ghost Load Persistence**.
-    - **Resolution**: Neutralized legacy signatures in `JdHardwareManager.kt` to prevent Samsung CFMS heuristic triggers.
-
-## 105. Monotonic Authority & Maintenance Uptime Hardening (Aug.24.01)
-*   **Issue #307: Inconsistent Maintenance Uptime Logging**.
-    - **Resolution**: Standardized health-check durations using monotonic time (`elapsedRealtime`).
+    - **Resolution**: Implemented Staggered Hydration (R314).
 
 *(Older resolutions preserved in Git history)*
