@@ -1,29 +1,31 @@
-# Project Issues & Hardening Tracking (Aug.26.00)
+# Project Issues & Hardening Tracking (Aug.26.01)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟢 STABLE | 47 |
+| **Open Technical Issues** | 🟡 CAUTION | 49 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 721 |
+| **Resolved (Total)** | 🟢 Progress | 723 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Samsung Setup Blockers (A15 & S21 FE)**: Deployment on SM-A155F identifies "Unrestricted" battery mode and "Appear on Top" permissions as hard blockers. Verified functional in vAug.25.05.
+*   **Issue #320**: **Native Resource Leak**. Logcat identifies `A resource failed to call BaseEventQueue.dispose` during `TrackerService` destruction or native release. Potential memory/handle leak.
+*   **Issue #321**: **A15 UI Hydration Stall**. 901ms Davey stall detected in `TrackerScreen` layout on A15 hardware. Staggered hydration successfully offloads core logic, but map composition remains heavy.
 
 ---
 
 ## 🔴 Open Issues
-*   *(No critical blockers open for Aug.26.00 branch)*
+*   **Issue #320**: Native Resource Leak (`BaseEventQueue`).
+*   **Issue #321**: UI Composition Performance Stall on A15.
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.26.00)
+## 🟢 Recently Resolved Issues (Aug.26.00 - Aug.26.01)
 *   **Issue #318**: **A15 Startup Frame Drops**. Implemented `LifecycleHydrationManager` to stagger startup sequences and offload hydration from the main thread.
 *   **Issue #319**: **Background Monitor Inflation Failure**. Hardened native initialization with exponential backoff retries in `JdHardwareManager` to ensure reliable hardware binding.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.26.00)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.26.01)

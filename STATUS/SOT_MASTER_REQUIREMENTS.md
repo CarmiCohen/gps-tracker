@@ -28,6 +28,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.26.01**: Deployment Verification. Confirmed hydration and native binding stability. Identified Issue #320 (Native Leak) and Issue #321 (Composition Davey).
 *   **Aug.26.00**: Resolved Issue #318 (A15 Startup Frame Drops) via `LifecycleHydrationManager` and Issue #319 (Monitor Inflation Failure) via native retry logic.
 *   **Aug.25.06**: Deployment Verification on SM-A155F. Hardware SOT verified. Identified Issue #318 (Startup Davey) and Issue #319 (Monitor Inflation).
 *   **Aug.25.05**: Resolved Issue #317 (Hardware SOT Architectural Decoupling). Migrated detection signatures to `:core:engine:HardwareSot.kt` (R313/R212).

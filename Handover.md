@@ -1,19 +1,21 @@
-# Handover (Aug.26.00) - Performance & Native Reliability Hardening
+# Handover (Aug.26.01) - Performance & Native Reliability Hardening
 
 ## 🎯 Current Status
-- **Goal**: Resolve startup performance stalls and native monitor initialization failures.
-- **Status**: 🟢 **STABLE** (Hydration), 🟢 **STABLE** (Native Binding)
-- **Version**: `Aug.26.00`
+- **Goal**: Verify startup performance and native monitor reliability.
+- **Status**: 🟢 **STABLE** (Hydration), 🟢 **STABLE** (Native Binding), 🟡 **MONITOR** (Resource Leak & Davey)
+- **Version**: `Aug.26.01`
 - **Database**: v73
-- **Audit Baseline**: SOT: 171, Resolved: 722, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 193, QA Status: 189.
+- **Audit Baseline**: SOT: 172, Resolved: 723, Open: 49, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 195, QA Status: 189.
 
-## 🧬 Forensic Audit Summary: Aug.26.00
-- **Issue #318 Resolved**: Implemented `LifecycleHydrationManager`. Startup sequence is now staggered (Surface -> Core -> Full) with 500ms-1200ms offsets for A15 hardware. Verified elimination of Davey stalls.
-- **Issue #319 Resolved**: Hardened `JdHardwareManager` with exponential backoff (5 retries). Resolves `Monitor::Inflate` failures by allowing OS hardware handles to settle before binding.
-- **Architecture**: Hydration logic is now decoupled from `MainViewModel` lifecycle, improving testability and budget hardware scaling.
+## 🧬 Forensic Audit Summary: Aug.26.01
+- **Deployment Verified**: Confirmed successful startup on SM-A155F. `LifecycleHydrationManager` executed levels 1-3 sequentially.
+- **Issue #319 Verified**: Logcat confirms native SDK initialization success on the first attempt with `jdHardware` bridge active.
+- **New Concern (Issue #320)**: Detected `BaseEventQueue.dispose` failure in logs. Indicates native resource cleanup leak.
+- **New Concern (Issue #321)**: Identified 901ms Davey stall during initial map composition. Staggered hydration works for logic, but UI rendering needs further decomposition.
 
 ## 🚀 Next Steps
-- Monitor A15 field logs for any secondary hydration spikes.
-- Perform high-frequency DB stress audit (Chapter 12.2) on the new hydration baseline.
+- Investigate `BaseEventQueue` lifecycle to resolve Issue #320.
+- Perform UI composition audit for `TrackerScreen` to reduce initial render latency (Issue #321).
+- Resume Chapter 12.2 stress testing on the current baseline.
 
-vAug.26.00
+vAug.26.01

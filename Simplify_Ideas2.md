@@ -1,4 +1,4 @@
-# Architectural Simplification Ideas (vAug.26.00)
+# Architectural Simplification Ideas (vAug.26.01)
 
 ## 🎯 Current Objectives
 - Reduce memory churn on budget hardware (A15).
@@ -11,6 +11,8 @@
 3.  **Monotonic-Only Evaluation**: Remove all `currentTimeMillis` dependencies from `MainAlarmLogic` to eliminate risk of clock-skew false positives.
 4.  **Baseline Quantization**: Store EMA baselines (Baro/Acoustic) in a separate `EnvironmentContext` to decouple environmental tracking from alarm evaluation logic.
 5.  **Standardized LRU Provider**: Evaluate replacing the custom `ShadowCache` wrapper with `androidx.collection.LruCache` to reduce custom concurrency boilerplate.
+6.  **Decomposed Map Layers (A15)**: (Issue #321) Consider splitting `TrackerScreen` into smaller sub-compositions that hydrate independently to reduce the 901ms Davey stall during initial map render.
+7.  **Native Disposal Guard**: (Issue #320) Implement a standardized `NativeResourceGuard` to ensure `dispose()` is called for all native handles, preventing `BaseEventQueue` warnings.
 
 ## 🟢 Implemented Simplifications
 - **LifecycleHydrationManager**: (Aug.26.00) Centralized staggered hydration sequence for budget hardware (Issue #318).
