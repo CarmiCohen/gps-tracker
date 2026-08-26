@@ -9,7 +9,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.4 Navigation Continuity**: Navigation backstack must be managed to prevent redundant route injection or invalid pop operations. Explicit graph-relative `popUpTo` and `launchSingleTop` are required for all mode transitions (R250).
 *   **1.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (Issue #310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (Issue #317).
 *   **1.6 Monotonic Authority (R307)**: All maintenance durations and health-check silence detections must prioritize monotonic references (`elapsedRealtime`) to prevent wall-clock corruption during reboots or system time jumps (Issue #307).
-*   **1.7 Staggered Hydration Manager (R318)**: To prevent Davey stalls, hydration must be managed by `LifecycleHydrationManager`, providing a multi-level staggered sequence (Surface, Core, Full) with environment-specific delays for budget hardware (Issue #318).
+*   **1.7 Staggered Hydration Manager (R318/R323)**: To prevent Davey stalls, hydration must be managed by `LifecycleHydrationManager`, providing a multi-level staggered sequence. Level 4 (Idle Map Hydration) must be triggered via `IdleHandler` to ensure heavy engine initialization occurs only after the UI thread is free (Issue #318, #323).
 
 ## 2. Forensic & Performance Requirements
 *   **2.1 Sampling Frequency**: Forensic sampling must operate between 10ms and 100ms based on system load (R700).
@@ -28,6 +28,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.2 Auto-Recovery**: System must restore to the previous active mode within 2s of launch (R243).
 
 ## 4. History of Changes (Recent)
+*   **Aug.26.05**: Resolved Issue #323 (Startup Davey Stall). Implemented Level 4 Idle-based Map Hydration (R323).
 *   **Aug.26.04**: Resolved Issue #322 (Compilation Regression). Validated Chapter 12.2 Stress Audit (R197, R700) and Hardening (R133, R191, R192). Verified Native Cleanup (R320) stability post-service destruction.
 *   **Aug.26.03**: Resolved Issue #320 (Native Leak Persistence) via explicit GpsManager lifecycle and Issue #321 (UI Regression) via expanded 1000ms hydration gaps.
 *   **Aug.26.02**: Resolved Issue #320 (Native Leak) via hardened cleanup and Issue #321 (UI Davey) via 3-stage hydration.

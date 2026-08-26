@@ -26,6 +26,9 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.26.06:
+ * - Audit Chapter 13: Added simulateMaliAnomaly hook to verify GPU driver 
+ *   forensic correlation logic (R266) without physical thermal stress.
  * Aug.22.05:
  * - Audit Chapter 12.3: Added simulateStoragePressure to verify log and trail 
  *   prioritization under simulated storage exhaustion (R197).
@@ -58,6 +61,7 @@ class IntegrityMonitor @Inject constructor(
 
     private val isStorageSimulated = AtomicBoolean(false)
     private val isStorageCriticalSimulated = AtomicBoolean(false)
+    private val isMaliAnomalySimulated = AtomicBoolean(false)
 
     // Vitality Tracking
     private var lastInternetUpdateRt = 0L
@@ -179,11 +183,17 @@ class IntegrityMonitor @Inject constructor(
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
         }
 
-        val cpu = systemStatusProvider.getCpuLoad()
-        val iow = systemStatusProvider.getIoWait()
-        val maxIo = LatencyMonitor.consumeMaxIoLatency()
+        var cpu = systemStatusProvider.getCpuLoad()
+        var iow = systemStatusProvider.getIoWait()
+        var maxIo = LatencyMonitor.consumeMaxIoLatency()
 
-        if (systemStatusProvider.isA15Hardware()) {
+        if (isMaliAnomalySimulated.get()) {
+            cpu = 7.5
+            maxIo = 1200L
+            iow = 2.0
+        }
+
+        if (systemStatusProvider.isA15Hardware() || isMaliAnomalySimulated.get()) {
             if (maxIo > LATENCY_THRESHOLD_DB_WRITE_MS) {
                 val msg = "PERFORMANCE WARNING: Critical I/O Spike detected on budget hardware (%dms). System stress: [CPU: %.1f, IOW: %.1f]".format(maxIo, cpu, iow)
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
@@ -486,6 +496,16 @@ class IntegrityMonitor @Inject constructor(
         }
     }
 
+    /**
+     * simulateMaliAnomaly: Simulation hook for Chapter 13 audit (R266).
+     */
+    fun simulateMaliAnomaly(active: Boolean) {
+        isMaliAnomalySimulated.set(active)
+        val msg = if (active) "System Info: Mali Driver Anomaly simulation ENABLED." 
+                  else "System Info: Mali Driver Anomaly simulation DISABLED."
+        _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, false))
+    }
+
     suspend fun isInternetHardwarePresent(): Boolean {
         return systemStatusProvider.isLocalOnline()
     }
@@ -566,6 +586,7 @@ class IntegrityMonitor @Inject constructor(
         lastInternetCheckRt = 0L
         isStorageSimulated.set(false)
         isStorageCriticalSimulated.set(false)
+        isMaliAnomalySimulated.set(false)
     }
 
     fun getBatteryLevel(): Int = currentHealth.batteryLevel

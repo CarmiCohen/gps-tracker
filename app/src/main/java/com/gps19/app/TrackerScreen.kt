@@ -29,13 +29,15 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Aug.26.05:
+ * - Issue #323 Hardening: Removed redundant internal hydration logic. 
+ *   Synchronized with LifecycleHydrationManager Level 4 (Idle Map) to 
+ *   ensure Map Engine initialization doesn't compete with startup frame 
+ *   rendering (R323).
  * Aug.26.04:
  * - Issue #321 Deep Hardening: Corrected parameter binding in TrackerDashboard 
  *   to resolve build failure. Further optimized hydration Level 2/3 timing 
  *   to eliminate frame-drop overlap during heavy OSM Engine init (R321).
- * Aug.26.03:
- * - Issue #321 Regression Fix: Expanded hydration gaps to 300ms/600ms/1000ms 
- *   to accommodate A15 hardware JIT burst.
  */
 
 @Composable
@@ -62,14 +64,6 @@ fun TrackerScreen(
     onSaveTrail: () -> Unit = {},
     onLoadTrail: () -> Unit = {}
 ) {
-    // Stage Hydration for Performance Hardening (Issue #321)
-    var hydrationLevel by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
-        delay(300); hydrationLevel = 1  // Basic Shell
-        delay(400); hydrationLevel = 2  // Telemetry Dashboard logic
-        delay(500); hydrationLevel = 3  // Heavy Map Engine
-    }
-
     val nav = uiState.navigation
     val isMapVisible = nav.isMapVisible
     val isLogVisible = nav.isLogVisible
@@ -128,7 +122,7 @@ fun TrackerScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (hydrationLevel < 1) {
+        if (uiState.hydrationLevel < 1) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
             }
@@ -141,7 +135,7 @@ fun TrackerScreen(
                         statusBar()
                         
                         Box(modifier = Modifier.weight(1f)) {
-                            if (hydrationLevel >= 3 && isMapVisible && !isAnyOverlayOpen) {
+                            if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen) {
                                 AppMapContainer(
                                     appMode = uiState.appMode,
                                     isMapButtonsVisible = uiState.isMapButtonsVisible,
@@ -188,7 +182,7 @@ fun TrackerScreen(
                                     showSettingsButton = true,
                                     showToolsOverlay = true
                                 )
-                            } else if (hydrationLevel >= 2 && !isMapVisible) {
+                            } else if (uiState.hydrationLevel >= 2 && !isMapVisible) {
                                 TrackerDashboard(
                                     appMode = uiState.appMode ?: "tracker",
                                     isSystemActive = uiState.isSystemActive,
@@ -269,7 +263,7 @@ fun TrackerScreen(
                     }
                 }
             } else {
-                if (hydrationLevel >= 3 && isMapVisible && !isAnyOverlayOpen) {
+                if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen) {
                     AppMapContainer(
                         appMode = uiState.appMode,
                         isMapButtonsVisible = uiState.isMapButtonsVisible,
@@ -332,7 +326,7 @@ fun TrackerScreen(
                             }
                         }
 
-                        if (hydrationLevel >= 3 && isMapVisible) {
+                        if (uiState.isMapHydrated && isMapVisible) {
                             Box(Modifier.fillMaxWidth().padding(top = 8.dp, end = 12.dp), contentAlignment = Alignment.CenterEnd) {
                                 MapSettingsToggle(
                                     isMapButtonsVisible = uiState.isMapButtonsVisible,
@@ -366,7 +360,7 @@ fun TrackerScreen(
                             }
                         }
                         
-                        if (hydrationLevel >= 2 && !isMapVisible) {
+                        if (uiState.hydrationLevel >= 2 && !isMapVisible) {
                             TrackerDashboard(
                                 appMode = uiState.appMode ?: "tracker",
                                 isSystemActive = uiState.isSystemActive,

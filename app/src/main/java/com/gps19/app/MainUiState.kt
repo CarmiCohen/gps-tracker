@@ -5,6 +5,10 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Aug.26.05:
+ * - Issue #323 Hardening: Added Level 4 to hydrationLevel (Idle Map Hydration) 
+ *   to ensure heavy OSM engine initialization only occurs when the main 
+ *   thread is free (R323).
  * Aug.25.01:
  * - Issue #311 Hardening: Added isManualSelectionInProgress and isSettlingActive 
  *   to ensure navigation state survives activity destruction during permission flows.
@@ -14,7 +18,7 @@ import org.osmdroid.util.GeoPoint
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
-    val hydrationLevel: Int = 0, // 0: Cold, 1: Surface, 2: Core/Nav, 3: Full
+    val hydrationLevel: Int = 0, // 0: Cold, 1: Surface, 2: Core/Nav, 3: Full, 4: Idle Map
     val appMode: String? = null,
     val isSystemActive: Boolean = false,
     val deviceId: String = MainRepository.DEFAULT_TRACKER_ID,
@@ -49,6 +53,7 @@ data class MainUiState(
     val isSettlingActive: Boolean = true
 ) {
     val isFullyHydrated: Boolean get() = hydrationLevel >= 3
+    val isMapHydrated: Boolean get() = hydrationLevel >= 4
 
     val isSystemReady: Boolean
         get() = permissions.isFineLocationGranted &&
