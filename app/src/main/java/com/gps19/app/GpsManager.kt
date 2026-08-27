@@ -10,6 +10,7 @@ import android.location.LocationManager
 import android.os.*
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
+import com.google.android.gms.tasks.Tasks
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -23,22 +24,14 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.27.03:
+ * - Issue #747 Hardening: Implemented synchronous Task awaiting for 
+ *   removeLocationUpdates in stop() to ensure FusedLocationProvider's 
+ *   internal event queue is disposed before thread termination, 
+ *   resolving persistent BaseEventQueue leaks (R747).
  * Aug.27.02:
  * - Issue #745 Hardening: Standardized lifecycle stop() to queue GNSS callback 
- *   unregistration on the hardware thread before quitting, ensuring deterministic 
- *   disposal of the native event queue and preventing "BaseEventQueue.dispose" 
- *   warnings (R745).
- * Aug.27.01:
- * - Issue #744 Remediation: Explicitly tracking and synchronously unregistering 
- *   activeLocationCallback in stop() to prevent BaseEventQueue leaks caused by 
- *   lingering flow subscriptions after thread termination (R744).
- * Aug.26.19:
- * - Issue #742 Hardening: Replaced anonymous LocationCallback in 
- *   restartLocationUpdates with a managed instance to prevent 
- *   BaseEventQueue leaks during service destruction (R742).
- * Aug.26.18:
- * - Issue #742 Remediation: Decoupled GNSS callback from callbackFlow to 
- *   prevent redundant/leaking registrations during polling changes.
+ *   unregistration on the hardware thread before quitting (R745).
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -178,30 +171,50 @@ class GpsManager @Inject constructor(
         synchronized(lifecycleLock) {
             if (!isStarted.getAndSet(false)) return
             
-            // Issue #745: Ensure GNSS callback is unregistered on the hardware thread
-            // before the thread is terminated. This prevents BaseEventQueue disposal leaks.
-            gpsHandler?.post {
+            // Issue #747: Deterministic unregistration of all GPS callbacks.
+            // 1. Unregister GnssStatusCallback synchronously on the handler.
+            val handler = gpsHandler
+            if (handler != null) {
+                val latch = java.util.concurrent.CountDownLatch(1)
+                handler.post {
+                    try {
+                        locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Error unregistering GNSS callback on thread")
+                    } finally {
+                        latch.countDown()
+                    }
+                }
                 try {
-                    locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
-                } catch (e: Exception) {
-                    Timber.e(e, "Error unregistering GNSS callback on thread")
+                    latch.await(1000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                } catch (e: InterruptedException) {
+                    Timber.e("GPS unregistration latch interrupted")
                 }
             }
 
+            // 2. Unregister FusedLocation callbacks and AWAIT the Task completion.
+            // This is critical to ensure the internal BaseEventQueue is disposed before the thread quits.
             activeLocationCallback?.let {
                 try {
-                    fusedLocationClient.removeLocationUpdates(it)
-                } catch (e: Exception) {}
+                    val task = fusedLocationClient.removeLocationUpdates(it)
+                    Tasks.await(task, 1000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                } catch (e: Exception) {
+                    Timber.e(e, "Timeout or error awaiting active location removal")
+                }
                 activeLocationCallback = null
             }
 
             revivalCallback?.let {
                 try {
-                    fusedLocationClient.removeLocationUpdates(it)
-                } catch (e: Exception) {}
+                    val task = fusedLocationClient.removeLocationUpdates(it)
+                    Tasks.await(task, 1000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                } catch (e: Exception) {
+                    Timber.e(e, "Timeout or error awaiting revival location removal")
+                }
                 revivalCallback = null
             }
 
+            // 3. Gracefully terminate the thread.
             gpsThread?.quitSafely()
             try {
                 gpsThread?.join(1000)
@@ -240,7 +253,11 @@ class GpsManager @Inject constructor(
             synchronized(lifecycleLock) {
                 if (!isStarted.get()) return@launch
                 
-                revivalCallback?.let { fusedLocationClient.removeLocationUpdates(it) }
+                revivalCallback?.let { 
+                    try {
+                        fusedLocationClient.removeLocationUpdates(it)
+                    } catch (e: Exception) {}
+                }
                 
                 val callback = object : LocationCallback() {
                     override fun onLocationResult(p0: LocationResult) {}

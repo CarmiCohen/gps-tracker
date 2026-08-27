@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.27.04 (vAug.27.04)
+*   **Concern #747 Resolved**: **Persistent BaseEventQueue Leak (GpsManager Task Race)**. Deployment regression confirmed that `BaseEventQueue.dispose` warnings persisted because `fusedLocationClient.removeLocationUpdates()` returns an asynchronous Task. Hardened `GpsManager.stop()` to synchronously await these tasks using `Tasks.await()`, ensuring native disposal finishes before the hardware thread is terminated (R747).
+
 ## 🟢 Aug.27.03 (vAug.27.03)
 *   **Concern #746 Resolved**: **Multi-Source BaseEventQueue Leak**. Identified that hardening `AppSensorManager` alone was insufficient as `GpsManager` and asynchronous `StepDetector` registration races were also orphaning native `EventQueue` resources. Standardized the "Unregister-on-Thread" pattern across all hardware managers and utilized `CountDownLatch` in `AppSensorManager.stop()` to guarantee that native listeners are disposed of before the controlling `HandlerThread` is terminated, eliminating "BaseEventQueue.dispose" warnings (R746).
 

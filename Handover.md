@@ -1,22 +1,22 @@
-# Handover (Aug.27.03) - Hardware Thread Hardening
+# Handover (Aug.27.04) - Hardware Lifecycle Hardening
 
 ## 🎯 Current Status
-- **Goal**: Deterministic disposal of native sensor resources during role transitions.
-- **Status**: 🟢 **RESOLVED** (Concern #746: Multi-Source BaseEventQueue Leak).
-- **Version**: `Aug.27.03`
+- **Goal**: Deterministic disposal of native hardware resources.
+- **Status**: 🟢 **RESOLVED** (Concern #747: Persistent BaseEventQueue Leak).
+- **Version**: `Aug.27.04`
 - **Database**: v73
-- **Audit Baseline**: SOT: 21, Resolved: 746, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 205, QA Status: 197.
+- **Audit Baseline**: SOT: 21, Resolved: 747, Open: 46, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 206, QA Status: 197.
 
-## 🧬 Implementation Summary: Aug.27.03
-- **Concern #746 Remediation**: **Multi-Source Hardware Hardening**.
-    - Identified that `BaseEventQueue` warnings persisted due to `GpsManager` (GNSS callbacks) and `AppSensorManager` (Async StepDetector races).
-    - **Standardized Cleanup**: Implemented a synchronous "Unregister-on-Thread" pattern using `CountDownLatch` in `AppSensorManager.stop()` and `gpsHandler.post` in `GpsManager.stop()`.
-    - **Race Protection**: Hardened `AppSensorManager` to explicitly unregister the `StepDetector` even if an async registration job was in flight, ensuring all native event queues are disposed before the controlling `HandlerThread` terminates.
-- **Architectural Update**: SOT Requirement 1.8 updated to mandate synchronous synchronization (e.g., latching) during hardware stop sequences to guarantee native disposal.
-- **Integrity**: Verified successful build `app:assembleDebug`.
+## 🧬 Implementation Summary: Aug.27.04
+- **Concern #747 Remediation**: **FusedLocation Task Hardening**.
+    - Identified that `BaseEventQueue.dispose` warnings persisted because `fusedLocationClient.removeLocationUpdates()` is asynchronous.
+    - **Synchronous Await**: Hardened `GpsManager.stop()` to use `Tasks.await()` for all location unregistration tasks.
+    - **Thread Safety**: Combined with the `CountDownLatch` pattern for `GnssStatus`, this ensures all native event queues are disposed of before the `HandlerThread` is quit and joined.
+- **Architectural Update**: SOT Requirement 1.8 updated to mandate synchronous Task awaiting (`Tasks.await`) for all Google Play Services hardware unregistrations.
+- **Integrity**: Verified successful build `app:assembleDebug` and version bump to `Aug.27.04`.
 
 ## 🚀 Next Steps
-- **Hardware Regression**: Perform role-swaps (Tracker -> Viewer) on A15 hardware. Confirm that `BaseEventQueue` disposal warnings are fully eliminated.
-- **Simplification Implementation**: Implement the `ManagedHardwareThread` utility proposed in `Simplify_Ideas2.md` to reduce boilerplate across hardware managers.
+- **Regression Verification**: Deploy `Aug.27.04` to A15 hardware. Perform multiple role-swaps (Tracker -> Viewer) and confirm total elimination of `BaseEventQueue` warnings in Logcat.
+- **Managed Utility**: Implement `ManagedHardwareThread` and `ManagedHardwareTask` utilities from `Simplify_Ideas2.md` to reduce lifecycle boilerplate.
 
-vAug.27.03
+vAug.27.04
