@@ -23,6 +23,10 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.27.01:
+ * - Issue #744 Remediation: Explicitly tracking and synchronously unregistering 
+ *   activeLocationCallback in stop() to prevent BaseEventQueue leaks caused by 
+ *   lingering flow subscriptions after thread termination (R744).
  * Aug.26.19:
  * - Issue #742 Hardening: Replaced anonymous LocationCallback in 
  *   restartLocationUpdates with a managed instance to prevent 
@@ -46,6 +50,7 @@ class GpsManager @Inject constructor(
     private val lifecycleLock = Any()
 
     private var revivalCallback: LocationCallback? = null
+    private var activeLocationCallback: LocationCallback? = null
 
     var satellitesInView = 0; private set
     var satellitesUsed = 0; private set
@@ -174,6 +179,13 @@ class GpsManager @Inject constructor(
                 Timber.e(e, "Error unregistering GNSS callback")
             }
 
+            activeLocationCallback?.let {
+                try {
+                    fusedLocationClient.removeLocationUpdates(it)
+                } catch (e: Exception) {}
+                activeLocationCallback = null
+            }
+
             revivalCallback?.let {
                 try {
                     fusedLocationClient.removeLocationUpdates(it)
@@ -281,7 +293,23 @@ class GpsManager @Inject constructor(
             start() 
             
             fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
-            val fusedCallback = object : LocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
+            
+            val fusedCallback = object : LocationCallback() { 
+                override fun onLocationResult(result: LocationResult) { 
+                    result.lastLocation?.let { 
+                        lastFixRt = timeProvider.elapsedRealtime()
+                        trySend(GpsUpdate.LocationUpdate(it))
+                        updateLocationStatus() 
+                    } 
+                } 
+            }
+            
+            synchronized(lifecycleLock) {
+                activeLocationCallback?.let { 
+                    try { fusedLocationClient.removeLocationUpdates(it) } catch (e: Exception) {}
+                }
+                activeLocationCallback = fusedCallback
+            }
             
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval)
                 .setMinUpdateIntervalMillis(interval / 2)
@@ -296,6 +324,11 @@ class GpsManager @Inject constructor(
 
             awaitClose { 
                 internalJob.cancel()
+                synchronized(lifecycleLock) {
+                    if (activeLocationCallback == fusedCallback) {
+                        activeLocationCallback = null
+                    }
+                }
                 try { 
                     fusedLocationClient.removeLocationUpdates(fusedCallback)
                 } catch (e: Exception) {} 

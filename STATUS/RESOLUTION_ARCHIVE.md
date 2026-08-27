@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.27.01 (vAug.27.01)
+*   **Concern #744 Resolved**: **Persistent EventQueue Leak**. Identified that the `LocationCallback` in `GpsManager.hardwareObservationFlow` was escaping the disposal sequence due to the 5-second lingering subscription of `WhileSubscribed(5000)`. Hardened `GpsManager` to explicitly track and synchronously unregister the `activeLocationCallback` during `stop()`, ensuring native resources are released before the hardware thread is quit (R744).
+
 ## 🟢 Aug.26.19 (vAug.26.19)
 *   **Concern #742 Hardening**: **Managed Hardware Callbacks**. Identified that anonymous `LocationCallback` in `GpsManager.restartLocationUpdates()` and escaped async `stepDetector` registrations in `AppSensorManager` were triggering `BaseEventQueue` leaks. Implemented explicit lifecycle tracking and cancellation for these transient registrations. Centralized native hardware bridge release in `BaseMonitorService` to ensure deterministic disposal during role-swaps (R742).
 
