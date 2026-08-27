@@ -20,4 +20,4 @@ Perform the following steps in order once an issue is resolved:
 5. **Simplicity Audit**: Evaluate if the code or app architecture can be further simplified. Save these ideas in `Simplify_Ideas2.md`.
 6. **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot to prepare for a fresh chat session.
 7. **Session Termination**: Stop the chat immediately. Do not attempt to fix any other issues or continue work.
-8. **Audit Recalculation**: Recalculate number of items for SOT, Resolved issues, open issues, Testing chapters, sub-items, simplification ideas, QA validation status, and display it in a format of: Current Audit Baseline.
+8. **Audit Recalculation**: Recalculate number of items for SOT (sum of 21 Architectural master rules and 143 Functional R-IDs), Resolved issues, open issues, Testing chapters, sub-items, simplification ideas, QA validation status, and display it in a format of: Current Audit Baseline.

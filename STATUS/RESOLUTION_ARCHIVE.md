@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.27.03 (vAug.27.03)
+*   **Concern #746 Resolved**: **Multi-Source BaseEventQueue Leak**. Identified that hardening `AppSensorManager` alone was insufficient as `GpsManager` and asynchronous `StepDetector` registration races were also orphaning native `EventQueue` resources. Standardized the "Unregister-on-Thread" pattern across all hardware managers and utilized `CountDownLatch` in `AppSensorManager.stop()` to guarantee that native listeners are disposed of before the controlling `HandlerThread` is terminated, eliminating "BaseEventQueue.dispose" warnings (R746).
+
 ## 🟢 Aug.27.02 (vAug.27.02)
 *   **Concern #745 Resolved**: **Persistent BaseEventQueue Leak (AppSensorManager)**. Deployment on A15 hardware confirmed that the "BaseEventQueue.dispose" warning persisted despite GpsManager hardening. Identified that `AppSensorManager` was quitting its `sensorThread` before the system could finalize listener unregistration. Hardened `stop()` to queue unregistration on the `sensorHandler` and wait for the thread to join, ensuring deterministic disposal of the native event queue (R745).
 

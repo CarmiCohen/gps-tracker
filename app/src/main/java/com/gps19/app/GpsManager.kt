@@ -23,6 +23,11 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.27.02:
+ * - Issue #745 Hardening: Standardized lifecycle stop() to queue GNSS callback 
+ *   unregistration on the hardware thread before quitting, ensuring deterministic 
+ *   disposal of the native event queue and preventing "BaseEventQueue.dispose" 
+ *   warnings (R745).
  * Aug.27.01:
  * - Issue #744 Remediation: Explicitly tracking and synchronously unregistering 
  *   activeLocationCallback in stop() to prevent BaseEventQueue leaks caused by 
@@ -173,10 +178,14 @@ class GpsManager @Inject constructor(
         synchronized(lifecycleLock) {
             if (!isStarted.getAndSet(false)) return
             
-            try {
-                locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
-            } catch (e: Exception) {
-                Timber.e(e, "Error unregistering GNSS callback")
+            // Issue #745: Ensure GNSS callback is unregistered on the hardware thread
+            // before the thread is terminated. This prevents BaseEventQueue disposal leaks.
+            gpsHandler?.post {
+                try {
+                    locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
+                } catch (e: Exception) {
+                    Timber.e(e, "Error unregistering GNSS callback on thread")
+                }
             }
 
             activeLocationCallback?.let {
@@ -195,7 +204,7 @@ class GpsManager @Inject constructor(
 
             gpsThread?.quitSafely()
             try {
-                gpsThread?.join(500)
+                gpsThread?.join(1000)
             } catch (e: InterruptedException) {
                 Timber.e("GPS thread join interrupted")
             }

@@ -1,8 +1,9 @@
-# Simplicity Ideas 2 (Aug.27.02)
+# Simplicity & Hardening Ideas (Aug.27.03)
 
-## 🏗️ Architectural Simplification
-1.  **Unified Hardware Bootstrap**: Move `JdHardwareManager.initialize` from role-specific services (`TrackerService`) into `BaseMonitorService` or a dedicated `HardwareLifecycleManager`. This would eliminate the need for `isA15Device` checks and JNI init logic in the business-logic layer.
-2.  **LocationCallback Factory**: Standardize all transient location requests (like revival pulses) through a factory that returns an `AutoCloseable` or `Job`-linked registration to prevent future anonymous listener leaks.
-3.  **Monotonic Logic Consolidation**: Create a `MonotonicDuration` utility to wrap `elapsedRealtime` math, reducing the risk of wall-clock drift bugs in maintenance and silence detection logic.
-4.  **HardwareFlow Wrapper**: Implement a specialized `HardwareFlow` wrapper for `callbackFlow` that enforces synchronous unregistration of native callbacks when the manager's `stop()` is called, regardless of the flow's internal subscription state or `awaitClose` timing (Issue #744).
-5.  **ManagedHardwareThread Utility**: Create a wrapper for `HandlerThread` that specifically handles the "unregistration-then-quit" pattern used in `GpsManager` and `AppSensorManager`. This would encapsulate the requirement to process final listener disposal messages before the Looper terminates, preventing `BaseEventQueue` leaks across the board (Issue #745).
+## 💡 Architectural Simplification
+1.  **Unified Hardware Handler (R746)**: Create a `ManagedHardwareThread` utility to encapsulate the `HandlerThread` lifecycle and the `CountDownLatch` unregistration pattern. This would reduce boilerplate and prevent future leaks in new hardware managers.
+2.  **Automated Leak Detection**: Integrate a lightweight `BaseEventQueue` monitor in debug builds to alert developers during role-swaps if a native queue is not disposed within 2s of a role change.
+
+## 🛠️ Technical Debt
+1.  **StepDetector Async Guard**: Replace the current `registrationJob` pattern with a synchronous `AtomicReference<RegistrationState>` to further simplify the race-condition guards in `AppSensorManager`.
+2.  **BaseMonitorService Centralization**: Move the `CountDownLatch` wait logic into a protected method in `BaseMonitorService` to ensure all hardware managers follow the same timing constraints during `onDestroy`.
