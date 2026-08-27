@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.27.02 (vAug.27.02)
+*   **Concern #745 Resolved**: **Persistent BaseEventQueue Leak (AppSensorManager)**. Deployment on A15 hardware confirmed that the "BaseEventQueue.dispose" warning persisted despite GpsManager hardening. Identified that `AppSensorManager` was quitting its `sensorThread` before the system could finalize listener unregistration. Hardened `stop()` to queue unregistration on the `sensorHandler` and wait for the thread to join, ensuring deterministic disposal of the native event queue (R745).
+
 ## 🟢 Aug.27.01 (vAug.27.01)
 *   **Concern #744 Resolved**: **Persistent EventQueue Leak**. Identified that the `LocationCallback` in `GpsManager.hardwareObservationFlow` was escaping the disposal sequence due to the 5-second lingering subscription of `WhileSubscribed(5000)`. Hardened `GpsManager` to explicitly track and synchronously unregister the `activeLocationCallback` during `stop()`, ensuring native resources are released before the hardware thread is quit (R744).
 

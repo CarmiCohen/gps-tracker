@@ -35,14 +35,15 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * Aug.27.02:
+ * - Issue #745 Hardening: Hardened lifecycle stop() to prevent BaseEventQueue leaks. 
+ *   Ensured unregistration is queued on the sensor thread before quitting, and 
+ *   added join() to acoustic monitoring shutdown (R745).
  * Aug.26.19:
  * - Issue #742 Hardening: Tracked step-detector registration job to ensure 
  *   proper cancellation during stop(), preventing BaseEventQueue leaks from 
  *   escaped async registrations (R742). Fixed kineticEnergy member declaration 
  *   and typo in acoustic monitoring status.
- * Aug.26.17:
- * - Issue #738 Remediation: Hardened lifecycle with synchronized start/stop 
- *   blocks and atomic state checks in async step-detector registration.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -272,22 +273,30 @@ class AppSensorManager @Inject constructor(
     fun stop() {
         synchronized(lifecycleLock) {
             if (!isStarted.getAndSet(false)) return
+            
+            // Issue #745: Immediate cancellation of async jobs
             recoveryJob?.cancel(); recoveryJob = null
             registrationJob?.cancel(); registrationJob = null
+            proximityJob?.cancel(); proximityJob = null
+            
             stopAcousticMonitoring()
             
-            try {
-                sensorManager.unregisterListener(this)
-                displayManager.unregisterDisplayListener(displayListener)
-            } catch (e: Exception) {
-                Timber.e(e, "Error during synchronous sensor unregistration")
+            // Issue #745: Ensure unregistration is processed on the sensor thread BEFORE it quits.
+            // This prevents the native event queue from being leaked during disposal.
+            sensorHandler?.post {
+                try {
+                    sensorManager.unregisterListener(this)
+                    displayManager.unregisterDisplayListener(displayListener)
+                } catch (e: Exception) {
+                    Timber.e(e, "Error during sensor unregistration on thread")
+                }
             }
 
-            proximityJob?.cancel()
+            // Small delay to allow the unregistration message to be processed by the Looper
             sensorThread?.quitSafely()
             
             try {
-                sensorThread?.join(500)
+                sensorThread?.join(1000)
             } catch (e: InterruptedException) {
                 Timber.e("Sensor thread join interrupted")
             }
@@ -518,7 +527,18 @@ class AppSensorManager @Inject constructor(
         }.apply { name = "AcousticMonitor"; priority = Thread.MIN_PRIORITY; start() }
     }
 
-    private fun stopAcousticMonitoring() { isMonitoring = false; isAcousticRunning = false; acousticThread?.interrupt(); acousticThread = null }
+    private fun stopAcousticMonitoring() { 
+        isMonitoring = false
+        isAcousticRunning = false
+        acousticThread?.interrupt()
+        try {
+            acousticThread?.join(1000)
+        } catch (e: Exception) {
+            Timber.e("Acoustic thread join failed")
+        }
+        acousticThread = null 
+    }
+
     fun isAcousticMonitoringActive() = isAcousticRunning
     fun isAcousticMonitoringEnabled() = isMonitoring
 

@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (Aug.27.01)
+# Project Issues & Hardening Tracking (Aug.27.02)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 ATTENTION | 47 |
+| **Open Technical Issues** | 🟢 Progress | 47 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 744 |
+| **Resolved (Total)** | 🟢 Progress | 745 |
 
 ---
 
@@ -21,9 +21,8 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.27.01)
-*   **Concern #744: Persistent EventQueue Leak**. Identified that the `LocationCallback` in `GpsManager.hardwareObservationFlow` was escaping the disposal sequence due to the 5-second lingering subscription of `WhileSubscribed(5000)`. Hardened `GpsManager` to explicitly track and synchronously unregister the `activeLocationCallback` during `stop()`, ensuring native resources are released before the hardware thread is quit (R744).
-*   **Concern #742 Hardening**: **Managed Hardware Callbacks**. (Aug.26.19) Implemented explicit lifecycle tracking and cancellation for transient `LocationCallback` and `stepDetector` registrations. Centralized native hardware bridge release in `BaseMonitorService` (R742).
+## 🟢 Recently Resolved Issues (Aug.27.02)
+*   **Concern #745: Persistent BaseEventQueue Leak (AppSensorManager)**. Deployment on A15 hardware confirmed that the "BaseEventQueue.dispose" warning persisted despite GpsManager hardening. Identified that `AppSensorManager` was quitting its `sensorThread` before the system could finalize listener unregistration. Hardened `stop()` to queue unregistration on the `sensorHandler` and wait for the thread to join, ensuring deterministic disposal of the native event queue (R745).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.27.01)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.27.02)

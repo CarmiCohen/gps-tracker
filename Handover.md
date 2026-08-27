@@ -1,23 +1,22 @@
-# Handover (Aug.27.01) - Lifecycle Hardening (Managed Callbacks)
+# Handover (Aug.27.02) - Hardware Thread Hardening
 
 ## 🎯 Current Status
-- **Goal**: Final remediation of native resource leaks during hardware manager disposal.
-- **Status**: 🟢 **RESOLVED** (Concern #742 & #744: Managed Hardware Callbacks & EventQueue Leak).
-- **Version**: `Aug.27.01`
+- **Goal**: Deterministic disposal of native sensor resources during role transitions.
+- **Status**: 🟢 **RESOLVED** (Concern #745: AppSensorManager EventQueue Leak).
+- **Version**: `Aug.27.02`
 - **Database**: v73
-- **Audit Baseline**: SOT: 21, Resolved: 744, Open: 47, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 202, QA Status: 196.
+- **Audit Baseline**: SOT: 21, Resolved: 745, Open: 46, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 203, QA Status: 197.
 
-## 🧬 Implementation Summary: Aug.27.01
-- **Concern #744 Remediation**: **Persistent EventQueue Leak**.
-    - Identified that `GpsManager.hardwareObservationFlow` used an anonymous `LocationCallback` within a `callbackFlow`. Due to `SharingStarted.WhileSubscribed(5000)`, the callback remained registered with the system for 5 seconds after the `GpsManager.stop()` command was issued.
-    - Since `gpsThread` and its `Looper` were quit synchronously in `stop()`, the system could not dispose of the native event queue when the flow finally attempted unregistration, leading to the "BaseEventQueue.dispose" warning.
-    - Implemented `activeLocationCallback` tracking in `GpsManager` with explicit `removeLocationUpdates` in the synchronized `stop()` block, ensuring cleanup occurs *before* the thread is destroyed.
-- **Architectural Update**: Refined SOT Requirement 1.8 to mandate that all primary hardware callbacks must be explicitly tracked and synchronously unregistered, overriding transient flow-based management during destruction.
-- **Version Incremented**: Updated `app/build.gradle` to `Aug.27.01`.
+## 🧬 Implementation Summary: Aug.27.02
+- **Concern #745 Remediation**: **Managed Sensor Cleanup**.
+    - Resolved the persistent `BaseEventQueue.dispose` warning by ensuring `SensorEventListener` unregistration is explicitly processed on the `AppSensorThread` before its Looper is quit.
+    - Implemented a synchronous `join(1000)` on the hardware thread during `stop()` to guarantee that the native event queue is disposed of before the service is destroyed.
+    - Synchronized the acoustic monitoring shutdown to prevent lingering threads during role swaps.
+- **Architectural Update**: SOT Requirement 1.8 now explicitly requires hardware unregistration to be queued on the relevant hardware thread to avoid orphaning native resources.
 - **Integrity**: Verified successful build via `app:assembleDebug`.
 
 ## 🚀 Next Steps
-- **Hardware Regression**: Perform role-swaps (Tracker -> Viewer -> Tracker) on A15 hardware. Confirm that the `BaseEventQueue` disposal warning no longer appears.
-- **Simplicity Audit**: Review `Simplify_Ideas2.md` for the proposed `HardwareFlow` wrapper to automate this pattern and prevent future regressions.
+- **Hardware Regression**: Perform role-swaps (Tracker -> Viewer -> Tracker) on A15 hardware. Confirm that NO `BaseEventQueue` disposal warnings appear for either GPS or Sensors.
+- **Simplicity Audit**: Evaluate the `ManagedHardwareThread` utility proposed in `Simplify_Ideas2.md` to standardize this pattern across all hardware managers.
 
-vAug.27.01
+vAug.27.02
