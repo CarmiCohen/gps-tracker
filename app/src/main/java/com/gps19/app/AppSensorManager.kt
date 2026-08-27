@@ -35,10 +35,14 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * Aug.26.19:
+ * - Issue #742 Hardening: Tracked step-detector registration job to ensure 
+ *   proper cancellation during stop(), preventing BaseEventQueue leaks from 
+ *   escaped async registrations (R742). Fixed kineticEnergy member declaration 
+ *   and typo in acoustic monitoring status.
  * Aug.26.17:
  * - Issue #738 Remediation: Hardened lifecycle with synchronized start/stop 
- *   blocks and atomic state checks in async step-detector registration to 
- *   prevent BaseEventQueue leaks (R738).
+ *   blocks and atomic state checks in async step-detector registration.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -69,6 +73,7 @@ class AppSensorManager @Inject constructor(
 
     private var isStepDetectorRegistered = false
     private var recoveryJob: Job? = null
+    private var registrationJob: Job? = null
 
     private var sensorThread: HandlerThread? = null
     private var sensorHandler: Handler? = null
@@ -264,15 +269,13 @@ class AppSensorManager @Inject constructor(
         attemptStepDetectorRegistration(); startStepDetectorRecoveryLoop()
     }
 
-    /**
-     * stop: Synchronous unregistration to prevent BaseEventQueue leaks (Issue #320).
-     */
     fun stop() {
         synchronized(lifecycleLock) {
             if (!isStarted.getAndSet(false)) return
-            recoveryJob?.cancel(); recoveryJob = null; stopAcousticMonitoring()
+            recoveryJob?.cancel(); recoveryJob = null
+            registrationJob?.cancel(); registrationJob = null
+            stopAcousticMonitoring()
             
-            // Strictly synchronous unregistration on calling thread to ensure binder call finishes.
             try {
                 sensorManager.unregisterListener(this)
                 displayManager.unregisterDisplayListener(displayListener)
@@ -310,24 +313,26 @@ class AppSensorManager @Inject constructor(
     private fun attemptStepDetectorRegistration() {
         val detector = stepDetector ?: return
         
-        scope.launch(Dispatchers.IO) {
-            val isGranted = systemStatusProvider.isActivityRecognitionGranted()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isGranted) {
-                isStepDetectorRegistered = false
-                return@launch
-            }
-            // Issue #738: Verify lifecycle state before registering in async block.
-            val targetHandler = synchronized(lifecycleLock) {
-                if (!isStarted.get()) return@launch
-                sensorHandler
-            } ?: return@launch
+        synchronized(lifecycleLock) {
+            registrationJob?.cancel()
+            registrationJob = scope.launch(Dispatchers.IO) {
+                val isGranted = systemStatusProvider.isActivityRecognitionGranted()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isGranted) {
+                    isStepDetectorRegistered = false
+                    return@launch
+                }
+                
+                val targetHandler = synchronized(lifecycleLock) {
+                    if (!isStarted.get()) return@launch
+                    sensorHandler
+                } ?: return@launch
 
-            withContext(targetHandler.asCoroutineDispatcher()) {
-                sensorManager.unregisterListener(this@AppSensorManager, detector)
-                // Final re-check under lock for atomic registration
-                synchronized(lifecycleLock) {
-                    if (isStarted.get()) {
-                        isStepDetectorRegistered = sensorManager.registerListener(this@AppSensorManager, detector, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler)
+                withContext(targetHandler.asCoroutineDispatcher()) {
+                    sensorManager.unregisterListener(this@AppSensorManager, detector)
+                    synchronized(lifecycleLock) {
+                        if (isStarted.get()) {
+                            isStepDetectorRegistered = sensorManager.registerListener(this@AppSensorManager, detector, AndroidSensorManager.SENSOR_DELAY_NORMAL, sensorHandler)
+                        }
                     }
                 }
             }
@@ -564,7 +569,7 @@ class AppSensorManager @Inject constructor(
                     peakVerticalVelocityRt = forensicPeakVerticalVelocityRt; plungeMatched = false; peakVerticalDisplacement = forensicPeakVerticalDisplacement
                     proximityIdx = this@AppSensorManager.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@AppSensorManager.proximityDebounceMs
                     vibrationRollingSum = this@AppSensorManager.vibrationRollingSum; acousticPeak = forensicPeakDb
-                    acousticMin = if (forensicMinDb >= 100.0) -1.0 else forensicMinDb; kineticEnergy = this@AppSensorManager.currentKineticEnergy
+                    acousticMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@AppSensorManager.currentKineticEnergy
                 }
                 forensicPeakVibration = 0.0; forensicPeakVerticalVelocity = 0.0; forensicPeakVerticalVelocityTs = 0L; forensicPeakVerticalVelocityRt = 0L
                 forensicPeakVerticalDisplacement = 0.0; forensicPeakDb = 0.0; forensicMinDb = 100.0

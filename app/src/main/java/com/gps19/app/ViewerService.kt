@@ -16,13 +16,13 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Aug.26.19:
+ * - Issue #320/742 Hardening: Removed redundant releaseHardware call as it is 
+ *   now centralized in BaseMonitorService. Simplified onDestroy to rely on 
+ *   base class cleanup (R320).
  * Aug.24.01:
  * - Issue #307 Remediation: Standardized monotonic authority for maintenance 
- *   uptime logging. Persisting LAST_SERVICE_TICK_REALTIME_KEY to ensure 
- *   accurate silence detection in MaintenanceWorker (R307).
- * Aug.21.09:
- * - Issue #249/262 Remediation: Added JdHardwareManager.releaseHardware() to 
- *   onDestroy to ensure native resources are disposed during role swaps (R249).
+ *   uptime logging.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -450,7 +450,7 @@ class ViewerService : BaseMonitorService() {
                 sats = gpsManager.satellitesUsed, 
                 battery = health.batteryLevel, 
                 isSecure = !alarmManager.hasUnresolvedAlarms(), 
-                isPowerSave = health.isPowerSaveMode
+                isPowerSave = isPowerSaveActive || health.isPowerSaveMode
             )
         }
     }
@@ -472,11 +472,8 @@ class ViewerService : BaseMonitorService() {
     }
 
     override fun onDestroy() {
-        // Issue #249/262: Release native hardware resources during role swaps.
-        if (capabilities.isA15Device) {
-            JdHardwareManager.releaseHardware(timeProvider)
-        }
         gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel()
+        // base.onDestroy() now centralizes hardware unregistration and native release.
         super.onDestroy()
     }
 }

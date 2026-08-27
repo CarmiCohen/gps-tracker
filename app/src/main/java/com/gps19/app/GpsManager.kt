@@ -23,14 +23,13 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.26.19:
+ * - Issue #742 Hardening: Replaced anonymous LocationCallback in 
+ *   restartLocationUpdates with a managed instance to prevent 
+ *   BaseEventQueue leaks during service destruction (R742).
  * Aug.26.18:
  * - Issue #742 Remediation: Decoupled GNSS callback from callbackFlow to 
- *   prevent redundant/leaking registrations during polling changes. GNSS 
- *   lifecycle is now strictly tied to start()/stop() sync blocks. Added 
- *   explicit permission checks in start() to ensure safety (R742).
- * Aug.26.17:
- * - Issue #738 Remediation: Hardened lifecycle with synchronized start/stop 
- *   to ensure deterministic GNSS/Location callback unregistration (R738).
+ *   prevent redundant/leaking registrations during polling changes.
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -45,6 +44,8 @@ class GpsManager @Inject constructor(
     private var gpsThread: HandlerThread? = null
     private var gpsHandler: Handler? = null
     private val lifecycleLock = Any()
+
+    private var revivalCallback: LocationCallback? = null
 
     var satellitesInView = 0; private set
     var satellitesUsed = 0; private set
@@ -173,6 +174,13 @@ class GpsManager @Inject constructor(
                 Timber.e(e, "Error unregistering GNSS callback")
             }
 
+            revivalCallback?.let {
+                try {
+                    fusedLocationClient.removeLocationUpdates(it)
+                } catch (e: Exception) {}
+                revivalCallback = null
+            }
+
             gpsThread?.quitSafely()
             try {
                 gpsThread?.join(500)
@@ -208,17 +216,24 @@ class GpsManager @Inject constructor(
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
 
         externalScope.launch(Dispatchers.Main) {
-            if (!isStarted.get()) return@launch
-            
-            val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
-                .setMaxUpdates(1)
-                .build()
-            try {
-                fusedLocationClient.requestLocationUpdates(fastRequest, object : LocationCallback() {
+            synchronized(lifecycleLock) {
+                if (!isStarted.get()) return@launch
+                
+                revivalCallback?.let { fusedLocationClient.removeLocationUpdates(it) }
+                
+                val callback = object : LocationCallback() {
                     override fun onLocationResult(p0: LocationResult) {}
-                }, Looper.getMainLooper())
-            } catch (e: Exception) {
-                Timber.e(e, "R124: Manual revival pulse failed")
+                }
+                revivalCallback = callback
+
+                val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
+                    .setMaxUpdates(1)
+                    .build()
+                try {
+                    fusedLocationClient.requestLocationUpdates(fastRequest, callback, Looper.getMainLooper())
+                } catch (e: Exception) {
+                    Timber.e(e, "R124: Manual revival pulse failed")
+                }
             }
         }
     }

@@ -30,6 +30,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.3 Identity Sanitization (R976)**: Identity sanitization state must be persistent. The warning overlay dismissal must be written to the DataStore to prevent redundant notifications across cold starts (Issue #737).
 
 ## 4. History of Changes (Recent)
+*   **Aug.26.19**: Resolved Concern #742 Hardening (Managed Hardware Callbacks). Implemented explicit lifecycle tracking for transient `LocationCallback` and `stepDetector` registrations. Centralized native bridge release in `BaseMonitorService` (R742).
 *   **Aug.26.18**: Resolved Concern #742 (Recurrent EventQueue Leak). Tied GNSS callback to GpsManager lifecycle instead of transient flows (R742).
 *   **Aug.26.17**: Resolved Concern #738 (EventQueue Resource Leak). Hardened hardware lifecycle synchronization and atomic async registration (R738).
 *   **Aug.26.16**: Resolved Concern #739 (Hydration Performance Stall - A15). Decomposed Map Hydration into Levels 4-7. Spreads Map Engine, Trails, Markers, and Final Overlays over multiple frames using IdleHandler and staggered delays (R739).

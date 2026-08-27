@@ -21,17 +21,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.26.19:
+ * - Issue #320/742 Hardening: Removed redundant releaseHardware call as it is 
+ *   now centralized in BaseMonitorService. Simplified onDestroy to rely on 
+ *   base class cleanup (R320).
  * Aug.26.09:
  * - Issue #320 Hardening: Replaced 200ms magic delay in onDestroy with a 
  *   deterministic hardware handshake using punchHardware() to ensure 
  *   native event drainage before bridge release.
- * Aug.26.03:
- * - Issue #320 Regression Fix: Hardened destruction sequence. Reordered 
- *   hardware unregistration to occur before the native JNI bridge release, 
- *   and added a 200ms settling delay to allow the OS to dispose of the 
- *   BaseEventQueue correctly (R320).
- * - Issue #321 Regression Fix: Integrated with refined multi-stage hydration 
- *   in TrackerScreen.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -710,17 +707,15 @@ class TrackerService : BaseMonitorService() {
     override fun onDestroy() {
         gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
         
-        // super.onDestroy() will trigger synchronous stop() for AppSensorManager and GpsManager.
-        super.onDestroy()
-
-        // Issue #320/262: Replaced legacy 200ms settling delay with deterministic hardware handshake.
-        // This ensures the native event queue is drained and the bridge is responsive before release.
+        // Issue #320/742: Perform deterministic hardware handshake before base destruction.
         if (capabilities.isA15Device && JdHardwareManager.isAvailable()) {
             val punchResult = JdHardwareManager.punchHardware(timeProvider)
             if (punchResult != 0) {
                 logManager.logServiceEvent("HARDWARE: Handshake failed (Code: $punchResult). Forcing release.", isImportant = true)
             }
-            JdHardwareManager.releaseHardware(timeProvider)
         }
+        
+        // base.onDestroy() now centralizes hardware unregistration and native release.
+        super.onDestroy()
     }
 }

@@ -1,8 +1,6 @@
-# Simplicity Ideas (Aug.26.17)
+# Simplicity Ideas 2 (Aug.26.19)
 
 ## 🏗️ Architectural Simplification
-1.  **Unified Issue Model**: Replace separate boolean flags for system issues in `UiStateAggregator` with a `List<SystemIssue>` to ensure counter-to-UI parity (Ref: Concern #740).
-2.  **Map Lazy-Loading**: Defer OsmDroid tile source initialization until after the first frame is rendered to reduce A15 hydration pressure (Ref: Concern #739).
-3.  **EventQueue Auto-Dispose**: Implement a scoped lifecycle observer for `BaseEventQueue` to prevent manual disposal failures (Ref: Concern #738).
-4.  **Hydration Component Abstraction**: Create a higher-order `StaggeredHydrator` component to encapsulate the delay/IdleHandler logic for all heavy UI components, removing the manual `hydrationLevel` gating from screen-level code (Ref: Issue #739).
-5.  **Hardware Lifecycle Delegate**: Use a dedicated `HardwareLifecycleObserver` to manage start/stop transitions for all hardware managers (Sensors, GPS) in a unified way, reducing synchronization boilerplate and ensuring atomic disposal (Ref: Issue #738).
+1.  **Unified Hardware Bootstrap**: Move `JdHardwareManager.initialize` from role-specific services (`TrackerService`) into `BaseMonitorService` or a dedicated `HardwareLifecycleManager`. This would eliminate the need for `isA15Device` checks and JNI init logic in the business-logic layer.
+2.  **LocationCallback Factory**: Standardize all transient location requests (like revival pulses) through a factory that returns an `AutoCloseable` or `Job`-linked registration to prevent future anonymous listener leaks.
+3.  **Monotonic Logic Consolidation**: Create a `MonotonicDuration` utility to wrap `elapsedRealtime` math, reducing the risk of wall-clock drift bugs in maintenance and silence detection logic.

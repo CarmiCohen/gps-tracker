@@ -19,12 +19,11 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Aug.26.19:
+ * - Issue #320/249 Hardening: Centralized JdHardwareManager native release 
+ *   in onDestroy to ensure consistent cleanup across all service roles (R320).
  * Aug.26.03:
- * - Issue #320 Remediation: Hardened cleanup sequence. Added explicit 
- *   gpsManager.stop() and ensured all hardware listeners are unregistered 
- *   synchronously before service destruction (R320).
- * Aug.21.09:
- * - Issue #249 Hardening: Added explicit appSensorManager.stop() to onDestroy.
+ * - Issue #320 Remediation: Hardened cleanup sequence.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -196,6 +195,15 @@ abstract class BaseMonitorService : LifecycleService() {
         // 1. Unregister all hardware callbacks synchronously.
         appSensorManager.stop()
         gpsManager.stop()
+
+        // Issue #320/249: Deterministic native hardware release.
+        if (JdHardwareManager.isAvailable()) {
+            try {
+                JdHardwareManager.releaseHardware(timeProvider)
+            } catch (e: Exception) {
+                Timber.e(e, "Error releasing native hardware bridge")
+            }
+        }
 
         runBlocking {
             withTimeoutOrNull(1000) {
