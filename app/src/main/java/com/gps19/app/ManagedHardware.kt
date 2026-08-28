@@ -1,5 +1,7 @@
 package com.gps19.app
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.net.ConnectivityManager
 import android.os.Handler
 import android.os.Looper
@@ -69,6 +71,23 @@ abstract class ManagedLocationCallback : LocationCallback() {
             Timber.d("ManagedLocationCallback: Unregistration complete.")
         } catch (e: Exception) {
             Timber.e(e, "ManagedLocationCallback: Unregistration failed or timed out")
+        }
+    }
+}
+
+/**
+ * ManagedBroadcastReceiver: Standardizes safe unregistration of receivers
+ * to ensure deterministic lifecycle management and avoid potential leaks (R753).
+ */
+abstract class ManagedBroadcastReceiver : BroadcastReceiver() {
+    fun unregister(context: Context) {
+        try {
+            context.unregisterReceiver(this)
+            Timber.d("ManagedBroadcastReceiver: Unregistration successful.")
+        } catch (e: IllegalArgumentException) {
+            Timber.w("ManagedBroadcastReceiver: Receiver already unregistered or not registered.")
+        } catch (e: Exception) {
+            Timber.e(e, "ManagedBroadcastReceiver: Unregistration failed.")
         }
     }
 }

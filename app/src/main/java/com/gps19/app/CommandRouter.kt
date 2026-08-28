@@ -1,6 +1,5 @@
 package com.gps19.app
 
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -19,9 +18,6 @@ import javax.inject.Singleton
  * CommandEvent: Reactive event container for system and UI commands.
  * Aug.22.05:
  * - Audit Chapter 12.3: Added SimulateStoragePressure support (R197).
- * Aug.22.04:
- * - Issue #140 Restoration: Re-added ExecuteStressTest to support Chapter 12.2 
- *   Database Stress Audit (R140/R196-V).
  */
 sealed class CommandEvent {
     data class ViewerPulse(val id: String) : CommandEvent()
@@ -37,6 +33,9 @@ sealed class CommandEvent {
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Aug.28.04:
+ * - Issue #753 Hardening: Refactored power and legacy receivers to use 
+ *   ManagedBroadcastReceiver for deterministic native resource cleanup (R753).
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -68,10 +67,10 @@ class CommandRouter @Inject constructor(
         logManager.logServiceEvent("CRITICAL: Command Router Failure: ${throwable.message}", true)
     }
 
-    private val powerReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
+    private val powerReceiver = object : ManagedBroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
             if (configManager.isTrackerMode) {
-                val action = intent?.action
+                val action = intent.action
                 logManager.logServiceEvent("POWER CHANGE: $action")
                 
                 when (action) {
@@ -82,9 +81,9 @@ class CommandRouter @Inject constructor(
         }
     }
 
-    private val legacyReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            when (intent?.action) {
+    private val legacyReceiver = object : ManagedBroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
                 ACTION_ALARM_WAKEUP -> _commandEvents.tryEmit(CommandEvent.WatchdogTrigger)
                 ACTION_RELAY_STATUS -> {
                     if (intent.getBooleanExtra("connected", false) == false) {
@@ -200,8 +199,7 @@ class CommandRouter @Inject constructor(
 
     fun unregister() {
         if (!isRegistered.getAndSet(false)) return
-
-        try { context.unregisterReceiver(legacyReceiver) } catch (e: Exception) {}
-        try { context.unregisterReceiver(powerReceiver) } catch (e: Exception) {}
+        legacyReceiver.unregister(context)
+        powerReceiver.unregister(context)
     }
 }

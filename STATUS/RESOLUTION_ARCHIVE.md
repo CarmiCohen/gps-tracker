@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.28.04 (vAug.28.04)
+*   **Concern #753 Resolved**: **Broadcast Hardware Abstraction (Leak Suppression)**. Soak testing revealed that while connectivity deadlocks were resolved, `BaseEventQueue.dispose` warnings persisted during shutdown. Identified that anonymous `BroadcastReceiver` instances for Battery and Power monitoring were the primary culprits. Implemented `ManagedBroadcastReceiver` to standardize and harden safe unregistration. Refactored `SystemStatusProvider` and `CommandRouter` to use this abstraction, ensuring deterministic native resource cleanup and complete silencing of hardware-linked disposal warnings (R753).
+
 ## 🟢 Aug.28.03 (vAug.28.03)
 *   **Concern #752 Resolved**: **Persistent BaseEventQueue Leak (Deadlock Remediation)**. Soak testing of Aug.28.02 revealed that `BaseEventQueue` disposal warnings persisted due to a deadlock in the `ManagedNetworkCallback` unregistration utility. The utility was self-blocking when called from the Main Looper (during `Service.onDestroy`) because it attempted to post a synchronous task to the same looper. Hardened the abstraction to detect the calling thread and execute unregistration immediately if already on the Main Looper, ensuring deterministic native disposal (R752).
 
@@ -13,9 +16,6 @@ This document archives all resolved issues and architectural refinements.
 
 ## 🟢 Aug.28.00 (vAug.28.00)
 *   **Concern #749 Resolved**: **Persistent BaseEventQueue Leak (SystemStatusProvider)**. Deployment testing of Aug.27.05 revealed that `BaseEventQueue` disposal warnings persisted after `TrackerService` termination. Identified that `SystemStatusProviderImpl` was running multiple hardware-bound `callbackFlow` implementations (Internet, Battery, Power) in the application scope without deterministic unregistration. Since these flows were shared in the external scope, they often orphaned native `ConnectivityManager` callbacks and `BroadcastReceivers` during UI detachment or service swaps. Hardened all flows to follow SOT 1.8, ensuring explicit unregistration in `awaitClose` and logging confirmation on A15 hardware (R749).
-
-## 🟢 Aug.27.05 (vAug.27.05)
-*   **Concern #748 Resolved**: **CallbackFlow BaseEventQueue Leak (GpsManager)**. Identified that `hardwareObservationFlow` in `GpsManager.kt` was performing asynchronous unregistration in its `awaitClose` block. Since `TrackerService` cancels the collection job during role-swaps, the native `BaseEventQueue` was not being disposed of before the callback object was reclaimed. Hardened the flow to synchronously await the `removeLocationUpdates` task, ensuring native disposal completes reliably (R748).
 
 ---
 *For historical entries, see legacy logs.*
