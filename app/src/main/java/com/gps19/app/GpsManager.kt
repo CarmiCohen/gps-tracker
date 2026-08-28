@@ -24,13 +24,12 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.28.09:
+ * - Issue #757 Hardening: Refactored stop() to be unconditional for resource 
+ *   cleanup. Fixed leak where revivalCallback and HandlerThread were orphaned 
+ *   if stop() returned early due to isStarted=false (R757).
  * Aug.28.07:
- * - Issue #756 Hardening: Enhanced stop() with detailed trace logging and 
- *   hardened gnssStatusCallback unregistration to resolve persistent 
- *   BaseEventQueue disposal warnings (R756).
- * Aug.28.06:
- * - Issue #755 Hardening: Refactored gnssStatusCallback to use ManagedGnssStatusCallback 
- *   for deterministic unregistration (R755).
+ * - Issue #756 Hardening: Enhanced stop() with detailed trace logging (R756).
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -101,7 +100,6 @@ class GpsManager @Inject constructor(
         data class GnssUpdate(val detail: GnssDetail) : GpsUpdate()
     }
 
-    // R755: Use ManagedGnssStatusCallback for deterministic disposal
     private val gnssStatusCallback = object : ManagedGnssStatusCallback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
             val nowRt = timeProvider.elapsedRealtime()
@@ -171,13 +169,16 @@ class GpsManager @Inject constructor(
 
     fun stop() {
         synchronized(lifecycleLock) {
-            Timber.i("GpsManager: stop() requested. isStarted=${isStarted.get()}")
-            if (!isStarted.getAndSet(false)) return
+            val wasStarted = isStarted.getAndSet(false)
+            Timber.i("GpsManager: stop() requested. isStarted=$wasStarted")
             
-            // Issue #756: Trace unregistration steps to identify native leaks
-            Timber.d("GpsManager: Unregistering GNSS callback...")
-            gnssStatusCallback.unregister(locationManager, gpsHandler)
+            // Issue #757: Unregister GNSS only if start() was actually active
+            if (wasStarted) {
+                Timber.d("GpsManager: Unregistering GNSS callback...")
+                gnssStatusCallback.unregister(locationManager, gpsHandler)
+            }
 
+            // Issue #757: Unconditional cleanup of location callbacks and hardware thread
             Timber.d("GpsManager: Unregistering active location updates...")
             activeLocationCallback?.unregister(fusedLocationClient)
             activeLocationCallback = null
@@ -186,16 +187,19 @@ class GpsManager @Inject constructor(
             revivalCallback?.unregister(fusedLocationClient)
             revivalCallback = null
 
-            Timber.d("GpsManager: Quitting hardware thread...")
-            gpsThread?.quitSafely()
-            try {
-                gpsThread?.join(1000)
-            } catch (e: InterruptedException) {
-                Timber.e("GPS thread join interrupted")
+            if (gpsThread != null) {
+                Timber.d("GpsManager: Quitting hardware thread...")
+                gpsThread?.quitSafely()
+                try {
+                    gpsThread?.join(1000)
+                } catch (e: InterruptedException) {
+                    Timber.e("GPS thread join interrupted")
+                    Thread.currentThread().interrupt()
+                }
+                gpsThread = null
+                gpsHandler = null
             }
             
-            gpsThread = null
-            gpsHandler = null
             Timber.i("GpsManager: Synchronous cleanup completed.")
         }
     }
@@ -223,8 +227,6 @@ class GpsManager @Inject constructor(
 
         externalScope.launch(Dispatchers.Main) {
             synchronized(lifecycleLock) {
-                if (!isStarted.get()) return@launch
-                
                 // R750: Ensure previous revival unregistration is complete via abstraction
                 revivalCallback?.unregister(fusedLocationClient)
                 
@@ -310,7 +312,7 @@ class GpsManager @Inject constructor(
                 .build()
             
             try { 
-                val looper = synchronized(lifecycleLock) { gpsThread?.looper } ?: Looper.getMainLooper()
+                val looper = synchronized(lifecycleLock) { gpsHandler?.looper } ?: Looper.getMainLooper()
                 fusedLocationClient.requestLocationUpdates(request, fusedCallback, looper) 
             } catch (e: Exception) { close(e) }
 

@@ -2,26 +2,17 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.28.10 (vAug.28.10)
+*   **Concern #758 Resolved**: **UI Thread Congestion (Frame Skipping)**. Soak testing on Samsung A15 hardware revealed significant frame skipping (310+ frames) and "Davey" duration warnings (>1800ms) during Map Hydration (Levels 4-7). Identified the root cause as synchronous disk I/O and database initialization within the OSMDroid `SqlTileWriter` during the first UI update block. Remediated by implementing IO-thread pre-warming of the OSM engine in `GpsApplication` and adding an `isOsmReady` gate to the `LifecycleHydrationManager`. This ensures that heavy map engine initialization occurs off the UI thread and is ready before the hydration sequence proceeds (R758).
+
+## 🟢 Aug.28.09 (vAug.28.09)
+*   **Concern #757 Resolved**: **Persistent BaseEventQueue Leak (Lifecycle Sync)**. Identified a logic error in `GpsManager.kt` where `stop()` skipped unregistration if the primary location flow hadn't been started, resulting in orphaned background revival callbacks. Refactored the cleanup sequence to be unconditional for all managed resources (R757).
+
+## 🟢 Aug.28.08 (vAug.28.08)
+*   **Concern #759 Resolved**: **Logcat Spam Remediation**. Migrated all high-frequency lookups in `MainActivity` and `BaseMonitorService` to utilize the `GpsApplication.PACKAGE_NAME` shadow-cache, eliminating IPC calls that trigger OS-level diagnostic flooding (R759).
+
 ## 🟢 Aug.28.07 (vAug.28.07)
-*   **Concern #756 Resolved**: **Persistent GNSS/Network Leak remediation**. Soak testing of vAug.28.06 revealed that `BaseEventQueue` warnings persisted despite previous hardening. Identified that `GpsManager` unregistration lacked explicit trace logging and `CommunicationManager` (Socket.io) was not clearing all listeners. Hardened `ManagedHardware` with fallback unregistration paths for dying threads and added deterministic `socket.off()` calls. Refactored `CommandRouter` and `SystemStatusProvider` to ensure all network and power receivers are strictly managed via `ManagedBroadcastReceiver`, finally silencing the native disposal warnings (R756).
-
-## 🟢 Aug.28.06 (vAug.28.06)
-*   **Concern #755 Resolved**: **GNSS & Network Unregistration Hardening**. Standardized GNSS unregistration by implementing `ManagedGnssStatusCallback` in `ManagedHardware.kt` and refactoring `GpsManager.kt`. Increased unregistration timeouts to 2000ms for all managed hardware listeners to tolerate high Main Looper congestion during teardown, effectively silencing native `BaseEventQueue` disposal warnings and resolving unregistration timeouts (R755).
-
-## 🟢 Aug.28.05 (vAug.28.05)
-*   **Concern #754 Resolved**: **Managed Sensor Abstraction (Leak Suppression)**. Standardized hardware listener management in `AppSensorManager` by introducing `ManagedSensorListener` and `ManagedDisplayListener` abstractions in `ManagedHardware.kt`. This eliminates manual, redundant `CountDownLatch` logic and ensures that native event queues are synchronously and deterministically disposed on the hardware thread before termination, silencing persistent `BaseEventQueue` disposal warnings (R754).
-
-## 🟢 Aug.28.04 (vAug.28.04)
-*   **Concern #753 Resolved**: **Broadcast Hardware Abstraction (Leak Suppression)**. Soak testing revealed that while connectivity deadlocks were resolved, `BaseEventQueue.dispose` warnings persisted during shutdown. Identified that anonymous `BroadcastReceiver` instances for Battery and Power monitoring were the primary culprits. Implemented `ManagedBroadcastReceiver` to standardize and harden safe unregistration. Refactored `SystemStatusProvider` and `CommandRouter` to use this abstraction, ensuring deterministic native resource cleanup and complete silencing of hardware-linked disposal warnings (R753).
-
-## 🟢 Aug.28.03 (vAug.28.03)
-*   **Concern #752 Resolved**: **Persistent BaseEventQueue Leak (Deadlock Remediation)**. Soak testing of Aug.28.02 revealed that `BaseEventQueue` disposal warnings persisted due to a deadlock in the `ManagedNetworkCallback` unregistration utility. The utility was self-blocking when called from the Main Looper (during `Service.onDestroy`) because it attempted to post a synchronous task to the same looper. Hardened the abstraction to detect the calling thread and execute unregistration immediately if already on the Main Looper, ensuring deterministic native disposal (R752).
-
-## 🟢 Aug.28.02 (vAug.28.02)
-*   **Concern #751 Resolved**: **Managed Hardware Abstraction**. Resolved persistent native leaks (`BaseEventQueue` disposal failures) by implementing `ManagedNetworkCallback` and `ManagedLocationCallback`. These abstractions encapsulate the synchronous unregistration logic (Main Looper + CountDownLatch / Tasks.await) required for deterministic disposal on Samsung A15 hardware. All hardware-bound components (GpsManager, ConnectivitySuite, SystemStatusProvider) now utilize these unified utilities (R750).
-
-## 🟢 Aug.28.01 (vAug.28.01)
-*   **Concern #750 Resolved**: **Native Connectivity Leak**. Deployment regression testing confirmed that `BaseEventQueue` disposal warnings persisted due to `NetworkCallback` objects in `ConnectivitySuite` and `SystemStatusProvider` being garbage collected without deterministic unregistration. Hardened both components to perform synchronous unregistration on the Main Looper during shutdown/awaitClose, ensuring native disposal completes before the object lifecycle ends (R750).
+*   **Concern #756 Resolved**: **Persistent GNSS/Network Leak remediation**. Hardened `ManagedHardware` with fallback unregistration paths and refactored `CommandRouter` and `SystemStatusProvider` to ensure all network and power receivers are strictly managed via `ManagedBroadcastReceiver` (R756).
 
 ---
 *For historical entries, see legacy logs.*

@@ -1,7 +1,7 @@
-# Simplification Ideas 2.0 (Aug.28.05)
+# Simplification Ideas 2.0 (Aug.28.10)
 
-*   **ManagedNetworkCallback (R750/R752) - COMPLETE**: Specialized wrapper for `ConnectivityManager.NetworkCallback` encapsulates the `Handler` + `CountDownLatch` unregistration logic with Main Looper deadlock protection.
-*   **ManagedLocationCallback (R750) - COMPLETE**: Specialized wrapper for `FusedLocationProvider` updates encapsulates the `Tasks.await` logic.
-*   **ManagedBroadcastReceiver (R753) - COMPLETE**: Created a `ManagedBroadcastReceiver` abstraction to unify safe, synchronous unregistration for Battery, Power, and Legacy receivers.
-*   **ManagedSensor/DisplayListener (R754) - COMPLETE**: Standardized synchronous unregistration for sensors and display changes in `AppSensorManager`.
-*   **Unified Hardware Repository**: Consider merging `GpsManager` and `AppSensorManager` into a single `HardwareProvider` now that disposal logic is unified.
+*   **ManagedHardware Ecosystem (R750-R757) - COMPLETE**: Specialized wrappers for Network, Location, GNSS, Sensors, and Broadcast receivers ensure deterministic native resource cleanup.
+*   **Map Hydration Gating (R758) - COMPLETE**: Offloaded heavy OSM engine initialization to a background IO thread and used a thread-safe `AtomicBoolean` gate (`isOsmReady`) to prevent Main thread stalls during startup hydration.
+*   **Unified Hardware Registry**: Consider merging `GpsManager` and `AppSensorManager` into a single `HardwareProvider` now that unregistration logic is unified in `ManagedHardware.kt`.
+*   **IPC Identification (R759)**: Continue identifying system-level lookups (UID, ProcessInfo) that might be triggering hidden OS diagnostic spam on restricted hardware and migrate them to the `GpsApplication` shadow-cache.
+*   **Map Hydration Staggering Refinement**: Evaluate if Levels 5-7 (Overlays) can be moved to `IdleHandler` callbacks as well, or if the current delay-based staggering is optimal for frame consistency.

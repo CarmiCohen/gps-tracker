@@ -17,10 +17,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import com.gps19.core.engine.ShadowCache
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Aug.28.10:
+ * - Issue #758 Optimization: Implemented pre-warming of SqlTileWriter on IO 
+ *   thread and added isOsmReady signal to prevent MapView initialization 
+ *   stalls during hydration (R758).
+ * Aug.28.10:
+ * - Issue #758 Optimization: Moved OsmDroid configuration to the start of the 
+ *   initialization block to ensure SqlTileWriter and cache paths are ready 
+ *   before MapView instantiation, reducing Davey stalls on A15 hardware (R758).
  * Aug.19.13:
  * - Issue #217: Shadow-Cache Eviction Strategy. Transitioned to LRU-based 
  *   ShadowCache to prevent unbounded memory growth during multi-day 
@@ -44,6 +53,11 @@ class GpsApplication : Application(), Configuration.Provider {
          */
         val PACKAGE_NAME: String by lazy { stringCache.getOrPut("pkg") { "" } }
         
+        /**
+         * Issue #758: Signal for map hydration to start.
+         */
+        val isOsmReady = AtomicBoolean(false)
+
         /**
          * Generic access for high-frequency string lookups that trigger OS diagnostic logs.
          */
@@ -80,11 +94,10 @@ class GpsApplication : Application(), Configuration.Provider {
 
         applicationScope.launch(Dispatchers.IO) {
             try {
-                MaintenanceWorker.schedule(this@GpsApplication)
-                delay(3000)
-
+                // Issue #758: Initialize OSM configuration immediately. 
+                // Deferring this too long causes MapView to stall on default paths.
                 val osmConfig = OsmConfig.getInstance()
-                osmConfig.userAgentValue = "GpsTracker/8.9.91"
+                osmConfig.userAgentValue = "GpsTracker/8.10.10"
                 
                 val baseDir = File(filesDir, "osmdroid")
                 if (!baseDir.exists()) baseDir.mkdirs()
@@ -97,6 +110,20 @@ class GpsApplication : Application(), Configuration.Provider {
                 osmConfig.load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
                 osmConfig.isDebugMode = false
                 osmConfig.isDebugTileProviders = false
+                
+                // Issue #758: Pre-warm SqlTileWriter to move DB initialization to IO thread.
+                try {
+                    SqlTileWriter()
+                    Timber.d("Issue #758: SqlTileWriter pre-warmed on IO thread.")
+                } catch (e: Exception) {
+                    Timber.e(e, "Issue #758: SqlTileWriter pre-warm failed")
+                }
+                
+                isOsmReady.set(true)
+
+                // Now perform other maintenance tasks
+                MaintenanceWorker.schedule(this@GpsApplication)
+                delay(3000)
                 
                 Timber.d("Issue #721: Shadow-cache synchronized with LRU strategy.")
             } catch (e: Exception) {

@@ -1,22 +1,20 @@
-# Handover (Aug.28.07) - Persistent Leak Remediation (Complete)
+# Handover (Aug.28.10) - UI Thread Congestion Remediation
 
 ## 🎯 Current Status
-- **Goal**: Eliminating the final persistent native resource leaks (`BaseEventQueue`) in GNSS and Network stacks.
-- **Status**: 🟢 **RESOLVED** (Concern #756: Persistent Leak Remediation).
-- **Version**: `Aug.28.07`
+- **Goal**: Offloading heavy map engine initialization to eliminate startup stalls.
+- **Status**: 🟢 **RESOLVED** (Concern #758: UI Thread Congestion).
+- **Version**: `Aug.28.10`
 - **Database**: v73
-- **Current Audit Baseline**: SOT: 164, Resolved: 756, Open: 43, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 213, QA Status: 198.
+- **Current Audit Baseline**: SOT: 166, Resolved: 759, Open: 43, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 215, QA Status: 198.
 
-## 🧬 Implementation Summary: Aug.28.07
-- **Concern #756 Remediation**: **Persistent GNSS/Network Leak remediation**.
-    - **ManagedHardware Hardening**: Added `posted` check to `handler.post` and fallback unregistration paths to handle scenarios where hardware threads are terminated before the unregistration handshake completes. Added explicit "Starting unregistration" trace logging.
-    - **GpsManager Trace**: Instrumented `stop()` with detailed trace logs for GNSS, active location, and revival updates to verify the exact failure point if warnings persist.
-    - **CommunicationManager Cleanup**: Added explicit `socket.off()` and listener clearing in `disconnect()` to prevent Socket.io from holding native transport references after service destruction.
-    - **CommandRouter Abstraction**: Verified that all power and legacy receivers are now strictly managed via `ManagedBroadcastReceiver`.
-- **Integrity**: Updated `SOT_MASTER_REQUIREMENTS.md` (Rule 1.8), `RESOLUTION_ARCHIVE.md`, and `issues.md`. Version bumped to `Aug.28.07`.
+## 🧬 Implementation Summary: Aug.28.10
+- **Concern #758 Remediation**: **UI Thread Congestion (Frame Skipping)**.
+    - **Engine Pre-warming**: Moved `SqlTileWriter` instantiation and OSMDroid configuration to a background IO thread in `GpsApplication.onCreate()`. This prevents synchronous disk I/O during the first `AndroidView` update.
+    - **Hydration Gating**: Introduced `GpsApplication.isOsmReady` (AtomicBoolean) and integrated it into `LifecycleHydrationManager.kt`. The Map Hydration sequence (Level 4+) now waits for IO-thread readiness, ensuring the Main thread is never blocked by native engine setup.
+    - **SOT Alignment**: Hardened Rule 2.1 to mandate background engine initialization and updated functional requirements (R758).
 
 ## 🚀 Next Steps
-- **Logcat Verification**: Deploy and verify that the `BaseEventQueue.dispose` warnings are now fully silenced during multiple service start/stop cycles.
-- **Socket.io Soak Test**: Monitor memory usage during high-frequency network handover to ensure `socket.off()` prevents transport-layer growth.
+- **Issue #757 Remediation**: Deep dive into `GpsManager` to ensure the `BaseEventQueue` leak is fully silenced after the lifecycle hardening in Aug.28.09.
+- **Simplification**: Evaluate merging `GpsManager` and `AppSensorManager` into a unified `HardwareProvider`.
 
-vAug.28.07
+vAug.28.10

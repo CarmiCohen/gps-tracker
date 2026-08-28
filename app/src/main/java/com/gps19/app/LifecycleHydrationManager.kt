@@ -10,18 +10,19 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * LifecycleHydrationManager (Issue #318/323/739):
+ * LifecycleHydrationManager (Issue #318/323/739/758):
  * Centralizes and staggers the app hydration sequence to prevent Davey stalls
  * on budget hardware (SM-A155F).
+ * Aug.28.10:
+ * - Issue #758 Optimization: Integrated GpsApplication.isOsmReady gate. Map 
+ *   hydration (Levels 4-7) now waits for the IO-thread pre-warming of the 
+ *   OSM engine to complete, preventing Main-thread blocking during 
+ *   SqlTileWriter initialization (R758).
  * Aug.26.16:
  * - Issue #739 Remediation: Decomposed Map Hydration into 4 distinct phases 
  *   (Levels 4-7). This spreads Map Engine, Trails, Markers, and Final Overlays 
  *   over multiple frames using IdleHandler and staggered delays to eliminate 
  *   the 1.4s main-thread stall on A15 hardware (R739).
- * Aug.26.05:
- * - Issue #323 Hardening: Added Level 4 (Idle Map Hydration) using IdleHandler 
- *   to ensure heavy OSM engine initialization only occurs when the main 
- *   thread is free (R323).
  */
 @Singleton
 class LifecycleHydrationManager @Inject constructor() {
@@ -58,6 +59,17 @@ class LifecycleHydrationManager @Inject constructor() {
             // Use IdleHandler to wait for initial rendering to finish.
             Looper.myQueue().addIdleHandler {
                 scope.launch(Dispatchers.Main.immediate) {
+                    // Issue #758: Wait for OSM IO-thread pre-warming to complete
+                    var retryCount = 0
+                    while (!GpsApplication.isOsmReady.get() && retryCount < 50) {
+                        delay(100)
+                        retryCount++
+                    }
+                    
+                    if (!GpsApplication.isOsmReady.get()) {
+                        Timber.w("Hydration: OSM not ready after timeout, forcing Level 4")
+                    }
+
                     // Level 4: Map Engine Base
                     _hydrationLevel.value = 4
                     Timber.d("Hydration: Level 4 (Map Engine Base)")

@@ -19,19 +19,19 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * Aug.28.08:
+ * - Issue #759: Logcat Spam Remediation. Switched to GpsApplication.PACKAGE_NAME 
+ *   shadow-cache to eliminate repetitive getPackageName() system logs (R759).
  * Aug.18.08:
  * - Issue #206 Hardening: Refined onRequestOverlayPermission with fallback 
  *   logic to handle Samsung-specific intent URI failures (R206).
- * Aug.13.04:
- * - Issue #150: Samsung A15 R405 Detection Hardening. Removed redundant R405 
- *   trigger logic as it was moved to MainViewModel monitoring loop (R405).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
-    private val cachedPkgName by lazy { packageName }
+    private val cachedPkgName: String get() = GpsApplication.PACKAGE_NAME
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()

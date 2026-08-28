@@ -19,11 +19,12 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Aug.28.08:
+ * - Issue #759: Logcat Spam Remediation. Switched to GpsApplication.PACKAGE_NAME 
+ *   shadow-cache to eliminate repetitive getPackageName() system logs (R759).
  * Aug.26.19:
  * - Issue #320/249 Hardening: Centralized JdHardwareManager native release 
  *   in onDestroy to ensure consistent cleanup across all service roles (R320).
- * Aug.26.03:
- * - Issue #320 Remediation: Hardened cleanup sequence.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -52,7 +53,7 @@ abstract class BaseMonitorService : LifecycleService() {
     @Inject lateinit var appSensorManager: AppSensorManager
     @Inject lateinit var serviceBehaviorUseCase: ServiceBehaviorUseCase
     
-    protected val cachedPkgName by lazy { packageName }
+    protected val cachedPkgName: String get() = GpsApplication.PACKAGE_NAME
 
     protected var serviceStartRealtime = 0L 
     protected var serviceStartWall = 0L 
