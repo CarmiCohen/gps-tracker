@@ -62,14 +62,15 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Aug.28.00:
+ * - Issue #749 Hardening: Hardened all hardware callbackFlows in SystemStatusProvider 
+ *   to follow SOT 1.8. Implemented deterministic unregistration for Internet, 
+ *   Battery, and Power flows to resolve persistent BaseEventQueue leaks on 
+ *   Samsung A15 (R749).
  * Aug.26.07:
  * - Issue #723: Diagnostic Log Leak (StackLog). Transitioned sharedInternetStatusFlow 
  *   to SharingStarted.Eagerly to prevent platform-level diagnostic noise triggered 
  *   by frequent ConnectivityManager callback re-registrations (R723).
- * Aug.25.05:
- * - Issue #317 Hardening: Hardware SOT Architectural Decoupling. Refactored to use 
- *   HardwareSot from core:engine directly, removing dependency on app:Utils.kt 
- *   for identification logic (R313/R212).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -131,7 +132,6 @@ class SystemStatusProviderImpl @Inject constructor(
     private val refreshMutex = Mutex()
     private val internetMutex = Mutex()
     
-    // Issue #317: Unified detection via engine:HardwareSot
     private val isXiaomi by lazy { HardwareSot.isXiaomi(Build.MANUFACTURER) }
     private val isSamsung by lazy { HardwareSot.isSamsung(Build.MANUFACTURER, Build.BRAND) }
     private val isS21FE by lazy { HardwareSot.isS21FE(Build.MANUFACTURER, Build.BRAND, Build.MODEL) }
@@ -270,9 +270,9 @@ class SystemStatusProviderImpl @Inject constructor(
     }
 
     /**
-     * Issue #723: Transitioned to SharingStarted.Eagerly.
-     * Prevents redundant callback registrations that trigger platform StackLog noise 
-     * on Samsung A15 hardware when UI subscribers cycle.
+     * Issue #749 Hardening: SOT 1.8 deterministic unregistration.
+     * Prevents BaseEventQueue leaks on Samsung A15 when connectivity callbacks 
+     * are held by sharedIn scope after UI detachment.
      */
     private val sharedInternetStatusFlow = callbackFlow<Boolean> {
         val callback = object : ConnectivityManager.NetworkCallback() {
@@ -285,14 +285,19 @@ class SystemStatusProviderImpl @Inject constructor(
         val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
         try {
             connectivityManager.registerNetworkCallback(request, callback)
-            launch {
-                trySend(isLocalOnline())
-            }
+            launch { trySend(isLocalOnline()) }
         } catch (e: Exception) {
             Timber.e(e, "Connectivity callback registration failed")
             trySend(false)
         }
-        awaitClose { try { connectivityManager.unregisterNetworkCallback(callback) } catch(e: Exception) {} }
+        awaitClose { 
+            try { 
+                connectivityManager.unregisterNetworkCallback(callback) 
+                Timber.d("SystemStatusProvider: Internet callback unregistered.")
+            } catch(e: Exception) {
+                Timber.e(e, "Error unregistering internet callback")
+            } 
+        }
     }.distinctUntilChanged()
      .conflate()
      .shareIn(
@@ -303,6 +308,10 @@ class SystemStatusProviderImpl @Inject constructor(
 
     override fun observeInternetStatus(): Flow<Boolean> = sharedInternetStatusFlow
 
+    /**
+     * Issue #749 Hardening: Deterministic unregistration of BroadcastReceiver 
+     * to prevent native event queue leaks during process state changes.
+     */
     private val sharedBatteryStatusFlow = callbackFlow<BatteryStatus> {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -327,7 +336,14 @@ class SystemStatusProviderImpl @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Battery receiver registration failed")
         }
-        awaitClose { try { context.unregisterReceiver(receiver) } catch(e: Exception) {} }
+        awaitClose { 
+            try { 
+                context.unregisterReceiver(receiver) 
+                Timber.d("SystemStatusProvider: Battery receiver unregistered.")
+            } catch (e: Exception) {
+                Timber.e(e, "Error unregistering battery receiver")
+            } 
+        }
     }.distinctUntilChanged()
      .conflate()
      .shareIn(
@@ -390,6 +406,10 @@ class SystemStatusProviderImpl @Inject constructor(
         }
     }
 
+    /**
+     * Issue #749 Hardening: Deterministic unregistration of BroadcastReceiver 
+     * and poll job cancellation to resolve BaseEventQueue leaks.
+     */
     private val sharedPowerStatusFlow = callbackFlow<PowerStatus> {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -412,7 +432,12 @@ class SystemStatusProviderImpl @Inject constructor(
         trySend(getPowerStatus())
         
         awaitClose { 
-            try { context.unregisterReceiver(receiver) } catch(e: Exception) {}
+            try { 
+                context.unregisterReceiver(receiver) 
+                Timber.d("SystemStatusProvider: Power status receiver unregistered.")
+            } catch (e: Exception) {
+                Timber.e(e, "Error unregistering power receiver")
+            }
             pollJob.cancel()
         }
     }.distinctUntilChanged()

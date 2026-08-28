@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.28.00 (vAug.28.00)
+*   **Concern #749 Resolved**: **Persistent BaseEventQueue Leak (SystemStatusProvider)**. Deployment testing of Aug.27.05 revealed that `BaseEventQueue` disposal warnings persisted after `TrackerService` termination. Identified that `SystemStatusProviderImpl` was running multiple hardware-bound `callbackFlow` implementations (Internet, Battery, Power) in the application scope without deterministic unregistration. Since these flows were shared in the external scope, they often orphaned native `ConnectivityManager` callbacks and `BroadcastReceivers` during UI detachment or service swaps. Hardened all flows to follow SOT 1.8, ensuring explicit unregistration in `awaitClose` and logging confirmation on A15 hardware (R749).
+
 ## 🟢 Aug.27.05 (vAug.27.05)
 *   **Concern #748 Resolved**: **CallbackFlow BaseEventQueue Leak (GpsManager)**. Identified that `hardwareObservationFlow` in `GpsManager.kt` was performing asynchronous unregistration in its `awaitClose` block. Since `TrackerService` cancels the collection job during role-swaps, the native `BaseEventQueue` was not being disposed of before the callback object was reclaimed. Hardened the flow to synchronously await the `removeLocationUpdates` task, ensuring native disposal completes reliably (R748).
 
@@ -16,12 +19,6 @@ This document archives all resolved issues and architectural refinements.
 
 ## 🟢 Aug.27.01 (vAug.27.01)
 *   **Concern #744 Resolved**: **Persistent EventQueue Leak**. Identified that the `LocationCallback` in `GpsManager.hardwareObservationFlow` was escaping the disposal sequence due to the 5-second lingering subscription of `WhileSubscribed(5000)`. Hardened `GpsManager` to explicitly track and synchronously unregister the `activeLocationCallback` during `stop()`, ensuring native resources are released before the hardware thread is quit (R744).
-
-## 🟢 Aug.26.19 (vAug.26.19)
-*   **Concern #742 Hardening**: **Managed Hardware Callbacks**. Identified that anonymous `LocationCallback` in `GpsManager.restartLocationUpdates()` and escaped async `stepDetector` registrations in `AppSensorManager` were triggering `BaseEventQueue` leaks. Implemented explicit lifecycle tracking and cancellation for these transient registrations. Centralized native hardware bridge release in `BaseMonitorService` to ensure deterministic disposal during role-swaps (R742).
-
-## 🟢 Aug.26.18 (vAug.26.18)
-*   **Concern #742 Resolved**: **Recurrent EventQueue Leak**. Identified that `GpsManager` was redundantly registering `GnssStatus.Callback` within its `callbackFlow`, leading to overlapping native event queues during polling interval changes. Decoupled the callback lifecycle from the flow and tied it strictly to the synchronized `start()`/`stop()` lifecycle of the singleton. Hardened permission checks to ensure safety during registration (R742).
 
 ---
 *For historical entries, see legacy logs.*

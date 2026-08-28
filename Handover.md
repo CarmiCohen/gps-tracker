@@ -1,23 +1,21 @@
-# Handover (Aug.27.05) - Hardware Lifecycle Hardening (Final)
+# Handover (Aug.28.00) - Hardware Lifecycle Hardening (Complete)
 
 ## 🎯 Current Status
 - **Goal**: Deterministic disposal of native hardware resources.
-- **Status**: 🟢 **RESOLVED** (Concern #748: CallbackFlow BaseEventQueue Leak).
-- **Version**: `Aug.27.05`
+- **Status**: 🟢 **RESOLVED** (Concern #749: Persistent BaseEventQueue Leak).
+- **Version**: `Aug.28.00`
 - **Database**: v73
-- **Audit Baseline**: SOT: 164, Resolved: 748, Open: 46, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 208, QA Status: 197.
+- **Audit Baseline**: SOT: 164, Resolved: 749, Open: 45, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 209, QA Status: 197.
 
-## 🧬 Implementation Summary: Aug.27.05
-- **Concern #748 Remediation**: **CallbackFlow Hardening**.
-    - Identified that `hardwareObservationFlow` in `GpsManager.kt` was the primary source of the persistent `BaseEventQueue` warnings on A15 hardware.
-    - **Synchronous awaitClose**: Updated `awaitClose { ... }` to use `Tasks.await()` for `removeLocationUpdates(fusedCallback)`.
-    - **Interval Swap Protection**: Added synchronous removal to `flatMapLatest` within the flow to prevent overlapping native queues during polling interval changes.
-    - **Revival Hardening**: Updated `restartLocationUpdates` to await the removal of the previous `revivalCallback`.
-- **Architectural Update**: SOT Requirement 1.8 updated to mandate synchronous unregistration in all `callbackFlow` implementations.
-- **Integrity**: Verified successful build `app:assembleDebug` and version bump to `Aug.27.05`.
+## 🧬 Implementation Summary: Aug.28.00
+- **Concern #749 Remediation**: **SystemStatusProvider Hardening**.
+    - Root cause: `ConnectivityManager` callbacks and `BroadcastReceivers` in application-scoped `callbackFlows` were not being unregistered deterministically, leading to `BaseEventQueue` leaks on Samsung A15.
+    - **Hardened Flows**: Updated `Internet`, `Battery`, and `Power` flows in `SystemStatusProviderImpl` to ensure explicit unregistration in `awaitClose`.
+    - **SOT Alignment**: Updated SOT Rule 1.8 to explicitly include Network and Broadcast receivers in the mandatory synchronous cleanup list.
+- **Integrity**: Verified successful build and version bump to `Aug.28.00`.
 
 ## 🚀 Next Steps
-- **Final Regression**: Deploy `Aug.27.05` and verify that role-swaps (Tracker -> Viewer) are now 100% silent in Logcat regarding `BaseEventQueue` disposal.
-- **Abstraction**: Implement `ManagedLocationProvider` from `Simplify_Ideas2.md` to wrap Play Services Tasks.
+- **Final Regression**: Deploy `Aug.28.00` and perform a 5-minute role-swap stress test to verify 0 `BaseEventQueue` warnings.
+- **Abstraction**: Implement `ManagedLocationProvider` and `safeCallbackFlow` from `Simplify_Ideas2.md` to eliminate lifecycle boilerplate.
 
-vAug.27.05
+vAug.28.00
