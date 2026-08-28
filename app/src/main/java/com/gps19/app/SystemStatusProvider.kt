@@ -15,7 +15,9 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Handler
 import android.os.HardwarePropertiesManager
+import android.os.Looper
 import android.os.PowerManager
 import android.os.StatFs
 import android.os.SystemClock
@@ -62,15 +64,15 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Aug.28.01:
+ * - Issue #750 Hardening: Hardened Internet callback unregistration in awaitClose 
+ *   to use the Main Looper. This ensures deterministic native handle disposal 
+ *   on Samsung A15 even if the application scope is terminated (R750).
  * Aug.28.00:
  * - Issue #749 Hardening: Hardened all hardware callbackFlows in SystemStatusProvider 
  *   to follow SOT 1.8. Implemented deterministic unregistration for Internet, 
  *   Battery, and Power flows to resolve persistent BaseEventQueue leaks on 
  *   Samsung A15 (R749).
- * Aug.26.07:
- * - Issue #723: Diagnostic Log Leak (StackLog). Transitioned sharedInternetStatusFlow 
- *   to SharingStarted.Eagerly to prevent platform-level diagnostic noise triggered 
- *   by frequent ConnectivityManager callback re-registrations (R723).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -270,9 +272,9 @@ class SystemStatusProviderImpl @Inject constructor(
     }
 
     /**
-     * Issue #749 Hardening: SOT 1.8 deterministic unregistration.
-     * Prevents BaseEventQueue leaks on Samsung A15 when connectivity callbacks 
-     * are held by sharedIn scope after UI detachment.
+     * Issue #750 Hardening: Synchronous unregistration on Main Looper.
+     * Hardened awaitClose to ensure ConnectivityManager callback is released 
+     * deterministically on budget hardware (Samsung A15).
      */
     private val sharedInternetStatusFlow = callbackFlow<Boolean> {
         val callback = object : ConnectivityManager.NetworkCallback() {
@@ -291,12 +293,19 @@ class SystemStatusProviderImpl @Inject constructor(
             trySend(false)
         }
         awaitClose { 
-            try { 
-                connectivityManager.unregisterNetworkCallback(callback) 
-                Timber.d("SystemStatusProvider: Internet callback unregistered.")
-            } catch(e: Exception) {
-                Timber.e(e, "Error unregistering internet callback")
-            } 
+            // Issue #750: Unregister on main looper to satisfy native disposal
+            val latch = java.util.concurrent.CountDownLatch(1)
+            Handler(Looper.getMainLooper()).post {
+                try {
+                    connectivityManager.unregisterNetworkCallback(callback)
+                    Timber.d("SystemStatusProvider: Internet callback unregistered.")
+                } catch(e: Exception) {
+                    Timber.e(e, "Error unregistering internet callback")
+                } finally {
+                    latch.countDown()
+                }
+            }
+            try { latch.await(1000, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (e: Exception) {}
         }
     }.distinctUntilChanged()
      .conflate()

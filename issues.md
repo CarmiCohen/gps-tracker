@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.28.00)
+# Project Issues & Hardening Tracking (Aug.28.01)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Progress | 45 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 749 |
+| **Resolved (Total)** | 🟢 Progress | 750 |
 
 ---
 
@@ -21,9 +21,8 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.28.00)
-*   **Concern #749: Persistent BaseEventQueue Leak (SystemStatusProvider)**. Deployment testing of Aug.27.05 revealed that `BaseEventQueue` disposal warnings persisted after `TrackerService` termination. Identified that `SystemStatusProviderImpl` was running multiple hardware-bound `callbackFlow` implementations (Internet, Battery, Power) in the application scope without deterministic unregistration. Hardened all flows to follow SOT 1.8, ensuring `ConnectivityManager` callbacks and `BroadcastReceivers` are explicitly unregistered in `awaitClose` (R749).
-*   **Concern #748: CallbackFlow BaseEventQueue Leak (GpsManager)**. (Aug.27.05) Identified that `hardwareObservationFlow` in `GpsManager.kt` was performing asynchronous unregistration in its `awaitClose` block. Hardened the flow to synchronously await the `removeLocationUpdates` task, ensuring native disposal completes before the callback object is reclaimed (R748).
+## 🟢 Recently Resolved Issues (Aug.28.01)
+*   **Concern #750: Native Connectivity Leak**. Deployment regression testing confirmed that `BaseEventQueue` disposal warnings persisted due to `NetworkCallback` objects in `ConnectivitySuite` and `SystemStatusProvider` being garbage collected without deterministic unregistration. Hardened both components to perform synchronous unregistration on the Main Looper during shutdown/awaitClose (R750).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.28.00)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.28.01)

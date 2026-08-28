@@ -33,6 +33,10 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Aug.28.01:
+ * - Issue #750 Hardening: Hardened stop() to ensure synchronous unregistration 
+ *   of NetworkCallbacks. This prevents BaseEventQueue disposal failures when 
+ *   the service is destroyed during high-frequency network state changes (R750).
  * Aug.22.04:
  * - Build Fix: Corrected Protobuf enum mapping logic to handle .name conversion 
  *   for LocationPendingReason and TrackerState.
@@ -816,9 +820,29 @@ class ConnectivitySuite @Inject constructor(
     }
 
     fun stop() { 
-        isStarted.set(false)
+        if (!isStarted.getAndSet(false)) return
         isStopped.set(true); keepAliveJob?.cancel(); syncJob?.cancel(); signalingJob?.cancel(); scope.cancel()
-        try { connectivityManager.unregisterNetworkCallback(networkCallback) } catch (e: Exception) {}
+        
+        // Issue #750: Synchronous unregistration of network callback to prevent native leak.
+        // We use a Handler on the main looper to ensure deterministic release before thread death.
+        val latch = java.util.concurrent.CountDownLatch(1)
+        Handler(Looper.getMainLooper()).post {
+            try {
+                connectivityManager.unregisterNetworkCallback(networkCallback)
+                Timber.d("ConnectivitySuite: Synchronous unregistration complete.")
+            } catch (e: Exception) {
+                Timber.e(e, "ConnectivitySuite: Unregistration failed")
+            } finally {
+                latch.countDown()
+            }
+        }
+        
+        try {
+            latch.await(1000, java.util.concurrent.TimeUnit.MILLISECONDS)
+        } catch (e: InterruptedException) {
+            Timber.e("ConnectivitySuite unregistration latch interrupted")
+        }
+
         signalingProvider.disconnect() 
     }
 
