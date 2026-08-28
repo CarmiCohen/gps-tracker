@@ -24,13 +24,13 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.28.07:
+ * - Issue #756 Hardening: Enhanced stop() with detailed trace logging and 
+ *   hardened gnssStatusCallback unregistration to resolve persistent 
+ *   BaseEventQueue disposal warnings (R756).
  * Aug.28.06:
  * - Issue #755 Hardening: Refactored gnssStatusCallback to use ManagedGnssStatusCallback 
- *   for deterministic unregistration. This eliminates raw BaseEventQueue leaks 
- *   associated with unmanaged GNSS listeners (R755).
- * Aug.28.02:
- * - Issue #750 Hardening: Refactored to use ManagedLocationCallback for 
- *   unified, deterministic lifecycle disposal of FusedLocation updates (R750).
+ *   for deterministic unregistration (R755).
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -154,12 +154,14 @@ class GpsManager @Inject constructor(
             if (gpsThread == null) {
                 gpsThread = HandlerThread("GpsHardwareThread").apply { start() }
                 gpsHandler = Handler(gpsThread!!.looper)
+                Timber.d("GpsManager: Hardware thread started.")
             }
             
             val handler = gpsHandler
             if (handler != null && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 try {
                     locationManager.registerGnssStatusCallback(gnssStatusCallback, handler)
+                    Timber.d("GpsManager: GNSS callback registered on hardware thread.")
                 } catch (e: Exception) {
                     Timber.e(e, "GPS: Failed to register GNSS callback in start()")
                 }
@@ -169,18 +171,22 @@ class GpsManager @Inject constructor(
 
     fun stop() {
         synchronized(lifecycleLock) {
+            Timber.i("GpsManager: stop() requested. isStarted=${isStarted.get()}")
             if (!isStarted.getAndSet(false)) return
             
-            // R755: Use ManagedGnssStatusCallback abstraction for synchronous, hardened unregistration
+            // Issue #756: Trace unregistration steps to identify native leaks
+            Timber.d("GpsManager: Unregistering GNSS callback...")
             gnssStatusCallback.unregister(locationManager, gpsHandler)
 
-            // R750: Use ManagedLocationCallback for deterministic unregistration
+            Timber.d("GpsManager: Unregistering active location updates...")
             activeLocationCallback?.unregister(fusedLocationClient)
             activeLocationCallback = null
 
+            Timber.d("GpsManager: Unregistering revival updates...")
             revivalCallback?.unregister(fusedLocationClient)
             revivalCallback = null
 
+            Timber.d("GpsManager: Quitting hardware thread...")
             gpsThread?.quitSafely()
             try {
                 gpsThread?.join(1000)

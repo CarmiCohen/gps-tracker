@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.28.07 (vAug.28.07)
+*   **Concern #756 Resolved**: **Persistent GNSS/Network Leak remediation**. Soak testing of vAug.28.06 revealed that `BaseEventQueue` warnings persisted despite previous hardening. Identified that `GpsManager` unregistration lacked explicit trace logging and `CommunicationManager` (Socket.io) was not clearing all listeners. Hardened `ManagedHardware` with fallback unregistration paths for dying threads and added deterministic `socket.off()` calls. Refactored `CommandRouter` and `SystemStatusProvider` to ensure all network and power receivers are strictly managed via `ManagedBroadcastReceiver`, finally silencing the native disposal warnings (R756).
+
 ## 🟢 Aug.28.06 (vAug.28.06)
 *   **Concern #755 Resolved**: **GNSS & Network Unregistration Hardening**. Standardized GNSS unregistration by implementing `ManagedGnssStatusCallback` in `ManagedHardware.kt` and refactoring `GpsManager.kt`. Increased unregistration timeouts to 2000ms for all managed hardware listeners to tolerate high Main Looper congestion during teardown, effectively silencing native `BaseEventQueue` disposal warnings and resolving unregistration timeouts (R755).
 

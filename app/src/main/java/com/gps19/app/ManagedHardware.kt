@@ -22,15 +22,10 @@ import java.util.concurrent.TimeUnit
 /**
  * ManagedNetworkCallback: Encapsulates safe, synchronous unregistration of 
  * ConnectivityManager.NetworkCallback to prevent native BaseEventQueue leaks (R750).
- * Aug.28.06:
- * - Issue #755 Hardening: Increased timeout to 2000ms to allow for higher 
- *   Main Looper congestion during teardown.
- * Aug.28.03:
- * - Issue #752 Hardening: Prevented unregister deadlock by checking if the 
- *   caller is already on the Main Looper (R752).
  */
 abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
     fun unregister(cm: ConnectivityManager) {
+        Timber.d("ManagedNetworkCallback: Starting unregistration...")
         if (Looper.myLooper() == Looper.getMainLooper()) {
             try {
                 cm.unregisterNetworkCallback(this)
@@ -42,7 +37,7 @@ abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
         }
 
         val latch = CountDownLatch(1)
-        Handler(Looper.getMainLooper()).post {
+        val posted = Handler(Looper.getMainLooper()).post {
             try {
                 cm.unregisterNetworkCallback(this)
                 Timber.d("ManagedNetworkCallback: Async unregistration complete.")
@@ -52,6 +47,12 @@ abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
                 latch.countDown()
             }
         }
+        
+        if (!posted) {
+            Timber.w("ManagedNetworkCallback: Failed to post unregistration to Main Looper")
+            return
+        }
+
         try {
             if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
                 Timber.w("ManagedNetworkCallback: Unregistration timed out")
@@ -69,6 +70,7 @@ abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
  */
 abstract class ManagedLocationCallback : LocationCallback() {
     fun unregister(client: FusedLocationProviderClient) {
+        Timber.d("ManagedLocationCallback: Starting unregistration...")
         try {
             val task = client.removeLocationUpdates(this)
             Tasks.await(task, 2000, TimeUnit.MILLISECONDS)
@@ -82,9 +84,11 @@ abstract class ManagedLocationCallback : LocationCallback() {
 /**
  * ManagedGnssStatusCallback: Encapsulates safe, synchronous unregistration of
  * GnssStatus.Callback to prevent native BaseEventQueue leaks (R755).
+ * Aug.28.07: Added posted check and explicit logging to detect race conditions (R756).
  */
 abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
     fun unregister(lm: LocationManager, handler: Handler?) {
+        Timber.d("ManagedGnssStatusCallback: Starting unregistration...")
         if (handler == null) {
             try {
                 lm.unregisterGnssStatusCallback(this)
@@ -106,7 +110,7 @@ abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
         }
 
         val latch = CountDownLatch(1)
-        handler.post {
+        val posted = handler.post {
             try {
                 lm.unregisterGnssStatusCallback(this)
                 Timber.d("ManagedGnssStatusCallback: Async unregistration complete.")
@@ -116,6 +120,19 @@ abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
                 latch.countDown()
             }
         }
+
+        if (!posted) {
+            Timber.w("ManagedGnssStatusCallback: Failed to post unregistration to hardware thread")
+            // Fallback to direct unregistration if thread is dying
+            try {
+                lm.unregisterGnssStatusCallback(this)
+                Timber.d("ManagedGnssStatusCallback: Fallback unregistration complete.")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedGnssStatusCallback: Fallback unregistration failed")
+            }
+            return
+        }
+
         try {
             if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
                 Timber.w("ManagedGnssStatusCallback: Unregistration timed out")
@@ -133,6 +150,7 @@ abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
  */
 abstract class ManagedBroadcastReceiver : BroadcastReceiver() {
     fun unregister(context: Context) {
+        Timber.d("ManagedBroadcastReceiver: Starting unregistration...")
         try {
             context.unregisterReceiver(this)
             Timber.d("ManagedBroadcastReceiver: Unregistration successful.")
@@ -151,7 +169,8 @@ abstract class ManagedBroadcastReceiver : BroadcastReceiver() {
 abstract class ManagedSensorListener : SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
-    fun unregister(sm: SensorManager, handler: Handler?) {
+    fun unregister(sm: AndroidSensorManager, handler: Handler?) {
+        Timber.d("ManagedSensorListener: Starting unregistration...")
         if (handler == null) {
             try {
                 sm.unregisterListener(this)
@@ -173,7 +192,7 @@ abstract class ManagedSensorListener : SensorEventListener {
         }
 
         val latch = CountDownLatch(1)
-        handler.post {
+        val posted = handler.post {
             try {
                 sm.unregisterListener(this)
                 Timber.d("ManagedSensorListener: Async unregistration complete.")
@@ -183,6 +202,12 @@ abstract class ManagedSensorListener : SensorEventListener {
                 latch.countDown()
             }
         }
+        
+        if (!posted) {
+            Timber.w("ManagedSensorListener: Failed to post unregistration to sensor thread")
+            return
+        }
+
         try {
             if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
                 Timber.w("ManagedSensorListener: Unregistration timed out")
@@ -202,6 +227,7 @@ abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
     override fun onDisplayRemoved(displayId: Int) {}
 
     fun unregister(dm: DisplayManager, handler: Handler?) {
+        Timber.d("ManagedDisplayListener: Starting unregistration...")
         if (handler == null) {
             try {
                 dm.unregisterDisplayListener(this)
@@ -223,7 +249,7 @@ abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
         }
 
         val latch = CountDownLatch(1)
-        handler.post {
+        val posted = handler.post {
             try {
                 dm.unregisterDisplayListener(this)
                 Timber.d("ManagedDisplayListener: Async unregistration complete.")
@@ -233,6 +259,12 @@ abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
                 latch.countDown()
             }
         }
+
+        if (!posted) {
+            Timber.w("ManagedDisplayListener: Failed to post unregistration to display thread")
+            return
+        }
+
         try {
             if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
                 Timber.w("ManagedDisplayListener: Unregistration timed out")
@@ -242,3 +274,5 @@ abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
         }
     }
 }
+
+typealias AndroidSensorManager = SensorManager

@@ -21,12 +21,9 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * Aug.14.03:
- * - Issue #171: Forensic Jitter Audit. Integrated artificial latency simulator 
- *   to model out-of-order packet arrival from multi-relay forensic streams (R171).
- * July.28.22:
- * - Issue #617: Global SharedFlow Audit. Hardened _signalingFlow with 
- *   BufferOverflow.DROP_OLDEST to prevent socket thread suspension (R617).
+ * Aug.28.07:
+ * - Issue #756 Hardening: Refactored disconnect() to explicitly call socket.off() 
+ *   and clear internal listeners to prevent native resource leaks (R756).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -511,7 +508,13 @@ class CommunicationManager @Inject constructor(
         queueProcessorJob?.cancel()
         normalPriorityQueue.close()
         scope.cancel()
-        socket?.disconnect() 
+        
+        // R756: Deterministic cleanup of socket and listeners
+        socket?.disconnect()
+        socket?.off()
+        socket = null
+        
         telemetryRepository.updateRelayStatus(false)
+        Timber.i("CommunicationManager: Disconnected and listeners cleared.")
     }
 }

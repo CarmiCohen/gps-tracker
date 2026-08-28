@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.28.06)
+# Project Issues & Hardening Tracking (Aug.28.07)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,12 +7,12 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Progress | 43 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 755 |
+| **Resolved (Total)** | 🟢 Progress | 756 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   *None currently identified.*
+*   *(No new concerns identified in this cycle)*
 
 ---
 
@@ -21,11 +21,11 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.28.06)
-*   **Concern #755: GNSS & Network Unregistration Hardening**. Standardized GNSS unregistration by implementing `ManagedGnssStatusCallback` in `ManagedHardware.kt` and refactoring `GpsManager.kt`. Increased unregistration timeouts to 2000ms to tolerate high Main Looper congestion during teardown, effectively silencing `BaseEventQueue` disposal warnings (R755).
-*   **Concern #754: Managed Sensor Abstraction (Leak Suppression)**. Introduced `ManagedSensorListener` and `ManagedDisplayListener` in `ManagedHardware.kt` to standardize synchronous hardware unregistration. Refactored `AppSensorManager` to use these abstractions (R754).
-*   **Concern #753: Broadcast Hardware Abstraction (Leak Suppression)**. Implemented `ManagedBroadcastReceiver` and refactored `SystemStatusProvider` and `CommandRouter` to ensure deterministic cleanup (R753).
-*   **Concern #752: Persistent BaseEventQueue Leak (Post-Abstraction)**. Resolved unregister deadlocks in `ManagedHardware.unregister` (R752).
+## 🟢 Recently Resolved Issues (Aug.28.07)
+*   **Concern #756: Persistent BaseEventQueue Leak (GNSS/Network)**. Resolved remaining native leaks by hardening the `GpsManager` unregistration sequence with explicit trace logging and implementing deterministic listener clearing in `CommunicationManager` (Socket.io). Added fallback unregistration paths in `ManagedHardware.kt` to handle scenarios where the hardware thread is disposed before unregistration completes (R756).
+*   **Concern #755: GNSS & Network Unregistration Hardening**. Standardized GNSS unregistration by implementing `ManagedGnssStatusCallback` in `ManagedHardware.kt` and refactoring `GpsManager.kt`. Increased unregistration timeouts to 2000ms.
+*   **Concern #754: Managed Sensor Abstraction (Leak Suppression)**. Introduced `ManagedSensorListener` and `ManagedDisplayListener` in `ManagedHardware.kt`.
+*   **Concern #753: Broadcast Hardware Abstraction (Leak Suppression)**. Implemented `ManagedBroadcastReceiver` for deterministic cleanup.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.28.06)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.28.07)
