@@ -1,7 +1,5 @@
-# Simplification Ideas 2.0
+# Simplification Ideas 2.0 (Aug.28.02)
 
-This document tracks architectural simplification and boilerplate reduction strategies.
-
-... (existing entries) ...
-
-*   **ManagedNetworkCallback (R750)**: Implement a specialized wrapper for `ConnectivityManager.NetworkCallback` that encapsulates the `Handler` + `CountDownLatch` unregistration logic. This will eliminate redundant lifecycle boilerplate and ensure native disposal safety across all hardware-bound components.
+*   **ManagedNetworkCallback (R750) - COMPLETE**: Specialized wrapper for `ConnectivityManager.NetworkCallback` encapsulates the `Handler` + `CountDownLatch` unregistration logic.
+*   **ManagedLocationCallback (R750) - COMPLETE**: Specialized wrapper for `FusedLocationProvider` updates encapsulates the `Tasks.await` logic.
+*   **Unified Hardware Repository**: Consider merging `GpsManager` and `AppSensorManager` into a single `HardwareProvider` now that disposal logic is unified.

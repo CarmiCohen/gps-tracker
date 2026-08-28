@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.28.01)
+# Project Issues & Hardening Tracking (Aug.28.02)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Progress | 45 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 750 |
+| **Resolved (Total)** | 🟢 Progress | 751 |
 
 ---
 
@@ -21,8 +21,8 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.28.01)
-*   **Concern #750: Native Connectivity Leak**. Deployment regression testing confirmed that `BaseEventQueue` disposal warnings persisted due to `NetworkCallback` objects in `ConnectivitySuite` and `SystemStatusProvider` being garbage collected without deterministic unregistration. Hardened both components to perform synchronous unregistration on the Main Looper during shutdown/awaitClose (R750).
+## 🟢 Recently Resolved Issues (Aug.28.02)
+*   **Concern #750: Native Connectivity Leak (Managed Abstraction)**. Resolved the persistent `BaseEventQueue` disposal warning by implementing `ManagedNetworkCallback` and `ManagedLocationCallback` abstractions. These utilities encapsulate synchronous unregistration (Main Looper + CountDownLatch) to ensure deterministic native handle disposal across all hardware-bound components, resolving the leak root-cause on Samsung A15 (R750).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.28.01)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.28.02)

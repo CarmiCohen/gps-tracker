@@ -33,16 +33,14 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Aug.28.02:
+ * - Issue #750 Hardening: Refactored to use ManagedNetworkCallback for 
+ *   deterministic lifecycle disposal, eliminating redundant unregistration 
+ *   boilerplate (R750).
  * Aug.28.01:
  * - Issue #750 Hardening: Hardened stop() to ensure synchronous unregistration 
  *   of NetworkCallbacks. This prevents BaseEventQueue disposal failures when 
  *   the service is destroyed during high-frequency network state changes (R750).
- * Aug.22.04:
- * - Build Fix: Corrected Protobuf enum mapping logic to handle .name conversion 
- *   for LocationPendingReason and TrackerState.
- * Aug.20.07:
- * - Issue #225 Analytical Telemetry Optimization: Refactored status mapping 
- *   to use ForensicMapper for 1:1 parity (R225).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -163,7 +161,8 @@ class ConnectivitySuite @Inject constructor(
     val trackerDistToHome get() = trackerStatus.sitDz 
     val trackerKineticEnergy get() = trackerStatus.kineticEnergy
 
-    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+    // R750: Use ManagedNetworkCallback abstraction for deterministic disposal
+    private val networkCallback = object : ManagedNetworkCallback() {
         override fun onAvailable(network: Network) {
             if (isStopped.get() || relayUrl.isEmpty()) return
             scope.launch {
@@ -823,25 +822,8 @@ class ConnectivitySuite @Inject constructor(
         if (!isStarted.getAndSet(false)) return
         isStopped.set(true); keepAliveJob?.cancel(); syncJob?.cancel(); signalingJob?.cancel(); scope.cancel()
         
-        // Issue #750: Synchronous unregistration of network callback to prevent native leak.
-        // We use a Handler on the main looper to ensure deterministic release before thread death.
-        val latch = java.util.concurrent.CountDownLatch(1)
-        Handler(Looper.getMainLooper()).post {
-            try {
-                connectivityManager.unregisterNetworkCallback(networkCallback)
-                Timber.d("ConnectivitySuite: Synchronous unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "ConnectivitySuite: Unregistration failed")
-            } finally {
-                latch.countDown()
-            }
-        }
-        
-        try {
-            latch.await(1000, java.util.concurrent.TimeUnit.MILLISECONDS)
-        } catch (e: InterruptedException) {
-            Timber.e("ConnectivitySuite unregistration latch interrupted")
-        }
+        // R750: Use ManagedNetworkCallback for deterministic unregistration
+        networkCallback.unregister(connectivityManager)
 
         signalingProvider.disconnect() 
     }

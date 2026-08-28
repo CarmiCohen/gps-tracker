@@ -64,15 +64,13 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Aug.28.02:
+ * - Issue #750 Hardening: Refactored sharedInternetStatusFlow to use 
+ *   ManagedNetworkCallback for deterministic unregistration (R750).
  * Aug.28.01:
  * - Issue #750 Hardening: Hardened Internet callback unregistration in awaitClose 
  *   to use the Main Looper. This ensures deterministic native handle disposal 
  *   on Samsung A15 even if the application scope is terminated (R750).
- * Aug.28.00:
- * - Issue #749 Hardening: Hardened all hardware callbackFlows in SystemStatusProvider 
- *   to follow SOT 1.8. Implemented deterministic unregistration for Internet, 
- *   Battery, and Power flows to resolve persistent BaseEventQueue leaks on 
- *   Samsung A15 (R749).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -272,12 +270,10 @@ class SystemStatusProviderImpl @Inject constructor(
     }
 
     /**
-     * Issue #750 Hardening: Synchronous unregistration on Main Looper.
-     * Hardened awaitClose to ensure ConnectivityManager callback is released 
-     * deterministically on budget hardware (Samsung A15).
+     * Issue #750 Hardening: Refactored to use ManagedNetworkCallback for deterministic unregistration.
      */
     private val sharedInternetStatusFlow = callbackFlow<Boolean> {
-        val callback = object : ConnectivityManager.NetworkCallback() {
+        val callback = object : ManagedNetworkCallback() {
             override fun onAvailable(network: Network) { trySend(true) }
             override fun onLost(network: Network) { trySend(false) }
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
@@ -293,19 +289,8 @@ class SystemStatusProviderImpl @Inject constructor(
             trySend(false)
         }
         awaitClose { 
-            // Issue #750: Unregister on main looper to satisfy native disposal
-            val latch = java.util.concurrent.CountDownLatch(1)
-            Handler(Looper.getMainLooper()).post {
-                try {
-                    connectivityManager.unregisterNetworkCallback(callback)
-                    Timber.d("SystemStatusProvider: Internet callback unregistered.")
-                } catch(e: Exception) {
-                    Timber.e(e, "Error unregistering internet callback")
-                } finally {
-                    latch.countDown()
-                }
-            }
-            try { latch.await(1000, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (e: Exception) {}
+            // Issue #750: Deterministic unregistration using abstraction
+            callback.unregister(connectivityManager)
         }
     }.distinctUntilChanged()
      .conflate()

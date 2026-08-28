@@ -30,6 +30,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.3 Identity Sanitization (R976)**: Identity sanitization state must be persistent. The warning overlay dismissal must be written to the DataStore to prevent redundant notifications across cold starts (Issue #737).
 
 ## 4. History of Changes (Recent)
+*   **Aug.28.02**: Resolved Concern #750 (Native Connectivity Leak). Implemented Managed Hardware Abstractions (ManagedNetworkCallback, ManagedLocationCallback) to unify deterministic disposal logic and eliminate persistent BaseEventQueue warnings (R750).
 *   **Aug.28.01**: Resolved Concern #750 (Native Connectivity Leak). Hardened NetworkCallback unregistration in ConnectivitySuite and SystemStatusProvider to ensure synchronous disposal on the Main Looper (R750).
 *   **Aug.28.00**: Resolved Concern #749 (Persistent BaseEventQueue Leak). Hardened all callbackFlows in SystemStatusProvider (Internet, Battery, Power) to follow SOT 1.8 with deterministic unregistration in awaitClose (R749).
 *   **Aug.27.05**: Resolved Concern #748 (CallbackFlow BaseEventQueue Leak). Hardened hardwareObservationFlow in GpsManager to synchronously await unregistration in awaitClose (R748).
