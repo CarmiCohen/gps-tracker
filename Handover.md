@@ -1,22 +1,23 @@
-# Handover (Aug.27.04) - Hardware Lifecycle Hardening
+# Handover (Aug.27.05) - Hardware Lifecycle Hardening (Final)
 
 ## 🎯 Current Status
 - **Goal**: Deterministic disposal of native hardware resources.
-- **Status**: 🟢 **RESOLVED** (Concern #747: Persistent BaseEventQueue Leak).
-- **Version**: `Aug.27.04`
+- **Status**: 🟢 **RESOLVED** (Concern #748: CallbackFlow BaseEventQueue Leak).
+- **Version**: `Aug.27.05`
 - **Database**: v73
-- **Audit Baseline**: SOT: 21, Resolved: 747, Open: 46, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 206, QA Status: 197.
+- **Audit Baseline**: SOT: 164, Resolved: 748, Open: 46, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 208, QA Status: 197.
 
-## 🧬 Implementation Summary: Aug.27.04
-- **Concern #747 Remediation**: **FusedLocation Task Hardening**.
-    - Identified that `BaseEventQueue.dispose` warnings persisted because `fusedLocationClient.removeLocationUpdates()` is asynchronous.
-    - **Synchronous Await**: Hardened `GpsManager.stop()` to use `Tasks.await()` for all location unregistration tasks.
-    - **Thread Safety**: Combined with the `CountDownLatch` pattern for `GnssStatus`, this ensures all native event queues are disposed of before the `HandlerThread` is quit and joined.
-- **Architectural Update**: SOT Requirement 1.8 updated to mandate synchronous Task awaiting (`Tasks.await`) for all Google Play Services hardware unregistrations.
-- **Integrity**: Verified successful build `app:assembleDebug` and version bump to `Aug.27.04`.
+## 🧬 Implementation Summary: Aug.27.05
+- **Concern #748 Remediation**: **CallbackFlow Hardening**.
+    - Identified that `hardwareObservationFlow` in `GpsManager.kt` was the primary source of the persistent `BaseEventQueue` warnings on A15 hardware.
+    - **Synchronous awaitClose**: Updated `awaitClose { ... }` to use `Tasks.await()` for `removeLocationUpdates(fusedCallback)`.
+    - **Interval Swap Protection**: Added synchronous removal to `flatMapLatest` within the flow to prevent overlapping native queues during polling interval changes.
+    - **Revival Hardening**: Updated `restartLocationUpdates` to await the removal of the previous `revivalCallback`.
+- **Architectural Update**: SOT Requirement 1.8 updated to mandate synchronous unregistration in all `callbackFlow` implementations.
+- **Integrity**: Verified successful build `app:assembleDebug` and version bump to `Aug.27.05`.
 
 ## 🚀 Next Steps
-- **Regression Verification**: Deploy `Aug.27.04` to A15 hardware. Perform multiple role-swaps (Tracker -> Viewer) and confirm total elimination of `BaseEventQueue` warnings in Logcat.
-- **Managed Utility**: Implement `ManagedHardwareThread` and `ManagedHardwareTask` utilities from `Simplify_Ideas2.md` to reduce lifecycle boilerplate.
+- **Final Regression**: Deploy `Aug.27.05` and verify that role-swaps (Tracker -> Viewer) are now 100% silent in Logcat regarding `BaseEventQueue` disposal.
+- **Abstraction**: Implement `ManagedLocationProvider` from `Simplify_Ideas2.md` to wrap Play Services Tasks.
 
-vAug.27.04
+vAug.27.05

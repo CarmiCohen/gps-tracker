@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.27.04)
+# Project Issues & Hardening Tracking (Aug.27.05)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Progress | 46 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 747 |
+| **Resolved (Total)** | 🟢 Progress | 748 |
 
 ---
 
@@ -21,9 +21,9 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.27.04)
-*   **Concern #747: Persistent BaseEventQueue Leak (GpsManager Task Race)**. Deployment regression confirmed that `BaseEventQueue.dispose` warnings persisted because `fusedLocationClient.removeLocationUpdates()` returns an asynchronous Task. Hardened `GpsManager.stop()` to synchronously await these tasks using `Tasks.await()`, ensuring native disposal finishes before the hardware thread is terminated (R747).
-*   **Concern #746: Multi-Source BaseEventQueue Leak**. (Aug.27.03) Standardized the "Unregister-on-Thread" pattern and implemented synchronous latching in `stop()` to guarantee native disposal before thread termination (R746).
+## 🟢 Recently Resolved Issues (Aug.27.05)
+*   **Concern #748: CallbackFlow BaseEventQueue Leak (GpsManager)**. Identified that `hardwareObservationFlow` in `GpsManager.kt` was performing asynchronous unregistration in its `awaitClose` block. Hardened the flow to synchronously await the `removeLocationUpdates` task, ensuring native disposal completes before the callback object is reclaimed (R748).
+*   **Concern #747: Persistent BaseEventQueue Leak (GpsManager Task Race)**. (Aug.27.04) Hardened `GpsManager.stop()` to synchronously await unregistration tasks using `Tasks.await()`, ensuring native disposal finishes before the hardware thread is terminated (R747).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.27.04)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.27.05)

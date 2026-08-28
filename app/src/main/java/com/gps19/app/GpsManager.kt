@@ -24,6 +24,10 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.27.05:
+ * - Issue #748 Hardening: Hardened hardwareObservationFlow to use synchronous 
+ *   Task awaiting in awaitClose. This prevents BaseEventQueue leaks when 
+ *   subscribers are lost during role-swaps (R748).
  * Aug.27.03:
  * - Issue #747 Hardening: Implemented synchronous Task awaiting for 
  *   removeLocationUpdates in stop() to ensure FusedLocationProvider's 
@@ -255,8 +259,12 @@ class GpsManager @Inject constructor(
                 
                 revivalCallback?.let { 
                     try {
-                        fusedLocationClient.removeLocationUpdates(it)
-                    } catch (e: Exception) {}
+                        // Issue #748: Ensure previous revival unregistration is complete
+                        val task = fusedLocationClient.removeLocationUpdates(it)
+                        Tasks.await(task, 1000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Revival removal await failed")
+                    }
                 }
                 
                 val callback = object : LocationCallback() {
@@ -331,8 +339,14 @@ class GpsManager @Inject constructor(
             }
             
             synchronized(lifecycleLock) {
-                activeLocationCallback?.let { 
-                    try { fusedLocationClient.removeLocationUpdates(it) } catch (e: Exception) {}
+                activeLocationCallback?.let { old ->
+                    try { 
+                        // Issue #748: Ensure previous callback is removed synchronously during interval swaps
+                        val task = fusedLocationClient.removeLocationUpdates(old)
+                        Tasks.await(task, 1000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Active removal await failed during flatMapLatest")
+                    }
                 }
                 activeLocationCallback = fusedCallback
             }
@@ -356,8 +370,12 @@ class GpsManager @Inject constructor(
                     }
                 }
                 try { 
-                    fusedLocationClient.removeLocationUpdates(fusedCallback)
-                } catch (e: Exception) {} 
+                    // Issue #748: Synchronous unregistration in awaitClose
+                    val task = fusedLocationClient.removeLocationUpdates(fusedCallback)
+                    Tasks.await(task, 1000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                } catch (e: Exception) {
+                    Timber.e(e, "awaitClose: removeLocationUpdates await failed")
+                }
             }
         }
     }.shareIn(scope = externalScope, started = SharingStarted.WhileSubscribed(5000), replay = 1)
