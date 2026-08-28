@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.28.05)
+# Project Issues & Hardening Tracking (Aug.28.06)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Progress | 43 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 754 |
+| **Resolved (Total)** | 🟢 Progress | 755 |
 
 ---
 
@@ -21,10 +21,11 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.28.05)
-*   **Concern #754: Managed Sensor Abstraction (Leak Suppression)**. Introduced `ManagedSensorListener` and `ManagedDisplayListener` in `ManagedHardware.kt` to standardize synchronous hardware unregistration. Refactored `AppSensorManager` to use these abstractions, replacing manual `CountDownLatch` logic and ensuring deterministic native resource cleanup (R754).
-*   **Concern #753: Broadcast Hardware Abstraction (Leak Suppression)**. Implemented `ManagedBroadcastReceiver` to standardize and harden unregistration of system receivers. Refactored `SystemStatusProvider` and `CommandRouter` to use this abstraction, ensuring deterministic native resource cleanup and silencing persistent `BaseEventQueue` warnings (R753).
-*   **Concern #752: Persistent BaseEventQueue Leak (Post-Abstraction)**. Resolved the persistent native leak warning by remediating a deadlock in `ManagedHardware.unregister`. The utility now detects if it's already on the Main Looper and executes immediately (R752).
+## 🟢 Recently Resolved Issues (Aug.28.06)
+*   **Concern #755: GNSS & Network Unregistration Hardening**. Standardized GNSS unregistration by implementing `ManagedGnssStatusCallback` in `ManagedHardware.kt` and refactoring `GpsManager.kt`. Increased unregistration timeouts to 2000ms to tolerate high Main Looper congestion during teardown, effectively silencing `BaseEventQueue` disposal warnings (R755).
+*   **Concern #754: Managed Sensor Abstraction (Leak Suppression)**. Introduced `ManagedSensorListener` and `ManagedDisplayListener` in `ManagedHardware.kt` to standardize synchronous hardware unregistration. Refactored `AppSensorManager` to use these abstractions (R754).
+*   **Concern #753: Broadcast Hardware Abstraction (Leak Suppression)**. Implemented `ManagedBroadcastReceiver` and refactored `SystemStatusProvider` and `CommandRouter` to ensure deterministic cleanup (R753).
+*   **Concern #752: Persistent BaseEventQueue Leak (Post-Abstraction)**. Resolved unregister deadlocks in `ManagedHardware.unregister` (R752).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.28.05)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.28.06)

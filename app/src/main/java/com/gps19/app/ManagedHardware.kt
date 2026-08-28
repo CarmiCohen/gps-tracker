@@ -7,6 +7,8 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.hardware.display.DisplayManager
+import android.location.GnssStatus
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.os.Handler
 import android.os.Looper
@@ -20,6 +22,9 @@ import java.util.concurrent.TimeUnit
 /**
  * ManagedNetworkCallback: Encapsulates safe, synchronous unregistration of 
  * ConnectivityManager.NetworkCallback to prevent native BaseEventQueue leaks (R750).
+ * Aug.28.06:
+ * - Issue #755 Hardening: Increased timeout to 2000ms to allow for higher 
+ *   Main Looper congestion during teardown.
  * Aug.28.03:
  * - Issue #752 Hardening: Prevented unregister deadlock by checking if the 
  *   caller is already on the Main Looper (R752).
@@ -48,7 +53,7 @@ abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
             }
         }
         try {
-            if (!latch.await(1000, TimeUnit.MILLISECONDS)) {
+            if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
                 Timber.w("ManagedNetworkCallback: Unregistration timed out")
             }
         } catch (e: InterruptedException) {
@@ -61,21 +66,63 @@ abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
 /**
  * ManagedLocationCallback: Encapsulates safe, synchronous unregistration of
  * FusedLocationProvider location updates to prevent native leaks (R747/R748).
- * Aug.28.03:
- * - Issue #752 Hardening: Hardened unregistration to avoid blocking the Main 
- *   Thread if the task is already being handled on it (R752).
  */
 abstract class ManagedLocationCallback : LocationCallback() {
     fun unregister(client: FusedLocationProviderClient) {
         try {
             val task = client.removeLocationUpdates(this)
-            // If we are on Main Thread, we should avoid blocking if possible, 
-            // but Tasks.await is generally safe if the task doesn't depend on Main Looper.
-            // Google Play Services tasks usually complete on their own internal threads.
-            Tasks.await(task, 1000, TimeUnit.MILLISECONDS)
+            Tasks.await(task, 2000, TimeUnit.MILLISECONDS)
             Timber.d("ManagedLocationCallback: Unregistration complete.")
         } catch (e: Exception) {
             Timber.e(e, "ManagedLocationCallback: Unregistration failed or timed out")
+        }
+    }
+}
+
+/**
+ * ManagedGnssStatusCallback: Encapsulates safe, synchronous unregistration of
+ * GnssStatus.Callback to prevent native BaseEventQueue leaks (R755).
+ */
+abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
+    fun unregister(lm: LocationManager, handler: Handler?) {
+        if (handler == null) {
+            try {
+                lm.unregisterGnssStatusCallback(this)
+                Timber.d("ManagedGnssStatusCallback: Unregistration complete (no handler).")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedGnssStatusCallback: Unregistration failed (no handler)")
+            }
+            return
+        }
+
+        if (Looper.myLooper() == handler.looper) {
+            try {
+                lm.unregisterGnssStatusCallback(this)
+                Timber.d("ManagedGnssStatusCallback: Immediate unregistration complete.")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedGnssStatusCallback: Immediate unregistration failed")
+            }
+            return
+        }
+
+        val latch = CountDownLatch(1)
+        handler.post {
+            try {
+                lm.unregisterGnssStatusCallback(this)
+                Timber.d("ManagedGnssStatusCallback: Async unregistration complete.")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedGnssStatusCallback: Async unregistration failed")
+            } finally {
+                latch.countDown()
+            }
+        }
+        try {
+            if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
+                Timber.w("ManagedGnssStatusCallback: Unregistration timed out")
+            }
+        } catch (e: InterruptedException) {
+            Timber.e("ManagedGnssStatusCallback: Unregistration interrupted")
+            Thread.currentThread().interrupt()
         }
     }
 }
@@ -137,11 +184,10 @@ abstract class ManagedSensorListener : SensorEventListener {
             }
         }
         try {
-            if (!latch.await(1000, TimeUnit.MILLISECONDS)) {
+            if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
                 Timber.w("ManagedSensorListener: Unregistration timed out")
             }
         } catch (e: InterruptedException) {
-            Timber.e("ManagedSensorListener: Unregistration interrupted")
             Thread.currentThread().interrupt()
         }
     }
@@ -188,11 +234,10 @@ abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
             }
         }
         try {
-            if (!latch.await(1000, TimeUnit.MILLISECONDS)) {
+            if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
                 Timber.w("ManagedDisplayListener: Unregistration timed out")
             }
         } catch (e: InterruptedException) {
-            Timber.e("ManagedDisplayListener: Unregistration interrupted")
             Thread.currentThread().interrupt()
         }
     }

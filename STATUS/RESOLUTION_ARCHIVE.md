@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.28.06 (vAug.28.06)
+*   **Concern #755 Resolved**: **GNSS & Network Unregistration Hardening**. Standardized GNSS unregistration by implementing `ManagedGnssStatusCallback` in `ManagedHardware.kt` and refactoring `GpsManager.kt`. Increased unregistration timeouts to 2000ms for all managed hardware listeners to tolerate high Main Looper congestion during teardown, effectively silencing native `BaseEventQueue` disposal warnings and resolving unregistration timeouts (R755).
+
 ## 🟢 Aug.28.05 (vAug.28.05)
 *   **Concern #754 Resolved**: **Managed Sensor Abstraction (Leak Suppression)**. Standardized hardware listener management in `AppSensorManager` by introducing `ManagedSensorListener` and `ManagedDisplayListener` abstractions in `ManagedHardware.kt`. This eliminates manual, redundant `CountDownLatch` logic and ensures that native event queues are synchronously and deterministically disposed on the hardware thread before termination, silencing persistent `BaseEventQueue` disposal warnings (R754).
 

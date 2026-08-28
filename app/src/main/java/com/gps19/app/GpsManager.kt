@@ -24,13 +24,13 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.28.06:
+ * - Issue #755 Hardening: Refactored gnssStatusCallback to use ManagedGnssStatusCallback 
+ *   for deterministic unregistration. This eliminates raw BaseEventQueue leaks 
+ *   associated with unmanaged GNSS listeners (R755).
  * Aug.28.02:
  * - Issue #750 Hardening: Refactored to use ManagedLocationCallback for 
  *   unified, deterministic lifecycle disposal of FusedLocation updates (R750).
- * Aug.27.05:
- * - Issue #748 Hardening: Hardened hardwareObservationFlow to use synchronous 
- *   Task awaiting in awaitClose. This prevents BaseEventQueue leaks when 
- *   subscribers are lost during role-swaps (R748).
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -101,7 +101,8 @@ class GpsManager @Inject constructor(
         data class GnssUpdate(val detail: GnssDetail) : GpsUpdate()
     }
 
-    private val gnssStatusCallback = object : GnssStatus.Callback() {
+    // R755: Use ManagedGnssStatusCallback for deterministic disposal
+    private val gnssStatusCallback = object : ManagedGnssStatusCallback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
             val nowRt = timeProvider.elapsedRealtime()
             if (lastGnssStatusRt > 0) {
@@ -170,24 +171,8 @@ class GpsManager @Inject constructor(
         synchronized(lifecycleLock) {
             if (!isStarted.getAndSet(false)) return
             
-            val handler = gpsHandler
-            if (handler != null) {
-                val latch = java.util.concurrent.CountDownLatch(1)
-                handler.post {
-                    try {
-                        locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
-                    } catch (e: Exception) {
-                        Timber.e(e, "Error unregistering GNSS callback on thread")
-                    } finally {
-                        latch.countDown()
-                    }
-                }
-                try {
-                    latch.await(1000, java.util.concurrent.TimeUnit.MILLISECONDS)
-                } catch (e: InterruptedException) {
-                    Timber.e("GPS unregistration latch interrupted")
-                }
-            }
+            // R755: Use ManagedGnssStatusCallback abstraction for synchronous, hardened unregistration
+            gnssStatusCallback.unregister(locationManager, gpsHandler)
 
             // R750: Use ManagedLocationCallback for deterministic unregistration
             activeLocationCallback?.unregister(fusedLocationClient)
