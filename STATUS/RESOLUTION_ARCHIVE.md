@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.28.05 (vAug.28.05)
+*   **Concern #754 Resolved**: **Managed Sensor Abstraction (Leak Suppression)**. Standardized hardware listener management in `AppSensorManager` by introducing `ManagedSensorListener` and `ManagedDisplayListener` abstractions in `ManagedHardware.kt`. This eliminates manual, redundant `CountDownLatch` logic and ensures that native event queues are synchronously and deterministically disposed on the hardware thread before termination, silencing persistent `BaseEventQueue` disposal warnings (R754).
+
 ## 🟢 Aug.28.04 (vAug.28.04)
 *   **Concern #753 Resolved**: **Broadcast Hardware Abstraction (Leak Suppression)**. Soak testing revealed that while connectivity deadlocks were resolved, `BaseEventQueue.dispose` warnings persisted during shutdown. Identified that anonymous `BroadcastReceiver` instances for Battery and Power monitoring were the primary culprits. Implemented `ManagedBroadcastReceiver` to standardize and harden safe unregistration. Refactored `SystemStatusProvider` and `CommandRouter` to use this abstraction, ensuring deterministic native resource cleanup and complete silencing of hardware-linked disposal warnings (R753).
 
@@ -13,9 +16,6 @@ This document archives all resolved issues and architectural refinements.
 
 ## 🟢 Aug.28.01 (vAug.28.01)
 *   **Concern #750 Resolved**: **Native Connectivity Leak**. Deployment regression testing confirmed that `BaseEventQueue` disposal warnings persisted due to `NetworkCallback` objects in `ConnectivitySuite` and `SystemStatusProvider` being garbage collected without deterministic unregistration. Hardened both components to perform synchronous unregistration on the Main Looper during shutdown/awaitClose, ensuring native disposal completes before the object lifecycle ends (R750).
-
-## 🟢 Aug.28.00 (vAug.28.00)
-*   **Concern #749 Resolved**: **Persistent BaseEventQueue Leak (SystemStatusProvider)**. Deployment testing of Aug.27.05 revealed that `BaseEventQueue` disposal warnings persisted after `TrackerService` termination. Identified that `SystemStatusProviderImpl` was running multiple hardware-bound `callbackFlow` implementations (Internet, Battery, Power) in the application scope without deterministic unregistration. Since these flows were shared in the external scope, they often orphaned native `ConnectivityManager` callbacks and `BroadcastReceivers` during UI detachment or service swaps. Hardened all flows to follow SOT 1.8, ensuring explicit unregistration in `awaitClose` and logging confirmation on A15 hardware (R749).
 
 ---
 *For historical entries, see legacy logs.*

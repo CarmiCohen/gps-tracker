@@ -35,13 +35,13 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * Aug.28.05:
+ * - Issue #754 Hardening: Refactored to use ManagedSensorListener and ManagedDisplayListener
+ *   abstractions. This standardizes synchronous unregistration and silences native 
+ *   BaseEventQueue disposal warnings (R754).
  * Aug.27.02:
  * - Issue #746 Hardening: Refined stop() to explicitly unregister StepDetector 
- *   and ensure async registration jobs are finalized before thread disposal, 
- *   resolving persistent BaseEventQueue leaks (R746).
- * - Issue #745 Hardening: Hardened lifecycle stop() to prevent BaseEventQueue leaks. 
- *   Ensured unregistration is queued on the sensor thread before quitting, and 
- *   added join() to acoustic monitoring shutdown (R745).
+ *   and ensure async registration jobs are finalized before thread disposal.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -50,7 +50,7 @@ class AppSensorManager @Inject constructor(
     private val timeProvider: TimeProvider,
     private val systemMonitor: SystemMonitor,
     private val systemStatusProvider: SystemStatusProvider
-) : SensorEventListener {
+) : ManagedSensorListener() {
 
     private val _sensorEvents = MutableSharedFlow<AppSensorEvent>(
         extraBufferCapacity = 8,
@@ -93,9 +93,7 @@ class AppSensorManager @Inject constructor(
         return lastDisplayState == Display.STATE_ON
     }
 
-    private val displayListener = object : DisplayManager.DisplayListener {
-        override fun onDisplayAdded(displayId: Int) {}
-        override fun onDisplayRemoved(displayId: Int) {}
+    private val displayListener = object : ManagedDisplayListener() {
         override fun onDisplayChanged(displayId: Int) {
             if (displayId != Display.DEFAULT_DISPLAY) return
             val display = displayManager.getDisplay(displayId) ?: return
@@ -272,38 +270,17 @@ class AppSensorManager @Inject constructor(
         synchronized(lifecycleLock) {
             if (!isStarted.getAndSet(false)) return
             
-            // Issue #746: Immediate cancellation of all async jobs
+            // Immediate cancellation of all async jobs
             recoveryJob?.cancel(); recoveryJob = null
             registrationJob?.cancel(); registrationJob = null
             proximityJob?.cancel(); proximityJob = null
             
             stopAcousticMonitoring()
             
-            // Issue #745/746: Deterministic cleanup on the hardware thread.
-            // We unregister explicitly before thread termination to prevent BaseEventQueue leaks.
+            // Refactored to use ManagedHardware abstractions (Aug.28.05)
             val handler = sensorHandler
-            if (handler != null) {
-                val latch = java.util.concurrent.CountDownLatch(1)
-                handler.post {
-                    try {
-                        sensorManager.unregisterListener(this)
-                        displayManager.unregisterDisplayListener(displayListener)
-                        // Explicitly clear detector in case of race during async registration
-                        stepDetector?.let { sensorManager.unregisterListener(this, it) }
-                    } catch (e: Exception) {
-                        Timber.e(e, "Error during sensor unregistration on thread")
-                    } finally {
-                        latch.countDown()
-                    }
-                }
-                
-                // Wait for unregistration to complete on the looper before quitting.
-                try {
-                    latch.await(1000, java.util.concurrent.TimeUnit.MILLISECONDS)
-                } catch (e: InterruptedException) {
-                    Timber.e("Unregistration latch interrupted")
-                }
-            }
+            this.unregister(sensorManager, handler)
+            displayListener.unregister(displayManager, handler)
 
             sensorThread?.quitSafely()
             try {

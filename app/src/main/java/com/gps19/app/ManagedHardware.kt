@@ -2,6 +2,11 @@ package com.gps19.app
 
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.hardware.display.DisplayManager
 import android.net.ConnectivityManager
 import android.os.Handler
 import android.os.Looper
@@ -88,6 +93,107 @@ abstract class ManagedBroadcastReceiver : BroadcastReceiver() {
             Timber.w("ManagedBroadcastReceiver: Receiver already unregistered or not registered.")
         } catch (e: Exception) {
             Timber.e(e, "ManagedBroadcastReceiver: Unregistration failed.")
+        }
+    }
+}
+
+/**
+ * ManagedSensorListener: Encapsulates safe, synchronous unregistration of
+ * SensorManager listeners to prevent native BaseEventQueue leaks (R745/R746).
+ */
+abstract class ManagedSensorListener : SensorEventListener {
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    fun unregister(sm: SensorManager, handler: Handler?) {
+        if (handler == null) {
+            try {
+                sm.unregisterListener(this)
+                Timber.d("ManagedSensorListener: Unregistration complete (no handler).")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedSensorListener: Unregistration failed (no handler)")
+            }
+            return
+        }
+
+        if (Looper.myLooper() == handler.looper) {
+            try {
+                sm.unregisterListener(this)
+                Timber.d("ManagedSensorListener: Immediate unregistration complete.")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedSensorListener: Immediate unregistration failed")
+            }
+            return
+        }
+
+        val latch = CountDownLatch(1)
+        handler.post {
+            try {
+                sm.unregisterListener(this)
+                Timber.d("ManagedSensorListener: Async unregistration complete.")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedSensorListener: Async unregistration failed")
+            } finally {
+                latch.countDown()
+            }
+        }
+        try {
+            if (!latch.await(1000, TimeUnit.MILLISECONDS)) {
+                Timber.w("ManagedSensorListener: Unregistration timed out")
+            }
+        } catch (e: InterruptedException) {
+            Timber.e("ManagedSensorListener: Unregistration interrupted")
+            Thread.currentThread().interrupt()
+        }
+    }
+}
+
+/**
+ * ManagedDisplayListener: Encapsulates safe, synchronous unregistration of
+ * DisplayManager.DisplayListener to prevent resource leaks.
+ */
+abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
+    override fun onDisplayAdded(displayId: Int) {}
+    override fun onDisplayRemoved(displayId: Int) {}
+
+    fun unregister(dm: DisplayManager, handler: Handler?) {
+        if (handler == null) {
+            try {
+                dm.unregisterDisplayListener(this)
+                Timber.d("ManagedDisplayListener: Unregistration complete (no handler).")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedDisplayListener: Unregistration failed (no handler)")
+            }
+            return
+        }
+
+        if (Looper.myLooper() == handler.looper) {
+            try {
+                dm.unregisterDisplayListener(this)
+                Timber.d("ManagedDisplayListener: Immediate unregistration complete.")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedDisplayListener: Immediate unregistration failed")
+            }
+            return
+        }
+
+        val latch = CountDownLatch(1)
+        handler.post {
+            try {
+                dm.unregisterDisplayListener(this)
+                Timber.d("ManagedDisplayListener: Async unregistration complete.")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedDisplayListener: Async unregistration failed")
+            } finally {
+                latch.countDown()
+            }
+        }
+        try {
+            if (!latch.await(1000, TimeUnit.MILLISECONDS)) {
+                Timber.w("ManagedDisplayListener: Unregistration timed out")
+            }
+        } catch (e: InterruptedException) {
+            Timber.e("ManagedDisplayListener: Unregistration interrupted")
+            Thread.currentThread().interrupt()
         }
     }
 }
