@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.28.02)
+# Project Issues & Hardening Tracking (Aug.28.03)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Progress | 45 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 751 |
+| **Resolved (Total)** | 🟢 Progress | 752 |
 
 ---
 
@@ -21,8 +21,8 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.28.02)
-*   **Concern #750: Native Connectivity Leak (Managed Abstraction)**. Resolved the persistent `BaseEventQueue` disposal warning by implementing `ManagedNetworkCallback` and `ManagedLocationCallback` abstractions. These utilities encapsulate synchronous unregistration (Main Looper + CountDownLatch) to ensure deterministic native handle disposal across all hardware-bound components, resolving the leak root-cause on Samsung A15 (R750).
+## 🟢 Recently Resolved Issues (Aug.28.03)
+*   **Concern #752: Persistent BaseEventQueue Leak (Post-Abstraction)**. Resolved the persistent native leak warning by remediating a deadlock in `ManagedHardware.unregister`. The utility now detects if it's already on the Main Looper and executes immediately, preventing the `CountDownLatch` from self-blocking during service destruction (R752).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.28.02)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.28.03)

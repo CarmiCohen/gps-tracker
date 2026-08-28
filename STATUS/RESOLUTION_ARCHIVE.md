@@ -2,6 +2,9 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.28.03 (vAug.28.03)
+*   **Concern #752 Resolved**: **Persistent BaseEventQueue Leak (Deadlock Remediation)**. Soak testing of Aug.28.02 revealed that `BaseEventQueue` disposal warnings persisted due to a deadlock in the `ManagedNetworkCallback` unregistration utility. The utility was self-blocking when called from the Main Looper (during `Service.onDestroy`) because it attempted to post a synchronous task to the same looper. Hardened the abstraction to detect the calling thread and execute unregistration immediately if already on the Main Looper, ensuring deterministic native disposal (R752).
+
 ## 🟢 Aug.28.02 (vAug.28.02)
 *   **Concern #751 Resolved**: **Managed Hardware Abstraction**. Resolved persistent native leaks (`BaseEventQueue` disposal failures) by implementing `ManagedNetworkCallback` and `ManagedLocationCallback`. These abstractions encapsulate the synchronous unregistration logic (Main Looper + CountDownLatch / Tasks.await) required for deterministic disposal on Samsung A15 hardware. All hardware-bound components (GpsManager, ConnectivitySuite, SystemStatusProvider) now utilize these unified utilities (R750).
 
