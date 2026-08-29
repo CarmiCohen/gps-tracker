@@ -6,10 +6,10 @@ import javax.inject.Singleton
 
 /**
  * UiStateAggregator: Orchestrates the transformation of raw domain states into UI-ready models.
+ * Aug.29.10:
+ * - Concern #765: Added isUltra support to Dashboard and HUD aggregation methods.
  * Aug.21.09:
- * - Issue #248 Performance Optimization: Refined HUD aggregation signatures to 
- *   accept granular parameters, enabling flow-level pruning and eliminating 
- *   Davey stalls on budget hardware (R248).
+ * - Issue #248 Performance Optimization: Refined HUD aggregation signatures.
  */
 interface UiStateAggregator {
     fun aggregateDashboardConnectivity(
@@ -22,7 +22,8 @@ interface UiStateAggregator {
         appMode: String?,
         kin: KinematicState,
         pulse: Long,
-        trkState: TrackerState
+        trkState: TrackerState,
+        isUltra: Boolean
     ): DashboardTelemetryState
 
     fun aggregateDashboardHealth(
@@ -47,7 +48,8 @@ interface UiStateAggregator {
         appMode: String?,
         kin: KinematicState,
         pulse: Long,
-        trkState: TrackerState
+        trkState: TrackerState,
+        isUltra: Boolean
     ): HudTelemetryState
 
     fun aggregateHudHealth(
@@ -73,9 +75,10 @@ class UiStateAggregatorImpl @Inject constructor(
         appMode: String?,
         kin: KinematicState,
         pulse: Long,
-        trkState: TrackerState
+        trkState: TrackerState,
+        isUltra: Boolean
     ): DashboardTelemetryState {
-        return dashboardStateProvider.buildDashboardTelemetryState(appMode, kin, pulse, trkState)
+        return dashboardStateProvider.buildDashboardTelemetryState(appMode, kin, pulse, trkState, isUltra)
     }
 
     override fun aggregateDashboardHealth(
@@ -104,9 +107,10 @@ class UiStateAggregatorImpl @Inject constructor(
         appMode: String?,
         kin: KinematicState,
         pulse: Long,
-        trkState: TrackerState
+        trkState: TrackerState,
+        isUltra: Boolean
     ): HudTelemetryState {
-        return dashboardStateProvider.buildHudTelemetryState(appMode, kin, pulse, trkState)
+        return dashboardStateProvider.buildHudTelemetryState(appMode, kin, pulse, trkState, isUltra)
     }
 
     override fun aggregateHudHealth(

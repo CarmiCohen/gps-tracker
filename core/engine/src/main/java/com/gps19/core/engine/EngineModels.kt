@@ -4,13 +4,11 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Aug.29.10:
+ * - Concern #765: Added isUltraLongStationary to EngineConnectionPoint for 
+ *   remote status transparency.
  * Aug.22.04:
- * - Issue #308/Build Fix: Converted SpatialAnchor to an interface and added 
- *   missing ts/rt properties to resolve inheritance failure in TrackerStatus (R308).
- * Aug.22.02:
- * - Issue #308 Hardening: Restored full AlarmEvaluationState, ProcessedLocation, 
- *   SpatialAnchor, and RejectedPoint definitions to resolve build blockers and 
- *   unit test compilation failures.
+ * - Issue #308/Build Fix: Converted SpatialAnchor to an interface.
  */
 
 @Serializable
@@ -110,7 +108,8 @@ class EngineConnectionPoint(
     var maxIoLatency: Long = 0L,
     var isSilentFailure: Boolean = false,
     var isBatteryLow: Boolean = false,
-    var isBatteryCritical: Boolean = false
+    var isBatteryCritical: Boolean = false,
+    var isUltraLongStationary: Boolean = false
 ) {
     fun copyFrom(other: EngineConnectionPoint) {
         this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt; this.remoteSig = other.remoteSig
@@ -129,6 +128,7 @@ class EngineConnectionPoint(
         this.kineticEnergy = other.kineticEnergy; this.gpsHardwareLock = other.gpsHardwareLock
         this.cpuLoad = other.cpuLoad; this.ioWait = other.ioWait; this.maxIoLatency = other.maxIoLatency
         this.isSilentFailure = other.isSilentFailure; this.isBatteryLow = other.isBatteryLow; this.isBatteryCritical = other.isBatteryCritical
+        this.isUltraLongStationary = other.isUltraLongStationary
     }
 }
 
@@ -444,7 +444,8 @@ data class HudTelemetryState(
     val isTrackerLocPending: Boolean = false,
     val trackerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isViewerLocPending: Boolean = false,
-    val viewerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE
+    val viewerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    val isUltraLongStationary: Boolean = false
 )
 
 @Serializable
@@ -505,6 +506,7 @@ data class HudState(
     val trackerLocPendingReason get() = telemetry.trackerLocPendingReason
     val isViewerLocPending get() = telemetry.isViewerLocPending
     val viewerLocPendingReason get() = telemetry.viewerLocPendingReason
+    val isUltraLongStationary get() = telemetry.isUltraLongStationary
 
     val battery get() = health.battery
     val remoteBattery get() = health.remoteBattery

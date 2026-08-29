@@ -18,12 +18,11 @@ import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
+ * Aug.29.10:
+ * - Concern #765: Added isUltra support to pulse messages for GNSS relaxation transparency.
  * JAug.04.111:
  * - Issue #721: Performance Hardening. Refactored to use GpsApplication.PACKAGE_NAME 
- *   shadow-cache to eliminate repetitive getPackageName() calls on Samsung A15.
- * July.27.13:
- * - Issue #608: Startup Notification Flicker. Added getPulseMessage() to allow 
- *   services to build rich notifications during startForeground() initialization.
+ *   shadow-cache.
  */
 @Singleton
 class AppNotificationManager @Inject constructor(
@@ -52,12 +51,10 @@ class AppNotificationManager @Inject constructor(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = context.getSystemService(NotificationManager::class.java) ?: return
             
-            // Service Channel: Always Low
             manager.createNotificationChannel(
                 NotificationChannel(channelId, "Service", NotificationManager.IMPORTANCE_LOW)
             )
             
-            // Alarm Channel: Suppressed if in Tracker Mode
             val alarmImportance = if (isTrackerMode) NotificationManager.IMPORTANCE_LOW else NotificationManager.IMPORTANCE_HIGH
             val alarmChannel = NotificationChannel(alarmChannelId, "Alarms", alarmImportance).apply {
                 setSound(null, null) 
@@ -65,7 +62,6 @@ class AppNotificationManager @Inject constructor(
                 setShowBadge(!isTrackerMode)
             }
             manager.createNotificationChannel(alarmChannel)
-            Timber.d("Channels updated. TrackerMode: $isTrackerMode (Importance: $alarmImportance)")
         }
     }
 
@@ -89,23 +85,24 @@ class AppNotificationManager @Inject constructor(
             .build()
     }
 
-    fun getPulseMessage(sats: Int, battery: Int, isSecure: Boolean, isPowerSave: Boolean): String {
+    fun getPulseMessage(sats: Int, battery: Int, isSecure: Boolean, isPowerSave: Boolean, isUltra: Boolean = false): String {
         val status = if (isSecure) "SECURE" else "VIOLATION"
-        val powerSaveTag = if (isPowerSave) " [LOW POWER]" else ""
+        val powerSaveTag = when {
+            isUltra -> " [ULTRA]"
+            isPowerSave -> " [LOW POWER]"
+            else -> ""
+        }
         return String.format(Locale.getDefault(), "Status: %s | Sats: %d | Batt: %d%%%s", status, sats, battery, powerSaveTag)
     }
 
-    fun updatePulse(sats: Int, battery: Int, isSecure: Boolean, isPowerSave: Boolean) {
-        val msg = getPulseMessage(sats, battery, isSecure, isPowerSave)
+    fun updatePulse(sats: Int, battery: Int, isSecure: Boolean, isPowerSave: Boolean, isUltra: Boolean = false) {
+        val msg = getPulseMessage(sats, battery, isSecure, isPowerSave, isUltra)
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(notificationId, buildForegroundNotification(msg))
     }
 
     fun updateAlarmNotification(causes: String, showPermissionAction: Boolean = false) {
-        if (isTrackerMode) {
-            Timber.d("Alarm notification suppressed: Tracker Mode")
-            return
-        }
+        if (isTrackerMode) return
 
         val intent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT

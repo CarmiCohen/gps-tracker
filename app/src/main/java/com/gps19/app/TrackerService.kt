@@ -21,6 +21,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Aug.29.09:
+ * - Issue #764 Simplification: Updated calculateGpsInterval call to pass 
+ *   HardwareCapabilities directly (R764).
  * Aug.29.03:
  * - Issue #760 Hardening: Migrated from GpsManager and AppSensorManager to 
  *   the unified HardwareProvider (R760).
@@ -426,10 +429,7 @@ class TrackerService : BaseMonitorService() {
             isScreenOn = hardwareProvider.isScreenOn(),
             isGeofenceActive = locationProcessor.getMaxDistanceAuthority() > 0.0,
             nowRt = nowRt,
-            deviceSpecialFlags = ServiceBehaviorUseCase.DeviceSpecialFlags(
-                isS21FE = capabilities.requiresAdaptationMuzzle,
-                isXiaomi = capabilities.requiresExtraTopPadding
-            )
+            capabilities = capabilities
         )
         
         if (targetGpsInterval != currentIntervalMs) {

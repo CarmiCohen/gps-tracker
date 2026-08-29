@@ -10,12 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.29.10:
+ * - Concern #765: Added isUltraLongStationary to ConnectionPoint for full state 
+ *   parity in history and UI.
  * Aug.26.10:
  * - Issue #735 Hardening: Added ToggleSetupBypass event to support developer-mode 
  *   automation for soak tests (R735).
- * Aug.25.04:
- * - Issue #312 Hardening: Refined contentEquals for LogEntry and ViolationPoint 
- *   to ensure full UI parity (coordinates, snapshots, and accuracy) (R312).
  */
 
 sealed class AppSensorEvent {
@@ -145,7 +145,8 @@ class ConnectionPoint(
     var cpuLoad: Double = 0.0,
     var ioWait: Double = 0.0,
     var maxIoLatency: Long = 0L,
-    var isSilentFailure: Boolean = false
+    var isSilentFailure: Boolean = false,
+    var isUltraLongStationary: Boolean = false
 ) {
     fun copyFrom(other: ConnectionPoint) {
         this.localId = other.localId; this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt
@@ -164,6 +165,7 @@ class ConnectionPoint(
         this.sitDz = other.sitDz; this.sitBaro = other.sitBaro; this.sitTilt = other.sitTilt
         this.sitShock = other.sitShock; this.kineticEnergy = other.kineticEnergy; this.cpuLoad = other.cpuLoad
         this.ioWait = other.ioWait; this.maxIoLatency = other.maxIoLatency; this.isSilentFailure = other.isSilentFailure
+        this.isUltraLongStationary = other.isUltraLongStationary
     }
 
     /**
@@ -175,7 +177,8 @@ class ConnectionPoint(
                isRecoveryEvent == other.isRecoveryEvent && hasGps == other.hasGps &&
                gpsIndex == other.gpsIndex && snrIdx == other.snrIdx && vibeIdx == other.vibeIdx &&
                luxIdx == other.luxIdx && noiseIdx == other.noiseIdx && liftIdx == other.liftIdx &&
-               tiltIdx == other.tiltIdx && baroIdx == other.baroIdx && isSitActive == other.isSitActive
+               tiltIdx == other.tiltIdx && baroIdx == other.baroIdx && isSitActive == other.isSitActive &&
+               isUltraLongStationary == other.isUltraLongStationary
     }
 
     fun reset() {
@@ -189,7 +192,7 @@ class ConnectionPoint(
         tiltIdx = 0.0; baroIdx = 0.0; isSitDetected = false; isSitActive = false
         sitVz = 0.0; sitVzTs = 0L; sitVzRt = 0L; sitDz = 0.0; sitBaro = 0.0; sitTilt = 0.0
         sitShock = 0.0; kineticEnergy = 0.0; cpuLoad = 0.0; ioWait = 0.0; maxIoLatency = 0L
-        isSilentFailure = false
+        isSilentFailure = false; isUltraLongStationary = false
     }
 }
 
@@ -343,7 +346,8 @@ data class TrackerStatus(
     val isTrajectoryPromoted: Boolean = false, val isSuspicious: Boolean = false,
     val tiltIdx: Double = 0.0, val baroIdx: Double = 0.0, val micPending: Boolean = false,
     val kineticEnergy: Double = 0.0, val isAdaptiveJump: Boolean = false,
-    val isBatteryLow: Boolean = false, val isBatteryCritical: Boolean = false, val isSilentFailure: Boolean = false
+    val isBatteryLow: Boolean = false, val isBatteryCritical: Boolean = false, val isSilentFailure: Boolean = false,
+    val isUltraLongStationary: Boolean = false
 ) : SpatialAnchor {
     
     fun writeTo(builder: RealtimeStatus.Builder, fromViewer: Boolean) {
@@ -435,6 +439,7 @@ data class TrackerStatus(
         put("vertical_velocity", verticalVelocity); put("kinetic_energy", kineticEnergy)
         put("is_adaptive_jump", isAdaptiveJump); put("is_battery_low", isBatteryLow)
         put("is_battery_critical", isBatteryCritical); put("is_silent_failure", isSilentFailure)
+        put("is_ultra_long_stationary", isUltraLongStationary)
     }
 
     companion object {
@@ -519,7 +524,8 @@ data class DashboardTelemetryState(
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val trackerState: TrackerState = TrackerState.UNKNOWN,
     val status: SentinelStatus = SentinelStatus.VALID,
-    val isTamperDetected: Boolean = false
+    val isTamperDetected: Boolean = false,
+    val isUltraLongStationary: Boolean = false
 )
 
 @Serializable
@@ -606,6 +612,7 @@ data class DashboardState(
     val trackerState get() = telemetry.trackerState
     val status get() = telemetry.status
     val isTamperDetected get() = telemetry.isTamperDetected
+    val isUltraLongStationary get() = telemetry.isUltraLongStationary
 
     val vibration get() = health.vibration
     val heading get() = health.heading

@@ -8,7 +8,11 @@ The following rules MUST be followed strictly for every task:
 4. **Mark Resolved**: Record all fixed issues in the relevant status tracking file and mark them as resolved.
 5. **Continuous Handover**: Update `Handover.md` after each modification to any `.kt` file.
 6. **Transparency**: Briefly explain each action before executing it.
-7. **Handover Trigger**: Bring the current work to a safe stopping point so we can update `Handover.md` and preserve everything completed so far, whenever the number of agent calls reaches about 90. Then stop the implementation and start a new fresh chat.
+7. **Handover Trigger**: Whenever the number of agent calls reaches about 90, stop the implementation and start a new fresh chat.
+    - **Running Tally**: Maintain a `Session Call Count` in the `Audit Baseline` section of `Handover.md`.
+    - **Budget Check**: Before starting a new task, check the `Session Call Count`. If it exceeds 80, transition to the Completion Sequence immediately.
+    - **Self-Reporting**: Occasionally include the estimated call count in Transparency explanations (e.g., "Step X [Call ~45/90]").
+    - **Reset**: The count resets only upon starting a fresh chat session.
 
 ## 🏁 Completion Sequence
 Perform the following steps in order once an issue is resolved:
@@ -20,4 +24,4 @@ Perform the following steps in order once an issue is resolved:
 5. **Simplicity Audit**: Evaluate if the code or app architecture can be further simplified. Save these ideas in `Simplify_Ideas2.md`.
 6. **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot to prepare for a fresh chat session.
 7. **Session Termination**: Stop the chat immediately. Do not attempt to fix any other issues or continue work.
-8. **Audit Recalculation**: Recalculate number of items for SOT (sum of 21 Architectural master rules and 143 Functional R-IDs), Resolved issues, open issues, Testing chapters, sub-items, simplification ideas, QA validation status, and display it in a format of: Current Audit Baseline.
+8. **Audit Recalculation**: Recalculate number of items for SOT (sum of 27 Architectural master rules and 143 Functional R-IDs), Resolved issues, open issues, Testing chapters, sub-items, simplification ideas, QA validation status, and Session Call Count [X/90]. Display it in a format of: Current Audit Baseline.

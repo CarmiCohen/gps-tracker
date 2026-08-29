@@ -1,8 +1,8 @@
-# SOT Master Requirements (Aug.29.07)
+# SOT Master Requirements (Aug.29.10)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (27 Rules)
+## 🏗️ Architectural Master Rules (29 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -19,9 +19,9 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.12 Telemetry Mapping Authority (R761)**: To ensure SRP and avoid logic duplication, all property transformations between Engine models (e.g., EngineConnectionPoint) and App models (e.g., ConnectionPoint) must be centralized in `TelemetryMapper.kt`. Managers and Services are prohibited from performing direct property mapping. (Updated Aug.29.05).
 
 ### 2. UI & Performance Authority
-*   **2.1 Staggered Hydration Manager (R318/R323/R739/R758)**: To prevent Davey stalls, hydration must be managed by `LifecycleHydrationManager`, providing a multi-level staggered sequence. Level 4-7 (Map Engine & Overlay Hydration) must be triggered via `IdleHandler` and staggered over multiple frames. Heavy initialization of the OSM engine and `SqlTileWriter` MUST be offloaded to a background IO thread in `GpsApplication` and gated via `isOsmReady` to ensure hydration never blocks the Main thread (R318, R323, R739, R758).
+*   **2.1 Staggered Hydration Manager (R318/R323/R739/R758)**: To prevent Davey stalls, hydration must be managed by `LifecycleHydrationManager`, providing a multi-level staggered sequence. Level 4-7 (Map Engine & Overlay Hydration) must be triggered via `IdleHandler` and staggered over multiple frames. Heavy initialization of the OSM engine and `SqlTileWriter` MUST be offloaded to a background IO thread in `GpsApplication` and gated via `isOsmReady` to ensure hydration never blocks the Main thread (R318, D323, R739, R758).
 *   **2.2 Native Watchdog & Retry (R301/R319)**: All JNI/native calls must be wrapped in a watchdog timer (2000ms). Native initialization must implement exponential backoff retries to ensure reliable binding during background service startup (R301, R319).
-*   **2.3 Shadow-Cache Stability (R280/R721)**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` and an LRU strategy for long-term stability (R280, R721).
+*   **2.3 Shadow-Cache Stability (R280/721)**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` and an LRU strategy for long-term stability (R280, R721).
 *   **2.4 Imperative Map Isolation (R309)**: High-frequency map overlay pools and icon caches must use standard collections and be isolated from Compose `Snapshot` observation. Since these are updated imperatively via `AndroidView.update`, standard collections eliminate lock verification failures and frame skips on non-generational GCs (R309).
 *   **2.5 Snap-Isolation Throttling (R312)**: High-frequency telemetry flows (Logs, Trails, Violations, History) must utilize Snap-Isolation via deep-parity throttling (`contentEquals` + `distinctUntilChanged`). This prevents the Compose Recomposer from performing redundant snapshot reconciliation cycles, eliminating lock verification failures and thread synchronization contention on Samsung hardware (R312).
 *   **2.6 GPS Warm-up Grace Period (R315)**: Signal loss and accuracy violations must be suppressed for the first 30 seconds after system activation or mode transition to allow GPS provider stabilization (R315).
@@ -31,15 +31,17 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 
 ### 3. Hardware Authority
 *   **3.1 Unified Hardware Provider (R760)**: To reduce thread overhead and synchronize platform callbacks, all GNSS, Location, IMU, and Environmental sensors must be managed by the unified `HardwareProvider`. This component must share a single `HandlerThread` ("HardwareThread") for all OS-level event delivery, ensuring consistent lifecycle management and deterministic unregistration via the `ManagedHardware` framework (Updated Aug.29.03).
-*   **3.2 Adaptive Acoustic Duty-Cycle (R762)**: **NEW**. To optimize battery life during extended stationary periods, acoustic monitoring off-cycles must scale linearly from 8 seconds up to 30 seconds based on stationary duration. This reduces native microphone initialization churn while maintaining security responsiveness (Updated Aug.29.07).
+*   **3.2 Adaptive Acoustic Duty-Cycle (R762)**: To optimize battery life during extended stationary periods, acoustic monitoring off-cycles must scale linearly from 8 seconds up to 30 seconds based on stationary duration. This reduces native microphone initialization churn while maintaining security responsiveness (Updated Aug.29.07).
+*   **3.3 Ultra-Long Stationary GNSS Relaxation (R763)**: To maximize battery life in long-term surveillance scenarios, GNSS polling intervals must be relaxed to 5 minutes (`ULTRA_LONG_STATIONARY_GPS_POLLING_MS`) when confirmed stationary duration exceeds 4 hours (`ULTRA_LONG_STATIONARY_DURATION_MS`). The transition must be managed by `ServiceBehaviorUseCase` to ensure immediate resumption upon movement detection (Updated Aug.29.08).
+*   **3.4 Hardware-State Transparency (R765)**: To ensure user and viewer awareness of low-power relaxation modes, high-level hardware states (e.g., Ultra-Long Stationary) MUST be exposed from `HardwareProvider` and propagated through the telemetry pipeline to UI components and foreground notifications. This provides deterministic explanations for variable polling frequencies. (Updated Aug.29.10).
 
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.29.10**: Resolved Concern #765 (Ultra-Long Stationary Exposure). Centralized detection and exposed state via Flow for UI/Notification parity.
+*   **Aug.29.09**: Resolved Concern #764 (Engine Config Refinement). Consolidated device-specific flags into HardwareCapabilities.
+*   **Aug.29.08**: Resolved Concern #763 (Ultra-Long Stationary GNSS Relaxation). Implemented 5min relaxation after 4h immobility.
 *   **Aug.29.07**: Completion audit and version increment.
-*   **Aug.29.06**: Resolved Concern #762 (Acoustic Duty-Cycle Optimization). Implemented adaptive off-cycle scaling in HardwareProvider.
-*   **Aug.29.05**: Resolved Concern #761 (Telemetry Mapping Decomposition). Centralized data transformations in TelemetryMapper.kt and completed Legacy Purge (R761).
-*   **Aug.29.03**: Resolved Concern #760 (Hardware Consolidation). Merged GpsManager and AppSensorManager into unified HardwareProvider (R760).
 
 ---
 

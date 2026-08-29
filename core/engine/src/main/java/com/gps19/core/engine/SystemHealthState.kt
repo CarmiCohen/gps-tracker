@@ -4,12 +4,10 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Aug.29.10:
+ * - Concern #765: Added isUltraLongStationary for GNSS relaxation transparency.
  * Aug.11.08:
- * - Issue #143: Forensic Integrity Verification. Added isThermalThrottling 
- *   to track load-correlated location stalls under heat (R133).
- * Aug.10.27:
- * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure 
- *   to track load-correlated location stalls (R133).
+ * - Issue #143: Forensic Integrity Verification. Added isThermalThrottling (R133).
  */
 @Serializable
 class SystemHealthState(
@@ -109,7 +107,8 @@ class SystemHealthState(
     var isBatteryCritical: Boolean = false,
 
     // Issue #133: Forensic Anomaly Correlation
-    var isSilentFailure: Boolean = false
+    var isSilentFailure: Boolean = false,
+    var isUltraLongStationary: Boolean = false
 ) {
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
@@ -195,6 +194,7 @@ class SystemHealthState(
         this.isBatteryLow = other.isBatteryLow
         this.isBatteryCritical = other.isBatteryCritical
         this.isSilentFailure = other.isSilentFailure
+        this.isUltraLongStationary = other.isUltraLongStationary
     }
 
     fun update(
@@ -210,7 +210,8 @@ class SystemHealthState(
         cpuLoad: Double = 0.0, ioWait: Double = 0.0, forensicReliability: Double = 1.0,
         vibration: Double = 0.0, storageAvailableMb: Long = 0L, storageTotalMb: Long = 0L,
         isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false, maxIoLatency: Long = 0L,
-        isSilentFailure: Boolean = false, isThermalThrottling: Boolean = false
+        isSilentFailure: Boolean = false, isThermalThrottling: Boolean = false,
+        isUltraLongStationary: Boolean = false
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -254,6 +255,7 @@ class SystemHealthState(
         this.isBatteryLow = isBatteryLow
         this.isBatteryCritical = isBatteryCritical
         this.isSilentFailure = isSilentFailure
+        this.isUltraLongStationary = isUltraLongStationary
     }
     
     fun reset() {
@@ -340,5 +342,6 @@ class SystemHealthState(
         isBatteryLow = false
         isBatteryCritical = false
         isSilentFailure = false
+        isUltraLongStationary = false
     }
 }

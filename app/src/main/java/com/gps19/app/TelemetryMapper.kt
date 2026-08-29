@@ -4,6 +4,8 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Aug.29.10:
+ * - Concern #765: Added isUltraLongStationary mapping for full state parity.
  * Aug.29.05:
  * - Issue #761: Decomposed mapping logic from HistoryManager. Centralized 
  *   parity transformation for both core and forensic telemetry fields (R761).
@@ -20,6 +22,7 @@ object TelemetryMapper {
             gpsAccuracy = p.accuracy; maxAccuracy = p.maxAccuracy
             speed = p.speed; bearing = p.bearing; currentMa = p.currentMa
             locationPendingReason = p.locationPendingReason
+            isUltraLongStationary = p.isUltraLongStationary
 
             // Forensic Parity
             snrIdx = p.snrIdx
@@ -148,7 +151,8 @@ object TelemetryMapper {
             isBatterySteepDischarge = status.isBatterySteepDischarge,
             isCoolingModeActive = status.isCoolingModeActive,
             isBatteryLow = status.isBatteryLow,
-            isBatteryCritical = status.isBatteryCritical
+            isBatteryCritical = status.isBatteryCritical,
+            isUltraLongStationary = status.isUltraLongStationary
         )
     }
 
@@ -177,7 +181,8 @@ object TelemetryMapper {
             isBatterySteepDischarge = entity.isBatterySteepDischarge,
             isCoolingModeActive = entity.isCoolingModeActive,
             isBatteryLow = entity.isBatteryLow,
-            isBatteryCritical = entity.isBatteryCritical
+            isBatteryCritical = entity.isBatteryCritical,
+            isUltraLongStationary = entity.isUltraLongStationary
         )
     }
 }

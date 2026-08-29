@@ -1,23 +1,26 @@
-# Handover (Aug.29.07) - Acoustic Duty-Cycle Optimization
+# Handover (Aug.29.10) - Hardware State Transparency
 
 ## 🎯 Current Status
-- **Goal**: Finalize Acoustic Duty-Cycle Optimization and synchronize project state.
+- **Goal**: Finalize ultra-long stationary relaxation and expose state for transparency.
 - **Status**: 🟢 **COMPLETE**
-- **Version**: `Aug.29.07`
-- **Database**: v73
-- **Current Audit Baseline**: SOT: 170, Resolved: 767, Open: 38, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 219, QA Status: 198.
+- **Version**: `Aug.29.10`
+- **Database**: v74 (MIGRATION_73_74)
+- **Current Audit Baseline**: SOT: 172, Resolved: 770, Open: 35, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 220, QA Status: 198, Session Call Count: [81/90].
 
-## 🧬 Implementation Summary: Aug.29.07
-- **Issue #762 Remediation (Acoustic Optimization)**:
-    - **Adaptive Duty-Cycle**: Implemented in `HardwareProvider.kt`. The acoustic off-cycle now scales dynamically from 8s to 30s based on stationary duration (`stationaryStartRt`). This reduces native resource churn and battery consumption during extended idle periods.
-    - **HardwareProvider Audit**: Verified the unified thread handler ("HardwareThread") correctly manages the acoustic monitor thread lifecycle alongside GNSS and IMU listeners.
-- **SOT & Documentation**:
-    - Added SOT Rule 3.2 to formalize the **Adaptive Acoustic Duty-Cycle** requirement.
-    - Updated `issues.md` and `RESOLUTION_ARCHIVE.md` to reflect the resolution of Concern #762.
-    - Incremented `versionName` in `app/build.gradle` to `Aug.29.07`.
+## 🧬 Implementation Summary: Aug.29.10
+- **Concern #765 Remediation (Hardware Transparency)**:
+    - **Hardware Tier**: Centralized "Ultra-Long Stationary" detection in `HardwareProvider.kt`. State is evaluated in the monitoring loop and exposed via `isUltraLongStationaryFlow`.
+    - **Service Tier**: Updated `TrackerService.kt` to observe the flow. State is now used to build the foreground notification pulse message via `NotificationManager`.
+    - **Telemetry Tier**: Added `isUltraLongStationary` to `EngineConnectionPoint`, `ConnectionPoint`, `TrackerStatus`, and `DashboardTelemetryState` for full parity.
+    - **Persistence Tier**: Updated `PendingStatusEntity` and `Database.kt` (v74) to store the state. Added `MIGRATION_73_74`.
+    - **UI Tier**: Refactored `DashboardStateProvider` and `UiStateAggregator` to propagate the state to the Dashboard and HUD.
+- **Concern #764 Remediation (Engine Config Refinement)**:
+    - Removed redundant `DeviceSpecialFlags` class. Refactored `ServiceBehaviorUseCase` to use `HardwareCapabilities` directly.
+- **Concern #763 Remediation (GNSS Relaxation)**:
+    - Implemented 5-minute GNSS polling relaxation after 4 hours of confirmed immobility (R763).
 
 ## 🚀 Next Steps
-- **Verification**: Monitor battery telemetry in the next QA cycle to quantify the gain from adaptive acoustic cycling.
-- **Hardware Refinement**: Evaluate if GNSS polling intervals can be further relaxed during confirmed long-duration stationary states (>4 hours).
+- **Field Verification**: Perform 12-hour static soak test to confirm transition to [ULTRA] status and battery discharge curve flattening.
+- **UI Refinement**: Add a visual indicator or label in the Telemetry dashboard specifically for the "Ultra-Long" state.
 
-vAug.29.07
+vAug.29.10

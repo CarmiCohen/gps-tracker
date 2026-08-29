@@ -6,13 +6,16 @@ import javax.inject.Singleton
 
 /**
  * ServiceBehaviorUseCase: Encapsulates high-level logic for service-level state transitions.
+ * Aug.29.09:
+ * - Concern #764 Simplification: Refactored calculateGpsInterval to use 
+ *   HardwareCapabilities directly, removing redundant DeviceSpecialFlags.
+ * Aug.29.08:
+ * - Concern #763: GNSS Relaxation. Added ultra-long stationary check to relax 
+ *   polling to 5 minutes after 4 hours of confirmed immobility (R763).
  * Aug.14.01:
  * - Issue #169: Geofence Accuracy vs. Battery Audit. Added isGeofenceActive to 
  *   calculateGpsInterval to prevent 45s polling blind-spots when moving with 
  *   screen off (R406a).
- * Aug.11.12:
- * - Issue #141: Stress Recovery Verification. Added reset() to ensure high-latency 
- *   latches don't persist across sessions (R141).
  */
 @Singleton
 class ServiceBehaviorUseCase @Inject constructor(
@@ -32,6 +35,7 @@ class ServiceBehaviorUseCase @Inject constructor(
     /**
      * Calculates the target GPS polling interval based on device state and forensic triggers.
      * R406a: Dynamic Polling.
+     * R763: Ultra-long Stationary Relaxation.
      */
     fun calculateGpsInterval(
         isCoolingMode: Boolean,
@@ -40,20 +44,23 @@ class ServiceBehaviorUseCase @Inject constructor(
         isScreenOn: Boolean,
         isGeofenceActive: Boolean,
         nowRt: Long,
-        deviceSpecialFlags: DeviceSpecialFlags
+        capabilities: HardwareCapabilities
     ): Long {
         if (!isStationary) {
             lastMotionDetectedTs = nowRt
         }
-        val isStationaryState = isStationary && (nowRt - lastMotionDetectedTs > MOVING_HOLD_DURATION_MS)
+        val stationaryDuration = nowRt - lastMotionDetectedTs
+        val isStationaryState = isStationary && (stationaryDuration > MOVING_HOLD_DURATION_MS)
+        val isUltraLongStationary = isStationaryState && (stationaryDuration > ULTRA_LONG_STATIONARY_DURATION_MS)
 
         return when {
             isCoolingMode -> COOLING_GPS_POLLING_MS
             isSuspiciousMode -> SUSPICIOUS_GPS_POLLING_MS
+            isUltraLongStationary -> ULTRA_LONG_STATIONARY_GPS_POLLING_MS
             isStationaryState -> STATIONARY_GPS_POLLING_MS
             // Issue #169: If Geofence is active and we are moving, do NOT drop to 45s even if screen is off.
             !isScreenOn && !isGeofenceActive -> SCREEN_OFF_GPS_POLLING_MS
-            deviceSpecialFlags.isS21FE || deviceSpecialFlags.isXiaomi -> HIGH_FREQUENCY_GPS_POLLING_MS
+            capabilities.requiresAdaptationMuzzle || capabilities.requiresExtraTopPadding -> HIGH_FREQUENCY_GPS_POLLING_MS
             else -> MOVING_GPS_POLLING_MS
         }
     }
@@ -91,9 +98,4 @@ class ServiceBehaviorUseCase @Inject constructor(
 
         return currentSuspicious
     }
-
-    data class DeviceSpecialFlags(
-        val isS21FE: Boolean,
-        val isXiaomi: Boolean
-    )
 }

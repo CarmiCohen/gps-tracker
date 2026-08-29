@@ -32,13 +32,15 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Aug.29.10:
+ * - Concern #765: Exposed isUltraLongStationaryFlow to provide transparency for 
+ *   GNSS relaxation states.
  * Aug.29.07:
  * - Completion Sequence: Finalized Acoustic Duty-Cycle Optimization audit and state 
  *   synchronization.
  * Aug.29.06:
  * - Issue #762 Remediation: Implemented adaptive acoustic duty-cycling. Off-cycle 
- *   duration now scales from 8s to 30s during extended stationary periods to 
- *   maximize battery life on budget hardware (R762).
+ *   duration now scales from 8s to 30s during extended stationary periods (R762).
  * Aug.29.03:
  * - Issue #760 Remediation: Consolidated GpsManager and AppSensorManager into a 
  *   single provider.
@@ -202,6 +204,9 @@ class HardwareProvider @Inject constructor(
     private var initialRotationMatrix = FloatArray(9); private var hasInitialRotation = false
     private var plungePhase = 0; private var plungeMatched = false; private var lastPlungePhaseRt = 0L
 
+    private val _isUltraLongStationary = MutableStateFlow(false)
+    val isUltraLongStationaryFlow: StateFlow<Boolean> = _isUltraLongStationary.asStateFlow()
+
     class ForensicSnapshot {
         var vibration = 0.0; var heading = 0.0; var baroAlt = 0.0; var lux = 0.0
         var isNear = true; var tiltDegrees = 0.0; var acousticDb = 0.0; var peakShock = 0.0
@@ -274,6 +279,7 @@ class HardwareProvider @Inject constructor(
             while (isActive) {
                 updateLocationStatus()
                 checkRevivalLifecycle()
+                updateStationaryExposure()
                 delay(2000L)
             }
         }
@@ -389,6 +395,16 @@ class HardwareProvider @Inject constructor(
                 else { nextPending = false; nextReason = LocationPendingReason.NONE; recoveryConfirmed = true; recoveryStartRt = 0L }
             } else { recoveryConfirmed = false; recoveryStartRt = 0L }
             current.copy(isPending = nextPending, reason = nextReason, lastFixRt = lastFixRt, lastPendingDurationMs = lastPendingDuration, recoveryConfirmed = recoveryConfirmed)
+        }
+    }
+
+    private fun updateStationaryExposure() {
+        val nowRt = timeProvider.elapsedRealtime()
+        val duration = if (stationaryStartRt > 0L) nowRt - stationaryStartRt else 0L
+        val isUltra = isStationary() && duration > ULTRA_LONG_STATIONARY_DURATION_MS
+        if (_isUltraLongStationary.value != isUltra) {
+            _isUltraLongStationary.value = isUltra
+            Timber.i("HardwareProvider: Ultra-Long Stationary State changed to $isUltra")
         }
     }
 

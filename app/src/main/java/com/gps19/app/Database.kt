@@ -8,12 +8,13 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.29.10:
+ * - Concern #765: Added isUltraLongStationary to PendingStatusEntity. 
+ *   Incremented version to 74 with migration.
+ * - Build Fix: Removed unused 'limit' parameter from PendingStatusDao.pruneByThreshold.
  * Aug.22.04:
  * - Issue #197 Standardization: Aligned ViolationDao, TrailDao, and HistoryDao 
- *   with R197 chunked pruning standards. Fixed SQLite DELETE syntax to use 
- *   subqueries for LIMIT support.
- * - Refactor: Cleaned up redundant 'abstract' keywords in interface DAOs to 
- *   prevent Kapt processing stalls.
+ *   with R197 chunked pruning standards.
  */
 @Entity(
     tableName = "logs", 
@@ -170,7 +171,8 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "UNKNOWN") val trackerState: String = "UNKNOWN",
     @ColumnInfo(defaultValue = "VALID") val status: String = "VALID",
     @ColumnInfo(defaultValue = "0") val isBatteryLow: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isBatteryCritical: Boolean = false
+    @ColumnInfo(defaultValue = "0") val isBatteryCritical: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val isUltraLongStationary: Boolean = false
 )
 
 @Dao
@@ -293,7 +295,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 73, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 74, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -317,6 +319,15 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_73_74 = object : Migration(73, 74) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // R765: Adding isUltraLongStationary for forensic status transparency
+                try {
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isUltraLongStationary INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_72_73 = object : Migration(72, 73) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // R224: Synchronizing sitVzRt in pending_status_updates for forensic parity
@@ -331,11 +342,8 @@ abstract class AppDatabase : RoomDatabase() {
                 // R195: Hardened recovery for connection_history schema mismatch
                 try {
                     db.execSQL("ALTER TABLE connection_history ADD COLUMN sitVzRt INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {
-                    // Column might already exist if migration 70_71 partially succeeded
-                }
+                } catch (e: Exception) { }
                 
-                // Force non-unique indices to clear any persistent legacy UNIQUE constraints
                 db.execSQL("DROP INDEX IF EXISTS index_logs_type_timestamp_spillIdx")
                 db.execSQL("CREATE INDEX index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
                 db.execSQL("DROP INDEX IF EXISTS index_logs_localId")
@@ -345,12 +353,10 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_70_71 = object : Migration(70, 71) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // R190e: Correct schema mismatch in connection_history
                 try {
                     db.execSQL("ALTER TABLE connection_history ADD COLUMN sitVzRt INTEGER NOT NULL DEFAULT 0")
                 } catch (e: Exception) {}
 
-                // R190: Force non-unique indices to resolve legacy duplication conflicts
                 db.execSQL("DROP INDEX IF EXISTS index_logs_type_timestamp_spillIdx")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
                 db.execSQL("DROP INDEX IF EXISTS index_logs_localId")
@@ -360,9 +366,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_69_70 = object : Migration(69, 70) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // R190c: Purge duplicates to prevent UNIQUE localId constraint violation
                 db.execSQL("DELETE FROM logs WHERE id NOT IN (SELECT MIN(id) FROM logs GROUP BY localId)")
-                
                 db.execSQL("DROP INDEX IF EXISTS index_logs_type_timestamp_spillIdx")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")
                 db.execSQL("DROP INDEX IF EXISTS index_logs_localId")
@@ -372,9 +376,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_68_69 = object : Migration(68, 69) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // R190c: Purge duplicates for high-frequency telemetry keys
                 db.execSQL("DELETE FROM logs WHERE id NOT IN (SELECT MIN(id) FROM logs GROUP BY type, timestamp, spillIdx)")
-
                 db.execSQL("DROP INDEX IF EXISTS index_logs_type_spillIdx_timestamp")
                 db.execSQL("DROP INDEX IF EXISTS index_logs_type_timestamp_spillIdx")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_logs_type_timestamp_spillIdx ON logs (type, timestamp, spillIdx)")

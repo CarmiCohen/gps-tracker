@@ -36,17 +36,12 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.29.10:
+ * - Concern #765: Integrated isUltraLongStationary into UI aggregation pipeline.
  * Aug.26.13:
  * - Concern #737 Remediation: Added DismissIdentitySanitization handler to 
  *   persist the dismissal of the identity warning. This prevents the warning 
  *   from re-initializing on every cold start (R976).
- * Aug.26.11:
- * - Issue #735 Hardening: Added ToggleSetupBypass handler to set 
- *   isSetupBypassActive in MainUiState, enabling automated soak test 
- *   execution (R735).
- * Aug.26.00:
- * - Issue #318 Remediation: Integrated LifecycleHydrationManager to stagger 
- *   startup sequences and optimize hydration for low-tier CPU scaling (R318).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -134,7 +129,8 @@ class MainViewModel @Inject constructor(
         _systemPulse,
         _trackerState
     ) { mode, kin, pulse, state ->
-        aggregator.aggregateDashboardTelemetry(mode, kin, pulse, state)
+        val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
+        aggregator.aggregateDashboardTelemetry(mode, kin, pulse, state, isUltra)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardTelemetryState())
@@ -184,7 +180,8 @@ class MainViewModel @Inject constructor(
         _systemPulse,
         _trackerState
     ) { mode, kin, pulse, state ->
-        aggregator.aggregateHudTelemetry(mode, kin, pulse, state)
+        val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
+        aggregator.aggregateHudTelemetry(mode, kin, pulse, state, isUltra)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudTelemetryState())

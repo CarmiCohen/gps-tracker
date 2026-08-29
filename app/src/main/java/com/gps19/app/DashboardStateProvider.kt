@@ -6,6 +6,8 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Aug.29.10:
+ * - Concern #765: Added isUltraLongStationary support to Dashboard and HUD telemetry states.
  * Aug.21.09:
  * - Issue #248 Performance Optimization: Completed full segmentation for both 
  *   Dashboard and HUD states to eliminate hydration stalls on budget hardware.
@@ -21,7 +23,8 @@ interface DashboardStateProvider {
         appMode: String?,
         kinematicState: KinematicState,
         now: Long,
-        trackerState: TrackerState
+        trackerState: TrackerState,
+        isUltra: Boolean
     ): DashboardTelemetryState
 
     fun buildDashboardHealthState(
@@ -46,7 +49,8 @@ interface DashboardStateProvider {
         appMode: String?,
         kinematicState: KinematicState,
         systemPulse: Long,
-        trackerState: TrackerState
+        trackerState: TrackerState,
+        isUltra: Boolean
     ): HudTelemetryState
 
     fun buildHudHealthState(
@@ -91,7 +95,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         appMode: String?,
         kinematicState: KinematicState,
         now: Long,
-        trackerState: TrackerState
+        trackerState: TrackerState,
+        isUltra: Boolean
     ): DashboardTelemetryState {
         val isViewer = appMode == "viewer"
         val loc = if (isViewer) kinematicState.trackerLocation else kinematicState.localLocation
@@ -127,7 +132,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             isLocationPending = if (isViewer) kinematicState.trackerHealth.isLocationPending else kinematicState.localHealth.isLocationPending,
             locationPendingReason = if (isViewer) kinematicState.trackerHealth.locationPendingReason else kinematicState.localHealth.locationPendingReason,
             trackerState = trackerState,
-            status = loc.status
+            status = loc.status,
+            isUltraLongStationary = isUltra
         )
     }
 
@@ -223,7 +229,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         appMode: String?,
         kinematicState: KinematicState,
         systemPulse: Long,
-        trackerState: TrackerState
+        trackerState: TrackerState,
+        isUltra: Boolean
     ): HudTelemetryState {
         val loc = if (appMode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
         
@@ -249,7 +256,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             isTrackerLocPending = kinematicState.trackerHealth.isLocationPending,
             trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
             isViewerLocPending = kinematicState.localHealth.isLocationPending,
-            viewerLocPendingReason = kinematicState.localHealth.locationPendingReason
+            viewerLocPendingReason = kinematicState.localHealth.locationPendingReason,
+            isUltraLongStationary = isUltra
         )
     }
 

@@ -2,7 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * Aug.25.01:
+ * Aug.29.08:
+ * - Concern #763: Added ULTRA_LONG_STATIONARY thresholds for GNSS relaxation.
+ * Aug.29.01:
  * - Issue #315: Added GPS_WARMUP_GRACE_MS (30s) to prevent immediate false 
  *   positives during GPS stabilization (R315).
  * Aug.21.09:
@@ -258,6 +260,10 @@ const val SUSPICIOUS_GPS_POLLING_MS = 10000L
 const val COOLING_GPS_POLLING_MS = 30000L
 const val VIEWER_GPS_POLLING_MS = 10000L
 
+// Issue #763: Ultra-long stationary relaxation
+const val ULTRA_LONG_STATIONARY_DURATION_MS = 14400000L // 4 Hours
+const val ULTRA_LONG_STATIONARY_GPS_POLLING_MS = 300000L // 5 Minutes
+
 // Hardware Heuristic Recovery 
 const val HARDWARE_SUPPRESSION_THRESHOLD_MS = 15000L
 const val HARDWARE_RECOVERY_COOLDOWN_MS = 60000L
@@ -341,7 +347,7 @@ const val RIBBON_CPU_LOAD_SCALE = 1.0
 const val RIBBON_IO_WAIT_SCALE = 1.0
 const val RIBBON_LATENCY_SCALE_MS = 1000.0
 
-const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 300000L
+const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 30000L
 const val MAX_BACKFILL_POINTS = 1000
 
 const val SIGNALING_EMIT_DELAY_MS = 50L
