@@ -28,11 +28,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Aug.29.05:
+ * - Issue #761: Migrated from ForensicMapper to TelemetryMapper. Centralized 
+ *   telemetry mapping authority (R761).
  * Aug.22.04:
  * - Issue #197 Standardization: Aligned triggerBackgroundPruning with R197 
  *   chunked standards for connection_history, violations, and trail_points.
- * - Build Fix: Restored public visibility for DEFAULT constants to resolve 
- *   MainUiState compilation failure.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -330,7 +331,7 @@ class MainRepository @Inject constructor(
                 currentMa = entity.currentMa
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
                 
-                ForensicMapper.mapEntityToApp(entity, this)
+                TelemetryMapper.mapEntityToApp(entity, this)
             }
             cp
         }
@@ -353,7 +354,7 @@ class MainRepository @Inject constructor(
         liveHistoryBuffer.add(ribbonKey to uiCopy)
 
         if (!PersistencePolicy.shouldSaveHistoryPoint(health)) return
-        historyBuffer.add(ForensicMapper.mapAppToEntity(point, ribbonKey))
+        historyBuffer.add(TelemetryMapper.mapAppToEntity(point, ribbonKey))
 
         val nowRt = timeProvider.elapsedRealtime()
         val shouldWrite = (nowRt - lastBatchWriteRealtime > HISTORY_BATCH_WRITE_INTERVAL_MS) || (historyBuffer.size >= HISTORY_BUFFER_MAX_SIZE)
@@ -371,7 +372,7 @@ class MainRepository @Inject constructor(
         if (!PersistencePolicy.shouldSaveHistoryPoint(health)) return
 
         points.forEach { point ->
-            historyBuffer.add(ForensicMapper.mapAppToEntity(point, ribbonKey))
+            historyBuffer.add(TelemetryMapper.mapAppToEntity(point, ribbonKey))
         }
 
         val nowRt = timeProvider.elapsedRealtime()
@@ -449,7 +450,6 @@ class MainRepository @Inject constructor(
                     onSpike = { message, _ -> logLatencySpike(message) }
                 ) {
                     database.withTransaction {
-                        // R197: Standardized Chunked Pruning
                         listOf("4M", "16M", "1H", "4H", "24H", "7D").forEach { key ->
                             val threshold = historyDao.getPruneThreshold(key, PRUNE_LIMIT_HISTORY)
                             threshold?.let { historyDao.pruneByThreshold(key, it, PRUNE_CHUNK_SIZE) }
@@ -465,7 +465,7 @@ class MainRepository @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Issue #585: Background pruning failed")
+                Timber.e(e, "Background pruning failed")
             } finally {
                 metrics.isPruningActive.set(false)
             }

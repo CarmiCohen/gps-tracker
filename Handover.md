@@ -1,21 +1,23 @@
-# Handover (Aug.29.00) - Async Geometry & UI Thread Decongestion
+# Handover (Aug.29.07) - Acoustic Duty-Cycle Optimization
 
 ## 🎯 Current Status
-- **Goal**: Resolve UI thread congestion (Davey stalls) during map hydration on budget hardware.
-- **Status**: 🟢 **RESOLVED** (Concern #758b: Residual UI Thread Congestion).
-- **Version**: `Aug.29.00`
+- **Goal**: Finalize Acoustic Duty-Cycle Optimization and synchronize project state.
+- **Status**: 🟢 **COMPLETE**
+- **Version**: `Aug.29.07`
 - **Database**: v73
-- **Current Audit Baseline**: SOT: 167, Resolved: 763, Open: 42, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 216, QA Status: 198.
+- **Current Audit Baseline**: SOT: 170, Resolved: 767, Open: 38, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 219, QA Status: 198.
 
-## 🧬 Implementation Summary: Aug.29.00
-- **Concern #758b Remediation**: **Async Geometry Generation**.
-    - **MapOverlayManager**: Refactored `getCachedCircle` into `getAsyncCircle`. Circle point calculations are now offloaded to `Dispatchers.Default`. This eliminates the main-thread bottleneck during map hydration Levels 4-7, where hundreds of coordinate points were previously generated synchronously.
-    - **Async State Matching**: Implemented a callback-based pattern that triggers `mapView.invalidate()` only when background geometry calculations complete, ensuring smooth 60FPS motion even during high-frequency telemetry updates.
-    - **Lifecycle Detach**: Added `onDetach()` to `MapOverlayManager` (called from `AndroidView.onRelease` in `MapComponents`) to ensure background coroutines are cancelled during map destruction, preventing memory leaks and orphaned jobs.
-- **Architectural Hardening**: Added SOT Rule 2.8 to formalize background geometry generation requirements for all map overlays.
+## 🧬 Implementation Summary: Aug.29.07
+- **Issue #762 Remediation (Acoustic Optimization)**:
+    - **Adaptive Duty-Cycle**: Implemented in `HardwareProvider.kt`. The acoustic off-cycle now scales dynamically from 8s to 30s based on stationary duration (`stationaryStartRt`). This reduces native resource churn and battery consumption during extended idle periods.
+    - **HardwareProvider Audit**: Verified the unified thread handler ("HardwareThread") correctly manages the acoustic monitor thread lifecycle alongside GNSS and IMU listeners.
+- **SOT & Documentation**:
+    - Added SOT Rule 3.2 to formalize the **Adaptive Acoustic Duty-Cycle** requirement.
+    - Updated `issues.md` and `RESOLUTION_ARCHIVE.md` to reflect the resolution of Concern #762.
+    - Incremented `versionName` in `app/build.gradle` to `Aug.29.07`.
 
 ## 🚀 Next Steps
-- **Issue #759b Optimization**: Evaluate further decomposition of `updateTrails` in `MapOverlayManager`. While circles are now async, extremely long polyline trails could still cause frame drops. Consider segmenting polyline addition across frames if trails exceed 500 points.
-- **Simplification**: Merge `GpsManager` and `AppSensorManager` into a unified `HardwareProvider` as identified in simplification ideas.
+- **Verification**: Monitor battery telemetry in the next QA cycle to quantify the gain from adaptive acoustic cycling.
+- **Hardware Refinement**: Evaluate if GNSS polling intervals can be further relaxed during confirmed long-duration stationary states (>4 hours).
 
-vAug.29.00
+vAug.29.07

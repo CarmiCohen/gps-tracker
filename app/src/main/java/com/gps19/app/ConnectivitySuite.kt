@@ -33,14 +33,11 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
- * Aug.28.02:
- * - Issue #750 Hardening: Refactored to use ManagedNetworkCallback for 
- *   deterministic lifecycle disposal, eliminating redundant unregistration 
- *   boilerplate (R750).
- * Aug.28.01:
- * - Issue #750 Hardening: Hardened stop() to ensure synchronous unregistration 
- *   of NetworkCallbacks. This prevents BaseEventQueue disposal failures when 
- *   the service is destroyed during high-frequency network state changes (R750).
+ * Aug.29.05:
+ * - Issue #761: Migrated from ForensicMapper to TelemetryMapper. Centralized 
+ *   telemetry mapping authority (R761). Fixed typo in pending status mapping.
+ * Aug.29.03:
+ * - Issue #760 Hardening: Migrated from GpsManager to unified HardwareProvider (R760).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -51,8 +48,8 @@ class ConnectivitySuite @Inject constructor(
     private val timeProvider: TimeProvider,
     private val signalingProvider: SignalingProvider,
     private val sessionManager: SessionManager,
-    private val gpsManager: GpsManager,
-    private var locationProcessor: LocationProcessor, // Current (Self or Shared)
+    private val hardwareProvider: HardwareProvider,
+    private var locationProcessor: LocationProcessor, 
     private val offlineRepository: OfflineRepository,
     private val mainRepository: MainRepository,
     private val remoteStatusRepository: RemoteStatusRepository
@@ -161,7 +158,6 @@ class ConnectivitySuite @Inject constructor(
     val trackerDistToHome get() = trackerStatus.sitDz 
     val trackerKineticEnergy get() = trackerStatus.kineticEnergy
 
-    // R750: Use ManagedNetworkCallback abstraction for deterministic disposal
     private val networkCallback = object : ManagedNetworkCallback() {
         override fun onAvailable(network: Network) {
             if (isStopped.get() || relayUrl.isEmpty()) return
@@ -184,9 +180,6 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
-    /**
-     * Issue #173: Inject a dedicated processor for remote telemetry filtering.
-     */
     fun updateRemoteProcessor(processor: LocationProcessor) {
         this.locationProcessor = processor
     }
@@ -378,8 +371,7 @@ class ConnectivitySuite @Inject constructor(
                 kineticEnergy = 0.0, isBatteryLow = entity.isBatteryLow, isBatteryCritical = entity.isBatteryCritical,
                 verticalVelocity = entity.verticalVelocity
             )
-            // R225: Consolidated forensic restoration during sync
-            val status = ForensicMapper.mapPendingToStatus(entity, statusTemplate)
+            val status = TelemetryMapper.mapPendingToStatus(entity, statusTemplate)
 
             if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) offlineRepository.deletePendingStatusUpdate(entity.id)
         }
@@ -404,8 +396,7 @@ class ConnectivitySuite @Inject constructor(
                     isBatteryLow = status.isBatteryLow, isBatteryCritical = status.isBatteryCritical,
                     verticalVelocity = status.verticalVelocity
                 )
-                // R225: Consolidated forensic persistence
-                val entity = ForensicMapper.mapStatusToPending(status, entityTemplate)
+                val entity = TelemetryMapper.mapStatusToPending(status, entityTemplate)
                 offlineRepository.addPendingStatusUpdate(entity)
             }
         }
@@ -435,7 +426,7 @@ class ConnectivitySuite @Inject constructor(
                     signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size, priority)
                     return true
                 } catch (e: Exception) {
-                    Timber.e(e, "Issue #560b: Pre-allocated serialization failed")
+                    Timber.e(e, "Pre-allocated serialization failed")
                 }
             }
             signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray(), priority = priority)
@@ -629,7 +620,7 @@ class ConnectivitySuite @Inject constructor(
                 updatedStatus
             }
         } catch (e: Exception) {
-            Timber.e(e, "Issue #541: Protobuf direct parse error")
+            Timber.e(e, "Protobuf direct parse error")
         }
     }
 
@@ -821,10 +812,7 @@ class ConnectivitySuite @Inject constructor(
     fun stop() { 
         if (!isStarted.getAndSet(false)) return
         isStopped.set(true); keepAliveJob?.cancel(); syncJob?.cancel(); signalingJob?.cancel(); scope.cancel()
-        
-        // R750: Use ManagedNetworkCallback for deterministic unregistration
         networkCallback.unregister(connectivityManager)
-
         signalingProvider.disconnect() 
     }
 

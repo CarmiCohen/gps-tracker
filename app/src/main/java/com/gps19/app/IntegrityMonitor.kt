@@ -26,15 +26,8 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * Aug.26.06:
- * - Audit Chapter 13: Added simulateMaliAnomaly hook to verify GPU driver 
- *   forensic correlation logic (R266) without physical thermal stress.
- * Aug.22.05:
- * - Audit Chapter 12.3: Added simulateStoragePressure to verify log and trail 
- *   prioritization under simulated storage exhaustion (R197).
- * Aug.22.04:
- * - Issue #266 Audit: Integrated Mali Driver "Meow" failure detection during 
- *   high-frequency DB writes on Samsung A15 (R266).
+ * Aug.29.03:
+ * - Issue #760 Hardening: Migrated from GpsManager to unified HardwareProvider (R760).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -42,7 +35,7 @@ class IntegrityMonitor @Inject constructor(
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
     private val systemStatusProvider: SystemStatusProvider,
-    private val gpsManager: GpsManager,
+    private val hardwareProvider: HardwareProvider,
     @ApplicationScope private val scope: CoroutineScope
 ) {
     private var lastFullPollTs = 0L
@@ -118,7 +111,7 @@ class IntegrityMonitor @Inject constructor(
         }
 
         scope.launch {
-            gpsManager.locationStatusFlow
+            hardwareProvider.locationStatusFlow
                 .onEach { status -> 
                     lastLocationStatusUpdateRt = timeProvider.elapsedRealtime()
                     handleLocationStatusUpdate(status) 
@@ -127,7 +120,7 @@ class IntegrityMonitor @Inject constructor(
         }
 
         scope.launch {
-            gpsManager.revivalEvents
+            hardwareProvider.revivalEvents
                 .onEach { event -> handleRevivalEvent(event) }
                 .collect()
         }
@@ -135,17 +128,17 @@ class IntegrityMonitor @Inject constructor(
         startHeartbeat()
     }
 
-    private fun handleRevivalEvent(event: GpsManager.RevivalEvent) {
+    private fun handleRevivalEvent(event: HardwareProvider.RevivalEvent) {
         when (event) {
-            is GpsManager.RevivalEvent.Attempt -> {
+            is HardwareProvider.RevivalEvent.Attempt -> {
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent("GPS REVIVAL: Hardware restart attempt ${event.count} on this device.", false))
             }
-            is GpsManager.RevivalEvent.HardwareLock -> {
+            is HardwareProvider.RevivalEvent.HardwareLock -> {
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent("CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed on this device. Manual intervention required.", true))
                 _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_GPS_HARDWARE_LOCK))
                 updateHealth { it.gpsHardwareLock = true }
             }
-            is GpsManager.RevivalEvent.Success -> {
+            is HardwareProvider.RevivalEvent.Success -> {
                 if (currentHealth.gpsHardwareLock) {
                     _integrityEvents.tryEmit(IntegrityEvent.LogEvent("GPS REVIVAL: Hardware fix restored on this device.", false))
                     _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_GPS_HARDWARE_LOCK))
@@ -200,7 +193,6 @@ class IntegrityMonitor @Inject constructor(
                 _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_PERFORMANCE_SPIKE))
             }
             
-            // Issue #266: Mali Driver "Meow" configuration failures
             auditMaliDriverPerformance(maxIo, cpu, iow)
         }
 
@@ -248,7 +240,7 @@ class IntegrityMonitor @Inject constructor(
         }
     }
 
-    private fun handleLocationStatusUpdate(status: GpsManager.LocationStatus) {
+    private fun handleLocationStatusUpdate(status: HardwareProvider.LocationStatus) {
         val workingHealth = currentHealth
         if (status.isPending && !workingHealth.isLocationPending) {
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Location fix pending: ${status.reason.name.replace("_", " ")} on this device", false))

@@ -27,20 +27,19 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * Aug.20.07:
- * - Issue #225 Analytical Telemetry Optimization: Refactored to use 
- *   ForensicMapper for engine-to-app parity (R225).
- * Aug.13.06:
- * - Issue #152: Excessive GC Pressure. Implemented ConnectionPoint pooling and 
- *   flyweight mapping to eliminate allocation churn in the 1Hz telemetry hot-path (R152).
+ * Aug.29.05:
+ * - Issue #761: Decomposed telemetry mapping logic into TelemetryMapper. 
+ *   Simplified HistoryManager to focus on persistence and aggregation cycles (R761).
+ * Aug.29.03:
+ * - Issue #760 Hardening: Migrated from GpsManager/AppSensorManager to 
+ *   unified HardwareProvider (R760).
  */
 @Singleton
 class HistoryManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
-    private val gpsManager: GpsManager,
-    private val sensorManager: AppSensorManager,
+    private val hardwareProvider: HardwareProvider,
     private val locationProcessor: LocationProcessor
 ) {
     private val _historyEvents = MutableSharedFlow<HistoryEvent>(
@@ -143,14 +142,13 @@ class HistoryManager @Inject constructor(
             this.currentMa = currentMa; this.locationPendingReason = locationPendingReason; this.kineticEnergy = kineticEnergy
             this.cpuLoad = cpuLoad; this.ioWait = ioWait; this.maxIoLatency = maxIoLatency; this.isSilentFailure = isSilentFailure
             this.isBatteryLow = isBatteryLow; this.isBatteryCritical = isBatteryCritical
-            // Issue #225: Ensure all forensic indices are set for aggregator
             this.noiseIdx = noiseIdx; this.luxIdx = luxIdx; this.vibeIdx = vibeIdx; this.proxIdx = proxIdx
             this.liftIdx = liftIdx; this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
         }
         
         aggregator.processPoint(currentPointFlyweight) { scale, point ->
             val flyweight = appPointPool[scale.ordinal]
-            mapToAppPoint(point, flyweight)
+            TelemetryMapper.mapEngineToApp(point, flyweight)
             repository.addHistoryPoint(scale.key, flyweight)
         }
 
@@ -179,8 +177,8 @@ class HistoryManager @Inject constructor(
         isRecoveryEvent: Boolean, cpuLoad: Double, ioWait: Double, maxIoLatency: Long,
         isSilentFailure: Boolean, isBatteryLow: Boolean, isBatteryCritical: Boolean
     ) {
-        val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs + 1, now) else emptySequence()
-        val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs + 1, now) else emptySequence()
+        val snrSamples = if (isTrackerMode) hardwareProvider.getSnrSamples(lastTickTs + 1, now) else emptySequence()
+        val sensorSamples = if (isTrackerMode) hardwareProvider.getSensorSamples(lastTickTs + 1, now) else emptySequence()
         
         baseTemplateFlyweight.apply {
             ts = 0L; rt = 0L; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; this.hasGps = hasGps
@@ -202,7 +200,7 @@ class HistoryManager @Inject constructor(
         
         aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplateFlyweight) { scale, point ->
             val appPoint = ConnectionPoint()
-            mapToAppPoint(point, appPoint)
+            TelemetryMapper.mapEngineToApp(point, appPoint)
             
             if (scale == RibbonScale.FOUR_MIN) { 
                 backfillBuffer.add(appPoint) 
@@ -219,14 +217,14 @@ class HistoryManager @Inject constructor(
     }
 
     private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
-        val snrSamples = if (isTrackerMode) gpsManager.getSnrSamples(lastTickTs, now) else emptySequence()
-        val sensorSamples = if (isTrackerMode) sensorManager.getSensorSamples(lastTickTs, now) else emptySequence()
+        val snrSamples = if (isTrackerMode) hardwareProvider.getSnrSamples(lastTickTs, now) else emptySequence()
+        val sensorSamples = if (isTrackerMode) hardwareProvider.getSensorSamples(lastTickTs, now) else emptySequence()
         
         RibbonScale.entries.forEach { scale ->
             val gapPoints = ArrayList<ConnectionPoint>()
             aggregator.fillRealGap(scale, lastTickRt, nowRt, lastTickTs, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb()) { point ->
                 val appPoint = ConnectionPoint()
-                mapToAppPoint(point, appPoint)
+                TelemetryMapper.mapEngineToApp(point, appPoint)
                 gapPoints.add(appPoint)
             }
             if (gapPoints.isNotEmpty()) { 
@@ -258,17 +256,6 @@ class HistoryManager @Inject constructor(
         lastSitDetectedRt = rt
         scope?.launch { repository.saveLong(LAST_HISTORY_SIT_TS_KEY, ts) }
         return true
-    }
-
-    private fun mapToAppPoint(p: EngineConnectionPoint, out: ConnectionPoint) {
-        out.apply {
-            ts = p.ts; rt = p.rt; rtt = p.rtt; localSig = 10; remoteSig = p.remoteSig; isConnected = p.isConnected
-            isGap = p.isGap; isRecoveryEvent = p.isRecoveryEvent; hasGps = p.hasGps; isTick = p.isTick; gpsAccuracy = p.accuracy; maxAccuracy = p.maxAccuracy
-            speed = p.speed; bearing = p.bearing; currentMa = p.currentMa; locationPendingReason = p.locationPendingReason
-            
-            // R225: Consolidated forensic mapping
-            ForensicMapper.mapEngineToApp(p, this)
-        }
     }
 
     private fun handleHourlyAutoSave(hour: Int) {

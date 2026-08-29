@@ -1,8 +1,8 @@
-# SOT Master Requirements (Aug.29.00)
+# SOT Master Requirements (Aug.29.07)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (23 Rules)
+## 🏗️ Architectural Master Rules (27 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -16,6 +16,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.9 IPC Optimization (R759)**: High-frequency lookups of system identifiers (e.g., Package Name) must utilize `GpsApplication.PACKAGE_NAME` shadow-cache to prevent repetitive IPC calls and associated OS-level diagnostic log flooding on restricted hardware (Updated Aug.28.11).
 *   **1.10 Dependency Injection**: Hilt is the sole authority for dependency management. Manual instantiation of repositories or DAOs is prohibited.
 *   **1.11 Monotonic Time**: Use `elapsedRealtime` for all interval and duration logic to survive clock regressions and drift (R116).
+*   **1.12 Telemetry Mapping Authority (R761)**: To ensure SRP and avoid logic duplication, all property transformations between Engine models (e.g., EngineConnectionPoint) and App models (e.g., ConnectionPoint) must be centralized in `TelemetryMapper.kt`. Managers and Services are prohibited from performing direct property mapping. (Updated Aug.29.05).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318/R323/R739/R758)**: To prevent Davey stalls, hydration must be managed by `LifecycleHydrationManager`, providing a multi-level staggered sequence. Level 4-7 (Map Engine & Overlay Hydration) must be triggered via `IdleHandler` and staggered over multiple frames. Heavy initialization of the OSM engine and `SqlTileWriter` MUST be offloaded to a background IO thread in `GpsApplication` and gated via `isOsmReady` to ensure hydration never blocks the Main thread (R318, R323, R739, R758).
@@ -25,14 +26,20 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **2.5 Snap-Isolation Throttling (R312)**: High-frequency telemetry flows (Logs, Trails, Violations, History) must utilize Snap-Isolation via deep-parity throttling (`contentEquals` + `distinctUntilChanged`). This prevents the Compose Recomposer from performing redundant snapshot reconciliation cycles, eliminating lock verification failures and thread synchronization contention on Samsung hardware (R312).
 *   **2.6 GPS Warm-up Grace Period (R315)**: Signal loss and accuracy violations must be suppressed for the first 30 seconds after system activation or mode transition to allow GPS provider stabilization (R315).
 *   **2.7 UI Fluidity**: UI stalls (Davey) must not exceed 700ms on target hardware (SM-A155F).
-*   **2.8 Async Geometry Generation (R758b)**: **NEW**. Heavy map overlay geometry (e.g., accuracy circles, geofence polygons) must be generated off the UI thread. `MapOverlayManager` must utilize `Dispatchers.Default` for point calculations and trigger a `MapView.invalidate()` only when geometry is ready, ensuring 60FPS fluid motion during high-frequency telemetry updates (Updated Aug.29.00).
+*   **2.8 Async Geometry Generation (R758b)**: Heavy map overlay geometry (e.g., accuracy circles, geofence polygons) must be generated off the UI thread. `MapOverlayManager` must utilize `Dispatchers.Default` for point calculations and trigger a `MapView.invalidate()` only when geometry is ready, ensuring 60FPS fluid motion during high-frequency telemetry updates (Updated Aug.29.00).
+*   **2.9 Segmented Polyline Hydration (R759b)**: Large telemetry trails (>500 points) must be updated using segmented coroutine patterns. `MapOverlayManager` must utilize `yield()` during polyline point assignment to interleave point hydration with UI frames, preventing Main-thread stalls during heavy history rendering (Updated Aug.29.02).
+
+### 3. Hardware Authority
+*   **3.1 Unified Hardware Provider (R760)**: To reduce thread overhead and synchronize platform callbacks, all GNSS, Location, IMU, and Environmental sensors must be managed by the unified `HardwareProvider`. This component must share a single `HandlerThread` ("HardwareThread") for all OS-level event delivery, ensuring consistent lifecycle management and deterministic unregistration via the `ManagedHardware` framework (Updated Aug.29.03).
+*   **3.2 Adaptive Acoustic Duty-Cycle (R762)**: **NEW**. To optimize battery life during extended stationary periods, acoustic monitoring off-cycles must scale linearly from 8 seconds up to 30 seconds based on stationary duration. This reduces native microphone initialization churn while maintaining security responsiveness (Updated Aug.29.07).
 
 ---
 
 ## 🧬 Change History (Recent)
-*   **Aug.29.00**: Resolved Concern #758b (Residual UI Thread Congestion). Implemented async geometry generation for accuracy circles and geofences to eliminate "Davey" stalls during map hydration (R758b).
-*   **Aug.28.11**: Resolved Concern #757 (Persistent BaseEventQueue Leak). Refactored `GpsManager` and `AppSensorManager` to perform unconditional unregistration of all hardware listeners, ensuring orphaned revival callbacks are cleared even if primary flow state was out of sync (R757). Hardened `SystemStatusProvider` with `PACKAGE_NAME` shadow-cache to eliminate high-frequency log spam (R759).
-*   **Aug.28.10**: Resolved Concern #758 (UI Thread Congestion). Offloaded OSMDroid engine pre-warming to IO thread and added `isOsmReady` gate to `LifecycleHydrationManager` (R758).
+*   **Aug.29.07**: Completion audit and version increment.
+*   **Aug.29.06**: Resolved Concern #762 (Acoustic Duty-Cycle Optimization). Implemented adaptive off-cycle scaling in HardwareProvider.
+*   **Aug.29.05**: Resolved Concern #761 (Telemetry Mapping Decomposition). Centralized data transformations in TelemetryMapper.kt and completed Legacy Purge (R761).
+*   **Aug.29.03**: Resolved Concern #760 (Hardware Consolidation). Merged GpsManager and AppSensorManager into unified HardwareProvider (R760).
 
 ---
 
@@ -41,16 +48,4 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R102**: Real-ala-time telemetry synchronization via Socket.io.
 *   **R103**: Forensic event logging with microsecond precision.
 *   **R104**: Geo-fencing authority with configurable distance thresholds.
-*   **R105**: Battery steep discharge detection and alerting.
-*   **R106**: Thermal mitigation and performance throttling (Cooling Mode).
-*   **R107**: Offline data buffering and batch synchronization.
-*   **R108**: Proactive database pruning (Logs, Trails, History).
-*   **R109**: Secure identity sanitization and persistence.
-*   **R110**: ApplicationContext enforcement for dependency injection.
-*   **R112**: Deterministic service destruction and resource release.
-*   **R113**: Thread-safe atomic state management (StateFlow/Mutex).
-*   **R114**: Foreground service notification persistence.
-*   **R115**: IO offloading from UI thread (Hardened IO).
-*   **R116**: Monotonic time reference for interval detection.
-*   **R117**: Centralized telemetry repository as Single Source of Truth.
-*   *(Remaining 126 functional requirements preserved in the project's internal technical registry)*
+*   *(Remaining 139 functional requirements preserved in the project's internal technical registry)*

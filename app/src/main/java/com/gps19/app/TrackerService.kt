@@ -21,14 +21,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * Aug.26.19:
- * - Issue #320/742 Hardening: Removed redundant releaseHardware call as it is 
- *   now centralized in BaseMonitorService. Simplified onDestroy to rely on 
- *   base class cleanup (R320).
- * Aug.26.09:
- * - Issue #320 Hardening: Replaced 200ms magic delay in onDestroy with a 
- *   deterministic hardware handshake using punchHardware() to ensure 
- *   native event drainage before bridge release.
+ * Aug.29.03:
+ * - Issue #760 Hardening: Migrated from GpsManager and AppSensorManager to 
+ *   the unified HardwareProvider (R760).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -125,13 +120,13 @@ class TrackerService : BaseMonitorService() {
         alarmManager.restoreState(savedAlarms)
 
         historyManager.initialize(lifecycleScope)
-        appSensorManager.start()
+        hardwareProvider.start()
 
         commandRouter.register()
         commandRouter.startObservingCommands(lifecycleScope)
 
-        gpsCollectionJob = lifecycleScope.launch(Dispatchers.Default) { gpsManager.getLocationFlow().collectLatest { onLocationChanged(it) } }
-        gnssDetailJob = lifecycleScope.launch(Dispatchers.Default) { gpsManager.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
+        gpsCollectionJob = lifecycleScope.launch(Dispatchers.Default) { hardwareProvider.getLocationFlow().collectLatest { onLocationChanged(it) } }
+        gnssDetailJob = lifecycleScope.launch(Dispatchers.Default) { hardwareProvider.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
 
         settingsJob = lifecycleScope.launch(Dispatchers.Default) {
             launch { repository.alertSettingsFlow.collectLatest { settings -> alarmManager.updateSettings(settings) } }
@@ -263,7 +258,7 @@ class TrackerService : BaseMonitorService() {
 
     private fun observeSensorEvents() {
         lifecycleScope.launch(Dispatchers.Default) {
-            appSensorManager.sensorEvents.collect { event ->
+            hardwareProvider.sensorEvents.collect { event ->
                 when (event) {
                     is AppSensorEvent.HardwareFailure -> {
                         val proc = lastProcessedLocation
@@ -287,7 +282,7 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
-                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); appSensorManager.start() }
+                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); hardwareProvider.start() }
                     is CommandEvent.ExecuteStressTest -> executeAutomatedStressTest()
                     is CommandEvent.SimulateStoragePressure -> {} 
                 }
@@ -311,7 +306,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun setupPhysicalFastPaths() {
-        appSensorManager.setAcousticFastPath(
+        hardwareProvider.setAcousticFastPath(
             floor = locationProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0,
             onSpike = {
                 logManager.logServiceEvent("Acoustic Spike Detected (FastPath)", isImportant = false)
@@ -348,7 +343,7 @@ class TrackerService : BaseMonitorService() {
         lastHardwareRecoveryTs = 0L
         stabilityAuditFixCount = 0
         stabilityAuditViolationCount = 0
-        gpsManager.resetGnssJitter()
+        hardwareProvider.resetGnssJitter()
         logManager.logServiceEvent("Session Terminated", isImportant = false)
     }
 
@@ -379,7 +374,7 @@ class TrackerService : BaseMonitorService() {
                 val type = getAvailableForegroundServiceType()
                 val health = integrityMonitor.currentHealth
                 val msg = notificationManager.getPulseMessage(
-                    sats = gpsManager.satellitesUsed,
+                    sats = hardwareProvider.satellitesUsed,
                     battery = health.batteryLevel,
                     isSecure = !alarmManager.hasUnresolvedAlarms(),
                     isPowerSave = isPowerSaveActive || health.isPowerSaveMode
@@ -397,7 +392,7 @@ class TrackerService : BaseMonitorService() {
             type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val isMicEnabled = appSensorManager.isAcousticMonitoringEnabled()
+            val isMicEnabled = hardwareProvider.isAcousticMonitoringEnabled()
             val hasPermission = capabilities.isMicrophoneGranted
             if (hasPermission && (isMicEnabled || isRecentUiPulse())) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE 
@@ -413,9 +408,9 @@ class TrackerService : BaseMonitorService() {
         integrityMonitor.checkInternetIntegrity(nowRt)
         
         val health = integrityMonitor.currentHealth
-        val snapshot = appSensorManager.consumeLogicSnapshot()
+        val snapshot = hardwareProvider.consumeLogicSnapshot()
 
-        appSensorManager.setHighLoad(health.isCoolingModeActive)
+        hardwareProvider.setHighLoad(health.isCoolingModeActive)
         
         isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(
             currentSuspicious = isSuspiciousMode,
@@ -427,8 +422,8 @@ class TrackerService : BaseMonitorService() {
         val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(
             isCoolingMode = health.isCoolingModeActive,
             isSuspiciousMode = isSuspiciousMode,
-            isStationary = appSensorManager.isStationary(),
-            isScreenOn = appSensorManager.isScreenOn(),
+            isStationary = hardwareProvider.isStationary(),
+            isScreenOn = hardwareProvider.isScreenOn(),
             isGeofenceActive = locationProcessor.getMaxDistanceAuthority() > 0.0,
             nowRt = nowRt,
             deviceSpecialFlags = ServiceBehaviorUseCase.DeviceSpecialFlags(
@@ -440,7 +435,7 @@ class TrackerService : BaseMonitorService() {
         if (targetGpsInterval != currentIntervalMs) {
             currentIntervalMs = targetGpsInterval
             lastIntervalChangeRt = nowRt
-            gpsManager.setPollingInterval(targetGpsInterval)
+            hardwareProvider.setPollingInterval(targetGpsInterval)
         }
         
         val isAdaptationMuzzled = nowRt - lastIntervalChangeRt < ADAPTATION_SETTLING_MS
@@ -471,7 +466,7 @@ class TrackerService : BaseMonitorService() {
         }
 
         if (nowRt - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
-            val maxJitter = gpsManager.maxGnssJitterMs
+            val maxJitter = hardwareProvider.maxGnssJitterMs
             if (stabilityAuditFixCount > 0 || maxJitter > 0) {
                 val reliability = if (stabilityAuditFixCount > 0) 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount else 100.0
                 val jitterViolation = maxJitter > GNSS_JITTER_THRESHOLD_MS
@@ -486,7 +481,7 @@ class TrackerService : BaseMonitorService() {
                     logManager.logServiceEvent(msg.toString().trim(), isImportant = true, isSpecial = jitterViolation, specialColor = if (jitterViolation) FORENSIC_PINK_COLOR else null, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
                 }
                 stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
-                gpsManager.resetGnssJitter()
+                hardwareProvider.resetGnssJitter()
             }
             lastStabilityAuditTs = nowRt
         }
@@ -512,9 +507,9 @@ class TrackerService : BaseMonitorService() {
 
         if (nowRt - lastPowerSaveCheckRt > 5000L) {
             val hasUnresolved = alarmManager.hasUnresolvedAlarms()
-            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(isStationary = appSensorManager.isStationary(), isGpsStalled = health.gpsStalled, hasUnresolvedAlarms = hasUnresolved, isUiVisible = isUiVisible())
+            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(isStationary = hardwareProvider.isStationary(), isGpsStalled = health.gpsStalled, hasUnresolvedAlarms = hasUnresolved, isUiVisible = isUiVisible())
             if (shouldBePowerSave != isPowerSaveActive) {
-                isPowerSaveActive = shouldBePowerSave; appSensorManager.setPowerSaveMode(shouldBePowerSave); logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISABLED"}", isImportant = false)
+                isPowerSaveActive = shouldBePowerSave; hardwareProvider.setPowerSaveMode(shouldBePowerSave); logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISABLED"}", isImportant = false)
                 withContext(Dispatchers.Main.immediate) { updateForegroundServiceType() }
             }
             lastPowerSaveCheckRt = nowRt
@@ -557,7 +552,7 @@ class TrackerService : BaseMonitorService() {
             while (isActive) {
                 val health = integrityMonitor.currentHealth
                 val proc = lastProcessedLocation
-                val snapshot = appSensorManager.consumeForensicSnapshot()
+                val snapshot = hardwareProvider.consumeForensicSnapshot()
                 
                 val lat = proc?.optimizedPoint?.lat ?: 0.0
                 val lng = proc?.optimizedPoint?.lng ?: 0.0
@@ -665,7 +660,7 @@ class TrackerService : BaseMonitorService() {
         if (isSystemActive) {
             val health = integrityMonitor.currentHealth
             notificationManager.updatePulse(
-                sats = gpsManager.satellitesUsed, 
+                sats = hardwareProvider.satellitesUsed, 
                 battery = health.batteryLevel, 
                 isSecure = !alarmManager.hasUnresolvedAlarms(), 
                 isPowerSave = isPowerSaveActive || health.isPowerSaveMode
@@ -692,7 +687,7 @@ class TrackerService : BaseMonitorService() {
         if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = nowRt
     }
 
-    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerConnected: Boolean, processed: ProcessedLocation, snapshot: AppSensorManager.ForensicSnapshot) {
+    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerConnected: Boolean, processed: ProcessedLocation, snapshot: HardwareProvider.ForensicSnapshot) {
         val health = integrityMonitor.currentHealth
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {

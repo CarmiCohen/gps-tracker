@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (Aug.29.00)
+# Project Issues & Hardening Tracking (Aug.29.07)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟢 Progress | 42 |
+| **Open Technical Issues** | 🟢 Progress | 38 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 763 |
+| **Resolved (Total)** | 🟢 Progress | 767 |
 
 ---
 
@@ -21,8 +21,10 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.29.00)
-*   **Concern #758b: Residual UI Thread Congestion (Async Geometry)**. Soak testing on SM-A155F revealed "Davey" warnings (>1000ms) during Map Hydration (Levels 4-7) despite engine pre-warming. Identified the bottleneck as synchronous point-circle generation in `MapOverlayManager`. Remediated by offloading all circle geometry calculations to `Dispatchers.Default` and implementing an async state-matching pattern to ensure the UI thread remains responsive during heavy overlay updates (R758b).
+## 🟢 Recently Resolved Issues (Aug.29.07)
+*   **Concern #762: Acoustic Duty-Cycle Optimization**. Identified excessive battery drain during long stationary periods due to fixed microphone duty-cycling. Remediated by implementing adaptive off-cycle scaling in `HardwareProvider`, increasing the interval from 8s up to 30s based on stationary duration (R762).
+*   **Concern #761: Telemetry Mapping Decomposition**. Resolved in Aug.29.05. Centralized transformations in `TelemetryMapper.kt`.
+*   **Legacy Purge**: Resolved in Aug.29.05. Emptied legacy manager files.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.29.00)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.29.07)

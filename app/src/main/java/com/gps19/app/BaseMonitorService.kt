@@ -19,12 +19,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * Aug.28.08:
- * - Issue #759: Logcat Spam Remediation. Switched to GpsApplication.PACKAGE_NAME 
- *   shadow-cache to eliminate repetitive getPackageName() system logs (R759).
- * Aug.26.19:
- * - Issue #320/249 Hardening: Centralized JdHardwareManager native release 
- *   in onDestroy to ensure consistent cleanup across all service roles (R320).
+ * Aug.29.03:
+ * - Issue #760 Hardening: Migrated from GpsManager and AppSensorManager to 
+ *   the unified HardwareProvider (R760).
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -40,7 +37,7 @@ abstract class BaseMonitorService : LifecycleService() {
     @Inject lateinit var systemMonitor: SystemMonitor
     @Inject lateinit var notificationManager: AppNotificationManager
 
-    @Inject lateinit var gpsManager: GpsManager
+    @Inject lateinit var hardwareProvider: HardwareProvider
     @Inject lateinit var sessionManager: SessionManager
     @Inject lateinit var systemStatusProvider: SystemStatusProvider
     @Inject lateinit var forensicUseCase: ServiceForensicUseCase
@@ -50,7 +47,6 @@ abstract class BaseMonitorService : LifecycleService() {
     @Inject lateinit var locationProcessor: LocationProcessor
     @Inject lateinit var commandRouter: CommandRouter
     
-    @Inject lateinit var appSensorManager: AppSensorManager
     @Inject lateinit var serviceBehaviorUseCase: ServiceBehaviorUseCase
     
     protected val cachedPkgName: String get() = GpsApplication.PACKAGE_NAME
@@ -192,10 +188,9 @@ abstract class BaseMonitorService : LifecycleService() {
         heartbeatJob?.cancel()
         fgsUpdateJob?.cancel()
         
-        // Issue #320/249: Hardened cleanup sequence.
-        // 1. Unregister all hardware callbacks synchronously.
-        appSensorManager.stop()
-        gpsManager.stop()
+        // Issue #760: Hardened cleanup sequence.
+        // 1. Unregister all hardware callbacks synchronously via unified provider.
+        hardwareProvider.stop()
 
         // Issue #320/249: Deterministic native hardware release.
         if (JdHardwareManager.isAvailable()) {

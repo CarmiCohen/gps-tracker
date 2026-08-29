@@ -24,6 +24,10 @@ import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Aug.29.01:
+ * - Issue #759b Remediation: Implemented segmented trail updates using 
+ *   coroutines with yield() to prevent Main-thread stalls when rendering 
+ *   large telemetry trails (>500 points).
  * Aug.29.00:
  * - Issue #758b Remediation: Implemented async geometry generation for accuracy 
  *   circles and geofences. Circle point calculations are now offloaded to 
@@ -109,6 +113,9 @@ class MapOverlayManager(
     private var lastDriftUpdateTs = 0L
     private var lastViolationUpdateTs = 0L
     private val BUDGET_THROTTLE_MS = 1000L 
+
+    private var trackerTrailJob: Job? = null
+    private var viewerTrailJob: Job? = null
 
     // Issue #208/758b: Circle Geometry Cache with Async Support
     private data class CircleKey(val latQ: Long, val lngQ: Long, val radiusQ: Long)
@@ -219,45 +226,76 @@ class MapOverlayManager(
         return true
     }
 
+    /**
+     * Issue #759b: Segmented trail update to prevent Main-thread stalls.
+     * Offloads checksum calculation and processes polyline points in chunks, 
+     * yielding to the UI thread for long trails (>500 points).
+     */
     fun updateTrails(
         trackerSegments: List<MapTrailSegment>, 
         viewerSegments: List<MapTrailSegment>, 
         systemPulseRt: Long
     ): Boolean {
-        var changed = false
         val canUpdateTracker = (systemPulseRt - lastTrailUpdateTs) > BUDGET_THROTTLE_MS || lastTrailChecksum == -1
         val canUpdateViewer = (systemPulseRt - lastViewerTrailUpdateTs) > BUDGET_THROTTLE_MS || lastViewerTrailChecksum == -1
 
-        val currentTrackerChecksum = trackerSegments.fold(0) { acc, seg -> acc * 31 + seg.checksum }
-        if (canUpdateTracker && lastTrailChecksum != currentTrackerChecksum) {
-            trailFolder.items.clear()
-            trackerSegments.forEachIndexed { idx, segment ->
-                val line = if (idx < trackerPolylinePool.size) trackerPolylinePool[idx] else Polyline(mapView).also { l -> l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); trackerPolylinePool.add(l) }
-                line.setPoints(segment.points)
-                line.outlinePaint.color = segment.color
-                trailFolder.add(line)
+        if (canUpdateTracker) {
+            val currentTrackerChecksum = trackerSegments.fold(0) { acc, seg -> acc * 31 + seg.checksum }
+            if (lastTrailChecksum != currentTrackerChecksum) {
+                lastTrailChecksum = currentTrackerChecksum
+                lastTrailUpdateTs = systemPulseRt
+                trackerTrailJob?.cancel()
+                trackerTrailJob = scope.launch {
+                    val polylines = mutableListOf<Polyline>()
+                    trackerSegments.forEachIndexed { idx, segment ->
+                        val line = if (idx < trackerPolylinePool.size) trackerPolylinePool[idx] else Polyline(mapView).also { l -> 
+                            l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); trackerPolylinePool.add(l) 
+                        }
+                        line.setPoints(segment.points)
+                        line.outlinePaint.color = segment.color
+                        polylines.add(line)
+                        
+                        // Issue #759b: Yield if segment is large or after every few segments to keep UI responsive
+                        if (segment.points.size > 500 || idx % 10 == 0) yield()
+                    }
+                    trailFolder.items.clear()
+                    trailFolder.items.addAll(polylines)
+                    mapView.invalidate()
+                    while(trackerPolylinePool.size > maxOf(trackerSegments.size + 5, MARKER_POOL_PRUNE_THRESHOLD)) {
+                        trackerPolylinePool.removeAt(trackerPolylinePool.size - 1)
+                    }
+                }
             }
-            lastTrailChecksum = currentTrackerChecksum
-            lastTrailUpdateTs = systemPulseRt
-            while(trackerPolylinePool.size > maxOf(trackerSegments.size + 5, MARKER_POOL_PRUNE_THRESHOLD)) trackerPolylinePool.removeAt(trackerPolylinePool.size - 1)
-            changed = true
         }
         
-        val currentViewerChecksum = viewerSegments.fold(0) { acc, seg -> acc * 31 + seg.checksum }
-        if (canUpdateViewer && lastViewerTrailChecksum != currentViewerChecksum) {
-            viewerTrailFolder.items.clear()
-            viewerSegments.forEachIndexed { idx, segment ->
-                val line = if (idx < viewerPolylinePool.size) viewerPolylinePool[idx] else Polyline(mapView).also { l -> l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); viewerPolylinePool.add(l) }
-                line.setPoints(segment.points)
-                line.outlinePaint.color = segment.color
-                viewerTrailFolder.add(line)
+        if (canUpdateViewer) {
+            val currentViewerChecksum = viewerSegments.fold(0) { acc, seg -> acc * 31 + seg.checksum }
+            if (lastViewerTrailChecksum != currentViewerChecksum) {
+                lastViewerTrailChecksum = currentViewerChecksum
+                lastViewerTrailUpdateTs = systemPulseRt
+                viewerTrailJob?.cancel()
+                viewerTrailJob = scope.launch {
+                    val polylines = mutableListOf<Polyline>()
+                    viewerSegments.forEachIndexed { idx, segment ->
+                        val line = if (idx < viewerPolylinePool.size) viewerPolylinePool[idx] else Polyline(mapView).also { l -> 
+                            l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); viewerPolylinePool.add(l) 
+                        }
+                        line.setPoints(segment.points)
+                        line.outlinePaint.color = segment.color
+                        polylines.add(line)
+                        
+                        if (segment.points.size > 500 || idx % 10 == 0) yield()
+                    }
+                    viewerTrailFolder.items.clear()
+                    viewerTrailFolder.items.addAll(polylines)
+                    mapView.invalidate()
+                    while(viewerPolylinePool.size > maxOf(viewerSegments.size + 5, MARKER_POOL_PRUNE_THRESHOLD)) {
+                        viewerPolylinePool.removeAt(viewerPolylinePool.size - 1)
+                    }
+                }
             }
-            lastViewerTrailChecksum = currentViewerChecksum
-            lastViewerTrailUpdateTs = systemPulseRt
-            while(viewerPolylinePool.size > maxOf(viewerSegments.size + 5, MARKER_POOL_PRUNE_THRESHOLD)) viewerPolylinePool.removeAt(viewerPolylinePool.size - 1)
-            changed = true
         }
-        return changed
+        return false // Job handles invalidation
     }
 
     fun updateViolations(violations: List<ViolationPoint>, isViolationsVisible: Boolean, isGeofenceViolationsVisible: Boolean, systemPulseRt: Long): Boolean {
