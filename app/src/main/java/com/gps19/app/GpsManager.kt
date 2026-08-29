@@ -24,12 +24,14 @@ import kotlin.math.abs
 
 /**
  * GpsManager: Hardware GPS and GNSS status provider.
+ * Aug.28.11:
+ * - Issue #757 Hardening: Refactored stop() to unconditionally attempt GNSS 
+ *   unregistration and added isStarted check to revival loop to prevent 
+ *   orphaned location updates during service teardown (R757).
  * Aug.28.09:
  * - Issue #757 Hardening: Refactored stop() to be unconditional for resource 
  *   cleanup. Fixed leak where revivalCallback and HandlerThread were orphaned 
  *   if stop() returned early due to isStarted=false (R757).
- * Aug.28.07:
- * - Issue #756 Hardening: Enhanced stop() with detailed trace logging (R756).
  */
 @Singleton
 class GpsManager @Inject constructor(
@@ -170,15 +172,16 @@ class GpsManager @Inject constructor(
     fun stop() {
         synchronized(lifecycleLock) {
             val wasStarted = isStarted.getAndSet(false)
-            Timber.i("GpsManager: stop() requested. isStarted=$wasStarted")
+            Timber.i("GpsManager: stop() requested. wasStarted=$wasStarted")
             
-            // Issue #757: Unregister GNSS only if start() was actually active
-            if (wasStarted) {
-                Timber.d("GpsManager: Unregistering GNSS callback...")
+            // Issue #757 Hardening: Unconditionally attempt unregistration to clear orphaned native callbacks
+            Timber.d("GpsManager: Unregistering GNSS callback...")
+            try {
                 gnssStatusCallback.unregister(locationManager, gpsHandler)
+            } catch (e: Exception) {
+                Timber.e(e, "GpsManager: GNSS unregistration failed")
             }
 
-            // Issue #757: Unconditional cleanup of location callbacks and hardware thread
             Timber.d("GpsManager: Unregistering active location updates...")
             activeLocationCallback?.unregister(fusedLocationClient)
             activeLocationCallback = null
@@ -205,6 +208,9 @@ class GpsManager @Inject constructor(
     }
 
     private fun checkRevivalLifecycle() {
+        // Issue #757: Prevent revival logic from running if the manager is explicitly stopped
+        if (!isStarted.get()) return
+
         val nowRt = timeProvider.elapsedRealtime()
         val currentStatus = _locationStatus.value
         
@@ -223,11 +229,13 @@ class GpsManager @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
+        if (!isStarted.get()) return
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
 
         externalScope.launch(Dispatchers.Main) {
             synchronized(lifecycleLock) {
-                // R750: Ensure previous revival unregistration is complete via abstraction
+                if (!isStarted.get()) return@synchronized
+                
                 revivalCallback?.unregister(fusedLocationClient)
                 
                 val callback = object : ManagedLocationCallback() {
@@ -302,7 +310,6 @@ class GpsManager @Inject constructor(
             }
             
             synchronized(lifecycleLock) {
-                // R750: Ensure previous callback is removed synchronously via abstraction during interval swaps
                 activeLocationCallback?.unregister(fusedLocationClient)
                 activeLocationCallback = fusedCallback
             }
@@ -325,7 +332,6 @@ class GpsManager @Inject constructor(
                         activeLocationCallback = null
                     }
                 }
-                // R750: Synchronous unregistration in awaitClose via abstraction
                 fusedCallback.unregister(fusedLocationClient)
             }
         }

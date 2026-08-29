@@ -35,13 +35,14 @@ import kotlin.math.*
 
 /**
  * AppSensorManager: Manages IMU, Environmental sensors, and Display state transitions.
+ * Aug.28.11:
+ * - Issue #757 Hardening: Refactored stop() to unconditionally attempt 
+ *   unregistration of sensor and display listeners to prevent native leaks 
+ *   if lifecycle state was out of sync (R757).
  * Aug.28.05:
  * - Issue #754 Hardening: Refactored to use ManagedSensorListener and ManagedDisplayListener
  *   abstractions. This standardizes synchronous unregistration and silences native 
  *   BaseEventQueue disposal warnings (R754).
- * Aug.27.02:
- * - Issue #746 Hardening: Refined stop() to explicitly unregister StepDetector 
- *   and ensure async registration jobs are finalized before thread disposal.
  */
 @Singleton
 class AppSensorManager @Inject constructor(
@@ -268,7 +269,7 @@ class AppSensorManager @Inject constructor(
 
     fun stop() {
         synchronized(lifecycleLock) {
-            if (!isStarted.getAndSet(false)) return
+            val wasStarted = isStarted.getAndSet(false)
             
             // Immediate cancellation of all async jobs
             recoveryJob?.cancel(); recoveryJob = null
@@ -277,23 +278,25 @@ class AppSensorManager @Inject constructor(
             
             stopAcousticMonitoring()
             
-            // Refactored to use ManagedHardware abstractions (Aug.28.05)
+            // Issue #757 Hardening: Unconditionally unregister listeners to clear native 
+            // resources even if isStarted state was out of sync.
             val handler = sensorHandler
             this.unregister(sensorManager, handler)
             displayListener.unregister(displayManager, handler)
 
-            sensorThread?.quitSafely()
-            try {
-                sensorThread?.join(1000)
-            } catch (e: InterruptedException) {
-                Timber.e("Sensor thread join interrupted")
+            if (sensorThread != null) {
+                sensorThread?.quitSafely()
+                try {
+                    sensorThread?.join(1000)
+                } catch (e: InterruptedException) {
+                    Timber.e("Sensor thread join interrupted")
+                }
+                sensorThread = null
+                sensorHandler = null
             }
             
-            sensorThread = null
-            sensorHandler = null
             isStepDetectorRegistered = false
-            
-            Timber.i("AppSensorManager: Synchronous stop completed.")
+            Timber.i("AppSensorManager: Synchronous stop completed. wasStarted=$wasStarted")
         }
     }
 

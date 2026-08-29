@@ -60,12 +60,13 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Aug.28.11:
+ * - Issue #759 Hardening: Switched all Context.packageName lookups to 
+ *   GpsApplication.PACKAGE_NAME shadow-cache to eliminate high-frequency 
+ *   Samsung A15 diagnostic log spam (R759).
  * Aug.28.03:
  * - Issue #753 Hardening: Refactored Battery and Power status flows to use 
  *   ManagedBroadcastReceiver for deterministic native resource cleanup (R753).
- * Aug.28.02:
- * - Issue #750 Hardening: Refactored sharedInternetStatusFlow to use 
- *   ManagedNetworkCallback for deterministic unregistration (R750).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -140,6 +141,9 @@ class SystemStatusProviderImpl @Inject constructor(
     private val INTERNET_CACHE_TTL_MS = 10000L
 
     private var lastHardwareCheckRt = 0L
+    
+    // R759: Centralized package name via shadow-cache
+    private val cachedPkgName: String get() = GpsApplication.PACKAGE_NAME
 
     override suspend fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
     override suspend fun isAutoStartGranted(): Boolean = getPermissionState().isAutoStartGranted
@@ -205,7 +209,7 @@ class SystemStatusProviderImpl @Inject constructor(
                 if (doubleCheckExecute) {
                     try {
                         val current = cachedState.get()
-                        val pkg = GpsApplication.PACKAGE_NAME
+                        val pkg = cachedPkgName // Issue #759: Use shadow-cache
                         withContext(Dispatchers.IO) {
                             val fineLocGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                             val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(pkg)
