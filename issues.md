@@ -1,18 +1,18 @@
-# Project Issues & Hardening Tracking (Aug.28.11)
+# Project Issues & Hardening Tracking (Aug.29.00)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟢 Progress | 43 |
+| **Open Technical Issues** | 🟢 Progress | 42 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 762 |
+| **Resolved (Total)** | 🟢 Progress | 763 |
 
 ---
 
 ## ⚠️ Newly Identified Risks & Concerns
-*   **Concern #758b: Residual UI Thread Congestion**. Despite engine pre-warming, log analysis on SM-A155F still shows "Davey" warnings (>1000ms) during Map Hydration (Levels 4-7). This indicates that the imperative overlay addition (Trails/Markers) in `MapOverlayManager` is still too heavy for single-frame execution.
+*   None identified in this session.
 
 ---
 
@@ -21,10 +21,8 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.28.11)
-*   **Concern #757: Persistent BaseEventQueue Leak (Hardening)**. Audit of deployment logs showed native disposal failures during service teardown. Refactored `GpsManager` and `AppSensorManager` to make listener unregistration unconditional, ensuring that background revival callbacks and secondary hardware listeners are cleared even if primary flow state-tracking was out of sync (R757).
-*   **Concern #759: Excessive Logcat Spam (Samsung A15)**. Hardened `SystemStatusProvider` to utilize `GpsApplication.PACKAGE_NAME` shadow-cache for high-frequency permission and capability checks, eliminating repetitive system-level diagnostic logs (R759).
-*   **Concern #758: UI Thread Congestion (Frame Skipping)**. Implemented IO-thread pre-warming for OSM engine and integrated an `isOsmReady` gate to ensure heavy engine initialization occurs off the UI thread (R758).
+## 🟢 Recently Resolved Issues (Aug.29.00)
+*   **Concern #758b: Residual UI Thread Congestion (Async Geometry)**. Soak testing on SM-A155F revealed "Davey" warnings (>1000ms) during Map Hydration (Levels 4-7) despite engine pre-warming. Identified the bottleneck as synchronous point-circle generation in `MapOverlayManager`. Remediated by offloading all circle geometry calculations to `Dispatchers.Default` and implementing an async state-matching pattern to ensure the UI thread remains responsive during heavy overlay updates (R758b).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.28.11)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.29.00)

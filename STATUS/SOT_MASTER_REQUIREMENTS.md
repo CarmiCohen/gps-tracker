@@ -1,8 +1,8 @@
-# SOT Master Requirements (Aug.28.11)
+# SOT Master Requirements (Aug.29.00)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (22 Rules)
+## 🏗️ Architectural Master Rules (23 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -25,28 +25,20 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **2.5 Snap-Isolation Throttling (R312)**: High-frequency telemetry flows (Logs, Trails, Violations, History) must utilize Snap-Isolation via deep-parity throttling (`contentEquals` + `distinctUntilChanged`). This prevents the Compose Recomposer from performing redundant snapshot reconciliation cycles, eliminating lock verification failures and thread synchronization contention on Samsung hardware (R312).
 *   **2.6 GPS Warm-up Grace Period (R315)**: Signal loss and accuracy violations must be suppressed for the first 30 seconds after system activation or mode transition to allow GPS provider stabilization (R315).
 *   **2.7 UI Fluidity**: UI stalls (Davey) must not exceed 700ms on target hardware (SM-A155F).
-
-### 3. Forensic & Security Rules
-*   **3.1 Sampling Frequency**: Forensic sampling must operate between 10ms and 100ms based on system load (R700).
-*   **3.2 Reliability Threshold**: `ALERT_ID_PERFORMANCE_SPIKE` must trigger if `forensicReliability` (EMA) drops below 0.85 for >30s (R715).
-*   **3.3 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`, `ToggleSetupBypass`) to verify alarm triggers and facilitate automated soak tests under simulated stress (R196-V, R735).
-*   **3.4 Identity Sanitization (R976)**: Identity sanitization state must be persistent. The warning overlay dismissal must be written to the DataStore to prevent redundant notifications across cold starts (R737, R976).
-*   **3.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
+*   **2.8 Async Geometry Generation (R758b)**: **NEW**. Heavy map overlay geometry (e.g., accuracy circles, geofence polygons) must be generated off the UI thread. `MapOverlayManager` must utilize `Dispatchers.Default` for point calculations and trigger a `MapView.invalidate()` only when geometry is ready, ensuring 60FPS fluid motion during high-frequency telemetry updates (Updated Aug.29.00).
 
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.29.00**: Resolved Concern #758b (Residual UI Thread Congestion). Implemented async geometry generation for accuracy circles and geofences to eliminate "Davey" stalls during map hydration (R758b).
 *   **Aug.28.11**: Resolved Concern #757 (Persistent BaseEventQueue Leak). Refactored `GpsManager` and `AppSensorManager` to perform unconditional unregistration of all hardware listeners, ensuring orphaned revival callbacks are cleared even if primary flow state was out of sync (R757). Hardened `SystemStatusProvider` with `PACKAGE_NAME` shadow-cache to eliminate high-frequency log spam (R759).
 *   **Aug.28.10**: Resolved Concern #758 (UI Thread Congestion). Offloaded OSMDroid engine pre-warming to IO thread and added `isOsmReady` gate to `LifecycleHydrationManager` (R758).
-*   **Aug.28.09**: Resolved Concern #757 (Persistent BaseEventQueue Leak). Refactored `GpsManager` to perform unconditional cleanup of location callbacks.
-*   **Aug.28.08**: Resolved Concern #759 (Logcat Spam Remediation). Migrated `MainActivity` and `BaseMonitorService` to `PACKAGE_NAME` shadow-cache.
-*   **Aug.28.07**: Resolved Concern #756 (Persistent GNSS/Network Leak). Hardened `ManagedHardware` with fallback unregistration paths.
 
 ---
 
 ## 📋 Functional Requirements (143 R-IDs)
 *   **R101**: Background location tracking continuity (High-Uptime).
-*   **R102**: Real-time telemetry synchronization via Socket.io.
+*   **R102**: Real-ala-time telemetry synchronization via Socket.io.
 *   **R103**: Forensic event logging with microsecond precision.
 *   **R104**: Geo-fencing authority with configurable distance thresholds.
 *   **R105**: Battery steep discharge detection and alerting.

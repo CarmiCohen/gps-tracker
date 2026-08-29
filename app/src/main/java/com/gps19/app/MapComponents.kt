@@ -38,14 +38,15 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Aug.29.00:
+ * - Issue #758b Remediation: Integrated MapOverlayManager.onDetach() into 
+ *   AndroidView onRelease to ensure background geometry jobs are cancelled 
+ *   during view destruction (R758b).
  * Aug.26.16:
  * - Issue #739 Remediation: Integrated hydrationLevel gating into OsmMap 
  *   AndroidView update block. This ensures that heavy overlay initialization 
  *   (trails, markers, circles) is staggered across multiple frames, 
  *   eliminating the 1.4s Davey stall on A15 hardware (R739).
- * Aug.20.04:
- * - Issue #224 Hardening: Increased smoothing reset threshold to 100m 
- *   to eliminate visual coordinate "snaps" during GPS revival (R224).
  */
 
 @Composable
@@ -450,7 +451,10 @@ fun OsmMap(
                 }
             }
         }
-    }, onRelease = { view -> view.onDetach(); view.tileProvider.tileCache.clear(); view.tileProvider.detach() }, modifier = Modifier.fillMaxSize())
+    }, onRelease = { view -> 
+        overlayManager?.onDetach()
+        view.onDetach(); view.tileProvider.tileCache.clear(); view.tileProvider.detach() 
+    }, modifier = Modifier.fillMaxSize())
 }
 
 @Composable

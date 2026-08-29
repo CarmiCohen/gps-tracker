@@ -11,6 +11,7 @@ import androidx.core.graphics.applyCanvas
 import androidx.core.graphics.drawable.toDrawable
 import com.gps19.app.BuildConfig
 import com.gps19.core.engine.*
+import kotlinx.coroutines.*
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.*
@@ -23,19 +24,16 @@ import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Aug.29.00:
+ * - Issue #758b Remediation: Implemented async geometry generation for accuracy 
+ *   circles and geofences. Circle point calculations are now offloaded to 
+ *   Dispatchers.Default to prevent Main-thread "Davey" stalls during 
+ *   hydration levels 4-7 (R758b).
+ * - Issue #758b Performance: Added a secondary geometry cache and specialized 
+ *   quantization for high-frequency drift updates to reduce allocation churn (R758b).
  * Aug.25.00:
  * - Issue #309 Remediation: Replaced SnapshotStateList/Map with standard 
- *   ArrayList/HashMap. These pools are imperative and used within AndroidView.update, 
- *   eliminating Compose lock verification failures on A15 hardware (R309).
- * Aug.24.00:
- * - Issue #255 Hardening: Refactored pools to SnapshotStateList and SnapshotStateMap 
- *   to resolve Compose lock verification failures during high-frequency telemetry (R255).
- * Aug.18.09:
- * - Issue #208 Performance Audit: Implemented circle geometry caching (R208).
- * - Issue #208 Performance Audit: Added drift and center quantization to 
- *   circle cache keys to maximize hit rates during movement (R208).
- * - Issue #208 Performance Audit: Implemented filtered violations caching 
- *   to eliminate O(N) churn in updateViolations (R208).
+ *   ArrayList/HashMap.
  */
 class MapOverlayManager(
     private val context: Context,
@@ -43,6 +41,7 @@ class MapOverlayManager(
     private val density: Float
 ) {
     private val resources = context.resources
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     // Folders
     private val trailFolder = FolderOverlay()
@@ -64,7 +63,7 @@ class MapOverlayManager(
     private val replayMarker = Marker(mapView).apply { setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); setInfoWindow(null) }
     private val replayCircle = Polygon(mapView).apply { fillPaint.color = 0; outlinePaint.strokeWidth = 2f; setInfoWindow(null) }
 
-    // Pools: Issue #309 Replaced SnapshotStateList with ArrayList
+    // Pools
     private val homeMarkerPool = ArrayList<Marker>()
     private val violationMarkerPool = ArrayList<Marker>()
     private val violationCirclePool = ArrayList<Polygon>()
@@ -80,7 +79,6 @@ class MapOverlayManager(
     private val geofenceIcon = createGeofenceViolationBitmap(density).toDrawable(resources)
     private val replayIcon = createReplayMarkerBitmap(density).toDrawable(resources)
     
-    // Issue #309 Replaced SnapshotStateMap with HashMap
     private val homeIcons = HashMap<Int, BitmapDrawable>()
 
     // State Caches
@@ -112,21 +110,41 @@ class MapOverlayManager(
     private var lastViolationUpdateTs = 0L
     private val BUDGET_THROTTLE_MS = 1000L 
 
-    // Issue #208: Circle Geometry Cache with Spatial Quantization
+    // Issue #208/758b: Circle Geometry Cache with Async Support
     private data class CircleKey(val latQ: Long, val lngQ: Long, val radiusQ: Long)
-    private val circleCache = mutableMapOf<CircleKey, List<GeoPoint>>()
+    private val circleCache = Collections.synchronizedMap(mutableMapOf<CircleKey, List<GeoPoint>>())
+    private val pendingCalculations = Collections.synchronizedSet(mutableSetOf<CircleKey>())
 
-    private fun getCachedCircle(center: GeoPoint, radius: Double): List<GeoPoint> {
-        // Issue #208: Quantize center (approx 0.1m) and radius (0.5m) to maximize hit rate
-        val latQ = (center.latitude * 1_000_000).toLong() // Approx 0.11m precision
+    /**
+     * Issue #758b: Offloads Polygon.pointsAsCircle to a background thread.
+     * Returns the cached points if available, otherwise triggers async generation.
+     */
+    private fun getAsyncCircle(center: GeoPoint, radius: Double, onReady: (List<GeoPoint>) -> Unit): List<GeoPoint>? {
+        val latQ = (center.latitude * 1_000_000).toLong()
         val lngQ = (center.longitude * 1_000_000).toLong()
-        val radiusQ = (round(radius * 2.0)).toLong() // 0.5m steps
+        val radiusQ = (round(radius * 2.0)).toLong()
         
         val key = CircleKey(latQ, lngQ, radiusQ)
-        return circleCache.getOrPut(key) { 
-            if (circleCache.size > 200) circleCache.clear() 
-            Polygon.pointsAsCircle(center, radiusQ / 2.0) 
+        val cached = circleCache[key]
+        
+        if (cached != null) return cached
+        
+        if (pendingCalculations.add(key)) {
+            scope.launch(Dispatchers.Default) {
+                try {
+                    val points = Polygon.pointsAsCircle(center, radiusQ / 2.0)
+                    if (circleCache.size > 300) circleCache.clear()
+                    circleCache[key] = points
+                    withContext(Dispatchers.Main) {
+                        onReady(points)
+                        pendingCalculations.remove(key)
+                    }
+                } catch (e: Exception) {
+                    pendingCalculations.remove(key)
+                }
+            }
         }
+        return null
     }
 
     init {
@@ -140,6 +158,10 @@ class MapOverlayManager(
         mapView.overlays.add(replayFolder)
     }
 
+    fun onDetach() {
+        scope.cancel()
+    }
+
     fun updateHomePoints(
         home: List<GeoPoint>,
         isFenceVisible: Boolean,
@@ -149,7 +171,6 @@ class MapOverlayManager(
         onTap: (GeoPoint) -> Unit,
         onRemoveMarker: (Int) -> Unit
     ): Boolean {
-        // Issue #208: Reference check first to avoid O(N) list equality
         if (lastHomeRendered === home && lastFenceState == isFenceVisible && 
             lastIsTrackerMode == isTrackerMode && lastGeofenceMode == geofenceMode) return false
             
@@ -166,10 +187,16 @@ class MapOverlayManager(
 
         if (isFenceVisible) {
             home.forEachIndexed { idx, p ->
-                fenceFolder.add(Polygon(mapView).apply { 
-                    points = getCachedCircle(p, maxD)
+                val poly = Polygon(mapView).apply { 
                     fillPaint.color = 0x28CBD5E1.toInt(); outlinePaint.color = 0xC8CBD5E1.toInt(); outlinePaint.strokeWidth = 2f; setInfoWindow(null) 
-                })
+                }
+                val cachedPoints = getAsyncCircle(p, maxD) { points ->
+                    poly.points = points
+                    mapView.invalidate()
+                }
+                if (cachedPoints != null) poly.points = cachedPoints
+                fenceFolder.add(poly)
+
                 val marker = if (idx < homeMarkerPool.size) homeMarkerPool[idx] else Marker(mapView).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); homeMarkerPool.add(m) }
                 marker.position = p; marker.icon = homeIcons.getOrPut(idx + 1) { createHomeBitmap(density, idx + 1).toDrawable(resources) as BitmapDrawable }
                 marker.setOnMarkerClickListener { mk, mv -> 
@@ -236,7 +263,6 @@ class MapOverlayManager(
     fun updateViolations(violations: List<ViolationPoint>, isViolationsVisible: Boolean, isGeofenceViolationsVisible: Boolean, systemPulseRt: Long): Boolean {
         val visibilityPair = Pair(isViolationsVisible, isGeofenceViolationsVisible)
         
-        // Issue #208: Skip filtering and re-rendering if data and visibility are identical
         if (lastViolationsRef === violations && lastViolationVisibility == visibilityPair) return false
         if (lastViolationsSize == violations.size && lastViolationVisibility == visibilityPair) return false
         if ((systemPulseRt - lastViolationUpdateTs) < BUDGET_THROTTLE_MS && lastViolationsSize != -1) return false
@@ -244,7 +270,6 @@ class MapOverlayManager(
         violationMarkersFolder.items.clear()
         violationAccuracyFolder.items.clear()
         
-        // Issue #208: Cache filtered results
         cachedFilteredViolations = violations.filter { v -> 
             val isJump = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
             val isGeo = v.type == ALERT_ID_TRACKER_GEOFENCE
@@ -267,8 +292,13 @@ class MapOverlayManager(
             val hAcc = if (v.maxAccuracy > 0.0) v.maxAccuracy else v.accuracy
             if (hAcc > 0.0) {
                 val c = if (index < violationCirclePool.size) violationCirclePool[index] else Polygon(mapView).also { p -> p.fillPaint.color = 0; p.outlinePaint.strokeWidth = 2f; p.setInfoWindow(null); violationCirclePool.add(p) }
-                c.points = getCachedCircle(gp, hAcc)
                 c.outlinePaint.color = (if (isJump) 0x60FF00FF else 0x60FF0000).toInt()
+                
+                val cachedPoints = getAsyncCircle(gp, hAcc) { points ->
+                    c.points = points
+                    mapView.invalidate()
+                }
+                if (cachedPoints != null) c.points = cachedPoints
                 violationAccuracyFolder.add(c)
             }
         }
@@ -288,7 +318,11 @@ class MapOverlayManager(
             replayMarker.icon = replayIcon
             replayFolder.add(replayMarker)
             
-            replayCircle.points = getCachedCircle(pos, 5.0)
+            val cachedPoints = getAsyncCircle(pos, 5.0) { points ->
+                replayCircle.points = points
+                mapView.invalidate()
+            }
+            if (cachedPoints != null) replayCircle.points = cachedPoints
             replayCircle.outlinePaint.color = android.graphics.Color.WHITE
             replayFolder.add(replayCircle)
         }
@@ -331,7 +365,13 @@ class MapOverlayManager(
 
                 if (canUpdateDrift && (posChanged || driftSignificant)) {
                     accuracyCirclesFolder.items.remove(trackerCircle)
-                    trackerCircle.points = getCachedCircle(trackerPos, drift)
+                    
+                    val cachedPoints = getAsyncCircle(trackerPos, drift) { points ->
+                        trackerCircle.points = points
+                        mapView.invalidate()
+                    }
+                    if (cachedPoints != null) trackerCircle.points = cachedPoints
+                    
                     trackerCircle.outlinePaint.color = if (isTrackerFresh) BrandJd.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                     accuracyCirclesFolder.add(trackerCircle)
                     lastTrackerPos = trackerPos
@@ -377,7 +417,13 @@ class MapOverlayManager(
 
                 if (canUpdateDrift && (posChanged || driftSignificant)) {
                     accuracyCirclesFolder.items.remove(viewerCircle)
-                    viewerCircle.points = getCachedCircle(viewerPos, drift)
+                    
+                    val cachedPoints = getAsyncCircle(viewerPos, drift) { points ->
+                        viewerCircle.points = points
+                        mapView.invalidate()
+                    }
+                    if (cachedPoints != null) viewerCircle.points = cachedPoints
+
                     viewerCircle.outlinePaint.color = if (isViewerFresh) ViewerCyan.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
                     accuracyCirclesFolder.add(viewerCircle)
                     lastViewerPos = viewerPos
