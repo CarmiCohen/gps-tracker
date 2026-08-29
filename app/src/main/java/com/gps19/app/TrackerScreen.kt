@@ -29,14 +29,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Aug.29.11:
+ * - UI Refinement: Added visual indicator for Ultra-Long Stationary state (R765).
  * Aug.26.16:
- * - Issue #739 Remediation: Passed hydrationLevel to AppMapContainer and fixed 
- *   unresolved reference in TrackerDashboard and MapToolsOverlay (R739).
- * Aug.26.05:
- * - Issue #323 Hardening: Removed redundant internal hydration logic. 
- *   Synchronized with LifecycleHydrationManager Level 4 (Idle Map) to 
- *   ensure Map Engine initialization doesn't compete with startup frame 
- *   rendering (R323).
+ * - Issue #739 Remediation: Passed hydrationLevel to AppMapContainer.
  */
 
 @Composable
@@ -256,6 +252,7 @@ fun TrackerScreen(
                                     cpuLoad = dashboardState.cpuLoad,
                                     ioWait = dashboardState.ioWait,
                                     maxIoLatency = dashboardState.maxIoLatency,
+                                    isUltraLongStationary = dashboardState.isUltraLongStationary,
                                     onEvent = { viewModel.onEvent(it) }
                                 )
                             }
@@ -435,6 +432,7 @@ fun TrackerScreen(
                                 cpuLoad = dashboardState.cpuLoad,
                                 ioWait = dashboardState.ioWait,
                                 maxIoLatency = dashboardState.maxIoLatency,
+                                isUltraLongStationary = dashboardState.isUltraLongStationary,
                                 onEvent = { viewModel.onEvent(it) }
                             )
                         }
@@ -589,6 +587,7 @@ fun TrackerDashboard(
     cpuLoad: Double,
     ioWait: Double,
     maxIoLatency: Long,
+    isUltraLongStationary: Boolean = false,
     onEvent: (UiEvent) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -665,6 +664,7 @@ fun TrackerDashboard(
                     cpuLoad = cpuLoad,
                     ioWait = ioWait,
                     maxIoLatency = maxIoLatency,
+                    isUltraLongStationary = isUltraLongStationary,
                     onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                 )
                 

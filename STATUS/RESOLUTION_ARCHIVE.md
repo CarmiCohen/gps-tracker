@@ -2,6 +2,14 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.29.12 (vAug.29.12)
+*   **Concern #762 Resolved**: **Acoustic Refinement (R762b)**. Encapsulated the adaptive acoustic duty-cycle calculation into a standalone pure function (`computeAdaptiveAcousticOffCycle`) in `SentinelValidator.kt`. Refactored `HardwareProvider.kt` to utilize this function, reducing complexity in the acoustic monitoring loop and improving testability by separating calculation logic from hardware side-effects (R762b).
+*   **Completion Sequence**: Finalized acoustic logic audit, synchronized all status tracking documentation, and incremented app version to `Aug.29.12`.
+
+## 🟢 Aug.29.11 (vAug.29.11)
+*   **Concern #765 Resolved**: **Ultra-Long Stationary State UI Refinement**. Identified a lack of visual feedback in the UI when the system enters the ultra-long GNSS relaxation mode. Remediated by adding `[ULTRA]` badges to the HUD (StatusBar) and the Telemetry Dashboard. This provides full transparency to the user (locally) and viewer (remotely) regarding the system's current power-saving state (R765).
+*   **Completion Sequence**: Finalized UI transparency audit, synchronized all status tracking documentation, and incremented app version to `Aug.29.11`.
+
 ## 🟢 Aug.29.10 (vAug.29.10)
 *   **Concern #765 Resolved**: **Ultra-Long Stationary State Exposure**. Identified a lack of transparency when the system enters ultra-long GNSS relaxation mode. Remediated by centralizing "Ultra-Long Stationary" state logic in `HardwareProvider.kt` and exposing it via `isUltraLongStationaryFlow`. Propagated this state through the `TrackerService` to the `NotificationManager` (for local foreground pulse) and the telemetry aggregation pipeline (for remote viewer transparency). This ensures deterministic awareness of power-saving behaviors (R765).
 *   **Completion Sequence**: Finalized hardware transparency audit, incremented database version to 74 with MIGRATION_73_74, and synchronized all status tracking documentation.

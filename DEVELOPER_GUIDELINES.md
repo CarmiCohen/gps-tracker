@@ -8,11 +8,13 @@ The following rules MUST be followed strictly for every task:
 4. **Mark Resolved**: Record all fixed issues in the relevant status tracking file and mark them as resolved.
 5. **Continuous Handover**: Update `Handover.md` after each modification to any `.kt` file.
 6. **Transparency**: Briefly explain each action before executing it.
+<!--
 7. **Handover Trigger**: Whenever the number of agent calls reaches about 90, stop the implementation and start a new fresh chat.
     - **Running Tally**: Maintain a `Session Call Count` in the `Audit Baseline` section of `Handover.md`.
     - **Budget Check**: Before starting a new task, check the `Session Call Count`. If it exceeds 80, transition to the Completion Sequence immediately.
     - **Self-Reporting**: Occasionally include the estimated call count in Transparency explanations (e.g., "Step X [Call ~45/90]").
     - **Reset**: The count resets only upon starting a fresh chat session.
+-->
 
 ## 🏁 Completion Sequence
 Perform the following steps in order once an issue is resolved:

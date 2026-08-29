@@ -49,11 +49,12 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Aug.29.11:
+ * - UI Refinement: Added visual indicator for Ultra-Long Stationary state 
+ *   in StatusBar and HUD (R765).
  * Aug.20.09:
  * - Issue #226: HUD State Centralization. Refactored GlobalStatusBar and 
  *   StatusBar to consume unified HudState (R226).
- * Aug.14.05:
- * - Issue #174: Forensic Replay Latency Audit.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -617,7 +618,8 @@ fun GlobalStatusBar(
         viewerLocPendingReason = hudState.viewerLocPendingReason, 
         lastGpsTs = lastGpsTs, 
         isTelemetryFresh = isPeerActive, 
-        isGpsFresh = isTrackerGpsActive
+        isGpsFresh = isTrackerGpsActive,
+        isUltraLongStationary = hudState.isUltraLongStationary
     )
 }
 
@@ -638,7 +640,8 @@ fun StatusBar(
     viewerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     lastGpsTs: Long = 0L,
     isTelemetryFresh: Boolean = true,
-    isGpsFresh: Boolean = true
+    isGpsFresh: Boolean = true,
+    isUltraLongStationary: Boolean = false
 ) {
     // Legacy mapping: lastP was treated as "last packet timestamp", but in GlobalStatusBar we passed a value derived from progressPulse.
     // We adjust here to maintain consistent visual progress.
@@ -687,7 +690,7 @@ fun StatusBar(
                     }
                     val tAge = if(lastGpsTs > 0) now - lastGpsTs else -1L
                     Box(modifier = Modifier.weight(1f)) { 
-                        StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = isTelemetryFresh, isGpsFresh = isGpsFresh) 
+                        StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = isTelemetryFresh, isGpsFresh = isGpsFresh, isUltraLongStationary = isUltraLongStationary) 
                     }
                 }
             } else {
@@ -697,7 +700,7 @@ fun StatusBar(
                     Spacer(modifier = Modifier.height(3.dp))
                 }
                 val tAge = if(lastGpsTs > 0) now - lastGpsTs else -1L
-                StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = if (mode == "tracker") (viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isTelemetryFresh, isGpsFresh = isGpsFresh)
+                StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = if (mode == "tracker") (viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isTelemetryFresh, isGpsFresh = isGpsFresh, isUltraLongStationary = isUltraLongStationary)
             }
         }
     }
@@ -708,7 +711,8 @@ fun StatusRowData(
     label: String, battery: Int, commIndex: Int, color: Color, isCharging: Boolean = false, accuracy: Float = 0f, maxAccuracy: Float = 0f, 
     satsView: Int = 0, satsUsed: Int = 0, gpsAgeMs: Long = -1L, temp: Float = 0f, distance: Double? = null, horizontalPadding: androidx.compose.ui.unit.Dp = 1.dp,
     isRemote: Boolean = false, isPeerActive: Boolean = true, overrideDistanceColor: Color? = null, 
-    isLocPending: Boolean = false, locPendingReason: LocationPendingReason = LocationPendingReason.NONE, isTelemetryFresh: Boolean = true, isGpsFresh: Boolean = true
+    isLocPending: Boolean = false, locPendingReason: LocationPendingReason = LocationPendingReason.NONE, isTelemetryFresh: Boolean = true, isGpsFresh: Boolean = true,
+    isUltraLongStationary: Boolean = false
 ) {
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     val isConnStale = isRemote && !isPeerActive
@@ -754,6 +758,13 @@ fun StatusRowData(
         }
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
             if (!isConnStale) {
+                if (isUltraLongStationary) {
+                    Box(modifier = Modifier.background(BrandJd.copy(alpha = 0.2f), RoundedCornerShape(2.dp)).padding(horizontal = 2.dp)) {
+                        Text(text = "[ULTRA]", color = BrandJd, fontSize = 8.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, style = compactStyle)
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+
                 if (isLocPending && locPendingReason != LocationPendingReason.NONE) {
                     Text(text = locPendingReason.name.replace("_", " "), color = Amber500, fontSize = 8.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false), textAlign = TextAlign.End, style = compactStyle)
                 } else {

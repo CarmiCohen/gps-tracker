@@ -25,10 +25,11 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Aug.29.11:
+ * - UI Refinement: Added visual indicator for Ultra-Long Stationary state 
+ *   in Dashboard header (R765).
  * Aug.22.04:
  * - Issue #140 Restoration Build Fix: Unified naming to maxIoLatency.
- * Aug.17.02:
- * - Issue #187: Dashboard Layout Jitter.
  */
 
 @Composable
@@ -100,6 +101,7 @@ fun MainDashboardGrid(
     cpuLoad: Double,
     ioWait: Double,
     maxIoLatency: Long,
+    isUltraLongStationary: Boolean = false,
     onShowGnssDetail: () -> Unit = {}
 ) {
     val isViewer = appMode == "viewer"
@@ -124,7 +126,8 @@ fun MainDashboardGrid(
                 isTamperDetected = isTamperDetected,
                 isBatterySteepDischarge = isBatterySteepDischarge,
                 isBatteryLow = isBatteryLow,
-                isBatteryCritical = isBatteryCritical
+                isBatteryCritical = isBatteryCritical,
+                isUltraLongStationary = isUltraLongStationary
             )
             
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
@@ -170,7 +173,8 @@ private fun DashboardHeader(
     isTamperDetected: Boolean,
     isBatterySteepDischarge: Boolean,
     isBatteryLow: Boolean,
-    isBatteryCritical: Boolean
+    isBatteryCritical: Boolean,
+    isUltraLongStationary: Boolean
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "DashboardPulse")
     val movingAlpha by infiniteTransition.animateFloat(
@@ -205,7 +209,8 @@ private fun DashboardHeader(
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (isUltraLongStationary) Badge("[ULTRA]", BrandJd)
             if (status == SentinelStatus.TAMPER) Badge("[TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
             if (isTamperDetected) Badge("[HW TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
             if (isBatterySteepDischarge) Badge("[BATT HEALTH]", if (isTelemetryFresh) Rose500 else Slate500)
@@ -452,6 +457,7 @@ fun TelemetryBox(
     heading: Double, tilt: Double, acousticDb: Double, baroAlt: Double, lux: Double, proximityCm: Double, proximityDebounceMs: Long,
     rollingVibration: Double, trackerMaxTemp: Double, viewerMaxTemp: Double, peakShock: Double, vibrationFloor: Double, luxBaseline: Double,
     acousticFloorDb: Double, trackerCurrentMa: Int, gpsIdx: GpsIndexData, rttValue: Int, cpuLoad: Double, ioWait: Double, maxIoLatency: Long,
+    isUltraLongStationary: Boolean = false,
     onShowGnssDetail: () -> Unit = {}
 ) {
     MainDashboardGrid(
@@ -468,7 +474,7 @@ fun TelemetryBox(
         heading = heading, tilt = tilt, acousticDb = acousticDb, baroAlt = baroAlt, lux = lux, proximityCm = proximityCm, proximityDebounceMs = proximityDebounceMs,
         rollingVibration = rollingVibration, trackerMaxTemp = trackerMaxTemp, viewerMaxTemp = viewerMaxTemp, peakShock = peakShock, vibrationFloor = vibrationFloor,
         luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb, trackerCurrentMa = trackerCurrentMa, gpsIdx = gpsIdx, rttValue = rttValue,
-        cpuLoad = cpuLoad, ioWait = ioWait, maxIoLatency = maxIoLatency, onShowGnssDetail = onShowGnssDetail
+        cpuLoad = cpuLoad, ioWait = ioWait, maxIoLatency = maxIoLatency, isUltraLongStationary = isUltraLongStationary, onShowGnssDetail = onShowGnssDetail
     )
 }
 

@@ -6,6 +6,7 @@ import androidx.preference.PreferenceManager
 import androidx.work.Configuration
 import android.content.Context
 import android.content.ComponentCallbacks2
+import android.os.Process
 import androidx.hilt.work.HiltWorkerFactory
 import org.osmdroid.config.Configuration as OsmConfig
 import org.osmdroid.tileprovider.modules.SqlTileWriter
@@ -22,20 +23,12 @@ import com.gps19.core.engine.ShadowCache
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Aug.29.13:
+ * - Issue #759 Hardening: Added MY_UID shadow-cache to eliminate repetitive 
+ *   Process.myUid() IPC calls that trigger system diagnostic logs (R759).
  * Aug.28.10:
  * - Issue #758 Optimization: Implemented pre-warming of SqlTileWriter on IO 
- *   thread and added isOsmReady signal to prevent MapView initialization 
- *   stalls during hydration (R758).
- * Aug.28.10:
- * - Issue #758 Optimization: Moved OsmDroid configuration to the start of the 
- *   initialization block to ensure SqlTileWriter and cache paths are ready 
- *   before MapView instantiation, reducing Davey stalls on A15 hardware (R758).
- * Aug.19.13:
- * - Issue #217: Shadow-Cache Eviction Strategy. Transitioned to LRU-based 
- *   ShadowCache to prevent unbounded memory growth during multi-day 
- *   tracking sessions (R217).
- * Aug.04.111:
- * - Issue #721: Logcat Spam Hardening. Added PACKAGE_NAME shadow-cache.
+ *   thread and added isOsmReady signal (R758).
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -46,12 +39,19 @@ class GpsApplication : Application(), Configuration.Provider {
 
     companion object {
         private val stringCache = ShadowCache<String, String>(100)
+        private val intCache = ShadowCache<String, Int>(10)
 
         /**
          * Shadow-cache for the package name to avoid triggering Samsung's repetitive 
          * 'getPackageName' logcat spam.
          */
         val PACKAGE_NAME: String by lazy { stringCache.getOrPut("pkg") { "" } }
+
+        /**
+         * Shadow-cache for the process UID to avoid triggering system-level IPC 
+         * diagnostic logs during high-frequency permission checks.
+         */
+        val MY_UID: Int by lazy { intCache.getOrPut("uid") { Process.myUid() } }
         
         /**
          * Issue #758: Signal for map hydration to start.
@@ -75,6 +75,7 @@ class GpsApplication : Application(), Configuration.Provider {
         super.onCreate()
         
         stringCache.put("pkg", super.getPackageName())
+        intCache.put("uid", Process.myUid())
 
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
@@ -94,8 +95,6 @@ class GpsApplication : Application(), Configuration.Provider {
 
         applicationScope.launch(Dispatchers.IO) {
             try {
-                // Issue #758: Initialize OSM configuration immediately. 
-                // Deferring this too long causes MapView to stall on default paths.
                 val osmConfig = OsmConfig.getInstance()
                 osmConfig.userAgentValue = "GpsTracker/8.10.10"
                 
@@ -111,7 +110,6 @@ class GpsApplication : Application(), Configuration.Provider {
                 osmConfig.isDebugMode = false
                 osmConfig.isDebugTileProviders = false
                 
-                // Issue #758: Pre-warm SqlTileWriter to move DB initialization to IO thread.
                 try {
                     SqlTileWriter()
                     Timber.d("Issue #758: SqlTileWriter pre-warmed on IO thread.")
@@ -121,7 +119,6 @@ class GpsApplication : Application(), Configuration.Provider {
                 
                 isOsmReady.set(true)
 
-                // Now perform other maintenance tasks
                 MaintenanceWorker.schedule(this@GpsApplication)
                 delay(3000)
                 
@@ -155,6 +152,7 @@ class GpsApplication : Application(), Configuration.Provider {
         applicationScope.launch(Dispatchers.IO) {
             try {
                 stringCache.clear()
+                intCache.clear()
                 System.gc()
             } catch (e: Exception) {
                 Timber.e(e, "Issue #656: Cache trim failed")

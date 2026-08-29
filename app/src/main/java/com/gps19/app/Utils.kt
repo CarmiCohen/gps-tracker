@@ -12,6 +12,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
+ * Aug.29.13:
+ * - Issue #759 Hardening: Switched Process.myUid() to GpsApplication.MY_UID 
+ *   shadow-cache to eliminate redundant system calls (R759).
  * Aug.25.05:
  * - Issue #317: Hardware SOT Architectural Decoupling. Delegated hardware 
  *   detection to HardwareSot in core:engine (R313/R212).
@@ -60,8 +63,9 @@ fun isXiaomiSpecialPermissionGranted(context: Context, pkgName: String): XiaomiP
     val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     return try {
         val checkOpMethod = ops.javaClass.getMethod("checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
-        val showOnLock = checkOpMethod.invoke(ops, 10021, android.os.Process.myUid(), pkgName) as Int
-        val backgroundPop = checkOpMethod.invoke(ops, 10020, android.os.Process.myUid(), pkgName) as Int
+        val myUid = GpsApplication.MY_UID
+        val showOnLock = checkOpMethod.invoke(ops, 10021, myUid, pkgName) as Int
+        val backgroundPop = checkOpMethod.invoke(ops, 10020, myUid, pkgName) as Int
         
         if (showOnLock == AppOpsManager.MODE_ALLOWED && backgroundPop == AppOpsManager.MODE_ALLOWED) {
             XiaomiPermissionStatus.GRANTED
@@ -78,7 +82,7 @@ fun getXiaomiAutostartStatus(context: Context, pkgName: String): XiaomiPermissio
     val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     return try {
         val checkOpMethod = ops.javaClass.getMethod("checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
-        val autostart = checkOpMethod.invoke(ops, 10008, android.os.Process.myUid(), pkgName) as Int
+        val autostart = checkOpMethod.invoke(ops, 10008, GpsApplication.MY_UID, pkgName) as Int
         if (autostart == AppOpsManager.MODE_ALLOWED) XiaomiPermissionStatus.GRANTED else XiaomiPermissionStatus.DENIED
     } catch (e: Exception) {
         XiaomiPermissionStatus.UNKNOWN

@@ -32,13 +32,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Aug.29.11:
+ * - UI Refinement: Added visual indicator for Ultra-Long Stationary state (R765).
  * Aug.26.16:
- * - Issue #739 Remediation: Passed hydrationLevel to AppMapContainer to enable 
- *   staggered Map Engine initialization and overlay creation (R739).
- * Aug.26.05:
- * - Issue #323 Hardening: Synchronized with LifecycleHydrationManager Level 4 
- *   (Idle Map) to ensure Map Engine initialization doesn't compete with 
- *   startup frame rendering (R323).
+ * - Issue #739 Remediation: Passed hydrationLevel to AppMapContainer.
  */
 
 @Composable
@@ -485,6 +482,7 @@ fun ViewerDashboard(
                         cpuLoad = dashboardState.cpuLoad,
                         ioWait = dashboardState.ioWait,
                         maxIoLatency = dashboardState.maxIoLatency,
+                        isUltraLongStationary = dashboardState.isUltraLongStationary,
                         onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                     )
                     DebugTable(

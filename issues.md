@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (Aug.29.10)
+# Project Issues & Hardening Tracking (Aug.29.12)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟢 Progress | 35 |
+| **Open Technical Issues** | 🟢 Progress | 33 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 770 |
+| **Resolved (Total)** | 🟢 Progress | 772 |
 
 ---
 
@@ -21,10 +21,12 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.29.10)
-*   **Concern #765: Ultra-Long Stationary State Exposure**. Centralized the "Ultra-Long Stationary" detection in `HardwareProvider` and exposed it via Flow. Integrated this state into `TrackerService`, `NotificationManager`, and the UI aggregation pipeline. This ensures users (locally) and viewers (remotely) have full transparency when the system enters GNSS relaxation mode (R765).
+## 🟢 Recently Resolved Issues (Aug.29.12)
+*   **Concern #762: Acoustic Refinement (R762b)**. Encapsulated the adaptive acoustic duty-cycle calculation into a standalone pure function in `SentinelValidator.kt`. Refactored `HardwareProvider.kt` to utilize this function, reducing complexity in the acoustic monitoring loop and improving testability (R762b).
+*   **Concern #765: Ultra-Long Stationary State UI Refinement**. Resolved in Aug.29.11. Added visual indicators to HUD and Dashboard.
+*   **Concern #765: Ultra-Long Stationary State Exposure**. Resolved in Aug.29.10. Centralized detection in HardwareProvider.
 *   **Concern #764: Shared Engine Configuration Refinement**. Resolved in Aug.29.09. Consolidated device-specific flags into `HardwareCapabilities`.
 *   **Concern #763: Ultra-Long Stationary GNSS Relaxation**. Resolved in Aug.29.08. Implemented 5min relaxation after 4h immobility.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.29.10)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.29.12)

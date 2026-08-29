@@ -2,15 +2,15 @@ package com.gps19.core.engine
 
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Aug.29.11:
+ * - Acoustic Refinement (R762b): Encapsulated adaptive acoustic duty-cycle 
+ *   logic into computeAdaptiveAcousticOffCycle.
  * Aug.11.08:
- * - Issue #143: Forensic Integrity Verification. Updated isSilentFailure 
- *   to correlate GPS stalls with thermal throttling (R133).
- * Aug.10.27:
- * - Issue #133: Forensic Anomaly Correlation Engine. Added isSilentFailure 
- *   to correlate GPS stalls with CPU/IO resource exhaustion (R133).
+ * - Issue #143: Forensic Integrity Verification.
  */
 object SentinelValidator {
 
@@ -151,6 +151,21 @@ object SentinelValidator {
         
         val nextFloor = applyEma(currentFloor, updateDb, alpha)
         return max(nextFloor, ACOUSTIC_FLOOR_MIN_DB)
+    }
+
+    /**
+     * computeAdaptiveAcousticOffCycle: Part of Issue #762 (R762b). 
+     * Calculates the acoustic monitor off-cycle duration based on stationary duration.
+     */
+    fun computeAdaptiveAcousticOffCycle(
+        isStationary: Boolean,
+        stationaryStartRt: Long,
+        nowRt: Long
+    ): Long {
+        if (!isStationary || stationaryStartRt == 0L) return ACOUSTIC_DUTY_CYCLE_OFF_MS
+        val durationMs = nowRt - stationaryStartRt
+        // Scale linearly from 8s up to 32s (8s * 4) based on minutes of immobility.
+        return min(ACOUSTIC_DUTY_CYCLE_OFF_MS * 4, ACOUSTIC_DUTY_CYCLE_OFF_MS + (durationMs / 60000) * 1000L)
     }
 
     /**

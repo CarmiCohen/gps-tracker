@@ -32,18 +32,12 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Aug.29.11:
+ * - Acoustic Refinement (R762b): Refactored acoustic duty-cycle to use 
+ *   SentinelValidator.computeAdaptiveAcousticOffCycle.
  * Aug.29.10:
  * - Concern #765: Exposed isUltraLongStationaryFlow to provide transparency for 
  *   GNSS relaxation states.
- * Aug.29.07:
- * - Completion Sequence: Finalized Acoustic Duty-Cycle Optimization audit and state 
- *   synchronization.
- * Aug.29.06:
- * - Issue #762 Remediation: Implemented adaptive acoustic duty-cycling. Off-cycle 
- *   duration now scales from 8s to 30s during extended stationary periods (R762).
- * Aug.29.03:
- * - Issue #760 Remediation: Consolidated GpsManager and AppSensorManager into a 
- *   single provider.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -522,11 +516,12 @@ class HardwareProvider @Inject constructor(
                     while (isMonitoring && !Thread.currentThread().isInterrupted) {
                         val nowRt = timeProvider.elapsedRealtime()
                         if (powerSaveMode) {
-                            // Issue #762: Adaptive off-cycle scaling during extended stationary periods
-                            val stationaryDurationMs = if (stationaryStartRt > 0L) nowRt - stationaryStartRt else 0L
-                            val adaptiveOffCycleMs = if (isStationary()) {
-                                min(ACOUSTIC_DUTY_CYCLE_OFF_MS * 4, ACOUSTIC_DUTY_CYCLE_OFF_MS + (stationaryDurationMs / 60000) * 1000L)
-                            } else ACOUSTIC_DUTY_CYCLE_OFF_MS
+                            // R762b: Encapsulated adaptive off-cycle logic in SentinelValidator
+                            val adaptiveOffCycleMs = SentinelValidator.computeAdaptiveAcousticOffCycle(
+                                isStationary = isStationary(),
+                                stationaryStartRt = stationaryStartRt,
+                                nowRt = nowRt
+                            )
 
                             if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUTY_CYCLE_ON_MS)) { 
                                 isInOffCycle = true; lastDutyCycleTransitionRt = nowRt; try { audioRecord.stop() } catch (e: Exception) {} 

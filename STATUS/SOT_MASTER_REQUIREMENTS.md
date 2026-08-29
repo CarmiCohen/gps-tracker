@@ -1,4 +1,4 @@
-# SOT Master Requirements (Aug.29.10)
+# SOT Master Requirements (Aug.29.11)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -33,15 +33,15 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **3.1 Unified Hardware Provider (R760)**: To reduce thread overhead and synchronize platform callbacks, all GNSS, Location, IMU, and Environmental sensors must be managed by the unified `HardwareProvider`. This component must share a single `HandlerThread` ("HardwareThread") for all OS-level event delivery, ensuring consistent lifecycle management and deterministic unregistration via the `ManagedHardware` framework (Updated Aug.29.03).
 *   **3.2 Adaptive Acoustic Duty-Cycle (R762)**: To optimize battery life during extended stationary periods, acoustic monitoring off-cycles must scale linearly from 8 seconds up to 30 seconds based on stationary duration. This reduces native microphone initialization churn while maintaining security responsiveness (Updated Aug.29.07).
 *   **3.3 Ultra-Long Stationary GNSS Relaxation (R763)**: To maximize battery life in long-term surveillance scenarios, GNSS polling intervals must be relaxed to 5 minutes (`ULTRA_LONG_STATIONARY_GPS_POLLING_MS`) when confirmed stationary duration exceeds 4 hours (`ULTRA_LONG_STATIONARY_DURATION_MS`). The transition must be managed by `ServiceBehaviorUseCase` to ensure immediate resumption upon movement detection (Updated Aug.29.08).
-*   **3.4 Hardware-State Transparency (R765)**: To ensure user and viewer awareness of low-power relaxation modes, high-level hardware states (e.g., Ultra-Long Stationary) MUST be exposed from `HardwareProvider` and propagated through the telemetry pipeline to UI components and foreground notifications. This provides deterministic explanations for variable polling frequencies. (Updated Aug.29.10).
+*   **3.4 Hardware-State Transparency (R765)**: To ensure user and viewer awareness of low-power relaxation modes, high-level hardware states (e.g., Ultra-Long Stationary) MUST be exposed from `HardwareProvider` and propagated through the telemetry pipeline to UI components (via visual `[ULTRA]` badges) and foreground notifications. This provides deterministic explanations for variable polling frequencies. (Updated Aug.29.11).
 
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.29.11**: Resolved Concern #765 (UI Refinement). Added [ULTRA] visual indicators to HUD and Telemetry Dashboard for hardware state transparency.
 *   **Aug.29.10**: Resolved Concern #765 (Ultra-Long Stationary Exposure). Centralized detection and exposed state via Flow for UI/Notification parity.
 *   **Aug.29.09**: Resolved Concern #764 (Engine Config Refinement). Consolidated device-specific flags into HardwareCapabilities.
 *   **Aug.29.08**: Resolved Concern #763 (Ultra-Long Stationary GNSS Relaxation). Implemented 5min relaxation after 4h immobility.
-*   **Aug.29.07**: Completion audit and version increment.
 
 ---
 
