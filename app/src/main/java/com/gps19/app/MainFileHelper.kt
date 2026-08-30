@@ -20,10 +20,11 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
+ * Aug.30.13:
+ * - Issue #779 Hardening: Integrated ForensicSanitizer to scrub internal absolute 
+ *   paths from error messages and log exports (R779).
  * July.27.00:
  * - Architecture Audit: Updated to use centralized PreferenceKeys.
- * v9.4.1:
- * - Issue #510: Removed Chair Sit Detection from import/export.
  */
 object MainFileHelper {
 
@@ -115,7 +116,8 @@ object MainFileHelper {
             
             Toast.makeText(context, "Settings loaded successfully", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
-            Toast.makeText(context, "Loading failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            val msg = ForensicSanitizer.sanitizeMessage("Loading failed: ${e.message}")
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -179,7 +181,8 @@ object MainFileHelper {
                             filesSuccess++
                         }
                     } catch (e: Exception) {
-                        Log.e("GPS19", "Error importing file $uri: ${e.message}")
+                        val logMsg = ForensicSanitizer.sanitizeMessage("Error importing file $uri: ${e.message}")
+                        Log.e("GPS19", logMsg)
                     }
                 }
                 
@@ -189,7 +192,8 @@ object MainFileHelper {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Trail loading failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    val msg = ForensicSanitizer.sanitizeMessage("Trail loading failed: ${e.message}")
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -231,7 +235,8 @@ object MainFileHelper {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Log.e("GPS19", "Manual logs save failed: ${e.message}")
+                    val logMsg = ForensicSanitizer.sanitizeMessage("Manual logs save failed: ${e.message}")
+                    Log.e("GPS19", logMsg)
                 }
             }
         }
@@ -295,7 +300,8 @@ object MainFileHelper {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Log.e("GPS19", "Config save failed: ${e.message}")
+                    val logMsg = ForensicSanitizer.sanitizeMessage("Config save failed: ${e.message}")
+                    Log.e("GPS19", logMsg)
                 }
             }
         }
@@ -359,7 +365,8 @@ object MainFileHelper {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Manual trail save failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    val msg = ForensicSanitizer.sanitizeMessage("Manual trail save failed: ${e.message}")
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -390,7 +397,8 @@ object MainFileHelper {
             
             Log.i("GPS19", "AUTO-SAVE: Completed successfully")
         } catch (e: Exception) {
-            Log.e("GPS19", "AUTO-SAVE: Failed: ${e.message}")
+            val logMsg = ForensicSanitizer.sanitizeMessage("AUTO-SAVE: Failed: ${e.message}")
+            Log.e("GPS19", logMsg)
         }
     }
 
@@ -420,7 +428,8 @@ object MainFileHelper {
             FileOutputStream(file).use { it.write(json.toString().toByteArray()) }
             true
         } catch (e: Exception) {
-            Log.e("GPS19", "Trail save failed ($source): ${e.message}")
+            val logMsg = ForensicSanitizer.sanitizeMessage("Trail save failed ($source): ${e.message}")
+            Log.e("GPS19", logMsg)
             false
         }
     }
@@ -458,13 +467,15 @@ object MainFileHelper {
                     if (file.renameTo(targetFile)) {
                         movedCount++
                     } else {
-                        Log.e("GPS19", "ARCHIVING: Failed to move ${file.name}")
+                        val logMsg = ForensicSanitizer.sanitizeMessage("ARCHIVING: Failed to move ${file.name}")
+                        Log.e("GPS19", logMsg)
                     }
                 }
             }
             if (movedCount > 0) Log.i("GPS19", "ARCHIVING: Moved $movedCount files to $targetFolderDate folder")
         } catch (e: Exception) {
-            Log.e("GPS19", "ARCHIVING: Failed: ${e.message}")
+            val logMsg = ForensicSanitizer.sanitizeMessage("ARCHIVING: Failed: ${e.message}")
+            Log.e("GPS19", logMsg)
         }
     }
 }

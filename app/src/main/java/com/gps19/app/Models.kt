@@ -10,12 +10,13 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.30.13:
+ * - Issue #779 Hardening: Integrated ForensicSanitizer into LogEntry and 
+ *   TrackerStatus to scrub internal paths and normalize hardware identifiers 
+ *   in exported telemetry and logs (R779).
  * Aug.29.10:
  * - Concern #765: Added isUltraLongStationary to ConnectionPoint for full state 
  *   parity in history and UI.
- * Aug.26.10:
- * - Issue #735 Hardening: Added ToggleSetupBypass event to support developer-mode 
- *   automation for soak tests (R735).
  */
 
 sealed class AppSensorEvent {
@@ -265,7 +266,13 @@ data class LogEntry(
         return JSONObject().apply {
             put("localId", localId); put("timestamp", timestamp)
             put("localTime", SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(timestamp)))
-            put("message", message); put("type", type); put("isImportant", isImportant)
+            
+            // R779: Forensic scrubbing of paths and hardware identifiers in messages.
+            val sanitizedMsg = ForensicSanitizer.sanitizeMessage(message)
+            val finalMsg = ForensicSanitizer.scrubHardwareInfo(sanitizedMsg, isSpecial)
+            put("message", finalMsg)
+            
+            put("type", type); put("isImportant", isImportant)
             put("id", SignalingConstants.getTransmissionId(id))
             put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
             put("count", count); put("duration_ms", durationMs); put("is_special", isSpecial)
@@ -440,6 +447,9 @@ data class TrackerStatus(
         put("is_adaptive_jump", isAdaptiveJump); put("is_battery_low", isBatteryLow)
         put("is_battery_critical", isBatteryCritical); put("is_silent_failure", isSilentFailure)
         put("is_ultra_long_stationary", isUltraLongStationary)
+        
+        // R779: Normalize specific fields that might contain normalized metadata
+        // net_interface is already normalized (e.g. WIFI, MOBILE) in SystemStatusProvider.
     }
 
     companion object {

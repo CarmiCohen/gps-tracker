@@ -23,12 +23,12 @@ import com.gps19.core.engine.ShadowCache
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Aug.30.13:
+ * - Issue #779 Hardening: Integrated ForensicSanitizer into the global 
+ *   Timber tree to scrub internal paths from logged stack traces (R779).
  * Aug.29.13:
  * - Issue #759 Hardening: Added MY_UID shadow-cache to eliminate repetitive 
  *   Process.myUid() IPC calls that trigger system diagnostic logs (R759).
- * Aug.28.10:
- * - Issue #758 Optimization: Implemented pre-warming of SqlTileWriter on IO 
- *   thread and added isOsmReady signal (R758).
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -86,8 +86,9 @@ class GpsApplication : Application(), Configuration.Provider {
                 if (priority >= Log.ERROR) {
                     try {
                         val fullMessage = if (tag != null) "[$tag] $message" else message
-                        val suffix = t?.let { ": ${it.stackTraceToString().take(500)}" } ?: ""
-                        logManager.logServiceEvent("CRITICAL ERROR: $fullMessage$suffix", true)
+                        val sanitizedMessage = ForensicSanitizer.sanitizeMessage(fullMessage)
+                        val suffix = t?.let { ": ${ForensicSanitizer.sanitizeStackTrace(it, 500)}" } ?: ""
+                        logManager.logServiceEvent("CRITICAL ERROR: $sanitizedMessage$suffix", true)
                     } catch (e: Exception) {}
                 }
             }

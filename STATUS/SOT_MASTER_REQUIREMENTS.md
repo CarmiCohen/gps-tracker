@@ -1,8 +1,8 @@
-# SOT Master Requirements (Aug.30.12)
+# SOT Master Requirements (Aug.30.13)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (31 Rules)
+## 🏗️ Architectural Master Rules (32 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -42,20 +42,15 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **4.3 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`, `ToggleSetupBypass`) to verify alarm triggers and facilitate automated soak tests under simulated stress (R196-V, R735).
 *   **4.4 Identity Sanitization (R976)**: Identity sanitization state must be persistent. The warning overlay dismissal must be written to the DataStore to prevent redundant notifications across cold starts (R737, R976).
 *   **4.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
+*   **4.6 Forensic Metadata Sanitization (R779)**: **MANDATORY**. All exported logs, trails, and telemetry payloads must be scrubbed of internal absolute paths (e.g., `/data/user/0/...`) and have hardware-specific identifiers (e.g., Build.MODEL) normalized unless explicitly marked as forensic audit traces (`isSpecial`). Sanitization must be applied at the edge of the logging pipeline via `ForensicSanitizer`. (Added Aug.30.13).
 
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.30.13**: Forensic Metadata Sanitization (#779). Integrated ForensicSanitizer across logging and export pipelines.
 *   **Aug.30.12**: Documentation Integrity Audit. Restored exhaustive R-IDs and resolution logs.
 *   **Aug.30.09**: Evaluated Stationary Derivation Logic (#778). Confirmed flag retention for state parity.
 *   **Aug.30.08**: Validated IPC Spam Remediation (#759). Confirmed ShadowCache effectiveness.
-*   **Aug.30.07**: Resolved Concern #777 (Marker Segmentation).
-*   **Aug.30.06**: Resolved Concern #776 (Segmented Hydration).
-*   **Aug.30.05**: Resolved Concern #775 (Native Leak Hardening).
-*   **Aug.30.01**: Validation Session. Confirmed R767 fallback unregistration behavior. Identified Concern #775 (Persistent native leak) and #776 (Hydration jank).
-*   **Aug.30.00**: Resolved Concern #767 (BaseEventQueue Leak Hardening). Implemented fallback direct unregistration.
-*   **Aug.29.13**: Resolved Concern #766 (RTL Inconsistency & Truncation). Enforced LTR direction for technical UI.
-*   **Aug.29.12**: Resolved Concern #762 (Acoustic Refinement R762b) and #765 (UI Transparency).
 
 ---
 
@@ -216,6 +211,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R776**: Segmented violation marker instantiation using yield().
 *   **R777**: Segmented home point marker instantiation using yield().
 *   **R778**: Definitive isUltraLongStationary flag for state parity.
+*   **R779**: Forensic Metadata Sanitization at the logging edge.
 *   **R799e**: Vivid green enforcement for JD identity.
 *   **R810-M**: Acoustic floor calibration logic parity.
 *   **R810-P**: Stationary GPS pulse asymmetry mitigation.
@@ -255,4 +251,4 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R993c**: Reactive sensor re-registration authority.
 *   **R999**: Type Safety Authority (Double Precision).
 
-*(Total: 31 Architectural Rules + 148 Functional R-IDs = 179 Items)*
+*(Total: 32 Architectural Rules + 149 Functional R-IDs = 181 Items)*

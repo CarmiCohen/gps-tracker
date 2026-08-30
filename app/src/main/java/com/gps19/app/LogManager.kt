@@ -9,14 +9,13 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Aug.30.13:
+ * - Issue #779 Hardening: Integrated ForensicSanitizer into submitToLogSink 
+ *   to ensure all persisted and emitted logs are scrubbed of forensic 
+ *   metadata at the edge of the pipeline (R779).
  * Aug.22.05:
  * - Audit Chapter 12.3: Hardened startup muzzle logic to allow isSpecial logs 
- *   to bypass the suppression window, ensuring stress audit traces are 
- *   persisted during the initial 60s (R197).
- * Aug.21.05:
- * - Issue #196 Hardening: Implemented overflow hysteresis. Alerts now only reset 
- *   when buffer pressure drops below 50% to prevent notification spam during 
- *   high-frequency (100Hz) bursts on budget hardware (R196).
+ *   to bypass the suppression window.
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -52,10 +51,15 @@ class LogManager @Inject constructor(
     fun logForensicTrace(message: String, lat: Double = 0.0, lng: Double = 0.0, accuracy: Double = 0.0) {
         val buffer = forensicSpillBufferProvider.get()
         val now = timeProvider.currentTimeMillis()
+        
+        // R779: Scrub metadata at the edge
+        val sanitizedMsg = ForensicSanitizer.sanitizeMessage(message)
+        val finalMsg = ForensicSanitizer.scrubHardwareInfo(sanitizedMsg, false)
+
         val log = LogEntry(
             localId = "", 
             timestamp = now,
-            message = message,
+            message = finalMsg,
             type = "FORENSIC_TRACE",
             isImportant = false,
             id = configManager.deviceId,
@@ -69,7 +73,6 @@ class LogManager @Inject constructor(
         if (!buffer.writeTrace(log)) {
             handleOverflow()
         } else {
-            // R196: Hysteresis reset to avoid alert oscillation
             if (isOverflowLogged.get() && buffer.getFillLevel() < 0.5) {
                 isOverflowLogged.set(false)
             }
@@ -78,6 +81,8 @@ class LogManager @Inject constructor(
 
     /**
      * logForensicTraceOptimized: Zero-allocation path for 100Hz sampling.
+     * Note: Optimized traces use primitive fields; message is fixed "FORENSIC_TRACE" 
+     * which doesn't require sanitization.
      */
     fun logForensicTraceOptimized(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
@@ -90,7 +95,6 @@ class LogManager @Inject constructor(
         )) {
             handleOverflow()
         } else {
-            // R196: Hysteresis reset to avoid alert oscillation
             if (isOverflowLogged.get() && buffer.getFillLevel() < 0.5) {
                 isOverflowLogged.set(false)
             }
@@ -134,14 +138,16 @@ class LogManager @Inject constructor(
         val now = timeProvider.currentTimeMillis()
         val health = telemetry.systemHealth.value
         
-        // Critical safety checks (storage/startup)
         if (health.isStorageCritical && !isSpecial) return
         if (health.isStorageLow && !isImportant && !isSpecial) return
         
-        // R197: isSpecial logs bypass the startup muzzle window
         if (type == "system" && !isImportant && !isSpecial && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
             return
         }
+
+        // R779: Forensic scrubbing of paths and hardware identifiers at the entry point.
+        val sanitizedMsg = ForensicSanitizer.sanitizeMessage(message)
+        val finalMsg = ForensicSanitizer.scrubHardwareInfo(sanitizedMsg, isSpecial)
 
         var finalLat = lat
         var finalLng = lng
@@ -182,7 +188,7 @@ class LogManager @Inject constructor(
         val log = LogEntry(
             localId = localId ?: "", 
             timestamp = now,
-            message = message,
+            message = finalMsg,
             type = type,
             isImportant = isImportant,
             id = configManager.deviceId,
