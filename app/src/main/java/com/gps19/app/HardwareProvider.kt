@@ -32,12 +32,12 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Aug.30.05:
+ * - Issue #775 Remediation (R775): Hardened setPowerSaveMode to use 
+ *   ManagedSensorListener.unregister for deterministic native disposal.
  * Aug.29.11:
  * - Acoustic Refinement (R762b): Refactored acoustic duty-cycle to use 
  *   SentinelValidator.computeAdaptiveAcousticOffCycle.
- * Aug.29.10:
- * - Concern #765: Exposed isUltraLongStationaryFlow to provide transparency for 
- *   GNSS relaxation states.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -656,7 +656,22 @@ class HardwareProvider @Inject constructor(
     fun setAcousticFastPath(floor: Double, spikeThreshold: Double, minDb: Double, onSpike: () -> Unit) { synchronized(this) { this.fastPathFloor = floor; this.fastPathSpikeThreshold = spikeThreshold; this.fastPathMinDb = minDb; this.onAcousticSpike = onSpike } }
     fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: () -> Unit) { synchronized(this) { this.fastPathLightBaseline = baseline; this.fastPathLightSpikeThreshold = spikeThreshold; this.onLightSpike = onSpike } }
     fun setHighLoad(high: Boolean) { this.isHighLoad = high }
-    fun setPowerSaveMode(active: Boolean) { synchronized(lifecycleLock) { if (this.powerSaveMode != active) { this.powerSaveMode = active; if (isStarted.get() && hardwareHandler != null) { sensorManager.unregisterListener(this); registerSensors() } } } }
+    
+    /**
+     * Issue #775 Hardening: Switched to ManagedSensorListener.unregister to 
+     * ensure deterministic native disposal on the correct hardware thread (R775).
+     */
+    fun setPowerSaveMode(active: Boolean) {
+        synchronized(lifecycleLock) {
+            if (this.powerSaveMode != active) {
+                this.powerSaveMode = active
+                if (isStarted.get() && hardwareHandler != null) {
+                    this.unregister(sensorManager, hardwareHandler)
+                    registerSensors()
+                }
+            }
+        }
+    }
 
     fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; synchronized(this) { bufferIdx = 0; bufferCount = 0 } }
 
@@ -667,7 +682,13 @@ class HardwareProvider @Inject constructor(
             registrationJob?.cancel(); registrationJob = scope.launch(Dispatchers.IO) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !systemStatusProvider.isActivityRecognitionGranted()) { isStepDetectorRegistered = false; return@launch }
                 val targetHandler = synchronized(lifecycleLock) { if (!isStarted.get()) return@launch; hardwareHandler } ?: return@launch
-                withContext(targetHandler.asCoroutineDispatcher()) { sensorManager.unregisterListener(this@HardwareProvider, detector); synchronized(lifecycleLock) { if (isStarted.get()) isStepDetectorRegistered = sensorManager.registerListener(this@HardwareProvider, detector, android.hardware.SensorManager.SENSOR_DELAY_NORMAL, hardwareHandler) } }
+                withContext(targetHandler.asCoroutineDispatcher()) { 
+                    // Issue #775: unregisterListener on the correct thread
+                    sensorManager.unregisterListener(this@HardwareProvider, detector)
+                    synchronized(lifecycleLock) { 
+                        if (isStarted.get()) isStepDetectorRegistered = sensorManager.registerListener(this@HardwareProvider, detector, android.hardware.SensorManager.SENSOR_DELAY_NORMAL, hardwareHandler) 
+                    } 
+                }
             }
         }
     }

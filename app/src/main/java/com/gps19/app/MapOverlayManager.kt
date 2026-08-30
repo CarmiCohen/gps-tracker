@@ -24,20 +24,12 @@ import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
- * Aug.29.01:
- * - Issue #759b Remediation: Implemented segmented trail updates using 
- *   coroutines with yield() to prevent Main-thread stalls when rendering 
- *   large telemetry trails (>500 points).
- * Aug.29.00:
- * - Issue #758b Remediation: Implemented async geometry generation for accuracy 
- *   circles and geofences. Circle point calculations are now offloaded to 
- *   Dispatchers.Default to prevent Main-thread "Davey" stalls during 
- *   hydration levels 4-7 (R758b).
- * - Issue #758b Performance: Added a secondary geometry cache and specialized 
- *   quantization for high-frequency drift updates to reduce allocation churn (R758b).
- * Aug.25.00:
- * - Issue #309 Remediation: Replaced SnapshotStateList/Map with standard 
- *   ArrayList/HashMap.
+ * Aug.30.07:
+ * - Issue #777 Optimization (R777): Implemented segmented home point updates 
+ *   using coroutines with yield() to ensure Level 4 hydration remains fluid 
+ *   even with high marker density.
+ * Aug.30.06:
+ * - Issue #776 Optimization (R776): Implemented segmented violation updates.
  */
 class MapOverlayManager(
     private val context: Context,
@@ -116,6 +108,8 @@ class MapOverlayManager(
 
     private var trackerTrailJob: Job? = null
     private var viewerTrailJob: Job? = null
+    private var violationJob: Job? = null
+    private var homeJob: Job? = null
 
     // Issue #208/758b: Circle Geometry Cache with Async Support
     private data class CircleKey(val latQ: Long, val lngQ: Long, val radiusQ: Long)
@@ -124,7 +118,6 @@ class MapOverlayManager(
 
     /**
      * Issue #758b: Offloads Polygon.pointsAsCircle to a background thread.
-     * Returns the cached points if available, otherwise triggers async generation.
      */
     private fun getAsyncCircle(center: GeoPoint, radius: Double, onReady: (List<GeoPoint>) -> Unit): List<GeoPoint>? {
         val latQ = (center.latitude * 1_000_000).toLong()
@@ -169,6 +162,11 @@ class MapOverlayManager(
         scope.cancel()
     }
 
+    /**
+     * Issue #777 Optimization: Segmented home point updates.
+     * Spreads marker and fence polygon instantiation across multiple frames 
+     * to eliminate "Davey" stalls during Level 4 hydration (R777).
+     */
     fun updateHomePoints(
         home: List<GeoPoint>,
         isFenceVisible: Boolean,
@@ -184,52 +182,65 @@ class MapOverlayManager(
         if (lastHomeRendered == home && lastFenceState == isFenceVisible && 
             lastIsTrackerMode == isTrackerMode && lastGeofenceMode == geofenceMode) return false
 
-        fenceFolder.items.clear()
-        homeMarkersFolder.items.clear()
-        
-        val activeHomeSize = if (isFenceVisible) home.size else 0
-        if (homeMarkerPool.size > activeHomeSize + MARKER_POOL_PRUNE_THRESHOLD) {
-            while (homeMarkerPool.size > maxOf(activeHomeSize + 5, MARKER_POOL_PRUNE_THRESHOLD)) homeMarkerPool.removeAt(homeMarkerPool.size - 1)
-        }
-
-        if (isFenceVisible) {
-            home.forEachIndexed { idx, p ->
-                val poly = Polygon(mapView).apply { 
-                    fillPaint.color = 0x28CBD5E1.toInt(); outlinePaint.color = 0xC8CBD5E1.toInt(); outlinePaint.strokeWidth = 2f; setInfoWindow(null) 
-                }
-                val cachedPoints = getAsyncCircle(p, maxD) { points ->
-                    poly.points = points
-                    mapView.invalidate()
-                }
-                if (cachedPoints != null) poly.points = cachedPoints
-                fenceFolder.add(poly)
-
-                val marker = if (idx < homeMarkerPool.size) homeMarkerPool[idx] else Marker(mapView).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); homeMarkerPool.add(m) }
-                marker.position = p; marker.icon = homeIcons.getOrPut(idx + 1) { createHomeBitmap(density, idx + 1).toDrawable(resources) as BitmapDrawable }
-                marker.setOnMarkerClickListener { mk, mv -> 
-                    if (!isTrackerMode && geofenceMode == GeofenceMode.REMOVE) { 
-                        mv.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                        onTap(p)
-                        onRemoveMarker(idx)
-                        Toast.makeText(context, "Home point removed", Toast.LENGTH_SHORT).show() 
-                    }
-                    else if (!isTrackerMode && geofenceMode == GeofenceMode.ADD) Toast.makeText(context, "Switch to DEL mode to remove points", Toast.LENGTH_SHORT).show()
-                    true 
-                }
-                homeMarkersFolder.add(marker)
-            }
-        }
         lastHomeRendered = home
         lastFenceState = isFenceVisible
         lastIsTrackerMode = isTrackerMode
         lastGeofenceMode = geofenceMode
-        return true
+
+        homeJob?.cancel()
+        homeJob = scope.launch {
+            val polygons = mutableListOf<Polygon>()
+            val markers = mutableListOf<Marker>()
+
+            if (isFenceVisible) {
+                home.forEachIndexed { idx, p ->
+                    val poly = Polygon(mapView).apply { 
+                        fillPaint.color = 0x28CBD5E1.toInt(); outlinePaint.color = 0xC8CBD5E1.toInt(); outlinePaint.strokeWidth = 2f; setInfoWindow(null) 
+                    }
+                    val cachedPoints = getAsyncCircle(p, maxD) { points ->
+                        poly.points = points
+                        mapView.invalidate()
+                    }
+                    if (cachedPoints != null) poly.points = cachedPoints
+                    polygons.add(poly)
+
+                    val marker = if (idx < homeMarkerPool.size) homeMarkerPool[idx] else Marker(mapView).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); homeMarkerPool.add(m) }
+                    marker.position = p; marker.icon = homeIcons.getOrPut(idx + 1) { createHomeBitmap(density, idx + 1).toDrawable(resources) as BitmapDrawable }
+                    marker.setOnMarkerClickListener { mk, mv -> 
+                        if (!isTrackerMode && geofenceMode == GeofenceMode.REMOVE) { 
+                            mv.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onTap(p)
+                            onRemoveMarker(idx)
+                            Toast.makeText(context, "Home point removed", Toast.LENGTH_SHORT).show() 
+                        }
+                        else if (!isTrackerMode && geofenceMode == GeofenceMode.ADD) Toast.makeText(context, "Switch to DEL mode to remove points", Toast.LENGTH_SHORT).show()
+                        true 
+                    }
+                    markers.add(marker)
+
+                    // Yield every 10 points to maintain UI responsiveness
+                    if (idx % 10 == 0) yield()
+                }
+            }
+
+            fenceFolder.items.clear()
+            fenceFolder.items.addAll(polygons)
+            homeMarkersFolder.items.clear()
+            homeMarkersFolder.items.addAll(markers)
+            mapView.invalidate()
+
+            // Prune pool
+            val activeHomeSize = if (isFenceVisible) home.size else 0
+            while (homeMarkerPool.size > maxOf(activeHomeSize + 5, MARKER_POOL_PRUNE_THRESHOLD)) {
+                homeMarkerPool.removeAt(homeMarkerPool.size - 1)
+            }
+        }
+
+        return false // Job handles invalidation
     }
 
     /**
      * Issue #759b: Segmented trail update to prevent Main-thread stalls.
-     * Offloads checksum calculation and processes polyline points in chunks, 
-     * yielding to the UI thread for long trails (>500 points).
      */
     fun updateTrails(
         trackerSegments: List<MapTrailSegment>, 
@@ -255,7 +266,6 @@ class MapOverlayManager(
                         line.outlinePaint.color = segment.color
                         polylines.add(line)
                         
-                        // Issue #759b: Yield if segment is large or after every few segments to keep UI responsive
                         if (segment.points.size > 500 || idx % 10 == 0) yield()
                     }
                     trailFolder.items.clear()
@@ -295,56 +305,76 @@ class MapOverlayManager(
                 }
             }
         }
-        return false // Job handles invalidation
+        return false 
     }
 
-    fun updateViolations(violations: List<ViolationPoint>, isViolationsVisible: Boolean, isGeofenceViolationsVisible: Boolean, systemPulseRt: Long): Boolean {
+    /**
+     * Issue #776 Optimization: Segmented violation update using coroutines.
+     */
+    fun updateViolations(
+        violations: List<ViolationPoint>, 
+        isViolationsVisible: Boolean, 
+        isGeofenceViolationsVisible: Boolean, 
+        systemPulseRt: Long
+    ): Boolean {
         val visibilityPair = Pair(isViolationsVisible, isGeofenceViolationsVisible)
         
         if (lastViolationsRef === violations && lastViolationVisibility == visibilityPair) return false
         if (lastViolationsSize == violations.size && lastViolationVisibility == visibilityPair) return false
         if ((systemPulseRt - lastViolationUpdateTs) < BUDGET_THROTTLE_MS && lastViolationsSize != -1) return false
 
-        violationMarkersFolder.items.clear()
-        violationAccuracyFolder.items.clear()
-        
-        cachedFilteredViolations = violations.filter { v -> 
-            val isJump = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
-            val isGeo = v.type == ALERT_ID_TRACKER_GEOFENCE
-            (isJump && isViolationsVisible) || (isGeo && isGeofenceViolationsVisible) 
-        }
-
-        if (violationMarkerPool.size > cachedFilteredViolations.size + MARKER_POOL_PRUNE_THRESHOLD) {
-            while (violationMarkerPool.size > maxOf(cachedFilteredViolations.size + 5, MARKER_POOL_PRUNE_THRESHOLD)) { 
-                violationMarkerPool.removeAt(violationMarkerPool.size - 1)
-                violationCirclePool.removeAt(violationCirclePool.size - 1) 
-            }
-        }
-
-        cachedFilteredViolations.forEachIndexed { index, v ->
-            val m = if (index < violationMarkerPool.size) violationMarkerPool[index] else Marker(mapView).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); violationMarkerPool.add(m) }
-            val isJump = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
-            val gp = v.toGeoPoint()
-            m.position = gp; m.icon = if (isJump) jumpIcon else geofenceIcon; violationMarkersFolder.add(m)
-            
-            val hAcc = if (v.maxAccuracy > 0.0) v.maxAccuracy else v.accuracy
-            if (hAcc > 0.0) {
-                val c = if (index < violationCirclePool.size) violationCirclePool[index] else Polygon(mapView).also { p -> p.fillPaint.color = 0; p.outlinePaint.strokeWidth = 2f; p.setInfoWindow(null); violationCirclePool.add(p) }
-                c.outlinePaint.color = (if (isJump) 0x60FF00FF else 0x60FF0000).toInt()
-                
-                val cachedPoints = getAsyncCircle(gp, hAcc) { points ->
-                    c.points = points
-                    mapView.invalidate()
-                }
-                if (cachedPoints != null) c.points = cachedPoints
-                violationAccuracyFolder.add(c)
-            }
-        }
         lastViolationsSize = violations.size
         lastViolationsRef = violations
         lastViolationVisibility = visibilityPair
         lastViolationUpdateTs = systemPulseRt
-        return true
+
+        violationJob?.cancel()
+        violationJob = scope.launch {
+            val filtered = violations.filter { v -> 
+                val isJump = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
+                val isGeo = v.type == ALERT_ID_TRACKER_GEOFENCE
+                (isJump && isViolationsVisible) || (isGeo && isGeofenceViolationsVisible) 
+            }
+
+            val markers = mutableListOf<Marker>()
+            val circles = mutableListOf<Polygon>()
+
+            filtered.forEachIndexed { index, v ->
+                val m = if (index < violationMarkerPool.size) violationMarkerPool[index] else Marker(mapView).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); violationMarkerPool.add(m) }
+                val isJump = v.type == ALERT_ID_JUMP_ALERT || v.type == ALERT_ID_VISUAL_JUMP
+                val gp = v.toGeoPoint()
+                m.position = gp; m.icon = if (isJump) jumpIcon else geofenceIcon
+                markers.add(m)
+                
+                val hAcc = if (v.maxAccuracy > 0.0) v.maxAccuracy else v.accuracy
+                if (hAcc > 0.0) {
+                    val c = if (index < violationCirclePool.size) violationCirclePool[index] else Polygon(mapView).also { p -> p.fillPaint.color = 0; p.outlinePaint.strokeWidth = 2f; p.setInfoWindow(null); violationCirclePool.add(p) }
+                    c.outlinePaint.color = (if (isJump) 0x60FF00FF else 0x60FF0000).toInt()
+                    
+                    val cachedPoints = getAsyncCircle(gp, hAcc) { points ->
+                        c.points = points
+                        mapView.invalidate()
+                    }
+                    if (cachedPoints != null) c.points = cachedPoints
+                    circles.add(c)
+                }
+                
+                if (index % 20 == 0) yield()
+            }
+
+            violationMarkersFolder.items.clear()
+            violationMarkersFolder.items.addAll(markers)
+            violationAccuracyFolder.items.clear()
+            violationAccuracyFolder.items.addAll(circles)
+            mapView.invalidate()
+
+            while (violationMarkerPool.size > maxOf(filtered.size + 5, MARKER_POOL_PRUNE_THRESHOLD)) { 
+                violationMarkerPool.removeAt(violationMarkerPool.size - 1)
+                if (violationCirclePool.size > violationMarkerPool.size) violationCirclePool.removeAt(violationCirclePool.size - 1)
+            }
+        }
+
+        return false
     }
 
     fun updateReplayCursor(pos: GeoPoint?): Boolean {
