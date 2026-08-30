@@ -1,4 +1,4 @@
-# SOT Master Requirements (Aug.30.00)
+# SOT Master Requirements (Aug.30.01)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -46,13 +46,11 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.30.01**: Validation Session. Confirmed R767 fallback unregistration behavior. Identified Concern #775 (Persistent native leak) and #776 (Hydration jank).
 *   **Aug.30.00**: Resolved Concern #767 (BaseEventQueue Leak Hardening). Implemented fallback direct unregistration.
 *   **Aug.29.13**: Resolved Concern #766 (RTL Inconsistency & Truncation). Enforced LTR direction for technical UI.
 *   **Aug.29.12**: Resolved Concern #762 (Acoustic Refinement R762b) and #765 (UI Transparency).
 *   **Aug.29.11**: Resolved Concern #765 (UI Refinement). Added [ULTRA] visual indicators to HUD.
-*   **Aug.29.10**: Resolved Concern #765 (Ultra-Long Stationary Exposure). Centralized detection in HardwareProvider.
-*   **Aug.29.09**: Resolved Concern #764 (Engine Config Refinement). Consolidated device-specific flags.
-*   **Aug.29.08**: Resolved Concern #763 (Ultra-Long Stationary GNSS Relaxation). Implemented 5min relaxation.
 
 ---
 
