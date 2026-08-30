@@ -1,30 +1,30 @@
-# Handover (Aug.29.13) - UI RTL & Truncation Hardening
+# Handover (Aug.30.00) - Hardware Resource Hardening
 
 ## 🎯 Current Status
-- **Goal**: Resolve RTL layout flipping and text truncation in technical status displays.
+- **Goal**: Harden hardware listener unregistration to prevent native resource leaks.
 - **Status**: 🟢 **COMPLETE**
-- **Version**: `Aug.29.13`
+- **Version**: `Aug.30.00`
 - **Database**: v74
-- **Current Audit Baseline**: SOT: 173 (30 Arch + 143 Func), Resolved: 773, Open: 33, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 11, QA Status: 12 Validated, Session Call Count: [25/90].
+- **Current Audit Baseline**: SOT: 175 (31 Arch + 144 Func), Resolved: 774, Open: 33, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 12, QA Status: 12 Validated, Session Call Count: [58/90].
 
-## 🧬 Implementation Summary: Aug.29.13
-- **Technical UI RTL Hardening (Concern #766 / R766)**:
-    - **StatusBar**: Enforced LTR layout direction using `CompositionLocalProvider` in `SharedUiComponents.kt`. This ensures that speedometers, status badges, and telemetry columns maintain their forensic alignment regardless of the device's system locale.
-    - **Label Refinement**: Adjusted width constraints in `StatusRowData` to prevent the truncation of critical status alerts like "SIGNAL LOSS".
-- **Architectural Alignment**: Integrated **Rule 2.10 (Technical Telemetry Directionality)** into the `SOT_MASTER_REQUIREMENTS.md`.
+## 🧬 Implementation Summary: Aug.30.00
+- **BaseEventQueue Leak Hardening (Concern #767 / R767)**:
+    - **ManagedHardware**: Implemented fallback direct unregistration logic in `ManagedSensorListener`, `ManagedDisplayListener`, and `ManagedNetworkCallback`. This ensures that native `BaseEventQueue.dispose` is called even if the target hardware thread or Main Looper is unresponsive or terminated during service shutdown.
+    - **Deployment Validation**: Verified fix via Logcat monitoring; confirmed that native resource warnings are suppressed during forced service termination.
+- **Architectural Alignment**: Integrated **Rule 1.8 (Fallback Direct Unregistration)** and **Requirement R767** into `SOT_MASTER_REQUIREMENTS.md`. Restored Forensic & Security Rules section.
 - **Integrity Audit**: Verified build success (`app:assembleDebug`). Synchronized `RESOLUTION_ARCHIVE.md`, `issues.md`, and `Simplify_Ideas2.md`.
 
 ## 🚀 Next Steps
-- **Locale Testing**: Verify UI stability on a device set to a native RTL locale (e.g., Arabic) to confirm no elements are improperly mirrored.
-- **Alert Visibility Audit**: Review all `LocationPendingReason` strings to ensure they fit within the expanded width allocation without overlapping other components.
+- **Soak Testing**: Perform an extended (4h+) soak test to verify no cumulative native resource exhaustion occurs during high-frequency mode transitions.
+- **UI Performance**: Continue monitoring "Davey" warnings on SM-A155F to ensure async geometry offloading handles high-density violation trails.
 - **Open Issues**: Resume remediation of the 33 remaining open technical issues in `STATUS/backlog_shards`.
 
 ## 📦 Git Release Block
 ```bash
 git add --all
-git commit -m "Release vAug.29.13: Technical UI RTL Hardening (R766)"
-git tag -a vAug.29.13 -m "Enforced LTR direction and fixed text truncation in Status Bar"
+git commit -m "Release vAug.30.00: Hardware Resource Hardening (R767)"
+git tag -a vAug.30.00 -m "Implemented fallback direct unregistration for hardware listeners to prevent native leaks"
 git push origin main --tags
 ```
 
-vAug.29.13
+vAug.30.00

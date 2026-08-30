@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Aug.29.13)
+# Project Issues & Hardening Tracking (Aug.30.00)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Progress | 33 |
 | **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
-| **Resolved (Total)** | 🟢 Progress | 773 |
+| **Resolved (Total)** | 🟢 Progress | 774 |
 
 ---
 
@@ -21,12 +21,12 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.29.13)
-*   **Concern #766: RTL Layout Inconsistency and Text Truncation**. Enforced LTR direction in `StatusBar` to ensure consistent UI layout across all locales. Adjusted width allocation in `StatusRowData` and enabled visible overflow for the pending reason text to prevent truncation of "SIGNAL LOSS" and similar alerts (R766).
-*   **Concern #762: Acoustic Refinement (R762b)**. Encapsulated the adaptive acoustic duty-cycle calculation into a standalone pure function in `SentinelValidator.kt`. Refactored `HardwareProvider.kt` to utilize this function, reducing complexity in the acoustic monitoring loop and improving testability (R762b).
+## 🟢 Recently Resolved Issues (Aug.30.00)
+*   **Concern #767: Lingering BaseEventQueue Leak (Hardening)**. Identified a native resource leak warning (`BaseEventQueue.dispose` failure) in Logcat during service shutdown. Remediated by implementing fallback direct unregistration logic in `ManagedHardware.kt`. This ensures native disposal completes even if the hardware thread is unresponsive (R767).
+*   **Concern #766: RTL Layout Inconsistency and Text Truncation**. Resolved in Aug.29.13. Enforced LTR direction in `StatusBar` and fixed "SIGNAL LOSS" truncation (R766).
+*   **Concern #762: Acoustic Refinement (R762b)**. Resolved in Aug.29.12. Encapsulated adaptive duty-cycle in SentinelValidator.
 *   **Concern #765: Ultra-Long Stationary State UI Refinement**. Resolved in Aug.29.11. Added visual indicators to HUD and Dashboard.
 *   **Concern #765: Ultra-Long Stationary State Exposure**. Resolved in Aug.29.10. Centralized detection in HardwareProvider.
-*   **Concern #764: Shared Engine Configuration Refinement**. Resolved in Aug.29.09. Consolidated device-specific flags into `HardwareCapabilities`.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.29.13)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.30.00)

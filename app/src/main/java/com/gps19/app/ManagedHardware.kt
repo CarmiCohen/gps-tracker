@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit
 /**
  * ManagedNetworkCallback: Encapsulates safe, synchronous unregistration of 
  * ConnectivityManager.NetworkCallback to prevent native BaseEventQueue leaks (R750).
+ * Aug.30.00: Added fallback direct unregistration if Main Looper post fails (R767).
  */
 abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
     fun unregister(cm: ConnectivityManager) {
@@ -50,6 +51,12 @@ abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
         
         if (!posted) {
             Timber.w("ManagedNetworkCallback: Failed to post unregistration to Main Looper")
+            try {
+                cm.unregisterNetworkCallback(this)
+                Timber.d("ManagedNetworkCallback: Fallback unregistration complete.")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedNetworkCallback: Fallback unregistration failed")
+            }
             return
         }
 
@@ -165,6 +172,7 @@ abstract class ManagedBroadcastReceiver : BroadcastReceiver() {
 /**
  * ManagedSensorListener: Encapsulates safe, synchronous unregistration of
  * SensorManager listeners to prevent native BaseEventQueue leaks (R745/R746).
+ * Aug.30.00: Added fallback direct unregistration if hardware thread post fails (R767).
  */
 abstract class ManagedSensorListener : SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -205,6 +213,12 @@ abstract class ManagedSensorListener : SensorEventListener {
         
         if (!posted) {
             Timber.w("ManagedSensorListener: Failed to post unregistration to sensor thread")
+            try {
+                sm.unregisterListener(this)
+                Timber.d("ManagedSensorListener: Fallback unregistration complete.")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedSensorListener: Fallback unregistration failed")
+            }
             return
         }
 
@@ -221,6 +235,7 @@ abstract class ManagedSensorListener : SensorEventListener {
 /**
  * ManagedDisplayListener: Encapsulates safe, synchronous unregistration of
  * DisplayManager.DisplayListener to prevent resource leaks.
+ * Aug.30.00: Added fallback direct unregistration if hardware thread post fails (R767).
  */
 abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
     override fun onDisplayAdded(displayId: Int) {}
@@ -262,6 +277,12 @@ abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
 
         if (!posted) {
             Timber.w("ManagedDisplayListener: Failed to post unregistration to display thread")
+            try {
+                dm.unregisterDisplayListener(this)
+                Timber.d("ManagedDisplayListener: Fallback unregistration complete.")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedDisplayListener: Fallback unregistration failed")
+            }
             return
         }
 
