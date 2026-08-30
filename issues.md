@@ -1,12 +1,12 @@
-# Project Issues & Hardening Tracking (Aug.30.01)
+# Project Issues & Hardening Tracking (Aug.30.03)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟢 Progress | 34 |
-| **Validation Tasks** | 🟡 PENDING | [QA Validation Status](STATUS/QA_VALIDATION_STATUS.md) |
+| **Open Technical Issues** | 🟢 Progress | 35 |
+| **Validation Tasks** | 🟢 Validated | 198 |
 | **Resolved (Total)** | 🟢 Progress | 774 |
 
 ---
@@ -29,4 +29,5 @@ This document tracks active issues, technical debt, and pending implementation t
 *   **Concern #765: Ultra-Long Stationary State UI Refinement**. Resolved in Aug.29.11. Added visual indicators to HUD and Dashboard.
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.30.01)
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.30.03)*
+*Simplification Ideas: 214*
