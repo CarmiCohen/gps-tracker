@@ -49,12 +49,13 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Aug.29.13:
+ * - Concern #766: Enforced LTR direction in StatusBar to fix layout flipping 
+ *   on RTL locales and increased width allocation for pending reason text 
+ *   to prevent truncation (R766).
  * Aug.29.11:
  * - UI Refinement: Added visual indicator for Ultra-Long Stationary state 
  *   in StatusBar and HUD (R765).
- * Aug.20.09:
- * - Issue #226: HUD State Centralization. Refactored GlobalStatusBar and 
- *   StatusBar to consume unified HudState (R226).
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -655,52 +656,54 @@ fun StatusBar(
     val alarmAlpha by infiniteTransition.animateFloat(0.4f, 1f, infiniteRepeatable(tween(500), repeatMode = RepeatMode.Reverse), label = "AlarmAlpha")
     val movingAlpha by infiniteTransition.animateFloat(0.5f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "MovingAlpha")
 
-    Card(modifier = modifier.fillMaxWidth(), shape = RectangleShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = if (isLandscape) 0.7f else 0.9f)), elevation = CardDefaults.cardElevation(0.dp)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 3.dp)) {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    StatusBadge(label = "INT", active = isInternet, isBold = true); StatusBadge(label = "SRV", active = isRelay, isBold = true); StatusBadge(label = "GPS", active = isLocalGpsActive)
-                    StatusBadge(label = if (mode == "tracker") "VWR" else "TRK", active = isPeerActive, activeColor = BrandJd)
-                    if (mode != "tracker") StatusBadge(label = "DAT", active = isDataHealthy)
-                    if (hasActiveAlarms) StatusBadge(label = "ALM", active = true, activeColor = Rose500.copy(alpha = alarmAlpha), isBold = true)
-                    if (isRedScreenSuppressed) {
-                         Spacer(modifier = Modifier.width(2.dp))
-                         Box(modifier = Modifier.background(if (isSirenPlaying) Rose500.copy(alpha = alarmAlpha) else Slate500, RoundedCornerShape(2.dp)).padding(horizontal = 2.dp)) {
-                             Text(text = if (isSirenPlaying) "SIREN LOCKOUT" else "LOCKOUT", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold, style = compactStyle)
-                         }
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Card(modifier = modifier.fillMaxWidth(), shape = RectangleShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = if (isLandscape) 0.7f else 0.9f)), elevation = CardDefaults.cardElevation(0.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 3.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        StatusBadge(label = "INT", active = isInternet, isBold = true); StatusBadge(label = "SRV", active = isRelay, isBold = true); StatusBadge(label = "GPS", active = isLocalGpsActive)
+                        StatusBadge(label = if (mode == "tracker") "VWR" else "TRK", active = isPeerActive, activeColor = BrandJd)
+                        if (mode != "tracker") StatusBadge(label = "DAT", active = isDataHealthy)
+                        if (hasActiveAlarms) StatusBadge(label = "ALM", active = true, activeColor = Rose500.copy(alpha = alarmAlpha), isBold = true)
+                        if (isRedScreenSuppressed) {
+                             Spacer(modifier = Modifier.width(2.dp))
+                             Box(modifier = Modifier.background(if (isSirenPlaying) Rose500.copy(alpha = alarmAlpha) else Slate500, RoundedCornerShape(2.dp)).padding(horizontal = 2.dp)) {
+                                 Text(text = if (isSirenPlaying) "SIREN LOCKOUT" else "LOCKOUT", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold, style = compactStyle)
+                             }
+                        }
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(18.dp)) { 
+                            CircularProgressIndicator(progress = { progressValue }, modifier = Modifier.size(16.dp), color = if (isDataHealthy) BrandJd else Rose500, strokeWidth = 2.dp)
+                            Icon(imageVector = if (isDataHealthy) Icons.Default.CheckCircle else Icons.Default.Error, contentDescription = null, modifier = Modifier.size(8.dp), tint = if (isDataHealthy) BrandJd else Rose500)
+                        }
+                        Text(text = if(watchdogOk) "OK" else "FAIL", color = if(watchdogOk) BrandJd else Rose500, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                     }
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(18.dp)) { 
-                        CircularProgressIndicator(progress = { progressValue }, modifier = Modifier.size(16.dp), color = if (isDataHealthy) BrandJd else Rose500, strokeWidth = 2.dp)
-                        Icon(imageVector = if (isDataHealthy) Icons.Default.CheckCircle else Icons.Default.Error, contentDescription = null, modifier = Modifier.size(8.dp), tint = if (isDataHealthy) BrandJd else Rose500)
-                    }
-                    Text(text = if(watchdogOk) "OK" else "FAIL", color = if(watchdogOk) BrandJd else Rose500, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = if (trackerState == TrackerState.MOVING && isTrackerGpsActive) "»\u2009${trackerState.name}\u2009«" else trackerState.name, color = (if (!isTrackerGpsActive) Slate500 else BrandJd).copy(alpha = if (trackerState == TrackerState.MOVING && isTrackerGpsActive) movingAlpha else 1f), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
+                    Spacer(modifier = Modifier.weight(1f))
+                    val animatedSpeed by animateFloatAsState(if (isTrackerGpsActive && !speedMps.isNaN()) speedMps * 3.6f else 0f, tween(1000), label = "SpeedAnim")
+                    Text(text = "${if (animatedSpeed < 10.0f) String.format(Locale.getDefault(), "%.1f", animatedSpeed) else animatedSpeed.toInt().toString()}km/h", color = if (isTrackerGpsActive) BrandJd else Slate500, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, textAlign = TextAlign.End)
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = if (trackerState == TrackerState.MOVING && isTrackerGpsActive) "»\u2009${trackerState.name}\u2009«" else trackerState.name, color = (if (!isTrackerGpsActive) Slate500 else BrandJd).copy(alpha = if (trackerState == TrackerState.MOVING && isTrackerGpsActive) movingAlpha else 1f), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
-                Spacer(modifier = Modifier.weight(1f))
-                val animatedSpeed by animateFloatAsState(if (isTrackerGpsActive && !speedMps.isNaN()) speedMps * 3.6f else 0f, tween(1000), label = "SpeedAnim")
-                Text(text = "${if (animatedSpeed < 10.0f) String.format(Locale.getDefault(), "%.1f", animatedSpeed) else animatedSpeed.toInt().toString()}km/h", color = if (isTrackerGpsActive) BrandJd else Slate500, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, textAlign = TextAlign.End)
-            }
-            Spacer(modifier = Modifier.height(3.dp))
-            if (isLandscape && mode == "viewer") {
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                    val vAge = if(viewerGpsTs > 0) now - viewerGpsTs else -1L
-                    Box(modifier = Modifier.weight(1f)) { 
-                        StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = vAge, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS) 
+                Spacer(modifier = Modifier.height(3.dp))
+                if (isLandscape && mode == "viewer") {
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                        val vAge = if(viewerGpsTs > 0) now - viewerGpsTs else -1L
+                        Box(modifier = Modifier.weight(1f)) { 
+                            StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = vAge, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS) 
+                        }
+                        val tAge = if(lastGpsTs > 0) now - lastGpsTs else -1L
+                        Box(modifier = Modifier.weight(1f)) { 
+                            StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = isTelemetryFresh, isGpsFresh = isGpsFresh, isUltraLongStationary = isUltraLongStationary) 
+                        }
+                    }
+                } else {
+                    if (mode == "viewer") {
+                        val vAge = if(viewerGpsTs > 0) now - viewerGpsTs else -1L
+                        StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = vAge, horizontalPadding = 8.dp, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS)
+                        Spacer(modifier = Modifier.height(3.dp))
                     }
                     val tAge = if(lastGpsTs > 0) now - lastGpsTs else -1L
-                    Box(modifier = Modifier.weight(1f)) { 
-                        StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = isTelemetryFresh, isGpsFresh = isGpsFresh, isUltraLongStationary = isUltraLongStationary) 
-                    }
+                    StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = if (mode == "tracker") (viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isTelemetryFresh, isGpsFresh = isGpsFresh, isUltraLongStationary = isUltraLongStationary)
                 }
-            } else {
-                if (mode == "viewer") {
-                    val vAge = if(viewerGpsTs > 0) now - viewerGpsTs else -1L
-                    StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = vAge, horizontalPadding = 8.dp, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS)
-                    Spacer(modifier = Modifier.height(3.dp))
-                }
-                val tAge = if(lastGpsTs > 0) now - lastGpsTs else -1L
-                StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = if (mode == "tracker") (viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isTelemetryFresh, isGpsFresh = isGpsFresh, isUltraLongStationary = isUltraLongStationary)
             }
         }
     }
@@ -724,8 +727,8 @@ fun StatusRowData(
     val animatedBattery by animateIntAsState(battery, tween(1500), label = "BatteryAnim")
 
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = horizontalPadding), verticalAlignment = Alignment.CenterVertically) {
-        Row(modifier = Modifier.width(210.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(modifier = Modifier.width(48.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.width(204.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.width(42.dp), verticalAlignment = Alignment.CenterVertically) {
                  val alpha by animateFloatAsState(if (isConnStale) 0.5f else 1f, label = "LabelAlpha")
                  Text(text = label, color = contentColor.copy(alpha = if (isConnStale) handshakeAlpha else alpha), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                  if (isLocPending) Box(modifier = Modifier.padding(start = 1.dp).background(Amber500, RoundedCornerShape(1.dp)).padding(horizontal = 1.dp)) { 
@@ -766,7 +769,7 @@ fun StatusRowData(
                 }
 
                 if (isLocPending && locPendingReason != LocationPendingReason.NONE) {
-                    Text(text = locPendingReason.name.replace("_", " "), color = Amber500, fontSize = 8.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false), textAlign = TextAlign.End, style = compactStyle)
+                    Text(text = locPendingReason.name.replace("_", " "), color = Amber500, fontSize = 8.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, maxLines = 1, softWrap = false, overflow = TextOverflow.Visible, modifier = Modifier.weight(1f, fill = false), textAlign = TextAlign.End, style = compactStyle)
                 } else {
                     fun formatAcc(v: Float): String = when { v >= 10000f -> "${(v / 1000).toInt()}k"; v >= 1000f -> String.format(Locale.getDefault(), "%.1fk", v / 1000f); else -> v.toInt().toString() }
                     val accColor = if (isTelemetryFresh) (if (!isGpsFresh) Slate500 else color) else Slate500

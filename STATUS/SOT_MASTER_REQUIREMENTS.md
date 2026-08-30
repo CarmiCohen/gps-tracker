@@ -1,8 +1,8 @@
-# SOT Master Requirements (Aug.29.11)
+# SOT Master Requirements (Aug.29.13)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (29 Rules)
+## 🏗️ Architectural Master Rules (30 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -28,16 +28,26 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **2.7 UI Fluidity**: UI stalls (Davey) must not exceed 700ms on target hardware (SM-A155F).
 *   **2.8 Async Geometry Generation (R758b)**: Heavy map overlay geometry (e.g., accuracy circles, geofence polygons) must be generated off the UI thread. `MapOverlayManager` must utilize `Dispatchers.Default` for point calculations and trigger a `MapView.invalidate()` only when geometry is ready, ensuring 60FPS fluid motion during high-frequency telemetry updates (Updated Aug.29.00).
 *   **2.9 Segmented Polyline Hydration (R759b)**: Large telemetry trails (>500 points) must be updated using segmented coroutine patterns. `MapOverlayManager` must utilize `yield()` during polyline point assignment to interleave point hydration with UI frames, preventing Main-thread stalls during heavy history rendering (Updated Aug.29.02).
+*   **2.10 Technical Telemetry Directionality (R766)**: All technical telemetry UI components (StatusBar, Dashboard, HUD) MUST enforce LTR (Left-to-Right) layout direction via `CompositionLocalProvider` regardless of system locale. This ensures that asymmetric technical data (e.g., speed on right, status badges on left) remains readable and aligned with forensic documentation (Updated Aug.29.13).
 
 ### 3. Hardware Authority
 *   **3.1 Unified Hardware Provider (R760)**: To reduce thread overhead and synchronize platform callbacks, all GNSS, Location, IMU, and Environmental sensors must be managed by the unified `HardwareProvider`. This component must share a single `HandlerThread` ("HardwareThread") for all OS-level event delivery, ensuring consistent lifecycle management and deterministic unregistration via the `ManagedHardware` framework (Updated Aug.29.03).
-*   **3.2 Adaptive Acoustic Duty-Cycle (R762)**: To optimize battery life during extended stationary periods, acoustic monitoring off-cycles must scale linearly from 8 seconds up to 30 seconds based on stationary duration. This reduces native microphone initialization churn while maintaining security responsiveness (Updated Aug.29.07).
+*   **3.2 Adaptive Acoustic Duty-Cycle (R762/R762b)**: To optimize battery life during extended stationary periods, acoustic monitoring off-cycles must scale linearly from 8 seconds up to 30 seconds based on stationary duration. The calculation logic MUST be encapsulated in `SentinelValidator.kt` as a pure function to ensure testability and separation from hardware side-effects. (Updated Aug.29.12).
 *   **3.3 Ultra-Long Stationary GNSS Relaxation (R763)**: To maximize battery life in long-term surveillance scenarios, GNSS polling intervals must be relaxed to 5 minutes (`ULTRA_LONG_STATIONARY_GPS_POLLING_MS`) when confirmed stationary duration exceeds 4 hours (`ULTRA_LONG_STATIONARY_DURATION_MS`). The transition must be managed by `ServiceBehaviorUseCase` to ensure immediate resumption upon movement detection (Updated Aug.29.08).
-*   **3.4 Hardware-State Transparency (R765)**: To ensure user and viewer awareness of low-power relaxation modes, high-level hardware states (e.g., Ultra-Long Stationary) MUST be exposed from `HardwareProvider` and propagated through the telemetry pipeline to UI components (via visual `[ULTRA]` badges) and foreground notifications. This provides deterministic explanations for variable polling frequencies. (Updated Aug.29.11).
+*   **3.4 Hardware-State Transparency (R765)**: To ensure user and viewer awareness of low-power relaxation modes, high-level hardware states (e.g., Ultra-Long Stationary) MUST be exposed from `HardwareProvider` and propagated through the telemetry pipeline to UI components (via visual `[ULTRA]` badges) and foreground notifications. This provides deterministic explanations for variable polling frequencies. (Updated Aug.29.12).
+
+### 4. Forensic & Security Rules
+*   **4.1 Sampling Frequency**: Forensic sampling must operate between 10ms and 100ms based on system load (R700).
+*   **4.2 Reliability Threshold**: `ALERT_ID_PERFORMANCE_SPIKE` must trigger if `forensicReliability` (EMA) drops below 0.85 for >30s (R715).
+*   **4.3 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`, `ToggleSetupBypass`) to verify alarm triggers and facilitate automated soak tests under simulated stress (R196-V, R735).
+*   **4.4 Identity Sanitization (R976)**: Identity sanitization state must be persistent. The warning overlay dismissal must be written to the DataStore to prevent redundant notifications across cold starts (R737, R976).
+*   **4.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
 
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.29.13**: Resolved Concern #766 (RTL Inconsistency & Truncation). Enforced LTR directionality for technical UI and expanded pending reason width.
+*   **Aug.29.12**: Resolved Concern #762 (Acoustic Refinement R762b) and #765 (UI Transparency). Encapsulated acoustic duty-cycle logic in SentinelValidator and integrated [ULTRA] badges for transparency.
 *   **Aug.29.11**: Resolved Concern #765 (UI Refinement). Added [ULTRA] visual indicators to HUD and Telemetry Dashboard for hardware state transparency.
 *   **Aug.29.10**: Resolved Concern #765 (Ultra-Long Stationary Exposure). Centralized detection and exposed state via Flow for UI/Notification parity.
 *   **Aug.29.09**: Resolved Concern #764 (Engine Config Refinement). Consolidated device-specific flags into HardwareCapabilities.
@@ -50,4 +60,57 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R102**: Real-ala-time telemetry synchronization via Socket.io.
 *   **R103**: Forensic event logging with microsecond precision.
 *   **R104**: Geo-fencing authority with configurable distance thresholds.
-*   *(Remaining 139 functional requirements preserved in the project's internal technical registry)*
+*   **R105**: Battery steep discharge detection and alerting.
+*   **R106**: Thermal mitigation and performance throttling (Cooling Mode).
+*   **R107**: Offline data buffering and batch synchronization.
+*   **R108**: Proactive database pruning (Logs, Trails, History).
+*   **R109**: Secure identity sanitization and persistence.
+*   **R110**: ApplicationContext enforcement for dependency injection.
+*   **R112**: Deterministic service destruction and resource release.
+*   **R113**: Thread-safe atomic state management (StateFlow/Mutex).
+*   **R114**: Foreground service notification persistence.
+*   **R115**: IO offloading from UI thread (Hardened IO).
+*   **R116**: Monotonic time reference for interval detection.
+*   **R117**: Centralized telemetry repository as Single Source of Truth.
+*   **R196-V**: Manual validation hooks for alarm simulation.
+*   **R197**: Chunked and staggered database pruning.
+*   **R212**: Neutral hardware namespace (jdHardware).
+*   **R240**: Centralized UI state aggregation (UiStateAggregator).
+*   **R243**: Automated recovery to previous active mode (<2s).
+*   **R248**: Segmented hydration flows for budget hardware.
+*   **R250**: Navigation backstack continuity (popUpTo/launchSingleTop).
+*   **R280**: LRU strategy for shadow-caches.
+*   **R301**: JNI watchdog timer (2000ms).
+*   **R307**: Maintenance duration monotonic authority.
+*   **R309**: Map overlay isolation from Compose Snapshots.
+*   **R310**: Heuristic OS trigger neutralization (mbrainSDK).
+*   **R312**: Snap-Isolation throttling for telemetry flows.
+*   **R314**: ViewModel initialization staggering.
+*   **R315**: GPS stabilization grace period (30s).
+*   **R317**: Decoupled hardware identification (HardwareSot).
+*   **R318**: Map Engine Level 4-7 hydration via IdleHandler.
+*   **R319**: Native initialization exponential backoff retry.
+*   **R323**: Multi-frame staggered engine initialization.
+*   **R700**: Forensic sampling frequency (10ms-100ms).
+*   **R715**: Performance spike reliability threshold (0.85 EMA).
+*   **R735**: Manual overlay bypass validation hooks.
+*   **R737**: DataStore persistence for identity sanitization dismissal.
+*   **R738**: Hardware lifecycle synchronization and atomic registration.
+*   **R739**: Sub-millisecond execution blocks for map hydration.
+*   **R742**: Lifecycle-bound GNSS callback persistence.
+*   **R744**: Explicit activeLocationCallback unregistration in stop().
+*   **R745**: Hardware thread-queued sensor unregistration.
+*   **R746**: Synchronous hardware thread join during disposal.
+*   **R747**: FusedLocationProvider unregistration task awaiting.
+*   **R748**: CallbackFlow awaitClose unregistration synchronization.
+*   **R749**: SystemStatusProvider callbackFlow hardening.
+*   **R750**: NetworkCallback synchronous disposal on Main Looper.
+*   **R752**: Deadlock-free unregistration utility (Looper detection).
+*   **R753**: ManagedBroadcastReceiver standardization.
+*   **R754**: ManagedSensor/DisplayListener abstraction.
+*   **R755**: Standardized GNSS unregistration timeout (2000ms).
+*   **R756**: Trace-logged unregistration handshake verification.
+*   **R757**: Unconditional cleanup of revival location callbacks.
+*   **R758**: IO-thread pre-warming of OSM engine and gating.
+*   **R759**: PackageName shadow-cache for IPC optimization.
+*   *(Remaining 86 functional requirements preserved in the project's internal technical registry)*
