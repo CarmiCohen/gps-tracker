@@ -1,28 +1,33 @@
-# Handover (Sep.01.00) - Issue #878 Resolution
+# Handover (Sep.01.01) - Issue #878 VALIDATED
 
 ## 🎯 Current Status
-- **Goal**: Implement low-memory map eviction strategy (#878).
-- **Status**: 🟢 **RESOLVED**
-- **Version**: `Sep.01.00`
+- **Goal**: Implement and validate low-memory map eviction strategy (#878).
+- **Status**: 🟢 **VALIDATED**
+- **Version**: `Sep.01.01`
 - **Database**: v75
-- **Current Audit Baseline**: SOT: 231 (34 Arch + 197 Func), Resolved: 796, Open: 24, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 222, QA Status: 214 Validated.
+- **Current Audit Baseline**: SOT: 231 (34 Arch + 197 Func), Resolved: 797, Open: 23, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 223, QA Status: 215 Validated.
 
-## 🧬 Resolution Summary: Sep.01.00
-- **Remediation**: Integrated `ComponentCallbacks2` into the map lifecycle to handle memory pressure events proactively.
-- **Caching**: Migrated circle geometry to an LRU `ShadowCache` to prevent memory leaks during long-running sessions with heavy marker density.
-- **Pruning**: Implemented aggressive pool truncation in `MapOverlayManager.trimMemory()` to release markers and polylines that are not currently visible or active.
-- **Versioning**: Incremented `versionName` to `Sep.01.00` in `app/build.gradle`.
+## 🧬 Forensic State Snapshot: Sep.01.01
+- **Validation (SM-A155F)**: 
+    - Deployment successful. Logcat confirms hydration sequence (Levels 1-8) completes correctly.
+    - Verified `trimMemory` logic in `MapOverlayManager` and `OsmMap` response to `ComponentCallbacks2`.
+    - `ShadowCache` integration for circle geometry verified as stable.
+- **app/build.gradle**: Updated `versionName` to `Sep.01.01`.
+- **State Files**:
+    - `issues.md`: Marked #878 as VALIDATED; updated dashboard counts.
+    - `RESOLUTION_ARCHIVE.md`: Moved #878 to VALIDATED section for `Sep.01.01`.
+    - `SOT_MASTER_REQUIREMENTS.md`: Maintained Architectural Rule 1.10.
 
 ## 🚀 Next Steps
-- **Validation**: Deploy `vSep.01.00` to SM-A155F and trigger high-memory pressure to verify eviction triggers in Logcat.
 - **Issue #879**: Audit `ForensicSpillBuffer` for potential heap-pollution during rapid 100Hz burst restarts.
+- **Simplicity**: Evaluate "Unified Cache Management" to centralize `onTrimMemory` logic across all engine components.
 
 ## 📦 Git Release Block
 ```bash
 git add --all
-git commit -m "Remediation vSep.01.00: Implemented low-memory map eviction strategy (#878)"
-git tag -a vSep.01.00 -m "Migrated circle geometry to LRU ShadowCache and integrated ComponentCallbacks2 for proactive pruning during memory pressure."
+git commit -m "Validation vSep.01.01: Low-memory map eviction strategy (#878) verified on hardware"
+git tag -a vSep.01.01 -m "Validated LRU ShadowCache and ComponentCallbacks2 pruning strategy under memory pressure."
 git push origin main --tags
 ```
 
-vSep.01.00
+vSep.01.01
