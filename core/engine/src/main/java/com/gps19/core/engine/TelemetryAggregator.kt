@@ -4,6 +4,9 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Aug.31.00:
+ * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
+ *   violationUptimeMs and isUltraLongStationary to aggregation logic (R782).
  * Aug.14.03:
  * - Issue #171: Forensic Jitter Audit. Hardened processPoint with a 
  *   monotonicity guard to prevent "Ghost Spikes" and "Replay Snap-backs" 
@@ -59,6 +62,8 @@ class TelemetryAggregator {
         var ioWait: Double = 0.0
         var maxIoLatency: Long = 0L
         var isSilentFailure: Boolean = false
+        var isUltraLongStationary: Boolean = false
+        var violationUptimeMs: Long = 0L
 
         fun reset(point: EngineConnectionPoint) {
             rtt = point.rtt
@@ -97,6 +102,8 @@ class TelemetryAggregator {
             ioWait = point.ioWait
             maxIoLatency = point.maxIoLatency
             isSilentFailure = point.isSilentFailure
+            isUltraLongStationary = point.isUltraLongStationary
+            violationUptimeMs = point.violationUptimeMs
         }
 
         fun merge(cur: EngineConnectionPoint) {
@@ -137,6 +144,8 @@ class TelemetryAggregator {
             ioWait = max(ioWait, cur.ioWait)
             maxIoLatency = max(maxIoLatency, cur.maxIoLatency)
             isSilentFailure = isSilentFailure || cur.isSilentFailure
+            isUltraLongStationary = isUltraLongStationary || cur.isUltraLongStationary
+            violationUptimeMs = max(violationUptimeMs, cur.violationUptimeMs)
         }
 
         fun writeTo(target: EngineConnectionPoint, base: EngineConnectionPoint, isTick: Boolean) {
@@ -176,6 +185,8 @@ class TelemetryAggregator {
             target.ioWait = this.ioWait
             target.maxIoLatency = this.maxIoLatency
             target.isSilentFailure = this.isSilentFailure
+            target.isUltraLongStationary = this.isUltraLongStationary
+            target.violationUptimeMs = this.violationUptimeMs
             target.isTick = isTick
         }
     }
@@ -321,6 +332,7 @@ class TelemetryAggregator {
 
             flyweight.apply {
                 ts = currentRt + rtToTsOffset; rt = currentRt; rtt = 0; remoteSig = 0; isConnected = false; isGap = true
+                isUltraLongStationary = false; violationUptimeMs = 0L
                 snrIdx = if (nextSnr != null && nextSnr.rt <= windowEndRt) (nextSnr.snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) else 0.0
                 val snapshot = if (nextSensor != null && nextSensor.rt <= windowEndRt) nextSensor else null
                 noiseIdx = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: 0.0

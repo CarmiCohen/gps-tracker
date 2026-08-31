@@ -8,13 +8,13 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Aug.31.00:
+ * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
+ *   violationUptimeMs and isUltraLongStationary to PendingStatusEntity and 
+ *   HistoryEntity. Incremented version to 75 with migration (R782).
  * Aug.29.10:
  * - Concern #765: Added isUltraLongStationary to PendingStatusEntity. 
  *   Incremented version to 74 with migration.
- * - Build Fix: Removed unused 'limit' parameter from PendingStatusDao.pruneByThreshold.
- * Aug.22.04:
- * - Issue #197 Standardization: Aligned ViolationDao, TrailDao, and HistoryDao 
- *   with R197 chunked pruning standards.
  */
 @Entity(
     tableName = "logs", 
@@ -119,7 +119,9 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val isAnchorLocked: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isBatteryLow: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isBatteryCritical: Boolean = false
+    @ColumnInfo(defaultValue = "0") val isBatteryCritical: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val violationUptimeMs: Long = 0L,
+    @ColumnInfo(defaultValue = "0") val isUltraLongStationary: Boolean = false
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -172,7 +174,8 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "VALID") val status: String = "VALID",
     @ColumnInfo(defaultValue = "0") val isBatteryLow: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isBatteryCritical: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isUltraLongStationary: Boolean = false
+    @ColumnInfo(defaultValue = "0") val isUltraLongStationary: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val violationUptimeMs: Long = 0L
 )
 
 @Dao
@@ -295,7 +298,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 74, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 75, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -319,6 +322,17 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_74_75 = object : Migration(74, 75) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // R782: Binary Schema Expansion - violationUptimeMs and isUltraLongStationary for parity.
+                try {
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN violationUptimeMs INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN violationUptimeMs INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN isUltraLongStationary INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_73_74 = object : Migration(73, 74) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // R765: Adding isUltraLongStationary for forensic status transparency

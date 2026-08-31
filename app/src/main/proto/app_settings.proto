@@ -194,6 +194,10 @@ message RealtimeStatus {
 
     // Issue #133: Forensic Anomaly Correlation
     bool is_silent_failure = 65;
+
+    // Issue #782: Protocol Audit - Binary Schema Expansion
+    int64 violation_uptime_ms = 66;
+    bool is_ultra_long_stationary = 67;
 }
 
 message GeoPointProto {

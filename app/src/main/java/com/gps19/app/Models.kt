@@ -10,13 +10,14 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.31.00:
+ * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
+ *   violationUptimeMs and isUltraLongStationary to RealtimeStatus serialization (R782).
+ * - Forensic Audit: Added violationUptimeMs to ConnectionPoint for history parity.
  * Aug.30.13:
  * - Issue #779 Hardening: Integrated ForensicSanitizer into LogEntry and 
  *   TrackerStatus to scrub internal paths and normalize hardware identifiers 
  *   in exported telemetry and logs (R779).
- * Aug.29.10:
- * - Concern #765: Added isUltraLongStationary to ConnectionPoint for full state 
- *   parity in history and UI.
  */
 
 sealed class AppSensorEvent {
@@ -147,7 +148,8 @@ class ConnectionPoint(
     var ioWait: Double = 0.0,
     var maxIoLatency: Long = 0L,
     var isSilentFailure: Boolean = false,
-    var isUltraLongStationary: Boolean = false
+    var isUltraLongStationary: Boolean = false,
+    var violationUptimeMs: Long = 0L
 ) {
     fun copyFrom(other: ConnectionPoint) {
         this.localId = other.localId; this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt
@@ -166,7 +168,7 @@ class ConnectionPoint(
         this.sitDz = other.sitDz; this.sitBaro = other.sitBaro; this.sitTilt = other.sitTilt
         this.sitShock = other.sitShock; this.kineticEnergy = other.kineticEnergy; this.cpuLoad = other.cpuLoad
         this.ioWait = other.ioWait; this.maxIoLatency = other.maxIoLatency; this.isSilentFailure = other.isSilentFailure
-        this.isUltraLongStationary = other.isUltraLongStationary
+        this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
     }
 
     /**
@@ -179,7 +181,7 @@ class ConnectionPoint(
                gpsIndex == other.gpsIndex && snrIdx == other.snrIdx && vibeIdx == other.vibeIdx &&
                luxIdx == other.luxIdx && noiseIdx == other.noiseIdx && liftIdx == other.liftIdx &&
                tiltIdx == other.tiltIdx && baroIdx == other.baroIdx && isSitActive == other.isSitActive &&
-               isUltraLongStationary == other.isUltraLongStationary
+               isUltraLongStationary == other.isUltraLongStationary && violationUptimeMs == other.violationUptimeMs
     }
 
     fun reset() {
@@ -193,7 +195,7 @@ class ConnectionPoint(
         tiltIdx = 0.0; baroIdx = 0.0; isSitDetected = false; isSitActive = false
         sitVz = 0.0; sitVzTs = 0L; sitVzRt = 0L; sitDz = 0.0; sitBaro = 0.0; sitTilt = 0.0
         sitShock = 0.0; kineticEnergy = 0.0; cpuLoad = 0.0; ioWait = 0.0; maxIoLatency = 0L
-        isSilentFailure = false; isUltraLongStationary = false
+        isSilentFailure = false; isUltraLongStationary = false; violationUptimeMs = 0L
     }
 }
 
@@ -413,6 +415,8 @@ data class TrackerStatus(
                .setIsBatteryLow(isBatteryLow)
                .setIsBatteryCritical(isBatteryCritical)
                .setIsSilentFailure(isSilentFailure)
+               .setViolationUptimeMs(violationUptimeMs)
+               .setIsUltraLongStationary(isUltraLongStationary)
     }
 
     fun toMap(fromViewer: Boolean): Map<String, Any?> = mutableMapOf<String, Any?>().apply {
@@ -447,9 +451,6 @@ data class TrackerStatus(
         put("is_adaptive_jump", isAdaptiveJump); put("is_battery_low", isBatteryLow)
         put("is_battery_critical", isBatteryCritical); put("is_silent_failure", isSilentFailure)
         put("is_ultra_long_stationary", isUltraLongStationary)
-        
-        // R779: Normalize specific fields that might contain normalized metadata
-        // net_interface is already normalized (e.g. WIFI, MOBILE) in SystemStatusProvider.
     }
 
     companion object {

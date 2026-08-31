@@ -4,11 +4,13 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Aug.31.00:
+ * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
+ *   violationUptimeMs mapping for full parity in binary telemetry (R782).
+ * - Forensic Audit: Hardened history mappings for violationUptimeMs and 
+ *   isUltraLongStationary to ensure replay parity.
  * Aug.29.10:
  * - Concern #765: Added isUltraLongStationary mapping for full state parity.
- * Aug.29.05:
- * - Issue #761: Decomposed mapping logic from HistoryManager. Centralized 
- *   parity transformation for both core and forensic telemetry fields (R761).
  */
 object TelemetryMapper {
 
@@ -23,6 +25,7 @@ object TelemetryMapper {
             speed = p.speed; bearing = p.bearing; currentMa = p.currentMa
             locationPendingReason = p.locationPendingReason
             isUltraLongStationary = p.isUltraLongStationary
+            violationUptimeMs = p.violationUptimeMs
 
             // Forensic Parity
             snrIdx = p.snrIdx
@@ -83,6 +86,8 @@ object TelemetryMapper {
             isCoolingModeActive = entity.isCoolingModeActive
             isBatteryLow = entity.isBatteryLow
             isBatteryCritical = entity.isBatteryCritical
+            isUltraLongStationary = entity.isUltraLongStationary
+            violationUptimeMs = entity.violationUptimeMs
         }
     }
 
@@ -122,7 +127,9 @@ object TelemetryMapper {
             sitDz = point.sitDz,
             sitBaro = point.sitBaro,
             sitTilt = point.sitTilt,
-            sitShock = point.sitShock
+            sitShock = point.sitShock,
+            isUltraLongStationary = point.isUltraLongStationary,
+            violationUptimeMs = point.violationUptimeMs
         )
     }
 
@@ -152,7 +159,8 @@ object TelemetryMapper {
             isCoolingModeActive = status.isCoolingModeActive,
             isBatteryLow = status.isBatteryLow,
             isBatteryCritical = status.isBatteryCritical,
-            isUltraLongStationary = status.isUltraLongStationary
+            isUltraLongStationary = status.isUltraLongStationary,
+            violationUptimeMs = status.violationUptimeMs
         )
     }
 
@@ -182,7 +190,8 @@ object TelemetryMapper {
             isCoolingModeActive = entity.isCoolingModeActive,
             isBatteryLow = entity.isBatteryLow,
             isBatteryCritical = entity.isBatteryCritical,
-            isUltraLongStationary = entity.isUltraLongStationary
+            isUltraLongStationary = entity.isUltraLongStationary,
+            violationUptimeMs = entity.violationUptimeMs
         )
     }
 }

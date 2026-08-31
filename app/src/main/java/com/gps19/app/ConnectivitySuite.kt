@@ -33,11 +33,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Aug.31.00:
+ * - Issue #782: Protocol Audit - Binary Schema Expansion. Integrated 
+ *   violationUptimeMs and isUltraLongStationary into handleBinaryUpdate (R782).
  * Aug.29.05:
  * - Issue #761: Migrated from ForensicMapper to TelemetryMapper. Centralized 
  *   telemetry mapping authority (R761). Fixed typo in pending status mapping.
- * Aug.29.03:
- * - Issue #760 Hardening: Migrated from GpsManager to unified HardwareProvider (R760).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -369,7 +370,8 @@ class ConnectivitySuite @Inject constructor(
                 isStorageLow = entity.isStorageLow, isStorageCritical = entity.isStorageCritical,
                 isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface,
                 kineticEnergy = 0.0, isBatteryLow = entity.isBatteryLow, isBatteryCritical = entity.isBatteryCritical,
-                verticalVelocity = entity.verticalVelocity
+                verticalVelocity = entity.verticalVelocity, violationUptimeMs = entity.violationUptimeMs,
+                isUltraLongStationary = entity.isUltraLongStationary
             )
             val status = TelemetryMapper.mapPendingToStatus(entity, statusTemplate)
 
@@ -394,7 +396,8 @@ class ConnectivitySuite @Inject constructor(
                     netInterface = status.netInterface, lastValidFixRt = status.lastValidFixRt,
                     locationPendingReason = status.locationPendingReason.name, trackerState = status.trackerState.name, status = status.status.name,
                     isBatteryLow = status.isBatteryLow, isBatteryCritical = status.isBatteryCritical,
-                    verticalVelocity = status.verticalVelocity
+                    verticalVelocity = status.verticalVelocity, violationUptimeMs = status.violationUptimeMs,
+                    isUltraLongStationary = status.isUltraLongStationary
                 )
                 val entity = TelemetryMapper.mapStatusToPending(status, entityTemplate)
                 offlineRepository.addPendingStatusUpdate(entity)
@@ -469,7 +472,8 @@ class ConnectivitySuite @Inject constructor(
         kineticEnergy: Double = 0.0,
         isAdaptiveJump: Boolean = false,
         isBatteryLow: Boolean = false,
-        isBatteryCritical: Boolean = false
+        isBatteryCritical: Boolean = false,
+        isUltraLongStationary: Boolean = false
     ) {
         val trackerStatus = TrackerStatus(
             deviceId = deviceId, viewerId = viewerId, ts = timeProvider.currentTimeMillis(),
@@ -495,7 +499,8 @@ class ConnectivitySuite @Inject constructor(
             micPending = micPending, isSitDetected = isSitDetected, isSitActive = isSitActive, lastSitTs = lastSitTs,
             verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs, sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
             kineticEnergy = kineticEnergy, isAdaptiveJump = isAdaptiveJump,
-            isBatteryLow = isBatteryLow, isBatteryCritical = isBatteryCritical
+            isBatteryLow = isBatteryLow, isBatteryCritical = isBatteryCritical,
+            isUltraLongStationary = isUltraLongStationary
         )
         sendTelemetry(trackerStatus)
     }
@@ -595,7 +600,9 @@ class ConnectivitySuite @Inject constructor(
                     isTamperDetected = statusProto.isTamperDetected,
                     jumpTier = statusProto.jumpTier,
                     kineticEnergy = statusProto.kineticEnergy,
-                    isAdaptiveJump = statusProto.isAdaptiveJump
+                    isAdaptiveJump = statusProto.isAdaptiveJump,
+                    violationUptimeMs = statusProto.violationUptimeMs,
+                    isUltraLongStationary = statusProto.isUltraLongStationary
                 )
 
                 scope.launch {
@@ -614,7 +621,8 @@ class ConnectivitySuite @Inject constructor(
                         verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitVzTs = updatedStatus.sitVzTs, sitVzRt = updatedStatus.sitVzRt, sitDz = updatedStatus.sitDz,
                         sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock,
                         kineticEnergy = updatedStatus.kineticEnergy, isAdaptiveJump = updatedStatus.isAdaptiveJump,
-                        isBatteryLow = updatedStatus.isBatteryLow, isBatteryCritical = updatedStatus.isBatteryCritical
+                        isBatteryLow = updatedStatus.isBatteryLow, isBatteryCritical = updatedStatus.isBatteryCritical,
+                        violationUptimeMs = updatedStatus.violationUptimeMs
                     ))
                 }
                 updatedStatus
@@ -768,7 +776,9 @@ class ConnectivitySuite @Inject constructor(
                     sitBaro = data.optDouble("sit_baro", current.sitBaro), sitTilt = data.optDouble("sit_tilt", current.sitTilt), sitShock = data.optDouble("sit_shock", current.sitShock),
                     isSitActive = data.optBoolean("is_sit_active", current.isSitActive),
                     kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy),
-                    isAdaptiveJump = data.optBoolean("is_adaptive_jump", current.isAdaptiveJump)
+                    isAdaptiveJump = data.optBoolean("is_adaptive_jump", current.isAdaptiveJump),
+                    violationUptimeMs = data.optLong("violation_uptime_ms", current.violationUptimeMs),
+                    isUltraLongStationary = data.optBoolean("is_ultra_long_stationary", current.isUltraLongStationary)
                 )
 
                 scope.launch {
@@ -787,7 +797,8 @@ class ConnectivitySuite @Inject constructor(
                         verticalVelocity = updatedStatus.verticalVelocity, sitVz = updatedStatus.sitVz, sitVzTs = updatedStatus.sitVzTs, sitVzRt = updatedStatus.sitVzRt, sitDz = updatedStatus.sitDz,
                         sitBaro = updatedStatus.sitBaro, sitTilt = updatedStatus.sitTilt, sitShock = updatedStatus.sitShock,
                         kineticEnergy = updatedStatus.kineticEnergy, isAdaptiveJump = updatedStatus.isAdaptiveJump,
-                        isBatteryLow = updatedStatus.isBatteryLow, isBatteryCritical = updatedStatus.isBatteryCritical
+                        isBatteryLow = updatedStatus.isBatteryLow, isBatteryCritical = updatedStatus.isBatteryCritical,
+                        violationUptimeMs = updatedStatus.violationUptimeMs
                     ))
                 }
                 updatedStatus

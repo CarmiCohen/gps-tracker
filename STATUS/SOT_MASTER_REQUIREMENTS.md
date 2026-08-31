@@ -1,4 +1,4 @@
-# SOT Master Requirements (Aug.30.13)
+# SOT Master Requirements (Aug.31.00)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -43,14 +43,15 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **4.4 Identity Sanitization (R976)**: Identity sanitization state must be persistent. The warning overlay dismissal must be written to the DataStore to prevent redundant notifications across cold starts (R737, R976).
 *   **4.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
 *   **4.6 Forensic Metadata Sanitization (R779)**: **MANDATORY**. All exported logs, trails, and telemetry payloads must be scrubbed of internal absolute paths (e.g., `/data/user/0/...`) and have hardware-specific identifiers (e.g., Build.MODEL) normalized unless explicitly marked as forensic audit traces (`isSpecial`). Sanitization must be applied at the edge of the logging pipeline via `ForensicSanitizer`. (Added Aug.30.13).
+*   **4.7 Binary Protocol Expansion (R782)**: To ensure forensic continuity across hot-path binary updates, all critical performance metrics (e.g., `violationUptimeMs`) and behavioral states (e.g., `isUltraLongStationary`) MUST be carried in the `RealtimeStatus` Protobuf schema. This eliminates state divergence when switching between JSON and binary signaling roles. (Added Aug.31.00).
 
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.31.00**: Binary Protocol Expansion (#782). Expanded Protobuf schema and implemented database v75 migration to carry violation metrics in hot-path telemetry.
 *   **Aug.30.13**: Forensic Metadata Sanitization (#779). Integrated ForensicSanitizer across logging and export pipelines.
 *   **Aug.30.12**: Documentation Integrity Audit. Restored exhaustive R-IDs and resolution logs.
 *   **Aug.30.09**: Evaluated Stationary Derivation Logic (#778). Confirmed flag retention for state parity.
-*   **Aug.30.08**: Validated IPC Spam Remediation (#759). Confirmed ShadowCache effectiveness.
 
 ---
 
@@ -212,6 +213,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R777**: Segmented home point marker instantiation using yield().
 *   **R778**: Definitive isUltraLongStationary flag for state parity.
 *   **R779**: Forensic Metadata Sanitization at the logging edge.
+*   **R782**: Binary Schema Expansion for violation metrics.
 *   **R799e**: Vivid green enforcement for JD identity.
 *   **R810-M**: Acoustic floor calibration logic parity.
 *   **R810-P**: Stationary GPS pulse asymmetry mitigation.
@@ -251,4 +253,4 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R993c**: Reactive sensor re-registration authority.
 *   **R999**: Type Safety Authority (Double Precision).
 
-*(Total: 32 Architectural Rules + 149 Functional R-IDs = 181 Items)*
+*(Total: 32 Architectural Rules + 150 Functional R-IDs = 182 Items)*

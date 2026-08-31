@@ -4,11 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Aug.31.00:
+ * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
+ *   violationUptimeMs to EngineConnectionPoint for parity (R782).
  * Aug.29.10:
  * - Concern #765: Added isUltraLongStationary to EngineConnectionPoint for 
  *   remote status transparency.
- * Aug.22.04:
- * - Issue #308/Build Fix: Converted SpatialAnchor to an interface.
  */
 
 @Serializable
@@ -109,7 +110,8 @@ class EngineConnectionPoint(
     var isSilentFailure: Boolean = false,
     var isBatteryLow: Boolean = false,
     var isBatteryCritical: Boolean = false,
-    var isUltraLongStationary: Boolean = false
+    var isUltraLongStationary: Boolean = false,
+    var violationUptimeMs: Long = 0L
 ) {
     fun copyFrom(other: EngineConnectionPoint) {
         this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt; this.remoteSig = other.remoteSig
@@ -128,7 +130,7 @@ class EngineConnectionPoint(
         this.kineticEnergy = other.kineticEnergy; this.gpsHardwareLock = other.gpsHardwareLock
         this.cpuLoad = other.cpuLoad; this.ioWait = other.ioWait; this.maxIoLatency = other.maxIoLatency
         this.isSilentFailure = other.isSilentFailure; this.isBatteryLow = other.isBatteryLow; this.isBatteryCritical = other.isBatteryCritical
-        this.isUltraLongStationary = other.isUltraLongStationary
+        this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
     }
 }
 

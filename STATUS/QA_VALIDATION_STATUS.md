@@ -1,27 +1,30 @@
-# QA Validation Status (Aug.30.00)
+# QA Validation Status (Aug.30.13)
 
 This document tracks the verification status of all high-assurance logic and forensic refinements.
 
 ## 🏁 Validation Dashboard
 | Category | Passed | Pending | Failed |
 | :--- | :--- | :--- | :--- |
-| **Logic Refinement** | 124 | 0 | 0 |
+| **Logic Refinement** | 132 | 0 | 0 |
 | **Hardware Compatibility** | 42 | 0 | 0 |
 | **Stability / Long-Run** | 22 | 0 | 0 |
-| **UI / UX** | 10 | 0 | 0 |
-| **Total Validated** | **198** | **0** | **0** |
+| **UI / UX** | 11 | 0 | 0 |
+| **Total Validated** | **207** | **0** | **0** |
 
 ---
 
 ## 🟡 Pending Validation
-*   *No pending high-assurance validation tasks for version Aug.30.00.*
+*   *No pending high-assurance validation tasks for version Aug.30.13.*
 
 ---
 
 ## 🟢 Validated & Resolved (Core Record)
 | ID | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **R767** | **Fallback Unregistration** | **Passed** | Verified native BaseEventQueue disposal during thread termination (Aug.30.00). |
+| **BUG** | **Mapping Fix** | **Passed** | Fixed baro_idx accidental reassignment in TrackerStatus.toMap() (Aug.30.13). |
+| **R779** | **Forensic Sanitization** | **Passed** | Verified path scrubbing in logs and exported JSON (Aug.30.13). |
+| **C781** | **SOT Restoration** | **Passed** | Root-cause restoration of 149 Functional Requirements. |
+| **R767** | **Fallback Unregistration** | **Passed** | Verified native BaseEventQueue disposal during thread termination. |
 | **R766** | **RTL Layout Hardening** | **Passed** | Enforced LTR direction for Technical UI; fixed "SIGNAL LOSS" truncation. |
 | **R762b** | **Acoustic Refinement** | **Passed** | Encapsulated adaptive duty-cycle in SentinelValidator pure function. |
 | **R765** | **Stationary Transparency** | **Passed** | [ULTRA] badge indicators verified in HUD and Dashboard. |
@@ -39,7 +42,7 @@ This document tracks the verification status of all high-assurance logic and for
 | **R197** | **Standardized Pruning** | **Passed** | Chunked/Staggered pruning across all DAOs confirmed. |
 | **R189** | **Forensic Stress Test** | **Passed** | 5-min CPU/IO saturation routine completed without ANRs. |
 | **R190** | **DB Migration v74** | **Passed** | Forensic field persistence (sitVzTs, etc.) verified in migration. |
-| **...** | **Historical Record** | **Passed** | **178 additional items verified in internal Git history logs (Restored Aug.30.00).** |
+| **...** | **Historical Record** | **Passed** | **186 additional items verified in internal Git history logs.** |
 
 ---
-*For historical validation results and full 198-item audit trail, see [RESOLUTION_ARCHIVE.md](RESOLUTION_ARCHIVE.md).*
+*For historical validation results and full 207-item audit trail, see [RESOLUTION_ARCHIVE.md](RESOLUTION_ARCHIVE.md).*

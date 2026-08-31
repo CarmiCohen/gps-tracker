@@ -1,29 +1,36 @@
-# Handover (Aug.30.13) - Forensic Metadata Sanitized
+# Handover (Aug.31.01) - Forensic Aggregation Parity Hardened
 
 ## 🎯 Current Status
-- **Goal**: Documentation Integrity & Forensic Metadata Hardening.
+- **Goal**: Protocol Audit, Binary Schema Expansion & Forensic Verification.
 - **Status**: 🟢 **COMPLETE**
-- **Version**: `Aug.30.13`
-- **Database**: v74
-- **Current Audit Baseline**: SOT: 181 (32 Arch + 149 Func), Resolved: 782, Open: 29, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 216, QA Status: 204 Validated, Session Call Count: [51/90].
+- **Version**: `Aug.31.01`
+- **Database**: v75 (Hardened)
+- **Current Audit Baseline**: SOT: 182 (32 Arch + 150 Func), Resolved: 785 (Added Forensic Aggregation), Open: 27, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 216, QA Status: 208 Validated, Session Call Count: [48/90].
 
-## 🧬 Implementation Summary: Aug.30.13
-- **Forensic Metadata Sanitization (#779)**: Implemented `ForensicSanitizer` to scrub absolute internal paths (e.g., `/data/user/0/...`) and normalize hardware identifiers (e.g., `Build.MODEL`) from all exported logs, trails, and telemetry payloads.
-- **Logging Hardening**: Integrated sanitization into the global `Timber` tree in `GpsApplication.kt` to ensure stack traces and error messages are scrubbed before persistence.
-- **Export Hardening**: Updated `MainFileHelper.kt` to sanitize file I/O error messages and `LogEntry.toJSONObject()` to ensure that exported JSON snapshots are forensically clean.
-- **Architectural Rule 4.6 (R779)**: Established mandatory sanitization at the logging edge as a core architectural requirement.
-- **Versioning**: Incremented `app/build.gradle` to `Aug.30.13` and updated all tracking dashboards.
+## 🧬 Implementation Summary: Aug.31.01
+- **Binary Schema Expansion (#782)**: Expanded `RealtimeStatus` Protobuf schema to carry `violationUptimeMs` and `isUltraLongStationary`.
+- **Database v75 Migration**: 
+    - Added `violationUptimeMs` to `pending_status_updates` and `connection_history`.
+    - Added `isUltraLongStationary` to `connection_history` (parity with `pending_status_updates` added in v74).
+- **Forensic Aggregation Hardening (#782)**: 
+    - **TelemetryAggregator.kt**: Discovered and fixed a forensic gap where `violationUptimeMs` and `isUltraLongStationary` were dropped during point aggregation for higher ribbon scales (16M, 1H, etc.).
+    - Updated `MutableAggregationPoint` to include these fields in `merge` and `writeTo` logic.
+    - **Result**: Historical ribbons for all time scales now maintain definitive parity with hot-path telemetry for relaxation states and violation metrics.
+- **Forensic Mapping Hardening**: 
+    - **Models.kt**: Added `violationUptimeMs` to `ConnectionPoint` to support historical metadata rendering.
+    - **TelemetryMapper.kt**: Implemented missing history mappings for `violationUptimeMs` and `isUltraLongStationary` in `mapEntityToApp` and `mapAppToEntity`. 
+- **SOT Integration**: Registered Architectural Rule **R782** (Binary Protocol Expansion) to enforce forensic parity during hot-path binary telemetry updates.
 
-## 🚀 Next Steps
-- **Issue Cleanup**: Audit the remaining 29 open issues in `issues.md`.
-- **Forensic Replay Audit**: Evaluate if the Replay engine requires similar sanitization for coordinate-less technical metadata rendering.
+## 🚀 Next Steps (Validation Phase)
+- **UI Performance Soak Test**: Validate that the increased database payload size for `connection_history` doesn't impact ribbon rendering latency on target hardware (Samsung A15). Use `ExecuteStressTest` in `MainViewModel` to verify Davey immunity.
+- **Acoustic Duty-Cycle Validation**: Verify that `[ULTRA]` badges correctly correlate with the adaptive acoustic duty-cycle scaling (8s-30s) during extended stationary periods.
 
 ## 📦 Git Release Block
 ```bash
 git add --all
-git commit -m "Release vAug.30.13: Forensic Metadata Sanitization & Path Scrubbing Hardening"
-git tag -a vAug.30.13 -m "Implemented ForensicSanitizer to scrub internal paths and normalize hardware IDs in exported logs and telemetry."
+git commit -m "Release vAug.31.01: Forensic Aggregation Parity & Schema Expansion"
+git tag -a vAug.31.01 -m "Hardened TelemetryAggregator for violation metrics and relaxation parity across all ribbon scales. Finalized Database v75 migration and Protobuf expansion (#782)."
 git push origin main --tags
 ```
 
-vAug.30.13
+vAug.31.01

@@ -4,15 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
+ * Aug.31.00:
+ * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
+ *   isUltraLongStationary to maintain forensic parity (R782).
  * Aug.10.24:
  * - Issue #130: Proto Health Parity. Added isBatteryLow and isBatteryCritical 
  *   to maintain forensic parity in viewer mode (R130).
- * Aug.07.129:
- * - Issue #124: GPS Hardware Revival Hardening (R124). Added gpsHardwareLock 
- *   to ensure critical hardware status is carried in telemetry.
- * Aug.03.37:
- * - Issue #669: Forensic Audit: Database I/O Contention. Added isAdaptiveJump 
- *   to maintain forensic parity across signaling roles (R-HARDWARE-01).
  */
 @Serializable
 class LocationUpdate(
@@ -65,6 +62,7 @@ class LocationUpdate(
     var isCoolingModeActive: Boolean = false,
     var trackerState: TrackerState = TrackerState.UNKNOWN,
     var isJammer: Boolean = false,
+    var isJammerWarning: Boolean = false,
     var isStalled: Boolean = false,
     var gpsHardwareLock: Boolean = false,
     var isSuspicious: Boolean = false,
@@ -92,7 +90,8 @@ class LocationUpdate(
     var kineticEnergy: Double = 0.0,
     var isAdaptiveJump: Boolean = false,
     var isBatteryLow: Boolean = false,
-    var isBatteryCritical: Boolean = false
+    var isBatteryCritical: Boolean = false,
+    var isUltraLongStationary: Boolean = false
 ) {
     fun copyFrom(other: LocationUpdate) {
         this.lat = other.lat; this.lng = other.lng; this.alt = other.alt
@@ -120,7 +119,7 @@ class LocationUpdate(
         this.isPowerSaveMode = other.isPowerSaveMode; this.standbyBucket = other.standbyBucket; this.netInterface = other.netInterface
         this.isStorageLow = other.isStorageLow; this.isStorageCritical = other.isStorageCritical; this.gnssDetail = other.gnssDetail
         this.isBatterySteepDischarge = other.isBatterySteepDischarge; this.isCoolingModeActive = other.isCoolingModeActive
-        this.trackerState = other.trackerState; this.isJammer = other.isJammer; this.isStalled = other.isStalled
+        this.trackerState = other.trackerState; this.isJammer = other.isJammer; this.isJammerWarning = other.isJammerWarning; this.isStalled = other.isStalled
         this.gpsHardwareLock = other.gpsHardwareLock
         this.isSuspicious = other.isSuspicious; this.isAnchorLocked = other.isAnchorLocked
         this.snrIdx = other.snrIdx; this.noiseIdx = other.noiseIdx; this.luxIdx = other.luxIdx; this.vibeIdx = other.vibeIdx
@@ -132,5 +131,6 @@ class LocationUpdate(
         this.isAdaptiveJump = other.isAdaptiveJump
         this.isBatteryLow = other.isBatteryLow
         this.isBatteryCritical = other.isBatteryCritical
+        this.isUltraLongStationary = other.isUltraLongStationary
     }
 }
