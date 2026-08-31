@@ -32,10 +32,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Sep.01.10:
+ * - Issue #882 Hardening: Segmented composition logic based on hydrationLevel 
+ *   to remediate 1074ms Davey. Delayed heavy components (StatusBar, Dashboard) 
+ *   until higher hydration levels to distribute JIT compilation load (R2.1/R882).
  * Aug.29.11:
  * - UI Refinement: Added visual indicator for Ultra-Long Stationary state (R765).
- * Aug.26.16:
- * - Issue #739 Remediation: Passed hydrationLevel to AppMapContainer.
  */
 
 @Composable
@@ -116,20 +118,24 @@ fun ViewerScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (uiState.hydrationLevel < 1) {
+        if (uiState.hydrationLevel < 3) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
             }
         } else {
             if (isLandscape) {
                 Row(modifier = Modifier.fillMaxSize()) {
-                    header()
+                    if (uiState.hydrationLevel >= 4) {
+                        header()
+                    }
                     
                     Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
-                        statusBar()
+                        if (uiState.hydrationLevel >= 5) {
+                            statusBar()
+                        }
                         
                         Box(modifier = Modifier.weight(1f)) {
-                            if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen) {
+                            if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen && uiState.hydrationLevel >= 6) {
                                 AppMapContainer(
                                     appMode = uiState.appMode,
                                     hydrationLevel = uiState.hydrationLevel,
@@ -177,7 +183,7 @@ fun ViewerScreen(
                                     showSettingsButton = true,
                                     showToolsOverlay = true
                                 )
-                            } else if (uiState.hydrationLevel >= 2 && !isMapVisible) {
+                            } else if (uiState.hydrationLevel >= 4 && !isMapVisible) {
                                 ViewerDashboard(
                                     appMode = uiState.appMode ?: "viewer",
                                     isDashboardExpanded = uiState.navigation.isDashboardExpanded,
@@ -198,7 +204,7 @@ fun ViewerScreen(
                     }
                 }
             } else {
-                if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen) {
+                if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen && uiState.hydrationLevel >= 6) {
                     AppMapContainer(
                         appMode = uiState.appMode,
                         hydrationLevel = uiState.hydrationLevel,
@@ -256,13 +262,17 @@ fun ViewerScreen(
                         ) {
                             Column {
                                 Box(Modifier.statusBarsPadding()) {
-                                    header()
+                                    if (uiState.hydrationLevel >= 4) {
+                                        header()
+                                    }
                                 }
-                                statusBar()
+                                if (uiState.hydrationLevel >= 5) {
+                                    statusBar()
+                                }
                             }
                         }
 
-                        if (uiState.isMapHydrated && isMapVisible) {
+                        if (uiState.isMapHydrated && isMapVisible && uiState.hydrationLevel >= 7) {
                             Box(Modifier.fillMaxWidth().padding(top = 8.dp, end = 12.dp), contentAlignment = Alignment.CenterEnd) {
                                 MapSettingsToggle(
                                     isMapButtonsVisible = uiState.isMapButtonsVisible,
@@ -296,7 +306,7 @@ fun ViewerScreen(
                             }
                         }
                         
-                        if (uiState.hydrationLevel >= 2 && !isMapVisible) {
+                        if (uiState.hydrationLevel >= 4 && !isMapVisible) {
                             ViewerDashboard(
                                 appMode = uiState.appMode ?: "viewer",
                                 isDashboardExpanded = uiState.navigation.isDashboardExpanded,
@@ -318,7 +328,7 @@ fun ViewerScreen(
             }
         }
 
-        if (isSettingsOpen) {
+        if (isSettingsOpen && uiState.hydrationLevel >= 8) {
             SettingsOverlay(
                 activeSubSettings = uiState.navigation.activeSubSettings,
                 draftDeviceId = uiState.draftSettings.deviceId,
@@ -355,7 +365,7 @@ fun ViewerScreen(
                 onShowPhoneSetup = { viewModel.onEvent(UiEvent.TogglePhoneSetup(true)) },
                 onEvent = { viewModel.onEvent(it) }
             )
-        } else if (isLogVisible) {
+        } else if (isLogVisible && uiState.hydrationLevel >= 8) {
             val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()
             val showRecovered by viewModel.repository.logFilterRecovered.collectAsStateWithLifecycle()
             LogOverlay(
@@ -367,7 +377,7 @@ fun ViewerScreen(
                 systemPulse = systemPulse,
                 isTelemetryFresh = dashboardState.isTelemetryFresh
             )
-        } else if (isRibbonsVisible) {
+        } else if (isRibbonsVisible && uiState.hydrationLevel >= 8) {
             RibbonsOverlay(
                 isStrictMode = uiState.navigation.isStrictMode,
                 replayCursorTs = uiState.navigation.replayCursorTs,
@@ -381,7 +391,7 @@ fun ViewerScreen(
                 onScrub = { viewModel.onEvent(UiEvent.SetReplayCursor(it)) },
                 onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) }
             )
-        } else if (isGnssDetailVisible) {
+        } else if (isGnssDetailVisible && uiState.hydrationLevel >= 8) {
             GnssDetailOverlay(
                 gnssDetailFlow = viewModel.activeGnssDetail,
                 onClose = { viewModel.onEvent(UiEvent.ToggleGnssDetail(false)) }

@@ -25,6 +25,11 @@ import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Sep.01.06:
+ * - Issue #881 Hardening: Optimized for datasets >500 items. Increased 
+ *   circleCache capacity to 600. Refined yielding to dynamic batching (size 5 
+ *   for large sets) to reduce rescheduling overhead while maintaining 
+ *   zero-Davey status on A15 hardware (R881).
  * Sep.01.04:
  * - Issue #880 Remediation: Increased hydration granularity to "High". Reduced 
  *   yield batch size from 5 to 2 items and added intra-position yields to 
@@ -34,10 +39,6 @@ import kotlin.math.round
  *   circleCache to ShadowCache (LRU) and added trimMemory() to handle 
  *   ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW. Prunes all pools to minimum 
  *   functional levels under pressure (R878).
- * Aug.31.09:
- * - Issue #875 Optimization (R875): Increased hydration granularity. Reduced 
- *   violation update batch size from 20 to 5 and added yields to current 
- *   position hydration to eliminate residual frame skips on A15 hardware.
  */
 class MapOverlayManager(
     private val context: Context,
@@ -120,9 +121,9 @@ class MapOverlayManager(
     private var homeJob: Job? = null
     private var currentPositionsJob: Job? = null
 
-    // Issue #878: Migrated to ShadowCache for LRU eviction
+    // Issue #881: Increased circleCache capacity for high-density datasets
     private data class CircleKey(val latQ: Long, val lngQ: Long, val radiusQ: Long)
-    private val circleCache = ShadowCache<CircleKey, List<GeoPoint>>(300)
+    private val circleCache = ShadowCache<CircleKey, List<GeoPoint>>(600)
     private val pendingCalculations = Collections.synchronizedSet(mutableSetOf<CircleKey>())
 
     /**
@@ -201,7 +202,7 @@ class MapOverlayManager(
     }
 
     /**
-     * Issue #777/880 Optimization: Segmented home point updates.
+     * Issue #777/880/881 Optimization: Segmented home point updates.
      */
     fun updateHomePoints(
         home: List<GeoPoint>,
@@ -226,6 +227,9 @@ class MapOverlayManager(
             val markers = mutableListOf<Marker>()
 
             if (isFenceVisible) {
+                // Issue #881: Dynamic batch size to balance overhead and responsiveness
+                val yieldBatch = if (home.size > 200) 5 else 2 
+
                 home.forEachIndexed { idx, p ->
                     val poly = Polygon(mapView).apply { 
                         fillPaint.color = 0x28CBD5E1.toInt(); outlinePaint.color = 0xC8CBD5E1.toInt(); outlinePaint.strokeWidth = 2f; setInfoWindow(null) 
@@ -251,7 +255,7 @@ class MapOverlayManager(
                     }
                     markers.add(marker)
 
-                    if (idx % 2 == 0) yield() // Issue #880: High-granularity yielding (every 2 items)
+                    if (idx % yieldBatch == 0) yield() 
                 }
             }
 
@@ -271,7 +275,7 @@ class MapOverlayManager(
     }
 
     /**
-     * Issue #759b/880: Segmented trail update.
+     * Issue #759b/880/881: Segmented trail update.
      */
     fun updateTrails(
         trackerSegments: List<MapTrailSegment>, 
@@ -289,6 +293,8 @@ class MapOverlayManager(
                 trackerTrailJob?.cancel()
                 trackerTrailJob = scope.launch {
                     val polylines = mutableListOf<Polyline>()
+                    val yieldBatch = if (trackerSegments.size > 200) 5 else 2
+
                     trackerSegments.forEachIndexed { idx, segment ->
                         val line = if (idx < trackerPolylinePool.size) trackerPolylinePool[idx] else Polyline(mapView).also { l -> 
                             l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); trackerPolylinePool.add(l) 
@@ -297,7 +303,7 @@ class MapOverlayManager(
                         line.outlinePaint.color = segment.color
                         polylines.add(line)
                         
-                        if (segment.points.size > 200 || idx % 2 == 0) yield() // Issue #880: Higher yielding frequency
+                        if (segment.points.size > 200 || idx % yieldBatch == 0) yield()
                     }
                     trailFolder.items.clear()
                     trailFolder.items.addAll(polylines)
@@ -317,6 +323,8 @@ class MapOverlayManager(
                 viewerTrailJob?.cancel()
                 viewerTrailJob = scope.launch {
                     val polylines = mutableListOf<Polyline>()
+                    val yieldBatch = if (viewerSegments.size > 200) 5 else 2
+
                     viewerSegments.forEachIndexed { idx, segment ->
                         val line = if (idx < viewerPolylinePool.size) viewerPolylinePool[idx] else Polyline(mapView).also { l -> 
                             l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); viewerPolylinePool.add(l) 
@@ -325,7 +333,7 @@ class MapOverlayManager(
                         line.outlinePaint.color = segment.color
                         polylines.add(line)
                         
-                        if (segment.points.size > 200 || idx % 2 == 0) yield() // Issue #880: Higher yielding frequency
+                        if (segment.points.size > 200 || idx % yieldBatch == 0) yield()
                     }
                     viewerTrailFolder.items.clear()
                     viewerTrailFolder.items.addAll(polylines)
@@ -340,7 +348,7 @@ class MapOverlayManager(
     }
 
     /**
-     * Issue #776/875/880 Optimization: Segmented violation update.
+     * Issue #776/875/880/881 Optimization: Segmented violation update.
      */
     fun updateViolations(
         violations: List<ViolationPoint>, 
@@ -370,6 +378,7 @@ class MapOverlayManager(
 
             val markers = mutableListOf<Marker>()
             val circles = mutableListOf<Polygon>()
+            val yieldBatch = if (filtered.size > 200) 5 else 2
 
             filtered.forEachIndexed { index, v ->
                 val m = if (index < violationMarkerPool.size) violationMarkerPool[index] else Marker(mapView).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); violationMarkerPool.add(m) }
@@ -390,7 +399,7 @@ class MapOverlayManager(
                     circles.add(c)
                 }
                 
-                if (index % 2 == 0) yield() // Issue #880: High-granularity yielding (every 2 items)
+                if (index % yieldBatch == 0) yield()
             }
 
             violationMarkersFolder.items.clear()

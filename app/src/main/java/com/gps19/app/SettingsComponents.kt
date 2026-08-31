@@ -32,13 +32,14 @@ import timber.log.Timber
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Sep.01.08:
+ * - Issue #882 Hardening: Implemented 8-level staggered hydration for 
+ *   PhoneSetupOverlay to remediate 751ms Davey on SM-A155F. Increased yielding 
+ *   granularity to ensure sub-700ms frame budget during transition (R2.1/R882).
  * Aug.26.15:
  * - Issue #740 Logic Fix: Synchronized PhoneSetupOverlay items with 
  *   MainUiState.systemIssuesCount. Added Step 0 (Precise Location) and corrected 
  *   Auto-start completion flag to resolve counter mismatch (R740).
- * Aug.26.14:
- * - Issue #735 Hardening: Added isSetupBypassActive to PhoneSetupOverlay to 
- *   support automated soak test execution and provide visual bypass status (R735).
  */
 
 @Composable
@@ -72,10 +73,10 @@ fun SettingsOverlay(
     var visibleCount by remember { mutableIntStateOf(0) }
     
     LaunchedEffect(Unit) {
-        delay(100) 
+        delay(150) 
         isHydrated = true
-        // Consolidated to 3 phases to reduce main-thread churn on budget hardware (R246)
-        repeat(3) { 
+        // Staggered to 5 phases for hardware stability (R2.1)
+        repeat(5) { 
             visibleCount++
             delay(100) 
         }
@@ -139,7 +140,9 @@ fun SettingsOverlay(
                             Button(onClick = onShowPhoneSetup, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.HelpCenter, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_phone_setup)) }
                         }
                         Spacer(Modifier.height(16.dp))
+                    }
 
+                    if (visibleCount >= 3) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
                             Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.Default.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
@@ -147,7 +150,7 @@ fun SettingsOverlay(
                         Spacer(Modifier.height(16.dp))
                     }
 
-                    if (visibleCount >= 3) {
+                    if (visibleCount >= 4) {
                         Button(onClick = { onEvent(UiEvent.NavigateToDiagnostics(true)) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
                         Spacer(Modifier.height(24.dp))
 
@@ -155,8 +158,10 @@ fun SettingsOverlay(
                             Button(onClick = onImportConfig, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_load_config), fontSize = 11.sp) }
                             if (onExport != null) { Button(onClick = onExport, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_save_logs), fontSize = 11.sp) } }
                         }
-                        Spacer(Modifier.height(24.dp))
+                    }
 
+                    if (visibleCount >= 5) {
+                        Spacer(Modifier.height(24.dp))
                         OutlinedTextField(value = draftRelayUrl, onValueChange = onUpdateRelayUrl, label = { Text(stringResource(R.string.settings_label_relay_url)) }, modifier = Modifier.fillMaxWidth())
                         Spacer(Modifier.height(56.dp))
                     }
@@ -167,7 +172,7 @@ fun SettingsOverlay(
                 }
             }
         }
-        if (isHydrated && visibleCount >= 3) {
+        if (isHydrated && visibleCount >= 5) {
             when (activeSubSettings) {
                 SubSettings.CLEAN -> CleanSetupOverlay(onClear = onClear, onReset = onReset, onFullInitialization = onFullInitialization, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
                 SubSettings.ALERTS -> AlertManagementOverlay(draftAlertSettings = draftAlertSettings, onUpdateAlertSettings = onUpdateAlertSettings, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
@@ -290,13 +295,13 @@ fun PhoneSetupOverlay(
     var visibleCount by remember { mutableIntStateOf(0) }
     
     LaunchedEffect(Unit) {
-        Timber.d("PhoneSetupOverlay: Initializing hydration sequence")
-        delay(100) 
+        Timber.d("PhoneSetupOverlay: Initializing hydration sequence (R882)")
+        delay(150) 
         isHydrated = true
-        // Consolidated to 3 phases to reduce main-thread churn on budget hardware (R246)
-        repeat(3) { 
+        // Staggered to 8 levels to maintain frame budget on mid-range hardware (R2.1/R882)
+        repeat(8) { 
             visibleCount++
-            delay(100) 
+            delay(80) 
         }
     }
 
@@ -324,26 +329,38 @@ fun PhoneSetupOverlay(
                     
                     if (visibleCount >= 1) {
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step0_title), stringResource(R.string.setup_step0_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isFineLocationGranted, Icons.Default.MyLocation, reason = if (!permissions.isFineLocationGranted) "Precise Location: Permission NOT granted" else null)
+                    }
+                    
+                    if (visibleCount >= 2) {
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step1_title), recentsLockDesc, {}, stringResource(R.string.setup_info_only), if (permissions.requiresWakeLockRenewal) true else null, Icons.Default.Lock)
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), batteryOptDesc, onWhitelist, stringResource(R.string.btn_open_settings), permissions.isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!permissions.isBatteryWhitelisted) "Battery Optimization: Unrestricted mode NOT active" else null)
+                    }
+                    
+                    if (visibleCount >= 3) {
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step3_title), stringResource(R.string.setup_step3_desc), onOverlay, stringResource(R.string.btn_authorize), permissions.isOverlayGranted, Icons.Default.Layers, reason = if (!permissions.isOverlayGranted) "Appear on Top: Permission NOT granted" else null)
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step4_title), stringResource(R.string.setup_step4_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isMicrophoneGranted, Icons.Default.Mic, reason = if (!permissions.isMicrophoneGranted) "Microphone: Permission NOT granted" else null)
-                        Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step5_title), description = autoStartDesc, onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isAutoStartGranted, icon = Icons.Default.PlayCircle, reason = if (!permissions.isAutoStartGranted) "Manual verification required: Ensure 'Unrestricted' battery mode and 'Background activity' are allowed in system settings." else null)
                     }
 
-                    if (visibleCount >= 2) {
+                    if (visibleCount >= 4) {
+                        Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step5_title), description = autoStartDesc, onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isAutoStartGranted, icon = Icons.Default.PlayCircle, reason = if (!permissions.isAutoStartGranted) "Manual verification required: Ensure 'Unrestricted' battery mode and 'Background activity' are allowed in system settings." else null)
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step6_title), stringResource(R.string.setup_step6_desc), {}, stringResource(R.string.setup_info_only), null, Icons.Default.Wifi)
+                    }
+
+                    if (visibleCount >= 5) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step7_title), stringResource(R.string.setup_step7_desc), onExactAlarm, stringResource(R.string.btn_authorize), permissions.isExactAlarmGranted, Icons.Default.Alarm, reason = if (!permissions.isExactAlarmGranted) "Exact Alarms: Permission NOT granted" else null) }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             Spacer(Modifier.height(16.dp)); GuideSection(title = "Notification Alerts", description = "Required to show status and critical alerts in the notification shade.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isPostNotificationsGranted, icon = Icons.Default.Notifications, reason = if (!permissions.isPostNotificationsGranted) "Notifications: Permission NOT granted" else null)
                         }
+                    }
+
+                    if (visibleCount >= 6) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                             Spacer(Modifier.height(16.dp)); GuideSection(title = "Background Location", description = "Allows tracking and geofencing to work while the screen is off or app is in background.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, reason = if (!permissions.isBackgroundLocationGranted) "Background Location: Set to 'Allow all the time' in system settings" else null)
                             Spacer(Modifier.height(16.dp)); GuideSection(title = "Physical Activity", description = "Required for Step Detector and stay-alive pulsing to stabilize background performance.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isActivityRecognitionGranted, icon = Icons.AutoMirrored.Filled.DirectionsRun, reason = if (!permissions.isActivityRecognitionGranted) "Physical Activity: Permission NOT granted" else null)
                         }
                     }
 
-                    if (visibleCount >= 3) {
+                    if (visibleCount >= 7) {
                         if (permissions.hasBackgroundRestriction) { 
                             Spacer(Modifier.height(16.dp))
                             val isCompleted = when(permissions.backgroundStatus) {
@@ -369,7 +386,9 @@ fun PhoneSetupOverlay(
                             }
                         }
                         if (!isTrackerMode) { Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step9_title), description = stringResource(R.string.setup_step9_desc), onClick = onGoToMap, buttonText = stringResource(R.string.btn_open_map), isCompleted = homePointsCount > 0, icon = Icons.Default.Map, reason = if (homePointsCount == 0) "Geofence: No Home Points defined" else null) }
-                        
+                    }
+
+                    if (visibleCount >= 8) {
                         if (isTrackerMode) {
                             Spacer(Modifier.height(16.dp))
                             Button(

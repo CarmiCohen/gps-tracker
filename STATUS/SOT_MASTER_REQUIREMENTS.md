@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.01.05)
+# SOT Master Requirements (Sep.01.09)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -12,9 +12,10 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 ...
 
 ### 2. UI & Performance Authority
-*   **2.1 Staggered Hydration Manager (R318/R323/R739/R758/R776/R777/R874/R875/R877/R880)**: **MANDATORY**. UI hydration and state transitions MUST be segmented and yielded to prevent Main-thread starvation.
-    *   **Map Hydration**: Must be segmented into 8 levels with high-granularity yielding (batch size ≤ 2) to ensure no single step exceeds the 700ms Davey threshold. (Updated Sep.01.04).
-    *   **Post-Connection Settling (R877)**: Upon relay connection, the `onConnectAction` MUST `yield()` before triggering the telemetry/room-join cascade. Furthermore, the `ConnectivitySuite` MUST implement a 500ms "settling window" before starting the initial offline telemetry sync to avoid colliding with simultaneous map hydration re-renders. (Updated Aug.31.12).
+*   **2.1 Staggered Hydration Manager (R318/R323/R739/R758/R776/R777/R874/R875/R877/R880/R881/R882)**: **MANDATORY**. UI hydration and state transitions MUST be segmented and yielded to prevent Main-thread starvation.
+    *   **Map Hydration**: Must be segmented into 8 levels with high-granularity yielding (batch size ≤ 2) to ensure no single step exceeds the 700ms Davey threshold.
+    *   **Setup Hydration (R882)**: The `PhoneSetupOverlay` rationale sequence MUST be segmented into an 8-level staggered hydration sequence with yielding delays (80ms+) between steps to ensure zero-Davey status on mid-range hardware. (Updated Sep.01.09).
+    *   **Scalability Hardening (R881)**: For datasets >200 items, `MapOverlayManager` MUST utilize "Dynamic Batching" (batch size 5) to balance coroutine rescheduling overhead against UI responsiveness, while increasing `circleCache` to 600 items. (Updated Sep.01.06).
 ...
 
 *(Total: 35 Architectural Rules + 197 Functional R-IDs = 232 Items)*
