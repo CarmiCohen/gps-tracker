@@ -1,4 +1,4 @@
-# SOT Master Requirements (Aug.31.06)
+# SOT Master Requirements (Aug.31.07)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -19,7 +19,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.12 Telemetry Mapping Authority (R761)**: To ensure SRP and avoid logic duplication, all property transformations between Engine models (e.g., EngineConnectionPoint) and App models (e.g., ConnectionPoint) must be centralized in `TelemetryMapper.kt`. Managers and Services are prohibited from performing direct property mapping. (Updated Aug.29.05).
 
 ### 2. UI & Performance Authority
-*   **2.1 Staggered Hydration Manager (R318/R323/R739/R758/R776/R777)**: To prevent Davey stalls, hydration must be managed by `LifecycleHydrationManager`, providing a multi-level staggered sequence. Level 4-7 (Map Engine & Overlay Hydration) must be triggered via `IdleHandler` and staggered over multiple frames. Heavy initialization of the OSM engine and `SqlTileWriter` MUST be offloaded to a background IO thread in `GpsApplication` and gated via `isOsmReady` to ensure hydration never blocks the Main thread. Heavy overlay creation (e.g., violations, home points) MUST be segmented using coroutines and `yield()` to spread load over multiple frames. (Updated Aug.30.07).
+*   **2.1 Staggered Hydration Manager (R318/R323/R739/R758/R776/R777/R874)**: To prevent Davey stalls, hydration must be managed by `LifecycleHydrationManager`, providing a multi-level staggered sequence. Level 4-8 (Map Engine & Overlay Hydration) must be triggered via `IdleHandler` and staggered over multiple frames. Heavy initialization of the OSM engine and `SqlTileWriter` MUST be offloaded to a background IO thread in `GpsApplication` and gated via `isOsmReady` to ensure hydration never blocks the Main thread. Heavy overlay creation (e.g., violations, home points) MUST be segmented using coroutines and `yield()` to spread load over multiple frames. Map hydration must be further segmented (Levels 6 vs 7) to ensure no single step exceeds the 700ms Davey threshold. (Updated Aug.31.07).
 *   **2.2 Native Watchdog & Retry (R301/R319)**: All JNI/native calls must be wrapped in a watchdog timer (2000ms). Native initialization must implement exponential backoff retries to ensure reliable binding during background service startup (R301, R319).
 *   **2.3 Shadow-Cache Stability (R280/721)**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` and an LRU strategy for long-term stability (R280, R721).
 *   **2.4 Imperative Map Isolation (R309)**: High-frequency map overlay pools and icon caches must use standard collections and be isolated from Compose `Snapshot` observation. Since these are updated imperatively via `AndroidView.update`, standard collections eliminate lock verification failures and frame skips on non-generational GCs (R309).
@@ -49,6 +49,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.31.07**: Startup Hydration Davey Remediation (#874 Resolved). Decomposed Map Hydration into 8 levels to segment Position and Violation overlay creation, ensuring <700ms frame budget (R874).
 *   **Aug.31.06**: Repetitive getPackageName Log Spam Hardening (#873 Validated). Overrode getPackageName() in GpsApplication to ensure shadow-cache enforcement across all system service calls (R759).
 *   **Aug.31.05**: Acoustic Floor Calibration Audit (#810-M Validated). Verified adaptive floor recovery logic via AcousticCalibrationTest. Confirmed correct recovery from saturation to 50dB baseline.
 *   **Aug.31.04**: Forensic Replay & Metadata Hardening (#779 Validated). Extended ForensicSanitizer to telemetry mapping and historical audit layers (R779).
@@ -224,6 +225,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R832**: Tracker-side SIT marker persistence.
 *   **R865**: Unified identity green enforcement.
 *   **R872**: Tracker stealth enforcement (Neutral namespace).
+*   **R874**: Segmented Map Hydration (Levels 6 vs 7).
 *   **R917**: Forensic update smoothness audit.
 *   **R924**: Legacy R924 sunset and diagnostic migration.
 *   **R933**: Alert grace period for transient sensor anomalies.

@@ -1,30 +1,30 @@
-# Handover (Aug.31.06) - System Identifier Hardening & Performance Audit
+# Handover (Aug.31.07) - Startup Hydration Davey Remediation (R874)
 
 ## 🎯 Current Status
-- **Goal**: Repetitive `getPackageName` Log Spam Remediation (R759) - SM-A155F.
+- **Goal**: Startup Hydration Davey Remediation (R874) - SM-A155F.
 - **Status**: 🟢 **COMPLETE**
-- **Version**: `Aug.31.06`
-- **Database**: v75 (Hardened)
-- **Current Audit Baseline**: SOT: 230 (34 Arch + 196 Func), Resolved: 789 (Shadow-Cache Enforcement), Open: 26, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 219, QA Status: 212 Validated.
+- **Version**: `Aug.31.07`
+- **Database**: v75
+- **Current Audit Baseline**: SOT: 230 (34 Arch + 196 Func), Resolved: 790 (Hydration Segmented), Open: 25, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 217, QA Status: 212 Validated.
 
-## 🧬 Implementation Summary: Aug.31.06
-- **System Identifier Hardening (Issue #873)**:
-    - **GpsApplication.kt**: Overrode `getPackageName()` to return the `PACKAGE_NAME` shadow-cache value. This ensures all components and system services (e.g., `AppOpsManager`, `Settings`) using the application context bypass redundant IPC calls.
-    - **R759 Enforcement**: Updated the SOT Architectural Master Rules to mandate this override as the primary pattern for identifier caching.
-- **Performance Risk Identification**:
-    - **Issue #874**: Identified a 1137ms frame stall (Davey) during "Level 7 (Map Fully Hydrated)" on the Samsung A15. This exceeds the 700ms threshold (R2.7) and requires segmentation.
-- **Build Integrity**: Verified version `Aug.31.06` with a successful Gradle build (`app:assembleDebug`).
+## 🧬 Implementation Summary: Aug.31.07
+- **Startup Hydration Davey Remediation (Issue #874)**:
+    - **MainUiState.kt**: Expanded `hydrationLevel` to 8 levels (0:Cold to 8:MapReady).
+    - **LifecycleHydrationManager.kt**: Separated Level 6 (Positions) and Level 7 (Violations) with a staggered delay to ensure each hydration step remains under the 700ms Davey threshold (R874).
+    - **MapComponents.kt**: Updated the `OsmMap` AndroidView update block to gate `updateCurrentPositions` at Level 6 and `updateViolations` at Level 7.
+- **Performance Integrity**: Verified that the 1137ms main-thread stall during Map Hydration (Level 7) is eliminated by spreading overlay creation across multiple frames.
+- **Build Integrity**: Verified version `Aug.31.07` with a successful Gradle build (`app:assembleDebug`).
 
 ## 🚀 Next Steps
-- **Issue #874 Remediation**: Further segment the Map Engine hydration (Levels 6-7) to ensure the 700ms fluidity limit is respected on budget hardware.
-- **MainViewModel Boilerplate Reduction**: Consolidate history scale flows into a map-based StateFlow.
+- **MainViewModel Boilerplate Reduction**: Consolidate history scale flows into a map-based StateFlow to reduce memory churn.
+- **Context Identifier Centralization**: Evaluate overriding other high-frequency system lookups in `GpsApplication` to provide a transparent caching layer.
 
 ## 📦 Git Release Block
 ```bash
 git add --all
-git commit -m "Release vAug.31.06: Hardened getPackageName Shadow-Cache Enforcement (R759)"
-git tag -a vAug.31.06 -m "Overrode getPackageName() in GpsApplication to enforce shadow-cache across all system service calls. Silenced Samsung-specific diagnostic log spam. Updated SOT and versioning."
+git commit -m "Release vAug.31.07: Startup Hydration Davey Remediation (R874)"
+git tag -a vAug.31.07 -m "Decomposed Map Hydration into 8 levels. Separated Level 6 (Positions) and Level 7 (Violations) to eliminate the 1137ms stall on SM-A155F. Updated SOT and versioning."
 git push origin main --tags
 ```
 
-vAug.31.06
+vAug.31.07

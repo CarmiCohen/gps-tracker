@@ -38,6 +38,10 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Aug.31.07:
+ * - Issue #874 Remediation: Further segmented the hydration update block. 
+ *   Current Positions (Level 6) and Violations (Level 7) are now decoupled 
+ *   to ensure frame budget remains under 700ms on budget hardware (R874).
  * Aug.29.00:
  * - Issue #758b Remediation: Integrated MapOverlayManager.onDetach() into 
  *   AndroidView onRelease to ensure background geometry jobs are cancelled 
@@ -410,17 +414,19 @@ fun OsmMap(
             overlayManager?.let { om ->
                 var changed = false
                 
-                // Issue #739: Hydration-level gating to stagger overlay initialization
+                // Issue #739/874: Hydration-level gating to stagger overlay initialization
+                // Level 4: Map Base (Home points and geofence)
                 if (hydrationLevel >= 4) {
                     changed = om.updateHomePoints(homePoints, isFenceVisible, maxDistance, isTrackerMode, geofenceMode, onTap, onRemoveMarker) || changed
                 }
                 
+                // Level 5: Map Trails
                 if (hydrationLevel >= 5) {
                     changed = om.updateTrails(trackerSegments, viewerSegments, systemPulseRt) || changed
                 }
                 
+                // Level 6: Current Positions & Accuracy Circles (R874)
                 if (hydrationLevel >= 6) {
-                    changed = om.updateViolations(violations, isViolationsVisible, isGeofenceViolationsVisible, systemPulseRt) || changed
                     changed = om.updateCurrentPositions(
                         trackerValid = smoothedTrackerPos.value != null,
                         trackerPos = smoothedTrackerPos.value,
@@ -441,8 +447,14 @@ fun OsmMap(
                         systemPulseRt = systemPulseRt
                     ) || changed
                 }
-                
+
+                // Level 7: Violations (R874 - Separated from Level 6 to stay under 700ms)
                 if (hydrationLevel >= 7) {
+                    changed = om.updateViolations(violations, isViolationsVisible, isGeofenceViolationsVisible, systemPulseRt) || changed
+                }
+                
+                // Level 8: Final Hydration (Replay Cursor)
+                if (hydrationLevel >= 8) {
                     changed = om.updateReplayCursor(replayCursorPos) || changed
                 }
                 

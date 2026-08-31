@@ -5,6 +5,11 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Aug.31.07:
+ * - Issue #874 Remediation: Expanded hydrationLevel to 8 levels to further 
+ *   segment Map Hydration. Level 6 (Current Positions) and Level 7 (Violations) 
+ *   are now separated to ensure the 700ms Davey threshold is respected on 
+ *   budget hardware (R874).
  * Aug.26.16:
  * - Issue #739 Remediation: Expanded hydrationLevel to 7 levels to decompose 
  *   Map Engine initialization. Level 4 (Base), 5 (Trails), 6 (Markers/Circles), 
@@ -19,7 +24,7 @@ import org.osmdroid.util.GeoPoint
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
-    val hydrationLevel: Int = 0, // 0:Cold, 1:Surface, 2:Core, 3:Full, 4:MapBase, 5:MapTrails, 6:MapMarkers, 7:MapReady
+    val hydrationLevel: Int = 0, // 0:Cold, 1:Surface, 2:Core, 3:Full, 4:MapBase, 5:MapTrails, 6:MapPositions, 7:MapViolations, 8:MapReady
     val appMode: String? = null,
     val isSystemActive: Boolean = false,
     val deviceId: String = MainRepository.DEFAULT_TRACKER_ID,

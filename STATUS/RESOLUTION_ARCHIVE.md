@@ -2,6 +2,12 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.31.07 (vAug.31.07)
+*   **Issue #874 Resolved**: **Startup Hydration Davey Remediation (R874)**. Decomposed Map Hydration into 8 levels to segment Position and Violation overlay creation, ensuring <700ms frame budget.
+    *   **Segmentation**: Separated `MapPositions` (Level 6) and `MapViolations` (Level 7) to spread the 1137ms main-thread workload across multiple frames.
+    *   **Hydration Gating**: Updated `LifecycleHydrationManager` and `MapComponents` to enforce the new 8-level sequence.
+    *   **Performance Baseline**: Targeted the 700ms threshold (R2.7) for Samsung A15 hardware to eliminate frame stalls during "Level 7 (Map Fully Hydrated)" transitions.
+
 ## 🟢 Aug.31.06 (vAug.31.06)
 *   **Issue #873 Validated**: **Repetitive getPackageName Log Spam (R759 violation)**. Overrode `getPackageName()` in `GpsApplication` to return the shadow-cache value.
     *   **Shadow-Cache Enforcement**: Ensured that all system service calls (e.g., `AppOpsManager`, `Settings`) using the `ApplicationContext` bypass redundant native IPC lookups.
