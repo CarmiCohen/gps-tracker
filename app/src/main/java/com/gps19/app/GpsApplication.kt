@@ -23,13 +23,15 @@ import com.gps19.core.engine.ShadowCache
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Aug.31.12:
+ * - Issue #877 Remediation: Restored PACKAGE_NAME and MY_UID to companion object 
+ *   as direct cache-querying properties. This resolves the build errors in 
+ *   Utils and NotificationManager while maintaining the zero-race hardening 
+ *   required for Samsung IPC silencing (R759).
  * Aug.31.10:
  * - Issue #876 Hardening (R759): Fixed race condition in getPackageName() 
  *   shadow-cache. Removed lazy initializer to prevent permanent empty-string 
  *   caching during early framework initialization.
- * Aug.31.06:
- * - Issue #873 Hardening (R759): Overrode getPackageName() to return the 
- *   shadow-cache value.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -41,6 +43,12 @@ class GpsApplication : Application(), Configuration.Provider {
     companion object {
         private val stringCache = ShadowCache<String, String>(100)
         private val intCache = ShadowCache<String, Int>(10)
+
+        /**
+         * R759: Direct shadow-cache authority for high-frequency identifiers.
+         */
+        val PACKAGE_NAME: String get() = stringCache.get("pkg") ?: ""
+        val MY_UID: Int get() = intCache.get("uid") ?: 0
 
         /**
          * Issue #758: Signal for map hydration to start.

@@ -21,6 +21,10 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Aug.31.12:
+ * - Issue #877 Remediation: Refactored onConnectAction to launch in scope and 
+ *   yield(). Prevents the 1.9s Davey stall by allowing the Main thread to 
+ *   breathe between the connection event and the subsequent telemetry flood (R877).
  * Aug.28.07:
  * - Issue #756 Hardening: Refactored disconnect() to explicitly call socket.off() 
  *   and clear internal listeners to prevent native resource leaks (R756).
@@ -218,13 +222,25 @@ class CommunicationManager @Inject constructor(
     private fun registerSocketListeners() {
         val s = socket ?: return
 
+        // Issue #877: Segmented connection state transition to eliminate the 1.9s Davey stall.
         val onConnectAction = {
-            isConnectingInternal = false
-            logToApp("Connected to relay", true)
-            markTraffic()
-            telemetryRepository.updateRelayStatus(true)
-            if (deviceId.isNotEmpty()) {
-                s.emit("join", createJoinPayload())
+            scope.launch {
+                isConnectingInternal = false
+                
+                // R877: Explicit yield() to allow Main-thread UI frame processing before 
+                // we trigger the telemetry and room-join cascade.
+                yield()
+                
+                withContext(Dispatchers.Default) {
+                    logToApp("Connected to relay", true)
+                }
+                
+                markTraffic()
+                telemetryRepository.updateRelayStatus(true)
+                
+                if (deviceId.isNotEmpty()) {
+                    s.emit("join", createJoinPayload())
+                }
             }
         }
 

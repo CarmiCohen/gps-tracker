@@ -33,12 +33,13 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Aug.31.12:
+ * - Issue #877 Remediation: Implemented post-connection settling window (R877). 
+ *   Added 500ms settling delay to flushPendingUpdates() to prevent Main-thread 
+ *   starvation when map hydration triggers simultaneously with a relay connection.
  * Aug.31.00:
  * - Issue #782: Protocol Audit - Binary Schema Expansion. Integrated 
  *   violationUptimeMs and isUltraLongStationary into handleBinaryUpdate (R782).
- * Aug.29.05:
- * - Issue #761: Migrated from ForensicMapper to TelemetryMapper. Centralized 
- *   telemetry mapping authority (R761). Fixed typo in pending status mapping.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -72,6 +73,7 @@ class ConnectivitySuite @Inject constructor(
     private var isTrackerMode = true
     private var lastReconnectTs = 0L 
     private var lastForceJoinTs = 0L 
+    private var lastConnectionSuccessRt = 0L
 
     private val statusBuilder = RealtimeStatus.newBuilder()
     private var serializationBuffer = ByteArray(4096) 
@@ -333,16 +335,34 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
+    /**
+     * Issue #877: Refactored sync loop to incorporate a post-connection settling delay.
+     */
     private fun startSyncLoop() {
         syncJob?.cancel()
         syncJob = scope.launch(Dispatchers.IO) {
+            var wasConnected = false
+            
             while (isActive) {
                 val currentRtt = signalingProvider.getRtt()
-                if (isConnected()) {
+                val isCurrentlyConnected = isConnected()
+                
+                if (isCurrentlyConnected) {
+                    // R877: Settling Window. If we just connected, wait 500ms before 
+                    // starting the offline sync to avoid Main-thread starvation during 
+                    // simultaneous map hydration.
+                    if (!wasConnected) {
+                        lastConnectionSuccessRt = timeProvider.elapsedRealtime()
+                        delay(500) 
+                    }
+                    
                     _isSyncing.value = true
                     try { flushPendingUpdates() } catch (e: Exception) { Timber.e(e, "Sync failure") }
                     finally { _isSyncing.value = false }
                 }
+                
+                wasConnected = isCurrentlyConnected
+
                 val dynamicDelay = when {
                     currentRtt > MAX_ALLOWED_RTT_MS -> PING_INTERVAL_MS * 3
                     currentRtt > MAX_ALLOWED_RTT_MS / 2 -> (PING_INTERVAL_MS * (1.0 + (currentRtt.toDouble() / MAX_ALLOWED_RTT_MS))).toLong()
