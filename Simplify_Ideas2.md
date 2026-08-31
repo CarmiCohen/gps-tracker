@@ -1,12 +1,7 @@
-# Simplification Ideas 2.0 (Aug.31.04)
+# Simplification Ideas 2.0 (Aug.31.05)
 
-*   **Forensic Metadata Sanitization (R779) - COMPLETE**: Implemented `ForensicSanitizer` to scrub absolute internal paths and normalize hardware identifiers at the logging edge. Extended this to the telemetry mapping and historical audit layers to ensure Replay engine integrity.
-*   **History Sampling (R650) - COMPLETE**: Hardened the ribbon rendering pipeline by integrating `sample()` in `MainViewModel.kt`. This eliminates Davey stalls on budget hardware (A15) by decoupling high-frequency DB writes from UI recomposition.
-*   **ManagedHardware Ecosystem (R750-R757) - COMPLETE**: Implemented specialized lifecycle-aware wrappers for deterministic native resource cleanup.
-*   **Fallback Unregistration Hardening (R767/R775) - COMPLETE**: Added synchronous direct unregistration paths in `ManagedHardware`. 
-*   **Map Hydration Gating (R758) - COMPLETE**: Resolved startup ANRs by offloading heavy OSMDroid engine initialization.
-*   **Async Geometry Generation (R758b) - COMPLETE**: Offloaded circle/geofence point calculations to `Dispatchers.Default`.
-*   **Segmented Overlay Population (R776/R777) - COMPLETE**: Applied segmented coroutine pattern with `yield()`.
-*   **Unified Hardware Registry (R760) - COMPLETE**: Consolidated legacy managers into `HardwareProvider`.
-*   **Stationary Transparency (R765) - COMPLETE**: Integrated definitive `[ULTRA]` visual indicators.
-*   **MainViewModel Boilerplate**: Evaluate consolidating the 6 history scale flows (4M, 1H, etc.) into a single map-based StateFlow if the UI can be refactored to consume a keyed subscription.
+*   **Acoustic Floor Calibration Audit (R810-M) - COMPLETE**: Verified adaptive floor recovery logic via `AcousticCalibrationTest`. Confirmed that the time-based contraction factor ensures forensic recovery even during duty-cycle off-cycles.
+*   **Forensic Metadata Sanitization (R779) - COMPLETE**: Implemented `ForensicSanitizer` to scrub absolute internal paths and normalize hardware identifiers at the logging edge.
+*   **History Sampling (R650) - COMPLETE**: Hardened the ribbon rendering pipeline by integrating `sample()` in `MainViewModel.kt`.
+*   **MainViewModel Boilerplate**: Evaluate consolidating the 6 history scale flows (4M, 1H, etc.) into a single map-based StateFlow if the UI can be refactored to consume a keyed subscription. This would significantly reduce repetitive boilerplate in the ViewModel and improve maintainability of the analytical pipeline.
+*   **Acoustic Contraction Optimization**: Evaluate replacing `Math.pow` in the acoustic floor contraction logic with a linear approximation or a pre-calculated decay table to further reduce CPU load in the sensor hot-path.

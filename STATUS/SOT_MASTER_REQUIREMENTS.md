@@ -1,4 +1,4 @@
-# SOT Master Requirements (Aug.31.04)
+# SOT Master Requirements (Aug.31.05)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -49,6 +49,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.31.05**: Acoustic Floor Calibration Audit (#810-M Validated). Verified adaptive floor recovery logic via AcousticCalibrationTest. Confirmed correct recovery from saturation to 50dB baseline.
 *   **Aug.31.04**: Forensic Replay & Metadata Hardening (#779 Validated). Extended ForensicSanitizer to telemetry mapping and historical audit layers (R779).
 *   **Aug.31.03**: Ultra-Long Stationary State Hardening (#762 Validation). Hardened end-to-end propagation of isUltraLongStationary across IntegrityMonitor, TelemetryUseCase, and HistoryManager to ensure definitive badge transparency (R765, R778).
 *   **Aug.31.02**: History Sampling Authority (#782 Validation). Hardened ribbon flows in MainViewModel with A15-specific sampling to ensure Davey immunity during forensic stress tests.

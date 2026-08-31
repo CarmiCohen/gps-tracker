@@ -2,6 +2,12 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.31.05 (vAug.31.05)
+*   **Issue #810-M Validated**: **Acoustic Floor Calibration Audit**. Verified adaptive floor recovery logic via `AcousticCalibrationTest`.
+    *   **Recovery Verification**: Confirmed that the floor correctly recovers from 90dB saturation to the 50dB baseline within expected forensic timeframes.
+    *   **Contraction Logic**: Validated that the time-based contraction factor (`ACOUSTIC_FLOOR_CONTRACTION_EMA`) ensures recovery even during duty-cycle off-periods.
+    *   **Baseline Alignment**: Confirmed that `SentinelValidator` maintains the `ACOUSTIC_FLOOR_MIN_DB` floor regardless of input noise levels.
+
 ## 🟢 Aug.31.04 (vAug.31.04)
 *   **Issue #779 Validated**: **Forensic Replay & Metadata Hardening**. Extended the `ForensicSanitizer` policy to the telemetry mapping and historical audit layers.
     *   **Telemetry Hardening**: Updated `TrackerStatus.toMap()` in `Models.kt` to scrub technical network identifiers (`net_interface`) before transmission to viewers or JSON export.
@@ -26,13 +32,6 @@ This document archives all resolved issues and architectural refinements.
     *   **Database v75 Migration**: Implemented `MIGRATION_74_75` to add violation metrics to `pending_status_updates` and `connection_history`.
     *   **Forensic Mapping**: Hardened `TelemetryMapper.kt` history mapping functions to ensure full state parity during historical replay and analytical ribbon rendering.
     *   **UI Transparency**: Integrated `[ULTRA]` status badges into the Dashboard and StatusBar to provide deterministic feedback for low-power GNSS relaxation modes (R782).
-
-## 🟢 Aug.30.13 (vAug.30.13)
-*   **Issue #779 Resolved**: **Forensic Metadata Leak Cleanup**. Implemented a centralized `ForensicSanitizer` utility to scrub absolute internal paths (e.g., `/data/user/0/...`) and normalize hardware identifiers (e.g., `Build.MODEL`) from all exported logs, trails, and telemetry payloads.
-    *   **Logging Hardening**: Integrated sanitization into the global `Timber` tree in `GpsApplication.kt` to ensure stack traces and error messages are scrubbed before persistence.
-    *   **Export Hardening**: Updated `MainFileHelper.kt` to sanitize file I/O error messages and `LogEntry.toJSONObject()` to ensure that exported JSON snapshots are forensically clean.
-    *   **SOT Integration**: Added Architectural Rule R779 to enforce mandatory sanitization at the logging edge.
-*   **Bug Fix**: Resolved a critical logic error in `TrackerStatus.toMap()` where `baro_idx` was incorrectly reassigned to a local variable instead of being mapped, ensuring forensic data parity in JSON payloads.
 
 ---
 *For historical entries, see [docs_history_archive.md](docs_history_archive.md) or Git logs.*
