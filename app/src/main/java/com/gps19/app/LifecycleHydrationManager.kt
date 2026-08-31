@@ -10,9 +10,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * LifecycleHydrationManager (Issue #318/323/739/758/874):
+ * LifecycleHydrationManager (Issue #318/323/739/758/874/880):
  * Centralizes and staggers the app hydration sequence to prevent Davey stalls
  * on budget hardware (SM-A155F).
+ * Sep.01.04:
+ * - Issue #880 Remediation: Refined staggered hydration strategy. Increased 
+ *   map hydration delays from 300ms to 600ms for A15 hardware to eliminate 
+ *   the residual 751ms Davey stall (R880).
  * Aug.31.07:
  * - Issue #874 Remediation: Further segmented Map Hydration. Separated Level 6 
  *   (Positions) and Level 7 (Violations) to ensure each hydration step remains 
@@ -43,17 +47,17 @@ class LifecycleHydrationManager @Inject constructor() {
             Timber.d("Hydration: Starting sequence (A15=$isA15)")
             
             // Level 1: Surface (Basic UI shell ready)
-            delay(if (isA15) 400 else 200)
+            delay(if (isA15) 500 else 200)
             _hydrationLevel.value = 1
             Timber.d("Hydration: Level 1 (Surface)")
 
             // Level 2: Core/Nav (Navigation and basic data)
-            delay(if (isA15) 600 else 300)
+            delay(if (isA15) 750 else 300)
             _hydrationLevel.value = 2
             Timber.d("Hydration: Level 2 (Core)")
 
             // Level 3: Full (Heavy observations started, UI functional)
-            delay(if (isA15) 800 else 400)
+            delay(if (isA15) 1000 else 400)
             _hydrationLevel.value = 3
             Timber.d("Hydration: Level 3 (Full)")
             
@@ -78,8 +82,8 @@ class LifecycleHydrationManager @Inject constructor() {
                     _hydrationLevel.value = 4
                     Timber.d("Hydration: Level 4 (Map Engine Base)")
                     
-                    // Stagger subsequent map overlays to avoid frame drops
-                    val mapDelay = if (isA15) 300L else 100L
+                    // Issue #880: Stagger subsequent map overlays with higher delays for A15
+                    val mapDelay = if (isA15) 600L else 100L
                     
                     delay(mapDelay)
                     _hydrationLevel.value = 5

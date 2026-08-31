@@ -25,6 +25,10 @@ import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Sep.01.04:
+ * - Issue #880 Remediation: Increased hydration granularity to "High". Reduced 
+ *   yield batch size from 5 to 2 items and added intra-position yields to 
+ *   eliminate the residual 751ms frame stall on SM-A155F (R880).
  * Sep.01.00:
  * - Issue #878 Remediation: Implemented low-memory eviction strategy. Migrated 
  *   circleCache to ShadowCache (LRU) and added trimMemory() to handle 
@@ -197,7 +201,7 @@ class MapOverlayManager(
     }
 
     /**
-     * Issue #777 Optimization: Segmented home point updates.
+     * Issue #777/880 Optimization: Segmented home point updates.
      */
     fun updateHomePoints(
         home: List<GeoPoint>,
@@ -247,7 +251,7 @@ class MapOverlayManager(
                     }
                     markers.add(marker)
 
-                    if (idx % 5 == 0) yield() // Issue #875: Reduced batch size for smoother hydration
+                    if (idx % 2 == 0) yield() // Issue #880: High-granularity yielding (every 2 items)
                 }
             }
 
@@ -267,7 +271,7 @@ class MapOverlayManager(
     }
 
     /**
-     * Issue #759b: Segmented trail update.
+     * Issue #759b/880: Segmented trail update.
      */
     fun updateTrails(
         trackerSegments: List<MapTrailSegment>, 
@@ -293,7 +297,7 @@ class MapOverlayManager(
                         line.outlinePaint.color = segment.color
                         polylines.add(line)
                         
-                        if (segment.points.size > 300 || idx % 5 == 0) yield() // Issue #875: Finer yielding
+                        if (segment.points.size > 200 || idx % 2 == 0) yield() // Issue #880: Higher yielding frequency
                     }
                     trailFolder.items.clear()
                     trailFolder.items.addAll(polylines)
@@ -321,7 +325,7 @@ class MapOverlayManager(
                         line.outlinePaint.color = segment.color
                         polylines.add(line)
                         
-                        if (segment.points.size > 300 || idx % 5 == 0) yield()
+                        if (segment.points.size > 200 || idx % 2 == 0) yield() // Issue #880: Higher yielding frequency
                     }
                     viewerTrailFolder.items.clear()
                     viewerTrailFolder.items.addAll(polylines)
@@ -336,7 +340,7 @@ class MapOverlayManager(
     }
 
     /**
-     * Issue #776/875 Optimization: Segmented violation update.
+     * Issue #776/875/880 Optimization: Segmented violation update.
      */
     fun updateViolations(
         violations: List<ViolationPoint>, 
@@ -386,7 +390,7 @@ class MapOverlayManager(
                     circles.add(c)
                 }
                 
-                if (index % 5 == 0) yield() // Issue #875: Reduced from 20 to 5 for smoother A15 rendering
+                if (index % 2 == 0) yield() // Issue #880: High-granularity yielding (every 2 items)
             }
 
             violationMarkersFolder.items.clear()
@@ -427,7 +431,7 @@ class MapOverlayManager(
     }
 
     /**
-     * Issue #875 Optimization: Offloaded heavy position and accuracy updates to 
+     * Issue #875/880 Optimization: Offloaded heavy position and accuracy updates to 
      * a segmented job to prevent frame skips during Level 6 hydration.
      */
     fun updateCurrentPositions(
@@ -471,6 +475,7 @@ class MapOverlayManager(
 
                     if (posChanged || driftSignificant) {
                         accuracyCirclesFolder.items.remove(trackerCircle)
+                        yield() // Issue #880: Yield after removal to reduce main-thread hold time
                         val cachedPoints = getAsyncCircle(trackerPos, drift) { points ->
                             trackerCircle.points = points
                             mapView.invalidate()
@@ -508,7 +513,7 @@ class MapOverlayManager(
                 changed = true
             }
 
-            yield() // Spread tracker and viewer updates across frames
+            yield() // Spread tracker and viewer updates across frames (Issue #875/880)
 
             // Viewer update
             if (viewerValid && viewerPos != null) {
@@ -523,6 +528,7 @@ class MapOverlayManager(
 
                     if (posChanged || driftSignificant) {
                         accuracyCirclesFolder.items.remove(viewerCircle)
+                        yield() // Issue #880: Yield before heavy geometric recalculation
                         val cachedPoints = getAsyncCircle(viewerPos, drift) { points ->
                             viewerCircle.points = points
                             mapView.invalidate()
