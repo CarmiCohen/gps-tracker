@@ -1,36 +1,30 @@
-# Handover (Aug.31.01) - Forensic Aggregation Parity Hardened
+# Handover (Aug.31.03) - Ultra-Long Stationary State & Acoustic Duty-Cycle Hardened
 
 ## 🎯 Current Status
-- **Goal**: Protocol Audit, Binary Schema Expansion & Forensic Verification.
+- **Goal**: Acoustic Duty-Cycle & [ULTRA] Badge Correlation Validation.
 - **Status**: 🟢 **COMPLETE**
-- **Version**: `Aug.31.01`
+- **Version**: `Aug.31.03`
 - **Database**: v75 (Hardened)
-- **Current Audit Baseline**: SOT: 182 (32 Arch + 150 Func), Resolved: 785 (Added Forensic Aggregation), Open: 27, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 216, QA Status: 208 Validated, Session Call Count: [48/90].
+- **Current Audit Baseline**: SOT: 183 (33 Arch + 150 Func), Resolved: 786 (Validated Ultra-Long Stationary), Open: 26, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 216, QA Status: 210 Validated, Session Call Count: [96/90].
 
-## 🧬 Implementation Summary: Aug.31.01
-- **Binary Schema Expansion (#782)**: Expanded `RealtimeStatus` Protobuf schema to carry `violationUptimeMs` and `isUltraLongStationary`.
-- **Database v75 Migration**: 
-    - Added `violationUptimeMs` to `pending_status_updates` and `connection_history`.
-    - Added `isUltraLongStationary` to `connection_history` (parity with `pending_status_updates` added in v74).
-- **Forensic Aggregation Hardening (#782)**: 
-    - **TelemetryAggregator.kt**: Discovered and fixed a forensic gap where `violationUptimeMs` and `isUltraLongStationary` were dropped during point aggregation for higher ribbon scales (16M, 1H, etc.).
-    - Updated `MutableAggregationPoint` to include these fields in `merge` and `writeTo` logic.
-    - **Result**: Historical ribbons for all time scales now maintain definitive parity with hot-path telemetry for relaxation states and violation metrics.
-- **Forensic Mapping Hardening**: 
-    - **Models.kt**: Added `violationUptimeMs` to `ConnectionPoint` to support historical metadata rendering.
-    - **TelemetryMapper.kt**: Implemented missing history mappings for `violationUptimeMs` and `isUltraLongStationary` in `mapEntityToApp` and `mapAppToEntity`. 
-- **SOT Integration**: Registered Architectural Rule **R782** (Binary Protocol Expansion) to enforce forensic parity during hot-path binary telemetry updates.
+## 🧬 Implementation Summary: Aug.31.03
+- **Ultra-Long Stationary Propagation (Issue #762 Validation)**:
+    - **IntegrityMonitor.kt**: Implemented observation of `isUltraLongStationaryFlow` from `HardwareProvider`. The local `SystemHealthState` now reflects the 4-hour immobility threshold, ensuring the local HUD displays the `[ULTRA]` badge (R765).
+    - **TelemetryUseCase.kt**: Hardened `mapHealthFromUpdate` and `mapHealthFromStatus` to carry the definitive `isUltraLongStationary` flag. This eliminates a forensic gap where the Viewer side was receiving a hardcoded `false` value.
+    - **HistoryManager.kt**: Updated `updateRibbons` and gap backfilling logic to persist the `isUltraLongStationary` state. This ensures historical replay parity in analytical ribbons (R778).
+    - **TrackerService.kt**: Orchestrated the flow from `IntegrityMonitor` to both the signaling suite (Socket.io) and the history stream.
+- **Protocol Audit**: Confirmed v75 schema parity for violation metrics and relaxation states across all hot-path and historical streams.
 
-## 🚀 Next Steps (Validation Phase)
-- **UI Performance Soak Test**: Validate that the increased database payload size for `connection_history` doesn't impact ribbon rendering latency on target hardware (Samsung A15). Use `ExecuteStressTest` in `MainViewModel` to verify Davey immunity.
-- **Acoustic Duty-Cycle Validation**: Verify that `[ULTRA]` badges correctly correlate with the adaptive acoustic duty-cycle scaling (8s-30s) during extended stationary periods.
+## 🚀 Next Steps
+- **Forensic Replay Sanitization**: Evaluate if the Replay engine should utilize the `ForensicSanitizer` logic when scrubbing technical metadata for external viewing.
+- **Acoustic Floor Calibration Audit**: Verify that the adaptive floor logic in `SentinelValidator` correctly recovers after high-decibel saturation events on budget hardware.
 
 ## 📦 Git Release Block
 ```bash
 git add --all
-git commit -m "Release vAug.31.01: Forensic Aggregation Parity & Schema Expansion"
-git tag -a vAug.31.01 -m "Hardened TelemetryAggregator for violation metrics and relaxation parity across all ribbon scales. Finalized Database v75 migration and Protobuf expansion (#782)."
+git commit -m "Release vAug.31.03: Hardened Ultra-Long Stationary state propagation"
+git tag -a vAug.31.03 -m "Hardened isUltraLongStationary propagation across IntegrityMonitor, TelemetryUseCase, and HistoryManager. Ensured definitive hardware transparency for [ULTRA] badges and acoustic duty-cycle scaling (R762b, R765, R778)."
 git push origin main --tags
 ```
 
-vAug.31.01
+vAug.31.03

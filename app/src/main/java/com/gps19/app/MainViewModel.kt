@@ -36,6 +36,9 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Aug.31.02:
+ * - Issue #782 Validation: Hardened history flows with sample() to ensure 
+ *   Davey immunity on budget hardware (R312, R650).
  * Aug.29.10:
  * - Concern #765: Integrated isUltraLongStationary into UI aggregation pipeline.
  * Aug.26.13:
@@ -249,29 +252,35 @@ class MainViewModel @Inject constructor(
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Forensic Ribbon Flows with Snap-Isolation Parity (R312)
+    // Forensic Ribbon Flows with Snap-Isolation Parity & A15 Sampling (R312/R650)
     val history4MFlow = repository.getHistoryFlow("4M")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         
     val history16MFlow = repository.getHistoryFlow("16M")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         
     val history1HFlow = repository.getHistoryFlow("1H")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         
     val history4HFlow = repository.getHistoryFlow("4H")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         
     val history24HFlow = repository.getHistoryFlow("24H")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         
     val history7DFlow = repository.getHistoryFlow("7D")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val activeGnssDetail: StateFlow<GnssDetail?> = repository.gnssDetail

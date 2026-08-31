@@ -5,15 +5,13 @@ import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * Aug.31.02:
+ * - Issue #762 Validation: Hardened isUltraLongStationary mapping in 
+ *   mapHealthFromUpdate and mapHealthFromStatus to ensure state parity 
+ *   across all ingestion paths (R765, R778).
  * Aug.10.24:
  * - Issue #130: Proto Health Parity. Synchronized isBatteryLow and isBatteryCritical 
  *   mapping across all health ingestion paths (R130).
- * Aug.07.130:
- * - Issue #124: GPS Hardware Revival Hardening (R124). Propagating gpsHardwareLock 
- *   in mapHealthFromUpdate and mapHealthFromStatus.
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Refactored to use mutable flyweight 
- *   updates instead of copy-on-write to eliminate allocation churn (R-HARDWARE-01).
  */
 class TelemetryUseCase @Inject constructor(
     private val timeProvider: TimeProvider
@@ -50,7 +48,7 @@ class TelemetryUseCase @Inject constructor(
             signalLoss = update.signal?.let { it < 2 } ?: current.signalLoss,
             gpsStalled = update.locationPendingReason == LocationPendingReason.GPS_STALL,
             gpsHardwareLock = update.gpsHardwareLock,
-            localInternetLoss = current.localInternetLoss, // LocationUpdate doesn't carry this
+            localInternetLoss = current.localInternetLoss, 
             isHardwareOnline = update.signal != null,
             batteryLevel = if (update.battery >= 0) update.battery else current.batteryLevel,
             batteryTemp = update.temp,
@@ -79,7 +77,8 @@ class TelemetryUseCase @Inject constructor(
             isBatterySteepDischarge = update.isBatterySteepDischarge,
             isCoolingModeActive = update.isCoolingModeActive,
             isBatteryLow = update.isBatteryLow,
-            isBatteryCritical = update.isBatteryCritical
+            isBatteryCritical = update.isBatteryCritical,
+            isUltraLongStationary = update.isUltraLongStationary
         )
         
         if (update.maxTemp > 0.0) current.maxTemp = update.maxTemp
@@ -147,7 +146,8 @@ class TelemetryUseCase @Inject constructor(
         current.isCoolingModeActive = status.isCoolingModeActive
         current.isBatteryLow = status.isBatteryLow
         current.isBatteryCritical = status.isBatteryCritical
-        current.gpsHardwareLock = status.locationPendingReason == LocationPendingReason.GPS_STALL // Approximate mapping for status
+        current.isUltraLongStationary = status.isUltraLongStationary
+        current.gpsHardwareLock = status.locationPendingReason == LocationPendingReason.GPS_STALL
         current.gnssDetail = status.gnssDetail
         current.snrIdx = status.snrIdx
         current.noiseIdx = status.noiseIdx

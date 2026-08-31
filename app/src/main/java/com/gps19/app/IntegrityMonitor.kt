@@ -26,6 +26,10 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Aug.31.02:
+ * - Issue #762 Validation: Added observation of isUltraLongStationaryFlow 
+ *   from HardwareProvider to ensure the [ULTRA] badge reflects local 
+ *   hardware relaxation state (R765, R778).
  * Aug.29.03:
  * - Issue #760 Hardening: Migrated from GpsManager to unified HardwareProvider (R760).
  */
@@ -122,6 +126,13 @@ class IntegrityMonitor @Inject constructor(
         scope.launch {
             hardwareProvider.revivalEvents
                 .onEach { event -> handleRevivalEvent(event) }
+                .collect()
+        }
+
+        // Issue #762: Local transparency for [ULTRA] relaxation state
+        scope.launch {
+            hardwareProvider.isUltraLongStationaryFlow
+                .onEach { isUltra -> updateHealth { it.isUltraLongStationary = isUltra } }
                 .collect()
         }
 

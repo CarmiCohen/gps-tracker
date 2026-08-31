@@ -27,12 +27,12 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Aug.31.03:
+ * - Issue #762 Validation: Added isUltraLongStationary support to updateRibbons 
+ *   to ensure history parity for the [ULTRA] relaxation state (R765, R778).
  * Aug.29.05:
  * - Issue #761: Decomposed telemetry mapping logic into TelemetryMapper. 
  *   Simplified HistoryManager to focus on persistence and aggregation cycles (R761).
- * Aug.29.03:
- * - Issue #760 Hardening: Migrated from GpsManager/AppSensorManager to 
- *   unified HardwareProvider (R760).
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -104,7 +104,8 @@ class HistoryManager @Inject constructor(
         maxIoLatency: Long = 0L,
         isSilentFailure: Boolean = false,
         isBatteryLow: Boolean = false,
-        isBatteryCritical: Boolean = false
+        isBatteryCritical: Boolean = false,
+        isUltraLongStationary: Boolean = false
     ) {
         detectClockTampering(now)
         val deltaRt = if (lastTickRt > 0) nowRt - lastTickRt else 0L
@@ -126,7 +127,7 @@ class HistoryManager @Inject constructor(
                 verticalVelocity, sitVz, sitVzTs, sitVzRt, sitDz, sitBaro, sitTilt, sitShock,
                 isBatterySteepDischarge, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive,
                 currentMa, locationPendingReason, kineticEnergy, isRecoveryEvent,
-                cpuLoad, ioWait, maxIoLatency, isSilentFailure, isBatteryLow, isBatteryCritical
+                cpuLoad, ioWait, maxIoLatency, isSilentFailure, isBatteryLow, isBatteryCritical, isUltraLongStationary
             )
         }
 
@@ -144,6 +145,7 @@ class HistoryManager @Inject constructor(
             this.isBatteryLow = isBatteryLow; this.isBatteryCritical = isBatteryCritical
             this.noiseIdx = noiseIdx; this.luxIdx = luxIdx; this.vibeIdx = vibeIdx; this.proxIdx = proxIdx
             this.liftIdx = liftIdx; this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
+            this.isUltraLongStationary = isUltraLongStationary
         }
         
         aggregator.processPoint(currentPointFlyweight) { scale, point ->
@@ -175,7 +177,8 @@ class HistoryManager @Inject constructor(
         isSitDetected: Boolean, isSitActive: Boolean, currentMa: Int,
         locationPendingReason: LocationPendingReason, kineticEnergy: Double,
         isRecoveryEvent: Boolean, cpuLoad: Double, ioWait: Double, maxIoLatency: Long,
-        isSilentFailure: Boolean, isBatteryLow: Boolean, isBatteryCritical: Boolean
+        isSilentFailure: Boolean, isBatteryLow: Boolean, isBatteryCritical: Boolean,
+        isUltraLongStationary: Boolean
     ) {
         val snrSamples = if (isTrackerMode) hardwareProvider.getSnrSamples(lastTickTs + 1, now) else emptySequence()
         val sensorSamples = if (isTrackerMode) hardwareProvider.getSensorSamples(lastTickTs + 1, now) else emptySequence()
@@ -194,6 +197,7 @@ class HistoryManager @Inject constructor(
             this.liftIdx = liftIdx; this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
             this.sitVz = sitVz; this.sitVzTs = sitVzTs; this.sitVzRt = sitVzRt; this.sitDz = sitDz
             this.sitBaro = sitBaro; this.sitTilt = sitTilt; this.sitShock = sitShock; this.verticalVelocity = verticalVelocity
+            this.isUltraLongStationary = isUltraLongStationary
         }
         
         val backfillBuffer = ArrayList<ConnectionPoint>(60) 

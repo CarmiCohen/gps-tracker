@@ -2,6 +2,18 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.31.03 (vAug.31.03)
+*   **Issue #762 Validated**: **Acoustic Duty-Cycle & [ULTRA] Badge Correlation**. Hardened end-to-end propagation of the `isUltraLongStationary` state to ensure definitive hardware transparency.
+    *   **Integrity Monitoring**: Updated `IntegrityMonitor.kt` to observe `isUltraLongStationaryFlow` from `HardwareProvider`, enabling local health state synchronization (R765).
+    *   **Forensic Mapping**: Hardened `TelemetryUseCase.kt` and `HistoryManager.kt` to carry the relaxation flag across all ingestion and persistence paths (R778).
+    *   **Service Coordination**: Updated `TrackerService.kt` to propagate the definitive hardware state to both the signaling pipeline (Viewer HUD) and the analytical history streams (Ribbons).
+
+## 🟢 Aug.31.02 (vAug.31.02)
+*   **Issue #782 Validated**: **UI Performance Hardening (History Sampling)**. Hardened the forensic ribbon pipeline in `MainViewModel.kt` to ensure Davey immunity during high-frequency stress scenarios.
+    *   **Throttling**: Integrated the `sample()` operator into all forensic history flows (`history4MFlow` through `history7DFlow`).
+    *   **Hardware Baseline**: Applied a 3000ms sampling window for Samsung A15 hardware and 1000ms for standard hardware, eliminating Main-thread congestion during synthetic DB saturation (R650, R312).
+    *   **SOT Integration**: Added Architectural Rule **2.11 (History Sampling Authority)** to mandate flow-throttling for high-density UI components.
+
 ## 🟢 Aug.31.00 (vAug.31.00)
 *   **Issue #782 Resolved**: **Protocol Audit - Binary Schema Expansion & Forensic Audit**. Expanded the `RealtimeStatus` Protobuf schema to carry `violationUptimeMs` and `isUltraLongStationary`.
     *   **Binary Hardening**: Updated `TrackerStatus.writeTo` and `toMap` in `Models.kt` to serialize expanded metrics.
@@ -15,15 +27,6 @@ This document archives all resolved issues and architectural refinements.
     *   **Export Hardening**: Updated `MainFileHelper.kt` to sanitize file I/O error messages and `LogEntry.toJSONObject()` to ensure that exported JSON snapshots are forensically clean.
     *   **SOT Integration**: Added Architectural Rule R779 to enforce mandatory sanitization at the logging edge.
 *   **Bug Fix**: Resolved a critical logic error in `TrackerStatus.toMap()` where `baro_idx` was incorrectly reassigned to a local variable instead of being mapped, ensuring forensic data parity in JSON payloads.
-
-## 🟢 Aug.30.12 (vAug.30.12)
-*   **Concern #781 Resolved**: **Forensic Documentation Restoration**. Completed the root-cause restoration of the "Source of Truth" (SOT). Reconstructed `SOT_MASTER_REQUIREMENTS.md` by retrieving and listing all 149 Functional Requirements (R101-R999) from historical logs, eliminating all placeholders. Expanded `Simplify_Ideas2.md` with full evaluative logic for Issue #778 (Stationary Derivation) and hardware-specific remediations (Samsung A15 stalls). Hardened `RESOLUTION_ARCHIVE.md` to ensure full descriptive integrity for all technical concerns from Aug.28 onwards.
-
-## 🟢 Aug.30.09 (vAug.30.09)
-*   **Concern #778 Evaluated**: **Stationary Derivation Logic**. Evaluated the feasibility of deriving the "Ultra-Long" stationary state on the Viewer side using coordinate monotonic timestamps. Determination: Flag MUST be retained in the telemetry payload. Derive-on-Viewer would introduce high state-mismatch risk during 5-minute relaxed polling intervals and lacks the IMU fidelity available to the Tracker. Transparency and State Parity prioritized over negligible payload savings.
-
-## 🟢 Aug.30.08 (vAug.30.08)
-*   **Concern #759 Validated**: **Logcat IPC Spam Remediation**. Confirmed via comprehensive codebase audit that all direct `getPackageName()` and `Process.myUid()` calls have been migrated to the `GpsApplication` shadow-caches. This successfully removes the IPC binder overhead that previously triggered Samsung-specific diagnostic log flooding on A15 hardware (R759).
 
 ---
 *For historical entries, see [docs_history_archive.md](docs_history_archive.md) or Git logs.*

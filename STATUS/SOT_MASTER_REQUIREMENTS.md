@@ -1,8 +1,8 @@
-# SOT Master Requirements (Aug.31.00)
+# SOT Master Requirements (Aug.31.03)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (32 Rules)
+## 🏗️ Architectural Master Rules (33 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -29,6 +29,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **2.8 Async Geometry Generation (R758b)**: Heavy map overlay geometry (e.g., accuracy circles, geofence polygons) must be generated off the UI thread. `MapOverlayManager` must utilize `Dispatchers.Default` for point calculations and trigger a `MapView.invalidate()` only when geometry is ready, ensuring 60FPS fluid motion during high-frequency telemetry updates (Updated Aug.29.00).
 *   **2.9 Segmented Polyline Hydration (R759b)**: Large telemetry trails (>500 points) must be updated using segmented coroutine patterns. `MapOverlayManager` must utilize `yield()` during polyline point assignment to interleave point hydration with UI frames, preventing Main-thread stalls during heavy history rendering (Updated Aug.29.02).
 *   **2.10 Technical Telemetry Directionality (R766)**: All technical telemetry UI components (StatusBar, Dashboard, HUD) MUST enforce LTR (Left-to-Right) layout direction via `CompositionLocalProvider` regardless of system locale. This ensures that asymmetric technical data (e.g., speed on right, status badges on left) remains readable and aligned with forensic documentation (Updated Aug.29.13).
+*   **2.11 History Sampling Authority (R650/R657)**: To maintain Davey immunity during stress tests, all forensic history flows (4M, 1H, etc.) MUST utilize the `sample()` operator (min 3000ms on A15 hardware) in `MainViewModel`. This protects the Main thread from recomposition storms when high-frequency database writes occur during forensic saturation bursts. (Added Aug.31.02).
 
 ### 3. Hardware Authority
 *   **3.1 Unified Hardware Provider (R760)**: To reduce thread overhead and synchronize platform callbacks, all GNSS, Location, IMU, and Environmental sensors must be managed by the unified `HardwareProvider`. This component must share a single `HandlerThread` ("HardwareThread") for all OS-level event delivery, ensuring consistent lifecycle management and deterministic unregistration via the `ManagedHardware` framework (Updated Aug.29.03).
@@ -48,10 +49,10 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.31.03**: Ultra-Long Stationary State Hardening (#762 Validation). Hardened end-to-end propagation of isUltraLongStationary across IntegrityMonitor, TelemetryUseCase, and HistoryManager to ensure definitive badge transparency (R765, R778).
+*   **Aug.31.02**: History Sampling Authority (#782 Validation). Hardened ribbon flows in MainViewModel with A15-specific sampling to ensure Davey immunity during forensic stress tests.
 *   **Aug.31.00**: Binary Protocol Expansion (#782). Expanded Protobuf schema and implemented database v75 migration to carry violation metrics in hot-path telemetry.
 *   **Aug.30.13**: Forensic Metadata Sanitization (#779). Integrated ForensicSanitizer across logging and export pipelines.
-*   **Aug.30.12**: Documentation Integrity Audit. Restored exhaustive R-IDs and resolution logs.
-*   **Aug.30.09**: Evaluated Stationary Derivation Logic (#778). Confirmed flag retention for state parity.
 
 ---
 
@@ -107,7 +108,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R210**: Atomic counter safety in central repositories.
 *   **R211**: Forensic stress baseline stability (100Hz).
 *   **R212**: Neutral hardware namespace (jdHardware).
-*   **R217**: Shadow-Cache hardening and thread-safe LRU eviction.
+*   **R217**: Shadow-Cache hardening and thread-safe LRU strategy.
 *   **R232**: PhoneSetup button clipping remediation.
 *   **R240**: Centralized UI state aggregation (UiStateAggregator).
 *   **R243**: Automated recovery to previous active mode (<2s).
@@ -213,7 +214,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R777**: Segmented home point marker instantiation using yield().
 *   **R778**: Definitive isUltraLongStationary flag for state parity.
 *   **R779**: Forensic Metadata Sanitization at the logging edge.
-*   **R782**: Binary Schema Expansion for violation metrics.
+*   **R782**: Binary Protocol Expansion for violation metrics.
 *   **R799e**: Vivid green enforcement for JD identity.
 *   **R810-M**: Acoustic floor calibration logic parity.
 *   **R810-P**: Stationary GPS pulse asymmetry mitigation.
@@ -253,4 +254,4 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R993c**: Reactive sensor re-registration authority.
 *   **R999**: Type Safety Authority (Double Precision).
 
-*(Total: 32 Architectural Rules + 150 Functional R-IDs = 182 Items)*
+*(Total: 33 Architectural Rules + 150 Functional R-IDs = 183 Items)*
