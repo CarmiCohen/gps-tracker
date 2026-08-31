@@ -1,5 +1,6 @@
-# Simplification Ideas 2.0 (Sep.01.00)
+# Simplification Ideas 2.0 (Sep.01.03)
 
+*   **Residual Hydration Davey (R880) - NEW**: Refine the staggered hydration yielding strategy to use dynamic batching based on frame-time availability rather than fixed batch sizes.
 *   **Low-memory map eviction strategy (R878) - COMPLETE**: Migrated circle geometry cache to LRU `ShadowCache` and integrated `ComponentCallbacks2` for proactive memory management (Sep.01.00).
 *   **Post-Connection Hydration Davey (R877) - COMPLETE**: Implemented state transition yielding and a 500ms post-connection settling window to eliminate the 1.9s stall (Aug.31.12).
 *   **Package Name Cache Race Hardening (R876) - COMPLETE**: Fixed race condition by removing lazy initialization in `GpsApplication`, ensuring the shadow-cache silences framework logs immediately (Aug.31.10).
