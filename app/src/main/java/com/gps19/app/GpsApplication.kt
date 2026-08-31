@@ -23,13 +23,13 @@ import com.gps19.core.engine.ShadowCache
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Aug.31.10:
+ * - Issue #876 Hardening (R759): Fixed race condition in getPackageName() 
+ *   shadow-cache. Removed lazy initializer to prevent permanent empty-string 
+ *   caching during early framework initialization.
  * Aug.31.06:
  * - Issue #873 Hardening (R759): Overrode getPackageName() to return the 
- *   shadow-cache value. This ensures all system service calls using the 
- *   ApplicationContext bypass repetitive IPC-triggered Logcat spam.
- * Aug.30.13:
- * - Issue #779 Hardening: Integrated ForensicSanitizer into the global 
- *   Timber tree to scrub internal paths from logged stack traces (R779).
+ *   shadow-cache value.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -42,18 +42,6 @@ class GpsApplication : Application(), Configuration.Provider {
         private val stringCache = ShadowCache<String, String>(100)
         private val intCache = ShadowCache<String, Int>(10)
 
-        /**
-         * Shadow-cache for the package name to avoid triggering Samsung's repetitive 
-         * 'getPackageName' logcat spam.
-         */
-        val PACKAGE_NAME: String by lazy { stringCache.getOrPut("pkg") { "" } }
-
-        /**
-         * Shadow-cache for the process UID to avoid triggering system-level IPC 
-         * diagnostic logs during high-frequency permission checks.
-         */
-        val MY_UID: Int by lazy { intCache.getOrPut("uid") { Process.myUid() } }
-        
         /**
          * Issue #758: Signal for map hydration to start.
          */
@@ -73,17 +61,18 @@ class GpsApplication : Application(), Configuration.Provider {
             .build()
 
     /**
-     * Issue #873 Override: Redirects all system-level package name lookups 
-     * to the shadow-cache to eliminate redundant IPC diagnostic logs (R759).
+     * Issue #876 Fix: Direct cache query to avoid lazy initialization race 
+     * conditions. Ensures framework log spam is eliminated as soon as 
+     * the cache is populated in onCreate() (R759).
      */
     override fun getPackageName(): String {
-        val cached = PACKAGE_NAME
-        return if (cached.isNotEmpty()) cached else super.getPackageName()
+        return stringCache.get("pkg") ?: super.getPackageName()
     }
 
     override fun onCreate() {
         super.onCreate()
         
+        // Populate caches immediately to silence framework IPC logs
         stringCache.put("pkg", super.getPackageName())
         intCache.put("uid", Process.myUid())
 

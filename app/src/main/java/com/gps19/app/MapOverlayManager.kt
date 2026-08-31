@@ -24,6 +24,10 @@ import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Aug.31.09:
+ * - Issue #875 Optimization (R875): Increased hydration granularity. Reduced 
+ *   violation update batch size from 20 to 5 and added yields to current 
+ *   position hydration to eliminate residual frame skips on A15 hardware.
  * Aug.30.07:
  * - Issue #777 Optimization (R777): Implemented segmented home point updates 
  *   using coroutines with yield() to ensure Level 4 hydration remains fluid 
@@ -110,6 +114,7 @@ class MapOverlayManager(
     private var viewerTrailJob: Job? = null
     private var violationJob: Job? = null
     private var homeJob: Job? = null
+    private var currentPositionsJob: Job? = null
 
     // Issue #208/758b: Circle Geometry Cache with Async Support
     private data class CircleKey(val latQ: Long, val lngQ: Long, val radiusQ: Long)
@@ -164,8 +169,6 @@ class MapOverlayManager(
 
     /**
      * Issue #777 Optimization: Segmented home point updates.
-     * Spreads marker and fence polygon instantiation across multiple frames 
-     * to eliminate "Davey" stalls during Level 4 hydration (R777).
      */
     fun updateHomePoints(
         home: List<GeoPoint>,
@@ -179,9 +182,6 @@ class MapOverlayManager(
         if (lastHomeRendered === home && lastFenceState == isFenceVisible && 
             lastIsTrackerMode == isTrackerMode && lastGeofenceMode == geofenceMode) return false
             
-        if (lastHomeRendered == home && lastFenceState == isFenceVisible && 
-            lastIsTrackerMode == isTrackerMode && lastGeofenceMode == geofenceMode) return false
-
         lastHomeRendered = home
         lastFenceState = isFenceVisible
         lastIsTrackerMode = isTrackerMode
@@ -218,8 +218,7 @@ class MapOverlayManager(
                     }
                     markers.add(marker)
 
-                    // Yield every 10 points to maintain UI responsiveness
-                    if (idx % 10 == 0) yield()
+                    if (idx % 5 == 0) yield() // Issue #875: Reduced batch size for smoother hydration
                 }
             }
 
@@ -229,18 +228,17 @@ class MapOverlayManager(
             homeMarkersFolder.items.addAll(markers)
             mapView.invalidate()
 
-            // Prune pool
             val activeHomeSize = if (isFenceVisible) home.size else 0
             while (homeMarkerPool.size > maxOf(activeHomeSize + 5, MARKER_POOL_PRUNE_THRESHOLD)) {
                 homeMarkerPool.removeAt(homeMarkerPool.size - 1)
             }
         }
 
-        return false // Job handles invalidation
+        return false
     }
 
     /**
-     * Issue #759b: Segmented trail update to prevent Main-thread stalls.
+     * Issue #759b: Segmented trail update.
      */
     fun updateTrails(
         trackerSegments: List<MapTrailSegment>, 
@@ -266,7 +264,7 @@ class MapOverlayManager(
                         line.outlinePaint.color = segment.color
                         polylines.add(line)
                         
-                        if (segment.points.size > 500 || idx % 10 == 0) yield()
+                        if (segment.points.size > 300 || idx % 5 == 0) yield() // Issue #875: Finer yielding
                     }
                     trailFolder.items.clear()
                     trailFolder.items.addAll(polylines)
@@ -294,7 +292,7 @@ class MapOverlayManager(
                         line.outlinePaint.color = segment.color
                         polylines.add(line)
                         
-                        if (segment.points.size > 500 || idx % 10 == 0) yield()
+                        if (segment.points.size > 300 || idx % 5 == 0) yield()
                     }
                     viewerTrailFolder.items.clear()
                     viewerTrailFolder.items.addAll(polylines)
@@ -309,7 +307,7 @@ class MapOverlayManager(
     }
 
     /**
-     * Issue #776 Optimization: Segmented violation update using coroutines.
+     * Issue #776/875 Optimization: Segmented violation update.
      */
     fun updateViolations(
         violations: List<ViolationPoint>, 
@@ -353,13 +351,13 @@ class MapOverlayManager(
                     
                     val cachedPoints = getAsyncCircle(gp, hAcc) { points ->
                         c.points = points
-                        mapView.invalidate()
+                        // mapView.invalidate() // Removed redundant invalidation, handled at end of job
                     }
                     if (cachedPoints != null) c.points = cachedPoints
                     circles.add(c)
                 }
                 
-                if (index % 20 == 0) yield()
+                if (index % 5 == 0) yield() // Issue #875: Reduced from 20 to 5 for smoother A15 rendering
             }
 
             violationMarkersFolder.items.clear()
@@ -399,6 +397,10 @@ class MapOverlayManager(
         return true
     }
 
+    /**
+     * Issue #875 Optimization: Offloaded heavy position and accuracy updates to 
+     * a segmented job to prevent frame skips during Level 6 hydration.
+     */
     fun updateCurrentPositions(
         trackerValid: Boolean,
         trackerPos: GeoPoint?,
@@ -418,113 +420,123 @@ class MapOverlayManager(
         viewerLastValidFixRt: Long,
         systemPulseRt: Long
     ): Boolean {
-        var changed = false
         val canUpdateDrift = (systemPulseRt - lastDriftUpdateTs) >= BUDGET_THROTTLE_MS
+        if (!canUpdateDrift && lastTrackerPos == trackerPos && lastViewerPos == viewerPos && lastTrackerFresh == isTrackerFresh && lastViewerFresh == isViewerFresh) return false
 
-        if (trackerValid && trackerPos != null) {
-            val baseAcc = if (maxTrackerAccuracy > 0.0) maxTrackerAccuracy else trackerAccuracy
-            if (baseAcc > 0.0) {
-                val drift = if (isTrackerPending && trackerLastValidFixRt > 0) {
-                    baseAcc + (if (trackerSpeed > 1.0) trackerSpeed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRt - trackerLastValidFixRt) / 1000.0)
-                } else baseAcc
-                
-                val posChanged = trackerPos != lastTrackerPos
-                val driftSignificant = abs(drift - lastTrackerDrift) > 0.5
-
-                if (canUpdateDrift && (posChanged || driftSignificant)) {
-                    accuracyCirclesFolder.items.remove(trackerCircle)
-                    
-                    val cachedPoints = getAsyncCircle(trackerPos, drift) { points ->
-                        trackerCircle.points = points
-                        mapView.invalidate()
-                    }
-                    if (cachedPoints != null) trackerCircle.points = cachedPoints
-                    
-                    trackerCircle.outlinePaint.color = if (isTrackerFresh) BrandJd.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
-                    accuracyCirclesFolder.add(trackerCircle)
-                    lastTrackerPos = trackerPos
-                    lastTrackerDrift = drift
-                    lastDriftUpdateTs = systemPulseRt
-                    changed = true
-                } else if (!accuracyCirclesFolder.items.contains(trackerCircle)) {
-                     accuracyCirclesFolder.add(trackerCircle)
-                     changed = true
-                }
-            }
+        violationJob?.cancel() // Safety: Don't let violation job compete with position updates if they overlap
+        
+        currentPositionsJob?.cancel()
+        currentPositionsJob = scope.launch {
+            var changed = false
             
-            if (trackerMarker.position != trackerPos) {
-                trackerMarker.position = trackerPos
-                changed = true
-            }
-            if (lastTrackerFresh != isTrackerFresh) {
-                trackerMarker.icon = if (isTrackerFresh) trackerIconFresh else trackerIconStale
-                lastTrackerFresh = isTrackerFresh
-                changed = true
-            }
-            if (!mapView.overlays.contains(trackerMarker)) {
-                mapView.overlays.add(trackerMarker)
-                changed = true
-            }
-        } else if (mapView.overlays.contains(trackerMarker) || accuracyCirclesFolder.items.contains(trackerCircle)) {
-            accuracyCirclesFolder.items.remove(trackerCircle)
-            mapView.overlays.remove(trackerMarker)
-            lastTrackerPos = null
-            lastTrackerFresh = null
-            changed = true
-        }
-
-        if (viewerValid && viewerPos != null) {
-            val baseMyAcc = if (viewerMaxAcc > 0.0) viewerMaxAcc else viewerAccuracy
-            if (baseMyAcc > 0.0) {
-                val drift = if (isViewerPending && viewerLastValidFixRt > 0) {
-                    baseMyAcc + (if (viewerSpeed > 1.0) viewerSpeed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRt - viewerLastValidFixRt) / 1000.0)
-                } else baseMyAcc
-                
-                val posChanged = viewerPos != lastViewerPos
-                val driftSignificant = abs(drift - lastViewerDrift) > 0.5
-
-                if (canUpdateDrift && (posChanged || driftSignificant)) {
-                    accuracyCirclesFolder.items.remove(viewerCircle)
+            // Tracker update
+            if (trackerValid && trackerPos != null) {
+                val baseAcc = if (maxTrackerAccuracy > 0.0) maxTrackerAccuracy else trackerAccuracy
+                if (baseAcc > 0.0) {
+                    val drift = if (isTrackerPending && trackerLastValidFixRt > 0) {
+                        baseAcc + (if (trackerSpeed > 1.0) trackerSpeed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRt - trackerLastValidFixRt) / 1000.0)
+                    } else baseAcc
                     
-                    val cachedPoints = getAsyncCircle(viewerPos, drift) { points ->
-                        viewerCircle.points = points
-                        mapView.invalidate()
-                    }
-                    if (cachedPoints != null) viewerCircle.points = cachedPoints
+                    val posChanged = trackerPos != lastTrackerPos
+                    val driftSignificant = abs(drift - lastTrackerDrift) > 0.5
 
-                    viewerCircle.outlinePaint.color = if (isViewerFresh) ViewerCyan.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
-                    accuracyCirclesFolder.add(viewerCircle)
-                    lastViewerPos = viewerPos
-                    lastViewerDrift = drift
-                    lastDriftUpdateTs = systemPulseRt
-                    changed = true
-                } else if (!accuracyCirclesFolder.items.contains(viewerCircle)) {
-                    accuracyCirclesFolder.add(viewerCircle)
+                    if (posChanged || driftSignificant) {
+                        accuracyCirclesFolder.items.remove(trackerCircle)
+                        val cachedPoints = getAsyncCircle(trackerPos, drift) { points ->
+                            trackerCircle.points = points
+                            mapView.invalidate()
+                        }
+                        if (cachedPoints != null) trackerCircle.points = cachedPoints
+                        trackerCircle.outlinePaint.color = if (isTrackerFresh) BrandJd.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
+                        accuracyCirclesFolder.add(trackerCircle)
+                        lastTrackerPos = trackerPos
+                        lastTrackerDrift = drift
+                        changed = true
+                    } else if (!accuracyCirclesFolder.items.contains(trackerCircle)) {
+                         accuracyCirclesFolder.add(trackerCircle)
+                         changed = true
+                    }
+                }
+                
+                if (trackerMarker.position != trackerPos) {
+                    trackerMarker.position = trackerPos
                     changed = true
                 }
-            }
-            
-            if (viewerMarker.position != viewerPos) {
-                viewerMarker.position = viewerPos
+                if (lastTrackerFresh != isTrackerFresh) {
+                    trackerMarker.icon = if (isTrackerFresh) trackerIconFresh else trackerIconStale
+                    lastTrackerFresh = isTrackerFresh
+                    changed = true
+                }
+                if (!mapView.overlays.contains(trackerMarker)) {
+                    mapView.overlays.add(trackerMarker)
+                    changed = true
+                }
+            } else if (mapView.overlays.contains(trackerMarker) || accuracyCirclesFolder.items.contains(trackerCircle)) {
+                accuracyCirclesFolder.items.remove(trackerCircle)
+                mapView.overlays.remove(trackerMarker)
+                lastTrackerPos = null
+                lastTrackerFresh = null
                 changed = true
             }
-            if (lastViewerFresh != isViewerFresh) {
-                viewerMarker.icon = if (isViewerFresh) viewerIconFresh else viewerIconStale
-                lastViewerFresh = isViewerFresh
+
+            yield() // Spread tracker and viewer updates across frames
+
+            // Viewer update
+            if (viewerValid && viewerPos != null) {
+                val baseMyAcc = if (viewerMaxAcc > 0.0) viewerMaxAcc else viewerAccuracy
+                if (baseMyAcc > 0.0) {
+                    val drift = if (isViewerPending && viewerLastValidFixRt > 0) {
+                        baseMyAcc + (if (viewerSpeed > 1.0) viewerSpeed.coerceIn(PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS) else PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS) * ((systemPulseRt - viewerLastValidFixRt) / 1000.0)
+                    } else baseMyAcc
+                    
+                    val posChanged = viewerPos != lastViewerPos
+                    val driftSignificant = abs(drift - lastViewerDrift) > 0.5
+
+                    if (posChanged || driftSignificant) {
+                        accuracyCirclesFolder.items.remove(viewerCircle)
+                        val cachedPoints = getAsyncCircle(viewerPos, drift) { points ->
+                            viewerCircle.points = points
+                            mapView.invalidate()
+                        }
+                        if (cachedPoints != null) viewerCircle.points = cachedPoints
+                        viewerCircle.outlinePaint.color = if (isViewerFresh) ViewerCyan.copy(alpha = 0.7f).toArgb() else Slate500.copy(alpha = 0.7f).toArgb()
+                        accuracyCirclesFolder.add(viewerCircle)
+                        lastViewerPos = viewerPos
+                        lastViewerDrift = drift
+                        changed = true
+                    } else if (!accuracyCirclesFolder.items.contains(viewerCircle)) {
+                        accuracyCirclesFolder.add(viewerCircle)
+                        changed = true
+                    }
+                }
+                
+                if (viewerMarker.position != viewerPos) {
+                    viewerMarker.position = viewerPos
+                    changed = true
+                }
+                if (lastViewerFresh != isViewerFresh) {
+                    viewerMarker.icon = if (isViewerFresh) viewerIconFresh else viewerIconStale
+                    lastViewerFresh = isViewerFresh
+                    changed = true
+                }
+                if (!mapView.overlays.contains(viewerMarker)) {
+                    mapView.overlays.add(viewerMarker)
+                    changed = true
+                }
+            } else if (mapView.overlays.contains(viewerMarker) || accuracyCirclesFolder.items.contains(viewerCircle)) {
+                accuracyCirclesFolder.items.remove(viewerCircle)
+                mapView.overlays.remove(viewerMarker)
+                lastViewerPos = null
+                lastViewerFresh = null
                 changed = true
             }
-            if (!mapView.overlays.contains(viewerMarker)) {
-                mapView.overlays.add(viewerMarker)
-                changed = true
+
+            if (changed) {
+                lastDriftUpdateTs = systemPulseRt
+                mapView.invalidate()
             }
-        } else if (mapView.overlays.contains(viewerMarker) || accuracyCirclesFolder.items.contains(viewerCircle)) {
-            accuracyCirclesFolder.items.remove(viewerCircle)
-            mapView.overlays.remove(viewerMarker)
-            lastViewerPos = null
-            lastViewerFresh = null
-            changed = true
         }
-        return changed
+        return false // Job handles invalidation
     }
 
     private fun createTrackerBitmap(density: Float, isFresh: Boolean): Bitmap { 
