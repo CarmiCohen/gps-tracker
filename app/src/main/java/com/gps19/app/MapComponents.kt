@@ -1,5 +1,7 @@
 package com.gps19.app
 
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import androidx.compose.foundation.background
@@ -38,19 +40,14 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Sep.01.00:
+ * - Issue #878 Remediation: Integrated low-memory eviction strategy. Added 
+ *   ComponentCallbacks2 registration to OsmMap to trigger proactive cache 
+ *   pruning in MapOverlayManager during memory pressure events (R878).
  * Aug.31.07:
  * - Issue #874 Remediation: Further segmented the hydration update block. 
  *   Current Positions (Level 6) and Violations (Level 7) are now decoupled 
  *   to ensure frame budget remains under 700ms on budget hardware (R874).
- * Aug.29.00:
- * - Issue #758b Remediation: Integrated MapOverlayManager.onDetach() into 
- *   AndroidView onRelease to ensure background geometry jobs are cancelled 
- *   during view destruction (R758b).
- * Aug.26.16:
- * - Issue #739 Remediation: Integrated hydrationLevel gating into OsmMap 
- *   AndroidView update block. This ensures that heavy overlay initialization 
- *   (trails, markers, circles) is staggered across multiple frames, 
- *   eliminating the 1.4s Davey stall on A15 hardware (R739).
  */
 
 @Composable
@@ -303,6 +300,23 @@ fun OsmMap(
 
     val overlayManager = remember(mapViewRef.value) {
         mapViewRef.value?.let { MapOverlayManager(context, it, density) }
+    }
+
+    // Issue #878: Register memory callbacks for proactive cache eviction
+    DisposableEffect(overlayManager) {
+        val callback = object : ComponentCallbacks2 {
+            override fun onTrimMemory(level: Int) {
+                overlayManager?.trimMemory(level)
+            }
+            override fun onConfigurationChanged(newConfig: Configuration) {}
+            override fun onLowMemory() {
+                overlayManager?.trimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
+            }
+        }
+        context.registerComponentCallbacks(callback)
+        onDispose {
+            context.unregisterComponentCallbacks(callback)
+        }
     }
 
     val smoothedTrackerPos = remember { mutableStateOf<GeoPoint?>(null) }

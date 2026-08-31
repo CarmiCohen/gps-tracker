@@ -1,5 +1,6 @@
 package com.gps19.app
 
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Paint
@@ -24,16 +25,15 @@ import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Sep.01.00:
+ * - Issue #878 Remediation: Implemented low-memory eviction strategy. Migrated 
+ *   circleCache to ShadowCache (LRU) and added trimMemory() to handle 
+ *   ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW. Prunes all pools to minimum 
+ *   functional levels under pressure (R878).
  * Aug.31.09:
  * - Issue #875 Optimization (R875): Increased hydration granularity. Reduced 
  *   violation update batch size from 20 to 5 and added yields to current 
  *   position hydration to eliminate residual frame skips on A15 hardware.
- * Aug.30.07:
- * - Issue #777 Optimization (R777): Implemented segmented home point updates 
- *   using coroutines with yield() to ensure Level 4 hydration remains fluid 
- *   even with high marker density.
- * Aug.30.06:
- * - Issue #776 Optimization (R776): Implemented segmented violation updates.
  */
 class MapOverlayManager(
     private val context: Context,
@@ -116,9 +116,9 @@ class MapOverlayManager(
     private var homeJob: Job? = null
     private var currentPositionsJob: Job? = null
 
-    // Issue #208/758b: Circle Geometry Cache with Async Support
+    // Issue #878: Migrated to ShadowCache for LRU eviction
     private data class CircleKey(val latQ: Long, val lngQ: Long, val radiusQ: Long)
-    private val circleCache = Collections.synchronizedMap(mutableMapOf<CircleKey, List<GeoPoint>>())
+    private val circleCache = ShadowCache<CircleKey, List<GeoPoint>>(300)
     private val pendingCalculations = Collections.synchronizedSet(mutableSetOf<CircleKey>())
 
     /**
@@ -130,7 +130,7 @@ class MapOverlayManager(
         val radiusQ = (round(radius * 2.0)).toLong()
         
         val key = CircleKey(latQ, lngQ, radiusQ)
-        val cached = circleCache[key]
+        val cached = circleCache.get(key)
         
         if (cached != null) return cached
         
@@ -138,8 +138,7 @@ class MapOverlayManager(
             scope.launch(Dispatchers.Default) {
                 try {
                     val points = Polygon.pointsAsCircle(center, radiusQ / 2.0)
-                    if (circleCache.size > 300) circleCache.clear()
-                    circleCache[key] = points
+                    circleCache.put(key, points)
                     withContext(Dispatchers.Main) {
                         onReady(points)
                         pendingCalculations.remove(key)
@@ -165,6 +164,36 @@ class MapOverlayManager(
 
     fun onDetach() {
         scope.cancel()
+    }
+
+    /**
+     * Issue #878: Eviction strategy for low-memory events.
+     */
+    fun trimMemory(level: Int) {
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            circleCache.clear()
+            pendingCalculations.clear()
+            
+            // Prune pools to absolute minimum (active items only)
+            val currentHomeSize = lastHomeRendered?.size ?: 0
+            while (homeMarkerPool.size > currentHomeSize) homeMarkerPool.removeAt(homeMarkerPool.size - 1)
+            
+            val currentViolationSize = cachedFilteredViolations.size
+            while (violationMarkerPool.size > currentViolationSize) violationMarkerPool.removeAt(violationMarkerPool.size - 1)
+            while (violationCirclePool.size > currentViolationSize) violationCirclePool.removeAt(violationCirclePool.size - 1)
+            
+            // Note: Trail pools are managed during update, but we clear excess capacity here
+            trackerPolylinePool.clear() // Will be re-populated on next valid update
+            viewerPolylinePool.clear()
+            
+            trailFolder.items.clear()
+            viewerTrailFolder.items.clear()
+            lastTrailChecksum = -1
+            lastViewerTrailChecksum = -1
+            
+            mapView.tileProvider.tileCache.clear()
+            System.gc()
+        }
     }
 
     /**
@@ -333,6 +362,7 @@ class MapOverlayManager(
                 val isGeo = v.type == ALERT_ID_TRACKER_GEOFENCE
                 (isJump && isViolationsVisible) || (isGeo && isGeofenceViolationsVisible) 
             }
+            cachedFilteredViolations = filtered
 
             val markers = mutableListOf<Marker>()
             val circles = mutableListOf<Polygon>()
@@ -351,7 +381,6 @@ class MapOverlayManager(
                     
                     val cachedPoints = getAsyncCircle(gp, hAcc) { points ->
                         c.points = points
-                        // mapView.invalidate() // Removed redundant invalidation, handled at end of job
                     }
                     if (cachedPoints != null) c.points = cachedPoints
                     circles.add(c)

@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (Aug.31.12)
+# Project Issues & Hardening Tracking (Sep.01.00)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 Needs Action | 25 |
-| **Validation Tasks** | 🟢 Validated | 213 |
-| **Resolved (Total)** | 🟢 Progress | 794 |
+| **Open Technical Issues** | 🔴 Needs Action | 24 |
+| **Validation Tasks** | 🟢 Validated | 214 |
+| **Resolved (Total)** | 🟢 Progress | 796 |
 
 ---
 
@@ -21,11 +21,11 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Aug.31.12)
-*   **Issue #877 Resolved: Post-Connection Hydration Davey (R877)**. Eliminated the 1.9s frame stall occurring after relay connection. Implemented state transition yielding in `CommunicationManager` and a 500ms post-connection settling window in `ConnectivitySuite` to prevent Main-thread starvation.
-*   **Issue #876 Resolved: `getPackageName` Cache Race Hardening (R759)**. Fixed race condition in `GpsApplication` where framework calls accessed the `lazy` property before `onCreate()`. Refactored to a direct cache lookup to silence Samsung framework log spam immediately.
-*   **Issue #875 Resolved: Hydration Frame-Skip Optimization (R875)**. Reduced marker and violation update batch sizes from 20 to 5. (Aug.31.09).
+## 🟢 Recently Resolved Issues (Sep.01.00)
+*   **Issue #878 Resolved: Low-memory map eviction strategy (R878)**. Migrated circle geometry cache to LRU `ShadowCache` and integrated `ComponentCallbacks2` for proactive memory management. (Sep.01.00).
+*   **Issue #877 VALIDATED: Post-Connection Hydration Davey (R877)**. Confirmed on SM-A155F. 1.9s frame stall eliminated via yielding and 500ms post-connection settling window. (Aug.31.13).
+*   **Issue #876 Resolved: `getPackageName` Cache Race Hardening (R759)**. Fixed race condition in `GpsApplication`. (Aug.31.12).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vAug.31.12)*
-*Simplification Ideas: 220*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.01.00)*
+*Simplification Ideas: 222*
