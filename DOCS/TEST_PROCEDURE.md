@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker
+# Test Procedure - GPS Tracker (vAug.31.04)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -78,7 +78,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
         *   Open the Log Overlay and confirm `JAMMER SUSPICION` and `GPS STALL` markers are injected and latched correctly.
         *   Check the Ribbons Overlay to ensure the violation state is persisted.
 *   **6.2 Heat Mitigation Validation (Issue #191):**
-    *   Trigger thermal simulation via `MainViewModel.simulateThermalEvent(true)` (Command: `SimulateThermalEvent`).
+    *   Trigger thermal simulation via `MainViewModel.simulateThermalEvent(true)`.
     *   **Verification:**
         1. Check Logcat for `SYSTEM EMERGENCY: Simulated Thermal limit reached. Entering forced COOLING MODE.`
         2. Monitor `TrackerService` forensic sampling. Confirm delay updates to `500ms`.
@@ -148,6 +148,8 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 17 - Forensic Log Export & Sharing
 **Goal:** Verify the forensic chain of custody during data export.
 *   **17.1 Export Integrity:** Tap **SAVE LOGS** and verify inclusion of all recent traces from the `ForensicSpillBuffer`.
+*   **17.2 Metadata Sanitization (R779):** Open the exported JSON file. Verify all internal paths are replaced with `[INTERNAL_PATH]` and hardware models are normalized to `[HW_ID]`.
+*   **Status (Aug.31.04):** ✅ PASSED. Hardened Replay and export paths verified.
 
 ## Chapter 18 - Physical Tamper Escalation (Light/Acoustic)
 **Goal:** Verify high-sensitivity tamper detection logic.
@@ -259,8 +261,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **100:** Final Forensic Trace Continuity Audit (48h).
 
 ---
-## Test Log: Aug.21.09
-*   **Chapters 1-7:** ✅ PASSED.
-*   **Chapter 8 (Validation Hooks):** ✅ PASSED.
-*   **Chapter 10 (Native Lifecycle):** ✅ PASSED.
-*   **Chapters 9, 11-100:** 🟡 PENDING AUDIT.
+## Test Log: Aug.31.04
+*   **Chapters 1-8, 10:** ✅ PASSED.
+*   **Chapter 17 (Forensic Sanitization):** ✅ PASSED (Aug.31.04).
+*   **Chapters 9, 11-16, 18-100:** 🟡 PENDING AUDIT.

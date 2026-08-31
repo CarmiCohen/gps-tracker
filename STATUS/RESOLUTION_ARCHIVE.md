@@ -2,6 +2,12 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.31.04 (vAug.31.04)
+*   **Issue #779 Validated**: **Forensic Replay & Metadata Hardening**. Extended the `ForensicSanitizer` policy to the telemetry mapping and historical audit layers.
+    *   **Telemetry Hardening**: Updated `TrackerStatus.toMap()` in `Models.kt` to scrub technical network identifiers (`net_interface`) before transmission to viewers or JSON export.
+    *   **Audit Sanitization**: Hardened `HistoryManager.kt` to sanitize continuity audit and backfilling logs at the source, ensuring no internal paths leak into the event stream (R779).
+    *   **Consistency Audit**: Confirmed that all `MainFileHelper` export paths and `LogEntry` JSON serializations are rigorously utilizing the centralized scrubbing utility.
+
 ## 🟢 Aug.31.03 (vAug.31.03)
 *   **Issue #762 Validated**: **Acoustic Duty-Cycle & [ULTRA] Badge Correlation**. Hardened end-to-end propagation of the `isUltraLongStationary` state to ensure definitive hardware transparency.
     *   **Integrity Monitoring**: Updated `IntegrityMonitor.kt` to observe `isUltraLongStationaryFlow` from `HardwareProvider`, enabling local health state synchronization (R765).

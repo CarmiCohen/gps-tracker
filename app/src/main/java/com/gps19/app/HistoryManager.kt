@@ -27,12 +27,12 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Aug.31.04:
+ * - Issue #779 Hardening: Integrated ForensicSanitizer into diagnostic log 
+ *   emission to ensure parity with global forensic policy (R779).
  * Aug.31.03:
  * - Issue #762 Validation: Added isUltraLongStationary support to updateRibbons 
  *   to ensure history parity for the [ULTRA] relaxation state (R765, R778).
- * Aug.29.05:
- * - Issue #761: Decomposed telemetry mapping logic into TelemetryMapper. 
- *   Simplified HistoryManager to focus on persistence and aggregation cycles (R761).
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -83,6 +83,11 @@ class HistoryManager @Inject constructor(
         }
     }
 
+    private fun emitSanitizedLog(message: String, isImportant: Boolean = false) {
+        val sanitized = ForensicSanitizer.sanitizeMessage(message)
+        _historyEvents.tryEmit(HistoryEvent.LogEvent(sanitized, isImportant))
+    }
+
     suspend fun updateRibbons(
         now: Long, nowRt: Long, lastTickTs: Long, lastTickRt: Long,
         serviceTickCounter: Int, rtt: Int, peerSignal: Int, peerAvail: Boolean,
@@ -112,7 +117,7 @@ class HistoryManager @Inject constructor(
         
         if (now - lastAuditTs > 60000L) {
             if (backfillAuditCount > 0) {
-                _historyEvents.tryEmit(HistoryEvent.LogEvent("Forensic: 4M Continuity Audit - Backfilled $backfillAuditCount points", false))
+                emitSanitizedLog("Forensic: 4M Continuity Audit - Backfilled $backfillAuditCount points")
                 backfillAuditCount = 0
             }
             lastAuditTs = now
@@ -248,7 +253,7 @@ class HistoryManager @Inject constructor(
         val delta = abs(currentDrift - clockDriftRef)
         if (delta > DRIFT_TOLERANCE_MS) {
             val direction = if (currentDrift > clockDriftRef) "forward" else "backward"
-            _historyEvents.tryEmit(HistoryEvent.LogEvent("FORENSIC ALERT: System clock jump detected ($direction ${delta / 1000}s).", true))
+            emitSanitizedLog("FORENSIC ALERT: System clock jump detected ($direction ${delta / 1000}s).", true)
             clockDriftRef = currentDrift
             scope?.launch { repository.saveLong(CLOCK_DRIFT_REF_KEY, currentDrift) }
         }
@@ -269,10 +274,10 @@ class HistoryManager @Inject constructor(
                     lastProcessedHour = hour
                     repository.saveIntSync(LAST_AUTO_SAVE_HOUR_KEY, hour)
                     if (hourlyBackfillTotal > 0) {
-                        _historyEvents.tryEmit(HistoryEvent.LogEvent("Forensic: Hourly Continuity Audit - Backfilled $hourlyBackfillTotal points.", false))
+                        emitSanitizedLog("Forensic: Hourly Continuity Audit - Backfilled $hourlyBackfillTotal points.")
                         hourlyBackfillTotal = 0
                     }
-                    _historyEvents.tryEmit(HistoryEvent.LogEvent("Hourly auto-export", false))
+                    emitSanitizedLog("Hourly auto-export")
                     scope?.launch(Dispatchers.IO) { 
                         MainFileHelper.autoExportData(context, repository, timeProvider) 
                     }
@@ -289,7 +294,7 @@ class HistoryManager @Inject constructor(
                     if (repository.getString(LAST_DAILY_CLEANUP_DATE_KEY, "") != todayDate) {
                         lastCleanupDate = todayDate
                         repository.saveStringSync(LAST_DAILY_CLEANUP_DATE_KEY, todayDate)
-                        _historyEvents.tryEmit(HistoryEvent.LogEvent("Periodic daily cleanup of trails", true))
+                        emitSanitizedLog("Periodic daily cleanup of trails", true)
                         repository.clearTrails()
                     } else { lastCleanupDate = todayDate }
                 }
@@ -305,7 +310,7 @@ class HistoryManager @Inject constructor(
                     if (repository.getString(LAST_DAILY_ARCHIVE_DATE_KEY, "") != todayDate) {
                         lastArchiveDate = todayDate
                         repository.saveStringSync(LAST_DAILY_ARCHIVE_DATE_KEY, todayDate)
-                        _historyEvents.tryEmit(HistoryEvent.LogEvent("Periodic daily archiving of old files", true))
+                        emitSanitizedLog("Periodic daily archiving of old files", true)
                         scope?.launch(Dispatchers.IO) { 
                             MainFileHelper.performDailyArchiving(context, timeProvider) 
                         }

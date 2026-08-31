@@ -1,6 +1,6 @@
-# Setup Guide & Configuration Mechanism (vAug.07.06)
+# Setup Guide & Configuration Mechanism (vAug.31.04)
 
-This document describes the implementation of the "Phone Setup" guide and the persistence logic for application settings. As of vAug.07.06, all terminology follows the R747 Locality Authority.
+This document describes the implementation of the "Phone Setup" guide and the persistence logic for application settings. All terminology follows the R747 Locality Authority and R779 Sanitization Authority.
 
 ## 1. The Setup Guide (`PhoneSetupOverlay`)
 The `PhoneSetupOverlay` guides the user through the Android permissions and battery optimizations required for high-reliability background tracking.
@@ -27,4 +27,6 @@ Significant changes (Relay URL/IDs) trigger a debounced re-initialization of the
 
 ## 3. Configuration Management
 - **Load Config**: Import JSON configuration for instant setup.
-- **Export Logs**: Provides a forensic snapshot of event history. Standardized to include mandatory role fields and Log Locality (R747).
+- **Export Logs & Trails**: Provides a forensic snapshot of system activity.
+    - **Hardened Sanitization (R779)**: **MANDATORY**. All exported files are rigorously scrubbed of absolute internal paths and raw hardware identifiers to ensure forensic integrity and privacy during external analysis.
+    - **Locality Authority (R747)**: Exports are standardized to include mandatory role fields and locality-aware descriptions.

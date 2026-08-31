@@ -1,30 +1,30 @@
-# Handover (Aug.31.03) - Ultra-Long Stationary State & Acoustic Duty-Cycle Hardened
+# Handover (Aug.31.04) - Forensic Replay & Metadata Hardened
 
 ## 🎯 Current Status
-- **Goal**: Acoustic Duty-Cycle & [ULTRA] Badge Correlation Validation.
+- **Goal**: Forensic Metadata Sanitization (R779) - Full Pipeline Validation.
 - **Status**: 🟢 **COMPLETE**
-- **Version**: `Aug.31.03`
+- **Version**: `Aug.31.04`
 - **Database**: v75 (Hardened)
-- **Current Audit Baseline**: SOT: 183 (33 Arch + 150 Func), Resolved: 786 (Validated Ultra-Long Stationary), Open: 26, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 216, QA Status: 210 Validated, Session Call Count: [96/90].
+- **Current Audit Baseline**: SOT: 230 (34 Arch + 196 Func), Resolved: 787 (Forensic Replay Hardening), Open: 26, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 216, QA Status: 211 Validated, Session Call Count: [75/90].
 
-## 🧬 Implementation Summary: Aug.31.03
-- **Ultra-Long Stationary Propagation (Issue #762 Validation)**:
-    - **IntegrityMonitor.kt**: Implemented observation of `isUltraLongStationaryFlow` from `HardwareProvider`. The local `SystemHealthState` now reflects the 4-hour immobility threshold, ensuring the local HUD displays the `[ULTRA]` badge (R765).
-    - **TelemetryUseCase.kt**: Hardened `mapHealthFromUpdate` and `mapHealthFromStatus` to carry the definitive `isUltraLongStationary` flag. This eliminates a forensic gap where the Viewer side was receiving a hardcoded `false` value.
-    - **HistoryManager.kt**: Updated `updateRibbons` and gap backfilling logic to persist the `isUltraLongStationary` state. This ensures historical replay parity in analytical ribbons (R778).
-    - **TrackerService.kt**: Orchestrated the flow from `IntegrityMonitor` to both the signaling suite (Socket.io) and the history stream.
-- **Protocol Audit**: Confirmed v75 schema parity for violation metrics and relaxation states across all hot-path and historical streams.
+## 🧬 Implementation Summary: Aug.31.04
+- **Forensic Replay Sanitization (Issue #779)**:
+    - **Models.kt**: Hardened `TrackerStatus.toMap()` to rigorously scrub technical network identifiers (`net_interface`) using `ForensicSanitizer` before transmission to Viewers or JSON export.
+    - **HistoryManager.kt**: Integrated `ForensicSanitizer` into the `emitSanitizedLog` orchestration. All continuity audit and backfilling logs are now scrubbed at the source, preventing internal path leaks into the persistent event stream.
+    - **Telemetry Continuity**: Confirmed that `TelemetryMapper` and `LogEntry` JSON serializations are aligned with the global forensic policy (R779).
+- **Documentation Audit**: Synchronized `SOT_MASTER_REQUIREMENTS.md`, `QA_VALIDATION_STATUS.md`, `VERIFICATION_MANIFEST.md`, and primary `DOCS/` files to reflect mandatory sanitization requirements.
+- **Build Integrity**: Verified version `Aug.31.04` with a successful Gradle build.
 
 ## 🚀 Next Steps
-- **Forensic Replay Sanitization**: Evaluate if the Replay engine should utilize the `ForensicSanitizer` logic when scrubbing technical metadata for external viewing.
 - **Acoustic Floor Calibration Audit**: Verify that the adaptive floor logic in `SentinelValidator` correctly recovers after high-decibel saturation events on budget hardware.
+- **MainViewModel Boilerplate Reduction**: Evaluate consolidating the history scale flows into a single map-based StateFlow.
 
 ## 📦 Git Release Block
 ```bash
 git add --all
-git commit -m "Release vAug.31.03: Hardened Ultra-Long Stationary state propagation"
-git tag -a vAug.31.03 -m "Hardened isUltraLongStationary propagation across IntegrityMonitor, TelemetryUseCase, and HistoryManager. Ensured definitive hardware transparency for [ULTRA] badges and acoustic duty-cycle scaling (R762b, R765, R778)."
+git commit -m "Release vAug.31.04: Hardened Forensic Replay & Telemetry Sanitization"
+git tag -a vAug.31.04 -m "Extended ForensicSanitizer to telemetry mapping and historical audit layers. Scrubbed technical network identifiers and audit logs at the source to ensure no metadata leaks during replay or export (R779)."
 git push origin main --tags
 ```
 
-vAug.31.03
+vAug.31.04

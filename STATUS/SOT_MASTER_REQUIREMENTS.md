@@ -1,8 +1,8 @@
-# SOT Master Requirements (Aug.31.03)
+# SOT Master Requirements (Aug.31.04)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (33 Rules)
+## 🏗️ Architectural Master Rules (34 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -13,7 +13,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.6 Monotonic Authority (R307)**: All maintenance durations and health-check silence detections must prioritize monotonic references (`elapsedRealtime`) to prevent wall-clock corruption during reboots or system time jumps (R307).
 *   **1.7 Single Source of Truth**: All system state (Health, Location, Alarms) must be centralized in repositories and propagated via Flows (R117).
 *   **1.8 Lifecycle Synchronization (R738/R742/R744-R757/R767/R775)**: **MANDATORY**. Hardware managers (GPS, Sensors, Network, GNSS) must use `ManagedHardware` abstractions for synchronous, trace-logged unregistration. Listener unregistration MUST be processed on the dedicated hardware thread (or Main Looper for OS callbacks) before termination, using synchronous synchronization (e.g., CountDownLatch or task awaiting) to ensure native disposal finishes. **Fallback Direct Unregistration (R767)**: If the target looper/thread is unresponsive or terminated during shutdown, managers MUST attempt immediate direct unregistration to prevent native `BaseEventQueue` leaks. **Zero-Raw-Unregistration (R775)**: Manual unregistration via `sensorManager.unregisterListener` outside the `ManagedHardware` flow is prohibited. (Updated Aug.30.05).
-*   **1.9 IPC Optimization (R759)**: High-frequency lookups of system identifiers (e.g., Package Name, UID) must utilize `GpsApplication` shadow-caches (e.g., `PACKAGE_NAME`, `MY_UID`) to prevent repetitive IPC calls and associated OS-level diagnostic log flooding on restricted hardware. (Updated Aug.30.08).
+*   **1.9 IPC Optimization (R759)**: High-frequency lookups of system identifiers (e.g., Package Name, UID) must utilize `GpsApplication` shadow-caches (e.g., `PACKAGE_NAME`, `MY_UID`) to prevent repetitive IPC calls and associated OS-level diagnostic log spam on Samsung hardware. (Updated Aug.30.08).
 *   **1.10 Dependency Injection**: Hilt is the sole authority for dependency management. Manual instantiation of repositories or DAOs is prohibited.
 *   **1.11 Monotonic Time**: Use `elapsedRealtime` for all interval and duration logic to survive clock regressions and drift (R116).
 *   **1.12 Telemetry Mapping Authority (R761)**: To ensure SRP and avoid logic duplication, all property transformations between Engine models (e.g., EngineConnectionPoint) and App models (e.g., ConnectionPoint) must be centralized in `TelemetryMapper.kt`. Managers and Services are prohibited from performing direct property mapping. (Updated Aug.29.05).
@@ -43,16 +43,16 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **4.3 Validation Hooks**: The app must provide manual hooks (e.g., `SetForensicSimulation`, `ToggleSetupBypass`) to verify alarm triggers and facilitate automated soak tests under simulated stress (R196-V, R735).
 *   **4.4 Identity Sanitization (R976)**: Identity sanitization state must be persistent. The warning overlay dismissal must be written to the DataStore to prevent redundant notifications across cold starts (R737, R976).
 *   **4.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
-*   **4.6 Forensic Metadata Sanitization (R779)**: **MANDATORY**. All exported logs, trails, and telemetry payloads must be scrubbed of internal absolute paths (e.g., `/data/user/0/...`) and have hardware-specific identifiers (e.g., Build.MODEL) normalized unless explicitly marked as forensic audit traces (`isSpecial`). Sanitization must be applied at the edge of the logging pipeline via `ForensicSanitizer`. (Added Aug.30.13).
+*   **4.6 Forensic Metadata Sanitization (R779)**: **MANDATORY**. All exported logs, trails, and telemetry payloads must be scrubbed of internal absolute paths (e.g., `/data/user/0/...`) and have hardware-specific identifiers (e.g., Build.MODEL) normalized unless explicitly marked as forensic audit traces (`isSpecial`). Sanitization must be applied at the edge of the logging pipeline via `ForensicSanitizer`. (Updated Aug.31.04).
 *   **4.7 Binary Protocol Expansion (R782)**: To ensure forensic continuity across hot-path binary updates, all critical performance metrics (e.g., `violationUptimeMs`) and behavioral states (e.g., `isUltraLongStationary`) MUST be carried in the `RealtimeStatus` Protobuf schema. This eliminates state divergence when switching between JSON and binary signaling roles. (Added Aug.31.00).
 
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.31.04**: Forensic Replay & Metadata Hardening (#779 Validated). Extended ForensicSanitizer to telemetry mapping and historical audit layers (R779).
 *   **Aug.31.03**: Ultra-Long Stationary State Hardening (#762 Validation). Hardened end-to-end propagation of isUltraLongStationary across IntegrityMonitor, TelemetryUseCase, and HistoryManager to ensure definitive badge transparency (R765, R778).
 *   **Aug.31.02**: History Sampling Authority (#782 Validation). Hardened ribbon flows in MainViewModel with A15-specific sampling to ensure Davey immunity during forensic stress tests.
 *   **Aug.31.00**: Binary Protocol Expansion (#782). Expanded Protobuf schema and implemented database v75 migration to carry violation metrics in hot-path telemetry.
-*   **Aug.30.13**: Forensic Metadata Sanitization (#779). Integrated ForensicSanitizer across logging and export pipelines.
 
 ---
 
@@ -254,4 +254,4 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R993c**: Reactive sensor re-registration authority.
 *   **R999**: Type Safety Authority (Double Precision).
 
-*(Total: 33 Architectural Rules + 150 Functional R-IDs = 183 Items)*
+*(Total: 34 Architectural Rules + 196 Functional R-IDs = 230 Items)*

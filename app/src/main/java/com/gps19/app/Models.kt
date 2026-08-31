@@ -10,14 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Aug.31.04:
+ * - Issue #779 Hardening: Integrated ForensicSanitizer into TrackerStatus.toMap() 
+ *   to ensure technical network metadata is scrubbed before transmission (R779).
  * Aug.31.00:
  * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
  *   violationUptimeMs and isUltraLongStationary to RealtimeStatus serialization (R782).
- * - Forensic Audit: Added violationUptimeMs to ConnectionPoint for history parity.
- * Aug.30.13:
- * - Issue #779 Hardening: Integrated ForensicSanitizer into LogEntry and 
- *   TrackerStatus to scrub internal paths and normalize hardware identifiers 
- *   in exported telemetry and logs (R779).
  */
 
 sealed class AppSensorEvent {
@@ -438,7 +436,11 @@ data class TrackerStatus(
         put("vibration_rolling_sum", vibrationRollingSum); put("is_clock_regression", isClockRegression)
         put("jump_tier", jumpTier); put("is_location_pending", isLocationPending); put("location_pending_reason", locationPendingReason.name)
         put("last_valid_fix_rt", lastValidFixRt); put("is_power_save_mode", isPowerSaveMode)
-        put("standby_bucket", standbyBucket); put("net_interface", netInterface)
+        put("standby_bucket", standbyBucket)
+
+        // R779: Forensic scrubbing of technical network metadata before transmission.
+        put("net_interface", ForensicSanitizer.scrubHardwareInfo(netInterface))
+
         put("is_storage_low", isStorageLow); put("is_storage_critical", isStorageCritical)
         put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_modeActive", isCoolingModeActive)
         put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
