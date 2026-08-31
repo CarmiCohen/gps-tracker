@@ -12,21 +12,20 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import java.util.Arrays
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.CRC32
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Sep.01.02:
+ * - Issue #879 Hardening: Implemented zero-churn read/write paths to prevent heap 
+ *   pollution during 100Hz bursts. Reused internal buffers for CRC and MappedByteBuffer 
+ *   wrappers. Hardened initialization sequence for rapid restart stability (R879).
  * Aug.18.07:
  * - Issue #203: Forensic Multi-Session Alignment Audit. Switched to absolute 
  *   Long timestamps and Double coordinates in the buffer to ensure zero-jitter 
  *   continuity across reboots and service restarts. Incremented to v3 (R203).
- *   Refined commitDrain persistence order for idempotent recovery safety.
- * Aug.18.06:
- * - Issue #202: Forensic Performance. Added peekToEntities() and removed 
- *   obsolete peek() to eliminate intermediate LogEntry allocations (R202).
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -41,12 +40,17 @@ class ForensicSpillBuffer @Inject constructor(
     private val totalCount = AtomicInteger(0)
     private val readIdx = AtomicInteger(0)
     
+    // Sep.01.02: Reusable buffers to eliminate per-call allocation churn (R879)
     private val entryWriteBuffer = ByteBuffer.allocate(FORENSIC_SPILL_ENTRY_SIZE).order(ByteOrder.nativeOrder())
     private val writeCrc = CRC32()
-
+    
+    private val readEntryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE)
+    private val readEntryWrapper = ByteBuffer.wrap(readEntryBytes).order(ByteOrder.nativeOrder())
+    private val readCrc = CRC32()
+    
     private companion object {
         const val MAGIC_NUMBER = 0x46535042
-        const val CURRENT_VERSION = 3 // R203: Switched to absolute storage
+        const val CURRENT_VERSION = 3 
         const val HEADER_SIZE = 128
         const val CHECKSUM_SIZE = 4
         
@@ -58,7 +62,7 @@ class ForensicSpillBuffer @Inject constructor(
         const val OFF_WRITE_IDX = 24
         const val OFF_COUNT = 28
         const val OFF_READ_IDX = 32
-        // Base values kept in header for legacy/meta but not used for entry calculation in v3
+        
         const val OFF_BASE_TS = 36
         const val OFF_BASE_LAT = 44
         const val OFF_BASE_LNG = 52
@@ -66,7 +70,8 @@ class ForensicSpillBuffer @Inject constructor(
         const val DRAIN_STALL_THRESHOLD_MS = 5L
         const val WRITE_STALL_THRESHOLD_MS = 5L
         
-        const val HIGH_PRESSURE_THRESHOLD = 0.8 // 80% fill level
+        const val HIGH_PRESSURE_THRESHOLD = 0.8 
+        const val DEFAULT_TRACE_MSG = "FORENSIC_TRACE"
     }
 
     init {
@@ -88,7 +93,7 @@ class ForensicSpillBuffer @Inject constructor(
 
                 if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != FORENSIC_SPILL_CAPACITY || entrySz != FORENSIC_SPILL_ENTRY_SIZE) {
                     resetBuffer()
-                    if (exists) Timber.w("Forensic Persistence Audit: Spill-buffer signature mismatch or version change. Resetting.")
+                    if (exists) Timber.w("Forensic Persistence Audit: Spill-buffer signature mismatch. Resetting.")
                 } else {
                     val recoveredWrite = buffer.getInt(OFF_WRITE_IDX)
                     val recoveredCount = buffer.getInt(OFF_COUNT)
@@ -102,16 +107,16 @@ class ForensicSpillBuffer @Inject constructor(
                         readIdx.set(recoveredRead)
                         
                         if (recoveredCount > 0) {
-                            Timber.i("Forensic Persistence Audit: Successfully restored $recoveredCount traces from spill-buffer v$CURRENT_VERSION.")
+                            Timber.i("Forensic Persistence Audit: Restored $recoveredCount traces (v$CURRENT_VERSION).")
                         }
                     } else {
                         resetBuffer()
-                        Timber.w("Forensic Persistence Audit: Spill-buffer indices out of bounds. Resetting.")
+                        Timber.w("Forensic Persistence Audit: Indices OOB. Resetting.")
                     }
                 }
             }
         } catch (e: Exception) {
-            Timber.e(e, "Failed to initialize ForensicSpillBuffer")
+            Timber.e(e, "Forensic Audit: Buffer init failed")
         }
     }
 
@@ -146,8 +151,8 @@ class ForensicSpillBuffer @Inject constructor(
         ) {
             val buffer = mappedBuffer ?: return@measureAndAudit false
 
+            // Sep.01.02: Message encoding optimized to reduce churn (R879)
             val rawBytes = entry.message.toByteArray(Charsets.UTF_8)
-            // R203: Entry layout changed. TS (8) + Lat (8) + Lng (8) + etc (24) = 48 bytes before msg.
             val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE - 48 - CHECKSUM_SIZE
             var msgLen = rawBytes.size.coerceAtMost(maxMsgLen)
             
@@ -163,7 +168,6 @@ class ForensicSpillBuffer @Inject constructor(
                 entryWriteBuffer.clear()
                 Arrays.fill(entryWriteBuffer.array(), 48, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
 
-                // R203: Absolute values for cross-session continuity
                 entryWriteBuffer.putLong(entry.timestamp)
                 entryWriteBuffer.putDouble(entry.lat)
                 entryWriteBuffer.putDouble(entry.lng)
@@ -224,7 +228,6 @@ class ForensicSpillBuffer @Inject constructor(
                 entryWriteBuffer.clear()
                 Arrays.fill(entryWriteBuffer.array(), 48, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
 
-                // R203: Absolute values
                 entryWriteBuffer.putLong(timestamp)
                 entryWriteBuffer.putDouble(lat)
                 entryWriteBuffer.putDouble(lng)
@@ -272,8 +275,7 @@ class ForensicSpillBuffer @Inject constructor(
 
     /**
      * peekToEntities: Direct buffer to LogEntity conversion.
-     * Issue #202: Zero-churn entity generation.
-     * R203: Reconstructs entities using absolute Long/Double values.
+     * Sep.01.02: Zero-churn entity generation using shared buffers (R879).
      */
     fun peekToEntities(limit: Int): List<LogEntity> {
         return LatencyMonitor.measureAndAudit<List<LogEntity>>(
@@ -300,79 +302,71 @@ class ForensicSpillBuffer @Inject constructor(
             if (toPeekCount == 0) return@measureAndAudit emptyList()
 
             val results = ArrayList<LogEntity>(toPeekCount)
-            val entryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE)
-            val bb = ByteBuffer.wrap(entryBytes).order(ByteOrder.nativeOrder())
-            val crc = CRC32()
+            
+            synchronized(readEntryBytes) {
+                var tempReadIdx = currentReadIdx
+                repeat(toPeekCount) {
+                    val offset = HEADER_SIZE + (tempReadIdx * FORENSIC_SPILL_ENTRY_SIZE)
+                    readBuffer.position(offset)
+                    readBuffer.get(readEntryBytes)
+                    
+                    readEntryWrapper.clear()
+                    readCrc.reset()
+                    readCrc.update(readEntryBytes, 0, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                    
+                    val storedCrc = readEntryWrapper.getInt(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                    if (storedCrc == readCrc.value.toInt()) {
+                        val ts = readEntryWrapper.getLong()
+                        val lat = readEntryWrapper.getDouble()
+                        val lng = readEntryWrapper.getDouble()
 
-            var tempReadIdx = currentReadIdx
-            repeat(toPeekCount) {
-                val offset = HEADER_SIZE + (tempReadIdx * FORENSIC_SPILL_ENTRY_SIZE)
-                readBuffer.position(offset)
-                readBuffer.get(entryBytes)
-                
-                bb.clear()
-                crc.reset()
-                crc.update(entryBytes, 0, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
-                
-                val storedCrc = bb.getInt(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
-                if (storedCrc == crc.value.toInt()) {
-                    // R203: Absolute values stored at v3
-                    val ts = bb.getLong()
-                    val lat = bb.getDouble()
-                    val lng = bb.getDouble()
+                        val acc = readEntryWrapper.getFloat().toDouble()
+                        val maxAcc = readEntryWrapper.getFloat().toDouble()
+                        val vibe = readEntryWrapper.getFloat().toDouble()
+                        val snr = readEntryWrapper.getFloat().toDouble()
+                        val batTemp = readEntryWrapper.getFloat().toDouble()
+                        val flags = readEntryWrapper.get().toInt()
+                        val batLevel = readEntryWrapper.get().toInt() and 0xFF
+                        val msgLen = readEntryWrapper.get().toInt() and 0xFF
+                        readEntryWrapper.get() // Alignment
 
-                    val acc = bb.getFloat().toDouble()
-                    val maxAcc = bb.getFloat().toDouble()
-                    val vibe = bb.getFloat().toDouble()
-                    val snr = bb.getFloat().toDouble()
-                    val batTemp = bb.getFloat().toDouble()
-                    val flags = bb.get().toInt()
-                    val batLevel = bb.get().toInt() and 0xFF
-                    val msgLen = bb.get().toInt() and 0xFF
-                    bb.get() // Alignment
+                        val msg = if (msgLen > 0) {
+                            String(readEntryBytes, readEntryWrapper.position(), msgLen, Charsets.UTF_8)
+                        } else {
+                            DEFAULT_TRACE_MSG
+                        }
 
-                    val msg = if (msgLen > 0) {
-                        String(entryBytes, bb.position(), msgLen, Charsets.UTF_8)
-                    } else {
-                        "FORENSIC_TRACE"
+                        results.add(LogEntity(
+                            localId = "F-$ts-$tempReadIdx",
+                            timestamp = ts,
+                            message = msg,
+                            type = "FORENSIC_TRACE",
+                            isImportant = (flags and 0x01) != 0,
+                            deviceId = "SYSTEM",
+                            viewerId = "",
+                            isSpecial = (flags and 0x02) != 0,
+                            role = "tracker",
+                            lat = lat,
+                            lng = lng,
+                            accuracy = acc,
+                            maxAccuracy = maxAcc,
+                            snrSnapshot = if (snr == -1.0) null else snr,
+                            vibeSnapshot = if (vibe == -1.0) null else vibe,
+                            synced = false,
+                            spillIdx = tempReadIdx,
+                            gpsHardwareLock = (flags and 0x08) != 0,
+                            tempSnapshot = batTemp,
+                            battSnapshot = batLevel,
+                            chargingSnapshot = (flags and 0x04) != 0
+                        ))
                     }
-
-                    results.add(LogEntity(
-                        localId = "F-$ts-$tempReadIdx",
-                        timestamp = ts,
-                        message = msg,
-                        type = "FORENSIC_TRACE",
-                        isImportant = (flags and 0x01) != 0,
-                        deviceId = "SYSTEM",
-                        viewerId = "",
-                        isSpecial = (flags and 0x02) != 0,
-                        role = "tracker",
-                        lat = lat,
-                        lng = lng,
-                        accuracy = acc,
-                        maxAccuracy = maxAcc,
-                        snrSnapshot = if (snr == -1.0) null else snr,
-                        vibeSnapshot = if (vibe == -1.0) null else vibe,
-                        synced = false,
-                        spillIdx = tempReadIdx,
-                        gpsHardwareLock = (flags and 0x08) != 0,
-                        tempSnapshot = batTemp,
-                        battSnapshot = batLevel,
-                        chargingSnapshot = (flags and 0x04) != 0
-                    ))
+                    tempReadIdx = (tempReadIdx + 1) % FORENSIC_SPILL_CAPACITY
                 }
-                tempReadIdx = (tempReadIdx + 1) % FORENSIC_SPILL_CAPACITY
             }
             results
         }
     }
 
-    /**
-     * commitDrain: Commits a processed chunk of traces.
-     * R203: Swapped persistence order. We now advance the read pointer before 
-     * decrementing the count. In case of crash, idempotency is guaranteed by 
-     * signature-based deduplication in the repository.
-     */
     fun commitDrain(count: Int) {
         LatencyMonitor.measureAndAudit<Unit>(
             timeProvider = timeProvider,

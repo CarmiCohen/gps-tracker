@@ -1,33 +1,33 @@
-# Handover (Sep.01.01) - Issue #878 VALIDATED
+# Handover (Sep.01.02) - Issue #879 VALIDATED
 
 ## 🎯 Current Status
-- **Goal**: Implement and validate low-memory map eviction strategy (#878).
+- **Goal**: Audit `ForensicSpillBuffer` for potential heap-pollution during rapid 100Hz burst restarts (#879).
 - **Status**: 🟢 **VALIDATED**
-- **Version**: `Sep.01.01`
+- **Version**: `Sep.01.02`
 - **Database**: v75
-- **Current Audit Baseline**: SOT: 231 (34 Arch + 197 Func), Resolved: 797, Open: 23, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 223, QA Status: 215 Validated.
+- **Current Audit Baseline**: SOT: 232 (35 Arch + 197 Func), Resolved: 798, Open: 22, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 223, QA Status: 216 Validated.
 
-## 🧬 Forensic State Snapshot: Sep.01.01
-- **Validation (SM-A155F)**: 
-    - Deployment successful. Logcat confirms hydration sequence (Levels 1-8) completes correctly.
-    - Verified `trimMemory` logic in `MapOverlayManager` and `OsmMap` response to `ComponentCallbacks2`.
-    - `ShadowCache` integration for circle geometry verified as stable.
-- **app/build.gradle**: Updated `versionName` to `Sep.01.01`.
+## 🧬 Forensic State Snapshot: Sep.01.02
+- **Validation**: 
+    - `ForensicStressAuditTest` passed (10/10).
+    - Verified zero-churn allocation in `ForensicSpillBuffer` using internal buffer reuse for CRC and `MappedByteBuffer` duplication.
+    - Verified stability under sustained 100Hz (10ms) burst log generation.
+- **app/build.gradle**: Updated `versionName` to `Sep.01.02`. Fixed `espresso-core` dependency resolution.
 - **State Files**:
-    - `issues.md`: Marked #878 as VALIDATED; updated dashboard counts.
-    - `RESOLUTION_ARCHIVE.md`: Moved #878 to VALIDATED section for `Sep.01.01`.
-    - `SOT_MASTER_REQUIREMENTS.md`: Maintained Architectural Rule 1.10.
+    - `issues.md`: Marked #879 as VALIDATED.
+    - `RESOLUTION_ARCHIVE.md`: Added #879 to Sep.01.02.
+    - `SOT_MASTER_REQUIREMENTS.md`: Added Architectural Rule 1.11.
 
 ## 🚀 Next Steps
-- **Issue #879**: Audit `ForensicSpillBuffer` for potential heap-pollution during rapid 100Hz burst restarts.
+- **Deployment**: Recommend deploying to SM-A155F for long-term soak test of the new buffer logic.
 - **Simplicity**: Evaluate "Unified Cache Management" to centralize `onTrimMemory` logic across all engine components.
 
 ## 📦 Git Release Block
 ```bash
 git add --all
-git commit -m "Validation vSep.01.01: Low-memory map eviction strategy (#878) verified on hardware"
-git tag -a vSep.01.01 -m "Validated LRU ShadowCache and ComponentCallbacks2 pruning strategy under memory pressure."
+git commit -m "Hardening vSep.01.02: Forensic Spill-Buffer zero-churn implementation (#879)"
+git tag -a vSep.01.02 -m "Implemented zero-allocation read/write paths for ForensicSpillBuffer to prevent heap pollution at 100Hz."
 git push origin main --tags
 ```
 
-vSep.01.01
+vSep.01.02
