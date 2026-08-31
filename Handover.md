@@ -1,31 +1,31 @@
-# Handover (Sep.01.04) - Issue #880 RESOLVED
+# Handover (Sep.01.05) - Issue #880 VALIDATED
 
 ## 🎯 Current Status
-- **Goal**: Remediate Hydration Davey stall (#880) identified during vSep.01.03 deployment.
-- **Status**: 🟢 **Issue #880 RESOLVED**
-- **Version**: `Sep.01.04`
+- **Goal**: Finalize hardware validation for Hydration Davey remediation (#880).
+- **Status**: 🟢 **Issue #880 VALIDATED**
+- **Version**: `Sep.01.05`
 - **Database**: v75
-- **Current Audit Baseline**: SOT: 232 (35 Arch + 197 Func), Resolved: 799, Open: 22, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 224, QA Status: 216 Validated.
+- **Current Audit Baseline**: SOT: 232 (35 Arch + 197 Func), Resolved: 800, Open: 22, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 224, QA Status: 217 Validated.
 
-## 🧬 Forensic State Snapshot: Sep.01.04
-- **Validation**: 
-    - `LifecycleHydrationManager`: Increased map hydration delays to 600ms for A15 hardware.
-    - `MapOverlayManager`: Implemented "High-Granularity Yielding" (batch size ≤ 2) and intra-position yields.
-    - SOT Rule 2.1 updated to enforce batch size ≤ 2 for hydration logic.
+## 🧬 Forensic State Snapshot: Sep.01.05
+- **Validation Results**: 
+    - Hardware Deployment (SM-A155F): Cold start hydration completed without frame drops. Logcat confirmed zero-Davey status (>700ms) across all 8 levels.
+    - Performance: High-granularity yielding (batch size 2) maintained main-thread availability despite intensive map initialization.
 - **Hardening**: 
-    - Versioned to `Sep.01.04`.
-    - Moved Issue #880 to Resolved in `issues.md` and `RESOLUTION_ARCHIVE.md`.
+    - Incremented version to `Sep.01.05`.
+    - Updated `issues.md` and `RESOLUTION_ARCHIVE.md` to reflect full hardware validation.
+    - SOT Rule 2.1 finalized to mandate batch size ≤ 2 for staggered hydration.
 
 ## 🚀 Next Steps
-- **Monitoring**: Perform fresh deployment on SM-A155F to verify zero-Davey status under cold start conditions.
-- **Cleanup**: Evaluate if `BUDGET_THROTTLE_MS` in `MapOverlayManager` can be dynamically adjusted based on measured frame time.
+- **Performance Hardening**: Monitor for potential regressions in `MapOverlayManager` if dataset size increases significantly (>500 items).
+- **Simplification**: Investigate if the 600ms hydration delay can be reduced on high-end hardware while keeping it at 600ms for A15-class devices.
 
 ## 📦 Git Release Block
 ```bash
 git add --all
-git commit -m "Remediation vSep.01.04: Resolved Hydration Davey (#880) via High-Granularity Yielding"
-git tag -a vSep.01.04 -m "Validated High-Granularity Yielding (batch size 2). Eliminated 751ms hydration stall on SM-A155F. Updated SOT Rule 2.1."
+git commit -m "Validation vSep.01.05: Hardware validation of Hydration Davey fix (#880)"
+git tag -a vSep.01.05 -m "Hardware validated zero-Davey status on SM-A155F. Batch size 2 yielding confirmed effective. Finalized SOT Rule 2.1."
 git push origin main --tags
 ```
 
-vSep.01.04
+vSep.01.05
