@@ -2,6 +2,12 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Aug.31.06 (vAug.31.06)
+*   **Issue #873 Validated**: **Repetitive getPackageName Log Spam (R759 violation)**. Overrode `getPackageName()` in `GpsApplication` to return the shadow-cache value.
+    *   **Shadow-Cache Enforcement**: Ensured that all system service calls (e.g., `AppOpsManager`, `Settings`) using the `ApplicationContext` bypass redundant native IPC lookups.
+    *   **Diagnostic Log Suppression**: Confirmed that the fix effectively silences Samsung-specific diagnostic logs on A15 hardware, reducing Binder overhead and Logcat saturation.
+    *   **Architectural Alignment**: Updated **Rule 1.9 (R759)** to mandate the `getPackageName()` override as the authoritative caching pattern for system identifiers.
+
 ## 🟢 Aug.31.05 (vAug.31.05)
 *   **Issue #810-M Validated**: **Acoustic Floor Calibration Audit**. Verified adaptive floor recovery logic via `AcousticCalibrationTest`.
     *   **Recovery Verification**: Confirmed that the floor correctly recovers from 90dB saturation to the 50dB baseline within expected forensic timeframes.
@@ -19,19 +25,6 @@ This document archives all resolved issues and architectural refinements.
     *   **Integrity Monitoring**: Updated `IntegrityMonitor.kt` to observe `isUltraLongStationaryFlow` from `HardwareProvider`, enabling local health state synchronization (R765).
     *   **Forensic Mapping**: Hardened `TelemetryUseCase.kt` and `HistoryManager.kt` to carry the relaxation flag across all ingestion and persistence paths (R778).
     *   **Service Coordination**: Updated `TrackerService.kt` to propagate the definitive hardware state to both the signaling pipeline (Viewer HUD) and the analytical history streams (Ribbons).
-
-## 🟢 Aug.31.02 (vAug.31.02)
-*   **Issue #782 Validated**: **UI Performance Hardening (History Sampling)**. Hardened the forensic ribbon pipeline in `MainViewModel.kt` to ensure Davey immunity during high-frequency stress scenarios.
-    *   **Throttling**: Integrated the `sample()` operator into all forensic history flows (`history4MFlow` through `history7DFlow`).
-    *   **Hardware Baseline**: Applied a 3000ms sampling window for Samsung A15 hardware and 1000ms for standard hardware, eliminating Main-thread congestion during synthetic DB saturation (R650, R312).
-    *   **SOT Integration**: Added Architectural Rule **2.11 (History Sampling Authority)** to mandate flow-throttling for high-density UI components.
-
-## 🟢 Aug.31.00 (vAug.31.00)
-*   **Issue #782 Resolved**: **Protocol Audit - Binary Schema Expansion & Forensic Audit**. Expanded the `RealtimeStatus` Protobuf schema to carry `violationUptimeMs` and `isUltraLongStationary`.
-    *   **Binary Hardening**: Updated `TrackerStatus.writeTo` and `toMap` in `Models.kt` to serialize expanded metrics.
-    *   **Database v75 Migration**: Implemented `MIGRATION_74_75` to add violation metrics to `pending_status_updates` and `connection_history`.
-    *   **Forensic Mapping**: Hardened `TelemetryMapper.kt` history mapping functions to ensure full state parity during historical replay and analytical ribbon rendering.
-    *   **UI Transparency**: Integrated `[ULTRA]` status badges into the Dashboard and StatusBar to provide deterministic feedback for low-power GNSS relaxation modes (R782).
 
 ---
 *For historical entries, see [docs_history_archive.md](docs_history_archive.md) or Git logs.*

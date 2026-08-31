@@ -1,4 +1,4 @@
-# SOT Master Requirements (Aug.31.05)
+# SOT Master Requirements (Aug.31.06)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -13,7 +13,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.6 Monotonic Authority (R307)**: All maintenance durations and health-check silence detections must prioritize monotonic references (`elapsedRealtime`) to prevent wall-clock corruption during reboots or system time jumps (R307).
 *   **1.7 Single Source of Truth**: All system state (Health, Location, Alarms) must be centralized in repositories and propagated via Flows (R117).
 *   **1.8 Lifecycle Synchronization (R738/R742/R744-R757/R767/R775)**: **MANDATORY**. Hardware managers (GPS, Sensors, Network, GNSS) must use `ManagedHardware` abstractions for synchronous, trace-logged unregistration. Listener unregistration MUST be processed on the dedicated hardware thread (or Main Looper for OS callbacks) before termination, using synchronous synchronization (e.g., CountDownLatch or task awaiting) to ensure native disposal finishes. **Fallback Direct Unregistration (R767)**: If the target looper/thread is unresponsive or terminated during shutdown, managers MUST attempt immediate direct unregistration to prevent native `BaseEventQueue` leaks. **Zero-Raw-Unregistration (R775)**: Manual unregistration via `sensorManager.unregisterListener` outside the `ManagedHardware` flow is prohibited. (Updated Aug.30.05).
-*   **1.9 IPC Optimization (R759)**: High-frequency lookups of system identifiers (e.g., Package Name, UID) must utilize `GpsApplication` shadow-caches (e.g., `PACKAGE_NAME`, `MY_UID`) to prevent repetitive IPC calls and associated OS-level diagnostic log spam on Samsung hardware. (Updated Aug.30.08).
+*   **1.9 IPC Optimization (R759)**: High-frequency lookups of system identifiers (e.g., Package Name, UID) must utilize `GpsApplication` shadow-caches (e.g., `PACKAGE_NAME`, `MY_UID`). **Overriding getPackageName()** in the Application class is mandatory to ensure all system service calls using the context bypass repetitive IPC-triggered diagnostic logs on Samsung hardware. (Updated Aug.31.06).
 *   **1.10 Dependency Injection**: Hilt is the sole authority for dependency management. Manual instantiation of repositories or DAOs is prohibited.
 *   **1.11 Monotonic Time**: Use `elapsedRealtime` for all interval and duration logic to survive clock regressions and drift (R116).
 *   **1.12 Telemetry Mapping Authority (R761)**: To ensure SRP and avoid logic duplication, all property transformations between Engine models (e.g., EngineConnectionPoint) and App models (e.g., ConnectionPoint) must be centralized in `TelemetryMapper.kt`. Managers and Services are prohibited from performing direct property mapping. (Updated Aug.29.05).
@@ -49,6 +49,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 ---
 
 ## 🧬 Change History (Recent)
+*   **Aug.31.06**: Repetitive getPackageName Log Spam Hardening (#873 Validated). Overrode getPackageName() in GpsApplication to ensure shadow-cache enforcement across all system service calls (R759).
 *   **Aug.31.05**: Acoustic Floor Calibration Audit (#810-M Validated). Verified adaptive floor recovery logic via AcousticCalibrationTest. Confirmed correct recovery from saturation to 50dB baseline.
 *   **Aug.31.04**: Forensic Replay & Metadata Hardening (#779 Validated). Extended ForensicSanitizer to telemetry mapping and historical audit layers (R779).
 *   **Aug.31.03**: Ultra-Long Stationary State Hardening (#762 Validation). Hardened end-to-end propagation of isUltraLongStationary across IntegrityMonitor, TelemetryUseCase, and HistoryManager to ensure definitive badge transparency (R765, R778).
@@ -113,7 +114,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R232**: PhoneSetup button clipping remediation.
 *   **R240**: Centralized UI state aggregation (UiStateAggregator).
 *   **R243**: Automated recovery to previous active mode (<2s).
-*   **R246**: Forensic pipeline range-deduplication and hysteresis.
+*   **R246**: Forensic pipeline range-deduplication and heartbeat.
 *   **R247**: Sensor sensitivity sliders and SOT parity.
 *   **R248**: Segmented hydration flows for budget hardware.
 *   **R250**: Navigation backstack continuity (popUpTo/launchSingleTop).

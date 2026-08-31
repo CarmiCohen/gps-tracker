@@ -1,32 +1,30 @@
-# Handover (Aug.31.05) - Acoustic Calibration Audit & Recovery Hardening
+# Handover (Aug.31.06) - System Identifier Hardening & Performance Audit
 
 ## 🎯 Current Status
-- **Goal**: Acoustic Floor Calibration Audit (R810-M) - Verification of Adaptive Recovery.
+- **Goal**: Repetitive `getPackageName` Log Spam Remediation (R759) - SM-A155F.
 - **Status**: 🟢 **COMPLETE**
-- **Version**: `Aug.31.05`
+- **Version**: `Aug.31.06`
 - **Database**: v75 (Hardened)
-- **Current Audit Baseline**: SOT: 230 (34 Arch + 196 Func), Resolved: 788 (Acoustic Floor Recovery), Open: 25, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 217, QA Status: 212 Validated.
+- **Current Audit Baseline**: SOT: 230 (34 Arch + 196 Func), Resolved: 789 (Shadow-Cache Enforcement), Open: 26, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 219, QA Status: 212 Validated.
 
-## 🧬 Implementation Summary: Aug.31.05
-- **Acoustic Floor Calibration (Issue #810-M)**:
-    - **AcousticCalibrationTest.kt**: Created a comprehensive test suite to verify adaptive floor behavior.
-    - **Saturation Recovery**: Confirmed that the floor correctly climbs to track high-decibel ambient noise (90dB saturation) and recovers to the `ACOUSTIC_FLOOR_MIN_DB` (50dB) baseline within forensic timeframes.
-    - **Contraction Verification**: Validated that the time-based contraction logic in `LocationSentinel` ensures floor recovery even during monitoring duty-cycle off-periods.
-- **Documentation & Tracking**: 
-    - Synchronized `SOT_MASTER_REQUIREMENTS.md`, `QA_VALIDATION_STATUS.md` (via issues.md), `RESOLUTION_ARCHIVE.md`, and `RELEASE_HISTORY.md` to reflect version `Aug.31.05`.
-    - Updated `Simplify_Ideas2.md` with potential optimization for acoustic contraction (linear approximation).
-- **Build Integrity**: Verified version `Aug.31.05` with a successful Gradle build (`app:assembleDebug`).
+## 🧬 Implementation Summary: Aug.31.06
+- **System Identifier Hardening (Issue #873)**:
+    - **GpsApplication.kt**: Overrode `getPackageName()` to return the `PACKAGE_NAME` shadow-cache value. This ensures all components and system services (e.g., `AppOpsManager`, `Settings`) using the application context bypass redundant IPC calls.
+    - **R759 Enforcement**: Updated the SOT Architectural Master Rules to mandate this override as the primary pattern for identifier caching.
+- **Performance Risk Identification**:
+    - **Issue #874**: Identified a 1137ms frame stall (Davey) during "Level 7 (Map Fully Hydrated)" on the Samsung A15. This exceeds the 700ms threshold (R2.7) and requires segmentation.
+- **Build Integrity**: Verified version `Aug.31.06` with a successful Gradle build (`app:assembleDebug`).
 
 ## 🚀 Next Steps
-- **MainViewModel Boilerplate Reduction**: Evaluate consolidating the 6 history scale flows (4M to 7D) into a single map-based StateFlow if the UI can be refactored to consume a keyed subscription.
-- **Urban Multipath Resilience Audit**: Verify that the SNR-based anchor lock (R201) correctly handles "low-speed drift" in deep urban canyons where GPS accuracy is <15m but jitter is high.
+- **Issue #874 Remediation**: Further segment the Map Engine hydration (Levels 6-7) to ensure the 700ms fluidity limit is respected on budget hardware.
+- **MainViewModel Boilerplate Reduction**: Consolidate history scale flows into a map-based StateFlow.
 
 ## 📦 Git Release Block
 ```bash
 git add --all
-git commit -m "Release vAug.31.05: Verified Acoustic Floor Recovery & Calibration Audit (R810-M)"
-git tag -a vAug.31.05 -m "Validated adaptive acoustic floor recovery logic. Implemented AcousticCalibrationTest suite. Confirmed forensic recovery from 90dB saturation to 50dB baseline. Updated SOT and versioning."
+git commit -m "Release vAug.31.06: Hardened getPackageName Shadow-Cache Enforcement (R759)"
+git tag -a vAug.31.06 -m "Overrode getPackageName() in GpsApplication to enforce shadow-cache across all system service calls. Silenced Samsung-specific diagnostic log spam. Updated SOT and versioning."
 git push origin main --tags
 ```
 
-vAug.31.05
+vAug.31.06
