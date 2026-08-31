@@ -49,16 +49,44 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Sep.01.11:
+ * - Issue #883 Remediation: Refactored StatusRowData to use stable StatusRowState 
+ *   to reduce JIT compilation overhead and remediate the 1074ms Davey stall (R2.1).
  * Aug.29.13:
  * - Concern #766: Enforced LTR direction in StatusBar to fix layout flipping 
  *   on RTL locales and increased width allocation for pending reason text 
  *   to prevent truncation (R766).
- * Aug.29.11:
- * - UI Refinement: Added visual indicator for Ultra-Long Stationary state 
- *   in StatusBar and HUD (R765).
  */
 
 enum class RibbonRenderType { BAR, LINE }
+
+/**
+ * StatusRowState: Grouped state for StatusRowData to reduce JIT compilation load (R883).
+ */
+@Stable
+data class StatusRowState(
+    val label: String,
+    val battery: Int,
+    val commIndex: Int,
+    val color: Color,
+    val isCharging: Boolean = false,
+    val accuracy: Float = 0f,
+    val maxAccuracy: Float = 0f,
+    val satsView: Int = 0,
+    val satsUsed: Int = 0,
+    val gpsAgeMs: Long = -1L,
+    val temp: Float = 0f,
+    val distance: Double? = null,
+    val horizontalPadding: androidx.compose.ui.unit.Dp = 1.dp,
+    val isRemote: Boolean = false,
+    val isPeerActive: Boolean = true,
+    val overrideDistanceColor: Color? = null,
+    val isLocPending: Boolean = false,
+    val locPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    val isTelemetryFresh: Boolean = true,
+    val isGpsFresh: Boolean = true,
+    val isUltraLongStationary: Boolean = false
+)
 
 @Composable
 fun RibbonsOverlay(
@@ -585,7 +613,7 @@ fun GlobalStatusBar(
         isTrackerGpsActive = isTrackerGpsActive, 
         mode = mode, 
         battery = hudState.battery, 
-        lastP = (hudState.progressPulse * TELEMETRY_UI_STALE_THRESHOLD_MS).toLong(), // Reconstruct relative p for legacy StatusBar logic if needed, or pass absolute
+        lastP = (hudState.progressPulse * TELEMETRY_UI_STALE_THRESHOLD_MS).toLong(), 
         commIndex = hudState.commIndex, 
         remoteCommIndex = hudState.remoteCommIndex, 
         remoteBattery = if (mode == "viewer") hudState.remoteBattery else -1, 
@@ -644,10 +672,7 @@ fun StatusBar(
     isGpsFresh: Boolean = true,
     isUltraLongStationary: Boolean = false
 ) {
-    // Legacy mapping: lastP was treated as "last packet timestamp", but in GlobalStatusBar we passed a value derived from progressPulse.
-    // We adjust here to maintain consistent visual progress.
     val progressValue = if (lastP > 0) maxOf(0f, minOf(1f, lastP.toFloat() / TELEMETRY_UI_STALE_THRESHOLD_MS)) else 0f
-
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val trkIdLabel = trackerId.take(6).uppercase()
@@ -688,50 +713,48 @@ fun StatusBar(
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                         val vAge = if(viewerGpsTs > 0) now - viewerGpsTs else -1L
                         Box(modifier = Modifier.weight(1f)) { 
-                            StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = vAge, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS) 
+                            StatusRowData(StatusRowState(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = vAge, isRemote = false, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS)) 
                         }
                         val tAge = if(lastGpsTs > 0) now - lastGpsTs else -1L
                         Box(modifier = Modifier.weight(1f)) { 
-                            StatusRowData(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = isTelemetryFresh, isGpsFresh = isGpsFresh, isUltraLongStationary = isUltraLongStationary) 
+                            StatusRowData(StatusRowState(label = trkIdLabel, battery = battery, commIndex = if(isPeerActive) remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = remoteCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = isTelemetryFresh, isGpsFresh = isGpsFresh, isUltraLongStationary = isUltraLongStationary)) 
                         }
                     }
                 } else {
                     if (mode == "viewer") {
                         val vAge = if(viewerGpsTs > 0) now - viewerGpsTs else -1L
-                        StatusRowData(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = vAge, horizontalPadding = 8.dp, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS)
+                        StatusRowData(StatusRowState(label = viewIdLabel, battery = battery, commIndex = commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = isCharging, accuracy = viewerAccuracy, maxAccuracy = maxViewerAccuracy, temp = viewerTemp, distance = distToViewer, satsUsed = viewerSatsUsed, satsView = viewerSatsView, gpsAgeMs = vAge, horizontalPadding = 8.dp, isLocPending = isViewerLocPending, locPendingReason = viewerLocPendingReason, isTelemetryFresh = viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS))
                         Spacer(modifier = Modifier.height(3.dp))
                     }
                     val tAge = if(lastGpsTs > 0) now - lastGpsTs else -1L
-                    StatusRowData(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = if (mode == "tracker") (viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isTelemetryFresh, isGpsFresh = isGpsFresh, isUltraLongStationary = isUltraLongStationary)
+                    StatusRowData(StatusRowState(label = trkIdLabel, battery = if (mode == "viewer") remoteBattery else battery, commIndex = if (mode == "viewer") (if(isPeerActive) remoteCommIndex else 0) else commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") remoteCharging else isCharging, accuracy = trackerAccuracy, maxAccuracy = maxTrackerAccuracy, satsView = satsView, satsUsed = satsUsed, gpsAgeMs = tAge, temp = trackerTemp, distance = distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = isTrackerLocPending, locPendingReason = trackerLocPendingReason, isTelemetryFresh = if (mode == "tracker") (viewerGpsTs > 0 && (now - viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isTelemetryFresh, isGpsFresh = isGpsFresh, isUltraLongStationary = isUltraLongStationary))
                 }
             }
         }
     }
 }
 
+/**
+ * Issue #883: Refactored to StatusRowState to group 22 parameters and reduce JIT 
+ * compilation load during Level 8 hydration.
+ */
 @Composable
-fun StatusRowData(
-    label: String, battery: Int, commIndex: Int, color: Color, isCharging: Boolean = false, accuracy: Float = 0f, maxAccuracy: Float = 0f, 
-    satsView: Int = 0, satsUsed: Int = 0, gpsAgeMs: Long = -1L, temp: Float = 0f, distance: Double? = null, horizontalPadding: androidx.compose.ui.unit.Dp = 1.dp,
-    isRemote: Boolean = false, isPeerActive: Boolean = true, overrideDistanceColor: Color? = null, 
-    isLocPending: Boolean = false, locPendingReason: LocationPendingReason = LocationPendingReason.NONE, isTelemetryFresh: Boolean = true, isGpsFresh: Boolean = true,
-    isUltraLongStationary: Boolean = false
-) {
+fun StatusRowData(state: StatusRowState) {
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-    val isConnStale = isRemote && !isPeerActive
-    val telemetryColor = if (isTelemetryFresh && !isConnStale) color else Slate500
-    val contentColor = if (isConnStale) Slate500 else color
-    val distColor = if (isTelemetryFresh && !isConnStale) (overrideDistanceColor ?: color) else Slate500
+    val isConnStale = state.isRemote && !state.isPeerActive
+    val telemetryColor = if (state.isTelemetryFresh && !isConnStale) state.color else Slate500
+    val contentColor = if (isConnStale) Slate500 else state.color
+    val distColor = if (state.isTelemetryFresh && !isConnStale) (state.overrideDistanceColor ?: state.color) else Slate500
     val infiniteTransition = rememberInfiniteTransition(label = "HandshakeAnimations")
     val handshakeAlpha by infiniteTransition.animateFloat(0.3f, 1f, infiniteRepeatable(tween(1200), repeatMode = RepeatMode.Reverse), label = "HandshakeAlpha")
-    val animatedBattery by animateIntAsState(battery, tween(1500), label = "BatteryAnim")
+    val animatedBattery by animateIntAsState(state.battery, tween(1500), label = "BatteryAnim")
 
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = horizontalPadding), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = state.horizontalPadding), verticalAlignment = Alignment.CenterVertically) {
         Row(modifier = Modifier.width(204.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(modifier = Modifier.width(42.dp), verticalAlignment = Alignment.CenterVertically) {
                  val alpha by animateFloatAsState(if (isConnStale) 0.5f else 1f, label = "LabelAlpha")
-                 Text(text = label, color = contentColor.copy(alpha = if (isConnStale) handshakeAlpha else alpha), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                 if (isLocPending) Box(modifier = Modifier.padding(start = 1.dp).background(Amber500, RoundedCornerShape(1.dp)).padding(horizontal = 1.dp)) { 
+                 Text(text = state.label, color = contentColor.copy(alpha = if (isConnStale) handshakeAlpha else alpha), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 if (state.isLocPending) Box(modifier = Modifier.padding(start = 1.dp).background(Amber500, RoundedCornerShape(1.dp)).padding(horizontal = 1.dp)) { 
                      Text(text = "P", color = Color.Black, fontSize = 7.sp, fontWeight = FontWeight.Bold, style = compactStyle) 
                  }
             }
@@ -741,45 +764,45 @@ fun StatusRowData(
             } else {
                 Row(modifier = Modifier.width(54.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.width(10.dp)) { 
-                        if (isCharging) Icon(imageVector = Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(10.dp), tint = if(!isConnStale && isTelemetryFresh) Amber500 else Slate500) 
+                        if (state.isCharging) Icon(imageVector = Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(10.dp), tint = if(!isConnStale && state.isTelemetryFresh) Amber500 else Slate500) 
                     }
-                    Icon(imageVector = if (isCharging) Icons.Default.BatteryChargingFull else Icons.Default.BatteryFull, contentDescription = null, modifier = Modifier.size(10.dp), tint = if (isConnStale || !isTelemetryFresh) Slate500 else if (battery in 0..19) Rose500 else telemetryColor)
-                    Spacer(modifier = Modifier.width(2.dp)); Text(text = if(battery >= 0) "$animatedBattery%" else "--%", color = telemetryColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
+                    Icon(imageVector = if (state.isCharging) Icons.Default.BatteryChargingFull else Icons.Default.BatteryFull, contentDescription = null, modifier = Modifier.size(10.dp), tint = if (isConnStale || !state.isTelemetryFresh) Slate500 else if (state.battery in 0..19) Rose500 else telemetryColor)
+                    Spacer(modifier = Modifier.width(2.dp)); Text(text = if(state.battery >= 0) "$animatedBattery%" else "--%", color = telemetryColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                 }
                 Row(modifier = Modifier.width(22.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(text = "°", color = telemetryColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = (-2).dp), style = compactStyle)
-                    Text(text = String.format(Locale.getDefault(), "%.0f", temp), color = telemetryColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
+                    Text(text = String.format(Locale.getDefault(), "%.0f", state.temp), color = telemetryColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                 }
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.width(20.dp)) { CommBar(index = commIndex, color = if (isTelemetryFresh) contentColor else Slate500) }
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.width(20.dp)) { CommBar(index = state.commIndex, color = if (state.isTelemetryFresh) contentColor else Slate500) }
                 Spacer(modifier = Modifier.width(4.dp))
-                Box(modifier = Modifier.width(34.dp)) { Text(text = "$satsUsed/$satsView", color = telemetryColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) }
+                Box(modifier = Modifier.width(34.dp)) { Text(text = "${state.satsUsed}/${state.satsView}", color = telemetryColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) }
                 Box(modifier = Modifier.width(26.dp)) {
-                    val ageStr = if (gpsAgeMs != -1L) { val ageSec = (maxOf(0L, gpsAgeMs) / 1000).toInt(); when { ageSec < 100 -> "${ageSec}s"; ageSec < 3600 -> "${ageSec/60}m"; else -> ">1h" } } else "--s"
-                    Text(text = ageStr, color = if (!isGpsFresh) Slate500 else color, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
+                    val ageStr = if (state.gpsAgeMs != -1L) { val ageSec = (maxOf(0L, state.gpsAgeMs) / 1000).toInt(); when { ageSec < 100 -> "${ageSec}s"; ageSec < 3600 -> "${ageSec/60}m"; else -> ">1h" } } else "--s"
+                    Text(text = ageStr, color = if (!state.isGpsFresh) Slate500 else state.color, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                 }
             }
         }
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
             if (!isConnStale) {
-                if (isUltraLongStationary) {
+                if (state.isUltraLongStationary) {
                     Box(modifier = Modifier.background(BrandJd.copy(alpha = 0.2f), RoundedCornerShape(2.dp)).padding(horizontal = 2.dp)) {
                         Text(text = "[ULTRA]", color = BrandJd, fontSize = 8.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, style = compactStyle)
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                 }
 
-                if (isLocPending && locPendingReason != LocationPendingReason.NONE) {
-                    Text(text = locPendingReason.name.replace("_", " "), color = Amber500, fontSize = 8.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, maxLines = 1, softWrap = false, overflow = TextOverflow.Visible, modifier = Modifier.weight(1f, fill = false), textAlign = TextAlign.End, style = compactStyle)
+                if (state.isLocPending && state.locPendingReason != LocationPendingReason.NONE) {
+                    Text(text = state.locPendingReason.name.replace("_", " "), color = Amber500, fontSize = 8.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, maxLines = 1, softWrap = false, overflow = TextOverflow.Visible, modifier = Modifier.weight(1f, fill = false), textAlign = TextAlign.End, style = compactStyle)
                 } else {
                     fun formatAcc(v: Float): String = when { v >= 10000f -> "${(v / 1000).toInt()}k"; v >= 1000f -> String.format(Locale.getDefault(), "%.1fk", v / 1000f); else -> v.toInt().toString() }
-                    val accColor = if (isTelemetryFresh) (if (!isGpsFresh) Slate500 else color) else Slate500
-                    val accText = "${if (accuracy > 0) "±${formatAcc(accuracy)}" else ""} ${if (maxAccuracy > 0) "(±${formatAcc(maxAccuracy)})" else ""}".trim()
+                    val accColor = if (state.isTelemetryFresh) (if (!state.isGpsFresh) Slate500 else state.color) else Slate500
+                    val accText = "${if (state.accuracy > 0) "±${formatAcc(state.accuracy)}" else ""} ${if (state.maxAccuracy > 0) "(±${formatAcc(state.maxAccuracy)})" else ""}".trim()
                     if (accText.isNotEmpty()) Text(text = accText, color = accColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false), textAlign = TextAlign.End, style = compactStyle)
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Box(contentAlignment = Alignment.CenterEnd, modifier = Modifier.width(62.dp)) {
-                    val animatedDistance by animateFloatAsState(if (distance == null || distance.isNaN()) 0f else distance.toFloat(), tween(1200), label = "DistAnim")
-                    val distStr = when { distance == null || distance.isNaN() -> "--"; animatedDistance >= 9000 -> String.format(Locale.getDefault(), "%.0fkm", animatedDistance / 1000.0); animatedDistance >= 1000 -> String.format(Locale.getDefault(), "%.1fkm", animatedDistance / 1000.0); else -> "${animatedDistance.toInt()}m" }
+                    val animatedDistance by animateFloatAsState(if (state.distance == null || state.distance.isNaN()) 0f else state.distance.toFloat(), tween(1200), label = "DistAnim")
+                    val distStr = when { state.distance == null || state.distance.isNaN() -> "--"; animatedDistance >= 9000 -> String.format(Locale.getDefault(), "%.0fkm", animatedDistance / 1000.0); animatedDistance >= 1000 -> String.format(Locale.getDefault(), "%.1fkm", animatedDistance / 1000.0); else -> "${animatedDistance.toInt()}m" }
                     Text(text = distStr, color = distColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1, style = compactStyle, textAlign = TextAlign.End)
                 }
             }

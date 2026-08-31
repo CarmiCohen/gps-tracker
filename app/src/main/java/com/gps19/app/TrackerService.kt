@@ -21,13 +21,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.01.11:
+ * - Issue #884 Remediation: Hardened JdHardwareManager initialization. 
+ *   Native init is now sequential on A15 devices to prevent Monitor::Inflate 
+ *   installation failures during GNSS registration (R884).
  * Aug.31.03:
  * - Issue #762 Validation: Propagated isUltraLongStationary from IntegrityMonitor 
  *   to connectivitySuite and historyManager to ensure badge transparency 
  *   and ribbon parity (R765, R778).
- * Aug.29.09:
- * - Issue #764 Simplification: Updated calculateGpsInterval call to pass 
- *   HardwareCapabilities directly (R764).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -91,15 +92,14 @@ class TrackerService : BaseMonitorService() {
         
         refreshCapabilitiesInternal()
 
+        // Issue #884: Sequential initialization on A15 to prevent inflation failures.
         if (capabilities.isA15Device) {
-             lifecycleScope.launch(Dispatchers.Default) {
-                 val success = JdHardwareManager.initialize(timeProvider, configManager.deviceId)
-                 if (success) {
-                    logManager.logServiceEvent("HARDWARE: libjdHardware initialized successfully.", isImportant = true)
-                 } else {
-                    logManager.logServiceEvent("HARDWARE: libjdHardware initialization failed.", isImportant = true)
-                 }
-             }
+            val success = JdHardwareManager.initialize(timeProvider, configManager.deviceId)
+            if (success) {
+                logManager.logServiceEvent("HARDWARE: libjdHardware initialized successfully.", isImportant = true)
+            } else {
+                logManager.logServiceEvent("HARDWARE: libjdHardware initialization failed.", isImportant = true)
+            }
         }
 
         observeAlarmEvents()
@@ -284,7 +284,7 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.WatchdogTrigger -> { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
                     is CommandEvent.UiPulse -> { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
-                    is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
+                    is CommandEvent.TransientDrop -> transientDropDetected.get(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); hardwareProvider.start() }
                     is CommandEvent.ExecuteStressTest -> executeAutomatedStressTest()
@@ -536,7 +536,7 @@ class TrackerService : BaseMonitorService() {
         }
 
         historyManager.updateRibbons(
-            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = if (isViewerActive && location != null) 10 else 0, peerAvail = isSocketConnected && isViewerActive, hasGps = location != null, isTrackerMode = true, accuracy = lastProcessedLocation?.currentAccuracy ?: 0.0, maxAccuracy = lastProcessedLocation?.maxAccuracy ?: 0.0, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = location?.bearing?.toDouble() ?: 0.0, isSitDetected = isSuspiciousMode, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = recoveryFlagged, cpuLoad = health.cpuLoad, ioWait = health.ioWait, maxIoLatency = health.maxIoLatency, isSilentFailure = health.isSilentFailure, isBatteryLow = health.isBatteryLow, isBatteryCritical = health.isBatteryCritical, isUltraLongStationary = health.isUltraLongStationary
+            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = if (isViewerActive && location != null) 10 else 0, peerAvail = isSocketConnected && isViewerActive, hasGps = location != null, isTrackerMode = true, accuracy = lastProcessedLocation?.currentAccuracy ?: 0.0, maxAccuracy = lastProcessedLocation?.maxAccuracy ?: 0.0, noiseIdx = noiseIdx, luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE, vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = avgCn0 / RIBBON_SNR_SCALE_DB, tiltIdx = abs(snapshot.tiltDegrees - locationProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG, baroIdx = (snapshot.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = location?.bearing?.toDouble() ?: 0.0, isSitDetected = isSuspiciousMode, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = recoveryFlagged, cpuLoad = health.cpuLoad, ioWait = health.ioWait, maxIoLatency = health.maxIoLatency, isSilentFailure = health.isSilentFailure, isBatteryLow = health.isBatteryLow, isBatteryCritical = health.isBatteryCritical, isUltraLongStationary = health.isUltraLongStationary
         )
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt

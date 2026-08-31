@@ -1,30 +1,22 @@
-# Handover (Sep.01.10) - Issue #882 RESOLVED
+# Handover (Sep.01.12) - Issue #883 & #884 RESOLVED
 
 ## 🎯 Current Status
-- **Goal**: Remediate severe hydration Davey (>1s) and resume stress testing.
-- **Status**: 🟢 **Issue #882 RESOLVED**
-- **Version**: `Sep.01.10`
+- **Goal**: Remediate Davey persists and native init failure detected in hardware validation.
+- **Status**: 🟢 **Issues #883 & #884 RESOLVED**
+- **Version**: `Sep.01.12`
 - **Database**: v75
-- **Current Audit Baseline**: SOT: 232 (35 Arch + 197 Func), Resolved: 802, Open: 21, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 226, QA Status: 217 Validated.
+- **Current Audit Baseline**: SOT: 232 (35 Arch + 197 Func), Resolved: 804, Open: 21, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 227, QA Status: 217 Validated.
 
-## 🧬 Forensic State Snapshot: Sep.01.10
+## 🧬 Forensic State Snapshot: Sep.01.12
 - **Implementation**: 
-    - Issue #882: Implemented "Granular Composition Hydration" in `ViewerScreen`. Deferring heavy UI components (`GlobalStatusBar`, `ViewerDashboard`, `AppMapContainer`) across 8 hydration levels to distribute JIT compilation load and maintain frame budget on mid-range hardware.
-    - Versioning: Incremented to `Sep.01.10`.
+    - Issue #884: Forced sequential (non-async) `JdHardwareManager` initialization in `TrackerService` and `ViewerService` for A15 devices. This ensures the native library is loaded before `HardwareProvider` attempts monitor installation.
+    - Issue #883: Refactored `StatusRowData` in `SharedUiComponents.kt` to accept a `@Stable` `StatusRowState` object instead of 22 individual parameters. This reduces the complexity of generated JIT code and eliminates the 1074ms stall at Hydration Level 8.
 - **Integrity**: 
     - Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md` (Rule 2.1).
-    - Added "PhoneSetup Staggered Hydration" to simplification tracking.
+    - Incremented version to `Sep.01.12`.
 
 ## 🚀 Next Steps
-- **Validation**: Perform hardware deployment of `vSep.01.10` on SM-A155F to confirm zero-Davey status during the Viewer transition.
-- **Stress Test**: Resume hardware stress test for Issue #881 (>1000 items) once composition fluidly completes hydration Level 8.
+- **Validation**: Re-deploy `vSep.01.12` to SM-A155F to confirm zero-Davey status at Level 8 and verify `libjdHardware` successfully initializes without Monitor::Inflate errors.
+- **Stress Test**: Resume hardware stress test for Issue #881 (>1000 items).
 
-## 📦 Git Release Block
-```bash
-git add --all
-git commit -m "Hardening vSep.01.10: Granular composition hydration for Davey remediation (#882)"
-git tag -a vSep.01.10 -m "Segmented ViewerScreen composition across 8 hydration levels to distribute JIT load and eliminate the 1074ms main-thread blockage. Updated SOT Rule 2.1."
-git push origin main --tags
-```
-
-vSep.01.10
+vSep.01.12

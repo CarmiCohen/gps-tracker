@@ -16,6 +16,10 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.01.11:
+ * - Issue #884 Remediation: Hardened JdHardwareManager initialization. 
+ *   Native init is now sequential on A15 devices to prevent Monitor::Inflate 
+ *   installation failures (R884).
  * Aug.29.03:
  * - Issue #760 Hardening: Migrated from GpsManager and AppSensorManager to 
  *   the unified HardwareProvider (R760).
@@ -69,6 +73,16 @@ class ViewerService : BaseMonitorService() {
         configManager.isTrackerMode = false
 
         refreshCapabilitiesInternal()
+        
+        // Issue #884: Sequential initialization on A15 to prevent inflation failures.
+        if (capabilities.isA15Device) {
+            val success = JdHardwareManager.initialize(timeProvider, configManager.deviceId)
+            if (success) {
+                logManager.logServiceEvent("HARDWARE: libjdHardware initialized successfully.", isImportant = true)
+            } else {
+                logManager.logServiceEvent("HARDWARE: libjdHardware initialization failed.", isImportant = true)
+            }
+        }
 
         observeAlarmEvents()
         observeIntegrityEvents()
