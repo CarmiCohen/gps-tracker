@@ -20,69 +20,83 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * ManagedNetworkCallback: Encapsulates safe, synchronous unregistration of 
- * ConnectivityManager.NetworkCallback to prevent native BaseEventQueue leaks (R750).
- * Sep.01.14: 
- * - Issue #887 Hardening: Increased timeout to 4000ms and added final direct 
- *   fallback on timeout to prevent native leaks during high-load stalls (R887).
+ * ManagedUnregistrationHelper: Centralized logic for safe, synchronous unregistration
+ * of hardware listeners. Ensures consistent 4000ms timeouts and fallback patterns (R889).
  */
-abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
-    fun unregister(cm: ConnectivityManager) {
-        Timber.d("ManagedNetworkCallback: Starting unregistration...")
-        if (Looper.myLooper() == Looper.getMainLooper()) {
+object ManagedUnregistrationHelper {
+    fun safeUnregister(
+        label: String,
+        handler: Handler?,
+        action: () -> Unit
+    ) {
+        Timber.d("$label: Starting unregistration...")
+
+        if (handler == null || Looper.myLooper() == handler.looper) {
             try {
-                cm.unregisterNetworkCallback(this)
-                Timber.d("ManagedNetworkCallback: Immediate unregistration complete.")
+                action()
+                Timber.d("$label: Immediate unregistration complete.")
             } catch (e: Exception) {
-                Timber.e(e, "ManagedNetworkCallback: Immediate unregistration failed")
+                Timber.e(e, "$label: Immediate unregistration failed")
             }
             return
         }
 
         val latch = CountDownLatch(1)
-        val posted = Handler(Looper.getMainLooper()).post {
+        val posted = handler.post {
             try {
-                cm.unregisterNetworkCallback(this)
-                Timber.d("ManagedNetworkCallback: Async unregistration complete.")
+                action()
+                Timber.d("$label: Async unregistration complete.")
             } catch (e: Exception) {
-                Timber.e(e, "ManagedNetworkCallback: Async unregistration failed")
+                Timber.e(e, "$label: Async unregistration failed")
             } finally {
                 latch.countDown()
             }
         }
-        
+
         if (!posted) {
-            Timber.w("ManagedNetworkCallback: Failed to post unregistration to Main Looper")
+            Timber.w("$label: Failed to post unregistration to handler thread")
             try {
-                cm.unregisterNetworkCallback(this)
-                Timber.d("ManagedNetworkCallback: Fallback unregistration complete.")
+                action()
+                Timber.d("$label: Fallback unregistration complete.")
             } catch (e: Exception) {
-                Timber.e(e, "ManagedNetworkCallback: Fallback unregistration failed")
+                Timber.e(e, "$label: Fallback unregistration failed")
             }
             return
         }
 
         try {
             if (!latch.await(4000, TimeUnit.MILLISECONDS)) {
-                Timber.w("ManagedNetworkCallback: Unregistration timed out. Forcing direct fallback.")
+                Timber.w("$label: Unregistration timed out. Forcing direct fallback.")
                 try {
-                    cm.unregisterNetworkCallback(this)
-                    Timber.d("ManagedNetworkCallback: Timeout fallback unregistration complete.")
+                    action()
+                    Timber.d("$label: Timeout fallback unregistration complete.")
                 } catch (e: Exception) {
-                    Timber.e(e, "ManagedNetworkCallback: Timeout fallback unregistration failed")
+                    Timber.e(e, "$label: Timeout fallback unregistration failed")
                 }
             }
         } catch (e: InterruptedException) {
-            Timber.e("ManagedNetworkCallback: Unregistration interrupted")
+            Timber.e("$label: Unregistration interrupted")
             Thread.currentThread().interrupt()
         }
     }
 }
 
 /**
+ * ManagedNetworkCallback: Encapsulates safe, synchronous unregistration of 
+ * ConnectivityManager.NetworkCallback to prevent native BaseEventQueue leaks (R750/R887).
+ */
+abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
+    fun unregister(cm: ConnectivityManager) {
+        ManagedUnregistrationHelper.safeUnregister(
+            "ManagedNetworkCallback",
+            Handler(Looper.getMainLooper())
+        ) { cm.unregisterNetworkCallback(this) }
+    }
+}
+
+/**
  * ManagedLocationCallback: Encapsulates safe, synchronous unregistration of
  * FusedLocationProvider location updates to prevent native leaks (R747/R748).
- * Sep.01.14: Issue #887 Hardening: Increased timeout to 4000ms (R887).
  */
 abstract class ManagedLocationCallback : LocationCallback() {
     fun unregister(client: FusedLocationProviderClient) {
@@ -99,71 +113,14 @@ abstract class ManagedLocationCallback : LocationCallback() {
 
 /**
  * ManagedGnssStatusCallback: Encapsulates safe, synchronous unregistration of
- * GnssStatus.Callback to prevent native BaseEventQueue leaks (R755).
- * Sep.01.14: 
- * - Issue #887 Hardening: Increased timeout to 4000ms and added final direct 
- *   fallback on timeout to prevent native leaks during high-load stalls (R887).
+ * GnssStatus.Callback to prevent native BaseEventQueue leaks (R755/R887).
  */
 abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
     fun unregister(lm: LocationManager, handler: Handler?) {
-        Timber.d("ManagedGnssStatusCallback: Starting unregistration...")
-        if (handler == null) {
-            try {
-                lm.unregisterGnssStatusCallback(this)
-                Timber.d("ManagedGnssStatusCallback: Unregistration complete (no handler).")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedGnssStatusCallback: Unregistration failed (no handler)")
-            }
-            return
-        }
-
-        if (Looper.myLooper() == handler.looper) {
-            try {
-                lm.unregisterGnssStatusCallback(this)
-                Timber.d("ManagedGnssStatusCallback: Immediate unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedGnssStatusCallback: Immediate unregistration failed")
-            }
-            return
-        }
-
-        val latch = CountDownLatch(1)
-        val posted = handler.post {
-            try {
-                lm.unregisterGnssStatusCallback(this)
-                Timber.d("ManagedGnssStatusCallback: Async unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedGnssStatusCallback: Async unregistration failed")
-            } finally {
-                latch.countDown()
-            }
-        }
-
-        if (!posted) {
-            Timber.w("ManagedGnssStatusCallback: Failed to post unregistration to hardware thread")
-            try {
-                lm.unregisterGnssStatusCallback(this)
-                Timber.d("ManagedGnssStatusCallback: Fallback unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedGnssStatusCallback: Fallback unregistration failed")
-            }
-            return
-        }
-
-        try {
-            if (!latch.await(4000, TimeUnit.MILLISECONDS)) {
-                Timber.w("ManagedGnssStatusCallback: Unregistration timed out. Forcing direct fallback.")
-                try {
-                    lm.unregisterGnssStatusCallback(this)
-                    Timber.d("ManagedGnssStatusCallback: Timeout fallback unregistration complete.")
-                } catch (e: Exception) {
-                    Timber.e(e, "ManagedGnssStatusCallback: Timeout fallback unregistration failed")
-                }
-            }
-        } catch (e: InterruptedException) {
-            Timber.e("ManagedGnssStatusCallback: Unregistration interrupted")
-            Thread.currentThread().interrupt()
-        }
+        ManagedUnregistrationHelper.safeUnregister(
+            "ManagedGnssStatusCallback",
+            handler
+        ) { lm.unregisterGnssStatusCallback(this) }
     }
 }
 
@@ -187,10 +144,7 @@ abstract class ManagedBroadcastReceiver : BroadcastReceiver() {
 
 /**
  * ManagedSensorListener: Encapsulates safe, synchronous unregistration of
- * SensorManager listeners to prevent native BaseEventQueue leaks (R745/R746).
- * Sep.01.14: 
- * - Issue #887/888 Hardening: Increased timeout to 4000ms and added final direct 
- *   fallback on timeout. Added specific sensor unregistration support (R888).
+ * SensorManager listeners to prevent native BaseEventQueue leaks (R745/R746/R888).
  */
 abstract class ManagedSensorListener : SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -208,120 +162,29 @@ abstract class ManagedSensorListener : SensorEventListener {
 
     private fun performUnregistration(sm: AndroidSensorManager, sensor: Sensor?, handler: Handler?) {
         val label = if (sensor == null) "global" else "specific (${sensor.name})"
-        Timber.d("ManagedSensorListener: Starting $label unregistration...")
-
-        val action = {
-            try {
-                if (sensor == null) sm.unregisterListener(this)
-                else sm.unregisterListener(this, sensor)
-                Timber.d("ManagedSensorListener: $label unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedSensorListener: $label unregistration failed")
-            }
-        }
-
-        if (handler == null) {
-            action()
-            return
-        }
-
-        if (Looper.myLooper() == handler.looper) {
-            action()
-            return
-        }
-
-        val latch = CountDownLatch(1)
-        val posted = handler.post {
-            action()
-            latch.countDown()
-        }
-        
-        if (!posted) {
-            Timber.w("ManagedSensorListener: Failed to post $label unregistration to sensor thread")
-            action()
-            return
-        }
-
-        try {
-            if (!latch.await(4000, TimeUnit.MILLISECONDS)) {
-                Timber.w("ManagedSensorListener: $label unregistration timed out. Forcing direct fallback.")
-                action()
-            }
-        } catch (e: InterruptedException) {
-            Thread.currentThread().interrupt()
+        ManagedUnregistrationHelper.safeUnregister(
+            "ManagedSensorListener ($label)",
+            handler
+        ) {
+            if (sensor == null) sm.unregisterListener(this)
+            else sm.unregisterListener(this, sensor)
         }
     }
 }
 
 /**
  * ManagedDisplayListener: Encapsulates safe, synchronous unregistration of
- * DisplayManager.DisplayListener to prevent resource leaks.
- * Sep.01.14: 
- * - Issue #887 Hardening: Increased timeout to 4000ms and added final direct 
- *   fallback on timeout to prevent native leaks during high-load stalls (R887).
+ * DisplayManager.DisplayListener to prevent resource leaks (R887).
  */
 abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
     override fun onDisplayAdded(displayId: Int) {}
     override fun onDisplayRemoved(displayId: Int) {}
 
     fun unregister(dm: DisplayManager, handler: Handler?) {
-        Timber.d("ManagedDisplayListener: Starting unregistration...")
-        if (handler == null) {
-            try {
-                dm.unregisterDisplayListener(this)
-                Timber.d("ManagedDisplayListener: Unregistration complete (no handler).")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedDisplayListener: Unregistration failed (no handler)")
-            }
-            return
-        }
-
-        if (Looper.myLooper() == handler.looper) {
-            try {
-                dm.unregisterDisplayListener(this)
-                Timber.d("ManagedDisplayListener: Immediate unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedDisplayListener: Immediate unregistration failed")
-            }
-            return
-        }
-
-        val latch = CountDownLatch(1)
-        val posted = handler.post {
-            try {
-                dm.unregisterDisplayListener(this)
-                Timber.d("ManagedDisplayListener: Async unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedDisplayListener: Async unregistration failed")
-            } finally {
-                latch.countDown()
-            }
-        }
-
-        if (!posted) {
-            Timber.w("ManagedDisplayListener: Failed to post unregistration to display thread")
-            try {
-                dm.unregisterDisplayListener(this)
-                Timber.d("ManagedDisplayListener: Fallback unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedDisplayListener: Fallback unregistration failed")
-            }
-            return
-        }
-
-        try {
-            if (!latch.await(4000, TimeUnit.MILLISECONDS)) {
-                Timber.w("ManagedDisplayListener: Unregistration timed out. Forcing direct fallback.")
-                try {
-                    dm.unregisterDisplayListener(this)
-                    Timber.d("ManagedDisplayListener: Timeout fallback unregistration complete.")
-                } catch (e: Exception) {
-                    Timber.e(e, "ManagedDisplayListener: Timeout fallback unregistration failed")
-                }
-            }
-        } catch (e: InterruptedException) {
-            Thread.currentThread().interrupt()
-        }
+        ManagedUnregistrationHelper.safeUnregister(
+            "ManagedDisplayListener",
+            handler
+        ) { dm.unregisterDisplayListener(this) }
     }
 }
 

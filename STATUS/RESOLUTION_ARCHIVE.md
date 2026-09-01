@@ -2,6 +2,11 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Sep.01.16 (vSep.01.16)
+*   **Issue #889 RESOLVED**: **ManagedHardware Boilerplate Reduction (R889)**.
+    *   **Problem**: Multiple managed callback classes in `ManagedHardware.kt` duplicated complex unregistration logic (Main-thread checking, latch-based synchronization, 4000ms timeouts, and direct fallback mechanisms). This redundancy increased maintenance risk and the potential for inconsistent hardening across different hardware types.
+    *   **Remediation**: Extracted the shared unregistration logic into a `ManagedUnregistrationHelper` object. Refactored `ManagedNetworkCallback`, `ManagedGnssStatusCallback`, `ManagedSensorListener`, and `ManagedDisplayListener` to delegate their disposal to this helper. This ensures absolute consistency in how native resource leaks are prevented while significantly reducing boilerplate code. (Sep.01.16).
+
 ## 🟢 Sep.01.15 (vSep.01.15)
 *   **Issue #888 RESOLVED**: **Specific Sensor Unregistration Hardening (R888)**.
     *   **Problem**: While Issue #887 addressed global unregistration leaks, `HardwareProvider.kt` contained a direct `unregisterListener(this, detector)` call in its step-detector recovery logic. This bypassed the 4000ms safety latch and fallback mechanisms, leaving the app vulnerable to `BaseEventQueue` leaks during specific sensor cycling on high-load devices.
@@ -12,13 +17,4 @@ This document archives all resolved issues and architectural refinements.
     *   **Problem**: Persistent Logcat warnings indicated that a resource failed to call `BaseEventQueue.dispose`. Investigation revealed that high Main-thread contention (Davey stalls) on Samsung A15 devices caused hardware unregistration tasks (Sensors, GNSS, Connectivity) to time out, leaving native listeners active when callback objects were GC'd.
     *   **Remediation**: Hardened `ManagedHardware.kt` by standardizing unregistration timeouts to 4000ms. Implemented a "Direct Fallback" mechanism: if the synchronization latch times out, the unregistration is immediately attempted on the current thread as a last resort, ensuring native resources are released even if the target thread is stalled.
 
-## 🟢 Sep.01.13 (vSep.01.13)
-*   **Issue #886 RESOLVED**: **Monitor::Inflate Timing Race (R886)**.
-    *   **Problem**: Sequential initialization (R884) ensured the native library was resident, but a timing race remained where GNSS stack registration occurred before the Samsung framework finished internalizing the library image.
-    *   **Remediation**: Added a 500ms post-initialization settling window in `TrackerService` and `ViewerService` before initiating hardware registration.
-*   **Issue #885 RESOLVED**: **Level 8 Hydration Davey Remediation (R885)**.
-    *   **Problem**: Monolithic overlay hydration caused 1s+ Davey stalls on SM-A155F.
-    *   **Remediation**: Decomposed hydration into 11 levels (staggered by 800ms) to distribute JIT compilation load across multiple frames.
-
-## 🟢 Sep.01.11 (vSep.01.12)
 ...
