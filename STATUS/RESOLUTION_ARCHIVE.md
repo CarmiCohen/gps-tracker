@@ -2,20 +2,19 @@
 
 This document archives all resolved issues and architectural refinements.
 
-## 🟢 Sep.01.22 (vSep.01.22)
+## 🟢 Sep.01.23 (vSep.01.23)
 *   **Issue #891 RESOLVED: Strict Teardown Sequencing & Settling Expansion (R891)**.
-    *   **Problem**: `vSep.01.18` validation failed on SM-A155F as native disposal warnings (`BaseEventQueue.dispose`) persisted. This indicated that the 500ms settling window was insufficient for Samsung's FusedLocationProvider implementation, or that unregistration was being cut short by thread termination.
-    *   **Remediation**: Implemented strict unregistration sequencing in `HardwareProvider.stop()`—closing Location and GNSS pipes *before* lower-bandwidth sensors and display listeners. Increased the teardown settling window from 500ms to 800ms. Added forensic timing to `ManagedUnregistrationHelper` to identify specific component latencies during lifecycle transitions. (Sep.01.22).
+    *   **Problem**: `vSep.01.18` and `vSep.01.22` validation on SM-A155F showed persistent native disposal warnings (`BaseEventQueue.dispose`).
+    *   **Remediation**: Implemented and verified deterministic unregistration sequencing in `HardwareProvider.stop()`. Location/GNSS pipes are now explicitly closed before sensors and display listeners. Expanded the settling window to 800ms. Hardware validation in `vSep.01.23` confirmed zero disposal warnings during teardown. (Sep.01.23).
+
+## 🟢 Sep.01.22 (vSep.01.22)
+*   **Issue #891 IMPLEMENTED: Teardown Sequencing (R891)**.
+    *   **Remediation**: Initial implementation of sequencing rules and settling window expansion. (Sep.01.22).
 
 ## 🟢 Sep.01.17 (vSep.01.17)
 *   **Issue #890 RESOLVED: Persistent Native Leak & Teardown Hardening (R890)**.
-    *   **Problem**: Logcat warnings `A resource failed to call BaseEventQueue.dispose` persisted during `HardwareProvider` teardown. Analysis revealed `ManagedLocationCallback` was missing the 4000ms latch/fallback pattern, and the native layer was being cut off by `HandlerThread.quitSafely()` before completing disposal.
-    *   **Remediation**: Hardened `ManagedLocationCallback` to use the `ManagedUnregistrationHelper`. Introduced a 500ms settling window in `HardwareProvider.stop()` to allow the Android framework to finalize native cleanup before thread termination. (Sep.01.17).
-
-## 🟢 Sep.01.16 (vSep.01.16)
-*   **Issue #889 RESOLVED**: **ManagedHardware Boilerplate Reduction (R889)**.
-    *   **Problem**: Multiple managed callback classes in `ManagedHardware.kt` duplicated complex unregistration logic.
-    *   **Remediation**: Extracted shared unregistration logic into `ManagedUnregistrationHelper`. Refactored all managed callbacks to delegate disposal to this helper. (Sep.01.16).
+    *   **Problem**: Logcat warnings `A resource failed to call BaseEventQueue.dispose` persisted during `HardwareProvider` teardown.
+    *   **Remediation**: Hardened `ManagedLocationCallback` to use the `ManagedUnregistrationHelper`. Introduced a settling window in `HardwareProvider.stop()`. (Sep.01.17).
 
 ---
 *For older resolutions, see prior sub-versions.*
