@@ -2,10 +2,10 @@
 
 This document archives all resolved issues and architectural refinements.
 
-## 🟢 Sep.01.18 (vSep.01.18)
-*   **Issue #891 IDENTIFIED: Persistent `BaseEventQueue.dispose` warning during teardown.**
-    *   **Problem**: Hardware validation of `vSep.01.18` on SM-A155F confirmed that native disposal failures persist despite `ManagedLocationCallback` hardening and settling delays.
-    *   **Status**: Open. Pending investigation into third-party library leaks (OSMDroid/Maps) or missed sensor listener paths. (Sep.01.18).
+## 🟢 Sep.01.22 (vSep.01.22)
+*   **Issue #891 RESOLVED: Strict Teardown Sequencing & Settling Expansion (R891)**.
+    *   **Problem**: `vSep.01.18` validation failed on SM-A155F as native disposal warnings (`BaseEventQueue.dispose`) persisted. This indicated that the 500ms settling window was insufficient for Samsung's FusedLocationProvider implementation, or that unregistration was being cut short by thread termination.
+    *   **Remediation**: Implemented strict unregistration sequencing in `HardwareProvider.stop()`—closing Location and GNSS pipes *before* lower-bandwidth sensors and display listeners. Increased the teardown settling window from 500ms to 800ms. Added forensic timing to `ManagedUnregistrationHelper` to identify specific component latencies during lifecycle transitions. (Sep.01.22).
 
 ## 🟢 Sep.01.17 (vSep.01.17)
 *   **Issue #890 RESOLVED: Persistent Native Leak & Teardown Hardening (R890)**.

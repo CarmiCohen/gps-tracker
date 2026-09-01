@@ -12,6 +12,7 @@ import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.tasks.Tasks
@@ -32,22 +33,26 @@ object ManagedUnregistrationHelper {
         Timber.d("$label: Starting unregistration...")
 
         if (handler == null || Looper.myLooper() == handler.looper) {
+            val startTime = SystemClock.elapsedRealtime()
             try {
                 action()
-                Timber.d("$label: Immediate unregistration complete.")
+                Timber.d("$label: Immediate unregistration complete in ${SystemClock.elapsedRealtime() - startTime}ms.")
             } catch (e: Exception) {
                 Timber.e(e, "$label: Immediate unregistration failed")
             }
             return
         }
 
+        val startTime = SystemClock.elapsedRealtime()
         val latch = CountDownLatch(1)
         val posted = handler.post {
+            val taskStartTime = SystemClock.elapsedRealtime()
             try {
                 action()
-                Timber.d("$label: Async unregistration complete.")
+                val duration = SystemClock.elapsedRealtime() - taskStartTime
+                Timber.d("$label: Async unregistration complete in ${duration}ms.")
             } catch (e: Exception) {
-                Timber.e(e, "$label: Async unregistration failed")
+                Timber.e(e, "$label: Async unregistration failed after ${SystemClock.elapsedRealtime() - taskStartTime}ms")
             } finally {
                 latch.countDown()
             }
@@ -66,7 +71,8 @@ object ManagedUnregistrationHelper {
 
         try {
             if (!latch.await(4000, TimeUnit.MILLISECONDS)) {
-                Timber.w("$label: Unregistration timed out. Forcing direct fallback.")
+                val waited = SystemClock.elapsedRealtime() - startTime
+                Timber.w("$label: Unregistration timed out after ${waited}ms. Forcing direct fallback.")
                 try {
                     action()
                     Timber.d("$label: Timeout fallback unregistration complete.")

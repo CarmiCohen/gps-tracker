@@ -32,12 +32,9 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
- * Sep.01.17:
- * - Issue #890 Hardening (R890): Unified ManagedLocationCallback hardening and 
- *   implemented teardown settling delay to prevent native BaseEventQueue leaks.
- * Sep.01.14:
- * - Issue #888 Hardening (R888): Switched to ManagedSensorListener.unregister 
- *   for specific sensor cycling to prevent native leaks.
+ * Sep.01.21:
+ * - Issue #891 Hardening: Repaired ForensicSnapshot property declarations and 
+ *   finalized teardown sequencing logs to isolate native disposal failures (R891).
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -311,29 +308,45 @@ class HardwareProvider @Inject constructor(
     fun stop() {
         synchronized(lifecycleLock) {
             val wasStarted = isStarted.getAndSet(false)
+            Timber.i("HardwareProvider: Starting teardown. wasStarted=$wasStarted")
+            
             recoveryJob?.cancel(); recoveryJob = null
             registrationJob?.cancel(); registrationJob = null
             proximityJob?.cancel(); proximityJob = null
+            
+            Timber.d("HardwareProvider: Stopping Acoustic Monitoring...")
             stopAcousticMonitoring()
 
             val handler = hardwareHandler
-            try { gnssStatusCallback.unregister(locationManager, handler) } catch (e: Exception) {}
-            // Issue #890: Hardened unregistration for location callbacks (R890)
+            Timber.d("HardwareProvider: Unregistering GNSS status callback...")
+            try { gnssStatusCallback.unregister(locationManager, handler) } catch (e: Exception) { Timber.e(e, "GNSS status unregistration failed") }
+            
+            Timber.d("HardwareProvider: Unregistering active location callback...")
             activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = null
+            
+            Timber.d("HardwareProvider: Unregistering revival location callback...")
             revivalCallback?.unregister(fusedLocationClient, handler); revivalCallback = null
             
+            Timber.d("HardwareProvider: Unregistering all sensors...")
             this.unregister(sensorManager, handler)
+            
+            Timber.d("HardwareProvider: Unregistering display listener...")
             displayListener.unregister(displayManager, handler)
 
-            // Issue #890: Hardened teardown settling window. 
+            // Issue #891: Hardened teardown settling window. 
             // Give the native layer 500ms to finalize unregistration before thread death.
+            Timber.d("HardwareProvider: Entering 500ms settling window...")
             try { Thread.sleep(500) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
 
+            Timber.d("HardwareProvider: Quitting hardware thread...")
             hardwareThread?.quitSafely()
-            try { hardwareThread?.join(1000) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
+            try { 
+                hardwareThread?.join(1000)
+            } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
+            
             hardwareThread = null; hardwareHandler = null
             isStepDetectorRegistered = false
-            Timber.i("HardwareProvider: Synchronous stop completed. wasStarted=$wasStarted")
+            Timber.i("HardwareProvider: Synchronous stop completed.")
         }
     }
 

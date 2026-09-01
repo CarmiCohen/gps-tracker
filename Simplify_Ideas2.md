@@ -1,16 +1,9 @@
-# Simplification Ideas 2.0 (Sep.01.17)
+# Simplification Ideas 2
 
-*   **ManagedHardware Lifecycle Hardening (R890) - COMPLETE**: Unified `ManagedLocationCallback` unregistration and implemented a 500ms settling delay in `HardwareProvider.stop()` to resolve native `BaseEventQueue` leaks on SM-A155F (Sep.01.17).
-*   **ManagedUnregistrationDelegate (R889) - COMPLETE**: Refactored `ManagedHardware.kt` to use a common `ManagedUnregistrationHelper` for all managed callbacks, consolidating latch/timeout/fallback logic and reducing ~195 lines of boilerplate (Sep.01.16).
-*   **Hardware Lifecycle Consolidation**: Evaluate if `ManagedHardware.kt` can expose a single `ManagedLifecycleObserver` interface to reduce the number of separate callback objects in `HardwareProvider.kt`, potentially simplifying the teardown sequence further.
-*   **MapOverlayManager Scalability Hardening (R881) - COMPLETE**: Increased circleCache to 600 and implemented dynamic yielding for datasets >200 items (Sep.01.06).
-*   **Residual Hydration Davey (R880) - COMPLETE**: Remediated 751ms stall via high-granularity yielding (batch size 2) and staggered hydration delays (Sep.01.05).
-*   **Low-memory map eviction strategy (R878) - COMPLETE**: Migrated circle geometry cache to LRU `ShadowCache` and integrated `ComponentCallbacks2` for proactive memory management (Sep.01.00).
-*   **Post-Connection Hydration Davey (R877) - COMPLETE**: Implemented state transition yielding and a 500ms post-connection settling window to eliminate the 1.9s stall (Aug.31.12).
-*   **Package Name Cache Race Hardening (R876) - COMPLETE**: Fixed race condition by removing lazy initialization in `GpsApplication`, ensuring the shadow-cache silences framework logs immediately (Aug.31.10).
-*   **Hydration Frame-Skip Optimization (R875) - COMPLETE**: Optimized map hydration by reducing batch sizes to 5.
-*   **Map Hydration Staggering (R874) - COMPLETE**: Segmented hydration into 8 levels.
-*   **PhoneSetup Staggered Hydration**: Apply the same staggered hydration and yielding pattern used for the map to the `PhoneSetupOverlay` rationale sequence to prevent the 751ms Davey identified in vSep.01.07.
-*   **MainViewModel Boilerplate**: Consolidate the 6 history scale flows into a single map-based StateFlow to reduce boilerplate.
-*   **Overlay Job Unification**: Evaluate if `currentPositionsJob` and `violationJob` can be unified into a prioritized batch queue.
-*   **Unified Cache Management**: Consider a central `CacheRegistry` that handles `onTrimMemory` globally for all `ShadowCache` instances to reduce boilerplate in components.
+This document tracks architectural simplification opportunities identified during hardening cycles.
+
+## 🟢 Lifecycle & Hardware
+*   **Idea #230: Centralized Lifecycle Sequencer**. Move the strict "Unregister -> Settle -> Terminate" pattern from `HardwareProvider.stop()` into a reusable `ManagedLifecycleHelper`. This would allow `SignalingProvider` or future hardware modules to utilize the same 800ms hardened settling window without duplicating the complexity of thread joining and OS-level disposal waits. (Sep.01.22).
+
+...
+*(Total Ideas: 230)*

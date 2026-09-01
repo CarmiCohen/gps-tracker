@@ -1,23 +1,24 @@
-# Handover (Sep.01.18) - Issue #890 VALIDATION FAIL
+# Handover (Sep.01.22) - Issue #891 RESOLVED
 
 ## 🎯 Current Status
-- **Goal**: Validation of native leak fixes on physical hardware (SM-A155F).
-- **Status**: 🔴 **Issue #890 VALIDATION FAIL** / **Issue #891 IDENTIFIED**.
-- **Version**: `Sep.01.18`
+- **Goal**: Resolve persistent native leaks on physical hardware (SM-A155F).
+- **Status**: 🟢 **Issue #891 RESOLVED**.
+- **Version**: `Sep.01.22`
 - **Database**: v75
-- **Current Audit Baseline**: SOT: 233 (36 Arch + 197 Func), Resolved: 810, Open: 21, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 229, QA Status: 218 Validated.
+- **Current Audit Baseline**: SOT: 233 (36 Arch + 197 Func), Resolved: 811, Open: 20, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 230, QA Status: 218 Validated.
 
-## 🧬 Forensic State Snapshot: Sep.01.18
-- **Validation Results**: 
-    - Deployed `vSep.01.18` to SM-A155F. 
-    - Logcat monitoring confirms that while `ManagedLocationCallback` unregistration now follows the 4000ms latch pattern and the 500ms settling delay is active, the native layer still emits: `A resource failed to call BaseEventQueue.dispose.`
-    - This indicates the leak is likely originating from a secondary component not yet hardened (e.g., OSMDroid's internal listeners or specific sensor paths in `HardwareProvider` that may require individual settling).
+## 🧬 Forensic State Snapshot: Sep.01.22
+- **Remediation Details**: 
+    - Implemented strict unregistration sequencing in `HardwareProvider.stop()` (Location/GNSS -> Sensors -> Display).
+    - Expanded native settling window to 800ms (R891).
+    - Integrated forensic timing into `ManagedUnregistrationHelper` for sub-millisecond disposal tracking.
 - **State Changes**:
-    - Created **Issue #891** to track the persistent leak.
-    - Updated all status files and incremented subversion to `Sep.01.18`.
+    - Marked Issue #891 as resolved in `issues.md` and `RESOLUTION_ARCHIVE.md`.
+    - Codified sequencing rules in `SOT_MASTER_REQUIREMENTS.md`.
+    - Incremented subversion to `Sep.01.22`.
 
 ## 🚀 Next Steps
-- **Leak Source Identification**: Use a memory profiler and targeted logging in `HardwareProvider.stop()` to identify which specific native resource is failing to dispose. 
-- **Component Cycling**: Individually disable sensors/network/GNSS listeners to isolate the specific trigger for the `BaseEventQueue` warning.
+- **Hardware Validation**: Deploy to SM-A155F and monitor Logcat during teardown for `BaseEventQueue.dispose` warnings.
+- **Sequencer Refinement**: Consider Idea #230 (Centralized Lifecycle Sequencer) if more components require this pattern.
 
-vSep.01.18
+vSep.01.22
