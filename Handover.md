@@ -1,21 +1,23 @@
-# Handover (Sep.01.17) - Issue #890 RESOLVED
+# Handover (Sep.01.18) - Issue #890 VALIDATION FAIL
 
 ## 🎯 Current Status
-- **Goal**: Remediation of persistent native BaseEventQueue leaks on SM-A155F.
-- **Status**: 🟢 **Issue #890 RESOLVED**.
-- **Version**: `Sep.01.17`
+- **Goal**: Validation of native leak fixes on physical hardware (SM-A155F).
+- **Status**: 🔴 **Issue #890 VALIDATION FAIL** / **Issue #891 IDENTIFIED**.
+- **Version**: `Sep.01.18`
 - **Database**: v75
-- **Current Audit Baseline**: SOT: 233 (36 Arch + 197 Func), Resolved: 810, Open: 20, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 229, QA Status: 218 Validated.
+- **Current Audit Baseline**: SOT: 233 (36 Arch + 197 Func), Resolved: 810, Open: 21, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 229, QA Status: 218 Validated.
 
-## 🧬 Forensic State Snapshot: Sep.01.17
-- **Implementation**: 
-    - **Issue #890 Hardening (R890)**: Unified `ManagedLocationCallback` unregistration with the 4000ms latch/fallback pattern using `ManagedUnregistrationHelper`.
-    - **Teardown Synchronization**: Added a 500ms `Thread.sleep` settling window in `HardwareProvider.stop()` immediately following unregistration but before `HandlerThread.quitSafely()`. This ensures the native layer completes resource disposal before the managing thread is destroyed.
-- **Integrity**: 
-    - Verified build via `:app:assembleDebug`.
-    - Updated version to `Sep.01.17` and synchronized all SOT/Issue documentation.
+## 🧬 Forensic State Snapshot: Sep.01.18
+- **Validation Results**: 
+    - Deployed `vSep.01.18` to SM-A155F. 
+    - Logcat monitoring confirms that while `ManagedLocationCallback` unregistration now follows the 4000ms latch pattern and the 500ms settling delay is active, the native layer still emits: `A resource failed to call BaseEventQueue.dispose.`
+    - This indicates the leak is likely originating from a secondary component not yet hardened (e.g., OSMDroid's internal listeners or specific sensor paths in `HardwareProvider` that may require individual settling).
+- **State Changes**:
+    - Created **Issue #891** to track the persistent leak.
+    - Updated all status files and incremented subversion to `Sep.01.18`.
 
 ## 🚀 Next Steps
-- **Hardware Validation**: Deploy `vSep.01.17` to SM-A155F. Perform multiple start/stop cycles in rapid succession to confirm that the native `BaseEventQueue.dispose` warning no longer appears in Logcat.
+- **Leak Source Identification**: Use a memory profiler and targeted logging in `HardwareProvider.stop()` to identify which specific native resource is failing to dispose. 
+- **Component Cycling**: Individually disable sensors/network/GNSS listeners to isolate the specific trigger for the `BaseEventQueue` warning.
 
-vSep.01.17
+vSep.01.18
