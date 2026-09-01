@@ -189,66 +189,63 @@ abstract class ManagedBroadcastReceiver : BroadcastReceiver() {
  * ManagedSensorListener: Encapsulates safe, synchronous unregistration of
  * SensorManager listeners to prevent native BaseEventQueue leaks (R745/R746).
  * Sep.01.14: 
- * - Issue #887 Hardening: Increased timeout to 4000ms and added final direct 
- *   fallback on timeout to prevent native leaks during high-load stalls (R887).
+ * - Issue #887/888 Hardening: Increased timeout to 4000ms and added final direct 
+ *   fallback on timeout. Added specific sensor unregistration support (R888).
  */
 abstract class ManagedSensorListener : SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     fun unregister(sm: AndroidSensorManager, handler: Handler?) {
-        Timber.d("ManagedSensorListener: Starting unregistration...")
-        if (handler == null) {
+        performUnregistration(sm, null, handler)
+    }
+
+    /**
+     * Unregisters a specific sensor while maintaining the listener for others (R888).
+     */
+    fun unregister(sm: AndroidSensorManager, sensor: Sensor, handler: Handler?) {
+        performUnregistration(sm, sensor, handler)
+    }
+
+    private fun performUnregistration(sm: AndroidSensorManager, sensor: Sensor?, handler: Handler?) {
+        val label = if (sensor == null) "global" else "specific (${sensor.name})"
+        Timber.d("ManagedSensorListener: Starting $label unregistration...")
+
+        val action = {
             try {
-                sm.unregisterListener(this)
-                Timber.d("ManagedSensorListener: Unregistration complete (no handler).")
+                if (sensor == null) sm.unregisterListener(this)
+                else sm.unregisterListener(this, sensor)
+                Timber.d("ManagedSensorListener: $label unregistration complete.")
             } catch (e: Exception) {
-                Timber.e(e, "ManagedSensorListener: Unregistration failed (no handler)")
+                Timber.e(e, "ManagedSensorListener: $label unregistration failed")
             }
+        }
+
+        if (handler == null) {
+            action()
             return
         }
 
         if (Looper.myLooper() == handler.looper) {
-            try {
-                sm.unregisterListener(this)
-                Timber.d("ManagedSensorListener: Immediate unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedSensorListener: Immediate unregistration failed")
-            }
+            action()
             return
         }
 
         val latch = CountDownLatch(1)
         val posted = handler.post {
-            try {
-                sm.unregisterListener(this)
-                Timber.d("ManagedSensorListener: Async unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedSensorListener: Async unregistration failed")
-            } finally {
-                latch.countDown()
-            }
+            action()
+            latch.countDown()
         }
         
         if (!posted) {
-            Timber.w("ManagedSensorListener: Failed to post unregistration to sensor thread")
-            try {
-                sm.unregisterListener(this)
-                Timber.d("ManagedSensorListener: Fallback unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedSensorListener: Fallback unregistration failed")
-            }
+            Timber.w("ManagedSensorListener: Failed to post $label unregistration to sensor thread")
+            action()
             return
         }
 
         try {
             if (!latch.await(4000, TimeUnit.MILLISECONDS)) {
-                Timber.w("ManagedSensorListener: Unregistration timed out. Forcing direct fallback.")
-                try {
-                    sm.unregisterListener(this)
-                    Timber.d("ManagedSensorListener: Timeout fallback unregistration complete.")
-                } catch (e: Exception) {
-                    Timber.e(e, "ManagedSensorListener: Timeout fallback unregistration failed")
-                }
+                Timber.w("ManagedSensorListener: $label unregistration timed out. Forcing direct fallback.")
+                action()
             }
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()

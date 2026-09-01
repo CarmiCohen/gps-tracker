@@ -32,6 +32,9 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.01.14:
+ * - Issue #888 Hardening (R888): Switched to ManagedSensorListener.unregister 
+ *   for specific sensor cycling to prevent native leaks.
  * Aug.30.05:
  * - Issue #775 Remediation (R775): Hardened setPowerSaveMode to use 
  *   ManagedSensorListener.unregister for deterministic native disposal.
@@ -683,8 +686,8 @@ class HardwareProvider @Inject constructor(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !systemStatusProvider.isActivityRecognitionGranted()) { isStepDetectorRegistered = false; return@launch }
                 val targetHandler = synchronized(lifecycleLock) { if (!isStarted.get()) return@launch; hardwareHandler } ?: return@launch
                 withContext(targetHandler.asCoroutineDispatcher()) { 
-                    // Issue #775: unregisterListener on the correct thread
-                    sensorManager.unregisterListener(this@HardwareProvider, detector)
+                    // Issue #888 Hardening: Use managed unregistration (R888)
+                    unregister(sensorManager, detector, targetHandler)
                     synchronized(lifecycleLock) { 
                         if (isStarted.get()) isStepDetectorRegistered = sensorManager.registerListener(this@HardwareProvider, detector, android.hardware.SensorManager.SENSOR_DELAY_NORMAL, hardwareHandler) 
                     } 

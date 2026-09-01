@@ -1,22 +1,23 @@
-# Handover (Sep.01.14) - Issue #887 RESOLVED
+# Handover (Sep.01.15) - Issue #888 RESOLVED
 
 ## 🎯 Current Status
-- **Goal**: Remediate native `BaseEventQueue` disposal leaks.
-- **Status**: 🟢 **Issue #887 RESOLVED**.
-- **Version**: `Sep.01.14`
+- **Goal**: Hardening specific sensor unregistration against native leaks.
+- **Status**: 🟢 **Issue #888 RESOLVED**.
+- **Version**: `Sep.01.15`
 - **Database**: v75
-- **Current Audit Baseline**: SOT: 233 (36 Arch + 197 Func), Resolved: 807, Open: 21, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 227, QA Status: 218 Validated.
+- **Current Audit Baseline**: SOT: 233 (36 Arch + 197 Func), Resolved: 808, Open: 20, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 227, QA Status: 218 Validated.
 
-## 🧬 Forensic State Snapshot: Sep.01.14
+## 🧬 Forensic State Snapshot: Sep.01.15
 - **Implementation**: 
-    - **Issue #887 Hardening (R887)**: Refactored `ManagedHardware.kt` to ensure deterministic native disposal. Increased unregistration timeouts to 4000ms and implemented a final direct fallback unregistration on the calling thread if the `CountDownLatch` expires. This ensures the native `BaseEventQueue` is released even under extreme Main-thread congestion or hardware thread stalls.
+    - **Issue #888 Hardening (R888)**: Refactored `ManagedSensorListener` to support hardened specific sensor unregistration. This ensures that individual sensor cycling (e.g., during step detector recovery) follows the same 4000ms latch and fallback pattern as global unregistration, preventing native `BaseEventQueue` leaks on SM-A155F.
+    - **HardwareProvider Refinement**: Integrated the managed unregistration into the `attemptStepDetectorRegistration` recovery flow.
 - **Integrity**: 
     - Verified build via `:app:assembleDebug`.
-    - Hardened synchronization logic across `ManagedNetworkCallback`, `ManagedGnssStatusCallback`, `ManagedSensorListener`, and `ManagedDisplayListener`.
-    - Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md` (Rule 1.12).
+    - Synchronized `SOT_MASTER_REQUIREMENTS.md` (Rule 1.12), `issues.md`, and `RESOLUTION_ARCHIVE.md`.
+    - Bumped version to `Sep.01.15` in `app/build.gradle`.
 
 ## 🚀 Next Steps
-- **Hardware Validation**: Deploy `vSep.01.14` to SM-A155F. Monitor Logcat for the absence of `BaseEventQueue.dispose` warnings during high-load transitions (e.g., map hydration).
-- **Audit**: Review `HardwareProvider.kt` for any remaining direct `SensorManager.registerListener` calls that could bypass the managed lifecycle.
+- **Hardware Validation**: Deploy `vSep.01.15` to SM-A155F. Verify that rapid step detector recovery cycles do not trigger `BaseEventQueue.dispose` warnings in Logcat.
+- **Simplification**: Evaluate if `ManagedGnssStatusCallback` and `ManagedDisplayListener` can be refactored to use a common `ManagedUnregistrationDelegate` to further reduce boilerplate in `ManagedHardware.kt`.
 
-vSep.01.14
+vSep.01.15
