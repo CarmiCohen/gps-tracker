@@ -22,7 +22,9 @@ import java.util.concurrent.TimeUnit
 /**
  * ManagedNetworkCallback: Encapsulates safe, synchronous unregistration of 
  * ConnectivityManager.NetworkCallback to prevent native BaseEventQueue leaks (R750).
- * Aug.30.00: Added fallback direct unregistration if Main Looper post fails (R767).
+ * Sep.01.14: 
+ * - Issue #887 Hardening: Increased timeout to 4000ms and added final direct 
+ *   fallback on timeout to prevent native leaks during high-load stalls (R887).
  */
 abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
     fun unregister(cm: ConnectivityManager) {
@@ -61,8 +63,14 @@ abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
         }
 
         try {
-            if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
-                Timber.w("ManagedNetworkCallback: Unregistration timed out")
+            if (!latch.await(4000, TimeUnit.MILLISECONDS)) {
+                Timber.w("ManagedNetworkCallback: Unregistration timed out. Forcing direct fallback.")
+                try {
+                    cm.unregisterNetworkCallback(this)
+                    Timber.d("ManagedNetworkCallback: Timeout fallback unregistration complete.")
+                } catch (e: Exception) {
+                    Timber.e(e, "ManagedNetworkCallback: Timeout fallback unregistration failed")
+                }
             }
         } catch (e: InterruptedException) {
             Timber.e("ManagedNetworkCallback: Unregistration interrupted")
@@ -74,13 +82,14 @@ abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
 /**
  * ManagedLocationCallback: Encapsulates safe, synchronous unregistration of
  * FusedLocationProvider location updates to prevent native leaks (R747/R748).
+ * Sep.01.14: Issue #887 Hardening: Increased timeout to 4000ms (R887).
  */
 abstract class ManagedLocationCallback : LocationCallback() {
     fun unregister(client: FusedLocationProviderClient) {
         Timber.d("ManagedLocationCallback: Starting unregistration...")
         try {
             val task = client.removeLocationUpdates(this)
-            Tasks.await(task, 2000, TimeUnit.MILLISECONDS)
+            Tasks.await(task, 4000, TimeUnit.MILLISECONDS)
             Timber.d("ManagedLocationCallback: Unregistration complete.")
         } catch (e: Exception) {
             Timber.e(e, "ManagedLocationCallback: Unregistration failed or timed out")
@@ -91,7 +100,9 @@ abstract class ManagedLocationCallback : LocationCallback() {
 /**
  * ManagedGnssStatusCallback: Encapsulates safe, synchronous unregistration of
  * GnssStatus.Callback to prevent native BaseEventQueue leaks (R755).
- * Aug.28.07: Added posted check and explicit logging to detect race conditions (R756).
+ * Sep.01.14: 
+ * - Issue #887 Hardening: Increased timeout to 4000ms and added final direct 
+ *   fallback on timeout to prevent native leaks during high-load stalls (R887).
  */
 abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
     fun unregister(lm: LocationManager, handler: Handler?) {
@@ -130,7 +141,6 @@ abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
 
         if (!posted) {
             Timber.w("ManagedGnssStatusCallback: Failed to post unregistration to hardware thread")
-            // Fallback to direct unregistration if thread is dying
             try {
                 lm.unregisterGnssStatusCallback(this)
                 Timber.d("ManagedGnssStatusCallback: Fallback unregistration complete.")
@@ -141,8 +151,14 @@ abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
         }
 
         try {
-            if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
-                Timber.w("ManagedGnssStatusCallback: Unregistration timed out")
+            if (!latch.await(4000, TimeUnit.MILLISECONDS)) {
+                Timber.w("ManagedGnssStatusCallback: Unregistration timed out. Forcing direct fallback.")
+                try {
+                    lm.unregisterGnssStatusCallback(this)
+                    Timber.d("ManagedGnssStatusCallback: Timeout fallback unregistration complete.")
+                } catch (e: Exception) {
+                    Timber.e(e, "ManagedGnssStatusCallback: Timeout fallback unregistration failed")
+                }
             }
         } catch (e: InterruptedException) {
             Timber.e("ManagedGnssStatusCallback: Unregistration interrupted")
@@ -172,7 +188,9 @@ abstract class ManagedBroadcastReceiver : BroadcastReceiver() {
 /**
  * ManagedSensorListener: Encapsulates safe, synchronous unregistration of
  * SensorManager listeners to prevent native BaseEventQueue leaks (R745/R746).
- * Aug.30.00: Added fallback direct unregistration if hardware thread post fails (R767).
+ * Sep.01.14: 
+ * - Issue #887 Hardening: Increased timeout to 4000ms and added final direct 
+ *   fallback on timeout to prevent native leaks during high-load stalls (R887).
  */
 abstract class ManagedSensorListener : SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -223,8 +241,14 @@ abstract class ManagedSensorListener : SensorEventListener {
         }
 
         try {
-            if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
-                Timber.w("ManagedSensorListener: Unregistration timed out")
+            if (!latch.await(4000, TimeUnit.MILLISECONDS)) {
+                Timber.w("ManagedSensorListener: Unregistration timed out. Forcing direct fallback.")
+                try {
+                    sm.unregisterListener(this)
+                    Timber.d("ManagedSensorListener: Timeout fallback unregistration complete.")
+                } catch (e: Exception) {
+                    Timber.e(e, "ManagedSensorListener: Timeout fallback unregistration failed")
+                }
             }
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
@@ -235,7 +259,9 @@ abstract class ManagedSensorListener : SensorEventListener {
 /**
  * ManagedDisplayListener: Encapsulates safe, synchronous unregistration of
  * DisplayManager.DisplayListener to prevent resource leaks.
- * Aug.30.00: Added fallback direct unregistration if hardware thread post fails (R767).
+ * Sep.01.14: 
+ * - Issue #887 Hardening: Increased timeout to 4000ms and added final direct 
+ *   fallback on timeout to prevent native leaks during high-load stalls (R887).
  */
 abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
     override fun onDisplayAdded(displayId: Int) {}
@@ -287,8 +313,14 @@ abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
         }
 
         try {
-            if (!latch.await(2000, TimeUnit.MILLISECONDS)) {
-                Timber.w("ManagedDisplayListener: Unregistration timed out")
+            if (!latch.await(4000, TimeUnit.MILLISECONDS)) {
+                Timber.w("ManagedDisplayListener: Unregistration timed out. Forcing direct fallback.")
+                try {
+                    dm.unregisterDisplayListener(this)
+                    Timber.d("ManagedDisplayListener: Timeout fallback unregistration complete.")
+                } catch (e: Exception) {
+                    Timber.e(e, "ManagedDisplayListener: Timeout fallback unregistration failed")
+                }
             }
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()

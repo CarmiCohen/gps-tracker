@@ -2,6 +2,19 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Sep.01.14 (vSep.01.14)
+*   **Issue #887 RESOLVED**: **Native BaseEventQueue Leak Remediation (R887)**.
+    *   **Problem**: Persistent Logcat warnings indicated that a resource failed to call `BaseEventQueue.dispose`. Investigation revealed that high Main-thread contention (Davey stalls) on Samsung A15 devices caused hardware unregistration tasks (Sensors, GNSS, Connectivity) to time out, leaving native listeners active when callback objects were GC'd.
+    *   **Remediation**: Hardened `ManagedHardware.kt` by standardizing unregistration timeouts to 4000ms. Implemented a "Direct Fallback" mechanism: if the synchronization latch times out, the unregistration is immediately attempted on the current thread as a last resort, ensuring native resources are released even if the target thread is stalled.
+
+## 🟢 Sep.01.13 (vSep.01.13)
+*   **Issue #886 RESOLVED**: **Monitor::Inflate Timing Race (R886)**.
+    *   **Problem**: Sequential initialization (R884) ensured the native library was resident, but a timing race remained where GNSS stack registration occurred before the Samsung framework finished internalizing the library image.
+    *   **Remediation**: Added a 500ms post-initialization settling window in `TrackerService` and `ViewerService` before initiating hardware registration.
+*   **Issue #885 RESOLVED**: **Level 8 Hydration Davey Remediation (R885)**.
+    *   **Problem**: Monolithic overlay hydration caused 1s+ Davey stalls on SM-A155F.
+    *   **Remediation**: Decomposed hydration into 11 levels (staggered by 800ms) to distribute JIT compilation load across multiple frames.
+
 ## 🟢 Sep.01.11 (vSep.01.12)
 *   **Issue #884 RESOLVED**: **Monitor::Inflate Initialization Regression (R884)**.
     *   **Problem**: Hardware validation revealed `Monitor::Inflate` installation failures on SM-A155F. Investigation showed a race condition where GNSS registration in `HardwareProvider` was triggered before `JdHardwareManager` native initialization completed.
@@ -11,11 +24,4 @@ This document archives all resolved issues and architectural refinements.
     *   **Remediation**: Refactored `StatusRowData` in `SharedUiComponents.kt` to use a `@Stable` data class (`StatusRowState`). This reduced the Composable parameter count from 22 to 1, significantly lowering the complexity of the generated JIT code and maintaining the frame budget during high-pressure state updates.
 
 ## 🟢 Sep.01.10 (vSep.01.10)
-*   **Issue #882 RESOLVED**: **Composition Segmentation & Davey Remediation (R882)**.
-    *   **Problem**: A severe 1074ms main-thread blockage was detected during hydration on SM-A155F (vSep.01.09) despite rationale staggering. Logcat identified heavy JIT compilation of `ViewerScreen` and `StatusRowData` as the bottleneck.
-    *   **Remediation**: Implemented "Granular Composition Hydration" in `ViewerScreen`. Heavy UI components (`GlobalStatusBar`, `ViewerDashboard`, `AppMapContainer`) are now deferred and composed incrementally across 8 hydration levels. This prevents concurrent JIT/composition spikes and maintains the frame budget.
-    *   **Validation**: Logic verified to segment rendering; pending hardware confirmation of zero-Davey status in vSep.01.12.
-
-## 🟢 Sep.01.09 (vSep.01.09)
-*   **Issue #882 PARTIAL**: **Phone Setup Hydration Davey (R882)**.
 ...

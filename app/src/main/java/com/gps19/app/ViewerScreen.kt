@@ -32,12 +32,14 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Sep.01.12:
+ * - Issue #885 Remediation: Decomposed overlay hydration into 4 levels (8-11) 
+ *   to distribute JIT load for Settings, Log, Ribbons, and GNSS Detail 
+ *   components respectively (R2.1).
  * Sep.01.10:
  * - Issue #882 Hardening: Segmented composition logic based on hydrationLevel 
  *   to remediate 1074ms Davey. Delayed heavy components (StatusBar, Dashboard) 
  *   until higher hydration levels to distribute JIT compilation load (R2.1/R882).
- * Aug.29.11:
- * - UI Refinement: Added visual indicator for Ultra-Long Stationary state (R765).
  */
 
 @Composable
@@ -328,6 +330,7 @@ fun ViewerScreen(
             }
         }
 
+        // Issue #885: Staggered overlay composition to distribute JIT load.
         if (isSettingsOpen && uiState.hydrationLevel >= 8) {
             SettingsOverlay(
                 activeSubSettings = uiState.navigation.activeSubSettings,
@@ -365,7 +368,7 @@ fun ViewerScreen(
                 onShowPhoneSetup = { viewModel.onEvent(UiEvent.TogglePhoneSetup(true)) },
                 onEvent = { viewModel.onEvent(it) }
             )
-        } else if (isLogVisible && uiState.hydrationLevel >= 8) {
+        } else if (isLogVisible && uiState.hydrationLevel >= 9) {
             val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()
             val showRecovered by viewModel.repository.logFilterRecovered.collectAsStateWithLifecycle()
             LogOverlay(
@@ -377,7 +380,7 @@ fun ViewerScreen(
                 systemPulse = systemPulse,
                 isTelemetryFresh = dashboardState.isTelemetryFresh
             )
-        } else if (isRibbonsVisible && uiState.hydrationLevel >= 8) {
+        } else if (isRibbonsVisible && uiState.hydrationLevel >= 10) {
             RibbonsOverlay(
                 isStrictMode = uiState.navigation.isStrictMode,
                 replayCursorTs = uiState.navigation.replayCursorTs,
@@ -391,7 +394,7 @@ fun ViewerScreen(
                 onScrub = { viewModel.onEvent(UiEvent.SetReplayCursor(it)) },
                 onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) }
             )
-        } else if (isGnssDetailVisible && uiState.hydrationLevel >= 8) {
+        } else if (isGnssDetailVisible && uiState.hydrationLevel >= 11) {
             GnssDetailOverlay(
                 gnssDetailFlow = viewModel.activeGnssDetail,
                 onClose = { viewModel.onEvent(UiEvent.ToggleGnssDetail(false)) }
