@@ -1,24 +1,25 @@
-# Handover (Sep.01.23) - Issue #891 VERIFIED
+# Handover (Sep.01.25) - Issue #892 VERIFIED
 
 ## 🎯 Current Status
-- **Goal**: Final hardware validation of teardown sequencing.
-- **Status**: 🟢 **Issue #891 VERIFIED & RESOLVED**.
-- **Version**: `Sep.01.23`
+- **Goal**: Resolve boot crash and stabilize hardware teardown.
+- **Status**: 🟢 **Issue #892 VERIFIED**. 🔴 **Issue #893 & #894 IDENTIFIED**.
+- **Version**: `Sep.01.25`
 - **Database**: v75
-- **Current Audit Baseline**: SOT: 233 (36 Arch + 197 Func), Resolved: 812, Open: 19, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 231, QA Status: 219 Validated.
+- **Current Audit Baseline**: SOT: 233 (36 Arch + 197 Func), Resolved: 814, Open: 20, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 233, QA Status: 220 Validated.
 
-## 🧬 Forensic State Snapshot: Sep.01.23
+## 🧬 Forensic State Snapshot: Sep.01.25
 - **Validation Details**: 
-    - Physical deployment to SM-A155F confirmed zero `BaseEventQueue.dispose` warnings during service destruction.
-    - Timing logs show Location/GNSS unregistration completing within 1-5ms, followed by sensor and display settling.
-    - Settling window of 800ms is stable and provides sufficient buffer for Samsung's `FusedLocationProvider` native cleanup.
+    - Verified `vSep.01.24` deployment on SM-A155F.
+    - `WorkManager` manual initialization successful; `BootWorker` executed without `IllegalStateException`.
+    - Identified lingering `BaseEventQueue.dispose` warning (Issue #893) despite 800ms settling.
+    - Identified regression in `getPackageName` log spam (Issue #894).
 - **State Changes**:
-    - Promoted Issue #891 to "Verified Resolved" in `issues.md`.
-    - Updated `versionName` to `Sep.01.23` in `app/build.gradle`.
-    - Added Simplification Idea #231 (Diagnostic Timing Abstraction).
+    - Incremented `versionName` to `Sep.01.25` in `app/build.gradle`.
+    - Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md`.
+    - Added Simplification Idea #233 (Context Shadowing) to `Simplify_Ideas2.md`.
 
 ## 🚀 Next Steps
-- **Issue Backlog**: Proceed with Issue #892 (or next in priority) from the open issues list.
-- **Simplification**: Review Idea #230 for potential centralized lifecycle management if teardown logic becomes more complex.
+- **Issue #893 Hardening**: Investigate `ManagedNetworkCallback` and `FusedLocationProvider` teardown to eliminate the remaining native disposal warning.
+- **Issue #894 Remediation**: Implement the Context Shadowing delegate to suppress `getPackageName` log spam.
 
-vSep.01.23
+vSep.01.25
