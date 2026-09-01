@@ -1,6 +1,8 @@
-# Simplification Ideas 2.0 (Sep.01.16)
+# Simplification Ideas 2.0 (Sep.01.17)
 
+*   **ManagedHardware Lifecycle Hardening (R890) - COMPLETE**: Unified `ManagedLocationCallback` unregistration and implemented a 500ms settling delay in `HardwareProvider.stop()` to resolve native `BaseEventQueue` leaks on SM-A155F (Sep.01.17).
 *   **ManagedUnregistrationDelegate (R889) - COMPLETE**: Refactored `ManagedHardware.kt` to use a common `ManagedUnregistrationHelper` for all managed callbacks, consolidating latch/timeout/fallback logic and reducing ~195 lines of boilerplate (Sep.01.16).
+*   **Hardware Lifecycle Consolidation**: Evaluate if `ManagedHardware.kt` can expose a single `ManagedLifecycleObserver` interface to reduce the number of separate callback objects in `HardwareProvider.kt`, potentially simplifying the teardown sequence further.
 *   **MapOverlayManager Scalability Hardening (R881) - COMPLETE**: Increased circleCache to 600 and implemented dynamic yielding for datasets >200 items (Sep.01.06).
 *   **Residual Hydration Davey (R880) - COMPLETE**: Remediated 751ms stall via high-granularity yielding (batch size 2) and staggered hydration delays (Sep.01.05).
 *   **Low-memory map eviction strategy (R878) - COMPLETE**: Migrated circle geometry cache to LRU `ShadowCache` and integrated `ComponentCallbacks2` for proactive memory management (Sep.01.00).

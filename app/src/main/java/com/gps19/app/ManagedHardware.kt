@@ -96,17 +96,21 @@ abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
 
 /**
  * ManagedLocationCallback: Encapsulates safe, synchronous unregistration of
- * FusedLocationProvider location updates to prevent native leaks (R747/R748).
+ * FusedLocationProvider location updates to prevent native leaks (R747/R748/R890).
  */
 abstract class ManagedLocationCallback : LocationCallback() {
-    fun unregister(client: FusedLocationProviderClient) {
-        Timber.d("ManagedLocationCallback: Starting unregistration...")
-        try {
+    fun unregister(client: FusedLocationProviderClient, handler: Handler?) {
+        ManagedUnregistrationHelper.safeUnregister(
+            "ManagedLocationCallback",
+            handler
+        ) {
             val task = client.removeLocationUpdates(this)
-            Tasks.await(task, 4000, TimeUnit.MILLISECONDS)
-            Timber.d("ManagedLocationCallback: Unregistration complete.")
-        } catch (e: Exception) {
-            Timber.e(e, "ManagedLocationCallback: Unregistration failed or timed out")
+            try {
+                Tasks.await(task, 4000, TimeUnit.MILLISECONDS)
+                Timber.d("ManagedLocationCallback: Native task await successful.")
+            } catch (e: Exception) {
+                Timber.e(e, "ManagedLocationCallback: Native task await failed")
+            }
         }
     }
 }

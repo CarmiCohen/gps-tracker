@@ -32,15 +32,12 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.01.17:
+ * - Issue #890 Hardening (R890): Unified ManagedLocationCallback hardening and 
+ *   implemented teardown settling delay to prevent native BaseEventQueue leaks.
  * Sep.01.14:
  * - Issue #888 Hardening (R888): Switched to ManagedSensorListener.unregister 
  *   for specific sensor cycling to prevent native leaks.
- * Aug.30.05:
- * - Issue #775 Remediation (R775): Hardened setPowerSaveMode to use 
- *   ManagedSensorListener.unregister for deterministic native disposal.
- * Aug.29.11:
- * - Acoustic Refinement (R762b): Refactored acoustic duty-cycle to use 
- *   SentinelValidator.computeAdaptiveAcousticOffCycle.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -321,11 +318,16 @@ class HardwareProvider @Inject constructor(
 
             val handler = hardwareHandler
             try { gnssStatusCallback.unregister(locationManager, handler) } catch (e: Exception) {}
-            activeLocationCallback?.unregister(fusedLocationClient); activeLocationCallback = null
-            revivalCallback?.unregister(fusedLocationClient); revivalCallback = null
+            // Issue #890: Hardened unregistration for location callbacks (R890)
+            activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = null
+            revivalCallback?.unregister(fusedLocationClient, handler); revivalCallback = null
             
             this.unregister(sensorManager, handler)
             displayListener.unregister(displayManager, handler)
+
+            // Issue #890: Hardened teardown settling window. 
+            // Give the native layer 500ms to finalize unregistration before thread death.
+            try { Thread.sleep(500) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
 
             hardwareThread?.quitSafely()
             try { hardwareThread?.join(1000) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
@@ -366,7 +368,8 @@ class HardwareProvider @Inject constructor(
         scope.launch(Dispatchers.Main) {
             synchronized(lifecycleLock) {
                 if (!isStarted.get()) return@synchronized
-                revivalCallback?.unregister(fusedLocationClient)
+                val handler = hardwareHandler
+                revivalCallback?.unregister(fusedLocationClient, handler)
                 val callback = object : ManagedLocationCallback() { override fun onLocationResult(p0: LocationResult) {} }
                 revivalCallback = callback
                 val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L).setMaxUpdates(1).build()
@@ -412,11 +415,12 @@ class HardwareProvider @Inject constructor(
             start() 
             fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
             val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
-            synchronized(lifecycleLock) { activeLocationCallback?.unregister(fusedLocationClient); activeLocationCallback = fusedCallback }
+            val handler = synchronized(lifecycleLock) { hardwareHandler }
+            synchronized(lifecycleLock) { activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = fusedCallback }
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval).setMinUpdateIntervalMillis(interval / 2).build()
             try { val looper = synchronized(lifecycleLock) { hardwareHandler?.looper } ?: Looper.getMainLooper(); fusedLocationClient.requestLocationUpdates(request, fusedCallback, looper) } catch (e: Exception) { close(e) }
             val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
-            awaitClose { internalJob.cancel(); synchronized(lifecycleLock) { if (activeLocationCallback == fusedCallback) activeLocationCallback = null }; fusedCallback.unregister(fusedLocationClient) }
+            awaitClose { internalJob.cancel(); synchronized(lifecycleLock) { if (activeLocationCallback == fusedCallback) activeLocationCallback = null }; fusedCallback.unregister(fusedLocationClient, handler) }
         }
     }.shareIn(scope = scope, started = SharingStarted.WhileSubscribed(5000), replay = 1)
 
@@ -519,7 +523,6 @@ class HardwareProvider @Inject constructor(
                     while (isMonitoring && !Thread.currentThread().isInterrupted) {
                         val nowRt = timeProvider.elapsedRealtime()
                         if (powerSaveMode) {
-                            // R762b: Encapsulated adaptive off-cycle logic in SentinelValidator
                             val adaptiveOffCycleMs = SentinelValidator.computeAdaptiveAcousticOffCycle(
                                 isStationary = isStationary(),
                                 stationaryStartRt = stationaryStartRt,
@@ -660,10 +663,6 @@ class HardwareProvider @Inject constructor(
     fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: () -> Unit) { synchronized(this) { this.fastPathLightBaseline = baseline; this.fastPathLightSpikeThreshold = spikeThreshold; this.onLightSpike = onSpike } }
     fun setHighLoad(high: Boolean) { this.isHighLoad = high }
     
-    /**
-     * Issue #775 Hardening: Switched to ManagedSensorListener.unregister to 
-     * ensure deterministic native disposal on the correct hardware thread (R775).
-     */
     fun setPowerSaveMode(active: Boolean) {
         synchronized(lifecycleLock) {
             if (this.powerSaveMode != active) {
@@ -686,7 +685,6 @@ class HardwareProvider @Inject constructor(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !systemStatusProvider.isActivityRecognitionGranted()) { isStepDetectorRegistered = false; return@launch }
                 val targetHandler = synchronized(lifecycleLock) { if (!isStarted.get()) return@launch; hardwareHandler } ?: return@launch
                 withContext(targetHandler.asCoroutineDispatcher()) { 
-                    // Issue #888 Hardening: Use managed unregistration (R888)
                     unregister(sensorManager, detector, targetHandler)
                     synchronized(lifecycleLock) { 
                         if (isStarted.get()) isStepDetectorRegistered = sensorManager.registerListener(this@HardwareProvider, detector, android.hardware.SensorManager.SENSOR_DELAY_NORMAL, hardwareHandler) 
