@@ -2,6 +2,11 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Sep.01.26 (vSep.01.26)
+*   **Issue #894 RESOLVED: logcat Overhead (getPackageName Spam)**.
+    *   **Problem**: Persistent `getPackageName` and `getOpPackageName` logcat spam on certain devices due to high-frequency system service lookups.
+    *   **Remediation**: Implemented `ContextShadow` delegate (R894) to wrap the application context and provide cached package identifiers via the `ShadowCache`, bypassing framework IPC.
+
 ## 🟢 Sep.01.25 (vSep.01.25)
 *   **Issue #892 VERIFIED: WorkManager Initialization Failure**. 
     *   **Validation**: Deployment of vSep.01.24 confirmed `BootWorker` executes successfully without `IllegalStateException`. (Sep.01.25).

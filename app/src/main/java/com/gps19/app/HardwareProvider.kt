@@ -32,6 +32,9 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.01.27:
+ * - Issue #894 Remediation: Integrated ContextShadow delegate to eliminate 
+ *   getPackageName log spam during system service calls (R894).
  * Sep.01.21:
  * - Issue #891 Hardening: Repaired ForensicSnapshot property declarations and 
  *   finalized teardown sequencing logs to isolate native disposal failures (R891).
@@ -45,10 +48,12 @@ class HardwareProvider @Inject constructor(
     private val systemStatusProvider: SystemStatusProvider
 ) : ManagedSensorListener() {
 
-    private val locationManager by lazy { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
-    private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
-    private val sensorManager by lazy { context.getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager }
-    private val displayManager by lazy { context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager }
+    private val shadowContext = ContextShadow(context)
+
+    private val locationManager by lazy { shadowContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
+    private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(shadowContext) }
+    private val sensorManager by lazy { shadowContext.getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager }
+    private val displayManager by lazy { shadowContext.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager }
 
     private var hardwareThread: HandlerThread? = null
     private var hardwareHandler: Handler? = null
@@ -204,7 +209,7 @@ class HardwareProvider @Inject constructor(
         var peakVerticalVelocity = 0.0; var peakVerticalVelocityTs = 0L; var peakVerticalVelocityRt = 0L
         var plungeMatched = false; var peakVerticalDisplacement = 0.0; var proximityIdx = 0.0
         var proximityCm = 0.0; var proximityDebounceMs = 0L; var vibrationRollingSum = 0.0
-        var acousticPeak = 0.0; var acousticMin = 0.0; var kineticEnergy = 0.0
+        var acousticPeak = 0.0; var acousticPeakMin = 0.0; var kineticEnergy = 0.0
 
         fun reset() {
             vibration = 0.0; heading = 0.0; baroAlt = 0.0; lux = 0.0
@@ -212,7 +217,7 @@ class HardwareProvider @Inject constructor(
             peakVerticalVelocity = 0.0; peakVerticalVelocityTs = 0L; peakVerticalVelocityRt = 0L
             plungeMatched = false; peakVerticalDisplacement = 0.0; proximityIdx = 0.0
             proximityCm = 0.0; proximityDebounceMs = 0L; vibrationRollingSum = 0.0
-            acousticPeak = 0.0; acousticMin = 0.0; kineticEnergy = 0.0
+            acousticPeak = 0.0; acousticPeakMin = 0.0; kineticEnergy = 0.0
         }
     }
 
@@ -289,7 +294,7 @@ class HardwareProvider @Inject constructor(
             }
             
             val handler = hardwareHandler
-            if (handler != null && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            if (handler != null && ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 try {
                     locationManager.registerGnssStatusCallback(gnssStatusCallback, handler)
                     Timber.d("HardwareProvider: GNSS callback registered.")
@@ -334,9 +339,9 @@ class HardwareProvider @Inject constructor(
             displayListener.unregister(displayManager, handler)
 
             // Issue #891: Hardened teardown settling window. 
-            // Give the native layer 500ms to finalize unregistration before thread death.
-            Timber.d("HardwareProvider: Entering 500ms settling window...")
-            try { Thread.sleep(500) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
+            // Give the native layer 800ms to finalize unregistration before thread death.
+            Timber.d("HardwareProvider: Entering 800ms settling window...")
+            try { Thread.sleep(800) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
 
             Timber.d("HardwareProvider: Quitting hardware thread...")
             hardwareThread?.quitSafely()
@@ -377,7 +382,7 @@ class HardwareProvider @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        if (!isStarted.get() || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        if (!isStarted.get() || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         scope.launch(Dispatchers.Main) {
             synchronized(lifecycleLock) {
                 if (!isStarted.get()) return@synchronized
@@ -576,7 +581,7 @@ class HardwareProvider @Inject constructor(
         return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeLogicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(m, false)) }) {
             synchronized(this) {
                 val snapshot = logicSnapshotPool[logicSnapshotIdx]; logicSnapshotIdx = (logicSnapshotIdx + 1) % logicSnapshotPool.size
-                snapshot.apply { reset(); vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = logicPeakVibration; peakVerticalVelocity = logicPeakVerticalVelocity; peakVerticalVelocityTs = logicPeakVerticalVelocityTs; peakVerticalVelocityRt = logicPeakVerticalVelocityRt; plungeMatched = !isWarming && plungeMatched; peakVerticalDisplacement = logicPeakVerticalDisplacement; proximityIdx = this@HardwareProvider.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareProvider.proximityDebounceMs; vibrationRollingSum = this@HardwareProvider.vibrationRollingSum; acousticPeak = logicPeakDb; acousticMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareProvider.currentKineticEnergy }
+                snapshot.apply { reset(); vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = logicPeakVibration; peakVerticalVelocity = logicPeakVerticalVelocity; peakVerticalVelocityTs = logicPeakVerticalVelocityTs; peakVerticalVelocityRt = logicPeakVerticalVelocityRt; plungeMatched = !isWarming && plungeMatched; peakVerticalDisplacement = logicPeakVerticalDisplacement; proximityIdx = this@HardwareProvider.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareProvider.proximityDebounceMs; vibrationRollingSum = this@HardwareProvider.vibrationRollingSum; acousticPeak = logicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareProvider.currentKineticEnergy }
                 logicPeakVibration = 0.0; logicPeakVerticalVelocity = 0.0; logicPeakVerticalVelocityTs = 0L; logicPeakVerticalVelocityRt = 0L; logicPeakVerticalDisplacement = 0.0; plungeMatched = false; logicPeakDb = 0.0; logicMinDb = 100.0; snapshot
             }
         }
@@ -586,7 +591,7 @@ class HardwareProvider @Inject constructor(
         return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeForensicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(m, false)) }) {
             synchronized(this) {
                 val snapshot = forensicSnapshotPool[forensicSnapshotIdx]; forensicSnapshotIdx = (forensicSnapshotIdx + 1) % forensicSnapshotPool.size
-                snapshot.apply { reset(); vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = forensicPeakVibration; peakVerticalVelocity = forensicPeakVerticalVelocity; peakVerticalVelocityTs = forensicPeakVerticalVelocityTs; peakVerticalVelocityRt = forensicPeakVerticalVelocityRt; plungeMatched = false; peakVerticalDisplacement = forensicPeakVerticalDisplacement; proximityIdx = this@HardwareProvider.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareProvider.proximityDebounceMs; vibrationRollingSum = this@HardwareProvider.vibrationRollingSum; acousticPeak = forensicPeakDb; acousticMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareProvider.currentKineticEnergy }
+                snapshot.apply { reset(); vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = forensicPeakVibration; peakVerticalVelocity = forensicPeakVerticalVelocity; peakVerticalVelocityTs = forensicPeakVerticalVelocityTs; peakVerticalVelocityRt = forensicPeakVerticalVelocityRt; plungeMatched = false; peakVerticalDisplacement = forensicPeakVerticalDisplacement; proximityIdx = this@HardwareProvider.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareProvider.proximityDebounceMs; vibrationRollingSum = this@HardwareProvider.vibrationRollingSum; acousticPeak = forensicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareProvider.currentKineticEnergy }
                 forensicPeakVibration = 0.0; forensicPeakVerticalVelocity = 0.0; forensicPeakVerticalVelocityTs = 0L; forensicPeakVerticalVelocityRt = 0L; forensicPeakVerticalDisplacement = 0.0; forensicPeakDb = 0.0; forensicMinDb = 100.0; snapshot
             }
         }

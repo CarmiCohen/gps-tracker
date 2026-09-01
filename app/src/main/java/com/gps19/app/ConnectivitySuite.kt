@@ -33,13 +33,11 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.01.26:
+ * - Issue #894 Remediation: Integrated ContextShadow delegate to eliminate 
+ *   getPackageName log spam during ConnectivityManager interactions (R894).
  * Aug.31.12:
  * - Issue #877 Remediation: Implemented post-connection settling window (R877). 
- *   Added 500ms settling delay to flushPendingUpdates() to prevent Main-thread 
- *   starvation when map hydration triggers simultaneously with a relay connection.
- * Aug.31.00:
- * - Issue #782: Protocol Audit - Binary Schema Expansion. Integrated 
- *   violationUptimeMs and isUltraLongStationary into handleBinaryUpdate (R782).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -56,13 +54,15 @@ class ConnectivitySuite @Inject constructor(
     private val mainRepository: MainRepository,
     private val remoteStatusRepository: RemoteStatusRepository
 ) {
+    private val shadowContext = ContextShadow(context)
+
     private val _connectivityEvents = MutableSharedFlow<ConnectivityEvent>(
         extraBufferCapacity = 16,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     val connectivityEvents: SharedFlow<ConnectivityEvent> = _connectivityEvents.asSharedFlow()
 
-    private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val connectivityManager = shadowContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val isStarted = AtomicBoolean(false)
     private val isStopped = AtomicBoolean(false)
     private val consecutiveHttpFailures = AtomicInteger(0)
@@ -671,7 +671,7 @@ class ConnectivitySuite @Inject constructor(
                 type = "event",
                 isImportant = true
             ))
-            Handler(Looper.getMainLooper()).post { Toast.makeText(context, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show() }
+            Handler(Looper.getMainLooper()).post { Toast.makeText(shadowContext, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show() }
             _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now)
             return
