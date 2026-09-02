@@ -32,6 +32,9 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Sep.03.25:
+ * - Idea #240: ContextShadow Automation. Updated AudioSynthesizer calls to use 
+ *   the injected instance from viewModel (R-ID 240).
  * Sep.02.68:
  * - Idea #243: Flattened StatusBar indicator chain. Updated GlobalStatusBar 
  *   call to use unified HudState and fixed parameter naming in ViewerDashboard (R243).
@@ -351,13 +354,13 @@ fun ViewerScreen(
                 onUpdateAlarmVolume = { viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(uiState.draftSettings.alertSettings.copy(alarmVolume = it))) },
                 onTestSiren = { 
                     if (diagnosticState.isSirenPlaying) {
-                        AudioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
+                        viewModel.audioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
                     } else {
                         val s = uiState.draftSettings.alertSettings
                         val volume = if (s.useMaxVolume) 1.0f else if (s.useCustomVolume) s.alarmVolume else 1.0f
-                        AudioSynthesizer.playSiren(
+                        viewModel.audioSynthesizer.playSiren(
                             uiState.selectedSirenType, force = true, volume = volume, 
-                            overrideSilence = s.overrideSilence, context = context, 
+                            overrideSilence = s.overrideSilence,
                             loop = true, vibrate = s.vibrationEnabled,
                             timeProvider = viewModel.timeProvider
                         )

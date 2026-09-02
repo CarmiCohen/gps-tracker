@@ -32,6 +32,9 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.02.70:
+ * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
+ *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 244).
  * Sep.02.45:
  * - Issue #122 Hardening: Enhanced stop() with forensic duration tracking and summary 
  *   reporting to verify the 800ms settling window's effectiveness (R891/R-ID 197).
@@ -39,22 +42,15 @@ import kotlin.math.*
  * - Issue #893 Hardening: Audited and verified all native listener unregistrations 
  *   (GNSS, Location, Sensors, Display) for Looper alignment and deterministic 
  *   settling windows to eliminate BaseEventQueue leaks on Android 15 (R893).
- * - Rule 1.15 Enforcement: Standardized all FusedLocationProvider registrations 
- *   to MainLooper for alignment with synchronous teardown logic (R893).
- * Sep.01.27:
- * - Issue #894 Remediation: Integrated ContextShadow delegate to eliminate 
- *   getPackageName log spam during system service calls (R894).
  */
 @Singleton
 class HardwareProvider @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val shadowContext: Context,
     @ApplicationScope private val scope: CoroutineScope,
     private val timeProvider: TimeProvider,
     private val systemMonitor: SystemMonitor,
     private val systemStatusProvider: SystemStatusProvider
 ) : ManagedSensorListener() {
-
-    private val shadowContext = ContextShadow(context)
 
     private val locationManager by lazy { shadowContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(shadowContext) }

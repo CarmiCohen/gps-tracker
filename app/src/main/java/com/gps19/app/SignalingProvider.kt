@@ -28,6 +28,10 @@ sealed class SignalingEvent {
 
 /**
  * Interface for signaling implementations (Socket.io, MQTT, etc.)
+ * Sep.02.70:
+ * - Idea #239: Signaling Interface Consolidation. Removed redundant emitMap 
+ *   and emitBinary overloads in favor of a unified transmit(TrackerStatus) 
+ *   entry point to simplify the telemetry pipeline (R-ID 239).
  */
 interface SignalingProvider {
     val signalingFlow: SharedFlow<SignalingEvent>
@@ -39,9 +43,18 @@ interface SignalingProvider {
     fun isConnecting(): Boolean
     fun getRtt(): Int
     fun clearRtt()
+    
+    /**
+     * emit: Retained for generic JSON commands (ping, pong, leave, join).
+     */
     fun emit(event: String, data: JSONObject, priority: SignalingPriority = SignalingPriority.NORMAL)
-    fun emitMap(event: String, data: Map<String, Any?>, priority: SignalingPriority = SignalingPriority.NORMAL) 
-    fun emitBinary(event: String, routingId: String, data: ByteArray, length: Int = data.size, priority: SignalingPriority = SignalingPriority.NORMAL)
+    
+    /**
+     * transmit: Unified telemetry transmission. 
+     * Handles internal serialization (Protobuf/JSON) and routing.
+     */
+    fun transmit(status: TrackerStatus, priority: SignalingPriority = SignalingPriority.NORMAL, fromViewer: Boolean = false)
+
     fun getLastRelayTrafficTs(): Long
     fun setConnectionLostCallback(callback: () -> Unit)
 }

@@ -13,20 +13,25 @@ import kotlinx.coroutines.*
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.math.exp
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
+ * Sep.03.25:
+ * - Idea #240: ContextShadow Automation. Migrated to @Singleton class with 
+ *   @ShadowContext injection to eliminate manual wrapper logic (R-ID 240).
  * Sep.02.50:
  * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber 
  *   to ensure log spillage protection on Samsung A15/G990 hardware (R759).
- * Sep.02.43:
- * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
- *   getPackageName log spam during system service lookups (R1.14).
  */
-object AudioSynthesizer {
+@Singleton
+class AudioSynthesizer @Inject constructor(
+    @ShadowContext private val shadowContext: Context
+) {
     private val isLooping = AtomicBoolean(false)
     private val isForced = AtomicBoolean(false)
     private val silencedUntilRt = AtomicLong(0)
@@ -64,7 +69,6 @@ object AudioSynthesizer {
         force: Boolean = false, 
         volume: Float = 1.0f, 
         overrideSilence: Boolean = true, 
-        context: Context? = null, 
         loop: Boolean = true,
         vibrate: Boolean = false,
         timeProvider: TimeProvider,
@@ -77,9 +81,7 @@ object AudioSynthesizer {
 
         if (!force && timeProvider.elapsedRealtime() < silencedUntilRt.get()) return
         
-        val shadowContext = context?.let { ContextShadow(it) }
-
-        if (shadowContext != null && !overrideSilence) {
+        if (!overrideSilence) {
             val am = shadowContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             if (am.ringerMode != AudioManager.RINGER_MODE_NORMAL) {
                 Timber.d("Siren suppressed by silence setting")
@@ -97,7 +99,7 @@ object AudioSynthesizer {
             try {
                 Timber.d("Siren loop started: $type (force=$force, loop=$loop)")
                 val startRt = timeProvider.elapsedRealtime()
-                val vibrator = if (vibrate && shadowContext != null) shadowContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator else null
+                val vibrator = if (vibrate) shadowContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator else null
 
                 while (isActive) {
                     val nowRt = timeProvider.elapsedRealtime()

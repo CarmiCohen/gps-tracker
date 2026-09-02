@@ -10,7 +10,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.widget.Toast
-import com.google.protobuf.CodedOutputStream
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -35,6 +34,13 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.03.25:
+ * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
+ *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 240).
+ * Sep.03.22:
+ * - Idea #239: Signaling Interface Consolidation. Removed local Protobuf 
+ *   serialization logic and redundant emit proxies. Delegated telemetry 
+ *   transmission and schema enforcement to SignalingProvider.transmit() (R-ID 239).
  * Sep.03.02:
  * - Issue #197 Hardening: Enhanced stop() with forensic duration tracking to 
  *   ensure parity with HardwareProvider's teardown auditing (R-ID 197).
@@ -47,7 +53,7 @@ sealed class ConnectivityEvent {
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val shadowContext: Context,
     private val settingsRepository: SettingsRepository,
     private val telemetryRepository: TelemetryRepository,
     private val logManagerProvider: Provider<LogManager>,
@@ -60,8 +66,6 @@ class ConnectivitySuite @Inject constructor(
     private val mainRepository: MainRepository,
     private val remoteStatusRepository: RemoteStatusRepository
 ) {
-    private val shadowContext = ContextShadow(context)
-
     private val _connectivityEvents = MutableSharedFlow<ConnectivityEvent>(
         extraBufferCapacity = 16,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
@@ -80,10 +84,6 @@ class ConnectivitySuite @Inject constructor(
     private var lastReconnectTs = 0L 
     private var lastForceJoinTs = 0L 
     private var lastConnectionSuccessRt = 0L
-
-    private val statusBuilder = RealtimeStatus.newBuilder()
-    private var serializationBuffer = ByteArray(4096) 
-    private val MAX_SERIALIZATION_BUFFER_SIZE = 65536 // 64KB Safety Clamp
 
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
@@ -129,6 +129,7 @@ class ConnectivitySuite @Inject constructor(
     val isTrackerLocationPending get() = trackerStatus.isLocationPending
     val trackerLocationPendingReason get() = trackerStatus.locationPendingReason
     val trackerLocationDetail get() = trackerStatus.gnssDetail
+    val isTrackerBatteryWhitelisted get() = trackerStatus.isBatteryWhitelisted
     val isTrackerBatterySteepDischarge get() = trackerStatus.isBatterySteepDischarge
     val isTrackerCoolingModeActive get() = trackerStatus.isCoolingModeActive
     val isTrackerBatteryLow get() = trackerStatus.isBatteryLow
@@ -438,36 +439,9 @@ class ConnectivitySuite @Inject constructor(
         return success
     }
 
-    @Synchronized
     private fun sendTelemetryInternal(status: TrackerStatus, priority: SignalingPriority): Boolean {
         if (!isConnected()) return false
-        if (isTrackerMode) {
-            status.writeTo(statusBuilder, false)
-            statusBuilder.setKineticEnergy(status.kineticEnergy)
-            
-            val message = statusBuilder.buildPartial()
-            val size = message.serializedSize
-            
-            if (size > serializationBuffer.size && size <= MAX_SERIALIZATION_BUFFER_SIZE) {
-                val nextSize = (serializationBuffer.size * 2).coerceAtLeast(size).coerceAtMost(MAX_SERIALIZATION_BUFFER_SIZE)
-                serializationBuffer = ByteArray(nextSize)
-            }
-
-            if (size <= serializationBuffer.size) {
-                try {
-                    val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
-                    message.writeTo(cos)
-                    cos.checkNoSpaceLeft()
-                    signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size, priority)
-                    return true
-                } catch (e: Exception) {
-                    Timber.e(e, "Pre-allocated serialization failed")
-                }
-            }
-            signalingProvider.emitBinary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray(), priority = priority)
-        } else {
-            signalingProvider.emitMap("location_update", status.toMap(true), priority)
-        }
+        signalingProvider.transmit(status, priority, fromViewer = !isTrackerMode)
         return true
     }
 
@@ -530,7 +504,7 @@ class ConnectivitySuite @Inject constructor(
             tiltIdx = tiltIdx, baroIdx = baroIdx,
             micPending = micPending, isSitDetected = isSitDetected, isSitActive = isSitActive, lastSitTs = lastSitTs,
             verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs, sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
-            kineticEnergy = kineticEnergy, isAdaptiveJump = isAdaptiveJump,
+            kineticEnergy = kineticEnergy, isAdaptiveJump = if (isTrackerMode) isAdaptiveJump else false,
             isBatteryLow = isBatteryLow, isBatteryCritical = isBatteryCritical,
             isUltraLongStationary = isUltraLongStationary
         )
@@ -888,9 +862,6 @@ class ConnectivitySuite @Inject constructor(
     
     fun emit(event: String, data: JSONObject, priority: SignalingPriority = SignalingPriority.NORMAL) { 
         if (!isStopped.get()) signalingProvider.emit(event, data, priority) 
-    }
-    fun emitBinary(event: String, routingId: String, data: ByteArray, priority: SignalingPriority = SignalingPriority.NORMAL) { 
-        if (!isStopped.get()) signalingProvider.emitBinary(event, routingId, data, priority = priority) 
     }
 
     fun updateRelayStatus(connected: Boolean) { telemetryRepository.updateRelayStatus(connected) }

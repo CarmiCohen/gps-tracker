@@ -30,15 +30,15 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.03.25:
+ * - Idea #240: ContextShadow Automation. Migrated AudioSynthesizer dependency 
+ *   to injection (R-ID 240).
  * Sep.02.01:
  * - Issue #897: Propagated vibrationSensitivity and tiltSensitivity from 
  *   AlertSettings to AlarmEvaluationState (R2.3).
  * Aug.07.131:
  * - Issue #124: GPS Hardware Revival Hardening (R124). Propagating 
  *   isGpsHardwareLock to SystemHealthState in evaluateAlarms.
- * Aug.04.55:
- * - Issue #716: Forensic Audit: Critical Battery Sentinel. Updated evaluateAlarms 
- *   to propagate vibration to SystemHealthState for correlated alerting (R716).
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -46,7 +46,8 @@ class AppAlarmManager @Inject constructor(
     private val repository: MainRepository,
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val audioSynthesizer: AudioSynthesizer
 ) {
     private val _alarmEvents = MutableSharedFlow<AlarmEvent>(
         extraBufferCapacity = 64,
@@ -107,7 +108,7 @@ class AppAlarmManager @Inject constructor(
         if (!hasUnresolvedAlarms()) return false
         val nowRt = timeProvider.elapsedRealtime()
         if (nowRt - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) return false
-        if (nowRt < AudioSynthesizer.getSilencedUntilRt()) return false
+        if (nowRt < audioSynthesizer.getSilencedUntilRt()) return false
         return true
     }
     

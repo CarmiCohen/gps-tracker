@@ -61,6 +61,9 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.03.25:
+ * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
+ *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 240).
  * Sep.02.43:
  * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
  *   getPackageName log spam during system service lookups (R1.14).
@@ -103,11 +106,9 @@ interface SystemStatusProvider {
 
 @Singleton
 class SystemStatusProviderImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val shadowContext: Context,
     @ApplicationScope private val externalScope: CoroutineScope
 ) : SystemStatusProvider {
-
-    private val shadowContext = ContextShadow(context)
 
     private val powerManager by lazy { shadowContext.getSystemService(Context.POWER_SERVICE) as PowerManager }
     private val connectivityManager by lazy { shadowContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager }

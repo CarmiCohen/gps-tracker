@@ -33,6 +33,9 @@ sealed class CommandEvent {
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Sep.03.25:
+ * - Idea #240: ContextShadow Automation. Migrated AudioSynthesizer dependency 
+ *   to injection (R-ID 240).
  * Aug.28.04:
  * - Issue #753 Hardening: Refactored power and legacy receivers to use 
  *   ManagedBroadcastReceiver for deterministic native resource cleanup (R753).
@@ -50,7 +53,8 @@ class CommandRouter @Inject constructor(
     private val locationProcessor: LocationProcessor,
     private val repository: MainRepository,
     private val integrityMonitor: IntegrityMonitor,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val audioSynthesizer: AudioSynthesizer
 ) {
     private val isRegistered = AtomicBoolean(false)
     private val isObserving = AtomicBoolean(false)
@@ -110,7 +114,7 @@ class CommandRouter @Inject constructor(
                             alarmManager.dismissResolvedAlarms()
                             integrityMonitor.clearPowerTamper()
                             sessionManager.notifyTamperCleared() 
-                            AudioSynthesizer.stopSiren(timeProvider = timeProvider)
+                            audioSynthesizer.stopSiren(timeProvider = timeProvider)
                             notificationManager.cancelAlarm()
                         }
                         is UiCommand.ClearTrails -> repository.clearTrails()
@@ -142,19 +146,18 @@ class CommandRouter @Inject constructor(
                                 try {
                                     logManager.logServiceEvent("TEST ALARM: Triggering 3s physical siren", true)
                                     val sirenType = repository.getString(SELECTED_SIREN_KEY, "Siren")
-                                    AudioSynthesizer.playSiren(
+                                    audioSynthesizer.playSiren(
                                         type = sirenType,
                                         force = true,
                                         volume = 1.0f,
                                         overrideSilence = true,
-                                        context = context,
                                         loop = true,
                                         vibrate = true,
                                         timeProvider = timeProvider,
                                         isTrackerMode = false 
                                     )
                                     delay(3000)
-                                    AudioSynthesizer.stopSiren(0, timeProvider = timeProvider)
+                                    audioSynthesizer.stopSiren(0, timeProvider = timeProvider)
                                     logManager.logServiceEvent("TEST ALARM: Siren stopped")
                                 } catch (e: Exception) {
                                     if (e is CancellationException) throw e

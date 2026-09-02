@@ -21,6 +21,14 @@ import javax.inject.Singleton
 @Retention(AnnotationRetention.BINARY)
 annotation class ApplicationScope
 
+/**
+ * ShadowContext: Qualifier for the ContextShadow wrapper used to optimize 
+ * system service interactions (R894).
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class ShadowContext
+
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class AppModule {
@@ -53,6 +61,17 @@ abstract class AppModule {
             return CoroutineScope(SupervisorJob() + Dispatchers.Main)
         }
 
+        /**
+         * provideContextShadow: Automates the creation of the shadowed context (Idea #240).
+         * This ensures all system service callers use the IPC-optimized wrapper by default.
+         */
+        @Provides
+        @Singleton
+        @ShadowContext
+        fun provideContextShadow(@ApplicationContext context: Context): Context {
+            return ContextShadow(context)
+        }
+
         @Provides
         @Singleton
         fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
@@ -66,7 +85,6 @@ abstract class AppModule {
                 AppDatabase.MIGRATION_56_57,
                 AppDatabase.MIGRATION_57_58,
                 AppDatabase.MIGRATION_58_59,
-                AppDatabase.MIGRATION_59_60,
                 AppDatabase.MIGRATION_60_61,
                 AppDatabase.MIGRATION_61_62,
                 AppDatabase.MIGRATION_62_63,
@@ -78,7 +96,6 @@ abstract class AppModule {
                 AppDatabase.MIGRATION_68_69,
                 AppDatabase.MIGRATION_69_70,
                 AppDatabase.MIGRATION_70_71,
-                AppDatabase.MIGRATION_71_72,
                 AppDatabase.MIGRATION_72_73
             )
             .fallbackToDestructiveMigration()

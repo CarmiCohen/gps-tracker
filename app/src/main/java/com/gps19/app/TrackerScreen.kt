@@ -29,6 +29,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Sep.03.25:
+ * - Idea #240: ContextShadow Automation. Updated AudioSynthesizer calls to use 
+ *   the injected instance from viewModel (R-ID 240).
  * Sep.02.68:
  * - Idea #243: Flattened StatusBar indicator chain. Fixed unresolved references 
  *   to dashboardState and standbyBucket in TrackerDashboard (R243).
@@ -465,13 +468,13 @@ fun TrackerScreen(
                 onUpdateAlarmVolume = { viewModel.onEvent(UiEvent.UpdateDraftAlarmVolume(it)) },
                 onTestSiren = { 
                     if (diagnosticState.isSirenPlaying) {
-                        AudioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
+                        viewModel.audioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
                     } else {
                         val s = uiState.draftSettings.alertSettings
                         val volume = if (s.useMaxVolume) 1.0f else if (s.useCustomVolume) s.alarmVolume else 1.0f
-                        AudioSynthesizer.playSiren(
+                        viewModel.audioSynthesizer.playSiren(
                             uiState.selectedSirenType, force = true, volume = volume, 
-                            overrideSilence = s.overrideSilence, context = context, 
+                            overrideSilence = s.overrideSilence, 
                             loop = true, vibrate = s.vibrationEnabled,
                             timeProvider = viewModel.timeProvider
                         )
@@ -643,7 +646,7 @@ fun TrackerDashboard(
                     viewerMaxAcc = viewerMaxAcc,
                     satsUsed = satsUsed,
                     satsView = satsView,
-                    isSatsIndexWarning = isSatsIndexWarning,
+                    isSatsIndexWarning = satsUsed < 4 || snr < 25.0,
                     snr = snr,
                     vibration = vibration,
                     heading = heading,

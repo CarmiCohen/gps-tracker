@@ -18,6 +18,9 @@ import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
+ * Sep.02.70:
+ * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
+ *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 244).
  * Sep.02.43:
  * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
  *   getPackageName log spam during NotificationManager lookups (R1.14).
@@ -26,10 +29,9 @@ import javax.inject.Singleton
  */
 @Singleton
 class AppNotificationManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ShadowContext private val shadowContext: Context
 ) {
 
-    private val shadowContext = ContextShadow(context)
     private val channelId = "location_service_channel"
     private val alarmChannelId = "alarm_service_channel"
     private val notificationId = 1919

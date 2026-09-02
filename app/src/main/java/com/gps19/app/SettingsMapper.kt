@@ -4,13 +4,11 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsMapper: Conversion logic between DataStore Protos and Domain Models.
- * Sep.02.60:
+ * Sep.02.70:
+ * - Idea #241: Protobuf Mapping Unification. Integrated TelemetryProtobufMapper 
+ *   to handle TrackerStatusProto serialization, ensuring field parity (R-ID 245).
  * - Issue #180: Proto-Mirror Parity Verification. Completed mapping for all 
- *   TrackerStatus fields including RT, forensic indices, and behavior flags (R180).
- * Aug.14.04:
- * - Issue #172: Viewer-Side State Audit. Restored SIT forensic fields (lastSitTs, 
- *   sitVz, sitDz, sitBaro, sitTilt, sitShock, verticalVelocity) to TrackerStatus 
- *   mapping to ensure mirror parity during viewer restarts (R172).
+ *   TrackerStatus fields including RT, forensic indices, and behavior flags.
  */
 object SettingsMapper {
 
@@ -101,13 +99,12 @@ object SettingsMapper {
             netInterface = s.netInterface,
             isStorageLow = s.isStorageLow,
             isStorageCritical = s.isStorageCritical,
+            isBatteryWhitelisted = s.isBatteryWhitelisted,
             isBatterySteepDischarge = s.isBatterySteepDischarge,
             isCoolingModeActive = s.isCoolingModeActive,
             currentMa = s.currentMa,
             trackerState = try { if (s.trackerState.isNullOrBlank()) TrackerState.UNKNOWN else TrackerState.valueOf(s.trackerState) } catch (e: Exception) { TrackerState.UNKNOWN },
             status = try { if (s.status.isNullOrBlank()) SentinelStatus.VALID else SentinelStatus.valueOf(s.status) } catch (e: Exception) { SentinelStatus.VALID },
-            
-            // Issue #172/180: Forensic Parity
             lastSitTs = s.lastSitTs,
             sitVz = s.sitVz,
             sitDz = s.sitDz,
@@ -120,8 +117,6 @@ object SettingsMapper {
             isBatteryLow = s.isBatteryLow,
             isBatteryCritical = s.isBatteryCritical,
             isSilentFailure = s.isSilentFailure,
-            
-            // Issue #180: Completion
             isJammer = s.isJammer,
             isStalled = s.isStalled,
             isClockRegression = s.isClockRegression,
@@ -140,98 +135,21 @@ object SettingsMapper {
             isSitActive = s.isSitActive,
             isUltraLongStationary = s.isUltraLongStationary,
             isJump = s.isJump,
-            micPending = s.micPending
+            micPending = s.micPending,
+            deviceId = s.deviceId,
+            viewerId = s.viewerId,
+            currentProximityCm = s.proximityCm,
+            proximityDebounceMs = s.proximityDebounceMs,
+            vibrationRollingSum = s.vibrationRollingSum,
+            isTrajectoryPromoted = s.isTrajectoryPromoted,
+            isSuspicious = s.isSuspicious,
+            isAnchorLocked = s.isAnchorLocked
         )
     }
 
     fun mapTrackerStatusToProto(status: TrackerStatus): TrackerStatusProto {
-        return TrackerStatusProto.newBuilder()
-            .setLat(status.lat)
-            .setLng(status.lng)
-            .setAlt(status.alt)
-            .setSpeed(status.speed)
-            .setBearing(status.bearing)
-            .setAccuracy(status.accuracy)
-            .setMaxAccuracy(status.maxAccuracy)
-            .setGpsTs(status.gpsTs)
-            .setTs(status.ts)
-            .setRt(status.rt)
-            .setBattery(status.battery)
-            .setTemp(status.temp)
-            .setMaxTemp(status.maxTemp)
-            .setIsCharging(status.isCharging)
-            .setSatsView(status.satsView)
-            .setSatsUsed(status.satsUsed)
-            .setLastConnTs(status.lastConnTs)
-            .setLastDiscTs(status.lastDiscTs)
-            .setUptimeMs(status.uptimeMs)
-            .setTotalConnectedMs(status.totalConnectedMs)
-            .setSessionConnectedMs(status.sessionConnectedMs)
-            .setTotalDropMs(status.totalDropMs)
-            .setMaxDropMs(status.maxDropMs)
-            .setMaxDropTs(status.maxDropTs)
-            .setViolationUptimeMs(status.violationUptimeMs)
-            .setViolationPercentage(status.violationPercentage)
-            .setIsPowerTamper(status.isPowerTamper)
-            .setVibration(status.vibration)
-            .setHeading(status.heading)
-            .setBaroAlt(status.baroAlt)
-            .setLux(status.lux)
-            .setIsNear(status.isNear)
-            .setTiltDegrees(status.tiltDegrees)
-            .setAcousticDb(status.acousticDb)
-            .setPeakShock(status.peakVibrationShock)
-            .setPeakShockTs(status.peakVibrationShockTs)
-            .setLuxBaseline(status.luxBaseline)
-            .setAcousticFloor(status.acousticFloorDb)
-            .setAdaptiveVibrationFloor(status.adaptiveVibrationFloor)
-            .setProxIdx(status.proxIdx)
-            .setIsTamperDetected(status.isTamperDetected)
-            .setIsPowerSaveMode(status.isPowerSaveMode)
-            .setStandbyBucket(status.standbyBucket)
-            .setNetInterface(status.netInterface)
-            .setIsStorageLow(status.isStorageLow)
-            .setIsBatterySteepDischarge(status.isBatterySteepDischarge)
-            .setIsCoolingModeActive(status.isCoolingModeActive)
-            .setIsStorageCritical(status.isStorageCritical)
-            .setCurrentMa(status.currentMa)
-            .setTrackerState(status.trackerState.name)
-            .setStatus(status.status.name)
-            
-            // Issue #172/180: Forensic Parity
-            .setLastSitTs(status.lastSitTs)
-            .setSitVz(status.sitVz)
-            .setSitDz(status.sitDz)
-            .setSitBaro(status.sitBaro)
-            .setSitTilt(status.sitTilt)
-            .setSitShock(status.sitShock)
-            .setVerticalVelocity(status.verticalVelocity)
-            .setKineticEnergy(status.kineticEnergy)
-            .setIsAdaptiveJump(status.isAdaptiveJump)
-            .setIsBatteryLow(status.isBatteryLow)
-            .setIsBatteryCritical(status.isBatteryCritical)
-            .setIsSilentFailure(status.isSilentFailure)
-            
-            // Issue #180: Completion
-            .setIsJammer(status.isJammer)
-            .setIsStalled(status.isStalled)
-            .setIsClockRegression(status.isClockRegression)
-            .setJumpTier(status.jumpTier)
-            .setIsLocationPending(status.isLocationPending)
-            .setLocationPendingReason(try { LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name) } catch (e: Exception) { LocationPendingReasonProto.LPR_NONE })
-            .setLastValidFixRt(status.lastValidFixRt)
-            .setSnrIdx(status.snrIdx)
-            .setNoiseIdx(status.noiseIdx)
-            .setLuxIdx(status.luxIdx)
-            .setVibeIdx(status.vibeIdx)
-            .setLiftIdx(status.liftIdx)
-            .setTiltIdx(status.tiltIdx)
-            .setBaroIdx(status.baroIdx)
-            .setIsSitDetected(status.isSitDetected)
-            .setIsSitActive(status.isSitActive)
-            .setIsUltraLongStationary(status.isUltraLongStationary)
-            .setIsJump(status.isJump)
-            .setMicPending(status.micPending)
-            .build()
+        val builder = TrackerStatusProto.newBuilder()
+        TelemetryProtobufMapper.mapToPersistence(status, builder)
+        return builder.build()
     }
 }

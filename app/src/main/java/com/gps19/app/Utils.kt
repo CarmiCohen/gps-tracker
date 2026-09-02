@@ -12,6 +12,10 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
+ * Sep.03.25:
+ * - Idea #240: ContextShadow Automation. Removed redundant manual ContextShadow 
+ *   wrapping in permission checks; callers are now expected to pass the 
+ *   injected shadowed context (R-ID 240).
  * Sep.02.43:
  * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
  *   getPackageName log spam during AppOpsManager lookups (R1.14).
@@ -56,12 +60,12 @@ fun isA15Device(): Boolean = HardwareSot.isA15(Build.MANUFACTURER, Build.BRAND, 
 
 /**
  * v9.3.11: Now requires non-null pkgName to prevent logcat spillage.
+ * R-ID 240: Callers should pass @ShadowContext.
  */
 fun isXiaomiSpecialPermissionGranted(context: Context, pkgName: String): XiaomiPermissionStatus {
     if (!isXiaomiDevice()) return XiaomiPermissionStatus.UNKNOWN
     
-    val shadowContext = ContextShadow(context)
-    val ops = shadowContext.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+    val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     return try {
         val checkOpMethod = ops.javaClass.getMethod("checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
         val myUid = GpsApplication.MY_UID
@@ -80,8 +84,7 @@ fun isXiaomiSpecialPermissionGranted(context: Context, pkgName: String): XiaomiP
 
 fun getXiaomiAutostartStatus(context: Context, pkgName: String): XiaomiPermissionStatus {
     if (!isXiaomiDevice()) return XiaomiPermissionStatus.UNKNOWN
-    val shadowContext = ContextShadow(context)
-    val ops = shadowContext.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+    val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     return try {
         val checkOpMethod = ops.javaClass.getMethod("checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
         val autostart = checkOpMethod.invoke(ops, 10008, GpsApplication.MY_UID, pkgName) as Int

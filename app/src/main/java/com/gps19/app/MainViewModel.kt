@@ -36,14 +36,11 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * Sep.03.22:
+ * Sep.02.70:
+ * - Idea #240: ContextShadow Automation. Migrated AudioSynthesizer dependency 
+ *   to injection (R-ID 240).
  * - Issue #245 RESOLVED: "SYS" Badge Deactivation. Integrated ManualExit into 
  *   session termination logic to ensure IS_SYSTEM_ACTIVE is toggled false (R245).
- * Sep.03.20:
- * - Issue #245 RESOLVED: "SYS" Badge Deactivation. Added handler for 
- *   ConfirmStopTracking to invoke stopTrackingSession, ensuring visual parity (R245).
- * Sep.03.19:
- * - Build Fix: Added missing clearTrails and fullInitialization bridge methods.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -62,6 +59,7 @@ class MainViewModel @Inject constructor(
     private val alertUseCase: AlertUseCase,
     private val mapUseCase: MapUseCase,
     val timeProvider: TimeProvider,
+    val audioSynthesizer: AudioSynthesizer,
     private val remoteStatusRepository: RemoteStatusRepository,
     private val hydrationManager: LifecycleHydrationManager,
     @ApplicationContext private val context: Context

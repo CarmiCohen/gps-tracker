@@ -2,6 +2,7 @@ package com.gps19.app
 
 import android.content.Context
 import android.os.SystemClock
+import com.google.protobuf.CodedOutputStream
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.socket.client.IO
@@ -21,16 +22,17 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * Sep.02.50:
- * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber 
- *   to ensure log spillage protection on Samsung A15/G990 hardware (R759).
- * Sep.03.02:
- * - Issue #197 Hardening: Enhanced disconnect() with forensic duration tracking 
- *   to ensure parity with HardwareProvider's teardown auditing (R-ID 197).
+ * Sep.02.70:
+ * - Idea #241: Protobuf Mapping Unification. Integrated TelemetryProtobufMapper 
+ *   to handle RealtimeStatus serialization, ensuring field parity across binary updates (R-ID 241).
+ * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
+ *   eliminate manual wrapper instantiation (R-ID 244).
+ * - Idea #239: Signaling Interface Consolidation. Migrated Protobuf and 
+ *   JSON serialization logic from ConnectivitySuite into transmit() (R-ID 239).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val shadowContext: Context,
     private val configManager: ConfigManager,
     private val logManager: LogManager,
     private val telemetryRepository: TelemetryRepository,
@@ -61,6 +63,11 @@ class CommunicationManager @Inject constructor(
     // Issue #171: Jitter Simulation Controls
     private val DEBUG_JITTER_SIMULATION = false // Set to true for forensic auditing
     private val jitterRandom = Random()
+
+    // Telemetry Serialization Buffers (Idea #239)
+    private val statusBuilder = RealtimeStatus.newBuilder()
+    private var serializationBuffer = ByteArray(4096)
+    private val MAX_SERIALIZATION_BUFFER_SIZE = 65536
 
     // Standardized Flow implementation
     private val _signalingFlow = MutableSharedFlow<SignalingEvent>(
@@ -382,7 +389,7 @@ class CommunicationManager @Inject constructor(
                     data.keys().forEach { incomingMap[it] = data.get(it) }
                     
                     SignalPayloadGenerator.createPongPayload(incomingMap as Map<String, Any>, deviceId, isTrackerMode)?.let { pongMap ->
-                        emitMap("pong_cmd", pongMap, SignalingPriority.HIGH)
+                        emitInternal("pong_cmd", JSONObject(pongMap), SignalingPriority.HIGH)
                     }
                     
                     _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply {
@@ -445,6 +452,46 @@ class CommunicationManager @Inject constructor(
     override fun getRtt(): Int = lastRttInternal
 
     override fun emit(event: String, data: JSONObject, priority: SignalingPriority) {
+        emitInternal(event, data, priority)
+    }
+
+    @Synchronized
+    override fun transmit(status: TrackerStatus, priority: SignalingPriority, fromViewer: Boolean) {
+        if (isStopped || !isConnected()) return
+        markTraffic()
+
+        if (isTrackerMode && !fromViewer) {
+            // Binary Protobuf Path for Trackers (R-ID 241)
+            statusBuilder.clear()
+            TelemetryProtobufMapper.mapToRealtime(status, statusBuilder, fromViewer)
+            
+            val message = statusBuilder.buildPartial()
+            val size = message.serializedSize
+            
+            if (size > serializationBuffer.size && size <= MAX_SERIALIZATION_BUFFER_SIZE) {
+                val nextSize = (serializationBuffer.size * 2).coerceAtLeast(size).coerceAtMost(MAX_SERIALIZATION_BUFFER_SIZE)
+                serializationBuffer = ByteArray(nextSize)
+            }
+
+            if (size <= serializationBuffer.size) {
+                try {
+                    val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
+                    message.writeTo(cos)
+                    cos.checkNoSpaceLeft()
+                    emitBinaryInternal("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size, priority)
+                    return
+                } catch (e: Exception) {
+                    Timber.e(e, "Pre-allocated serialization failed")
+                }
+            }
+            emitBinaryInternal("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray(), priority = priority)
+        } else {
+            // JSON/Map Path for Viewers (or remote commands)
+            emitInternal("location_update", JSONObject(status.toMap(fromViewer)), priority)
+        }
+    }
+
+    private fun emitInternal(event: String, data: JSONObject, priority: SignalingPriority) {
         if (isStopped) return
         markTraffic()
         if (priority == SignalingPriority.HIGH) {
@@ -458,21 +505,7 @@ class CommunicationManager @Inject constructor(
         }
     }
 
-    override fun emitMap(event: String, data: Map<String, Any?>, priority: SignalingPriority) {
-        if (isStopped) return
-        markTraffic()
-        if (priority == SignalingPriority.HIGH) {
-            socket?.emit(event, JSONObject(data as Map<*, *>))
-        } else {
-            if (event == "location_update") {
-                emitLocationConflated(data)
-            } else {
-                normalPriorityQueue.trySend(SignalingCommand.Emit(event, JSONObject(data as Map<*, *>)))
-            }
-        }
-    }
-
-    override fun emitBinary(event: String, routingId: String, data: ByteArray, length: Int, priority: SignalingPriority) {
+    private fun emitBinaryInternal(event: String, routingId: String, data: ByteArray, length: Int = data.size, priority: SignalingPriority) {
         if (isStopped) return
         markTraffic()
         val payload = if (length == data.size) data else Arrays.copyOf(data, length)

@@ -1,9 +1,14 @@
-# Resolution Archive (Sep.02.68)
+# Resolution Archive (Sep.02.70)
+
+## 🟢 Resolved Issues (Sep.02.70)
+*   **Idea #241: Protobuf Mapping Unification**. Consolidated mapping logic for `RealtimeStatus` (Signaling) and `TrackerStatusProto` (Persistence) into `TelemetryProtobufMapper`. Synchronized schemas to ensure 100% field parity and removed redundant serialization boilerplate from domain models (R-ID 245).
+*   **Idea #240: ContextShadow Automation**. Integrated Hilt-managed `@ShadowContext` injection across all singleton services and suites. Migrated `AudioSynthesizer` to a `@Singleton` class to support injection. This eliminates manual `ContextShadow` wrapping boilerplate and ensures consistent IPC optimization (R-ID 244).
+*   **Idea #239: Signaling Interface Consolidation**. Refactored `SignalingProvider` to remove redundant `emitMap` and `emitBinary` overloads. Migrated Protobuf and JSON telemetry serialization logic from `ConnectivitySuite` into `CommunicationManager.transmit()`, simplifying the communication pipeline (R-ID 239).
+*   **Issue #245: "SYS" Badge Deactivation lifecycle**. Added handlers for `ConfirmStopTracking` and `ManualExit` in `MainViewModel` to ensure `isSystemActive` is toggled false upon session termination, maintaining visual parity (R-ID 246).
 
 ## 🟢 Resolved Issues (Sep.02.68)
-*   **Issue #245: "SYS" Badge Deactivation lifecycle**. Added handlers for `ConfirmStopTracking` and `ManualExit` in `MainViewModel` to ensure `isSystemActive` is toggled false upon session termination, maintaining visual parity. (Sep.02.68).
-*   **Idea #243: UI State Flattening for StatusBar**. Refactored `StatusBar` and `GlobalStatusBar` to consume the unified `HudState` object. This removed over 40 individual parameters from the signature, improving code maintainability and JIT compilation efficiency on Samsung A15 hardware. (Sep.02.68).
 *   **Issue #243: GlobalStatusBar isSystemActive Pass-through**. Propagated `isSystemActive` flag from `GlobalStatusBar` to `StatusBar` via `HudConnectivityState` and implemented a "SYS" status badge for visual parity. (Sep.02.68).
+*   **Idea #243: UI State Flattening for StatusBar**. Refactored `StatusBar` and `GlobalStatusBar` to consume the unified `HudState` object. This removed over 40 individual parameters from the signature, improving code maintainability and JIT compilation efficiency on Samsung A15 hardware. (Sep.02.68).
 
 ## 🟢 Previously Resolved (Sep.03.18)
 *   **Issue #243: GlobalStatusBar isSystemActive Pass-through**. Propagated `isSystemActive` flag from `GlobalStatusBar` to `StatusBar` and implemented a "SYS" status badge to ensure visual parity of the tracking engine's state. (Sep.03.18).

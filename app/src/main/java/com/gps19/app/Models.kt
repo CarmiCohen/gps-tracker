@@ -10,14 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.02.70:
+ * - Idea #241: Protobuf Mapping Unification. Removed redundant writeTo() from 
+ *   TrackerStatus; serialization is now centralized in TelemetryProtobufMapper (R-ID 241).
  * Sep.03.06:
  * - Issue #238: Location Model Unification. Removed obsolete LocationState 
  *   class; project now standardizes on LocationUpdate (R-ID 238).
- * - Issue #238 cleanup: Moved UiEvent and UiCommand to MainUiState.kt to 
- *   unify UI state definitions and resolve redeclaration errors.
- * Aug.31.04:
- * - Issue #779 Hardening: Integrated ForensicSanitizer into TrackerStatus.toMap() 
- *   to ensure technical network metadata is scrubbed before transmission (R779).
  */
 
 sealed class AppSensorEvent {
@@ -357,69 +355,10 @@ data class TrackerStatus(
     val tiltIdx: Double = 0.0, val baroIdx: Double = 0.0, val micPending: Boolean = false,
     val kineticEnergy: Double = 0.0, val isAdaptiveJump: Boolean = false,
     val isBatteryLow: Boolean = false, val isBatteryCritical: Boolean = false, val isSilentFailure: Boolean = false,
-    val isUltraLongStationary: Boolean = false
+    val isUltraLongStationary: Boolean = false,
+    val currentProximityCm: Double = -1.0
 ) : SpatialAnchor {
     
-    fun writeTo(builder: RealtimeStatus.Builder, fromViewer: Boolean) {
-        builder.setId(deviceId)
-               .setViewerId(viewerId)
-               .setFromViewer(fromViewer)
-               .setLat(lat)
-               .setLng(lng)
-               .setAlt(alt)
-               .setSpeed(speed)
-               .setBearing(bearing)
-               .setAccuracy(accuracy)
-               .setMaxAccuracy(maxAccuracy)
-               .setGpsTs(gpsTs)
-               .setBattery(battery)
-               .setTemp(temp)
-               .setIsCharging(isCharging)
-               .setSatsView(satsView)
-               .setSatsUsed(satsUsed)
-               .setIsJammer(isJammer)
-               .setIsStalled(isStalled)
-               .setIsTamperDetected(isTamperDetected)
-               .setJumpTier(jumpTier)
-               .setIsLocationPending(isLocationPending)
-               .setLastValidFixRt(lastValidFixRt)
-               .setIsBatterySteepDischarge(isBatterySteepDischarge)
-               .setIsCoolingModeActive(isCoolingModeActive)
-               .setState(TrackerStateProto.valueOf("TS_" + trackerState.name))
-               .setSnrIdx(snrIdx)
-               .setNoiseIdx(noiseIdx)
-               .setLuxIdx(luxIdx)
-               .setVibeIdx(vibeIdx)
-               .setLiftIdx(liftIdx)
-               .setTiltIdx(tiltIdx)
-               .setBaroIdx(baroIdx)
-               .setIsSitDetected(isSitDetected)
-               .setLastSitTs(lastSitTs)
-               .setVerticalVelocity(verticalVelocity)
-               .setSitVz(sitVz)
-               .setSitVzTs(sitVzTs)
-               .setSitVzRt(sitVzRt)
-               .setSitDz(sitDz)
-               .setSitBaro(sitBaro)
-               .setSitTilt(sitTilt)
-               .setSitShock(sitShock)
-               .setIsSitActive(isSitActive)
-               .setUptimeMs(uptimeMs)
-               .setTotalConnectedMs(totalConnectedMs)
-               .setSessionConnectedMs(sessionConnectedMs)
-               .setTotalDropMs(totalDropMs)
-               .setMaxDropMs(maxDropMs)
-               .setLastConnTs(lastConnTs)
-               .setLastDiscTs(lastDiscTs)
-               .setIsClockRegression(isClockRegression)
-               .setIsAdaptiveJump(isAdaptiveJump)
-               .setIsBatteryLow(isBatteryLow)
-               .setIsBatteryCritical(isBatteryCritical)
-               .setIsSilentFailure(isSilentFailure)
-               .setViolationUptimeMs(violationUptimeMs)
-               .setIsUltraLongStationary(isUltraLongStationary)
-    }
-
     fun toMap(fromViewer: Boolean): Map<String, Any?> = mutableMapOf<String, Any?>().apply {
         put("id", SignalingConstants.getTransmissionId(deviceId)); put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
         put("from_viewer", fromViewer); put("lat", lat); put("lng", lng); put("alt", alt)

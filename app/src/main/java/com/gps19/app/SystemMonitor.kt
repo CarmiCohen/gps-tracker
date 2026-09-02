@@ -26,19 +26,19 @@ sealed class SystemMonitorEvent {
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * Sep.03.25:
+ * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
+ *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 240).
  * Sep.02.43:
  * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
  *   getPackageName log spam during system service lookups (R1.14).
  * Aug.13.08:
  * - Issue #156: WakeLock Log Saturation. Throttled WakeLock acquisition logging 
  *   to once per minute to prevent logcat saturation (R156).
- * Aug.11.09:
- * - Issue #141: Stress Recovery Verification. Implemented resetSimulatedAnomalies() 
- *   to ensure sticky stress-test states don't persist post-saturation.
  */
 @Singleton
 class SystemMonitor @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val shadowContext: Context,
     private val timeProvider: TimeProvider
 ) {
     private val _systemMonitorEvents = MutableSharedFlow<SystemMonitorEvent>(
@@ -47,7 +47,6 @@ class SystemMonitor @Inject constructor(
     )
     val systemMonitorEvents: SharedFlow<SystemMonitorEvent> = _systemMonitorEvents.asSharedFlow()
 
-    private val shadowContext = ContextShadow(context)
     private val powerManager = shadowContext.getSystemService(Context.POWER_SERVICE) as PowerManager
     private var wakeLock: PowerManager.WakeLock? = null
     private var lastScheduledWatchdogTs = 0L
