@@ -1,7 +1,7 @@
 package com.gps19.app
 
 import android.content.Context
-import android.util.Log
+import android.os.SystemClock
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.socket.client.IO
@@ -21,13 +21,12 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * Aug.31.12:
- * - Issue #877 Remediation: Refactored onConnectAction to launch in scope and 
- *   yield(). Prevents the 1.9s Davey stall by allowing the Main thread to 
- *   breathe between the connection event and the subsequent telemetry flood (R877).
- * Aug.28.07:
- * - Issue #756 Hardening: Refactored disconnect() to explicitly call socket.off() 
- *   and clear internal listeners to prevent native resource leaks (R756).
+ * Sep.02.50:
+ * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber 
+ *   to ensure log spillage protection on Samsung A15/G990 hardware (R759).
+ * Sep.03.02:
+ * - Issue #197 Hardening: Enhanced disconnect() with forensic duration tracking 
+ *   to ensure parity with HardwareProvider's teardown auditing (R-ID 197).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -113,7 +112,7 @@ class CommunicationManager @Inject constructor(
 
     private fun logToApp(message: String, important: Boolean = false) {
         if (isStopped) return
-        Log.i("GPS19_COMM", message)
+        Timber.tag("GPS19_COMM").i(message)
         logManager.submitToLogSink(message, "system", important)
     }
 
@@ -222,13 +221,9 @@ class CommunicationManager @Inject constructor(
     private fun registerSocketListeners() {
         val s = socket ?: return
 
-        // Issue #877: Segmented connection state transition to eliminate the 1.9s Davey stall.
         val onConnectAction = {
             scope.launch {
                 isConnectingInternal = false
-                
-                // R877: Explicit yield() to allow Main-thread UI frame processing before 
-                // we trigger the telemetry and room-join cascade.
                 yield()
                 
                 withContext(Dispatchers.Default) {
@@ -305,7 +300,7 @@ class CommunicationManager @Inject constructor(
                 _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(data))
             }
         } catch (e: Exception) {
-            Log.e("GPS19", "location_relay parse error")
+            Timber.e("location_relay parse error")
         }
     }
 
@@ -321,7 +316,7 @@ class CommunicationManager @Inject constructor(
                 _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
             }
         } catch (e: Exception) {
-            Log.e("GPS19", "location_relay_bin direct dispatch failure")
+            Timber.e("location_relay_bin direct dispatch failure")
         }
     }
 
@@ -519,18 +514,29 @@ class CommunicationManager @Inject constructor(
     override fun isConnecting(): Boolean = isConnectingInternal
 
     override fun disconnect() { 
+        val stopStartTime = SystemClock.elapsedRealtime()
         isStopped = true
         isConnectingInternal = false
-        queueProcessorJob?.cancel()
+        Timber.i("CommunicationManager: Starting teardown sequence (R-ID 197).")
+        
+        queueProcessorJob?.cancel(); queueProcessorJob = null
         normalPriorityQueue.close()
         scope.cancel()
         
-        // R756: Deterministic cleanup of socket and listeners
+        val socketStart = SystemClock.elapsedRealtime()
         socket?.disconnect()
         socket?.off()
         socket = null
+        val socketDuration = SystemClock.elapsedRealtime() - socketStart
         
         telemetryRepository.updateRelayStatus(false)
-        Timber.i("CommunicationManager: Disconnected and listeners cleared.")
+        
+        val totalDuration = SystemClock.elapsedRealtime() - stopStartTime
+        Timber.i("""
+            CommunicationManager: Teardown Summary (Issue #197 Verification):
+            - Total Teardown Time: ${totalDuration}ms
+            - Socket Cleanup Duration: ${socketDuration}ms
+            - Status: Clean Teardown Completed.
+        """.trimIndent())
     }
 }

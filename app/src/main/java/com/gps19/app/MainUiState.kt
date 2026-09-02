@@ -5,22 +5,19 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Sep.03.07:
+ * - Issue #238 cleanup: Moved UiEvent and UiCommand to MainUiState.kt to 
+ *   unify UI state definitions and resolve widespread unresolved reference 
+ *   errors. Restored SetStorageSimulation as a UiEvent (R-ID 238).
+ * Sep.03.04:
+ * - Issue #238: Location Model Unification. Replaced LocationState with 
+ *   LocationUpdate in KinematicState to eliminate mapping churn and 
+ *   standardize on the core engine model (R-ID 238).
  * Aug.31.07:
  * - Issue #874 Remediation: Expanded hydrationLevel to 8 levels to further 
  *   segment Map Hydration. Level 6 (Current Positions) and Level 7 (Violations) 
  *   are now separated to ensure the 700ms Davey threshold is respected on 
  *   budget hardware (R874).
- * Aug.26.16:
- * - Issue #739 Remediation: Expanded hydrationLevel to 7 levels to decompose 
- *   Map Engine initialization. Level 4 (Base), 5 (Trails), 6 (Markers/Circles), 
- *   7 (Full Map Hydration) allows staggered O(N) overlay creation (R739).
- * Aug.26.06:
- * - Issue #735 Hardening: Added isSetupBypassActive to allow developer-mode 
- *   bypass of the PhoneSetupOverlay for automated soak tests (R735).
- * Aug.26.05:
- * - Issue #323 Hardening: Added Level 4 to hydrationLevel (Idle Map Hydration) 
- *   to ensure heavy OSM engine initialization only occurs when the main 
- *   thread is free (R323).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -95,8 +92,8 @@ data class MainUiState(
             if (appMode != "tracker" && homePoints.isEmpty()) count++
             
             val configIssue = permissions.hasBackgroundRestriction && 
-                             (permissions.backgroundStatus != CapabilityStatus.GRANTED || 
-                              permissions.autostartStatus != CapabilityStatus.GRANTED) &&
+                             (permissions.backgroundStatus == CapabilityStatus.GRANTED || 
+                              permissions.autostartStatus == CapabilityStatus.GRANTED) &&
                              !(permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)
             if (configIssue) count++
             
@@ -108,8 +105,8 @@ data class MainUiState(
  * KinematicState: High-frequency transient state.
  */
 class KinematicState(
-    var localLocation: LocationState = LocationState(),
-    var trackerLocation: LocationState = LocationState(),
+    var localLocation: LocationUpdate = LocationUpdate(),
+    var trackerLocation: LocationUpdate = LocationUpdate(),
     var localHealth: SystemHealthState = SystemHealthState(),
     var trackerHealth: SystemHealthState = SystemHealthState(),
     var distanceTrackerToHome: Double? = null,
@@ -133,8 +130,8 @@ class KinematicState(
     }
 
     fun reset() {
-        localLocation.reset()
-        trackerLocation.reset()
+        localLocation = LocationUpdate()
+        trackerLocation = LocationUpdate()
         localHealth.reset()
         trackerHealth.reset()
         distanceTrackerToHome = null
@@ -263,3 +260,104 @@ data class NavigationState(
 )
 
 enum class SubSettings { ALERTS, SOUND, CLEAN }
+
+sealed class UiEvent {
+    data class ToggleMap(val visible: Boolean) : UiEvent()
+    data class ToggleLog(val visible: Boolean) : UiEvent()
+    data class ToggleSettings(val visible: Boolean) : UiEvent()
+    data class TogglePhoneSetup(val visible: Boolean) : UiEvent()
+    data class ToggleRibbons(val visible: Boolean) : UiEvent()
+    data class ToggleStrictMode(val visible: Boolean) : UiEvent()
+    data class SetRedScreenVisible(val visible: Boolean) : UiEvent()
+    data class SetDashboardExpanded(val expanded: Boolean) : UiEvent()
+    data class SetUiVisible(val visible: Boolean) : UiEvent()
+    object DismissAlarms : UiEvent()
+    data class SetAppMode(val mode: String?) : UiEvent()
+    data class SetPendingMode(val mode: String?) : UiEvent()
+    data class SetSystemActive(val active: Boolean) : UiEvent()
+    data class SetSystemMode(val mode: String) : UiEvent()
+    data class StopSiren(val causes: String? = null) : UiEvent()
+    object ResetStats : UiEvent()
+    object ClearLogs : UiEvent()
+    object ClearHomePoints : UiEvent()
+    object ManualExit : UiEvent()
+    data class LogAction(val type: String, val message: String, val isImportant: Boolean = false, val isSpecial: Boolean = false, val specialColor: Int? = null) : UiEvent()
+    data class AddHomePoint(val point: GeoPoint) : UiEvent()
+    data class RemoveHomePoint(val index: Int) : UiEvent()
+    data class SetGeofenceMode(val mode: GeofenceMode) : UiEvent()
+    data class MapTap(val point: GeoPoint) : UiEvent()
+    data class SetMaxDistance(val distance: Double) : UiEvent()
+    data class SetHomePoints(val points: List<GeoPoint>) : UiEvent()
+    object SaveHomePoints : UiEvent()
+    data class SetAlertSettings(val settings: AlertSettings) : UiEvent()
+    data class SetSirenType(val type: String) : UiEvent()
+    data class SetFenceVisible(val visible: Boolean) : UiEvent()
+    data class SetViolationsVisible(val visible: Boolean) : UiEvent()
+    data class SetGeofenceViolationsVisible(val visible: Boolean) : UiEvent() 
+    data class SetMapButtonsVisible(val visible: Boolean) : UiEvent()
+    data class SetMapLocked(val locked: Boolean) : UiEvent()
+    object MapZoomIn : UiEvent()
+    object MapZoomOut : UiEvent()
+    object CenterTracker : UiEvent()
+    object CenterViewer : UiEvent()
+    data class SetDeviceId(val id: String) : UiEvent()
+    data class SetViewerId(val id: String) : UiEvent()
+    data class SetRelayUrl(val url: String) : UiEvent()
+    data class UpdateDraftDeviceId(val id: String) : UiEvent()
+    data class UpdateDraftViewerId(val id: String) : UiEvent()
+    data class UpdateDraftRelayUrl(val url: String) : UiEvent()
+    data class UpdateDraftMaxDistance(val distance: String) : UiEvent()
+    data class UpdateDraftAlertSettings(val settings: AlertSettings) : UiEvent()
+    data class UpdateDraftAlarmVolume(val volume: Float) : UiEvent()
+    object CommitSettings : UiEvent()
+    object RefreshPermissionStatus : UiEvent()
+    object RequestTestAlarm : UiEvent()
+    data class ToggleAlertsSetup(val visible: Boolean) : UiEvent()
+    data class ToggleAlarmSoundSetup(val visible: Boolean) : UiEvent()
+    object ToggleTestSiren : UiEvent()
+    data class SetJammerSuspicion(val isJammer: Boolean) : UiEvent()
+    data class SetSignalLoss(val isSignalLoss: Boolean) : UiEvent()
+    data class BulkUpdateSettings(
+        val deviceId: String? = null,
+        val viewerId: String? = null,
+        val relayUrl: String? = null,
+        val maxDistance: Double? = null,
+        val homePoints: List<GeoPoint>? = null,
+        val alertSettings: AlertSettings? = null
+    ) : UiEvent()
+    data class ShowStopTrackingConfirmation(val show: Boolean) : UiEvent()
+    object ConfirmStopTracking : UiEvent()
+    data class SetSubSettings(val sub: SubSettings?) : UiEvent()
+    data class SetLogFilterShowDetails(val show: Boolean) : UiEvent()
+    data class SetLogFilterShowRecovered(val show: Boolean) : UiEvent()
+    data class ToggleGnssDetail(val visible: Boolean) : UiEvent()
+    object ToggleXiaomiManualOverride : UiEvent()
+    object DismissIdentitySanitization : UiEvent()
+    data class NavigateToDiagnostics(val visible: Boolean) : UiEvent()
+    object TriggerRecovery : UiEvent()
+    data class SetRecoveryPending(val pending: Boolean) : UiEvent()
+    data class SetReplayCursor(val ts: Long?) : UiEvent()
+    data class SetForensicSimulation(val active: Boolean) : UiEvent()
+    object ExecuteStressTest : UiEvent()
+    data class SetStorageSimulation(val active: Boolean, val isCritical: Boolean) : UiEvent()
+    data class SetManualSelection(val active: Boolean) : UiEvent()
+    data class SetSettlingActive(val active: Boolean) : UiEvent()
+    data class ToggleSetupBypass(val active: Boolean) : UiEvent()
+}
+
+sealed class UiCommand {
+    object SyncRequest : UiCommand()
+    data class UiVisibilityChanged(val visible: Boolean) : UiCommand()
+    data class StopSiren(val causes: String? = null) : UiCommand()
+    object ClearTrails : UiCommand()
+    object StatsReset : UiCommand()
+    object SettingsUpdated : UiCommand()
+    object ZoomIn : UiCommand()
+    object ZoomOut : UiCommand()
+    object FullInitializationReset : UiCommand()
+    object ExecuteTestAlarm : UiCommand()
+    object MapZoomIn : UiCommand()
+    object MapZoomOut : UiCommand()
+    object ExecuteStressTest : UiCommand()
+    data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : UiCommand()
+}

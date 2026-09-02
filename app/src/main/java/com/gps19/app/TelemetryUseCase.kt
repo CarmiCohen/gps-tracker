@@ -5,41 +5,44 @@ import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * Sep.03.05:
+ * - Issue #238: Location Model Unification. Refactored all mapping methods 
+ *   to use LocationUpdate as the unified model, eliminating LocationState 
+ *   to reduce allocation churn (R-ID 238).
  * Aug.31.02:
  * - Issue #762 Validation: Hardened isUltraLongStationary mapping in 
  *   mapHealthFromUpdate and mapHealthFromStatus to ensure state parity 
  *   across all ingestion paths (R765, R778).
- * Aug.10.24:
- * - Issue #130: Proto Health Parity. Synchronized isBatteryLow and isBatteryCritical 
- *   mapping across all health ingestion paths (R130).
  */
 class TelemetryUseCase @Inject constructor(
     private val timeProvider: TimeProvider
 ) {
     fun mapTrackerLocation(
         update: LocationUpdate, 
-        currentLoc: LocationState, 
+        currentLoc: LocationUpdate, 
         nowMs: Long, 
         appStartTime: Long
-    ): LocationState {
+    ): LocationUpdate {
         val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng)
         val newTimestamp = update.gpsTs
         
         val effectiveTelemetryTs = if (!update.isMe) nowMs else (if (update.ts > 0) update.ts else nowMs)
         
-        currentLoc.update(
-            lat = if (isLocationValid) update.lat else currentLoc.lat, 
-            lng = if (isLocationValid) update.lng else currentLoc.lng, 
-            speed = if (isLocationValid) update.speed else currentLoc.speed, 
-            accuracy = if (isLocationValid) update.accuracy else currentLoc.accuracy, 
-            maxAccuracy = if (update.maxAccuracy > 0.0) update.maxAccuracy else currentLoc.maxAccuracy,
-            bearing = if (isLocationValid) update.bearing else currentLoc.bearing, 
-            timestamp = if (newTimestamp > 0) newTimestamp else currentLoc.timestamp,
-            telemetryTs = effectiveTelemetryTs,
-            status = update.status,
-            trackerState = update.trackerState,
-            gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail
-        )
+        if (isLocationValid) {
+            currentLoc.lat = update.lat
+            currentLoc.lng = update.lng
+            currentLoc.speed = update.speed
+            currentLoc.accuracy = update.accuracy
+            currentLoc.bearing = update.bearing
+        }
+        if (update.maxAccuracy > 0.0) currentLoc.maxAccuracy = update.maxAccuracy
+        if (newTimestamp > 0) currentLoc.gpsTs = newTimestamp
+        
+        currentLoc.ts = effectiveTelemetryTs
+        currentLoc.status = update.status
+        currentLoc.trackerState = update.trackerState
+        update.gnssDetail?.let { currentLoc.gnssDetail = it }
+        
         return currentLoc
     }
 
@@ -195,38 +198,45 @@ class TelemetryUseCase @Inject constructor(
         return current
     }
 
-    fun mapTrackerLocationFromStatus(status: TrackerStatus, currentLoc: LocationState): LocationState {
-        currentLoc.update(
-            lat = status.lat, lng = status.lng, speed = status.speed, bearing = status.bearing, 
-            accuracy = status.accuracy, maxAccuracy = status.maxAccuracy,
-            timestamp = status.gpsTs, telemetryTs = status.ts, status = status.status,
-            trackerState = status.trackerState, gnssDetail = status.gnssDetail
-        )
+    fun mapTrackerLocationFromStatus(status: TrackerStatus, currentLoc: LocationUpdate): LocationUpdate {
+        currentLoc.lat = status.lat
+        currentLoc.lng = status.lng
+        currentLoc.speed = status.speed
+        currentLoc.bearing = status.bearing
+        currentLoc.accuracy = status.accuracy
+        currentLoc.maxAccuracy = status.maxAccuracy
+        currentLoc.gpsTs = status.gpsTs
+        currentLoc.ts = status.ts
+        currentLoc.status = status.status
+        currentLoc.trackerState = status.trackerState
+        currentLoc.gnssDetail = status.gnssDetail
         return currentLoc
     }
 
     fun mapLocalLocation(
         update: LocationUpdate, 
-        currentLoc: LocationState, 
+        currentLoc: LocationUpdate, 
         nowMs: Long, 
         appStartTime: Long
-    ): LocationState {
+    ): LocationUpdate {
         val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng)
         val newTimestamp = update.gpsTs
         
-        currentLoc.update(
-            lat = if (isLocationValid) update.lat else currentLoc.lat, 
-            lng = if (isLocationValid) update.lng else currentLoc.lng, 
-            speed = if (isLocationValid) update.speed else currentLoc.speed, 
-            accuracy = if (isLocationValid) update.accuracy else currentLoc.accuracy, 
-            maxAccuracy = if (update.maxAccuracy > 0.0) update.maxAccuracy else currentLoc.maxAccuracy,
-            bearing = if (isLocationValid) update.bearing else currentLoc.bearing, 
-            timestamp = if (newTimestamp > 0) newTimestamp else currentLoc.timestamp,
-            telemetryTs = if (update.ts > 0) update.ts else nowMs,
-            status = update.status,
-            trackerState = update.trackerState,
-            gnssDetail = update.gnssDetail ?: currentLoc.gnssDetail
-        )
+        if (isLocationValid) {
+            currentLoc.lat = update.lat
+            currentLoc.lng = update.lng
+            currentLoc.speed = update.speed
+            currentLoc.accuracy = update.accuracy
+            currentLoc.bearing = update.bearing
+        }
+        if (update.maxAccuracy > 0.0) currentLoc.maxAccuracy = update.maxAccuracy
+        if (newTimestamp > 0) currentLoc.gpsTs = newTimestamp
+        
+        currentLoc.ts = if (update.ts > 0) update.ts else nowMs
+        currentLoc.status = update.status
+        currentLoc.trackerState = update.trackerState
+        update.gnssDetail?.let { currentLoc.gnssDetail = it }
+
         return currentLoc
     }
 

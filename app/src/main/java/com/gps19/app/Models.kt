@@ -10,12 +10,14 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.03.06:
+ * - Issue #238: Location Model Unification. Removed obsolete LocationState 
+ *   class; project now standardizes on LocationUpdate (R-ID 238).
+ * - Issue #238 cleanup: Moved UiEvent and UiCommand to MainUiState.kt to 
+ *   unify UI state definitions and resolve redeclaration errors.
  * Aug.31.04:
  * - Issue #779 Hardening: Integrated ForensicSanitizer into TrackerStatus.toMap() 
  *   to ensure technical network metadata is scrubbed before transmission (R779).
- * Aug.31.00:
- * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
- *   violationUptimeMs and isUltraLongStationary to RealtimeStatus serialization (R782).
  */
 
 sealed class AppSensorEvent {
@@ -342,8 +344,9 @@ data class TrackerStatus(
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val lastValidFixRt: Long = 0L, val isPowerSaveMode: Boolean = false, val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN", val isStorageLow: Boolean = false, val isStorageCritical: Boolean = false,
-    val gnssDetail: GnssDetail? = null, val isBatterySteepDischarge: Boolean = false,
-    val isCoolingModeActive: Boolean = false, val trackerState: TrackerState = TrackerState.UNKNOWN,
+    val gnssDetail: GnssDetail? = null, val isBatteryWhitelisted: Boolean = false,
+    val isBatterySteepDischarge: Boolean = false, val isCoolingModeActive: Boolean = false,
+    val trackerState: TrackerState = TrackerState.UNKNOWN,
     val snrIdx: Double = 0.0, val noiseIdx: Double = 0.0, val luxIdx: Double = 0.0,
     val vibeIdx: Double = 0.0, val liftIdx: Double = 0.0, val isAnchorLocked: Boolean = false,
     val isSitDetected: Boolean = false, val isSitActive: Boolean = false, val lastSitTs: Long = 0L,
@@ -462,36 +465,6 @@ data class TrackerStatus(
         fun mapProtoToTrackerState(proto: String): TrackerState {
             return try { TrackerState.valueOf(proto) } catch (e: Exception) { TrackerState.UNKNOWN }
         }
-    }
-}
-
-class LocationState(
-    var lat: Double = 0.0, var lng: Double = 0.0, var speed: Double = 0.0,
-    var accuracy: Double = 0.0, var maxAccuracy: Double = 0.0, var bearing: Double = 0.0,
-    var timestamp: Long = 0L, var telemetryTs: Long = 0L, 
-    var status: SentinelStatus = SentinelStatus.VALID,
-    var trackerState: TrackerState = TrackerState.UNKNOWN,
-    var gnssDetail: GnssDetail? = null
-) {
-    fun update(
-        lat: Double, lng: Double, speed: Double, accuracy: Double, maxAccuracy: Double, bearing: Double,
-        timestamp: Long, telemetryTs: Long, status: SentinelStatus, trackerState: TrackerState, gnssDetail: GnssDetail?
-    ) {
-        this.lat = lat; this.lng = lng; this.speed = speed; this.accuracy = accuracy; this.maxAccuracy = maxAccuracy
-        this.bearing = bearing; this.timestamp = timestamp; this.telemetryTs = telemetryTs
-        this.status = status; this.trackerState = trackerState; this.gnssDetail = gnssDetail
-    }
-
-    fun copyFrom(other: LocationState) {
-        this.lat = other.lat; this.lng = other.lng; this.speed = other.speed; this.accuracy = other.accuracy
-        this.maxAccuracy = other.maxAccuracy; this.bearing = other.bearing; this.timestamp = other.timestamp
-        this.telemetryTs = other.telemetryTs; this.status = other.status; this.trackerState = other.trackerState
-        this.gnssDetail = other.gnssDetail
-    }
-    fun reset() {
-        lat = 0.0; lng = 0.0; speed = 0.0; accuracy = 0.0; maxAccuracy = 0.0; bearing = 0.0
-        timestamp = 0L; telemetryTs = 0L; status = SentinelStatus.VALID; trackerState = TrackerState.UNKNOWN
-        gnssDetail = null
     }
 }
 
@@ -661,107 +634,6 @@ data class DashboardState(
     val ioWait get() = health.ioWait
     val maxIoLatency get() = health.maxIoLatency
     val isSilentFailure get() = health.isSilentFailure
-}
-
-sealed class UiEvent {
-    data class ToggleMap(val visible: Boolean) : UiEvent()
-    data class ToggleLog(val visible: Boolean) : UiEvent()
-    data class ToggleSettings(val visible: Boolean) : UiEvent()
-    data class TogglePhoneSetup(val visible: Boolean) : UiEvent()
-    data class ToggleRibbons(val visible: Boolean) : UiEvent()
-    data class ToggleStrictMode(val visible: Boolean) : UiEvent()
-    data class SetRedScreenVisible(val visible: Boolean) : UiEvent()
-    data class SetDashboardExpanded(val expanded: Boolean) : UiEvent()
-    data class SetUiVisible(val visible: Boolean) : UiEvent()
-    object DismissAlarms : UiEvent()
-    data class SetAppMode(val mode: String?) : UiEvent()
-    data class SetPendingMode(val mode: String?) : UiEvent()
-    data class SetSystemActive(val active: Boolean) : UiEvent()
-    data class SetSystemMode(val mode: String) : UiEvent()
-    data class StopSiren(val causes: String? = null) : UiEvent()
-    object ResetStats : UiEvent()
-    object ClearLogs : UiEvent()
-    object ClearHomePoints : UiEvent()
-    object ManualExit : UiEvent()
-    data class LogAction(val type: String, val message: String, val isImportant: Boolean = false, val isSpecial: Boolean = false, val specialColor: Int? = null) : UiEvent()
-    data class AddHomePoint(val point: GeoPoint) : UiEvent()
-    data class RemoveHomePoint(val index: Int) : UiEvent()
-    data class SetGeofenceMode(val mode: GeofenceMode) : UiEvent()
-    data class MapTap(val point: GeoPoint) : UiEvent()
-    data class SetMaxDistance(val distance: Double) : UiEvent()
-    data class SetHomePoints(val points: List<GeoPoint>) : UiEvent()
-    object SaveHomePoints : UiEvent()
-    data class SetAlertSettings(val settings: AlertSettings) : UiEvent()
-    data class SetSirenType(val type: String) : UiEvent()
-    data class SetFenceVisible(val visible: Boolean) : UiEvent()
-    data class SetViolationsVisible(val visible: Boolean) : UiEvent()
-    data class SetGeofenceViolationsVisible(val visible: Boolean) : UiEvent() 
-    data class SetMapButtonsVisible(val visible: Boolean) : UiEvent()
-    data class SetMapLocked(val locked: Boolean) : UiEvent()
-    object MapZoomIn : UiEvent()
-    object MapZoomOut : UiEvent()
-    object CenterTracker : UiEvent()
-    object CenterViewer : UiEvent()
-    data class SetDeviceId(val id: String) : UiEvent()
-    data class SetViewerId(val id: String) : UiEvent()
-    data class SetRelayUrl(val url: String) : UiEvent()
-    data class UpdateDraftDeviceId(val id: String) : UiEvent()
-    data class UpdateDraftViewerId(val id: String) : UiEvent()
-    data class UpdateDraftRelayUrl(val url: String) : UiEvent()
-    data class UpdateDraftMaxDistance(val distance: String) : UiEvent()
-    data class UpdateDraftAlertSettings(val settings: AlertSettings) : UiEvent()
-    data class UpdateDraftAlarmVolume(val volume: Float) : UiEvent()
-    object CommitSettings : UiEvent()
-    object RefreshPermissionStatus : UiEvent()
-    object RequestTestAlarm : UiEvent()
-    data class ToggleAlertsSetup(val visible: Boolean) : UiEvent()
-    data class ToggleAlarmSoundSetup(val visible: Boolean) : UiEvent()
-    object ToggleTestSiren : UiEvent()
-    data class SetJammerSuspicion(val isJammer: Boolean) : UiEvent()
-    data class SetSignalLoss(val isSignalLoss: Boolean) : UiEvent()
-    data class BulkUpdateSettings(
-        val deviceId: String? = null,
-        val viewerId: String? = null,
-        val relayUrl: String? = null,
-        val maxDistance: Double? = null,
-        val homePoints: List<GeoPoint>? = null,
-        val alertSettings: AlertSettings? = null
-    ) : UiEvent()
-    data class ShowStopTrackingConfirmation(val show: Boolean) : UiEvent()
-    object ConfirmStopTracking : UiEvent()
-    data class SetSubSettings(val sub: SubSettings?) : UiEvent()
-    data class SetLogFilterShowDetails(val show: Boolean) : UiEvent()
-    data class SetLogFilterShowRecovered(val show: Boolean) : UiEvent()
-    data class ToggleGnssDetail(val visible: Boolean) : UiEvent()
-    object ToggleXiaomiManualOverride : UiEvent()
-    object DismissIdentitySanitization : UiEvent()
-    data class NavigateToDiagnostics(val visible: Boolean) : UiEvent()
-    object TriggerRecovery : UiEvent()
-    data class SetRecoveryPending(val pending: Boolean) : UiEvent()
-    data class SetReplayCursor(val ts: Long?) : UiEvent()
-    data class SetForensicSimulation(val active: Boolean) : UiEvent()
-    object ExecuteStressTest : UiEvent()
-    data class SetStorageSimulation(val active: Boolean, val isCritical: Boolean) : UiEvent()
-    data class SetManualSelection(val active: Boolean) : UiEvent()
-    data class SetSettlingActive(val active: Boolean) : UiEvent()
-    data class ToggleSetupBypass(val active: Boolean) : UiEvent()
-}
-
-sealed class UiCommand {
-    object SyncRequest : UiCommand()
-    data class UiVisibilityChanged(val visible: Boolean) : UiCommand()
-    data class StopSiren(val causes: String? = null) : UiCommand()
-    object ClearTrails : UiCommand()
-    object StatsReset : UiCommand()
-    object SettingsUpdated : UiCommand()
-    object ZoomIn : UiCommand()
-    object ZoomOut : UiCommand()
-    object FullInitializationReset : UiCommand()
-    object ExecuteTestAlarm : UiCommand()
-    object MapZoomIn : UiCommand()
-    object MapZoomOut : UiCommand()
-    object ExecuteStressTest : UiCommand()
-    data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : UiCommand()
 }
 
 class StatsState(

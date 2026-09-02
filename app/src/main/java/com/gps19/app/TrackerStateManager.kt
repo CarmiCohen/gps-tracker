@@ -1,13 +1,15 @@
 package com.gps19.app
 
-import android.util.Log
 import com.gps19.core.engine.*
+import timber.log.Timber
 
 /**
  * TrackerStateManager: Logic for mapping raw telemetry to high-level behavioral states.
+ * Sep.02.50:
+ * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber to 
+ *   ensure log spillage protection on Samsung A15/G990 hardware (R759).
  * July.1.16:
  * - Issue #512: Consolidate Sentinel Statuses. Replaced isVisualJump with SentinelStatus.
- * - Issue #509: Abandon GtoEngine. Removed isTrajectoryPromoted from state logic.
  */
 object TrackerStateManager {
     private var currentState = TrackerState.UNKNOWN
@@ -25,7 +27,6 @@ object TrackerStateManager {
         isTrackerConnected: Boolean,
         systemTimePulse: Long
     ): TrackerState {
-        // 1. Connectivity check is immediate
         if (!isTrackerConnected) {
             currentState = TrackerState.UNKNOWN
             pendingState = TrackerState.UNKNOWN
@@ -33,7 +34,6 @@ object TrackerStateManager {
             return currentState
         }
 
-        // 2. Multi-Factor Movement Detection
         val hasSpeed = speed >= ACTIVE_MOVE_THRESHOLD
         if (hasSpeed) {
             sustainedSpeedCount++
@@ -41,20 +41,16 @@ object TrackerStateManager {
             sustainedSpeedCount = 0
         }
 
-        // Issue #318: Use unified constants from EngineConstants
         val isPhysicalMoving = vibration > (vibrationFloor * STATIONARY_FLOOR_MULT) && vibration > VIBRATION_STATIONARY_THRESHOLD
         
-        // R880: Require more evidence to exit PARKING if not physically moving
         val requiredSustainedCount = if (currentState == TrackerState.PARKING && !isPhysicalMoving) {
             SUSTAINED_SPEED_STATIONARY_THRESHOLD
         } else {
             SUSTAINED_SPEED_THRESHOLD
         }
 
-        // Issue #302: Unified high speed promotion threshold
         val isSpeedConfirmed = (sustainedSpeedCount >= requiredSustainedCount) || (speed > HIGH_SPEED_PROMOTION_THRESHOLD)
         
-        // Confirmation: Must have sustained speed OR speed confirmed by vibration
         val isMovingNow = isSpeedConfirmed || (hasSpeed && isPhysicalMoving)
 
         if (isMovingNow) {
@@ -69,8 +65,6 @@ object TrackerStateManager {
             else -> TrackerState.PARKING
         }
 
-        // 3. Apply Confidence Buffer (Hysteresis)
-        // Issue #302: Centralized confidence buffers
         val requiredBuffer = if (targetState == TrackerState.PARKING) PARKING_CONFIDENCE_BUFFER_MS else STATE_CONFIDENCE_BUFFER_MS
 
         if (targetState == currentState || targetState == TrackerState.JUMPING) {
@@ -95,6 +89,6 @@ object TrackerStateManager {
     }
 
     private fun logStateChange(old: TrackerState, new: TrackerState, speed: Double) {
-        Log.d("GPS19", "Tracker behavior changed: $old -> $new (Speed: ${"%.1f".format(speed)})")
+        Timber.tag("GPS19").d("Tracker behavior changed: $old -> $new (Speed: ${"%.1f".format(speed)})")
     }
 }

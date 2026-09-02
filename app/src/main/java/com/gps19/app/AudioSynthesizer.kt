@@ -8,7 +8,6 @@ import android.media.AudioTrack
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
-import android.util.Log
 import com.gps19.core.engine.*
 import kotlinx.coroutines.*
 import timber.log.Timber
@@ -20,12 +19,12 @@ import kotlin.math.exp
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
+ * Sep.02.50:
+ * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber 
+ *   to ensure log spillage protection on Samsung A15/G990 hardware (R759).
  * Sep.02.43:
  * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
  *   getPackageName log spam during system service lookups (R1.14).
- * July.24.04:
- * - Stealth Enforcement: Added check for isTrackerMode in playSiren to prevent 
- *   accidental local alarms in stealth mode.
  */
 object AudioSynthesizer {
     private val isLooping = AtomicBoolean(false)
@@ -72,7 +71,7 @@ object AudioSynthesizer {
         isTrackerMode: Boolean = false 
     ) {
         if (isTrackerMode) {
-            Log.d("AudioSynthesizer", "Siren suppressed: Tracker mode (Stealth enforced)")
+            Timber.d("Siren suppressed: Tracker mode (Stealth enforced)")
             return
         }
 
@@ -83,7 +82,7 @@ object AudioSynthesizer {
         if (shadowContext != null && !overrideSilence) {
             val am = shadowContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             if (am.ringerMode != AudioManager.RINGER_MODE_NORMAL) {
-                Log.d("AudioSynthesizer", "Siren suppressed by silence setting")
+                Timber.d("Siren suppressed by silence setting")
                 return
             }
         }
@@ -96,7 +95,7 @@ object AudioSynthesizer {
             val thisJob = coroutineContext[Job]
             var isAutoStopped = false
             try {
-                Log.d("AudioSynthesizer", "Siren loop started: $type (force=$force, loop=$loop)")
+                Timber.d("Siren loop started: $type (force=$force, loop=$loop)")
                 val startRt = timeProvider.elapsedRealtime()
                 val vibrator = if (vibrate && shadowContext != null) shadowContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator else null
 
@@ -108,7 +107,6 @@ object AudioSynthesizer {
                         break
                     }
 
-                    // Calculate fade-in factor (0.0 to 1.0 over fade-in duration)
                     val fadeInFactor = if (elapsed < SIREN_FADE_IN_DURATION_MS) {
                         elapsed.toFloat() / SIREN_FADE_IN_DURATION_MS
                     } else 1.0f
@@ -134,7 +132,7 @@ object AudioSynthesizer {
                     yield()
                 }
             } catch (e: CancellationException) {
-                Log.d("AudioSynthesizer", "Siren job cancelled")
+                Timber.d("Siren job cancelled")
             } catch (e: Exception) {
                 Timber.e(e, "Siren loop error")
             } finally {
@@ -142,10 +140,10 @@ object AudioSynthesizer {
                     isLooping.set(false)
                     isForced.set(false)
                     if (isAutoStopped) {
-                        Log.d("AudioSynthesizer", "Siren auto-stopped (${SIREN_AUTO_STOP_MS/1000}s limit reached). Triggering cooldown.")
+                        Timber.d("Siren auto-stopped (${SIREN_AUTO_STOP_MS/1000}s limit reached). Triggering cooldown.")
                         setSilence(SIREN_RESUME_COOLDOWN_MS, timeProvider)
                     }
-                    Log.d("AudioSynthesizer", "Siren loop finished (flags reset)")
+                    Timber.d("Siren loop finished (flags reset)")
                 }
             }
         }
@@ -204,7 +202,7 @@ object AudioSynthesizer {
         isForced.set(false)
         sirenJob?.cancel()
         setSilence(silenceDurationMs, timeProvider)
-        Log.d("AudioSynthesizer", "Siren stop requested")
+        Timber.d("Siren stop requested")
     }
 
     private fun setSilence(durationMs: Long, timeProvider: TimeProvider) {

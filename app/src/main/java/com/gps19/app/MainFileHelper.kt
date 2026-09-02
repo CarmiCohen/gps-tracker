@@ -3,7 +3,6 @@ package com.gps19.app
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
-import android.util.Log
 import android.widget.Toast
 import com.gps19.core.engine.TimeProvider
 import org.json.JSONArray
@@ -17,14 +16,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
 import org.osmdroid.util.GeoPoint
+import timber.log.Timber
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
+ * Sep.02.50:
+ * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber to 
+ *   ensure log spillage protection on Samsung A15/G990 hardware (R759).
  * Aug.30.13:
  * - Issue #779 Hardening: Integrated ForensicSanitizer to scrub internal absolute 
  *   paths from error messages and log exports (R779).
- * July.27.00:
- * - Architecture Audit: Updated to use centralized PreferenceKeys.
  */
 object MainFileHelper {
 
@@ -182,7 +183,7 @@ object MainFileHelper {
                         }
                     } catch (e: Exception) {
                         val logMsg = ForensicSanitizer.sanitizeMessage("Error importing file $uri: ${e.message}")
-                        Log.e("GPS19", logMsg)
+                        Timber.e(logMsg)
                     }
                 }
                 
@@ -236,7 +237,7 @@ object MainFileHelper {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     val logMsg = ForensicSanitizer.sanitizeMessage("Manual logs save failed: ${e.message}")
-                    Log.e("GPS19", logMsg)
+                    Timber.e(logMsg)
                 }
             }
         }
@@ -301,7 +302,7 @@ object MainFileHelper {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     val logMsg = ForensicSanitizer.sanitizeMessage("Config save failed: ${e.message}")
-                    Log.e("GPS19", logMsg)
+                    Timber.e(logMsg)
                 }
             }
         }
@@ -395,10 +396,10 @@ object MainFileHelper {
             val viewerTrail = repository.loadTrailStatic(isViewer = true)
             saveTrailDataInternal(context, viewerTrail, "trail", "viewer", deviceId, isAuto = true, timeProvider)
             
-            Log.i("GPS19", "AUTO-SAVE: Completed successfully")
+            Timber.i("AUTO-SAVE: Completed successfully")
         } catch (e: Exception) {
             val logMsg = ForensicSanitizer.sanitizeMessage("AUTO-SAVE: Failed: ${e.message}")
-            Log.e("GPS19", logMsg)
+            Timber.e(logMsg)
         }
     }
 
@@ -429,7 +430,7 @@ object MainFileHelper {
             true
         } catch (e: Exception) {
             val logMsg = ForensicSanitizer.sanitizeMessage("Trail save failed ($source): ${e.message}")
-            Log.e("GPS19", logMsg)
+            Timber.e(logMsg)
             false
         }
     }
@@ -468,14 +469,14 @@ object MainFileHelper {
                         movedCount++
                     } else {
                         val logMsg = ForensicSanitizer.sanitizeMessage("ARCHIVING: Failed to move ${file.name}")
-                        Log.e("GPS19", logMsg)
+                        Timber.e(logMsg)
                     }
                 }
             }
-            if (movedCount > 0) Log.i("GPS19", "ARCHIVING: Moved $movedCount files to $targetFolderDate folder")
+            if (movedCount > 0) Timber.i("ARCHIVING: Moved $movedCount files to $targetFolderDate folder")
         } catch (e: Exception) {
             val logMsg = ForensicSanitizer.sanitizeMessage("ARCHIVING: Failed: ${e.message}")
-            Log.e("GPS19", logMsg)
+            Timber.e(logMsg)
         }
     }
 }

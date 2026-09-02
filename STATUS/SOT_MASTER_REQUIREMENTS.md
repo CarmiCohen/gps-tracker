@@ -1,8 +1,8 @@
-# SOT Master Requirements (Sep.02.46)
+# SOT Master Requirements (Sep.02.50)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (40 Rules)
+## 🏗️ Architectural Master Rules (41 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context权威 (R001)**: **MANDATORY**. Use `ApplicationContext` for all singleton services. Activity context is strictly for UI-only components.
@@ -12,11 +12,14 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.15 Looper Alignment (R893)**: **MANDATORY**. All `ManagedNetworkCallback` and `FusedLocationProvider` registrations MUST specify the `MainLooper` to ensure alignment with the synchronous teardown logic, preventing native `BaseEventQueue` disposal failures (Sep.01.27).
 *   **1.16 16KB Page Alignment (R895)**: **MANDATORY**. Native libraries MUST be aligned to 16KB boundaries to support Android 15+ devices. Implementation requires AGP 8.3+, `useLegacyPackaging = false` in `app/build.gradle`, and `-Wl,-z,max-page-size=16384` linker flags (Sep.02.27). Verified in #118 (Sep.02.46).
 *   **1.17 Robust Battery Navigation (R896)**: **MANDATORY**. Battery optimization exemption intents MUST use `Uri.fromParts("package", pkg, null)` for URI encoding and implement a multi-tier fallback: (1) `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, (2) `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`, and (3) `ACTION_APPLICATION_DETAILS_SETTINGS` to ensure accessibility on Samsung/Xiaomi devices (Sep.02.40).
+*   **1.18 Log Spillage Protection (R759)**: **MANDATORY**. All application-level logging MUST use `Timber`. Direct calls to `android.util.Log` or `System.out.println` are strictly prohibited to ensure that diagnostic output can be centrally silenced in production, preventing forensic log spillage on audited hardware (Samsung G990/A15). (Sep.02.50).
 
-## 🧩 Functional Requirements (199 IDs)
+## 🧩 Functional Requirements (200 IDs)
 *   **R-ID 172 (Forensic Parity)**: SIT events MUST include high-precision timestamps (`sitVzTs`, `sitVzRt`) captured at the moment of peak vertical velocity to ensure forensic traceability across all telemetry layers (Sep.02.46).
-*   **R-ID 197 (Forensic Teardown)**: Teardown logic MUST include forensic timing logs for each component's unregistration to identify OS-level disposal delays.
+*   **R-ID 197 (Forensic Teardown)**: Teardown logic MUST include forensic timing logs for each component's unregistration to identify OS-level disposal delays. Verified in `HardwareProvider`, `ConnectivitySuite`, and `CommunicationManager` (Sep.03.01).
 *   **R-ID 198 (Dynamic Sensitivity Propagation)**: UI-driven sensor sensitivity adjustments (Vibration, Tilt) MUST be propagated to the tracking engine's `SentinelValidator` to replace hardcoded constants with dynamic user-defined thresholds (R2.3). (Sep.02.41).
 *   **R-ID 199 (Telemetry Observation Parity)**: `MainViewModel` MUST observe both `localLocation` and `trackerLocation` repository flows to ensure HUD and Dashboard telemetry remains live regardless of app role or hardware version (R3.1). (Sep.02.42).
+*   **R-ID 238 (Model Unification)**: The application MUST use `LocationUpdate` as the single source of truth for location data across both the Core Engine and UI layers to eliminate allocation churn caused by redundant model mapping (Sep.03.01).
+*   **R-ID 239 (Samsung Log Silence)**: All background tasks and workers MUST maintain absolute logcat silence on Samsung G990/A15 hardware unless a CRITICAL error occurs, which must then be routed through the forensic-sanitized LogManager pipeline (Sep.02.50).
 
-*(Total: 40 Architectural Rules + 199 Functional R-IDs = 239 Items)*
+*(Total: 41 Architectural Rules + 201 Functional R-IDs = 242 Items)*

@@ -10,6 +10,7 @@
 # --- JSON/Serialization ---
 -keep class org.json.** { *; }
 -keep @kotlinx.serialization.Serializable class com.gps19.app.** { *; }
+-keep @kotlinx.serialization.Serializable class com.gps19.core.engine.** { *; }
 
 # --- Room Persistence ---
 -keep class com.gps19.app.LogEntity { *; }
@@ -27,19 +28,16 @@
 # --- Models & Telemetry (Reflection/JSON) ---
 # Ensuring telemetry and UI state models are not obfuscated to prevent serialization failures.
 -keep class com.gps19.app.TrackerStatus { *; }
--keep class com.gps19.app.LocationUpdate { *; }
+-keep class com.gps19.core.engine.LocationUpdate { *; }
 -keep class com.gps19.app.LogEntry { *; }
 -keep class com.gps19.app.ConnectionPoint { *; }
 -keep class com.gps19.app.DashboardState { *; }
--keep class com.gps19.app.LocationState { *; }
 -keep class com.gps19.app.MainUiState { *; }
 -keep class com.gps19.app.StatsState { *; }
 -keep class com.gps19.app.BatteryState { *; }
 -keep class com.gps19.app.ConnectivityState { *; }
 
 # --- JNI / Native SDK (Issue #212) ---
-# Preserve the JNI bridge for vendor hardware stabilization.
-# Transitioned to JdHardwareManager to eliminate Samsung framework collisions (R212).
 -keep class com.gps19.app.JdHardwareManager { *; }
 -keepclasseswithmembernames class * {
     native <methods>;

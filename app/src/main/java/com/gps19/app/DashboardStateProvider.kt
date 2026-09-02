@@ -6,11 +6,11 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Sep.03.01:
+ * - Issue #238: Location Model Unification. Updated to use ts and gpsTs 
+ *   from LocationUpdate instead of telemetryTs and timestamp (R-ID 238).
  * Aug.29.10:
  * - Concern #765: Added isUltraLongStationary support to Dashboard and HUD telemetry states.
- * Aug.21.09:
- * - Issue #248 Performance Optimization: Completed full segmentation for both 
- *   Dashboard and HUD states to eliminate hydration stalls on budget hardware.
  */
 interface DashboardStateProvider {
     fun buildDashboardConnectivityState(
@@ -101,12 +101,12 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         val isViewer = appMode == "viewer"
         val loc = if (isViewer) kinematicState.trackerLocation else kinematicState.localLocation
         
-        val telemetryAge = if (loc.telemetryTs > 0) now - loc.telemetryTs else Long.MAX_VALUE
-        val sourceGpsAge = if (loc.telemetryTs > 0 && loc.timestamp > 0) maxOf(0L, loc.telemetryTs - loc.timestamp) else 0L
+        val telemetryAge = if (loc.ts > 0) now - loc.ts else Long.MAX_VALUE
+        val sourceGpsAge = if (loc.ts > 0 && loc.gpsTs > 0) maxOf(0L, loc.ts - loc.gpsTs) else 0L
         val totalGpsAge = telemetryAge + sourceGpsAge
 
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
-        val isGpsActive = totalGpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
+        val isGpsActive = totalGpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.gpsTs > 0
 
         val gnss = loc.gnssDetail
         var avgCn0 = 0.0
@@ -234,13 +234,13 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
     ): HudTelemetryState {
         val loc = if (appMode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
         
-        val telemetryAge = if (loc.telemetryTs > 0) systemPulse - loc.telemetryTs else Long.MAX_VALUE
-        val sourceGpsAge = if (loc.telemetryTs > 0 && loc.timestamp > 0) maxOf(0L, loc.telemetryTs - loc.timestamp) else 0L
+        val telemetryAge = if (loc.ts > 0) systemPulse - loc.ts else Long.MAX_VALUE
+        val sourceGpsAge = if (loc.ts > 0 && loc.gpsTs > 0) maxOf(0L, loc.ts - loc.gpsTs) else 0L
         val totalGpsAge = telemetryAge + sourceGpsAge
-        val isGpsFresh = totalGpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.timestamp > 0
+        val isGpsFresh = totalGpsAge < GPS_UI_FAIL_THRESHOLD_MS && loc.gpsTs > 0
 
         return HudTelemetryState(
-            isLocalGpsActive = if (appMode == "tracker") isGpsFresh else (systemPulse - kinematicState.localLocation.timestamp < GPS_UI_FAIL_THRESHOLD_MS),
+            isLocalGpsActive = if (appMode == "tracker") isGpsFresh else (systemPulse - kinematicState.localLocation.gpsTs < GPS_UI_FAIL_THRESHOLD_MS),
             isGpsFresh = isGpsFresh,
             speedMps = (if (appMode == "viewer") kinematicState.trackerLocation.speed else 0.0).toFloat(),
             trackerAccuracy = kinematicState.trackerLocation.accuracy.toFloat(),
@@ -250,8 +250,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             satsUsed = 0,
             distToHome = kinematicState.distanceTrackerToHome,
             distToViewer = kinematicState.distanceTrackerToViewer,
-            lastGpsTs = loc.timestamp,
-            viewerGpsTs = kinematicState.localLocation.timestamp,
+            lastGpsTs = loc.gpsTs,
+            viewerGpsTs = kinematicState.localLocation.gpsTs,
             trackerState = trackerState,
             isTrackerLocPending = kinematicState.trackerHealth.isLocationPending,
             trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,

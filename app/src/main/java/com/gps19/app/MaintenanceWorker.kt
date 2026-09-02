@@ -3,7 +3,6 @@ package com.gps19.app
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.work.*
 import com.gps19.core.engine.*
@@ -12,17 +11,18 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * Sep.02.50:
+ * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber to 
+ *   ensure log spillage protection on Samsung A15/G990 hardware (R759).
  * Aug.24.01:
  * - Issue #307 Remediation: Standardized monotonic authority for maintenance 
  *   uptime logging. Refactored silence detection to use elapsedRealtime() with 
  *   wall-clock fallbacks to prevent 56-year "Ghost Silence" logs (R307).
- * Aug.04.115:
- * - Issue #729: Forensic Audit: Automated Database Integrity Validation. 
- *   Integrated checkDatabaseIntegrity() with charging-aware execution.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -48,7 +48,7 @@ class MaintenanceWorker @AssistedInject constructor(
                 ExistingPeriodicWorkPolicy.KEEP,
                 request
             )
-            Log.d("GPS19", "MAINTENANCE: Work scheduled")
+            Timber.d("MAINTENANCE: Work scheduled")
         }
     }
 
@@ -70,8 +70,6 @@ class MaintenanceWorker @AssistedInject constructor(
         val lastTickRt = repository.getLong(LAST_SERVICE_TICK_REALTIME_KEY, 0L)
         val appStartTime = repository.getLong(APP_START_TIME_KEY, 0L)
         
-        // Monotonic Authority (Issue #307): Prioritize elapsedRealtime for duration checks.
-        // If lastTickRt is 0 or exceeds nowRt (reboot), fall back to wall-clock with safety gating.
         val silenceDurationMs = when {
             lastTickRt > 0 && nowRt >= lastTickRt -> nowRt - lastTickRt
             lastTick > 0 && now >= lastTick -> now - lastTick
@@ -84,29 +82,27 @@ class MaintenanceWorker @AssistedInject constructor(
         val networkStatus = if (isNetworkAlive) "ALIVE" else "DEAD"
 
         val silenceDisplay = if (lastTick == 0L) "NEVER" else "${silenceDurationMs/1000}s"
-        Log.d("GPS19", "MAINTENANCE: Periodic check. Mode: $savedMode, Active: $isSystemActive, Silence: $silenceDisplay, Uptime: ${appUptimeMs/1000}s, Net: $networkStatus")
+        Timber.d("MAINTENANCE: Periodic check. Mode: $savedMode, Active: $isSystemActive, Silence: $silenceDisplay, Uptime: ${appUptimeMs/1000}s, Net: $networkStatus")
 
-        // Issue #729: Automated Database Integrity Check
         performIntegrityAudit(now)
 
         if (appUptimeMs < RECOVERY_GRACE_PERIOD_MS && appStartTime > 0) {
-            Log.d("GPS19", "MAINTENANCE: Within startup grace period (${appUptimeMs/1000}s). Skipping recovery check.")
+            Timber.d("MAINTENANCE: Within startup grace period (${appUptimeMs/1000}s). Skipping recovery check.")
             return Result.success()
         }
 
         if (savedMode != null && isSystemActive) {
             if (lastTick == 0L || silenceDurationMs > RECOVERY_THRESHOLD_MS) {
                 
-                // Issue #539: Elevate to foreground to ensure background-start exemption on API 34+
                 try {
                     setForeground(getForegroundInfo())
                 } catch (e: Exception) {
-                    Log.w("GPS19", "MAINTENANCE: Could not set foreground, attempting recovery anyway.")
+                    Timber.w("MAINTENANCE: Could not set foreground, attempting recovery anyway.")
                 }
 
                 if (systemStatusProvider.getStorageStatus().isCritical) {
                     val storageMsg = "MAINTENANCE: Recovery ABORTED. Storage is CRITICAL."
-                    Log.e("GPS19", storageMsg)
+                    Timber.e(storageMsg)
                     repository.addLog(LogEntry(
                         id = "SYSTEM",
                         timestamp = now,
@@ -120,7 +116,7 @@ class MaintenanceWorker @AssistedInject constructor(
                 }
 
                 val recoveryMsg = "MAINTENANCE: Service RECOVERY triggered ($savedMode). Silence: $silenceDisplay"
-                Log.w("GPS19", recoveryMsg)
+                Timber.w(recoveryMsg)
                 
                 repository.addLog(LogEntry(
                     id = "SYSTEM",
@@ -139,21 +135,19 @@ class MaintenanceWorker @AssistedInject constructor(
                 
                 try {
                     ContextCompat.startForegroundService(applicationContext, serviceIntent)
-                    Log.i("GPS19", "MAINTENANCE: Recovery intent sent successfully")
+                    Timber.i("MAINTENANCE: Recovery intent sent successfully")
                     repository.saveBoolean(IS_RECOVERY_PENDING_KEY, false)
                 } catch (e: Exception) {
-                    // Issue #626: Handle background start restriction on Android 12+
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && 
                         e.toString().contains("ForegroundServiceStartNotAllowedException")) {
-                        Log.w("GPS19", "MAINTENANCE: Foreground start restricted. Flagging recovery pending.")
+                        Timber.w("MAINTENANCE: Foreground start restricted. Flagging recovery pending.")
                         repository.saveBoolean(IS_RECOVERY_PENDING_KEY, true)
-                        // Issue #629: Forensic Latency Audit
                         repository.saveLong(RECOVERY_BLOCKED_TS_KEY, now)
                         return Result.success()
                     }
 
                     val errorMsg = "MAINTENANCE: Recovery FAILED: ${e.message}"
-                    Log.e("GPS19", errorMsg)
+                    Timber.e(errorMsg)
                     repository.addLog(LogEntry(
                         id = "SYSTEM",
                         timestamp = now,
@@ -165,10 +159,10 @@ class MaintenanceWorker @AssistedInject constructor(
                     ))
                 }
             } else {
-                Log.d("GPS19", "MAINTENANCE: Service is healthy (${silenceDurationMs/1000}s ago)")
+                Timber.d("MAINTENANCE: Service is healthy (${silenceDurationMs/1000}s ago)")
             }
         } else if (savedMode != null && !isSystemActive) {
-            Log.d("GPS19", "MAINTENANCE: System is INACTIVE. Skipping recovery check.")
+            Timber.d("MAINTENANCE: System is INACTIVE. Skipping recovery check.")
         }
 
         return Result.success()
@@ -179,12 +173,11 @@ class MaintenanceWorker @AssistedInject constructor(
         val batteryStatus = systemStatusProvider.observeBatteryStatus().first()
         val isCharging = batteryStatus.isCharging
         
-        // Check every 24h, OR more frequently if charging and 12h have passed
         val interval = if (isCharging) INTEGRITY_CHECK_INTERVAL_MS / 2 else INTEGRITY_CHECK_INTERVAL_MS
         val shouldCheck = (now - lastCheck >= interval)
         
         if (shouldCheck) {
-            Log.i("GPS19", "MAINTENANCE: Starting Database Integrity Audit (Charging: $isCharging)...")
+            Timber.i("MAINTENANCE: Starting Database Integrity Audit (Charging: $isCharging)...")
             val result = repository.checkDatabaseIntegrity()
             val isOk = result.equals("ok", ignoreCase = true)
             
@@ -194,7 +187,7 @@ class MaintenanceWorker @AssistedInject constructor(
                 "MAINTENANCE: Database Integrity Audit FAILED: $result"
             }
             
-            Log.w("GPS19", msg)
+            Timber.w(msg)
             repository.addLog(LogEntry(
                 id = "SYSTEM",
                 timestamp = now,

@@ -8,6 +8,7 @@ import android.net.NetworkRequest
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.widget.Toast
 import com.google.protobuf.CodedOutputStream
 import com.gps19.core.engine.*
@@ -34,6 +35,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.03.02:
+ * - Issue #197 Hardening: Enhanced stop() with forensic duration tracking to 
+ *   ensure parity with HardwareProvider's teardown auditing (R-ID 197).
  * Sep.01.27:
  * - Issue #893 Hardening: Standardized ManagedNetworkCallback to register on 
  *   MainLooper to ensure alignment with unregistration logic, with API 26 compatibility (R893).
@@ -850,10 +854,32 @@ class ConnectivitySuite @Inject constructor(
 
     fun stop() { 
         if (!isStarted.getAndSet(false)) return
-        isStopped.set(true); keepAliveJob?.cancel(); syncJob?.cancel(); signalingJob?.cancel(); scope.cancel()
+        isStopped.set(true)
+        val stopStartTime = SystemClock.elapsedRealtime()
+        Timber.i("ConnectivitySuite: Starting teardown sequence (R-ID 197).")
+        
+        keepAliveJob?.cancel(); keepAliveJob = null
+        syncJob?.cancel(); syncJob = null
+        signalingJob?.cancel(); signalingJob = null
+        scope.cancel()
+        
+        val unregStart = SystemClock.elapsedRealtime()
         // Issue #893: Managed unregistration on MainLooper.
         networkCallback.unregister(connectivityManager, Handler(Looper.getMainLooper()))
+        val unregDuration = SystemClock.elapsedRealtime() - unregStart
+        
+        val sigStart = SystemClock.elapsedRealtime()
         signalingProvider.disconnect() 
+        val sigDuration = SystemClock.elapsedRealtime() - sigStart
+        
+        val totalDuration = SystemClock.elapsedRealtime() - stopStartTime
+        Timber.i("""
+            ConnectivitySuite: Teardown Summary (Issue #197 Verification):
+            - Total Teardown Time: ${totalDuration}ms
+            - Network Unreg Duration: ${unregDuration}ms
+            - Signaling Disconnect Duration: ${sigDuration}ms
+            - Status: Clean Teardown Completed.
+        """.trimIndent())
     }
 
     fun isConnected() = signalingProvider.isConnected()

@@ -32,6 +32,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Sep.03.01:
+ * - Issue #238: Location Model Unification. Updated field references 
+ *   from timestamp/telemetryTs to gpsTs/ts to align with unified 
+ *   LocationUpdate model (R-ID 238).
  * Sep.01.12:
  * - Issue #885 Remediation: Decomposed overlay hydration into 4 levels (8-11) 
  *   to distribute JIT load for Settings, Log, Ribbons, and GNSS Detail 
@@ -159,8 +163,8 @@ fun ViewerScreen(
                                     trackerSpeed = kinematicState.trackerLocation.speed,
                                     trackerAccuracy = kinematicState.trackerLocation.accuracy,
                                     trackerMaxAccuracy = kinematicState.trackerLocation.maxAccuracy,
-                                    trackerGpsTs = kinematicState.trackerLocation.timestamp,
-                                    trackerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
+                                    trackerGpsTs = kinematicState.trackerLocation.gpsTs,
+                                    trackerTelemetryTs = kinematicState.trackerLocation.ts,
                                     trackerLocPending = kinematicState.trackerHealth.isLocationPending,
                                     trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
                                     trackerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
@@ -169,7 +173,7 @@ fun ViewerScreen(
                                     viewerSpeed = kinematicState.localLocation.speed,
                                     viewerAccuracy = kinematicState.localLocation.accuracy,
                                     viewerMaxAcc = kinematicState.localLocation.maxAccuracy,
-                                    viewerGpsTs = kinematicState.localLocation.timestamp,
+                                    viewerGpsTs = kinematicState.localLocation.gpsTs,
                                     viewerTelemetryTs = 0L,
                                     viewerLocPending = kinematicState.localHealth.isLocationPending,
                                     viewerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
@@ -193,7 +197,7 @@ fun ViewerScreen(
                                     isLocalOnline = diagnosticState.connectivity.isLocalOnline,
                                     isRelayConnected = diagnosticState.connectivity.isRelayConnected,
                                     lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
-                                    trackerLocationTs = kinematicState.trackerLocation.timestamp,
+                                    trackerLocationTs = kinematicState.trackerLocation.gpsTs,
                                     dashboardState = dashboardState,
                                     gpsIdx = gpsIndexData,
                                     rttValue = rtt,
@@ -228,8 +232,8 @@ fun ViewerScreen(
                         trackerSpeed = kinematicState.trackerLocation.speed,
                         trackerAccuracy = kinematicState.trackerLocation.accuracy,
                         trackerMaxAccuracy = kinematicState.trackerLocation.maxAccuracy,
-                        trackerGpsTs = kinematicState.trackerLocation.timestamp,
-                        trackerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
+                        trackerGpsTs = kinematicState.trackerLocation.gpsTs,
+                        trackerTelemetryTs = kinematicState.trackerLocation.ts,
                         trackerLocPending = kinematicState.trackerHealth.isLocationPending,
                         trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
                         trackerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
@@ -238,7 +242,7 @@ fun ViewerScreen(
                         viewerSpeed = kinematicState.localLocation.speed,
                         viewerAccuracy = kinematicState.localLocation.accuracy,
                         viewerMaxAcc = kinematicState.localLocation.maxAccuracy,
-                        viewerGpsTs = kinematicState.localLocation.timestamp,
+                        viewerGpsTs = kinematicState.localLocation.gpsTs,
                         viewerTelemetryTs = 0L,
                         viewerLocPending = kinematicState.localHealth.isLocationPending,
                         viewerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
@@ -316,7 +320,7 @@ fun ViewerScreen(
                                 isLocalOnline = diagnosticState.connectivity.isLocalOnline,
                                 isRelayConnected = diagnosticState.connectivity.isRelayConnected,
                                 lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
-                                trackerLocationTs = kinematicState.trackerLocation.timestamp,
+                                trackerLocationTs = kinematicState.trackerLocation.gpsTs,
                                 dashboardState = dashboardState,
                                 gpsIdx = gpsIndexData,
                                 rttValue = rtt,

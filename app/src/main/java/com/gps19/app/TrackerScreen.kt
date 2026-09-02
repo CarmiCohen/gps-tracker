@@ -29,6 +29,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Sep.03.01:
+ * - Issue #238: Location Model Unification. Updated field references 
+ *   from timestamp/telemetryTs to gpsTs/ts to align with unified 
+ *   LocationUpdate model (R-ID 238).
  * Aug.29.11:
  * - UI Refinement: Added visual indicator for Ultra-Long Stationary state (R765).
  * Aug.26.16:
@@ -152,8 +156,8 @@ fun TrackerScreen(
                                     trackerSpeed = kinematicState.localLocation.speed,
                                     trackerAccuracy = kinematicState.localLocation.accuracy,
                                     trackerMaxAccuracy = kinematicState.localLocation.maxAccuracy,
-                                    trackerGpsTs = kinematicState.localLocation.timestamp,
-                                    trackerTelemetryTs = 0L,
+                                    trackerGpsTs = kinematicState.localLocation.gpsTs,
+                                    trackerTelemetryTs = kinematicState.localLocation.ts,
                                     trackerLocPending = kinematicState.localHealth.isLocationPending,
                                     trackerLocPendingReason = kinematicState.localHealth.locationPendingReason,
                                     trackerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
@@ -162,8 +166,8 @@ fun TrackerScreen(
                                     viewerSpeed = kinematicState.trackerLocation.speed,
                                     viewerAccuracy = kinematicState.trackerLocation.accuracy,
                                     viewerMaxAcc = kinematicState.trackerLocation.maxAccuracy,
-                                    viewerGpsTs = kinematicState.trackerLocation.timestamp,
-                                    viewerTelemetryTs = kinematicState.trackerLocation.telemetryTs,
+                                    viewerGpsTs = kinematicState.trackerLocation.gpsTs,
+                                    viewerTelemetryTs = kinematicState.trackerLocation.ts,
                                     viewerLocPending = kinematicState.trackerHealth.isLocationPending,
                                     viewerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
                                     replayCursorPos = kinematicState.replayCursorPos,
@@ -188,7 +192,7 @@ fun TrackerScreen(
                                     isRelayConnected = diagnosticState.connectivity.isRelayConnected,
                                     lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
                                     localLat = kinematicState.localLocation.lat,
-                                    localLocationTs = kinematicState.localLocation.timestamp,
+                                    localLocationTs = kinematicState.localLocation.gpsTs,
                                     isGpsFresh = dashboardState.isGpsFresh,
                                     isTelemetryFresh = dashboardState.isTelemetryFresh,
                                     isLinkFresh = dashboardState.isLinkFresh,
@@ -282,8 +286,8 @@ fun TrackerScreen(
                         trackerSpeed = kinematicState.localLocation.speed,
                         trackerAccuracy = kinematicState.localLocation.accuracy,
                         trackerMaxAccuracy = kinematicState.localLocation.maxAccuracy,
-                        trackerGpsTs = kinematicState.localLocation.timestamp,
-                        trackerTelemetryTs = 0L,
+                        trackerGpsTs = kinematicState.localLocation.gpsTs,
+                        trackerTelemetryTs = kinematicState.localLocation.ts,
                         trackerLocPending = kinematicState.localHealth.isLocationPending,
                         trackerLocPendingReason = kinematicState.localHealth.locationPendingReason,
                         trackerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
@@ -292,8 +296,8 @@ fun TrackerScreen(
                         viewerSpeed = kinematicState.trackerLocation.speed,
                         viewerAccuracy = kinematicState.trackerLocation.accuracy,
                         viewerMaxAcc = kinematicState.trackerLocation.maxAccuracy,
-                        viewerGpsTs = kinematicState.trackerLocation.timestamp,
-                        viewerTelemetryTs = 0L,
+                        viewerGpsTs = kinematicState.trackerLocation.gpsTs,
+                        viewerTelemetryTs = kinematicState.trackerLocation.ts,
                         viewerLocPending = kinematicState.trackerHealth.isLocationPending,
                         viewerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
                         replayCursorPos = kinematicState.replayCursorPos,
@@ -368,7 +372,7 @@ fun TrackerScreen(
                                 isRelayConnected = diagnosticState.connectivity.isRelayConnected,
                                 lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
                                 localLat = kinematicState.localLocation.lat,
-                                localLocationTs = kinematicState.localLocation.timestamp,
+                                localLocationTs = kinematicState.localLocation.gpsTs,
                                 isGpsFresh = dashboardState.isGpsFresh,
                                 isTelemetryFresh = dashboardState.isTelemetryFresh,
                                 isLinkFresh = dashboardState.isLinkFresh,
