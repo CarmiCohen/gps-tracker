@@ -15,7 +15,6 @@ import android.net.NetworkRequest
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
-import android.os.HardwarePropertiesManager
 import android.os.Looper
 import android.os.PowerManager
 import android.os.StatFs
@@ -62,6 +61,9 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.02.43:
+ * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
+ *   getPackageName log spam during system service lookups (R1.14).
  * Sep.01.27:
  * - Issue #893 Hardening: Standardized ManagedNetworkCallback to register on 
  *   MainLooper to ensure alignment with unregistration logic (R893).
@@ -105,20 +107,22 @@ class SystemStatusProviderImpl @Inject constructor(
     @ApplicationScope private val externalScope: CoroutineScope
 ) : SystemStatusProvider {
 
-    private val powerManager by lazy { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
-    private val connectivityManager by lazy { context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager }
-    private val alarmManager by lazy { context.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
-    private val batteryManager by lazy { context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager }
+    private val shadowContext = ContextShadow(context)
+
+    private val powerManager by lazy { shadowContext.getSystemService(Context.POWER_SERVICE) as PowerManager }
+    private val connectivityManager by lazy { shadowContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager }
+    private val alarmManager by lazy { shadowContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
+    private val batteryManager by lazy { shadowContext.getSystemService(Context.BATTERY_SERVICE) as BatteryManager }
     private val storageStatsManager by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.getSystemService(Context.STORAGE_STATS_SERVICE) as? StorageStatsManager
+            shadowContext.getSystemService(Context.STORAGE_STATS_SERVICE) as? StorageStatsManager
         } else null
     }
-    private val storageManager by lazy { context.getSystemService(Context.STORAGE_SERVICE) as StorageManager }
+    private val storageManager by lazy { shadowContext.getSystemService(Context.STORAGE_SERVICE) as StorageManager }
     
     private val usageStatsManager by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            shadowContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         } else null
     }
     
@@ -213,17 +217,17 @@ class SystemStatusProviderImpl @Inject constructor(
                         val current = cachedState.get()
                         val pkg = cachedPkgName // Issue #759: Use shadow-cache
                         withContext(Dispatchers.IO) {
-                            val fineLocGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                            val fineLocGranted = ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                             val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(pkg)
-                            val overlayGranted = Settings.canDrawOverlays(context)
-                            val micGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                            val overlayGranted = Settings.canDrawOverlays(shadowContext)
+                            val micGranted = ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
                             val alarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true
-                            val notifyGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true
-                            val bgLocGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true
-                            val actRecogGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true
+                            val notifyGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true
+                            val bgLocGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED else true
+                            val actRecogGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true
 
-                            val xiaomiStatus = if (isXiaomi) isXiaomiSpecialPermissionGranted(context, pkg) else XiaomiPermissionStatus.UNKNOWN
-                            val xiaomiAutostart = if (isXiaomi) getXiaomiAutostartStatus(context, pkg) else XiaomiPermissionStatus.UNKNOWN
+                            val xiaomiStatus = if (isXiaomi) isXiaomiSpecialPermissionGranted(shadowContext, pkg) else XiaomiPermissionStatus.UNKNOWN
+                            val xiaomiAutostart = if (isXiaomi) getXiaomiAutostartStatus(shadowContext, pkg) else XiaomiPermissionStatus.UNKNOWN
 
                             lastHardwareCheckRt = currentNow
                             lastFullRefreshTime = currentNow
@@ -231,7 +235,7 @@ class SystemStatusProviderImpl @Inject constructor(
                             val newState = PermissionState(
                                 isFineLocationGranted = fineLocGranted,
                                 isBatteryWhitelisted = batteryWhitelisted,
-                                isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(context, pkg) else batteryWhitelisted,
+                                isAutoStartGranted = if (isXiaomi) isXiaomiAutostartGranted(shadowContext, pkg) else batteryWhitelisted,
                                 isOverlayGranted = overlayGranted,
                                 isMicrophoneGranted = micGranted,
                                 isExactAlarmGranted = alarmGranted,
@@ -328,12 +332,12 @@ class SystemStatusProviderImpl @Inject constructor(
             }
         }
         try {
-            context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            shadowContext.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         } catch (e: Exception) {
             Timber.e(e, "Battery receiver registration failed")
         }
         awaitClose { 
-            receiver.unregister(context)
+            receiver.unregister(shadowContext)
         }
     }.distinctUntilChanged()
      .conflate()
@@ -361,7 +365,7 @@ class SystemStatusProviderImpl @Inject constructor(
 
     override fun getStorageStatus(): StorageStatus {
         return try {
-            val stat = StatFs(context.filesDir.path)
+            val stat = StatFs(shadowContext.filesDir.path)
             
             var totalMbValue: Long
             var availableMbValue: Long
@@ -408,7 +412,7 @@ class SystemStatusProviderImpl @Inject constructor(
             }
         }
         try {
-            context.registerReceiver(receiver, IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED))
+            shadowContext.registerReceiver(receiver, IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED))
         } catch (e: Exception) {
             Timber.e(e, "Power save receiver registration failed")
         }
@@ -423,7 +427,7 @@ class SystemStatusProviderImpl @Inject constructor(
         trySend(getPowerStatus())
         
         awaitClose { 
-            receiver.unregister(context)
+            receiver.unregister(shadowContext)
             pollJob.cancel()
         }
     }.distinctUntilChanged()

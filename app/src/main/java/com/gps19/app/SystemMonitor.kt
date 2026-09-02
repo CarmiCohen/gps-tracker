@@ -26,15 +26,15 @@ sealed class SystemMonitorEvent {
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * Sep.02.43:
+ * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
+ *   getPackageName log spam during system service lookups (R1.14).
  * Aug.13.08:
  * - Issue #156: WakeLock Log Saturation. Throttled WakeLock acquisition logging 
  *   to once per minute to prevent logcat saturation (R156).
  * Aug.11.09:
  * - Issue #141: Stress Recovery Verification. Implemented resetSimulatedAnomalies() 
  *   to ensure sticky stress-test states don't persist post-saturation.
- * JAug.04.111:
- * - Issue #721: Performance Hardening. Refactored to use GpsApplication.PACKAGE_NAME 
- *   shadow-cache to eliminate repetitive getPackageName() calls on Samsung A15.
  */
 @Singleton
 class SystemMonitor @Inject constructor(
@@ -47,7 +47,8 @@ class SystemMonitor @Inject constructor(
     )
     val systemMonitorEvents: SharedFlow<SystemMonitorEvent> = _systemMonitorEvents.asSharedFlow()
 
-    private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    private val shadowContext = ContextShadow(context)
+    private val powerManager = shadowContext.getSystemService(Context.POWER_SERVICE) as PowerManager
     private var wakeLock: PowerManager.WakeLock? = null
     private var lastScheduledWatchdogTs = 0L
     private var nextExpectedExpiryTs = 0L
@@ -128,10 +129,10 @@ class SystemMonitor @Inject constructor(
             return
         }
 
-        val alarmManagerService = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val alarmManagerService = shadowContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(ACTION_ALARM_WAKEUP).setPackage(GpsApplication.PACKAGE_NAME)
         val pendingIntent = PendingIntent.getBroadcast(
-            context, 0, intent, 
+            shadowContext, 0, intent, 
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
@@ -161,10 +162,10 @@ class SystemMonitor @Inject constructor(
 
     fun cancelWatchdogAlarm() {
         try {
-            val alarmManagerService = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val alarmManagerService = shadowContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val intent = Intent(ACTION_ALARM_WAKEUP).setPackage(GpsApplication.PACKAGE_NAME)
             val pendingIntent = PendingIntent.getBroadcast(
-                context, 0, intent, 
+                shadowContext, 0, intent,
                 PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
             )
             if (pendingIntent != null) {

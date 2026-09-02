@@ -20,12 +20,12 @@ import kotlin.math.exp
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
+ * Sep.02.43:
+ * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
+ *   getPackageName log spam during system service lookups (R1.14).
  * July.24.04:
  * - Stealth Enforcement: Added check for isTrackerMode in playSiren to prevent 
  *   accidental local alarms in stealth mode.
- * v9.4.00:
- * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
- *   parameter naming to 'nowRt'.
  */
 object AudioSynthesizer {
     private val isLooping = AtomicBoolean(false)
@@ -69,7 +69,7 @@ object AudioSynthesizer {
         loop: Boolean = true,
         vibrate: Boolean = false,
         timeProvider: TimeProvider,
-        isTrackerMode: Boolean = false // Added for stealth enforcement
+        isTrackerMode: Boolean = false 
     ) {
         if (isTrackerMode) {
             Log.d("AudioSynthesizer", "Siren suppressed: Tracker mode (Stealth enforced)")
@@ -78,8 +78,10 @@ object AudioSynthesizer {
 
         if (!force && timeProvider.elapsedRealtime() < silencedUntilRt.get()) return
         
-        if (context != null && !overrideSilence) {
-            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val shadowContext = context?.let { ContextShadow(it) }
+
+        if (shadowContext != null && !overrideSilence) {
+            val am = shadowContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             if (am.ringerMode != AudioManager.RINGER_MODE_NORMAL) {
                 Log.d("AudioSynthesizer", "Siren suppressed by silence setting")
                 return
@@ -96,7 +98,7 @@ object AudioSynthesizer {
             try {
                 Log.d("AudioSynthesizer", "Siren loop started: $type (force=$force, loop=$loop)")
                 val startRt = timeProvider.elapsedRealtime()
-                val vibrator = if (vibrate && context != null) context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator else null
+                val vibrator = if (vibrate && shadowContext != null) shadowContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator else null
 
                 while (isActive) {
                     val nowRt = timeProvider.elapsedRealtime()

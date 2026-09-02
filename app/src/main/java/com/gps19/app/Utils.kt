@@ -12,12 +12,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
+ * Sep.02.43:
+ * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
+ *   getPackageName log spam during AppOpsManager lookups (R1.14).
  * Aug.29.13:
  * - Issue #759 Hardening: Switched Process.myUid() to GpsApplication.MY_UID 
  *   shadow-cache to eliminate redundant system calls (R759).
- * Aug.25.05:
- * - Issue #317: Hardware SOT Architectural Decoupling. Delegated hardware 
- *   detection to HardwareSot in core:engine (R313/R212).
  */
 
 enum class XiaomiPermissionStatus {
@@ -60,7 +60,8 @@ fun isA15Device(): Boolean = HardwareSot.isA15(Build.MANUFACTURER, Build.BRAND, 
 fun isXiaomiSpecialPermissionGranted(context: Context, pkgName: String): XiaomiPermissionStatus {
     if (!isXiaomiDevice()) return XiaomiPermissionStatus.UNKNOWN
     
-    val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+    val shadowContext = ContextShadow(context)
+    val ops = shadowContext.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     return try {
         val checkOpMethod = ops.javaClass.getMethod("checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
         val myUid = GpsApplication.MY_UID
@@ -79,7 +80,8 @@ fun isXiaomiSpecialPermissionGranted(context: Context, pkgName: String): XiaomiP
 
 fun getXiaomiAutostartStatus(context: Context, pkgName: String): XiaomiPermissionStatus {
     if (!isXiaomiDevice()) return XiaomiPermissionStatus.UNKNOWN
-    val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+    val shadowContext = ContextShadow(context)
+    val ops = shadowContext.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     return try {
         val checkOpMethod = ops.javaClass.getMethod("checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
         val autostart = checkOpMethod.invoke(ops, 10008, GpsApplication.MY_UID, pkgName) as Int

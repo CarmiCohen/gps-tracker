@@ -2,6 +2,11 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Sep.02.43 (vSep.02.43)
+*   **Issue #894 RESOLVED: ContextShadow Coverage Expansion**.
+    *   **Problem**: Multiple core services (`SystemStatusProvider`, `SystemMonitor`, `AppNotificationManager`) and utilities were using the base `ApplicationContext` for system service lookups. This bypassed the `getOpPackageName` optimizations in `ContextShadow`, causing redundant IPC diagnostic log spam on Samsung A15/Android 15 (R1.14).
+    *   **Remediation**: Expanded `ContextShadow` usage to all high-frequency system service access points. Standardized the pattern of creating a local `shadowContext` within singleton services to ensure all downstream framework calls use the optimized package name authority.
+
 ## 🟢 Sep.02.42 (vSep.02.42)
 *   **Issue #898 RESOLVED: HUD Telemetry Stalled in Tracker Mode**.
     *   **Problem**: `MainViewModel` was missing observation logic for `localLocation` and `trackerLocation` flows from `MainRepository`. In tracker mode, telemetry remained at baseline values despite active background sampling by `TrackerService` (R3.1).
