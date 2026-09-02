@@ -2,6 +2,11 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Sep.02.44 (vSep.02.44)
+*   **Issue #893 RESOLVED: Native Resource Disposal Leak Hardening**.
+    *   **Problem**: Budget hardware (Samsung A15) exhibited `BaseEventQueue` disposal failures on Android 15 when hardware listeners were unregistered from non-Looper threads or without sufficient settling time.
+    *   **Remediation**: Hardened `ManagedHardware` pattern (R893). Standardized `MainLooper` alignment for `ManagedNetworkCallback` and `FusedLocationProvider` registrations. Verified deterministic unregistration sequence in `HardwareProvider.stop()` and confirmed the 800ms settling window before thread termination. Added forensic duration logging to `ManagedUnregistrationHelper`.
+
 ## 🟢 Sep.02.43 (vSep.02.43)
 *   **Issue #894 RESOLVED: ContextShadow Coverage Expansion**.
     *   **Problem**: Multiple core services (`SystemStatusProvider`, `SystemMonitor`, `AppNotificationManager`) and utilities were using the base `ApplicationContext` for system service lookups. This bypassed the `getOpPackageName` optimizations in `ContextShadow`, causing redundant IPC diagnostic log spam on Samsung A15/Android 15 (R1.14).

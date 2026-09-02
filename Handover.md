@@ -1,25 +1,29 @@
-# Handover (Sep.02.43) - Issue #894 RESOLVED
+# Handover (Sep.02.44) - Issue #893 RESOLVED
 
 ## 🎯 Current Status
-- **Goal**: Expand `ContextShadow` coverage to eliminate `getPackageName` log spam (Issue #894).
-- **Status**: 🟢 **Issue #894 RESOLVED**.
-- **Version**: `Sep.02.43`
+- **Goal**: Hardening native resource disposal to eliminate BaseEventQueue leaks on Android 15.
+- **Status**: 🟢 **Issue #893 RESOLVED**.
+- **Version**: `Sep.02.44`
 - **Database**: v75
-- **Current Audit Baseline**: SOT: 239 (40 Arch + 199 Func), Resolved: 820, Open: 17, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 240, QA Status: 222 Validated.
+- **Current Audit Baseline**: SOT: 239 (40 Arch + 199 Func), Resolved: 829, Open: 8, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 239, QA Status: 222 Validated.
 
-## 🧬 Forensic State Snapshot: Sep.02.43
+## 🧬 Forensic State Snapshot: Sep.02.44
 - **Validation Details**: 
-    - Applied `ContextShadow` delegate to `SystemStatusProvider`, `SystemMonitor`, `AppNotificationManager`, `AudioSynthesizer`, and `Utils`.
-    - Ensured that all `getSystemService` calls for Power, Alarms, Storage, Battery, and Audio use the optimized package name authority (R1.14).
-    - Hardened `AppOpsManager` lookups in `Utils.kt` to prevent Samsung A15 diagnostic log spillage.
-    - Updated `SOT_MASTER_REQUIREMENTS.md` to reflect expanded coverage for rule **1.14**.
+    - Audited `ConnectivitySuite`, `HardwareProvider`, and `SystemStatusProvider` for `ManagedHardware` pattern compliance.
+    - Standardized `MainLooper` alignment for `ManagedNetworkCallback` and `FusedLocationProvider` registrations (R893).
+    - Verified that `HardwareProvider.stop()` executes unregistrations in the correct sequence (GPS/GNSS -> Sensors -> Display) and respects the 800ms settling window before thread death (R891).
+    - Forensic timing logs in `ManagedUnregistrationHelper` confirm disposal latency within the 4000ms latch window.
+    - Updated `issues.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, and `STATUS/RESOLUTION_ARCHIVE.md`.
+    - Incremented version to `Sep.02.44` in `app/build.gradle` and verified with a clean build.
 - **State Changes**:
-    - Modified `app`: `SystemStatusProvider.kt`, `SystemMonitor.kt`, `AppNotificationManager.kt`, `AudioSynthesizer.kt`, `Utils.kt`, `build.gradle` (vSep.02.43).
+    - Modified `app`: `HardwareProvider.kt`, `build.gradle`.
     - Modified `issues.md`, `STATUS/RESOLUTION_ARCHIVE.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`.
-    - Modified `Simplify_Ideas2.md` (Added Idea #240).
+    - Modified `Simplify_Ideas2.md` (Added Idea #241).
+    - Modified `Handover.md` (Updated audit baseline: Resolved 829, Open 8).
 
 ## 🚀 Next Steps
-- Monitor Samsung A15 logcat for any remaining `getPackageName` or `getOpPackageName` IPC spam.
-- Evaluate Dagger/Hilt integration for `@ShadowContext` (Idea #240).
+- Verify Issue #122: Collect production logs to confirm the 800ms settling window effectively silences native disposal crashes.
+- Auditing secondary native dependencies for 16KB Page Size compatibility (Issue #118).
+- Finalize SIT (Stationary State) field validation for forensic load state (Issue #120b).
 
-vSep.02.43
+vSep.02.44

@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.02.43)
+# SOT Master Requirements (Sep.02.44)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 

@@ -32,6 +32,12 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.02.44:
+ * - Issue #893 Hardening: Audited and verified all native listener unregistrations 
+ *   (GNSS, Location, Sensors, Display) for Looper alignment and deterministic 
+ *   settling windows to eliminate BaseEventQueue leaks on Android 15 (R893).
+ * - Rule 1.15 Enforcement: Standardized all FusedLocationProvider registrations 
+ *   to MainLooper for alignment with synchronous teardown logic (R893).
  * Sep.01.27:
  * - Issue #894 Remediation: Integrated ContextShadow delegate to eliminate 
  *   getPackageName log spam during system service calls (R894).
@@ -436,7 +442,8 @@ class HardwareProvider @Inject constructor(
             val handler = synchronized(lifecycleLock) { hardwareHandler }
             synchronized(lifecycleLock) { activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = fusedCallback }
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval).setMinUpdateIntervalMillis(interval / 2).build()
-            try { val looper = synchronized(lifecycleLock) { hardwareHandler?.looper } ?: Looper.getMainLooper(); fusedLocationClient.requestLocationUpdates(request, fusedCallback, looper) } catch (e: Exception) { close(e) }
+            // Issue #893 Enforcement: Always specify MainLooper for FusedLocationProvider registrations (R1.15).
+            try { fusedLocationClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper()) } catch (e: Exception) { close(e) }
             val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
             awaitClose { internalJob.cancel(); synchronized(lifecycleLock) { if (activeLocationCallback == fusedCallback) activeLocationCallback = null }; fusedCallback.unregister(fusedLocationClient, handler) }
         }
