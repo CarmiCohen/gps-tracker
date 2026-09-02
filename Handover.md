@@ -1,24 +1,22 @@
-# Forensic Handover Snapshot (Sep.02.60)
+# Forensic Handover - Sep.03.02
 
-## 🎯 Current Status
-*   **Last Version**: Sep.02.60
-*   **Active Issue**: Issue #180 (Resolved)
-*   **Build State**: 🟢 Success (`:app:assembleDebug`)
+## 🎯 Active Context
+Completed verification of **Issue #197** (Forensic Teardown Timing) and **Issue #238** (Location Model Unification). The codebase now features high-precision teardown auditing in the connectivity layer and a streamlined telemetry model in the core engine.
 
-## 🛠️ Modifications
-1.  **`app/src/main/proto/app_settings.proto`**: Added fields 80-99 to `TrackerStatusProto` to cover all `TrackerStatus` fields.
-2.  **`app/src/main/java/com/gps19/app/SettingsMapper.kt`**: Implemented mapping for `rt`, `isJammer`, `isStalled`, `isClockRegression`, forensic indices, and SIT states.
-3.  **`app/build.gradle`**: Incremented `versionName` to `Sep.02.60`.
-4.  **`STATUS/SOT_MASTER_REQUIREMENTS.md`**: Added **R-ID 180 (Proto Mirror Parity)**.
-5.  **`STATUS/RESOLUTION_ARCHIVE.md`**: Documented Issue #180 resolution.
-6.  **`issues.md`**: Marked #180 as resolved; updated dashboard.
-
-## 📋 Audit Baseline
-*   **SOT Items**: 244 (41 Architectural Rules, 203 Functional R-IDs)
-*   **Resolved Issues**: 839
-*   **Open Issues**: 0
-*   **Simplification Ideas**: 2 (Active)
-*   **QA Validation Status**: 🟢 224 Items Validated
+## 🛠️ Modifications Summary
+- **ConnectivitySuite.kt**: Added `SystemClock` based duration auditing in `stop()`.
+- **CommunicationManager.kt**: Added `SystemClock` based duration auditing in `disconnect()`.
+- **EngineModels.kt**: Verified unified model structure for telemetry parity.
+- **issues.md**: Confirmed status updates for #197 and #238.
 
 ## 🚀 Next Steps
-*   Session termination completed. Ready for a fresh audit or new task.
+- Monitor teardown logs in field tests to identify potential ANR risks during network interface congestion.
+- Finalize the transition of all legacy Compose UI components to the segmented `HudState` facets.
+
+## 🏁 Final Audit Baseline
+- Architectural Rules: 34
+- Functional R-IDs: 196
+- Resolved: 839
+- Open: 0
+- Simplification Ideas: 238
+- QA Validation: 224

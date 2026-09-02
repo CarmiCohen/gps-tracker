@@ -1,7 +1,10 @@
-# Simplification Ideas 2
+# Simplification Ideas 2 (Sep.03.02)
 
-This document tracks ideas for reducing complexity and improving maintainability.
+## 💡 Active Ideas
+*   **Idea #239: Signaling Interface Consolidation**. Now that the telemetry models are unified (#238), the `SignalingProvider` can be simplified by removing redundant `emitMap` and `emitBinary` overloads in favor of a single unified `transmit(Telemetry)` entry point.
+*   **Idea #240: ContextShadow Automation**. Explore using a Hilt provider to automatically inject the `ContextShadow` into all services, removing the manual delegation boilerplate in `ConnectivitySuite` and others.
+*   **Idea #241: Protobuf Mapping Unification**. Consolidate the `writeTo(RealtimeStatus.Builder)` and `writeTo(TrackerStatusProto.Builder)` logic in `TrackerStatus` into a shared mapping utility to ensure field parity is maintained automatically (Issue #180).
 
-*   **Idea #242**: Consolidate LogManager and Timber Tree. Currently, Timber delegates to LogManager for critical errors. We should evaluate if LogManager can be implemented as a standalone Timber Tree to reduce the number of direct dependencies on LogManager in the business logic (Sep.02.50).
-
-*   **Idea #243**: Evaluate if BatteryStatus in SystemStatusProvider can be merged into SystemHealthState to reduce model conversion overhead during high-frequency status updates. (Sep.02.55).
+## ✅ Implemented / Rejected
+*   **Idea #238: Model Unification**. (Implemented Sep.03.02).
+*   **Idea #197: Teardown Auditing**. (Implemented Sep.03.02).
